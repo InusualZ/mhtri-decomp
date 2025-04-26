@@ -1,0 +1,3 @@
+ancestorEntries = ["configure.py"]
+ourEntries = ["configure.py"]
+theirEntries = ["configure.py"]
