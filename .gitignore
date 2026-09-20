@@ -35,6 +35,10 @@ compile_commands.json
 *.exe
 
 /.lavish
-/.pi
+# /.pi/ stays ignored except the shared objdiff-verify skill, which is tracked on purpose.
+/.pi/*
+!/.pi/skills/
+/.pi/skills/*
+!/.pi/skills/objdiff-verify/
 /.agents
 /openspec
