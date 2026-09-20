@@ -13,6 +13,7 @@ Documentation
 - [`symbols.txt`](docs/symbols.md)
 - [`splits.txt`](docs/splits.md)
 - [GitHub Actions](docs/github_actions.md)
+- [Matching compiler flags](docs/matching.md) (how to pin down a unit's flag set)
 
 General:
 
