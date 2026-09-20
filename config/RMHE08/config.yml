@@ -24,7 +24,7 @@ selfile_hash: 0233F8569C319224DA81EFF14C5CB25AE10F9546
 # (optional) When enabled, function boundary analysis will be skipped.
 # Only valid _after_ initial analysis has been performed and
 # the symbols and splits files have been generated. 
-quick_analysis: false
+quick_analysis: true
 
 # (optional) When enabled, the analyzer will attempt to detect sizes
 # and data types of objects based on code usage and alignment.
