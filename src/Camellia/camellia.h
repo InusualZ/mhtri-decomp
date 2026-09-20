@@ -24,6 +24,18 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/*
+ * Matching status (RMHE08).  This unit is compiled with its own flag set, see `cflags_camellia` in
+ * configure.py (`-O3 -inline noauto -opt nopeephole -pool off -use_lmw_stmw off`): the retail object
+ * has no stmw/lmw (it calls the EABI _savegpr_14/_restgpr_14 helpers), never fuses srwi+clrlwi into
+ * extrwi, and emits one lis+addi pair per S-box table.
+ *
+ * With those flags 9 of the 10 functions in camellia.c are byte-identical to the retail object.
+ * The one residual, `camellia_setup256`, is documented on top of its definition in camellia.c
+ * (not a matched function: objdiff 99.83 % fuzzy, one extra 4-byte stack slot).
+ * Full analysis: .pi/notes/camellia-match-process.md.
+ */
+
 #ifndef HEADER_CAMELLIA_H
 #define HEADER_CAMELLIA_H
 

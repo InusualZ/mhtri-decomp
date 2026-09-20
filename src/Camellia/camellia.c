@@ -662,6 +662,22 @@ void camellia_setup128(const unsigned char *key, u32 *subkey)
     return;
 }
 
+/*
+ * MATCHING STATUS: not a matched function -- objdiff reports 99.83 % (v3.6.1; 4860 B / 1215
+ * instructions, every one of them identical to the retail object except for the r1 offsets).
+ * Residual: our frame is -0x1e0 where the retail object uses -0x1d0, i.e. exactly one extra 4-byte
+ * local slot, which shifts every slot from 0x64 upwards by 4.
+ *
+ * `subL[29]` is the value that keeps ONE slot in the retail object (0xc8) and TWO in ours (0x64 for
+ * the range defined by `subl(29) = krl;` and read by `subl(29) ^= subl(1);`, plus 0xcc for the result
+ * of that xor, read by CamelliaSubkeyL(28)/(30)).  MWCC scalarizes subL[]/subR[] into individual
+ * pseudo-variables, so this is a register-allocator ordering difference, not a semantic one.
+ *
+ * Ruled out (all byte-identical output): statement shape, comma-operator splitting, `x ^= y` spelling,
+ * declaration order.  Ruled out as flags: the whole -O/-opt axis -- `-opt nopeephole,level=4` does
+ * produce the retail frame, but it reorders two XORs of the absorb `dw` chain, which the retail object
+ * does not do, so the level really is 3.  See .pi/notes/camellia-match-process.md finding #14.
+ */
 void camellia_setup256(const unsigned char *key, u32 *subkey)
 {
     u32 kll,klr,krl,krr;           /* left half of key */
