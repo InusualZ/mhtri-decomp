@@ -19,6 +19,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `Runtime.PPCEABI.H` holds two stubs registered as `NonMatching` (= not linked). Everything else is
   still unsplit.
 
+
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
@@ -49,6 +50,109 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    edit normally. Verify with `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` → must print `0` (this
    rule's own prose mentions the markers, so anchor the match at line start).
 
+## Matching policy: flags and source variants
+
+Two working rules that apply to **every** unit, agreed with the project owner:
+
+1. **Apply the best-scoring variant even if it is not a full match.** A source rewrite or flag change is
+   worth landing as soon as it *measurably improves* the objdiff score (`ninja build/RMHE08/report.json`,
+   per-symbol `match_percent`) and regresses nothing else. Do not hold a real improvement back waiting for
+   100 %: record the residual diff (what still differs and why) **in that unit's header file**, for
+   example as a comment on top of the specific symbol it concerns, so the next reader finds it where the
+   code lives. Never land a change that makes any function worse. Landing means the unit's own source or
+   `configure.py` carries the change and the repository rebuilds better - the skill does it with
+   `python .agents/skills/mwcc-unit-matching/scripts/mt.py variants --apply <name>` followed by a forced
+   rebuild; a probe-only winner is not progress.
+2. **Evidence-backed flags live in `configure.py` as soon as they are proven**, even while the unit is
+   still short of 100 %, so the repo always reflects the best known state. They must be **per library**
+   (never edit `cflags_base`/`cflags_runtime` for everyone) and must be called out explicitly, as
+   non-negotiable #3 requires, with the instruction/size evidence in a comment next to them.
+
+A unit's flag evidence belongs next to its definition in `configure.py` (a per-library `cflags_*`
+override below `cflags_runtime`), not in this file; this file only carries the policy.
+
+The *how* - the ideas, the problem each one solves and whether it has been tried - is the playbook index
+below, which doubles as the todo list for whatever unit is being worked on.
+
+## Matching playbook (index of `docs/matching.md`)
+
+`docs/matching.md` is the playbook for making a unit match its original object. Every idea in it is
+indexed below together with the problem it solves. **Treat this table as the todo list**: for a unit that
+does not match yet, work down the rows and keep the status current.
+
+The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matching/` (tracked - the
+`.gitignore` excepts it), so an agent can load it on demand instead of reading the playbook every session: `SKILL.md` holds the loop and the idea list,
+`references/` is *generated* from `docs/matching.md` (never edit it - run
+`python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py`, or `--check` to detect staleness),
+and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
+`variants`, `diff`, `slots`, `sections`, `dwarf`). The table below stays the source of truth for state.
+
+| # | idea | problem it solves | status |
+| --- | --- | --- | --- |
+| 1 | Per-unit instrument | The project-wide pass/fail cannot measure one unit (`ninja build/RMHE08/ok` cannot pass while any object is `NonMatching`, and `complete_code_percent` says 100 % for wrong code), so no change can be judged. | no |
+| 2 | First divergence, not the percentage | `match_percent` is positional, so one instruction too many in the prologue reports the same ~0 % as completely wrong code and sends you hunting in the wrong place. | no |
+| 3 | Read the target's disassembly | The diff says *what* differs, not what code shape the original source had - and a prologue or an addressing idiom is a flag fingerprint. | no |
+| 4 | Codegen is the oracle, not `.comment` | A synthesized `.comment`/`mw_comment_version` looks like a compiler fingerprint and invites a version hunt that cannot pay off. | no |
+| 5 | One flag at a time, real command line | A hand-written command drifts from what ninja runs, and with several flags in play it is unclear which one explains which symptom. | no |
+| 6 | Guard against stale objects | Scripted compiles silently measure an object the compiler never wrote (MWCC's `-o` is a *directory*), producing impossible "all versions identical" results. | no |
+| 7 | Scratch files to attribute a symptom | The full-unit diff cannot tell whether an instruction choice comes from a source idiom or from an optimizer pass, so the wrong thing gets blamed. | no |
+| 8 | Ask the compiler what is on (`-opt display`) | One `-O` level sets several switches, so what a flag set actually resolves to (peephole? scheduling?) is guesswork. | no |
+| 9 | Enumerate options from `-help` | Invented spellings are silently accepted and ignored, so "no effect" looks like evidence; other spellings do not parse at all. | no |
+| 10 | Frame size is not a success signal | Locals are rounded to 16 bytes, so several unrelated variants hit the target's frame while emitting wrong code. | no |
+| 11 | Size gap is not "different source" | Aggressive flags *remove* instructions, so a target that is hundreds of bytes bigger can be purely a flag problem - and rewriting correct code wastes days. | no |
+| 12 | Check the flag's relocations | A flag can match the code shape while referencing symbols (save helpers, table bases) the original build never had. | no |
+| 13 | Stop when the diff is not flag-shaped | A near-miss variant that fixes one symptom (a frame, a single instruction) keeps you hunting flags when the residual is really source or liveness. | no |
+| 14 | Prove the committed flags reproduce the object | A hand-written `cflags_*` list can silently differ from the command line that was tested (leftover `-O4,p`, duplicated `-inline`). | no |
+| 15 | Pin a metric that does not drift | Fuzzy percentages change between objdiff versions, so a decision made against one number is meaningless against the other. | no |
+| 16 | Scope optimizer settings per function with pragmas | The `-opt` levers are global, so a per-function codegen difference looks unreachable from the source side - a pragma pair scopes them to one function. | no |
+
+Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
+
+| idea | problem it solves | status |
+| --- | --- | --- |
+| Compiler-version matrix | "The original used a different compiler release" is the first suspicion and has to be closed once, per unit. | no |
+| The rest of the `-opt` axis | An unknown sub-option might be what controls fusion or stack allocation. | no |
+| `-Cpp_exceptions` | `extab`/`extabindex` presence suggests exceptions were on; it adds those sections but no `.text` bytes here. | no |
+| `-O4`/`-O4,p`/`-O2`, `-schedule off`, `-fp_contract off`, `-ipa off` | Another optimizer level or codegen switch might be the retail setting. | no |
+
+The status column is about the **current target** - the one unit/diff being worked on - not about whether
+an idea is any good. The target and the step being worked are kept in the local-only `Current task / plan`
+section at the top of this file.
+
+| status | meaning |
+| --- | --- |
+| `todo` | queued for the current target, not tried yet |
+| `no` | tried for the current target and it did not resolve it, or it does not apply |
+| `done` | this is what resolved the current target (and it is the `docs/matching.md` section with this row's number) |
+
+All 15 rows read `no` today because the table was derived from the `Camellia` flag hunt: the ideas all
+worked there and their outcome is already in `configure.py`, but none of them is what the open
+`camellia_setup256` residual needs.
+
+New ideas for the current target (no `docs/matching.md` section yet - they earn one only if they work):
+
+| idea | problem it solves | status |
+| --- | --- | --- |
+| Third historical source variant | Our `camellia_setup256` matches NSS and NetBSD textually, but the retail file may be a third variant (original NTT 1.2.0 / SDK copy). Diffing another copy's absorb region is the cheapest way to find the source shape the allocator liked. | no - NSS 3.19.1 / 3.24 / 3.28.4, the older NSS fetch and NetBSD NTT-derived are all statement-identical to ours (only `PRUint32`/`SUBL` naming and whitespace); no third variant exists in that lineage. |
+| Perturbation probe | The slot outcome is sensitive to IR shape (level 4 flips the frame). Deliberately perturb one independent statement, watch whether `subL[29]` coalesces, then look for the natural source form that produces the same perturbation. | no - 22 statement/pragma perturbations tried; none flips the frame at level 3. The productive version of this idea turned out to be per-function pragmas (row 16). |
+| Absorb `dw` / `CAMELLIA_RL1` IR shape | The level-4 near-miss changes exactly this chain, and it is the only region whose IR shape demonstrably moves the frame. Rewrites here (temps, ordering, expression form) are the highest-probability remaining lever. | no - five source forms tried *with* the level-4 pragma (split comma, RL1 temp, operand swap, `tl` rewrite, `tl` temp): the 12-row window is unchanged, so it is level-4 optimizer behaviour, not source shape. |
+| Pragma combination search | With the level-4 pragma the frame is correct and only a 12-row window differs; a pragma that suppresses the level-4 reorder would finish the job. | todo - try `opt_lifetimes on`, `opt_common_subs on` explicitly, and level 4 combined with each honoured pragma. |
+| Level-4 pragma + window source forms | The window is 12 rows of register choice plus `CAMELLIA_RL1` placement; a source form that makes level 4 emit the target order there would be a 100 % match. | todo - 5 forms tried, more structural rewrites of the whole kw4 chain remain. |
+
+How to work the list:
+
+1. Set the **target** in the local-only section, queue the rows as `todo`, and start at row 1. Do **one
+   idea at a time** and record *evidence* - numbers, sizes, first-divergence indices - not impressions.
+2. Update the row's status and put the step you are on in the local-only section, so a fresh session knows
+   where to resume.
+3. A `done` idea gets a section in `docs/matching.md` in the house style - **Problem / Why try it /
+   Result / Example**, short and to the point - and the row's number is that section's number.
+4. When every row is `no` again, the target needs **new** ideas: add them here as `todo` rows first
+   (idea + problem it solves), try them, and promote the ones that work into `docs/matching.md` (same
+   style, next free number). Ideas that fail stay in the table as `no`, so they are not re-run.
+5. Unit-specific findings that are not playbook material (a residual diff, a known-bad flag) belong in
+   the unit's own header comment, per the matching policy above.
+
 ## Repository layout
 
 ```
@@ -61,9 +165,18 @@ src/                      Our C/C++ source (currently Camellia/)
 include/                  Our headers (does not exist yet; `cflags` already get `-i include`)
 orig/RMHE08/              Original game files (read-only, gitignored). main.dol, files/mh3.sel, ...
 build/                    Everything generated: build.ninja, compilers/, tools/, RMHE08/ (gitignored)
-tools/                    Shared dtk-template scripts (project.py, download_tool.py, ...)
+tools/                    Tooling. dtk-template's scripts at the top level (project.py, download_tool.py, ...),
+                          plus ours, grouped by what they do:
+                            unitutil.py  shared unit/flag/ELF layer used by the tools below
+                            flags/    compiler-flag experiments (frame.py, mwcc_matrix.py,
+                                      optsweep.py, tryvar.py) + variants/<lib>.py data
+                                      - see docs/matching.md
+                            objdiff/  objdiff consumers (symdiff.py, slotmap.py)
+                            elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
+                          matching.md is the matching playbook; its ideas are indexed in the
+                          "Matching playbook" section above, which doubles as the todo list.
 ```
 
 Inside `build/RMHE08/`:
@@ -127,7 +240,9 @@ one unit, a function missing from the report is 0 %). Follow skill **`.pi/skills
    use `.ctors$10`, `.dtors$10`, `.dtors$15` — see `docs/getting_started.md`, "GC 2.7+ and Wii linkers").
 5. **Compile and diff:**
    `python configure.py && ninja build/RMHE08/src/Dir/file.o`, then produce/refresh the report and inspect
-   the unit's per-function diff (objdiff GUI reads the generated `objdiff.json`).
+   the unit's per-function diff (objdiff GUI reads the generated `objdiff.json`). When it does not match,
+   work the **Matching playbook** index above - one idea at a time, keeping its status column current -
+   instead of guessing at flags.
 6. **Flip to `Object(Matching, ...)`** only once the unit matches (bytes/instructions + relocations).
 7. **Prove it end-to-end:** `ninja build/RMHE08/ok` must finish green, i.e. `main.dol` matches
    `config/RMHE08/build.sha1`.
@@ -152,7 +267,7 @@ regression if the hash goes red.
   `Matching` unit's object is substituted in. A `Matching` flag on a wrong object is worse than no flag —
   and a failing `ninja build/RMHE08/ok` cannot tell you *which* unit is wrong.
 * **A `.comment` version-byte difference means a different compiler build.** Dump it with
-  `python build/tmp/elfsect.py <obj>` (also at `.pi/skills/objdiff-verify/scripts/elfsect.py`): the
+  `python tools/elf/elfsect.py <obj>` (also at `.pi/skills/objdiff-verify/scripts/elfsect.py`): the
   original Camellia object is `"CodeWarrior" 0e …`, our `Wii/1.3` build is `"CodeWarrior" 0f …`, and
   `config.yml`'s `mw_comment_version: 14` describes the original. Different version byte + `0 %`/size-very-
   different functions = suspect the compiler release, not the source.
@@ -169,8 +284,10 @@ regression if the hash goes red.
 * Stale `build/` output causes false conclusions (an old object from different flags can look "matching").
   Prefer a clean rebuild of the specific unit, and `rm -rf build/RMHE08` when in doubt.
 * Local agent scratch directories (`.lavish/`, `.agents/`, `openspec/`, and everything under `.pi/`
-  **except** the tracked `.pi/skills/objdiff-verify/` skill) are gitignored; keep them that way and never
-  add their contents to commits.
+  **except** the tracked `.pi/skills/objdiff-verify/` skill and the tracked
+  `.agents/skills/mwcc-unit-matching/` skill) are gitignored; keep them that way and never add their
+  contents to commits. Both exceptions are narrow on purpose: the ignore rules un-ignore the skills
+  directory and then re-ignore everything in it except the one skill.
 
 ## Conventions
 

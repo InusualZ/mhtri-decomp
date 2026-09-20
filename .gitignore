@@ -40,5 +40,10 @@ compile_commands.json
 !/.pi/skills/
 /.pi/skills/*
 !/.pi/skills/objdiff-verify/
-/.agents
+# /.agents/ stays ignored except the shared matching skill, which is tracked on purpose.
+# (the parent directory itself must not be excluded, or git never descends into it)
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/mwcc-unit-matching/
 /openspec
