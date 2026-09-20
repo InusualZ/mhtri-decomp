@@ -247,6 +247,29 @@ cflags_rel = [
     "-sdata2 0",
 ]
 
+# Camellia flags. Evidence-backed per-object overrides for Camellia/camellia.c, which does not match with
+# the cflags_runtime defaults:
+#   * the retail object has no stmw/lmw -- it calls the EABI _savegpr_14/_restgpr_14 helpers
+#     => -use_lmw_stmw off (24 B of the size gap)
+#   * the retail object never fuses srwi+clrlwi into extrwi
+#     => -opt nopeephole
+#   * the retail object emits one lis+addi pair per S-box table (no shared base register)
+#     => -pool off
+#   * -O4,p / -inline auto do not reproduce the retail code shape at all
+#     => -O3 -inline noauto
+# With these, 9 of the 10 functions in the unit are byte-identical to the retail object and only
+# camellia_setup256 differs (one 4-byte stack slot). See .pi/notes/camellia-match-process.md.
+# The conflicting cflags_runtime defaults are removed rather than appended, so the command line has
+# exactly one -O / -inline / -use_lmw_stmw.
+cflags_camellia = [
+    *[f for f in cflags_runtime if f not in ("-O4,p", "-inline auto", "-use_lmw_stmw on")],
+    "-O3",
+    "-inline noauto",
+    "-use_lmw_stmw off",
+    "-opt nopeephole",
+    "-pool off",
+]
+
 config.linker_version = "Wii/1.0"
 
 
@@ -298,7 +321,7 @@ config.libs = [
     {
         "lib": "Camellia",
         "mw_version": "Wii/1.3",
-        "cflags": cflags_runtime,
+        "cflags": cflags_camellia,
         "host": False,
         "objects": [
             Object(Matching, "Camellia/camellia.c"),
