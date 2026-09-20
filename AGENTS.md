@@ -177,6 +177,8 @@ docs/                     Where all documentation lives — ours and dtk-templat
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
                           "Matching playbook" section above, which doubles as the todo list.
+                          rso-modules.md documents the RSO module format, the inventory and the
+                          splitter blocker.
 ```
 
 Inside `build/RMHE08/`:
