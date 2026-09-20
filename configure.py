@@ -29,7 +29,7 @@ from tools.project import (
 # Game versions
 DEFAULT_VERSION = 0
 VERSIONS = [
-    "GAMEID",  # 0
+    "RMHE08",  # 0
 ]
 
 parser = argparse.ArgumentParser()
@@ -103,6 +103,12 @@ parser.add_argument(
     help="path to sjiswrap.exe (optional)",
 )
 parser.add_argument(
+    "--ninja",
+    metavar="BINARY",
+    type=Path,
+    help="path to ninja binary (optional)",
+)
+parser.add_argument(
     "--verbose",
     action="store_true",
     help="print verbose output",
@@ -112,6 +118,13 @@ parser.add_argument(
     dest="non_matching",
     action="store_true",
     help="builds equivalent (but non-matching) or modded objects",
+)
+parser.add_argument(
+    "--warn",
+    dest="warn",
+    type=str,
+    choices=["all", "off", "error"],
+    help="how to handle warnings",
 )
 parser.add_argument(
     "--no-progress",
@@ -134,6 +147,7 @@ config.compilers_path = args.compilers
 config.generate_map = args.map
 config.non_matching = args.non_matching
 config.sjiswrap_path = args.sjiswrap
+config.ninja_path = args.ninja
 config.progress = args.progress
 if not is_windows():
     config.wrapper = args.wrapper
@@ -142,12 +156,12 @@ if not config.non_matching:
     config.asm_dir = None
 
 # Tool versions
-config.binutils_tag = "2.42-1"
-config.compilers_tag = "20240706"
-config.dtk_tag = "v1.4.1"
-config.objdiff_tag = "v2.7.1"
-config.sjiswrap_tag = "v1.2.0"
-config.wibo_tag = "0.6.11"
+config.binutils_tag = "2.42-2"
+config.compilers_tag = "20251118"
+config.dtk_tag = "v1.8.3"
+config.objdiff_tag = "v3.6.1"
+config.sjiswrap_tag = "v1.2.2"
+config.wibo_tag = "1.0.3"
 
 # Project
 config.config_path = Path("config") / config.version / "config.yml"
@@ -158,7 +172,6 @@ config.asflags = [
     "-I include",
     f"-I build/{config.version}/include",
     f"--defsym BUILD_VERSION={version_num}",
-    f"--defsym VERSION_{config.version}",
 ]
 config.ldflags = [
     "-fp hardware",
@@ -181,14 +194,18 @@ config.scratch_preset_id = None
 # Generally leave untouched, with overrides added below.
 cflags_base = [
     "-nodefaults",
-    "-nosyspath",
     "-proc gekko",
     "-align powerpc",
     "-enum int",
     "-fp hardware",
+    "-Cpp_exceptions off",
+    "-O4,p",
+    "-inline auto",
     '-pragma "cats off"',
     '-pragma "warn_notinlined off"',
     "-maxerrors 1",
+    "-nosyspath",
+    "-RTTI off",
     "-fp_contract on",
     "-str reuse",
     "-multibyte",  # For Wii compilers, replace with `-enc SJIS`
@@ -205,17 +222,23 @@ if args.debug:
 else:
     cflags_base.append("-DNDEBUG=1")
 
+# Warning flags
+if args.warn == "all":
+    cflags_base.append("-W all")
+elif args.warn == "off":
+    cflags_base.append("-W off")
+elif args.warn == "error":
+    cflags_base.append("-W error")
+
 # Metrowerks library flags
 cflags_runtime = [
     *cflags_base,
-    #"-use_lmw_stmw off",
+    "-use_lmw_stmw on",
     "-str reuse,pool,readonly",
     "-gccinc",
     "-common off",
     "-inline auto",
 ]
-
-
 
 # REL flags
 cflags_rel = [
@@ -224,7 +247,7 @@ cflags_rel = [
     "-sdata2 0",
 ]
 
-config.linker_version = "Wii\\1.0"
+config.linker_version = "Wii/1.0"
 
 
 # Helper function for Dolphin libraries
@@ -297,6 +320,7 @@ def link_order_callback(module_id: int, objects: List[str]) -> List[str]:
         return objects + ["dummy.c"]
     return objects
 
+
 # Uncomment to enable the link order callback.
 # config.link_order_callback = link_order_callback
 
@@ -308,12 +332,18 @@ config.progress_categories = [
     ProgressCategory("sdk", "SDK Code"),
 ]
 config.progress_each_module = args.verbose
+# Optional extra arguments to `objdiff-cli report generate`
+config.progress_report_args = [
+    # Marks relocations as mismatching if the target value is different
+    # Default is "functionRelocDiffs=none", which is most lenient
+    # "--config functionRelocDiffs=data_value",
+]
 
 if args.mode == "configure":
     # Write build.ninja and objdiff.json
     generate_build(config)
 elif args.mode == "progress":
-    # Print progress and write progress.json
+    # Print progress information
     calculate_progress(config)
 else:
     sys.exit("Unknown mode: " + args.mode)
