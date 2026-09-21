@@ -13,6 +13,17 @@ Sections:
 	.sdata2     type:rodata align:4
 	.sbss2      type:bss align:32
 
+g3d/g3d_resanmamblight.c:
+	extab       start:0x80007B14 end:0x80007B1C
+	extabindex  start:0x8001FF5C end:0x8001FF68
+	.text       start:0x800680A8 end:0x800680CC
+
+lobby/lobby_scene.c:
+	.text       start:0x801EC9E0 end:0x801EC9F8
+
+Network/NetworkWiiMediator.c:
+	.text       start:0x80413F3C end:0x80413F50
+
 Camellia/camellia.c:
 	extab       start:0x8001D16C end:0x8001D1B4
 	extabindex  start:0x8003DBD8 end:0x8003DC44
@@ -26,6 +37,12 @@ Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
 	.dtors      start:0x8056F444 end:0x8056F448 rename:.dtors$15
 	.sdata      start:0x80793CC8 end:0x80793CCC
 
+OS/OSAlarm.c:
+	.text       start:0x804CBC50 end:0x804CBC60
+
 RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40
 	.data       start:0x80629C08 end:0x80629C40
+
+Runtime.PPCEABI.H/memset.c:
+	.init       start:0x80004350 end:0x80004380
