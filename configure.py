@@ -384,6 +384,23 @@ config.libs = [
             Object(NonMatching, "RSO/runtime.c"),
         ],
     },
+    {
+        "lib": "Pl",
+        # Wii/1.0 (mwcc 4.3 build 145): game code, neither runtime-style code (Wii/1.3) nor a REL.
+        # Both ranges come from tools/splits/tudiscover.py: the must-link anchors are .sdata2 pools
+        # (`lbl_8079A03C` for pl_skill.c, `lbl_8079A0AC` for pl_act.c), so the extents are lower
+        # bounds and `NonMatching` keeps the original bytes in the link until a unit actually matches.
+        # 50 of the region's 372 functions are pinned; the rest have no layout evidence and stay in
+        # auto units on purpose (see the `tu-boundary-discovery` skill).
+        "mw_version": "Wii/1.0",
+        "cflags": cflags_base,
+        "progress_category": "game",
+        "host": False,
+        "objects": [
+            Object(NonMatching, "Pl/pl_skill.c"),
+            Object(NonMatching, "Pl/pl_act.c"),
+        ],
+    },
 ]
 
 
