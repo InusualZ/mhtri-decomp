@@ -69,7 +69,7 @@ SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
 ASM_DIR = os.path.join(ROOT, "build", GAME, "asm")
 DOL = os.path.join(ROOT, "orig", GAME, "sys", "main.dol")
 CACHE = os.path.join(ROOT, "build", "tmp", "tudiscover", "graph.json")
-SCHEMA = 8      # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
+SCHEMA = 9      # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
 
 # Section order for the printed `splits.txt` block (matches config/RMHE08/splits.txt's header).
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
@@ -295,6 +295,36 @@ def rel_owners(txt, fns, labels):
     return out
 
 
+AT_SPELLED_RE = re.compile(r"^(@[^_]+)_([0-9A-Fa-f]{8})$")
+
+
+def resolve_name(tok, names, labels=None):
+    """Resolve an asm operand token to a symbol-map name, or None.
+
+    Two spellings need care:
+
+    * `lbl_807947A5@sda21` / `camellia_sp3033@ha` - the `@modifier` is a relocation modifier, so the
+      name is everything before it.  Splitting on `@` only works when the token does not *start* with
+      `@`: for a `@`-pool object the leading `@` is part of the name, and `tok.split("@")[0]` is the
+      empty string, so every such reference used to be dropped unless the map spelled it exactly.
+    * `"@1841_80629B90"` - dtk spells a `@`-pool object with its address appended, while the map holds
+      `@1841`.  About 34 labels are affected here, and one of them is the `RSO/runtime` string pool -
+      the only label that ties two functions of that unit together - so dropping them loses real
+      anchors.  The appended address must match the map entry, so a suffix cannot resolve to a
+      different copy of the same generated name.
+    """
+    if tok in names:
+        return tok
+    if tok.startswith("@"):
+        m = AT_SPELLED_RE.match(tok)
+        if m and m.group(1) in names and (labels is None
+                                          or labels[m.group(1)]["addr"] == int(m.group(2), 16)):
+            return m.group(1)
+        return None
+    base = tok.split("@", 1)[0]
+    return base if base in names else None
+
+
 def parse_fingerprint():
     """A fingerprint of the parsing code itself, for the graph-cache stamp.
 
@@ -305,10 +335,10 @@ def parse_fingerprint():
     """
     parts = [FN_BLOCK_RE.pattern, FN_NAME_RE.pattern, REL_OBJ_RE.pattern, REL_OWNER_RE.pattern,
              ETI_RE.pattern, FIRST_INS_RE.pattern, TOKEN_RE.pattern, CALL_RE.pattern, SAVE_RE.pattern,
-             REC_RE.pattern, FOURBYTE_RE.pattern, HEADER_RANGE_RE.pattern]
+             REC_RE.pattern, FOURBYTE_RE.pattern, HEADER_RANGE_RE.pattern, AT_SPELLED_RE.pattern]
     try:
         import inspect
-        for fn in (asm_files, dedupe_ranges, load_map, rel_owners, build_graph):
+        for fn in (asm_files, dedupe_ranges, load_map, rel_owners, build_graph, resolve_name):
             parts.append(inspect.getsource(fn))
     except (OSError, TypeError, IOError):
         parts.append("source unavailable")
@@ -433,15 +463,13 @@ def build_graph(fns, labels, force=False):
                     check["mismatched"].append([name, got, fns[name]["addr"]])
             refs, calls = set(), set()
             for tok in TOKEN_RE.findall(block):
-                base = tok.split("@", 1)[0]
-                if base in datanames:
-                    refs.add(base)
-                elif tok in datanames:
-                    refs.add(tok)
+                ref = resolve_name(tok, datanames, labels)
+                if ref:
+                    refs.add(ref)
             for callee in CALL_RE.findall(block):
-                base = callee.split("@", 1)[0]
-                if base in fns:
-                    calls.add(base)
+                ref = resolve_name(callee, fns)
+                if ref:
+                    calls.add(ref)
             rec = len(REC_RE.findall(block))
             graph[name] = {"refs": sorted(refs), "calls": sorted(calls),
                            "fp": [1 if SAVE_RE.search(block) else 0, rec]}

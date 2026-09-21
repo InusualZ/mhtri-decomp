@@ -72,6 +72,7 @@ table** with its accept/reject verdict per name.
 | a `.sdata2`/`.sdata` constant whose value is copied elsewhere in the section and whose referrers span ≤ `--span-max` bytes | strong (per-TU pooling proven by the copy) |
 | a `__FILE__` assert string naming a `.c`/`.cpp`, anchored **per name** (one name can have several label copies): accepted while no function inside its span cites a *different* name and the span is ≤ `--source-span-max` (0x8000) | strong - 92 of 93 names accepted here, 1 rejected (`menu_infomation.cpp`, 65 KB span) |
 | adjacent private pool labels whose referrer runs are disjoint and ordered | strong boundary |
+| a `@`-pool object referenced from inside one range only - resolve the asm's `"@NAME_ADDRESS"` spelling to the map's `@NAME` by **address** (`@1841` is the RSO unit's string pool) | strong, when the referrer set is exclusive |
 | `.rel <function>, ...` in a data object's `.obj` block | ownership only (which function owns a jump table/vtable); never a must-link between functions |
 | a function called only from inside the range, or a caller/callee pair with no other callers | weak (soft vote) |
 | a `_savegpr_*`/`stmw` flip or a record-form presence change between neighbours | weak (flag fingerprint, idea 21) |
@@ -113,8 +114,20 @@ The first answer was **wrong**, and the scorecard did not notice - both facts sh
 * `at RSOLink` returned an 8-function MATCH SET held together by **one** anchor, `@1845`
   (`.data:0x80629C08`, the unit's jump table). It was an artifact: the parse split each file on `"\n.fn "`,
   so the `.obj "@1845"` *definition* block that follows the last `.endfn` counted as a reference from the
-  previous function. Function blocks are now `.fn`..`.endfn` spans. The artifact is gone, and with it the
-  set: `at RSOLink` now returns **1 function, 0 anchors, no data run**.
+  previous function. Function blocks are now `.fn`..`.endfn` spans, the artifact went away, and the set
+  correctly collapsed to **1 function, 0 anchors** - the unit appeared to have no layout evidence at all.
+* Asking *which symbols really belong to that unit* then found the evidence that had been invisible: the
+  unit's `.data` **string pool** (`@1841`, `0x80629B90`) is referenced by `RSOStaticLocateObject` and
+  `RSORelocateSmallDataSection` and by nothing else - but the asm spells it `"@1841_80629B90"` while the
+  map says `@1841`, and the reference resolver treated a leading `@` as a relocation modifier
+  (`tok.split("@")[0]` is empty), so both references were dropped. Resolved by address, that one label
+  pins **8 of the 9 claimed functions** (`0x804D9EC4..0x804DAE40`) and leaves `LocateObject` as the single
+  function nothing links - which is what the independent review of that unit had concluded too (its only
+  caller, `fn_804DAEB0`, lives in the *next* block). Tier 1 reports exactly that, as `DISAGREES: 9 seeds,
+  2 intervals (1 fn / 8 fn)`.
+* The lesson generalises: the same 8-function set was produced twice, once by a parse artifact and once by
+  a real anchor. **An answer that does not name its evidence is worthless** - and no scorecard caught the
+  artifact, because the artifact and the truth happened to agree.
 * **Tier 1 had been seeding only the unit's first function**, so it reported "8 of 9 functions, start exact"
   for a set no mid-unit seed agreed with. Tier 1 now seeds *every* function of a claimed range and reports
   agreement (`consistent` / `disagrees` / `no evidence`).
@@ -127,9 +140,12 @@ The first answer was **wrong**, and the scorecard did not notice - both facts sh
   supported**: its recipe is already written in `docs/getting_started.md`, and the privacy of a DOL-local
   symbol cannot be proven from the binary. It is the weakest available test of the tool; do not read it as
   the tool having validated itself.
-* The RSO unit also shows the data side working independently of `.text`: its jump table, `@1841` string
-  pool and `lbl_80629C40` are referenced **only** from inside the claimed range, and the real pool is
-  `0x80629B90..0x80629CA8` - while claiming the pool is known to cost 1.35 % (idea 23).
+* The RSO unit also shows the data side working independently of `.text`: its jump table (`@1845`,
+  `.rel`-owned by `RSOStaticLocateObject`), its string pool (`@1841`) and `lbl_80629C40` (used by
+  `RSORelocate`) are referenced **only** from inside the claimed range, and the real pool is
+  `0x80629B90..0x80629CA8`. Note the tension: `@1841` is the best *anchor* evidence in that unit and the
+  claim idea 23 measured as harmful (1.35 % lost) - which is exactly why anchors and run claims are
+  separate things in the tool.
 
 ## Iterating on this tool
 
@@ -158,7 +174,7 @@ Judge an idea by whether it makes the *set* better, never by boundary exactness 
 
 | tier | measures | baseline (`--seeds 400`) | role |
 | --- | --- | --- | --- |
-| 1 labels | the units `splits.txt` claims (3 today): seeds **every** function in the range and reports agreement, plus start/end deltas and predicted runs vs claimed | `consistent 1  disagrees 0  no evidence 2`; 1 of 3 units has any closure evidence (the weakest one) | guardrail. Tiny, and its claims are the pathological ones - do not tune to it |
+| 1 labels | the units `splits.txt` claims (3 today): seeds **every** function in the range and reports agreement, plus start/end deltas and predicted runs vs claimed | `consistent 1  disagrees 1  no evidence 1`; 2 of 3 units have evidence - `RSO/runtime` disagrees in the informative way (8 of its 9 functions agree, `LocateObject` is the outlier and nothing links it) | guardrail. Tiny, and its claims are the pathological ones - do not tune to it |
 | 2 sweep | 400 random seeds: closure median/p75/p90/max, guard hits, singleton share, leak-free data runs, mean density | median 1, p75 33, p90 72, **max 146**, guard 0, singletons 63 %, leak-free 35 %, density 0.82 | the objective: `max`/`p90` catch over-merging, leak-free/density catch wrong boundaries |
 | 3 consistency | closures of all sampled seeds: distinct intervals, *partially overlapping* pairs | 347 distinct, **0 partial overlaps** | regression canary: must stay 0 |
 
@@ -179,10 +195,11 @@ read `splits.txt` as an input as well as an answer key (idea 1).
 
 ## What the tool cannot do yet
 
-* **A unit with no pooled data and no assert strings leaves no layout evidence.** On this repo that is
-  `Camellia` (1 of 10 functions, no anchors) and `RSO/runtime` (1 of 9, no anchors): the tool's honest
-  answer for `RSOLink` is "these bytes are the function you asked about; nothing here says what else
-  belongs". The extent then comes from the call graph, the Ghidra dump's names/order, and from matching.
+* **A unit whose functions share no data at all leaves no layout evidence.** `Camellia` is that case here
+  (1 of 10 functions, no anchors: its S-box tables are named symbols with one referrer each). The extent
+  then comes from the call graph, the Ghidra dump's names/order, and from matching. `RSO/runtime` is *not*
+  that case: its string pool pins 8 of its 9 claimed functions, leaving `LocateObject` unlinked
+  (only caller in the next block, no data references of its own).
 * **`scope:local` is not a proof on a DOL.** 0 of 21 655 auto `lbl_*` objects carry it, and 22 451 of
   23 216 `scope:local` objects are `@`-pool symbols; the split object is dtk-synthesized and echoes the
   annotation as `STB_LOCAL`. A `static` `.sdata` object and a one-TU global are byte-identical in a DOL.
