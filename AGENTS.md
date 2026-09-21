@@ -39,8 +39,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    that rewrites history (`rebase`, `commit --amend`, `reset --hard`, force-push, deleting/moving tags)
    unless the user's instruction for the current task explicitly says to do it. Finishing the work is not
    approval to commit it — leave the changes in the working tree and report exactly what you changed and
-   what you would commit. `origin` is the *upstream template* (`encounter/dtk-template`), not a fork of
-   this project, so work stays on the local `main` branch and is never pushed there.
+   what you would commit.
 7. **Never paste `config/RMHE08/symbols.txt` into a prompt/tool output.** It is ~65,700 lines / 4.5 MB.
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
