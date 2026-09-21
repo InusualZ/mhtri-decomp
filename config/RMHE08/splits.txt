@@ -59,5 +59,14 @@ RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40
 	.data       start:0x80629C08 end:0x80629C40
 
+Runtime.PPCEABI.H/memcpy.c:
+	.init       start:0x80004000 end:0x80004350
+
 Runtime.PPCEABI.H/memset.c:
 	.init       start:0x80004350 end:0x80004380
+
+Runtime.PPCEABI.H/__start.c:
+	.init       start:0x800062C0 end:0x800065C0
+
+Runtime.PPCEABI.H/__ppc_eabi_init.cpp:
+	.init       start:0x800065C0 end:0x80006624
