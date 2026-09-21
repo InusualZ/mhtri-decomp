@@ -588,10 +588,12 @@ SDK symbol names, function signatures, annotated struct layouts and the contents
 does not own. It answers in one query what otherwise costs a disassembly read - and it answers questions
 no static object can.
 
-**Result.** For `RSO/runtime` it named all nine functions (`LocateObject`, `RSOUnLink`, `FindExportIndex`,
-`RSORelocate`, `RSORelocateSmallDataSection`, and the four `RSONotify*` thunks), gave their signatures
-(`RSOLink(RSOModule*, RSOModule*, ...)` - the second argument is the *exporting* module, not a private
-"relocation table"), and its `RSOModule` layout confirmed every offset this project had derived by hand,
-with real field names. It is **not** codegen evidence (idea 17), its annotations mix SDK names with Ghidra
-placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23). Recipes and the
-full worked example: `docs/memory-dump.md`.
+**Result.** For `RSO/runtime` it named eight of the unit's nine functions (`LocateObject`,
+`RSOStaticLocateObject`, `RSOUnLocateObject`, `RSOLink`, `RSOUnLink`, `FindExportIndex`, `RSORelocate`,
+`RSORelocateSmallDataSection` - the ninth, `fn_804DA7E4`, is a `zz_` placeholder there too), and it
+separately named the four 4-byte `RSONotify*` thunks that sit just *before* the unit's range. It gave
+their signatures (`RSOLink(RSOModule*, RSOModule*, ...)` - the second argument is the *exporting* module,
+not a private "relocation table"), and its `RSOModule` layout confirmed every offset this project had
+derived by hand, with real field names. It is **not** codegen evidence (idea 17), its annotations mix SDK
+names with Ghidra placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23).
+Recipes and the full worked example: `docs/memory-dump.md`.
