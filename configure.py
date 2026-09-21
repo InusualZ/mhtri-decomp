@@ -359,7 +359,10 @@ config.libs = [
         "cflags": cflags_camellia,
         "host": False,
         "objects": [
-            Object(Matching, "Camellia/camellia.c"),
+            # Not a match yet: 9 of the 10 functions are byte-identical, camellia_setup256 still has
+            # one extra 4-byte stack slot (see the file header comment in src/Camellia/camellia.c).
+            # NonMatching keeps the original bytes in the link, so the DOL hash is unaffected by it.
+            Object(NonMatching, "Camellia/camellia.c"),
         ],
     },
     {
