@@ -14,12 +14,23 @@ Observations, in decreasing authority:
 
 * **must-link** (a boundary here is impossible) - from a private label referenced from both sides, a
   `scope:local` function and its callers, or a `__FILE__` assert string naming a `.c`/`.cpp` file.
+  The file name anchors are one per *distinct name* (one string can have several label copies), and
+  a name is only anchored while its `.text` span holds no function referencing a *different* name
+  and stays within `--source-span-max`; a rejected name still votes as a soft source-file change.
 * **pool run jump** - two adjacent labels of one section whose referrer sets are disjoint and
   ordered; the boundary lies between the last referrer of the first run and the first of the second.
 * **codegen fingerprint** (soft) - a `_savegpr_*`/`stmw` change or a record-form presence change
   between two neighbouring functions is a per-TU flag change (playbook idea 21).
 * **alignment gap** (soft) - a >4 byte gap; weak in this binary, where `.text` is one run with gaps
   of only 4/8/12 bytes.
+
+Every observation above is read from inside the `.fn <name>`..`.endfn <name>` span of the function it
+belongs to.  Section *data* blocks that follow the last `.endfn` are not part of any function, and a
+label's own `.obj` block is not a reference to it - reading them as one is how a dangling data block
+became a fake two-referrer must-link anchor.  A data object's `.rel <target symbol>, <label>` lines
+do name the symbol holding the relocated target address (`@1845`, a table of addresses inside
+`RSOStaticLocateObject`); that is used only as *ownership* of the object for its data run, never as a
+reference, so a table with several relocated functions cannot merge them.
 
 What is deliberately *not* used: dtk's `auto_*` units (they are per-function build scaffolding, not
 TU evidence), naive `lbl_` sharing (`.sbss` 69.8 % and `.bss` 60 % of labels are shared by several
@@ -32,6 +43,8 @@ Usage (addresses in hex, or a symbol name):
                                       [--unit src/<Lib>/<file>.c] [--max-funcs 400]
     tudiscover.py stats                 # cache + coverage + observation counts
     tudiscover.py cache [--force]       # (re)build build/tmp/tudiscover/graph.json
+    tudiscover.py bench [--seeds 400] [--seed 7] [--seeds-per-unit 64] [--max-funcs 400]
+                        [--json] [--save F] [--compare F]     # the tool's own scorecard
 
 Nothing is written outside `build/tmp/`: the `splits.txt` block is printed, never applied.
 """
@@ -56,7 +69,7 @@ SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
 ASM_DIR = os.path.join(ROOT, "build", GAME, "asm")
 DOL = os.path.join(ROOT, "orig", GAME, "sys", "main.dol")
 CACHE = os.path.join(ROOT, "build", "tmp", "tudiscover", "graph.json")
-SCHEMA = 5
+SCHEMA = 8      # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
 
 # Section order for the printed `splits.txt` block (matches config/RMHE08/splits.txt's header).
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
@@ -69,8 +82,27 @@ REC_RE = re.compile(r"\b(?:rlwinm|and|or|add|subf|subfc|neg|cntlzw|slw|srw|andc|
 SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp)$")
 ETI_RE = re.compile(r'\.obj "@eti_([0-9A-Fa-f]{8})".*?\.endobj', re.S)
 FOURBYTE_RE = re.compile(r"\.4byte\s+(\S+)")
+# The whole-unit extent dtk prints in the header comment of every `.s`, in either spelling the tree
+# uses: `# 0xSTART..0xEND | size: 0xN` (current dtk) and the pre-2025 `# 0xSTART - 0xEND`.
+HEADER_RANGE_RE = re.compile(r"^#\s+(0x[0-9A-Fa-f]+)\s*(?:\.\.|-)\s*(0x[0-9A-Fa-f]+)\s*(?:\|.*)?$",
+                             re.M)
+# A function is exactly its `.fn <name>, ...` .. matching `.endfn <name>` span (nothing else).
+FN_BLOCK_RE = re.compile(r"(?ms)^\.fn\s+([^\s,]+)[^\n]*\n(.*?)^\.endfn\s+\1[ \t]*$")
+# Just the names, for the cheap "does the symbol map know this file" test (`FN_BLOCK_RE.findall`
+# returns (name, block) tuples and would compare tuples against the map).
+FN_NAME_RE = re.compile(r"(?m)^\.fn\s+([^\s,]+)")
+# The address dtk prints in the leading comment of every instruction (`/* ADDR RELOC  bytes */`).
+FIRST_INS_RE = re.compile(r"/\* ([0-9A-Fa-f]{8}) ")
+# `.obj <label>` blocks that declare where the addresses in their relocations live.
+REL_OBJ_RE = re.compile(r"(?ms)^\.obj\s+\"?([^\s,\"]+)\"?[^\n]*\n(.*?)^\.endobj\s")
+REL_OWNER_RE = re.compile(r"^\s*\.rel\s+([^\s,]+)", re.M)
 # Observation kinds by authority: `pool`/`source` pin a real boundary, the other two are weak.
 STRONG = ("pool", "source")
+
+# Tier 1: how many functions inside one claimed `.text` range may seed their own closure, and how
+# many of the resulting distinct intervals the report lists (the rest are counted).
+SEED_CAP = 64
+INTERVAL_CAP = 4
 
 # Sections whose labels must never be read as TU-shared data: `extab`/`extabindex` are per-function
 # unwind table fragments whose `@eti_`/`@etb_` symbols are aliases covering arbitrary addresses in the
@@ -121,38 +153,241 @@ def load_map():
             fns[e["name"]] = {"addr": e["address"], "size": e["size"],
                               "scope": "local" if "scope:local" in e["line"] else ""}
         elif e["section"] != ".text":
-            # `(?<!\w)` matters: `.sdata:` and `.rodata:` also contain the substring `data:`.
-            kind = re.search(r"(?<!\w)data:(\S+)", e["line"])
+            # `(?<![\w.])` matters: `.sdata:`, `.rodata:` and `.data:` all contain the substring
+            # `data:`, and only the third is preceded by a non-word char.  With a bare `(?<!\w)`
+            # the `.data` *address* (`0x8058F750;`) became the kind, so `source_file_label` silently
+            # skipped every `.data`-resident `__FILE__` string - 53 of them are referenced from more
+            # than one function, including the widest anchor in the binary.
+            kind = re.search(r"(?<![\w.])data:(\S+)", e["line"])
             labels[e["name"]] = {"section": e["section"], "addr": e["address"],
                                  "size": e["size"], "kind": kind.group(1) if kind else "",
                                  "local": "scope:local" in e["line"]}
     return fns, labels
 
 
-def asm_files():
-    """Every unit's disassembly: `*_text.s` at top level, plus the claimed units' files."""
+# Duplicate/stale copies of one unit's asm that `asm_files()` resolved (refilled on every call).
+ASM_COLLISIONS = []
+ASM_RANGE_DUPS = []
+ASM_NO_RANGE = []
+
+
+def dedupe_ranges(paths, fns):
+    """Drop the stale copy when two parsed files cover the same section range.
+
+    `build/<version>/asm/` keeps a file per naming convention rather than per unit: an older run
+    wrote `auto_fn_<ADDR>_text.s` and today's writes `auto_dtor_<ADDR>_text.s`, and both describe the
+    same region - the header's `# 0xSTART..0xEND | size:` is the file's leading section range, so the
+    range, not the stem, is what makes them copies.  Their stems differ, so the stem rule in
+    `asm_files()` cannot see them; the shadowed file only adds its stale `fn_<ADDR>` to the `.fn`
+    parse self-check's `outside_map` and costs a full parse.
+
+    The copy whose `.fn` names the symbol map knows is the live one; among equals the newest mtime
+    wins.  A group that cannot be decided keeps every file and is reported (never silently).  A file
+    whose header cannot be read at all is **kept** and reported rather than dropped: the parse
+    self-check must keep seeing a format change, not lose the file that would have shown it.
+    """
+    ranges, unkeyed = {}, []
+    for path in paths:
+        try:
+            head = open(path, "rb").read(1024).decode("utf-8", "replace")
+        except OSError:
+            head = ""
+        m = HEADER_RANGE_RE.search(head)
+        if m:
+            ranges[path] = (int(m.group(1), 16), int(m.group(2), 16))
+        else:
+            unkeyed.append(path)
+            ASM_NO_RANGE.append(os.path.relpath(path, ASM_DIR))
+    keep = list(unkeyed)
+    by_range = collections.defaultdict(list)
+    for path, key in ranges.items():
+        by_range[key].append(path)
+    for key, group in sorted(by_range.items()):
+        if len(group) == 1:
+            keep.append(group[0])
+            continue
+        scored = [(map_fn_hits(path, fns), os.path.getmtime(path), path) for path in group]
+        best = max(s[0] for s in scored)
+        top = max(s[1] for s in scored if s[0] == best)
+        kept = [s[2] for s in scored if s[0] == best and s[1] == top]
+        keep.extend(kept)
+        ASM_RANGE_DUPS.append({"range": "0x%08X..0x%08X" % key,
+                               "kept": [os.path.relpath(p, ASM_DIR) for p in kept],
+                               "dropped": [os.path.relpath(s[2], ASM_DIR)
+                                           for s in scored if s[2] not in kept],
+                               "resolved": len(kept) == 1})
+    return sorted(keep)
+
+
+def map_fn_hits(path, fns):
+    """How many of a file's `.fn` names the symbol map knows (full read; collision groups only)."""
+    if not fns:
+        return 0
+    try:
+        txt = open(path, "r", encoding="utf-8", errors="replace").read()
+    except OSError:
+        return 0
+    return sum(1 for n in FN_NAME_RE.findall(txt) if n in fns)
+
+
+def asm_files(fns=None):
+    """Every unit's disassembly - one file per unit, never a stale duplicate.
+
+    `build/<version>/asm/` can hold the same unit twice: a top-level copy (`asm/camellia.s`) and one
+    under the unit's lib directory (`asm/Camellia/camellia.s`, the path `configure.py`/`objdiff.json`
+    use for a claimed unit).  The copies disagree: the stale top-level `camellia.s` prints its save
+    helper as `bl fn_80456DD4` where the canonical copy prints `bl _savegpr_14`, which silently
+    zeroes the codegen fingerprint of `camellia_setup128`/`camellia_setup256`.  A top-level copy is
+    therefore dropped whenever the same stem also exists in a subdirectory, and every collision is
+    recorded in `ASM_COLLISIONS` (reported by `stats`, never silent).
+
+    A second, independent kind of stale copy - one per *section range* rather than per stem, the
+    `auto_fn_<ADDR>` files an older dtk run left beside today's `auto_dtor_<ADDR>` - is resolved by
+    `dedupe_ranges()`.
+    """
     out = []
     for dirpath, _dirs, names in os.walk(ASM_DIR):
         for n in names:
             if not n.endswith(".s"):
                 continue
             if dirpath == ASM_DIR and n.startswith("auto_") and not n.endswith("_text.s"):
-                continue          # data-section scaffolding, no `.fn` blocks
+                continue          # per-function scaffolding / data dumps: not a unit's `.text`
             out.append(os.path.join(dirpath, n))
-    return sorted(out)
+    del ASM_COLLISIONS[:]
+    del ASM_RANGE_DUPS[:]
+    del ASM_NO_RANGE[:]
+    by_stem = collections.defaultdict(list)
+    for path in sorted(out):
+        by_stem[os.path.basename(path)[:-len(".s")]].append(path)
+    keep = []
+    for stem, paths in sorted(by_stem.items()):
+        top = [p for p in paths if os.path.dirname(p) == ASM_DIR]
+        deep = [p for p in paths if os.path.dirname(p) != ASM_DIR]
+        if top and deep:
+            keep.extend(deep)          # the configured unit's directory wins, deterministically
+            ASM_COLLISIONS.append({"stem": stem, "kept": deep, "dropped": top, "resolved": True})
+        else:
+            keep.extend(paths)
+            if len(paths) > 1:          # two lib directories, one stem: keep both, but say so
+                ASM_COLLISIONS.append({"stem": stem, "kept": paths, "dropped": [],
+                                       "resolved": False})
+    return dedupe_ranges(keep, fns)
+
+
+def rel_owners(txt, fns, labels):
+    """`data label -> function names it relocates against`, from the objects' `.rel` lines.
+
+    dtk prints a relocation as `.rel <symbol containing the target address>, <target label>`, so a
+    data object that is a table of code addresses (a jump table, a handler table) names the function
+    those addresses live in.  It is *ownership* of the object, not a reference to it: a table whose
+    entries point into two functions must not merge them.
+    """
+    if ".rel " not in txt:
+        return {}
+    out = {}
+    for m in REL_OBJ_RE.finditer(txt):
+        if m.group(1) not in labels:
+            continue
+        got = out.setdefault(m.group(1), set())
+        for rel in REL_OWNER_RE.finditer(m.group(2)):
+            if rel.group(1) in fns:
+                got.add(rel.group(1))
+    return out
+
+
+def parse_fingerprint():
+    """A fingerprint of the parsing code itself, for the graph-cache stamp.
+
+    Without it the stamp binds only the inputs (symbols sha1, file count, byte total), so an edit to
+    `FN_BLOCK_RE`/`rel_owners` that forgets to bump `SCHEMA` silently reuses a graph built by the old
+    parser.  The regex patterns and the source text of the parse functions are both hashed, so *any*
+    parse-relevant edit invalidates the cache.
+    """
+    parts = [FN_BLOCK_RE.pattern, FN_NAME_RE.pattern, REL_OBJ_RE.pattern, REL_OWNER_RE.pattern,
+             ETI_RE.pattern, FIRST_INS_RE.pattern, TOKEN_RE.pattern, CALL_RE.pattern, SAVE_RE.pattern,
+             REC_RE.pattern, FOURBYTE_RE.pattern, HEADER_RANGE_RE.pattern]
+    try:
+        import inspect
+        for fn in (asm_files, dedupe_ranges, load_map, rel_owners, build_graph):
+            parts.append(inspect.getsource(fn))
+    except (OSError, TypeError, IOError):
+        parts.append("source unavailable")
+    return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def warn_parse(out):
+    """A one-line stderr warning when the graph's own `.fn` self-check is unhappy."""
+    c = out.get("fn_check")
+    if c and (c["mismatched_count"] or c["nocode_count"] or c["unparsed_fn_lines"]):
+        print("# warning: `.fn` parse self-check failed (%d mismatched, %d without code, %d "
+              "unparsed) - `stats` has the details"
+              % (c["mismatched_count"], c["nocode_count"], c["unparsed_fn_lines"]), file=sys.stderr)
+
+
+def parse_report(out):
+    """The `.fn` self-check and the asm-file collisions stored with a graph, as print lines."""
+    c, col = out.get("fn_check"), out.get("collisions") or []
+    rd = out.get("range_dups") or []
+    lines = []
+    if not c:
+        lines.append("parse check        not in this cache - rebuild with --force")
+    else:
+        total = c["matched"] + c["mismatched_count"] + c["nocode_count"]
+        lines.append("parse check        %d/%d `.fn` spans start at the map address of their function"
+                     "  (%d mismatched, %d with no code, %d `.fn` names outside the map)"
+                     % (c["matched"], total, c["mismatched_count"], c["nocode_count"],
+                        c["outside_map"]))
+        for name, got, want in c["mismatched"][:10]:
+            lines.append("  mismatch         %-40s asm 0x%08X != map 0x%08X" % (name, got, want))
+        if c["mismatched_count"] > len(c["mismatched"]):
+            lines.append("  ...              %d more mismatched"
+                         % (c["mismatched_count"] - len(c["mismatched"])))
+        for name in c["nocode"][:5]:
+            lines.append("  no code          %s" % name)
+        if c["unparsed_fn_lines"]:
+            lines.append("  UNPARSED         %d `.fn` line(s) did not parse as a span: %s"
+                         % (c["unparsed_fn_lines"],
+                            ", ".join("%s (%d lines, %d spans)" % tuple(m)
+                                      for m in c["parse_misses"][:5])))
+    if col:
+        lines.append("asm duplicates     %d stem(s) exist in more than one asm directory (the"
+                     " deeper, configured-unit copy is kept):" % len(col))
+        for dup in col[:10]:
+            lines.append("  %-24s keep %s   drop %s%s"
+                         % (dup["stem"], ", ".join(dup["kept"]),
+                            ", ".join(dup["dropped"]) or "-",
+                            "" if dup["resolved"] else "   UNRESOLVED (both kept)"))
+    if rd:
+        lines.append("range duplicates   %d section range(s) are covered by more than one parsed"
+                     " file (the copy whose `.fn` names the symbol map is kept):" % len(rd))
+        for dup in rd[:10]:
+            lines.append("  %-20s keep %-34s drop %s%s"
+                         % (dup["range"], ", ".join(dup["kept"]),
+                            ", ".join(dup["dropped"]) or "-",
+                            "" if dup["resolved"] else "   UNRESOLVED (all kept)"))
+        if len(rd) > 10:
+            lines.append("  ...                  %d more (--json/`stats --force` has the rest)"
+                         % (len(rd) - 10))
+    if out.get("no_range"):
+        lines.append("header unreadable  %d parsed file(s) have no recognisable `# 0xSTART..0xEND`"
+                     " header (kept, not deduped): %s"
+                     % (len(out["no_range"]), ", ".join(out["no_range"][:6])))
+    return lines
 
 
 def build_graph(fns, labels, force=False):
     """Per-function data references, calls and codegen fingerprint, from the disassembly."""
-    files = asm_files()
+    files = asm_files(fns)
     stamp = {"schema": SCHEMA, "symbols": hashlib.sha1(open(SYMBOLS, "rb").read()).hexdigest(),
-             "files": len(files), "bytes": sum(os.path.getsize(f) for f in files)}
+             "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
+             "parse": parse_fingerprint()}
     if not force and os.path.exists(CACHE):
         try:
             cached = json.load(open(CACHE, encoding="utf-8"))
             if cached.get("stamp") == stamp:
                 print("# graph cache: build/tmp/tudiscover/graph.json (%d files)" % stamp["files"],
                       file=sys.stderr)
+                warn_parse(cached)
                 return cached
         except (ValueError, OSError):
             pass
@@ -160,18 +395,42 @@ def build_graph(fns, labels, force=False):
     datanames = {n for n, l in labels.items() if l["section"] not in NO_REF_SECTIONS}
     graph = {}
     extab = {}
+    owners = collections.defaultdict(set)
+    # `.fn` parse self-check: every parsed span must start at its symbol-map address, and the number
+    # of `.fn` lines must match the number of spans, so a format change cannot quietly drop
+    # functions while the tool still prints a confident MATCH SET.
+    check = {"matched": 0, "mismatched_count": 0, "nocode_count": 0, "outside_map": 0,
+             "unparsed_fn_lines": 0, "mismatched": [], "nocode": [], "parse_misses": []}
     for path in files:
         txt = open(path, "r", encoding="utf-8", errors="replace").read()
+        blocks = list(FN_BLOCK_RE.finditer(txt))
+        loose = len(re.findall(r"(?m)^[ \t]*\.fn[ \t]", txt))
+        if loose != len(blocks):
+            check["unparsed_fn_lines"] += loose - len(blocks)
+            if len(check["parse_misses"]) < 20:
+                check["parse_misses"].append([os.path.relpath(path, ASM_DIR), loose, len(blocks)])
         for m in ETI_RE.finditer(txt):
             ops = FOURBYTE_RE.findall(m.group(0))
             if ops and ops[0] in fns:
                 etb = int(ops[1], 16) if len(ops) > 1 and ops[1].startswith("0x") else None
                 extab[ops[0]] = [int(m.group(1), 16), etb]
-        for block in txt.split("\n.fn ")[1:]:
-            cut = block.find(",")
-            name = block[:cut if 0 <= cut < 80 else block.find("\n")].strip()
+        for m in blocks:
+            name, block = m.group(1), m.group(2)
             if name not in fns:
+                check["outside_map"] += 1
                 continue
+            first = FIRST_INS_RE.search(block)
+            got = int(first.group(1), 16) if first else None
+            if got == fns[name]["addr"]:
+                check["matched"] += 1
+            elif got is None:
+                check["nocode_count"] += 1
+                if len(check["nocode"]) < 20:
+                    check["nocode"].append(name)
+            else:
+                check["mismatched_count"] += 1
+                if len(check["mismatched"]) < 20:
+                    check["mismatched"].append([name, got, fns[name]["addr"]])
             refs, calls = set(), set()
             for tok in TOKEN_RE.findall(block):
                 base = tok.split("@", 1)[0]
@@ -186,11 +445,20 @@ def build_graph(fns, labels, force=False):
             rec = len(REC_RE.findall(block))
             graph[name] = {"refs": sorted(refs), "calls": sorted(calls),
                            "fp": [1 if SAVE_RE.search(block) else 0, rec]}
-    out = {"stamp": stamp, "files": len(files), "funcs": graph, "extab": extab}
+        for name, own in rel_owners(txt, fns, labels).items():
+            owners[name] |= own
+    out = {"stamp": stamp, "files": len(files), "funcs": graph, "extab": extab,
+           "owners": {k: sorted(v) for k, v in owners.items()},
+           "collisions": [{k: [os.path.relpath(p, ASM_DIR) for p in v] if k in ("kept", "dropped")
+                           else v for k, v in c.items()} for c in ASM_COLLISIONS],
+           "range_dups": list(ASM_RANGE_DUPS),
+           "no_range": list(ASM_NO_RANGE),
+           "fn_check": check}
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
     json.dump(out, open(CACHE, "w", encoding="utf-8"))
     print("# graph: %d functions (%d with extab) from %d files in %.1fs -> build/tmp/tudiscover/graph.json"
           % (len(graph), len(extab), len(files), time.time() - t0), file=sys.stderr)
+    warn_parse(out)
     return out
 
 
@@ -245,7 +513,7 @@ def source_file_label(dol, labels, name):
     return text.strip() if SRCFILE_RE.match(text.strip()) else None
 
 
-def analyse(fns, labels, graph, dol, span_max):
+def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000):
     """Ordered function list + every observation, in index space (cut i = boundary before f[i])."""
     ordered = sorted(fns, key=lambda n: fns[n]["addr"])
     idx = {n: i for i, n in enumerate(ordered)}
@@ -264,6 +532,14 @@ def analyse(fns, labels, graph, dol, span_max):
     for d in (refs_of, callers_of):
         for k in d:
             d[k] = sorted(set(d[k]))
+
+    # `.rel` ownership: which functions' addresses a data object's relocations point at.  Kept out
+    # of `refs_of` on purpose - ownership is not a reference and must not link functions.
+    owners_of = {}
+    for name, own in graph.get("owners", {}).items():
+        got = tuple(n for n in own if n in idx)
+        if got:
+            owners_of[name] = got
 
     cls = classify(labels, refs_of, ordered, addr, size, span_max, duplicate_values(labels, dol))
     must_link, soft = [], []
@@ -294,13 +570,51 @@ def analyse(fns, labels, graph, dol, span_max):
                          "%s called only from this range (%d callers)" % (name, len(users))))
 
     # Source-file assert strings: one `.c`/`.cpp` per TU - must-link inside, boundary between.
+    # Anchored per *name*, never per label: 5 names carry 3-5 copies of their own string (MWCC does
+    # not pool a `__FILE__` literal once per TU here), and anchoring each copy nests intervals inside
+    # each other.  A name is trusted only while its whole span holds no function referencing a
+    # *different* file name - the direct fingerprint of a literal shared with a second TU (0 of 1804
+    # functions do today) - and while the span stays within `--source-span-max`, the same size sanity
+    # check `classify()` applies to a pooled constant.  A rejected name keeps its soft source-change
+    # vote, so a mis-attributed name misvotes a boundary instead of forbidding one.
     file_of = {}
     for name in labels:
         src = source_file_label(dol, labels, name)
         if src and name in refs_of:
             file_of[name] = src
-            u = refs_of[name]
-            link(u[0], u[-1], '%s = "%s"' % (name, src))
+    by_name = collections.defaultdict(list)
+    for name, src in file_of.items():
+        by_name[src].append(name)
+    src_of = collections.defaultdict(set)        # function index -> file names it references
+    for name, src in file_of.items():
+        for i in refs_of[name]:
+            src_of[i].add(src)
+    source_names = []
+    for src, names_ in sorted(by_name.items(),
+                              key=lambda kv: (min(refs_of[n][0] for n in kv[1]), kv[0])):
+        lo, hi = min(refs_of[n][0] for n in names_), max(refs_of[n][-1] for n in names_)
+        users = set()
+        for n in names_:
+            users.update(refs_of[n])
+        span = addr[hi] + size[hi] - addr[lo]
+        other = sorted({s for i in range(lo, hi + 1) for s in src_of.get(i, ()) if s != src})
+        gaps = [i for i in range(lo, hi + 1) if i not in users]
+        if other:
+            reject = "contaminating referrer: %s" % ", ".join(other[:3])
+        elif span > source_span_max:
+            reject = "span %d B > --source-span-max 0x%X" % (span, source_span_max)
+        else:
+            reject = None
+        source_names.append({"src": src, "labels": sorted(names_), "lo": lo, "hi": hi,
+                             "refs": len(users), "copies": len(names_), "cuts": hi - lo,
+                             "bytes": span, "gaps": len(gaps),
+                             "gap_bytes": sum(size[i] for i in gaps),
+                             "start": addr[lo], "end": addr[hi] + size[hi], "reject": reject})
+        if reject is None:
+            link(lo, hi, '"%s" (%d label(s), %d refs)' % (src, len(names_), len(users)))
+
+    # The soft vote is unchanged: between adjacent labels' first referrers, so a rejected name still
+    # votes - a literal spanning two TUs then misvotes a boundary, it does not merge them.
     groups = sorted(((refs_of[n][0], refs_of[n][-1], s) for n, s in file_of.items()),
                     key=lambda t: t[0])
     for (a_lo, a_hi, a_src), (b_lo, b_hi, b_src) in zip(groups, groups[1:]):
@@ -338,7 +652,8 @@ def analyse(fns, labels, graph, dol, span_max):
                          "alignment gap 0x%X" % gap))
 
     return {"ordered": ordered, "idx": idx, "addr": addr, "size": size, "refs_of": refs_of,
-            "cls": cls, "must_link": must_link, "soft": soft}
+            "cls": cls, "must_link": must_link, "soft": soft, "owners_of": owners_of,
+            "source_names": source_names}
 
 
 def expand(an, seed, max_funcs):
@@ -408,33 +723,39 @@ def short(why):
 
 
 def data_runs(an, labels, lo, hi):
-    """The data a TU covering functions [lo, hi) plausibly owns: one contiguous run per section."""
+    """The data a TU covering functions [lo, hi) plausibly owns: one contiguous run per section.
+
+    A label counts either because a `.text` function in the range references it, or because its
+    object's `.rel` lines name one (see `rel_owners`) - a jump table no instruction loads by name
+    still belongs to the function whose addresses it holds.
+    """
     inside = set(an["ordered"][lo:hi])
     out = {}
     for name, lab in labels.items():
         if lab["section"] in (".init", "extab", "extabindex"):
             continue                      # boot code and per-function unwind tables: see extab_runs
-        users = an["refs_of"].get(name)
-        if not users:
-            continue
+        users = an["refs_of"].get(name) or []
         fns_here = [an["ordered"][i] for i in users]
         here = [f for f in fns_here if f in inside]
-        if not here:
+        owned = bool([f for f in an["owners_of"].get(name, ()) if f in inside])
+        if not here and not owned:
             continue
         out.setdefault(lab["section"], []).append((lab["addr"], lab["size"], name,
-                                                  len(here) != len(fns_here)))
+                                                  len(here) != len(fns_here), owned and not here))
     runs = {}
     for section, items in out.items():
         items.sort()
         start = items[0][0]
-        end = max(a + s for a, s, _, _ in items)
-        own = {n for _, _, n, _ in items}
+        end = max(a + s for a, s, _, _, _ in items)
+        own = {n for _, _, n, _, _ in items}
         # a linker fragment is contiguous: every label inside the run belongs to the same TU
         filler = [n for n, lab in labels.items()
                   if lab["section"] == section and start <= lab["addr"] < end and n not in own]
         runs[section] = {"start": start, "end": end, "labels": len(items), "filler": len(filler),
                          "density": round(len(items) / (len(items) + len(filler)), 2),
-                         "leak": sum(1 for _, _, _, leaks in items if leaks),
+                         "leak": sum(1 for _, _, _, leaks, _ in items if leaks),
+                         "owned": sum(1 for _, _, _, _, only in items if only),
+                         "owned_names": sorted(n for _, _, n, _, only in items if only),
                          "names": sorted(own)}
     return runs
 
@@ -464,7 +785,7 @@ def report(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=False)
     dol = Dol(DOL)
-    an = analyse(fns, labels, graph, dol, args.span_max)
+    an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max)
     ordered, idx = an["ordered"], an["idx"]
 
     if args.at in idx:
@@ -505,8 +826,8 @@ def report(args):
     runs = data_runs(an, labels, sug_lo, sug_hi)
     runs.update(extab_runs(an, labels, graph, sug_lo, sug_hi))
     candidates = list(ordered[lo:hi])
-    srcs = sorted({s for n in labels if (s := source_file_label(dol, labels, n))
-                   and n in an["refs_of"] and sug_lo <= an["refs_of"][n][0] < sug_hi})
+    srcs = sorted({r["src"] for r in an["source_names"]
+                   if sug_lo <= r["start"] and r["start"] < sug_hi})
 
     result = {
         "target": target, "target_address": fns[target]["addr"], "seed_index": seed,
@@ -578,12 +899,20 @@ def print_human(res, ordered, fns, sug_lo, sug_hi):
                           else "only weak signals here: the closure edge is the best estimate"))
     print()
     print("data the range would own (contiguous run per section; `dens` = share of labels inside the"
-          " run that the range actually references, `leak` = also referenced from outside):")
+          " run that the range actually references, `leak` = also referenced from outside, `own` ="
+          " claimed by the object's `.rel` lines with no reference at all):")
     for section in sorted(res["runs"], key=SECTION_ORDER.index):
         r = res["runs"][section]
-        print("  %-10s 0x%08X..0x%08X  %3d labels  dens %.2f  leak %s"
-              % (section, r["start"], r["end"], r["labels"], r.get("density", 1.0),
-                 r["leak"] if r["leak"] else "0"))
+        line = ("  %-10s 0x%08X..0x%08X  %3d labels  dens %.2f  leak %s"
+                % (section, r["start"], r["end"], r["labels"], r.get("density", 1.0),
+                   r["leak"] if r["leak"] else "0"))
+        if r.get("owned"):
+            line += "  own %d" % r["owned"]
+        print(line)
+        if r.get("owned_names"):
+            names = r["owned_names"]
+            print("             own: %s%s" % (", ".join(names[:6]),
+                                              " (+%d more)" % (len(names) - 6) if len(names) > 6 else ""))
     if not res["runs"]:
         print("  (none - this range owns no labelled data at all: the boundary is unconstrained)")
     leak = sum(r["leak"] for r in res["runs"].values())
@@ -609,33 +938,94 @@ def claimed_units():
     return {u: s for u, s in out.items() if ".text" in s}
 
 
-def tier_labels(an, fns, labels):
-    """Tier 1: how the tool does on the units `splits.txt` already claims."""
-    rows = []
+def sampled(seq, cap):
+    """At most `cap` evenly spaced items of `seq` (deterministic), plus whether it was truncated."""
+    if len(seq) <= cap:
+        return list(seq), False
+    if cap <= 1:
+        return list(seq[:cap]), True
+    step = (len(seq) - 1) / (cap - 1)
+    out = []
+    for i in range(cap):
+        j = int(i * step + 0.5)
+        if not out or seq[j] != out[-1]:
+            out.append(seq[j])
+    return out, True
+
+
+def tier_labels(an, fns, labels, seeds_per_unit=SEED_CAP, max_funcs=400):
+    """Tier 1: every map function inside a claimed `.text` range seeds its own closure.
+
+    One seed is one observation, not the answer: seeding only the range's first function made all
+    three claimed units look like "start exact, end short", which was an artifact of that seed.  A
+    unit is `consistent` only when all of its seeds close to the same interval, `disagrees` when
+    they differ, and `no evidence` when every seed closes to itself - the range has no must-link
+    anchor at all, so it says nothing about the boundary either way.
+    """
+    rows, classes = [], collections.Counter()
     for unit, secs in sorted(claimed_units().items()):
         start, end = secs[".text"]
-        hit = [i for i, n in enumerate(an["ordered"]) if fns[n]["addr"] >= start]
-        if not hit:
-            continue
-        lo, hi, _, guard = expand(an, hit[0], 400)
-        got = (an["addr"][lo], an["addr"][hi - 1] + an["size"][hi - 1])
-        runs = data_runs(an, labels, lo, hi)
-        rows.append({"unit": unit, "claimed": [start, end], "predicted": list(got),
-                     "function_delta": (hi - lo) - len([n for n in an["ordered"]
-                                                        if start <= fns[n]["addr"] < end]),
-                     "start_off": got[0] - start, "end_off": got[1] - end,
-                     "guard": bool(guard), "runs": {k: [v["start"], v["end"]] for k, v in runs.items()}})
-    return rows
+        inside = [i for i, n in enumerate(an["ordered"]) if start <= fns[n]["addr"] < end]
+        seeds, capped = sampled(inside, seeds_per_unit)
+        closures = []
+        for s in seeds:
+            lo, hi, _touched, guard = expand(an, s, max_funcs)
+            closures.append((lo, hi, bool(guard)))
+        groups = collections.OrderedDict()
+        for lo, hi, guard in sorted(closures, key=lambda c: c[:2]):
+            rec = groups.setdefault((lo, hi), {
+                "range": [lo, hi], "functions": hi - lo, "seeds": 0, "guard": False,
+                "text": [an["addr"][lo], an["addr"][hi - 1] + an["size"][hi - 1]]})
+            rec["seeds"] += 1
+            rec["guard"] = rec["guard"] or guard
+        # `no evidence` first: a unit whose every seed closes to itself has no evidence even when
+        # the seeds disagree wildly (they are just different singletons).
+        anchored = [c for c in closures if c[1] - c[0] > 1]
+        klass = ("no evidence" if not anchored else
+                 "consistent" if len(groups) == 1 else "disagrees")
+        classes[klass] += 1
+        # Worst case against the claimed range, in functions: dropped at each edge, pulled in from
+        # outside it.  A claimed range holding no map function uses its insertion point.
+        if inside:
+            c_lo, c_hi = inside[0], inside[-1] + 1
+        else:
+            c_lo = c_hi = sum(1 for i, n in enumerate(an["ordered"]) if fns[n]["addr"] < start)
+        worst = [0, 0, 0, 0]
+        for lo, hi, _guard in closures:
+            worst[0] = max(worst[0], max(0, min(lo, c_hi) - c_lo))
+            worst[1] = max(worst[1], max(0, c_hi - max(hi, c_lo)))
+            worst[2] = max(worst[2], max(0, c_lo - lo))
+            worst[3] = max(worst[3], max(0, hi - c_hi))
+        row = {"unit": unit, "claimed": [start, end], "claimed_functions": len(inside),
+               "seeds": len(seeds), "seed_cap": seeds_per_unit, "seed_cap_binds": capped,
+               "distinct_intervals": len(groups), "class": klass,
+               "intervals": list(groups.values())[:INTERVAL_CAP],
+               "intervals_omitted": max(0, len(groups) - INTERVAL_CAP),
+               "worst_missing_start": worst[0], "worst_missing_end": worst[1],
+               "worst_extra_start": worst[2], "worst_extra_end": worst[3],
+               "guard": any(g for _lo, _hi, g in closures)}
+        if closures:                       # the first seed is still the old single-seed number
+            lo, hi = closures[0][0], closures[0][1]
+            got = (an["addr"][lo], an["addr"][hi - 1] + an["size"][hi - 1])
+            runs = data_runs(an, labels, lo, hi)
+            row.update({"predicted": list(got), "function_delta": (hi - lo) - len(inside),
+                        "start_off": got[0] - start, "end_off": got[1] - end,
+                        "runs": {k: [v["start"], v["end"]] for k, v in runs.items()}})
+        rows.append(row)
+    return rows, {"units": len(rows), "seed_cap": seeds_per_unit,
+                  "capped_units": [r["unit"] for r in rows if r["seed_cap_binds"]],
+                  "classes": {k: classes[k] for k in ("consistent", "disagrees", "no evidence")},
+                  "units_with_evidence": sum(1 for r in rows if r["class"] != "no evidence")}
 
 
-def tier_sweep(an, labels, seeds, seed):
+def tier_sweep(an, labels, seeds, seed, max_funcs=400):
     """Tier 2: closure behaviour over random seeds (over-merging canary, run quality)."""
     import random
     rnd = random.Random(seed)
     picks = rnd.sample(range(len(an["ordered"])), min(seeds, len(an["ordered"])))
     sizes, guard, clean, dens = [], 0, 0, []
     for s in picks:
-        lo, hi, _, g = expand(an, s, 400)
+        lo, hi, _, g = expand(an, s, max_funcs)
         sizes.append(hi - lo)
         guard += 1 if g else 0
         if hi - lo <= 60:
@@ -652,12 +1042,12 @@ def tier_sweep(an, labels, seeds, seed):
             "mean_density": round(sum(dens) / len(dens), 2) if dens else 0.0}
 
 
-def tier_consistency(an, seeds, seed):
+def tier_consistency(an, seeds, seed, max_funcs=400):
     """Tier 3: distinct closures that partially overlap = the anchor set contradicts itself."""
     import random
     rnd = random.Random(seed + 1)
     picks = rnd.sample(range(len(an["ordered"])), min(seeds, len(an["ordered"])))
-    spans = sorted({expand(an, s, 400)[:2] for s in picks})
+    spans = sorted({expand(an, s, max_funcs)[:2] for s in picks})
     merged, partial = [], 0
     for lo, hi in spans:
         while merged and lo < merged[-1][1] < hi:
@@ -671,18 +1061,45 @@ def tier_consistency(an, seeds, seed):
 def cmd_bench(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
-    an = analyse(fns, labels, graph, Dol(DOL), args.span_max)
-    score = {"labels": tier_labels(an, fns, labels), "sweep": tier_sweep(an, labels, args.seeds, args.seed),
-             "consistency": tier_consistency(an, args.seeds, args.seed),
-             "span_max": args.span_max, "seeds": args.seeds, "seed": args.seed}
+    an = analyse(fns, labels, graph, Dol(DOL), args.span_max, args.source_span_max)
+    rows, classes = tier_labels(an, fns, labels, args.seeds_per_unit, args.max_funcs)
+    score = {"labels": rows, "label_classes": classes,
+             "sweep": tier_sweep(an, labels, args.seeds, args.seed, args.max_funcs),
+             "consistency": tier_consistency(an, args.seeds, args.seed, args.max_funcs),
+             "span_max": args.span_max, "source_span_max": args.source_span_max,
+             "seeds": args.seeds, "seed": args.seed}
     if args.json:
         print(json.dumps(score, indent=2))
     else:
-        print("tier 1  known units (splits.txt as truth)")
+        print("tier 1  claimed units (splits.txt as truth): every map function in the range seeds"
+              " a closure; one seed is one observation, not the answer")
         for r in score["labels"]:
-            print("  %-46s delta %+d fn  start %+d B  end %+d B%s"
-                  % (r["unit"], r["function_delta"], r["start_off"], r["end_off"],
-                     "  GUARD" if r["guard"] else ""))
+            print("  %-46s %2d seeds  %2d intervals  %s%s"
+                  % (r["unit"], r["seeds"], r["distinct_intervals"], r["class"].upper(),
+                     "  (seed cap)" if r["seed_cap_binds"] else ""))
+            if "predicted" in r:
+                print("      %d claimed fn; first-seed closure delta %+d fn  start %+d B  end %+d B"
+                      % (r["claimed_functions"], r["function_delta"], r["start_off"], r["end_off"]))
+            else:
+                print("      %d claimed fn; the range contains no map function at all"
+                      % r["claimed_functions"])
+            print("      worst case %d fn missing at the start, %d at the end (%+d/%+d outside)"
+                  % (r["worst_missing_start"], r["worst_missing_end"],
+                     r["worst_extra_start"], r["worst_extra_end"]))
+            for iv in r["intervals"]:
+                print("      interval 0x%08X..0x%08X  %4d fn  %d seed(s)%s"
+                      % (iv["text"][0], iv["text"][1], iv["functions"], iv["seeds"],
+                         "  GUARD" if iv["guard"] else ""))
+            if r["intervals_omitted"]:
+                print("      ... and %d more distinct interval(s) (--json for the full list)"
+                      % r["intervals_omitted"])
+        lc = score["label_classes"]
+        print("  classes  consistent %d   disagrees %d   no evidence %d"
+              % (lc["classes"]["consistent"], lc["classes"]["disagrees"],
+                 lc["classes"]["no evidence"]))
+        print("  %d of %d claimed units have any closure evidence at all%s"
+              % (lc["units_with_evidence"], lc["units"],
+                 "  (seed cap: %s)" % ", ".join(lc["capped_units"]) if lc["capped_units"] else ""))
         s = score["sweep"]
         print("tier 2  closure over %d random seeds" % s["seeds"])
         print("  median %d  p75 %d  p90 %d  max %d  guard %d (singletons %.0f%%)"
@@ -730,19 +1147,61 @@ def print_splits(res, unit):
         print("\t%-10s start:0x%08X end:0x%08X" % (section, r["start"], r["end"]))
 
 
+def source_anchors(an, top=10):
+    """The `__FILE__`-style anchors, widest `.text` span first, with the guard's verdict.
+
+    One source file per TU makes each distinct name a must-link anchor, but the literal could also
+    have been *shared* (linker string pooling) - then its referrers straddle several TUs and the
+    anchor over-merges them.  `copies` is the first discriminator: MWCC emits one copy of a literal
+    per TU that uses it (measured on this image as 16 copies of the generic `NW4R:Failed assertion
+    0` string, while a `.cpp` name has one), so several copies of one name are several emitters, not
+    a merged literal.  The guards are the second: a function inside the span referencing a
+    *different* name, and a span past `--source-span-max`.  The rows come from `analyse()`, so the
+    table and the anchors cannot disagree.
+    """
+    rows = sorted(an["source_names"], key=lambda r: (-r["bytes"], r["src"]))
+    return rows[:top], rows
+
+
 def cmd_stats(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
-    an = analyse(fns, labels, graph, Dol(DOL), args.span_max)
+    dol = Dol(DOL)
+    an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max)
     covered = set(graph["funcs"])
     print("functions in map   %d" % len(fns))
-    print("functions in asm   %d  (map entries without a `.fn` block: %d)"
+    print("functions in asm   %d  (map entries with no `.fn` block in a parsed file: %d)"
           % (len(covered), len(set(fns) - covered)))
+    for line in parse_report(graph):
+        print(line)
     kinds = collections.Counter(v[0] for v in an["cls"].values())
     print("labels classified  %s" % dict(kinds))
+    owners = graph.get("owners", {})
+    print("labels owned       %d via `.rel` lines (%d with more than one owner)"
+          % (sum(1 for v in owners.values() if v), sum(1 for v in owners.values() if len(v) > 1)))
     print("must-link anchors  %d   soft observations %d" % (len(an["must_link"]), len(an["soft"])))
     print("soft by kind       %s" % dict(collections.Counter(o[3] for o in an["soft"])))
     print("candidate cuts     %d function boundaries in .text" % len(an["ordered"]))
+    rows, all_rows = source_anchors(an)
+    rejected = [r for r in all_rows if r["reject"]]
+    print("source anchors     %d `.c`/`.cpp` file names are referenced by .text functions; %d"
+          " anchored, %d rejected by the guard (--source-span-max 0x%X); widest %d by span:"
+          % (len(all_rows), len(all_rows) - len(rejected), len(rejected), args.source_span_max,
+             len(rows)))
+    print("  %-34s %4s %4s %5s %8s %5s %8s  %s"
+          % ("source file", "lbls", "refs", "cuts", "span B", "gaps", "gap B", "verdict"))
+    for r in rows:
+        print("  %-34s %4d %4d %5d %8d %5d %8d  %s"
+              % (r["src"], r["copies"], r["refs"], r["cuts"], r["bytes"], r["gaps"],
+                 r["gap_bytes"], r["reject"] or ("contiguous" if not r["gaps"] else
+                                                  "accepted, %d gap fn" % r["gaps"])))
+    for r in [r for r in rejected if r not in rows]:
+        print("  rejected           %-34s %4d %4d %5d %8d   %s"
+              % (r["src"], r["copies"], r["refs"], r["cuts"], r["bytes"], r["reject"]))
+    print("  lbls = string labels carrying that name in the image (MWCC pools a literal per TU, so"
+          " several copies = several emitters, not one merged literal)")
+    print("  gaps = functions inside the span that do not reference it (a TU's assert-free"
+          " functions); anchor count is one per accepted name, not per label")
     return 0
 
 
@@ -756,6 +1215,8 @@ def main():
     a.add_argument("--top", type=int, default=3, help="candidates to list per side")
     a.add_argument("--span-max", type=int, default=0x4000,
                    help="referrer span (bytes) above which a pool label counts as cross-TU")
+    a.add_argument("--source-span-max", type=int, default=0x8000,
+                   help="referrer span (bytes) above which a `__FILE__` name stops being anchored")
     a.add_argument("--max-funcs", type=int, default=400, help="give up past this range size")
     a.add_argument("--unit", default=None, help="unit path for the printed splits block")
     a.add_argument("--json", action="store_true")
@@ -764,18 +1225,24 @@ def main():
 
     b = sub.add_parser("stats", help="cache, coverage and observation counts")
     b.add_argument("--span-max", type=int, default=0x4000)
+    b.add_argument("--source-span-max", type=int, default=0x8000)
     b.add_argument("--force", action="store_true", help="rebuild the graph cache")
     b.set_defaults(func=cmd_stats)
 
     c = sub.add_parser("cache", help="(re)build the graph cache only")
     c.add_argument("--force", action="store_true")
     c.add_argument("--span-max", type=int, default=0x4000)
+    c.add_argument("--source-span-max", type=int, default=0x8000)
     c.set_defaults(func=lambda a: cmd_stats(a) or 0)
 
     d = sub.add_parser("bench", help="scorecard used to iterate on this tool")
     d.add_argument("--seeds", type=int, default=400)
     d.add_argument("--seed", type=int, default=7)
+    d.add_argument("--seeds-per-unit", type=int, default=SEED_CAP,
+                   help="tier 1: functions per claimed unit allowed to seed a closure")
+    d.add_argument("--max-funcs", type=int, default=400, help="give up past this range size")
     d.add_argument("--span-max", type=int, default=0x4000)
+    d.add_argument("--source-span-max", type=int, default=0x8000)
     d.add_argument("--force", action="store_true", help="rebuild the graph cache")
     d.add_argument("--json", action="store_true")
     d.add_argument("--save", default=None, help="write the scorecard here (e.g. build/tmp/tudiscover/baseline.json)")
