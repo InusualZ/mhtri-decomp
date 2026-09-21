@@ -370,7 +370,13 @@ config.libs = [
         "objects": [
             Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
+            # The .init runtime, in the order the retail section lays it out. memcpy.c is the provisional
+            # half of MSL's __mem.o (the other half is memset.c, already at 100 %); making them one file
+            # is proposed in the escalation queue - see the unit's file header comment.
+            Object(NonMatching, "Runtime.PPCEABI.H/memcpy.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/memset.c"),
+            Object(NonMatching, "Runtime.PPCEABI.H/__start.c"),
+            Object(NonMatching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
         ],
     },
     {
