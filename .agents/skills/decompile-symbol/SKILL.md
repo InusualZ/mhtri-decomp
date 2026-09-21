@@ -69,9 +69,28 @@ A stop of kind 1 is not "report and give up": check whether the owning unit's so
    build tree, so `build/binutils/powerpc-eabi-objdump.exe -d build/RMHE08/obj/<...>.o` is the authoritative
    disassembly and needs no Ghidra session. A Ghidra MCP session is per-agent: a subagent can be unable to
    reach it while you can, so hand parallel work the offline route.
-3. **Names, signatures and struct layouts** come from the dump (`get_struct_layout`, `get_function_signature`)
+4. **`m2c` as a second shape oracle, offline** (`tools/m2c`, a submodule): it decompiles the same
+   disassembly to C and targets matching MWCC source, so it works with no Ghidra session and is the
+   cross-check when the Ghidra shape does not look like the code.
+
+   ```sh
+   python tools/units/m2cinput.py build/RMHE08/obj/<unit>.o -f <symbol> -o build/tmp/<symbol>.s
+   python tools/m2c/m2c.py -t ppc-mwcc-c --no-cache -f <symbol> build/tmp/<symbol>.s
+   ```
+
+   `m2cinput.py` exists because m2c wants GNU-as style asm, not `objdump -d` output; its docstring lists
+   every rewrite and why (`@ha`/`@l`/`@sda21`, `loc_` labels, a mid-function tail call as `bl`+`blr`, the
+   data-only `gap_*` blobs it has to drop). `--list` says what is in the object and marks the `bctr`
+   (jump-table) functions; those work too - the table's bytes are read out of the original DOL and written
+   into the output as `.data`, which is what m2c needs to rebuild the `switch`, and a table whose entries
+   are not this function's case labels is refused with a warning rather than guessed at. If one is still
+   refused, m2c aborts the *whole* file on that function: keep the others with `-f`. An instruction m2c
+   has no pattern for (`mfcr`, `cmpwi cr1, …`) comes back as `M2C_ERROR(...)` inline: a visible gap in the
+   shape, not a claim. Read the C as a starting shape and the disassembly as the arbiter - never as codegen
+   evidence.
+5. **Names, signatures and struct layouts** come from the dump (`get_struct_layout`, `get_function_signature`)
    - never treat the dump as codegen evidence, and never let it choose a compiler.
-4. **If the Ghidra instance or program is unreachable: stop and ask the user.** Do not substitute guesses
+6. **If the Ghidra instance or program is unreachable: stop and ask the user.** Do not substitute guesses
    from a stale `symbols.txt`.
 
 Then read the target: `python .agents/skills/mwcc-unit-matching/scripts/mt.py units` for what exists, and
@@ -212,6 +231,7 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
 ## 7. Never
 
 Never mark `Matching` below 100 % · never touch `orig/RMHE08/**` · never change `mw_version` or a shared
-`cflags` without instruction-level evidence · never take a range or a name another unit owns without the
-approval gate in §1 · never commit or push on your own initiative (leave a *prepared* commit instead - §6) ·
-never hand-edit `symbols.txt` (use `symedit.py`) · never edit another agent's files.
+`cflags` without instruction-level evidence (m2c's and Ghidra's C are shapes, not evidence) · never take a
+range or a name another unit owns without the approval gate in §1 · never commit or push on your own
+initiative (leave a *prepared* commit instead - §6) · never hand-edit `symbols.txt` (use `symedit.py`) ·
+never edit another agent's files.
