@@ -48,7 +48,7 @@ def od_size(e):
 
 
 def diff_unit(unit, label, symbol):
-    out = os.path.join(OUTDIR, label + ".json")
+    out = os.path.join(OUTDIR, label.replace("/", "_") + ".json")
     cmd = [OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol, "--format", "json", "-o", out]
     p = subprocess.run(cmd, cwd=uu.ROOT, capture_output=True, text=True)
     if p.returncode != 0:
@@ -102,7 +102,14 @@ def main():
         label = (version or "default") + ("__" + "_".join(args.flags_extra.split())
                                           if args.flags_extra else "")
         head_v = uu.with_compiler_version(head, version) if version else head
-        rc, log, obj = uu.run_compile(head_v + flags + tail, expect=unit.obj)
+        flags_v = list(flags)
+        rc, log, obj = uu.run_compile(head_v + flags_v + tail, expect=unit.obj)
+        while rc != 0 and len(flags_v) > 1:
+            trimmed = uu.drop_unknown_option(flags_v, log)
+            if trimmed is None:
+                break
+            flags_v = trimmed
+            rc, log, obj = uu.run_compile(head_v + flags_v + tail, expect=unit.obj)
         if rc != 0:
             msg = "%s: COMPILE FAILED rc=%d\n%s" % (label, rc, uu.quiet(log)[:800])
             print(msg)

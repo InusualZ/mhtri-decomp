@@ -340,17 +340,47 @@ def compiler_token(head):
 
 
 def with_compiler_version(head, version):
-    """Same command line, but with the compiler version component replaced."""
+    """Same command line, but with the compiler version component replaced.
+
+    `version` is a bare version ("1.3", the unit's own family) or a cross-family spec
+    ("GC/3.0a3").  The cross-family form is how a unit's compiler family is verified: a unit can come
+    from a different toolchain than the rest of the game (prebuilt SDK libraries in particular), and
+    the target object's `.comment` cannot answer that because it is synthesized from `config.yml`
+    (see docs/matching.md 17).
+    """
+    family, _, ver = version.partition("/")
     out = []
     for t in head:
         if t.endswith("mwcceppc.exe"):
             parts = re.split(r"[\\/]", t)
-            parts[-2] = version
+            parts[-2] = ver if ver else family
+            if ver:
+                parts[-3] = family
             sep = "\\" if "\\" in t else "/"
             out.append(sep.join(parts))
         else:
             out.append(t)
     return out
+
+
+def drop_unknown_option(flags, log):
+    """Remove the option MWCC rejected, so a matrix can span compiler generations.
+
+    Older compilers do not know every option the unit's command line uses (GC 1.x rejects
+    `-gccinc`, for instance), which would otherwise abort the whole sweep.
+    """
+    m = re.search(r"Unknown option '([^']+)'", log)
+    if not m:
+        return None
+    bad = m.group(1)
+    out = list(flags)
+    for i, f in enumerate(out):
+        if f == bad or (f.startswith("-") and bad in f):
+            del out[i]
+            if i < len(out) and not out[i].startswith("-"):
+                del out[i]
+            return out
+    return None
 
 
 def available_versions(head):
