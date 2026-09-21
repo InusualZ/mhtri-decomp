@@ -730,9 +730,13 @@ def score_cuts(an, lo, hi, window):
                 cand[c]["support"] += per
                 if width <= 4:
                     cand[c]["pins"].append((kind, why))
+        # A cut index is `boundary before function c`, so an anchor (a, b) - "functions a..b are one
+        # TU" - forbids cuts a < c <= b, NOT c == a: a cut before a does not separate a from b. Using
+        # `<=` on the left wrongly vetoed the closure's own start, which pushed the suggested boundary
+        # one function out (the 51-vs-50 seam on the Pl units, and LocateObject on RSO/runtime).
         for a, b, why in an["must_link"]:
             for c in rng:
-                if a <= c <= b and cand[c]["veto"] is None:
+                if a < c <= b and cand[c]["veto"] is None:
                     cand[c]["veto"] = why
         for d in cand.values():
             d["support"] = round(d["support"], 3)
