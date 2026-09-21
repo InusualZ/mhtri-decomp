@@ -93,9 +93,11 @@ All project skills live in one tracked folder, `.agents/skills/`, so every harne
 `mwcc-unit-matching/` (this playbook), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
 range and rename symbols without ever loading `symbols.txt` into context), `agents-md-local-only/`
 (`tools/agents/localonly.py` - pull the local-only section out of this file before a commit and push it
-back after), `objdiff-verify/` (proving a unit really matches) and `tu-boundary-discovery/`
+back after), `objdiff-verify/` (proving a unit really matches), `tu-boundary-discovery/`
 (`tools/splits/tudiscover.py` - from one symbol address, work out which functions and data ranges form one
-translation unit, before any source is written).
+translation unit, before any source is written) and `decompile-symbol/` (`tools/units/symbolpreflight.py`,
+plus `tools/units/m2cinput.py` for the `tools/m2c` decompiler - one symbol from an address to a registered,
+measured unit).
 
 | # | idea | problem it solves | status |
 | --- | --- | --- | --- |
@@ -209,6 +211,11 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                             agents/   AGENTS.md housekeeping (localonly.py): pull the local-only
                                       working-state section out before a commit and push it back after
                                       - see the `agents-md-local-only` skill
+                            units/    the `decompile-symbol` helpers (symbolpreflight.py: one symbol's
+                                      owner and collision pre-flight; m2cinput.py: a target object's
+                                      disassembly as `tools/m2c` input) plus their self-tests
+                            m2c/      matt-kempster/m2c as a git submodule - the offline decompiler
+                                      units/m2cinput.py feeds - see the `decompile-symbol` skill
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
