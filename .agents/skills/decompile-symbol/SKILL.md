@@ -78,6 +78,9 @@ A stop of kind 1 is not "report and give up": check whether the owning unit's so
    python tools/m2c/m2c.py -t ppc-mwcc-c --no-cache -f <symbol> build/tmp/<symbol>.s
    ```
 
+   A unit that lives in `.init` (the runtime and boot code) needs `--section .init` on the first command: its
+   default is `.text`, and the symbol is then simply "not found in the object".
+
    `m2cinput.py` exists because m2c wants GNU-as style asm, not `objdump -d` output; its docstring lists
    every rewrite and why (`@ha`/`@l`/`@sda21`, `loc_` labels, a mid-function tail call as `bl`+`blr`, the
    data-only `gap_*` blobs it has to drop). `--list` says what is in the object and marks the `bctr`

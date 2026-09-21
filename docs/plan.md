@@ -39,6 +39,15 @@ because that is the one input here that is a build output and it describes a rep
 | 3 | match | `mt.py diff/info`, `ninja changes`, report.json | the symbol's own `match_percent` ≥ 80, nothing else regressed, `ninja build/RMHE08/ok` still green | the residual in the unit's file header comment |
 | 4 | commit | `tools/git/prepcommit.py` | the review sheet is read and approved (rule 6) | one commit, and the ledger moves |
 
+**Alignment and flags, learned the hard way in batch 1.** `-O4,p` implies `-func_align 16`, and the retail SDK
+objects of `Runtime.PPCEABI.H` are all `.init align 2**2`: `memcpy.o`'s two functions are packed
+contiguously, while `__start.o`'s are 16-byte aligned. Both layouts are reproducible (a
+`#pragma function_align 4` in `memcpy.c`, the implied `-func_align 16` for `__start.c`), so no lib-wide flag
+changes until a measurement says otherwise; if one lands, every unit in that lib has to be re-measured, since
+function alignment moves every symbol after the first. A source pragma is also the honest place for a
+*per-unit* difference like this - and note the inverse lesson: a pragma the reference SDK source carries
+(`#pragma scheduling off` in `__init_data`) can itself be the residual, and no `-opt` sweep will show it.
+
 Steps 2-3 are the two existing skills: `decompile-symbol` for "an address becomes a registered, measured
 unit", `mwcc-unit-matching` for "this unit does not match yet". This plan only adds the order, the bar, and
 the bookkeeping.
@@ -88,6 +97,19 @@ python tools/splits/tudiscover.py at <address|name>         # TU boundary propos
 * **Name the unit** from module evidence, not from taste: `Panic(__FILE__, line)` strings in the surrounding
   code, pooled string literals, clusters of mangled C++ names, or the shared runtime dump
   (`docs/memory-dump.md`). A unit's path mirrors the module (`src/<Dir>/<file>.c`).
+* **Claiming a unit's data ranges is what makes its relocations pair.** A `static` the retail file defines but
+  nothing claims stays in the `auto_*` scaffold, where dtk names it `<name>_<address>` - and objdiff matches a
+  relocation by name, so the owning unit's score stops just short (batch 1: 98.33 % and 97.5 % on two 3- and
+  2-instruction accessors until the re-split after registration renamed it back). The catch is alignment: a
+  `.sbss` split has to be 16-byte aligned (`Invalid alignment for split: ... .sbss 10:0x807953C9`), so a
+  one-byte static that shares its 16-byte block with another unit's symbols **cannot** be claimed - accept the
+  reloc-name residual and write it down in the unit header.
+* **Never claim linker-generated data.** `_rom_copy_info` / `_bss_init_info` are "found in Linker Generated
+  Symbol File" in `build/RMHE08/main.MAP`; MW ld emits them, no source can own them, and the DOL reproduces
+  them byte-identically. A `preflight` draft for such an address is wrong: reject it.
+* **A unit owns its `extab`/`extabindex` fragment, but check whose it is** before claiming one: the entry that
+  a surrounding function's unwind record names belongs to *that* function's unit (`@etb_800066E0` in `.init` is
+  `main`'s, three sections away from the `.init` code it sits next to).
 * **`approve` and `never touch` are stop signs** (skill `decompile-symbol` §1): both are reported with
   numbers and wait for a human answer. `never touch` means the owner is `Matching` and its bytes are linked.
 * Data-only symbols cannot be decompiled - they are claimed as ranges, which is what later lets the code
