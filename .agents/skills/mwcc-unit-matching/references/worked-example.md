@@ -11,8 +11,10 @@ SDK names and seven `fn_XXXX`. Everything below is in the repository now (`src/R
 
 **Finding out what the unit is** (idea 25): one `mcpScript` fanning the nine addresses through the shared
 dump returned `LocateObject`, `RSOStaticLocateObject`, `RSOUnLocateObject`, `RSOLink`, `RSOUnLink`,
-`FindExportIndex`, `RSORelocate`, `RSORelocateSmallDataSection`, the four `RSONotify*` thunks - plus
-typed signatures and an `RSOModule` layout that matched every offset derived from the disassembly.
+`FindExportIndex`, `RSORelocate` and `RSORelocateSmallDataSection` - eight of the nine (`fn_804DA7E4` is
+a `zz_` placeholder there too) - plus the four 4-byte `RSONotify*` thunks that sit immediately *before*
+the range, typed signatures whose body lengths match this repo's map sizes exactly, and an `RSOModule`
+layout that matched every offset derived from the disassembly.
 
 **Finding out how it was built** (ideas 17, 21): the record-form count (9 in this target, 0 in
 `Camellia`'s) said peephole + scheduling were on, so `-opt nopeephole` - the project's `Camellia` setting -
