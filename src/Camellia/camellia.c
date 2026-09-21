@@ -29,6 +29,20 @@
  *  http://info.isl.ntt.co.jp/crypt/eng/camellia/specifications.html
  */
 
+/*
+ * Monster Hunter Tri, RMHE08 -- Camellia (NTT 1.2.0, MPL 1.1; see the vendor header above).
+ *
+ * Nine of the ten functions are byte-identical to the retail object.  camellia_setup256 does not
+ * match: our frame is -0x1e0 where retail uses -0x1d0, one extra 4-byte local slot, because
+ * `subL[29]`'s split live range takes two slots (0x64 and 0xcc) where retail keeps one (0xc8).
+ * Every instruction is otherwise identical, so it is allocator ordering, not semantics: statement
+ * shape, comma splitting, `x ^= y` spelling, declaration order and the whole `-O`/`-opt` axis are
+ * ruled out (the per-function `#pragma optimization_level 4` pair reaches the retail frame but
+ * reorders the absorb `dw` chain).  Details: docs/matching.md 16, .pi/notes/camellia-match-process.md.
+ *
+ * Flags: `cflags_camellia` in configure.py.
+ */
+
 
 // #include <string.h>
 // #include <stdlib.h>
@@ -662,22 +676,7 @@ void camellia_setup128(const unsigned char *key, u32 *subkey)
     return;
 }
 
-/*
- * MATCHING STATUS: not a matched function -- objdiff reports 99.83 % (v3.6.1; 4860 B / 1215
- * instructions, every one of them identical to the retail object except for the r1 offsets).
- * Residual: our frame is -0x1e0 where the retail object uses -0x1d0, i.e. exactly one extra 4-byte
- * local slot, which shifts every slot from 0x64 upwards by 4.
- *
- * `subL[29]` is the value that keeps ONE slot in the retail object (0xc8) and TWO in ours (0x64 for
- * the range defined by `subl(29) = krl;` and read by `subl(29) ^= subl(1);`, plus 0xcc for the result
- * of that xor, read by CamelliaSubkeyL(28)/(30)).  MWCC scalarizes subL[]/subR[] into individual
- * pseudo-variables, so this is a register-allocator ordering difference, not a semantic one.
- *
- * Ruled out (all byte-identical output): statement shape, comma-operator splitting, `x ^= y` spelling,
- * declaration order.  Ruled out as flags: the whole -O/-opt axis -- `-opt nopeephole,level=4` does
- * produce the retail frame, but it reorders two XORs of the absorb `dw` chain, which the retail object
- * does not do, so the level really is 3.  See .pi/notes/camellia-match-process.md finding #14.
- */
+/* Derives the 34 subkeys of the 256-bit Camellia key schedule from eight 32-bit key words. */
 void camellia_setup256(const unsigned char *key, u32 *subkey)
 {
     u32 kll,klr,krl,krr;           /* left half of key */
