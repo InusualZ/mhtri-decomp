@@ -583,13 +583,15 @@ SDK symbol names, function signatures, annotated struct layouts and the contents
 does not own. It answers in one query what otherwise costs a disassembly read - and it answers questions
 no static object can.
 
-**Result.** For `RSO/runtime` it named all nine functions (`LocateObject`, `RSOUnLink`, `FindExportIndex`,
-`RSORelocate`, `RSORelocateSmallDataSection`, and the four `RSONotify*` thunks), gave their signatures
-(`RSOLink(RSOModule*, RSOModule*, ...)` - the second argument is the *exporting* module, not a private
-"relocation table"), and its `RSOModule` layout confirmed every offset this project had derived by hand,
-with real field names. It is **not** codegen evidence (idea 17), its annotations mix SDK names with Ghidra
-placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23). Recipes and the
-full worked example: `docs/memory-dump.md`.
+**Result.** For `RSO/runtime` it named eight of the unit's nine functions (`LocateObject`,
+`RSOStaticLocateObject`, `RSOUnLocateObject`, `RSOLink`, `RSOUnLink`, `FindExportIndex`, `RSORelocate`,
+`RSORelocateSmallDataSection` - the ninth, `fn_804DA7E4`, is a `zz_` placeholder there too), and it
+separately named the four 4-byte `RSONotify*` thunks that sit just *before* the unit's range. It gave
+their signatures (`RSOLink(RSOModule*, RSOModule*, ...)` - the second argument is the *exporting* module,
+not a private "relocation table"), and its `RSOModule` layout confirmed every offset this project had
+derived by hand, with real field names. It is **not** codegen evidence (idea 17), its annotations mix SDK
+names with Ghidra placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23).
+Recipes and the full worked example: `docs/memory-dump.md`.
 
 ## 26. The target's section is part of the match
 
@@ -668,8 +670,10 @@ SDK names and seven `fn_XXXX`. Everything below is in the repository now (`src/R
 
 **Finding out what the unit is** (idea 25): one `mcpScript` fanning the nine addresses through the shared
 dump returned `LocateObject`, `RSOStaticLocateObject`, `RSOUnLocateObject`, `RSOLink`, `RSOUnLink`,
-`FindExportIndex`, `RSORelocate`, `RSORelocateSmallDataSection`, the four `RSONotify*` thunks - plus
-typed signatures and an `RSOModule` layout that matched every offset derived from the disassembly.
+`FindExportIndex`, `RSORelocate` and `RSORelocateSmallDataSection` - eight of the nine (`fn_804DA7E4` is
+a `zz_` placeholder there too) - plus the four 4-byte `RSONotify*` thunks that sit immediately *before*
+the range, typed signatures whose body lengths match this repo's map sizes exactly, and an `RSOModule`
+layout that matched every offset derived from the disassembly.
 
 **Finding out how it was built** (ideas 17, 21): the record-form count (9 in this target, 0 in
 `Camellia`'s) said peephole + scheduling were on, so `-opt nopeephole` - the project's `Camellia` setting -
