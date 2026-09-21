@@ -91,11 +91,11 @@ The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matchi
 and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
 `variants`, `diff`, `slots`, `sections`, `dwarf`). The table below stays the source of truth for state.
 
-Three more tracked skills sit next to it, all deliberately narrow: `.agents/skills/symbol-map-editing/`
-(`tools/symbols/symedit.py` - look up, list by range and rename symbols without ever loading
-`symbols.txt` into context), `.agents/skills/agents-md-local-only/` (`tools/agents/localonly.py` - pull the
-local-only section out of this file before a commit and push it back after) and
-`.pi/skills/objdiff-verify/` (proving a unit really matches).
+All project skills live in one tracked folder, `.agents/skills/`, so every harness sees the same set:
+`mwcc-unit-matching/` (this playbook), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
+range and rename symbols without ever loading `symbols.txt` into context), `agents-md-local-only/`
+(`tools/agents/localonly.py` - pull the local-only section out of this file before a commit and push it
+back after) and `objdiff-verify/` (proving a unit really matches).
 
 | # | idea | problem it solves | status |
 | --- | --- | --- | --- |
@@ -272,7 +272,7 @@ Notes:
 
 Verifying whether a unit, function or symbol matches is its own procedure — per-symbol objdiff plus raw ELF
 evidence, and a specific set of traps (`complete_code_percent` lies, `ninja build/RMHE08/ok` cannot isolate
-one unit, a function missing from the report is 0 %). Follow skill **`.pi/skills/objdiff-verify/SKILL.md`**
+one unit, a function missing from the report is 0 %). Follow skill **`.agents/skills/objdiff-verify/SKILL.md`**
 (the only tracked path under `.pi/`; everything else there is gitignored).
 
 ## The core loop: adding / matching a translation unit
@@ -318,7 +318,7 @@ regression if the hash goes red.
   `Matching` unit's object is substituted in. A `Matching` flag on a wrong object is worse than no flag —
   and a failing `ninja build/RMHE08/ok` cannot tell you *which* unit is wrong.
 * **A `.comment` version-byte difference means a different compiler build.** Dump it with
-  `python tools/elf/elfsect.py <obj>` (also at `.pi/skills/objdiff-verify/scripts/elfsect.py`): the
+  `python tools/elf/elfsect.py <obj>` (also at `.agents/skills/objdiff-verify/scripts/elfsect.py`): the
   original Camellia object is `"CodeWarrior" 0e …`, our `Wii/1.3` build is `"CodeWarrior" 0f …`, and
   `config.yml`'s `mw_comment_version: 14` describes the original. Different version byte + `0 %`/size-very-
   different functions = suspect the compiler release, not the source.
@@ -334,11 +334,9 @@ regression if the hash goes red.
   DOL; they are not offsets, and section order matters (`.init`, `extab`, `extabindex`, `.text`, ...).
 * Stale `build/` output causes false conclusions (an old object from different flags can look "matching").
   Prefer a clean rebuild of the specific unit, and `rm -rf build/RMHE08` when in doubt.
-* Local agent scratch directories (`.lavish/`, `.agents/`, `openspec/`, and everything under `.pi/`
-  **except** the tracked `.pi/skills/objdiff-verify/` skill and the tracked `.agents/skills/`
-  `mwcc-unit-matching/`, `symbol-map-editing/` and `agents-md-local-only/` skills) are gitignored; keep them
-  that way and never add their contents to commits. The exceptions are narrow on purpose: the ignore rules
-  un-ignore the skills directory and then re-ignore everything in it except those skills.
+* Local agent scratch directories (`.lavish/` and everything under `.pi/` - notes, prompts, scratch) are
+  gitignored; keep them that way and never add their contents to commits. `.agents/` is ignored **except**
+  its skills folder, which is tracked in full (`.agents/skills/`) so every harness shares one set of skills.
 
 ## Conventions
 
