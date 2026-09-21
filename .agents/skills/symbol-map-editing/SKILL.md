@@ -1,0 +1,64 @@
+---
+name: symbol-map-editing
+description: Query and surgically edit a decomp-toolkit symbol map (config/RMHE08/symbols.txt and the per-module config/RMHE08/<module>/symbols.txt) without loading the file into context - name/address/range lookup, rename with reference checking, duplicate checks - through tools/symbols/symedit.py. Use when a unit needs a symbol renamed to its real name, when the symbols of an address or split range must be listed, or when a rename's other half (the references) must be found.
+license: MIT
+compatibility: decomp-toolkit project layout; map lines look like `name = section:0xADDR; // type:... size:...`
+metadata:
+  author: mhtri-dtk
+  tool: tools/symbols/symedit.py
+---
+
+# Editing the symbol map without reading it
+
+`config/RMHE08/symbols.txt` is ~65 700 lines / 4.5 MB, and the per-module RSO maps add 4 462 more lines.
+Never paste it into a prompt, never read it whole, and never regenerate it to make a small change.
+`tools/symbols/symedit.py` is the proxy: it prints only the lines you asked for, and it changes only the
+name token you asked it to change.
+
+## Commands
+
+| goal | command |
+| --- | --- |
+| what is this symbol? | `python tools/symbols/symedit.py show <name> [<name> ...]` |
+| what is called like X? | `python tools/symbols/symedit.py find "<regex>" [--section .text] [--type function] [--limit N]` |
+| what is around this address? | `python tools/symbols/symedit.py at 0x804DA598 [--count N] [--section .text]` |
+| what is inside this split range? | `python tools/symbols/symedit.py range 0x804D9B4C 0x804DAE40 [--section .text]` |
+| where is this name referenced? | `python tools/symbols/symedit.py refs <name> [--roots src include docs]` |
+| is the map sane? | `python tools/symbols/symedit.py check` |
+| rename one symbol | `python tools/symbols/symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]` |
+| rename many | `python tools/symbols/symedit.py rename-batch map.txt [--dry-run]` (lines of `old new`) |
+| a per-module RSO map | add `--file config/RMHE08/<module>/symbols.txt` |
+
+`--json` gives machine-readable output, and every option works both before and after the subcommand.
+All output is bounded by `--limit` (default 40) and says how many more there are, so a lookup can never
+flood the context.
+
+## Renaming: the rules that matter
+
+1. **A rename is two edits in one change**: the map (it names the *target* object) and the source that
+   defines or references the symbol. Rename only the map and objdiff stops matching the symbol by name and
+   reports it as 0 %.
+2. **Find the other half first**: `refs <name>` lists every in-repo mention (source, docs, tools).
+   `rename` runs the same scan and prints it after writing.
+3. **Dry-run, then apply.** The tool refuses when the old name is not defined exactly once or the new name
+   is already taken (`--force` overrides the latter), writes atomically, preserves the file's line endings,
+   and prints just the one line it changed - that output *is* the diff to quote in the report.
+4. **Verify after**: `python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u <unit> <new-name>` must
+   show the same match as before, and `ninja build/RMHE08/main.dol` must keep the same hash.
+5. **Never regenerate the map for a rename.** It is hand-editable; a regeneration (`ninja apply`) brings the
+   generated names back and silently loses every documented rename.
+6. **Choosing the name is its own judgement call** - real name when it is known, fitting the surrounding
+   naming scheme, `fn_xxxxxxxx` beats a speculative name. The rules are in `AGENTS.md` -> Conventions ->
+   "Commenting and naming", and `docs/memory-dump.md` is where real names come from.
+
+## Reading the map
+
+* Prefer `find`/`at`/`range` over `grep`: they parse the format, so they can filter by section and type,
+  and they print a fixed-width table instead of raw lines.
+* `check` reports duplicate names and unparsed lines. Three duplicate names are **pre-existing** in this
+  project's map (`@stringBase0` x3, `ShutdownFunctionInfo` x2, `BootInfo` x2 - dtk synthesizes the same name
+  for different units' data). Do not "fix" them without knowing what references them.
+* Address alias groups (two names on one address, e.g. `_dtors` and `__destroy_global_chain_reference`) are
+  normal and are reported as information, not as a failure.
+* The map is not the only name source: `docs/memory-dump.md` (the shared Ghidra runtime dump) has real SDK
+  names and signatures for symbols this map still calls `fn_xxxxxxxx`.
