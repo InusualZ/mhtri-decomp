@@ -12,3 +12,7 @@
   does not change `.text` here.
 * **`-O` level and `-schedule`/`-fp_contract`/`-ipa`.** Worth exactly one sweep each; if the level is wrong
   the symptom is unmistakable (sizes off by hundreds of bytes and fused/hoisted code everywhere).
+* **Disassembler aliases as fingerprints.** `extrwi`, `clrlslwi` and friends are *aliases* GNU objdump never
+  prints (it prints the underlying `rlwinm`), so counting them on either side proves nothing - see idea 21.
+  Fingerprint what the compiler emits (record forms, save-helper calls, `lis` sharing), not what the
+  disassembler happens to name.

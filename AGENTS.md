@@ -19,7 +19,6 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `Runtime.PPCEABI.H` holds two stubs registered as `NonMatching` (= not linked). Everything else is
   still unsplit.
 
-
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
@@ -57,9 +56,10 @@ Two working rules that apply to **every** unit, agreed with the project owner:
 1. **Apply the best-scoring variant even if it is not a full match.** A source rewrite or flag change is
    worth landing as soon as it *measurably improves* the objdiff score (`ninja build/RMHE08/report.json`,
    per-symbol `match_percent`) and regresses nothing else. Do not hold a real improvement back waiting for
-   100 %: record the residual diff (what still differs and why) **in that unit's header file**, for
-   example as a comment on top of the specific symbol it concerns, so the next reader finds it where the
-   code lives. Never land a change that makes any function worse. Landing means the unit's own source or
+   100 %: record the residual diff (what still differs and why) **in the unit's file header comment**, so
+   the next reader finds it where the code lives. The residual belongs in that one place, never as a
+   per-function comment - see "Commenting and naming" under Conventions for what a function comment is for.
+   Never land a change that makes any function worse. Landing means the unit's own source or
    `configure.py` carries the change and the repository rebuilds better - the skill does it with
    `python .agents/skills/mwcc-unit-matching/scripts/mt.py variants --apply <name>` followed by a forced
    rebuild; a probe-only winner is not progress.
@@ -87,6 +87,10 @@ The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matchi
 and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
 `variants`, `diff`, `slots`, `sections`, `dwarf`). The table below stays the source of truth for state.
 
+Two more tracked skills sit next to it, both deliberately narrow: `.agents/skills/symbol-map-editing/`
+(`tools/symbols/symedit.py` - look up, list by range and rename symbols without ever loading
+`symbols.txt` into context) and `.pi/skills/objdiff-verify/` (proving a unit really matches).
+
 | # | idea | problem it solves | status |
 | --- | --- | --- | --- |
 | 1 | Per-unit instrument | The project-wide pass/fail cannot measure one unit (`ninja build/RMHE08/ok` cannot pass while any object is `NonMatching`, and `complete_code_percent` says 100 % for wrong code), so no change can be judged. | no |
@@ -105,6 +109,15 @@ and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`,
 | 14 | Prove the committed flags reproduce the object | A hand-written `cflags_*` list can silently differ from the command line that was tested (leftover `-O4,p`, duplicated `-inline`). | no |
 | 15 | Pin a metric that does not drift | Fuzzy percentages change between objdiff versions, so a decision made against one number is meaningless against the other. | no |
 | 16 | Scope optimizer settings per function with pragmas | The `-opt` levers are global, so a per-function codegen difference looks unreachable from the source side - a pragma pair scopes them to one function. | no |
+| 17 | Cross-family version matrix | `mw_version` is inherited project-wide and the target's `.comment` is synthesized, so a unit built by a different toolchain (a prebuilt SDK library, say) looks like an unexplainable residual. | done |
+| 18 | Named temporaries, declaration order, operand order | With the opcodes already equal the residual is register numbers only and looks unreachable - but the allocator colours live ranges from the source's temporary structure. | done |
+| 19 | Loop shape decides the loop idiom | A countdown loop only becomes `mtctr`/`bdnz` from the right source shape; the wrong shape adds an instruction and shifts every later register. | done |
+| 20 | Loop-invariant address through a `u32` local | Retail keeps a field address in a callee-saved register where we fold it into a load displacement, which costs a register and the whole function's colouring. | done |
+| 21 | Record-form count as the peephole/scheduling fingerprint | `-opt` is per unit, and the old whole-DOL `extrwi` scan could not see the fused form at all (it is an objdump alias). | done |
+| 22 | Stop when retail's colouring is your mirror image | Once only the allocator's web priority differs, more source shapes cannot help - record the residual and move on. | done |
+| 23 | `splits.txt` data ranges: what objdiff can and cannot fix | Defining a data symbol fixes name rows only by (section, offset), and can make dtk drop the target's `R_PPC_NONE` pool relocs - a regression. | done |
+| 24 | Merging a probe into the unit is its own step | Probe numbers are not unit numbers, and one struct definition has to serve every function, so types need use-site casts and everything must be re-measured. | done |
+| 25 | Shared memory dump as a name/signature/struct oracle | Unnamed `fn_*` functions and untyped structs can be resolved in one query from the game's runtime dump (`docs/memory-dump.md`). | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
@@ -125,9 +138,12 @@ section at the top of this file.
 | `no` | tried for the current target and it did not resolve it, or it does not apply |
 | `done` | this is what resolved the current target (and it is the `docs/matching.md` section with this row's number) |
 
-All 15 rows read `no` today because the table was derived from the `Camellia` flag hunt: the ideas all
-worked there and their outcome is already in `configure.py`, but none of them is what the open
-`camellia_setup256` residual needs.
+Rows 1-16 read `no` because the table was derived from the `Camellia` flag hunt: the ideas all worked there
+and their outcome is already in `configure.py`, but none of them is what the open `camellia_setup256`
+residual needs. Rows 17-25 are `done` for the target in flight, the `RSO/runtime` unit - each one is the
+idea that closed part of it, and the full walkthrough is the "Worked example: the `RSO/runtime` unit"
+section of `docs/matching.md`. Every idea that produced a win gets recorded here (and as a section) **in the
+same session it worked** - see "How to work the list" below.
 
 New ideas for the current target (no `docs/matching.md` section yet - they earn one only if they work):
 
@@ -146,7 +162,10 @@ How to work the list:
 2. Update the row's status and put the step you are on in the local-only section, so a fresh session knows
    where to resume.
 3. A `done` idea gets a section in `docs/matching.md` in the house style - **Problem / Why try it /
-   Result / Example**, short and to the point - and the row's number is that section's number.
+   Result / Example**, short and to the point - and the row's number is that section's number. **Record it in
+   the same session, as soon as it works**: a win that only exists in a chat message or a scratch report is
+   lost at the next compaction and the next unit re-derives it (this has already happened once here), so
+   treat "the idea is written into the table and the playbook" as part of the win, not as follow-up work.
 4. When every row is `no` again, the target needs **new** ideas: add them here as `todo` rows first
    (idea + problem it solves), try them, and promote the ones that work into `docs/matching.md` (same
    style, next free number). Ideas that fail stay in the table as `no`, so they are not re-run.
@@ -177,9 +196,25 @@ docs/                     Where all documentation lives — ours and dtk-templat
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
                           "Matching playbook" section above, which doubles as the todo list.
+                          memory-dump.md documents the shared Ghidra runtime memory dump: real SDK
+                          symbol names, annotated struct layouts and data contents, used as an
+                          oracle for names/signatures/data (never for codegen) - see below.
                           rso-modules.md documents the RSO module format, the inventory and the
                           splitter blocker.
 ```
+
+### External oracles
+
+* **Shared Ghidra project `MH3Shared` / runtime memory dump `/DolphinDump85.raw.keep`** (a dump of the
+game running, reachable through the `ghidra` MCP server). It is the quickest way to turn a region full
+of `fn_XXXX` into named SDK functions, to get a function's real signature, to confirm a struct's field
+offsets/names, or to read a data blob this repo does not own yet. Example: it named the `RSO/runtime`
+unit's thunks `RSONotifyPreRSOLink`/`RSONotifyPostRSOLink`, its `fn_804DA834` `FindExportIndex` and its
+`fn_804DAA24` `RSORelocate`, and its `RSOModule` layout matched every offset we had derived by hand.
+Two rules: it is **not** codegen evidence (flags and the compiler family still come from diffing the
+retail bytes, see playbook 17), and a `splits.txt` range derived from it must be **measured before and
+after** - claiming the RSO unit's string pool *lowered* a function by 1.35 points, claiming its jump
+table raised another by 0.08. Details and the recipes: `docs/memory-dump.md`.
 
 Inside `build/RMHE08/`:
 
@@ -231,7 +266,9 @@ one unit, a function missing from the report is 0 %). Follow skill **`.pi/skills
 ## The core loop: adding / matching a translation unit
 
 1. **Find the unit.** Locate the function in `config/RMHE08/symbols.txt` (`grep`), get its address and size,
-   and find the surrounding section ranges in `config/RMHE08/splits.txt`.
+   and find the surrounding section ranges in `config/RMHE08/splits.txt`. If it is an unnamed `fn_XXXX`,
+   look it up in the shared memory dump (`docs/memory-dump.md`) first - the real SDK name and signature
+   usually come back in one query, and they tell you what the function is before you read a byte of code.
 2. **Register it** in `config.libs` in `configure.py`: pick the right `mw_version` (this is a Wii title:
    `Wii/1.0` for REL-type code, `Wii/1.3` for runtime-style code — **not** the GC compilers) and an
    appropriate `cflags` group (`cflags_runtime` for runtime units, `cflags_base` otherwise).
@@ -286,10 +323,10 @@ regression if the hash goes red.
 * Stale `build/` output causes false conclusions (an old object from different flags can look "matching").
   Prefer a clean rebuild of the specific unit, and `rm -rf build/RMHE08` when in doubt.
 * Local agent scratch directories (`.lavish/`, `.agents/`, `openspec/`, and everything under `.pi/`
-  **except** the tracked `.pi/skills/objdiff-verify/` skill and the tracked
-  `.agents/skills/mwcc-unit-matching/` skill) are gitignored; keep them that way and never add their
-  contents to commits. Both exceptions are narrow on purpose: the ignore rules un-ignore the skills
-  directory and then re-ignore everything in it except the one skill.
+  **except** the tracked `.pi/skills/objdiff-verify/` skill and the tracked `.agents/skills/`
+  `mwcc-unit-matching/` and `symbol-map-editing/` skills) are gitignored; keep them that way and never add
+  their contents to commits. The exceptions are narrow on purpose: the ignore rules un-ignore the skills
+  directory and then re-ignore everything in it except those skills.
 
 ## Conventions
 
@@ -298,9 +335,39 @@ regression if the hash goes red.
   `configure.py: add REL flags`. Describe *why* when fixing a mismatch.
 * **Keep generated/large churn separate.** A `symbols.txt` regeneration or an analyzer settings change gets
   its own commit; never mix it with source changes or unrelated formatting.
-* **Naming:** use the real name when it's known from the original binary/symbol map; leave dtk's generated
-  `FUN_xxxxxxxx` names in place until they're understood. Vendor files keep vendor naming
-  (e.g. `Camellia/` uses `CAMELLIA_*` constants and its original MPL-1.1 header — keep those intact).
+* **Naming and commenting** (see "Commenting and naming" below): use the real name when it's known, leave
+  dtk's generated `FUN_xxxxxxxx`/`fn_xxxxxxxx` names in place until they're understood, and keep function
+  comments descriptive. Vendor files keep vendor naming (e.g. `Camellia/` uses `CAMELLIA_*` constants and its
+  original MPL-1.1 header — keep those intact).
+* **Commenting and naming** (applies to every unit we write):
+  * **A comment on top of a function is a short description of what the function does** - one or two lines,
+    in the present tense ("Rebases the module's section pointers, then patches every import's relocation
+    chain."). It must **not** carry the symbol's name and **not** a matching percentage: the name is already
+    the identifier below it, and the percentage lives in the objdiff report (and changes on every build).
+    Residuals, flag evidence, name provenance and anything else that is about the *unit* go in the unit's
+    file header comment.
+  * **The unit's file header comment is the one place for the unit's own notes** - what it is, the `.text`
+    range and function order, where its flags/evidence live, the residuals, and any load-bearing source
+    shapes. Keep it to the essentials: one line per fact, no repetition of what `configure.py`, the playbook
+    or a report already says, and no per-function inventory (addresses, sizes and instruction counts are in
+    `symbols.txt` and the objdiff report). A header that re-argues the flag hunt or tabulates every function
+    is noise the next reader has to skip - the two existing units' headers are the length to aim for.
+  * **Use the real name when it is known** (the retail symbol map, the shared memory dump in
+    `docs/memory-dump.md`, the SDK), or a descriptive name when you clearly have a better one - but it has
+    to fit the **naming scheme of the surrounding symbols**, especially where siblings are already named:
+    in the `RSO/runtime` unit `RSOStaticLocateObject`/`RSOUnLocateObject` make `LocateObject` an obvious fit,
+    and `RSORelocate`/`RSORelocateSmallDataSection`/`RSOUnLink`/`RSONotifyPreRSOLink` match the `RSO*` public
+    API around them. A name that reads like it belongs to another module is worse than `fn_xxxxxxxx`. Leave
+    a generated name in place when there is no known or clearly better one - a speculative name is a bug.
+  * **A rename is always two edits**: `config/RMHE08/symbols.txt` (which names the *target* object) and the
+    source that defines/references it, in the same change - otherwise objdiff stops matching the symbol by
+    name and reports it as 0 %. Verify with `mt.py diff -u <unit> <symbol>` and keep the linked DOL hash
+    unchanged; symbols.txt edits are surgical (never regenerate it to do this).
+  * **Name `unk` variables, fields and parameters from the context they are used in** - what is stored,
+    what it is compared against, which SDK type the offset belongs to, what the value is later passed to
+    (e.g. `unk50` in a struct became `import_symbol_table_size` once the dump confirmed the layout, and an
+    argument only ever used as a string pointer became `symbol`). Leaving `unk`/`unkNN` in place is fine and
+    expected when the context does not support a name - do not invent one to fill the gap.
 * **Style:** match the file you're editing (vendor sources mirror upstream formatting; new project code
   follows the surrounding 4-space-indent C style). Files are UTF-8, LF endings (`.gitattributes`
   enforces the checkout).
@@ -321,7 +388,8 @@ regression if the hash goes red.
 * [ ] The committed `AGENTS.md` has no local-only block: `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'`
       → `0`.
 * [ ] `symbols.txt` / `splits.txt` edits are byte-clean for the lines you didn't mean to touch
-      (`git diff --stat` sanity check — these files are huge).
+      (`git diff --stat` sanity check — these files are huge; a symbol rename goes through
+      `python tools/symbols/symedit.py rename`, so its diff is exactly one line per symbol).
 * [ ] No new compiler flags / tool version changes smuggled in.
 * [ ] Nothing was committed or pushed unless the user asked for it (see Non-negotiables rule 6); staged vs.
       unstaged state reported clearly.

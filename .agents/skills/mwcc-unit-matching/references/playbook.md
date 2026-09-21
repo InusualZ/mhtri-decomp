@@ -308,7 +308,10 @@ have not found" from "the wrong flag that happens to fix one symptom".
 
 **Result.** Inspect what the near-miss variant does to the instruction stream. If it reorders instructions
 the target does not reorder, the flag is wrong and the residual belongs to source shape or liveness - stop
-flag hunting there and document the residual instead (see the matching policy in `AGENTS.md`).
+flag hunting there and document the residual instead (see the matching policy in `AGENTS.md`). Document it
+**once, in the unit's file header comment** - not as a comment on the function it concerns: a function
+comment is a short description of what the function does, never its symbol name, its match percentage or a
+residual (see `AGENTS.md` -> Conventions).
 
 **Example**
 
@@ -394,3 +397,201 @@ void camellia_setup192(const unsigned char *key, u32 *subkey) { ... }
 ```sh
 python tools/flags/tryvar.py -u <unit> v26_pragma_opt4   # frame -0x1d0, 99.32 % (only the window differs)
 ```
+
+## 17. Cross-family version matrix: a unit's compiler is per unit, not per project
+
+**Problem.** `mw_version` is set once per library in `configure.py` and every unit inherits the same one
+(the template default here is `Wii/1.3`). Prebuilt SDK libraries in particular were compiled by Nintendo
+with whatever compiler the SDK shipped with, so a unit can legitimately come from a *different* toolchain -
+and then no flag or source change will ever close its residual.
+
+**Why try it.** The target object's `.comment` cannot answer it: the retail DOL has no `.comment` section at
+all (`grep -c -a CodeWarrior orig/RMHE08/sys/main.dol` -> `0`), so the comment in a split object is
+synthesized from `config.yml`'s `mw_comment_version` and says nothing about the original build (trick 4).
+Codegen is the oracle, so compile the unit with every installed compiler *across families* and diff each
+result: a single function whose instruction count differs is enough to separate them.
+
+**Result.** For `RSO/runtime` the matrix is flat *within* each family but separates the families on exactly
+one function - every other reconstructed function is byte-identical under all of them:
+
+| compiler | `fn_804DA7E4` | `fn_804DA834` | `fn_804DAA24` |
+| --- | --- | --- | --- |
+| GC 1.0 - 1.2.5n | 69.5 % | 82.2 % | 84.3 % |
+| GC 1.3 - 2.7 | 69.75 % | 90.8 % | 93.3 % |
+| **GC 3.0a3 / 3.0a5 / 3.0a5.2** | **100 %** | **100 %** | **99.30 %** (460 B / 115 insns = retail) |
+| Wii 0x4201_127 - 1.7 | 100 % | 100 % | 97.30 % (116 insns: one extra `lwz`) |
+
+So the unit was built with a GC-era compiler (its lib entry now carries `mw_version: "GC/3.0a3"`); every Wii
+compiler emits one instruction more than retail in the `R_PPC_REL24` case. The three 3.0a* builds are
+codegen-identical on every reconstructed function, so the choice among them is only tied down by
+`config.yml`'s `mw_comment_version` (14 = 3.0a3's comment byte; 3.0a5.x and the Wii compilers emit 15) -
+that is a config value, not retail evidence. Older compilers also reject options the newer ones accept
+(GC 1.x rejects `-gccinc`), so the driver drops unknown options and retries.
+
+**Example**
+
+```sh
+python tools/flags/mwcc_matrix.py -u RSO/runtime GC/1.2.5n GC/3.0a3 Wii/1.3 Wii/1.7
+# cross-family specs are "<family>/<version>"; a bare version still means the unit's own family
+```
+
+## 18. Named temporaries, declaration order and operand order steer the allocator
+
+**Problem.** Once the opcodes, sizes and relocations all match, the residual is often nothing but register
+numbers, and it looks unreachable from the source side.
+
+**Why try it.** MWCC colours live ranges from the *source's* temporary structure, not only from the data
+flow: an unnamed sub-expression is a short-lived temp with its own range, a named local gets its own
+colour, and the order in which two locals are declared (or assigned) decides which one gets the lower
+register. Operand order is observable as well - `a != b` and `b != a` emit `cmplw` with swapped operands.
+
+**Result.** The single biggest lever on `RSO/runtime`, closing the last 2-39 % of three functions:
+`fn_804DA7E4` 61.45 -> **100 %** (a signed `int count` for the `srwi.`+`ble` entry test plus a named
+`RSOImport* pEntry` so the pointer lands in r4 and the byte offset in r5 instead of r0/r6),
+`fn_804DA834` 81.56 -> **100 %** (a named `u32 no = <entry>.name_offset` at all three `strcmp` sites, a
+named pointer *before* a named offset in the backward scan, and `hash == p->hash` rather than the
+reverse), `RSOLink` 98.20 -> **100 %** (function-scope declaration order: the loop pointer before the entry
+pointer). `RSOStaticLocateObject` needed the message as a local `char* msg = ...`; using the symbol inline
+cost an extra `@ha` register and a whole `_savegpr_14` vs `_savegpr_15` colouring.
+
+**Example**
+
+```c
+/* 61.45 % -> 100 %: signed count for the record-form test, named pointer for the colour */
+int count = pModule->import_symbol_table_size / 12;   /* srwi. r0,r0,3 + ble */
+u32 offset = 0;
+RSOImport* pEntry;                                    /* r4; unnamed, the offset is pushed to r6 */
+while (count-- > 0) {
+    pEntry = (RSOImport*)((u8*)pModule->import_symbol_table_offset + offset);
+    if (pEntry->code_offset == pModule->unresolved_function_offset) return FALSE;
+    offset += 12;
+}
+```
+
+## 19. Loop shape decides the loop idiom
+
+**Problem.** A loop can compile to a `mtctr`/`bdnz` countdown, to a compare-and-branch, or to a bottom-tested
+loop; the wrong idiom adds or removes instructions and moves every later register.
+
+**Why try it.** MWCC picks the idiom from the source's shape, and it is visible in the first three
+instructions after the loop's bound is computed, so it is a cheap thing to check before touching anything
+else: `while (count--)` and `for (i = count; i > 0; i--)` become `mtctr` + `ble` + `bdnz` (with a
+record-form shift as the entry test), `for (i = 0; i < n; i++)` becomes `cmpw` + `blt`, and an explicit
+second induction variable (`for (i = 1, off = sizeof(RSOSection); ...)`) is what produces retail's separate
+index and offset registers.
+
+**Result.** `fn_804DA7E4`: the `mtctr`/`bdnz` idiom and the `srwi.` entry test only appeared with
+`while (count--)` (a `for (i = 0; i < count; i++)` gave `cmplwi` + `ble` and one extra instruction). The
+percentage did not move until idea 18 fixed the colours - the idiom and the colouring are two separate
+residuals, so fix the shape first and only then chase registers. `RSOStaticLocateObject` reproduced
+retail's `r15..r31` colouring (and `_savegpr_15` instead of `_savegpr_14`) only with the two-variable
+`for`.
+
+## 20. Force a loop-invariant address through a `u32` local
+
+**Problem.** Retail materialises a loop-invariant field address into a callee-saved register in the loop
+preheader (`addi r30,r26,84` then `lwz r0,0(r30)`); our build folds it into a load displacement
+(`lwz r4,0x54(r27)`). That costs one callee-saved register and changes the colouring of the whole
+function (`_savegpr_24` where retail has `_savegpr_23`).
+
+**Why try it.** It is a codegen choice, not an algorithmic one, and taking the address (`&p->field`) does
+*not* prevent the fold. Routing the address through an integer type does.
+
+**Result.** `fn_804DA6C8` 94.77 -> **100 %** by computing `(u32)pObject + 0x54`, parking it in a `u32 buf[1]`
+local, and declaring `int i;` before `count`. Worth trying wherever retail shows a preheader
+`addi rN,rM,<disp>`.
+
+**Example**
+
+```c
+u32 buf[1];
+buf[0] = (u32)pModule + 0x54;   /* retail: addi r30,r26,84 ; lwz r0,0(r30) - not lwz r0,0x54(r26) */
+```
+
+## 21. Count record-form instructions to fingerprint peephole/scheduling per unit
+
+**Problem.** The flags of one unit were inferred for the whole binary from "the DOL contains no `extrwi`" -
+wrong twice over: it is not a whole-binary property, and the detector could not see what it was looking
+for.
+
+**Why try it.** MWCC emits record-form instructions (`srwi.`, `add.`, `extsb.`, `clrrwi.`) only with the
+peephole pass on, and their count is a *per-unit* property of the retail bytes. Count them on the target
+object before deciding a unit's `-opt` flags; they are the fingerprint the `-opt` axis actually leaves.
+
+**Result.** The `RSO/runtime` target has 9 record forms (`srwi.` x4, `add.` x3, `extsb.`, `clrrwi.`) and
+needs `-opt peephole,schedule,level=4`; the `Camellia` target has 0 and needs `-opt nopeephole`. The same
+count exposes the alias trap: **GNU objdump never prints `extrwi`** - it prints the underlying
+`rlwinm rX,rY,SH,MB,ME` - so "0 `extrwi` in 1 357 339 instructions" said nothing at all (a raw-word scan
+finds 5 386 extrwi-form words). Any fingerprint built on a disassembler *alias* is a fingerprint of the
+disassembler, not of the build.
+
+**Example**
+
+```sh
+powerpc-eabi-objdump -d build/RMHE08/obj/<Unit>.o \
+  | grep -oE "(srwi\.|slwi\.|add\.|subf\.|extsb\.|clrrwi\.|and\.|or\.)" | sort | uniq -c
+```
+
+## 22. When retail's colouring is your exact mirror, stop
+
+**Problem.** A residual that is nothing but register numbers invites another hundred source variants, each
+of which costs a compile-and-diff cycle and none of which can be reasoned about.
+
+**Why try it.** MWCC's allocator assigns the *highest* free callee-saved register first (it minimises the
+`_savegpr_*` range), so with N live webs the only free variable is the *priority order* of the webs. If
+retail is the exact mirror of your build - same instructions, same sizes, mirrored colours - the source is
+not the lever, and the honest move is to record the residual on the function and spend the time elsewhere.
+
+**Result.** `fn_804D9B4C`: ~300 source variants (element types, four positions for each induction
+variable, `while`/`do..while`/pointer walks/array forms, ten declaration permutations), all 22 GC and all
+9 Wii compilers, and six `-opt` keyword permutations all produce the identical 21-row colour residual.
+`fn_804DAA24`'s `R_PPC_REL24` case is the same story over 31 shapes. Both are documented as known
+residuals on the function (see idea 13).
+
+## 23. Data ranges in `splits.txt`: what objdiff can and cannot fix
+
+**Problem.** A unit's near-miss rows are often just *symbol names* for data the unit owns but whose range
+is not claimed in `splits.txt` (`@1841_80629B90` in the target vs our `lbl_80629B90`), so it looks like a
+one-line fix.
+
+**Why try it - and why it can backfire.** objdiff matches a *defined* data symbol by (section, offset) but
+an *undefined* one by name. Claiming a range therefore fixes rows only when both sides end up defined at
+the same offset - and defining a symbol changes what dtk emits. Claiming the RSO unit's string pool made
+dtk drop the target's `R_PPC_NONE` pool relocations (they carry the pool-relative addends), so objdiff
+could no longer pair the pool-relative instructions at all: 99.36 % -> 98.01 %.
+
+**Result.** Claiming the compiler-generated jump table (`.data 0x80629C08..0x80629C40`) was worth +0.077 %
+on `RSOStaticLocateObject`; claiming the string pool at `0x80629B90` cost 1.35 % on `fn_804DABF0` and was
+reverted. Measure before *and* after, and check that the linked DOL hash did not change.
+
+## 24. Merging a probe into the unit is its own step
+
+**Problem.** Probes are measured standalone, in their own translation unit, so their numbers are not the
+unit's numbers - and a probe cannot see the unit's types.
+
+**Why try it.** The unit can only have one definition of a struct, so when two functions want different
+field types the merge has to choose, and the choice is codegen-relevant: one field as `u8*` instead of
+`u32` changed `add r6,r3,r0` into `add r6,r0,r3` and cost 0.3 % on that function.
+
+**Result.** Give the struct the most specific pointer type and **cast at the individual use sites**; then
+re-measure *every* function of the unit after the merge, because the unit's per-symbol table - not the
+probe's - is what gets recorded. Merging the seven RSO reconstructions moved one function *up*
+(`fn_804DABF0` 99.29 in the probe, 99.36 in-unit) and left the five byte-identical ones at 100 %.
+
+## 25. Use the shared memory dump as a name/signature/struct oracle
+
+**Problem.** Before a function can be matched it has to be *understood*, and this repo's `symbols.txt` has
+thousands of `fn_XXXX` names and no types at all.
+
+**Why try it.** A second Ghidra project on this machine holds a runtime memory dump of the game with real
+SDK symbol names, function signatures, annotated struct layouts and the contents of data blobs this repo
+does not own. It answers in one query what otherwise costs a disassembly read - and it answers questions
+no static object can.
+
+**Result.** For `RSO/runtime` it named all nine functions (`LocateObject`, `RSOUnLink`, `FindExportIndex`,
+`RSORelocate`, `RSORelocateSmallDataSection`, and the four `RSONotify*` thunks), gave their signatures
+(`RSOLink(RSOModule*, RSOModule*, ...)` - the second argument is the *exporting* module, not a private
+"relocation table"), and its `RSOModule` layout confirmed every offset this project had derived by hand,
+with real field names. It is **not** codegen evidence (idea 17), its annotations mix SDK names with Ghidra
+placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23). Recipes and the
+full worked example: `docs/memory-dump.md`.
