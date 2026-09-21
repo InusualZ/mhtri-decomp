@@ -35,18 +35,10 @@ compile_commands.json
 *.exe
 
 /.lavish
-# /.pi/ stays ignored except the shared objdiff-verify skill, which is tracked on purpose.
+# /.pi/ stays ignored in full: it is agent scratch (notes, prompts, scratch), not repo content.
 /.pi/*
-!/.pi/skills/
-/.pi/skills/*
-!/.pi/skills/objdiff-verify/
-# /.agents/ stays ignored except the shared matching, symbol-map and AGENTS.md-local-only skills, which
-# are tracked on purpose.
-# (the parent directory itself must not be excluded, or git never descends into it)
+# /.agents/ stays ignored except the skills folder, which is tracked in full so every skill is shared
+# with every harness.  (The parent directory itself must not be excluded, or git never descends into it.)
 /.agents/*
 !/.agents/skills/
-/.agents/skills/*
-!/.agents/skills/mwcc-unit-matching/
-!/.agents/skills/symbol-map-editing/
-!/.agents/skills/agents-md-local-only/
 /openspec
