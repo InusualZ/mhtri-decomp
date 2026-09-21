@@ -25,3 +25,7 @@ Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
 	.dtors      start:0x8056F440 end:0x8056F444 rename:.dtors$10
 	.dtors      start:0x8056F444 end:0x8056F448 rename:.dtors$15
 	.sdata      start:0x80793CC8 end:0x80793CCC
+
+RSO/runtime.c:
+	.text       start:0x804D9B4C end:0x804DAE40
+	.data       start:0x80629C08 end:0x80629C40

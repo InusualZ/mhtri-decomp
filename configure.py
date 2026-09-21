@@ -270,6 +270,41 @@ cflags_camellia = [
     "-pool off",
 ]
 
+# RSO runtime flags (DOL-side RSO loader/linker, src/RSO/runtime.c, retail .text 0x804D9B4C..0x804DAE40).
+# This unit is NOT built like Camellia: its retail object contains 9 record-form instructions
+# (srwi. x4, add. x3, extsb., clrrwi.) while the Camellia object contains 0, and MWCC only emits the
+# record forms with the peephole pass ON.  Fingerprinted from the retail object:
+#   * the record forms above, the 5 `rlwimi` field-inserts in fn_804DAA24, and the retail prologue
+#     instruction ORDER (lis / lwz / addi / li / mulhwu / srwi.) all need peephole + the instruction
+#     scheduler, and fn_804DA834 needs optimizer level 4 (99.80 % at level 3)
+#     => -opt peephole,schedule,level=4
+#   * -O4,p implies -func_align 16, which pads every function to 16 B; the retail .text packs these
+#     functions back to back
+#     => -func_align 4
+#   * RSOLink's prologue is `addi r11,r1,48; bl _savegpr_23` and its epilogue `bl _restgpr_23`, and
+#     stmw/lmw do not occur anywhere in the range
+#     => -use_lmw_stmw off
+#   * RSOStaticLocateObject emits 12 `lis` for 11 distinct ADDR16_HA symbols, one dedicated base
+#     register each (r19, r21-r30) and never a shared base
+#     => -pool off
+# -inline noauto is not observable in the binary yet; it is carried over from the Camellia evidence
+# and still needs a source-level experiment here.
+# NOTE (corrects an earlier revision of this comment): the whole-DOL "extrwi == 0 => nopeephole"
+# argument was wrong -- GNU objdump never prints the `extrwi` alias (it prints `rlwinm rX,rY,SH,MB,ME`),
+# so that scan could not see the fused form at all.  The per-unit discriminator is the record-form
+# count above, which is a real property of the retail bytes.
+# The conflicting cflags_runtime defaults are removed rather than appended, so the command line has
+# exactly one -O / -inline / -use_lmw_stmw.
+cflags_rso = [
+    *[f for f in cflags_runtime if f not in ("-O4,p", "-inline auto", "-use_lmw_stmw on")],
+    "-O3",
+    "-opt peephole,schedule,level=4",
+    "-func_align 4",
+    "-inline noauto",
+    "-use_lmw_stmw off",
+    "-pool off",
+]
+
 config.linker_version = "Wii/1.0"
 
 
@@ -325,6 +360,25 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "Camellia/camellia.c"),
+        ],
+    },
+    {
+        "lib": "RSO",
+        # GC/3.0a3, not a Wii compiler: the retail object's fn_804DAA24 is 460 B / 115 instructions
+        # and the GC 3.0a3-3.0a5.2 family reproduces that opcode sequence exactly (only register
+        # colours left, 99.30 %), while every installed Wii compiler (0x4201_127, 1.0RC1, 1.0a, 1.0,
+        # 1.1, 1.3, 1.5, 1.6, 1.7) emits one extra `lwz` in the R_PPC_REL24 case (116 insns, 97.30 %).
+        # The older GC compilers (1.0-2.7) are far worse (53-93 %), so it is specifically GC 3.0a3+.
+        # 3.0a3 / 3.0a5 / 3.0a5.2 are codegen-identical on every function reconstructed so far; the
+        # tiebreak is the comment version (config.yml mw_comment_version: 14 == 3.0a3's 0e byte,
+        # 3.0a5.2 and the Wii compilers emit 0f) - that is a config value, not retail evidence, since
+        # the DOL carries no .comment section at all.
+        # Method: docs/matching.md 17 (cross-family version matrix).
+        "mw_version": "GC/3.0a3",
+        "cflags": cflags_rso,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "RSO/runtime.c"),
         ],
     },
 ]
