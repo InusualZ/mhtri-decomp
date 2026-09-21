@@ -69,7 +69,7 @@ SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
 ASM_DIR = os.path.join(ROOT, "build", GAME, "asm")
 DOL = os.path.join(ROOT, "orig", GAME, "sys", "main.dol")
 CACHE = os.path.join(ROOT, "build", "tmp", "tudiscover", "graph.json")
-SCHEMA = 9      # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
+SCHEMA = 10     # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
 
 # Section order for the printed `splits.txt` block (matches config/RMHE08/splits.txt's header).
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
@@ -169,6 +169,7 @@ def load_map():
 ASM_COLLISIONS = []
 ASM_RANGE_DUPS = []
 ASM_NO_RANGE = []
+ASM_SUBRANGE = []
 
 
 def dedupe_ranges(paths, fns):
@@ -216,7 +217,28 @@ def dedupe_ranges(paths, fns):
                                "dropped": [os.path.relpath(s[2], ASM_DIR)
                                            for s in scored if s[2] not in kept],
                                "resolved": len(kept) == 1})
-    return sorted(keep)
+
+    # A second kind of leftover: the range is *contained* in another kept file's range (an older
+    # naming pass wrote a sub-range with the pre-2025 header spelling, so the exact-range test above
+    # cannot see it). Contained is only stale when the symbol map knows none of its `.fn` names -
+    # a file whose functions are live is a real unit that happens to sit inside a bigger region.
+    ordered = sorted(keep, key=lambda p: (ranges.get(p, (1 << 32, 0))[0],
+                                          -ranges.get(p, (1 << 32, 0))[1]))
+    pruned, max_end, max_path = [], -1, None
+    for path in ordered:
+        if path not in ranges:
+            pruned.append(path)                 # headerless: never deduped, never judged
+            continue
+        start, end = ranges[path]
+        if end <= max_end and map_fn_hits(path, fns) == 0:
+            ASM_SUBRANGE.append({"range": "0x%08X..0x%08X" % (start, end),
+                                 "kept": os.path.relpath(max_path, ASM_DIR),
+                                 "dropped": os.path.relpath(path, ASM_DIR)})
+            continue
+        pruned.append(path)
+        if end > max_end:
+            max_end, max_path = end, path
+    return sorted(pruned)
 
 
 def map_fn_hits(path, fns):
@@ -256,6 +278,7 @@ def asm_files(fns=None):
     del ASM_COLLISIONS[:]
     del ASM_RANGE_DUPS[:]
     del ASM_NO_RANGE[:]
+    del ASM_SUBRANGE[:]
     by_stem = collections.defaultdict(list)
     for path in sorted(out):
         by_stem[os.path.basename(path)[:-len(".s")]].append(path)
@@ -354,6 +377,29 @@ def warn_parse(out):
               % (c["mismatched_count"], c["nocode_count"], c["unparsed_fn_lines"]), file=sys.stderr)
 
 
+def stale_files(out):
+    """The stale split-tree files still on disk, as (absolute, relative) pairs.
+
+    Read from the *cache*, not the module globals: a cache hit skips the walk, so the globals are
+    empty then. Existence is checked, so a tree that has been pruned reports none.
+    """
+    rel = []
+    for d in out.get("collisions") or []:
+        if d.get("resolved"):
+            rel += d.get("dropped") or []
+    for d in out.get("range_dups") or []:
+        if d.get("resolved"):
+            rel += d.get("dropped") or []
+    for d in out.get("subrange") or []:
+        rel.append(d["dropped"])
+    pairs = []
+    for r in sorted(set(rel)):
+        p = os.path.join(ASM_DIR, r)
+        if os.path.exists(p):
+            pairs.append((p, r))
+    return pairs
+
+
 def parse_report(out):
     """The `.fn` self-check and the asm-file collisions stored with a graph, as print lines."""
     c, col = out.get("fn_check"), out.get("collisions") or []
@@ -380,17 +426,23 @@ def parse_report(out):
                             ", ".join("%s (%d lines, %d spans)" % tuple(m)
                                       for m in c["parse_misses"][:5])))
     if col:
+        live = [d for d in col if any(os.path.exists(os.path.join(ASM_DIR, x))
+                                      for x in (d.get("dropped") or []))]
         lines.append("asm duplicates     %d stem(s) exist in more than one asm directory (the"
-                     " deeper, configured-unit copy is kept):" % len(col))
-        for dup in col[:10]:
+                     " deeper, configured-unit copy is kept)%s:"
+                     % (len(col), "  (all pruned)" if not live else ""))
+        for dup in (live or [])[:10]:
             lines.append("  %-24s keep %s   drop %s%s"
                          % (dup["stem"], ", ".join(dup["kept"]),
                             ", ".join(dup["dropped"]) or "-",
                             "" if dup["resolved"] else "   UNRESOLVED (both kept)"))
     if rd:
+        live = [d for d in rd if any(os.path.exists(os.path.join(ASM_DIR, x))
+                                     for x in (d.get("dropped") or []))]
         lines.append("range duplicates   %d section range(s) are covered by more than one parsed"
-                     " file (the copy whose `.fn` names the symbol map is kept):" % len(rd))
-        for dup in rd[:10]:
+                     " file (the copy whose `.fn` names the symbol map is kept)%s:"
+                     % (len(rd), "  (all pruned)" if not live else ""))
+        for dup in (live or [])[:10]:
             lines.append("  %-20s keep %-34s drop %s%s"
                          % (dup["range"], ", ".join(dup["kept"]),
                             ", ".join(dup["dropped"]) or "-",
@@ -398,6 +450,14 @@ def parse_report(out):
         if len(rd) > 10:
             lines.append("  ...                  %d more (--json/`stats --force` has the rest)"
                          % (len(rd) - 10))
+    sub = out.get("subrange") or []
+    if sub:
+        left = [d for d in sub if os.path.exists(os.path.join(ASM_DIR, d["dropped"]))]
+        lines.append("sub-range copies   %d file(s) sit inside another file's range and name no"
+                     " function the map knows%s:"
+                     % (len(sub), "  (all pruned)" if not left else "  - `prune --apply` removes them"))
+        for d in sub[:10]:
+            lines.append("  %-20s keep %-30s drop %s" % (d["range"], d["kept"], d["dropped"]))
     if out.get("no_range"):
         lines.append("header unreadable  %d parsed file(s) have no recognisable `# 0xSTART..0xEND`"
                      " header (kept, not deduped): %s"
@@ -480,6 +540,7 @@ def build_graph(fns, labels, force=False):
            "collisions": [{k: [os.path.relpath(p, ASM_DIR) for p in v] if k in ("kept", "dropped")
                            else v for k, v in c.items()} for c in ASM_COLLISIONS],
            "range_dups": list(ASM_RANGE_DUPS),
+           "subrange": list(ASM_SUBRANGE),
            "no_range": list(ASM_NO_RANGE),
            "fn_check": check}
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
@@ -880,6 +941,21 @@ def report(args):
         return 0
     print_human(result, ordered, fns, sug_lo, sug_hi)
     if args.splits:
+        # Hand off nothing that may have been built from a stale parse: the duplicates in the split
+        # tree are the one input the tool can be silently wrong about (a stale copy won the parse for
+        # camellia_setup128/256 once). `prune` is idempotent and only removes files dtk never rewrites.
+        stale = stale_files(graph)
+        if stale and not args.allow_stale:
+            print("\n# HANDOFF BLOCKED: %d stale split-tree file(s) shadow current ones, so this block"
+                  % len(stale))
+            print("# could come from a stale parse. Remove them first, then hand off:")
+            print("#   python tools/splits/tudiscover.py prune --apply")
+            for _p, r in stale[:5]:
+                print("#   %s" % r)
+            if len(stale) > 5:
+                print("#   ... and %d more (`prune` lists them all)" % (len(stale) - 5))
+            print("# (read-only inspection of this proposal: add --allow-stale)")
+            return 2
         print_splits(result, args.unit)
     return 0
 
@@ -1237,6 +1313,50 @@ def cmd_stats(args):
     return 0
 
 
+def cmd_prune(args):
+    """Remove the split-tree duplicates the tool already refuses to parse. Idempotent.
+
+    Safe by construction: only files this tool has proven stale are touched (a shadowed same-range
+    copy, or a sub-range copy whose `.fn` names are all unknown to the symbol map), `build/` is
+    gitignored build output, and dtk never rewrites them - deleting cannot change the DOL or the
+    linked build. `--apply` is required; the default is a dry run.
+    """
+    fns, labels = load_map()
+    graph = build_graph(fns, labels, force=args.force)
+    asm = stale_files(graph)
+    print("stale asm files    %d (%.1f MB) - copies `dedupe_ranges()` already drops"
+          % (len(asm), sum(os.path.getsize(p) for p, _ in asm) / 1e6))
+    for _p, rel in asm[:args.limit]:
+        print("  %s" % rel)
+    if len(asm) > args.limit:
+        print("  ... and %d more" % (len(asm) - args.limit))
+    npath = os.path.join(ROOT, "build.ninja")
+    ninja = open(npath, encoding="utf-8", errors="replace").read() if os.path.exists(npath) else ""
+    obj = []
+    if args.include_obj:
+        for _p, rel in asm:
+            cand = os.path.join(os.path.dirname(ASM_DIR), "obj", rel[:-2] + ".o")
+            # A path guard, not a basename guard: `obj/camellia.o` shares its basename with the
+            # canonical `obj/Camellia/camellia.o`, and build.ninja only ever names the latter.
+            if os.path.exists(cand) and os.path.relpath(cand, ROOT).replace(os.sep, "/") not in ninja:
+                obj.append(cand)
+        print("stale obj files    %d (the same units; none is referenced by build.ninja)" % len(obj))
+        for c in obj[:args.limit]:
+            print("  %s" % os.path.relpath(c, ROOT))
+    if not args.apply:
+        print("\ndry run: nothing deleted. Add --apply to remove them.")
+        return 0
+    removed = 0
+    for path in [p for p, _ in asm] + obj:
+        try:
+            os.remove(path)
+            removed += 1
+        except OSError as exc:
+            print("  could not remove %s: %s" % (path, exc), file=sys.stderr)
+    print("\nremoved %d file(s). `stats` should now report none; hand off the block afterwards." % removed)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1253,6 +1373,8 @@ def main():
     a.add_argument("--unit", default=None, help="unit path for the printed splits block")
     a.add_argument("--json", action="store_true")
     a.add_argument("--splits", action="store_true", help="also print the splits.txt block")
+    a.add_argument("--allow-stale", action="store_true",
+                   help="print the splits block even when stale split-tree files remain (read-only)")
     a.set_defaults(func=report)
 
     b = sub.add_parser("stats", help="cache, coverage and observation counts")
@@ -1280,6 +1402,14 @@ def main():
     d.add_argument("--save", default=None, help="write the scorecard here (e.g. build/tmp/tudiscover/baseline.json)")
     d.add_argument("--compare", default=None, help="diff the sweep against a saved scorecard")
     d.set_defaults(func=cmd_bench)
+
+    e = sub.add_parser("prune", help="remove the stale split-tree duplicates (dry run unless --apply)")
+    e.add_argument("--apply", action="store_true", help="actually delete (default: dry run)")
+    e.add_argument("--include-obj", action="store_true",
+                   help="also remove the matching stale objects under build/<version>/obj")
+    e.add_argument("--limit", type=int, default=20, help="paths to list")
+    e.add_argument("--force", action="store_true", help="rebuild the graph cache")
+    e.set_defaults(func=cmd_prune)
 
     args = ap.parse_args()
     sys.exit(args.func(args) or 0)

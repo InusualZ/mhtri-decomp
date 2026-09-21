@@ -41,6 +41,7 @@ Spearman(offset in section, lowest referring `.text` address) = **1.000** for `.
 | ... machine-readable (full symbol list) | add `--json` |
 | widen the boundary search / list more candidates | `--window 80 --top 5` |
 | cache, coverage, signal counts, source anchors, parse self-check | `python tools/splits/tudiscover.py stats` |
+| remove the stale split-tree duplicates | `python tools/splits/tudiscover.py prune [--apply] [--include-obj]` |
 | rebuild the graph cache | `python tools/splits/tudiscover.py cache --force` |
 | scorecard for iterating on this tool | `python tools/splits/tudiscover.py bench [--seeds 400] [--compare <baseline.json>]` |
 
@@ -87,11 +88,12 @@ Two known weaknesses of the reference graph itself:
 * References are collected from **token presence in the disassembly, not register liveness**. An independent
   scan that tracked register writes collapsed one label's apparent 12 286 references to its true 27. Treat a
   *huge* referrer count as suspicious until a liveness-aware scan confirms it.
-* The reference source is the **split tree's asm**, which accumulates stale duplicates across re-splits
-  (95 files here: 83 `auto_fn_*` files that shadow the current `auto_dtor_*` range, plus 2 top-level
-  leftovers and 10 sub-range copies). The tool now drops range-duplicates and prefers the configured
-  deep path, which is what fixed a silently wrong `camellia_setup128/256` fingerprint; the remaining 10 are
-  a known gap.
+* The reference source is the **split tree's asm**, which accumulates stale duplicates across
+  re-splits - 188 files here: 83 `auto_fn_*` that shadow the current `auto_dtor_*` range, 9 sub-range
+  copies (the pre-2025 header spelling), and the 2 top-level stem leftovers (one of which, a stale
+  `camellia.s`, silently zeroed the `camellia_setup128/256` fingerprint). The tool detects all three
+  classes, never parses a shadowed file, and `prune --apply` removes them; **`--splits` refuses to hand
+  off a block while any remain**, so a proposal can never come from a stale parse.
 
 ## Matching settles the boundary
 
@@ -147,6 +149,21 @@ The first answer was **wrong**, and the scorecard did not notice - both facts sh
   claim idea 23 measured as harmful (1.35 % lost) - which is exactly why anchors and run claims are
   separate things in the tool.
 
+## Handing off the block
+
+`--splits` is the handoff, and it **refuses to print** while the split tree holds files that shadow
+current ones - a proposal must not be built from a stale parse. The fix is one idempotent command:
+
+```sh
+python tools/splits/tudiscover.py prune --include-obj --apply
+```
+
+It removes exactly what the tool has proven stale (a shadowed same-range copy, a sub-range copy naming no
+function the map knows, or a stale stem beside a configured-unit copy) and nothing else: `build/` is
+gitignored build output, dtk never rewrites those files, and the removal cannot change the DOL or the
+linked build (verified - the scorecard is bit-identical after pruning 188 files). `--allow-stale` exists
+only for reading a proposal without acting on it.
+
 ## Iterating on this tool
 
 Judge an idea by whether it makes the *set* better, never by boundary exactness alone.
@@ -188,7 +205,7 @@ read `splits.txt` as an input as well as an answer key (idea 1).
 | 3 | one global partition instead of N independent closures | per-seed closures cannot use each other's evidence, and a seed with no anchors stays a singleton | todo |
 | 4 | gap-chained referrers instead of one interval per label | a 146-function anchor built from 18 scattered referrers asserts far more than it measured: chaining referrers by gap distance would bound the claim to what is actually cited | todo - recommended by the widest-anchor stress test |
 | 5 | liveness-aware references | token presence over-counts (12 286 → 27 on one label) and under-counts (a stale register looks live) | todo |
-| 6 | sub-range containment in the asm dedupe | 10 stale files still shadow current ones (different header spelling, sub-range), adding noise to the self-check | todo |
+| 6 | sub-range containment in the asm dedupe (done) | 9 stale files shadowed current ones under a different header spelling; the tool now detects any file whose range is contained in another's **and** names no function the map knows, and `prune --apply` removes all three classes (188 files, 92 of them asm). Bench is bit-identical afterwards, `outside_map` self-check noise 1 466 → 1 457 | done |
 | 7 | call-graph closure as a second, separately-labelled hypothesis | a helper called only from inside the set (the `RSONotify*` thunks in `RSO/runtime`) is invisible to layout evidence | todo - the thunks case is a known-open question, not a win |
 | 8 | Dolphin dynamic tier (indirect callers, runtime data ownership) | static xrefs see no vtable calls, so a C++ unit's call closure is incomplete | todo |
 | 9 | grow-while-`leak == 0` boundary policy | the closure finds the *start* reliably and under-covers the tail; growth may recover it | todo |
