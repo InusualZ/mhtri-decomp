@@ -151,6 +151,11 @@ Never soften it to "essentially matching" / "only sizes differ": a size delta is
 
 ## 7. Guardrails
 
+- **A report number that disagrees with an object diff is a stale report.** `build/RMHE08/report.json` is
+generated from the objects at report time: a unit that had just been rebuilt to 100 % read as `None` in it
+until the report was regenerated. Delete it (or run `ninja changes`) and re-read before concluding anything,
+and settle every claim with the object diff itself.
+
 * Nothing is committed or pushed without explicit user approval (rule 6); leave results in the working tree
   and state exactly what you would commit.
 * Do not edit `configure.py` flags/`mw_version`/tool versions to force a match (rule 3), and do not flip
