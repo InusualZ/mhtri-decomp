@@ -22,6 +22,7 @@ check against a committed revision: `git show <rev>:AGENTS.md | grep -c '^<!-- L
 """
 import argparse
 import datetime
+import difflib
 import hashlib
 import json
 import os
@@ -72,9 +73,38 @@ def find_block(text):
     start = sum(len(line) + 1 for line in lines[:b])
     end = sum(len(line) + 1 for line in lines[:e]) + len(lines[e])
     k = end
-    while k < len(text) and text[k] == "\n":
+    while k < len(text) and text[k] in "\r\n":
         k += 1
     return start, end, k
+
+
+def head_version(file):
+    out = subprocess.run(["git", "show", "HEAD:%s" % file], cwd=REPO, capture_output=True,
+                         text=True, encoding="utf-8", errors="replace")
+    return out.stdout if out.returncode == 0 else None
+
+
+def notice_framing(file, stripped):
+    """A pull should leave the file byte-identical to the committed revision.
+
+    When it does not, the section's framing is not canonical - a doubled blank line where the section
+    sits is the usual cause - and that whitespace difference otherwise reaches the next commit as a
+    mystery hunk next to the real edit.  Say so here, where the cause is visible, rather than leaving it
+    to be discovered in a review.
+    """
+    head = head_version(file)
+    if head is None:
+        return
+    if stripped.replace("\r\n", "\n") == head.replace("\r\n", "\n"):
+        print("the pulled file matches HEAD - removing the section leaves no trace")
+        return
+    print("note: the pulled file differs from HEAD, so a commit now carries more than your staged edit:")
+    diff = list(difflib.unified_diff(head.splitlines(), stripped.splitlines(), "HEAD", "pulled", n=0))
+    for line in diff[:12]:
+        print("   " + line)
+    if len(diff) > 12:
+        print("   ... (%d more diff lines)" % (len(diff) - 12))
+    print("   a doubled blank line around the section is the usual cause - fix the framing, then re-pull")
 
 
 def cmd_pull(a):
@@ -101,6 +131,7 @@ def cmd_pull(a):
     with open(a.state, "w", encoding="utf-8") as fh:
         json.dump(state, fh, indent=1)
     write(path, text[:i] + text[k:])
+    notice_framing(a.file, text[:i] + text[k:])
     print("pulled %d lines (%d bytes) out of %s" % (state["block"].count("\n"), len(state["block"]), a.file))
     print("stored in %s" % os.path.relpath(a.state, REPO))
     print("now: git add %s && git commit ... && %s push" % (a.file, os.path.basename(__file__)))
@@ -158,7 +189,7 @@ def cmd_status(a):
 
 def cmd_verify(a):
     out = subprocess.run(["git", "show", "%s:%s" % (a.rev, a.file)], cwd=REPO,
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
     if out.returncode != 0:
         raise SystemExit("git show %s:%s failed: %s" % (a.rev, a.file, out.stderr.strip()[:200]))
     count = sum(1 for line in out.stdout.splitlines() if line.startswith("<!-- LOCAL-ONLY"))
