@@ -94,10 +94,9 @@ All project skills live in one tracked folder, `.agents/skills/`, so every harne
 `mwcc-unit-matching/` (this playbook), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
 range and rename symbols without ever loading `symbols.txt` into context), `agents-md-local-only/`
 (`tools/agents/localonly.py` - pull the local-only section out of this file before a commit and push it
-back after), `objdiff-verify/` (proving a unit really matches), `tu-boundary-discovery/`
+back after), `objdiff-verify/` (proving a unit really matches) and `tu-boundary-discovery/`
 (`tools/splits/tudiscover.py` - from one symbol address, work out which functions and data ranges form one
-translation unit, before any source is written) and `commit-review-gate/` (`tools/agents/commitgate.py` -
-show what is about to be committed and refuse until a human has approved that exact staged content).
+translation unit, before any source is written).
 
 | # | idea | problem it solves | status |
 | --- | --- | --- | --- |
@@ -210,9 +209,7 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       context - see the `symbol-map-editing` skill
                             agents/   AGENTS.md housekeeping (localonly.py): pull the local-only
                                       working-state section out before a commit and push it back after
-                                      - see the `agents-md-local-only` skill - and the commit gate
-                                      (commitgate.py): review sheet plus human approval before any
-                                      commit - see the `commit-review-gate` skill
+                                      - see the `agents-md-local-only` skill
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
