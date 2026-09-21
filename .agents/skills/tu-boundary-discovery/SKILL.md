@@ -192,6 +192,7 @@ read `splits.txt` as an input as well as an answer key (idea 1).
 | 7 | call-graph closure as a second, separately-labelled hypothesis | a helper called only from inside the set (the `RSONotify*` thunks in `RSO/runtime`) is invisible to layout evidence | todo - the thunks case is a known-open question, not a win |
 | 8 | Dolphin dynamic tier (indirect callers, runtime data ownership) | static xrefs see no vtable calls, so a C++ unit's call closure is incomplete | todo |
 | 9 | grow-while-`leak == 0` boundary policy | the closure finds the *start* reliably and under-covers the tail; growth may recover it | todo |
+| 10 | fix the suspected veto off-by-one | claiming the player units, an independent check found the tool suggesting `0x8026FFBC` (51 functions) when the raw pin admitted a cut at `0x80270018` (50, the value the evidence supports): the pin's admissible interval is `{8634, 8635}` and 8635 was vetoed. `must_link` intervals are inclusive at both ends, so an admitted cut can be excluded - that was one function of a real split | todo |
 
 ## What the tool cannot do yet
 
