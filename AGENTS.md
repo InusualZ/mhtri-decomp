@@ -19,7 +19,6 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `Runtime.PPCEABI.H` holds two stubs registered as `NonMatching` (= not linked). Everything else is
   still unsplit.
 
-
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
@@ -124,6 +123,8 @@ back after) and `objdiff-verify/` (proving a unit really matches).
 | 23 | `splits.txt` data ranges: what objdiff can and cannot fix | Defining a data symbol fixes name rows only by (section, offset), and can make dtk drop the target's `R_PPC_NONE` pool relocs - a regression. | done |
 | 24 | Merging a probe into the unit is its own step | Probe numbers are not unit numbers, and one struct definition has to serve every function, so types need use-site casts and everything must be re-measured. | done |
 | 25 | Shared memory dump as a name/signature/struct oracle | Unnamed `fn_*` functions and untyped structs can be resolved in one query from the game's runtime dump (`docs/memory-dump.md`). | done |
+| 26 | The target's section is part of the match | objdiff pairs sections, so a unit whose code landed in `.text` while the target object says `.init` diffs perfectly and still reports `None` (`__declspec(section "...")`). | done |
+| 27 | Same instructions, different order names the `-O` level - probe it per unit | An epilogue swap looks like an unreachable scheduling residual and is not source-shaped. `-O4,p` vs `-O3` is per unit (g3d/lobby want `-O3`, OSAlarm/NetworkWiiMediator want `-O4,p`), and the two-variant probe can be run against the `auto_*` blob before the unit is registered. | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
