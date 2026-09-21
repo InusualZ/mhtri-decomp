@@ -213,13 +213,17 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       - see the `agents-md-local-only` skill
                             units/    the `decompile-symbol` helpers (symbolpreflight.py: one symbol's
                                       owner and collision pre-flight; m2cinput.py: a target object's
-                                      disassembly as `tools/m2c` input) plus their self-tests
+                                      disassembly as `tools/m2c` input) plus their self-tests, and
+                                      ledger.py: the campaign's progress and the next symbol to claim
+                                      (docs/plan.md)
                             m2c/      matt-kempster/m2c as a git submodule - the offline decompiler
                                       units/m2cinput.py feeds - see the `decompile-symbol` skill
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
                           "Matching playbook" section above, which doubles as the todo list.
+                          plan.md is the campaign plan: every symbol in symbols.txt, the four steps per
+                          symbol, the 80 % bar for closing one, and the order to work in.
                           memory-dump.md documents the shared Ghidra runtime memory dump: real SDK
                           symbol names, annotated struct layouts and data contents, used as an
                           oracle for names/signatures/data (never for codegen) - see below.

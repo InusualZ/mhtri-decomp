@@ -1,0 +1,288 @@
+# Campaign plan: every symbol in `symbols.txt`
+
+The goal is one pass over the whole symbol map, symbol by symbol:
+
+1. **attribute it** - discover the translation unit (TU) it belongs to, or move it to the one that should
+   own it,
+2. **decompile it** - write the source,
+3. **match it** - ≥ 80 % per-symbol `match_percent` is the bar for closing the symbol,
+4. **commit it**.
+
+Nothing about the project's rules changes. `Matching` still means byte-identical (non-negotiable 4), so a
+unit closed at 80 % stays `Object(NonMatching, ...)` and its bytes are not linked - which is what keeps
+`ninja build/RMHE08/ok` green for the whole campaign. The 80 % bar is a bar for *closing a symbol*, not for
+changing what "matching" means.
+
+## Where this starts
+
+| | |
+| --- | --- |
+| symbol map | 65,700 lines: **20,524 functions**, 45,176 data symbols (22,418 of those are
+`extab`/`extabindex`/`.ctors`/`.dtors` fragments that come with the code unit that owns them) |
+| split units | 13,615 in the report, of which the `auto_*_text.o` scaffolding is unowned |
+| registered | 11 units in `splits.txt`, 12 registered objects, 7 C sources (+ 1 header) under `src/` |
+| closed today | **24 of 20,524 functions at >= 80 %** (objdiff counts 19 matched), 21,836 of 5,437,392 `.text`
+bytes (0.54 %) |
+
+This is a ~20 000-function campaign: it is run in sessions, and the *repository* is the state - `splits.txt`,
+`configure.py`, `report.json` and the units' own file header comments. Nothing that matters may live only in
+a chat (the playbook says so, and this repo has already lost a finding that way). The numbers above come from
+a regenerated report; `ledger.py` prints a warning when `report.json` predates `splits.txt`/`configure.py`,
+because that is the one input here that is a build output and it describes a repository one session old.
+
+## The loop, and the gate at each step
+
+| # | step | tool | gate before moving on | left behind |
+| --- | --- | --- | --- | --- |
+| 1 | attribute | `tools/units/symbolpreflight.py`, `tools/splits/tudiscover.py` | the verdict is `proceed`, or `approve` with a written proposal the owner accepted | `splits.txt` ranges (+ `configure.py` entry) |
+| 2 | decompile | Ghidra dump (`docs/memory-dump.md`) + `tools/units/m2cinput.py` → `tools/m2c` | it compiles, and the disassembly agrees with every instruction-level decision | `src/<Dir>/<file>.c` (+ header) |
+| 3 | match | `mt.py diff/info`, `ninja changes`, report.json | the symbol's own `match_percent` ≥ 80, nothing else regressed, `ninja build/RMHE08/ok` still green | the residual in the unit's file header comment |
+| 4 | commit | `tools/git/prepcommit.py` | the review sheet is read and approved (rule 6) | one commit, and the ledger moves |
+
+Steps 2-3 are the two existing skills: `decompile-symbol` for "an address becomes a registered, measured
+unit", `mwcc-unit-matching` for "this unit does not match yet". This plan only adds the order, the bar, and
+the bookkeeping.
+
+### 0. Once, before the first symbol
+
+* **Build the ledger** (approved): `tools/units/ledger.py`, which *derives* progress from the repo instead of
+  keeping its own state, so there is nothing to sync or commit -
+
+  ```sh
+  python tools/units/ledger.py             # totals, per-module table, units at >= 80 %
+  python tools/units/ledger.py next 20     # the next 20 unclaimed symbols, in address order
+  python tools/units/ledger.py unit <unit> # one unit's coverage and per-symbol score
+  ```
+
+  It reads `symbols.txt` through `symedit.py` (never by hand - rule 7), `splits.txt`, `configure.py` and
+  `build/RMHE08/report.json`. `next` is what step 1 of each iteration consumes; without it there is no
+  mechanical way to pick the next symbol out of a 65,700-line map.
+  `tools/units/ledger_selftest.py` covers the views on fixtures (no build, no repository state).
+* **Standing approval for step 4** (granted by the owner): every commit in the loop - the campaign runs
+  without asking per symbol. `prepcommit.py` still stages explicit paths, still writes the message, still
+  refuses to commit by itself, and the staged diff is still read before `git commit -F`. If the standing
+  approval is ever withdrawn, stop after step 3 and hand the prepared commit over instead.
+* **One worktree per stream** (`git worktree add -b <stream> ../mhtri-dtk.ws-<stream> <base>`), so a second
+  `ninja` cannot race this one and dirty files are not shared.
+* **`ninja baseline` once**, so `ninja changes` has something to compare against for the rest of the run.
+
+## 1. Attribute the symbol
+
+**The unit is the unit of work.** A `splits.txt` edit re-splits the whole DOL (6-12 minutes here), and
+`configure.py` + `splits.txt` are the only expensive parts of the loop - the functions of a registered unit
+are then cheap to iterate. So: register a unit once, then close *all* of its symbols before moving on. Batch
+registrations; never pay a re-split for one function.
+
+```sh
+python tools/units/symbolpreflight.py <address|name>        # owner, collision verdict, drafts
+python tools/splits/tudiscover.py at <address|name>         # TU boundary proposal when it is unowned
+```
+
+* **Already owned** (preflight kind 1 shows the address inside a registered unit): the question is not "who
+  owns it" but "should it". Check whether that unit's source or object actually *references* the symbol; if
+  it does not, propose the re-attribution with that reason.
+* **Unowned** (`auto_*` scaffolding, kind 2): `tudiscover` proposes the TU - the functions *and* the data
+  ranges (`.rodata`/`.sdata2` pools, `scope:local` anchors, jump tables). The proposal is the input, not the
+  justification: every range is measured before and after (playbook 23 - a claimed range has *lowered* a
+  function here before).
+* **Name the unit** from module evidence, not from taste: `Panic(__FILE__, line)` strings in the surrounding
+  code, pooled string literals, clusters of mangled C++ names, or the shared runtime dump
+  (`docs/memory-dump.md`). A unit's path mirrors the module (`src/<Dir>/<file>.c`).
+* **`approve` and `never touch` are stop signs** (skill `decompile-symbol` §1): both are reported with
+  numbers and wait for a human answer. `never touch` means the owner is `Matching` and its bytes are linked.
+* Data-only symbols cannot be decompiled - they are claimed as ranges, which is what later lets the code
+  around them match. That is a legitimate loop iteration; close it like any other.
+
+## 2. Decompile it
+
+Follow `decompile-symbol` §3; the two shape sources are the Ghidra decompiler C and, offline, `m2c`:
+
+```sh
+python tools/units/m2cinput.py build/RMHE08/obj/<unit>.o -f <symbol> -o build/tmp/<symbol>.s
+python tools/m2c/m2c.py -t ppc-mwcc-c --no-cache -f <symbol> build/tmp/<symbol>.s
+```
+
+* The **disassembly is the arbiter**; both decompilers are shapes and neither is codegen evidence.
+* Real names come from the dump, and a rename is `symedit.py` **plus the source in the same edit** (skill
+  `symbol-map-editing`) - otherwise objdiff stops matching the symbol by name and reports 0 %.
+* The unit's **file header comment** is written on the first commit that creates the file: what it is, its
+  `.text` range and function order, where its flags/evidence live, the residual. Not a per-function
+  inventory, not percentages.
+
+## 3. Match it
+
+```sh
+python configure.py && ninja build/RMHE08/src/<Dir>/<file>.o   # the unit alone
+rm build/RMHE08/report.json && ninja build/RMHE08/report.json   # the report is what the bar reads
+ninja changes                                                   # this symbol up, nothing else down
+python .agents/skills/mwcc-unit-matching/scripts/mt.py info    -u <unit>
+python .agents/skills/mwcc-unit-matching/scripts/mt.py diff    -u <unit> <symbol>
+```
+
+The bar, all of it:
+
+1. the symbol has a **real per-symbol score of at least 80** - in `build/RMHE08/report.json` (report version
+   2, objdiff `v3.6.1`) that field is `fuzzy_match_percent` on the *function* entry, and a function entry
+   **without** the key is 0 %, not 100 %; the unit-level `complete_code_percent` is not a score and has read
+   100 % next to 1.77 %,
+2. **no other symbol regressed** (`ninja changes`; the unit is judged by its own numbers, never by the
+   DOL-wide totals, which move for bookkeeping reasons when a range is claimed),
+3. `ninja build/RMHE08/ok` is still green (true by construction while the unit is `NonMatching`),
+4. the object measured is the one the **real ninja command line** produced - never a hand-written compile,
+5. the **residual is recorded** in the unit's file header comment: what still differs, the first divergent
+   instruction, the sizes, and what was tried.
+
+The metric is pinned to the objdiff version in `configure.py` (playbook 15): if that version is ever bumped,
+re-baseline the closed symbols against the new report before trusting the bar again.
+
+**Below 80 %**: land it only if it measurably improves the unit and regresses nothing (the project's
+matching policy is already "land the best-scoring variant", and a `NonMatching` unit cannot hurt the link),
+record the residual, and mark it `partial` in the ledger for a second pass. The playbook rows in `AGENTS.md`
+are that second pass's todo list - work them one idea at a time, with evidence.
+
+Re-check the two traps every time: a **stale `report.json`** lies (delete it before believing a number), and
+**frame size is not progress** (playbook 10).
+
+## 4. Commit it
+
+```sh
+python tools/git/prepcommit.py --message "<area>: <what this closes>"
+git diff --cached          # read it
+git commit -F .git/prepcommit_msg.txt
+```
+
+* One commit per closed symbol **or** per batch that was registered together (the owner confirmed per
+  batch) - the same work, one concern. Subject style is the repo's: area-prefixed and imperative
+  (`Pl/pl_act: match fn_8027BE0C`).
+* `prepcommit.py` stages explicit paths only, refuses build/original/scratch output, verifies the `main.dol`
+  SHA-1, and handles the `AGENTS.md` LOCAL-ONLY block (non-negotiable 8) - do not stage `AGENTS.md` by hand.
+* The `AGENTS.md` local-only **`## Current task / plan` block is updated in the same commit** that closes a
+  symbol: the symbol just closed, the next one, and the stream/worktree in flight. That is the one place a
+  fresh session looks to resume.
+* A playbook idea that worked becomes its `docs/matching.md` section **and** its `AGENTS.md` row in the same
+  session; a unit-specific residual stays in the unit's header. A finding that only lives in a reply is lost
+  at the next compaction.
+
+## Parallelising the loop with subagents
+
+Every step above is subagent-shaped, and the campaign is expected to run several at once. The rule is that
+**analysis fans out, shared files do not**: a subagent may read anything, and may write only files no other
+stream is writing.
+
+| step | what fans out | what stays serial (the parent's job) |
+| --- | --- | --- |
+| 1 attribute | one subagent per unclaimed address: `symbolpreflight` + `tudiscover at`, returning a *proposal* (unit name, ranges, configure draft) and its evidence. Read-only, so it can run 8-wide. | applying the ranges to `splits.txt`/`configure.py`, and the re-split that follows |
+| 2 decompile | one subagent per unit (or per function inside a large unit): the source file is its own; `m2cinput.py`/`m2c` and the Ghidra dump are read-only. | shared headers (one declaration, one place), and any `symbols.txt` rename (`symedit.py` edits one map) |
+| 3 match | per unit, using `mt.py diff`/`symdiff` and the unit's own object - no global state. | regenerating `report.json` and `ninja changes`, which see the whole repo |
+| 4 commit | nothing; it is one index per worktree. | staging, `prepcommit.py`, and the `AGENTS.md` LOCAL-ONLY round trip |
+
+Practical rules, mostly already in the skills:
+
+* **A worktree per stream** (`git worktree add -b <stream> ../mhtri-dtk.ws-<stream> <base>`) and therefore one
+  build tree per stream: two `ninja` runs in one tree race, and `build/RMHE08/` is shared state. If two
+  streams must share a worktree, give them disjoint source files and serialise every `ninja` call.
+* **Never two writers on one file**: `splits.txt`, `configure.py`, `symbols.txt` and `AGENTS.md` are the
+  four files the whole campaign has one of each.
+* **A subagent cannot see the parent's Ghidra MCP session** unless it has its own - so hand it the offline
+  route (`build/RMHE08/obj/<unit>.o` + `m2cinput.py` + `tools/m2c`), which is why that route is step 2 as
+  written rather than an afterthought.
+* **Ask for evidence, not prose**: the commands run, the numbers, the first divergence, and the files
+  touched - a subagent's report is what the parent verifies with `mt.py diff` and `ninja changes` before it
+  is committed under the parent's name.
+* **The re-split and the report are the global choke points** (6-12 minutes and a full-repo rebuild). Batch
+  the work that needs them: many proposals in, one registration, one re-split, one report - then fan out
+  again on step 2.
+
+## The orchestrator
+
+The orchestrator is a **role, not a fixed agent**: by default the main session plays it, and it can be
+delegated in turn - one orchestrator per module, reporting to the campaign orchestrator. What has to be unique
+is *who writes which file*, not who reads what. The role owns the four shared files, the re-split, the report,
+the index and the ledger; what it must not do is the reading-heavy work itself.
+
+**Its loop, once per iteration**
+
+1. `ledger.py` - read the state, never memory: totals, `next N`, and the stale-report flag.
+2. Pick the batch: one TU's unclaimed symbols, plus the data ranges that come with it (see "Order of work").
+3. Fan out step 1 as read-only proposal subagents and collect their verdicts.
+4. Decide. `proceed` is the orchestrator's call; `approve` and `never touch` go into the **escalation queue**
+   for the human - in one batch, not one interruption per symbol.
+5. Apply the registration itself (the shared files have one writer), then pay the one re-split.
+6. Fan out step 2, one subagent per unit, each in its own worktree if it will also run `ninja`.
+7. Re-derive every claim cheaply, per unit: `ledger.py unit`, a fresh report, `ninja changes`, `mt.py diff`.
+   A number that does not reproduce is not a result.
+8. Commit the batch (standing approval), update the local-only block, back to 1.
+
+**What it has to weigh**
+
+* **Its own context is the scarce resource.** It reads the ledger, subagent summaries, `git diff --stat` and
+  the numbers - not source files and not disassembly. Every read-heavy question is cheaper as a subagent's
+  answer than as its own context.
+* **Evidence over reports.** A summary is a claim; the orchestrator verifies it with the ledger and
+  `mt.py diff` before committing it under its own name (skill `objdiff-verify`).
+* **The escalation queue** collects the decisions it cannot make: a re-attribution (`approve`), a
+  `never touch` owner, a policy question, a batch that would exceed the standing commit approval. Keep working
+  on the rest; hand the queue over as a list with numbers.
+* **Serialisation**: one writer for `splits.txt`/`configure.py`/`symbols.txt`/`AGENTS.md`, one `ninja` per
+  build tree, one re-split at a time. The batch should therefore be as large as is safe - the re-split is the
+  campaign's slowest step.
+* **Blast radius**: everything lands `NonMatching`, so a bad batch cannot break the link - but it can break
+  the *next* session's ability to measure. A half-registered unit, a `splits.txt` range with no `configure.py`
+  entry, or a report that was not regenerated is what actually stops the loop.
+* **Handover**: before a compaction or the end of a session, the local-only block says which batch is open,
+  the ledger is the state, and anything worth keeping is in `docs/`, a skill or `AGENTS.md`. A finding that
+  lives in a reply is lost.
+
+**When the orchestrator delegates itself**
+
+* **Per module**: a module with hundreds of symbols (`Pl/` is 189 registered already) gets its own
+  orchestrator, worktree and commit stream; the campaign orchestrator then owns the plan, the four shared
+  files and the cross-module view.
+* **Per step**: a registration orchestrator that only applies proposals and re-splits, alongside one that
+  only orchestrates decompilation - worth it when one step is the bottleneck (the report and the re-split
+  usually are).
+* **Never** two orchestrators writing one registration file, and never an orchestrator that commits from
+  another's index - the index belongs to the worktree.
+
+**Briefing a subagent** (the shape that keeps verification cheap)
+
+* State the *one* artefact it returns, the read-only inputs it may use, the number it must report, and the
+  files it may not touch (`splits.txt`, `configure.py`, `symbols.txt`, `AGENTS.md`, any `ninja`, any commit).
+* Step 1: "run `symbolpreflight` + `tudiscover at` on `<address>`; return the verdict, the proposed unit path,
+  the exact `splits.txt` block and `configure.py` entry, the evidence for each range, and what you could not
+  decide."
+* Step 2: "write `<src/path>` (+ a header only if a declaration is shared); return the file, the compile
+  command and its output, the per-symbol score from a fresh report, the first divergent instruction, and the
+  residual paragraph for the file header."
+
+## Order of work
+
+* **Ascending address**, because the DOL's layout groups a module's code and data: a TU discovered at one
+  address usually runs into the next unclaimed symbols, and `tudiscover` works from an address.
+* **Finish a TU before starting the next**, so one re-split covers all of its functions.
+* **Calibration first**: the first ~20 symbols should be small ones with known names (the runtime dump has
+  real SDK names for a good fraction of them). They validate the loop and the 80 % bar cheaply; a
+  `fn_*` blob nobody can name is the worst place to start.
+* **Milestones**, recorded in the ledger output, not in prose: every 100 closed symbols, and every module's
+  first unit. Re-check `ninja changes` at each milestone - a systematic regression is much cheaper to find
+  then than 500 symbols later.
+
+## Risks, and where they are already written down
+
+| risk | where it is handled |
+| --- | --- |
+| reaching for flags to fix what is really source shape or liveness | playbook 13; `mwcc-unit-matching` |
+| a `Matching` flag on a wrong object | non-negotiable 4; proof procedure in `objdiff-verify` |
+| claiming a data range that lowers a function | playbook 23; measure before/after |
+| a rename that splits the map and the source | skill `symbol-map-editing` (two edits, one change) |
+| a stale report or a hand-written compile | `decompile-symbol` §5; `objdiff-verify` |
+| four agents editing one file | one worktree per stream; `prepcommit.py` stages explicit paths |
+| committing the local-only block | non-negotiable 8; `prepcommit.py`/`localonly.py` handle it |
+
+## What "done" means
+
+* Per symbol: attributed, decompiled, ≥ 80 %, committed, and counted by the ledger.
+* Per unit: every symbol it owns is closed (or recorded `partial` with its residual), and its ranges measure
+  no worse than before.
+* Campaign: `python tools/units/ledger.py` reports no unclaimed symbol, and the remaining sub-100 % units
+  are an explicit, listed second-pass queue - each with a residual in its own file header comment.
