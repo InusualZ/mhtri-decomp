@@ -247,6 +247,25 @@ cflags_rel = [
     "-sdata2 0",
 ]
 
+# g3d flags (src/g3d/g3d_resanmamblight.c). Evidence: the retail fn_800680A8 (0x24 B / 9 instructions)
+# loads the field at +0xC *before* the epilogue's LR reload. Under -O4,p the nine instructions are the same
+# multiset in the other order; under -O3 the object is byte-identical. The -O3 variants tried (-inline auto /
+# -inline noauto / -opt nopeephole) all reproduce the retail order, so the level is the lever. Camellia and
+# RSO settled on -O3 as well; -O4,p is cflags_base's default, not this build's.
+cflags_g3d = [
+    *[f for f in cflags_base if f != "-O4,p"],
+    "-O3",
+]
+
+# lobby flags (src/lobby/lobby_scene.c). Evidence: the retail fn_801EC9E0 (0x18 B / 6 instructions) reads the
+# small-data scene pointer, then the +0x10 table base, before the argument's byte, and keeps the table base
+# in r4; -O4,p instead hoists the byte load, splits the base across r3 and reorders the two loads. -O3 is
+# byte-identical. Note the OS unit next to this list wants -O4,p: the level is per unit, so probe both.
+cflags_lobby = [
+    *[f for f in cflags_base if f != "-O4,p"],
+    "-O3",
+]
+
 # Camellia flags. Evidence-backed per-object overrides for Camellia/camellia.c, which does not match with
 # the cflags_runtime defaults:
 #   * the retail object has no stmw/lmw -- it calls the EABI _savegpr_14/_restgpr_14 helpers
@@ -351,6 +370,7 @@ config.libs = [
         "objects": [
             Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
+            Object(NonMatching, "Runtime.PPCEABI.H/memset.c"),
         ],
     },
     {
@@ -382,6 +402,42 @@ config.libs = [
         "host": False,
         "objects": [
             Object(NonMatching, "RSO/runtime.c"),
+        ],
+    },
+    {
+        "lib": "g3d",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_g3d,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "g3d/g3d_resanmamblight.c"),
+        ],
+    },
+    {
+        "lib": "Network",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_base,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "Network/NetworkWiiMediator.c"),
+        ],
+    },
+    {
+        "lib": "OS",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_base,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "OS/OSAlarm.c"),
+        ],
+    },
+    {
+        "lib": "lobby",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_lobby,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "lobby/lobby_scene.c"),
         ],
     },
 ]
