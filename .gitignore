@@ -40,11 +40,13 @@ compile_commands.json
 !/.pi/skills/
 /.pi/skills/*
 !/.pi/skills/objdiff-verify/
-# /.agents/ stays ignored except the shared matching and symbol-map skills, which are tracked on purpose.
+# /.agents/ stays ignored except the shared matching, symbol-map and AGENTS.md-local-only skills, which
+# are tracked on purpose.
 # (the parent directory itself must not be excluded, or git never descends into it)
 /.agents/*
 !/.agents/skills/
 /.agents/skills/*
 !/.agents/skills/mwcc-unit-matching/
 !/.agents/skills/symbol-map-editing/
+!/.agents/skills/agents-md-local-only/
 /openspec

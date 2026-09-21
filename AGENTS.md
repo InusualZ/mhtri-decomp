@@ -19,6 +19,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `Runtime.PPCEABI.H` holds two stubs registered as `NonMatching` (= not linked). Everything else is
   still unsplit.
 
+
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
@@ -45,9 +46,12 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
-   content: strip it before `git add AGENTS.md`, restore it afterwards, and commit every *other* AGENTS.md
-   edit normally. Verify with `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` → must print `0` (this
-   rule's own prose mentions the markers, so anchor the match at line start).
+   content: pull it out before `git add AGENTS.md`, restore it afterwards, and commit every *other* AGENTS.md
+   edit normally. Use the tool, not `sed`: `python tools/agents/localonly.py pull` before staging and
+   `python tools/agents/localonly.py push` after the commit (skill: `agents-md-local-only`). Verify with
+   `python tools/agents/localonly.py verify` - i.e. `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'`
+   must print `0`. (This rule's own prose mentions the markers, so anchor the match at line start; the tool
+   matches whole marker lines for the same reason.)
 
 ## Matching policy: flags and source variants
 
@@ -87,9 +91,11 @@ The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matchi
 and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
 `variants`, `diff`, `slots`, `sections`, `dwarf`). The table below stays the source of truth for state.
 
-Two more tracked skills sit next to it, both deliberately narrow: `.agents/skills/symbol-map-editing/`
+Three more tracked skills sit next to it, all deliberately narrow: `.agents/skills/symbol-map-editing/`
 (`tools/symbols/symedit.py` - look up, list by range and rename symbols without ever loading
-`symbols.txt` into context) and `.pi/skills/objdiff-verify/` (proving a unit really matches).
+`symbols.txt` into context), `.agents/skills/agents-md-local-only/` (`tools/agents/localonly.py` - pull the
+local-only section out of this file before a commit and push it back after) and
+`.pi/skills/objdiff-verify/` (proving a unit really matches).
 
 | # | idea | problem it solves | status |
 | --- | --- | --- | --- |
@@ -192,6 +198,12 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       - see docs/matching.md
                             objdiff/  objdiff consumers (symdiff.py, slotmap.py)
                             elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
+                            symbols/  symbol-map proxy (symedit.py): look up, list by range and rename
+                                      symbols in config/RMHE08/symbols.txt without loading it into
+                                      context - see the `symbol-map-editing` skill
+                            agents/   AGENTS.md housekeeping (localonly.py): pull the local-only
+                                      working-state section out before a commit and push it back after
+                                      - see the `agents-md-local-only` skill
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
@@ -324,9 +336,9 @@ regression if the hash goes red.
   Prefer a clean rebuild of the specific unit, and `rm -rf build/RMHE08` when in doubt.
 * Local agent scratch directories (`.lavish/`, `.agents/`, `openspec/`, and everything under `.pi/`
   **except** the tracked `.pi/skills/objdiff-verify/` skill and the tracked `.agents/skills/`
-  `mwcc-unit-matching/` and `symbol-map-editing/` skills) are gitignored; keep them that way and never add
-  their contents to commits. The exceptions are narrow on purpose: the ignore rules un-ignore the skills
-  directory and then re-ignore everything in it except those skills.
+  `mwcc-unit-matching/`, `symbol-map-editing/` and `agents-md-local-only/` skills) are gitignored; keep them
+  that way and never add their contents to commits. The exceptions are narrow on purpose: the ignore rules
+  un-ignore the skills directory and then re-ignore everything in it except those skills.
 
 ## Conventions
 
@@ -361,8 +373,12 @@ regression if the hash goes red.
     a generated name in place when there is no known or clearly better one - a speculative name is a bug.
   * **A rename is always two edits**: `config/RMHE08/symbols.txt` (which names the *target* object) and the
     source that defines/references it, in the same change - otherwise objdiff stops matching the symbol by
-    name and reports it as 0 %. Verify with `mt.py diff -u <unit> <symbol>` and keep the linked DOL hash
-    unchanged; symbols.txt edits are surgical (never regenerate it to do this).
+    name and reports it as 0 %. Do it through the proxy, never by hand:
+    `python tools/symbols/symedit.py rename <old> <new> --dry-run` first, then for real; it refuses
+    ambiguous renames, keeps the file's line endings, prints the one-line diff and lists the in-repo
+    references that are the other half of the edit. Verify with `mt.py diff -u <unit> <symbol>` and keep the
+    linked DOL hash unchanged. Never open or regenerate the map for this - it is 4.5 MB and must not enter
+    an agent's context (skill: `symbol-map-editing`).
   * **Name `unk` variables, fields and parameters from the context they are used in** - what is stored,
     what it is compared against, which SDK type the offset belongs to, what the value is later passed to
     (e.g. `unk50` in a struct became `import_symbol_table_size` once the dump confirmed the layout, and an
