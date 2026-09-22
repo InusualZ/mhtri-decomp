@@ -158,11 +158,11 @@ class Writer(object):
     def default(self, paths: NinjaPathOrPaths) -> None:
         self._line("default %s" % " ".join(serialize_paths(paths)))
 
-    def _count_dollars_before_index(self, s: str, i: int) -> int:
-        """Returns the number of '$' characters right in front of s[i]."""
+    def _count_dollars_before_index(self, s: str, i: int, floor: int = 0) -> int:
+        """Returns the number of '$' characters right in front of s[i], above `floor`."""
         dollar_count = 0
         dollar_index = i - 1
-        while dollar_index > 0 and s[dollar_index] == "$":
+        while dollar_index > floor and s[dollar_index] == "$":
             dollar_count += 1
             dollar_index -= 1
         return dollar_count
@@ -170,39 +170,43 @@ class Writer(object):
     def _line(self, text: str, indent: int = 0) -> None:
         """Write 'text' word-wrapped at self.width characters."""
         leading_space = "  " * indent
-        while len(leading_space) + len(text) > self.width:
+        # Track the unwrapped remainder with an offset instead of slicing it off: a single
+        # `build` line can carry every object of a project (hundreds of kB), and
+        # `text = text[space + 1:]` copied that remainder once per wrapped line, which made
+        # the wrap quadratic in the number of objects on the line.
+        start = 0
+        while len(leading_space) + (len(text) - start) > self.width:
             # The text is too wide; wrap if possible.
 
             # Find the rightmost space that would obey our width constraint and
             # that's not an escaped space.
             available_space = self.width - len(leading_space) - len(" $")
-            space = available_space
-            while True:
-                space = text.rfind(" ", 0, space)
-                if space < 0 or self._count_dollars_before_index(text, space) % 2 == 0:
-                    break
+            space = text.rfind(" ", start, start + available_space)
+            while (
+                space >= 0
+                and self._count_dollars_before_index(text, space, start) % 2 != 0
+            ):
+                space = text.rfind(" ", start, space)
 
             if space < 0:
                 # No such space; just use the first unescaped space we can find.
-                space = available_space - 1
-                while True:
+                space = text.find(" ", start + available_space)
+                while (
+                    space >= 0
+                    and self._count_dollars_before_index(text, space, start) % 2 != 0
+                ):
                     space = text.find(" ", space + 1)
-                    if (
-                        space < 0
-                        or self._count_dollars_before_index(text, space) % 2 == 0
-                    ):
-                        break
             if space < 0:
                 # Give up on breaking.
                 break
 
-            self.output.write(leading_space + text[0:space] + " $\n")
-            text = text[space + 1 :]
+            self.output.write(leading_space + text[start:space] + " $\n")
+            start = space + 1
 
             # Subsequent lines are continuations, so indent them.
             leading_space = "  " * (indent + 2)
 
-        self.output.write(leading_space + text + "\n")
+        self.output.write(leading_space + text[start:] + "\n")
 
     def close(self) -> None:
         self.output.close()
