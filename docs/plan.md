@@ -54,6 +54,35 @@ the bookkeeping.
 
 ### 0. Once, before the first symbol
 
+* **Autonomy (owner grant, 2026-09-21): the orchestrator runs the campaign without gates.** It decides the
+  batch, the registrations, the flags, the queue below and the commits, and does not ask per item. It
+  interrupts the owner only for a **pressing** issue, meaning one of:
+  1. **the linked DOL is at risk** - anything that would change `config/RMHE08/build.sha1` outside the
+     `NonMatching`-safe path;
+  2. **loss or destruction** - deleting work, rewriting history, pushing, or an unrevertible bulk edit (a
+     mass rename, a scaffold-wide range claim);
+  3. **information only the owner has** - a reference source, a ROM, a tool that is not on this machine;
+  4. **a premise change** - the bar, the scope, the vendor files, or an `AGENTS.md` rule the campaign would
+     have to break;
+  5. **the environment** - the owner's machine, disk or another session is in the way.
+  Everything else - a symbol that resists, a flag that does not help, a table left unowned - is the campaign's
+  own business, recorded (playbook, unit header, this file) rather than asked about.
+* **The escalation queue, decided** (kept here so it is not re-litigated in every session):
+  1. **`memcpy.c` and `memset.c` stay separate.** The retail member is one object (`__mem.o`), but this lib
+     builds with `-inline auto`, and one file holding both `__fill_mem` and `memset` lets MWCC inline the
+     helper into `memset` - a 100 % symbol spent to buy a file name. Revisit only if that lib's inline
+     setting changes for another reason.
+  2. **The TRK interrupt-vector table (0x80004380-0x800062B4) stays unowned.** Zero relocations, not
+     expressible in C: reproducing it as `.long` data would match ~8 KB of bytes while recovering no method,
+     against the repository's "no hand-written assembly" premise. Revisit only if byte coverage becomes the
+     goal.
+  3. **`-func_align 4` for `Runtime.PPCEABI.H` is scheduled for that lib's next measurement pass.** It needs
+     `#pragma function_align 16` in `__start.c` (whose 16-byte function starts depend on the implied 16) plus
+     a re-split of both units, and it only shows the day one of them is flipped to `Matching`.
+* **`Matching` flips** (decided): a unit is flipped only when it is byte-identical - every symbol 100 %,
+  sections and relocations equal, proven per the `objdiff-verify` skill - **and** `ninja build/RMHE08/ok` stays
+  green afterwards, one unit per commit and named in the message. Nothing qualifies today (best unit: 97.81 %
+  fuzzy); the first flip is done alone so the commit before it is the revert point.
 * **Commits need no per-batch approval** (owner grant, 2026-09-21): the orchestrator commits its own campaign
   work as it goes - one commit per batch, carrying the sources, the registration, the flags it proved and the
   knowledge delta. What is *not* committed is anything that is not a finished piece of work: probes, scratch,
@@ -79,14 +108,9 @@ the bookkeeping.
   `build/RMHE08/report.json`. `next` is what step 1 of each iteration consumes; without it there is no
   mechanical way to pick the next symbol out of a 65,700-line map.
   `tools/units/ledger_selftest.py` covers the views on fixtures (no build, no repository state).
-* **Standing approval for step 4** (granted by the owner): every commit in the loop - the campaign runs
-  without asking per symbol. `prepcommit.py` still stages explicit paths, still writes the message, still
-  refuses to commit by itself, and the staged diff is still read before `git commit -F`. If the standing
-  approval is ever withdrawn, stop after step 3 and hand the prepared commit over instead.
-
-  (Superseded by the owner's later grant in "0. Once, before the first symbol": commits need no approval, and
-  `prepcommit.py` is used for its checks - explicit paths, refusals, the DOL gate, the LOCAL-ONLY round trip -
-  not as an approval gate.)
+* **Standing approval for step 4** (granted by the owner, then superseded by the autonomy grant above): the
+  campaign commits without asking. `prepcommit.py` is used for its checks - explicit paths, refusals, the DOL
+  gate, the LOCAL-ONLY round trip - not as an approval gate.
 * **One worktree per stream** (`git worktree add -b <stream> ../mhtri-dtk.ws-<stream> <base>`), so a second
   `ninja` cannot race this one and dirty files are not shared.
 * **`ninja baseline` once**, so `ninja changes` has something to compare against for the rest of the run.
