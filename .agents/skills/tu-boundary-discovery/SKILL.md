@@ -44,6 +44,15 @@ Spearman(offset in section, lowest referring `.text` address) = **1.000** for `.
 | remove the stale split-tree duplicates | `python tools/splits/tudiscover.py prune [--apply] [--include-obj]` |
 | rebuild the graph cache | `python tools/splits/tudiscover.py cache --force` |
 | scorecard for iterating on this tool | `python tools/splits/tudiscover.py bench [--seeds 400] [--compare <baseline.json>]` |
+| **bulk attribution** over an unclaimed region | `python tools/units/attribute.py plan 0x80040598 0x800408A8` |
+| ... and register it (splits + configure + stub source) | `python tools/units/attribute.py apply <start> <end> [--dry-run] [--limit N]` |
+
+`attribute.py` is the bulk driver on top of this tool: it walks the *unclaimed* runs of a region, cuts them
+only at seams a narrow strong observation pins (`--min-bytes`/`--max-bytes` repair the pieces that are not
+TU-shaped), and emits one proposal per unit - `.text` only, with the data runs it saw printed as comments for
+a measured second pass (playbook idea 23). A run with no evidence stays **one** unit and its stub header says
+the seam is unproven: one function per file is certainly wrong, one file per region is only unproven. It is
+idempotent, and `apply` asserts rather than silently skipping (configure.py is CRLF, splits.txt is LF).
 
 The graph (per-function data references, calls, codegen fingerprint, unwind entries, `.rel` ownership) is
 built from `build/<version>/asm/` once (~12 s / 13 751 files) and cached in
