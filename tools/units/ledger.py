@@ -184,6 +184,19 @@ class Ledger:
     def owner(self, entry: dict) -> dict | None:
         return preflight.covering(self.splits, entry["section"], entry["address"])
 
+    def unit_symbols(self, block: dict, kind: str = "all") -> list[dict]:
+        """Every symbol inside one unit's ranges, from the section lists (not from a scan of the whole map)."""
+        out = []
+        for rng in block["ranges"]:
+            for entry in self.by_section.get(rng["section"], ()):
+                if not rng["start"] <= entry["address"] < rng["end"]:
+                    continue
+                if kind == "function" and (entry.get("type") or "") != "function":
+                    continue
+                out.append(entry)
+        out.sort(key=lambda entry: (entry["address"], entry["section"]))
+        return out
+
     def score(self, owner: dict, entry: dict) -> float:
         return self.scores.get(report_name(owner["unit"]), {}).get(entry["name"], 0.0)
 
@@ -232,9 +245,9 @@ class Ledger:
                 module, {"module": module, "units": 0, "symbols": 0, "closed": 0, "scored": 0, "best": 0.0}
             )
             row["units"] += 1
-            for entry in self.by_section.get(".text", ()):
-                if preflight.covering([block], entry["section"], entry["address"]) is None:
-                    continue
+            # Every section, not just .text: a runtime unit's functions live in .init, and counting only
+            # .text made the Runtime.PPCEABI.H row look empty while it held five units.
+            for entry in self.unit_symbols(block, "function"):
                 score = scores.get(entry["name"], 0.0)
                 row["symbols"] += 1
                 row["closed"] += score >= BAR
@@ -294,9 +307,7 @@ class Ledger:
             return None
         scores = self.scores.get(report_name(block["unit"]), {})
         symbols = []
-        for entry in self.symbols("all"):
-            if preflight.covering([block], entry["section"], entry["address"]) is None:
-                continue
+        for entry in self.unit_symbols(block):
             symbols.append(
                 {
                     "name": entry["name"],
