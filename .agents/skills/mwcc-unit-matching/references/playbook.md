@@ -564,6 +564,16 @@ could no longer pair the pool-relative instructions at all: 99.36 % -> 98.01 %.
 on `RSOStaticLocateObject`; claiming the string pool at `0x80629B90` cost 1.35 % on `fn_804DABF0` and was
 reverted. Measure before *and* after, and check that the linked DOL hash did not change.
 
+Two more jump tables confirmed it (batch 6), and one counter-example shows where the claim stops: claiming
+`.data 0x805C5FA0..0x805C5FC4` took `Pl/pl_master`'s `fn_8026CC7C` from 99.9946 to **100 %** and
+`.data 0x8060E8A0..0x8060E8E4` did the same for `Gecko_ExceptionPPC.cp`'s `ExPPC_NextAction` - both were
+only ever short by the *relocation's* symbol, and the emitted table was byte-equal all along. The same
+object's `.bss fragmentinfo` (0x806F4B48, referenced 6 times) must **not** be claimed: the target's `.bss` is
+0x180 B and our object emits none, so the claim pairs a section against nothing and the unit's `matched_data`
+collapses. There the fix was a plain re-split - dtk names an unclaimed reloc target from the map, and the
+target object had been split before the symbol was renamed. Claim data that the object *emits*; re-split when
+it only *references* something.
+
 ## 24. Merging a probe into the unit is its own step
 
 **Problem.** Probes are measured standalone, in their own translation unit, so their numbers are not the

@@ -55,9 +55,30 @@
  *     fn_802738E8 97.73 - single-row residuals: register choice, one redundant `clrlwi` on the
  *     `& ~(1<<i)` form (MWCC folds it into `andc`), or a branchless `subf/cntlzw` select where the target
  *     keeps four separate `li r3,1; blr` returns.
+ *   fn_80273228 97.40 - the 24-entry scan's loop: ours carries a byte-offset induction variable and
+ *     materialises the array base for the second half of the eight unrolled checks, where the target
+ *     advances the base pointer (`addi r28,r28,0x20`) and folds the dead counter into `addi r3,r3,7`
+ *     (584 B against the target's 580).
+ *   fn_8027350C 95.20 - after the fn_802693C4/fn_80269474 call ours recomputes `plw + i*4` for the
+ *     `unk218[i] = unk234[i]` copy; the target reuses the base it had already kept for `&plw->unk234[i]`
+ *     (three instructions and 12 B over the target).
  *
- * Work in progress: 45 of 50 functions written, in address order; still unwritten are fn_8027252C,
- * fn_80272B10, fn_80272E30, fn_80273228 and fn_8027350C.
+ * Source shapes in these five that are load-bearing, not guesses:
+ *   - A helper's narrow return type is *not* trusted sign-extended, so it decides where MWCC re-emits the
+ *     conversion: `fn_8004BA3C` must return `s16` (the `(u32)(s16)v` tests then keep their own `extsh` and
+ *     the two 8/24-slot call blocks stay separate) and fn_80272E30 must return `s16` for `return v` to stay
+ *     a bare `mr`. fn_802724E8's `a` and 7th parameter are signed-byte typed (`s8*`, `s8 aval`) - as `u8`
+ *     it masks the level the target passes raw - and fn_8027252C's third parameter follows it to `s8*`.
+ *   - fn_80272E30's `case 4` compares `plw->unk26E` against the *first* slot lookup, not the resolved one;
+ *     only `case 0` and the 1-3 block use the resolved slot.
+ *   - fn_8027252C's locals are declared `tv, tb, ta` - that order fixes both the stack slots (0x20/0x18/
+ *     0x10) and the register order (r7/r8/the table pointer/ta). Its value loop has to be
+ *     `if (v != 0) { if (v > 0) ... else ... } else { zeros }` so the zero block lands out of line, the
+ *     swap has to do tv/tb first and ta in its own block, and the epilogue stores `a[i] = (s8)tv[i]`.
+ *   - fn_80272B10's second slot lookup indexes `plw->unk278` with a `?:` *and* calls GetItemData in each
+ *     arm of the if/else; written as one arm the two loads get merged.
+ *
+ * All 50 functions are written in address order (unit fuzzy 96.1 %, up from 75.6 % at 45 written).
  */
 
 #include "types.h"
@@ -100,7 +121,10 @@ struct _SLOTENT {
 struct _PLW {
     /* 0x000 */ u8 unk000[2];
     /* 0x002 */ u8 unk2;
-    /* 0x003 */ u8 unk003[0x140 - 0x003];
+    /* 0x003 */ u8 unk003[0x008 - 0x003];
+    /* 0x008 */ u8 unk8;
+    /* 0x009 */ u8 unk009[0x13C - 0x009];
+    /* 0x13C */ u8* unk13C;
     /* 0x140 */ _EQUIP equipA[6];
     /* 0x188 */ u8 unk188[0x1D0 - 0x188];
     /* 0x1D0 */ _EQUIP equipB;
@@ -128,7 +152,9 @@ struct _PLW {
     /* 0x278 */ _SLOTENT unk278[24];
     /* 0x2D8 */ u8 unk2D8[0x2E0 - 0x2D8];
     /* 0x2E0 */ _SLOTENT unk2E0[8];
-    /* 0x300 */ u8 unk300[0x370 - 0x300];
+    /* 0x300 */ u8 unk300[0x304 - 0x300];
+    /* 0x304 */ u16 unk304;
+    /* 0x306 */ u8 unk306[0x370 - 0x306];
     /* 0x370 */ s16 unk370;
     /* 0x372 */ s16 unk372;
     /* 0x374 */ u8 unk374[0x37A - 0x374];
@@ -194,7 +220,7 @@ u32 fn_8027E290(u8);
 void fn_8027E98C(u8*);
 s32 fn_8027EBA8(_PLW*, u8*);
 u32 fn_80274B20(u16);
-void fn_8027252C(_EQUIP*, u16*, u8*, u8*);
+void fn_8027252C(_EQUIP*, u16*, s8*, u8*);
 void* memset(void*, int, u32);
 s8 Get_pl_type__FP6_EQUIPP6_EQUIP(_EQUIP*, _EQUIP*);
 u16 fn_8027993C(_PLW*, u16, int);
@@ -203,12 +229,35 @@ u8* GetItemData__FUs(u16);
 u16 fn_80273044(_PLW*, u16);
 s32 fn_8004BD30(s16*);
 
-u32 fn_8027350C(_PLW*, s32);
+void fn_8027350C(_PLW*, s32);
 
 
 void* fn_8027E344(void);
 
 u32 fn_80274AEC(u8*, u32, u8);
+
+s16 fn_8004BA3C(u16, s16, void*, int, int, int);
+u16 fn_8025DF78(_PLW*, u16, int);
+u32 fn_80269394(void*);
+u32 fn_802693C4(u8, int, s32);
+u32 fn_80269474(u8, int, s32);
+void fn_802695A4(u8, void*, void*);
+void fn_80223258(_PLW*, u8);
+void fn_80272B10(_PLW*, s32);
+s8 fn_8027234C(u8*, u8);
+void fn_802736A0(_PLW*);
+
+/* One 0x14C-byte entry of the player-object table behind lbl_80794B28. */
+struct _PLOBJ {
+    /* 0x000 */ u8 unk000[0x14C];
+};
+
+/* The small-data pointer object the table hangs off (only the table base is named). */
+struct _PLGLOBAL {
+    /* 0x00 */ u8 unk00[0x10];
+    /* 0x10 */ _PLOBJ* table;
+};
+extern _PLGLOBAL* lbl_80794B28;
 
 extern u16 lbl_805C0198[];
 extern u16 lbl_805C01B8[];
@@ -525,7 +574,7 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
         fn_8004A20C(&plw->equipC, &equip[7]);
         fn_8004A20C(&plw->equipD, &equip[8]);
         fn_80272A08(plw);
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             plw->unk61A[i] = plw->unk5F2[i];
         }
         fn_8027885C(plw, 0, 0);
@@ -580,7 +629,7 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
         fn_8004A20C(&plw->equipC, &saved[7]);
         fn_8004A20C(&plw->equipD, &saved[8]);
         fn_80272A08(plw);
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             plw->unk61A[i] = 0;
         }
         fn_8027885C(plw, 0, 0);
@@ -604,13 +653,13 @@ bool Pl_Skill_ck(_PLW* plw, u16 skill) {
         }
     }
     if (ok == 1) {
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             if (skill == plw->unk61A[i]) {
                 return true;
             }
         }
     } else {
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             if (skill == plw->unk5F2[i]) {
                 return true;
             }
@@ -636,13 +685,13 @@ extern "C" u32 fn_802715A0(_PLW* plw, u32 slot) {
     int i;
 
     if (fn_800CF208() == 2 && lobby_w[0] == 6) {
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             if ((u8)slot == plw->unk62A[i]) {
                 return (u8)plw->unk61A[i];
             }
         }
     } else {
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             if ((u8)slot == plw->unk602[i]) {
                 return (u8)plw->unk5F2[i];
             }
@@ -861,7 +910,7 @@ extern "C" u32 fn_80271B4C(u16 item, u8 skill) {
 #define SLOT_IDX(slot) (((slot) & 0x80) ? (((slot) & 0x7F) + 26) : (slot))
 
 /* Appends one (value, a, b) triple to a bounded parallel-array set and bumps the count. */
-extern "C" void fn_802724E8(u16* table, u8* a, u8* b, u8* count, u16 v, u8 bval, u8 aval) {
+extern "C" void fn_802724E8(u16* table, s8* a, u8* b, u8* count, u16 v, u8 bval, s8 aval) {
     if (v == 0) {
         return;
     }
@@ -872,6 +921,85 @@ extern "C" void fn_802724E8(u16* table, u8* a, u8* b, u8* count, u16 v, u8 bval,
     a[*count] = aval;
     b[*count] = bval;
     *count += 1;
+}
+
+/* The saved-skill set behind fn_80272A08: looks each skill id up in the 16-byte record table, keeps the
+ * rank the player's equipment reaches, converts it to a display value and sorts the eight entries. */
+extern "C" void fn_8027252C(_EQUIP* equips, u16* table, s8* a, u8* b) {
+    _SKILLREC* rec = (_SKILLREC*)lbl_805C01C8;
+    s16 tv[8];
+    u8 tb[8];
+    u8 ta[8];
+    u8 count = 0;
+    s8 level;
+    int i;
+    int j;
+
+    for (i = 0; i < 8; i++) {
+        table[i] = 0;
+        b[i] = 0;
+        a[i] = 0;
+    }
+    while (rec->id != 0xFFFF) {
+        level = fn_8027234C((u8*)equips, (u8)rec->id);
+        if (level <= (s8)rec->unk2) {
+            fn_802724E8(table, a, b, &count, (u16)rec->unk3, (u8)rec->id, level);
+        } else if (level <= (s8)rec->unk4) {
+            fn_802724E8(table, a, b, &count, (u16)rec->unk5, (u8)rec->id, level);
+        } else if (level <= (s8)rec->unk6) {
+            fn_802724E8(table, a, b, &count, (u16)rec->unk7, (u8)rec->id, level);
+        } else if (level >= (s8)rec->unkC) {
+            fn_802724E8(table, a, b, &count, (u16)rec->unkD, (u8)rec->id, level);
+        } else if (level >= (s8)rec->unkA) {
+            fn_802724E8(table, a, b, &count, (u16)rec->unkB, (u8)rec->id, level);
+        } else if (level >= (s8)rec->unk8) {
+            fn_802724E8(table, a, b, &count, (u16)rec->unk9, (u8)rec->id, level);
+        }
+        rec++;
+    }
+    for (i = 0; i < 8; i++) {
+        s8 v = (s8)a[i];
+
+        if (v != 0) {
+            if (v > 0) {
+                tv[i] = (s16)(v + 200);
+                tb[i] = b[i];
+                ta[i] = (u8)table[i];
+            } else {
+                tv[i] = (s16)((s16)(-v) + 100);
+                tb[i] = b[i];
+                ta[i] = (u8)table[i];
+            }
+        } else {
+            tv[i] = 0;
+            tb[i] = 0;
+            ta[i] = 0;
+        }
+    }
+    for (i = 0; i < 7; i++) {
+        for (j = i + 1; j < 8; j++) {
+            if (tv[i] < tv[j] || (tv[i] == tv[j] && tb[i] < tb[j])) {
+                s16 s = tv[i];
+                u8 t = tb[i];
+
+                tv[i] = tv[j];
+                tb[i] = tb[j];
+                tv[j] = s;
+                tb[j] = t;
+                {
+                    u8 u = ta[i];
+
+                    ta[i] = ta[j];
+                    ta[j] = u;
+                }
+            }
+        }
+    }
+    for (i = 0; i < 8; i++) {
+        a[i] = (s8)tv[i];
+        b[i] = tb[i];
+        table[i] = ta[i];
+    }
 }
 
 /* Whether `skill` is one of the four decoration-slot skill ids. */
@@ -1001,7 +1129,192 @@ extern "C" void fn_80272A08(_PLW* plw) {
     fn_8004A20C(&saved[6], &plw->equipB);
     fn_8004A20C(&saved[7], &plw->equipC);
     fn_8004A20C(&saved[8], &plw->equipD);
-    fn_8027252C(&saved[0], plw->unk5F2, plw->unk60A, plw->unk602);
+    fn_8027252C(&saved[0], plw->unk5F2, (s8*)plw->unk60A, plw->unk602);
+}
+
+/* Re-selects the skill slot: keeps the current one when it still holds the same skill id, otherwise
+ * falls back through the resolved-slot table and drops it when the item is not a valid one. */
+extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
+    u16* ent;
+    u32 v;
+
+    if (slot & 0x80) {
+        ent = (u16*)((u8*)plw + ((slot & 0x7F) + 26) * 4 + 0x278);
+    } else {
+        ent = (u16*)((u8*)plw + slot * 4 + 0x278);
+    }
+    v = fn_80274B20(*ent);
+    if (slot != plw->unk26E) {
+        if (plw->unk26C != (u8)v) {
+            return;
+        }
+        plw->unk26E = (u16)slot;
+    }
+    if (slot == plw->unk26E) {
+        plw->unk26E = fn_8027993C(plw, (u16)slot, 2);
+        fn_80279B84(plw);
+        plw->unk272 = plw->unk270;
+        plw->unk275 = plw->unk26A;
+        plw->unk274 = 0;
+        return;
+    }
+    if (fn_8026FE44(plw) != 0) {
+        u16 cur = plw->unk26E;
+
+        if (cur == 0xFF) {
+            plw->unk26E = fn_8027993C(plw, 0, 2);
+            fn_80279B84(plw);
+            return;
+        }
+        u8* item;
+
+        if (cur & 0x80) {
+            item = GetItemData__FUs(plw->unk278[(cur & 0x7F) + 26].unk0);
+        } else {
+            item = GetItemData__FUs(plw->unk278[cur].unk0);
+        }
+        if (item[0] != 1) {
+            plw->unk26E = fn_8027993C(plw, plw->unk26E, 0);
+            fn_80279B84(plw);
+        }
+    }
+}
+
+/* Resolves the equipment slot for a changed slot and re-selects the skill to display. */
+extern "C" s16 fn_80272E30(_PLW* plw, u16 item, s16 value) {
+    u8* data = GetItemData__FUs(item);
+    u16 cur = fn_80273044(plw, item);
+    s16 v;
+    u16 slot;
+
+    if (data[0] == 1 && fn_8026FE44(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
+        v = fn_8004BA3C(item, value, plw->unk2E0, 8, 1, 0);
+        slot = fn_80273044(plw, item);
+        if ((u32)v <= 4) {
+            goto found;
+        }
+    }
+    v = fn_8004BA3C(item, value, plw->unk278, 24, 1, 0);
+    slot = fn_80273044(plw, item);
+found:
+    switch (v) {
+    case 0:
+        {
+            u8* d = GetItemData__FUs(plw->unk278[plw->unk304].unk0);
+
+            if ((d[2] & 8) == 0 || d[0] == 1) {
+                plw->unk304 = fn_8025DF78(plw, plw->unk304, 0);
+            }
+        }
+        fn_80272B10(plw, slot);
+        break;
+    case 1:
+    case 2:
+    case 3:
+        if (data[0] == 1 && plw->unk26E == slot) {
+            fn_80272D5C(plw);
+        }
+        break;
+    case 4:
+        if (data[0] == 1) {
+            if (fn_8027993C(plw, plw->unk26E, 1) == 0xFF) {
+                plw->unk26E = 0xFF;
+                plw->unk270 = 0;
+                plw->unk26A = 0;
+                plw->unk269 = 0;
+            } else if (plw->unk26E == cur) {
+                plw->unk270 = 0;
+                plw->unk26A = 0;
+                plw->unk269 = 0;
+            }
+            if (plw->unk26E == cur) {
+                fn_80272D5C(plw);
+            }
+        }
+        break;
+    }
+    return v;
+}
+
+/* The value one equipment slot contributes to `value`, clamped to the item's own limit. */
+extern "C" s32 fn_80273228(_PLW* plw, u16 item, s16 value) {
+    u16 slot = fn_80273044(plw, item);
+    u8* data = GetItemData__FUs(item);
+    s16 ent;
+
+    if (slot != 0xFFFF) {
+        if (slot & 0x80) {
+            ent = *(s16*)((u8*)plw + ((slot & 0x7F) + 26) * 4 + 0x27A);
+            if ((s16)value + ent >= data[3]) {
+                return data[3] - ent;
+            }
+            return value;
+        }
+        ent = *(s16*)((u8*)plw + slot * 4 + 0x27A);
+        if ((s16)value + ent >= data[3]) {
+            return data[3] - ent;
+        }
+        return value;
+    }
+    if (data[0] == 1 && fn_8026FE44(plw) == 1) {
+        for (int i = 0; i < 8; i++) {
+            if (plw->unk2E0[i].unk0 == 0) {
+                return value;
+            }
+        }
+    }
+    for (int j = 0; j < 3; j++) {
+        for (int k = 0; k < 8; k++) {
+            if (plw->unk278[j * 8 + k].unk0 == 0) {
+                return value;
+            }
+        }
+    }
+    return 0;
+}
+
+/* Flushes the skill sets whose cached values no longer resolve, and the decoration slots. */
+extern "C" void fn_8027350C(_PLW* plw, s32 arg) {
+    u32 ok;
+    u8 id;
+    u32 mask;
+    u32 val;
+    u8 i;
+
+    if (!(plw->unk252 != 0 || plw->unk250 != 0 || plw->unk254 != 0)) {
+        return;
+    }
+    ok = fn_80269394(lbl_80794B28->table + plw->unk8);
+    for (i = 0; i < 7; i++) {
+        id = fn_802738B8(i);
+        mask = 1 << i;
+        if (plw->unk252 & mask) {
+            if (ok == 1) {
+                if (*(u32*)((u8*)plw->unk13C + i * 0x164 + 0x11C) == 0) {
+                    val = fn_802693C4(plw->unk8, i, plw->unk234[i]);
+                } else {
+                    val = fn_80269474(plw->unk8, i, plw->unk234[i]);
+                }
+                if (val == 1) {
+                    plw->unk252 &= (u16)~mask;
+                    plw->unk218[i] = plw->unk234[i];
+                    if (id != 0xFF) {
+                        fn_8027373C(plw, id);
+                    }
+                }
+            }
+        } else {
+            plw->unk252 &= (u16)~mask;
+            if (id != 0xFF) {
+                fn_8027373C(plw, id);
+                fn_80223258(plw, id);
+            }
+        }
+    }
+    if (plw->unk254 != 0 && ok == 1) {
+        fn_802695A4(plw->unk8, (u8*)plw + 0x1DC, (u8*)plw + 0x200);
+        fn_802736A0(plw);
+    }
 }
 
 /* Clears every derived skill array and the three valid-bit words. */
@@ -1371,14 +1684,14 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
     int k;
 
     if (GetItemData__FUs(slot)[0] == 1 && fn_8026FE44(plw) == 1) {
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             if (slot == plw->unk2E0[i].unk0) {
                 return (u16)(i | 0x80);
             }
         }
     }
-    for (j = 0; j < 3; j++) {
-        for (k = 0; k < 8; k++) {
+    for (int j = 0; j < 3; j++) {
+        for (int k = 0; k < 8; k++) {
             if (slot == plw->unk278[j * 8 + k].unk0) {
                 return (u16)(j * 8 + k);
             }
