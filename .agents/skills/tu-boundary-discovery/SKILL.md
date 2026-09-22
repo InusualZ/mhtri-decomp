@@ -2,7 +2,7 @@
 name: tu-boundary-discovery
 description: Identify which symbols belong to one translation unit (and which data ranges it owns) from a single symbol address, offline, using the split DOL's own layout - the per-TU ordering of the data sections, private pooled constants, scope:local anchors and __FILE__ assert strings - through tools/splits/tudiscover.py, so a candidate set of functions can be written and matched together and the unit's exact extent settles as they match. Use when picking up an unsplit fn_XXXXXXXX, when deciding which symbols to match together, or when a splits.txt range must be proposed or sanity-checked.
 license: MIT
-compatibility: decomp-toolkit project layout with a completed split (build/<version>/asm/ per-unit disassembly, config/<game>/symbols.txt, splits.txt). Pure Python 3, no network, nothing written outside build/tmp/.
+compatibility: decomp-toolkit project layout with a completed split (build/<version>/asm/ per-unit disassembly, regenerated on demand by tools/splits/dump_asm.py; config/<game>/symbols.txt; splits.txt). Pure Python 3, no network, nothing written outside build/tmp/ (dump_asm.py writes build/<game>/).
 metadata:
   author: mhtri-dtk
   tool: tools/splits/tudiscover.py
@@ -31,6 +31,14 @@ Spearman(offset in section, lowest referring `.text` address) = **1.000** for `.
 * a **private** data symbol - a file-scope static, or a constant MWCC pooled per TU - has all of its
   referrers inside one TU, so it pins them together;
 * a discontinuity between two sections' referrer runs pins a boundary between them.
+
+**Prerequisite: the asm dump is generated on demand.** `config/<game>/config.yml` sets `write_asm: false`
+(nothing in the build reads the dump - see `docs/build-performance.md`), so `build/<version>/asm/` only
+changes when `python tools/splits/dump_asm.py` writes it: one full `dol split` (~200-400 s), stamped with
+the `symbols.txt`/`splits.txt`/DOL it came from. Run that tool before a discovery or attribution session;
+`stats` prints the dump's state and warns on stderr once it no longer matches the map. Everything below -
+anchors, closures, cuts - is only as current as that dump, and stale asm is silent (a save helper prints as
+`fn_80456DD4` instead of `_savegpr_14`, which zeroes a codegen fingerprint).
 
 ## Commands
 

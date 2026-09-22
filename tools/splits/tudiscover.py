@@ -252,6 +252,85 @@ def map_fn_hits(path, fns):
     return sum(1 for n in FN_NAME_RE.findall(txt) if n in fns)
 
 
+ASM_STAMP = os.path.join(ASM_DIR, ".stamp.json")
+
+
+def repo_rel(path):
+    """`path` relative to the repo root, or as-is when that is not expressible (Windows drives)."""
+    try:
+        return os.path.relpath(path, ROOT)
+    except ValueError:
+        return path
+
+
+def dump_files():
+    """Every `.s` in the dump. The directory also holds `.stamp.json`, which is not a unit."""
+    out = []
+    for dirpath, _dirs, names in os.walk(ASM_DIR):
+        for n in names:
+            if n.endswith(".s"):
+                out.append(os.path.join(dirpath, n))
+    return out
+
+
+def dump_stamp():
+    """What the dump in `build/<game>/asm/` is a function of: the three files dtk's split reads."""
+    files = dump_files()
+    return {
+        "game": GAME,
+        "symbols": hashlib.sha1(open(SYMBOLS, "rb").read()).hexdigest(),
+        "splits": hashlib.sha1(open(SPLITS, "rb").read()).hexdigest(),
+        "dol": hashlib.sha1(open(DOL, "rb").read()).hexdigest(),
+        "files": len(files),
+        "bytes": sum(os.path.getsize(f) for f in files),
+        "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+def write_asm_stamp(extra=None):
+    """Stamp the current dump (called by `tools/splits/dump_asm.py` after a split)."""
+    stamp = dump_stamp()
+    if extra:
+        stamp.update(extra)
+    tmp = ASM_STAMP + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(stamp, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+    os.replace(tmp, ASM_STAMP)
+    return stamp
+
+
+def asm_stamp_status():
+    """`(state, message)` for the dump: fresh / missing / unstamped / stale / truncated.
+
+    `config.yml` sets `write_asm: false`, so the dump only changes when `tools/splits/dump_asm.py`
+    writes it - and every number in this tool is a function of it. Staleness is otherwise silent and
+    expensive: `asm_files()`'s docstring records a stale copy printing `bl fn_80456DD4` where the
+    canonical one prints `bl _savegpr_14`, which zeroes a codegen fingerprint.
+    """
+    cur = dump_stamp()
+    rel = repo_rel(ASM_DIR)
+    if not cur["files"]:
+        return "missing", "no `.s` file under %s - run tools/splits/dump_asm.py" % rel
+    if not os.path.exists(ASM_STAMP):
+        return "unstamped", "%d file(s), no stamp - run tools/splits/dump_asm.py" % cur["files"]
+    try:
+        old = json.load(open(ASM_STAMP, encoding="utf-8"))
+        assert isinstance(old, dict)
+    except (ValueError, OSError, AssertionError) as exc:
+        return "unstamped", "%d file(s), unreadable stamp (%s) - run tools/splits/dump_asm.py" \
+            % (cur["files"], exc)
+    changed = [k for k in ("symbols", "splits", "dol") if old.get(k) != cur[k]]
+    if changed:
+        return "stale", "%s changed since the dump (%s) - run tools/splits/dump_asm.py" \
+            % ("/".join(changed), old.get("utc", "unknown time"))
+    if cur["files"] < old.get("files", 0):
+        return "truncated", "%d of %d file(s) are gone - run tools/splits/dump_asm.py" \
+            % (old["files"] - cur["files"], old["files"])
+    return "fresh", "%d file(s), matches symbols.txt/splits.txt/main.dol (dumped %s)" \
+        % (cur["files"], old.get("utc", "unknown time"))
+
+
 def asm_files(fns=None):
     """Every unit's disassembly - one file per unit, never a stale duplicate.
 
@@ -1272,6 +1351,11 @@ def source_anchors(an, top=10):
 
 
 def cmd_stats(args):
+    state, msg = asm_stamp_status()
+    print("asm dump           %s" % msg)
+    if state != "fresh":
+        print("WARNING: the asm dump is %s - every number below describes that dump, not the current"
+              " map; run `python tools/splits/dump_asm.py` first" % state, file=sys.stderr)
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
     dol = Dol(DOL)
