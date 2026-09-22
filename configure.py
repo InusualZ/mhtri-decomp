@@ -239,6 +239,14 @@ cflags_runtime = [
     "-common off",
     "-inline auto",
 ]
+# Runtime.PPCEABI.H flags: cflags_runtime + -func_align 4. Evidence: -O4,p implies -func_align 16 and all
+# five target objects of this lib are `.init align 2**2`; with 16 the compiler pads between functions
+# (global_destructor_chain .text 0x20 vs 0x18, __init_cpp_exceptions 0x74 vs 0x70, Gecko's two loop
+# preheaders gain a nop - ExPPC_FindExceptionRecord 99.07 -> 100.00 with the flag). __start.c's 16-byte
+# function starts are unaffected: they come from each function's own `#pragma section code_type ".init"`
+# section, not from the function alignment.
+cflags_ppceabi = [*cflags_runtime, "-func_align", "4"]
+
 
 # REL flags
 cflags_rel = [
@@ -271,6 +279,24 @@ cflags_lobby = [
 # does not inline them. `-inline noauto` rather than `-inline off`: fn_8003F940 is the retail aggregate
 # GXRenderModeObj copy, and `off` makes MWCC emit a call to the implicit copy-assignment operator (99.02 %)
 # where `noauto` inlines it (100.00 %) - nothing else in the unit moves between the two.
+
+# Pl flags (src/Pl/*.cpp). Measured on this lib's three units with the real ninja command line:
+#   -O4,p -> -O3          pl_master: 5/22 functions at 100 % under -O4,p, 18/22 under -O3 (and the target
+#                         packs on 4 B, which -O4,p's implied -func_align 16 cannot produce);
+#                         pl_skill fn_80270018 65.0 -> 87.6; pl_act fn_80276B58 85.9 -> 97.3
+#   -inline auto -> noauto  pl_master fn_8026FA6C was inlined into fn_8026FB20 (892 B vs target 288);
+#                         pl_skill fn_80270CA4 828 -> 684 B (= target); pl_act fn_802770E8 57 -> 229 ins
+#   -opt nopeephole       pl_skill fn_80270018 87.6 -> 99.73; pl_act fn_80276B58 97.3 -> 100.0 (retail has
+#                         exactly one record-form instruction in all 115 of its functions)
+#   -Cpp_exceptions on    every Pl target object carries extab/extabindex and `off` emits none; with `on`
+#                         the .text is unchanged and all 12 extab entries we can emit equal the target's
+cflags_pl = [
+    *[f for f in cflags_base if f not in ("-O4,p", "-inline auto", "-Cpp_exceptions off")],
+    "-O3",
+    "-inline noauto",
+    "-opt nopeephole",
+    "-Cpp_exceptions on",
+]
 cflags_main = [
     *[f for f in cflags_lobby if f != "-inline auto"],
     "-inline noauto",
@@ -375,10 +401,12 @@ config.libs = [
     {
         "lib": "Runtime.PPCEABI.H",
         "mw_version": "Wii/1.3",
-        "cflags": cflags_runtime,
+        "cflags": cflags_ppceabi,
         "progress_category": "sdk",  # str | List[str]
         "objects": [
             Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
+            # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
+            Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(NonMatching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
             # The .init runtime, in the order the retail section lays it out. memcpy.c is the provisional
             # half of MSL's __mem.o (the other half is memset.c, already at 100 %); making them one file
@@ -429,7 +457,7 @@ config.libs = [
         # 50 of the region's 372 functions are pinned; the rest have no layout evidence and stay in
         # auto units on purpose (see the `tu-boundary-discovery` skill).
         "mw_version": "Wii/1.0",
-        "cflags": cflags_base,
+        "cflags": cflags_pl,
         "progress_category": "game",
         "host": False,
         "objects": [

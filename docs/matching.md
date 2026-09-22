@@ -651,10 +651,19 @@ so a frame-equal sweep row is not evidence about instruction order.
 The level also decides **function packing**, which is a second and independent reason to probe it: `-O4,p`
 implies `-func_align 16`, so under it every function after the first moves to the next 16-byte boundary. Which
 one a unit wants is visible in its target object - `Runtime.PPCEABI.H`'s five objects are all `.init
-align 2**2` and `memcpy.o` packs two functions contiguously, so `-func_align 4` was required there (landed as
-`#pragma function_align 4` in `src/Runtime.PPCEABI.H/memcpy.c`, because `__start.o` in the same lib does want
-16-byte function starts). A `-O` change that fixes an instruction order but moves every symbol after the
-first is not a fix: check the section alignment and the function offsets too.
+align 2**2` and `memcpy.o` packs two functions contiguously, so `-func_align 4` was required there (it is a
+per-lib flag now, `cflags_ppceabi`, with `#pragma function_align 4` in `src/Runtime.PPCEABI.H/memcpy.c` as its
+first witness; `__start.o` in the same lib does want 16-byte function starts, which come from each function's
+own `#pragma section code_type ".init"` section, not from the function alignment). A `-O` change that fixes an
+instruction order but moves every symbol after the first is not a fix: check the section alignment and the
+function offsets too.
+
+The same flag bites *inside* a function: MWCC aligns loop heads to 8 bytes relative to the object's `.text`
+start, so 16-byte packing made two `Gecko_ExceptionPPC.cp` functions carry a `nop` before their loop
+(`ExPPC_FindExceptionRecord` 99.07 -> 100.00 with `-func_align 4`), and left 4-8 bytes of padding between the
+functions of two other objects in that lib (`global_destructor_chain` `.text` 0x20 vs 0x18,
+`__init_cpp_exceptions` 0x74 vs 0x70). Three independent witnesses to one flag is what makes the re-split worth
+it.
 
 ## 28. A kept `bl` to a tiny static names the unit's inlining setting
 
@@ -714,6 +723,36 @@ Example: the `splits.txt` claim plus
 ```c
 extern f32 lbl_80795AC0;   /* not `f32 lbl_80795AC0 = ...;` - that would rebuild the pool */
 ```
+
+## 30. A C++ unit's exception settings live in its object, not in the source
+
+Problem: every function of a unit matches instruction for instruction, and the *unit* still measures short
+because its target object carries `extab`/`extabindex` while ours carries none, or carries different records.
+It reads as a codegen problem, so the search goes into the source and stays there.
+
+Why try it: `-Cpp_exceptions off` in `cflags_base` is a **build** setting, and not every retail object was built
+with it. The object says which one it was: `extab`/`extabindex` present means exceptions were on, and their
+*entries* say which constructs were used - a `throw()` specification emits one handler reference and an empty
+action list, where a real `try`/`catch` emits far more. The setting is per unit, not per project: in this repo
+the `Pl` lib and `Gecko_ExceptionPPC.cp` need it on, while `__init_cpp_exceptions.cpp` would *gain* extab its
+target does not have.
+
+Result (batch 5): `-Cpp_exceptions on` for the `Pl` lib left every `.text` byte unchanged and made all 12 extab
+entries we could emit equal the target's; `#pragma exceptions on` in `sys_mem.cpp` (a unit whose lib keeps the
+flag off) turned its `operator new`/`operator delete` `throw()` specs into the target's extab byte for byte; the
+same pragma on `Gecko_ExceptionPPC.cp` reproduced the target's `extab 0x10` + `extabindex 0x18` exactly. So make
+it part of a unit's measurement: compare the two objects' `extab`/`extabindex` **sizes and bytes**, not only the
+score.
+
+Example:
+
+```c
+#pragma exceptions on   /* the source spelling of the one flag, for a unit in a lib that has it off */
+```
+
+and for a `$`-suffixed section the pragma **pair** is required: `#pragma section const_type ".ctors$10"` to name
+it plus `__declspec(section ".ctors$10")` to place it - `__declspec` alone is rejected (error 33048), and
+`code_type` would add a `.mwcats` section the target does not have.
 
 ## Ruled out - do not re-run these
 
