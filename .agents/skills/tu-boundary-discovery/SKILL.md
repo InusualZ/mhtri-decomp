@@ -95,6 +95,36 @@ Two known weaknesses of the reference graph itself:
   classes, never parses a shadowed file, and `prune --apply` removes them; **`--splits` refuses to hand
   off a block while any remain**, so a proposal can never come from a stale parse.
 
+## Cutting a C++ unit: decode the `extabindex` records
+
+A `.text` seam is invisible from addresses alone - functions are packed on 4-byte boundaries and nothing in
+the DOL says where one retail object ended. The exception tables are the exception: for C++ code they are a
+fingerprint of the *function set*, and dtk enforces the correspondence, refusing a claim that crosses one:
+
+```
+Mismatched splits for extabindex 2:0x8001E540 (sys_mem.cpp) and function 3:0x80040360 (main.cpp)
+```
+
+Each `extabindex` record is 12 bytes - `{function_address, function_size, extab_address}` - so the seam can be
+read out of the original DOL instead of guessed (`tools/units/m2cinput.py` has the reader):
+
+```python
+import struct
+from m2cinput import Dol                 # tools/units on sys.path
+d = Dol("orig/RMHE08/sys/main.dol")
+for i in range(10):
+    fn, size, etab = struct.unpack(">III", d.read(0x8001E540 + 12 * i, 12))
+```
+
+Batch 4 is the worked example: the records at 0x8001E540/0x8001E54C name `main.cpp`'s functions at 0x80040360
+and 0x80040420 (so `main.cpp` owns `.text` through 0x80040478, `extab` through 0x80006770, `extabindex`
+through 0x8001E558), and the next four name `sys_mem.cpp`'s (0x80040478..0x8004054C, its own `extab`
+0x80006770-0x80006810). The records also give the order inside the unit, which is what the unit header states.
+
+Its limit: it pins only functions that *have* an unwind record. A unit's plain-C neighbours are still cut with
+`tudiscover`'s closure plus the call graph - A's `fn_800403AC` in the same batch has no `extab`, and it was
+placed by `Screen_w` ownership and the closure edge.
+
 ## Matching settles the boundary
 
 1. **Take the MATCH SET and write it as one unit.** Do not wait for a perfect boundary — the set is what

@@ -14,10 +14,15 @@ Sections:
 	.sbss2      type:bss align:32
 
 main.cpp:
-	extab       start:0x800066E0 end:0x80006760
-	extabindex  start:0x8001E480 end:0x8001E540
-	.text       start:0x8003F200 end:0x80040360
+	extab       start:0x800066E0 end:0x80006770
+	extabindex  start:0x8001E480 end:0x8001E558
+	.text       start:0x8003F200 end:0x80040478
 	.sdata2     start:0x80795AA0 end:0x80795AD8
+
+sys_mem.cpp:
+	extab       start:0x80006770 end:0x80006810
+	extabindex  start:0x8001E558 end:0x8001E588
+	.text       start:0x80040478 end:0x80040598
 
 g3d/g3d_resanmamblight.c:
 	extab       start:0x80007B14 end:0x80007B1C
