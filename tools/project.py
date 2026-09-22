@@ -882,6 +882,15 @@ def generate_build_ninja(
             self.ldscript: Optional[Path] = Path(config["ldscript"])
             self.entry = config["entry"]
             self.inputs: List[str] = []
+            # The one `dol split` edge writes every object this link consumes but declares only
+            # `<build dir>/config.json`, so the link has to be ordered after that file or ninja links
+            # while the split is still rewriting the objects - a mix of old and new, plus a second link
+            # once they land. Order-**only**, not implicit: `config.json` is rewritten on every split,
+            # so an implicit dependency would relink (~84 s) after a split that changed no object at
+            # all. Ordering is enough because `build.ninja` itself depends on `config.json`: a split
+            # always completes (and regenerates the manifest) before anything downstream is re-planned
+            # with the fresh object mtimes. See docs/build-performance.md.
+            self.build_config_path = build_path / "config.json"
 
         def add(self, obj: Path) -> None:
             self.inputs.append(serialize_path(obj))
@@ -918,7 +927,7 @@ def generate_build_ninja(
                     ],
                     implicit_outputs=elf_map,
                     variables={"ldflags": elf_ldflags},
-                    order_only="post-compile",
+                    order_only=["post-compile", self.build_config_path],
                 )
             else:
                 preplf_path = build_path / self.name / f"{self.name}.preplf"
@@ -945,7 +954,7 @@ def generate_build_ninja(
                     implicit=mwld_implicit,
                     implicit_outputs=preplf_map,
                     variables={"ldflags": preplf_ldflags},
-                    order_only="post-compile",
+                    order_only=["post-compile", self.build_config_path],
                 )
                 n.build(
                     outputs=plf_path,
@@ -954,7 +963,7 @@ def generate_build_ninja(
                     implicit=[self.ldscript, preplf_path, *mwld_implicit],
                     implicit_outputs=plf_map,
                     variables={"ldflags": plf_ldflags},
-                    order_only="post-compile",
+                    order_only=["post-compile", self.build_config_path],
                 )
             n.newline()
 
