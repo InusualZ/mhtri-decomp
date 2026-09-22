@@ -35,11 +35,14 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
 5. **Don't rename or delete symbols that already exist in `config/RMHE08/symbols.txt`** unless you have
    verified nothing else depends on them. Symbol names are referenced by `splits.txt`, the linker script
    and the analysis output.
-6. **Never commit or push without explicit approval.** Do not run `git commit`, `git push`, or anything
-   that rewrites history (`rebase`, `commit --amend`, `reset --hard`, force-push, deleting/moving tags)
-   unless the user's instruction for the current task explicitly says to do it. Finishing the work is not
-   approval to commit it — leave the changes in the working tree and report exactly what you changed and
-   what you would commit.
+6. **Commit only what the task covers, and never push.** History is never rewritten (`rebase`,
+   `commit --amend`, `reset --hard`, force-push, deleting/moving tags) and nothing is ever pushed - `origin`
+   is the upstream template, not a fork of this project. On **commit approval**: the project owner has granted
+   the campaign's orchestrator **standing approval to commit its own work without asking per commit**
+   (2026-09-21, docs/plan.md, "Commits"), so a `docs/plan.md` batch ends by committing - that is not a licence
+   to commit *anything*: an experiment, a probe, a half-registered unit, another stream's file or a scratch
+   artifact still stays uncommitted, and anything outside the campaign keeps the old rule (leave it in the
+   working tree and report what you would commit).
 7. **Never paste `config/RMHE08/symbols.txt` into a prompt/tool output.** It is ~65,700 lines / 4.5 MB.
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
