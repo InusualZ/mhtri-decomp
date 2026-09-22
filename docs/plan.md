@@ -417,7 +417,17 @@ the index and the ledger; what it must not do is the reading-heavy work itself.
   on the rest; hand the queue over as a list with numbers.
 * **Serialisation**: one writer for `splits.txt`/`configure.py`/`symbols.txt`/`AGENTS.md`, one `ninja` per
   build tree, one re-split at a time. The batch should therefore be as large as is safe - the re-split is the
-  campaign's slowest step.
+  campaign's slowest step (**~200-400 s** measured; the link after it is ~75 s, and `docs/build-performance.md`
+  has the breakdown and the knobs). Two things follow from that number, and both are the orchestrator's call:
+  * **Renames and phantom merges ride the batch too.** A `symbols.txt` edit is itself a split dirty-check
+    input, so N renames applied one at a time cost N re-splits while the batch re-splits once. Collect them
+    with `tools/symbols/symedit.py rename-batch <file>` (one `old new` per line, per-line failure report) and
+    re-split once - the same "one re-split per batch" rule step 3 of the attribution method already follows.
+    The price is that objdiff verification of a rename moves to the batch boundary: verify every renamed
+    symbol after the batch's split, before the commit.
+  * **The asm dump is on demand, not on every split** (`config.yml`'s `write_asm: false`): only
+    `tudiscover` reads `build/RMHE08/asm/`, so run `python tools/splits/dump_asm.py` once before an
+    attribution session and let `tudiscover stats` tell you if it has gone stale since.
 * **Blast radius**: everything lands `NonMatching`, so a bad batch cannot break the link - but it can break
   the *next* session's ability to measure. A half-registered unit, a `splits.txt` range with no `configure.py`
   entry, or a report that was not regenerated is what actually stops the loop.
