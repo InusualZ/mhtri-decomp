@@ -225,6 +225,45 @@ git commit -F .git/prepcommit_msg.txt
   session; a unit-specific residual stays in the unit's header. A finding that only lives in a reply is lost
   at the next compaction.
 
+## Goal: every symbol in its unit (attribution before matching)
+
+The owner's goal (2026-09-21): **every symbol in `symbols.txt` belongs to the translation unit it came from** -
+registered, ranged and named - before the matching work is finished. The 80 % bar still closes a symbol, but
+attribution is now the campaign's **primary objective**: it is the cheap half (no source, no measurement) and it
+is what makes everything else legible. With every address owned, a unit's score in `report.json` means
+something, and a batch's source work has a home before it starts.
+
+**What "attributed" means**: a `splits.txt` block whose ranges cover the symbol's section and address, plus a
+`configure.py` entry for that unit (lib, `mw_version`, cflags, `Object(NonMatching, ...)`). The source file may
+be *absent* - the build warns, the report scores that unit 0 % - because attribution is not a claim that the
+source exists. Ranges never overlap a registered unit's.
+
+**Naming**: the retail file name is only available where evidence exists (`Panic(__FILE__)`, a shared pool, the
+runtime dump, an `extabindex` group). Everywhere else the unit gets an honest placeholder under `src/auto/`
+(`src/auto/<first-symbol>.c`) with `progress_category: "auto"`, and its file header records *why* it sits where
+it does (the `tudiscover` closure, the extab group, the pool it owns, and how reliable the seam is). A later
+session renames it when evidence appears - map, source, `splits.txt` and `configure.py` in one edit.
+
+**The method is bulk, not one scout per symbol**:
+
+1. `python tools/units/attribute.py plan <start> <end>` - `tudiscover`'s proposals for every unclaimed address
+   in the range, grouped into units, with the data ranges each would own and the boundary confidence
+   (`certainly one TU` vs `weak signals` only).
+2. `python tools/units/attribute.py apply <start> <end> [--dry-run]` - append the `splits.txt` blocks and the
+   `configure.py` entries, code ranges first, `extab`/`extabindex` placed from the decoded records, never
+   overlapping an existing range. No source files yet.
+3. One re-split per batch, then the ledger is the acceptance test: **`covered` must equal
+   `20 524 - unclaimed`** for the range claimed, and `ninja changes` must show no *real* unit regressed (the
+   `auto_*` scaffold losing symbols is expected and is not a regression).
+4. **Data ranges are a second pass**, per batch, measured against the report before and after - claiming a
+   range has lowered a matched function in this repo before (playbook 23). The code pass never touches them.
+5. **Confidence is recorded, not hidden**: a unit whose seam rests only on weak signals is still applied (the
+   extent settles as its functions match - that is the documented workflow) and its header says the seam is
+   provisional.
+
+Order: ascending address, module by module, so each batch's ranges are contiguous and its re-split buys the
+most coverage. Source writing (steps 2-3 of the loop) follows behind, unit by unit, in the same order.
+
 ## The knowledge delta - the playbook is the real product
 
 The campaign's output is not only closed symbols, it is the accumulated *method*. A trick that closed one
