@@ -317,10 +317,13 @@ one unit, a function missing from the report is 0 %). Follow skill **`.agents/sk
    appropriate `cflags` group (`cflags_runtime` for runtime units, `cflags_base` otherwise).
    Start with `Object(NonMatching, "Dir/file.c")`.
 3. **Create `src/Dir/file.c`** (and headers under `include/` if needed) - **in the same change as the
-   registration, because a unit's source file is mandatory.** A stub is enough and is a real deliverable: it
-   carries the unit's header comment (what it is, its range, why it sits there, what is still unknown), so the
-   unit compiles, appears in the build and is comparable from the first commit. Registering a unit without a
-   source leaves the build warning about it and its object unbuildable - a bug, not a state.
+   registration, because a unit's source file is mandatory, and it is created with its functions, not just a
+   header: the functions the unit is known to hold, with their decompiled bodies wherever they are recoverable
+   and measured against the target.** A unit whose bodies cannot be written yet still gets its file, whose
+   header says what it is, its range, why it sits there, what is unknown, and where its inventory and evidence
+   live (`ledger.py unit <path>`, the map, `splits.txt`) - never a copied-out function list, which goes stale
+   on the next range edit. Registering a unit without a source leaves the build warning about it and its object
+   unbuildable - a bug, not a state.
 4. **Add the splits** to `config/RMHE08/splits.txt`: one line per section with exact `start:`/`end:`
    addresses, including the small `.ctors`/`.dtors`/`.sdata` fragments that runtime units own (Wii linkers
    use `.ctors$10`, `.dtors$10`, `.dtors$15` — see `docs/getting_started.md`, "GC 2.7+ and Wii linkers").

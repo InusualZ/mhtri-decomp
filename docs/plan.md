@@ -242,6 +242,15 @@ bare - a `Missing source file` warning from the build is a bug, not a state. The
 violated this were fixed the day the rule was written (`Pl/pl_{master,skill,act}.c`,
 `Runtime.PPCEABI.H/__init_cpp_exceptions.cpp`). Ranges never overlap a registered unit's.
 
+**A source file is created with its functions, not just a header.** The attribution pass registers a unit
+*and* writes what has been discovered of it: the functions the unit is known to hold, with their decompiled
+bodies wherever they are recoverable, measured against the target. A file that carries only a header comment is
+a note, not a unit - `global_destructor_chain.c` is the worked example (registered with its range, its two
+functions written from the SDK's listing and a 100 % each, in the same commit). Where a body cannot be written
+yet the rule is narrower but still explicit: the header names where the unit's inventory and evidence live
+(`ledger.py unit <path>`, the map, `splits.txt`) instead of copying a function list into the file, because the
+inventory belongs to the map and a header that tabulates it goes stale on the next range edit.
+
 **Naming**: the retail file name is only available where evidence exists (`Panic(__FILE__)`, a shared pool, the
 runtime dump, an `extabindex` group). Everywhere else the unit gets an honest placeholder under `src/auto/`
 (`src/auto/<first-symbol>.c`) with `progress_category: "auto"`, and its file header records *why* it sits where

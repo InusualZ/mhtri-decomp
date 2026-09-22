@@ -32,17 +32,17 @@ g3d/g3d_resanmamblight.c:
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8
 
-Pl/pl_master.c:
+Pl/pl_master.cpp:
 	extab       start:0x8001265C end:0x800126CC
 	extabindex  start:0x8002F808 end:0x8002F8B0
 	.text       start:0x8026BA1C end:0x8026FFBC
 
-Pl/pl_skill.c:
+Pl/pl_skill.cpp:
 	extab       start:0x800126D4 end:0x8001280C
 	extabindex  start:0x8002F8BC end:0x8002FA90
 	.text       start:0x80270018 end:0x80273B14
 
-Pl/pl_act.c:
+Pl/pl_act.cpp:
 	extab       start:0x8001294C end:0x80012B54
 	extabindex  start:0x8002FC70 end:0x8002FF7C
 	.text       start:0x80276B58 end:0x8027D684
@@ -55,6 +55,9 @@ Camellia/camellia.c:
 	extabindex  start:0x8003DBD8 end:0x8003DC44
 	.text       start:0x8041DF10 end:0x80423E74
 	.rodata     start:0x80570E98 end:0x80571E98
+
+Runtime.PPCEABI.H/global_destructor_chain.c:
+	.text       start:0x804566A4 end:0x80456704
 
 Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
 	.text       start:0x80457420 end:0x80457490
