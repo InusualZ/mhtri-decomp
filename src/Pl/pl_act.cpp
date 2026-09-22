@@ -37,14 +37,15 @@
  *
  * Residual (work in progress - the functions below 100 %, each measured with the flags above, i.e.
  * `-O3 -opt nopeephole -inline noauto`):
- *   * the unclaimed `.sdata2` pool (playbook 23) is the single largest residual class: MWCC synthesises
- *     the `(f32)(s32)` magic constant as a private `@NN` local where retail `lfd f1, lbl_8079A0A0@sda21`,
- *     and the plain thresholds pool as `@NN` too. That ARG-only row holds down every function that
- *     converts an integer to float (B58, 7A08C, 7D5A4, 7C8B4, Pl_get_gunner_vec, 7CD0C, Get_Shell_rate_adj)
- *     and is its only residual in four of them; it is *all* Pl_attack_set_sub (1776 B, 8 rows) has left.
- *     Naming it needs the unit's `.sdata2` range in `splits.txt`, not a source change - the constants are
- *     already `extern`-declared under their map names (`lbl_8079A0A8/A0AC/A0B0/A0B4/A0B8` were added to
- *     that block by the same pass; `A0B8` is only ever the magic constant).
+ *   * the unclaimed `.sdata2` pool (playbook 23): the unit's own run is `0x8079A080-0x8079A114`
+ *     (35 labels - `A080`-`A0B8`, with the two int->float magics as f64s at `A0A0` and `A0B8`, then
+ *     `A0C0`-`A110`). All of them are `extern`-declared and used as load operands (`A0C0`, `A0D4`,
+ *     `A0D8`, `A0F8` came in with the last bodies), so the `.sdata2` rows pair by name. Three entries
+ *     are *shared*: `A080`, `A084` and `A088` are also loaded by `fn_802756F0` / `fn_8027633C` (the
+ *     unsplit run before the unit) and `fn_8027D968` (after it), so no contiguous claim can make those
+ *     three private - the claim has to leave them global. The only pool-*address* mismatch left is
+ *     `.sdata` `lbl_80792150` (`.sdata 0x80792150-0x80792158`), which needs the claim plus the scalar
+ *     declaration noted below.
  *   * a byte/short local that accumulates in 32 bits and is sign-extended only where it is *compared*:
  *     retail emits the `extsb`/`extsh` at the compare, not at the assignment. Write `s32 v = *(u8*)...`
  *     and cast at each comparison (`(s8)v <= n`); declaring the local `s8`/`s16` makes MWCC convert at the
@@ -100,18 +101,32 @@
  *   * `Pl_zanzo_set` and C89C/A044 read `Get_motion_no` as `s16`: the shared declaration has to stay `s16`
  *     (a `u16` return drops Pl_zanzo_set from 100 to 94.2), so A57C casts at its own call site.
  *
- * Written so far: 102 of the 115 bodies, 68 of them byte-exact; the residual list above names the rest.
- * This pass added, biggest first: Pl_attack_set_sub (1776, 100.0), A57C (1668, 66.1), B358 (1472, 100.0),
- * 78D1C (920, 99.5), B918 (816, 100.0), D0D4 (796, 97.4), B0BC (668, 94.0), BE4C (484, 100.0),
- * 79490 (480, 85.7), Get_Shell_bure_type (476, 78.6), 791FC (356, 86.8), 7885C (312, 88.2); unit fuzzy
- * 36.4 -> 70.4 %, matched bytes 4768 -> 9316.
- * The 13 unwritten bodies are all >= 276 B: C208 (1684), 79C20 (668), 7993C (584), AC2C (508), 77974 (464),
- * A340 (428), C064 (420), 78674 (416), 78144 (372), 77FF8 (332), 79EBC (324), 78310 (320), 77DAC (276).
+ * Written so far: all 115 bodies. This pass added the last 13, biggest first: C208 (1684, 93.9),
+ * 79C20 (668, 94.3), 7993C (584, 95.4), AC2C (508, 95.4), 77974 (464, 97.2), A340 (428, 94.2),
+ * C064 (420, 97.9), 78674 (416, 97.0), 78144 (372, 82.6), 77FF8 (332, 93.5), 79EBC (324, 100.0),
+ * 78310 (320, 82.9), 77DAC (276, 97.1); unit fuzzy 70.4 -> 93.8 %, matched bytes 9316 -> 9640,
+ * 70 of 115 functions byte-exact, none unwritten. The three source shapes that did most of that, in
+ * order of payoff:
+ *   * a `switch` whose case bodies end in `return 1` gets folded to a branchless bool; writing `break`
+ *     and one `return 1` after the switch restores retail's branchy shared tail (77FF8 72.5 -> 93.5,
+ *     78144 66.7 -> 82.6, 78310 66.7 -> 82.9, C208 86.8 -> 93.9).
+ *   * an equality on a `u8` lvalue compiles as `cmplwi`; `(s32)(u8)x` compiles as retail's `cmpwi`
+ *     (78310 82.2 -> 82.9, and the same rows in 77FF8/78144/C064).
+ *   * a small dense `switch` whose *default* body retail emits first means the source's `default:`
+ *     (or its highest case) is written first, with the low case bodies after it (C064 71.5 -> 97.9).
+ *   * `extern u8 lbl_80792150;` + `&lbl_80792150` gives retail's `li r3, X@sda21` address form where
+ *     `extern u8 lbl_80792150[]` gave `lis/addi` (Get_Shell_bure_type 78.6 -> 79.9).
+ *
+ * Still open in the new bodies: C208 keeps 16 extra `li r3,0` rows (bodies that `return 0` inline where
+ * retail branches to the merged return-0 block at 0x5d28) and its frame is 0x30 against retail's 0x40
+ * (two locals short); 78144/78310 keep the `case 6: case 7:` range test as two signed compares where
+ * retail emits `subi/cmplwi`, plus one `cmpwi`-vs-`cmplwi` on `(u8)m != 9`; 77FF8 has ~6 rows left in the
+ * `t`-vs-`arg1` test polarity.
  *
  * Source-order caveat: the bodies were appended in per-batch address order, not as one address-ordered
  * list, so the file is *not* in `.text` order any more (Pl_attack_set_sub in particular sits in the
  * appended run instead of at its seam). The object's function layout is source order, so the file has to
- * be sorted into address order (and the 13 missing bodies added) before this unit can be linked, even at
+ * be sorted into address order before this unit can link, even at 100 %.
  * 100 %.
  *
  * Load-bearing source shapes (do not "simplify"):
@@ -2773,7 +2788,7 @@ extern "C" s32 fn_802791FC(_PLW* self, u8 arg1)
 
 extern u8 lbl_805BFCD8[];
 extern u8 lbl_805C6100[];
-extern u8 lbl_80792150[];
+extern u8 lbl_80792150;
 
 /* 0x80275A80: the shell "bure" type (0/1/2) the actor's equipped shell and its skills resolve to. */
 u32 Get_Shell_bure_type(_PLW* self, u8 arg1)
@@ -2783,7 +2798,7 @@ u32 Get_Shell_bure_type(_PLW* self, u8 arg1)
     v29 += *(s8*)(lbl_805BF538 + arg1 * 4 + 3);
     u8 r29;
     if (*(u8*)((u8*)self + 0x1E8) == 0xC) {
-        v29 -= *(u8*)(lbl_80792150 + *(u8*)(fn_8027ED18((u8*)self + 0x1E8) + 0x10));
+        v29 -= *(u8*)((u8*)&lbl_80792150 + *(u8*)(fn_8027ED18((u8*)self + 0x1E8) + 0x10));
     }
     if ((s8)v29 <= 5) {
         r29 = 0;
@@ -2868,7 +2883,7 @@ extern "C" s16 fn_80279490(_PLW* self, u8 arg1)
 }
 
 extern "C" s32 fn_8026A6A4(_PLW*, s32);
-extern "C" void fn_80279EBC(_PLW*, s32, s32);
+extern "C" void fn_80279EBC(_PLW*, u16, u16);
 extern "C" s32 fn_8027A340(_PLW*);
 extern "C" u32 fn_80287244(_PLW*, s32);
 extern "C" void fn_802B9740(_PLW*, u8*, u8*, f32*);
@@ -3102,4 +3117,864 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
         break;
     }
     }
+}
+
+/* ===== appended pass: the 13 bodies the previous pass left unwritten ==============================
+ * Order below is address order of the bodies written here, not the file's; the whole file still has to
+ * be sorted into .text order before the unit can link (see the header).
+ * New callees these bodies reference, under the map's spellings. */
+extern "C" u16 fn_803BA9B0(u8, u8, u8*, s16*, void*, void*, void*);
+extern "C" void hit_flag_set__FP6_HIT_WUl(void*, u32);
+extern "C" void fn_8029F204(void*, void*);
+extern "C" void fn_8029F538(void*);
+extern "C" void fn_8035B700(s32, s32, s32);
+extern "C" void fn_8033A920(s32);
+extern "C" u16 ran_suu__Fl(s32);
+extern "C" void fn_8004A1F8(void*, void*);
+extern "C" u32 fn_80274DCC(_PLW*, u8);
+extern "C" s32 fn_8027D968(_PLW*, void*, void*, void*);
+extern "C" s32 fn_8027DC90(void);
+extern "C" u32 fn_802D7804(s32, f32);
+extern "C" void fn_8005050C(void*);
+extern "C" void fn_800504D4(void*);
+extern "C" void fn_8008C484(void*, f32, f32, f32);
+extern "C" void fn_80051574(void*, void*);
+extern "C" void fn_80041E40(nw4r::math::VEC3*, void*);
+extern "C" void* fn_80143174(void*, void*, s32);
+extern "C" u8 fn_80224E28(_PLW*, u8);
+extern "C" void fn_8026A394(_PLW*, s32, void*);
+extern "C" void fn_8026A230(_PLW*, s32, u16, s32, s32);
+extern "C" void fn_8026A23C(_PLW*, s32, f32);
+extern "C" f32 fn_8026A34C(_PLW*);
+
+void mulVecMat(nw4r::math::VEC3*, nw4r::math::MTX34*);
+void setVector3(nw4r::math::VEC3*, f32, f32, f32);
+
+extern const f32 lbl_8079A0C0;
+extern const f32 lbl_8079A0D4;
+extern const f32 lbl_8079A0D8;
+extern const f32 lbl_8079A0F8;
+extern u8 lbl_805BFFCC[];
+extern u8 lbl_805BAA90[];
+extern u8 lbl_805BAC98[];
+extern u8 lbl_805C6168[];
+extern u8 lbl_805C61D4[];
+
+/* 0x80277DAC: whether a ground-height probe along the actor's fractional facing clears the band. */
+extern "C" s32 fn_80277DAC(_PLW* self, s32 arg1, f32 arg2, f32 arg3)
+{
+    nw4r::math::VEC3 v;
+    u8 hit;
+    fn_80043EA8(&v);
+    v.x = lbl_8079A084;
+    v.y = lbl_8079A084;
+    v.z = arg2;
+    rotVecY(&v, self->unk058);
+    v.x = v.x + self->unk03C;
+    v.y = v.y + self->unk040;
+    v.z = v.z + self->unk044;
+    f32 h = GetGroundHit2(&v, (u32)-2, self->unk016, &hit);
+    if ((s32)hit == 0) {
+        return 0;
+    }
+    f32 c = self->unk040 + arg3;
+    if (arg1 == 0) {
+        if (h < c) {
+            return 1;
+        }
+    } else {
+        if (h > c) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* 0x80277FF8: whether the given action may start on the current map/weapon combination. */
+extern "C" s32 fn_80277FF8(u8 arg0, u8 arg1, s32 arg2)
+{
+    s32 t = arg2 & 0x7F;
+    switch (arg0) {
+    case 1:
+        if (((u32)(arg1 - 2) <= 4U || (s32)(u8)arg1 == 0xB) && t != 0) {
+            return 0;
+        }
+        break;
+    case 2:
+        if (((s32)(u8)arg1 == 6 || (s32)(u8)arg1 == 9 || (s32)(u8)arg1 == 0xB) && t != 0) {
+            return 0;
+        }
+        break;
+    case 3:
+        if ((u32)(arg1 - 5) <= 1U) {
+            if (t != 0) {
+                return 0;
+            }
+        } else if ((s32)(u8)arg1 == 1 || (s32)(u8)arg1 == 8) {
+            if ((u32)t > 1U) {
+                return 0;
+            }
+        } else if ((s32)(u8)arg1 == 9) {
+            if (t != 0) {
+                return 0;
+            }
+        }
+        break;
+    case 4:
+        if ((u32)(arg1 - 1) <= 5U && t != 0) {
+            return 0;
+        }
+        break;
+    case 5:
+        if (((s32)(u8)arg1 == 3 || (s32)(u8)arg1 == 5 || (s32)(u8)arg1 == 8 || (s32)(u8)arg1 == 10) &&
+            t != 0) {
+            return 0;
+        }
+        break;
+    case 8:
+    case 9:
+    case 10:
+        if (t != 0) {
+            return 0;
+        }
+        break;
+    }
+    return 1;
+}
+
+/* 0x80278144: whether the given action may start in the player's current map/move-work state. */
+extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
+{
+    u32 m = fn_802B0668(get_now_mapno());
+    if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
+        return 0;
+    }
+    if ((s32)(u8)m != 9) {
+        u8* w = get_move_work_adrs(0);
+        if (w != 0 && arg0 == *(u8*)(w + 0xF6)) {
+            return 0;
+        }
+        switch ((s32)(u8)m) {
+        case 1:
+            if (arg0 == 7 || arg0 == 0xB) {
+                return 0;
+            }
+            break;
+        case 2:
+            if (arg0 == 0xB) {
+                return 0;
+            }
+            break;
+        case 3:
+            if (arg0 == 2 || arg0 == 4 || arg0 == 8) {
+                return 0;
+            }
+            break;
+        case 5:
+            if (arg0 == 0xA) {
+                return 0;
+            }
+            break;
+        case 6:
+        case 7:
+        case 10:
+            return 0;
+        }
+        return 1;
+    } else {
+        if (fn_802B0688(arg1) == 1U) {
+            return 0;
+        }
+        return 1;
+    }
+}
+
+/* 0x80278310: the same map/move-work gate as 80278144, for the smaller action set. */
+extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
+{
+    u32 m = fn_802B0668(get_now_mapno());
+    if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
+        return 0;
+    }
+    if ((s32)(u8)m != 9) {
+        u8* w = get_move_work_adrs(0);
+        if (w != 0 && arg0 == *(u8*)(w + 0xF6)) {
+            return 0;
+        }
+        switch ((s32)(u8)m) {
+        case 1:
+            if (arg0 == 0xB) {
+                return 0;
+            }
+            break;
+        case 2:
+            if (arg0 == 0xB) {
+                return 0;
+            }
+            break;
+        case 5:
+            if (arg0 == 0xA) {
+                return 0;
+            }
+            break;
+        case 6:
+        case 7:
+        case 10:
+            return 0;
+        }
+        return 1;
+    } else {
+        if (fn_802B0688(arg1) == 1U) {
+            return 0;
+        }
+        return 1;
+    }
+}
+
+/* 0x80277974: builds the attack entry an incoming hit produces and runs the shared attack set-up. */
+extern "C" void fn_80277974(_PLW* self, _HIT_W* hit, u8* base, u16 idx, s32* ids, u16 flags)
+{
+    u8* p = (u8*)self->unk13C;
+    u8* d = base + idx * 0x1A;
+    *(s32*)((u8*)hit + 0x08) = ids[*(u8*)(d + 0xF)];
+    fn_8029F538(hit);
+    if ((flags & 1) != 0) {
+        hit_flag_set__FP6_HIT_WUl(hit, 0x728);
+    } else {
+        hit_flag_set__FP6_HIT_WUl(hit, 0x708);
+    }
+    if (self->unk002 == 1) {
+        hit_flag_set__FP6_HIT_WUl(hit, 0x800);
+    }
+    if ((flags & 0x80) != 0) {
+        hit_flag_set__FP6_HIT_WUl(hit, 0x1000);
+    }
+    if ((flags & 0x100) != 0) {
+        hit_flag_set__FP6_HIT_WUl(hit, 0x2000);
+    }
+    *(s16*)((u8*)hit + 0x18) = Get_motion_no(self);
+    *(s16*)((u8*)hit + 0x1A) = 0;
+    *(s16*)((u8*)hit + 0x1C) = 0;
+    *(s16*)((u8*)hit + 0x1E) = 0;
+    f32 f = *(f32*)(p + 0x48) - lbl_8079A0C0;
+    if (f < lbl_8079A084 || (*(u32*)(p + 0x50) & 1) != 0) {
+        f = lbl_8079A084;
+    }
+    f32 g = *(f32*)(p + 0x78);
+    f32 t = (f32)*(s16*)(d + 0);
+    f32 u = (f32)*(s16*)(d + 2);
+    *(f32*)((u8*)hit + 0x38) = t;
+    *(f32*)((u8*)hit + 0x3C) = u;
+    if (*(s16*)(d + 0) != 0) {
+        f32 x = t + (f - g);
+        *(f32*)((u8*)hit + 0x38) = x;
+        if (x < lbl_8079A084) {
+            f32 y = u + x;
+            *(f32*)((u8*)hit + 0x3C) = y;
+            *(f32*)((u8*)hit + 0x38) = lbl_8079A084;
+            if (y <= lbl_8079A084) {
+                *(u8*)((u8*)hit + 0x05) = 0;
+                return;
+            }
+        }
+    }
+    fn_8029F204(hit, d);
+    Pl_attack_set_sub(self, (_HIT_DATA*)d, hit, flags);
+}
+
+/* 0x80278674: adds a signed amount to the actor's stamina pool, with the two armour-skill modifiers. */
+extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
+{
+    s16 v = arg1;
+    s32 changed = 0;
+    if (Pl_master_ck(self) != 0 && fn_8026FE44(self) != 1U) {
+        if (v < 0 && arg2 == 0) {
+            if (Pl_Skill_ck(self, 0x15) == 1U) {
+                if (v == -1 && (ran_suu__Fl(1) & 1) != 0) {
+                    return;
+                }
+                v = (s16)((v + (s32)((u32)v >> 31)) >> 1);
+                if (v == 0) {
+                    v = -1;
+                }
+            } else if (Pl_Skill_ck(self, 0x16) == 1U) {
+                v = (s16)(v * 2);
+            }
+        }
+        s16 t = *(s16*)((u8*)self + 0x56C) + v;
+        *(s16*)((u8*)self + 0x56C) = t;
+        if (t <= 0) {
+            *(s16*)((u8*)self + 0x56C) = 0;
+        }
+        s16 lim = *(s16*)((u8*)self + 0x56E);
+        if (*(s16*)((u8*)self + 0x56C) > lim) {
+            *(s16*)((u8*)self + 0x56C) = lim;
+            changed = 1;
+        }
+        s32 m = fn_80278590(self);
+        u8 old = *(u8*)((u8*)self + 0x56B);
+        if ((u8)m != old) {
+            if (old > (u8)m) {
+                fn_8035B700(1, 4, 0);
+                fn_8033A920(0x15);
+            } else {
+                fn_8035B700(1, 5, 0);
+            }
+            *(u8*)((u8*)self + 0x56B) = m;
+        }
+        if (changed != 0) {
+            fn_8035B700(1, 6, 0);
+        }
+    }
+}
+
+/* 0x8027993C: the first item slot the actor may use, scanned round the 33-entry shell ring. */
+extern "C" u16 fn_8027993C(_PLW* self, u16 arg1, u8 arg2)
+{
+    u16 slot;
+    s32 i;
+    if (fn_8026FE44(self) == 0) {
+        return 0xFF;
+    }
+    u8 ring[33 * 4];
+    for (i = 0; i < 0x18; i++) {
+        fn_8004A1F8(ring + i * 4, (u8*)self + 0x278 + i * 4);
+    }
+    for (i = 0; i < 9; i++) {
+        fn_8004A1F8(ring + (i + 0x18) * 4, (u8*)self + 0x278 + (i + 0x1A) * 4);
+    }
+    slot = arg1;
+    if ((slot & 0x80) != 0) {
+        slot = (u16)((slot & 0x7F) + 0x18);
+    }
+    if ((s32)slot >= 0x21) {
+        slot = 0;
+    }
+    switch (arg2) {
+    case 0:
+        slot = (u16)((slot + 1) % 33);
+        break;
+    case 1:
+        slot = (u16)((slot == 0) ? 32 : slot - 1);
+        break;
+    }
+    for (i = 0; i < 0x21; i++) {
+        u8* e = ring + slot * 4;
+        if (*(u16*)(e + 0) != 0 && *(s16*)(e + 2) > 0) {
+            u8* it = (u8*)GetItemData(*(u16*)(e + 0));
+            if ((it[2] & 8) != 0 && it[0] == 1 &&
+                fn_80274DCC(self, (u8)fn_80274B20(*(u16*)(e + 0))) == 1U) {
+                if ((u32)slot >= 0x18U) {
+                    slot = (u16)((slot - 0x18) | 0x80);
+                }
+                return slot;
+            }
+        }
+        switch (arg2) {
+        case 0:
+        case 2:
+            slot = (u16)((slot + 1) % 33);
+            break;
+        case 1:
+        case 3:
+            slot = (u16)((slot == 0) ? 32 : slot - 1);
+            break;
+        }
+    }
+    return 0xFF;
+}
+
+/* 0x80279C20: refreshes the actor's held-shell state each frame - the ring position, the shell search,
+ * and the save/restore of the fields it rewrites. */
+extern "C" void fn_80279C20(_PLW* self)
+{
+    if (Pl_master_ck(self) == 0) {
+        return;
+    }
+    if (fn_8026FE44(self) == 0) {
+        return;
+    }
+    if (fn_8027BC48(1) == 1U) {
+        return;
+    }
+    if (Pl_bari_ck(self, 1) == 1U) {
+        return;
+    }
+    u8 a = self->unk00A;
+    if ((u32)(a - 8) <= 1U) {
+        return;
+    }
+    switch (a) {
+    case 6: {
+        s32 id = self->unk00C;
+        if (id == 0x1B) {
+            return;
+        }
+        if (id == 0x23) {
+            return;
+        }
+        break;
+    }
+    case 4: {
+        s32 id = self->unk00C;
+        if (id >= 0x17) {
+            if (id >= 0x32) {
+                break;
+            }
+            if (id >= 0x1A) {
+                return;
+            }
+        } else {
+            if (id >= 0x0E) {
+                if (id >= 0x13) {
+                    return;
+                }
+                break;
+            }
+            if (id < 5) {
+                break;
+            }
+        }
+        if (*(u8*)((u8*)self + 5) <= 2) {
+            return;
+        }
+        break;
+    }
+    }
+    if (*(u8*)((u8*)self + 0x26B) == 0) {
+        *(u8*)((u8*)self + 0x26B) = 1;
+        *(u8*)((u8*)self + 0x26D) = self->unk26C;
+        *(s16*)((u8*)self + 0x272) = *(s16*)((u8*)self + 0x270);
+        *(u8*)((u8*)self + 0x275) = *(u8*)((u8*)self + 0x26A);
+        *(u8*)((u8*)self + 0x274) = self->unk269;
+    }
+    if (fn_8026A6F4(self, 0xB) == 1U) {
+        if (fn_8026A6F4(self, 0xD) == 1U) {
+            if (self->unk26E == 0xFF) {
+                self->unk26E = fn_8027993C(self, 0, 3);
+            } else {
+                self->unk26E = fn_8027993C(self, 1, 0);
+            }
+            fn_80279B84(self);
+            if (self->unk26E != 0xFF) {
+                *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 8);
+                sysSE_req(6);
+            }
+        } else if (fn_8026A6F4(self, 0xC) == 1U) {
+            if (self->unk26E == 0xFF) {
+                self->unk26E = fn_8027993C(self, 0, 2);
+            } else {
+                self->unk26E = fn_8027993C(self, 0, 0);
+            }
+            fn_80279B84(self);
+            if (self->unk26E != 0xFF) {
+                *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 0x10);
+                sysSE_req(6);
+            }
+        }
+    } else if (self->unk26B != 0) {
+        self->unk26B = 0;
+        if (self->unk26D != self->unk26C) {
+            fn_80279B84(self);
+        } else {
+            *(s16*)((u8*)self + 0x270) = *(s16*)((u8*)self + 0x272);
+            *(u8*)((u8*)self + 0x26A) = *(u8*)((u8*)self + 0x275);
+            self->unk269 = *(u8*)((u8*)self + 0x274);
+        }
+    }
+    if (self->unk26D == self->unk26C) {
+        *(s16*)((u8*)self + 0x270) = *(s16*)((u8*)self + 0x272);
+        *(u8*)((u8*)self + 0x26A) = *(u8*)((u8*)self + 0x275);
+        self->unk269 = *(u8*)((u8*)self + 0x274);
+    }
+}
+
+/* 0x80279EBC: starts the shell-swap motion, scaled by the actor's stored shell count. */
+extern "C" void fn_80279EBC(_PLW* self, u16 arg1, u16 arg2)
+{
+    s32 v = *(s8*)((u8*)self + 0x64F);
+    if (v == 0) {
+        fn_8026A23C(self, 0, lbl_8079A080);
+        fn_8026A23C(self, 1, lbl_8079A084);
+        return;
+    }
+    f32 f = (f32)v;
+    *(u8*)((u8*)self + 0x64E) = 1;
+    u16 m;
+    if (v > 0) {
+        if (arg1 == 0x581) {
+            m = 0x580;
+            *(u8*)((u8*)self + 0x64E) = 0;
+        } else {
+            m = arg1;
+        }
+    } else {
+        if (arg2 == 0x582) {
+            m = 0x580;
+            *(u8*)((u8*)self + 0x64E) = 0;
+        } else {
+            m = arg2;
+        }
+        f = f * lbl_8079A0D4;
+    }
+    fn_8026A230(self, 1, m, 0, (s32)(lbl_8079A0C0 + fn_8026A34C(self)));
+    f32 t = f * lbl_8079A0D8;
+    fn_8026A23C(self, 0, lbl_8079A080 - t);
+    fn_8026A23C(self, 1, t);
+}
+
+/* 0x8027A340: whether the actor may act at all this frame - master/bari state, the stun flag and the
+ * per-action-class exceptions. */
+extern "C" s32 fn_8027A340(_PLW* self)
+{
+    s32 ok = 1;
+    if (Pl_master_ck(self) == 0) {
+        ok = 0;
+    }
+    if (fn_8026FE44(self) == 0) {
+        ok = 0;
+    }
+    if (self->unk5E6 != 0) {
+        ok = 0;
+    }
+    if (fn_8026A644(self, 0x1D) == 0) {
+        if (self->unk00A == 4) {
+            s32 id = self->unk00C;
+            if (id != 0x13 && id != 0x2A && id != 0x2E && id != 0x15 && id != 0x2C && id != 0x30) {
+                ok = 0;
+            }
+        } else {
+            ok = 0;
+        }
+    }
+    u8 a = *(u8*)((u8*)self + 0x00A);
+    if ((u32)(a - 5) <= 6U) {
+        ok = 0;
+    } else {
+        switch (a) {
+        case 0: {
+            s32 id = self->unk00C;
+            switch (id) {
+            case 1:
+            case 2:
+            case 5:
+            case 6:
+            case 7:
+            case 20:
+            case 21:
+            case 28:
+            case 73:
+            case 91:
+            case 122:
+            case 158:
+            case 159:
+            case 160:
+            case 161:
+                ok = 0;
+                break;
+            }
+            break;
+        }
+        case 2:
+            ok = 0;
+            break;
+        case 4: {
+            s32 id = self->unk00C;
+            if ((u32)(id - 2) <= 1U || (u32)(id - 0x10) <= 1U) {
+                ok = 0;
+            }
+            break;
+        }
+        }
+    }
+    return ok;
+}
+
+/* 0x8027AC2C: sets the two stored shell ids (or their per-weapon-class defaults) and scales them by
+ * the actor's ammo skill. */
+extern "C" void fn_8027AC2C(_PLW* self, u8 arg1, u8 arg2)
+{
+    if (arg1 == 0xFF) {
+        u8 t = self->unk002;
+        *(u8*)((u8*)self + 0x568) = lbl_805BFFCC[t * 2];
+        if (t == 7 && Pl_condition_ck(self, 0x80000000) == 1U) {
+            *(u8*)((u8*)self + 0x568) = 0x71;
+        }
+    } else {
+        *(u8*)((u8*)self + 0x568) = arg1;
+    }
+    if (arg2 == 0xFF) {
+        u8 t = self->unk002;
+        *(u8*)((u8*)self + 0x569) = lbl_805BFFCC[t * 2 + 1];
+    } else {
+        *(u8*)((u8*)self + 0x569) = arg2;
+    }
+    f32 f = (f32)((s8)*(u8*)((u8*)self + 0x452) + 100) / lbl_8079A0D0;
+    if (Pl_cat_skill_ck(self, 0x26) == 1U) {
+        s32 n = *(u8*)((u8*)self + 0x445);
+        if (n != 0) {
+            s16 i = 0;
+            if (n > 0) {
+                for (; i < n; i++) {
+                    f = f * lbl_8079A0AC;
+                }
+            }
+        }
+    }
+    *(u8*)((u8*)self + 0x568) = (u8)(s32)((f32)(*(u8*)((u8*)self + 0x568)) * f);
+    *(u8*)((u8*)self + 0x569) = (u8)(s32)((f32)(*(u8*)((u8*)self + 0x569)) * f);
+}
+
+/* 0x8027C064: builds the impact vector an attacking part starts from - the per-weapon-class motion, the
+ * hit matrix and the actor's world offset. */
+extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
+{
+    u8 buf[12];
+    nw4r::math::VEC3 v;
+    u8 m2[0x30];
+    nw4r::math::MTX34 m;
+    s32 part;
+    fn_8005050C(&m);
+    fn_8005050C(m2);
+    fn_80043EA8(&v);
+    u8 t = fn_80224E28(self, lbl_805BAA90[self->unk002]);
+    out->x = lbl_8079A084;
+    out->y = lbl_8079A084;
+    setVector3(&v, lbl_8079A084, lbl_8079A084, lbl_8079A084);
+    switch ((s32)t) {
+    default:
+        part = *(s32*)(lbl_805C6168 + (self->unk002 * 3 + 2) * 4);
+        out->z = lbl_8079A084;
+        break;
+    case 1:
+        if (self->unk002 == 3) {
+            fn_80041E40(&v, fn_80143174(buf, lbl_805BAC98 + self->unk002 * 0x18 + 0xC,
+                                         self->unk002 * 0x18));
+        }
+        /* fall through */
+    case 0:
+        part = *(s32*)(lbl_805C6168 + (t + self->unk002 * 3) * 4);
+        out->z = *(f32*)(lbl_805C61D4 + self->unk002 * 4);
+        break;
+    }
+    fn_8026A394(self, part, &m);
+    fn_800504D4(m2);
+    fn_8008C484(m2, v.x, v.y, v.z);
+    fn_80051574(&m, m2);
+    mulVecMat(out, &m);
+    out->x = out->x + m.m[0][3];
+    out->y = out->y + m.m[1][3];
+    out->z = out->z + m.m[2][3];
+}
+
+/* 0x8027C208: the action-class gate - whether the actor may start the given action id. */
+extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
+{
+    nw4r::math::VEC3 sp24;
+    s32 sp18;
+    s32 sp14;
+    s32 sp10;
+    s32 spC;
+    s16 sp8;
+    fn_80043EA8(&sp24);
+    if (self->unk00A == 7) {
+        if (arg1 == 0x15B) {
+            if ((u32)self->unk00C <= 1U) {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+    if ((Pl_act_ck(self, 6, 0x1C) == 1U || Pl_act_ck(self, 6, 0x1D) == 1U) && arg1 != 0x176) {
+        return 0;
+    }
+    if ((fn_80278C7C(self) == 1U || fn_80278CD0(self) == 1U) && arg1 != 0x177) {
+        return 0;
+    }
+    switch ((s32)arg1) {
+    case 0x177:
+        if (fn_80278C7C(self) == 1U || fn_80278CD0(self) == 1U) {
+            return 1;
+        }
+        return 0;
+    case 3:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        return fn_802782B8(self);
+    case 4:
+    case 0x31:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        return fn_80278450(self);
+    case 0x22:
+    case 0x23:
+    case 0x24:
+        if (fn_803BA9B0(self->unk008, self->unk016, (u8*)self + 0x3C, &sp8, &sp24, &sp18, &sp14) != 0xFFFFU &&
+            sp8 == 3) {
+            return 1;
+        }
+        return 0;
+    case 0x25:
+    case 0x26:
+    case 0x27:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        if (fn_803BA9B0(self->unk008, self->unk016, (u8*)self + 0x3C, &sp8, &sp24, &sp18, &sp14) != 0xFFFFU &&
+            sp8 == 4) {
+            return 1;
+        }
+        return 0;
+    case 0xCA:
+    case 0xCB:
+    case 0xCC:
+    case 0xCD:
+    case 0xCE:
+    case 0x15F:
+    case 0x161:
+    case 0x163:
+    case 0x185:
+    case 0x186:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        if (fn_803BA9B0(self->unk008, self->unk016, (u8*)self + 0x3C, &sp8, &sp24, &sp18, &sp14) != 0xFFFFU &&
+            sp8 == 5) {
+            return 1;
+        }
+        return 0;
+    case 0x159:
+    case 0x15A:
+    case 0x15B:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        break;
+    case 0x1A:
+    case 0x1B:
+    case 0x1C:
+    case 0xA6:
+    case 0xA7:
+    case 0xD0:
+    case 0xD6:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        break;
+    case 0x1D:
+    case 0x1E:
+    case 0x1F:
+    case 0x20:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        return fn_802784A8(self);
+    case 0x16E:
+        return fn_802784B8(self);
+    case 6:
+    case 0x2E:
+    case 0x8A:
+    case 0xC2:
+    case 0x184:
+        if (self->unk009 != 3) {
+            return 0;
+        }
+        break;
+    case 0x28:
+    case 0x2F:
+    case 0x109:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        if (fn_8027CC2C(self) == 1U) {
+            return 0;
+        }
+        if (fn_802731B4(self, 0x1D) > 0 && self->unk009 != 3) {
+            return 1;
+        }
+        return 0;
+    case 0x1B6:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        if (fn_8027CC2C(self) == 1U) {
+            return 0;
+        }
+        if (fn_802731B4(self, 0x1D) > 0 && fn_802D7804(4, lbl_8079A0F8) == 1U) {
+            return 1;
+        }
+        return 0;
+    case 0x169:
+    case 0x16A:
+    case 0x16B:
+    case 0x16C:
+    case 0x16D:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        break;
+    case 0x2B:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+        break;
+    case 0x17F:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 1;
+        }
+        return 0;
+    case 2:
+    case 0x34:
+    case 0x246:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        return fn_80277F54(self);
+    case 0x108:
+        if (self->unk009 == 3) {
+            return 0;
+        }
+    case 1:
+    case 0x237:
+    case 0x258:
+    case 0x259:
+        if (*(u8*)((u8*)self + 0x585) != 0) {
+            return 0;
+        }
+        break;
+    case 0x30:
+    case 0x62:
+    case 0xCF:
+        if (fn_8026FE44(self) != 0) {
+            return 0;
+        }
+        break;
+    case 0x180:
+        if (fn_8027DC90() == 0) {
+            return 0;
+        }
+    case 0x17C:
+        if (fn_8027D968(self, &sp24, &sp10, &spC) == 1) {
+            return 1;
+        }
+        return 0;
+    case 0x247:
+        if (fn_8027D968(self, &sp24, &sp10, &spC) == 5) {
+            return 1;
+        }
+        return 0;
+    }
+    return 1;
 }
