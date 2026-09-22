@@ -16,6 +16,36 @@ decompilation **for names, signatures and data**, never for codegen.
   qualified with the section it lives in.
 * Reachable through the `ghidra` MCP server (instance `MH3Shared`).
 
+## The symbol map of the same dump (`DumpSymbols.zip`)
+
+A second, cheaper oracle sits next to the dump: `D:/WiiExperiment/DumpSymbols.zip` holds
+`Dump_Loading85.raw.h` and `Dump_Loading85.raw.map` - **48 367 symbol lines** for the same
+loading-state dump, in Dolphin's map format:
+
+```
+CntSdRsoTerminate 800406ac f          # name [demangled argument list] address flags; `f` = function
+kbd_open(unsigned 80040798 f
+zz_0040598_ 80040598 f                # `zz_<address>_` means the dumper had no name for it
+```
+
+It is a plain text file, so it needs no Ghidra session and no MCP call - which makes it the first thing to
+consult when a region is full of `fn_XXXXXXXX`. Addresses are the DOL's own (checked against the map:
+`kbd_move` 0x80040770, `set_kbd_param` 0x800407C4, `ck_sub_ovl_idx` 0x800408A0 all agree), and it settles
+questions the Ghidra project answers only one function at a time:
+
+* **a real name**, e.g. `fn_800406AC` -> `CntSdRsoTerminate` (batch 6; the rename went map + source as usual);
+* **whether an address is a function at all** - a `fn_*` in our map with no line in this one, where the
+dump does carry `zz_` placeholders for genuinely unnamed functions, is usually not a function. Five
+4-byte `fn_80040794`-style symbols in `src/auto/80040598_fn_80040598.cpp` turned out to be the dead
+epilogue MWCC emits after a `mtctr`/`bctr` tail-call dispatcher: merging each into the dispatcher before it
+(map sizes +4, symbols deleted) closed four of them outright;
+* **a signature**, since the argument list is demangled (`kbd_init(unsigned`, `set_kbd_param(char`).
+
+Read it with `python -c "import zipfile;z=zipfile.ZipFile('D:/WiiExperiment/DumpSymbols.zip');
+print(z.read('Dump_Loading85.raw.map').decode('latin-1'))"` - or grep the `.map` member without extracting
+it. It is **not** codegen evidence (same rule as the dump itself), and a name it does not have is not
+proof of anything: `zz_` means "unnamed", not "absent".
+
 ## What it answers
 
 | question | call | worked example (the `RSO/runtime` unit) |

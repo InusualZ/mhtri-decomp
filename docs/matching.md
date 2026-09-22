@@ -603,6 +603,18 @@ derived by hand, with real field names. It is **not** codegen evidence (idea 17)
 names with Ghidra placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23).
 Recipes and the full worked example: `docs/memory-dump.md`.
 
+The same dump has a **companion symbol map** (`DumpSymbols.zip` -> `Dump_Loading85.raw.map`, 48 367 lines
+of `name [args] address flags`), which needs no Ghidra session and answers two questions the project call
+cannot answer in bulk: a real name (`fn_800406AC` -> `CntSdRsoTerminate`), and **whether an address is a
+function at all**. The second one is worth a playbook row of its own because it is a *map* bug, not a
+source bug: `src/auto/80040598_fn_80040598.cpp` carried five 4-byte `fn_80040794`-style symbols that were
+not functions but the dead epilogue MWCC emits after a `mtctr`/`bctr` tail-call dispatcher. The dispatchers
+compiled exactly 4 bytes longer than the map said (their bodies are byte-identical to *their own symbol
+plus the artifact*), so objdiff could never pair them: growing the five owner sizes by 4 and deleting the
+five artifacts closed four dispatchers outright (88.9 % -> 100 %) and removed 20 bytes of phantom code
+from the map. The tell is in the dump: it carries `zz_<address>_` placeholders for genuinely unnamed
+functions (including four inside that very range) and **no** line at those five addresses.
+
 ## 26. The target's section is part of the match
 
 Problem: a unit can be instruction-identical and relocation-identical and still measure as *unmatched*, because
