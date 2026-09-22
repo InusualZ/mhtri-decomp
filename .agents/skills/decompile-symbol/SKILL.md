@@ -103,8 +103,13 @@ the disassembly of the function you are writing (`mt.py diff -u <unit> <symbol>`
 
 * Path: `src/<Dir>/<file>.c`, following the module the dump reports, mirroring an existing sibling unit's
   directory (`src/Camellia/camellia.c`, `src/RSO/runtime.c`).
-* Header: only when a shared declaration needs one, then beside the source (`src/<Dir>/<file>.h`), not
-  `include/`. Shared declarations are deduplicated through that header, never repeated per unit.
+* Header: only when a shared declaration needs one. The project's common scalar types live in
+  `include/types.h` - include it, never re-typedef `u8`/`u32`/`f32`/`BOOL` in a unit (a file that carries its
+  own copy is a bug: the campaign moved three units onto the shared header, and the vendor exception is
+  `src/Camellia/camellia.c`, whose `u32` is `unsigned int` and whose match rests on it). A declaration a
+  *unit* shares internally goes beside the source (`src/<Dir>/<file>.h`), never in `include/`; an SDK type
+  (`GXRenderModeObj`, `Vec`, `Mtx`, `OSHeapHandle`, ...) gets a `include/dolphin/` mirror rather than a fresh
+  declaration per unit. Shared declarations are deduplicated through those headers, never repeated per unit.
 * Names: use the dump's real name when it is known, rename through `tools/symbols/symedit.py` — **the map
   and the source in one edit** (skill: `symbol-map-editing`). Never invent a name: `fn_xxxxxxxx`/`unkNN`
   stay until the context supports one.

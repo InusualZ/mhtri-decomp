@@ -497,6 +497,7 @@ config.libs = [
         "lib": "main",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
+        "progress_category": "game",
         "host": False,
         "objects": [
             Object(NonMatching, "main.cpp"),

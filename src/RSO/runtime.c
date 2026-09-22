@@ -31,13 +31,8 @@
  * the `unlink_rso_module` group after it is a separate unit.
  */
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned long u32;
-typedef int BOOL;
+#include "types.h"
 
-#define TRUE 1
-#define FALSE 0
 
 /* 12-byte entry of the import symbol table at RSOModule::import_symbol_table_offset (real SDK
  * layout: dolphin's RSO.h `RSOImport`).  This is the array every function of this unit walks with

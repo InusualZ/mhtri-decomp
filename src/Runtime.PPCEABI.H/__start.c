@@ -47,9 +47,7 @@
 
 #pragma section code_type ".init"
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned long u32;
+#include "types.h"
 
 /* Low-memory OS addresses (plain constants in the retail object: `lis`+`addi`, no relocation). */
 #define EXCEPTIONMASK_ADDR      0x80000044

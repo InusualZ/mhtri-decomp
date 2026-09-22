@@ -200,7 +200,13 @@ config/RMHE08/symbols.txt Symbol map: name = section:address; // type/size/scope
 config/RMHE08/splits.txt  Which address ranges belong to which translation unit / section
 config/RMHE08/build.sha1  SHA-1 of each built artifact — the pass/fail check for the whole project
 src/                      Our C/C++ source (currently Camellia/)
-include/                  Our headers (does not exist yet; `cflags` already get `-i include`)
+include/types.h            The project's common scalar types (u8..s64, f32/f64, BOOL/TRUE/FALSE/NULL) - one
+                          definition, included by every unit that needs them; `cflags` already get `-i include`.
+                          A declaration moves here the *second* time a unit needs it, never the first (a type
+                          one unit uses belongs to that unit, or beside it like `src/Camellia/camellia.h`);
+                          `src/Camellia/camellia.c` is the vendor exception and keeps its own typedefs.
+                          An SDK type (`GXRenderModeObj`, `Vec`, `Mtx`, ...) gets a `dolphin/` mirror here
+                          rather than a fresh declaration per unit.
 orig/RMHE08/              Original game files (read-only, gitignored). main.dol, files/mh3.sel, ...
 build/                    Everything generated: build.ninja, compilers/, tools/, RMHE08/ (gitignored)
 tools/                    Tooling. dtk-template's scripts at the top level (project.py, download_tool.py, ...),

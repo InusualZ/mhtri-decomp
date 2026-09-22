@@ -130,15 +130,7 @@
  *     `lis r31, Screen_w@ha; addi r31, r31, Screen_w@l`. `fn_8004030C` 99.76 % - one pool `lfd` ARG row.
  */
 
-typedef signed char s8;
-typedef signed short s16;
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned long u32;
-typedef long s32;
-typedef unsigned long long u64;
-typedef float f32;
-typedef double f64;
+#include "types.h"
 
 /* The retail `.sbss`/`.bss`/`.sdata2` labels this unit references; they live in the unclaimed scaffolding
  * until the data ranges are split, so these are declarations only and objdiff pairs the relocations by the
