@@ -176,6 +176,10 @@ How to work the list:
    the same session, as soon as it works**: a win that only exists in a chat message or a scratch report is
    lost at the next compaction and the next unit re-derives it (this has already happened once here), so
    treat "the idea is written into the table and the playbook" as part of the win, not as follow-up work.
+   The same commit has to bring the skill's copy with it: `python
+   .agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check` must come back clean, because
+   `references/` is what a fresh session and every subagent actually load - it sat 55 lines behind
+   `docs/matching.md` the day this was written, i.e. current knowledge that no agent could see.
 4. When every row is `no` again, the target needs **new** ideas: add them here as `todo` rows first
    (idea + problem it solves), try them, and promote the ones that work into `docs/matching.md` (same
    style, next free number). Ideas that fail stay in the table as `no`, so they are not re-run.

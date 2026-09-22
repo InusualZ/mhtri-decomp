@@ -200,7 +200,12 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
 * A short report with the numbers: the unit's score before and after, the first divergent instruction, the
   residual region, and what was tried.
 * `docs/matching.md`: a section in house style (Problem / Why try it / Result / Example) the moment an idea
-  actually works — a win that only lives in chat is lost at the next compaction.
+  actually works — a win that only lives in chat is lost at the next compaction. Then regenerate the skill's
+  copy in the same commit: `python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check` has to
+  come back clean, because `references/` is what a fresh session and **every subagent** load — when this rule
+  was written it was 55 lines behind the playbook, so the knowledge existed and no agent would have seen it.
+  Report in the handover what the run taught *and* what it tried that did not work: a `no` result saves the
+  next session the same detour, and a unit-specific fact belongs in the unit's file header comment.
 * `AGENTS.md`: **write it** when the change is a meaningful improvement to the system (a playbook row, a new
   idea, a corrected rule) and report the write in the handover. Keep the local-only block rules:
   `python tools/agents/localonly.py pull` before staging and `push` after a commit
