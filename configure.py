@@ -433,13 +433,13 @@ config.libs = [
         "progress_category": "game",
         "host": False,
         "objects": [
-            Object(NonMatching, "Pl/pl_skill.c"),
-            Object(NonMatching, "Pl/pl_act.c"),
+            Object(NonMatching, "Pl/pl_skill.cpp"),
+            Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
             # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.
             # `fn_8026FFBC` (0x8026FFBC..0x80270018) sits on the ambiguous side of that seam and is
             # deliberately left unclaimed rather than guessed in.
-            Object(NonMatching, "Pl/pl_master.c"),
+            Object(NonMatching, "Pl/pl_master.cpp"),
         ],
     },
     {
