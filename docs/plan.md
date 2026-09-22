@@ -76,9 +76,12 @@ the bookkeeping.
      expressible in C: reproducing it as `.long` data would match ~8 KB of bytes while recovering no method,
      against the repository's "no hand-written assembly" premise. Revisit only if byte coverage becomes the
      goal.
-  3. **`-func_align 4` for `Runtime.PPCEABI.H` is scheduled for that lib's next measurement pass.** It needs
-     `#pragma function_align 16` in `__start.c` (whose 16-byte function starts depend on the implied 16) plus
-     a re-split of both units, and it only shows the day one of them is flipped to `Matching`.
+  3. **`-func_align 4` for `Runtime.PPCEABI.H` - landed** (batch 5, `cflags_ppceabi`): `-O4,p`'s implied 16 padded
+     every function of that lib (three independent witnesses), and `__start.c`'s 16-byte function starts come
+     from each function's own `.init` section, not from the alignment. Next pass on that lib should also claim
+     the `.bss` fragment `fragmentinfo` (0x806F4B48-0x806F4CC8) and `Gecko_ExceptionPPC.cp`'s jump table
+     (`.data 0x8060E8A0-0x8060E8E4`), both currently in the scaffold so their `lis`/`addi` displacements count
+     as mismatches.
 * **`Matching` flips** (decided): a unit is flipped only when it is byte-identical - every symbol 100 %,
   sections and relocations equal, proven per the `objdiff-verify` skill - **and** `ninja build/RMHE08/ok` stays
   green afterwards, one unit per commit and named in the message. Nothing qualifies today (best unit: 97.81 %

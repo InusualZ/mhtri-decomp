@@ -1,10 +1,15 @@
 /*
  * The game's root translation unit: main(), the pre-main latches, and the init/video/mode helpers.
  *
- * .text 0x8003F200-0x80040360 - 38 functions, 4448 B, one file. `__start` calls `main` (0x8003F218, the DOL
+ * .text 0x8003F200-0x80040478 - 47 functions, 4728 B, one file. `__start` calls `main` (0x8003F218, the DOL
  * entry point); the first 24 B are the two pre-main latches `fn_8003F200`/`fn_8003F20C` that set the bytes
- * main polls (0x807947A5/A6); then the GQR/VI/TV setup, the memory-heap creation, and the wide-mode /
- * brightness / screen-size accessors.
+ * main polls (0x807947A5/A6); then the GQR/VI/TV setup, the memory-heap creation, the wide-mode /
+ * brightness / screen-size accessors, and finally the `Screen_w` flag/rectangle accessors and the two
+ * expansion-heap wrappers that sys_mem.cpp's `operator new`/`operator delete` call.
+ *
+ * Batch 4 extended the split from the 0x80040360 cut to the real seam 0x80040478 (`tudiscover`'s boundary,
+ * commit 845a6d8): the `ck_WideMode`/`Screen_w` group belongs to this file, and 0x80040478 is where
+ * sys_mem.cpp's `__nw__FUl` starts.
  *
  * Attribution (batch 2, step 1): `tudiscover at 0x8003F218` calls the whole range one TU (two must-link
  * anchors); main.cpp is first in link order, so its `.data` pool at 0x8057C820 is the first fragment of
@@ -43,9 +48,9 @@
  *     `GXRenderModeObj` copy, which MWCC lowers to a call to the implicitly-*inline* copy-assignment
  *     operator under `-inline off` (4 B `bl`, 0.98 %) and inlines under `-inline noauto` (164 B, 100.00 %).
  *     Measured on the whole unit, `-inline noauto` moves nothing else (main 96.70, fn_8003F58C 90.81,
- *     fn_8003FC64 99.58, every other function unchanged), so `cflags_main` should carry `-inline noauto`;
- *     the committed `-inline off` is what leaves `fn_8003F940` unmatched.
- *   * `-use_lmw_stmw` stays **off**: the target's 4448 B `.text` has no `lmw`/`stmw` at all (objdump), and
+ *     fn_8003FC64 99.58, every other function unchanged), so `cflags_main` carries `-inline noauto` and
+ *     `fn_8003F940` is at 100 %.
+ *   * `-use_lmw_stmw` stays **off**: the target's 4728 B `.text` has no `lmw`/`stmw` at all (objdump), and
  *     `-use_lmw_stmw on` measures byte-identical to off.
  *
  * Load-bearing source shapes:
@@ -91,14 +96,19 @@
  *     `(void* alarm, u32 unk, u64 time, u32 arg5, u32 arg6, void* handler)`; the retail call is
  *     `(&alarm, 0xF0000, OSGetTime(), 0, 0xF7314, fn_8003F52C)`.
  *
- * All 38 functions are written (address order, .text 0x8003F200-0x80040360): F200, F20C, F218(main), F4D8,
+ * All 47 functions are written (address order, .text 0x8003F200-0x80040478): F200, F20C, F218(main), F4D8,
  * F50C, F524, F52C, F554, F564, F58C, F620, F728, F730, F940, F9E4, FBE8, FBFC, FC04, FC48, FC50, FC58,
  * FC5C, FC64, FCC4, FCCC, FE20, FE24, FE30, FEBC, FF98, 40144, 4026C, 40274, 40280, 4028C, 4029C,
- * get_ScreenSize, 4030C. Nothing is left to add; the residuals below are what keeps the unit off 100 %.
+ * get_ScreenSize, 4030C, 40360, 403AC, ck_WideMode, 403DC, 403F8, 40414, 4041C, 40420, 40460. Nothing is
+ * left to add: 36 of the 47 are at 100 % and the residuals below are what keeps the rest off 100 %.
  *
- * Residual (all measured with the committed `cflags_main`, i.e. `-O3 -inline off`):
- *   * `fn_8003F940` 0.98 % - **flag, not source**. The body is `*dst = *src;`, which retail inlines; see the
- *     `-inline noauto` bullet above. With that flag it is 164 B / 100.00 %.
+ * Residual (all measured with the committed `cflags_main`, i.e. `-O3 -inline noauto`):
+ *   * `fn_80040360` 99.47 % - 76 B both, 19 instructions, rows 6-7 only: retail `lis r4, Screen_w@ha;`
+ *     `addi r31, r4, Screen_w@l`, ours `lis r31, Screen_w@ha; addi r31, r31, Screen_w@l` - the same
+ *     lis-scratch-vs-coalesced residual as `fn_8004029C`. Six source shapes tried (a named `ScreenWork*`
+ *     local, a `u32` base local, a `char*` base local, an `f32*` parameter, a `_MH_VEC2*` source local, and
+ *     two spelled-out `(char*)&Screen_w + off` expressions), all byte-identical, so it is an allocator
+ *     tie-break, not source-shaped.
  *   * `fn_8003F58C` 90.81 % - 148 B both. Two argument-setup order swaps (`mr r5,r3` before `mr r6,r4`;
  *     `addi r8,r4,0x7314` before `li r7,0`) and one coalesced `lis r9` where retail uses a scratch `r4`.
  *   * `main` 96.70 % - 704 B target vs 712 B ours. First divergence is instruction 19: retail emits
@@ -983,4 +993,71 @@ extern "C" void fn_8004030C(_MH_VEC2* v)
 {
     v->x = (f32)(s16)Screen_w.w0;
     v->y = (f32)(s16)Screen_w.w2;
+}
+
+/* ---- 0x80040360-0x80040478: the screen-size accessors and the game's expansion-heap allocator ---- */
+
+extern "C" void* fn_804C2200(void* heap, u32 size, u32 align);
+extern "C" void fn_804C22B0(void* heap, void* block);
+extern "C" void fn_800403AC(_MH_VEC2* dst, const _MH_VEC2* src);
+
+/* Copies the two screen-size rectangles out of the calibration block. */
+extern "C" void fn_80040360(_MH_VEC2* dst)
+{
+    fn_800403AC(&dst[0], (const _MH_VEC2*)&Screen_w.f44);
+    fn_800403AC(&dst[1], (const _MH_VEC2*)&Screen_w.f52);
+}
+
+/* Copies one screen-size rectangle. */
+extern "C" void fn_800403AC(_MH_VEC2* dst, const _MH_VEC2* src)
+{
+    dst->x = src->x;
+    dst->y = src->y;
+}
+
+/* Reports whether the console is running in wide mode. */
+int ck_WideMode(void)
+{
+    return Screen_w.b25 != 0;
+}
+
+/* Reports whether the calibration block's wide-mode flag is set. */
+extern "C" u32 fn_800403DC(void)
+{
+    return Screen_w.b24 != 0;
+}
+
+/* Reports whether the calibration block's third flag is set. */
+extern "C" u32 fn_800403F8(void)
+{
+    return Screen_w.unk26 != 0;
+}
+
+/* Returns 0; the retail object defines the symbol as a constant load. */
+extern "C" u32 fn_80040414(void)
+{
+    return 0;
+}
+
+/* Empty; the retail object defines the symbol as a bare return. */
+extern "C" void fn_8004041C(void)
+{
+}
+
+/* Allocates `size` bytes, 8-aligned, from the expansion heap. */
+extern "C" void* fn_80040420(u32 size)
+{
+    void* block = NULL;
+    if (size != 0) {
+        block = fn_804C2200(lbl_80794788, size, 8);
+    }
+    return block;
+}
+
+/* Returns a block to the expansion heap. */
+extern "C" void fn_80040460(void* block)
+{
+    if (block != NULL) {
+        fn_804C22B0(lbl_80794788, block);
+    }
 }
