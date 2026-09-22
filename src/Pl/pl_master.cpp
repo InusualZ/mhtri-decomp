@@ -38,14 +38,21 @@
  *     `Pl_act_ck`+`fn_8026FE98`-`fn_8026FEF0`, `fn_8026BE94`. Each is a scoped `off`/`reset` pair; no other
  *     function in the range needs it.
  *
- * Residual (all 24 functions written; 23 are exactly 100 %):
- *   - `fn_8026F908` 98.21 %: same length, whole diff is colouring (retail `level` r6 / `value` r4, ours
- *     r5/r6). Reordering the declarations moves the diff around but never closes it.
- *   - `fn_8026CC7C` 99.99 %: the 2766 instructions are byte-identical; the only difference is the relocation
- *     of the switch jump table - retail references the map's `jumptable_805C5FA0` (.data 0x805C5FA0,
- *     0x24 B) while ours references the compiler's local label for its own identical `.data` table (the two
- *     tables' nine words are equal, verified entry by entry). Fixing it is a `splits.txt` change, not a
- *     source one: `Pl/pl_master.cpp` needs `.data start:0x805C5FA0 end:0x805C5FC4`.
+ * Residual (all 24 functions written; 23 are exactly 100 %, and the object's only differing bytes are 9
+ * inside `fn_8026F908`):
+ *   - `fn_8026F908` 98.85 % (9 bytes): the load has to be spelled `(s16)self->unkD4[idx]` - the array+cast
+ *     form is what puts `level` in r6 like retail (the pointer-arithmetic spelling is 15 bytes off). What is
+ *     left is one colouring tie-break: retail coalesces the load result with the index-address temp
+ *     (`add r4,r3,r0; lha r4,212(r4)`, so `value` r4 / `low` r5), ours keeps them apart (`lha r5,212(r4)`,
+ *     `value` r5 / `low` r4); the differing `lbz` temp, `subi` and the two `li` bounds follow from that swap.
+ *     Moving the same load below the early-out return reproduces retail's registers exactly but then the
+ *     3-instruction load block sits after the branch - MWCC does not hoist a load across it - so position and
+ *     colouring cannot both be reached from the source. ~60 shapes tried (declaration order, pointer/temp
+ *     forms, cast spellings, chain and bounds order, array bounds, pragma state), none better.
+ *   - `fn_8026CC7C` 100 % since the `.data` claim (`.data start:0x805C5FA0 end:0x805C5FC4`, splits.txt) paired
+ *     the switch jump table: the section is byte-identical (0x24 B, nine words). The only trace of the old
+ *     mismatch is that our reloc reaches the table through the compiler's local symbol (`.data+0`) where the
+ *     target names `jumptable_805C5FA0` - same section and offset, so it resolves to the same address.
  *
  * Load-bearing source shapes in the two big dispatchers (everything else there is plain member access):
  *   - both take the action state as a `st = &self->unkB8` local, which is the register retail keeps the whole
@@ -1724,7 +1731,7 @@ extern "C" u32 fn_8026F888(_PLW* self)
 extern "C" u8 fn_8026F908(_PLW* self, u32 idx)
 {
     u32 level = 0;
-    s16 value = *(s16*)((u8*)self + 0xD4 + idx * 2);
+    s16 value = (s16)self->unkD4[idx];
     s32 high;
     s32 mid;
     s32 low;
