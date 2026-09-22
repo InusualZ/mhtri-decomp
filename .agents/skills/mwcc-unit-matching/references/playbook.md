@@ -672,19 +672,22 @@ Why try it: `-inline auto` in `cflags_base` inlines eagerly, and not every retai
 (`-inline off`, or a threshold we cannot see). The inline setting is a per-library flag like the `-O` level,
 and a `#pragma` can scope it to the one function that needs it.
 
-Result: for the `main` lib (batch 2), `-O3` **plus `-inline off`** took `fn_8003F52C` and `fn_8003F564` from
-74 % to 100 % (retail keeps their `bl fn_8003F554`), `change_widemode_req_default__Fv` from 21.18 % to 100 %,
-and `main` itself from 71.12 % to 96.73 %. Two spelling traps came out of the same batch: `#pragma peephole
-on/off` is honoured (it is what keeps retail's unfused `srwi`+`clrlwi` in `change_widemode_req_default__Fv`),
-while `opt_peephole`/`peep` parse and do nothing, and whole-unit `-opt nopeephole` cost `main` 2.2 points -
-scope the pragma to the function that needs it, and never assume a pragma name works because it parses.
+Result: for the `main` lib (batch 2), `-O3` **plus `-inline noauto`** took `fn_8003F52C` and `fn_8003F564`
+from 74 % to 100 % (retail keeps their `bl fn_8003F554`), `change_widemode_req_default__Fv` from 21.18 % to
+100 %, and `main` itself from 71.12 % to 96.73 %. Pick the *middle* setting, not `-inline off`: `fn_8003F940`
+is retail's inlined aggregate `GXRenderModeObj` copy, and `off` turns it into a call to the implicit
+copy-assignment operator (99.02 %, and 4 bytes short) where `noauto` still inlines it (100 %). Two spelling
+traps came out of the same batch: `#pragma peephole on/off` is honoured (it is what keeps retail's unfused
+`srwi`+`clrlwi` in `change_widemode_req_default__Fv`), while `opt_peephole`/`peep` parse and do nothing, and
+whole-unit `-opt nopeephole` cost `main` 2.2 points - scope the pragma to the function that needs it, and
+never assume a pragma name works because it parses.
 
 Example: the inline half belongs in the library's flags
 
 ```python
 cflags_main = [
     *[f for f in cflags_lobby if f != "-inline auto"],
-    "-inline off",
+    "-inline noauto",
 ]
 ```
 
@@ -694,4 +697,25 @@ and the peephole half from the same batch is a pragma, scoped to the function th
 ```c
 #pragma peephole off
 void change_widemode_req(unsigned char mode);
+```
+
+## 29. A claimed literal pool: declare the constants, never define them
+
+Problem: a unit whose `.sdata2`/`.sdata` fragment is claimed in `splits.txt` still shows its pooled constants
+as `ARG` rows - the target loads `lbl_80795AC0@sda21`, our source loads a literal the compiler put in a pool of
+its own, and the names cannot pair. The obvious fix (define the constants in the source) is the wrong one: it
+rebuilds the pool, so the section and every load that references it changes.
+
+Why try it: the claim already put the target's pool *inside* the unit, so the map's names (`lbl_80795AC0`,
+`lbl_80790E24`, ...) can be declared `extern` in the source and used as the operands of the loads. The compiler
+then references the claimed address instead of pooling a new copy, and the rows pair by name.
+
+Result: `main.cpp` (batch 3) declared its `.sdata2` constants (0x80795AA0-0x80795AD8) and its `.sdata` byte
+instead of redefining them, which is what let the remaining float rows in `main`, `fn_8003FEBC`,
+`fn_8003FF98` and `fn_8003FC64` be judged on their instructions rather than on a pool name.
+
+Example: the `splits.txt` claim plus
+
+```c
+extern f32 lbl_80795AC0;   /* not `f32 lbl_80795AC0 = ...;` - that would rebuild the pool */
 ```

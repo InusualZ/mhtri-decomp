@@ -266,12 +266,14 @@ cflags_lobby = [
     "-O3",
 ]
 
-# main flags (src/main.cpp). Evidence in the lib entry below: -O3, and -inline auto has to go, because the
-# retail main.cpp keeps its tiny file-local calls (fn_8003F554 out of fn_8003F52C/fn_8003F564) and does not
-# inline them.
+# main flags (src/main.cpp). Evidence in the lib entry below: -O3, and the inline knob has to move off `auto`,
+# because the retail main.cpp keeps its tiny file-local calls (fn_8003F554 out of fn_8003F52C/fn_8003F564) and
+# does not inline them. `-inline noauto` rather than `-inline off`: fn_8003F940 is the retail aggregate
+# GXRenderModeObj copy, and `off` makes MWCC emit a call to the implicit copy-assignment operator (99.02 %)
+# where `noauto` inlines it (100.00 %) - nothing else in the unit moves between the two.
 cflags_main = [
     *[f for f in cflags_lobby if f != "-inline auto"],
-    "-inline off",
+    "-inline noauto",
 ]
 
 # Camellia flags. Evidence-backed per-object overrides for Camellia/camellia.c, which does not match with
@@ -483,8 +485,12 @@ config.libs = [
         # per-symbol match, before -> after):
         #   -O4,p -> -O3            main 71.12 -> 96.70, fn_8003FC64 65.62 -> 99.58,
         #                           change_widemode_req__FUc 58.00 -> 100.00, fn_8003F58C 79.78 -> 90.81
-        #   -inline auto -> off     fn_8003F52C and fn_8003F564 74.00 -> 100.00 (retail keeps the out-of-line
+        #   -inline auto -> noauto   fn_8003F52C and fn_8003F564 74.00 -> 100.00 (retail keeps the out-of-line
         #                           call to fn_8003F554), change_widemode_req_default__Fv 21.18 -> 100.00
+        #                           `-inline off` instead costs fn_8003F940 0.98 points (99.02): it turns
+        #                           retail's inlined aggregate GXRenderModeObj copy into a call to the
+        #                           implicit copy-assignment operator; `noauto` keeps that one inlined while
+        #                           still refusing the auto inlines above
         #   no -func_align needed   with -O3 the functions pack on 4 B boundaries as the target does; -O4,p
         #                           implies -func_align 16 and would need a 4-byte override
         #   -use_lmw_stmw           absent from this 4448 B range in the target (no lmw/stmw)
