@@ -37,7 +37,7 @@ because that is the one input here that is a build output and it describes a rep
 | 1 | attribute | `tools/units/symbolpreflight.py`, `tools/splits/tudiscover.py` | the verdict is `proceed`, or `approve` with a written proposal the owner accepted | `splits.txt` ranges (+ `configure.py` entry) |
 | 2 | decompile | Ghidra dump (`docs/memory-dump.md`) + `tools/units/m2cinput.py` → `tools/m2c` | it compiles, and the disassembly agrees with every instruction-level decision | `src/<Dir>/<file>.c` (+ header) |
 | 3 | match | `mt.py diff/info`, `ninja changes`, report.json | the symbol's own `match_percent` ≥ 80, nothing else regressed, `ninja build/RMHE08/ok` still green | the residual in the unit's file header comment |
-| 4 | commit | `tools/git/prepcommit.py` | the review sheet is read and approved (rule 6) | one commit, and the ledger moves |
+| 4 | commit | `tools/git/prepcommit.py` | the review sheet is read and approved (rule 6), and the batch's knowledge delta is written (see below) | one commit, and the ledger moves |
 
 **Alignment and flags, learned the hard way in batch 1.** `-O4,p` implies `-func_align 16`, and the retail SDK
 objects of `Runtime.PPCEABI.H` are all `.init align 2**2`: `memcpy.o`'s two functions are packed
@@ -185,6 +185,44 @@ git commit -F .git/prepcommit_msg.txt
   session; a unit-specific residual stays in the unit's header. A finding that only lives in a reply is lost
   at the next compaction.
 
+## The knowledge delta - the playbook is the real product
+
+The campaign's output is not only closed symbols, it is the accumulated *method*. A trick that closed one
+symbol here (or cost an hour to find) is worth more to the next 20,000 than the symbol it closed - and it is
+worth nothing at all while it lives in a chat message or a subagent's reply. This repository has already lost
+a finding that way, which is why "record it in the same session" is a rule in `AGENTS.md`; the campaign makes
+it a gate instead of a good intention.
+
+Every iteration owes a **knowledge delta**, and it has exactly four homes:
+
+| what was learned | where it goes | who reads it next |
+| --- | --- | --- |
+| a matching idea - a code shape, a flag, an allocator rule | a section in `docs/matching.md` (house style: Problem / Why try it / Result / Example) **and** its row in the `AGENTS.md` "Matching playbook" table | every future session, and the `mwcc-unit-matching` skill |
+| a workflow or tool fact - a gate, an order, a trap in our own tools | the skill that owns that step (`decompile-symbol`, `tu-boundary-discovery`, `symbol-map-editing`) | every agent running that step, subagents included |
+| a unit's own residual - what still differs and why | that unit's file header comment | whoever touches that unit next |
+| a campaign mechanic - registration, batching, orchestration | this file | the orchestrator of the next batch |
+
+Three rules make that real rather than aspirational:
+
+1. **A batch is not closed until its delta is written.** Step 4 of the loop ends with the delta, and the commit
+   carries it - a batch whose commit holds only sources and ranges is a batch whose lesson is about to be
+   paid for again. Write it *before* reviewing the staged diff: that is the moment the numbers are still in
+   hand, and the diff is then the proof that the lesson is committed.
+2. **The skills' generated references have to be in sync**, because a skill is what a fresh session and every
+   subagent actually load:
+
+   ```sh
+   python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py           # regenerate
+   python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check    # exit 1 when stale
+   ```
+
+   The day this rule was written, `references/playbook.md` was **55 lines behind** `docs/matching.md`: the
+   playbook had grown and the skill had not, so the knowledge existed and no agent would ever have loaded it.
+   The check belongs in the same commit as the playbook edit.
+3. **A batch that found nothing new says so.** "Nothing new" is a legitimate delta (it means the playbook
+   already covered it) and belongs in the local-only block; silence does not, because it is indistinguishable
+   from not having looked.
+
 ## Parallelising the loop with subagents
 
 Every step above is subagent-shaped, and the campaign is expected to run several at once. The rule is that
@@ -210,7 +248,10 @@ Practical rules, mostly already in the skills:
   written rather than an afterthought.
 * **Ask for evidence, not prose**: the commands run, the numbers, the first divergence, and the files
   touched - a subagent's report is what the parent verifies with `mt.py diff` and `ninja changes` before it
-  is committed under the parent's name.
+  is committed under the parent's name. Ask it for **knowledge too**: what it tried that did *not* work is
+  often the most valuable line in the reply (it becomes a `no` row or a note in the unit header, so nobody
+  tries it again) - and if a worker had to re-derive something the playbook already knew, that is a playbook
+  bug, fixed in the same commit.
 * **The re-split and the report are the global choke points** (6-12 minutes and a full-repo rebuild). Batch
   the work that needs them: many proposals in, one registration, one re-split, one report - then fan out
   again on step 2.
@@ -233,10 +274,17 @@ the index and the ledger; what it must not do is the reading-heavy work itself.
 6. Fan out step 2, one subagent per unit, each in its own worktree if it will also run `ninja`.
 7. Re-derive every claim cheaply, per unit: `ledger.py unit`, a fresh report, `ninja changes`, `mt.py diff`.
    A number that does not reproduce is not a result.
-8. Commit the batch (standing approval), update the local-only block, back to 1.
+8. Record the batch's **knowledge delta** (see "The knowledge delta": playbook row + `docs/matching.md`
+   section, the skill that owns the step, the unit headers, or "nothing new" in the block), run
+   `sync_reference.py --check`, then commit the batch (standing approval) and update the local-only block.
+   Back to 1.
 
 **What it has to weigh**
 
+* **The playbook is the compounding asset, and the orchestrator is its librarian.** It owns the
+  `AGENTS.md` table and `docs/matching.md`, it refuses to close a batch whose delta is unwritten, and it runs
+  `sync_reference.py --check` so the skills keep carrying the knowledge - a stale generated reference is a bug
+  that makes every future subagent pay again for something this campaign already knows.
 * **Its own context is the scarce resource.** It reads the ledger, subagent summaries, `git diff --stat` and
   the numbers - not source files and not disassembly. Every read-heavy question is cheaper as a subagent's
   answer than as its own context.
@@ -304,6 +352,9 @@ the index and the ledger; what it must not do is the reading-heavy work itself.
 ## What "done" means
 
 * Per symbol: attributed, decompiled, ≥ 80 %, committed, and counted by the ledger.
+* Per batch: every symbol it set out to close is closed (or recorded `partial` with its residual), its ranges
+  measure no worse than before, and its **knowledge delta** is committed - a playbook row, a skill line, a unit
+  header, or an explicit "nothing new".
 * Per unit: every symbol it owns is closed (or recorded `partial` with its residual), and its ranges measure
   no worse than before.
 * Campaign: `python tools/units/ledger.py` reports no unclaimed symbol, and the remaining sub-100 % units

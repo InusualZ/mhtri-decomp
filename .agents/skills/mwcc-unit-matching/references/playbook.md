@@ -597,3 +597,58 @@ not a private "relocation table"), and its `RSOModule` layout confirmed every of
 derived by hand, with real field names. It is **not** codegen evidence (idea 17), its annotations mix SDK
 names with Ghidra placeholders, and a `splits.txt` range taken from it still has to be measured (idea 23).
 Recipes and the full worked example: `docs/memory-dump.md`.
+
+## 26. The target's section is part of the match
+
+Problem: a unit can be instruction-identical and relocation-identical and still measure as *unmatched*, because
+the code landed in the wrong section. The compiler emits `.text` by default; the map and the split object may
+say something else - `.init` for the MSL runtime and the boot code.
+
+Why try it: objdiff pairs sections, so a `.text`-vs-`.init` mismatch reports `fuzzy_match_percent: None`
+while the per-function diff shows every row equal. That is the worst kind of false negative: the diff view says
+the code is right and the report says nothing matched, which reads like "not decompiled yet".
+
+Result: `__declspec(section ".init")` on the definition puts the function in the target's section, and the
+unit then measures 100 %.
+
+Example: `src/Runtime.PPCEABI.H/memset.c` (`memset`, `.init` 0x80004350-0x80004380, 48 B / 12 instructions).
+Plain C produced `.text` + `.rela.text` where the target object has `.init` + `.rela.init`; everything else
+agreed (`memset` at offset 0, one `R_PPC_REL24` to `__fill_mem` at 0x14, both 48 B) and the report said
+`None`. With the declspec the object carries `.init`/`.rela.init` and the unit reads `fuzzy_match_percent
+100.0`, `matched_code 48/48`. Confirm with `tools/elf/elfsect.py`: the forced section plus `.rela.<section>`,
+and **no** `.mwcats.<section>` - that one shows up when the flags you test with omit the cats pragma, so test
+with the whole flag list from `mt.py info`.
+
+## 27. Same instructions, different order names the `-O` level - probe both, per unit
+
+Problem: the instruction multiset and the relocations agree, but independent instructions are swapped or
+split across registers - typically the epilogue's `lwz r0,0x14(r1)` (LR reload) and the function's real last
+load. It reads like a scheduling residual with no lever, and source rewrites do nothing.
+
+Why try it: the schedule is a property of the `-O` level, and the project default (`-O4,p` in `cflags_base`)
+is not what every unit wants. It is also **not one setting for the build**: of the six units reconstructed so
+far, `-O3` is right for Camellia, RSO, `g3d` and `lobby`, while `-O4,p` is right for `OS/OSAlarm.c` and
+`NetworkWiiMediator.c` - under the wrong one the instructions come out reordered (g3d, lobby) or with the
+`li r0,-1` no longer hoisted above the stores (OSAlarm).
+
+Why the probe comes first: the target function can be diffed **before** the unit is registered, which saves a
+re-split (minutes) per guess. It sits inside the `auto_*` object covering its region at `offset = function
+address - blob base`, and the base is in the object's own name - region blobs are `auto_<n>_<BASE>_text.o`,
+per-function objects are `auto_fn_<ADDR>_text.o`:
+
+```sh
+# auto_03_80458A60_text.o covers 0x80458A60..., so 0x804CBC50 is at offset 0x731F0
+build/binutils/powerpc-eabi-objdump.exe -d --section=.text build/RMHE08/obj/auto_03_80458A60_text.o
+#     its window for 0x804CBC50-0x804CBC60 is offset 0x731F0-0x73200
+```
+
+Compile the candidate source under both levels into a scratch directory and compare that window: the level
+that reproduces it byte-for-byte (mnemonic + operands, reloc names normalised) is the one for the per-library
+`cflags_*` override.
+
+Example: `src/g3d/g3d_resanmamblight.c` (`fn_800680A8`, 0x24 B / 9 instructions). Under `cflags_base`
+(`-O4,p`) the unit measured 97.56 % with `lwz r0,0x14(r1)` before `lwz r3,0xc(r3)`; the same source under
+`-O3` is byte-identical (100 %), now `cflags_g3d`. The same two-variant probe then landed
+`src/OS/OSAlarm.c` (`-O4,p` identical, `-O3` differs) and `src/lobby/lobby_scene.c` (`-O3` identical) at
+100 % on their first registration. `tools/flags/optsweep.py` cannot see any of this: it reports frame sizes,
+so a frame-equal sweep row is not evidence about instruction order.
