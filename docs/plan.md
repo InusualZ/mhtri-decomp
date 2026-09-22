@@ -280,6 +280,26 @@ session renames it when evidence appears - map, source, `splits.txt` and `config
 Order: ascending address, module by module, so each batch's ranges are contiguous and its re-split buys the
 most coverage. Source writing (steps 2-3 of the loop) follows behind, unit by unit, in the same order.
 
+**Status (batch 6): the tool exists and the first pass is applied.** `tools/units/attribute.py` implements
+`plan`/`apply` as above; the first unit is `src/auto/80040598_fn_80040598.cpp` (`.text`
+0x80040598..0x800408A8, 17 functions, 784 B, seam unproven - the region offers no narrow strong boundary
+evidence), taking the ledger to **300 covered / 20 224 unclaimed** with the linked DOL unchanged (`ok` green,
+0 regressions). Three things the first pass taught, all now in the tool:
+
+* **The partition is evidence-first, not seed-first.** Walking seed by seed with `tudiscover`'s closure turns
+  a region with no anchors into one unit per *function* (17 units of 4-40 B here), which is certainly wrong.
+  The right shape is: one proposal per maximal unclaimed run, cut only at seams a narrow (<= 4 cuts) strong
+  observation pins, then repaired for TU shape - a piece under `--min-bytes` joins its neighbour, a piece over
+  `--max-bytes` is split and *flagged as a guess*.
+* **A claim the object does not emit is worse than no claim** (playbook 23): so `apply` writes `.text` only and
+  prints the data runs it saw as comments, for the measured second pass. `extab`/`extabindex` follow the same
+  rule even though they look mechanical - the fragments must pair by (section, offset) or they cost score.
+* **Two silent-failure traps, both now loud.** `configure.py` is CRLF and `splits.txt` is LF, so a replacement
+  anchored on the wrong line ending does nothing at all; and dtk refuses a `progress_category` that is not
+  declared in `config.progress_categories` (`Progress category 'auto' missing...`), which fails the *next*
+  `ninja` rather than the registration. Both are asserted in the tool, and `apply` is idempotent (a unit
+already in `splits.txt` is skipped).
+
 ## The knowledge delta - the playbook is the real product
 
 The campaign's output is not only closed symbols, it is the accumulated *method*. A trick that closed one

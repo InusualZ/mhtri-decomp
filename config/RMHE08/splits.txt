@@ -24,6 +24,11 @@ sys_mem.cpp:
 	extabindex  start:0x8001E558 end:0x8001E588
 	.text       start:0x80040478 end:0x80040598
 
+auto/80040598_fn_80040598.cpp:
+	extab       start:0x80006810 end:0x80006820
+	extabindex  start:0x8001E588 end:0x8001E5A0
+	.text       start:0x80040598 end:0x800408A8
+
 g3d/g3d_resanmamblight.c:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68

@@ -398,6 +398,16 @@ def MatchingFor(*versions):
 config.warn_missing_config = True
 config.warn_missing_source = True
 config.libs = [
+
+    {
+        "lib": "auto",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "auto",
+        "objects": [
+            Object(NonMatching, "auto/80040598_fn_80040598.cpp"),
+        ],
+    },
     {
         "lib": "Runtime.PPCEABI.H",
         "mw_version": "Wii/1.3",
@@ -559,7 +569,8 @@ def link_order_callback(module_id: int, objects: List[str]) -> List[str]:
 # Optional extra categories for progress tracking
 # Adjust as desired for your project
 config.progress_categories = [
-    ProgressCategory("game", "Game Code"),
+
+    ProgressCategory("auto", "Auto (bulk attribution)"),    ProgressCategory("game", "Game Code"),
     ProgressCategory("sdk", "SDK Code"),
 ]
 config.progress_each_module = args.verbose
