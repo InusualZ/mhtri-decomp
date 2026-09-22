@@ -36,6 +36,7 @@ Pl/pl_master.cpp:
 	extab       start:0x8001265C end:0x800126CC
 	extabindex  start:0x8002F808 end:0x8002F8B0
 	.text       start:0x8026BA1C end:0x8026FFBC
+	.data       start:0x805C5FA0 end:0x805C5FC4
 
 Pl/pl_skill.cpp:
 	extab       start:0x800126D4 end:0x8001280C
@@ -70,6 +71,7 @@ Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 	extab       start:0x8001E3F0 end:0x8001E400
 	extabindex  start:0x8003F174 end:0x8003F18C
 	.text       start:0x80457490 end:0x804578FC
+	.data       start:0x8060E8A0 end:0x8060E8E4
 
 OS/OSAlarm.c:
 	.text       start:0x804CBC50 end:0x804CBC60

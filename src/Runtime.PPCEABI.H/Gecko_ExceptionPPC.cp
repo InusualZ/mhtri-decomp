@@ -57,23 +57,44 @@
  *      (0x18) - two entries, for `ExPPC_FindExceptionRecord` and `ExPPC_NextAction`, with the empty action
  *      list of a function that can unwind but has no cleanups - and our exceptions-off build has neither.
  *      Compiling this file with `-Cpp_exceptions on` reproduces both sections byte-for-byte (relocations
- *      included) with `.text` unchanged. It cannot be a lib-wide flag: the same lib's
+ *      included) with `.text` unchanged, re-checked with `objcopy --only-section` + `cmp` (extab 16 B,
+ *      extabindex 24 B, both identical). It cannot be a lib-wide flag: the same lib's
  *      `__init_cpp_exceptions.cpp` *gains* extab/extabindex under it while its target object has none, so it
  *      belongs in the object's own `extra_cflags`.
  *
- * Residual / open items:
- *   - `__register_fragment` 93.68 %: the only difference left is the order of two independent preheader
+ * Residual / open items (all measured against the target object this session):
+ *   - **The unit's real residual is symbol pairing, not code.** `fragmentinfo` is the only reference the
+ *     target object spells differently (`fragmentinfo_806F4B48` vs our `fragmentinfo`), and `objdiff`
+ *     compares an undefined relocation target by name: it costs 1.58 points on `__register_fragment`
+ *     (92.11 -> 93.68) and 1.5 on `__unregister_fragment` (98.5 -> 100). The target object is simply stale -
+ *     it was split before the map renamed `.bss:0x806F4B48` to `fragmentinfo` (target object 09:52, symbols.txt
+ *     10:23), and dtk names unclaimed
+ *     relocation targets from the map (the sibling `jumptable_8060E8A0` carries its map name), so a re-split
+ *     fixes it. Do **not** claim `.bss 0x806F4B48-0x806F4CC8`: it would add a 0x180 `.bss` this object does
+ *     not have and drop the unit's `matched_data` (same decision as the lib's unclaimed
+ *     `__global_destructor_chain`, `.sbss` 0x80794DF8).
+ *   - The three walkers are `static`, so objdiff finds no counterpart for the map's `fn_80457504`,
+ *     `fn_8045759C` and `fn_8045774C` and scores all three 0 %: with the map renamed to this file's mangled
+ *     names (a rename, not a source edit - the code is byte-identical either way) they measure 100.0, 100.0
+ *     and 99.86 %, and the unit goes from 9.82 % (1/5 functions, 40/1132 B) to ~99.5 %. `fn_8045670C` has
+ *     the same shape (see below).
+ *   - `__register_fragment` 93.68 %: the only code difference left is the order of two independent preheader
  *     instructions - retail `addi r5,r5,fragmentinfo@l` (the pointer) before `li r6,0` (the index), ours the
- *     reverse. A dozen source shapes for the declaration and initialisation of `f` and `i` (declaration
- *     order, a comma for-init in both orders, separate statements, `while`, indexed `f[i]`) either keep the
- *     retail register assignment with our order or flip the order *and* the registers (r6/r5 swapped,
- *     91.05 %). No `-opt` lever moves it either (`noloop`/`nostrength`/`nolifetimes`/`nodeadcode` unchanged,
- *     everything else regresses). 76/76 B, relocations identical.
- *   - Two references pair badly only because their symbols live in the auto blob today, not in the code:
- *     `fragmentinfo` (.bss 0x806F4B48) is referenced as `fragmentinfo_806F4B48` and the local jump table as
- *     `jumptable_8060E8A0`, so objdiff counts those `lis`/`addi` displacements as mismatches. Claiming
- *     `.bss 0x806F4B48-0x806F4CC8` and `.data 0x8060E8A0-0x8060E8E4` in `splits.txt` would pair them; with
- *     the names aligned the unit is 4/5 functions at 100 %.
+ *     reverse; 76/76 B, 19/19 ins, relocations identical. 35 source shapes (declaration order, comma for-init
+ *     both ways, separate statements, initialiser instead of for-init, `while`, `do`/`while`, `goto`, indexed
+ *     `f[i]`/`fragmentinfo[i]`, `f + i`, pointer-end compare, literal and cast bound, `f += 1`, reversed and
+ *     swapped increments, `!f->active`) leave it untouched or move registers too (89.47 / 86.05 / 9.68 %).
+ *     `-O4,p` emits the counter init before the SDA address `addi` for every shape: a preheader scheduling
+ *     tie-break, not reachable from the source. No `-opt` lever moves it either (`noloop`/`nostrength`/
+ *     `nolifetimes`/`nodeadcode` unchanged, everything else regresses).
+ *   - `.data 0x8060E8A0-0x8060E8E4` (0x44) is this file's jump table and is unclaimed: only
+ *     `ExPPC_NextAction` uses it (3 rows - the `lis`/`addi` base and the `lwzx`), and `objdiff` sees our
+ *     compiler-local `@204` against the map's `jumptable_8060E8A0`, which is the 99.86 %. Claiming the range
+ *     should pair it by (section, offset) - this very object's `extabindex` relocations already pair that way
+ *     (target `@etb_8001E3F0`/`@etb_8001E3F8` against our `@134`/`@205`, both `extab`-local, 100 %), and
+ *     `RSO/runtime`'s claimed `.data` pairs too (`@1845` vs `@176`) - so expect `ExPPC_NextAction`
+ *     99.86 -> 100. This object loads no `.sdata2` or `.sdata` constant (no such section, no pool
+ *     relocation), so there is nothing else to claim.
  *   - `fn_8045670C` is MSL's `terminate` - three instructions tail-calling the SDA's terminate handler. The
  *     reference below uses the map's generated name so the relocation pairs; renaming it is the usual two
  *     edits (symbols.txt + this file).
