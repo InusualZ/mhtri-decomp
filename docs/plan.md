@@ -252,6 +252,13 @@ Practical rules, mostly already in the skills:
   often the most valuable line in the reply (it becomes a `no` row or a note in the unit header, so nobody
   tries it again) - and if a worker had to re-derive something the playbook already knew, that is a playbook
   bug, fixed in the same commit.
+* **Audit the shared files after every subagent, before trusting its report**:
+  `git diff --stat config/RMHE08/splits.txt configure.py config/RMHE08/symbols.txt AGENTS.md`. A read-only
+  brief is not a guarantee - in batch 2 a scout added ranges to `splits.txt` (correct, and kept, but it could
+  as easily have been wrong) - and the orchestrator is the only writer that can be held to it.
+* **Cap the reply.** Ask each subagent for a fixed-size answer ("HARD LIMIT 30 lines, tables only, no command
+  transcripts"): the orchestrator's context is what a long campaign spends, and a 200-line report costs the
+  next three batches. Ask for the numbers, the one-line evidence, and what it tried that did *not* work.
 * **The re-split and the report are the global choke points** (6-12 minutes and a full-repo rebuild). Batch
   the work that needs them: many proposals in, one registration, one re-split, one report - then fan out
   again on step 2.
@@ -330,6 +337,10 @@ the index and the ledger; what it must not do is the reading-heavy work itself.
 * **Ascending address**, because the DOL's layout groups a module's code and data: a TU discovered at one
   address usually runs into the next unclaimed symbols, and `tudiscover` works from an address.
 * **Finish a TU before starting the next**, so one re-split covers all of its functions.
+* **Size the batch by the re-split, not by a symbol count.** Register a whole island once - the range, and
+  the `extab`/`extabindex`/data fragments that come with it - then fill its functions over several batches:
+  a source-only change needs no re-split at all. Batch 2 registered `main.cpp` (38 functions, 4448 B) in one
+  step and wrote 20 of them; the remaining 18 are pure source work on an already-claimed range.
 * **Calibration first**: the first ~20 symbols should be small ones with known names (the runtime dump has
   real SDK names for a good fraction of them). They validate the loop and the 80 % bar cheaply; a
   `fn_*` blob nobody can name is the worst place to start.

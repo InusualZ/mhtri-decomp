@@ -266,6 +266,14 @@ cflags_lobby = [
     "-O3",
 ]
 
+# main flags (src/main.cpp). Evidence in the lib entry below: -O3, and -inline auto has to go, because the
+# retail main.cpp keeps its tiny file-local calls (fn_8003F554 out of fn_8003F52C/fn_8003F564) and does not
+# inline them.
+cflags_main = [
+    *[f for f in cflags_lobby if f != "-inline auto"],
+    "-inline off",
+]
+
 # Camellia flags. Evidence-backed per-object overrides for Camellia/camellia.c, which does not match with
 # the cflags_runtime defaults:
 #   * the retail object has no stmw/lmw -- it calls the EABI _savegpr_14/_restgpr_14 helpers
@@ -466,6 +474,26 @@ config.libs = [
         "host": False,
         "objects": [
             Object(NonMatching, "lobby/lobby_scene.c"),
+        ],
+    },
+    {
+        # The game root file (main.cpp). New lib because nothing registered is a game-root file.
+        #
+        # Flags, measured on the batch-2 source with the real command line (all numbers are that unit's
+        # per-symbol match, before -> after):
+        #   -O4,p -> -O3            main 71.12 -> 96.70, fn_8003FC64 65.62 -> 99.58,
+        #                           change_widemode_req__FUc 58.00 -> 100.00, fn_8003F58C 79.78 -> 90.81
+        #   -inline auto -> off     fn_8003F52C and fn_8003F564 74.00 -> 100.00 (retail keeps the out-of-line
+        #                           call to fn_8003F554), change_widemode_req_default__Fv 21.18 -> 100.00
+        #   no -func_align needed   with -O3 the functions pack on 4 B boundaries as the target does; -O4,p
+        #                           implies -func_align 16 and would need a 4-byte override
+        #   -use_lmw_stmw           absent from this 4448 B range in the target (no lmw/stmw)
+        "lib": "main",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "main.cpp"),
         ],
     },
 ]

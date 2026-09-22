@@ -652,3 +652,46 @@ Example: `src/g3d/g3d_resanmamblight.c` (`fn_800680A8`, 0x24 B / 9 instructions)
 `src/OS/OSAlarm.c` (`-O4,p` identical, `-O3` differs) and `src/lobby/lobby_scene.c` (`-O3` identical) at
 100 % on their first registration. `tools/flags/optsweep.py` cannot see any of this: it reports frame sizes,
 so a frame-equal sweep row is not evidence about instruction order.
+
+The level also decides **function packing**, which is a second and independent reason to probe it: `-O4,p`
+implies `-func_align 16`, so under it every function after the first moves to the next 16-byte boundary. Which
+one a unit wants is visible in its target object - `Runtime.PPCEABI.H`'s five objects are all `.init
+align 2**2` and `memcpy.o` packs two functions contiguously, so `-func_align 4` was required there (landed as
+`#pragma function_align 4` in `src/Runtime.PPCEABI.H/memcpy.c`, because `__start.o` in the same lib does want
+16-byte function starts). A `-O` change that fixes an instruction order but moves every symbol after the
+first is not a fix: check the section alignment and the function offsets too.
+
+## 28. A kept `bl` to a tiny static names the unit's inlining setting
+
+Problem: the target calls a small file-local function the source could just as well inline
+(`bl fn_8003F554`), while our build inlines it away - the callee has no counterpart in our object and the
+caller comes out an instruction short, shifting every register after it. It reads as a missing helper, so the
+first instinct is to hunt for a source shape that suppresses the inline.
+
+Why try it: `-inline auto` in `cflags_base` inlines eagerly, and not every retail unit was built that way
+(`-inline off`, or a threshold we cannot see). The inline setting is a per-library flag like the `-O` level,
+and a `#pragma` can scope it to the one function that needs it.
+
+Result: for the `main` lib (batch 2), `-O3` **plus `-inline off`** took `fn_8003F52C` and `fn_8003F564` from
+74 % to 100 % (retail keeps their `bl fn_8003F554`), `change_widemode_req_default__Fv` from 21.18 % to 100 %,
+and `main` itself from 71.12 % to 96.73 %. Two spelling traps came out of the same batch: `#pragma peephole
+on/off` is honoured (it is what keeps retail's unfused `srwi`+`clrlwi` in `change_widemode_req_default__Fv`),
+while `opt_peephole`/`peep` parse and do nothing, and whole-unit `-opt nopeephole` cost `main` 2.2 points -
+scope the pragma to the function that needs it, and never assume a pragma name works because it parses.
+
+Example: the inline half belongs in the library's flags
+
+```python
+cflags_main = [
+    *[f for f in cflags_lobby if f != "-inline auto"],
+    "-inline off",
+]
+```
+
+and the peephole half from the same batch is a pragma, scoped to the function that needs it because
+`-opt nopeephole` for the whole unit cost `main` 2.2 points:
+
+```c
+#pragma peephole off
+void change_widemode_req(unsigned char mode);
+```
