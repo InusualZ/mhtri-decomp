@@ -302,6 +302,12 @@ Notes:
 * `mwcc_sjis` (sjiswrap) wraps the compiler, so keep source files UTF-8 with no BOM.
 * If results look impossible, the build tree is probably stale: `rm -rf build/RMHE08` then
   `python configure.py && ninja`.
+* The **`dol split` is the slow step** and it re-runs whenever `symbols.txt`, `splits.txt` or the DOL
+  changes - so a rename costs a re-split, which is why renames ride one batch (see the batch rule in
+  `docs/plan.md`). It is **~18 s as configured** and **200-400 s with the asm dump on**: the dump is on
+  demand (`write_asm: false` + `python tools/splits/dump_asm.py`) because only `tudiscover` reads
+  `build/RMHE08/asm/`. Measurements, the link-ordering pitfall and the recipes for reading `.ninja_log`:
+  `docs/build-performance.md`.
 
 Verifying whether a unit, function or symbol matches is its own procedure — per-symbol objdiff plus raw ELF
 evidence, and a specific set of traps (`complete_code_percent` lies, `ninja build/RMHE08/ok` cannot isolate
