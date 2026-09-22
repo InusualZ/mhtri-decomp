@@ -54,6 +54,18 @@ the bookkeeping.
 
 ### 0. Once, before the first symbol
 
+* **Commits need no per-batch approval** (owner grant, 2026-09-21): the orchestrator commits its own campaign
+  work as it goes - one commit per batch, carrying the sources, the registration, the flags it proved and the
+  knowledge delta. What is *not* committed is anything that is not a finished piece of work: probes, scratch,
+  half-registered units, another stream's files. History is never rewritten and nothing is ever pushed.
+* **Stop conditions** - the orchestrator does not stop because a batch ended; it stops when one of these is
+  true, and each stop leaves the block, the ledger and `ok` consistent:
+  1. the campaign target it was given ("the next N symbols") is closed - report the delta and the new totals;
+  2. a gate blocks it: an escalation-queue item only the owner can decide, a regression it cannot fix, or a
+     check that keeps failing (three attempts on one symptom is the limit - report the attempts, not a fourth);
+  3. its own working budget runs out (context or turn): stop at a verified boundary - never mid-registration,
+     with a dirty `splits.txt`/`configure.py` that has not been through a re-split and a report.
+
 * **Build the ledger** (approved): `tools/units/ledger.py`, which *derives* progress from the repo instead of
   keeping its own state, so there is nothing to sync or commit -
 
@@ -71,6 +83,10 @@ the bookkeeping.
   without asking per symbol. `prepcommit.py` still stages explicit paths, still writes the message, still
   refuses to commit by itself, and the staged diff is still read before `git commit -F`. If the standing
   approval is ever withdrawn, stop after step 3 and hand the prepared commit over instead.
+
+  (Superseded by the owner's later grant in "0. Once, before the first symbol": commits need no approval, and
+  `prepcommit.py` is used for its checks - explicit paths, refusals, the DOL gate, the LOCAL-ONLY round trip -
+  not as an approval gate.)
 * **One worktree per stream** (`git worktree add -b <stream> ../mhtri-dtk.ws-<stream> <base>`), so a second
   `ninja` cannot race this one and dirty files are not shared.
 * **`ninja baseline` once**, so `ninja changes` has something to compare against for the rest of the run.
