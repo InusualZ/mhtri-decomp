@@ -316,7 +316,11 @@ one unit, a function missing from the report is 0 %). Follow skill **`.agents/sk
    `Wii/1.0` for REL-type code, `Wii/1.3` for runtime-style code — **not** the GC compilers) and an
    appropriate `cflags` group (`cflags_runtime` for runtime units, `cflags_base` otherwise).
    Start with `Object(NonMatching, "Dir/file.c")`.
-3. **Create `src/Dir/file.c`** (and headers under `include/` if needed).
+3. **Create `src/Dir/file.c`** (and headers under `include/` if needed) - **in the same change as the
+   registration, because a unit's source file is mandatory.** A stub is enough and is a real deliverable: it
+   carries the unit's header comment (what it is, its range, why it sits there, what is still unknown), so the
+   unit compiles, appears in the build and is comparable from the first commit. Registering a unit without a
+   source leaves the build warning about it and its object unbuildable - a bug, not a state.
 4. **Add the splits** to `config/RMHE08/splits.txt`: one line per section with exact `start:`/`end:`
    addresses, including the small `.ctors`/`.dtors`/`.sdata` fragments that runtime units own (Wii linkers
    use `.ctors$10`, `.dtors$10`, `.dtors$15` — see `docs/getting_started.md`, "GC 2.7+ and Wii linkers").

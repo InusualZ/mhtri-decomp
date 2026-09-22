@@ -233,10 +233,14 @@ attribution is now the campaign's **primary objective**: it is the cheap half (n
 is what makes everything else legible. With every address owned, a unit's score in `report.json` means
 something, and a batch's source work has a home before it starts.
 
-**What "attributed" means**: a `splits.txt` block whose ranges cover the symbol's section and address, plus a
-`configure.py` entry for that unit (lib, `mw_version`, cflags, `Object(NonMatching, ...)`). The source file may
-be *absent* - the build warns, the report scores that unit 0 % - because attribution is not a claim that the
-source exists. Ranges never overlap a registered unit's.
+**What "attributed" means**: a `splits.txt` block whose ranges cover the symbol's section and address, a
+`configure.py` entry for that unit (lib, `mw_version`, cflags, `Object(NonMatching, ...)`) **and the unit's
+source file, whose existence is mandatory - not optional**. A stub is enough, and it is what makes the unit
+real: it compiles, it appears in the build, and its header comment (what it is, its range, why it sits there,
+what is still unknown and how reliable the seam is) is the note the next session needs. Nothing is registered
+bare - a `Missing source file` warning from the build is a bug, not a state. The four registrations that
+violated this were fixed the day the rule was written (`Pl/pl_{master,skill,act}.c`,
+`Runtime.PPCEABI.H/__init_cpp_exceptions.cpp`). Ranges never overlap a registered unit's.
 
 **Naming**: the retail file name is only available where evidence exists (`Panic(__FILE__)`, a shared pool, the
 runtime dump, an `extabindex` group). Everywhere else the unit gets an honest placeholder under `src/auto/`
@@ -249,9 +253,9 @@ session renames it when evidence appears - map, source, `splits.txt` and `config
 1. `python tools/units/attribute.py plan <start> <end>` - `tudiscover`'s proposals for every unclaimed address
    in the range, grouped into units, with the data ranges each would own and the boundary confidence
    (`certainly one TU` vs `weak signals` only).
-2. `python tools/units/attribute.py apply <start> <end> [--dry-run]` - append the `splits.txt` blocks and the
-   `configure.py` entries, code ranges first, `extab`/`extabindex` placed from the decoded records, never
-   overlapping an existing range. No source files yet.
+2. `python tools/units/attribute.py apply <start> <end> [--dry-run]` - append the `splits.txt` blocks, the
+   `configure.py` entries and **the unit's stub source in the same commit** (mandatory - see above), code
+   ranges first, `extab`/`extabindex` placed from the decoded records, never overlapping an existing range.
 3. One re-split per batch, then the ledger is the acceptance test: **`covered` must equal
    `20 524 - unclaimed`** for the range claimed, and `ninja changes` must show no *real* unit regressed (the
    `auto_*` scaffold losing symbols is expected and is not a regression).
