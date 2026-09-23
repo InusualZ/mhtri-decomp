@@ -537,14 +537,19 @@ proof has to contain (detail: `.pi/notes/flip-round-1.md`):
    `__init_cpp_exceptions_reference` (the symbol is absent from the ELF) and every later entry shifts one slot,
    while `.dtors` is off by one entry only. `sys_mem` shows the same shape in `extab`/`extabindex`
    (`_eti_init_info` 0x8003F1C8 -> 0x8003F17C, 5 536 639 differing DOL bytes) even though its fragments are
-   The lead that fits every observation: dtk's stand-in `auto_*` blobs name their constructor word **`.ctors`**
-   (bare) where a real object spells it **`.ctors$10`** - 90 of 10 813 `auto_fn_*` blobs carry a bare `.ctors`,
-   e.g. `auto_fn_80046B94_text.o` with `R_PPC_ADDR32 fn_80046B94`. The merged `.ctors` is therefore built from
-   two name forms and the order of the two groups decides the table: green, the single `.ctors$10` fragment
-   (`__init_cpp_exceptions`) comes first and the bare group starts with `fn_80046B94` - exactly retail's
-   `.ctors[0]`/`.ctors[1]`; flipped, the groups come out the other way round. The anomaly is on the
-   split/attribution side (a fragment named differently from the original object's), not in the unit - the same
-   "every symbol in its unit" work as the campaign's primary goal. Rejected with evidence on the way: a second
+   **Measured, from the linked ELF after a forced relink:** flipping this unit makes the link *lose* two words -
+   `.ctors` goes from 92 entries to 91 and `.dtors` from 3 to 2 - and of the unit's three words only `.dtors$10`'s
+   survives (0x804566BC is still `.dtors[0]`). They are absent, not reordered. What separates them is what their
+   relocations point at: the dropped `.ctors$10` -> `__init_cpp_exceptions` and `.dtors$15` ->
+   `__fini_cpp_exceptions` are both defined in this same object, while the kept `.dtors$10` ->
+   `__destroy_global_chain` is defined in another unit. The two objects are otherwise equivalent (same section
+   names, sizes, alignment, flags, bytes; our object is the only one in the link list). Two candidate causes
+   were tested and rejected: in-object section order (a copy of our object with the headers permuted to the
+   target's order still loses them, and the source cannot change MWCC's order) and `.rela.*` flags (ours are all
+   0x0 vs the target's 0x40 - uniform, so it cannot explain why one word survives). Next: whether `mwldeppc`
+   drops an unreferenced `_reference` symbol's section - nothing names it, since the startup code walks `.ctors`
+   by address - and whether dtk's synthesised target objects are exempt from that, which would explain why green
+   keeps all three words and only the substituted object loses two.
    object covering those bytes, and object reordering (dtk substitutes in place).
 
 `tools/units/flipcheck.py` checks all three conditions per unit (claim vs emitted sections, sizes/alignment,
