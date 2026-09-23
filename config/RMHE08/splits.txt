@@ -211,6 +211,137 @@ auto/80154FAC_fn_80154FAC.c:
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8
 
+auto/801FBB64_fn_801FBB64.c:
+	extab       start:0x80010AD4 end:0x80010ADC
+	extabindex  start:0x8002CF28 end:0x8002CF34
+	.text       start:0x801FBB64 end:0x801FBF78
+
+auto/801FBF78_fn_801FBF78.cpp:
+	extab       start:0x80010ADC end:0x80010D7C
+	extabindex  start:0x8002CF34 end:0x8002D324
+	.text       start:0x801FBF78 end:0x80201C80
+	.ctors      start:0x8056F35C end:0x8056F360
+
+auto/80201C80_fn_80201C80.c:
+	extab       start:0x80010D7C end:0x80010D84
+	extabindex  start:0x8002D324 end:0x8002D330
+	.text       start:0x80201C80 end:0x80201F60
+
+auto/80201F60_fn_80201F60.c:
+	extab       start:0x80010D84 end:0x80010D8C
+	extabindex  start:0x8002D330 end:0x8002D33C
+	.text       start:0x80201F60 end:0x802020FC
+
+auto/802020FC_fn_802020FC.c:
+	extab       start:0x80010D8C end:0x80010D94
+	extabindex  start:0x8002D33C end:0x8002D348
+	.text       start:0x802020FC end:0x80202394
+
+auto/802027CC_fn_802027CC.c:
+	extab       start:0x80010DB4 end:0x80010DBC
+	extabindex  start:0x8002D378 end:0x8002D384
+	.text       start:0x802027CC end:0x802029B4
+
+auto/802029B4_fn_802029B4.c:
+	extab       start:0x80010DBC end:0x80010F7C
+	extabindex  start:0x8002D384 end:0x8002D624
+	.text       start:0x802029B4 end:0x802074E8
+
+auto/802076D4_fn_802076D4.c:
+	extab       start:0x80010F7C end:0x80011054
+	extabindex  start:0x8002D624 end:0x8002D768
+	.text       start:0x802076D4 end:0x802097E8
+
+auto/802097E8_fn_802097E8.c:
+	extab       start:0x80011054 end:0x8001105C
+	extabindex  start:0x8002D768 end:0x8002D774
+	.text       start:0x802097E8 end:0x8020A058
+
+auto/8020C588_fn_8020C588.c:
+	extab       start:0x80011184 end:0x8001131C
+	extabindex  start:0x8002D930 end:0x8002DB94
+	.text       start:0x8020C588 end:0x8020FE18
+
+auto/8020FE18_fn_8020FE18.c:
+	extab       start:0x8001131C end:0x80011324
+	extabindex  start:0x8002DB94 end:0x8002DBA0
+	.text       start:0x8020FE18 end:0x802103AC
+
+auto/802310D4_fn_802310D4.c:
+	extab       start:0x80011C8C end:0x80011C94
+	extabindex  start:0x8002E9BC end:0x8002E9C8
+	.text       start:0x802310D4 end:0x80233448
+
+auto/80233448_fn_80233448.c:
+	extab       start:0x80011C94 end:0x80011C9C
+	extabindex  start:0x8002E9C8 end:0x8002E9D4
+	.text       start:0x80233448 end:0x80234E9C
+
+auto/80234E9C_fn_80234E9C.c:
+	extab       start:0x80011C9C end:0x80011CA4
+	extabindex  start:0x8002E9D4 end:0x8002E9E0
+	.text       start:0x80234E9C end:0x802373AC
+
+auto/802373AC_fn_802373AC.c:
+	extab       start:0x80011CA4 end:0x80011CAC
+	extabindex  start:0x8002E9E0 end:0x8002E9EC
+	.text       start:0x802373AC end:0x802399C8
+
+auto/802399C8_fn_802399C8.c:
+	extab       start:0x80011CAC end:0x80011CB4
+	extabindex  start:0x8002E9EC end:0x8002E9F8
+	.text       start:0x802399C8 end:0x8023C2D0
+
+auto/8023C2D0_fn_8023C2D0.c:
+	extab       start:0x80011CB4 end:0x80011CBC
+	extabindex  start:0x8002E9F8 end:0x8002EA04
+	.text       start:0x8023C2D0 end:0x8023FC20
+
+auto/8023FC20_fn_8023FC20.c:
+	extab       start:0x80011CBC end:0x80011CC4
+	extabindex  start:0x8002EA04 end:0x8002EA10
+	.text       start:0x8023FC20 end:0x80241558
+
+auto/80241558_fn_80241558.c:
+	extab       start:0x80011CC4 end:0x80011CCC
+	extabindex  start:0x8002EA10 end:0x8002EA1C
+	.text       start:0x80241558 end:0x802430E8
+
+auto/802430E8_fn_802430E8.c:
+	extab       start:0x80011CCC end:0x80011DA4
+	extabindex  start:0x8002EA1C end:0x8002EB60
+	.text       start:0x802430E8 end:0x802485C8
+
+auto/802489D4_fn_802489D4.c:
+	extab       start:0x80011DB4 end:0x80011E6C
+	extabindex  start:0x8002EB78 end:0x8002EC8C
+	.text       start:0x802489D4 end:0x8024C614
+
+auto/8024CA50_fn_8024CA50.c:
+	extab       start:0x80011E8C end:0x80011E9C
+	extabindex  start:0x8002ECBC end:0x8002ECD4
+	.text       start:0x8024CA50 end:0x8024CD8C
+
+auto/8024CD8C_fn_8024CD8C.c:
+	extab       start:0x80011E9C end:0x80011EEC
+	extabindex  start:0x8002ECD4 end:0x8002ED4C
+	.text       start:0x8024CD8C end:0x8024EF60
+
+auto/8024EF60_fn_8024EF60.c:
+	extab       start:0x80011EEC end:0x80011EF4
+	extabindex  start:0x8002ED4C end:0x8002ED58
+	.text       start:0x8024EF60 end:0x8024F0DC
+
+auto/8024F0DC_fn_8024F0DC.c:
+	extab       start:0x80011EF4 end:0x80011EFC
+	extabindex  start:0x8002ED58 end:0x8002ED64
+	.text       start:0x8024F0DC end:0x8024F200
+
+auto/8025C09C_fn_8025C09C.c:
+	extab       start:0x800122B4 end:0x800122BC
+	extabindex  start:0x8002F2F8 end:0x8002F304
+	.text       start:0x8025C09C end:0x8025C27C
+
 Pl/pl_master.cpp:
 	extab       start:0x8001265C end:0x800126CC
 	extabindex  start:0x8002F808 end:0x8002F8B0
