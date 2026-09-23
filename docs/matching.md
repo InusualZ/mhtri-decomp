@@ -1131,6 +1131,12 @@ signature: one flag set cannot be right for a unit and wrong for one function in
 ```c
 #pragma peephole off   /* the whole unit, or a scoped pair around one function */
 ```
+
+**Measure it, do not assume it.** On two units this lever is a *regression*: `auto/800FD718` goes 100.00 -> 98.72
+(`.text` 0x14C -> 0x150) and `auto/80119C44` 99.61 -> 95.88, where it produces the target's `addi r0` but un-folds two
+narrowing stores the peephole was correctly folding. Both targets keep *some* folds, so the pass is not a per-bucket
+property - try it, then keep it only if the measurement agrees.
+
 ## 40. A unit whose retail code keeps unfused multiply-adds needs `-fp_contract off`
 
 **Problem.** Retail keeps `a*b + c` as two instructions (`fmuls` + `fadds`/`fsubs`) where our default `-fp_contract on` emits one fused `fmadds`/`fmsubs`, so the function is a few instructions short and every later register shifts. It reads as a source-shape problem and sends you rewriting expressions that were already right.
