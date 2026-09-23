@@ -37,7 +37,9 @@
  *     .sbss 10:0x807953C9`) and that block also holds PowerCallback/ResetCallback. dtk therefore names the
  *     scaffold symbol `Debug_BBA_807953C8`, and objdiff matches a relocation by name.
  *
- * Residual: the name on the two Debug_BBA SDA21 relocations, and nothing else. All six functions are
+ * Residual: none since the map declares Debug_BBA scope:global (the split then keeps the name, so the two
+ *   SDA21 relocations resolve; with scope:local it spelled them Debug_BBA_807953C8 and both functions were
+ *   98.33 %/97.5 %). All six functions are
  * instruction- and hint-bit-identical (.rela.init identical, 30 relocations) and .init's first 760 bytes
  * match byte for byte - the target's 8 trailing bytes (0x800065B8) are the DOL's link-time padding before
  * __init_hardware, not object content. The mismatch leaves __set_debug_bba at 98.33 % and __get_debug_bba
@@ -87,13 +89,12 @@ extern void __flush_cache(void* addr, u32 size);
 extern void* memcpy(void* dst, const void* src, u32 size);
 extern void* memset(void* dst, int val, u32 size);
 
-/* This file's own static (the map marks it scope:local at .sbss:0x807953C8, and its only users are
-   __set_debug_bba/__get_debug_bba below). The split spells a local symbol's name as <name>_<address>, so the
-   object the linker is given calls it Debug_BBA_807953C8; referencing that name is what makes both the
-   relocations and the link resolve - a probe with it measures 100 % on both functions, and a claim for the
-   byte alone is rejected by the splitter ("Invalid alignment for split: auto_10_807953C9_sbss"). */
-extern u8 Debug_BBA_807953C8;
-#define Debug_BBA Debug_BBA_807953C8
+/* This file's own static: the byte lives in the .sbss scaffold at 0x807953C8, which no unit can claim (a
+   .sbss split has to be 16-byte aligned and that block also holds PowerCallback/ResetCallback), and its only
+   users are __set_debug_bba/__get_debug_bba below. The map declares it scope:global so the split keeps the
+   name instead of spelling a local symbol <name>_<address> - with the suffix the two SDA21 relocations named
+   a symbol the source never defined, which is what the header used to record as this unit's only residual. */
+extern u8 Debug_BBA;
 
 /* Linker-script addresses loaded by __init_registers. */
 extern u8 _stack_addr[];
