@@ -124,6 +124,50 @@ def selftest() -> int:
     check("mangled: C++ method", at.mangled("Pl_Skill_ck__FP4_PLWUs"), True)
     check("mangled: identifier with __ inside", at.mangled("my__thing"), False)
 
+    # --- language (the extension picks the front-end: dtk turns it into -lang=c / -lang=c++) --------
+    # attribute.py reads the verdict from `tools/units/langcheck.py`; these pin the *region* evidence it
+    # feeds it, because a new stub has no target object to read.
+    check("region language: a mangled name in the region",
+          at.region_language({}, {}, ["Pl_Skill_ck__FP4_PLWUs"], 0x1000, 0x1100)["lang"], "c++")
+    graph_callee = {"funcs": {"f1": {"calls": ["Panic__Q24nw4r2dbFPCciPCce", "fn_80041E8C"]}}}
+    v = at.region_language({}, graph_callee, ["f1"], 0x1000, 0x1100)
+    check("region language: a mangled callee is C++/medium", (v["lang"], v["confidence"]), ("c++", "medium"))
+    check("region language: a mangled callee of a foreign function is not evidence",
+          at.region_language({}, {"funcs": {"other": {"calls": ["Panic__Q24nw4r2dbFPCciPCce"]}}},
+                             ["f1"], 0x1000, 0x1100)["lang"], "c")
+    an_cpp = {"source_names": [{"src": "ef_line.cpp", "start": 0x1000, "end": 0x1100}]}
+    check("region language: a .cpp __FILE__ inside the region",
+          at.region_language(an_cpp, {}, ["f1"], 0x1000, 0x1100)["lang"], "c++")
+    check("region language: the same .cpp __FILE__ outside is not evidence",
+          at.region_language(an_cpp, {}, ["f1"], 0x2000, 0x2100)["lang"], "c")
+    check("region language: a .c __FILE__ inside is C/high",
+          at.region_language({"source_names": [{"src": "TPL.c", "start": 0x1000, "end": 0x1100}]},
+                             {}, ["f1"], 0x1000, 0x1100)["confidence"], "high")
+    check("region language: no evidence is C and low",
+          (at.region_language({}, {}, ["fn_80040598"], 0x1000, 0x1100)["lang"],
+           at.region_language({}, {}, ["fn_80040598"], 0x1000, 0x1100)["confidence"]), ("c", "low"))
+    check("region language: a missing source_names key is not a crash",
+          at.region_language({}, None, ["fn_80040598"], 0x1000, 0x1100)["lang"], "c")
+
+    langcxx = at.region_language({}, {}, ["Pl_Skill_ck__FP4_PLWUs"], 0x1000, 0x1100)
+    stub = {"unit": "auto/800CCFB0_fn_800CCFB0.cpp", "text": [0x800CCFB0, 0x800CD584], "count": 1,
+            "bytes": 0x5D4, "seam": None, "seam_note": None, "cxx": True, "runs": {},
+            "language": at.lc.classify([], [], ["ef_line.cpp"])}
+    check("the placeholder derives C++ from the region verdict",
+          at.placeholder("Pl_Skill_ck__FP4_PLWUs", 0x1000, langcxx["lang"] == "c++"),
+          "auto/00001000_Pl_Skill_ck__FP4_PLWUs.cpp")
+    check("the stub header states the language and its evidence",
+          "Language: C++ (high: `__FILE__` string `ef_line.cpp`)" in at.stub_text(stub), True)
+    check("the stub header states an unevidenced C default as such",
+          "Language: C (low: no evidence)" in at.stub_text(
+              {"unit": "auto/x.c", "text": [0, 4], "count": 1, "seam": None, "seam_note": None,
+               "cxx": False, "language": at.region_language({}, {}, ["fn_1"], 0, 4)}), True)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        at.human([stub])
+    check("the plan's human line carries the language verdict",
+          "C++ (high: `__FILE__` string `ef_line.cpp`)" in buf.getvalue(), True)
+
     # --- seams -------------------------------------------------------------------------------------
     # six 100-byte functions at 0x1000: cuts are `boundary before function c`, so 1..5 are interior
     FUNCS = [(0x1000 + 0x64 * i, 0x64) for i in range(6)]

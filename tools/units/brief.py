@@ -4,8 +4,10 @@ docs/plan.md 7.3, §5.2. Four workers in separate processes inherit nothing from
 the brief has to be self-contained and has to say the same thing every time. It has exactly six parts:
 
 1. the unit      - path, lib, mw_version, the real cflags, object and target paths, the `.text` range,
-   and the shared headers (`include/**`) that already declare what this unit needs - so it reuses them
-   instead of re-creating them (`tools/units/typeregistry.py`)
+   the **language** (C/C++, from `tools/units/langcheck.py` - the extension decides the front-end, so a
+   worker has to be told which one it is and what that costs), and the shared headers (`include/**`)
+   that already declare what this unit needs - so it reuses them instead of re-creating them
+   (`tools/units/typeregistry.py`)
 2. the inventory - every symbol the unit owns, its address, size and current measured %
 3. the residuals - the unit's file-header comment, so a re-brief never re-derives settled work
 4. the decided   - the flags landed for this lib, and the data ranges deliberately not claimed
@@ -51,7 +53,9 @@ sys.path.insert(0, os.path.dirname(HERE))
 import unitutil  # noqa: E402
 from units import recompile as rc  # noqa: E402
 from units import claims  # noqa: E402
+from units import langcheck as lc  # noqa: E402
 from units import typeregistry  # noqa: E402
+from units import dossier as dossier_mod  # noqa: E402
 
 SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 BAR = 80.0
@@ -406,10 +410,16 @@ def build(main: str, wt: str, unit: str, task: str | None, assume_claim: bool = 
         "source": os.path.join(wt, "src", *name.split("/")),
         "object": obj, "target": target,
         "sections": rng, "flags": tokens, "flag_error": err,
+        # the language verdict: the extension is what picks the front-end, so this is not cosmetic (see
+        # langcheck). `object_verdict` returns lang=None for a missing target and never raises.
+        "language": lc.object_verdict(target),
         "symbols": syms, "below_bar": len(below),
         "task": task, "task_symbols": [s["name"] for s in below] if not task else [],
         "header": header_comment(main, wt, unit),
         "data_queue": data_queue_entries(main, unit),
+        # the binary dossier: the traces the split object already carries (source file, asserts, pool,
+        # jump tables) - rendered as part 2b so a worker starts from the maximum the binary gives
+        "dossier": dossier_mod.build(main, unit, target, ranges=rng, map_symbols=syms),
         "shared_headers": shared_headers(main, wt, unit, [s["name"] for s in syms]),
     }
 
@@ -459,6 +469,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("| edits | **yours only**: change files inside your worktree. MAIN's working tree belongs to the orchestrator, and other workers are often mid-round in it - an edit there blocks every batch gate |")
     lines.append("| sections | %s |" % (", ".join("%s 0x%X-0x%X" % (s, a, e) for s, (a, e, _n) in sorted(rng.items()))
                                         or "(none in splits.txt)"))
+    lines.append("| language | %s |" % lc.language_cell(b.get("language")))
     if b["flags"]:
         lines.append("")
         lines.append("The real command line (flags only; `recompile.py` builds the full one):")
@@ -466,6 +477,8 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("```")
         lines.append(" ".join(b["flags"]))
         lines.append("```")
+    lines.append("")
+    lines.append(lc.brief_paragraph(b.get("language")))
     sh = b.get("shared_headers") or []
     lines.append("")
     lines.append("**Shared headers this unit should reuse** (`docs/plan.md` \u00a76.5 rule 1, AGENTS.md -> "
@@ -507,6 +520,9 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("| `%s` | 0x%X | %s | %s%s |"
                      % (s["name"], s["address"] or 0, s["size"], "n/a" if pct is None else "%.2f" % pct, mark))
     lines.append("")
+    if b.get("dossier"):
+        lines.append(dossier_mod.render(b["dossier"]).rstrip())
+        lines.append("")
     lines.append("## 3 · What is already known (the unit's own header, verbatim)")
     lines.append("")
     lines.append("```c")
@@ -809,6 +825,13 @@ def selftest() -> int:
         check("the brief flags the duplication", "you define these too" in text, True)
         check("the brief tells the worker include/ is read-only",
               "`include/**` is read-only for you" in text, True)
+        # the language verdict rides part 1: the extension picks the front-end, so a worker has to be
+        # told. A fixture with no target object must degrade to 'not on record', never guess or raise.
+        check("an unreadable target leaves the language unrecorded", b["language"]["lang"], None)
+        check("the brief has a language row", "| language | not on record" in text, True)
+        check("the brief still states the language rule", "language is not on record" in text, True)
+        check("the language paragraph cites the language rule's home",
+              "The language comes from the symbol" in text, True)
         plain = build(tmp, tmp, "auto/plain", None)
         check("a unit with no match has an empty shared-header table", plain["shared_headers"], [])
         check("a unit with no match still carries the rule",
@@ -821,6 +844,18 @@ def selftest() -> int:
               [h["header"] for h in hb["shared_headers"]], ["include/nw4r/math.h"])
         check("the brief labels a comment-only hint",
               "your file header names these" in render(tmp, hb, None), True)
+
+    # the real end-to-end case: `auto/800CCFB0` is `ef_line.cpp` (its target object's `__FILE__` string),
+    # registered `.c`. The brief has to name it C++ and hand over the two consequences that cost score.
+    real_target = os.path.join("build", "RMHE08", "obj", "auto", "800CCFB0_fn_800CCFB0.o")
+    if os.path.exists(real_target):
+        rb = build(".", ".", "auto/800CCFB0_fn_800CCFB0", None)
+        check("the real 800CCFB0 brief reads C++/high", (rb["language"]["lang"], rb["language"]["confidence"]),
+              ("c++", "high"))
+        check("it carries the __FILE__ evidence", "ef_line.cpp" in rb["language"]["sources"], True)
+        rtext = render(".", rb, None)
+        check("the brief says this unit is C++", "**This unit is C++**" in rtext, True)
+        check("the brief asks for extern \"C\"", 'extern "C"' in rtext, True)
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:

@@ -46,6 +46,14 @@ fragments and `__init_cpp_exceptions` (112 B) is a stub, so the smallest *unit-s
 `MIN_BYTES_DEFAULT = 288` (below it, a piece is not a file of its own) and
 `MAX_BYTES_DEFAULT = 27436` (above it, a piece is too big and is split, flagged as a guess).
 
+**The language (docs/plan.md, "The language comes from the symbol").** The extension a stub is named
+with is not cosmetic: `dtk` turns it into the front-end flag (`-lang=c` / `-lang=c++`), so a new unit's
+extension decides how it is compiled from its first build. `region_language()` reads the verdict from
+`tools/units/langcheck.py` using the evidence an *unclaimed* region already exposes - the map's mangled
+names, the graph's mangled callees (the disassembly's relocation names), and the `__FILE__` names whose
+referring functions sit inside the region - and, if a region still holds two distinct `__FILE__` names,
+says so, because that is a boundary defect rather than a language one.
+
 **Transactional apply (roadmap 7.20).** `apply` validates the whole batch before writing anything (no
 proposal overlaps another or a range `splits.txt` already owns, no unit twice, every function
 resolvable in the map at the address and size claimed, both `configure.py` anchors present), then
@@ -68,6 +76,7 @@ sys.path.insert(0, str(ROOT / "tools" / "units"))
 
 import tudiscover as td  # noqa: E402  (path set above)
 import sharedfiles as sf  # noqa: E402
+import langcheck as lc  # noqa: E402
 
 SPLITS = ROOT / "config" / "RMHE08" / "splits.txt"
 CONFIGURE = ROOT / "configure.py"
@@ -145,7 +154,28 @@ def placeholder(first: str, addr: int, cxx: bool) -> str:
 
 def mangled(name: str) -> bool:
     """MWCC's C++ mangling puts the argument list after `__` (`fn__Fv`, `Pl_Skill_ck__FP4_PLWUs`)."""
-    return "__" in name and re.search(r"__(F|Q)", name) is not None
+    return lc.mangled(name)
+
+
+def region_language(an, graph, names, t0: int, t1: int) -> dict:
+    """The language verdict for an *unclaimed* region - before any target object exists.
+
+    The extension `placeholder()` picks is not cosmetic: dtk derives `-lang=c`/`-lang=c++` from it, so a
+    wrong one is a wrong compiler front-end from the unit's first build (owner's rule, `docs/plan.md`
+    "The language comes from the symbol"; `tools/units/langcheck.py` is the one implementation). With
+    no object to read, the same evidence comes from what the region already exposes: the map's mangled
+    names, the graph's mangled *callees* (the disassembly's relocation names - exactly the names the
+    target object would carry as undefined), and the `__FILE__` names whose referring functions sit
+    inside `[t0, t1)`.
+    """
+    callees = set()
+    for n in names:
+        rec = (graph or {}).get("funcs", {}).get(n)
+        if rec:
+            callees.update(c for c in rec.get("calls", ()) if lc.mangled(c))
+    sources = [r["src"] for r in (an or {}).get("source_names", ())
+               if r["start"] >= t0 and r["end"] <= t1]
+    return lc.classify([n for n in names if lc.mangled(n)], sorted(callees), sources)
 
 
 def interior_seams(an, lo: int, hi: int) -> dict[int, list[tuple[str, str]]]:
@@ -248,8 +278,10 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
     for lo, hi in runs:
         for lo_i, hi_i, why, note in segments(an, lo, hi, min_bytes, max_bytes):
             names = ordered[lo_i:hi_i]
-            cxx = any(mangled(n) for n in names)
             first_addr = an["addr"][lo_i]
+            end_addr = an["addr"][hi_i - 1] + an["size"][hi_i - 1]
+            language = region_language(an, graph, names, first_addr, end_addr)
+            cxx = language["lang"] == "c++"
             data = td.data_runs(an, labels, lo_i, hi_i)
             data.update(td.extab_runs(an, labels, graph, lo_i, hi_i))
             out.append({
@@ -260,6 +292,7 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
                 "count": len(names),
                 "bytes": sum(an["size"][lo_i:hi_i]),
                 "cxx": cxx,
+                "language": language,
                 "seam": None if why is None else [{"kind": k, "why": w} for k, w in why],
                 "seam_note": note,
                 "runs": data,
@@ -272,8 +305,12 @@ def human(proposals: list[dict]) -> None:
         t0, t1 = p["text"]
         seam = "pinned: " + "; ".join(w for _, w in [(s["kind"], s["why"]) for s in p["seam"]]) \
             if p["seam"] else "no evidence - one run, seam is unproven"
+        lang = p.get("language") or {}
+        tag = "C++" if p["cxx"] else "C"
+        if lang.get("lang"):
+            tag += " (%s: %s)" % (lang.get("confidence"), lc.evidence_text(lang))
         print("%-46s 0x%08X..0x%08X  %3d fn  %6d B  %s" %
-              (p["unit"], t0, t1, p["count"], p["bytes"], "C++" if p["cxx"] else "C"))
+              (p["unit"], t0, t1, p["count"], p["bytes"], tag))
         print("      %s" % seam[:150])
         if p["seam_note"]:
             print("      WARNING: %s" % p["seam_note"])
@@ -292,6 +329,9 @@ STUB = '''/* %(unit)s - placeholder attribution, %(count)d function(s), 0x%(t0)0
  * No source has been recovered for this unit yet: the range was claimed in bulk from the DOL's own
  * layout, and the bodies are still the original bytes (`Object(NonMatching, …)`, so the link keeps
  * them and `ninja build/RMHE08/ok` cannot move).
+ *
+ * Language: %(language)s
+ * (`tools/units/langcheck.py`; dtk turns the extension into `-lang`, so this decides the front-end).
  *
  * What the seam rests on (see the `tu-boundary-discovery` skill for the method):
 %(evidence)s *
@@ -313,8 +353,18 @@ def stub_text(p: dict) -> str:
                   " *   translation unit. Re-check it with `tudiscover at <addr>` before writing source.\n")
     if p["seam_note"]:
         ev.append(" *   WARNING: %s\n" % p["seam_note"])
+    lang = p.get("language") or {}
+    if lang.get("lang"):
+        language = "%s (%s: %s)" % ("C++" if lang["lang"] == "c++" else "C", lang.get("confidence"),
+                                     lc.evidence_text(lang))
+        if lang.get("conflict"):
+            language += " - two source files, so the boundary needs a re-check"
+    elif p["cxx"]:
+        language = "C++ (a mangled name is in the region)"
+    else:
+        language = "C (no evidence; the default)"
     return STUB % {"unit": p["unit"], "count": p["count"], "t0": p["text"][0],
-                   "t1": p["text"][1], "evidence": "".join(ev)}
+                   "t1": p["text"][1], "evidence": "".join(ev), "language": language}
 
 
 # --------------------------------------------------------------------------------------------------
