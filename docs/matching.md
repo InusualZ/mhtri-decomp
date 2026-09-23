@@ -941,6 +941,37 @@ reset's position is a free variable and moving it changes codegen in functions t
 fixed two functions it was never aimed at. When a pragma pair is in play, re-measure the whole unit - where the
 region ends is part of the change.
 
+## 34. A switch tail's constant returns are if-converted, so write the arms negated
+
+**Problem.** A `switch` whose default is `return 1` and whose allowed cases `break` leaves the target as
+`return 0` looks like a missing arm: the diff shows the target loading a constant and branching while ours
+returns early per case, and the function sits at ~94 % with the same opcodes in a different order.
+
+**Why try it.** MWCC if-converts two constant return arms (`return 0` / `return 1`) into a branchless boolean,
+so a body written `if (c) return 0; break;` compiles to an early `return 0` the target never has. Negating the
+test (`if (!c) return 1; break;`) gives the compiler the *same* two arms but in the order it folds into the
+branchless form, and the tail matches. The same class of shape - a case body that falls through to a shared
+constant - has to be written the way the *tail* reads, not the way the condition reads.
+
+**Result.** `Pl/pl_act`'s `fn_8027C208` 93.926 -> **99.967 %**, `.text` exact. The sibling shapes in the same
+round: cases written in **body-address order** (not condition order) took `fn_8027A340` 94.234 -> 98.084 %, and
+`s32` locals for equality tests (so the compiler emits `cmpwi`, not `cmplwi`) took `Pl_bari_ck`
+84.415 -> 86.679 %. Unit 97.42033 -> **97.86864 %**, matched bytes unchanged, no flag change.
+
+**Example.**
+
+```c
+/* target: the tail is `return 0`, the default `return 1`, every case falls through */
+switch (id) {
+case 0: case 4: case 2:            /* body-address order, not condition order */
+    if (!allowed) return 1;        /* negated: gives MWCC its two constant arms */
+    break;
+default:
+    return 1;
+}
+return 0;
+```
+
 ## 33. Prefer the unit's flags over a per-function flag - a TU was compiled once
 
 **Problem.** A function that will not match invites a scoped pragma (`optimization_level`, `peephole`,
