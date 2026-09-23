@@ -710,7 +710,7 @@ config.libs = [
             # The C++ allocation group right after main.cpp (operator new/delete over main.cpp's heap). Same
             # lib because it is the same module and the same measured flags; its retail file name is not
             # evidenced - the unit is defined by its extab group (see the file header comment).
-            Object(NonMatching, "sys_mem.cpp"),
+            Object(Matching, "sys_mem.cpp"),
         ],
     },
 ]

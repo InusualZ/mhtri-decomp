@@ -3,6 +3,12 @@
  *
  * .text 0x80040478-0x80040598 - `__nw__FUl` (0x44, operator new), `fn_800404BC` (0x44), `__dl__FPv` (0x4C,
  * operator delete), `fn_8004054C` (0x4C), in that order and nothing else. Both operators work over the game's
+ *
+ * `fn_8004054C` must keep its `__declspec(export)`: it is the object's trailing function and nothing in the
+ * object references it, and the linker trims an unreferenced tail. The target object's `.comment` marks every
+ * entry `active_flags=0x08` (dtk's `dol split` writes `export_all: true`) while MWCC writes `0x00`, so without
+ * the export our object is 0x4C shorter and every later section shifts by exactly that - the failure that kept
+ * this unit from flipping. Measured three ways in `.pi/notes/` (FORCEACTIVE, and swapping `.comment` each way).
  * single experimental heap (the handle `lbl_80794788`, which `main.cpp` creates with
  * `MEMCreateExpHeapEx`, and the alloc/free wrappers that stay with `main.cpp` call into).
  *
@@ -79,7 +85,7 @@ void operator delete(void* ptr) throw()
     }
 }
 
-extern "C" void fn_8004054C(void* ptr) throw()
+extern "C" __declspec(export) void fn_8004054C(void* ptr) throw()
 {
     if (ptr) {
         fn_80040460(ptr);
