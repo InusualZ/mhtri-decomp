@@ -851,6 +851,28 @@ reset's position is a free variable and moving it changes codegen in functions t
 fixed two functions it was never aimed at. When a pragma pair is in play, re-measure the whole unit - where the
 region ends is part of the change.
 
+## 36. A flipped unit's unreferenced trailing function is trimmed by the linker
+
+**Problem.** The unit's object is byte-identical, `flipcheck.py` is happy and `linkorder.py` says `LINK OK` - and the
+flip still breaks the DOL, by exactly the size of the object's *last* function, with every later section shifted. It
+reads as an unreachable linker mystery, because nothing about the code differs.
+
+**Why it happens.** `dol split` writes the target objects with `export_all: true`, which stamps `active_flags=0x08`
+on every entry of the `.comment` symbol table; MWCC-compiled objects write `0x00`. The linker honours that flag, so
+our object's *trailing* function - the one nothing inside the object references - is dropped, along with its `extab`
+record and `extabindex` entry. Measured on `sys_mem.cpp`: `ninja diff` reported `_eti_init_info` at 0x8003F17C where
+the target has it at 0x8003F1C8, and the 0x4C difference is exactly `fn_8004054C`'s size.
+
+**Result.** Marking the function `__declspec(export)` sets the flag. `.text` is unchanged and the link reproduces the
+original DOL byte for byte - `sys_mem.cpp`, flip 12. Proven three ways: adding the symbol to the script's
+`FORCEACTIVE` restores the target layout, and swapping the two objects' `.comment` sections in each direction swaps
+the behaviour. Ruled out by measurement: the `.comment` version byte alone, `SHF_INFO_LINK` on `.rela.*`, section
+order, `.note.split`, local symbol names, and all 21 Wii/GC compilers.
+
+**Example.** Only a *trailing* unreferenced function needs it, and only in a unit that flips. The generalised check
+belongs in `flipcheck.py`: compare the `.comment` per-symbol `active_flags` (offset 0x2C + 8*index, byte 5) between
+`obj/<unit>.o` and `src/<unit>.o` - a mismatch means the link will trim.
+
 ## 35. A dead copy chain steers the allocator's web priority
 
 **Problem.** The residual is two live ranges sharing one register pair - retail colours them one way, we colour them
