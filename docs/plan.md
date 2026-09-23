@@ -196,6 +196,13 @@ git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
   outlives the worktree. **`<slug>` is the claim's branch minus `worker/`** (`claims.slug_of_branch`), the one rule
   `brief.py`, `handoff.py`, `land.py` and `claims.py` all read: a unit's *path* is not its *name* (`Pl/pl_act` vs
   `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
+* **The handoff is automatic now.** `subagent_done` is no longer required to be *delivered*: the herdr extension
+  publishes on `agent_end` after a 10 s grace period (`HERDR_AGENT_END_GRACE_MS` to override), writes the same
+  sidecar `subagent_done` writes and shuts the pane down, so a worker that merely replies is delivered. The timer is
+  cancelled by any new turn (`before_agent_start`/`turn_start`/`input`/`session_shutdown`), so a compaction or retry
+  still delivers exactly once, with the final summary - measured on four fixtures. `subagent_done` stays the
+  authoritative path and workers are still told to call it, but nothing depends on the instruction being followed.
+  Trade-off, recorded: a *user-driven* subagent pane would also auto-complete 10 s after a turn.
 * **`tools/m2c` is a submodule - do not initialise it in a worktree.** `git worktree remove` refuses to remove a
   worktree that contains a checked-out submodule ("working trees containing submodules cannot be moved or
   removed"), which would leave the branch - the lock - alive forever. The brief points the worker at

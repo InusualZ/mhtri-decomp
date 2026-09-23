@@ -138,6 +138,7 @@ measured unit).
 | 32 | A pragma region is not local to the functions it covers | A scoped `#pragma peephole off` pair fixes one function's residual, but the *reset* decides where the region ends - moving it past two more functions in `main.cpp` flipped them 99.52 -> 100 and 99.47 -> 100, functions the pragma was never aimed at. | done |
 | 33 | Prefer the unit's flags over a per-function flag | A TU is compiled once, with one flag set: if the unit's other functions match, a function that needs *different* flags is a source, boundary or stale-target problem, not a flag one. A scoped pragma that fixes one function fights the rest (RSO's level-3 pragma cost `RSOUnLink` and `FindExportIndex` their 100 %), and `optimization_level`/`opt_*` are whole-function anyway. | done |
 | 34 | A switch tail's constant returns are if-converted | The target's `return 0` tail and a `default: return 1` look like a missing arm, but MWCC folds two constant return arms into a branchless bool - so the case bodies must be written negated (`if (!c) return 1; break;`) and in body-address order. | done |
+| 35 | A dead copy chain steers the allocator's web priority | Two webs sharing one register pair look unreachable from the source - but the allocator colours in web-list order and the IR's *dead* copy webs count, so a chain of dead copies of the competing value plus one live load flips the pair without changing an instruction. | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
