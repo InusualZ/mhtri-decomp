@@ -165,13 +165,38 @@
  *     `*(u16*)((u8*)self + 0x278 + i * 4)`: the field form gives retail's `lhz r4,632(r3)` displacement loads
  *     and drops the two pointer-materialising `addi`s (BCE0).
  *
- * Still open in the new bodies: C208 keeps 16 extra `li r3,0` rows (bodies that `return 0` inline where
- * retail branches to the merged return-0 block at 0x5d28) and its frame is 0x30 against retail's 0x40
- * (two locals short); 77FF8 has ~6 rows left in the `t`-vs-`arg1` test polarity; 7885C's five
+ * Round 2 (worker `pl-act-09c6`, same 73 byte-exact functions): 97.42 -> 97.87 %, three functions moved,
+ * no flag change. The shapes that did it:
+ *   * C208 93.9 -> 99.97 (`.text` now the target's exact 1684 B): retail's switch ends in `return 0` with an
+ *     explicit `default: return 1`, and every "not allowed" path is a `break` - so retail shares *one*
+ *     `li r3,0` at the function's end and inlines the `li r3,1`s, where the old `return 1`-after-the-switch /
+ *     `return 0`-per-case form did the opposite (16 extra instructions). A case body written
+ *     `if (c) return 0; break;` has to become its negation, `if (!c) return 1; break;`, because
+ *     `if (c) return 0; return 1;` makes MWCC if-convert the two constant arms into a branchless bool.
+ *     Its only residual is the frame: 0x30 against retail's 0x40, i.e. 16 B of locals the function never
+ *     touches - the target has no stack access we do not, and MWCC drops unused locals (4 `s32`, a `VEC3`
+ *     and an `f64` all measured), so the frame cannot be reached from source.
+ *   * A340 94.2 -> 98.1: the `switch`'s cases are written in *body address* order (case 0, case 4, case 2 -
+ *     not numeric), and the `(u32)(a - 5) <= 6` guard is negated with its arms swapped
+ *     (`if ((u32)(a - 5) > 6U) { switch ... } else { ok = 0; }`) so `ok = 0` lands at the end and the
+ *     failing edge branches to it. Residual: 2 rows (an extra `li r31,0`/`b` pair where retail shares
+ *     case 2's block with the guard's edge).
+ *   * Pl_bari_ck 84.4 -> 86.7: `s32 id = self->unk00C;` and `s32 m = (u16)Get_motion_no(self);` - the `u16`
+ *     locals made the equality tests `cmplwi` where retail has `cmpwi` (the rule in "Load-bearing source
+ *     shapes" below). Residual: retail lays the first arm's body out of line and the second arm's inline
+ *     (`ble`/`ble` into the body, then the next arm's tests); the natural `if`/`else if` gives the mirror
+ *     image and both rewrites tried (negated `&&` with the arms swapped, two separate `if`s) measured
+ *     75.0 and 76.7.
+ *
+ * Still open in the new bodies: 77FF8 has ~6 rows left in the `t`-vs-`arg1` test polarity; 7885C's five
  * `(s16)fn_802753E4(...)` call sites schedule `extsh r4,r3` before `mr r3,self` where retail copies the
  * result first (`mr r0,r3; mr r3,self; extsh r4,r0`); BCE0 keeps only a `v`/`id` callee-saved swap (retail
  * v=r6/id=r4, ours the mirror); 78590's `* 14` stays `mulli` where retail emits `slwi/subf/slwi` (MWCC folds
- * `* 7 * 2` before strength reduction).
+ * `* 7 * 2` before strength reduction); B0BC's six `clrlwi r0,r0,24` in front of the `stb`s into
+ * `q + 0x5E1` are a flag-level residual, not source-shaped - the peephole removes them but also turns
+ * `extsb`/`clrlwi` + `cmpwi` into record forms retail does not have (whole-function `#pragma peephole on`:
+ * 93.95 -> 92.28), and `+= (s8)7`, an `s8` field, a `u8` local and an explicit `(u8)` cast all measured
+ * identically.
  *
  * Source-order caveat: the bodies were appended in per-batch address order, not as one address-ordered
  * list, so the file is *not* in `.text` order any more (Pl_attack_set_sub in particular sits in the
@@ -1645,12 +1670,12 @@ u32 Pl_bari_ck(_PLW* self, s32 arg1)
 {
     s32 v = 0;
     if (self->unk00A == 0) {
-        u16 id = self->unk00C;
+        s32 id = self->unk00C;
         if ((u32)(id - 169) <= 1 || (u32)(id - 172) <= 1) {
             if (arg1 != 2) {
                 v = 1;
             } else {
-                u16 m = (u16)Get_motion_no(self);
+                s32 m = (u16)Get_motion_no(self);
                 if ((m == 314 || m == 365)
                     && Pl_frame_check(self, 1, lbl_8079A0EC, lbl_8079A084) == 1) {
                     v = 1;
@@ -3738,9 +3763,7 @@ extern "C" s32 fn_8027A340(_PLW* self)
         }
     }
     u8 a = *(u8*)((u8*)self + 0x00A);
-    if ((u32)(a - 5) <= 6U) {
-        ok = 0;
-    } else {
+    if ((u32)(a - 5) > 6U) {
         switch (a) {
         case 0: {
             s32 id = self->unk00C;
@@ -3765,9 +3788,6 @@ extern "C" s32 fn_8027A340(_PLW* self)
             }
             break;
         }
-        case 2:
-            ok = 0;
-            break;
         case 4: {
             s32 id = self->unk00C;
             if ((u32)(id - 2) <= 1U || (u32)(id - 0x10) <= 1U) {
@@ -3775,7 +3795,12 @@ extern "C" s32 fn_8027A340(_PLW* self)
             }
             break;
         }
+        case 2:
+            ok = 0;
+            break;
         }
+    } else {
+        ok = 0;
     }
     return ok;
 }
@@ -3887,7 +3912,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (fn_80278C7C(self) == 1U || fn_80278CD0(self) == 1U) {
             return 1;
         }
-        return 0;
+        break;
     case 3:
         if (self->unk009 == 3) {
             return 0;
@@ -3909,7 +3934,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
             sp8 == 3) {
             return 1;
         }
-        return 0;
+        break;
     case 0x25:
     case 0x26:
     case 0x27:
@@ -3920,7 +3945,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
             sp8 == 4) {
             return 1;
         }
-        return 0;
+        break;
     case 0xCA:
     case 0xCB:
     case 0xCC:
@@ -3938,15 +3963,15 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
             sp8 == 5) {
             return 1;
         }
-        return 0;
+        break;
     case 0x159:
     case 0x15A:
     case 0x15B:
         if (*(u8*)((u8*)self + 0x585) != 0) {
             return 0;
         }
-        if (self->unk009 == 3) {
-            return 0;
+        if (self->unk009 != 3) {
+            return 1;
         }
         break;
     case 0x1A:
@@ -3956,8 +3981,8 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
     case 0xA7:
     case 0xD0:
     case 0xD6:
-        if (self->unk009 == 3) {
-            return 0;
+        if (self->unk009 != 3) {
+            return 1;
         }
         break;
     case 0x1D:
@@ -3978,8 +4003,8 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
     case 0x8A:
     case 0xC2:
     case 0x184:
-        if (self->unk009 != 3) {
-            return 0;
+        if (self->unk009 == 3) {
+            return 1;
         }
         break;
     case 0x28:
@@ -3994,7 +4019,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (fn_802731B4(self, 0x1D) > 0 && self->unk009 != 3) {
             return 1;
         }
-        return 0;
+        break;
     case 0x1B6:
         if (self->unk009 == 3) {
             return 0;
@@ -4005,26 +4030,26 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (fn_802731B4(self, 0x1D) > 0 && fn_802D7804(4, lbl_8079A0F8) == 1U) {
             return 1;
         }
-        return 0;
+        break;
     case 0x169:
     case 0x16A:
     case 0x16B:
     case 0x16C:
     case 0x16D:
-        if (self->unk009 == 3) {
-            return 0;
+        if (self->unk009 != 3) {
+            return 1;
         }
         break;
     case 0x2B:
-        if (self->unk009 == 3) {
-            return 0;
+        if (self->unk009 != 3) {
+            return 1;
         }
         break;
     case 0x17F:
         if (*(u8*)((u8*)self + 0x585) != 0) {
             return 1;
         }
-        return 0;
+        break;
     case 2:
     case 0x34:
     case 0x246:
@@ -4040,15 +4065,15 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
     case 0x237:
     case 0x258:
     case 0x259:
-        if (*(u8*)((u8*)self + 0x585) != 0) {
-            return 0;
+        if (*(u8*)((u8*)self + 0x585) == 0) {
+            return 1;
         }
         break;
     case 0x30:
     case 0x62:
     case 0xCF:
-        if (fn_8026FE44(self) != 0) {
-            return 0;
+        if (fn_8026FE44(self) == 0) {
+            return 1;
         }
         break;
     case 0x180:
@@ -4059,12 +4084,14 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (fn_8027D968(self, &sp24, &sp10, &spC) == 1) {
             return 1;
         }
-        return 0;
+        break;
     case 0x247:
         if (fn_8027D968(self, &sp24, &sp10, &spC) == 5) {
             return 1;
         }
-        return 0;
+        break;
+    default:
+        return 1;
     }
-    return 1;
+    return 0;
 }
