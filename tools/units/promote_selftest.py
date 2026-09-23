@@ -326,6 +326,21 @@ def selftest() -> int:
         check("plan: a new lib is declared new", g["creating_lib"], True)
         check("plan: no --symbol leaves the map alone", g["map_changed"], [])
 
+        # a stale build.ninja (the last configure.py ran against the previous split) must not leave
+        # the new lib with an unknown mw_version - configure.py's own lib is the fallback
+        real_ninja = ctx.build_ninja
+        ctx.build_ninja = tmp / "no-such-build.ninja"
+        g2 = pr.plan(ctx, "auto/80001000_fn_80001000", "move_indicator", "Game", None, [])
+        check("plan: a stale build.ninja still gets the mw_version from configure.py",
+              g2["new_lib_settings"]["mw_version"], "Wii/1.3")
+        check("plan: a stale build.ninja still writes a usable lib block",
+              '"mw_version": "Wii/1.3",' in pr.configure_move(g2), True)
+        ctx.build_ninja = real_ninja
+        g_bad_mw = dict(g)
+        g_bad_mw["new_lib_settings"] = dict(g["new_lib_settings"], mw_version="?")
+        check("configure: an unknown mw_version is refused",
+              "unknown mw_version" in message(lambda: pr.configure_move(g_bad_mw)), True)
+
         # the refusals
         check("refuse: unregistered unit",
               "not a registered source" in message(lambda: pr.plan(ctx, "auto/nope", "x", "Pl",
@@ -524,13 +539,46 @@ def selftest() -> int:
         shutil.copyfile(write_elf(objs / "m.o", syms=[
             ("", 0, 0, 0, 0), ("moved.c", 0, 0, 4, 0xFFF1), ("main_fn", 0, 16, 0x12, 1)]),
             ctx.object_dir / "Pl" / "again.o")                               # the "after" object
+
+        # the regression this gate exists for: the after-object is byte-identical to the baseline,
+        # but the unit is not in the build graph - the check must refuse it
+        check("check: a byte-identical object outside the build graph is refused",
+              silent(lambda: pr.check(ctx, p2, None, None, False, False)), 2)
+        rc, text = captured(lambda: pr.check(ctx, p2, None, None, False, True))
+        check("check: the JSON verdict is not-in-build",
+              json.loads(text or "{}").get("verdict"), "not-in-build")
+        check("check: the JSON names what is missing",
+              json.loads(text or "{}").get("build_graph", {}).get("in_graph"), False)
+
+        # put the unit in the graph: the source file, the split's config.json, the build.ninja rule
+        (ctx.src / "Pl" / "again.c").write_text("void again(void) {}\n", encoding="utf-8")
+        ctx.build_config.parent.mkdir(parents=True, exist_ok=True)
+        ctx.build_config.write_text(json.dumps({"units": [{"name": "Pl/again.c"}],
+                                                "modules": []}), encoding="utf-8")
+        with open(ctx.build_ninja, "a", encoding="utf-8", newline="") as f:
+            f.write("build build/RMHE08/src/Pl/again.o: mwcc_sjis src/Pl/again.c\n"
+                    "  mw_version = Wii/1.0\n"
+                    "  cflags = -nodefaults -O3 -lang=c\n")
+        g = pr.build_graph(ctx, "Pl/again.c", ".c")
+        check("build_graph: source found", g["source"], True)
+        check("build_graph: config.json found", g["config_json"], True)
+        check("build_graph: build.ninja rule found", g["build_ninja"], True)
+        check("build_graph: in the graph", g["in_graph"], True)
         check("check: defaults resolve old_obj/new_obj and exit 0 on names-only",
               silent(lambda: pr.check(ctx, p2, None, None, False, False)), 0)
         check("check: a changed section exits 1",
               silent(lambda: pr.check(ctx, p2, str(a), str(objs / "e.o"), False, False)), 1)
         rc, text = captured(lambda: pr.check(ctx, p2, None, None, False, True))
         check("check: the JSON has the verdict", json.loads(text or "{}").get("verdict"), "names-only")
+        check("check: the JSON reports the build graph",
+              json.loads(text or "{}").get("build_graph", {}).get("in_graph"), True)
         check("check: the JSON exit code is 0 for names-only", rc, 0)
+
+        # drop only the config.json entry - the object bytes are untouched and still identical
+        ctx.build_config.write_text(json.dumps({"units": [{"name": "Pl/other.c"}],
+                                                "modules": []}), encoding="utf-8")
+        check("check: a unit missing from config.json is refused even with identical bytes",
+              silent(lambda: pr.check(ctx, p2, None, None, False, False)), 2)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
