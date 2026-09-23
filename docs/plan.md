@@ -536,24 +536,26 @@ proof has to contain (detail: `.pi/notes/flip-round-1.md`):
    `build.ninja`'s input list has `src/lobby/lobby_scene.o` exactly where the target object was, and
    `src/Runtime.PPCEABI.H/memcpy.o`/`memset.o` adjacent to each other as before.
 
-   What is still unexplained is a *link* question, not a unit property: with `__init_cpp_exceptions` flipped, the
-   unit's code links at exactly 0x80457420 and the object is byte-identical, yet the merged `.ctors` loses
-   `__init_cpp_exceptions_reference` (the symbol is absent from the ELF) and every later entry shifts one slot,
-   while `.dtors` is off by one entry only. `sys_mem` shows the same shape in `extab`/`extabindex`
-   (`_eti_init_info` 0x8003F1C8 -> 0x8003F17C, 5 536 639 differing DOL bytes) even though its fragments are
-   **Measured, from the linked ELF after a forced relink:** flipping this unit makes the link *lose* two words -
-   `.ctors` goes from 92 entries to 91 and `.dtors` from 3 to 2 - and of the unit's three words only `.dtors$10`'s
-   survives (0x804566BC is still `.dtors[0]`). They are absent, not reordered. What separates them is what their
-   relocations point at: the dropped `.ctors$10` -> `__init_cpp_exceptions` and `.dtors$15` ->
-   `__fini_cpp_exceptions` are both defined in this same object, while the kept `.dtors$10` ->
-   `__destroy_global_chain` is defined in another unit. The two objects are otherwise equivalent (same section
-   names, sizes, alignment, flags, bytes; our object is the only one in the link list). Two candidate causes
-   were tested and rejected: in-object section order (a copy of our object with the headers permuted to the
-   target's order still loses them, and the source cannot change MWCC's order) and `.rela.*` flags (ours are all
-   0x0 vs the target's 0x40 - uniform, so it cannot explain why one word survives). Next: whether `mwldeppc`
-   drops an unreferenced `_reference` symbol's section - nothing names it, since the startup code walks `.ctors`
-   by address - and whether dtk's synthesised target objects are exempt from that, which would explain why green
-   keeps all three words and only the substituted object loses two.
+   **Resolved - and the honest account matters more than a rule.** The blocker does not reproduce. With a
+   freshly compiled object the flipped link holds 92 `.ctors` and 3 `.dtors` words - the green counts, with
+   `__init_cpp_exceptions` at `.ctors[0]` and `__fini_cpp_exceptions` at `.dtors[1]` - and the unit passes all
+   fifteen gate checks (`2e15e1e`). Earlier measurements in this same session gave 91/2, and the investigation's
+   suggested settling experiment (patch `SHF_INFO_LINK` 0x40 onto our `.rela.*` headers) came back
+   **inconclusive**: the *unpatched* baseline already produced 92/3, so the flag is not the rule.
+
+   What changed in between is a forced **re-split** - `build/RMHE08/config.json` and `dep` deleted, so dtk
+   regenerated every synthesised target object. That is the playbook-row-31 trap the campaign has hit before: a
+   target object built before a map edit keeps its old symbol spelling or layout, and the link then mixes it with
+   ours. **Lesson for the flip campaign: re-split after any map change before judging a flip** - which also
+   explains why `land.py`'s own gate (which re-splits) never reproduced the failure while the manual experiments
+   (which did not) did.
+
+   `sys_mem` is a **separate, still-open case**, not this one: it is byte-identical in every section including
+   `extab`/`extabindex`, it is the only object in the link list for its unit, and flipping it still scrambles the
+   DOL (5 536 639 differing bytes, `_eti_init_info` 0x8003F1C8 -> 0x8003F17C). Note that `g3d_resanmamblight`
+   flips green while contributing `extab`/`extabindex` from a `src/` object, so "a concatenated section" is not
+   the discriminator either - the investigation proved the `$NN`-versus-unsuffixed framing wrong and found
+   `mwldeppc`'s built-in ctor/dtor table path in the binary, which is where to look next.
 
 **`__ppc_eabi_init` is flipped** (`1a517a8`, with the per-file `-func_align 16` lib split in `895e72a`) - the
 first flipped unit whose code lives in `.init` and the first needing a flag rather than a per-lib setting.
