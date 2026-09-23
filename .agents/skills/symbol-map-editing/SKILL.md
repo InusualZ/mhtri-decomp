@@ -27,6 +27,7 @@ name token you asked it to change.
 | is the map sane? | `python tools/symbols/symedit.py check` |
 | rename one symbol | `python tools/symbols/symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]` |
 | rename many | `python tools/symbols/symedit.py rename-batch map.txt [--dry-run]` (lines of `old new`) |
+| merge phantoms (7.9) | `python tools/symbols/symedit.py merge-batch batch.txt [--dry-run]` (lines of `merge <phantom> <previous> <size_hex>`) |
 | a per-module RSO map | add `--file config/RMHE08/<module>/symbols.txt` |
 
 `--json` gives machine-readable output, and every option works both before and after the subcommand.
@@ -50,6 +51,18 @@ flood the context.
 6. **Choosing the name is its own judgement call** - real name when it is known, fitting the surrounding
    naming scheme, `fn_xxxxxxxx` beats a speculative name. The rules are in `AGENTS.md` -> Conventions ->
    "Commenting and naming", and `docs/memory-dump.md` is where real names come from.
+
+## Merging phantom symbols (roadmap 7.9)
+
+A **phantom** is an unnamed `fn_*` that is really the previous function's dead epilogue, so a merge grows
+the previous symbol's `size:` and deletes the phantom's line. `tools/symbols/phantom.py` finds them;
+`merge-batch` applies them. Per row it refuses - before any write - unless both symbols are defined
+exactly once, in the same section, the previous ends exactly at the phantom's address, no other name sits
+at that address, the stated size is exactly the two sizes added, the two scopes agree, and the phantom has
+no in-repo reference. An already-merged row is a no-op. A refusal for an absent previous names the symbol
+that actually ends at the phantom's address, so a **stale row after a rename pass** is obvious (the
+previous symbol's real name changed) rather than silently skipped. A merge is a `splits.txt` dirty-check
+input, so it rides the same re-split as the renames (docs/plan.md §4 item 4).
 
 ## Reading the map
 

@@ -15,6 +15,7 @@ Usage (default file: config/RMHE08/symbols.txt, override with --file):
     symedit.py check                                 # duplicate names / addresses, bad lines
     symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]
     symedit.py rename-batch <file> [--dry-run]       # lines: "old new" (# comments allowed)
+    symedit.py merge-batch <file> [--dry-run] [--no-refs]   # lines: "merge <phantom> <previous> <size>"
     symedit.py --selftest                            # the checks, against temp fixtures only
 
 `rename` writes through `tools/units/sharedfiles.py` (docs/plan.md 7.12): the edit is a temp file +
@@ -26,6 +27,15 @@ the new name is already taken (unless `--force`), when `--force` would still lea
 addresses, and when the new name is not a valid symbol name; it warns about in-repo references to the
 old name (a rename is always two edits: this file *and* the source - see AGENTS.md -> Conventions ->
 "Commenting and naming").
+
+`merge-batch` is the other half of `tools/symbols/phantom.py` (docs/plan.md 7.9): a phantom is an
+unnamed `fn_*` that is really the previous function's dead epilogue, so a merge grows the previous
+symbol's `size:` and deletes the phantom's line.  Per row it refuses - before any write - unless both
+symbols are defined exactly once, in the same section, the previous ends exactly at the phantom's
+address, no other name sits at that address, the stated size is exactly the two sizes added, the two
+scopes agree, and the phantom has no in-repo reference.  An already-merged row is a no-op.  When the
+plan's previous name is stale (a rename landed after `phantom.py` ran), the refusal names the symbol
+that actually ends at the phantom's address instead of guessing.
 """
 import argparse
 import os
@@ -128,31 +138,50 @@ def cmd_range(a):
     return 0
 
 
-def cmd_refs(a):
-    pat = re.compile(r"\b%s\b" % re.escape(a.name))
-    found = 0
-    for root in a.roots:
-        for base, dirs, files in os.walk(os.path.join(REPO, root)):
+REF_SUFFIXES = (".c", ".h", ".cpp", ".hpp", ".py", ".md", ".txt", ".yml", ".yaml")
+
+
+def find_refs(names, roots, limit, exclude=None):
+    """`name -> [(relpath, lineno, text)]` for every in-repo mention, in one walk of `roots`.
+
+    The scan `rename` warns with and `merge-batch` refuses on: a name mentioned in the source is a
+    caller a delete would break.  Bounded by `limit` hits per name, so the output cannot flood.
+    """
+    pats = {n: re.compile(r"\b%s\b" % re.escape(n)) for n in names}
+    hits = {n: [] for n in names}
+    for root in roots:
+        base_root = os.path.join(REPO, root)
+        if not os.path.isdir(base_root):
+            continue
+        for base, dirs, files in os.walk(base_root):
             dirs[:] = [d for d in dirs if d not in (".git", "build", "__pycache__")]
             for fn in files:
-                if not fn.endswith((".c", ".h", ".cpp", ".hpp", ".py", ".md", ".txt", ".yml", ".yaml")):
+                if not fn.endswith(REF_SUFFIXES):
                     continue
                 p = os.path.join(base, fn)
-                if os.path.abspath(p) == os.path.abspath(a.file):
+                if exclude and os.path.abspath(p) == os.path.abspath(exclude):
                     continue
                 try:
                     with open(p, "r", encoding="utf-8", errors="replace") as fh:
                         for i, line in enumerate(fh, 1):
-                            if pat.search(line):
-                                print("%s:%d: %s" % (os.path.relpath(p, REPO), i, line.strip()[:160]))
-                                found += 1
-                                if found >= a.limit:
-                                    print("... (stopping at --limit %d)" % a.limit)
-                                    return 0
+                            for name, pat in pats.items():
+                                if len(hits[name]) < limit and pat.search(line):
+                                    hits[name].append((os.path.relpath(p, REPO), i,
+                                                       line.strip()[:160]))
                 except OSError:
                     continue
-    if not found:
+    return hits
+
+
+def cmd_refs(a):
+    hits = find_refs([a.name], a.roots, a.limit, a.file).get(a.name, [])
+    if not hits:
         print("no references to %s outside %s" % (a.name, a.file))
+        return 0
+    for rel, lineno, text in hits:
+        print("%s:%d: %s" % (rel, lineno, text))
+    if len(hits) >= a.limit:
+        print("... (stopping at --limit %d)" % a.limit)
     return 0
 
 
@@ -291,6 +320,192 @@ def apply_rename(path, nl, lines, changed):
     _write_text(path, nl.join(lines))
 
 
+def _scope(line):
+    """The `scope:` token of a map line, or `""` - a merge must not change a symbol's scope."""
+    m = re.search(r"scope:(\S+)", line)
+    return m.group(1) if m else ""
+
+
+def _resize_line(line, name, new_size):
+    """The `size:` field of one definition line, set to `new_size` - or `sf.AnchorError`.
+
+    The merge's shape gate: the line must parse as a map line naming `name` and carry a positive
+    `size:` field, and the rewrite must parse back with the new size.  Anything else raises before a
+    byte is written, so a merge can never silently grow the wrong line.  The digits are written the
+    way the map writes them (upper case, as dtk does).
+    """
+    e = parse_line(line)
+    if not e or e["name"] != name:
+        raise sf.AnchorError("line %r is not the definition of %r" % (line[:80], name))
+    if e["size"] <= 0:
+        raise sf.AnchorError("line %r has no size: field to grow" % line[:80])
+    out = re.sub(r"size:0x[0-9a-fA-F]+", "size:0x%X" % new_size, line, count=1)
+    if out == line:
+        raise sf.AnchorError("line %r has no size: field to grow" % line[:80])
+    e2 = parse_line(out)
+    if not e2 or e2["name"] != name or e2["size"] != new_size:
+        raise sf.AnchorError("rewriting %r did not set size:0x%X" % (line[:80], new_size))
+    return out
+
+
+def _ending_at(lines, address):
+    """`name (size:0xN)` for every symbol whose declared end is exactly `address`.
+
+    The stale-plan hint: when the batch names a previous symbol the map no longer has, the symbol that
+    actually ends at the phantom's address is what a rename pass turned it into.
+    """
+    out = []
+    for line in lines:
+        e = parse_line(line)
+        if e and e["size"] and e["address"] + e["size"] == address:
+            out.append("%s (size:0x%X)" % (e["name"], e["size"]))
+    return out
+
+
+def plan_merge(path, rows, scan_refs=None):
+    """Read the map and plan a batch of phantom merges - no write, every gate runs here.
+
+    `rows` is `(phantom, previous, new_size)` in ascending address order.  A merge grows `previous` to
+    `new_size` and deletes `phantom`'s line, so the plan refuses - before any write - unless the two
+    are defined exactly once each, in the same section, with the previous symbol ending exactly at the
+    phantom's address, no other name at that address, the stated size being exactly the previous size
+    plus the phantom's, matching scope, and no reference to the phantom in `scan_refs`' result.
+
+    Returns `(text, nl, lines, grown, deleted, applied)`: `grown` is `index -> new line`, `deleted`
+    the indices to drop, and `applied` the rows already merged (the idempotent no-op).  A row whose
+    phantom is absent *and* whose previous already carries `new_size` is the re-apply; a row whose
+    phantom is absent but whose previous still has the old size is a half-applied plan and is refused.
+    """
+    text = sf.read_text(path)
+    nl = sf.line_ending(text)
+    lines = text.split(nl)
+    defined = _definitions(lines)
+    by_addr = {}
+    for line in lines:
+        e = parse_line(line)
+        if e:
+            by_addr.setdefault((e["section"], e["address"]), []).append(e["name"])
+    refs = scan_refs([r[0] for r in rows]) if scan_refs else {}
+    grown, deleted, applied = {}, [], []
+    used = set()
+    for phantom, previous, new_size in rows:
+        if phantom == previous:
+            raise SystemExit("refusing: %s is its own previous symbol" % phantom)
+        for name in (phantom, previous):
+            if name in used:
+                raise SystemExit("refusing: %s appears twice in the batch" % name)
+            used.add(name)
+        ph_hits, pv_hits = defined.get(phantom, []), defined.get(previous, [])
+        if not ph_hits:
+            if not pv_hits:
+                raise SystemExit("refusing: neither %s nor %s is defined in %s"
+                                 % (phantom, previous, path))
+            if len(pv_hits) != 1:
+                raise SystemExit("refusing: %s is defined %d times" % (previous, len(pv_hits)))
+            e = parse_line(lines[pv_hits[0]])
+            if e["size"] == new_size:
+                applied.append((phantom, previous, new_size))
+                continue
+            raise SystemExit("refusing: %s is absent but %s has size:0x%X, not the planned 0x%X"
+                             % (phantom, previous, e["size"], new_size))
+        if len(ph_hits) != 1:
+            raise SystemExit("refusing: %s is defined %d times" % (phantom, len(ph_hits)))
+        ph = parse_line(lines[ph_hits[0]])
+        if not pv_hits:
+            cands = _ending_at(lines, ph["address"])
+            hint = ("; the symbol ending at 0x%08X is %s - the plan may be stale after a rename"
+                    % (ph["address"], ", ".join(cands[:3]))) if cands else ""
+            raise SystemExit("refusing: %s is not defined in %s%s" % (previous, path, hint))
+        if len(pv_hits) != 1:
+            raise SystemExit("refusing: %s is defined %d times" % (previous, len(pv_hits)))
+        pv = parse_line(lines[pv_hits[0]])
+        if ph["section"] != pv["section"]:
+            raise SystemExit("refusing: %s is in %s but %s is in %s"
+                             % (phantom, ph["section"], previous, pv["section"]))
+        if pv["address"] + pv["size"] != ph["address"]:
+            raise SystemExit("refusing: %s ends at 0x%08X, not at %s's 0x%08X"
+                             % (previous, pv["address"] + pv["size"], phantom, ph["address"]))
+        if pv["size"] + ph["size"] != new_size:
+            raise SystemExit("refusing: 0x%X (the plan) is not 0x%X + 0x%X (%s + %s)"
+                             % (new_size, pv["size"], ph["size"], previous, phantom))
+        if ph["size"] <= 0:
+            raise SystemExit("refusing: %s has no size to merge" % phantom)
+        if ph["type"] != "function" or pv["type"] != "function":
+            raise SystemExit("refusing: %s and %s are not both type:function" % (previous, phantom))
+        if _scope(lines[ph_hits[0]]) != _scope(lines[pv_hits[0]]):
+            raise SystemExit("refusing: %s and %s disagree on scope" % (previous, phantom))
+        aliases = [n for n in by_addr.get((ph["section"], ph["address"]), []) if n != phantom]
+        if aliases:
+            raise SystemExit("refusing: %s shares its address with %s"
+                             % (phantom, ", ".join(sorted(aliases)[:3])))
+        hits = refs.get(phantom) or []
+        if hits:
+            rel, lineno, txt = hits[0]
+            raise SystemExit("refusing: %s is referenced at %s:%d (%s)"
+                             % (phantom, rel, lineno, txt))
+        if ph_hits[0] in grown:
+            raise SystemExit("refusing: %s is another row's grown symbol" % phantom)
+        grown[pv_hits[0]] = _resize_line(lines[pv_hits[0]], previous, new_size)
+        deleted.append(ph_hits[0])
+    if set(deleted) & set(grown):
+        raise SystemExit("refusing: a line is both grown and deleted")
+    return text, nl, lines, grown, deleted, applied
+
+
+def apply_merge(path, nl, lines, grown, deleted):
+    """Apply the planned growths and deletions and write once, in the file's own line ending."""
+    if not grown and not deleted:
+        return
+    drop = set(deleted)
+    out = [grown.get(i, line) for i, line in enumerate(lines) if i not in drop]
+    _write_text(path, nl.join(out))
+
+
+def merge(a, rows):
+    if not rows:
+        print("no merge rows in %s" % a.mapfile)
+        return 0
+    scan = None if a.no_refs else (lambda names: find_refs(names, a.roots, a.limit, a.file))
+    _text, nl, lines, grown, deleted, applied = plan_merge(a.file, rows, scan)
+    if not a.dry_run:
+        apply_merge(a.file, nl, lines, grown, deleted)
+    for _i, line in sorted(grown.items()):
+        print("%s %s" % ("would grow" if a.dry_run else "grew", line))
+    for i in sorted(deleted):
+        print("%s %s" % ("would delete" if a.dry_run else "deleted", lines[i]))
+    for phantom, previous, new_size in applied:
+        print("no-op: %s -> %s already merged (size:0x%X)" % (phantom, previous, new_size))
+    print("%s %d merged, %d deleted, %d already merged in %s"
+          % ("dry-run:" if a.dry_run else "wrote", len(grown), len(deleted), len(applied), a.file))
+    return 0
+
+
+def read_merge_rows(mapfile):
+    """Parse a `merge <phantom> <previous> <new_size_hex>` batch file (`#` comments allowed)."""
+    rows = []
+    with open(mapfile, "r", encoding="utf-8") as fh:
+        for lineno, line in enumerate(fh, 1):
+            line = line.split("#")[0].strip()
+            if not line:
+                continue
+            tok = line.split()
+            if len(tok) != 4 or tok[0].lower() != "merge":
+                raise SystemExit("refusing: %s:%d is not 'merge <phantom> <previous> <size>': %s"
+                                 % (mapfile, lineno, line[:80]))
+            try:
+                new_size = int(tok[3], 16)
+            except ValueError:
+                raise SystemExit("refusing: %s:%d has no hex size: %s" % (mapfile, lineno, tok[3]))
+            if new_size <= 0:
+                raise SystemExit("refusing: %s:%d has a non-positive size" % (mapfile, lineno))
+            rows.append((tok[1], tok[2], new_size))
+    return rows
+
+
+def cmd_merge_batch(a):
+    return merge(a, read_merge_rows(a.mapfile))
+
+
 def rename(a, pairs):
     _text, nl, lines, changed, applied = plan_rename(a.file, pairs, a.force)
     if not a.dry_run:
@@ -373,6 +588,13 @@ def main():
     p.add_argument("--force", action="store_true")
     p.add_argument("--no-refs", action="store_true")
     p.set_defaults(func=cmd_batch)
+
+    p = sub.add_parser("merge-batch", parents=[common],
+                       help="merge phantom fn_* rows from 'merge <phantom> <previous> <size>' lines")
+    p.add_argument("mapfile")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--no-refs", action="store_true", help="skip the reference scan")
+    p.set_defaults(func=cmd_merge_batch)
 
     a = ap.parse_args()
     if a.selftest:
@@ -577,6 +799,187 @@ def selftest() -> int:
         check("rename: prints the line it changed", "bar = .text:0x80040600;" in buf.getvalue(), True)
         check("rename: reports one symbol written", "wrote 1 symbol(s)" in buf.getvalue(), True)
         check("rename: the new name is in the file", "bar = .text:0x80040600;" in sf.read_text(p), True)
+
+    # --- phantom merges: the happy path (grow + delete), both line endings ------------------------
+    mrows = [("prev", ".text:0x80041000", "type:function size:0x20"),
+             ("fn_80041020", ".text:0x80041020", "type:function size:0x4"),
+             ("after", ".text:0x80041024", "type:function size:0x8")]
+    mrow = ("fn_80041020", "prev", 0x24)
+    for nl, label in (("\n", "LF"), ("\r\n", "CRLF")):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "symbols.txt"
+            text = map_text(nl, mrows)
+            p.write_bytes(text.encode("utf-8"))
+            _t, nl2, lines, grown, deleted, applied = plan_merge(p, [mrow])
+            check("merge %s: one grown, one deleted, none applied" % label,
+                  (len(grown), len(deleted), len(applied)), (1, 1, 0))
+            check("merge %s: the grown line sets the size" % label, grown[0],
+                  "prev = .text:0x80041000; // type:function size:0x24")
+            check("merge %s: the deleted line is the phantom" % label, lines[deleted[0]],
+                  "fn_80041020 = .text:0x80041020; // type:function size:0x4")
+            apply_merge(p, nl2, lines, grown, deleted)
+            after = sf.read_text(p)
+            want = [("prev = .text:0x80041000; // type:function size:0x24"
+                     if x == "prev = .text:0x80041000; // type:function size:0x20" else x)
+                    for x in text.split(nl)
+                    if x != "fn_80041020 = .text:0x80041020; // type:function size:0x4"]
+            check("merge %s: exactly one line grew and one vanished" % label, after.split(nl), want)
+            check("merge %s: the ending survives" % label, sf.line_ending(after), nl)
+            if nl == "\r\n":
+                check("merge CRLF: no bare LF appeared", after.replace("\r\n", "").count("\n"), 0)
+            else:
+                check("merge LF: no CR appeared", "\r" in after, False)
+            check("merge %s: no temp left" % label, temps(tmp), [])
+            once = p.read_bytes()
+            _t2, nl3, lines2, grown2, deleted2, applied2 = plan_merge(p, [mrow])
+            check("merge %s: the second plan is a no-op" % label,
+                  (len(grown2), len(deleted2)), (0, 0))
+            check("merge %s: the row is reported already merged" % label, applied2, [mrow])
+            apply_merge(p, nl3, lines2, grown2, deleted2)
+            check("merge %s: the bytes do not move" % label, p.read_bytes(), once)
+
+    # --- the resize shape gate -------------------------------------------------------------------
+    check("resize: a map line grows",
+          _resize_line("prev = .text:0x80041000; // type:function size:0x20", "prev", 0x24),
+          "prev = .text:0x80041000; // type:function size:0x24")
+    check("resize: a line naming another symbol is refused",
+          raises(lambda: _resize_line("other = .text:0x80041000; // type:function size:0x20",
+                                      "prev", 0x24), sf.AnchorError), True)
+    check("resize: a line without a size is refused",
+          raises(lambda: _resize_line("prev = .text:0x80041000; // type:function", "prev", 0x24),
+                 sf.AnchorError), True)
+
+    # --- phantom merges: every refusal leaves the file untouched ---------------------------------
+    def merge_plan(map_rows, rows_, scan=None):
+        """Plan against a throwaway map; returns (refusal message or "", file_changed)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "symbols.txt"
+            text = map_text("\n", map_rows)
+            p.write_bytes(text.encode("utf-8"))
+            try:
+                plan_merge(p, rows_, scan)
+            except SystemExit as e:
+                return str(e), p.read_bytes() != text.encode("utf-8")
+            return "", p.read_bytes() != text.encode("utf-8")
+
+    adj = [("prev", ".text:0x80041000", "type:function size:0x20"),
+           ("fn_80041020", ".text:0x80041020", "type:function size:0x4")]
+    cases = [
+        ("a gap before the phantom",
+         [("prev", ".text:0x80041000", "type:function size:0x1C"),
+          ("fn_80041020", ".text:0x80041020", "type:function size:0x4")],
+         [mrow], "ends at 0x8004101C"),
+        ("a size that is not the two sizes added", adj,
+         [("fn_80041020", "prev", 0x28)], "is not"),
+        ("different sections",
+         [("prev", ".init:0x80041000", "type:function size:0x20"),
+          ("fn_80041020", ".text:0x80041020", "type:function size:0x4")],
+         [mrow], "is in .init"),
+        ("a scope mismatch",
+         [("prev", ".text:0x80041000", "type:function size:0x20"),
+          ("fn_80041020", ".text:0x80041020", "type:function size:0x4 scope:local")],
+         [mrow], "disagree on scope"),
+        ("an alias at the phantom's address",
+         adj + [("alias", ".text:0x80041020", "type:function size:0x4")],
+         [mrow], "shares its address"),
+        ("a non-function previous",
+         [("prev", ".text:0x80041000", "type:object size:0x20"),
+          ("fn_80041020", ".text:0x80041020", "type:function size:0x4")],
+         [mrow], "not both type:function"),
+        ("a phantom that is another row's previous",
+         adj + [("fn_80041024", ".text:0x80041024", "type:function size:0x4")],
+         [mrow, ("fn_80041024", "fn_80041020", 0x28)], "appears twice"),
+        ("the same phantom twice", adj, [mrow, mrow], "appears twice"),
+        ("a phantom with no previous defined",
+         [("fn_80041020", ".text:0x80041020", "type:function size:0x4")],
+         [mrow], "is not defined"),
+        ("a half-applied row (phantom gone, old size)",
+         [("prev", ".text:0x80041000", "type:function size:0x20")],
+         [mrow], "is absent but prev has size:0x20"),
+        ("neither name defined", [], [mrow], "neither"),
+    ]
+    for name, map_rows, batch, needle in cases:
+        msg, changed = merge_plan(map_rows, batch)
+        check("merge refuses %s" % name, bool(msg) and needle in msg, True)
+        check("merge refusal leaves the file alone (%s)" % name, changed, False)
+
+    # the stale-plan diagnostic: a rename landed after phantom.py ran
+    msg, _changed = merge_plan([("new_prev", ".text:0x80041000", "type:function size:0x20"),
+                                ("fn_80041020", ".text:0x80041020", "type:function size:0x4")],
+                               [("fn_80041020", "old_prev", 0x24)])
+    check("merge: a stale previous name is refused", "is not defined" in msg, True)
+    check("merge: the refusal names the symbol that ends at the phantom",
+          "the symbol ending at 0x80041020 is new_prev (size:0x20)" in msg, True)
+
+    # an absent phantom whose previous already carries the planned size is the re-apply, not a typo
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "symbols.txt"
+        p.write_bytes(map_text("\n", [("prev", ".text:0x80041000",
+                                       "type:function size:0x24")]).encode("utf-8"))
+        _t, _nl, _l, grown2, deleted2, applied2 = plan_merge(p, [mrow])
+        check("merge: an absent phantom with the new size is already applied",
+              (len(grown2), len(deleted2), applied2), (0, 0, [mrow]))
+
+    # the reference gate
+    fake = lambda names: {n: [("src/x.c", 7, "call %s" % n)] for n in names}
+    msg, changed = merge_plan(adj, [mrow], fake)
+    check("merge: a referenced phantom is refused", "is referenced at src/x.c:7" in msg, True)
+    check("merge: the reference refusal leaves the file alone", changed, False)
+    msg, _c = merge_plan(adj, [mrow], lambda names: {n: [] for n in names})
+    check("merge: a clean reference scan passes", msg, "")
+    check("refs: a known name is found", len(find_refs(["symedit"], ["tools"], 3)["symedit"]) > 0, True)
+    ghost = "fn_" + "9" * 8
+    check("refs: a made-up name is not", find_refs([ghost], ["tools"], 3)[ghost], [])
+
+    # --- the merge-batch file parser -------------------------------------------------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        bf = Path(tmp) / "batch.txt"
+        bf.write_text("# a comment\n\nmerge fn_80041020 prev 0x24\n", encoding="utf-8")
+        check("merge batch: comments and blanks are skipped", read_merge_rows(bf), [mrow])
+        bf.write_text("merge fn_80041020 prev\n", encoding="utf-8")
+        check("merge batch: a short line is refused",
+              "is not 'merge" in message(lambda: read_merge_rows(bf)), True)
+        bf.write_text("rename a b 0x4\n", encoding="utf-8")
+        check("merge batch: a non-merge verb is refused",
+              "is not 'merge" in message(lambda: read_merge_rows(bf)), True)
+        bf.write_text("merge fn_80041020 prev zz\n", encoding="utf-8")
+        check("merge batch: a non-hex size is refused",
+              "has no hex size" in message(lambda: read_merge_rows(bf)), True)
+
+    # --- the merge command path (dry-run and real) -----------------------------------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "symbols.txt"
+        p.write_bytes(map_text("\n", mrows).encode("utf-8"))
+        bf = Path(tmp) / "batch.txt"
+        bf.write_text("# comment\nmerge fn_80041020 prev 0x24\n\n", encoding="utf-8")
+        before = p.read_bytes()
+        ns = argparse.Namespace(file=str(p), dry_run=True, no_refs=True, roots=[], limit=40,
+                                mapfile=str(bf))
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = cmd_merge_batch(ns)
+        check("merge cmd: dry-run returns 0", rc, 0)
+        check("merge cmd: dry-run leaves the file", p.read_bytes(), before)
+        check("merge cmd: dry-run says what it would do",
+              "would grow" in buf.getvalue() and "would delete" in buf.getvalue(), True)
+        ns.dry_run = False
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = cmd_merge_batch(ns)
+        check("merge cmd: returns 0", rc, 0)
+        check("merge cmd: the phantom line is gone", "fn_80041020" in sf.read_text(p), False)
+        check("merge cmd: the previous grew",
+              "prev = .text:0x80041000; // type:function size:0x24" in sf.read_text(p), True)
+        check("merge cmd: reports the counts",
+              "wrote 1 merged, 1 deleted, 0 already merged" in buf.getvalue(), True)
+        once = p.read_bytes()
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = cmd_merge_batch(ns)
+        check("merge cmd: the second run is a no-op",
+              "0 merged, 0 deleted, 1 already merged" in buf.getvalue(), True)
+        check("merge cmd: the bytes do not move", p.read_bytes(), once)
+        check("merge cmd: no temp left", temps(tmp), [])
 
     if fails:
         print("FAIL (%d)" % len(fails))
