@@ -341,6 +341,9 @@ cflags_camellia = [
     "-use_lmw_stmw off",
     "-opt nopeephole",
     "-pool off",
+    # Evidence: the retail object carries extab 0x48 that ours did not emit, and the same unwind-only
+    # records the flag reproduces for g3d (e9522b4) and Pl. Analysis: .pi/notes/extab-gap.md.
+    "-Cpp_exceptions on",
 ]
 
 # RSO runtime flags (DOL-side RSO loader/linker, src/RSO/runtime.c, retail .text 0x804D9B4C..0x804DAE40).
