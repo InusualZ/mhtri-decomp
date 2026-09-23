@@ -38,17 +38,23 @@
  *     `Pl_act_ck`+`fn_8026FE98`-`fn_8026FEF0`, `fn_8026BE94`. Each is a scoped `off`/`reset` pair; no other
  *     function in the range needs it.
  *
- * Residual (all 24 functions written; 23 are exactly 100 %, and the object's only differing bytes are 9
- * inside `fn_8026F908`):
- *   - `fn_8026F908` 98.85 % (9 bytes): the load has to be spelled `(s16)self->unkD4[idx]` - the array+cast
- *     form is what puts `level` in r6 like retail (the pointer-arithmetic spelling is 15 bytes off). What is
- *     left is one colouring tie-break: retail coalesces the load result with the index-address temp
- *     (`add r4,r3,r0; lha r4,212(r4)`, so `value` r4 / `low` r5), ours keeps them apart (`lha r5,212(r4)`,
- *     `value` r5 / `low` r4); the differing `lbz` temp, `subi` and the two `li` bounds follow from that swap.
- *     Moving the same load below the early-out return reproduces retail's registers exactly but then the
- *     3-instruction load block sits after the branch - MWCC does not hoist a load across it - so position and
- *     colouring cannot both be reached from the source. ~60 shapes tried (declaration order, pointer/temp
- *     forms, cast spellings, chain and bounds order, array bounds, pragma state), none better.
+ * Residual: none. All 24 functions are 100 % and `.text` is byte-identical to the target (0x45A0 B, 0
+ * differing bytes).
+ *   - `fn_8026F908` was the last 9 bytes, and they were a colouring tie-break rather than a code shape.
+ *     Retail coalesces the load result with the index-address temp (`add r4,r3,r0; lha r4,212(r4)`, so
+ *     `value` r4 and the class temp r5); the natural source - `s16 value = (s16)self->unkD4[idx];` before
+ *     the early-out, which is the only spelling that puts `level` in r6 - keeps them apart (`lha r5,212(r4)`,
+ *     `value` r5 / class temp r4), the exact mirror. ~200 shapes reproduce that mirror: declaration order,
+ *     pointer/cast/temp/array spellings, `switch`/`do`/`for`/nested-if early-out forms, bounds and chain
+ *     order, named class temporaries, dead statements, all 30 toolchain compilers, and every `-opt` keyword
+ *     and `#pragma` (`peephole`, `scheduling`, `optimization_level 0..4`, `opt_lifetimes`, ...) combination.
+ *     The lever is the *web list order*: MWCC colours the two webs from the order the IR's copy webs were
+ *     born in, so the function carries a three-deep chain of dead copies of `self->weaponClass` (`classCopy0..2`,
+ *     all optimised away) and tests a separate `weaponClass` load. That is the only shape tried that lands
+ *     `value` in r4 with the same 39 instructions; without the chain the function is retail's mirror.
+ *   - The load itself still has to be spelled `(s16)self->unkD4[idx]` (the array+cast form is what puts
+ *     `level` in r6; the pointer-arithmetic spelling is 15 bytes off), and moving it below the early-out
+ *     return puts the 3-instruction load block after the branch - MWCC does not hoist a load across it.
  *   - `fn_8026CC7C` 100 % since the `.data` claim (`.data start:0x805C5FA0 end:0x805C5FC4`, splits.txt) paired
  *     the switch jump table: the section is byte-identical (0x24 B, nine words). The only trace of the old
  *     mismatch is that our reloc reaches the table through the compiler's local symbol (`.data+0`) where the
@@ -83,7 +89,7 @@ typedef struct Vec3 {
  * the action-state region, and the per-part tables at 0xD0/0xD4 are indexed by the callers' part number. */
 struct _PLW {
     u8 pad00[2];          /* 0x00 */
-    u8 unk02;             /* 0x02 - weapon/class id: 3 and 6 are switch cases, 4..6 an "is gun" range */
+    u8 weaponClass;       /* 0x02 - weapon/class id: 3 and 6 are switch cases, 4..6 an "is gun" range */
     u8 pad03[5];          /* 0x03 */
     u8 unk08;             /* 0x08 */
     u8 pad09;             /* 0x09 */
@@ -240,7 +246,7 @@ extern "C" void fn_8026BA1C(_PLW* self)
                 fn_8026A618(self, 65);
             }
         }
-        switch (self->unk02) {
+        switch (self->weaponClass) {
         case 6:
             if (fn_8026FA6C(self, 0, -8192, 8192) == 1) {
                 fn_8026A618(self, 62);
@@ -667,7 +673,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
 {
     ActState* st = (ActState*)&self->unkB8;
     fn_8026CC70((u32)self, (u8*)st);
-    switch (self->unk02) {
+    switch (self->weaponClass) {
     case 0:
         switch (st->mode) {
         case 2:
@@ -1732,11 +1738,17 @@ extern "C" u8 fn_8026F908(_PLW* self, u32 idx)
 {
     u32 level = 0;
     s16 value = (s16)self->unkD4[idx];
+    /* Dead copies, load-bearing for the allocator: retail's colouring needs the class web to be born
+     * after a chain of copies of it (see the unit header). */
+    u32 classCopy0 = self->weaponClass;
+    u32 classCopy1 = classCopy0;
+    u32 classCopy2 = classCopy1;
+    u32 weaponClass = self->weaponClass;
     s32 high;
     s32 mid;
     s32 low;
 
-    if ((u32)(self->unk02 - 4) <= 2 && self->unk18 == 1 && self->unk5E6 == 1) {
+    if ((u32)(weaponClass - 4) <= 2 && self->unk18 == 1 && self->unk5E6 == 1) {
         return 0;
     }
     if (self->unk128 == 2) {
@@ -1882,7 +1894,7 @@ u32 Pl_master_ck(_PLW* self)
 /* 0x8026FE44: true for the "gun" weapon classes. */
 extern "C" u32 fn_8026FE44(_PLW* self)
 {
-    return (u32)(self->unk02 - 4) <= 2;
+    return (u32)(self->weaponClass - 4) <= 2;
 }
 
 #pragma peephole off
