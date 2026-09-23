@@ -37,6 +37,7 @@ import symbolpreflight as preflight  # noqa: E402  (shares its symbols.txt / spl
 
 BAR = 80.0
 SCORE_KEY = "fuzzy_match_percent"
+TEXT_BLOCK = 0x10000
 REPORT_PATH = os.path.join(ROOT, "build", GAME, "report.json")
 CONFIG_PATH = os.path.join(ROOT, "build", GAME, "config.json")
 SOURCES = (
@@ -233,6 +234,7 @@ class Ledger:
             "total_code": measures.get("total_code"),
             "fuzzy_match_percent": measures.get("fuzzy_match_percent"),
             "report_stale": self.stale,
+            "text_blocks": self.text_blocks(),
         }
 
     def modules(self) -> list[dict]:
@@ -279,6 +281,46 @@ class Ledger:
                     }
                 )
         return sorted(out, key=lambda row: (row["worst"], row["unit"]))
+
+    def text_blocks(self, block_size: int = TEXT_BLOCK) -> dict:
+        """Coarse per-0x10000 view of `.text` so the next unit can be picked by address (plan 7.11).
+
+        A block is *touched* when it holds at least one claimed function and *closed* when one of them is at
+        the bar. The largest untouched run is the widest stretch with no claim - the address to work next.
+        """
+        entries = self.by_section.get(".text", ())
+        empty = {"block_size": block_size, "start": 0, "end": 0, "total": 0, "claimed": 0,
+                 "closed": 0, "largest_untouched": None}
+        if not entries:
+            return empty
+        start = min(entry["address"] for entry in entries) // block_size * block_size
+        end = max(entry["address"] + (entry.get("size") or 0) for entry in entries)
+        total = (end - start + block_size - 1) // block_size
+        touched, closed = set(), set()
+        for entry in entries:
+            owner = self.owner(entry)
+            if owner is None:
+                continue
+            block = (entry["address"] - start) // block_size
+            touched.add(block)
+            if self.score(owner, entry) >= BAR:
+                closed.add(block)
+        best_len = best_start = 0
+        run_start = None
+        for block in range(total + 1):
+            if block < total and block not in touched:
+                if run_start is None:
+                    run_start = block
+            elif run_start is not None:
+                if block - run_start > best_len:
+                    best_len, best_start = block - run_start, run_start
+                run_start = None
+        largest = None
+        if best_len:
+            largest = {"blocks": best_len, "start": start + best_start * block_size,
+                       "end": start + (best_start + best_len) * block_size}
+        return {"block_size": block_size, "start": start, "end": end, "total": total,
+                "claimed": len(touched), "closed": len(closed), "largest_untouched": largest}
 
     def next(self, limit: int = 10, kind: str = "function", named_only: bool = False) -> list[dict]:
         out = []
@@ -340,11 +382,23 @@ def render_totals(ledger: Ledger) -> str:
         f" ({totals['fragment_symbols']} of them extab/extabindex/ctors/dtors fragments)",
         f"covered    {totals['claimed_functions']} functions in {totals['units_registered']} registered units"
         f" ({totals['units_configured']} configured, {totals['units_total']} split objects in the report)",
-        f"closed     {totals['closed']} >= {BAR:.0f} %, {totals['partial']} partial,"
+        f"closed     {totals['closed']} / {totals['functions']} >= {BAR:.0f} %, {totals['partial']} partial,"
         f" {totals['unclaimed']} unclaimed  (objdiff counts {totals['matched_functions']} matched)",
         f"bytes      {totals['matched_code']} / {totals['total_code']} of .text"
         f" ({totals['fuzzy_match_percent']} % fuzzy)",
     ]
+    blocks = totals["text_blocks"]
+    if blocks["total"]:
+        lines.append(
+            f"blocks     {blocks['total']} x {blocks['block_size']:#x} in .text,"
+            f" {blocks['claimed']} touched, {blocks['closed']} closed"
+        )
+        run = blocks["largest_untouched"]
+        if run:
+            lines.append(
+                f"           largest untouched run {run['blocks']} blocks,"
+                f" {run['start']:#010x}-{run['end']:#010x}"
+            )
     if totals["report_stale"]:
         lines.append(
             "report     STALE - older than splits.txt/configure.py, so the scores below are one session old"
@@ -396,9 +450,63 @@ def render_unit(unit: dict) -> str:
     return "\n".join(lines)
 
 
+def selftest() -> int:
+    """Fixture check for the byte view (plan 7.11) - no build, no repository state.
+
+    The other views are pinned by `ledger_selftest.py`; this covers what that file predates: the per-0x10000
+    block view and the two burn-downs it feeds.
+    """
+    fails, checks = [], 0
+
+    def check(name, got, want):
+        nonlocal checks
+        checks += 1
+        if got != want:
+            fails.append("%s: got %r want %r" % (name, got, want))
+
+    def sym(name, address, size=0x100):
+        return {"name": name, "section": ".text", "address": address, "type": "function", "size": size,
+                "lineno": 1}
+
+    symbols = [sym("fn_80040000", 0x80040000), sym("fn_80050000", 0x80050000),
+               sym("fn_80070000", 0x80070000), sym("fn_80080000", 0x80080000)]
+    by_section = {".text": symbols}
+    splits = [{"unit": "Mod/text.c", "ranges": [
+        {"section": ".text", "start": 0x80040000, "end": 0x80060000, "rename": None}]}]
+    configured = {"Mod/text.c": {"flag": "NonMatching", "path": "Mod/text.c", "lib": "mod",
+                                  "mw_version": "Wii/1.3", "cflags": "cflags_base"}}
+    report = {"version": 2, "measures": {"matched_code": "0x100", "total_code": "0x500"}, "units": [
+        {"name": "main/Mod/text", "functions": [
+            {"name": "fn_80040000", "fuzzy_match_percent": 90.0},
+            {"name": "fn_80050000", "fuzzy_match_percent": 50.0}]}]}
+    missing = os.path.join(ROOT, "build", GAME, "does-not-exist.json")
+    ledger = Ledger(symbols=({s["name"]: s for s in symbols}, by_section, {}), splits=splits,
+                    configured=configured, report=report, config_path=missing)
+    blocks = ledger.text_blocks()
+    check("block size", blocks["block_size"], 0x10000)
+    check("block origin is aligned down", blocks["start"], 0x80040000)
+    check("blocks total", blocks["total"], 5)
+    check("blocks touched (claimed)", blocks["claimed"], 2)
+    check("blocks closed", blocks["closed"], 1)
+    check("largest untouched run", blocks["largest_untouched"],
+          {"blocks": 3, "start": 0x80060000, "end": 0x80090000})
+    check("totals carries the view", ledger.totals()["text_blocks"], blocks)
+    check("a section with no .text has no blocks",
+          Ledger(symbols=({}, {}, {}), splits=[], configured={}, report={"units": [], "measures": {}},
+                 config_path=missing).text_blocks()["total"], 0)
+    if fails:
+        print("FAIL (%d)" % len(fails))
+        for line in fails:
+            print("  " + line)
+        return 1
+    print("ok - %d checks" % checks)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--selftest", action="store_true", help="run the ledger self-test (plan 7.11)")
     parser.add_argument("--report", default=REPORT_PATH, help="objdiff report (default build/RMHE08/report.json)")
     parser.add_argument("--config", default=CONFIG_PATH, help="dtk config (default build/RMHE08/config.json)")
     sub = parser.add_subparsers(dest="command")
@@ -411,6 +519,9 @@ def main() -> int:
     p = sub.add_parser("unit", help="one unit: ranges, symbols, per-symbol score")
     p.add_argument("name")
     args = parser.parse_args()
+
+    if args.selftest:
+        return selftest()
 
     ledger = Ledger(args.report, args.config)
 

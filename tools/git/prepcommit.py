@@ -141,7 +141,59 @@ def _report_measures() -> dict:
     return {u.get("name", ""): (u.get("measures") or {}) for u in data.get("units", [])}
 
 
-def verify() -> tuple[str, list[str]]:
+def _num(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def ledger_improved(before: dict, after: dict) -> bool:
+    """Did the ledger's closed/matched/bytes move up? The same three keys land.py's verify checks (7.10)."""
+    for key in ("closed", "matched", "bytes"):
+        old, new = _num((before or {}).get(key)), _num((after or {}).get(key))
+        if old is not None and new is not None and new > old:
+            return True
+    return False
+
+
+def improved_since_base() -> bool:
+    """Whether this batch improved, from the recorded base and the existing report - never a fresh build.
+
+    `land.py record-base` writes `.pi/land-base.json` when the batch opens, and `land.ledger_numbers` reads
+    the current numbers out of `build/RMHE08/report.json`. If either is absent the delta is unknown, and
+    unknown is reported as "no improvement" rather than warning on absent evidence.
+    """
+    units = os.path.join(ROOT, "tools", "units")
+    if units not in sys.path:
+        sys.path.insert(0, units)
+    try:
+        import land
+        before = land.read_base(ROOT).get("ledger") or {}
+        after = land.ledger_numbers(ROOT)
+    except Exception:  # a missing build tree, or land's own imports, must never break a commit
+        return False
+    return ledger_improved(before, after)
+
+
+def knowledge_delta_warning(paths: list[str], improved: bool) -> str | None:
+    """The 7.10 rule: a batch that improved a unit owes a docs/, header or flag-comment delta.
+
+    Same shape as land.py verify's check (`not improved or docs_changed or headers_changed`), with the plan's
+    third home - `configure.py` flag evidence - added, since a flag-only improvement otherwise warns forever.
+    """
+    if not improved:
+        return None
+    if any(path.startswith("docs/") or path == "AGENTS.md" for path in paths):
+        return None
+    if any(path == "configure.py" for path in paths):
+        return None
+    if any(path.startswith("src/") and path.endswith((".c", ".cpp", ".cp")) for path in paths):
+        return None
+    return "a unit's score rose but no src/ header, docs/ file or configure.py comment changed (plan 7.10)"
+
+
+def verify(paths: list[str] | None = None) -> tuple[str, list[str]]:
     """Cheap, real evidence for the message: the DOL hash and the last changes report."""
     notes, warnings = [], []
     dol = os.path.join(ROOT, "build", "RMHE08", "main.dol")
@@ -165,6 +217,10 @@ def verify() -> tuple[str, list[str]]:
                 if b and (a is None or int(a) < int(b)) and "auto_" not in name:
                     warnings.append(f"{name}: {key} {b} -> {a} (regression)")
         notes.append("last changes report read: build/RMHE08/report_changes.json")
+    if paths is not None:
+        warning = knowledge_delta_warning(paths, improved_since_base())
+        if warning:
+            warnings.append(warning)
     return "; ".join(notes), warnings
 
 
@@ -268,7 +324,7 @@ def main() -> int:
         print(message_for(split_plan(paths)[0][1], args.message))
         return 0
 
-    notes, warnings = verify()
+    notes, warnings = verify(paths)
     message = message_for(paths, args.message, notes, warnings)
     if args.dry_run:
         print("\n--- message (not written, nothing staged) ---\n" + message)

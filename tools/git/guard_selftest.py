@@ -65,6 +65,30 @@ with tempfile.TemporaryDirectory() as tmp:
     check("empty hash file detected", len(pc.ground_truth_error(dol, sha)), 1)
     check("missing dol tolerated", pc.ground_truth_error(os.path.join(tmp, "nope.dol"), sha), [])
 
+# --- knowledge delta (7.10): an improved batch must carry a document, header or flag comment ----------------
+check("improved + src header: no warning", pc.knowledge_delta_warning(["src/Mod/unit.c"], True), None)
+check("improved + a .cp header: no warning", pc.knowledge_delta_warning(["src/Gecko/Gecko_ExceptionPPC.cp"], True), None)
+check("improved + docs: no warning", pc.knowledge_delta_warning(["docs/plan.md"], True), None)
+check("improved + AGENTS.md: no warning", pc.knowledge_delta_warning(["AGENTS.md"], True), None)
+check("improved + configure.py: no warning", pc.knowledge_delta_warning(["configure.py"], True), None)
+delta = pc.knowledge_delta_warning(["config/RMHE08/splits.txt"], True)
+check("improved with no knowledge: warns", delta is not None, True)
+check("the warning names 7.10", "7.10" in (delta or ""), True)
+check("no improvement: no warning", pc.knowledge_delta_warning(["config/RMHE08/splits.txt"], False), None)
+check("an improved batch with no knowledge path warns",
+      pc.knowledge_delta_warning([], True) is not None, True)
+
+# ledger_improved() is land.py verify's rule, with the report's string byte counts coerced
+check("ledger improved: closed",
+      pc.ledger_improved({"closed": 10, "matched": 5, "bytes": "100"},
+                         {"closed": 11, "matched": 5, "bytes": "100"}), True)
+check("ledger improved: bytes as strings", pc.ledger_improved({"bytes": "100"}, {"bytes": "200"}), True)
+check("a flat ledger is not improved",
+      pc.ledger_improved({"closed": 10, "matched": 5, "bytes": "100"},
+                         {"closed": 10, "matched": 5, "bytes": "100"}), False)
+check("missing sides are not improved", pc.ledger_improved({}, {}), False)
+check("improved_since_base returns a bool", isinstance(pc.improved_since_base(), bool), True)
+
 # --- the hook: present, executable in the index where git records modes, and covering the four refusals -------
 hook = os.path.join(ROOT, "tools", "git", "hooks", "pre-commit")
 check("hook exists", os.path.exists(hook), True)
