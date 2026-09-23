@@ -210,6 +210,29 @@ git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
   Python interpreter absolutely (`C:\…\Python312\python.exe`) — which is why `MAIN` resolution matters and why
   `configure.py` is re-run only in `MAIN`.
 
+**Spawning a worker (herdr).** Workers live in the session's **Worker tab** - never in the orchestrator's own
+pane: a split of the orchestrator's pane drops four agents into the middle of its own work, and the round's
+teardown then has to close the orchestrator's pane to release a worktree. Find the tab once, then one pane per
+worker:
+
+```sh
+herdr tab list                                     # the tab labelled Worker, e.g. w1:t2
+herdr pane split <a pane inside that tab> --cwd <the worker's worktree> --direction down
+herdr agent start <name> --kind pi --pane <the new pane id>
+herdr agent prompt <name> "<read your brief; ack first; you may fan out; then deliver>"
+herdr agent wait <name> --until idle --until blocked
+```
+
+`--cwd` is what makes the rest work: the pane starts *inside* the worktree, so `recompile.py` resolves that
+worktree from its cwd and MAIN's toolchain and target object from git - no junction, no environment variable.
+
+**Teardown is part of the round.** After the handoff and after the integration: close the worker's pane
+(`herdr pane close <pane id>`), **then** `claims.py release <unit>`. A live pane holds its worktree as its cwd
+and Windows refuses to delete a directory a process is sitting in ("Device or resource busy", or
+`git worktree remove` failing with "Permission denied"), so releasing first fails and leaves a directory that
+nothing can remove until that pane goes away. If a worktree cannot be removed, ask who is sitting in it - it may
+be the owner's own pane.
+
 ### 5.2 The worker's input — one generated file, nothing else
 
 `tools/units/brief.py <unit>` writes `tools/units/briefs/<unit>.md`, containing:
@@ -261,7 +284,7 @@ through `recompile.py` (direct compiler invocation, mtime asserted, section size
 | a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never let a worker silently compile nothing |
 | the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse than `main` → drop the branch and re-brief; better → merge, record the residual in the header, mark the unit `partial` in the ledger |
 | `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
-| a claim cannot be released | `git worktree remove` fails with `Permission denied` | a live worker terminal is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory that is a process's cwd. Teardown is therefore part of the orchestrator's round, after the handoff: exit the worker's agent, take its shell out of the worktree (or close the pane), then `claims.py release <unit>`. Until then the claim stays `done` and nothing is lost |
+| a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live pane is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: `herdr pane close <pane>`, then `claims.py release <unit>` - and if that pane is the owner's, ask first, because a stale claim blocks the unit rather than losing anything |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
 ### 5.5 A worker may fan out subagents - under the same rules
