@@ -143,11 +143,12 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
     conclusive = bool(md or cpp_src or c_src)
     if md or cpp_src:
         lang, confidence = "c++", "high"
+    elif c_src:
+        # a `.c` __FILE__ is conclusive C and outranks a mangled callee (the counter-example's shape)
+        lang, confidence = "c", "high"
     elif mu:
         # a mangled *callee* only: report it, but it does not decide the language (see the docstring)
         lang, confidence = "c++", "medium"
-    elif c_src:
-        lang, confidence = "c", "high"
     else:
         lang, confidence = "c", "low"
     return {
@@ -277,9 +278,10 @@ def object_verdict(target: str, labels=None, dol=None) -> dict:
     the only I/O besides reading the object.
     """
     if not os.path.exists(target):
-        return {"lang": None, "confidence": "none", "evidence": [],
-                "sources": [], "conflict": False, "mangled_defined": [], "mangled_undefined": [],
-                "cpp_sources": [], "c_sources": [], "target": target, "error": "no target object"}
+        return {"lang": None, "confidence": "none", "conclusive": False, "suggested": False,
+                "evidence": [], "sources": [], "conflict": False, "mangled_defined": [],
+                "mangled_undefined": [], "cpp_sources": [], "c_sources": [], "target": target,
+                "error": "no target object"}
     if labels is None or dol is None:
         labels, dol = oracle()
     defined, undefined = object_names(target)
@@ -468,8 +470,8 @@ def sweep(main: str) -> dict:
         v["flag_agrees"] = (v["lang"] is None) or (v["effective_lang"] is None) or (v["effective_lang"] == v["lang"])
         v["unit"] = os.path.splitext(reg["path"])[0]
         rows.append(v)
-    ext_dis = [r for r in rows if not r["extension_agrees"] and r["conclusive"]]
-    flag_dis = [r for r in rows if r["effective_lang"] not in (None, r["lang"]) and r["conclusive"]]
+    ext_dis = [r for r in rows if not r["extension_agrees"] and r.get("conclusive")]
+    flag_dis = [r for r in rows if r["effective_lang"] not in (None, r["lang"]) and r.get("conclusive")]
     # a mangled *callee* only: reported, with its reason, but never a rename driver - a C unit can call
     # a mangled function by declaring it with the map's spelling (auto/800FD520_fn_800FD520)
     suggested = [r for r in rows if r.get("suggested")]
@@ -503,7 +505,7 @@ def render_row(r: dict) -> str:
     ev = _evidence_text(r) if r["lang"] else (r.get("error") or "no object")
     warn = ""
     # only *conclusive* evidence drives an extension change; a suggested unit keeps its extension
-    if not r["extension_agrees"] and r["conclusive"]:
+    if not r["extension_agrees"] and r.get("conclusive"):
         warn = "  <- extension %s" % r["extension"]
     if r.get("suggested"):
         warn += "  <- suggested C++ (mangled callee only, not conclusive)"
@@ -515,7 +517,15 @@ def render_row(r: dict) -> str:
 
 
 def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
-    rows = s["extension_disagreements"] + s["flag_disagreements"] if only_disagree else s["units"]
+    if only_disagree:
+        # a unit can be both an extension and a `-lang` disagreement (the same dict object): show it once
+        rows, seen = [], set()
+        for r in s["extension_disagreements"] + s["flag_disagreements"]:
+            if id(r) not in seen:
+                seen.add(id(r))
+                rows.append(r)
+    else:
+        rows = s["units"]
     print("%-52s %-6s %-7s %s" % ("unit (as registered)", "lang", "conf", "evidence"), file=out)
     for r in rows:
         print(render_row(r), file=out)
@@ -692,6 +702,9 @@ def selftest() -> int:
         check("its __FILE__ evidence is ef_line.cpp", "ef_line.cpp" in v["sources"], True)
         check("its mangled callee is Panic", any(m.startswith("Panic__Q24nw4r2d") for m in v["mangled_undefined"]), True)
         check("a missing object is reported, not guessed", object_verdict(real + ".nope")["lang"], None)
+        check("a missing object carries the new flags (no KeyError downstream)",
+              (object_verdict(real + ".nope")["conclusive"], object_verdict(real + ".nope")["suggested"]),
+              (False, False))
 
         # the sweep report, end to end, against the real tree - it is what the promotion pass consumes
         import io
@@ -782,7 +795,10 @@ def selftest() -> int:
     check("C++ paragraph says extern \"C\"", 'extern "C"' in p, True)
     check("C++ paragraph names row 42", "row 42" in p, True)
     p = brief_paragraph(classify([], ["get_now_areano__Fv"], []))
-    check("probable C++ says probable", "probable" in p, True)
+    check("a suggested C++ says the evidence is only suggestive", "only suggestive" in p, True)
+    check("a suggested C++ says only conclusive evidence changes the language", "only conclusive" in p, True)
+    check("a suggested C++ cites the 800FD520 counter-example", "800FD520" in p, True)
+    check("a suggested C++ says keep .c unless conclusive evidence appears", "Keep `.c`" in p, True)
     p = brief_paragraph(classify([], [], []))
     check("an unevidenced unit says C is the default", "default" in p and "`.c`" in p, True)
     p = brief_paragraph(classify([], [], ["OSAlarm.c"]))
