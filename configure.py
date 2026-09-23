@@ -250,7 +250,6 @@ cflags_ppceabi = [*cflags_runtime, "-func_align", "4"]
 # The two bootstrap files want 16-byte function alignment (their .init regions carry the retail zero padding:
 # __start 0x300 vs our 0x2E0, __ppc_eabi_init 0x64 vs our 0x58), while the rest of this lib packs on 4.
 cflags_ppceabi16 = [*cflags_runtime, "-func_align", "16"]
-cflags_ppceabi32 = [*cflags_runtime, "-func_align", "32"]
 
 
 # REL flags
