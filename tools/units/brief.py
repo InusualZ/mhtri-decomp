@@ -282,6 +282,7 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("| object (yours) | `%s` |" % b["object"])
     lines.append("| target (read-only, MAIN) | `%s` |" % b["target"])
     lines.append("| worktree | `%s` |" % b["worktree"])
+    lines.append("| build | **yours**: `build/RMHE08` in your worktree - compile and measure there, never in MAIN's `build/` |")
     lines.append("| sections | %s |" % (", ".join("%s 0x%X-0x%X" % (s, a, e) for s, (a, e, _n) in sorted(rng.items()))
                                         or "(none in splits.txt)"))
     if b["flags"]:
@@ -354,6 +355,10 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("Measurement loop (never `ninja`, never the link, never the split):")
     lines.append("")
     lines.append("```sh")
+    lines.append("**Build in your worktree, never in MAIN's.** `build/RMHE08` there is yours alone; MAIN's belongs to")
+    lines.append("the orchestrator, and several workers share this machine. The target objects you diff against are read-only")
+    lines.append("in MAIN, and your worktree's `build/tools` is seeded with the toolchain (`dtk`, `objdiff-cli`, `sjiswrap`).")
+    lines.append("")
     lines.append("python tools/units/recompile.py %s --measure <symbol>   # compiles YOUR source in YOUR worktree" % b["unit"])
     lines.append("```")
     lines.append("")
