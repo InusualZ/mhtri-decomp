@@ -757,6 +757,29 @@ and when a slot frees, prefer a new unit, a new symbol or the next attribution b
 The 11 units that *are* flipped: `Runtime.PPCEABI.H/{__start,__ppc_eabi_init,global_destructor_chain,__init_cpp_exceptions,memcpy,memset}`,
 `g3d/g3d_resanmamblight`, `Network/NetworkWiiMediator`, `OS/OSAlarm`, `lobby/lobby_scene`, `Pl/pl_master`.
 
+### The breadth blocker: rule 7 versus the `auto` bucket (2026-09-23)
+
+Every `auto/*` unit is named `fn_XXXXXXXX` by construction - the symbol map has no better name and the naming rule
+forbids inventing one - and a reconstructed body necessarily *calls* other `fn_XXXXXXXX` functions. Section 6.5's
+rule 7 counts both, so `stylelint --diff` adds a violation for any breadth landing and `land.py` refuses the batch.
+Measured on `auto/802B2978_fn_802B2978`, whose first body reached 99.93 % on its only function with `.text` exact
+296 B: the lint reports `+1 rule 7` and the gate stops there. Its branch (`worker/802b2978-fn-802b2978-90ed`,
+commit `98c8931f`) is safe and ready to land the moment this is settled.
+
+**This is a policy question, not a code one**: rule 7 should not be enforced under `src/auto/`. Those files are the
+attribution scaffolding - their names come from the map, their bodies are reconstructed *before* the symbol is
+understood, and renaming one is a separate batch (`symedit.py` + re-split) that the naming rule itself forbids while
+the name is unknown. Everything else in 6.5 still applies to them (types with sizes, fields with offsets and context
+names, no pointer arithmetic). Until the exemption exists, breadth work can be prepared and committed on a branch
+but not landed, so this is the first thing to settle before the next breadth round lands.
+
+Two smaller findings from the same round, both already fixed or decided:
+* the `auto` bucket's first landed body wanted `-opt nopeephole` as the *unit's* flag (its neighbour `fn_802B2AA0`'s
+  target object shows the same unfused `lis`/`stw`, so the setting is TU-wide) - row 33's answer, and the source's
+  pragma pair is the stand-in until a per-region `cflags` group exists;
+* the claim's key was the unit's *spelling*, so `auto/X` and `auto/X.c` defeated the lock and two workers took one
+  unit. `claims.norm_unit` now strips the source extension at claim and release (commit `c36ab86f`).
+
 ### Production mode (owner, 2026-09-23)
 
 The campaign now runs continuously and the orchestrator manages it: **the worker slots stay full and the queue is
