@@ -258,7 +258,7 @@ def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
 
 
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
-           allow_regression: list[str] | None = None) -> int:
+           allow_regression: list[str] | None = None, worker_units: bool = True) -> int:
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str]] = []
 
@@ -284,14 +284,17 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     paths = changed_paths(main)
     bad = outside_batch(paths)
     check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad))
-    if units:
+    if units and worker_units:
         ok_units, problems = outbox_units(main, units)
         check("every unit's outbox validates", not problems, "; ".join(problems[:4]))
         uncommitted = [u for u in units if branch_commits(main, u, want_base) == 0]
         check("every unit's branch carries its work as commits", not uncommitted,
               "no commits on the branch (work left uncommitted in the worktree?): %s" % ", ".join(uncommitted))
+    elif units:
+        check("orchestrator-only batch (no worker outboxes to check)", True,
+              info="%d unit(s): %s" % (len(units), ", ".join(units)))
     else:
-        check("batch units named", False, "pass --units (the outboxes are what the batch is judged by)")
+        check("batch units named", False, "pass --units (or --no-worker-units for an orchestrator-only batch)")
 
     # 4. the style lint (7.21), when it exists
     lint = os.path.join(main, "tools", "units", "stylelint.py")
@@ -455,6 +458,8 @@ def main() -> int:
     v.add_argument("--units", default=None, help="comma-separated units in this batch")
     v.add_argument("--dry-run", action="store_true", help="run the cheap checks only; touch nothing")
     v.add_argument("--no-build", action="store_true", help="skip the split/link/ok/baseline steps")
+    v.add_argument("--no-worker-units", action="store_true", dest="no_worker_units",
+                   help="orchestrator-only batch (a flip, a range claim): no outbox or branch to check")
     v.add_argument("--allow-regression", action="append", default=[],
                    help="unit whose measured regression is authorised by a rule (recorded in the message); repeatable")
     v.add_argument("--json", action="store_true")
@@ -469,7 +474,8 @@ def main() -> int:
         return 0
     if args.cmd == "verify":
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
-        return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression)
+        return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
+                      worker_units=not args.no_worker_units)
     ap.print_help()
     return 0
 
