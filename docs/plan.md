@@ -727,6 +727,25 @@ attempts, not a fourth); (3) its working budget runs out — and then only at a 
 
 ## 12. The next batches, concretely
 
+### Production mode (owner, 2026-09-23)
+
+The campaign now runs continuously and the orchestrator manages it: **the worker slots stay full and the queue is
+worked without per-batch approval.** The loop is one unit of work wide and the same for every kind of work:
+
+1. **Prepare** (a worker, no build): a batch's stubs and its paste-ready shared-file edits, a tooling fix, a
+   read-only investigation, or a matching round on one unit in its own worktree.
+2. **Apply** (the orchestrator, owns the build): the `splits.txt`/`configure.py` edits or the cherry-pick, then
+   **one re-split and one `land.py` gate** per batch - renames, phantom merges, range claims and source work ride
+   the same split (item 4 of the constraints above).
+3. **Land** one unit at a time: cherry-pick, gate, commit, `claims.py release`, `git worktree remove` (close the
+   pane first - a live pane holds the worktree's cwd on Windows).
+4. **Refill**: as soon as a slot frees, launch the next item, so the round never drains.
+
+Work is chosen by the ledger: the next attribution run by the block view, the next residual unit by the per-module
+table, the next flip by `flipcheck.py`. The gates stay on (they have caught real regressions, protocol bugs and a
+wrong premise this session); what the owner has removed is the *approval*, not the verification. A stop is only
+for the plan's own conditions: the target closed, a check that will not pass after three attempts, or the budget.
+
 **Today there are no workers**, and that is the normal case: the orchestrator does everything itself. The §5.2
 brief is then a *file it writes for itself* too, so a later worker can pick the unit up, and the compile is
 `ninja build/RMHE08/src/<unit>.o` instead of `recompile.py`. Nothing in the protocol waits for workers to exist.
