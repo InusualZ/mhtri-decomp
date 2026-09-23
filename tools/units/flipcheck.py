@@ -23,9 +23,14 @@ OBJDUMP = os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objdump.exe")
 SPLITS = os.path.join(MAIN, "config", "RMHE08", "splits.txt")
 SRC = os.path.join(MAIN, "build", "RMHE08", "src")
 
-SEC_RE = re.compile(r"^\s*\d+\s+(\.\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
+# section names may or may not start with a dot: extab/extabindex do not.
+SEC_RE = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
 CLAIM_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)(?:\s+rename:(\S+))?")
 IGNORE = (".comment", ".note.split", ".symtab", ".strtab", ".shstrtab", ".rela")
+# Sections the linker builds by concatenating each object's fragment in command-line order. Substituting a
+# Matching object for the target moves it in that list, so every later fragment shifts one slot and the
+# section's contents change while its address and size stay the same (plan 7.19).
+ORDER_SENSITIVE = ("extab", "extabindex", ".ctors", ".dtors")
 
 
 def sections(path: str) -> dict[str, tuple[int, int]]:
@@ -96,6 +101,13 @@ def check(unit: str, claim: dict[str, tuple[int, int]]) -> list[str]:
     for name in sorted(set(ours) - set(claim)):
         problems.append("%s (0x%X) is in the object but not claimed by splits.txt - "
                         "it will be linked somewhere the original had nothing" % (name, ours[name][0]))
+
+    sensitive = sorted(n for n in ours if n.startswith(ORDER_SENSITIVE))
+    if sensitive:
+        problems.append("contributes ORDER-SENSITIVE sections (%s) - the linker concatenates these in object "
+                        "order, so a flip reorders every later fragment and the section's contents change even "
+                        "when the bytes match (plan 7.19); needs the link step to substitute in place"
+                        % ", ".join("%s 0x%X" % (n, ours[n][0]) for n in sensitive))
 
     # sizes and alignment matching is not enough: the bytes have to be the original's too.
     for name in sorted(set(ours) & set(claim)):
