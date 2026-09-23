@@ -283,6 +283,7 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("| target (read-only, MAIN) | `%s` |" % b["target"])
     lines.append("| worktree | `%s` |" % b["worktree"])
     lines.append("| build | **yours**: `build/RMHE08` in your worktree - compile and measure there, never in MAIN's `build/` |")
+    lines.append("| edits | **yours only**: change files inside your worktree. MAIN's working tree belongs to the orchestrator, and other workers are often mid-round in it - an edit there blocks every batch gate |")
     lines.append("| sections | %s |" % (", ".join("%s 0x%X-0x%X" % (s, a, e) for s, (a, e, _n) in sorted(rng.items()))
                                         or "(none in splits.txt)"))
     if b["flags"]:
