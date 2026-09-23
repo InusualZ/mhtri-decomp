@@ -537,9 +537,15 @@ proof has to contain (detail: `.pi/notes/flip-round-1.md`):
    `__init_cpp_exceptions_reference` (the symbol is absent from the ELF) and every later entry shifts one slot,
    while `.dtors` is off by one entry only. `sys_mem` shows the same shape in `extab`/`extabindex`
    (`_eti_init_info` 0x8003F1C8 -> 0x8003F17C, 5 536 639 differing DOL bytes) even though its fragments are
-   byte-identical too. Next diagnostic: whether a *second* object also covers those regions - the fragments are
-   claimed by `splits.txt` with a `rename:`, so a `dol split` pass may still leave an auto blob on the same
-   bytes.
+   The lead that fits every observation: dtk's stand-in `auto_*` blobs name their constructor word **`.ctors`**
+   (bare) where a real object spells it **`.ctors$10`** - 90 of 10 813 `auto_fn_*` blobs carry a bare `.ctors`,
+   e.g. `auto_fn_80046B94_text.o` with `R_PPC_ADDR32 fn_80046B94`. The merged `.ctors` is therefore built from
+   two name forms and the order of the two groups decides the table: green, the single `.ctors$10` fragment
+   (`__init_cpp_exceptions`) comes first and the bare group starts with `fn_80046B94` - exactly retail's
+   `.ctors[0]`/`.ctors[1]`; flipped, the groups come out the other way round. The anomaly is on the
+   split/attribution side (a fragment named differently from the original object's), not in the unit - the same
+   "every symbol in its unit" work as the campaign's primary goal. Rejected with evidence on the way: a second
+   object covering those bytes, and object reordering (dtk substitutes in place).
 
 `tools/units/flipcheck.py` checks all three conditions per unit (claim vs emitted sections, sizes/alignment,
 and the bytes against the target object) and reports **7 of 19 ready**. Its one false positive is
