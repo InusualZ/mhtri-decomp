@@ -27,22 +27,11 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8009AA78_fn_8009AA78.c`.
  */
 
-#include "types.h"
+#include "gx.h"
 
-/* The write-gather-pipe window at 0xCC008000, one store per width as the SDK's `GXWGFifo` union is.
- * size: 0x8 (the f64 member sets the alignment). */
-typedef union {
-    u8 u8;   /* +0x0 */
-    u16 u16; /* +0x0 */
-    u32 u32; /* +0x0 */
-    s8 s8;   /* +0x0 */
-    s16 s16; /* +0x0 */
-    s32 s32; /* +0x0 */
-    f32 f32; /* +0x0 */
-    f64 f64; /* +0x0 */
-} GXWGFifo_t;
-
-#define GXWGFifo (*(volatile GXWGFifo_t*)0xCC008000)
+/* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `include/gx.h` now that
+ * a second `auto` unit (the GX-writer family at 0x800C6F90) needs them too (AGENTS.md -> Conventions,
+ * rule 1: a type more than one unit uses lives in one header). */
 
 /* Pipe writers and the byte table, all defined by other translation units of the same library; the
  * addresses are the map's and the local extab names above are the only object-level difference. */
