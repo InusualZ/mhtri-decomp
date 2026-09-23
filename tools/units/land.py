@@ -13,10 +13,14 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   outside the batch's expected set, or whose outbox entry does not validate;
 * runs the style lint when it exists (7.21), reports the ledger delta, and warns when a unit improved with no
   document or header change to show for it (7.10);
-* refreshes the baseline afterwards (7.16), so `ninja changes` compares against the batch that just landed.
+* refreshes the baseline afterwards (7.16), so `ninja changes` compares against the batch that just landed;
+* and **releases the claim of every unit it just gated** (owner's rule, "Teardown is part of landing"): a
+  landed unit must not leave a worktree, a merged branch or a registry entry behind. A release that is
+  incomplete (a live pane, a worktree that would not go) fails the gate and names what held it; `--no-release`
+  turns the step off for an orchestrator-only batch.
 
     python tools/units/land.py record-base [--json]
-    python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--allow PATH]
+    python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-release] [--allow PATH]
 
 `verify` never commits. It writes the message to `.git/land_msg.txt` and prints it; committing stays a
 separate, deliberate step (and `prepcommit.py` stages the paths).
@@ -271,8 +275,23 @@ def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
     return ok, problems
 
 
+def release_plan(checks: list[tuple], units: list[str], release_claims: bool) -> list[str]:
+    """The units whose claim `verify` releases: every gated unit, but only once every check so far passed.
+
+    Releasing is a side effect, so it must not run behind a failed gate - a refused batch has to leave its
+    worker's branch and worktree exactly as they are, or the retry has nothing to re-run. `--no-release`
+    (and an orchestrator-only batch, which has no worker claim) turns the step off entirely.
+    """
+    if not release_claims or not units:
+        return []
+    if any(not good for _n, good, _d, _i in checks):
+        return []
+    return list(units)
+
+
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
-           allow_regression: list[str] | None = None, worker_units: bool = True) -> int:
+           allow_regression: list[str] | None = None, worker_units: bool = True,
+           release_claims: bool = True) -> int:
     # a unit's *name* is its path without the source extension (`claims.norm_unit`): `Camellia/camellia` and
     # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
     # whichever the orchestrator typed.
@@ -400,6 +419,24 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # 7. the baseline, so the next batch's `ninja changes` compares against this one (7.16)
     if not no_build:
         gate("ninja baseline", ["ninja", "baseline"])
+
+    # 8. the teardown (owner's rule): release the claim of every unit just gated. This runs after the build
+    # checks and only when every one of them passed, so a refused batch keeps its branch and worktree for the
+    # retry; an incomplete teardown is itself a failed check (a live pane is named, not silently kept).
+    to_release = release_plan(checks, units, release_claims and worker_units)
+    for unit_name in to_release:
+        out = claims.release(unit_name, main, force=False, dry_run=False)
+        failed_step = next((s for s in out["steps"] if s["status"] == "failed"), None)
+        note = out.get("refused") or (("failed: %s - %s" % (failed_step["label"], failed_step["why"]))
+                                      if failed_step else "")
+        info = "branch %s" % out["branch"]
+        if out.get("release_ref"):
+            info += "; un-merged commits rescued to %s" % out["release_ref"]
+        check("claim released: %s" % unit_name, bool(out.get("complete")), note, info=info)
+    if release_claims and worker_units and units and not to_release:
+        check("claim release deferred", True, info="a check above failed - the claim is left alone")
+    elif units and not (release_claims and worker_units):
+        check("claim release skipped", True, info="--no-release or an orchestrator-only batch")
 
     print("%-58s %s" % ("check", "result"))
     for name, good, detail, info in checks:
@@ -547,6 +584,13 @@ def selftest() -> int:
         check("the outbox path ignores the spelling",
               claims.outbox_path(tmp, "Camellia/camellia.c"), claims.outbox_path(tmp, "Camellia/camellia"))
 
+    # the teardown step (owner's rule): a green gate releases the batch's claims, a failed one leaves them
+    green = [("ground truth", True, "", ""), ("ok", True, "", "")]
+    red = [("ground truth", True, "", ""), ("ok was recreated by THIS run", False, "stale stamp", "")]
+    check("a green gate releases the batch's claims", release_plan(green, ["Pl/pl_act"], True), ["Pl/pl_act"])
+    check("a failed gate leaves the claims alone", release_plan(red, ["Pl/pl_act"], True), [])
+    check("--no-release turns the teardown off", release_plan(green, ["Pl/pl_act"], False), [])
+    check("an empty batch releases nothing", release_plan(green, [], True), [])
     check("summary delta", summary({"closed": 284, "matched": 217}, {"closed": 290, "matched": 223}),
           "closed 284 -> 290, matched 217 -> 223")
     check("summary tolerates a missing side", summary({}, {}), "(ledger numbers unavailable)")
@@ -572,6 +616,8 @@ def main() -> int:
     v.add_argument("--no-build", action="store_true", help="skip the split/link/ok/baseline steps")
     v.add_argument("--no-worker-units", action="store_true", dest="no_worker_units",
                    help="orchestrator-only batch (a flip, a range claim): no outbox or branch to check")
+    v.add_argument("--no-release", action="store_true", dest="no_release",
+                   help="do not release the batch's claims (an orchestrator-only batch has none)")
     v.add_argument("--allow-regression", action="append", default=[],
                    help="unit whose measured regression is authorised by a rule (recorded in the message); repeatable")
     v.add_argument("--json", action="store_true")
@@ -587,7 +633,7 @@ def main() -> int:
     if args.cmd == "verify":
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
-                      worker_units=not args.no_worker_units)
+                      worker_units=not args.no_worker_units, release_claims=not args.no_release)
     ap.print_help()
     return 0
 
