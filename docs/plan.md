@@ -261,6 +261,7 @@ through `recompile.py` (direct compiler invocation, mtime asserted, section size
 | a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never let a worker silently compile nothing |
 | the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse than `main` → drop the branch and re-brief; better → merge, record the residual in the header, mark the unit `partial` in the ledger |
 | `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
+| a claim cannot be released | `git worktree remove` fails with `Permission denied` | a live worker terminal is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory that is a process's cwd. Teardown is therefore part of the orchestrator's round, after the handoff: exit the worker's agent, take its shell out of the worktree (or close the pane), then `claims.py release <unit>`. Until then the claim stays `done` and nothing is lost |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
 ### 5.5 A worker may fan out subagents - under the same rules
