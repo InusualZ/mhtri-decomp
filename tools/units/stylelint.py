@@ -19,7 +19,7 @@ Rules checked (each finding is `file:line`):
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
 | 6 | no pointer arithmetic reaches a field | a `(T*)base + 0xNN` / `(T*)(base + 0xNN)` cast-plus-literal-offset expression, except an offset passed straight to `memset`/`memcpy`/`memmove` (the rule's own byte-range exception) |
-| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's) |
+| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's); **not enforced under `src/auto/`** - see below |
 | 8 | `goto` is forbidden | the `goto` keyword |
 
 Rules 1 (a shared type lives in one header) and 2 (an extern lives with the TU that owns it) need
@@ -34,6 +34,15 @@ exists for.
 The backlog is a burn-down, not a gate: `--diff` fails only when a (rule, file) count rises, so touching a
 unit with 300 `unk*` fields is allowed as long as the touch adds none. A **new** file starts from zero, so
 its violations are all additions - new work is held to the rules from its first commit.
+
+**Rule 7 is not enforced under `src/auto/`** (`EXEMPT` below, decided 2026-09-23 - docs/plan.md, "The
+breadth blocker: rule 7 versus the `auto` bucket"). Those files are the attribution scaffolding: the symbol
+map has no better name for them and the naming rule forbids inventing one while the name is unknown, so
+their own `fn_XXXXXXXX` name and every call they make to another `fn_XXXXXXXX` are exactly what the rule
+would flag - it would reject every breadth landing. Renaming one is a separate `symedit.py` + re-split
+batch, not a source edit. **Rules 1-6 and 8 still apply there** (sized types, fields with offsets and
+context names, no pointer arithmetic, no `goto`), and rule 7 is enforced everywhere else - the exemption is
+keyed on the `src/auto/` path prefix, so it cannot leak into a neighbouring unit.
 """
 
 from __future__ import annotations
@@ -47,6 +56,10 @@ import sys
 
 SRC = "src"
 SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
+
+# The attribution scaffolding is exempt from rule 7 (docs/plan.md, "The breadth blocker"). One entry per
+# (rule, path prefix); every other rule still applies under the prefix.
+EXEMPT = [(7, "src/auto/", "attribution scaffolding: the name comes from the symbol map")]
 
 RULE_NAMES = {
     3: "struct/class states its size (/* size: 0xNN */)",
@@ -339,14 +352,15 @@ def lint_source(src: Source) -> list[dict]:
             continue
         out.append(_finding(src, 6, src.line_of(m.start()), "pointer arithmetic: `%s`" % m.group(0).strip()))
 
-    def in_field(pos: int) -> bool:
-        return any(a <= pos < b for a, b in field_spans)
+    if rule_enforced(7, src.rel):
+        def in_field(pos: int) -> bool:
+            return any(a <= pos < b for a, b in field_spans)
 
-    for m in RULE7_FN_RE.finditer(src.code):
-        out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
-    for m in RULE7_UNK_RE.finditer(src.code):
-        if not in_field(m.start()):
-            out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
+        for m in RULE7_FN_RE.finditer(src.code):
+            out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
+        for m in RULE7_UNK_RE.finditer(src.code):
+            if not in_field(m.start()):
+                out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
 
     for m in RULE8_RE.finditer(src.code):
         out.append(_finding(src, 8, src.line_of(m.start()), "goto statement"))
@@ -405,6 +419,17 @@ def unique_names(findings: list[dict]) -> dict:
                 for m in [re.search(r"`([^`]+)`", f["detail"])] if m}
     return {"fn_names": len(names(7, "auto")), "unk_identifiers": len(names(7, "bare")),
             "unk_fields": len(names(5, "")), "types": len(names(3, ""))}
+
+
+def rule_enforced(rule: int, rel: str) -> bool:
+    """Whether `rule` is enforced for the repo-relative path `rel` (see `EXEMPT`)."""
+    norm = rel.replace("\\", "/")
+    return not any(rule == r and norm.startswith(prefix) for r, prefix, _why in EXEMPT)
+
+
+def exemptions() -> list[dict]:
+    """The `EXEMPT` table in the shape the JSON output reports it."""
+    return [{"rule": r, "prefix": p, "why": w} for r, p, w in EXEMPT]
 
 
 def rule_counts(findings: list[dict]) -> dict[tuple[int, str], int]:
@@ -502,6 +527,8 @@ def print_budget(findings: list[dict]) -> None:
           % (b["findings"], len(b["units"]), len(source_files_of(findings))))
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))
+    for rule, prefix, why in EXEMPT:
+        print("not enforced: rule %d under %s (%s)" % (rule, prefix, why))
 
 
 def source_files_of(findings: list[dict]) -> set[str]:
@@ -513,6 +540,8 @@ def print_findings(findings: list[dict]) -> None:
         print("%s:%d: rule %d: %s [%s]" % (f["file"], f["line"], f["rule"], f["detail"], f["text"]))
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))
+    for rule, prefix, why in EXEMPT:
+        print("not enforced: rule %d under %s (%s)" % (rule, prefix, why))
 
 
 # --------------------------------------------------------------------------------------------------
@@ -528,11 +557,11 @@ def selftest() -> int:
         if got != want:
             fails.append("%s: got %r want %r" % (name, got, want))
 
-    def rules_of(text: str) -> list[tuple[int, int]]:
-        return [(f["rule"], f["line"]) for f in lint_source(Source("x.c", "x.c", text))]
+    def rules_of(text: str, rel: str = "x.c") -> list[tuple[int, int]]:
+        return [(f["rule"], f["line"]) for f in lint_source(Source("x.c", rel, text))]
 
-    def lines_of(text: str, rule: int) -> list[int]:
-        return [f["line"] for f in lint_source(Source("x.c", "x.c", text)) if f["rule"] == rule]
+    def lines_of(text: str, rule: int, rel: str = "x.c") -> list[int]:
+        return [f["line"] for f in lint_source(Source("x.c", rel, text)) if f["rule"] == rule]
 
     # --- stripping --------------------------------------------------------------------------------
     code, comm = strip("a /* goto */ b\nc // goto\nd \"goto\" 'x'\n")
@@ -629,6 +658,37 @@ def selftest() -> int:
     check("rule7: a name that merely contains unk is clean", lines_of("void f(void) {\n    u32 junk = 0;\n}\n", 7), [])
     check("rule7: fn_ with the wrong digit count is clean", lines_of("void fn_1234(void) {}\n", 7), [])
 
+    # --- rule 7 exemption under src/auto/ (docs/plan.md, "The breadth blocker") --------------------
+    auto = "src/auto/802B2978_fn_802B2978.c"
+    check("rule7 exempt: an auto file's own fn_ name is clean",
+          lines_of("void fn_802B2978(void) {}\n", 7, auto), [])
+    check("rule7 exempt: an auto body calling fn_ is clean",
+          lines_of("void fn_802B2978(void) {\n    fn_80040598();\n}\n", 7, auto), [])
+    check("rule7 exempt: a bare unk local is clean under src/auto/ too",
+          lines_of("void fn_802B2978(void) {\n    u32 unk4 = 0;\n}\n", 7, auto), [])
+    check("rule7 exempt: a subdirectory of src/auto/ is covered",
+          lines_of("void fn_802B2978(void) {}\n", 7, "src/auto/deep/x.c"), [])
+    check("rule7 exempt: a path that merely contains auto is not covered",
+          lines_of("void fn_802B2978(void) {}\n", 7, "src/auto_tools/x.c"), [1])
+    check("rule7 exempt: a sibling prefix is not covered",
+          lines_of("void fn_802B2978(void) {}\n", 7, "src/automaton/x.c"), [1])
+    check("rule7 exempt: the same code under src/Pl/ is still a violation",
+          lines_of("void fn_802B2978(void) {}\n", 7, "src/Pl/pl_act.cpp"), [1])
+    check("rule7 exempt: a src/Pl/ body calling fn_ is still a violation",
+          lines_of("void Pl_x(void) {\n    fn_80040598();\n}\n", 7, "src/Pl/pl_act.cpp"), [2])
+    check("rule7 exempt: only rule 7 is exempt - rule 4 still fires under src/auto/",
+          lines_of("/* size: 0x8 */\nstruct A {\n    u32 x;\n};\n", 4, auto), [3])
+    check("rule7 exempt: rule 6 still fires under src/auto/",
+          lines_of("void fn_802B2978(u8* p) {\n    *(u32*)((u8*)p + 4) = 1;\n}\n", 6, auto), [2])
+    check("rule7 exempt: rule 8 still fires under src/auto/",
+          lines_of("void fn_802B2978(void) {\n    goto out;\nout:\n    return;\n}\n", 8, auto), [2])
+    check("rule7 exempt: rule_enforced is path-keyed",
+          [rule_enforced(7, "src/auto/x.c"), rule_enforced(7, "src/Pl/x.c"),
+           rule_enforced(6, "src/auto/x.c"), rule_enforced(7, "src/auto\\x.c")],
+          [False, True, True, False])
+    check("rule7 exempt: the exemption table names rule 7 and src/auto/",
+          [(r, p) for r, p, _w in EXEMPT], [(7, "src/auto/")])
+
     # --- rule 8: goto -----------------------------------------------------------------------------
     check("rule8: goto is a violation", lines_of("void f(void) {\n    goto out;\nout:\n    return;\n}\n", 8), [2])
     check("rule8: goto in a comment is clean",
@@ -715,7 +775,8 @@ def main(argv: list[str] | None = None) -> int:
         added = diff_deltas(before, after)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
-                              "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED]}, indent=2))
+                              "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
+                              "exempt": exemptions()}, indent=2))
         elif added:
             print("stylelint: the batch adds %d section 6.5 violation(s) over %d changed file(s):"
                   % (sum(a["added"] for a in added), len(rels)))
@@ -723,15 +784,19 @@ def main(argv: list[str] | None = None) -> int:
                 print("  +%d rule %d  %s  (%d -> %d)" % (a["added"], a["rule"], a["file"], a["before"], a["after"]))
             for num, what in UNCHECKED:
                 print("  not checked (cross-file): rule %d - %s" % (num, what))
+            for rule, prefix, why in EXEMPT:
+                print("  not enforced: rule %d under %s (%s)" % (rule, prefix, why))
         else:
-            print("stylelint: no new section 6.5 violation over %d changed file(s) (rules 1-2 not checked: cross-file)"
+            print("stylelint: no new section 6.5 violation over %d changed file(s) "
+                  "(rules 1-2 not checked: cross-file; rule 7 not enforced under src/auto/)"
                   % len(rels))
         return 1 if added else 0
 
     findings = lint_tree(root)
     if args.json:
         print(json.dumps({"budget": budget(findings),
-                          "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED]}, indent=2))
+                          "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
+                          "exempt": exemptions()}, indent=2))
     elif args.budget:
         print_budget(findings)
     else:
