@@ -315,6 +315,18 @@ cflags_pl = [
     "-opt nopeephole",
     "-Cpp_exceptions on",
 ]
+
+# pl_skill flags (src/Pl/pl_skill.cpp). cflags_pl plus `-opt nopeephole,level=4`: at level 3 the
+# allocator rematerialises fn_8027350C's `plw + i*4` base across the fn_802693C4/fn_80269474 call;
+# at level 4 it keeps it in r24 like the target (416 -> 404 B, 95.50 -> 99.21). Measured on the
+# whole TU: the pragma-free source under this flag set is codegen-identical to the pragma build -
+# 0 of 197 symbols move and every allocatable section is byte-equal (only MWCC's generated local
+# `@NNN` names in .strtab shift by 2). The level is per-object, not per-lib: pl_master loses
+# fn_8026CC70 at level 4 (100 -> 33.33) and is a flipped Matching unit, so cflags_pl stays level 3.
+cflags_pl_skill = [
+    *[f for f in cflags_pl if f != "-opt nopeephole"],
+    "-opt nopeephole,level=4",
+]
 cflags_main = [
     *[f for f in cflags_lobby if f != "-inline auto"],
     "-inline noauto",
@@ -610,7 +622,7 @@ config.libs = [
         "progress_category": "game",
         "host": False,
         "objects": [
-            Object(NonMatching, "Pl/pl_skill.cpp"),
+            Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
             # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.

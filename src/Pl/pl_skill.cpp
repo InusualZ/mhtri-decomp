@@ -49,7 +49,8 @@
  *     against the target's three linear `subi`/`cmplwi` range tests, and - in fn_80271E0C - the C block's
  *     `deco_count` bound, which the target keeps in r0 and re-masks (`clrlwi r5, r0, 24`) for the `< 3`
  *     test where we reuse the register. The removed label-chain shapes measured 98.59 / 97.97.
- *   fn_8027350C 99.21 - with the level-4 pragma (below) the target's shape is reproduced exactly,
+ *   fn_8027350C 99.21 - at the unit's level 4 (`cflags_pl_skill` in configure.py) the target's
+ *     shape is reproduced exactly,
  *     including the `plw + i*4` base kept in r24 across the fn_802693C4/fn_80269474 call. The residual is
  *     the allocator's colouring of the three call-spanning values: target base/`pend`/mask in r24/r25/r26,
  *     ours mask/base/`pend` in the same three registers, so `add r24, r27, r0` reads `add r25, r27, r0`
@@ -93,12 +94,11 @@
  *     (`p += 2`), not four straight compares and not `plw = (_PLW*)((u8*)plw + 4)`: the walk is what makes
  *     MWCC emit the target's `addi r3, r3, 0x4` re-base *and* keep its instruction count (79.92 -> 95.75
  *     -> 99.88; `plw += 4` folds the add into the entry displacements and loses the row).
- *   - fn_8027350C needs `#pragma optimization_level 4` scoped to it (restored with
- *     `#pragma optimization_level 3` + `#pragma peephole off` before the next function): at the unit's
- *     level 3 the allocator rematerialises the `plw + i*4` base for the `set_applied[i] = set_pending[i]`
- *     copy, at level 4 it keeps it in r24 like the target (95.50 -> 99.21, 416 -> 404 B). It is a
- *     per-function deviation, not a lib flag: all 49 other functions measure byte-identical with and
- *     without it.
+ *   - fn_8027350C needs level 4 (the unit's `-opt nopeephole,level=4`, i.e. `cflags_pl_skill` in
+ *     configure.py): at level 3 the allocator rematerialises the `plw + i*4` base for the
+ *     `set_applied[i] = set_pending[i]` copy, at level 4 it keeps it in r24 like the target
+ *     (95.50 -> 99.21, 416 -> 404 B). The level is per-object, not per-lib: pl_master loses
+ *     fn_8026CC70 at level 4 (100 -> 33.33) and is a flipped Matching unit.
  *
  * Other load-bearing shapes, from the earlier pass:
  *   - A helper's narrow return type is *not* trusted sign-extended, so it decides where MWCC re-emits the
@@ -1324,7 +1324,6 @@ extern "C" s32 fn_80273228(_PLW* plw, u16 item, s16 value) {
     return 0;
 }
 
-#pragma optimization_level 4
 /* Flushes the skill sets whose cached values no longer resolve, and the decoration slots. */
 extern "C" void fn_8027350C(_PLW* plw, s32 arg) {
     u8 i;
@@ -1368,9 +1367,6 @@ extern "C" void fn_8027350C(_PLW* plw, s32 arg) {
         fn_802736A0(plw);
     }
 }
-
-#pragma optimization_level 3
-#pragma peephole off
 
 /* Clears every derived skill array and the three valid-bit words. */
 extern "C" void fn_80273484(_PLW* plw) {
