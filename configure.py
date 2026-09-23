@@ -423,7 +423,7 @@ config.libs = [
         "cflags": cflags_ppceabi,
         "progress_category": "sdk",  # str | List[str]
         "objects": [
-            Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
+            Object(Matching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
             # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
             Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(NonMatching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
