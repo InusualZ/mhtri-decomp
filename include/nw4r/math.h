@@ -21,6 +21,12 @@ struct VEC3 {
     /* +0x8 */ f32 z;
 };
 
+/* A 3x4 row-major float matrix; the translation column is `m[0][3]` / `m[1][3]` / `m[2][3]` at
+ * +0x0C / +0x1C / +0x2C. size: 0x30 */
+struct MTX34 {
+    /* +0x00 */ f32 m[3][4];
+};
+
 }  // namespace math
 }  // namespace nw4r
 
