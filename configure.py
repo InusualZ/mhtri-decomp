@@ -433,7 +433,7 @@ config.libs = [
         "host": False,
         "objects": [
             Object(NonMatching, "Runtime.PPCEABI.H/__start.c"),
-            Object(NonMatching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
+            Object(Matching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
         ],
     },
     {
