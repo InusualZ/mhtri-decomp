@@ -486,7 +486,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.14 | `attribute.py --max-total-bytes` | §3's 0.5 MB cap is not expressible today (only `--min-bytes`, `--max-bytes`, `--limit`) | a registration batch never exceeds the cap, and the tool says how many bytes it is about to claim | ~20 |
 | 7.15 | worktree-safe measurement | a fresh worktree has no `build/` and cannot measure at all; this blocks the first 4-worker round | a worker in a worktree measures its own object against `MAIN`'s target and prints both paths | inside 7.1 |
 | 7.16 | `land.py` owns the baseline | `ninja changes` compares against a `baseline.json` nobody refreshes, so a per-batch regression can hide | `verify` refreshes the baseline after a green batch and reports the batch's own delta | inside 7.5 |
-| 7.17 | `tools/units/data-queue.json` + `dataclaim.py` (7.8) consuming it | data is 18.5 % of the DOL (1 233 640 B, 45 176 symbols, 720 B matched) and its queue is comments nothing reads | every data run `attribute.py` sees is in the queue with a verdict, and `land.py` reports the queue's size | ~40 |
+| 7.17 | **done** - `tools/units/dataqueue.py` writes the queue; `dataclaim.py` (7.8) still has to consume it | data is 18.5 % of the DOL (1 233 640 B, 45 176 symbols, 720 B matched) and its queue is comments nothing reads | every data run `attribute.py` sees is in the queue with a verdict, and `land.py` reports the queue's size | ~40 |
 | 7.18 | **ground-truth guard**: `prepcommit.py` refuses `config/RMHE08/build.sha1` and `config/RMHE08/config.yml`, and a tracked **`tools/git/hooks/pre-commit`** (enabled with `git config core.hooksPath tools/git/hooks` — local config, so 7.18 also states the checks that do *not* depend on a hook: `prepcommit.py`'s and `land.py`'s path refusals) refuses `orig/**`, `build/` and the LOCAL-ONLY block on **any** commit path | `prepcommit.classify('config/RMHE08/build.sha1')` returns `stage` today: a worker or I could rewrite the DOL's expected hash and commit it, after which green `ok` means nothing | a staged `build.sha1` is refused, and the hash is checked against `orig/RMHE08/sys/main.dol`'s own sha1 | ~40 |
 | 7.19 | link-order audit for flips | 13 584 objects link in 66-131 s now; with hundreds of `Matching` units the order, pool placement and symbol collisions become real | after a batch of flips, compare `main.MAP`'s section/symbol order against the original and diff the DOL | ~60 |
 | 7.20 | transactional `attribute.py apply` | `apply` writes `splits.txt` first and can leave a half-registration; `plan` can propose overlapping data spans | no proposal overlaps a claimed range, both shared files are written via temp+rename, and a failure restores them | ~40 |
@@ -506,7 +506,7 @@ tool is not done until `land.py` calls it or the plan says who runs it**.
 | 7.3 `brief.py` | **done** | six parts, rules extracted verbatim from §6.5/§8, inventory parsed in-process; for `Pl/pl_act`: 115 symbols, 5 below the bar, every score real |
 | 7.4 `handoff.py` | **done** | outbox schema + validation (13 checks): unowned symbols, out-of-range percentages, a rename without evidence, a missing `measured_with` are all refused |
 | 7.5 + 7.16 `land.py` | **done (build path dry-run only)** | 13 checks; the gate refuses on a moved base, a shared-file edit, a missing/invalid outbox, a regression, and requires `ok` to be recreated by *this* run; baseline refresh |
-| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **not yet** | `brief.py` already reads the queue and `land.py` reports the missing lint as skipped |
+| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **done 2026-09-23** | `dataqueue.py` writes the queue `brief.py` reads (3728 runs / 2.27 MB, 42 checks); `attribute.py` has `--max-total-bytes` (0.5 MB cap) and a transactional `apply` that restores byte-exactly on failure (103 checks); `stylelint.py` reports §6.5 rules 3-8 as `file:line` and the gate refuses a batch that adds one (79 checks) |
 
 **Flip campaign (7.6), round 1 2026-09-23.** Six objects are flipped and committed, each alone in its commit -
 `memset` (3e5a072), `NetworkWiiMediator` (6e0ed8c), `OSAlarm` (0806eae), `memcpy` (eadd4bd), `lobby_scene`
@@ -719,11 +719,15 @@ brief is then a *file it writes for itself* too, so a later worker can pick the 
 1. **The ground-truth guard** (7.18) - `prepcommit.py` refuses `build.sha1`/`config.yml`, the tracked
    `tools/git/hooks/pre-commit` is added and `core.hooksPath` pointed at it. First, because it is the only hole
    that can invalidate the campaign's evidence, and it is ~40 lines.
-2. **The protocol tools** (7.1 + 7.15, 7.2 -> 7.5, 7.17, 7.20) - **7.1/7.15, 7.2-7.5 done 2026-09-23**; 7.17, 7.20 and 7.21 remain - `recompile.py` (worktree-safe), `claims.py`,
-   `brief.py`, `handoff.py`, `land.py`, the data queue, transactional `apply`. The first *worker* round does not
+2. **The protocol tools** (7.1 + 7.15, 7.2 -> 7.5, 7.17, 7.20) - **7.1/7.15, 7.2-7.5, 7.17, 7.20 and 7.21 all done 2026-09-23** - `recompile.py` (worktree-safe),
+   `claims.py`, `brief.py`, `handoff.py`, `land.py`, the data queue (`dataqueue.py`, 3728 runs / 2.27 MB),
+   transactional `apply` + `--max-total-bytes`, and `stylelint.py` (79 checks, wired into the gate). The first *worker* round does not
    start before 7.1/7.15 and 7.2 exist; the first *land batch* does not start before 7.5 does.
-3. **The first `Matching` flip** (7.6) - one byte-identical runtime *object*, alone in its commit. It may run
-   before step 2 finishes, because it needs no worker. Cheapest possible moment to discover a linking problem.
+3. **The first `Matching` flip** (7.6) - **done 2026-09-23, and past its first**: nine objects are linked from
+   `src/` with `main.dol` byte-identical throughout (`memset`, `NetworkWiiMediator`, `OSAlarm`, `memcpy`,
+   `lobby_scene`, `global_destructor_chain`, `__ppc_eabi_init`, `g3d_resanmamblight`, `__start`). The round's
+   lessons are in the flip-campaign paragraph above; the one open blocker is the `.ctors`/`_reference`
+   question, and `flipcheck.py` reports 10 of 19 registered units ready.
 4. **`dumpmap.py` + one batched rename pass** (7.7) - thousands of real names, one re-split, every rename
    verified after it.
 5. **The attribution pass, scaled** - `attribute.py apply` over the next regions in ascending address order,
