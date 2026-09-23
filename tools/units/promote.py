@@ -43,6 +43,13 @@ failure reports what has already happened and how to undo it, and a successful `
 whose `mw_version` and `cflags` **default to the moved unit's own**, so the compile command - and with
 it the object - is unchanged by the creation; the module's real flags are a later, measured edit.
 
+**A language promotion is `in_place`.** `docs/plan.md`, "The language comes from the symbol": a unit
+whose object names a `.cpp` (a `__FILE__` string, or a mangled symbol the C front-end cannot spell) is
+registered as `.c`, which is the wrong front-end. That change keeps the stem, the module and the lib and
+moves only the extension, so `--allow-ext-change` (single unit) or `in_place=True` (the batch) is what
+permits it - and the object is *expected* to move, because the front-end changes. A batch of them rides
+one re-split and one gate: `tools/units/promote_batch.py`.
+
 **Byte-identity (`check`).** A name and a path change no instructions, so the object must survive the
 move byte for byte. That holds for the *meaningful* object only, because three things are metadata:
 
@@ -590,8 +597,15 @@ def symbols_in_range(ctx: Ctx, start: int, end: int) -> list[dict]:
 
 
 def plan(ctx: Ctx, unit: str, name: str, module: str, lib: str | None,
-         symbols: list[str], allow_ext_change: bool = False) -> dict:
-    """Every input the change depends on, read and checked - nothing is written."""
+         symbols: list[str], allow_ext_change: bool = False, in_place: bool = False) -> dict:
+    """Every input the change depends on, read and checked - nothing is written.
+
+    `in_place` is the *language* promotion (`docs/plan.md`, "The language comes from the symbol"):
+    the unit keeps its stem, its module and its lib, and only the extension changes - so `.c` ->
+    `.cpp` is legal even inside the `auto` bucket, which a real promotion may never target. It is
+    what `promote_batch.py` uses for a whole language batch; a single-unit caller has
+    `--allow-ext-change`.
+    """
     registered = source_name(ctx.root, unit)
     if registered is None:
         raise SystemExit("refusing: %s is not a registered source under %s" % (unit, ctx.src))
@@ -610,7 +624,7 @@ def plan(ctx: Ctx, unit: str, name: str, module: str, lib: str | None,
         raise SystemExit("refusing: %s -> %s changes the language (-lang= is derived from the "
                          "extension, so the object cannot stay byte-identical); pass "
                          "--allow-ext-change to do it anyway" % (old_ext, ext))
-    if not re.fullmatch(r"[A-Za-z_]\w*", stem):
+    if not in_place and not re.fullmatch(r"[A-Za-z_]\w*", stem):
         raise SystemExit("refusing: %r is not a valid source stem" % stem)
     new_name = stem + ext
     module = module.strip().strip("/").replace("\\", "/")
@@ -638,7 +652,7 @@ def plan(ctx: Ctx, unit: str, name: str, module: str, lib: str | None,
                          % module)
     creating = target_lib not in libs
     same_lib = not creating and target_lib == src_lib
-    if same_lib and src_lib == AUTO_LIB:
+    if same_lib and src_lib == AUTO_LIB and not in_place:
         raise SystemExit("refusing: the target lib is the auto bucket itself (%s) - nothing is "
                          "promoted; pass a real module or --lib" % src_lib)
 
@@ -729,7 +743,9 @@ def plan(ctx: Ctx, unit: str, name: str, module: str, lib: str | None,
         cmd_note = "the command line changes" if changes else "command line not comparable"
 
     # -- the brief pool and the claim ----------------------------------------------------------
-    pooled = pool_briefs(ctx, registered)
+    # A language promotion keeps the unit's stem, so its pooled brief still names it: only a real
+    # move/rename makes the old pooled brief stale.
+    pooled = [] if norm_unit(unit) == norm_unit(new_unit) else pool_briefs(ctx, registered)
     claim = {}
     try:
         from units import claims as claims_mod
