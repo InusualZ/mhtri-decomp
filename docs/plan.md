@@ -790,6 +790,30 @@ Two smaller findings from the same round, both already fixed or decided:
 * the claim's key was the unit's *spelling*, so `auto/X` and `auto/X.c` defeated the lock and two workers took one
   unit. `claims.norm_unit` now strips the source extension at claim and release (commit `c36ab86f`).
 
+### The language comes from the symbol, not from our convenience (owner's rule, 2026-09-23)
+
+A unit is **C++** when either of these says so:
+
+* its **symbol is mangled** - `Panic__Q24nw4r2dbFPCciPCce` is C++, and so is anything whose map name carries a
+  `__Q`/`Q24`/`__F`-style mangling instead of a plain C identifier;
+* its **panic/log string names a `.cpp`** - the `__FILE__` assert strings are original source names, and five of the
+  ones we have found end in `.cpp` (`ef_line.cpp`, `ef_point.cpp`, `ef_cube.cpp`, `ef_cylinder.cpp`, `ef_disc.cpp`), so
+  a unit whose pool holds one is a C++ translation unit even when its `.text` reads like C.
+
+That decides three things, and none of them is stylistic:
+
+* **the file extension** - `.cpp`, not `.c`;
+* **`-lang`** - the front-end changes, and the residual it leaves is *not* source-reachable: the `800CCFB0` round
+  closed at 99.96 % with its last two rows attributed to "C-vs-C++ front-end", and `Panic`'s variadic `crclr
+  4*cr1+eq` is emitted *only* for a C++ callee;
+* **the name objdiff pairs by** - a C++ definition is mangled unless it is `extern "C"`, which is row 42 seen from the
+  other side.
+
+**Retro-fit**: an `auto` unit whose `__FILE__` string ends in `.cpp` while it is registered as `.c` is *wrong* - the
+same class of defect as a mis-named unit - so it belongs in the promotion pass (rename, extension, `-lang`, one
+re-split), not in a later fix. The attribution batches chose extensions without this evidence, so some registered
+units are the wrong language today.
+
 ### An `auto` unit stops being scaffolding once matching work starts (owner's rule, 2026-09-23)
 
 The `auto/*` bucket exists to *attribute* symbols: a placeholder that gives an otherwise unnamed function an owner and
