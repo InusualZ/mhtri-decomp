@@ -149,6 +149,34 @@ def resolve_pane(row: dict, panes: dict[str, dict]) -> str | None:
     return None
 
 
+def panes_for_claim(row: dict, panes: dict[str, dict] | None, slug_hint: str | None = None) -> list[str]:
+    """Every pane a claim owns: the worker's own pane (by worktree) plus the panes of subagents it spawned.
+
+    A subagent runs in its own herdr pane and nothing owns that pane when its parent finishes, so three
+    `ef-big*` panes and an `ef-source-hunt` pane outlived their worker (2026-09-23) and stayed in herdr.
+    The join is the **label**: a pane's `label` is the agent name, which the worker chose, and the convention
+    is to prefix a subagent with the claim's slug. A pane whose label starts with the claim's slug therefore
+    belongs to the claim and teardown closes it. Only the full slug is matched - the slug's bare stem would
+    also catch a sibling unit's subagent (`pl-act-*` vs `pl-act-skill-*`), and closing another worker's
+    pane mid-round is worse than leaving a grandchild behind.
+    """
+    if not panes:
+        return []
+    found: list[str] = []
+    own = resolve_pane(row, panes)
+    if own:
+        found.append(own)
+    hint = (slug_hint or "").strip().lower()
+    if hint:
+        for pane_id, info in panes.items():
+            if pane_id in found:
+                continue
+            label = str(info.get("label") or "").strip().lower()
+            if label.startswith(hint):
+                found.append(pane_id)
+    return found
+
+
 def pane_probe(row: dict, interval: float | None = None, lister=None, reader=None,
                sleeper=None) -> dict:
     """What the claim's pane itself shows: `known`, `alive`, `active`, `status`.
@@ -319,6 +347,23 @@ def slug_of_branch(branch: str | None) -> str | None:
     if branch.startswith(BRANCH_PREFIX):
         return branch[len(BRANCH_PREFIX):]
     return branch or None
+
+
+def rescue_ref_name(unit: str) -> str:
+    """Where a release parks an un-merged branch's commits: `refs/rescue/<slug>`.
+
+    The branch is deleted (it is the lock and must go), so this ref is the worker's only remaining copy. A
+    later `land.py` gate that finds the branch missing can name the exact restore command from it instead of
+    the bare "no branch" that cost a round on 2026-09-23.
+    """
+    return "refs/rescue/%s" % slug(norm_unit(unit.strip("/")))
+
+
+def rescue_exists(main: str, unit: str) -> str | None:
+    """The rescue ref holding `unit`'s work, or `None` when there is none."""
+    ref = rescue_ref_name(unit)
+    out = subprocess.run(["git", "show-ref", "--verify", "--quiet", ref], cwd=main, capture_output=True)
+    return ref if out.returncode == 0 else None
 
 
 def claim_slug(main: str, unit: str) -> str | None:
@@ -496,7 +541,7 @@ def _close_step(pane: str, close) -> callable:
 
 def timeout(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
             apply: bool = False, unit: str | None = None, view=None, probe=None,
-            close=None) -> list[dict]:
+            close=None, lister=None) -> list[dict]:
     """Reclaim what a silent worker holds: rescue its commits, close its pane, then free the unit.
 
     A worker's branch is the lock, so a timed-out claim has to *release* that lock - but a branch can hold real
@@ -509,6 +554,7 @@ def timeout(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
     teardown is abandoned with a reason and the claim is left alone.
     """
     close = close or herdr_close
+    all_panes = (lister or herdr_panes)()
     victims = []
     for row in claim_status(main, ack_seconds, stall_minutes, probe=probe, view=view):
         if unit and row["unit"] != unit.strip("/"):
@@ -532,6 +578,11 @@ def timeout(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
                          lambda b=branch: git(["update-ref", rescue, b], main)))
         if pane and row.get("pane_alive") is not False:
             plan.append(("herdr pane close %s" % pane, _close_step(pane, close)))
+        # a subagent's pane has no other owner and outlives its parent, so a stalled worker's grandchildren
+        # are closed here too (`panes_for_claim`); only the worker's own pane is a refusal, a child is a step
+        for child in [p for p in panes_for_claim({"worktree": worktree, "pane": pane}, all_panes, slugged)
+                      if p != pane]:
+            plan.append(("herdr pane close %s (subagent pane)" % child, _close_step(child, close)))
         if worktree and os.path.isdir(worktree):
             plan.append(("git worktree remove --force %s" % worktree,
                          lambda w=worktree: git(["worktree", "remove", "--force", w], main)))
@@ -737,7 +788,8 @@ def _run_teardown(steps: list[dict]) -> bool:
     return complete
 
 
-def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=None) -> dict:
+def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=None,
+            lister=None) -> dict:
     """The one-shot teardown of a claim: rescue ref, pane close, worktree, branch, prune, registry, ack.
 
     Idempotent and total (docs/plan.md, "Teardown is part of landing"): every step reports what it did or why
@@ -745,10 +797,14 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
     cleanly instead of aborting and leaving the branch - the lock - alive. A **live pane** is the one refusal
     that stays: it pins the worktree as its cwd on Windows (plan 5.1), so the teardown stops before anything is
     touched and the message names the pane. `--force` overrides the work-record refusal (merged or outbox),
-    never the pane. The returned `complete` says whether the teardown finished, and the registry entry and the
-    ack file survive an incomplete one so the next attempt has the claim to work from.
+    never the pane, and it **costs the branch**: its commits survive only at `refs/rescue/<slug>`, which
+    `result["cost"]` states plainly along with the exact restore command. The returned `complete` says whether
+    the teardown finished, and the registry entry and the ack file survive an incomplete one so the next
+    attempt has the claim to work from.
 
-    `probe` and `close` exist for the selftests; both default to the real herdr layer.
+    Every pane the claim owns is closed, not just the worker's own: a subagent's pane has no other owner and
+    outlives its parent (`panes_for_claim`). `probe`, `close` and `lister` exist for the selftests; all three
+    default to the real herdr layer.
     """
     unit = norm_unit(unit.strip("/"))
     registry = load_registry(main)
@@ -762,12 +818,14 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
     merged = merged_into_main(main, branch) if branch_present else True
     result = {"unit": unit, "branch": branch, "worktree": path, "merged": merged, "outbox": outbox,
               "registry": key is not None, "pane": None, "release_ref": None, "steps": [],
-              "complete": False, "dry_run": dry_run, "refused": None}
+              "complete": False, "dry_run": dry_run, "refused": None, "child_panes": [], "cost": None}
 
+    forced = force and not (merged or outbox)
     if not force and not (merged or outbox):
         result["refused"] = ("%s's branch %s is neither merged into main nor has an outbox entry at\n  %s\n"
                              "  releasing it would drop work with no record. Finish the handoff, or pass "
-                             "--force." % (unit, branch, outbox_path(main, unit)))
+                             "--force (the branch is deleted; its commits are rescued to %s)."
+                             % (unit, branch, outbox_path(main, unit), rescue_ref_name(unit)))
         return result
 
     # the pane is asked before anything is touched: a live one is the one real refusal, and closing it has to
@@ -781,9 +839,17 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
                              % (pane, "active" if info.get("active") else "unreadable", path, pane))
         return result
 
+    # a subagent runs in its own pane and nothing owns that pane when its parent finishes: gather every pane
+    # whose label starts with the claim's slug so teardown closes the grandchildren too (2026-09-23).
+    slug_hint = claim_slug(main, unit) or slug(unit)
+    panes = (lister or herdr_panes)()
+    child_panes = [p for p in panes_for_claim({"worktree": path, "pane": record.get("pane")}, panes,
+                                              slug_hint) if p != pane]
+    result["child_panes"] = child_panes
+
     steps: list[dict] = []
     if branch_present and not merged:
-        rescue = "refs/rescue/%s" % slug(unit)
+        rescue = rescue_ref_name(unit)
         ahead = commits_ahead(main, branch)
         if ahead:
             result["release_ref"] = rescue
@@ -802,6 +868,9 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
         steps.append(_skip_step("herdr pane close", "no pane matches this claim"))
     else:
         steps.append(_skip_step("herdr pane close", "herdr unavailable - the pane was not checked"))
+    for child in child_panes:
+        steps.append(_done_step("herdr pane close %s (subagent pane)" % child,
+                                _close_step(child, close or herdr_close)))
     if os.path.isdir(path):
         steps.append(_done_step("git worktree remove --force %s" % path,
                                 lambda p=path: remove_worktree(main, p)))
@@ -814,6 +883,16 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
         steps.append(_done_step("git branch -D %s" % branch, lambda b=branch: git(["branch", "-D", b], main)))
     else:
         steps.append(_skip_step("git branch -D %s" % branch, "branch already gone"))
+
+    # what `--force` costs: the branch (the lock) is deleted, so the only remaining copy of its commits is the
+    # rescue ref. State it and the exact restore command; the next gate names the same command from that ref.
+    if forced and branch_present:
+        if result["release_ref"]:
+            result["cost"] = ("--force deleted the branch %s: its commits survive only at %s. Restore with:\n"
+                              "    git branch %s %s" % (branch, result["release_ref"], branch,
+                                                        result["release_ref"]))
+        else:
+            result["cost"] = ("--force deleted the branch %s, which had no commits of its own" % branch)
 
     if dry_run:
         result["steps"] = steps
@@ -857,7 +936,7 @@ def worktree_dirty(path: str) -> bool | None:
     return bool(p.stdout.strip()) if p.returncode == 0 else None
 
 
-def release_merged(main: str, dry_run: bool = False, probe=None, close=None) -> dict:
+def release_merged(main: str, dry_run: bool = False, probe=None, close=None, lister=None) -> dict:
     """Sweep: release every finished claim, one worker at a time (the owner's rule, plan "Teardown is part of
     landing").
 
@@ -881,7 +960,7 @@ def release_merged(main: str, dry_run: bool = False, probe=None, close=None) -> 
             out["skipped"].append({"unit": unit, "branch": branch,
                                    "why": "worktree has uncommitted changes and no outbox"})
             continue
-        result = release(unit, main, force=False, dry_run=dry_run, probe=probe, close=close)
+        result = release(unit, main, force=False, dry_run=dry_run, probe=probe, close=close, lister=lister)
         if result.get("refused"):
             out["refused"].append({"unit": unit, "branch": result["branch"], "why": result["refused"]})
             out["complete"] = False
@@ -1023,6 +1102,23 @@ def selftest() -> int:
         check("an unknown worktree resolves to no pane",
               resolve_pane({"worktree": r"C:\x\mhtri-dtk.ws-nothing"}, panes), None)
 
+        # a subagent's pane has no owner once its parent finishes: the label prefix (the worker names each
+        # subagent with its claim's slug) is the join teardown uses to close the grandchildren too
+        labelled = {
+            "w1:pK": {**panes["w1:pK"], "label": "pl-master-6337"},
+            "w1:pA": {"pane_id": "w1:pA", "label": "pl-master-6337-ef-big-1", "tokens": {}},
+            "w1:pB": {"pane_id": "w1:pB", "label": "pl-master-6337-ef-big-2", "tokens": {}},
+            "w1:pC": {"pane_id": "w1:pC", "label": "pl-master-skill-hunt", "tokens": {}},
+        }
+        check("a claim's own pane is matched by its worktree",
+              panes_for_claim({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, labelled, "pl-master-6337"),
+              ["w1:pK", "w1:pA", "w1:pB"])
+        check("a sibling unit's subagent pane is not closed",
+              "w1:pC" in panes_for_claim({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, labelled,
+                                         "pl-master-6337"), False)
+        check("no herdr means no child panes",
+              panes_for_claim({"worktree": r"C:\x\ws-pl-master-6337"}, None, "pl-master-6337"), [])
+
         moving = iter(["one", "two"])
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, interval=0,
                        lister=lambda: panes, reader=lambda _pane: next(moving), sleeper=lambda _s: None)
@@ -1081,16 +1177,16 @@ def selftest() -> int:
         check("a static pane leaves the stale ack stalled",
               claim_status(tmp, view=[row], probe=idle)[0]["state"], "stalled")
         check("timeout does not victimize a live pane",
-              timeout(tmp, view=[row], probe=active, apply=False), [])
+              timeout(tmp, view=[row], probe=active, apply=False, lister=lambda: None), [])
         check("even --unit does not victimize a live pane",
-              timeout(tmp, view=[row], probe=active, apply=False, unit="Pl/live"), [])
+              timeout(tmp, view=[row], probe=active, apply=False, unit="Pl/live", lister=lambda: None), [])
         save_registry(tmp, {"Pl/live": {"branch": None, "worktree": row["worktree"]}})
         check("timeout --apply leaves a live pane's claim alone",
-              timeout(tmp, view=[row], probe=active, apply=True), [])
+              timeout(tmp, view=[row], probe=active, apply=True, lister=lambda: None), [])
         check("... and its registry entry", "Pl/live" in load_registry(tmp), True)
         check("... and its worktree", os.path.isdir(row["worktree"]), True)
 
-        victims = timeout(tmp, view=[row], probe=idle, apply=False)
+        victims = timeout(tmp, view=[row], probe=idle, apply=False, lister=lambda: None)
         steps = victims[0]["steps"]
         check("the pane is closed before the worktree goes",
               steps.index("herdr pane close w1:pK")
@@ -1098,11 +1194,19 @@ def selftest() -> int:
 
         # a live pane that will not close must abort the whole teardown: the claim and the worktree stay
         save_registry(tmp, {"Pl/live": {"branch": None, "worktree": row["worktree"]}})
-        victims = timeout(tmp, view=[row], probe=idle, apply=True,
+        victims = timeout(tmp, view=[row], probe=idle, apply=True, lister=lambda: None,
                           close=lambda _pane: (False, "pane still live"))
         check("a pane that will not close leaves the claim", "Pl/live" in load_registry(tmp), True)
         check("a pane that will not close leaves the worktree", os.path.isdir(row["worktree"]), True)
         check("and the abort is reported", bool(victims[0].get("error")), True)
+
+        # a stalled worker's subagent panes are closed too: they have no other owner
+        save_registry(tmp, {"Pl/live": {"branch": None, "worktree": row["worktree"]}})
+        child_pane = {"pane_id": "w1:pA", "label": slug("Pl/live") + "-child", "tokens": {}}
+        victims = timeout(tmp, view=[row], probe=idle, apply=True, close=lambda p: (True, ""),
+                          lister=lambda: {"w1:pK": {"pane_id": "w1:pK", "label": ""}, "w1:pA": child_pane})
+        check("timeout closes a stalled worker's subagent pane",
+              any("w1:pA" in s for s in victims[0]["steps"]), True)
 
     # the handoff slug is the claim's branch minus worker/, so outbox/notes follow the branch - the name
     # brief.py writes and land.py's gate reads - while the ack stays keyed by the unit
@@ -1269,8 +1373,45 @@ def selftest() -> int:
         os.remove(outbox_path(main, unit))
         out = release(unit, main, force=False, dry_run=False, probe=no_pane)
         check("an unmerged claim with no outbox is refused", bool(out["refused"]), True)
-        check("... and force releases it anyway",
-              release(unit, main, force=True, dry_run=False, probe=no_pane)["complete"], True)
+        check("... and the refusal names the rescue ref", rescue_ref_name(unit) in (out["refused"] or ""), True)
+        tip = repo_git(main, "rev-parse", branch)
+        forced = release(unit, main, force=True, dry_run=False, probe=no_pane)
+        check("... and force releases it anyway", forced["complete"], True)
+        # --force deletes the branch - the lock - so the rescue ref is the only copy left, and the cost names
+        # the exact command that restores it (the 2026-09-23 "no branch" refusal the next gate hit)
+        check("... force parks the work at the rescue ref",
+              repo_git(main, "rev-parse", forced["release_ref"]), tip)
+        check("... force deletes the branch", branch_exists(main, branch), False)
+        check("... the cost names the restore command",
+              "git branch %s refs/rescue/%s" % (branch, slug(unit)) in (forced["cost"] or ""), True)
+        check("... and rescue_exists finds it", rescue_exists(main, unit),
+              "refs/rescue/%s" % slug(unit))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        # a subagent pane (label starts with the claim's slug) and a sibling's pane (it must not be touched)
+        child = {"pane_id": "w1:pA", "label": slug(unit) + "-ef-big-1", "tokens": {}}
+        sibling = {"pane_id": "w1:pB", "label": "pl-skill-9c1a-hunt", "tokens": {}}
+        closed = []
+        out = release(unit, main, force=False, dry_run=False, probe=no_pane,
+                      close=lambda p: (closed.append(p) is None, ""), lister=lambda: {"w1:pA": child, "w1:pB": sibling})
+        check("teardown closes a subagent pane", closed, ["w1:pA"])
+        check("... records it in the plan",
+              any("w1:pA" in s["label"] for s in out["steps"]), True)
+        check("... and does not touch a sibling's pane", "w1:pB" in closed, False)
+        check("... and the release completes", out["complete"], True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        out = release(unit, main, force=False, dry_run=False, probe=no_pane,
+                      close=lambda p: (False, "pane %s will not close" % p),
+                      lister=lambda: {"w1:pA": {"pane_id": "w1:pA", "label": slug(unit) + "-a", "tokens": {}}})
+        check("a subagent pane that will not close stops the teardown", out["complete"], False)
+        check("... the worktree is left alone", os.path.isdir(wt), True)
+        check("... and the failure names the subagent pane",
+              any(s["status"] == "failed" and "w1:pA" in s["label"] for s in out["steps"]), True)
 
     # the sweep: only merged claims, and a live pane is reported rather than forced
     with tempfile.TemporaryDirectory() as tmp:
@@ -1420,6 +1561,8 @@ def main() -> int:
             mark = {"done": "done  ", "skipped": "skip  ", "planned": "would ", "failed": "FAILED"}\
                 .get(step["status"], step["status"])
             print("  %s %s%s" % (mark, step["label"], (" - " + step["why"]) if step.get("why") else ""))
+        if out.get("cost"):
+            print("COST: %s" % out["cost"])
         if out["dry_run"]:
             print("would release %s (branch %s, merged=%s, outbox=%s)"
                   % (out["unit"], out["branch"], out["merged"], out["outbox"]))

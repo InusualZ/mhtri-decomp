@@ -20,15 +20,28 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   turns the step off for an orchestrator-only batch.
 
     python tools/units/land.py record-base [--json]
-    python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-release] [--allow PATH]
+    python tools/units/land.py land --units a,b [--base SHA] [--no-build] [--no-outbox] [--no-release]
+    python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-outbox]
+                                  [--no-release] [--allow-regression UNIT]
 
-`verify` never commits. It writes the message to `.git/land_msg.txt` and prints it; committing stays a
-separate, deliberate step (and `prepcommit.py` stages the paths).
+`land` is the one command and the one you should use: it runs `verify`, stages the batch's own files, commits
+with the gate's message, releases the claims, and prints a **single answer line** (`LANDED ...` / `REFUSED ...`)
+whose exit status is the answer. The gate log goes to stderr, so piping stdout cannot lose the verdict - and a
+failed gate can never reach `git commit` (the old flow wrote the message unconditionally, which is how a piped
+`| tail -3` committed a refused batch twice).
+
+`verify` never commits. It writes the message to `.git/land_msg.txt` **only when every check passed**, and
+removes a stale one when it refuses; committing it stays a deliberate step for the rare manual case.
+
+`--no-outbox` and `--no-release` are **separate** opt-outs: skipping the outbox/branch checks does not skip the
+claim teardown (the old `--no-worker-units` did both, and a round that passed it left 18 worktrees and 3 dead
+claims behind). `--no-worker-units` remains as an alias for `--no-outbox`.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -85,17 +98,94 @@ def read_base(main: str) -> dict:
         return {}
 
 
-def changed_paths(main: str) -> list[str]:
-    out = git(["status", "--porcelain"], main)
-    paths = []
+def land_message_path(main: str) -> str:
+    """The gate's commit message. Only a green gate writes it (`write_land_message`); a red one clears it."""
+    return os.path.join(main, ".git", "land_msg.txt")
+
+
+def write_land_message(main: str, body: str) -> str:
+    path = land_message_path(main)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body)
+    return path
+
+
+def clear_land_message(main: str) -> str | None:
+    """Remove a stale message so a failed gate cannot be committed through `git commit -F .git/land_msg.txt`."""
+    path = land_message_path(main)
+    if os.path.exists(path):
+        os.remove(path)
+        return path
+    return None
+
+
+def land_decision(gate_ok: bool, stageable: list[str]) -> tuple[str, str]:
+    """What `land` does after the gate: -> (`"commit"` | `"refuse"`, reason).
+
+    The one command has to be safe when its output is piped (the exit status is then lost): the gate's verdict
+    *is* the decision, and a red gate can never reach `git commit`. A green gate with nothing to stage is also
+    a refusal - there is no batch to land.
+    """
+    if not gate_ok:
+        return "refuse", "the gate failed - nothing staged or committed"
+    if not stageable:
+        return "refuse", "the gate passed but no batch path is stageable - nothing to commit"
+    return "commit", ""
+
+
+def changed_status(main: str) -> list[tuple[str, str]]:
+    """[(status, path)] for every change git reports, untracked files listed individually (`-uall`)."""
+    out = git(["status", "--porcelain", "-uall"], main)
+    rows = []
     for line in out.splitlines():
         if len(line) < 4:
             continue
-        path = line[3:].strip()
+        code, path = line[:2].strip(), line[3:].strip()
         if " -> " in path:
             path = path.split(" -> ")[-1]
-        paths.append(path.strip('"'))
-    return paths
+        rows.append((code, path.strip('"')))
+    return rows
+
+
+def changed_paths(main: str) -> list[str]:
+    return [path for _code, path in changed_status(main)]
+
+
+def unit_owned_paths(units: list[str]) -> set[str]:
+    """The source paths a batch's units own: `src/<unit>.<ext>` and any path the unit names directly."""
+    owned: set[str] = set()
+    for unit in units:
+        unit = unit.strip("/")
+        if not unit:
+            continue
+        owned.add(unit)
+        normalized = claims.norm_unit(unit)
+        owned.add("src/" + normalized)
+        for ext in (".c", ".cpp", ".cp"):
+            owned.add(unit + ext)
+            owned.add("src/" + normalized + ext)
+    return owned
+
+
+def land_stageable(units: list[str], rows: list[tuple[str, str]]) -> list[str]:
+    """The paths `land` stages: the batch's own files, never another stream's in-flight work.
+
+    A *tracked* change inside the allowed set is part of the batch (the cherry-pick, the shared-file edits).
+    An **untracked** file is staged when it is a named unit's own path or lives under `src/`/`include/` (source
+    is the batch's), but not otherwise: a fresh `tools/*.py` from a different worker sitting in MAIN's tree is
+    their in-flight work, and sweeping it into the batch's commit is exactly the kind of accident the
+    one-command landing exists to prevent.
+    """
+    owned = unit_owned_paths(units)
+    stageable = []
+    for code, path in rows:
+        if outside_batch([path]):
+            continue
+        if code.startswith("??") and path not in owned and not path.startswith(("src/", "include/")):
+            continue
+        stageable.append(path)
+    return stageable
 
 
 def outside_batch(paths: list[str], allowed: tuple[str, ...] = ALLOWED_PREFIXES,
@@ -275,13 +365,20 @@ def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
     return ok, problems
 
 
-def release_plan(checks: list[tuple], units: list[str], release_claims: bool) -> list[str]:
+def release_plan(checks: list[tuple], units: list[str], release_claims: bool,
+                 check_outbox: bool = True) -> list[str]:
     """The units whose claim `verify` releases: every gated unit, but only once every check so far passed.
 
     Releasing is a side effect, so it must not run behind a failed gate - a refused batch has to leave its
     worker's branch and worktree exactly as they are, or the retry has nothing to re-run. `--no-release`
-    (and an orchestrator-only batch, which has no worker claim) turns the step off entirely.
+    turns the step off entirely.
+
+    `check_outbox` is an input that **does not affect the answer**, and that is the point: the old
+    `--no-worker-units` flag skipped the outbox check *and* the release, so a round that passed it to quiet
+    an outbox problem silently stopped tearing its workers down (18 worktrees and 3 dead claims left behind,
+    2026-09-23). Outbox checking and release are separate opt-outs now.
     """
+    del check_outbox  # independent of the release decision by design
     if not release_claims or not units:
         return []
     if any(not good for _n, good, _d, _i in checks):
@@ -289,8 +386,31 @@ def release_plan(checks: list[tuple], units: list[str], release_claims: bool) ->
     return list(units)
 
 
+def branch_problems(main: str, units: list[str]) -> list[str]:
+    """One line per unit whose worker branch does not carry its work as commits.
+
+    A missing branch is the 2026-09-23 shape: `release --force` on an unreported worker deleted the branch
+    (its only copy of the work) and left it at `refs/rescue/<slug>`, so the next gate refused with a bare "no
+    branch" and the round had to work out how to get the work back. The refusal now names the rescue ref and
+    the exact restore command.
+    """
+    problems = []
+    for u in units:
+        branch = claims.claim_branch(main, u)
+        if not claims.branch_exists(main, branch):
+            rescue = claims.rescue_exists(main, u)
+            if rescue:
+                problems.append("%s (no branch %s; its commits are preserved at %s - restore with "
+                                "`git branch %s %s`)" % (u, branch, rescue, branch, rescue))
+            else:
+                problems.append("%s (no branch %s)" % (u, branch))
+        elif branch_commits(main, u) == 0:
+            problems.append("%s (branch %s has no commits of its own)" % (u, branch))
+    return problems
+
+
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
-           allow_regression: list[str] | None = None, worker_units: bool = True,
+           allow_regression: list[str] | None = None, check_outbox: bool = True,
            release_claims: bool = True) -> int:
     # a unit's *name* is its path without the source extension (`claims.norm_unit`): `Camellia/camellia` and
     # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
@@ -321,16 +441,10 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     paths = changed_paths(main)
     bad = outside_batch(paths)
     check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad))
-    if units and worker_units:
+    if units and check_outbox:
         ok_units, problems = outbox_units(main, units)
         check("every unit's outbox validates", not problems, "; ".join(problems[:4]))
-        uncommitted = []
-        for u in units:
-            branch = claims.branch_for(u)
-            if not claims.branch_exists(main, branch):
-                uncommitted.append("%s (no branch %s)" % (u, branch))
-            elif branch_commits(main, u) == 0:
-                uncommitted.append("%s (branch %s has no commits of its own)" % (u, branch))
+        uncommitted = branch_problems(main, units)
         check("every unit's branch carries its work as commits", not uncommitted,
               "no commits of its own on the branch (work left uncommitted in the worktree?): %s"
               % ", ".join(uncommitted))
@@ -338,7 +452,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         check("orchestrator-only batch (no worker outboxes to check)", True,
               info="%d unit(s): %s" % (len(units), ", ".join(units)))
     else:
-        check("batch units named", False, "pass --units (or --no-worker-units for an orchestrator-only batch)")
+        check("batch units named", False, "pass --units (or --no-outbox for an orchestrator-only batch)")
 
     # 4. the style lint (7.21), when it exists
     lint = os.path.join(main, "tools", "units", "stylelint.py")
@@ -423,7 +537,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # 8. the teardown (owner's rule): release the claim of every unit just gated. This runs after the build
     # checks and only when every one of them passed, so a refused batch keeps its branch and worktree for the
     # retry; an incomplete teardown is itself a failed check (a live pane is named, not silently kept).
-    to_release = release_plan(checks, units, release_claims and worker_units)
+    to_release = release_plan(checks, units, release_claims, check_outbox)
     for unit_name in to_release:
         out = claims.release(unit_name, main, force=False, dry_run=False)
         failed_step = next((s for s in out["steps"] if s["status"] == "failed"), None)
@@ -433,17 +547,16 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         if out.get("release_ref"):
             info += "; un-merged commits rescued to %s" % out["release_ref"]
         check("claim released: %s" % unit_name, bool(out.get("complete")), note, info=info)
-    if release_claims and worker_units and units and not to_release:
+    if release_claims and units and not to_release:
         check("claim release deferred", True, info="a check above failed - the claim is left alone")
-    elif units and not (release_claims and worker_units):
-        check("claim release skipped", True, info="--no-release or an orchestrator-only batch")
+    elif units and not release_claims:
+        check("claim release skipped", True, info="--no-release")
 
     print("%-58s %s" % ("check", "result"))
     for name, good, detail, info in checks:
         note = (detail if not good else "") or info
         print("%-58s %s%s" % (name[:58], "PASS" if good else "FAIL", ("  " + note[:80]) if note else ""))
 
-    message = os.path.join(main, ".git", "land_msg.txt")
     body = ["land: %s" % ("; ".join(units) if units else "batch"),
             "",
             "ledger: %s" % summary(before, after),
@@ -451,19 +564,100 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
             % ((want_base or "?")[:8], len(checks), fresh, ", main.elf relinked" if flip else "",
                ", authorised regressions: %s" % ", ".join(sorted(allow_regression)) if allow_regression else ""),
             ""]
-    with open(message, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(body))
-    print("\nledger: %s" % summary(before, after))
-    print("message written to %s - review it, then `git commit -F .git/land_msg.txt`" % message)
     failed = [name for name, good, _d, _i in checks if not good]
     if failed:
+        # a failed gate must not leave a message a `git commit -F .git/land_msg.txt` could pick up: the old
+        # flow wrote it unconditionally, so a piped `| tail -3` read a green-looking summary and committed a
+        # batch whose gate had failed (twice, 2026-09-23). No message exists unless every check passed.
+        stale = clear_land_message(main)
+        if stale:
+            print("removed the stale %s (a failed gate has no committable message)" % os.path.relpath(stale, main))
+        print("\nledger: %s" % summary(before, after))
         print("FAILED: %s" % ", ".join(failed))
         return 1
+    message = write_land_message(main, "\n".join(body))
+    print("\nledger: %s" % summary(before, after))
+    print("message written to %s - review it, then `git commit -F .git/land_msg.txt`" % message)
     print("READY: every check passed")
     return 0
 
 
+def land(main: str, units: list[str], base: str | None, no_build: bool,
+         allow_regression: list[str] | None = None, check_outbox: bool = True,
+         release_claims: bool = True, subject: str | None = None) -> int:
+    """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
+
+    The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
+    batch whose gate had *failed* was committed by hand - twice, leaving a partial source on `main` while
+    `ok` stayed green (the unit is `NonMatching`). So the gate's verdict is now the decision, not a report:
+
+    * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message;
+    * the commit uses the gate's own message, so there is no separate `git commit -F` to get wrong;
+    * the gate log goes to **stderr** and stdout carries exactly one answer line, so `tail -1` is the answer
+      whether or not the exit status survived the pipe;
+    * the exit status *is* the answer: 0 landed, 1 refused (or landed with an incomplete teardown).
+
+    Releasing runs after the commit, never before: until `main` has the commits, the worker's branch is their
+    only copy.
+    """
+    norm_units = [claims.norm_unit(u.strip("/")) for u in units]
+    with contextlib.redirect_stdout(sys.stderr):
+        gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
+                         allow_regression=allow_regression, check_outbox=check_outbox,
+                         release_claims=False) == 0
+    rows = changed_status(main)
+    outside = outside_batch([path for _code, path in rows])
+    if outside:
+        clear_land_message(main)
+        print("REFUSED %s | paths outside the batch appeared during the build: %s"
+              % (",".join(norm_units), ", ".join(outside)))
+        return 1
+    stageable = land_stageable(norm_units, rows)
+    action, why = land_decision(gate_ok, stageable)
+    if action != "commit":
+        clear_land_message(main)
+        print("REFUSED %s | %s" % (",".join(norm_units), why))
+        return 1
+    msg_file = land_message_path(main)
+    if subject:
+        raw = open(msg_file, encoding="utf-8").read()
+        _first, sep, rest = raw.partition("\n")
+        write_land_message(main, subject + sep + rest)
+    agents_md = "AGENTS.md" in stageable
+    if agents_md:
+        pc.localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
+    try:
+        git(["add", "--", *stageable], main)
+    finally:
+        if agents_md:
+            pc.localonly("push")
+    p = run(["git", "commit", "-F", msg_file], main)
+    if p.returncode != 0:
+        clear_land_message(main)
+        tail = ((p.stderr or p.stdout) or "").strip().splitlines()
+        print("REFUSED %s | git commit failed: %s" % (",".join(norm_units), tail[-1] if tail else ""))
+        return 1
+    sha = git(["rev-parse", "--short", "HEAD"], main).strip()
+    teardown, incomplete = [], []
+    if release_claims:
+        for u in norm_units:
+            out = claims.release(u, main, force=False, dry_run=False)
+            if out.get("complete"):
+                teardown.append(u)
+            else:
+                incomplete.append("%s (%s)" % (u, out.get("refused") or "a teardown step failed"))
+    ledger = summary(read_base(main).get("ledger") or {}, ledger_numbers(main))
+    tail = ""
+    if teardown:
+        tail += " | teardown %s" % ",".join(teardown)
+    if incomplete:
+        tail += " | TEARDOWN INCOMPLETE: %s" % "; ".join(incomplete)
+    print("LANDED %s %s | %s%s" % (sha, ",".join(norm_units), ledger, tail))
+    return 1 if incomplete else 0
+
+
 def selftest() -> int:
+    import tempfile
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -480,7 +674,39 @@ def selftest() -> int:
           ["config/RMHE08/build.sha1"])
     check("outside the batch: the local-only state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
 
-    import tempfile
+    # `land` stages the batch's own files only: a tracked change is the batch, but an untracked file that is
+    # not a named unit's source is another stream's in-flight work (the round's `tools/units/playbook.py`)
+    rows = [(" M", "src/Pl/pl_act.cpp"), ("??", "src/Pl/pl_act.cpp"), ("??", "tools/units/playbook.py"),
+            ("??", "tools/units/land.py"), ("??", "include/Foo.h"), ("??", "src/Other/other.cpp"),
+            (" M", "configure.py"), ("??", "build/RMHE08/main.dol")]
+    check("a tracked batch file is staged", "src/Pl/pl_act.cpp" in land_stageable(["Pl/pl_act"], rows), True)
+    check("an untracked unit source is staged", "src/Pl/pl_act.cpp" in land_stageable(["Pl/pl_act"], rows), True)
+    check("another worker's untracked tool is not",
+          "tools/units/playbook.py" in land_stageable(["Pl/pl_act"], rows), False)
+    check("an untracked source or header is staged",
+          ("include/Foo.h" in land_stageable(["Pl/pl_act"], rows)
+           and "src/Other/other.cpp" in land_stageable(["Pl/pl_act"], rows)), True)
+    check("a unit named by its own path is staged",
+          "tools/units/land.py" in land_stageable(["tools/units/land.py"], rows), True)
+    check("a shared-file edit is staged", "configure.py" in land_stageable(["Pl/pl_act"], rows), True)
+    check("build output is never staged", "build/RMHE08/main.dol" in land_stageable(["Pl/pl_act"], rows), False)
+
+    # the one-command path: the gate's verdict is the decision, so a red gate can never reach `git commit`
+    check("a failed gate refuses the commit", land_decision(False, ["src/Pl/pl_act.cpp"]),
+          ("refuse", "the gate failed - nothing staged or committed"))
+    check("a green gate with nothing to stage refuses", land_decision(True, []),
+          ("refuse", "the gate passed but no batch path is stageable - nothing to commit"))
+    check("a green gate with a batch commits", land_decision(True, ["src/Pl/pl_act.cpp"]),
+          ("commit", ""))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, ".git"), exist_ok=True)
+        stale = write_land_message(tmp, "land: old batch\n")
+        check("a green gate writes the message", os.path.exists(stale), True)
+        check("a failed gate removes it", clear_land_message(tmp), stale)
+        check("... and it is gone", os.path.exists(stale), False)
+        check("clearing a missing message is a no-op", clear_land_message(tmp), None)
+
     with tempfile.TemporaryDirectory() as tmp:
         # regression_rows() reads a report_changes.json fixture
         fixture = os.path.join(tmp, "changes.json")
@@ -554,6 +780,23 @@ def selftest() -> int:
         repo_commit(tmp, "claim-time main")
         check("a missing worker branch fails", branch_commits(tmp, unit), 0)
 
+    # a `--force` release deletes the branch and parks the work at refs/rescue/<slug>; the gate's refusal must
+    # name that ref and the exact command that puts the branch back (the 2026-09-23 "no branch" dead end)
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        rescue = claims.rescue_ref_name(unit)
+        repo_git(tmp, "update-ref", rescue, repo_git(tmp, "rev-parse", "HEAD"))
+        problems = branch_problems(tmp, [unit])
+        check("a branch gone to a rescue ref is reported", len(problems), 1)
+        check("... the refusal names the rescue ref", rescue in problems[0], True)
+        check("... and the exact restore command",
+              "git branch %s %s" % (claims.branch_for(unit), rescue) in problems[0], True)
+        check("a missing branch with no rescue ref is still reported", len(branch_problems(tmp, ["Nope/none"])), 1)
+        check("... and has no restore command to name",
+              "restore with" in branch_problems(tmp, ["Nope/none"])[0], False)
+
     # outbox_units() must look where brief.py wrote: the claim's branch minus worker/, not slug(unit)
     entry = {"unit": "Pl/pl_act", "worker": "a", "finished_at": "2026-01-01T00:00:00", "unit_percent": 50.0,
              "symbols": [{"name": "fn_1", "percent": 50.0}], "residual": "none",
@@ -591,6 +834,14 @@ def selftest() -> int:
     check("a failed gate leaves the claims alone", release_plan(red, ["Pl/pl_act"], True), [])
     check("--no-release turns the teardown off", release_plan(green, ["Pl/pl_act"], False), [])
     check("an empty batch releases nothing", release_plan(green, [], True), [])
+    # the 2026-09-23 bug: `--no-worker-units` skipped the outbox check *and* the release, so teardowns stopped
+    # for a dozen landings. The two opt-outs are independent now: skipping the outbox check must not skip this.
+    check("release runs when the outbox check is off",
+          release_plan(green, ["Pl/pl_act"], True, check_outbox=False), ["Pl/pl_act"])
+    check("... and is unchanged by it", release_plan(green, ["Pl/pl_act"], True, check_outbox=True),
+          release_plan(green, ["Pl/pl_act"], True, check_outbox=False))
+    check("--no-release still stops it with the outbox check off",
+          release_plan(green, ["Pl/pl_act"], False, check_outbox=False), [])
     check("summary delta", summary({"closed": 284, "matched": 217}, {"closed": 290, "matched": 223}),
           "closed 284 -> 290, matched 217 -> 223")
     check("summary tolerates a missing side", summary({}, {}), "(ledger numbers unavailable)")
@@ -609,18 +860,31 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd")
     rb = sub.add_parser("record-base", help="record main's HEAD as the batch base")
     rb.add_argument("--json", action="store_true")
-    v = sub.add_parser("verify", help="run the batch checklist")
+    v = sub.add_parser("verify", help="run the batch checklist (never commits; use `land` for that)")
     v.add_argument("--base", default=None, help="expected main HEAD (default: the recorded base)")
     v.add_argument("--units", default=None, help="comma-separated units in this batch")
     v.add_argument("--dry-run", action="store_true", help="run the cheap checks only; touch nothing")
     v.add_argument("--no-build", action="store_true", help="skip the split/link/ok/baseline steps")
-    v.add_argument("--no-worker-units", action="store_true", dest="no_worker_units",
-                   help="orchestrator-only batch (a flip, a range claim): no outbox or branch to check")
+    v.add_argument("--no-outbox", "--no-worker-units", action="store_true", dest="no_outbox",
+                   help="skip the outbox/branch checks (an orchestrator-only batch); release still runs, "
+                        "add --no-release to skip that too. `--no-worker-units` is the old alias and no "
+                        "longer turns the teardown off")
     v.add_argument("--no-release", action="store_true", dest="no_release",
-                   help="do not release the batch's claims (an orchestrator-only batch has none)")
+                   help="do not release the batch's claims")
     v.add_argument("--allow-regression", action="append", default=[],
                    help="unit whose measured regression is authorised by a rule (recorded in the message); repeatable")
     v.add_argument("--json", action="store_true")
+    ld = sub.add_parser("land", help="gate + stage + commit + release; one answer line, exit status is the answer")
+    ld.add_argument("--base", default=None, help="expected main HEAD (default: the recorded base)")
+    ld.add_argument("--units", required=True, help="comma-separated units in this batch")
+    ld.add_argument("--no-build", action="store_true", help="skip the baseline step")
+    ld.add_argument("--no-outbox", "--no-worker-units", action="store_true", dest="no_outbox",
+                    help="skip the outbox/branch checks (release still runs)")
+    ld.add_argument("--no-release", action="store_true", dest="no_release",
+                    help="commit without releasing the batch's claims")
+    ld.add_argument("--allow-regression", action="append", default=[],
+                    help="unit whose measured regression is authorised by a rule; repeatable")
+    ld.add_argument("--message", default=None, help="override the gate message's subject line")
     args = ap.parse_args()
 
     if args.selftest:
@@ -633,7 +897,12 @@ def main() -> int:
     if args.cmd == "verify":
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
-                      worker_units=not args.no_worker_units, release_claims=not args.no_release)
+                      check_outbox=not args.no_outbox, release_claims=not args.no_release)
+    if args.cmd == "land":
+        units = [u.strip() for u in args.units.split(",") if u.strip()]
+        return land(main, units, args.base, args.no_build, args.allow_regression,
+                    check_outbox=not args.no_outbox, release_claims=not args.no_release,
+                    subject=args.message)
     ap.print_help()
     return 0
 
