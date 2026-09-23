@@ -505,7 +505,7 @@ config.libs = [
         "cflags": cflags_network,
         "host": False,
         "objects": [
-            Object(NonMatching, "Network/NetworkWiiMediator.c"),
+            Object(Matching, "Network/NetworkWiiMediator.c"),
         ],
     },
     {
