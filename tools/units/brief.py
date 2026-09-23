@@ -46,14 +46,104 @@ SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 BAR = 80.0
 
 
-def source_name(unit: str) -> str:
-    """`Pl/pl_act` -> `Pl/pl_act.cpp`; a full name is left alone."""
-    return unit if unit.endswith(SRC_EXT) else unit + ".cpp"
+def source_name(unit: str, *roots: str) -> str:
+    """`Pl/pl_act` -> `Pl/pl_act.cpp`; a full name is left alone.
+
+    A unit's *identity* is extensionless (`claims.norm_unit`), so a caller that passes the short spelling must
+    not get `.cpp` by default: `RSO/runtime` is `runtime.c` and `Camellia/camellia` is `camellia.c`. When a
+    root is given, the real extension is resolved from the tree (`src/<unit>.<ext>`); with no root the old
+    `.cpp` default stays, so the pure spelling rules are unchanged for callers that do not need a file.
+    """
+    unit = claims.norm_unit(unit.strip("/"))
+    if unit.endswith(SRC_EXT):
+        return unit
+    for root in roots:
+        if not root:
+            continue
+        for ext in SRC_EXT:
+            if os.path.exists(os.path.join(root, "src", *unit.split("/")) + ext):
+                return unit + ext
+    return unit + ".cpp"
+
+
+def strip_comments(text: str) -> str:
+    """Source with its comments removed - a placeholder's whole content is a header comment."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def has_bodies(path: str) -> bool:
+    """Whether a source file defines at least one function body.
+
+    The attribution placeholders (`src/auto/*`) are a file-header comment and nothing else, so a brace outside
+    the comments is the honest, cheap signal that a body exists. This is deliberately a source-level
+    heuristic: it decides which units the *pool* has nothing to hand a worker for, never whether a unit is
+    finished.
+    """
+    if not os.path.exists(path):
+        return False
+    return "{" in strip_comments(open(path, encoding="utf-8", errors="replace").read())
+
+
+def registered_units(main: str) -> list[str]:
+    """Every source file registered in `configure.py`'s `config.libs`, in registration order.
+
+    Parsed from the file rather than from `build/` so it does not depend on a generated build tree: a unit
+    whose object has never been built still counts as registered.
+    """
+    text = open(os.path.join(main, "configure.py"), encoding="utf-8", errors="replace").read()
+    return re.findall(r'Object\([^,]+,\s*"([^"]+)"', text)
+
+
+def pool_units(main: str) -> list[str]:
+    """Registered units whose source exists and has no bodies yet, extensionless, sorted by name.
+
+    This is the pool's definition: a unit is pooled exactly while there is nothing to hand a worker except
+    the inventory and the rules. A unit that gains a body (a worker's source lands) drops out on the next
+    `--pool` run, and a registered unit with no source at all is reported separately, never pooled.
+    """
+    out = []
+    for src in registered_units(main):
+        path = os.path.join(main, "src", *src.split("/"))
+        if os.path.exists(path) and not has_bodies(path):
+            out.append(claims.norm_unit(src))
+    return sorted(set(out))
+
+
+def config_schema_lines() -> list[str]:
+    """The outbox `config_requests` schema as the brief renders it, from handoff.py's one definition.
+
+    The brief is what the worker is told to follow, so it has to state the vocabulary the validator accepts:
+    a worker that invents `data`/`flags`/`tool` (or a non-object `flags_probed`) produces a handoff the gate
+    refuses, which is exactly what happened to `RSO/runtime`'s first outbox. Imported lazily because
+    `handoff.py` imports this module at load time.
+    """
+    from units import handoff as handoff_mod  # local: handoff imports brief, so a top-level import would cycle
+    lines = ["",
+             "The validator accepts exactly these kinds - the fields marked * are required:",
+             "",
+             "| kind | required | also | what it is |",
+             "| --- | --- | --- | --- |"]
+    for row in handoff_mod.config_schema_rows():
+        needs = ", ".join("`%s`*" % f for f in row["needs"]) or "(none)"
+        also = ", ".join("`%s`" % f for f in row["also"]) or ""
+        lines.append("| `%s` | %s | %s | %s |" % (row["kind"], needs, also, row["means"]))
+    lines.append("")
+    lines.append("`flags_probed` is a list of `{ \"flags\", \"effect\", \"verdict\" }` objects, with the"
+                 " verdict one of `%s`. `python tools/units/handoff.py <unit> --template` prints the whole"
+                 " skeleton, and `handoff.py <unit> --check <file>` validates what you wrote."
+                 % "/".join(handoff_mod.FLAG_PROBE_VERDICTS))
+    return lines
 
 
 def claim_for(main: str, unit: str) -> dict:
-    """The unit's active claim from `MAIN/.pi/claims.json` - `{}` when it is unclaimed."""
-    return claims.load_registry(main).get(unit.strip("/"), {})
+    """The unit's active claim from `MAIN/.pi/claims.json` - `{}` when it is unclaimed.
+
+    Read through `claims.registry_record`, so the unit may be spelled with or without its source extension:
+    the registry key is the unit's *name* (extensionless), and a claim written before `norm_unit` existed may
+    still carry the extension (`Gecko/Gecko_ExceptionPPC.cp`).
+    """
+    return claims.registry_record(main, unit)
 
 
 def claim_slug(claim: dict) -> str | None:
@@ -75,14 +165,21 @@ def unclaimed_notice(main: str, unit: str) -> str:
             "written afterwards." % (claims.registry_path(main), unit, unit))
 
 
-def handoff_paths(main: str, unit: str) -> dict:
+def handoff_paths(main: str, unit: str, assume_claim: bool = False) -> dict:
     """Where a worker's artefacts go, derived from the claim (see `claim_slug`).
 
     The ack file and the rescue ref stay `claims.py`'s own (`claims.ack_path`/`claims.slug`): the heartbeat is
     written by `claims.py ack`, so the brief has to name the file that command actually writes.
+
+    `assume_claim` is for the pool: a unit with no claim yet is rendered against the branch `claims.py claim`
+    *will* make (`worker/<slug(unit)>`), so the pooled brief already carries the outbox and notes paths its
+    real claim will produce. The registry is never written - the assumed claim exists only in the returned
+    dict.
     """
     unit = unit.strip("/")
     claim = claim_for(main, unit)
+    if not claim and assume_claim:
+        claim = {"branch": claims.branch_for(claims.norm_unit(unit))}
     slug = claim_slug(claim)
     return {
         "claimed": bool(slug),
@@ -96,9 +193,13 @@ def handoff_paths(main: str, unit: str) -> dict:
 
 
 def splits_range(main: str, unit: str) -> dict:
-    """The unit's section ranges from `splits.txt`, e.g. {'.text': (start, end, size)}."""
+    """The unit's section ranges from `splits.txt`, e.g. {'.text': (start, end, size)}.
+
+    Blocks are matched by *stem*, so either spelling of the unit finds them: the map and the registry key a
+    unit by its extensionless name, while `splits.txt` names the source file (`Camellia/camellia.c`).
+    """
     path = os.path.join(main, "config", "RMHE08", "splits.txt")
-    want = source_name(unit.strip("/"))
+    want = os.path.splitext(source_name(unit, main))[0]
     out, current = {}, None
     if not os.path.exists(path):
         return out
@@ -107,7 +208,7 @@ def splits_range(main: str, unit: str) -> dict:
             current = line.strip()[:-1]
             continue
         m = re.match(r"\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-        if m and current and current.lstrip("/") == want:
+        if m and current and os.path.splitext(current.lstrip("/"))[0] == want:
             start, end = int(m.group(2), 16), int(m.group(3), 16)
             out[m.group(1)] = (start, end, end - start)
     return out
@@ -164,8 +265,9 @@ def report_scores(main: str, unit: str) -> dict:
 
 def header_comment(main: str, wt: str, unit: str) -> str:
     """The unit's file-header comment - the place its residuals live."""
+    name = source_name(unit, wt, main)
     for root in (wt, main):
-        path = os.path.join(root, "src", *source_name(unit).split("/"))
+        path = os.path.join(root, "src", *name.split("/"))
         if not os.path.exists(path):
             continue
         text = open(path, encoding="utf-8", errors="replace").read()
@@ -185,7 +287,7 @@ def flags_for(main: str, unit: str) -> tuple[list[str], str]:
 
 def lib_for(main: str, unit: str) -> str:
     text = open(os.path.join(main, "configure.py"), encoding="utf-8", errors="replace").read()
-    want = "\"%s\"" % source_name(unit)
+    want = "\"%s\"" % source_name(unit, main)
     for block in re.finditer(r"\{\s*\n\s*\"lib\": \"([^\"]+)\"[^{}]*?\"objects\": \[(.*?)\]\s*,\s*\n\s*\}", text, re.S):
         if want in block.group(2):
             return block.group(1)
@@ -217,26 +319,27 @@ def data_queue_entries(main: str, unit: str) -> list[dict]:
             if e.get("unit") == unit]
 
 
-def build(main: str, wt: str, unit: str, task: str | None) -> dict:
-    unit = unit.strip("/")
+def build(main: str, wt: str, unit: str, task: str | None, assume_claim: bool = False) -> dict:
+    unit = claims.norm_unit(unit.strip("/"))
+    name = source_name(unit, wt, main)
     rng = splits_range(main, unit)
     text_range = rng.get(".text")
     syms = symbols_in_range(main, text_range[0], text_range[1]) if text_range else []
     scores = report_scores(main, unit)
     tokens, err = flags_for(main, unit)
     lib = lib_for(main, unit)
-    obj = os.path.join(wt, "build", "RMHE08", "src", *source_name(unit).split("/"))
+    obj = os.path.join(wt, "build", "RMHE08", "src", *name.split("/"))
     obj = os.path.splitext(obj)[0] + ".o"
-    target = os.path.join(main, "build", "RMHE08", "obj", *source_name(unit).split("/"))
+    target = os.path.join(main, "build", "RMHE08", "obj", *name.split("/"))
     target = os.path.splitext(target)[0] + ".o"
     for sym in syms:
         sym["percent"] = scores.get(sym["name"])
     below = [s for s in syms if (s.get("percent") is None or s["percent"] < BAR)]
-    handoff = handoff_paths(main, unit)
+    handoff = handoff_paths(main, unit, assume_claim)
     return {
         "unit": unit, "slug": handoff["slug"], "claimed": handoff["claimed"],
         "branch": handoff["branch"], "handoff": handoff, "lib": lib, "worktree": wt, "main": main,
-        "source": os.path.join(wt, "src", *source_name(unit).split("/")),
+        "source": os.path.join(wt, "src", *name.split("/")),
         "object": obj, "target": target,
         "sections": rng, "flags": tokens, "flag_error": err,
         "symbols": syms, "below_bar": len(below),
@@ -366,6 +469,7 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("A worker never touches `splits.txt`, `configure.py`, `symbols.txt` or `AGENTS.md`, never runs "
                  "`ninja`/the split/the link/`ok`, and never commits on `main`. Everything you need changed goes "
                  "into the outbox's `config_requests`.")
+    lines.extend(config_schema_lines())
     lines.append("")
     lines.append("**You may fan out subagents** for parallel work. They run in *your* worktree, on *your* branch; "
                  "they never commit (you make the one commit); you assign them disjoint files or functions; and you "
@@ -391,10 +495,38 @@ def selftest() -> int:
 
     check("source_name adds the extension", source_name("Pl/pl_act"), "Pl/pl_act.cpp")
     check("source_name keeps one", source_name("main.cpp"), "main.cpp")
-    check("source_name handles .c", source_name("RSO/runtime"), "RSO/runtime.cpp")
+    check("source_name's .cpp default is unchanged without a root", source_name("RSO/runtime"), "RSO/runtime.cpp")
+    check("source_name resolves the real extension from the tree", source_name("RSO/runtime", "."), "RSO/runtime.c")
+    check("source_name strips an extension first (norm_unit)", source_name("Camellia/camellia.c", "."),
+          "Camellia/camellia.c")
     check("splits parses a block", splits_range(".", "Pl/pl_act").get(".text") is not None
           and len(splits_range(".", "Pl/pl_act")[".text"]) == 3, True)
+    check("splits finds a .c unit from the extensionless spelling",
+          splits_range(".", "RSO/runtime").get(".text") is not None, True)
+    check("splits finds it from the .c spelling too",
+          splits_range(".", "RSO/runtime.c") == splits_range(".", "RSO/runtime"), True)
+    check("splits finds Camellia both ways",
+          splits_range(".", "Camellia/camellia") == splits_range(".", "Camellia/camellia.c"), True)
     check("splits ignores an unknown unit", splits_range(".", "Nope/nothing"), {})
+
+    # the brief's own schema table is what a worker follows, so an outbox shaped by it must validate clean
+    from units import handoff as handoff_mod
+    table = "\n".join(config_schema_lines())
+    check("the brief names every config kind", all(k in table for k in handoff_mod.CONFIG_KINDS), True)
+    check("the brief names the required fields",
+          all(f in table for row in handoff_mod.config_schema_rows() for f in row["needs"]), True)
+    check("the brief names every flags_probed field",
+          all(f in table for f in handoff_mod.FLAG_PROBE_FIELDS), True)
+    brief_shaped = {"unit": "Pl/pl_act", "worker": "a", "finished_at": "2026-01-01T00:00:00",
+                    "unit_percent": 50.0, "symbols": [{"name": "fn_1", "percent": 50.0}],
+                    "residual": "none", "measured_with": "recompile.py", "blockers": [],
+                    "config_requests": [], "flags_probed": []}
+    for row in handoff_mod.config_schema_rows():
+        brief_shaped["config_requests"].append(
+            dict({"kind": row["kind"]}, **{f: "<%s>" % f for f in row["needs"]}))
+    brief_shaped["flags_probed"].append({"flags": "<flags>", "effect": "<symbol: before -> after>",
+                                          "verdict": "reject"})
+    check("a brief-shaped outbox validates clean", handoff_mod.validate(brief_shaped, {"fn_1"})[0], [])
     check("plan_section finds §6.5", "Type and naming discipline" in plan_section(".", "### 6.5 Type and naming discipline"), True)
     check("§6.5 now carries the goto rule", "`goto` is forbidden" in plan_section(".", "### 6.5 Type and naming discipline"), True)
     check("the plan has the acknowledgement section",

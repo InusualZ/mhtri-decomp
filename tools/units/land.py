@@ -239,8 +239,12 @@ def branch_commits(main: str, unit: str) -> int:
     simply "the worker's work exists as commits of its own on its branch that landing has not taken yet" -
     `main..branch`. A branch that predates the base but carries its own commit passes; a branch with
     nothing beyond main fails.
+
+    The branch comes from the claim (`claims.claim_branch`), not from re-deriving it here: the unit may be
+    spelled with or without its source extension, and the stored branch is the lock.
     """
-    branch = claims.branch_for(unit)
+    unit = claims.norm_unit(unit.strip("/"))
+    branch = claims.claim_branch(main, unit)
     if not claims.branch_exists(main, branch):
         return 0
     p = run(["git", "rev-list", "--count", "main..%s" % branch], main)
@@ -251,6 +255,7 @@ def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
     """-> (units whose outbox validates, problems)."""
     ok, problems = [], []
     for unit in units:
+        unit = claims.norm_unit(unit.strip("/"))
         path = handoff_mod.outbox_path(main, unit)
         if not os.path.exists(path):
             problems.append("%s: no outbox at %s" % (unit, path))
@@ -268,6 +273,10 @@ def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
 
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, worker_units: bool = True) -> int:
+    # a unit's *name* is its path without the source extension (`claims.norm_unit`): `Camellia/camellia` and
+    # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
+    # whichever the orchestrator typed.
+    units = [claims.norm_unit(u.strip("/")) for u in units]
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str]] = []
 
@@ -453,8 +462,9 @@ def selftest() -> int:
 
     # branch_commits() counts `main..branch`, not `<batch base>..branch`: a worker's branch is cut when the
     # unit is claimed, so in a multi-batch round it predates the base the orchestrator later records. Real
-    # temp repos, because the check is entirely about git reachability.
-    unit = "Pl/pl_act.cpp"
+    # temp repos, because the check is entirely about git reachability. The unit is spelled extensionless and
+    # then called with the extension: the branch must be found under either spelling (the 2026-09-23 fix).
+    unit = "Pl/pl_act"
     branch = claims.branch_for(unit)
 
     def repo_git(path, *args):
@@ -479,6 +489,8 @@ def selftest() -> int:
         repo_commit(tmp, "the worker's own work")  # committed on the branch
         repo_git(tmp, "checkout", "-q", "main")
         check("a branch with commits ahead of main passes", branch_commits(tmp, unit) > 0, True)
+        check("the .cpp spelling finds the same branch", branch_commits(tmp, unit + ".cpp"),
+              branch_commits(tmp, unit))
 
     with tempfile.TemporaryDirectory() as tmp:
         repo_git(tmp, "init", "-q")
@@ -520,6 +532,20 @@ def selftest() -> int:
         ok_units, problems = outbox_units(tmp, ["Pl/pl_act"])
         check("an outbox under the unit-path slug is not found", ok_units, [])
         check("and is reported as missing", "no outbox" in (problems[0] if problems else ""), True)
+
+    # the case that failed: a registry keyed by the extensionless name, the gate asked for the .c spelling.
+    # `land.py verify --units Camellia/camellia.c` must read the same outbox as `Camellia/camellia`.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
+        claims.save_registry(tmp, {"Camellia/camellia": {"branch": "worker/camellia-67ed"}})
+        json.dump(dict(entry, unit="Camellia/camellia"),
+                  open(os.path.join(tmp, ".pi", "outbox", "camellia-67ed.json"), "w"))
+        check("the extensionless spelling finds the outbox", outbox_units(tmp, ["Camellia/camellia"])[1], [])
+        check("the .c spelling finds the same outbox", outbox_units(tmp, ["Camellia/camellia.c"])[1], [])
+        check("both spellings resolve to one unit",
+              outbox_units(tmp, ["Camellia/camellia"])[0] == outbox_units(tmp, ["Camellia/camellia.c"])[0], True)
+        check("the outbox path ignores the spelling",
+              claims.outbox_path(tmp, "Camellia/camellia.c"), claims.outbox_path(tmp, "Camellia/camellia"))
 
     check("summary delta", summary({"closed": 284, "matched": 217}, {"closed": 290, "matched": 223}),
           "closed 284 -> 290, matched 217 -> 223")

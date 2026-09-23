@@ -15,8 +15,10 @@ What `--check` enforces (each is something the orchestrator would otherwise have
 * every symbol it reports is a symbol the unit actually owns (a typo or a stale name would silently score 0);
 * `unit_percent` and each `percent` are in 0-100;
 * `measured_with` names the command, so a number can be reproduced and a hand-written compile spotted;
-* `config_requests` entries carry the evidence the plan's §8 requires (a range needs section/start/end, a
-  rename needs old/new/evidence, a flag needs the probe numbers and a verdict).
+* `config_requests` entries carry the evidence the plan's §8 requires. The accepted kinds and their required
+  fields are `CONFIG_REQUEST_SCHEMA` below - the one definition, which `brief.py` renders into the worker's
+  brief (part 6), so the brief asks for exactly what this validator accepts. `flags_probed` is a list of
+  `{flags, effect, verdict}` objects.
 """
 
 from __future__ import annotations
@@ -35,7 +37,37 @@ from units import claims  # noqa: E402
 from units import recompile as rc  # noqa: E402
 
 REQUIRED = ("unit", "worker", "finished_at", "unit_percent", "symbols", "residual", "measured_with")
-CONFIG_KINDS = ("range", "rename", "flag", "shared-file")
+
+# The `config_requests` schema: the kind, the fields this validator *requires* and the fields the
+# orchestrator reads when they are present. `brief.py` renders this table verbatim (part 6), so the brief
+# asks for exactly what the validator accepts - the two cannot drift, because there is one definition.
+#
+# Why this direction (the brief copies the schema, not the reverse): the kind name carries the required
+# fields. `range` means section/start/end, `rename` means old/new/evidence, and a synonym such as `data` or
+# `tool` would have to be mapped back to a canonical kind before those checks run - two vocabularies and two
+# chances for a typo to skip a required-field check. The brief is machine-generated, so it can carry the
+# exact vocabulary at no cost. The 2026-09-23 `RSO/runtime` round produced an 18-error outbox precisely
+# because the brief named no schema and the worker invented `data`/`flags`/`tool` and a non-dict
+# `flags_probed`; a brief that states the schema is the fix, not a validator that guesses.
+CONFIG_REQUEST_SCHEMA = (
+    {"kind": "range", "needs": ("section", "start", "end"), "also": ("evidence",),
+     "means": "a data range this unit owns (a splits.txt range plus its configure.py entry)"},
+    {"kind": "rename", "needs": ("old", "new", "evidence"), "also": (),
+     "means": "a map-symbol rename, with the evidence for the new name"},
+    {"kind": "flag", "needs": ("evidence",), "also": ("lib", "change"),
+     "means": "a compiler flag for a lib, with the probe numbers that justify it"},
+    {"kind": "shared-file", "needs": ("why",), "also": ("file",),
+     "means": "an edit to a file a worker may not touch (a tool, configure.py, splits.txt)"},
+)
+CONFIG_KINDS = tuple(row["kind"] for row in CONFIG_REQUEST_SCHEMA)
+CONFIG_NEEDS = {row["kind"]: row["needs"] for row in CONFIG_REQUEST_SCHEMA}
+FLAG_PROBE_FIELDS = ("flags", "effect", "verdict")
+FLAG_PROBE_VERDICTS = ("reject", "adopt", "inconclusive")
+
+
+def config_schema_rows() -> list[dict]:
+    """The schema table `brief.py` renders - the one definition both tools read."""
+    return [dict(row) for row in CONFIG_REQUEST_SCHEMA]
 
 
 def outbox_path(main: str, unit: str) -> str:
@@ -93,23 +125,25 @@ def validate(entry: dict, owned: set[str]) -> tuple[list[str], list[str]]:
                                      or not entry.get("measured_with", "").strip()):
         errors.append("measured_with must name the command the numbers came from")
     for i, req in enumerate(entry.get("config_requests") or []):
+        if not isinstance(req, dict):
+            errors.append("config_requests[%d] is not an object" % i)
+            continue
         kind = req.get("kind")
-        if kind not in CONFIG_KINDS:
+        if kind not in CONFIG_NEEDS:
             errors.append("config_requests[%d] has kind %r, expected one of %s" % (i, kind, list(CONFIG_KINDS)))
             continue
-        if kind == "range" and not all(k in req for k in ("section", "start", "end")):
-            errors.append("config_requests[%d] (range) needs section, start, end" % i)
-        if kind == "rename" and not all(k in req for k in ("old", "new", "evidence")):
-            errors.append("config_requests[%d] (rename) needs old, new, evidence" % i)
-        if kind == "flag" and not req.get("evidence"):
-            errors.append("config_requests[%d] (flag) needs evidence (the probe numbers)" % i)
-        if kind == "shared-file" and not req.get("why"):
-            errors.append("config_requests[%d] (shared-file) needs why" % i)
+        missing = [f for f in CONFIG_NEEDS[kind] if f not in req or req.get(f) in (None, "")]
+        if missing:
+            errors.append("config_requests[%d] (%s) needs %s" % (i, kind, ", ".join(missing)))
     for i, probe in enumerate(entry.get("flags_probed") or []):
-        if not all(k in probe for k in ("flags", "effect", "verdict")):
-            errors.append("flags_probed[%d] needs flags, effect, verdict" % i)
-        elif probe["verdict"] not in ("reject", "adopt", "inconclusive"):
-            errors.append("flags_probed[%d] verdict %r is not reject/adopt/inconclusive" % (i, probe["verdict"]))
+        if not isinstance(probe, dict):
+            errors.append("flags_probed[%d] is not an object (it needs flags, effect, verdict)" % i)
+            continue
+        if not all(k in probe for k in FLAG_PROBE_FIELDS):
+            errors.append("flags_probed[%d] needs %s" % (i, ", ".join(FLAG_PROBE_FIELDS)))
+        elif probe["verdict"] not in FLAG_PROBE_VERDICTS:
+            errors.append("flags_probed[%d] verdict %r is not one of %s"
+                          % (i, probe["verdict"], "/".join(FLAG_PROBE_VERDICTS)))
     if entry.get("claim_state") not in (None, "released", "open"):
         warnings.append("claim_state %r is not open or released" % entry["claim_state"])
     if not (entry.get("blockers") or []):
@@ -157,7 +191,26 @@ def selftest() -> int:
           bool(validate(dict(good, flags_probed=[{"flags": "-O4,p", "effect": "x", "verdict": "maybe"}]), {"fn_1"})[0]), True)
     check("an unknown config kind rejected",
           bool(validate(dict(good, config_requests=[{"kind": "vibe"}]), {"fn_1"})[0]), True)
+    check("the brief's old `data` kind is not silently accepted",
+          bool(validate(dict(good, config_requests=[{"kind": "data", "section": ".data"}]), {"fn_1"})[0]), True)
+    for row in config_schema_rows():
+        check("a %s without its required fields is rejected" % row["kind"],
+              bool(validate(dict(good, config_requests=[{"kind": row["kind"]}]), {"fn_1"})[0]), True)
     check("residual 'none' is allowed", validate(dict(good, residual="none"), {"fn_1"})[0], [])
+
+    # the outbox a worker writes by following the brief's schema table must validate clean: this is the
+    # round-trip the two tools share (brief.py renders `config_schema_rows()`, the worker fills it in).
+    brief_shaped = dict(good, config_requests=[], flags_probed=[])
+    for row in config_schema_rows():
+        req = {"kind": row["kind"]}
+        for field in row["needs"]:
+            req[field] = "<%s>" % field
+        brief_shaped["config_requests"].append(req)
+    brief_shaped["flags_probed"].append({"flags": "<flags>", "effect": "<symbol: before -> after>",
+                                          "verdict": "reject"})
+    check("a brief-shaped outbox validates clean", validate(brief_shaped, {"fn_1"})[0], [])
+    check("a flags_probed string is rejected (it must be a list of objects)",
+          bool(validate(dict(good, flags_probed=["-O4,p"]), {"fn_1"})[0]), True)
     check("a template passes structurally",
           validate(template("auto/x") | {"symbols": [{"name": "fn_1", "percent": 0.0}], "unit_percent": 0.0,
                                          "residual": "none"}, {"fn_1"})[0], [])
@@ -201,7 +254,7 @@ def main() -> int:
 
     if args.check:
         entry = json.loads(open(args.check, encoding="utf-8").read())
-        unit = entry.get("unit") or (args.unit or "")
+        unit = claims.norm_unit((entry.get("unit") or (args.unit or "")).strip("/"))
         owned: set[str] = set()
         rng = brief_mod.splits_range(main, unit) if unit else {}
         if rng.get(".text"):
@@ -221,7 +274,7 @@ def main() -> int:
     if not args.unit:
         ap.print_help()
         return 0
-    unit = args.unit.strip("/")
+    unit = claims.norm_unit(args.unit.strip("/"))
     rng = brief_mod.splits_range(main, unit)
     rows = brief_mod.symbols_in_range(main, *rng[".text"][:2]) if rng.get(".text") else []
     scores = brief_mod.report_scores(main, unit)
