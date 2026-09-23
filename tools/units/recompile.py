@@ -14,10 +14,19 @@ What it does instead:
 * takes the real command line from MAIN's ninja (`ninja -t commands`), rewrites the three paths that must
   change (the source, the `-o` directory, the worktree's own `include/`), and runs it with MAIN as cwd;
 * deletes the object first, then asserts the file exists and its mtime moved — a stale object is impossible;
-* prints the two object paths, the section sizes, and can measure a symbol with objdiff-cli's explicit
-  `-1 <target> -2 <base>` mode, which needs no project files at all.
+* prints the two object paths, the section sizes, and can measure a symbol **with the same objdiff code
+  path the official report uses** (`report generate` on a one-unit project), so the number equals
+  `build/RMHE08/report.json`'s `fuzzy_match_percent` for the same object.
 
     python tools/units/recompile.py <unit> [--measure <symbol>] [--json] [--dry-run] [--print-command]
+
+The measurement trap this closes (`--measure` used to lie by ~0.36 points on `RSO/runtime`, which sent a
+worker chasing a regression that did not exist): objdiff-cli's explicit `diff` mode is **not** the
+report's metric. Two differences compound - `diff` defaults `functionRelocDiffs` to `data_value` while
+`report generate` defaults to `none` (so relocation-only differences count as mismatches), and even at the
+same setting the diff JSON's per-symbol `match_percent` is a different normalisation from the report's
+`fuzzy_match_percent`. `report generate` over a one-unit project is the only path that is the report by
+construction, and it costs ~0.04 s.
 
 `<unit>` is the path from the repository root, e.g. `Pl/pl_act`, `main.cpp`, `auto/80040598_fn_80040598`.
 """
@@ -141,16 +150,72 @@ def section_sizes(obj: str) -> dict:
     return {s["sname"]: s["size"] for s in secs if s.get("sname") and s.get("size")}
 
 
-def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str) -> dict:
-    """Per-symbol diff with objdiff-cli's explicit-object mode - no project files, so it works in a worktree.
+MIN_PROJECT_VERSION = "2.0.0-beta.5"
 
-    The JSON is `{left: {symbols: [...]}, right: {...}}`; each symbol entry carries `name`, `size`,
-    `match_percent`. `left` is the target object, `right` the candidate.
+
+def measure_project(target: str, base: str, unit: str, tmpdir: str) -> tuple[str, str]:
+    """Write a one-unit objdiff project pointing at the two objects; return (project dir, config path).
+
+    `report generate` resolves `target_path`/`base_path` against the project directory, and on Windows it
+    only treats a **backslash**-rooted path as absolute (`C:/...` is joined and mangled into `C:...`), so
+    the paths are absolutised with `os.path.abspath` - which yields exactly that shape on Windows and a
+    plain absolute path elsewhere.
+    """
+    proj = os.path.join(tmpdir, "measure_project")
+    os.makedirs(proj, exist_ok=True)
+    cfg_path = os.path.join(proj, "objdiff.json")
+    config = {
+        "min_version": MIN_PROJECT_VERSION,
+        "units": [{
+            "name": unit or "measure",
+            "target_path": os.path.abspath(target),
+            "base_path": os.path.abspath(base),
+        }],
+    }
+    with open(cfg_path, "w", encoding="utf-8") as fh:
+        json.dump(config, fh, indent=2)
+    return proj, cfg_path
+
+
+def report_measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
+                   unit: str = None, runner=subprocess.run) -> dict:
+    """Score one symbol with `report generate` - the exact path behind build/RMHE08/report.json.
+
+    The returned `fuzzy_match_percent` is the official metric: `ledger.py`, `brief.py` and `land.py` all
+    read it from the project report, so a worker must not be handed anything else.
+    """
+    os.makedirs(tmpdir, exist_ok=True)
+    proj, _cfg = measure_project(target, base, unit, tmpdir)
+    out = os.path.join(tmpdir, "recompile_report_%s.json" % re.sub(r"\W", "_", symbol))
+    p = runner([objdiff, "report", "generate", "-p", proj, "-o", out],
+               capture_output=True, text=True, errors="replace")
+    if p.returncode != 0 or not os.path.exists(out):
+        return {"symbol": symbol, "error": (p.stdout or "") + (p.stderr or "")}
+    data = json.loads(open(out, encoding="utf-8").read())
+    units = data.get("units") or []
+    functions = (units[0].get("functions") if units else []) or []
+    fn = next((f for f in functions if f.get("name") == symbol), None)
+    if fn is None:
+        return {"symbol": symbol,
+                "error": "symbol is not in the target object (renamed? not in this unit?)"}
+    return {"symbol": symbol, "fuzzy_match_percent": fn.get("fuzzy_match_percent"),
+            "target_size": fn.get("size"), "report_json": out}
+
+
+def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
+              runner=subprocess.run) -> dict:
+    """Instruction-level diff for the row detail the report does not carry.
+
+    `-c functionRelocDiffs=none` is passed explicitly because `report generate`'s default is `none` while
+    `diff`'s is `data_value`: without it the rows disagree with the official classification (relocation-only
+    differences show up as `DIFF_ARG_MISMATCH`). The metric in this JSON (`match_percent`) is *not* the
+    report's - it is exposed as `diff_match_percent` and must never be quoted as the score.
     """
     out = os.path.join(tmpdir, "recompile_%s.json" % re.sub(r"\W", "_", symbol))
     os.makedirs(tmpdir, exist_ok=True)
-    p = subprocess.run([objdiff, "diff", "-1", target, "-2", base, symbol, "--format", "json", "-o", out],
-                       capture_output=True, text=True, errors="replace")
+    p = runner([objdiff, "diff", "-1", target, "-2", base, symbol,
+                "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
+               capture_output=True, text=True, errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return {"symbol": symbol, "error": (p.stdout or "") + (p.stderr or "")}
     data = json.loads(open(out, encoding="utf-8").read())
@@ -172,12 +237,38 @@ def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str) -> d
         return {"symbol": symbol, "error": "symbol is in neither object (renamed? unpaired?)"}
     return {
         "symbol": symbol,
-        "match_percent": (cand or tgt or {}).get("match_percent"),
+        "diff_match_percent": (cand or tgt or {}).get("match_percent"),
         "target_size": (tgt or {}).get("size"),
         "candidate_size": (cand or {}).get("size"),
         "paired": tgt is not None and cand is not None,
         "json": out,
     }
+
+
+def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
+            unit: str = None, runner=subprocess.run) -> dict:
+    """The official score for one symbol, plus the instruction-level rows behind it.
+
+    `match_percent` is deliberately the **report** metric (`fuzzy_match_percent`), so any existing consumer
+    that reads `measure().match_percent` gets the number that closes a symbol. The positional objdiff value
+    is kept as `diff_match_percent`; it is diagnostic only.
+    """
+    result = report_measure(target, base, symbol, objdiff, tmpdir, unit=unit, runner=runner)
+    if "error" in result:
+        return result
+    result["match_percent"] = result.pop("fuzzy_match_percent")
+    rows = diff_rows(target, base, symbol, objdiff, tmpdir, runner=runner)
+    if "error" in rows:
+        # the score stands on its own; only the row detail is unavailable
+        result["rows_error"] = rows["error"]
+        return result
+    result["diff_match_percent"] = rows.get("diff_match_percent")
+    if result.get("target_size") is None:
+        result["target_size"] = rows.get("target_size")
+    result["candidate_size"] = rows.get("candidate_size")
+    result["paired"] = rows.get("paired")
+    result["json"] = rows.get("json")
+    return result
 
 
 def absolutize(tokens: list[str], main: str) -> list[str]:
@@ -245,7 +336,7 @@ def main() -> int:
 
     if args.measure and result.get("compiled") and os.path.exists(target):
         result["measure"] = measure(target, result["object"], args.measure, unitutil.OBJDIFF,
-                                    os.path.join(wt, "build", "tmp"))
+                                    os.path.join(wt, "build", "tmp"), unit=unit)
 
     if args.json:
         print(json.dumps(result, indent=2))
@@ -267,9 +358,15 @@ def main() -> int:
         if "error" in m:
             print("  measure %s: ERROR %s" % (m.get("symbol"), m["error"][:200]))
         else:
-            print("  measure %s: %s%% (target %s B, ours %s B, paired=%s)"
+            print("  measure %s: %s%% (official report metric; target %s B, ours %s B, paired=%s)"
                   % (m["symbol"], m.get("match_percent"), m.get("target_size"), m.get("candidate_size"),
                      m.get("paired")))
+            dmp = m.get("diff_match_percent")
+            if isinstance(dmp, (int, float)) and isinstance(m.get("match_percent"), (int, float)) \
+                    and abs(dmp - m["match_percent"]) > 1e-6:
+                # objdiff-cli's explicit diff mode is a different normalisation; say so, so nobody quotes it
+                print("    (objdiff's positional diff reports %s%% for the same object - not the report metric)"
+                      % dmp)
     print("\nnext: python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u %s <symbol>   (in MAIN)"
           "\n      or: python tools/units/recompile.py %s --measure <symbol>" % (result["unit"], result["unit"]))
     if not result.get("fresh"):
