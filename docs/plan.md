@@ -476,9 +476,9 @@ construction: a tool can waste time, it cannot break the link.
 | 7.4 | `tools/units/handoff.py` | worker replies were inconsistently shaped; detail was lost to truncation | prints the digest skeleton; validates an outbox entry against the schema | ~60 |
 | 7.5 | `tools/units/land.py` | the batch checklist was six manual commands and the regression scan was rewritten four times; a green `ok` can come from a stale link | `verify` **deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) before the run and requires both to be recreated**, then runs configure → split → report → regressions → `ok` → ledger delta → knowledge-delta check; refuses on a shared-file edit or an outbox violation; owns the baseline (7.16). The `.ninja_log` ordering idea does not work: a `NonMatching` batch never relinks, so `main.elf` never runs | ~240 |
 | 7.6 | **first `Matching` flip** | `0 / 5 files linked` today; every linking question is untested and gets more expensive with every unit | one byte-identical **object** (§1) flipped alone in its commit, `ok` green, then the next | — |
-| 7.7 | `tools/symbols/dumpmap.py` | 48 367 real names/signatures sit in `DumpSymbols.zip` and using them means remembering the member, format and flags | `lookup <addr\|name>` and `join` (rename candidates, `zz_` confirmations, conflicts) against `symbols.txt` | ~80 |
-| 7.8 | `tools/units/dataclaim.py` | the riskiest edit class was reasoned out by hand three times | for each proposed run: target section size/bytes vs ours, verdict, expected effect | ~80 |
-| 7.9 | `tools/symbols/phantom.py` | five 4-byte `fn_*` were not functions (dead epilogues) and cost four functions their last 11 points | for every small unnamed `fn_*`, test whether the previous function's bytes include it → merge candidates | ~60 |
+| 7.7 | **done 2026-09-23** - `tools/symbols/dumpmap.py` (66 checks) | 48 367 real names/signatures sit in `DumpSymbols.zip` and using them means remembering the member, format and flags | `lookup <addr\|name>` and `join` (rename candidates, `zz_` confirmations, conflicts) against `symbols.txt` | ~80 |
+| 7.8 | **done 2026-09-23** - `tools/units/dataclaim.py` (75 checks) | the riskiest edit class was reasoned out by hand three times | for each proposed run: target section size/bytes vs ours, verdict, expected effect | ~80 |
+| 7.9 | **done 2026-09-23** - `tools/symbols/phantom.py` (60 checks) | five 4-byte `fn_*` were not functions (dead epilogues) and cost four functions their last 11 points | for every small unnamed `fn_*`, test whether the previous function's bytes include it → merge candidates | ~60 |
 | 7.10 | `prepcommit.py` knowledge-delta check | the rule was enforced by me remembering | warns when a unit's score rose and no `src/` header, `docs/` file or `configure.py` comment changed in the same commit | ~40 |
 | 7.11 | ledger byte burn-down | `295 / 20 519` and `65 128 / 5 437 392` are two burn-downs and the second predicts the DOL | print both, plus a coarse per-0x10000-block view | ~40 |
 | 7.12 | one shared-file writer module | CRLF vs LF silently voided two edits; an undeclared progress category failed the *next* `ninja` | one module owns the writes, asserts every anchor, is idempotent, runs `symbolpreflight`'s overlap check before a range lands | ~120 |
@@ -728,8 +728,12 @@ brief is then a *file it writes for itself* too, so a later worker can pick the 
    `lobby_scene`, `global_destructor_chain`, `__ppc_eabi_init`, `g3d_resanmamblight`, `__start`). The round's
    lessons are in the flip-campaign paragraph above; the one open blocker is the `.ctors`/`_reference`
    question, and `flipcheck.py` reports 10 of 19 registered units ready.
-4. **`dumpmap.py` + one batched rename pass** (7.7) - thousands of real names, one re-split, every rename
-   verified after it.
+4. **`dumpmap.py` + one batched rename pass** (7.7) - **`dumpmap.py` done 2026-09-23** (203d975, 66 checks):
+   30 991 of the map's 65 695 symbols have a dump entry, giving **2 692 rename candidates** (1 685 high
+   confidence, 1 007 review, 64 flagged), 27 134 confirmations and 1 165 conflicts (a conflict is never
+   auto-renamed). **The batched rename pass itself is the next step.** `dataclaim.py` (7.8, 737a5ce) and
+   `phantom.py` (7.9, 4629ae1) are done too - the latter finds 16 `fn_*` that are really a previous function's
+   dead epilogue, and reproduces the earlier hand-made merge byte-for-byte.
 5. **The attribution pass, scaled** - `attribute.py apply` over the next regions in ascending address order,
    registration batches capped at 0.5 MB, each new unit's stub source in the same commit, its seam re-checked the
    moment its functions match.
