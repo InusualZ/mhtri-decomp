@@ -92,16 +92,37 @@
  *     but the rows do not pair. 7CFC0 additionally gets two extra `extsh` before its clamp stores.
  *   * `mulli` vs the shift/subf/shift form of `* 14` (78590): MWCC folds `* 7 * 2` before strength
  *     reduction, so the three-instruction form cannot be recovered from a constant product.
- *   * A57C (1668 B, the one body this pass left far from perfect): the CFG is right but MWCC lays the two
- *     *shared* tails out differently. Retail puts case 0's body, then case 2's, then the `block_53` tail
- *     (its `switch` default) and falls into `block_75`; writing that tail as the `else` of case 0's `if`
- *     keeps it where the source wrote it, so both `goto`s land elsewhere and about a third of the function
- *     shifts by a block. Case 0's condition polarity (`A || (B && C)`) is the same problem: retail jumps
- *     *to* the body, ours past it. Rewriting the shared tail to sit after the `switch`, reached only by the
- *     two `goto`s, is the next thing to try - the body itself (the flag reads, the `fn_803BECA0` swaps, the
- *     `lbl_805C6118` interpolation loop, the per-motion write-back) is already instruction-for-instruction.
+ *   * A57C (1668 B): the body (the flag reads, the `fn_803BECA0` swaps, the `lbl_805C6118`
+ *     interpolation loop, the per-motion write-back) is instruction-for-instruction, but the two shared
+ *     tails were reached through labels until the conformance pass below; see its note for the residual.
  *   * `Pl_zanzo_set` and C89C/A044 read `Get_motion_no` as `s16`: the shared declaration has to stay `s16`
  *     (a `u16` return drops Pl_zanzo_set from 100 to 94.2), so A57C casts at its own call site.
+ *
+ * Conformance pass (worker `pl-act-09c6`, rule 8: no label as a control-flow device). Four
+ * functions carried one - 78144/78310 (their own `ret0`/`ret1` labels), BC48 (`ret1`/`ret0`) and A57C
+ * (`block_16`/`block_53`/`block_75`). Every conformant shape is a deliberate approximation of retail's
+ * flow, because retail's own source clearly used labels; each was measured against a set of alternatives
+ * and the best kept (the numbers are this pass's, `-` = that function's own percent):
+ *   * BC48 100 -> 99.24: `do { ... } while (0)` around the whole dispatch. The `(u32)(x - 6) <= 2` test
+ *     `break`s out of the loop (a single `ble` into the shared `return 1`, exactly retail's row) and the
+ *     case-3/5 failures `return 0` inline. Retail instead branches *to* a shared `return 0`, so those two
+ *     arms keep their polarity inverted (2 rows, 152 B either way). Alternatives measured: plain returns
+ *     94.47, `switch` case-group 93.68, one result variable 63.6, inline `return 1` per arm 94.47.
+ *   * 78144 100 -> 97.74, 78310 100 -> 97.38: the outer `if (m != 9) ... else` becomes a `switch (m)` whose
+ *     `default:` (the m != 9 body) is written FIRST and whose `case 9:` is last, which keeps the bodies in
+ *     retail's address order and lets the two labelled exits disappear. The residual is the early
+ *     `(u32)((u8)m - 6) <= 1` exit: retail reaches it with one `ble` into the block `case 10:` also uses,
+ *     and two separate `return 0;` statements cannot share a block without the label, so ours inlines the
+ *     `li r3,0; b epilogue` pair (+8 B each). Alternatives measured: compound `||` condition 84.7,
+ *     `for (;;)`/`break` dispatch 87.0, shared result variable 67.5.
+ *   * A57C 99.96 -> 97.63: the outer dispatch is a `for (;;)` whose `break` carries every "skip the body"
+ *     case (retail's `bne 3b40`/`beq 3fc0` edges come out as the same edges), and the body's `block_53` /
+ *     `block_75` jumps are gone because the case-0/2 arms now hoist `mag = 5` above their flag-sum test and
+ *     `if (mag == 0)` selects the pad scan - `mag` is the discriminator, so no extra live variable is
+ *     needed. Same instruction count (417), ~126 rows differ: retail's own dispatch is `switch`-shaped
+ *     (`cmpwi 0; beq; cmpwi 2; beq; b body`) where the conformant if/else-if form makes MWCC interleave the
+ *     case tests. Alternatives measured: compound `||` dispatch 96.02, extra `skip_scan` variable 96.25,
+ *     `mag = 1` marker 97.46, dropping the flag-sum test 94.30.
  *
  * Written so far: all 115 bodies. This pass added the last 13, biggest first: C208 (1684, 93.9),
  * 79C20 (668, 94.3), 7993C (584, 95.4), AC2C (508, 95.4), 77974 (464, 97.2), A340 (428, 94.2),
@@ -129,9 +150,9 @@
  *   * a big `if` whose failing edge falls into the *next* arm's body: move the shared tail out of the `else`
  *     of the first arm and make it the `switch`'s `default:` after the last case (A57C 66.0 -> 96.0; its
  *     only residual is the two implicit int->float magics, which cannot be named from source - playbook 29).
- *   * a `return` block MWCC refuses to merge: write `goto ret1; ret0: return 0;` at the end of the block so
- *     the shared label lands *before* the other return (78144 95.6 -> 100.0, 78310 94.9 -> 100.0,
- *     BC48 94.5 -> 100.0, and BC48's `case 4: return 1;` shares that block with an earlier `if (...) return 1;`).
+ *   * a `return` block MWCC refuses to merge: 78144/78310 needed a shared `ret0`/`ret1` label (95.6 -> 100.0,
+ *     94.9 -> 100.0) and BC48 a shared `ret1` (94.5 -> 100.0). Rule 8 removed the label again
+ *     in the conformance pass below, which records what replaced it and what that cost.
  *   * `(s32)arg0 == N` for a `u8` parameter gives retail's `cmpwi` where `arg0 == N` gives `cmplwi`
  *     (78144, 78310).
  *   * an accumulator retail keeps in 32 bits and sign-extends only at each *compare*: declare it `s32`, write
@@ -209,6 +230,8 @@ struct _SLOTENT {
     /* 0x2 */ s16 value;
 };
 
+/* The player actor. size: 0x668 - the extent of the field layout below (the pl_skill.cpp copy of this
+ * type stops at 0x644, so that one is short; the two belong in one Pl-wide header, see the header note). */
 struct _PLW {
     /* 0x000 */ u8 unk000[2];
     /* 0x002 */ u8 unk002;
@@ -1353,28 +1376,30 @@ extern "C" s32 fn_8027BC48(s32 arg1)
         return 1;
     }
     s32 x = p[0xFA];
-    if ((u32)(x - 6) <= 2) {
-        goto ret1;
-    }
-    switch (x) {
-    case 3:
-        if (arg1 == 0) {
-            return 1;
+    /* `break` = "this motion still takes directional input"; the loop is the shared `return 1` the
+     * retail source reached through a label (the other half, the shared `return 0`, is inlined). */
+    do {
+        if ((u32)(x - 6) <= 2) {
+            break;
         }
-        break;
-    case 5:
-        if (arg1 != 2) {
-            return 1;
+        switch (x) {
+        case 3:
+            if (arg1 != 0) {
+                return 0;
+            }
+            break;
+        case 5:
+            if (arg1 == 2) {
+                return 0;
+            }
+            break;
+        case 4:
+            break;
+        default:
+            return 0;
         }
-        break;
-    case 4:
-        goto ret1;
-    }
-    goto ret0;
-ret1:
+    } while (0);
     return 1;
-ret0:
-    return 0;
 }
 
 /* 0x8027CFC0: ticks down the actor's stun timer and clears the stun condition at zero. */
@@ -2976,29 +3001,27 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
     if (arg1 != (u16)Get_motion_no(self)) {
         return;
     }
-    if ((s8)*(u8*)((u8*)self + 0x36A) != 0) {
+    if ((s8)self->unk36A != 0) {
         return;
     }
     if ((s32)self->unk5E5 != 0 || (s32)self->unk5E6 != 0) {
         self->unk5E5 = 0xA;
     }
-    if ((s32)self->unk5E5 == 0 && (s32)self->unk5E6 == 0) {
-        if ((u32)fn_8026A6F4(self, 0xB) != 1) {
-            switch (arg2) {
-            case 0:
-                if (self->unk00A == 4 || fn_8027A340(self) != 0) {
-                    goto block_16;
-                }
-                break;
-            case 2:
-                if (fn_8026A644(self, 0x37) != 0) {
-                    goto block_16;
-                }
+    for (;;) {
+        if ((s32)self->unk5E5 == 0 && (s32)self->unk5E6 == 0) {
+            if ((u32)fn_8026A6F4(self, 0xB) == 1) {
                 break;
             }
+            if (arg2 == 0) {
+                if (!(self->unk00A == 4 || fn_8027A340(self) != 0)) {
+                    break;
+                }
+            } else if (arg2 == 2) {
+                if (fn_8026A644(self, 0x37) == 0) {
+                    break;
+                }
+            }
         }
-    } else {
-    block_16:
         switch (arg2) {
         case 0:
             if (fn_8027A340(self) != 0 ||
@@ -3026,13 +3049,10 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                     f27 = f26;
                     f26 = c;
                 }
+                mag = 5;
                 if ((s32)(f26 + f24 + (f27 + f25)) != 0) {
-                    mag = 5;
                     step = 0x180;
-                    goto block_75;
                 }
-            } else {
-                goto block_53;
             }
             break;
         case 2:
@@ -3060,17 +3080,18 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                     f27 = f26;
                     f26 = c;
                 }
+                mag = 5;
                 if ((s32)(f26 + f24 + (f27 + f25)) != 0) {
-                    mag = 5;
                     step = 0x200;
-                    goto block_75;
                 }
-            } else {
-                goto block_53;
             }
             break;
         default:
-        block_53:
+            break;
+        }
+        if (mag == 0) {
+            /* `mag` is still 0 only when no case arm fired: that is this unit's rule-8 replacement for the
+             * `block_53` edge, and the pad scan below is what retail's label reached. */
             if ((s32)self->unk5E5 != 0 || (s32)self->unk5E6 != 0) {
                 u16 w = *(u16*)((u8*)self + 0xC8);
                 u8 r;
@@ -3116,9 +3137,8 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                     }
                 }
             }
-        block_75:
-            {
-                s32 c = f25 + f24;
+        {
+            s32 c = f25 + f24;
                 if (c != 0 && (s32)(f27 + f26) != 0) {
                     step = (s32)(lbl_8079A0F0 * (f32)step);
                     mag = (s32)(lbl_8079A0F0 * (f32)mag);
@@ -3143,6 +3163,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                 }
             }
         }
+        break;
     }
     switch (arg2) {
     case 0:
@@ -3306,13 +3327,16 @@ extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
     if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
         return 0;
     }
-    if ((s32)(u8)m != 9) {
+    /* `default:` first and `case 9:` last keeps the two bodies in retail's address order - the else arm
+     * is out of line, and this is the rule-8 shape for the two labelled exits retail's source had. */
+    switch ((s32)(u8)m) {
+    default: {
         u8* w = get_move_work_adrs(0);
         if (w != 0 && arg0 == *(u8*)(w + 0xF6)) {
             return 0;
         }
         if ((u32)((u8)m - 6) <= 1) {
-            goto ret0;
+            return 0;
         }
         switch ((s32)(u8)m) {
         case 1:
@@ -3336,17 +3360,16 @@ extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
             }
             break;
         case 10:
-            goto ret0;
+            return 0;
         }
-        goto ret1;
-    ret0:
-        return 0;
-    } else {
+        break;
+    }
+    case 9:
         if (fn_802B0688(arg1) == 1U) {
             return 0;
         }
+        break;
     }
-ret1:
     return 1;
 }
 
@@ -3357,13 +3380,16 @@ extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
     if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
         return 0;
     }
-    if ((s32)(u8)m != 9) {
+    /* `default:` first and `case 9:` last keeps the two bodies in retail's address order - the else arm
+     * is out of line, and this is the rule-8 shape for the two labelled exits retail's source had. */
+    switch ((s32)(u8)m) {
+    default: {
         u8* w = get_move_work_adrs(0);
         if (w != 0 && arg0 == *(u8*)(w + 0xF6)) {
             return 0;
         }
         if ((u32)((u8)m - 6) <= 1) {
-            goto ret0;
+            return 0;
         }
         switch ((s32)(u8)m) {
         case 1:
@@ -3382,17 +3408,16 @@ extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
             }
             break;
         case 10:
-            goto ret0;
+            return 0;
         }
-        goto ret1;
-    ret0:
-        return 0;
-    } else {
+        break;
+    }
+    case 9:
         if (fn_802B0688(arg1) == 1U) {
             return 0;
         }
+        break;
     }
-ret1:
     return 1;
 }
 
