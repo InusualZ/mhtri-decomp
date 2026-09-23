@@ -560,6 +560,16 @@ in this same file - and a local symbol cannot be referenced across objects, so i
 it is currently attributed to an auto `.sbss` blob, whose copy dtk spells `Debug_BBA_807953C8`. The fix is a
 `splits.txt` claim plus a definition in the source: the second flip this round blocked by **attribution** rather
 than by codegen, after the `.ctors` words.
+
+That one is **solved**: the byte cannot be claimed (a `.sbss` split must be 16-byte aligned and the block also
+holds `PowerCallback`/`ResetCallback`), and what actually broke was the *name* - `scope:local` makes the split
+spell a local symbol `<name>_<address>`, so the scaffold defined `Debug_BBA_807953C8` while the two SDA21
+relocations in `__start.o` named a symbol nothing defined. Declaring `Debug_BBA` **`scope:global`** in the map
+(b08576d) keeps the plain name on both sides: the source goes back to the SDK's name, the relocations of our
+object and the target's are identical, and the unit now reports **100.00 % (736/736 bytes)** - its recorded
+residual is gone. **Rule: when a `scope:local` symbol has to be visible by name to another object, declare it
+`scope:global` in `symbols.txt`** (or reference dtk's `<name>_<address>` spelling); `scope:local` is what makes
+dtk disambiguate, and the map is a build input, not a claim about the original's symbol table.
    object covering those bytes, and object reordering (dtk substitutes in place).
 
 `tools/units/flipcheck.py` checks all three conditions per unit (claim vs emitted sections, sizes/alignment,
