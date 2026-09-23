@@ -550,6 +550,16 @@ proof has to contain (detail: `.pi/notes/flip-round-1.md`):
    drops an unreferenced `_reference` symbol's section - nothing names it, since the startup code walks `.ctors`
    by address - and whether dtk's synthesised target objects are exempt from that, which would explain why green
    keeps all three words and only the substituted object loses two.
+
+**`__ppc_eabi_init` is flipped** (`1a517a8`, with the per-file `-func_align 16` lib split in `895e72a`) - the
+first flipped unit whose code lives in `.init` and the first needing a flag rather than a per-lib setting.
+**`__start` is not an alignment problem**: 16 gives `.init` 0x2F8 against the retail 0x300 and 32 overshoots to
+0x348, so the 8 missing bytes are trailing pad, and the flip fails at the link with `undefined: 'Debug_BBA'`.
+The map has one entry for it - `scope:local`, `.sbss:0x807953C8`, used only by `__set_debug_bba`/`__get_debug_bba`
+in this same file - and a local symbol cannot be referenced across objects, so it belongs to `__start.c` itself;
+it is currently attributed to an auto `.sbss` blob, whose copy dtk spells `Debug_BBA_807953C8`. The fix is a
+`splits.txt` claim plus a definition in the source: the second flip this round blocked by **attribution** rather
+than by codegen, after the `.ctors` words.
    object covering those bytes, and object reordering (dtk substitutes in place).
 
 `tools/units/flipcheck.py` checks all three conditions per unit (claim vs emitted sections, sizes/alignment,
