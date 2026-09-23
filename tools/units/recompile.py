@@ -12,7 +12,11 @@ What it does instead:
 * resolves **MAIN** with `git worktree list --porcelain` and takes the toolchain, the include path and the
   *target* object from there;
 * takes the real command line from MAIN's ninja (`ninja -t commands`), rewrites the three paths that must
-  change (the source, the `-o` directory, the worktree's own `include/`), and runs it with MAIN as cwd;
+  change (the source, the `-o` directory, the `-i` search path), and runs it with MAIN as cwd;
+* puts the worktree's `-i` directories **first** and points every one of MAIN's at the worktree's copy of
+  that directory, so a worker's edit to an existing shared header is the header that gets compiled (see
+  `order_includes`; appending them - the old behaviour - left MAIN's copy first and silently measured the
+  wrong source, which is what the `eft004` round had to work around with a scratch measurer);
 * deletes the object first, then asserts the file exists and its mtime moved — a stale object is impossible;
 * prints the two object paths, the section sizes, and can measure a symbol **with the same objdiff code
   path the official report uses** (`report generate` on a one-unit project), so the number equals
@@ -105,7 +109,8 @@ def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str]
     """Point the command at the worktree's source and object, and at its own headers first.
 
     Returns (tokens, object_path). The three rewrites are the source path, the `-o` directory (MWCC's `-o`
-    is a directory - the object's *name* comes from the source) and the include path order.
+    is a directory - the object's *name* comes from the source) and the include search path
+    (`order_includes`).
     """
     rel_src = os.path.join("src", *unit_source(unit).split("/"))
     wt_src = os.path.join(wt, rel_src)
@@ -130,16 +135,83 @@ def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str]
         i += 1
     if obj_dir is None:
         raise SystemExit("no -o in the command line - refusing to guess where the object goes")
-    # the worktree's own headers must win over MAIN's copy of the same path
-    inc = []
-    for p in (os.path.join(wt, "build", "RMHE08", "include"), os.path.join(wt, "include")):
-        if os.path.isdir(p):
-            inc += ["-i", p]
-    if inc:
-        first_compile = next((k for k, t in enumerate(out) if t in ("-c",)), len(out))
-        out = out[:first_compile] + inc + out[first_compile:]
+    out = order_includes(out, main, wt)
     obj_path = os.path.join(obj_dir, os.path.splitext(os.path.basename(wt_src))[0] + ".o")
     return out, obj_path
+
+
+# The flag configure.py's cflags use for a search directory; the include *values* are relative to MAIN
+# (`-i include`, `-i build/RMHE08/include`), which is exactly why the order matters here.
+INCLUDE_FLAG = "-i"
+
+
+def include_pairs(tokens: list[str]) -> list[tuple[int, str]]:
+    """[(index of the flag, its directory)] for every `-i <dir>` in a command line."""
+    pairs: list[tuple[int, str]] = []
+    i = 0
+    while i < len(tokens):
+        if tokens[i] == INCLUDE_FLAG and i + 1 < len(tokens):
+            pairs.append((i, tokens[i + 1]))
+            i += 2
+        else:
+            i += 1
+    return pairs
+
+
+def order_includes(tokens: list[str], main: str, wt: str) -> list[str]:
+    """Rebuild the command line's `-i` list so the worktree's headers always win.
+
+    MWCC searches `-i` directories **in the order given**, and the command line ninja hands over carries
+    MAIN's directories as relative paths (`-i include -i build/RMHE08/include`) which the compile resolves
+    against its cwd - MAIN. Appending the worktree's `include/` (what this used to do) therefore left MAIN's
+    copy of every shared header first: a worker's edit to an *existing* header (`include/nw4r/math.h`,
+    `include/ef.h`) was shadowed, the compile succeeded, and the measurement was silently of MAIN's source -
+    a lower score that reads as a matching problem.
+
+    Two changes: the worktree's own include directories go **first**, and every one of MAIN's directories is
+    pointed at the worktree's copy of it when the worktree has one, so the worktree is self-sufficient
+    (`docs/plan.md` §5.1) and no MAIN path can shadow a worktree file. A directory only MAIN has (the
+    generated `build/RMHE08/include`, the toolchain) keeps MAIN's absolute path.
+
+    Pure in the sense that matters for testing: it only reads the two trees' directory listings, never the
+    compiler, so the ordering can be asserted without a build.
+    """
+    pairs = include_pairs(tokens)
+    dirs: list[str] = []
+    seen: set[str] = set()
+
+    def add(path: str) -> None:
+        key = os.path.normcase(os.path.abspath(path))
+        if key not in seen:
+            seen.add(key)
+            dirs.append(path)
+
+    # 1. the worktree's own headers, before anything MAIN carries - the whole point
+    for rel in ("include", os.path.join("build", "RMHE08", "include")):
+        cand = os.path.join(wt, rel)
+        if os.path.isdir(cand):
+            add(cand)
+    # 2. MAIN's own list, each entry redirected to the worktree's copy when it has one
+    for _idx, value in pairs:
+        rel = os.path.normpath(value)
+        wt_copy = os.path.join(wt, rel)
+        if os.path.isdir(wt_copy):
+            add(wt_copy)
+            continue
+        main_copy = os.path.join(main, rel)
+        add(main_copy if os.path.isdir(main_copy) else value)
+
+    block = [t for d in dirs for t in (INCLUDE_FLAG, d)]
+    if pairs:
+        at = pairs[0][0]
+        skip = {i for idx, _v in pairs for i in (idx, idx + 1)}
+    else:
+        # no `-i` at all: put the worktree's own directories at the head of the flag list
+        at = next((k for k, t in enumerate(tokens) if t.startswith("-")), len(tokens))
+        skip = set()
+    kept = [t for k, t in enumerate(tokens) if k not in skip]
+    pos = at - sum(1 for k in skip if k < at)
+    return kept[:pos] + block + kept[pos:]
 
 
 def section_sizes(obj: str) -> dict:
