@@ -815,6 +815,24 @@ The corollary is a working rule: when a tool or a brief can carry one of these, 
 this session showed six workers independently rediscovering the same peephole lever, which is the same waste in a
 different place.
 
+### The leaked SDK source is forbidden (owner's rule, 2026-09-23)
+
+The `oracle-mine` experiment indexed the leaked RVL SDK / `wii_development_package` archive and a public decomp
+(`doldecomp/ogws`) to answer "does the original source for this symbol exist". **The owner has forbidden it**: no
+corpus, no index, no fetcher, no query tool. The branch, the worktree, the fetcher and the index are deleted, and the
+fetched trees were removed from `%TEMP%`.
+
+Two things from that experiment are worth keeping as *facts about the terrain*, not as a licence:
+
+* the archive's SDK half is **headers only** - so it offered signatures, types and layouts rather than bodies;
+* `doldecomp/ogws` was **verified byte-identical to a public decompilation project**, not to Nintendo's source.
+
+The existing oracles are unchanged and remain the sanctioned ones: the **shared Ghidra runtime memory dump**
+(`docs/memory-dump.md` - names, signatures, struct layouts, data contents, explicitly *not* codegen evidence), the
+**symbol map**, and the **original DOL itself**. If a future session wants a *public decompilation* as an oracle, that
+is a **separate decision for the owner** - it is not covered by this experiment's removal, and it must be asked for
+explicitly rather than assumed.
+
 ### The language comes from the symbol, not from our convenience (owner's rule, 2026-09-23)
 
 A unit is **C++** when either of these says so:
