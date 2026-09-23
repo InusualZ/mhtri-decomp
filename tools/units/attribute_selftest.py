@@ -33,6 +33,59 @@ import attribute as at  # noqa: E402
 FIXTURE_SPLITS = "main/foo.c:\n\t.text       start:0x80001000 end:0x80001100\n"
 FIXTURE_CONF = ("config.progress_categories = [\n]\n\nconfig.libs = [\n]\n")
 
+# A `configure.py` that already declares the `auto` lib: the second batch must extend this block's
+# object list, not append a second `"lib": "auto"` block (a duplicate lib silently changes the flags
+# every earlier unit was built with).
+FIXTURE_CONF_AUTO = (
+    "config.progress_categories = [\n"
+    '    ProgressCategory("auto", "Auto (bulk attribution)"),\n'
+    "]\n\n"
+    "config.libs = [\n"
+    "    {\n"
+    '        "lib": "auto",\n'
+    '        "mw_version": "Wii/1.3",\n'
+    '        "cflags": cflags_main,\n'
+    '        "progress_category": "auto",\n'
+    '        "objects": [\n'
+    '            Object(NonMatching, "auto/old.c"),\n'
+    "        ],\n"
+    "    },\n"
+    "]\n"
+)
+
+# The same, with another lib whose object list comes first: the anchor must pick the auto block, not
+# the first `"objects": [` in the file.
+FIXTURE_CONF_MULTI = (
+    "config.progress_categories = [\n"
+    '    ProgressCategory("auto", "Auto (bulk attribution)"),\n'
+    "]\n\n"
+    "config.libs = [\n"
+    "    {\n"
+    '        "lib": "main",\n'
+    '        "mw_version": "Wii/1.3",\n'
+    '        "cflags": cflags_main,\n'
+    '        "objects": [\n'
+    '            Object(NonMatching, "main.cpp"),\n'
+    "        ],\n"
+    "    },\n"
+    "    {\n"
+    '        "lib": "auto",\n'
+    '        "mw_version": "Wii/1.3",\n'
+    '        "cflags": cflags_main,\n'
+    '        "progress_category": "auto",\n'
+    '        "objects": [\n'
+    '            Object(NonMatching, "auto/old.c"),\n'
+    "        ],\n"
+    "    },\n"
+    "]\n"
+)
+
+# An auto lib whose object list is written inline: there is no line to insert under, so `apply` must
+# refuse instead of producing invalid Python or a duplicate block.
+FIXTURE_CONF_INLINE = FIXTURE_CONF_AUTO.replace(
+    '        "objects": [\n            Object(NonMatching, "auto/old.c"),\n        ],',
+    '        "objects": [],')
+
 
 def fake_an(funcs, soft=(), must_link=()):
     """`an` with only the keys the partitioner reads, in the shape `tudiscover` produces."""
@@ -308,6 +361,85 @@ def selftest() -> int:
         text = read(layout.splits)
         check("apply: a CRLF splits.txt stays CRLF", "\n" not in text.replace("\r\n", ""), True)
         check("apply: the new block uses CRLF", "\r\n" in text and "auto/e.c:\r\n" in text, True)
+
+    # --- apply: extending an existing lib (a second batch must not append a second block) ------------
+    check("extend: lib_objects_anchor finds the auto block",
+          at.lib_objects_anchor(FIXTURE_CONF_AUTO, "auto") is not None, True)
+    check("extend: lib_objects_anchor is None when the lib is absent",
+          at.lib_objects_anchor(FIXTURE_CONF, "auto"), None)
+    check("extend: lib_objects_anchor refuses an inline objects list",
+          at.lib_objects_anchor(FIXTURE_CONF_INLINE, "auto"), None)
+    check("extend: lib_present finds the block", at.lib_present(FIXTURE_CONF_AUTO, "auto"), True)
+    check("extend: lib_present is False when the lib is absent", at.lib_present(FIXTURE_CONF, "auto"),
+          False)
+    once = at.configure_insertion(FIXTURE_CONF_AUTO, ["auto/new.c"])
+    check("extend: configure_insertion extends, not appends", once.count('"lib": "auto"'), 1)
+    check("extend: the old object survives", '"auto/old.c"' in once, True)
+    check("extend: the new object lands after the old one",
+          once.index('"auto/old.c"') < once.index('"auto/new.c"'), True)
+    check("extend: configure_insertion is idempotent",
+          at.configure_insertion(once, ["auto/new.c"]), once)
+    check("extend: the progress category is not duplicated", once.count('ProgressCategory("auto"'), 1)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        layout, fns = fixture(tmp, conf=FIXTURE_CONF_AUTO), {}
+        props = [proposal("auto/new.c", 0x80002000, 0x100, fns)]
+        code, out = run(props, layout, cap=0)
+        conf = read(layout.configure)
+        check("extend: exit 0", code, 0)
+        check("extend: the object line landed", '"auto/new.c"' in conf, True)
+        check("extend: exactly one auto lib remains", conf.count('"lib": "auto"'), 1)
+        check("extend: the new object is inside the auto objects list",
+              conf.index('"auto/new.c"') < conf.index("],", conf.index('"objects": [')), True)
+        check("extend: the stub exists", (layout.src / "auto/new.c").exists(), True)
+        check("extend: no temp files", temps(tmp), [])
+        code, out = run(props, layout, cap=0)
+        conf = read(layout.configure)
+        check("extend: re-applying adds no object line", conf.count('"auto/new.c"'), 1)
+        check("extend: re-applying keeps one auto lib", conf.count('"lib": "auto"'), 1)
+        check("extend: re-applying says what it skipped",
+              "skipped 1 split block(s) already in splits.txt" in out, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        layout, fns = fixture(tmp, conf=FIXTURE_CONF_MULTI), {}
+        run([proposal("auto/multi.c", 0x80002000, 0x100, fns)], layout, cap=0)
+        conf = read(layout.configure)
+        check("extend: the anchor picks the auto lib, not the first", conf.count('"lib": "auto"'), 1)
+        check("extend: the other lib is untouched", conf.count('"main.cpp"'), 1)
+        check("extend: the new object is in the auto list",
+              conf.index('"auto/old.c"') < conf.index('"auto/multi.c"'), True)
+        check("extend: the new object is not in the main list",
+              conf.index('"auto/multi.c"') < conf.index("],", conf.index('"lib": "main"')), False)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        layout, fns = fixture(tmp, conf=FIXTURE_CONF_AUTO.replace("\n", "\r\n")), {}
+        run([proposal("auto/crlf.c", 0x80002000, 0x100, fns)], layout, cap=0)
+        conf = read(layout.configure)
+        check("extend: a CRLF configure.py stays CRLF", "\n" not in conf.replace("\r\n", ""), True)
+        check("extend: the new object landed with CRLF",
+              '\r\n' in conf and '"auto/crlf.c"' in conf, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        layout, fns = fixture(tmp, conf=FIXTURE_CONF_INLINE), {}
+        code, out = run([proposal("auto/inline.c", 0x80002000, 0x100, fns)], layout, cap=0)
+        check("extend: an inline objects list is refused", "no multi-line" in out, True)
+        check("extend: the refusal touches nothing", read(layout.configure), FIXTURE_CONF_INLINE)
+        check("extend: the refusal writes no stub", (layout.src / "auto/inline.c").exists(), False)
+        check("extend: the refusal leaves no temp files", temps(tmp), [])
+
+    # --- apply: a new lib is appended only when none exists -----------------------------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        layout, fns = fixture(tmp), {}
+        props = [proposal("auto/fresh.c", 0x80002000, 0x100, fns)]
+        code, out = run(props, layout, cap=0)
+        conf = read(layout.configure)
+        check("new lib: exit 0", code, 0)
+        check("new lib: exactly one auto block is appended", conf.count('"lib": "auto"'), 1)
+        check("new lib: the object line landed", '"auto/fresh.c"' in conf, True)
+        check("new lib: the block has its own objects list", '"objects": [' in conf, True)
+        check("new lib: the progress category was declared", 'ProgressCategory("auto"' in conf, True)
+        check("new lib: the stub exists", (layout.src / "auto/fresh.c").exists(), True)
+        check("new lib: no temp files", temps(tmp), [])
 
     # --- apply: rollback on a mid-write failure -----------------------------------------------------
     with tempfile.TemporaryDirectory() as tmp:

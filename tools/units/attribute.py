@@ -24,8 +24,11 @@ Usage:
     python tools/units/attribute.py apply 0x80040598 0x800408A8 --max-total-bytes 0x80000
     python tools/units/attribute.py --selftest
 
-`plan` is read-only. `apply` appends the `splits.txt` blocks, the `configure.py` objects and a stub
+`plan` is read-only. `apply` writes the `splits.txt` blocks, the `configure.py` objects and a stub
 source per unit; nothing is measured by it - run `ninja` (which re-splits) and read the ledger after.
+The `configure.py` objects extend the existing `auto` lib when one is already declared, and only the
+first batch appends the block - a second `"lib": "auto"` block would be a different lib with the same
+name.
 
 **The registration cap (docs/plan.md §3 clause 2, roadmap 7.14).** `--max-total-bytes` (default
 0x80000 = 0.5 MB, the plan's registration-batch ceiling; `0` disables) keeps the longest address-ordered
@@ -87,6 +90,11 @@ MAX_BYTES_DEFAULT = 27436
 # layout with these instead of the real files.
 CONFIG_LIBS_ANCHOR = "config.libs = ["
 CONFIG_CAT_ANCHOR = "config.progress_categories = ["
+
+# The one lib `apply` registers into. `configure_insertion` extends this lib's object list when the
+# block is already in `configure.py`, so a later batch does not add a second block with the same name
+# (a duplicate lib silently changes the flags every earlier unit was built with).
+AUTO_LIB = "auto"
 
 
 # The write layer lives in `sharedfiles.py` (roadmap 7.12); re-exported so existing callers and the
@@ -420,10 +428,16 @@ def validate(proposals: list[dict], layout: Layout, fns: dict | None = None) -> 
                         % (u, own[0][0], own[0][1], t0, t1))
         seen[u] = (t0, t1)
 
-    if [p for p in proposals if '"%s"' % p["unit"] not in conf]:
-        if CONFIG_LIBS_ANCHOR + nl_conf not in conf:
-            errs.append("configure.py: the `%s` anchor is missing (line endings?) - the object line "
-                        "would not land" % CONFIG_LIBS_ANCHOR)
+    missing = [p for p in proposals if '"%s"' % p["unit"] not in conf]
+    if missing:
+        if lib_objects_anchor(conf, AUTO_LIB) is None:
+            if lib_present(conf, AUTO_LIB):
+                errs.append("configure.py: the `\"lib\": \"%s\"` block has no multi-line "
+                            "`\"objects\": [` list to extend - refused rather than append a second "
+                            "lib block" % AUTO_LIB)
+            elif CONFIG_LIBS_ANCHOR + nl_conf not in conf:
+                errs.append("configure.py: the `%s` anchor is missing (line endings?) - the object line "
+                            "would not land" % CONFIG_LIBS_ANCHOR)
         if 'ProgressCategory("auto"' not in conf and CONFIG_CAT_ANCHOR + nl_conf not in conf:
             errs.append("configure.py: the `%s` anchor is missing - the auto progress category "
                         "cannot be declared" % CONFIG_CAT_ANCHOR)
@@ -445,17 +459,80 @@ def split_block(p: dict, nl: str) -> str:
     return nl.join(b) + nl
 
 
-def configure_insertion(conf: str, units: list[str]) -> str:
-    """`conf` with a new `auto` lib holding `units`, the progress category declared if it is new.
+def lib_present(conf: str, lib_name: str) -> bool:
+    """Whether `configure.py` already declares a lib with this name."""
+    return '"lib": "%s",' % lib_name in conf
 
-    Both edits go through `sharedfiles.insert_after_anchor`: the anchor is asserted (never silently
-    skipped) and the insertion takes configure.py's own CRLF line ending.
+
+def lib_objects_anchor(conf: str, lib_name: str) -> str | None:
+    """The lib block's own header up to and including the last line before its `"objects": [` closes.
+
+    The anchor has to be the lib's own header, not the bare `"objects": [` line: several libs have an
+    objects list and only this one may be extended. It runs to the last line *before* the list's
+    closing `],` so an insertion lands after the objects already there (append) rather than before them
+    (prepend), which is both the natural order and keeps the anchor stable across batches. Returns None
+    when the lib is absent, or when its objects list is not the multi-line form the tool writes (an
+    inline `"objects": [],` or a `"objects": objects,` variable) - extending those would be a rewrite
+    of the line, not an insertion, so `apply` refuses instead of guessing.
     """
+    lines = conf.splitlines()
+    want = '"lib": "%s",' % lib_name
+    for i, line in enumerate(lines):
+        if line.strip() != want:
+            continue
+        for j in range(i + 1, len(lines)):
+            s = lines[j].strip()
+            if s == '"objects": [':
+                k = j + 1
+                while k < len(lines) and lines[k].strip() != "],":
+                    k += 1
+                last = k - 1 if k > j else j
+                return sf.line_ending(conf).join(lines[i:last + 1])
+            if s.startswith('"lib":'):
+                break
+        return None
+    return None
+
+
+def insert_lines_after(conf: str, anchor: str, insertion: str) -> str:
+    """Insert `insertion` directly under the line `anchor` (no blank separator), asserting the anchor.
+
+    `sharedfiles.insert_after_anchor` puts a blank line between the anchor and the insertion, which is
+    right for a block-level edit (`config.libs = [` ...) but wrong inside an object list: the new
+    `Object(...)` lines belong directly under the objects already there, and a blank line would
+    accumulate once per registration batch. The anchor assertion is the same - a missing anchor raises
+    instead of silently skipping the edit - and the insertion takes configure.py's own line ending.
+    """
+    nl = sf.line_ending(conf)
+    marker = anchor + nl
+    if marker not in conf:
+        raise sf.AnchorError("%r not found (line ending %r?)" % (anchor, nl))
+    return conf.replace(marker, marker + sf.with_ending(insertion, nl), 1)
+
+
+def configure_insertion(conf: str, units: list[str]) -> str:
+    """`conf` with `units` registered in the `auto` lib, the progress category declared if it is new.
+
+    The lib is **extended** when `configure.py` already declares it and appended only when it does not.
+    The units already present are dropped first, so the same batch applied twice is a no-op - an
+    `Object(...)` line is never duplicated and a second `"lib": "auto"` block is never created. Every
+    anchor is asserted (never silently skipped) and the insertion takes configure.py's own CRLF ending.
+    """
+    units = [u for u in units if '"%s"' % u not in conf]
+    if not units:
+        return conf
     objects = "".join('            Object(NonMatching, "%s"),\n' % u for u in units)
-    lib = ('    {\n        "lib": "auto",\n        "mw_version": "Wii/1.3",\n'
-           '        "cflags": cflags_main,\n        "progress_category": "auto",\n'
-           '        "objects": [\n%s        ],\n    },\n' % objects)
-    conf, _ = sf.insert_after_anchor(conf, CONFIG_LIBS_ANCHOR, lib)
+    anchor = lib_objects_anchor(conf, AUTO_LIB)
+    if anchor is not None:
+        conf = insert_lines_after(conf, anchor, objects)
+    else:
+        if lib_present(conf, AUTO_LIB):
+            raise sf.AnchorError('the `"lib": "%s"` block has no multi-line `"objects": [` list to '
+                                 "extend" % AUTO_LIB)
+        lib = ('    {\n        "lib": "%s",\n        "mw_version": "Wii/1.3",\n'
+               '        "cflags": cflags_main,\n        "progress_category": "auto",\n'
+               '        "objects": [\n%s        ],\n    },\n' % (AUTO_LIB, objects))
+        conf, _ = sf.insert_after_anchor(conf, CONFIG_LIBS_ANCHOR, lib)
     # dtk refuses a progress_category it does not know (`Progress category 'auto' missing from
     # config.progress_categories`), so registering the first auto unit declares the category too.
     conf, _ = sf.insert_after_anchor(conf, CONFIG_CAT_ANCHOR,
