@@ -654,6 +654,32 @@ Camellia/camellia.c:
 	.text       start:0x8041DF10 end:0x80423E74
 	.rodata     start:0x80570E98 end:0x80571E98
 
+auto/80430400_fn_80430400.c:
+	extab       start:0x8001D548 end:0x8001D558
+	extabindex  start:0x8003E0C4 end:0x8003E0DC
+	.text       start:0x80430400 end:0x8043065C
+
+auto/804309E8_fn_804309E8.c:
+	extab       start:0x8001D568 end:0x8001D570
+	extabindex  start:0x8003E0F4 end:0x8003E100
+	.text       start:0x804309E8 end:0x80430D8C
+
+auto/80440798_fn_80440798.c:
+	extab       start:0x8001DD0C end:0x8001DD14
+	extabindex  start:0x8003E8C8 end:0x8003E8D4
+	.text       start:0x80440798 end:0x80440920
+
+auto/80443958_fn_80443958.cpp:
+	extab       start:0x8001DE24 end:0x8001DEE4
+	extabindex  start:0x8003EA6C end:0x8003EB8C
+	.text       start:0x80443958 end:0x80446AE8
+	.ctors      start:0x8056F3CC end:0x8056F3D0
+
+auto/8044E340_fn_8044E340.c:
+	extab       start:0x8001E0D4 end:0x8001E0DC
+	extabindex  start:0x8003EE74 end:0x8003EE80
+	.text       start:0x8044E340 end:0x8044E990
+
 Runtime.PPCEABI.H/global_destructor_chain.c:
 	.text       start:0x804566A4 end:0x80456704
 

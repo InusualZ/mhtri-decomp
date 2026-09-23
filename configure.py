@@ -561,6 +561,11 @@ config.libs = [
             Object(NonMatching, "auto/803E3678_fn_803E3678.c"),
             Object(NonMatching, "auto/803E3CE8_fn_803E3CE8.c"),
             Object(NonMatching, "auto/803E44C8_fn_803E44C8.c"),
+            Object(NonMatching, "auto/80430400_fn_80430400.c"),
+            Object(NonMatching, "auto/804309E8_fn_804309E8.c"),
+            Object(NonMatching, "auto/80440798_fn_80440798.c"),
+            Object(NonMatching, "auto/80443958_fn_80443958.cpp"),
+            Object(NonMatching, "auto/8044E340_fn_8044E340.c"),
         ],
     },
     {
