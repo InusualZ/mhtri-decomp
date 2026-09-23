@@ -479,10 +479,10 @@ construction: a tool can waste time, it cannot break the link.
 | 7.7 | **done 2026-09-23** - `tools/symbols/dumpmap.py` (66 checks) | 48 367 real names/signatures sit in `DumpSymbols.zip` and using them means remembering the member, format and flags | `lookup <addr\|name>` and `join` (rename candidates, `zz_` confirmations, conflicts) against `symbols.txt` | ~80 |
 | 7.8 | **done 2026-09-23** - `tools/units/dataclaim.py` (75 checks) | the riskiest edit class was reasoned out by hand three times | for each proposed run: target section size/bytes vs ours, verdict, expected effect | ~80 |
 | 7.9 | **done 2026-09-23** - `tools/symbols/phantom.py` (60 checks) | five 4-byte `fn_*` were not functions (dead epilogues) and cost four functions their last 11 points | for every small unnamed `fn_*`, test whether the previous function's bytes include it → merge candidates | ~60 |
-| 7.10 | `prepcommit.py` knowledge-delta check | the rule was enforced by me remembering | warns when a unit's score rose and no `src/` header, `docs/` file or `configure.py` comment changed in the same commit | ~40 |
-| 7.11 | ledger byte burn-down | `295 / 20 519` and `65 128 / 5 437 392` are two burn-downs and the second predicts the DOL | print both, plus a coarse per-0x10000-block view | ~40 |
-| 7.12 | one shared-file writer module | CRLF vs LF silently voided two edits; an undeclared progress category failed the *next* `ninja` | one module owns the writes, asserts every anchor, is idempotent, runs `symbolpreflight`'s overlap check before a range lands | ~120 |
-| 7.13 | `attribute.py` size defaults | the two size defaults are a guess | derive them from the units we have measured (288 B … 27 KB) and say so in the docstring | ~20 |
+| 7.10 | **done 2026-09-23** - `prepcommit.py` warns when an improved batch carries no knowledge | the rule was enforced by me remembering | warns when a unit's score rose and no `src/` header, `docs/` file or `configure.py` comment changed in the same commit | ~40 |
+| 7.11 | **done 2026-09-23** - `ledger.py` reports both burn-downs and a per-0x10000 `.text` view (8 checks) | `295 / 20 519` and `65 128 / 5 437 392` are two burn-downs and the second predicts the DOL | print both, plus a coarse per-0x10000-block view | ~40 |
+| 7.12 | **done 2026-09-23** - `tools/units/sharedfiles.py` owns the writes (34 checks); `attribute.py` routes through it | CRLF vs LF silently voided two edits; an undeclared progress category failed the *next* `ninja` | one module owns the writes, asserts every anchor, is idempotent, runs `symbolpreflight`'s overlap check before a range lands | ~120 |
+| 7.13 | **done 2026-09-23** - derived: 288 B (`sys_mem.cpp`) to 27436 B (`Pl/pl_act.cpp`), stated in the docstring | the two size defaults are a guess | derive them from the units we have measured (288 B … 27 KB) and say so in the docstring | ~20 |
 | 7.14 | `attribute.py --max-total-bytes` | §3's 0.5 MB cap is not expressible today (only `--min-bytes`, `--max-bytes`, `--limit`) | a registration batch never exceeds the cap, and the tool says how many bytes it is about to claim | ~20 |
 | 7.15 | worktree-safe measurement | a fresh worktree has no `build/` and cannot measure at all; this blocks the first 4-worker round | a worker in a worktree measures its own object against `MAIN`'s target and prints both paths | inside 7.1 |
 | 7.16 | `land.py` owns the baseline | `ninja changes` compares against a `baseline.json` nobody refreshes, so a per-batch regression can hide | `verify` refreshes the baseline after a green batch and reports the batch's own delta | inside 7.5 |
@@ -734,6 +734,16 @@ brief is then a *file it writes for itself* too, so a later worker can pick the 
    auto-renamed). **The batched rename pass itself is the next step.** `dataclaim.py` (7.8, 737a5ce) and
    `phantom.py` (7.9, 4629ae1) are done too - the latter finds 16 `fn_*` that are really a previous function's
    dead epilogue, and reproduces the earlier hand-made merge byte-for-byte.
+**The attribution pass is ready and has a first target.** `attribute.py plan 0x80280000 0x80410000` proposes a
+batch inside the largest untouched run the ledger reports (25 blocks, 0x80280000-0x80410000) - 52 functions /
+17 312 B in the first unit, then 31 / 10 760, and so on, each with its `.data`/`.sdata`/`.sdata2`/`extabindex`
+proposals and a flag: `pinned` for a jump-table seam, `no evidence - one run` or `capped at --max-bytes` for the
+guesses. Those flagged units are exactly what `dataclaim.py` (7.8) classifies before anyone edits `splits.txt`.
+
+**Follow-ups the tool work named:** migrate `tools/symbols/symedit.py::rewrite` to `sharedfiles.py` - it writes
+`symbols.txt` with its own temp+replace and no anchor/overlap/idempotency gate, the highest-risk shared file -
+and `tools/units/dataqueue.py::write_queue`, which duplicates the same primitive.
+
 5. **The attribution pass, scaled** - `attribute.py apply` over the next regions in ascending address order,
    registration batches capped at 0.5 MB, each new unit's stub source in the same commit, its seam re-checked the
    moment its functions match.
