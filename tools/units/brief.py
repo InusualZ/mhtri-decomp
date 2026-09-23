@@ -3,7 +3,9 @@
 docs/plan.md 7.3, §5.2. Four workers in separate processes inherit nothing from the orchestrator's context, so
 the brief has to be self-contained and has to say the same thing every time. It has exactly six parts:
 
-1. the unit      - path, lib, mw_version, the real cflags, object and target paths, the `.text` range
+1. the unit      - path, lib, mw_version, the real cflags, object and target paths, the `.text` range,
+   and the shared headers (`include/**`) that already declare what this unit needs - so it reuses them
+   instead of re-creating them (`tools/units/typeregistry.py`)
 2. the inventory - every symbol the unit owns, its address, size and current measured %
 3. the residuals - the unit's file-header comment, so a re-brief never re-derives settled work
 4. the decided   - the flags landed for this lib, and the data ranges deliberately not claimed
@@ -49,6 +51,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 import unitutil  # noqa: E402
 from units import recompile as rc  # noqa: E402
 from units import claims  # noqa: E402
+from units import typeregistry  # noqa: E402
 
 SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 BAR = 80.0
@@ -331,6 +334,30 @@ def lib_for(main: str, unit: str) -> str:
     return "(unknown)"
 
 
+def shared_headers(main: str, wt: str, unit: str, symbol_names) -> list:
+    """The shared headers this unit should reuse, from `typeregistry`.
+
+    The unit's own source (the worktree's copy wins, so a worker re-briefed mid-unit sees its own state) is
+    matched against every `include/**` declaration by three signals: it includes the header, it defines one
+    of the header's names (the duplication), or it / one of its owned map symbols names one. The result is
+    what part 1 renders; an empty list still carries the rule, so a worker with no match knows to ask rather
+    than define locally (`docs/plan.md` 6.5 rule 1).
+    """
+    try:
+        reg = typeregistry.registry(main)
+    except OSError:
+        return []
+    name = source_name(unit, wt, main)
+    rel = os.path.join("src", *name.split("/")).replace("\\", "/")
+    text = ""
+    for root in (wt, main):
+        path = os.path.join(root, "src", *name.split("/"))
+        if os.path.exists(path):
+            text = open(path, encoding="utf-8", errors="replace").read()
+            break
+    return typeregistry.relevant_headers(reg, text, symbol_names, unit_file=rel)
+
+
 def plan_section(main: str, heading: str) -> str:
     """One section of docs/plan.md, verbatim - the rules have exactly one source."""
     path = os.path.join(main, "docs", "plan.md")
@@ -383,6 +410,7 @@ def build(main: str, wt: str, unit: str, task: str | None, assume_claim: bool = 
         "task": task, "task_symbols": [s["name"] for s in below] if not task else [],
         "header": header_comment(main, wt, unit),
         "data_queue": data_queue_entries(main, unit),
+        "shared_headers": shared_headers(main, wt, unit, [s["name"] for s in syms]),
     }
 
 
@@ -438,6 +466,36 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("```")
         lines.append(" ".join(b["flags"]))
         lines.append("```")
+    sh = b.get("shared_headers") or []
+    lines.append("")
+    lines.append("**Shared headers this unit should reuse** (`docs/plan.md` \u00a76.5 rule 1, AGENTS.md -> "
+                 "Repository layout): a type or helper another unit already declares belongs under `include/` - "
+                 "include it, never copy it. `include/**` is read-only for you: a change there goes in the outbox's "
+                 "`config_requests`, not in your branch.")
+    if sh:
+        lines.append("")
+        lines.append("| header | why | declaration(s) |")
+        lines.append("| --- | --- | --- |")
+        for h in sh:
+            why = []
+            if "duplicated" in h["reasons"]:
+                why.append("**you define these too - include the header and delete your copies**")
+            if "included" in h["reasons"]:
+                why.append("already included")
+            if "used" in h["reasons"]:
+                why.append("you name these")
+            if "mentioned" in h["reasons"]:
+                why.append("your file header names these")
+            names = h["duplicated"] + [n for n in h["used"] if n not in h["duplicated"]]
+            shown = ", ".join("`%s`" % n for n in names[:12])
+            if len(names) > 12:
+                shown += " (+%d more)" % (len(names) - 12)
+            lines.append("| `%s` | %s | %s |" % (h["header"], "; ".join(why), shown))
+    else:
+        lines.append("")
+        lines.append("No shared header declares anything this unit names yet. If you need a type or helper another "
+                     "unit already uses, do not define it here - put it in the outbox's `config_requests` so it can "
+                     "move to `include/` first.")
     lines.append("")
     lines.append("## 2 · The inventory (every symbol the unit owns, and where it stands)")
     lines.append("")
@@ -712,6 +770,57 @@ def selftest() -> int:
         check("an unclaimed unit is marked", u["claimed"], False)
         check("the unclaimed notice says so plainly",
               "no active claim" in unclaimed_notice(main, "RSO/runtime"), True)
+
+    # the brief must name the shared headers the unit should reuse instead of re-creating (typeregistry)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "include", "nw4r"))
+        os.makedirs(os.path.join(tmp, "src", "auto"))
+        os.makedirs(os.path.join(tmp, "config", "RMHE08"))
+        open(os.path.join(tmp, "configure.py"), "w").write(
+            'config.libs = [{"lib": "auto", "objects": [Object(NonMatching, "auto/copies.c")]}]')
+        open(os.path.join(tmp, "include", "ef.h"), "w").write(
+            "typedef struct Vec { f32 x; f32 y; f32 z; } Vec;\n"
+            "#define EF_ASSERT_PTR(p) do { } while (0)\n")
+        open(os.path.join(tmp, "include", "nw4r", "math.h"), "w").write(
+            "namespace nw4r { namespace math { struct VEC3 { f32 x; f32 y; f32 z; }; } }\n")
+        # the unit copies `Vec` (debt) and owns a symbol whose mangled name encodes `VEC3`
+        open(os.path.join(tmp, "src", "auto", "copies.c"), "w").write(
+            "typedef struct Vec { f32 x; f32 y; f32 z; } Vec;\n"
+            "void f(Vec* v) { EF_ASSERT_PTR(v); }\n")
+        open(os.path.join(tmp, "src", "auto", "plain.c"), "w").write("void g(void) { }\n")
+        open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w").write(
+            "auto/copies.c:\n\t.text start:0x80000000 end:0x80000004\n")
+        open(os.path.join(tmp, "config", "RMHE08", "symbols.txt"), "w").write(
+            "fn_1 = .text:0x80000000; // type:func size:0x4\n"
+            "make__FPQ34nw4r4math4VEC3 = .text:0x80000002; // type:func size:0x2\n")
+        typeregistry.clear_cache()
+        b = build(tmp, tmp, "auto/copies", None)
+        check("build carries the shared-header advice",
+              [h["header"] for h in b["shared_headers"]],
+              ["include/ef.h", "include/nw4r/math.h"])
+        check("the copying header is marked duplicated",
+              b["shared_headers"][0]["duplicated"], ["Vec"])
+        check("a mangled owned symbol names the second header's type",
+              b["shared_headers"][1]["used"], ["VEC3"])
+        text = render(tmp, b, None)
+        check("the brief prints the shared-header block", "Shared headers this unit should reuse" in text, True)
+        check("the brief names the header the unit copies", "`include/ef.h`" in text, True)
+        check("the brief names the header the owned symbol needs", "`include/nw4r/math.h`" in text, True)
+        check("the brief flags the duplication", "you define these too" in text, True)
+        check("the brief tells the worker include/ is read-only",
+              "`include/**` is read-only for you" in text, True)
+        plain = build(tmp, tmp, "auto/plain", None)
+        check("a unit with no match has an empty shared-header table", plain["shared_headers"], [])
+        check("a unit with no match still carries the rule",
+              "No shared header declares anything" in render(tmp, plain, None), True)
+        # a bodyless stub is steered by its own file-header comment (typeregistry's 'mentioned')
+        open(os.path.join(tmp, "src", "auto", "hinted.c"), "w").write(
+            "/* the nw4r::math VEC3 shape, no body yet */\n")
+        hb = build(tmp, tmp, "auto/hinted", None)
+        check("a stub's brief carries the header its comment names",
+              [h["header"] for h in hb["shared_headers"]], ["include/nw4r/math.h"])
+        check("the brief labels a comment-only hint",
+              "your file header names these" in render(tmp, hb, None), True)
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
