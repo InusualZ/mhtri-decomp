@@ -430,6 +430,9 @@ def timeout(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
             continue
         if row["state"] in ("unacked", "stalled") or (unit and row["state"] != "done"):
             victims.append(row)
+    # an explicit `--unit` may force a claim the ack calls healthy, but never one whose pane is moving: the
+    # whole point of the pane layer is that a busy worker is not reclaimed, named or not
+    victims = [r for r in victims if r.get("pane_active") is not True]
     for row in victims:
         slugged = slug(row["unit"])
         rescue = "refs/rescue/%s" % slugged
@@ -678,7 +681,8 @@ def selftest() -> int:
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, interval=0,
                        lister=lambda: panes, reader=lambda _pane: "same", sleeper=lambda _s: None)
         check("a static pane is not active", p["active"], False)
-        p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, lister=lambda: panes,
+        p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"},
+                       lister=lambda: {"w1:pK": {**panes["w1:pK"], "agent_status": "working"}},
                        reader=lambda _pane: (_ for _ in ()).throw(AssertionError("must not read")),
                        sleeper=lambda _s: None)
         check("agent_status working is active without reading", p["active"], True)
@@ -706,6 +710,7 @@ def selftest() -> int:
 
         stale_ack(tmp, "Pl/live", 60)
         row = fixture_row("Pl/live", os.path.join(tmp, "ws-live"))
+        os.makedirs(row["worktree"], exist_ok=True)
         check("a live pane keeps a stale ack working", claim_status(tmp, view=[row], probe=active)[0]["state"],
               "working")
         check("a gone pane leaves the stale ack stalled",
@@ -714,6 +719,13 @@ def selftest() -> int:
               claim_status(tmp, view=[row], probe=idle)[0]["state"], "stalled")
         check("timeout does not victimize a live pane",
               timeout(tmp, view=[row], probe=active, apply=False), [])
+        check("even --unit does not victimize a live pane",
+              timeout(tmp, view=[row], probe=active, apply=False, unit="Pl/live"), [])
+        save_registry(tmp, {"Pl/live": {"branch": None, "worktree": row["worktree"]}})
+        check("timeout --apply leaves a live pane's claim alone",
+              timeout(tmp, view=[row], probe=active, apply=True), [])
+        check("... and its registry entry", "Pl/live" in load_registry(tmp), True)
+        check("... and its worktree", os.path.isdir(row["worktree"]), True)
 
         victims = timeout(tmp, view=[row], probe=idle, apply=False)
         steps = victims[0]["steps"]
