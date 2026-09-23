@@ -703,6 +703,49 @@ RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40
 	.data       start:0x80629C08 end:0x80629C40
 
+auto/804E01E0_fn_804E01E0.c:
+	.text       start:0x804E01E0 end:0x804E074C
+
+auto/804E08F0_fn_804E08F0.c:
+	.text       start:0x804E08F0 end:0x804E670C
+
+auto/804E6710_fn_804E6710.c:
+	.text       start:0x804E6710 end:0x804E68A8
+
+auto/804E7280_fn_804E7280.c:
+	.text       start:0x804E7280 end:0x804E7480
+
+auto/80500E34_SinFIdx__Q24nw4r4mathFf.cpp:
+	.text       start:0x80500E34 end:0x805012C4
+
+auto/8050A770_fn_8050A770.c:
+	.text       start:0x8050A770 end:0x8050A898
+
+auto/8051E864_fn_8051E864.c:
+	.text       start:0x8051E864 end:0x8051EB38
+
+auto/8051EB38_fn_8051EB38.c:
+	.text       start:0x8051EB38 end:0x8051EF60
+
+auto/80533B04_fn_80533B04.c:
+	.text       start:0x80533B04 end:0x80537B2C
+
+auto/80537E50_fn_80537E50.c:
+	.text       start:0x80537E50 end:0x8053D64C
+
+auto/8053D8D4_fn_8053D8D4.c:
+	.text       start:0x8053D8D4 end:0x8053DD64
+
+auto/8053DD64_fn_8053DD64.c:
+	.text       start:0x8053DD64 end:0x8053DF20
+
+auto/8053DF20_fn_8053DF20.c:
+	.text       start:0x8053DF20 end:0x80541B4C
+	.ctors      start:0x8056F3F4 end:0x8056F3F8
+
+auto/80541B4C_fn_80541B4C.c:
+	.text       start:0x80541B4C end:0x80541DA0
+
 Runtime.PPCEABI.H/memcpy.c:
 	.init       start:0x80004000 end:0x80004350
 
