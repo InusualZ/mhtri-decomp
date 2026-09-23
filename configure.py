@@ -517,7 +517,7 @@ config.libs = [
         "cflags": cflags_g3d,
         "host": False,
         "objects": [
-            Object(NonMatching, "g3d/g3d_resanmamblight.c"),
+            Object(Matching, "g3d/g3d_resanmamblight.c"),
         ],
     },
     {
