@@ -531,9 +531,16 @@ proof has to contain (detail: `.pi/notes/flip-round-1.md`):
 and the bytes against the target object) and reports **7 of 19 ready**. Its one false positive is
 `Runtime.PPCEABI.H/__init_cpp_exceptions`, which passes all three and still fails: `dtk dol diff` reports
 `__init_cpp_exceptions_reference` expected at `0x8056F2C0` - the *first* `.ctors` entry - and ours holds a
-different value there. The unit's `.ctors`/`.dtors`/`.sdata` fragments are claimed and emitted, so this is
-not the sys_mem mechanism: a flipped object's `.ctors$10` entry does not land where the original's did. That is
-the link-order question roadmap **7.19** has to answer, and it is the flip campaign's own remaining unknown.
+different value there. **7.19 has now answered this**: the unit's code links at exactly the right address
+(`objdump -t main.elf` shows `__init_cpp_exceptions` at 0x80457420) and its `.ctors$10` symbol
+`__init_cpp_exceptions_reference` is *absent from the symbol table*, while `.ctors[0]` holds `fn_80046B94` and
+`.dtors[1]` is 0 where retail has `__fini_cpp_exceptions`. The merged `.ctors`/`.dtors` sections concatenate
+every object's fragment in **link command-line order**, so substituting our object for the target moves it in
+that list and every later fragment shifts one slot - the table's contents change while its address and size do
+not. **Consequence for the campaign: a flip is only safe for a unit that contributes no order-sensitive
+fragment** (`.ctors$NN`/`.dtors$NN`); all six successful flips qualify, and `__init_cpp_exceptions` is the first
+candidate that does not. The fix is in the link step (substitute in place, or re-order the merged fragments
+after the link), not in the source - our object matches the target in sections, symbols, relocations and bytes.
 
 **End-to-end dry round (2026-09-23).** claim → brief → measure inside the worktree → outbox → gate: `claims.py
 claim` → `brief.py` → (in the worktree) `recompile.py --measure` → `handoff.py --check` → `land.py verify
