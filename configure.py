@@ -265,6 +265,15 @@ cflags_g3d = [
     "-O3",
 ]
 
+# Network and OS flags (src/Network/NetworkWiiMediator.c, src/OS/OSAlarm.c): cflags_base + -func_align 4.
+# Evidence: both retail objects are `.text align 2**2`, while cflags_base's -O4,p implies -func_align 16, which
+# is what our objects emit. Flipping NetworkWiiMediator with that alignment made the linker round the object's
+# start up to the next 16-byte boundary: `dtk dol diff` reported fn_80413F3C expected at 0x80413F3C but found at
+# 0x80413F40, every following symbol shifted by 4, and main.dol stopped matching build.sha1. Section sizes were
+# already identical, so the alignment was the entire difference - the same finding as cflags_ppceabi above.
+cflags_network = [*cflags_base, "-func_align", "4"]
+cflags_os = [*cflags_base, "-func_align", "4"]
+
 # lobby flags (src/lobby/lobby_scene.c). Evidence: the retail fn_801EC9E0 (0x18 B / 6 instructions) reads the
 # small-data scene pointer, then the +0x10 table base, before the argument's byte, and keeps the table base
 # in r4; -O4,p instead hoists the byte load, splits the base across r3 and reorders the two loads. -O3 is
@@ -493,7 +502,7 @@ config.libs = [
     {
         "lib": "Network",
         "mw_version": "Wii/1.3",
-        "cflags": cflags_base,
+        "cflags": cflags_network,
         "host": False,
         "objects": [
             Object(NonMatching, "Network/NetworkWiiMediator.c"),
@@ -502,7 +511,7 @@ config.libs = [
     {
         "lib": "OS",
         "mw_version": "Wii/1.3",
-        "cflags": cflags_base,
+        "cflags": cflags_os,
         "host": False,
         "objects": [
             Object(NonMatching, "OS/OSAlarm.c"),
