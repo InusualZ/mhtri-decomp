@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -199,6 +200,27 @@ def worktree_for(unit: str, main: str) -> str:
 
 def registry_path(main: str) -> str:
     return os.path.join(main, ".pi", "claims.json")
+
+
+def seed_worktree_build(main: str, wt: str) -> str:
+    """Give a fresh worktree its own `build/tools` (the toolchain is ~15 MB of read-only binaries).
+
+    A worktree must be self-sufficient: the worker compiles and measures in *its* `build/RMHE08`, and MAIN's
+    `build/` belongs to the orchestrator (docs/plan.md 5.1 - several workers share the machine, and one build
+    tree cannot take two builds). Seeding this at claim time is why no worker has to junction into MAIN's.
+    """
+    src = os.path.join(main, "build", "tools")
+    dst = os.path.join(wt, "build", "tools")
+    if not os.path.isdir(src):
+        return "skipped (MAIN has no build/tools yet - run `ninja tools`)"
+    os.makedirs(dst, exist_ok=True)
+    copied = 0
+    for name in sorted(os.listdir(src)):
+        s, d = os.path.join(src, name), os.path.join(dst, name)
+        if os.path.isfile(s) and not os.path.exists(d):
+            shutil.copy2(s, d)
+            copied += 1
+    return "seeded %d file(s)" % copied
 
 
 def load_registry(main: str) -> dict:
@@ -533,6 +555,7 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool) -> dict:
         return {"unit": unit, "branch": branch, "worktree": path, "base": base,
                 "command": "git " + " ".join(cmd), "dry_run": True}
     git(cmd, main)
+    seed_note = seed_worktree_build(main, path)
     # the worker writes its outbox and notes here (docs/plan.md 5.3); create them with the claim so the
     # paths in the brief exist before the worker tries to write to them
     for sub in ("outbox", "notes"):
@@ -681,6 +704,17 @@ def selftest() -> int:
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, interval=0,
                        lister=lambda: panes, reader=lambda _pane: "same", sleeper=lambda _s: None)
         check("a static pane is not active", p["active"], False)
+        # a fresh worktree is seeded with the toolchain, so it never reaches into MAIN's build/ for one
+        _seed_main = os.path.join(tmp, "seed-main")
+        os.makedirs(os.path.join(_seed_main, "build", "tools"), exist_ok=True)
+        open(os.path.join(_seed_main, "build", "tools", "dtk.exe"), "w").close()
+        _seed_wt = os.path.join(tmp, "ws-seeded")
+        seed_worktree_build(_seed_main, _seed_wt)
+        check("a claim seeds the worktree's toolchain",
+              os.path.exists(os.path.join(_seed_wt, "build", "tools", "dtk.exe")), True)
+        check("seeding reports what it did", seed_worktree_build(_seed_main, _seed_wt).startswith("seeded"), True)
+        check("seeding skips cleanly when MAIN has no toolchain",
+              seed_worktree_build(os.path.join(tmp, "nowhere"), os.path.join(tmp, "ws-x")).startswith("skipped"), True)
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"},
                        lister=lambda: {"w1:pK": {**panes["w1:pK"], "agent_status": "working"}},
                        reader=lambda _pane: (_ for _ in ()).throw(AssertionError("must not read")),
