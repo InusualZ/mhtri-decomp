@@ -736,6 +736,27 @@ attempts, not a fourth); (3) its working budget runs out — and then only at a 
 
 ## 12. The next batches, concretely
 
+### The parked list: units that cannot be flipped yet (owner's call, 2026-09-23)
+
+A unit may only be flipped to `Object(Matching, ...)` when its `.text` is byte-identical to the target object's
+(rule 4, enforced by the flip gate). These are the registered units that are *measured* but not there yet. They are
+**parked, not abandoned**: annotate and move on, and come back when there is new information (a flag, a source
+shape, the memory dump, a tool). Do **not** spend a worker round re-deriving what the "why" column already records -
+and when a slot frees, prefer a new unit, a new symbol or the next attribution batch over re-working a parked row.
+
+| unit | score | why it cannot flip yet | what would unblock it |
+| --- | --- | --- | --- |
+| `main/sys_mem.cpp` | own object clean | **the flip itself fails**: `linkorder.py` says `LINK OK` (sections, sizes, bytes, relocations all fine), so the divergence is elsewhere in the link | the `ninja diff` divergence, or a second opinion on what the flip changes |
+| `RSO/runtime.c` | 99.71 % | `RSORelocate` keeps 12 colouring rows at the TU's real level (4) against 9 at level 3; no unit flag and none of the 28 `-opt` sub-options separate them, so the residual is source | a source shape for the web-order tie-break (rows 18-22), or evidence the TU's level is 3 |
+| `Camellia/camellia.c` | 99.79 % | `setup256`'s last 9 rows are a genuine two-way ambiguity: `setup128` is exactly 100 % at level 3 and 99.498 % at level 4, `setup256` is 9 rows + retail's frame at level 4 against 211 rows at level 3 | a third source variant, or an `-opt` combination that separates the two functions |
+| `Pl/pl_skill.cpp` | 99.76 % | 13 of 197 functions below 100; the unit-level flag that replaces the pragma is byte-identical (landed), so the flag is now the unit's and the residual is unchanged | per-function shapes for the 13 (row 34's switch-tail family) |
+| `Pl/pl_act.cpp` | 97.87 % | `Pl_bari_ck` has retail's out-of-line first-arm body; `fn_8027C208`'s 16-byte frame is locals retail never touches and is not source-reachable | a shape for the out-of-line arm |
+| `Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` | 93.68 % | the exception/rename work landed; what remains is the long tail | a round per function |
+| the `auto/*` stubs | 0 % | attribution-only placeholders: they exist so every symbol has an owner, and their bodies are not written yet | a matching round per unit - **this is the breadth queue** |
+
+The 11 units that *are* flipped: `Runtime.PPCEABI.H/{__start,__ppc_eabi_init,global_destructor_chain,__init_cpp_exceptions,memcpy,memset}`,
+`g3d/g3d_resanmamblight`, `Network/NetworkWiiMediator`, `OS/OSAlarm`, `lobby/lobby_scene`, `Pl/pl_master`.
+
 ### Production mode (owner, 2026-09-23)
 
 The campaign now runs continuously and the orchestrator manages it: **the worker slots stay full and the queue is
