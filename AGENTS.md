@@ -139,6 +139,7 @@ measured unit).
 | 33 | Prefer the unit's flags over a per-function flag | A TU is compiled once, with one flag set: if the unit's other functions match, a function that needs *different* flags is a source, boundary or stale-target problem, not a flag one. A scoped pragma that fixes one function fights the rest (RSO's level-3 pragma cost `RSOUnLink` and `FindExportIndex` their 100 %), and `optimization_level`/`opt_*` are whole-function anyway. | done |
 | 34 | A switch tail's constant returns are if-converted | The target's `return 0` tail and a `default: return 1` look like a missing arm, but MWCC folds two constant return arms into a branchless bool - so the case bodies must be written negated (`if (!c) return 1; break;`) and in body-address order. | done |
 | 35 | A dead copy chain steers the allocator's web priority | Two webs sharing one register pair look unreachable from the source - but the allocator colours in web-list order and the IR's *dead* copy webs count, so a chain of dead copies of the competing value plus one live load flips the pair without changing an instruction. | done |
+| 36 | A flipped unit's unreferenced trailing function is trimmed | The object is byte-identical and the flip still breaks the DOL by exactly the last function's size: `dol split` stamps `active_flags=0x08` in `.comment` (export_all) while MWCC writes `0x00`, so the linker drops the unreferenced tail. `__declspec(export)` fixes it. | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
