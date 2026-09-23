@@ -11,12 +11,20 @@ the brief has to be self-contained and has to say the same thing every time. It 
 6. the rules     - `docs/plan.md` §6.5 and §8 verbatim, plus the measurement loop
 
     python tools/units/brief.py <unit> [--task "..."] [--stdout] [--json] [--selftest]
+    python tools/units/brief.py --pool [--force] [--no-prune]
 
 The brief is written into MAIN (`<main>/tools/units/briefs/`), not into a worker's worktree, so it outlives
 the worktree the same way the outbox does. Its file name and the paths in part 4 come from the unit's
 **active claim**: the slug is the claim's branch minus `worker/` - the name `land.py`'s gate keys the outbox
 by - never a name re-derived from the unit path, and a brief for an unclaimed unit says so instead of
 inventing one.
+
+`--pool` is the one exception, and it is what lets the orchestrator start a worker the instant a slot frees:
+for every registered unit that has no bodies yet it writes a brief *before* any claim exists, keyed by
+`claims.slug(unit)` and rendered against the worktree and branch the default claim will create, so
+`tools/units/queue.py next` only has to claim the unit and copy the file. No claim is made and the registry
+is never touched. Re-running is idempotent (existing briefs are skipped) and prunes a brief whose unit has
+gained a body.
 """
 
 from __future__ import annotations
@@ -214,6 +222,34 @@ def splits_range(main: str, unit: str) -> dict:
     return out
 
 
+_MAP_CACHE: dict = {}
+
+
+def map_rows(main: str) -> list[dict] | None:
+    """Every symbol in the map, parsed once per (path, mtime) - `None` when the map is missing.
+
+    `--pool` briefs every stub in one process and the map is 4.5 MB; parsing it per unit would read it
+    hundreds of times. The cache is keyed on the mtime, so a rename or a re-split invalidates it.
+    """
+    path = os.path.join(main, "config", "RMHE08", "symbols.txt")
+    if not os.path.exists(path):
+        return None
+    key = (path, os.path.getmtime(path))
+    if key not in _MAP_CACHE:
+        pattern = re.compile(r"^(\S+) = (\S+):(0x[0-9A-Fa-f]+); // type:(\w+)( size:(0x[0-9A-Fa-f]+))?")
+        rows = []
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = pattern.match(line)
+                if not m:
+                    continue
+                rows.append({"name": m.group(1), "section": m.group(2), "address": int(m.group(3), 16),
+                             "size": int(m.group(6), 16) if m.group(6) else 0, "type": m.group(4)})
+        _MAP_CACHE.clear()
+        _MAP_CACHE[key] = rows
+    return _MAP_CACHE[key]
+
+
 def symbols_in_range(main: str, start: int, end: int) -> list[dict]:
     """The unit's symbols from the map, parsed in-process.
 
@@ -224,31 +260,32 @@ def symbols_in_range(main: str, start: int, end: int) -> list[dict]:
     A failure is reported, never swallowed: an empty inventory would let a worker believe a unit is finished.
     """
     path = os.path.join(main, "config", "RMHE08", "symbols.txt")
-    rows: list[dict] = []
     if not os.path.exists(path):
         print("WARNING: no %s" % path, file=sys.stderr)
-        return rows
-    pattern = re.compile(r"^(\S+) = (\S+):(0x[0-9A-Fa-f]+); // type:(\w+)( size:(0x[0-9A-Fa-f]+))?")
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            m = pattern.match(line)
-            if not m:
-                continue
-            addr = int(m.group(3), 16)
-            if start <= addr < end:
-                rows.append({"name": m.group(1), "section": m.group(2), "address": addr,
-                             "size": int(m.group(6), 16) if m.group(6) else 0, "type": m.group(4)})
+        return []
+    rows = [dict(r) for r in map_rows(main) if start <= r["address"] < end]
     if not rows:
         print("WARNING: no symbols found in 0x%X-0x%X - check the split range" % (start, end), file=sys.stderr)
     return rows
 
 
+_REPORT_CACHE: dict = {}
+
+
 def report_scores(main: str, unit: str) -> dict:
-    """Per-symbol scores for this unit out of `report.json`, keyed by symbol name."""
+    """Per-symbol scores for this unit out of `report.json`, keyed by symbol name.
+
+    Cached once per (path, mtime) for the same reason as `map_rows`: the report is 7 MB and `--pool` briefs
+    hundreds of units in one process.
+    """
     path = os.path.join(main, "build", "RMHE08", "report.json")
     if not os.path.exists(path):
         return {}
-    data = json.loads(open(path, encoding="utf-8").read())
+    key = (path, os.path.getmtime(path))
+    if key not in _REPORT_CACHE:
+        _REPORT_CACHE.clear()
+        _REPORT_CACHE[key] = json.loads(open(path, encoding="utf-8").read())
+    data = _REPORT_CACHE[key]
     want = source_name(unit.strip("/"))
     stem = os.path.splitext(want)[0]
     best = {}
@@ -280,7 +317,7 @@ def header_comment(main: str, wt: str, unit: str) -> str:
 def flags_for(main: str, unit: str) -> tuple[list[str], str]:
     try:
         tokens = rc.ninja_command(main, unit)
-    except SystemExit as exc:
+    except (SystemExit, OSError) as exc:
         return [], str(exc)
     return [t for t in tokens if t.startswith("-")], ""
 
@@ -349,12 +386,17 @@ def build(main: str, wt: str, unit: str, task: str | None, assume_claim: bool = 
     }
 
 
-def render(main: str, b: dict, task: str | None) -> str:
+def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     rng = b["sections"]
     txt = rng.get(".text")
     lines = []
     lines.append("# Brief: %s" % b["unit"])
     lines.append("")
+    if pool:
+        lines.append("> **Pooled brief** - prepared by `brief.py --pool` before the claim. `queue.py next` claims")
+        lines.append("> this unit and hands you this file; the worktree and outbox paths below are the ones your")
+        lines.append("> claim will have. Do not act on a pooled brief you were not handed.")
+        lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
     lines.append("## 0 · Acknowledge first, then heartbeat")
@@ -484,6 +526,60 @@ def render(main: str, b: dict, task: str | None) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def brief_unit(path: str) -> str | None:
+    """The unit a written brief names, from its `# Brief: <unit>` title - `None` when it is not a brief."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = re.match(r"# Brief: (\S+)", line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        return None
+    return None
+
+
+def pool_dir(main: str) -> str:
+    return os.path.join(main, "tools", "units", "briefs", "pool")
+
+
+def pool(main: str, force: bool = False, prune: bool = True) -> dict:
+    """Write a brief for every registered unit with no bodies yet into `tools/units/briefs/pool/`.
+
+    The point (owner's ask, 2026-09-23): the brief's content is unit-derived, so it can be prepared before any
+    worker exists. Only its *file name* used to need a claim, and the pooled name is the same
+    `claims.slug(unit)` the default claim's branch yields - so the orchestrator starts a worker the moment a
+    slot frees with `queue.py next` and no derivation.
+
+    No claim is made and the claims registry is never touched. `assume_claim` renders each brief against the
+    worktree and branch the claim *will* create, so promoting it later is a copy.
+
+    Idempotent: an existing brief is skipped unless `force`. A pooled brief whose unit has gained a body (a
+    worker's source landed) is pruned, so the pool always equals the current no-body set.
+    """
+    units = pool_units(main)
+    outdir = pool_dir(main)
+    os.makedirs(outdir, exist_ok=True)
+    wrote, skipped, pruned = [], [], []
+    want = {claims.slug(u): u for u in units}
+    for unit in units:
+        path = os.path.join(outdir, claims.slug(unit) + ".md")
+        if os.path.exists(path) and not force:
+            skipped.append(unit)
+            continue
+        b = build(main, claims.worktree_for(unit, main), unit, None, assume_claim=True)
+        open(path, "w", encoding="utf-8", newline="\n").write(render(main, b, None, pool=True))
+        wrote.append(unit)
+    if prune:
+        for name in sorted(os.listdir(outdir)):
+            if not name.endswith(".md") or name[:-3] in want:
+                continue
+            path = os.path.join(outdir, name)
+            pruned.append({"slug": name[:-3], "unit": brief_unit(path)})
+            os.remove(path)
+    return {"dir": outdir, "units": units, "wrote": wrote, "skipped": skipped, "pruned": pruned}
+
+
 def selftest() -> int:
     fails, checks = [], 0
 
@@ -508,6 +604,50 @@ def selftest() -> int:
     check("splits finds Camellia both ways",
           splits_range(".", "Camellia/camellia") == splits_range(".", "Camellia/camellia.c"), True)
     check("splits ignores an unknown unit", splits_range(".", "Nope/nothing"), {})
+
+    # the pool's definition: a registered unit whose source exists and has no bodies yet. A temp fixture keeps
+    # the checks independent of which stubs the real tree happens to have written
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src", "auto"))
+        open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("/* header only */\n")
+        open(os.path.join(tmp, "src", "auto", "done.c"), "w").write("/* header */\nint f(void) { return 1; }\n")
+        open(os.path.join(tmp, "configure.py"), "w").write(
+            'config.libs = [\n    {\n        "lib": "auto",\n        "objects": [\n'
+            '            Object(NonMatching, "auto/stub.c"),\n'
+            '            Object(NonMatching, "auto/done.c"),\n'
+            '            Object(NonMatching, "auto/missing.c"),\n'
+            "        ],\n    },\n]\n")
+        check("registered_units parses the object list", registered_units(tmp),
+              ["auto/stub.c", "auto/done.c", "auto/missing.c"])
+        check("has_bodies: a header-only placeholder", has_bodies(os.path.join(tmp, "src", "auto", "stub.c")), False)
+        check("has_bodies: a written body", has_bodies(os.path.join(tmp, "src", "auto", "done.c")), True)
+        check("has_bodies: a missing file", has_bodies(os.path.join(tmp, "src", "auto", "missing.c")), False)
+        check("pool_units keeps only the registered no-body source", pool_units(tmp), ["auto/stub"])
+        check("strip_comments does not count a brace in a comment",
+              has_bodies(os.path.join(tmp, "src", "auto", "stub.c")), False)
+        # a pooled brief assumes the claim `queue.py next` will make, so its outbox path is already right
+        h = handoff_paths(tmp, "auto/stub", assume_claim=True)
+        check("assume_claim marks the brief claimed", h["claimed"], True)
+        check("assume_claim's slug is the default branch's", h["slug"], claims.slug("auto/stub"))
+        check("assume_claim's outbox is the fallback path", h["outbox"], claims.outbox_path(tmp, "auto/stub"))
+        check("assume_claim writes no registry", claims.load_registry(tmp), {})
+        claims.save_registry(tmp, {"auto/stub": {"branch": "worker/" + claims.slug("auto/stub") + "-zz"}})
+        check("a real claim wins over assume_claim",
+              handoff_paths(tmp, "auto/stub", assume_claim=True)["slug"], claims.slug("auto/stub") + "-zz")
+        claims.save_registry(tmp, {})
+        # the pool writes one brief, is idempotent, and prunes a unit that gained a body
+        out = pool(tmp)
+        check("pool writes the stub's brief", out["wrote"], ["auto/stub"])
+        brief_path = os.path.join(pool_dir(tmp), claims.slug("auto/stub") + ".md")
+        check("the pooled brief is named by the unit slug", os.path.exists(brief_path), True)
+        check("the pooled brief is parseable", brief_unit(brief_path), "auto/stub")
+        check("the pooled brief carries the claim's outbox", "outbox" in open(brief_path, encoding="utf-8").read()
+              and "no active claim" not in open(brief_path, encoding="utf-8").read(), True)
+        check("pool is idempotent", pool(tmp)["skipped"], ["auto/stub"])
+        open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("int f(void) { return 1; }\n")
+        check("pool prunes a unit that gained a body",
+              [p["unit"] for p in pool(tmp)["pruned"]], ["auto/stub"])
 
     # the brief's own schema table is what a worker follows, so an outbox shaped by it must validate clean
     from units import handoff as handoff_mod
@@ -589,16 +729,37 @@ def main() -> int:
     ap.add_argument("--stdout", action="store_true")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--pool", action="store_true",
+                    help="write a brief for every registered unit with no bodies yet into tools/units/briefs/pool/")
+    ap.add_argument("--force", action="store_true", help="with --pool, rewrite briefs that already exist")
+    ap.add_argument("--no-prune", action="store_true",
+                    help="with --pool, keep briefs whose unit has gained a body")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest()
+
+    main = rc.main_root(rc.worktree_root())
+    if args.pool:
+        out = pool(main, force=args.force, prune=not args.no_prune)
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        print("pool %s" % out["dir"])
+        print("  %d registered unit(s) with no bodies" % len(out["units"]))
+        print("  wrote    %d" % len(out["wrote"]))
+        for unit in out["wrote"]:
+            print("      + %s" % unit)
+        print("  skipped  %d  (already written)" % len(out["skipped"]))
+        print("  pruned   %d  (unit has a body now, or is no longer registered)" % len(out["pruned"]))
+        for row in out["pruned"]:
+            print("      - %s  (%s)" % (row["unit"] or "?", row["slug"]))
+        return 0
     if not args.unit:
         ap.print_help()
         return 0
 
     wt = rc.worktree_root()
-    main = rc.main_root(wt)
     b = build(main, wt, args.unit, args.task)
     text = render(main, b, args.task)
     if args.json:
