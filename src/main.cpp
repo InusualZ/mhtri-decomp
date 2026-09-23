@@ -64,6 +64,9 @@
  *     byte parameter, fuses that function's `srwi`+`clrlwi` into one `rlwinm`, and (the same fusion) turns
  *     `clrlwi r0,r0,31; cmpwi r0,0` into the record form `clrlwi.` in `fn_8003FE30`. It also strips the
  *     `clrlwi r0,r3,24` that retail keeps in front of `stb` in `fn_8003F730` and at the head of
+ *   * the unit's extab/extabindex are emitted by the lib's -Cpp_exceptions on: the target carries extab 0x90 +
+ *     extabindex 0xD8 (18 unwind-only records, one per framed function) and our object emitted none. With the
+ *     flag both sections equal the target's exactly and no function's .text moves.
  *     `fn_8003F9E4` - while the rest of the unit needs the peephole *on* (it is what removes `main`'s
  *     redundant `clrlwi`s in front of the two `sth r0,0x3e(r4)`; with the whole-unit `-opt nopeephole` those
  *     two appear and `main` drops to 94.49 %). `fn_8003F9E4` shows why the reset can sit *inside* a function:

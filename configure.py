@@ -318,6 +318,11 @@ cflags_pl = [
 cflags_main = [
     *[f for f in cflags_lobby if f != "-inline auto"],
     "-inline noauto",
+    # Evidence: the retail main.o carries extab 0x90 + extabindex 0xD8 (18 unwind-only records, one per
+    # function with a frame) and our object emitted none, while every function's .text is unaffected by the
+    # flag - the same finding as Pl, g3d and camellia. sys_mem.cpp in this lib already turns exceptions on
+    # with a per-file pragma, so this only adds what that pragma would have (analysis: .pi/notes/extab-gap.md).
+    "-Cpp_exceptions on",
 ]
 
 # Camellia flags. Evidence-backed per-object overrides for Camellia/camellia.c, which does not match with
