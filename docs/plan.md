@@ -263,7 +263,48 @@ through `recompile.py` (direct compiler invocation, mtime asserted, section size
 | `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
-## 6. The loop — four steps, one gate each
+### 5.5 A worker may fan out subagents - under the same rules
+
+A unit is often several independent functions, so a worker is expected to spawn its own subagents for parallel
+work where that helps. Three rules make it safe, and they are part of the brief:
+
+* **the subagents work in the worker's worktree, on the worker's branch** - one branch, **one commit**, made by
+  the worker. A subagent never commits;
+* **the worker assigns disjoint files or functions** (the one-writer-per-file rule applies inside a worker too)
+  and is **accountable for everything its subagents produce**: it re-measures every claim they make, exactly as
+  the orchestrator re-measures the worker's;
+* **every subagent is handed §6.5 and §8 verbatim** (the brief's part 6). A subagent that has not read them
+  will name a field `unk4`, reach it with a pointer cast and use a `goto` - and those are repair work for the
+  next pass, charged to the worker that spawned it.
+
+The worker's handoff covers its subagents' work as its own: `measured_with` says how the numbers were obtained,
+and `residual` covers whatever they left unfinished.
+
+### 5.6 Acknowledgement, heartbeats and timeouts
+
+A terminal multiplexer cannot tell "finished" from "never started": both read as *idle*. In the first round with
+four external workers that ambiguity cost forty minutes - one agent sat idle while the other ground through its
+unit, and the orchestrator had no cheap way to see which was which. Three mechanisms remove it:
+
+* **Acknowledge first.** A worker's first action, before it reads the target disassembly, is
+  `python tools/units/claims.py ack <unit> --agent <name> --pane <pane>`, which writes
+  `MAIN/.pi/ack/<slug>.json`: the branch, the agent, the pane and a timestamp. Spawning a worker and seeing no
+  ack within two minutes is an unambiguous failure, and the claim can be reclaimed immediately.
+* **Heartbeat per iteration.** The same command with `--progress <symbol>` after every function the worker
+  measures. The `progress` list is the difference between "quiet because it is thinking" and "quiet because it
+  stopped", and it costs one second per function.
+* **Status and timeout.** `claims.py status` reports `unacked` / `stalled` / `working` / `done` per claim,
+  combining the ack file with what cannot lie - the commits on the branch (`rev-list --count <base>..<branch>`)
+  and the outbox's existence - and exits non-zero when anything is unhealthy. `claims.py timeout [<unit>]
+  [--apply]` reclaims the unhealthy ones: **it copies the branch to `refs/rescue/<slug>` first**, then removes
+  the worktree, deletes the branch and drops the claim, so a timed-out worker loses the lock but never its work.
+  The unit is then free to be re-briefed, and the rescue ref is printed for whoever picks it up.
+
+The orchestrator's rule of thumb: **an ack or an artefact, never a hunch.** A worker is progressing if its ack
+says so or its branch has commits; if neither is true and the grace period has passed, it is timed out - not
+asked again.
+
+## 6. The loop - four steps, one gate each
 
 > **A worker never runs `ninja`, the split, the link or `ok`** (§5.4). In this section the `ninja` commands are
 > the orchestrator's; a worker's equivalent is `tools/units/recompile.py` (7.1).
@@ -369,9 +410,17 @@ rules 3 and 4 exist to record.
 | 5 | **Every field has a name from its context** | what is stored, compared against, passed on. The **only** exception is a padding or unused field — present in the original object but untouched by the functions we match — which gets `pad_0xNN` / `unused_0xNN` **and keeps its offset** |
 | 6 | **Pointer arithmetic to reach a field is forbidden** | `*(u32*)((u8*)self + 0x1C) = v;` is not acceptable; declare the type and write `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise copy, a `sizeof`/offset computation) — and even there prefer `offsetof(Type, field)` |
 | 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used. Neither `fn_XXXXXXXX` nor `unkNN` may survive in `src/` |
+| 8 | **`goto` is forbidden** | No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read |
 
 **These rules are part of phase C, not a separate chore.** The residual sweep already revisits every unit that
-is not byte-identical; the conformance work (rules 1-7) rides the same pass, unit by unit, in address order.
+is not byte-identical; the conformance work (rules 1-8) rides the same pass, unit by unit, in address order.
+
+**The `goto` backlog from the first protocol round (2026-09-23).** Four functions reached 100 % with a `goto`
+shape before rule 8 existed: `Pl/pl_act`'s `fn_80278144` and `fn_80278310` (`goto ret1; ret0: return 0;`) and
+`fn_8027BC48` (`switch` + `goto`), and `Pl/pl_skill`'s `fn_80271BD4`/`fn_80271E0C` (label dispatch). They are the
+lint's first reported entries: each needs a conformant shape that keeps the score, or a recorded residual with
+the measurement that shows what the conformant shapes score. Their unit headers carry the shapes that were
+tried.
 
 **Enforcement is a tool, not a promise.** `tools/units/stylelint.py` (roadmap 7.21) reports each rule with
 `file:line`, per unit and as a backlog, and **`land.py verify` refuses a batch that adds a violation** — a rule
@@ -398,7 +447,7 @@ construction: a tool can waste time, it cannot break the link.
 | # | tool | why it exists (incident) | acceptance test | size |
 | --- | --- | --- | --- | --- |
 | 7.1 | `tools/units/recompile.py` (+ 7.15) | two workers measured objects the compiler never rewrote (1-second mtime granularity); a worker must not run `ninja` | delete the object, compile **without ninja**, assert the mtime moved, print section sizes and both object paths; resolve `MAIN` for the toolchain and the target object | ~60 |
-| 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock | `claim` creates the worktree+branch or refuses; `list` shows owner/age; `expire`/`remove` clean up; `MAIN` resolution for the outbox paths | ~60 |
+| 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock, and a silent worker must be reclaimable (see the ack/heartbeat/timeout layer, §5.6) | `claim` creates the worktree+branch or refuses; `ack`/`status`/`timeout` cover liveness and reclaim (a timed-out branch is rescued to `refs/rescue/<slug>` first); `list` shows owner/age; `remove` cleans up | ~140 |
 | 7.3 | `tools/units/brief.py` | every fan-out cost a hand-written 40-line brief and each drifted | one file per unit with §5.2's six parts; idempotent | ~120 |
 | 7.4 | `tools/units/handoff.py` | worker replies were inconsistently shaped; detail was lost to truncation | prints the digest skeleton; validates an outbox entry against the schema | ~60 |
 | 7.5 | `tools/units/land.py` | the batch checklist was six manual commands and the regression scan was rewritten four times; a green `ok` can come from a stale link | `verify` **deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) before the run and requires both to be recreated**, then runs configure → split → report → regressions → `ok` → ledger delta → knowledge-delta check; refuses on a shared-file edit or an outbox violation; owns the baseline (7.16). The `.ninja_log` ordering idea does not work: a `NonMatching` batch never relinks, so `main.elf` never runs | ~240 |
@@ -417,7 +466,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.18 | **ground-truth guard**: `prepcommit.py` refuses `config/RMHE08/build.sha1` and `config/RMHE08/config.yml`, and a tracked **`tools/git/hooks/pre-commit`** (enabled with `git config core.hooksPath tools/git/hooks` — local config, so 7.18 also states the checks that do *not* depend on a hook: `prepcommit.py`'s and `land.py`'s path refusals) refuses `orig/**`, `build/` and the LOCAL-ONLY block on **any** commit path | `prepcommit.classify('config/RMHE08/build.sha1')` returns `stage` today: a worker or I could rewrite the DOL's expected hash and commit it, after which green `ok` means nothing | a staged `build.sha1` is refused, and the hash is checked against `orig/RMHE08/sys/main.dol`'s own sha1 | ~40 |
 | 7.19 | link-order audit for flips | 13 584 objects link in 66-131 s now; with hundreds of `Matching` units the order, pool placement and symbol collisions become real | after a batch of flips, compare `main.MAP`'s section/symbol order against the original and diff the DOL | ~60 |
 | 7.20 | transactional `attribute.py apply` | `apply` writes `splits.txt` first and can leave a half-registration; `plan` can propose overlapping data spans | no proposal overlaps a claimed range, both shared files are written via temp+rename, and a failure restores them | ~40 |
-| 7.21 | `tools/units/stylelint.py` — the seven rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields and **0** struct-size annotations; a rule enforced by remembering is not a rule | flags each rule as `file:line`, reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~120 |
+| 7.21 | `tools/units/stylelint.py` - the eight rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b`), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a

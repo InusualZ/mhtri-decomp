@@ -106,6 +106,139 @@ def outbox_path(main: str, unit: str) -> str:
     return os.path.join(main, ".pi", "outbox", slug(unit) + ".json")
 
 
+def ack_path(main: str, unit: str) -> str:
+    return os.path.join(main, ".pi", "ack", slug(unit) + ".json")
+
+
+def load_ack(main: str, unit: str) -> dict:
+    path = ack_path(main, unit)
+    if not os.path.exists(path):
+        return {}
+    try:
+        return json.loads(open(path, encoding="utf-8").read())
+    except json.JSONDecodeError:
+        return {}
+
+
+def ack(unit: str, main: str, agent: str | None = None, pane: str | None = None,
+        progress: str | None = None) -> dict:
+    """A worker's heartbeat: its FIRST action, and again after every measured iteration.
+
+    `agent_status` in a terminal multiplexer cannot tell "finished" from "never started" - both read as idle,
+    and one of two workers sat idle for forty minutes because of it. The ack file is the worker's own promise
+    that it is alive, and its `progress` list is the evidence that it is moving. The orchestrator's `status`
+    combines it with the artefacts that cannot lie (commits, the outbox).
+    """
+    unit = unit.strip("/")
+    path = ack_path(main, unit)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    data = load_ack(main, unit) or {"unit": unit}
+    record = load_registry(main).get(unit, {})
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    data.setdefault("worker", record.get("worker"))
+    data.setdefault("branch", record.get("branch"))
+    data.setdefault("acked_at", now)
+    if agent:
+        data["agent"] = agent
+    if pane:
+        data["pane"] = pane
+    if progress:
+        data.setdefault("progress", []).append({"at": now, "note": progress})
+    data["last_progress_at"] = now
+    data["iterations"] = len(data.get("progress") or [])
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=1, sort_keys=True)
+    return data
+
+
+def _age_seconds(stamp: str | None) -> float | None:
+    if not stamp:
+        return None
+    try:
+        return max(0.0, time.time() - time.mktime(time.strptime(stamp, "%Y-%m-%dT%H:%M:%S")))
+    except ValueError:
+        return None
+
+
+def claim_status(main: str, ack_seconds: float = 120, stall_minutes: float = 20) -> list[dict]:
+    """Every claim with the state a supervisor needs: unacked, stalled, working or done.
+
+    The state is decided from the ack file *and* from what git and the filesystem can prove - so a worker that
+    never acked but whose branch has commits is reported as `working`, and a worker that acked and then went
+    quiet is `stalled`. `unacked` past the grace period is the case that cost forty minutes in the first round.
+    """
+    registry = load_registry(main)
+    rows = []
+    for row in claims_view(main):
+        unit = row["unit"]
+        record = registry.get(unit, {})
+        data = load_ack(main, unit) if unit != "(unregistered)" else {}
+        claimed = _age_seconds(row.get("claimed_at"))
+        acked = _age_seconds(data.get("acked_at"))
+        progress = _age_seconds(data.get("last_progress_at"))
+        commits = 0
+        if row.get("branch") and row.get("base"):
+            out = subprocess.run(["git", "rev-list", "--count", "%s..%s" % (row["base"], row["branch"])],
+                                 cwd=main, capture_output=True, text=True)
+            if out.returncode == 0 and out.stdout.strip().isdigit():
+                commits = int(out.stdout.strip())
+        if row["outbox"]:
+            state = "done"
+        elif not data and claimed is not None and claimed > ack_seconds:
+            state = "unacked"
+        elif data and progress is not None and progress > stall_minutes * 60:
+            state = "stalled"
+        else:
+            state = "working"
+        rows.append({**row, "state": state, "acked_seconds_ago": round(acked) if acked is not None else None,
+                     "progress_seconds_ago": round(progress) if progress is not None else None,
+                     "claimed_seconds_ago": round(claimed) if claimed is not None else None,
+                     "commits": commits, "iterations": data.get("iterations", 0),
+                     "agent": data.get("agent") or (record.get("spawn") or {}).get("agent"),
+                     "pane": data.get("pane") or (record.get("spawn") or {}).get("pane")})
+    return rows
+
+
+def timeout(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
+            apply: bool = False, unit: str | None = None) -> list[dict]:
+    """Reclaim what a silent worker holds: rescue its commits, then free the unit.
+
+    A worker's branch is the lock, so a timed-out claim has to *release* that lock - but a branch can hold real
+    work, so the commits are copied to `refs/rescue/<slug>` first and the rescue ref is printed. Nothing is
+    destroyed, and the unit can be claimed again immediately.
+    """
+    victims = []
+    for row in claim_status(main, ack_seconds, stall_minutes):
+        if unit and row["unit"] != unit.strip("/"):
+            continue
+        if row["state"] in ("unacked", "stalled") or (unit and row["state"] != "done"):
+            victims.append(row)
+    for row in victims:
+        slugged = slug(row["unit"])
+        rescue = "refs/rescue/%s" % slugged
+        branch = row.get("branch")
+        steps = []
+        if branch and row.get("commits"):
+            steps.append(["update-ref", rescue, branch])
+        if row.get("worktree") and os.path.isdir(row["worktree"]):
+            steps.append(["worktree", "remove", "--force", row["worktree"]])
+        if branch and branch_exists(main, branch):
+            steps.append(["branch", "-D", branch])
+        steps.append(["worktree", "prune"])
+        row["steps"] = ["git " + " ".join(s) for s in steps]
+        row["rescue"] = rescue if row.get("commits") else None
+        if apply:
+            for step in steps:
+                git(step, main)
+            registry = load_registry(main)
+            registry.pop(row["unit"], None)
+            save_registry(main, registry)
+            ack_file = ack_path(main, row["unit"])
+            if os.path.exists(ack_file):
+                os.remove(ack_file)
+    return victims
+
+
 def claims_view(main: str) -> list[dict]:
     """Every worker claim git knows about, enriched with the registry and what the worker left behind."""
     registry = load_registry(main)
@@ -241,6 +374,21 @@ def selftest() -> int:
         save_registry(main, {"Pl/pl_act": {"branch": "worker/pl-act-1234", "claimed_at": "2026-01-01T00:00:00"}})
         check("registry round-trips", load_registry(main)["Pl/pl_act"]["branch"], "worker/pl-act-1234")
 
+    # ack/status/timeout against a throwaway registry
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, ".pi"), exist_ok=True)
+        save_registry(tmp, {"Pl/x": {"branch": "worker/x", "claimed_at": "2026-01-01T00:00:00"}})
+        check("an unacked claim has no ack file", load_ack(tmp, "Pl/x"), {})
+        out = ack("Pl/x", tmp, agent="w-a", pane="w1:p2", progress="fn_1")
+        check("ack records the agent", out.get("agent"), "w-a")
+        check("ack counts iterations", out.get("iterations"), 1)
+        out = ack("Pl/x", tmp, progress="fn_2")
+        check("a second ack appends progress", out.get("iterations"), 2)
+        check("acked_at is not overwritten", out.get("acked_at"), load_ack(tmp, "Pl/x")["acked_at"])
+        check("_age_seconds parses", _age_seconds(out["last_progress_at"]) is not None, True)
+        check("_age_seconds tolerates junk", _age_seconds("nonsense"), None)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -265,6 +413,21 @@ def main() -> int:
     r.add_argument("unit")
     r.add_argument("--force", action="store_true")
     r.add_argument("--dry-run", action="store_true")
+    a = sub.add_parser("ack", help="a worker's heartbeat: call this first, then after each iteration")
+    a.add_argument("unit")
+    a.add_argument("--agent", default=None)
+    a.add_argument("--pane", default=None)
+    a.add_argument("--progress", default=None, help="what you just finished (a symbol, usually)")
+    a.add_argument("--json", action="store_true")
+    s = sub.add_parser("status", help="unacked / stalled / working / done, per claim")
+    s.add_argument("--ack-seconds", type=float, default=120)
+    s.add_argument("--stall-minutes", type=float, default=20)
+    s.add_argument("--json", action="store_true")
+    t = sub.add_parser("timeout", help="reclaim what a silent worker holds (rescues its commits first)")
+    t.add_argument("unit", nargs="?", default=None)
+    t.add_argument("--ack-seconds", type=float, default=120)
+    t.add_argument("--stall-minutes", type=float, default=20)
+    t.add_argument("--apply", action="store_true", help="act; without it, only report")
     e = sub.add_parser("expire", help="claims older than N minutes with no outbox")
     e.add_argument("--minutes", type=int, default=120)
     e.add_argument("--apply", action="store_true")
@@ -313,6 +476,41 @@ def main() -> int:
         else:
             print("released %s (branch %s, merged=%s, outbox=%s)"
                   % (out["unit"], out["branch"], out["merged"], out["outbox"]))
+        return 0
+    if args.cmd == "ack":
+        out = ack(args.unit, main_wt, args.agent, args.pane, args.progress)
+        print(json.dumps(out, indent=2) if args.json
+              else "ack %s: %d iteration(s), agent=%s pane=%s" % (out["unit"], out.get("iterations", 0),
+                                                                  out.get("agent"), out.get("pane")))
+        return 0
+    if args.cmd == "status":
+        rows = claim_status(main_wt, args.ack_seconds, args.stall_minutes)
+        if args.json:
+            print(json.dumps(rows, indent=2))
+        else:
+            print("%-16s %-9s %8s %8s %8s %-8s %s"
+                  % ("unit", "state", "acked", "progress", "commits", "outbox", "agent@pane"))
+            for row in rows:
+                print("%-16s %-9s %8s %8s %8d %-8s %s"
+                      % (row["unit"][:16], row["state"],
+                         row["acked_seconds_ago"] if row["acked_seconds_ago"] is not None else "-",
+                         row["progress_seconds_ago"] if row["progress_seconds_ago"] is not None else "-",
+                         row["commits"], str(row["outbox"]),
+                         "%s@%s" % (row["agent"] or "?", row["pane"] or "?")))
+            unhealthy = [r for r in rows if r["state"] in ("unacked", "stalled")]
+            if unhealthy:
+                print("\n%d unhealthy claim(s) - reclaim with: python tools/units/claims.py timeout%s"
+                      % (len(unhealthy), " --apply"))
+                return 1
+        return 0 if all(r["state"] not in ("unacked", "stalled") for r in rows) else (0 if args.json else 1)
+    if args.cmd == "timeout":
+        rows = timeout(main_wt, args.ack_seconds, args.stall_minutes, args.apply, args.unit)
+        for row in rows:
+            print("%-16s %-9s commits=%d%s" % (row["unit"][:16], row["state"], row["commits"],
+                                               "  rescue: %s" % row["rescue"] if row["rescue"] else ""))
+            for step in row["steps"]:
+                print("   %s %s" % ("ran " if args.apply else "would run", step))
+        print("%d claim(s) %s" % (len(rows), "reclaimed" if args.apply else "(dry run: pass --apply)"))
         return 0
     if args.cmd == "expire":
         rows = expire(main_wt, args.minutes, args.apply)
