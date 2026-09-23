@@ -1,22 +1,93 @@
-/* auto/802D0DCC_fn_802D0DCC.c - placeholder attribution, 1 function(s), 0x802D0DCC..0x802D0F34.
+/*
+ * auto/802D0DCC_fn_802D0DCC.c - one state dispatch over a shared .data table, .text 0x802D0DCC-0x802D0F34.
  *
- * No source has been recovered for this unit yet: the range was claimed in bulk from the DOL's own
- * layout (docs/plan.md 12 item 5, the attribution pass), and the bodies are still the original bytes
- * (`Object(NonMatching, …)`, so the link keeps them and `ninja build/RMHE08/ok` cannot move).
+ * One function, `fn_802D0DCC`, the only symbol in the range.  It switches on the state byte at +0x420 of
+ * its argument and tail-calls `fn_802D3398(self, entry)` with one of two adjacent entries of the
+ * 16-pointer table `lbl_805D4150` (`.data` 0x805D4150, 0x40 B), chosen by the byte at +0x170.  States 1-6
+ * use table slots 2-13, the default uses 14/15.  It calls nothing else and touches no other field of
+ * `self`.
  *
- * What the seam rests on (see the `tu-boundary-discovery` skill for the method):
- *   pinned seam (pool): .data run jump jumptable_805D4DB0 -> jumptable_805D4E80
+ * Flags: `cflags_main` (`auto`, `Wii/1.3`, `-O3 -inline noauto`) reproduces the object exactly - 360 B,
+ * 90/90 rows, every relocation equal - so no flag or pragma deviation is needed.
  *
- * Data runs in this range. They are recorded in `splits.txt` as comments and **not** claimed: a stub
- * object emits nothing, and a range our object does not emit must not be claimed (playbook 23,
- * docs/plan.md 8.4). The claim belongs to the measured data pass - `tools/units/dataclaim.py`,
- * docs/plan.md 7.8 / 12 item 7 - once the source emits the bytes:
- *   .data        0x805D4150..0x805D4190   1 labels  NOT CLAIMED (dataclaim: unowned)
+ * The `default` arm is written **first** because that is the layout MWCC emits: the default body sits
+ * directly after the `cmpwi`/`beq` chain, while a `default` written last is placed after the case bodies
+ * and needs an extra branch to reach it (364 B, 93.73 %).
  *
- * Evidence for this batch: `python tools/units/attribute.py plan 0x80280000 0x80410000
- * --max-total-bytes 0x80000` (this unit's plan line), `.pi/attribution-batch-1.patch.md` (the exact
- * splits/configure edits) and `.pi/notes/attribution-batch-1.md` (the chosen/dropped table).
+ * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object, the
+ * symbol map or the runtime dump (`zz_02d0dcc_`, `zz_02d3398_`) names the original file or function, and
+ * the neighbours carry no naming scheme.  Same for the callee and the table.
+ *
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/802D0DCC_fn_802D0DCC.c`.
- * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object
- * names the original source file. Rename it the moment there is evidence.
  */
+
+#include "types.h"
+
+/* The dispatch state object.  Only the two bytes the function reads are named; everything else is
+ * padding the disassembly does not describe. */
+typedef struct DispatchState {
+    u8 pad_0x000[0x170];    /* +0x000 */
+    u8 variant;             /* +0x170: selects the odd/even table entry */
+    u8 pad_0x171[0x2AF];    /* +0x171 */
+    u8 state;               /* +0x420: the switch value */
+} DispatchState;            /* size: 0x421 */
+
+/* 16 entries, each handed to the tail-called handler.  Both the table and the handler live outside this
+ * unit and have no name in any source, so they are declared here and never defined (playbook 29). */
+extern void* const lbl_805D4150[16];
+extern void fn_802D3398(DispatchState* self, void* entry);
+
+void fn_802D0DCC(DispatchState* self)
+{
+    switch (self->state) {
+    default:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[15]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[14]);
+        }
+        break;
+    case 1:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[3]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[2]);
+        }
+        break;
+    case 2:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[5]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[4]);
+        }
+        break;
+    case 3:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[7]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[6]);
+        }
+        break;
+    case 4:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[9]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[8]);
+        }
+        break;
+    case 5:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[11]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[10]);
+        }
+        break;
+    case 6:
+        if (self->variant == 2) {
+            fn_802D3398(self, lbl_805D4150[13]);
+        } else {
+            fn_802D3398(self, lbl_805D4150[12]);
+        }
+        break;
+    }
+}
