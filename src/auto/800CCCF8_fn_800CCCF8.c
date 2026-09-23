@@ -1,29 +1,167 @@
-/* auto/800CCCF8_fn_800CCCF8.c - placeholder attribution, 10 function(s), 0x800CCCF8..0x800CCFB0.
+/*
+ * auto/800CCCF8_fn_800CCCF8.c - the effect-emitter shape registry: seven shape constructors, one static
+ * initializer and one lookup.  `.text` 0x800CCCF8-0x800CCFB0 (10 functions, 0x2B8 B) and the unit's
+ * `.ctors` word at 0x8056F2E8.  All four sections (`.text`, `.ctors`, `extab`, `extabindex`) are
+ * byte-identical to the target object.
  *
- * No source has been recovered for this unit yet: the range was claimed in bulk from the DOL's own
- * layout (docs/plan.md 12 item 5, the attribution pass), and the bodies are still the original bytes
- * (`Object(NonMatching, …)`, so the link keeps them and `ninja build/RMHE08/ok` cannot move).
+ * The unit owns one registered instance per emitter shape.  `fn_800CCDA8` (the `.ctors` entry) constructs
+ * the seven instances `lbl_80794938`..`lbl_80794950`; `fn_800CCCF8` maps an id to one of them.  `fn_800CCE38`
+ * is the shared base constructor (stores the abstract base vtable `lbl_80594ED0`); the seven
+ * `fn_800CCDFC`..`fn_800CCF74` are the derived constructors, each calling the base and then overwriting the
+ * vtable pointer at +0 with its shape's own vtable.  An instance is a bare vtable pointer, so the
+ * reconstructed type is 4 bytes with one field.
  *
- * What the seam rests on (see the `tu-boundary-discovery` skill for the method):
- *   pinned seam (source): source file change ef_line.cpp -> ef_point.cpp
- *   pinned seam (pool): .sdata2 run jump lbl_807962F8 -> lbl_80796300
+ * The vtable, instance and string symbols are owned by other units (the seven instances by the `.sbss`
+ * data unit); they are declared `extern` here and never defined (playbook 29), which is how the target
+ * object holds them - all undefined.
  *
- * Data runs in this range. They are recorded in `splits.txt` as comments and **not** claimed: a stub
- * object emits nothing, and a range our object does not emit must not be claimed (playbook 23,
- * docs/plan.md 8.4). The claim belongs to the measured data pass - `tools/units/dataclaim.py`,
- * docs/plan.md 7.8 / 12 item 7 - once the source emits the bytes:
- *   extabindex   0x80023BEC..0x80023C58   9 labels  proposed    (dataclaim: no queue run)
- *   .data        0x80594C58..0x80595118  10 labels  NOT CLAIMED (dataclaim: unowned)
- *   .sbss        0x80794938..0x80794958   7 labels  proposed    (dataclaim: unowned)
+ * Flags: the unit needs `cflags_main` **plus `#pragma peephole off`**.  The peephole is the only lever:
+ * with it on every constructor computes the vtable address into the `lis` register (`addi r4, r4, sym@l`),
+ * where retail computes into `r0` (`addi r0, r4, sym@l`) - 97.5 % on the base constructor and 99.33 % on
+ * each derived one; with it off, 100 %.  The pragma covers the whole unit, matching the original TU's one
+ * flag set.
  *
- *   The `extab`/`extabindex` fragment sections are the exception: they travel with the code unit
- *   (`dataqueue.py`'s `FRAGMENT_SECTIONS`) and are claimed in `splits.txt` with its `.text`;
- *   `.ctors`/`.dtors` are added after the split. Everything else above waits for the measured pass.
+ * Two source shapes are load-bearing: the lookup's id parameter is **signed** (`cmplwi` for every case but
+ * 0 otherwise) and its cases are written in retail's unsorted order (0, 1, 7, 8, 10, 5, 9), which is the
+ * `cmpwi` chain MWCC emits; and the `.ctors` word is placed with `__declspec(section ".ctors")` alone,
+ * because the `#pragma section const_type` pair answers 33041 for the plain `.ctors` name.
  *
- * Evidence for this batch: `python tools/units/attribute.py plan 0x80070000 0x801e0000
- * --max-total-bytes 0x80000` (this unit's plan line), `.pi/attribution-batch-2.patch.md` (the exact
- * splits/configure edits) and `.pi/notes/attribution-batch-2.md` (the chosen/dropped table).
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800CCCF8_fn_800CCCF8.c`.
- * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object
- * names the original source file. Rename it the moment there is evidence.
+ * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object names
+ * the original source file.
  */
+
+#include "types.h"
+
+#pragma peephole off
+
+/* One registered shape: the object itself is nothing but its vtable pointer. */
+typedef struct EmForm {
+    /* +0x00 */ void* vtable;
+} EmForm; /* size: 0x04 */
+
+/* Shape vtables.  Each is { offset-to-top, typeinfo, virtual fn, [virtual fn] }, owned by the shape's own
+ * unit; declared here, never defined.  The comment is the `__FILE__` string the unit pools after it. */
+extern u32 lbl_80594ED0[];   /* base (ef_line.cpp) */
+extern u32 lbl_80594C58[];   /* ef_cube.cpp */
+extern u32 lbl_80594D14[];   /* ef_cylinder.cpp */
+extern u32 lbl_80594DD0[];   /* ef_disc.cpp */
+extern u32 lbl_80594E8C[];   /* ef_emform.cpp */
+extern u32 lbl_80594F8C[];   /* ef_point.cpp */
+extern u32 lbl_80595048[];   /* ef_sphere.cpp */
+extern u32 lbl_80595108[];   /* no pooled file string */
+
+/* The seven registered instances (owned by the .sbss data unit). */
+extern EmForm lbl_80794938;
+extern EmForm lbl_8079493C;
+extern EmForm lbl_80794940;
+extern EmForm lbl_80794944;
+extern EmForm lbl_80794948;
+extern EmForm lbl_8079494C;
+extern EmForm lbl_80794950;
+
+/* nw4r::db::Panic's file/format strings and the variadic entry point. */
+extern const char lbl_80594E98[];
+extern const char lbl_80594EA8[];
+extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
+
+void fn_800CCE38(EmForm* self);
+EmForm* fn_800CCDFC(EmForm* self);
+EmForm* fn_800CCE48(EmForm* self);
+EmForm* fn_800CCE84(EmForm* self);
+EmForm* fn_800CCEC0(EmForm* self);
+EmForm* fn_800CCEFC(EmForm* self);
+EmForm* fn_800CCF38(EmForm* self);
+EmForm* fn_800CCF74(EmForm* self);
+
+/* Maps a shape id to its registered instance, or asserts and returns null.  The first parameter is the
+ * virtual dispatch's `this`, which the function never reads. */
+EmForm* fn_800CCCF8(void* self, int id)
+{
+    switch (id) {
+    case 0:  return &lbl_80794938;
+    case 1:  return &lbl_8079493C;
+    case 7:  return &lbl_80794940;
+    case 8:  return &lbl_80794944;
+    case 10: return &lbl_80794948;
+    case 5:  return &lbl_8079494C;
+    case 9:  return &lbl_80794950;
+    default:
+        Panic__Q24nw4r2dbFPCciPCce(lbl_80594E98, 65, lbl_80594EA8);
+        return 0;
+    }
+}
+
+/* Static initializer: constructs the seven registered shape instances. */
+void fn_800CCDA8(void)
+{
+    fn_800CCF74(&lbl_80794938);
+    fn_800CCF38(&lbl_8079493C);
+    fn_800CCEFC(&lbl_80794940);
+    fn_800CCEC0(&lbl_80794944);
+    fn_800CCE84(&lbl_80794948);
+    fn_800CCE48(&lbl_8079494C);
+    fn_800CCDFC(&lbl_80794950);
+}
+
+/* Derived constructors: run the base constructor, then install the shape's own vtable.  They are written
+ * in the target's `.text` order, so `fn_800CCDFC` comes before the base constructor it calls. */
+EmForm* fn_800CCDFC(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80595048;
+    return self;
+}
+
+/* Base constructor: installs the abstract base's vtable. */
+void fn_800CCE38(EmForm* self)
+{
+    self->vtable = lbl_80594ED0;
+}
+
+EmForm* fn_800CCE48(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80594D14;
+    return self;
+}
+
+EmForm* fn_800CCE84(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80594C58;
+    return self;
+}
+
+EmForm* fn_800CCEC0(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80595108;
+    return self;
+}
+
+EmForm* fn_800CCEFC(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80594DD0;
+    return self;
+}
+
+EmForm* fn_800CCF38(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80594F8C;
+    return self;
+}
+
+EmForm* fn_800CCF74(EmForm* self)
+{
+    fn_800CCE38(self);
+    self->vtable = lbl_80594E8C;
+    return self;
+}
+
+#pragma peephole reset
+
+/* The `.ctors` word the linker walks: this unit's static initializer reference. */
+__declspec(section ".ctors") void* const lbl_8056F2E8 = (void*)fn_800CCDA8;
