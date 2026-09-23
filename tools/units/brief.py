@@ -266,6 +266,11 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("* `%s`" % os.path.join(main, ".pi", "notes", b["slug"] + ".md"))
     lines.append("* a ≤ 15-line digest in your reply")
     lines.append("")
+    lines.append("**End your turn by calling the `subagent_done` tool** (a one-line summary). Do not just reply "
+                 "with text: the completion signal the orchestrator is woken by is the sidecar that tool writes, "
+                 "and the automatic path does not fire for long runs - a worker that only replies parks in "
+                 "`phase: waiting` and its result is never delivered (`.pi/notes/handoff-root-cause.md`).")
+    lines.append("")
     lines.append("## 5 · The task")
     lines.append("")
     if task:

@@ -239,6 +239,15 @@ be the owner's own pane.
 
 ### 5.2 The worker's input — one generated file, nothing else
 
+**A brief ends by requiring `subagent_done`.** The completion signal the orchestrator is woken by is the exit
+sidecar `<sessionFile>.exit`, and the extension writes it only when its `agent_settled` handler runs - which does
+not happen for long runs. A worker that merely replies with text reaches `agent_end`, parks in `phase: waiting`,
+never writes the sidecar and never shuts down, so its result is never delivered even though its work is complete.
+The `subagent_done` tool writes the sidecar directly; two workers stuck for 45+ turns delivered the moment they
+were asked to call it (`.pi/notes/handoff-root-cause.md`). `brief.py` therefore emits the instruction in part 4,
+and a hand-written brief must carry it too.
+
+
 `tools/units/brief.py <unit>` writes `tools/units/briefs/<unit>.md`, containing:
 
 1. the **unit**: path, lib, `mw_version`, the real cflags, object and target paths, the `.text` range;
