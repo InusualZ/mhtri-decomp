@@ -13,10 +13,19 @@ registry is missing).
     python tools/units/claims.py claim <unit> [--worker NAME] [--dry-run] [--json]
     python tools/units/claims.py list [--json]
     python tools/units/claims.py release <unit> [--force] [--dry-run]
+    python tools/units/claims.py release --all-merged [--dry-run]
     python tools/units/claims.py expire [--minutes N] [--apply]
     python tools/units/claims.py --selftest
 
 `<unit>` is the path from the repository root (`Pl/pl_act`, `auto/80040598_fn_80040598`).
+
+`release` is the **one-shot, idempotent** teardown (docs/plan.md, "Teardown is part of landing"): rescue ref ->
+pane close -> `git worktree remove --force` -> `branch -D` -> `prune` -> registry entry (+ the ack file). Every
+step reports what it did or why it was skipped, so releasing an already-released claim (or one whose worktree was
+already removed by hand) is a clean no-op instead of an abort. The one refusal that stays is a **live pane**,
+because Windows will not delete a directory a process is sitting in (5.1); it is named in the message. The exit
+status says whether the teardown is complete. `release --all-merged` sweeps every claim whose branch is already
+merged into main, releasing what it can and naming what it skipped.
 
 A claim is only ever declared `stalled` from the ack *and* the worker's own pane: `herdr pane list`
 is matched to the claim by its worktree name, and `herdr pane read` is sampled twice - a pane whose
@@ -622,33 +631,268 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool) -> dict:
     return {"unit": unit, "branch": branch, "worktree": path, "base": base}
 
 
-def release(unit: str, main: str, force: bool, dry_run: bool) -> dict:
+def registry_key(registry: dict, unit: str) -> str | None:
+    """The key `unit` is stored under - the extensionless spelling when present, else any equivalent key.
+
+    The registry is keyed by the unit's name without its source extension (`norm_unit`), but a record written
+    before that rule existed can still carry the extension (`Gecko/Gecko_ExceptionPPC.cp`). A `release` that
+    looked the extensionless key up directly would miss the old record, find the default branch instead of the
+    stored one, and leave the registry entry behind - exactly the half-torn-down state this tool exists to end.
+    """
+    unit = norm_unit(unit.strip("/"))
+    if unit in registry:
+        return unit
+    for key in registry:
+        if norm_unit(key) == unit:
+            return key
+    return None
+
+
+def commits_ahead(main: str, branch: str) -> int:
+    """How many commits `branch` has that main does not - 0 when either is missing."""
+    if not branch or not branch_exists(main, branch):
+        return 0
+    p = subprocess.run(["git", "rev-list", "--count", "main..%s" % branch],
+                       cwd=main, capture_output=True, text=True, errors="replace")
+    return int(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip().isdigit() else 0
+
+
+def registered_worktree_paths(main: str) -> list[str] | None:
+    """Every path `git worktree list` knows, or `None` when git could not be asked."""
+    p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=main, capture_output=True, text=True,
+                       errors="replace")
+    if p.returncode != 0:
+        return None
+    return [line[len("worktree "):].strip() for line in p.stdout.splitlines()
+            if line.startswith("worktree ")]
+
+
+def _same_path(a: str, b: str) -> bool:
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def remove_worktree(main: str, path: str) -> str:
+    """Remove one worktree, repairing the two states git refuses. -> what was done.
+
+    Two refusals are known and both have a repair, which is the difference between an abort and a teardown:
+
+    * a **submodule** inside the worktree (`tools/m2c`, plan 5.1) needs the force flag twice - otherwise the
+      worktree and therefore the branch (the lock) outlive their round forever;
+    * a directory git **no longer tracks** is the 2026-09-23 half-teardown (`git worktree remove` deleted
+      `.git` and then failed on the directory because a live pane pinned it). Nothing else can clear it, and it
+      blocks the next claim's `git worktree add`, so the leftover tree is removed here.
+    """
+    try:
+        git(["worktree", "remove", "--force", path], main)
+        return "removed"
+    except SystemExit as first:
+        message = str(first)
+        if "submodule" in message:
+            git(["worktree", "remove", "--force", "--force", path], main)
+            return "removed (force twice, for the submodule)"
+        known = registered_worktree_paths(main)
+        if known is not None and not any(_same_path(p, path) for p in known):
+            shutil.rmtree(path)
+            return "removed the leftover directory (git no longer tracked it)"
+        raise
+
+
+def _done_step(label: str, action) -> dict:
+    """A teardown step: `action` returns a note (or None) on success, raising to fail the teardown."""
+    return {"label": label, "action": action, "status": "planned", "why": ""}
+
+
+def _skip_step(label: str, why: str) -> dict:
+    """A step that has nothing to do, with the reason recorded instead of hidden."""
+    return {"label": label, "action": None, "status": "skipped", "why": why}
+
+
+def _run_teardown(steps: list[dict]) -> bool:
+    """Run a teardown plan in order. -> complete.
+
+    A step that is already `skipped` stays skipped. The first failure stops the plan - the remaining steps are
+    recorded as "not attempted" rather than run against a half-torn-down claim (removing a branch whose worktree
+    is still live, or a worktree behind a pane that would not close, is how the 2026-09-23 tangle started) - and
+    the teardown is reported incomplete so the registry entry and the ack survive for the next attempt.
+    """
+    complete, failed = True, None
+    for step in steps:
+        if step["status"] == "skipped":
+            continue
+        if failed:
+            step["status"] = "skipped"
+            step["why"] = "not attempted: %s failed first" % failed
+            continue
+        try:
+            note = step["action"]()
+            step["status"] = "done"
+            if note:
+                step["why"] = note
+        except (SystemExit, Exception) as exc:  # noqa: BLE001 - any refuser must be recorded, not propagated
+            detail = str(exc).strip().splitlines()
+            step["status"] = "failed"
+            step["why"] = detail[0] if detail else exc.__class__.__name__
+            complete = False
+            failed = step["label"]
+    return complete
+
+
+def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=None) -> dict:
+    """The one-shot teardown of a claim: rescue ref, pane close, worktree, branch, prune, registry, ack.
+
+    Idempotent and total (docs/plan.md, "Teardown is part of landing"): every step reports what it did or why
+    it was skipped, so a claim whose worktree was already removed by hand, or one released twice, tears down
+    cleanly instead of aborting and leaving the branch - the lock - alive. A **live pane** is the one refusal
+    that stays: it pins the worktree as its cwd on Windows (plan 5.1), so the teardown stops before anything is
+    touched and the message names the pane. `--force` overrides the work-record refusal (merged or outbox),
+    never the pane. The returned `complete` says whether the teardown finished, and the registry entry and the
+    ack file survive an incomplete one so the next attempt has the claim to work from.
+
+    `probe` and `close` exist for the selftests; both default to the real herdr layer.
+    """
     unit = norm_unit(unit.strip("/"))
     registry = load_registry(main)
-    record = registry.get(unit, {})
+    key = registry_key(registry, unit)
+    record = registry.get(key, {}) if key else {}
     branch = record.get("branch") or branch_for(unit)
     path = record.get("worktree") or worktree_for(unit, main)
+    ack_file = ack_path(main, unit)
     outbox = os.path.exists(outbox_path(main, unit))
-    merged = merged_into_main(main, branch) if branch_exists(main, branch) else True
+    branch_present = branch_exists(main, branch)
+    merged = merged_into_main(main, branch) if branch_present else True
+    result = {"unit": unit, "branch": branch, "worktree": path, "merged": merged, "outbox": outbox,
+              "registry": key is not None, "pane": None, "release_ref": None, "steps": [],
+              "complete": False, "dry_run": dry_run, "refused": None}
+
     if not force and not (merged or outbox):
-        raise SystemExit(
-            "REFUSED: %s's branch %s is neither merged into main nor has an outbox entry at\n  %s\n"
-            "  releasing it would drop work with no record. Finish the handoff, or pass --force."
-            % (unit, branch, outbox_path(main, unit)))
-    steps = []
+        result["refused"] = ("%s's branch %s is neither merged into main nor has an outbox entry at\n  %s\n"
+                             "  releasing it would drop work with no record. Finish the handoff, or pass "
+                             "--force." % (unit, branch, outbox_path(main, unit)))
+        return result
+
+    # the pane is asked before anything is touched: a live one is the one real refusal, and closing it has to
+    # happen before the worktree goes (plan 5.1), so an idle pane is a step rather than a precondition.
+    info = (probe or pane_probe)({"worktree": path, "pane": record.get("pane")})
+    pane = info.get("pane")
+    result["pane"] = pane
+    if info.get("known") and info.get("alive") and info.get("active") is not False:
+        result["refused"] = ("pane %s is %s and holds %s as its cwd; release again once it is closed\n"
+                             "  (herdr pane close %s)"
+                             % (pane, "active" if info.get("active") else "unreadable", path, pane))
+        return result
+
+    steps: list[dict] = []
+    if branch_present and not merged:
+        rescue = "refs/rescue/%s" % slug(unit)
+        ahead = commits_ahead(main, branch)
+        if ahead:
+            result["release_ref"] = rescue
+            steps.append(_done_step("git update-ref %s %s" % (rescue, branch),
+                                    lambda b=branch, r=rescue: git(["update-ref", r, b], main) and None))
+        else:
+            steps.append(_skip_step("rescue ref %s" % rescue, "branch has no commits of its own"))
+    else:
+        steps.append(_skip_step("rescue ref",
+                                "branch already merged into main" if branch_present else "branch already gone"))
+    if pane and info.get("alive") is not False:
+        steps.append(_done_step("herdr pane close %s" % pane, _close_step(pane, close or herdr_close)))
+    elif pane:
+        steps.append(_skip_step("herdr pane close %s" % pane, "pane already gone"))
+    elif info.get("known"):
+        steps.append(_skip_step("herdr pane close", "no pane matches this claim"))
+    else:
+        steps.append(_skip_step("herdr pane close", "herdr unavailable - the pane was not checked"))
     if os.path.isdir(path):
-        steps.append(["worktree", "remove", "--force", path])
-    if branch_exists(main, branch):
-        steps.append(["branch", "-D", branch])
-    steps.append(["worktree", "prune"])
+        steps.append(_done_step("git worktree remove --force %s" % path,
+                                lambda p=path: remove_worktree(main, p)))
+    else:
+        steps.append(_skip_step("git worktree remove --force %s" % path, "worktree already gone"))
+    # prune runs *before* the branch: a worktree whose directory is already gone is still registered until git
+    # is told, and `branch -D` refuses a branch that a registered worktree has checked out
+    steps.append(_done_step("git worktree prune", lambda: git(["worktree", "prune"], main)))
+    if branch_present:
+        steps.append(_done_step("git branch -D %s" % branch, lambda b=branch: git(["branch", "-D", b], main)))
+    else:
+        steps.append(_skip_step("git branch -D %s" % branch, "branch already gone"))
+
     if dry_run:
-        return {"unit": unit, "steps": ["git " + " ".join(s) for s in steps], "dry_run": True,
-                "merged": merged, "outbox": outbox}
-    for step in steps:
-        git(step, main)
-    registry.pop(unit, None)
-    save_registry(main, registry)
-    return {"unit": unit, "branch": branch, "worktree": path, "merged": merged, "outbox": outbox}
+        result["steps"] = steps
+        result["complete"] = None
+        return result
+
+    result["complete"] = complete = _run_teardown(steps)
+    # the record and the heartbeat are only cleared by a *complete* teardown: an incomplete one has to stay
+    # visible to `list`/`status` (and re-runnable) or the claim becomes the stale entry this tool cleans up
+    if complete:
+        if key is not None:
+            registry.pop(key, None)
+            save_registry(main, registry)
+            steps.append({"label": "registry entry %s" % key, "action": None, "status": "done", "why": ""})
+        else:
+            steps.append(_skip_step("registry entry %s" % unit, "no entry"))
+        if os.path.exists(ack_file):
+            os.remove(ack_file)
+            steps.append({"label": "ack file %s" % os.path.basename(ack_file), "action": None,
+                          "status": "done", "why": "removed"})
+        else:
+            steps.append(_skip_step("ack file %s" % os.path.basename(ack_file), "none"))
+    else:
+        steps.append(_skip_step("registry entry %s" % unit, "kept: the teardown did not complete"))
+        steps.append(_skip_step("ack file %s" % os.path.basename(ack_file), "kept: the teardown did not complete"))
+    result["steps"] = steps
+    return result
+
+
+def worktree_dirty(path: str) -> bool | None:
+    """True when the worktree has uncommitted changes; None when it cannot be asked (gone or not a repo).
+
+    The sweep uses this so "finished" cannot mean "the branch is merged": a branch with no commits of its own
+    is trivially merged, and a worker that has claimed a unit and is still editing has exactly that shape. An
+    uncommitted change is work that no branch and no outbox records, so it is a skip, not a casualty.
+    """
+    if not os.path.isdir(path):
+        return None
+    p = subprocess.run(["git", "-C", path, "status", "--porcelain"], capture_output=True, text=True,
+                       errors="replace")
+    return bool(p.stdout.strip()) if p.returncode == 0 else None
+
+
+def release_merged(main: str, dry_run: bool = False, probe=None, close=None) -> dict:
+    """Sweep: release every finished claim, one worker at a time (the owner's rule, plan "Teardown is part of
+    landing").
+
+    A claim is **finished** when main already has its commits (merged or cherry-picked) and it left no
+    uncommitted work behind - or it carries an outbox entry, the worker's own statement that the round is
+    delivered. Everything else is skipped with the reason: a branch that is not merged is not finished, an
+    unregistered worktree has no registry entry to key by, a dirty worktree without an outbox is work nothing
+    records, and a **live pane** is a refusal - reported and named, never forced. -> {"released", "skipped",
+    "refused", "complete", "dry_run"}.
+    """
+    out: dict = {"released": [], "skipped": [], "refused": [], "complete": True, "dry_run": dry_run}
+    for row in claims_view(main):
+        unit, branch = row["unit"], row.get("branch")
+        if unit == "(unregistered)":
+            out["skipped"].append({"unit": unit, "branch": branch, "why": "no registry entry"})
+            continue
+        if not row.get("merged"):
+            out["skipped"].append({"unit": unit, "branch": branch, "why": "branch is not merged into main"})
+            continue
+        if not row.get("outbox") and worktree_dirty(row.get("worktree") or ""):
+            out["skipped"].append({"unit": unit, "branch": branch,
+                                   "why": "worktree has uncommitted changes and no outbox"})
+            continue
+        result = release(unit, main, force=False, dry_run=dry_run, probe=probe, close=close)
+        if result.get("refused"):
+            out["refused"].append({"unit": unit, "branch": result["branch"], "why": result["refused"]})
+            out["complete"] = False
+        elif dry_run or result.get("complete"):
+            out["released"].append(result)
+        else:
+            failed = next((s["label"] for s in result["steps"] if s["status"] == "failed"), "a step")
+            out["refused"].append({"unit": unit, "branch": result["branch"],
+                                   "why": "teardown incomplete: %s failed" % failed})
+            out["complete"] = False
+    return out
 
 
 def expire(main: str, minutes: int, apply: bool) -> list[dict]:
@@ -666,7 +910,16 @@ def expire(main: str, minutes: int, apply: bool) -> list[dict]:
             stale.append(row)
     if apply:
         for row in stale:
-            release(row["unit"], main, force=True, dry_run=False)
+            if row["unit"] == "(unregistered)":
+                row["released"] = False
+                row["error"] = "no registry entry"
+                continue          # nothing to key a release by: the worktree has to be dealt with by hand
+            out = release(row["unit"], main, force=True, dry_run=False)
+            row["released"] = bool(out.get("complete"))
+            if not row["released"]:
+                failed = next((s for s in out["steps"] if s["status"] == "failed"), None)
+                row["error"] = (out.get("refused") or ("%s: %s" % (failed["label"], failed["why"])
+                                                        if failed else "incomplete"))
     return stale
 
 
@@ -873,6 +1126,180 @@ def selftest() -> int:
         check("the ack stays keyed by the unit", os.path.basename(ack_path(tmp, "Pl/pl_skill")),
               slug("Pl/pl_skill") + ".json")
 
+    # release: idempotent and total (docs/plan.md, "Teardown is part of landing"). Real temp repos, because
+    # the check is git reachability plus the worktree registration; the panes are always injected, so no real
+    # worker's claim is ever touched by a selftest.
+    unit = "Pl/pl_act"
+
+    def no_pane(_row):
+        return {"pane": None, "known": True, "alive": False, "active": False, "status": None, "revision": None}
+
+    def idle_pane(_row):
+        return {"pane": "w1:pK", "known": True, "alive": True, "active": False, "status": None, "revision": 13}
+
+    def live_pane(_row):
+        return {"pane": "w1:pK", "known": True, "alive": True, "active": True, "status": "working",
+                "revision": 41}
+
+    def step_of(result, needle):
+        return next((s for s in result["steps"] if needle in s["label"]), {})
+
+    def repo_git(path, *args):
+        p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True)
+        if p.returncode != 0:
+            raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
+        return p.stdout.strip()
+
+    def repo_commit(path, msg):
+        with open(os.path.join(path, "f.txt"), "a", encoding="utf-8") as fh:
+            fh.write(msg + "\n")
+        repo_git(path, "add", "-A")
+        repo_git(path, "commit", "-q", "-m", msg)
+
+    def new_repo(tmp):
+        """A throwaway repo in a subdirectory, so the sibling worktrees it creates are cleaned up with it."""
+        path = os.path.join(tmp, "mhtri-dtk")
+        os.makedirs(path)
+        repo_git(path, "init", "-q")
+        repo_git(path, "checkout", "-q", "-b", "main")
+        repo_commit(path, "claim-time main")
+        return path
+
+    def claimed(main, unit_name, worktree=True):
+        """A real claim in a real repo: branch (+ worktree with one commit), outbox, heartbeat, registry."""
+        branch = branch_for(unit_name)
+        wt = worktree_for(unit_name, main)
+        if worktree:
+            repo_git(main, "worktree", "add", "-b", branch, wt)
+            repo_commit(wt, "the worker's work: %s" % unit_name)
+        else:
+            repo_git(main, "branch", branch)
+        entry = os.path.join(main, ".pi", "outbox", slug(unit_name) + ".json")
+        os.makedirs(os.path.dirname(entry), exist_ok=True)
+        json.dump({"unit": unit_name}, open(entry, "w"))
+        heartbeat = ack_path(main, unit_name)
+        os.makedirs(os.path.dirname(heartbeat), exist_ok=True)
+        json.dump({"unit": unit_name}, open(heartbeat, "w"))
+        registry = load_registry(main)
+        registry[unit_name] = {"branch": branch, "worktree": wt}
+        save_registry(main, registry)
+        return branch, wt
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        tip = repo_git(main, "rev-parse", branch)
+        first = release(unit, main, force=False, dry_run=False, probe=no_pane)
+        check("release: complete", first["complete"], True)
+        check("release: the worktree is gone", os.path.isdir(wt), False)
+        check("release: the branch is gone", branch_exists(main, branch), False)
+        check("release: the unmerged work is rescued", repo_git(main, "rev-parse", first["release_ref"]), tip)
+        check("release: the registry entry is gone", load_registry(main), {})
+        check("release: the heartbeat is gone", os.path.exists(ack_path(main, unit)), False)
+        second = release(unit, main, force=False, dry_run=False, probe=no_pane)
+        check("release twice: still complete", second["complete"], True)
+        check("release twice: the worktree step is skipped", step_of(second, "worktree remove")["status"], "skipped")
+        check("release twice: the branch step is skipped", step_of(second, "branch -D")["status"], "skipped")
+        check("release twice: every step is accounted for",
+              all(s["status"] in ("done", "skipped") for s in second["steps"]), True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        shutil.rmtree(wt)                      # removed by hand: git's registration is still there
+        out = release(unit, main, force=False, dry_run=False, probe=no_pane)
+        check("a worktree already gone is a clean release", out["complete"], True)
+        check("... and the skip says so", "already gone" in step_of(out, "worktree remove")["why"], True)
+        check("... and the branch still goes", branch_exists(main, branch), False)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit, worktree=False)
+        repo_git(main, "branch", "-D", branch)   # the branch is already gone
+        os.makedirs(wt)                            # ... but a leftover directory remains (the 2026-09-23 state)
+        open(os.path.join(wt, "junk.txt"), "w").close()
+        out = release(unit, main, force=False, dry_run=False, probe=no_pane)
+        check("a branch already deleted is a clean release", out["complete"], True)
+        check("... and the skip says so", "already gone" in step_of(out, "branch -D")["why"], True)
+        check("... a leftover directory git no longer tracks is removed", os.path.isdir(wt), False)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        out = release(unit, main, force=False, dry_run=False, probe=live_pane)
+        check("a live pane refuses the release", bool(out["refused"]), True)
+        check("... and the refusal names the pane", "w1:pK" in (out["refused"] or ""), True)
+        check("... the registry entry is kept", unit in load_registry(main), True)
+        check("... the worktree is kept", os.path.isdir(wt), True)
+        check("... the branch is kept", branch_exists(main, branch), True)
+        check("... and the teardown is not complete", out["complete"], False)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        closed = []
+        out = release(unit, main, force=False, dry_run=False, probe=idle_pane,
+                      close=lambda p: (closed.append(p) is None, ""))
+        check("an idle pane is closed", closed, ["w1:pK"])
+        labels = [s["label"] for s in out["steps"]]
+        check("the pane is closed before the worktree goes",
+              labels.index("herdr pane close w1:pK") < labels.index("git worktree remove --force " + wt), True)
+        check("and then the release completes", out["complete"], True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        out = release(unit, main, force=False, dry_run=False, probe=idle_pane,
+                      close=lambda p: (False, "pane %s will not close" % p))
+        check("a pane that will not close stops the teardown", out["complete"], False)
+        check("... the pane failure is recorded", step_of(out, "herdr pane close")["status"], "failed")
+        check("... the worktree is left alone", os.path.isdir(wt), True)
+        check("... the branch is left alone", branch_exists(main, branch), True)
+        check("... the registry entry is kept", unit in load_registry(main), True)
+        check("... and no later step is attempted", step_of(out, "worktree remove")["status"], "skipped")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        out = release(unit, main, force=False, dry_run=True, probe=no_pane)
+        check("a dry run is a plan, not a verdict", out["complete"], None)
+        check("a dry run touches nothing",
+              (os.path.isdir(wt), branch_exists(main, branch), unit in load_registry(main)), (True, True, True))
+        os.remove(outbox_path(main, unit))
+        out = release(unit, main, force=False, dry_run=False, probe=no_pane)
+        check("an unmerged claim with no outbox is refused", bool(out["refused"]), True)
+        check("... and force releases it anyway",
+              release(unit, main, force=True, dry_run=False, probe=no_pane)["complete"], True)
+
+    # the sweep: only merged claims, and a live pane is reported rather than forced
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        done_branch, done_wt = claimed(main, "Pl/pl_act")
+        repo_git(main, "cherry-pick", done_branch)
+        live_branch, live_wt = claimed(main, "Pl/pl_skill")
+        repo_git(main, "cherry-pick", live_branch)
+        open_branch, open_wt = claimed(main, "Pl/pl_master")
+        # a merged claim whose worktree still holds uncommitted work: nothing records it, so the sweep skips it
+        dirty_branch, dirty_wt = claimed(main, "Pl/pl_misc")
+        repo_git(main, "cherry-pick", dirty_branch)
+        os.remove(outbox_path(main, "Pl/pl_misc"))
+        open(os.path.join(dirty_wt, "uncommitted.c"), "w").close()
+        swept = release_merged(
+            main, probe=lambda row: live_pane(row) if "ws-pl-skill" in row.get("worktree", "") else no_pane(row))
+        check("the sweep releases the merged claim", [r["unit"] for r in swept["released"]], ["Pl/pl_act"])
+        check("... refuses the live one", [r["unit"] for r in swept["refused"]], ["Pl/pl_skill"])
+        check("... skips the unmerged one and the dirty one", [r["unit"] for r in swept["skipped"]],
+              ["Pl/pl_master", "Pl/pl_misc"])
+        check("... naming the uncommitted work",
+              [r["why"] for r in swept["skipped"] if r["unit"] == "Pl/pl_misc"],
+              ["worktree has uncommitted changes and no outbox"])
+        check("... and reports the sweep incomplete", swept["complete"], False)
+        check("... the merged branch is gone", branch_exists(main, done_branch), False)
+        check("... the live pane's branch is kept", branch_exists(main, live_branch), True)
+        check("... the unmerged branch is kept", branch_exists(main, open_branch), True)
+        check("... the unmerged worktree is kept", os.path.isdir(open_wt), True)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -893,10 +1320,14 @@ def main() -> int:
     c.add_argument("--json", action="store_true")
     l = sub.add_parser("list", help="every claim git knows about")
     l.add_argument("--json", action="store_true")
-    r = sub.add_parser("release", help="remove the worktree and the branch")
-    r.add_argument("unit")
-    r.add_argument("--force", action="store_true")
+    r = sub.add_parser("release", help="remove the worktree and the branch (idempotent, total)")
+    r.add_argument("unit", nargs="?", default=None, help="the unit to release; omit with --all-merged")
+    r.add_argument("--all-merged", action="store_true", dest="all_merged",
+                   help="sweep every claim whose branch is already merged into main")
+    r.add_argument("--force", action="store_true",
+                   help="release even with no outbox and an unmerged branch (the work is rescued first)")
     r.add_argument("--dry-run", action="store_true")
+    r.add_argument("--json", action="store_true")
     a = sub.add_parser("ack", help="a worker's heartbeat: call this first, then after each iteration")
     a.add_argument("unit")
     a.add_argument("--agent", default=None, help="your name; defaults to the herdr pane")
@@ -954,14 +1385,49 @@ def main() -> int:
                      row["merged"], row["outbox"], row.get("claimed_at") or ""))
         return 0
     if args.cmd == "release":
+        if args.all_merged:
+            out = release_merged(main_wt, args.dry_run)
+            if args.json:
+                print(json.dumps({**out, "released": ["%s (%s)" % (r["unit"], r["branch"]) for r in out["released"]]},
+                                 indent=2))
+            else:
+                for result in out["released"]:
+                    done = sum(1 for s in result["steps"] if s["status"] == "done")
+                    skipped = sum(1 for s in result["steps"] if s["status"] == "skipped")
+                    print("%s %s (branch %s) - %d done, %d skipped"
+                          % ("would release" if args.dry_run else "released", result["unit"], result["branch"],
+                             done, skipped))
+                for row in out["skipped"]:
+                    print("skip      %s - %s" % (row["unit"], row["why"]))
+                for row in out["refused"]:
+                    print("REFUSED   %s - %s" % (row["unit"], row["why"].replace("\n  (", " (")))
+                print("%d released, %d skipped, %d refused%s"
+                      % (len(out["released"]), len(out["skipped"]), len(out["refused"]),
+                         "" if out["complete"] else " - the teardown is INCOMPLETE"))
+            return 0 if out["complete"] else 1
+        if not args.unit:
+            print("release needs a <unit>, or --all-merged to sweep")
+            return 2
         out = release(args.unit, main_wt, args.force, args.dry_run)
-        if out.get("dry_run"):
-            for step in out["steps"]:
-                print("would run: %s" % step)
-        else:
-            print("released %s (branch %s, merged=%s, outbox=%s)"
+        if args.json:
+            print(json.dumps({k: v for k, v in out.items() if k != "steps"} | {
+                "steps": [{k: v for k, v in s.items() if k != "action"} for s in out["steps"]]}, indent=2))
+            return 0 if (out["complete"] or out["dry_run"]) and not out.get("refused") else 1
+        if out.get("refused"):
+            print("REFUSED: %s" % out["refused"])
+            return 1
+        for step in out["steps"]:
+            mark = {"done": "done  ", "skipped": "skip  ", "planned": "would ", "failed": "FAILED"}\
+                .get(step["status"], step["status"])
+            print("  %s %s%s" % (mark, step["label"], (" - " + step["why"]) if step.get("why") else ""))
+        if out["dry_run"]:
+            print("would release %s (branch %s, merged=%s, outbox=%s)"
                   % (out["unit"], out["branch"], out["merged"], out["outbox"]))
-        return 0
+            return 0
+        print("released %s (branch %s, merged=%s, outbox=%s)%s"
+              % (out["unit"], out["branch"], out["merged"], out["outbox"],
+                 "" if out["complete"] else " - the teardown is INCOMPLETE, the claim is kept"))
+        return 0 if out["complete"] else 1
     if args.cmd == "ack":
         out = ack(args.unit, main_wt, args.agent, args.pane, args.progress)
         print(json.dumps(out, indent=2) if args.json
@@ -1011,8 +1477,14 @@ def main() -> int:
     if args.cmd == "expire":
         rows = expire(main_wt, args.minutes, args.apply)
         for row in rows:
-            print("%-34s %-30s %.1f min  outbox=%s" % (row["unit"], row["branch"], row["age_minutes"], row["outbox"]))
-        print("%d stale claim(s)%s" % (len(rows), " released" if args.apply else " (dry run: pass --apply)"))
+            note = ""
+            if args.apply:
+                note = "  released" if row.get("released") else "  KEPT: %s" % (row.get("error") or "incomplete")
+            print("%-34s %-30s %.1f min  outbox=%s%s"
+                  % (row["unit"], row["branch"], row["age_minutes"], row["outbox"], note))
+        released = sum(1 for row in rows if row.get("released"))
+        print("%d stale claim(s)%s" % (len(rows), " (%d released, %d kept)" % (released, len(rows) - released)
+                                        if args.apply else " (dry run: pass --apply)"))
         return 0
     return 0
 
