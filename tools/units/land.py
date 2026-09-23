@@ -25,10 +25,13 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
                                   [--no-release] [--allow-regression UNIT]
 
 `land` is the one command and the one you should use: it runs `verify`, stages the batch's own files, commits
-with the gate's message, releases the claims, and prints a **single answer line** (`LANDED ...` / `REFUSED ...`)
-whose exit status is the answer. The gate log goes to stderr, so piping stdout cannot lose the verdict - and a
-failed gate can never reach `git commit` (the old flow wrote the message unconditionally, which is how a piped
-`| tail -3` committed a refused batch twice).
+**with a pathspec** (`git commit -F msg -- <paths>`, so the whole index is never taken), releases the claims,
+and prints a **single answer line** (`LANDED ...` / `REFUSED ...`) whose exit status is the answer. The gate log
+goes to stderr, so piping stdout cannot lose the verdict - and a failed gate can never reach `git commit` (the
+old flow wrote the message unconditionally, which is how a piped `| tail -3` committed a refused batch twice).
+The pathspec is the other half of that safety: without it, another stream's *staged* edit was swept into the
+batch's commit twice on 2026-09-23 (`85f3d4b5`, `d50fdd32` took `tools/units/langcheck.py`). Paths the index
+holds but the batch does not are left staged and named in a warning.
 
 `verify` never commits. It writes the message to `.git/land_msg.txt` **only when every check passed**, and
 removes a stale one when it refuses; committing it stays a deliberate step for the rare manual case.
@@ -143,7 +146,10 @@ def changed_status(main: str) -> list[tuple[str, str]]:
             continue
         code, path = line[:2].strip(), line[3:].strip()
         if " -> " in path:
-            path = path.split(" -> ")[-1]
+            # a rename is two paths, and both belong to the pathspec: passing only the new one leaves the
+            # deletion staged, so the commit records an add where the batch meant a move
+            old, path = path.split(" -> ")
+            rows.append((code, old.strip('"')))
         rows.append((code, path.strip('"')))
     return rows
 
@@ -186,6 +192,30 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]]) -> list[str]:
             continue
         stageable.append(path)
     return stageable
+
+
+def staged_elsewhere(main: str, stageable: list[str]) -> list[str]:
+    """Paths already in the index that are not part of this batch - another stream's in-flight work.
+
+    `land` commits with a pathspec, so these are never swept in; naming them is the warning that keeps the
+    accident visible. The 2026-09-23 collision (a staged `tools/units/langcheck.py` landed under two unrelated
+    unit commits, `85f3d4b5` and `d50fdd32`) happened because the commit had no pathspec and took the whole
+    index.
+    """
+    staged = git(["diff", "--cached", "--name-only"], main).splitlines()
+    return [p for p in staged if p and p not in stageable]
+
+
+def foreign_warning(foreign: list[str]) -> str:
+    """The warning `land` prints when the index holds paths outside the batch (a note, never a refusal)."""
+    noun = "path" if len(foreign) == 1 else "paths"
+    return ("WARNING: the index holds %d %s outside this batch - left staged, not committed: %s"
+            % (len(foreign), noun, ", ".join(foreign)))
+
+
+def commit_pathspec(main: str, msg_file: str, stageable: list[str]) -> subprocess.CompletedProcess:
+    """Commit exactly the batch's paths. `git commit` with no pathspec commits the whole index; with one it
+    commits the named paths (read from the working tree) and leaves every other staged path staged."""
 
 
 def outside_batch(paths: list[str], allowed: tuple[str, ...] = ALLOWED_PREFIXES,
@@ -593,6 +623,9 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
 
     * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message;
     * the commit uses the gate's own message, so there is no separate `git commit -F` to get wrong;
+    * the commit is `git commit -F msg -- <the batch's paths>`: no pathspec means the whole index, which
+      swept another stream's staged edit into a land twice on 2026-09-23 (`85f3d4b5`, `d50fdd32`). Paths the
+      index holds but the batch does not are left staged, and a warning names them;
     * the gate log goes to **stderr** and stdout carries exactly one answer line, so `tail -1` is the answer
       whether or not the exit status survived the pipe;
     * the exit status *is* the answer: 0 landed, 1 refused (or landed with an incomplete teardown).
@@ -628,10 +661,16 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         pc.localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
     try:
         git(["add", "--", *stageable], main)
+        foreign = staged_elsewhere(main, stageable)
+        if foreign:
+            print(foreign_warning(foreign), file=sys.stderr)
+        # A pathspec, never a bare `git commit`: that takes the whole index and is how another stream's staged
+        # edit landed under the batch's message twice on 2026-09-23. `git commit -- <paths>` reads the working
+        # tree, so the LOCAL-ONLY block goes back into AGENTS.md *after* the commit, never before it.
+        p = commit_pathspec(main, msg_file, stageable)
     finally:
         if agents_md:
             pc.localonly("push")
-    p = run(["git", "commit", "-F", msg_file], main)
     if p.returncode != 0:
         clear_land_message(main)
         tail = ((p.stderr or p.stdout) or "").strip().splitlines()
