@@ -192,8 +192,10 @@ git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
   dropping all but the last.
 * **Evidence lives in `MAIN`, not in the worktree.** `.pi/` is a directory inside each worktree, so an outbox or
   notes file written there is destroyed by `git worktree remove` (or blocks it as untracked). A worker writes
-  `MAIN/.pi/outbox/<unit>.json` and `MAIN/.pi/notes/<unit>.md` — `MAIN` it already resolved — so the evidence
-  outlives the worktree.
+  `MAIN/.pi/outbox/<slug>.json` and `MAIN/.pi/notes/<slug>.md` — `MAIN` it already resolved — so the evidence
+  outlives the worktree. **`<slug>` is the claim's branch minus `worker/`** (`claims.slug_of_branch`), the one rule
+  `brief.py`, `handoff.py`, `land.py` and `claims.py` all read: a unit's *path* is not its *name* (`Pl/pl_act` vs
+  `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
 * **`tools/m2c` is a submodule - do not initialise it in a worktree.** `git worktree remove` refuses to remove a
   worktree that contains a checked-out submodule ("working trees containing submodules cannot be moved or
   removed"), which would leave the branch - the lock - alive forever. The brief points the worker at
@@ -271,8 +273,8 @@ write your report.*
 | # | artefact | consumed by |
 | --- | --- | --- |
 | 1 | the source it owns, compiled and measured, committed on its branch (one commit) | the build, the merge |
-| 2 | `MAIN/.pi/outbox/<unit>.json` — per-symbol %, unit %, residual, **config requests** (range/rename/flag with evidence), **flag probes** (numbers + verdict), blockers, and the command it measured with | me and `land.py`, which can refuse a batch from it alone |
-| 3 | `MAIN/.pi/notes/<unit>.md` — the full evidence trail | a later session, or a re-brief of the same unit |
+| 2 | `MAIN/.pi/outbox/<slug>.json` (branch minus `worker/`) — per-symbol %, unit %, residual, **config requests** (range/rename/flag with evidence), **flag probes** (numbers + verdict), blockers, and the command it measured with | me and `land.py`, which can refuse a batch from it alone |
+| 3 | `MAIN/.pi/notes/<slug>.md` — the full evidence trail | a later session, or a re-brief of the same unit |
 | 4 | a ≤ 15-line digest in the reply | human review |
 | 5 | the claim released (worktree removed, branch deleted after the merge) | other workers |
 
