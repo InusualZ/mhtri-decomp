@@ -49,14 +49,20 @@
  *     against the target's three linear `subi`/`cmplwi` range tests, and - in fn_80271E0C - the C block's
  *     `deco_count` bound, which the target keeps in r0 and re-masks (`clrlwi r5, r0, 24`) for the `< 3`
  *     test where we reuse the register. The removed label-chain shapes measured 98.59 / 97.97.
- *   fn_8027350C 95.50 - after the fn_802693C4/fn_80269474 call ours recomputes `plw + i*4` for the
- *     `set_applied[i] = set_pending[i]` copy; the target reuses the base it had already kept for
- *     `&plw->set_pending[i]` (three instructions and 12 B over the target). Keeping the base alive in a
- *     callee-saved register is the allocator's call, not the source's: an explicit `&set_applied[i]` /
- *     `&set_pending[i]` pair, a `u16*` walk and a `u8*` base all measure *lower* (91.4 / 91.4 / 90.6).
- *   Pl_cat_skill_ck 95.75 - the two-iteration decoration-slot loop is right; the target materialises
- *     `addi r3, r3, 0x4` and keeps the entry offsets at 0x612/0x614, ours folds the +4 into 0x616/0x618.
- *     `u16*`/`u8*` pointer walks, an explicit `q` local and a two-arm `||` measure the same or worse.
+ *   fn_8027350C 99.21 - with the level-4 pragma (below) the target's shape is reproduced exactly,
+ *     including the `plw + i*4` base kept in r24 across the fn_802693C4/fn_80269474 call. The residual is
+ *     the allocator's colouring of the three call-spanning values: target base/`pend`/mask in r24/r25/r26,
+ *     ours mask/base/`pend` in the same three registers, so `add r24, r27, r0` reads `add r25, r27, r0`
+ *     and r25/r26 swap. At the unit's level 3 MWCC *rematerialises* the base instead (three instructions,
+ *     416 B, 95.50); an explicit `&set_applied[i]`/`&set_pending[i]` pair, a `u16*` walk and a `u8*` base
+ *     all measure lower (91.4 / 91.4 / 90.6) because they shift `plw` out of r27.
+ *   Pl_cat_skill_ck 99.88 - the two-iteration decoration-slot loop with a `u16*` walk reproduces the
+ *     target's `addi r3, r3, 0x4`. The residual is which constant that add carries: target
+ *     `addi r3, r3, 4` + `lhz 0x612/0x614(r3)`, ours `addi r3, r3, 0x616` + `lhz 0x0/0x2(r3)`. MWCC
+ *     reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every shape tried (`_PLW*`, `u16*`, `u8*`
+ *     and pair-struct walks, an index form, a nested 2x2 loop, a pointer-bounded `while`, a straight-line
+ *     two-block body, a `u32*` walk, a two-arm `||`), so the target's split of the two constants is not
+ *     reachable from source here; the folded form measures 95.75.
  *
  * Source shapes that are load-bearing, not guesses (the ones below were all found by measuring):
  *   - fn_80271BD4 / fn_80271E0C's kind dispatch is `switch ((u32)kind)` with cases 1-5 (block B), 6 (block
@@ -83,8 +89,16 @@
  *     makes MWCC insert a redundant `clrlwi` before the `sth` (90.9 -> 100, 96.6 -> 100, 97.7 -> 100).
  *   - fn_802736A0's `Get_pl_type__FP6_EQUIPP6_EQUIP` return type is `u8`, not `s8` (only its caller here
  *     constrains it): as `s8` MWCC masks the byte with `clrlwi` before the `stb`.
- *   - Pl_cat_skill_ck's decoration-slot pair has to be a two-iteration loop, not four straight compares:
- *     the loop is what makes MWCC emit the target's `addi r3, r3, 0x4` re-base at all (79.92 -> 95.75).
+ *   - Pl_cat_skill_ck's decoration-slot pair has to be a two-iteration loop over a `u16*` walk
+ *     (`p += 2`), not four straight compares and not `plw = (_PLW*)((u8*)plw + 4)`: the walk is what makes
+ *     MWCC emit the target's `addi r3, r3, 0x4` re-base *and* keep its instruction count (79.92 -> 95.75
+ *     -> 99.88; `plw += 4` folds the add into the entry displacements and loses the row).
+ *   - fn_8027350C needs `#pragma optimization_level 4` scoped to it (restored with
+ *     `#pragma optimization_level 3` + `#pragma peephole off` before the next function): at the unit's
+ *     level 3 the allocator rematerialises the `plw + i*4` base for the `set_applied[i] = set_pending[i]`
+ *     copy, at level 4 it keeps it in r24 like the target (95.50 -> 99.21, 416 -> 404 B). It is a
+ *     per-function deviation, not a lib flag: all 49 other functions measure byte-identical with and
+ *     without it.
  *
  * Other load-bearing shapes, from the earlier pass:
  *   - A helper's narrow return type is *not* trusted sign-extended, so it decides where MWCC re-emits the
@@ -108,7 +122,7 @@
  * `config_requests`), and `_PLW`'s skill-selection group (`unk269`, `unk26A`, `unk26E`, `unk270`, `unk304`)
  * stays `unk`: naming it needs evidence from outside this unit.
  *
- * All 50 functions are written in address order (unit fuzzy 99.63 %).
+ * All 50 functions are written in address order (unit fuzzy 99.76 %).
  */
 
 #include "types.h"
@@ -1045,15 +1059,16 @@ extern "C" void fn_8027252C(_EQUIP* equips, u16* table, s8* a, u8* b) {
 /* Whether `skill` is one of the four decoration-slot skill ids. */
 u32 Pl_cat_skill_ck(_PLW* plw, u16 skill) {
     int i;
+    u16* p = plw->deco_skill_id;
 
     for (i = 0; i < 2; i++) {
-        if (skill == plw->deco_skill_id[0]) {
+        if (skill == p[0]) {
             return 1;
         }
-        if (skill == plw->deco_skill_id[1]) {
+        if (skill == p[1]) {
             return 1;
         }
-        plw = (_PLW*)((u8*)plw + 4);
+        p += 2;
     }
     return 0;
 }
@@ -1309,6 +1324,7 @@ extern "C" s32 fn_80273228(_PLW* plw, u16 item, s16 value) {
     return 0;
 }
 
+#pragma optimization_level 4
 /* Flushes the skill sets whose cached values no longer resolve, and the decoration slots. */
 extern "C" void fn_8027350C(_PLW* plw, s32 arg) {
     u8 i;
@@ -1352,6 +1368,9 @@ extern "C" void fn_8027350C(_PLW* plw, s32 arg) {
         fn_802736A0(plw);
     }
 }
+
+#pragma optimization_level 3
+#pragma peephole off
 
 /* Clears every derived skill array and the three valid-bit words. */
 extern "C" void fn_80273484(_PLW* plw) {
