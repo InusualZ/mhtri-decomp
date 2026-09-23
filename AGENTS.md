@@ -427,7 +427,12 @@ regression if the hash goes red.
     what it is compared against, which SDK type the offset belongs to, what the value is later passed to
     (e.g. `unk50` in a struct became `import_symbol_table_size` once the dump confirmed the layout, and an
     argument only ever used as a string pointer became `symbol`). Leaving `unk`/`unkNN` in place is fine and
-    expected when the context does not support a name - do not invent one to fill the gap.
+    expected when the context does not support a name - do not invent one to fill the gap. **Exception: work done
+    under the campaign plan (`docs/plan.md` §6.5) is held to a stricter standard** - there, no `fn_XXXXXXXX` or
+    `unkNN` may survive in `src/`, every reconstructed type states its size, every field carries its offset and a
+    context name (padding excepted), shared types live in one header, an `extern` lives with the unit that owns
+    the symbol, and pointer arithmetic to reach a field is forbidden. `tools/units/stylelint.py` (roadmap 7.21)
+    enforces those seven rules at the campaign's land gate.
 * **Style:** match the file you're editing (vendor sources mirror upstream formatting; new project code
   follows the surrounding 4-space-indent C style). Files are UTF-8, LF endings (`.gitattributes`
   enforces the checkout).
