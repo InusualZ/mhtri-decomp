@@ -790,6 +790,30 @@ Two smaller findings from the same round, both already fixed or decided:
 * the claim's key was the unit's *spelling*, so `auto/X` and `auto/X.c` defeated the lock and two workers took one
   unit. `claims.norm_unit` now strips the source extension at claim and release (commit `c36ab86f`).
 
+### An `auto` unit stops being scaffolding once matching work starts (owner's rule, 2026-09-23)
+
+The `auto/*` bucket exists to *attribute* symbols: a placeholder that gives an otherwise unnamed function an owner and
+a range. The moment real matching work starts on one of those units it is no longer scaffolding, and it must stop
+looking like it - **give it a proper name and move it to the corresponding `src/...` location**, in the same change.
+
+Concretely, for a unit `auto/<addr>_fn_<addr>.<ext>`:
+
+* **name it** - the shared memory dump first (`docs/memory-dump.md`), then the module's own naming scheme, then a
+  descriptive name from what the unit *does* (its worker knows: a state handler, a loader, a getter). If nothing is
+  known and no sibling suggests one, say so in the commit and keep the map's name - the naming rule forbids inventing
+  a name to fill a gap, and that is a legitimate outcome.
+* **move it** - `git mv src/auto/<file> src/<module>/<file>`, and with it the `configure.py` object path and its `lib`,
+  the `splits.txt` unit line (same ranges, same order), and the symbol map where the rename touches it. The rename
+  goes through `symedit.py`, never by hand, and the source is the other half of that edit.
+* **one re-split for the batch** - a rename and a move both cost the split, so promotions ride a batch the way renames
+  do (5.6): collect them, then one re-split and one gate.
+* the **brief pool** follows the unit: it leaves the pool, and its next brief comes from its real path.
+* **the object must stay byte-identical** - a name and a path change no instructions, so any byte difference across a
+  promotion is a bug in the move, not a matching change. Verify it, do not assume it.
+
+Four units qualify today - their bodies landed on 2026-09-23 and each is byte-identical or near it:
+`auto/803066F0` (100 %, flipped), `auto/80324F7C` (100 %), `auto/802D0DCC` (100 %), `auto/802B2978` (99.93 %).
+
 ### Teardown is part of landing (owner's rule, 2026-09-23)
 
 **When a worker finishes, its claim is released and its worktree and branch are removed** - and `claims.py` is the tool
