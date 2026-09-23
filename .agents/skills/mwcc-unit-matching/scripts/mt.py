@@ -12,6 +12,7 @@ Usage:
     python scripts/mt.py matrix [-u <unit>] [--flags-extra "..."] [versions...]
     python scripts/mt.py sweep  [-u <unit>] [subs...]
     python scripts/mt.py variants [-u <unit>] [--variants f.py] [names...]
+    python scripts/mt.py shapes [-u <unit>] [-f <function>] [--scan N] [--gens ...] [--depth N]
     python scripts/mt.py diff   [-u <unit>] <symbol> [n] [--all]        (symdiff: side by side)
     python scripts/mt.py slots  [-u <unit>] <symbol> [--map] [--slot 0x64]
     python scripts/mt.py sections [-u <unit>]                           (elfsect: section table)
@@ -33,6 +34,7 @@ TOOLS = {
     "matrix":   "tools/flags/mwcc_matrix.py",
     "sweep":    "tools/flags/optsweep.py",
     "variants": "tools/flags/tryvar.py",
+    "shapes":   "tools/flags/shapesearch.py",
     "diff":     "tools/objdiff/symdiff.py",
     "slots":    "tools/objdiff/slotmap.py",
     "sections": "tools/elf/elfsect.py",
