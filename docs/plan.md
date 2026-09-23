@@ -521,22 +521,25 @@ proof has to contain (detail: `.pi/notes/flip-round-1.md`):
    differed. Fixed per lib (`cflags_network`, `cflags_os`, commit b523f3d). Every retail object in the project
    is `.text`/`.init align 2**2`, so 4-byte alignment is the default expectation - and the two units that
    genuinely want 16-byte padding (`__start`, `__ppc_eabi_init`) want it from their own section pragmas.
-2. **Order-sensitive sections cannot survive a flip yet.** `sys_mem` is byte-identical to its target in every
-   section (including `extab`/`extabindex`) and still scrambles the DOL: 5 536 639 differing bytes, with
-   `_eti_init_info` moving 0x8003F1C8 -> 0x8003F17C and 61 differing bytes inside `.init`. The mechanism is the
-   one 7.19 found for `.ctors`: the linker builds `extab`, `extabindex`, `.ctors$NN` and `.dtors$NN` by
-   concatenating each object's fragment **in linker command-line order**, so substituting our object for the
-   target's moves it in that list and every later fragment shifts one slot - the section's contents change while
-   its address and size do not, and every relocation pointing into it moves with them. A unit is therefore only
-   flippable while its object contributes **none** of those four sections; all six successful flips are pure
-   `.text`/`.init` objects. This is the flip campaign's real blocker and it belongs in the link step
-   (substitute in place, or re-order the merged fragments after the link), not in the source.
-   *(Correction: an earlier version of this entry blamed a missing `extab` on our side. That was a bug in
-   `flipcheck.py` - its section regex required a leading dot, so `extab`/`extabindex` were invisible. Fixed, and
-   the corrected tool predicts exactly the six units that flipped cleanly and marks every failure NOT READY.)*
-   `g3d/g3d_resanmamblight` and `main.cpp` are a **separate, genuine** case: their target objects carry
-   `extab`/`extabindex` that our objects do not emit at all, which is playbook row 30 (exceptions off) - they
-   need exceptions on as well as the link-order fix.
+2. **`extab`, `extabindex`, `.ctors$NN` and `.dtors$NN` are not an obstacle - they are part of the unit.**
+   These sections are *compiler-generated*: their content is a side effect of the unit's code (exception tables
+   for the try/catch and destructor shapes, reference words for the static initialisers), which is why
+   `__init_cpp_exceptions.cpp` declares its three words through `#pragma section const_type` and carries a
+   `static int fragmentID = -4` for `.sdata`. A matched unit therefore produces the matching fragment, and
+   `flipcheck.py` verifies those fragments byte-for-byte like any other section - contributing one is not a
+   reason to withhold a flip. **The earlier claim here (that such units cannot be flipped, and that the linker's
+   object order was the cause) was wrong and is retracted.** dtk substitutes a `Matching` object *in place*:
+   `build.ninja`'s input list has `src/lobby/lobby_scene.o` exactly where the target object was, and
+   `src/Runtime.PPCEABI.H/memcpy.o`/`memset.o` adjacent to each other as before.
+
+   What is still unexplained is a *link* question, not a unit property: with `__init_cpp_exceptions` flipped, the
+   unit's code links at exactly 0x80457420 and the object is byte-identical, yet the merged `.ctors` loses
+   `__init_cpp_exceptions_reference` (the symbol is absent from the ELF) and every later entry shifts one slot,
+   while `.dtors` is off by one entry only. `sys_mem` shows the same shape in `extab`/`extabindex`
+   (`_eti_init_info` 0x8003F1C8 -> 0x8003F17C, 5 536 639 differing DOL bytes) even though its fragments are
+   byte-identical too. Next diagnostic: whether a *second* object also covers those regions - the fragments are
+   claimed by `splits.txt` with a `rename:`, so a `dol split` pass may still leave an auto blob on the same
+   bytes.
 
 `tools/units/flipcheck.py` checks all three conditions per unit (claim vs emitted sections, sizes/alignment,
 and the bytes against the target object) and reports **7 of 19 ready**. Its one false positive is

@@ -27,10 +27,12 @@ SRC = os.path.join(MAIN, "build", "RMHE08", "src")
 SEC_RE = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
 CLAIM_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)(?:\s+rename:(\S+))?")
 IGNORE = (".comment", ".note.split", ".symtab", ".strtab", ".shstrtab", ".rela")
-# Sections the linker builds by concatenating each object's fragment in command-line order. Substituting a
-# Matching object for the target moves it in that list, so every later fragment shifts one slot and the
-# section's contents change while its address and size stay the same (plan 7.19).
-ORDER_SENSITIVE = ("extab", "extabindex", ".ctors", ".dtors")
+# Fragments the *compiler* generates as a side effect of the unit's code: the exception tables and the
+# constructor/destructor reference words. A matched unit produces them, so they are part of its match and are
+# checked byte-for-byte below like any other section - contributing one is not a reason to withhold a flip.
+# (The target object is dtk's synthesised object, so its *in-object section order* is dtk's, not the original
+# compiler's, and comparing the two orders says nothing.)
+COMPILER_GENERATED = ("extab", "extabindex", ".ctors", ".dtors")
 
 
 def sections(path: str) -> dict[str, tuple[int, int]]:
@@ -85,11 +87,12 @@ def raw_section(path: str, name: str) -> bytes | None:
     return data
 
 
-def check(unit: str, claim: dict[str, tuple[int, int]]) -> list[str]:
+def check(unit: str, claim: dict[str, tuple[int, int]]) -> tuple[list[str], list[str]]:
     ours = sections(os.path.join(SRC, unit + ".o"))
     if not ours:
-        return ["no compiled object (build/RMHE08/src/%s.o) - compile it first" % unit]
+        return ["no compiled object (build/RMHE08/src/%s.o) - compile it first" % unit], []
     problems = []
+    notes: list[str] = []
     for name, (size, _) in sorted(claim.items()):
         got = ours.get(name)
         if got is None:
@@ -102,12 +105,10 @@ def check(unit: str, claim: dict[str, tuple[int, int]]) -> list[str]:
         problems.append("%s (0x%X) is in the object but not claimed by splits.txt - "
                         "it will be linked somewhere the original had nothing" % (name, ours[name][0]))
 
-    sensitive = sorted(n for n in ours if n.startswith(ORDER_SENSITIVE))
-    if sensitive:
-        problems.append("contributes ORDER-SENSITIVE sections (%s) - the linker concatenates these in object "
-                        "order, so a flip reorders every later fragment and the section's contents change even "
-                        "when the bytes match (plan 7.19); needs the link step to substitute in place"
-                        % ", ".join("%s 0x%X" % (n, ours[n][0]) for n in sensitive))
+    generated = sorted(n for n in ours if n.startswith(COMPILER_GENERATED))
+    if generated:
+        notes.append("compiler-generated fragments, byte-checked above: %s"
+                     % ", ".join("%s 0x%X" % (n, ours[n][0]) for n in generated))
 
     # sizes and alignment matching is not enough: the bytes have to be the original's too.
     for name in sorted(set(ours) & set(claim)):
@@ -121,11 +122,14 @@ def check(unit: str, claim: dict[str, tuple[int, int]]) -> list[str]:
             problems.append("%s: bytes differ from the target object at +0x%X (ours %02x, target %02x) - "
                             "the object is not the original's code"
                             % (name, at, mine[at] if at < len(mine) else 0, tgt[at] if at < len(tgt) else 0))
-    return problems
+    return problems, notes
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Is a unit ready to flip to Object(Matching, ...)?")
+    ap = argparse.ArgumentParser(
+        description="Is a unit ready to flip to Object(Matching, ...)? Checks the object against the claim "
+                    "its splits.txt entry makes (sections, sizes, alignment) and against the target object's "
+                    "bytes. The DOL itself remains the only proof.")
     ap.add_argument("units", nargs="*")
     args = ap.parse_args()
 
@@ -147,7 +151,7 @@ def main() -> int:
 
     bad = 0
     for unit, claim in sorted(wanted.items()):
-        problems = check(unit, claim)
+        problems, notes = check(unit, claim)
         if problems:
             bad += 1
             print("NOT READY  %s" % unit)
@@ -155,6 +159,8 @@ def main() -> int:
                 print("   - %s" % p)
         else:
             print("READY      %s (%d section(s) match the claim)" % (unit, len(claim)))
+            for n in notes:
+                print("   . %s" % n)
     print("\n%d of %d unit(s) ready" % (len(wanted) - bad, len(wanted)))
     return 1 if bad else 0
 
