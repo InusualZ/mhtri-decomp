@@ -422,7 +422,8 @@ config.libs = [
             # half of MSL's __mem.o (the other half is memset.c, already at 100 %); making them one file
             # is proposed in the escalation queue - see the unit's file header comment.
             Object(NonMatching, "Runtime.PPCEABI.H/memcpy.c"),
-            Object(NonMatching, "Runtime.PPCEABI.H/memset.c"),
+            # First flip (docs/plan.md 7.6): the object is byte-identical, so its bytes now come from src/.
+            Object(Matching, "Runtime.PPCEABI.H/memset.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/__start.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
         ],
