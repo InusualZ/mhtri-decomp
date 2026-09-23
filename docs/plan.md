@@ -49,11 +49,11 @@ The campaign is not one loop; it is four phases with different economics, and co
 | phase | what it does | cost per unit of progress | measured so far |
 | --- | --- | --- | --- |
 | **A. attribute** | claim ranges, name units, register, write stub sources | ~1 min per unit, no source work | 19 units, 295 functions |
-| **B. decompile** | write bodies to >= 80 % | a worker round (10-40 functions) per 4 workers | 60 functions from a 7-worker round, before the 4-worker cap existed |
+| **B. decompile** | write bodies to >= 80 % | a worker round (10-40 functions) per 12 workers | 60 functions from a 7-worker round, before the 4-worker cap existed |
 | **C. second pass** | push the 80-99.9 % band to 100 % | the playbook's idea list, per unit | 67 symbols sit in that band today, ~26 % of each batch's output |
 | **D. flip** | prove byte-identity per object, link it, keep `ok` green | minutes per object, but the DOL hash starts depending on us | 0 objects flipped |
 
-**The honest arithmetic.** 20 224 unclaimed functions at 10-40 functions per 4-worker round is **500-2 000 worker-rounds**; the 284 closed so far are the *easiest* 1.2 % of the bytes. The plan's job is therefore not to promise a date - it is to keep each round cheap (the protocol), to keep the method compounding (the knowledge delta) and to make attribution, which is mechanical, run at machine speed. **Phases C and D are on the critical path for the DOL**, not optional polish: a unit with any residual cannot flip, and the DOL cannot be byte-identical until every unit can.
+**The honest arithmetic.** 20 224 unclaimed functions at 10-40 functions per 12-worker round is **500-2 000 worker-rounds**; the 284 closed so far are the *easiest* 1.2 % of the bytes. The plan's job is therefore not to promise a date - it is to keep each round cheap (the protocol), to keep the method compounding (the knowledge delta) and to make attribution, which is mechanical, run at machine speed. **Phases C and D are on the critical path for the DOL**, not optional polish: a unit with any residual cannot flip, and the DOL cannot be byte-identical until every unit can.
 
 ## 2. Where we are (measured, 2026-09-22, commit `9d6b351`)
 
@@ -90,7 +90,7 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 | term | what it is | size |
 | --- | --- | --- |
 | **registration batch** | the ranges and `configure.py` entries claimed in one go (one split, one ledger check) | **≤ 0.5 MB of `.text`** (owner's call) — ≈ 2 000 functions, a blast-radius ceiling, not a target |
-| **work round** | what one group of ≤ 4 workers does in parallel | 10–40 functions, bounded by worker throughput |
+| **work round** | what one group of ≤ 12 workers does in parallel | 10–40 functions, bounded by worker throughput |
 | **land batch** | everything that goes into one commit on `main` (one split, one link, one `ok`) | one or more work rounds, plus the renames/merges that ride them |
 
 **The law, in five clauses:**
@@ -100,7 +100,11 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 2. **Cap a registration batch at 0.5 MB of `.text`** (owner's call) — it binds the *attribution* pass, where one
    command can claim a whole region. Until `attribute.py` grows `--max-total-bytes` (§7.14) the cap is enforced
    with `--limit N`, using the byte total `attribute.py plan` prints.
-3. **Four workers to one orchestrator** (owner's call). The machine already has the parallelism (4 processes);
+3. **Twelve workers to one orchestrator** (owner's call, raised from four on 2026-09-23). What the cap bounds is
+   *coordination*, not CPU: the shared resource is the build tree, and only the orchestrator ever runs
+   `configure.py`/`ninja`/the link (§5.1), while a worker measures its own object with `recompile.py` (no ninja)
+   inside its own worktree. Twelve no-build workers therefore contend for nothing but the provider, which is why
+   the cap can be this high; a round that needs builds still serialises behind the orchestrator.
    what it lacks without §5 is an interface. My verification time, not the machine's, is the scarce resource.
 4. **Renames, phantom merges and range claims ride the same batch** as the source work, because each is a split
    dirty-check input. `symedit.py rename-batch <file>` collects renames; verify every renamed symbol *after* the

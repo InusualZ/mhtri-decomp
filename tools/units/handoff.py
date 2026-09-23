@@ -1,6 +1,6 @@
 """Print the report skeleton a worker fills in, and validate what comes back.
 
-docs/plan.md 7.4 / §5.3. Four workers in four processes produce four reports; if those are prose, the
+docs/plan.md 7.4 / §5.3. Twelve workers in twelve processes produce twelve reports; if those are prose, the
 orchestrator reconciles numbers by hand - which is the failure mode the protocol exists to remove. So the
 handoff is data: `MAIN/.pi/outbox/<slug>.json`, and this tool both emits the skeleton and refuses a bad one.
 

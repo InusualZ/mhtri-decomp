@@ -1,6 +1,6 @@
 """Claim a unit for a worker: one git worktree, one branch, and the branch *is* the lock.
 
-docs/plan.md 7.2. With up to four externally spawned worker agents, "who owns this unit" cannot live in
+docs/plan.md 7.2. With up to twelve externally spawned worker agents, "who owns this unit" cannot live in
 anyone's memory, and a lock file has to be trusted. Git already has an atomic one: creating a branch either
 succeeds or fails, and two worktrees cannot share a branch name. So a claim is
 
