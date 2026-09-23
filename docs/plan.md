@@ -423,6 +423,24 @@ Rules for building them: **a tool that writes shared files goes through 7.12**; 
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
 tool is not done until `land.py` calls it or the plan says who runs it**.
 
+**Status (2026-09-23): the first five items are built, tested and committed.**
+
+| item | state | evidence |
+| --- | --- | --- |
+| 7.18 ground-truth guard | **done** | `prepcommit.py` refuses `build.sha1`/`config.yml` and cross-checks the DOL hash; tracked `tools/git/hooks/pre-commit`; `tools/git/guard_selftest.py` (33 checks); both refusal paths exercised by hand |
+| 7.1 + 7.15 `recompile.py` | **done** | compiles without ninja from a worktree that has **no `build/`**, asserts the mtime moved, prints section sizes, measures with `objdiff-cli -1/-2`; verified in MAIN (94.78261 %) and in a scratch worktree (identical, MAIN's object untouched) |
+| 7.2 `claims.py` | **done** | branch-as-lock (`worker/<slug>`), registry in `MAIN/.pi/claims.json`, `list`/`release`/`expire`; refuses a second claim; 12 checks |
+| 7.3 `brief.py` | **done** | six parts, rules extracted verbatim from §6.5/§8, inventory parsed in-process; for `Pl/pl_act`: 115 symbols, 5 below the bar, every score real |
+| 7.4 `handoff.py` | **done** | outbox schema + validation (13 checks): unowned symbols, out-of-range percentages, a rename without evidence, a missing `measured_with` are all refused |
+| 7.5 + 7.16 `land.py` | **done (build path dry-run only)** | 13 checks; the gate refuses on a moved base, a shared-file edit, a missing/invalid outbox, a regression, and requires `ok` to be recreated by *this* run; baseline refresh |
+| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **not yet** | `brief.py` already reads the queue and `land.py` reports the missing lint as skipped |
+
+**End-to-end dry round (2026-09-23).** claim → brief → measure inside the worktree → outbox → gate: `claims.py
+claim` → `brief.py` → (in the worktree) `recompile.py --measure` → `handoff.py --check` → `land.py verify
+--dry-run` exited **0** with all five cheap checks passing, then the claim was released. The heavy path
+(configure → split → report → regressions → `ok` → baseline) has only been exercised as a *plan*; the first real
+land is what runs it.
+
 **Ordering constraint.** **7.18 comes first** - the ground-truth guard exists before any worker does, because it is the
 only hole that can invalidate the whole campaign's evidence. Then 7.1 + 7.15 and 7.2 (a worker that cannot
 measure, or two workers on one unit, is not a round), then 7.3 + 7.4, then 7.5 - the gate every later batch runs
@@ -549,7 +567,7 @@ brief is then a *file it writes for itself* too, so a later worker can pick the 
 1. **The ground-truth guard** (7.18) - `prepcommit.py` refuses `build.sha1`/`config.yml`, the tracked
    `tools/git/hooks/pre-commit` is added and `core.hooksPath` pointed at it. First, because it is the only hole
    that can invalidate the campaign's evidence, and it is ~40 lines.
-2. **The protocol tools** (7.1 + 7.15, 7.2 -> 7.5, 7.17, 7.20) - `recompile.py` (worktree-safe), `claims.py`,
+2. **The protocol tools** (7.1 + 7.15, 7.2 -> 7.5, 7.17, 7.20) - **7.1/7.15, 7.2-7.5 done 2026-09-23**; 7.17, 7.20 and 7.21 remain - `recompile.py` (worktree-safe), `claims.py`,
    `brief.py`, `handoff.py`, `land.py`, the data queue, transactional `apply`. The first *worker* round does not
    start before 7.1/7.15 and 7.2 exist; the first *land batch* does not start before 7.5 does.
 3. **The first `Matching` flip** (7.6) - one byte-identical runtime *object*, alone in its commit. It may run
