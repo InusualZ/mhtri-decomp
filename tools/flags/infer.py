@@ -364,11 +364,13 @@ class Fingerprint:
                      "peephole pass emits them" % rec)
             return
         clr_store = shift_mask = 0
-        for k, i in enumerate(self.insns):
-            if k + 1 < len(self.insns) and i.is_clr_mask() and self.insns[k + 1].is_narrow_store():
-                clr_store += 1
-            if k + 1 < len(self.insns) and i.is_shift() and self.insns[k + 1].is_clr_mask():
-                shift_mask += 1
+        for _name, start, end in self.funcs:
+            body = self.insns_in(start, end)
+            for k in range(len(body) - 1):
+                if body[k].is_clr_mask() and body[k + 1].is_narrow_store():
+                    clr_store += 1
+                if body[k].is_shift() and body[k + 1].is_clr_mask():
+                    shift_mask += 1
         self.clr_store_count = clr_store
         self.shift_mask_count = shift_mask
         folds = idx_psq + clr_store + shift_mask
