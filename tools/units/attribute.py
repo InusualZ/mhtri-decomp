@@ -21,18 +21,35 @@ Usage:
     python tools/units/attribute.py plan 0x80040598 0x800408A8
     python tools/units/attribute.py plan 0x80040598 0x800408A8 --json
     python tools/units/attribute.py apply 0x80040598 0x800408A8 --dry-run
-    python tools/units/attribute.py apply 0x80040598 0x800408A8
+    python tools/units/attribute.py apply 0x80040598 0x800408A8 --max-total-bytes 0x80000
+    python tools/units/attribute.py --selftest
 
 `plan` is read-only. `apply` appends the `splits.txt` blocks, the `configure.py` objects and a stub
 source per unit; nothing is measured by it - run `ninja` (which re-splits) and read the ledger after.
+
+**The registration cap (docs/plan.md §3 clause 2, roadmap 7.14).** `--max-total-bytes` (default
+0x80000 = 0.5 MB, the plan's registration-batch ceiling; `0` disables) keeps the longest address-ordered
+prefix of the proposals whose `.text` totals no more than the cap, and names the first candidate it
+refused with the exact overflow. It counts `.text` bytes because that is all `apply` claims - the data
+runs are recorded as comments and cannot move the DOL. A batch that lands exactly on the cap passes.
+With `--json`, `plan` prints the capped batch (the proposals that would land) and the refusal goes to
+stderr, so a consumer parsing the JSON still sees a consistent list.
+
+**Transactional apply (roadmap 7.20).** `apply` validates the whole batch before writing anything (no
+proposal overlaps another or a range `splits.txt` already owns, no unit twice, every function
+resolvable in the map at the address and size claimed, both `configure.py` anchors present), then
+writes every file through a `*.attribute-tmp` temp file and `os.replace`, and restores the exact
+previous bytes of every file it already replaced if any write fails. `--dry-run` touches nothing.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,6 +66,31 @@ AUTO_DIR = ROOT / "src" / "auto"
 # A unit's name is a placeholder until someone has evidence for the real path. The header comment of
 # each stub says so; this is the only place that decides what a placeholder looks like.
 NAME_MAX = 48
+
+# docs/plan.md §3 clause 2: one registration batch claims at most 0.5 MB of `.text` (a blast-radius
+# ceiling, not a target). `0` disables the cap.
+CAP_DEFAULT = 0x80000
+
+# Every file `apply` writes goes to `<name>.attribute-tmp` first and is renamed in; the suffix is also
+# what the selftest sweeps for, so it lives in one place.
+TMP_SUFFIX = ".attribute-tmp"
+
+# The two anchors `configure.py` must have or the registration cannot land. The selftest uses a fixture
+# layout with these instead of the real files.
+CONFIG_LIBS_ANCHOR = "config.libs = ["
+CONFIG_CAT_ANCHOR = "config.progress_categories = ["
+
+
+@dataclass(frozen=True)
+class Layout:
+    """Where `apply` writes: the two shared files and the root of the stub sources."""
+
+    splits: Path
+    configure: Path
+    src: Path
+
+
+LAYOUT = Layout(SPLITS, CONFIGURE, ROOT / "src")
 
 
 def load(span_max: int = 0x4000, source_span_max: int = 0x8000):
@@ -259,71 +301,349 @@ def stub_text(p: dict) -> str:
                    "t1": p["text"][1], "evidence": "".join(ev)}
 
 
-def apply(proposals: list[dict], dry_run: bool) -> None:
-    if not proposals:
-        print("nothing to apply")
-        return
-    splits = open(SPLITS, encoding="utf-8", newline="").read()
-    conf = open(CONFIGURE, encoding="utf-8", newline="").read()
+# --------------------------------------------------------------------------------------------------
+# the cap (docs/plan.md 7.14)
+# --------------------------------------------------------------------------------------------------
+def cap_batch(proposals: list[dict], max_total_bytes: int) -> tuple[list[dict], list[dict], dict | None]:
+    """The longest address-ordered prefix of `proposals` that fits `max_total_bytes`.
+
+    Returns `(kept, refused, detail)`. `refused` is the tail that did not fit, and `detail` names the
+    first candidate the cap refused, its size and the exact overflow - the number an operator needs to
+    choose between a narrower range and a smaller `--limit`. A candidate that lands exactly on the cap
+    is kept (`>` rather than `>=`), and `0` means no cap at all.
+    """
+    if not max_total_bytes:
+        return list(proposals), [], None
+    kept: list[dict] = []
+    total = 0
+    for i, p in enumerate(proposals):
+        if total + p["bytes"] > max_total_bytes:
+            return kept, proposals[i:], {
+                "unit": p["unit"], "text": p["text"], "bytes": p["bytes"], "claimed": total,
+                "cap": max_total_bytes, "overflow": total + p["bytes"] - max_total_bytes,
+                "remaining": len(proposals) - i,
+            }
+        kept.append(p)
+        total += p["bytes"]
+    return kept, [], None
+
+
+def cap_report(kept: list[dict], detail: dict | None, cap: int, file=None) -> None:
+    """How many bytes the batch is about to claim, and exactly what the cap refused."""
+    if cap:
+        total = sum(p["bytes"] for p in kept)
+        print("cap: --max-total-bytes 0x%X (%d B); this batch claims %d B of .text in %d unit(s), %d B left"
+              % (cap, cap, total, len(kept), cap - total), file=file)
+    if detail:
+        t0, t1 = detail["text"]
+        print("refused: %s (0x%08X..0x%08X, %d B) does not fit: %d + %d = %d B, %d B over the cap"
+              % (detail["unit"], t0, t1, detail["bytes"], detail["claimed"], detail["bytes"],
+                 detail["claimed"] + detail["bytes"], detail["overflow"]), file=file)
+        print("         %d candidate(s) left unregistered; re-run from 0x%08X or raise --max-total-bytes"
+              % (detail["remaining"], t0), file=file)
+
+
+# --------------------------------------------------------------------------------------------------
+# transactional apply (docs/plan.md 7.20)
+# --------------------------------------------------------------------------------------------------
+SPLIT_HEAD = re.compile(r"^(\S[^:]*):\s*$")
+SPLIT_RANGE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
+
+
+def read_text(path: Path) -> str:
+    """The file's text with its line endings intact - what goes back in on a rollback."""
+    return open(path, encoding="utf-8", newline="").read()
+
+
+def parse_ranges(text: str) -> list[tuple[str, str, int, int]]:
+    """Every `start:`/`end:` range in a `splits.txt` text, as (unit, section, start, end)."""
+    out, cur = [], None
+    for line in text.splitlines():
+        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
+            cur = line.strip()[:-1]
+            continue
+        m = SPLIT_RANGE.match(line)
+        if m and cur is not None:
+            out.append((cur, m.group(1), int(m.group(2), 16), int(m.group(3), 16)))
+    return out
+
+
+def overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    return a[0] < b[1] and b[0] < a[1]
+
+
+def validate(proposals: list[dict], layout: Layout, fns: dict | None = None) -> list[str]:
+    """Everything that must hold before a byte is written. An empty list means the batch may land.
+
+    The write phase is the only thing that can fail afterwards, and every way it can fail has been
+    turned into an error here: an anchor that is not in `configure.py`, a section name `SECTION_ORDER`
+    does not know, a proposal that would double-claim a range. `fns` is `tudiscover.load_map()`'s
+    function table - with it, every function a proposal names must resolve at the address and size the
+    proposal claims, which is the "every referenced symbol resolvable" half of 7.20.
+    """
+    errs: list[str] = []
+    gone = [str(p) for p in (layout.splits, layout.configure) if not p.exists()]
+    if gone:
+        return ["%s: does not exist" % g for g in gone]
+    splits = read_text(layout.splits)
+    conf = read_text(layout.configure)
+    nl_conf = "\r\n" if "\r\n" in conf else "\n"
+    have = parse_ranges(splits)
+
+    seen: dict[str, tuple[int, int]] = {}
+    for p in proposals:
+        u = p["unit"]
+        if u in seen:
+            errs.append("%s: the batch names this unit twice" % u)
+        parts = Path(u).parts
+        if Path(u).is_absolute() or ".." in parts:
+            errs.append("%s: the unit path is absolute or escapes src/ - refused" % u)
+        t0, t1 = p["text"]
+        if t0 >= t1:
+            errs.append("%s: empty or inverted .text range 0x%08X..0x%08X" % (u, t0, t1))
+            continue
+        if not p["functions"]:
+            errs.append("%s: no functions in the proposal" % u)
+        else:
+            lo = min(f["address"] for f in p["functions"])
+            hi = max(f["address"] + f["size"] for f in p["functions"])
+            if (t0, t1) != (lo, hi):
+                errs.append("%s: .text 0x%08X..0x%08X is not the span of its functions (0x%08X..0x%08X)"
+                            % (u, t0, t1, lo, hi))
+            total = sum(f["size"] for f in p["functions"])
+            if total != p["bytes"]:
+                errs.append("%s: byte total %d is not the sum of its functions (%d)" % (u, p["bytes"], total))
+            if fns is not None:
+                for f in p["functions"]:
+                    rec = fns.get(f["name"])
+                    if rec is None:
+                        errs.append("%s: %s is not a .text function in the symbol map" % (u, f["name"]))
+                    elif (rec["addr"], rec["size"]) != (f["address"], f["size"]):
+                        errs.append("%s: %s is 0x%08X+%d in the map, not 0x%08X+%d"
+                                    % (u, f["name"], rec["addr"], rec["size"], f["address"], f["size"]))
+        for section in p["runs"]:
+            if section not in td.SECTION_ORDER:
+                errs.append("%s: unknown section %r - not in tudiscover.SECTION_ORDER" % (u, section))
+        for other, section, s, e in have:
+            if other == u and section == ".text" and (s, e) == (t0, t1):
+                continue                       # idempotent re-apply of the same block
+            if overlaps((t0, t1), (s, e)):
+                errs.append("%s: .text 0x%08X..0x%08X overlaps %s's %s range 0x%08X..0x%08X"
+                            % (u, t0, t1, other, section, s, e))
+        for other, (s, e) in seen.items():
+            if overlaps((t0, t1), (s, e)):
+                errs.append("%s: .text 0x%08X..0x%08X overlaps %s earlier in the batch" % (u, t0, t1, other))
+        own = [(s, e) for o, sec, s, e in have if o == u and sec == ".text"]
+        if own and (t0, t1) not in own:
+            errs.append("%s: already in splits.txt at 0x%08X..0x%08X, the batch says 0x%08X..0x%08X"
+                        % (u, own[0][0], own[0][1], t0, t1))
+        seen[u] = (t0, t1)
+
+    if [p for p in proposals if '"%s"' % p["unit"] not in conf]:
+        if CONFIG_LIBS_ANCHOR + nl_conf not in conf:
+            errs.append("configure.py: the `%s` anchor is missing (line endings?) - the object line "
+                        "would not land" % CONFIG_LIBS_ANCHOR)
+        if 'ProgressCategory("auto"' not in conf and CONFIG_CAT_ANCHOR + nl_conf not in conf:
+            errs.append("configure.py: the `%s` anchor is missing - the auto progress category "
+                        "cannot be declared" % CONFIG_CAT_ANCHOR)
+    return errs
+
+
+class Transaction:
+    """All-or-nothing writes over a fixed set of paths.
+
+    Every target is staged to `<name>.attribute-tmp` beside it and renamed in with `os.replace`, so a
+    reader never sees a half-written file. If a write fails, `rollback()` puts every already-renamed
+    target back to the bytes it had before - and deletes the ones that did not exist - newest first;
+    `cleanup()` removes the temp files on both paths. `rename` is the injection point the selftest
+    uses to fail a write on purpose; recovery deliberately does not go through it, because recovery
+    must not be breakable by the fault it is recovering from.
+    """
+
+    def __init__(self, rename=None):
+        self._rename = rename or os.replace
+        self.prev: dict[Path, bytes | None] = {}
+        self.order: list[Path] = []
+        self.dirs: list[Path] = []
+        self.temps: list[Path] = []
+
+    def write(self, path: Path, text: str) -> None:
+        if not path.parent.exists():
+            made, d = [], path.parent
+            while not d.exists() and d != d.parent:
+                made.append(d)
+                d = d.parent
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.dirs.extend(made)          # deepest first: rollback removes children before parents
+        if path not in self.prev:
+            self.prev[path] = path.read_bytes() if path.exists() else None
+        tmp = path.with_name(path.name + TMP_SUFFIX)
+        self.temps.append(tmp)
+        tmp.write_bytes(text.encode("utf-8"))
+        self._rename(tmp, path)
+        self.order.append(path)
+
+    def cleanup(self) -> None:
+        for tmp in self.temps:
+            try:
+                tmp.unlink()
+            except FileNotFoundError:
+                pass
+
+    def rollback(self) -> None:
+        """Undo every rename already made, newest first, back to the exact previous bytes.
+
+        The temp files go first: the write that failed left one in the directory this is about to
+        remove, and a directory with a file in it cannot be removed. The restore then re-creates a
+        temp per file, so a second `cleanup()` follows. Recovery uses `os.replace` directly - an
+        injected fault must not be able to break the recovery from itself.
+        """
+        self.cleanup()
+        for path in reversed(self.order):
+            prev = self.prev[path]
+            try:
+                if prev is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    tmp = path.with_name(path.name + TMP_SUFFIX)
+                    tmp.write_bytes(prev)
+                    os.replace(tmp, path)
+            except OSError:
+                pass
+        self.cleanup()
+        for d in self.dirs:                     # deepest first, so a child is gone before its parent
+            try:
+                d.rmdir()                       # only if empty: never destroy a pre-existing tree
+            except OSError:
+                pass
+
+
+def split_block(p: dict, nl: str) -> str:
+    """The `splits.txt` block for one proposal: `.text` claimed, the data runs recorded as comments."""
+    t0, t1 = p["text"]
+    b = ["%s:" % p["unit"], "\t.text       start:0x%08X end:0x%08X" % (t0, t1)]
+    for section in sorted(p["runs"], key=td.SECTION_ORDER.index):
+        r = p["runs"][section]
+        if r["leak"] or r.get("density", 1.0) < 0.5:
+            b.append("\t# %-10s 0x%08X..0x%08X not claimed - leak %d, density %.2f"
+                     % (section, r["start"], r["end"], r["leak"], r.get("density", 1.0)))
+            continue
+        b.append("\t# %-10s 0x%08X..0x%08X - claim in the measured data pass"
+                 % (section, r["start"], r["end"]))
+    return nl.join(b) + nl
+
+
+def configure_insertion(conf: str, nl_conf: str, units: list[str]) -> str:
+    """`conf` with a new `auto` lib holding `units`, the progress category declared if it is new."""
+    objects = "".join('            Object(NonMatching, "%s"),\n' % u for u in units)
+    lib = ('    {\n        "lib": "auto",\n        "mw_version": "Wii/1.3",\n'
+           '        "cflags": cflags_main,\n        "progress_category": "auto",\n'
+           '        "objects": [\n%s        ],\n    },\n' % objects)
+    marker = CONFIG_LIBS_ANCHOR + nl_conf
+    # configure.py is CRLF: match its line ending, and fail loudly when the anchor is not there -
+    # a silently skipped registration is a unit that exists in splits.txt and nowhere else.
+    assert marker in conf, "configure.py: `%s` not found (line endings?)" % CONFIG_LIBS_ANCHOR
+    conf = conf.replace(marker, marker + nl_conf + lib.replace("\n", nl_conf), 1)
+    # dtk refuses a progress_category it does not know (`Progress category 'auto' missing from
+    # config.progress_categories`), so registering the first auto unit declares the category too.
+    cat = CONFIG_CAT_ANCHOR + nl_conf
+    assert cat in conf, "configure.py: `%s` not found" % CONFIG_CAT_ANCHOR
+    if 'ProgressCategory("auto"' not in conf:
+        conf = conf.replace(cat, cat + nl_conf +
+                            '    ProgressCategory("auto", "Auto (bulk attribution)"),', 1)
+    return conf
+
+
+def plan_writes(proposals: list[dict], layout: Layout) -> dict:
+    """The complete new content of every file `apply` would touch, computed before anything is written.
+
+    Nothing here touches the disk. Building the full text up front is what makes the write phase pure
+    I/O - so a failure can only be a failed rename, and the rollback is a list of renames rather than
+    a guess about what the file looked like.
+    """
+    splits = read_text(layout.splits)
+    conf = read_text(layout.configure)
     nl = "\r\n" if "\r\n" in splits else "\n"
     nl_conf = "\r\n" if "\r\n" in conf else "\n"   # the two files do not share a line ending
-    blocks = []
-    for p in proposals:
-        t0, t1 = p["text"]
-        b = ["%s:" % p["unit"], "\t.text       start:0x%08X end:0x%08X" % (t0, t1)]
-        for section in sorted(p["runs"], key=td.SECTION_ORDER.index):
-            r = p["runs"][section]
-            if r["leak"] or r.get("density", 1.0) < 0.5:
-                b.append("\t# %-10s 0x%08X..0x%08X not claimed - leak %d, density %.2f"
-                         % (section, r["start"], r["end"], r["leak"], r.get("density", 1.0)))
-                continue
-            b.append("\t# %-10s 0x%08X..0x%08X - claim in the measured data pass"
-                     % (section, r["start"], r["end"]))
-        blocks.append(nl.join(b) + nl)
-    if dry_run:
-        print("--- splits.txt would gain:\n" + "".join(blocks))
-        print("--- configure.py would gain %d object line(s) in a new `auto` lib" % len(proposals))
-        print("--- src/ would gain:\n" + "\n".join("    %s" % p["unit"] for p in proposals))
-        return
+    writes: list[tuple[Path, str]] = []
+
+    blocks = [split_block(p, nl) for p in proposals]
     fresh = [b for b in blocks if b.split(":", 1)[0] not in splits]
-    if len(fresh) != len(blocks):
-        print("skipped %d split block(s) already in splits.txt" % (len(blocks) - len(fresh)))
     if fresh:
         if not splits.endswith(nl):
             splits += nl
-        open(SPLITS, "w", encoding="utf-8", newline="").write(splits + nl + "".join(fresh))
+        writes.append((layout.splits, splits + nl + "".join(fresh)))
     missing = [p["unit"] for p in proposals if '"%s"' % p["unit"] not in conf]
     if missing:
-        objects = "".join('            Object(NonMatching, "%s"),\n' % u for u in missing)
-        lib = ('    {\n        "lib": "auto",\n        "mw_version": "Wii/1.3",\n'
-               '        "cflags": cflags_main,\n        "progress_category": "auto",\n'
-               '        "objects": [\n%s        ],\n    },\n' % objects)
-        marker = "config.libs = [" + nl_conf
-        # configure.py is CRLF: match its line ending, and fail loudly when the anchor is not there -
-        # a silently skipped registration is a unit that exists in splits.txt and nowhere else.
-        assert marker in conf, "configure.py: `config.libs = [` not found (line endings?)"
-        conf = conf.replace(marker, marker + nl_conf + lib.replace("\n", nl_conf), 1)
-        # dtk refuses a progress_category it does not know (`Progress category 'auto' missing from
-        # config.progress_categories`), so registering the first auto unit declares the category too.
-        cat = "config.progress_categories = [" + nl_conf
-        assert cat in conf, "configure.py: `config.progress_categories = [` not found"
-        if 'ProgressCategory("auto"' not in conf:
-            conf = conf.replace(cat, cat + nl_conf +
-                                '    ProgressCategory("auto", "Auto (bulk attribution)"),', 1)
-        open(CONFIGURE, "w", encoding="utf-8", newline="").write(conf)
+        writes.append((layout.configure, configure_insertion(conf, nl_conf, missing)))
+    stubs = 0
     for p in proposals:
-        path = ROOT / "src" / p["unit"]
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path = layout.src / p["unit"]
         if not path.exists():
-            open(path, "w", encoding="utf-8", newline="").write(stub_text(p))
+            writes.append((path, stub_text(p)))
+            stubs += 1
+    return {"writes": writes, "splits": len(fresh), "objects": len(missing), "stubs": stubs}
+
+
+def apply(proposals: list[dict], dry_run: bool = False, cap: int = CAP_DEFAULT,
+          layout: Layout | None = None, fns: dict | None = None, rename=None) -> int:
+    """Register a batch: cap it, validate it, then write every file through temp + rename.
+
+    Nothing is written until the whole batch has been validated and its new content built, so the only
+    way to fail once the write phase starts is a failed rename - and that restores every file it had
+    already replaced. `cap` defaults to the plan's 0.5 MB registration ceiling.
+    """
+    layout = layout or LAYOUT
+    kept, refused, detail = cap_batch(proposals, cap)
+    if not kept:
+        if detail:
+            cap_report(kept, detail, cap)
+            print("nothing written")
+            return 1
+        print("nothing to apply")
+        return 0
+    try:
+        errs = validate(kept, layout, fns)
+        if errs:
+            print("refusing to write (%d problem(s)) - nothing was touched:" % len(errs))
+            for e in errs:
+                print("  " + e)
+            return 1
+        plan = plan_writes(kept, layout)
+    except OSError as exc:
+        print("cannot read %s (%s) - nothing was touched" % (exc.filename, exc))
+        return 1
+    cap_report(kept, detail, cap)
+    if len(kept) > plan["splits"]:
+        print("skipped %d split block(s) already in splits.txt" % (len(kept) - plan["splits"]))
+    if dry_run:
+        print("--- would write %d file(s):" % len(plan["writes"]))
+        for path, text in plan["writes"]:
+            print("    %-52s %d B" % (path.relative_to(ROOT) if path.is_relative_to(ROOT) else path,
+                                       len(text.encode("utf-8"))))
+        print("--- dry run: nothing written")
+        return 0
+    tx = Transaction(rename=rename)
+    try:
+        for path, text in plan["writes"]:
+            tx.write(path, text)
+    except OSError as exc:
+        tx.rollback()
+        print("write failed (%s) - rolled back %d file(s), nothing was registered" % (exc, len(tx.order)))
+        return 1
+    finally:
+        tx.cleanup()
     print("wrote %d split block(s), %d configure object(s), %d stub source(s)"
-          % (len(proposals), len(proposals), len(proposals)))
+          % (plan["splits"], plan["objects"], plan["stubs"]))
     print("next: python configure.py && ninja   (re-split), then read the ledger")
+    return 0
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The CLI, in one place so the selftest can check the flags without loading the DOL."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
+    sub = ap.add_subparsers(dest="cmd")
     for cmd in ("plan", "apply"):
         a = sub.add_parser(cmd)
         a.add_argument("start")
@@ -332,23 +652,41 @@ def main() -> int:
                        help="a piece smaller than this joins its neighbour (default 0x200)")
         a.add_argument("--max-bytes", type=lambda v: int(v, 0), default=0x4000,
                        help="a piece larger than this is split, flagged as a guess (default 0x4000)")
+        a.add_argument("--max-total-bytes", type=lambda v: int(v, 0), default=CAP_DEFAULT,
+                       help="register at most this many .text bytes in one batch (default 0x80000, the "
+                            "plan's 0.5 MB registration cap; 0 disables)")
         a.add_argument("--json", action="store_true")
         a.add_argument("--dry-run", action="store_true")
         a.add_argument("--limit", type=int, default=0, help="apply at most N units")
+    return ap
+
+
+def main() -> int:
+    ap = build_parser()
     args = ap.parse_args()
+
+    if args.selftest:
+        import attribute_selftest                 # imported late: it imports this module
+        return attribute_selftest.selftest()
+    if not args.cmd:
+        ap.print_help()
+        return 2
 
     start, end = int(args.start, 0), int(args.end, 0)
     fns, labels, graph, an = load()
     props = propose(an, fns, labels, graph, start, end, args.min_bytes, args.max_bytes)
     if args.limit:
         props = props[:args.limit]
+    kept, refused, detail = cap_batch(props, args.max_total_bytes)
     if args.json:
-        print(json.dumps(props, indent=2))
-    elif args.cmd == "plan":
-        human(props)
-    if args.cmd == "apply":
-        apply(props, args.dry_run)
-    return 0
+        # the batch that would land, i.e. the capped prefix - a refusal is not part of the batch
+        print(json.dumps(kept, indent=2))
+    if args.cmd == "plan":
+        if not args.json:
+            human(kept)
+        cap_report(kept, detail, args.max_total_bytes, file=sys.stderr if args.json else sys.stdout)
+        return 0
+    return apply(props, args.dry_run, args.max_total_bytes, fns=fns)
 
 
 if __name__ == "__main__":
