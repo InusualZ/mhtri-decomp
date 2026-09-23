@@ -247,6 +247,11 @@ cflags_runtime = [
 # section, not from the function alignment.
 cflags_ppceabi = [*cflags_runtime, "-func_align", "4"]
 
+# The two bootstrap files want 16-byte function alignment (their .init regions carry the retail zero padding:
+# __start 0x300 vs our 0x2E0, __ppc_eabi_init 0x64 vs our 0x58), while the rest of this lib packs on 4.
+cflags_ppceabi16 = [*cflags_runtime, "-func_align", "16"]
+cflags_ppceabi32 = [*cflags_runtime, "-func_align", "32"]
+
 
 # REL flags
 cflags_rel = [
@@ -418,6 +423,20 @@ config.libs = [
         ],
     },
     {
+        # The bootstrap pair, whose retail .init regions carry 16-byte zero padding between functions
+        # (__start 0x300 vs 0x2E0, __ppc_eabi_init 0x64 vs 0x58 with 4-byte alignment). Same compiler and
+        # version as the lib below; only the function alignment differs, so it needs its own cflags group.
+        "lib": "Runtime.PPCEABI.H/init",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_ppceabi16,
+        "progress_category": "sdk",
+        "host": False,
+        "objects": [
+            Object(NonMatching, "Runtime.PPCEABI.H/__start.c"),
+            Object(NonMatching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
+        ],
+    },
+    {
         "lib": "Runtime.PPCEABI.H",
         "mw_version": "Wii/1.3",
         "cflags": cflags_ppceabi,
@@ -433,8 +452,6 @@ config.libs = [
             Object(Matching, "Runtime.PPCEABI.H/memcpy.c"),
             # First flip (docs/plan.md 7.6): the object is byte-identical, so its bytes now come from src/.
             Object(Matching, "Runtime.PPCEABI.H/memset.c"),
-            Object(NonMatching, "Runtime.PPCEABI.H/__start.c"),
-            Object(NonMatching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
         ],
     },
     {
