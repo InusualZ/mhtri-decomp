@@ -229,12 +229,21 @@ def summary(before: dict, after: dict) -> str:
     return ", ".join(parts) or "(ledger numbers unavailable)"
 
 
-def branch_commits(main: str, unit: str, base: str | None) -> int:
-    """How many commits the unit's worker branch has beyond the batch base - the artefact that cannot lie."""
+def branch_commits(main: str, unit: str) -> int:
+    """How many commits the unit's worker branch has that main does not already have.
+
+    The batch base is deliberately *not* part of this. A worker's branch is cut when the unit is claimed,
+    and the orchestrator records a fresh base for every batch it lands, so `base..branch` is only
+    meaningful while that base is main's HEAD; in a multi-batch round the recorded base is stale, which
+    makes the count report 0 for work that *is* committed (or miss it entirely). The check's intent is
+    simply "the worker's work exists as commits of its own on its branch that landing has not taken yet" -
+    `main..branch`. A branch that predates the base but carries its own commit passes; a branch with
+    nothing beyond main fails.
+    """
     branch = claims.branch_for(unit)
-    if not base or not claims.branch_exists(main, branch):
+    if not claims.branch_exists(main, branch):
         return 0
-    p = run(["git", "rev-list", "--count", "%s..%s" % (base, branch)], main)
+    p = run(["git", "rev-list", "--count", "main..%s" % branch], main)
     return int(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip().isdigit() else 0
 
 
@@ -287,9 +296,16 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     if units and worker_units:
         ok_units, problems = outbox_units(main, units)
         check("every unit's outbox validates", not problems, "; ".join(problems[:4]))
-        uncommitted = [u for u in units if branch_commits(main, u, want_base) == 0]
+        uncommitted = []
+        for u in units:
+            branch = claims.branch_for(u)
+            if not claims.branch_exists(main, branch):
+                uncommitted.append("%s (no branch %s)" % (u, branch))
+            elif branch_commits(main, u) == 0:
+                uncommitted.append("%s (branch %s has no commits of its own)" % (u, branch))
         check("every unit's branch carries its work as commits", not uncommitted,
-              "no commits on the branch (work left uncommitted in the worktree?): %s" % ", ".join(uncommitted))
+              "no commits of its own on the branch (work left uncommitted in the worktree?): %s"
+              % ", ".join(uncommitted))
     elif units:
         check("orchestrator-only batch (no worker outboxes to check)", True,
               info="%d unit(s): %s" % (len(units), ", ".join(units)))
@@ -434,6 +450,60 @@ def selftest() -> int:
               regression_rows(fixture) != [] and all("main/auto/" not in r[0] for r in rows), True)
         check("a flat measure is not a regression", any(r[1] == "matched_code" and r[2] == 90 for r in rows), False)
         check("a missing changes file is not a crash", regression_rows(os.path.join(tmp, "nope.json")), [])
+
+    # branch_commits() counts `main..branch`, not `<batch base>..branch`: a worker's branch is cut when the
+    # unit is claimed, so in a multi-batch round it predates the base the orchestrator later records. Real
+    # temp repos, because the check is entirely about git reachability.
+    unit = "Pl/pl_act.cpp"
+    branch = claims.branch_for(unit)
+
+    def repo_git(path, *args):
+        p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True)
+        if p.returncode != 0:
+            raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
+        return p.stdout.strip()
+
+    def repo_commit(path, msg):
+        with open(os.path.join(path, "f.txt"), "a", encoding="utf-8") as fh:
+            fh.write(msg + "\n")
+        repo_git(path, "add", "-A")
+        repo_git(path, "commit", "-q", "-m", msg)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        repo_git(tmp, "branch", branch)          # the worker branch is cut here
+        repo_git(tmp, "checkout", "-q", branch)
+        repo_commit(tmp, "the worker's own work")  # committed on the branch
+        repo_git(tmp, "checkout", "-q", "main")
+        check("a branch with commits ahead of main passes", branch_commits(tmp, unit) > 0, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        repo_git(tmp, "branch", branch)          # cut, but nothing committed on it
+        check("a branch with no commits ahead of main fails", branch_commits(tmp, unit), 0)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        repo_git(tmp, "branch", branch)          # cut before the batch base
+        repo_commit(tmp, "the batch base")        # main moves on while the worker works
+        repo_git(tmp, "checkout", "-q", branch)
+        repo_commit(tmp, "the worker's own work")
+        repo_git(tmp, "checkout", "-q", "main")
+        check("a branch cut before the batch base still passes with commits ahead",
+              branch_commits(tmp, unit) > 0, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        check("a missing worker branch fails", branch_commits(tmp, unit), 0)
 
     check("summary delta", summary({"closed": 284, "matched": 217}, {"closed": 290, "matched": 223}),
           "closed 284 -> 290, matched 217 -> 223")
