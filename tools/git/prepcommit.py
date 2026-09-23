@@ -37,6 +37,11 @@ STAGE_FILES = ("configure.py", "AGENTS.md")
 REFUSE_PREFIXES = ("build/", "orig/", ".lavish/", ".pi/", ".vscode/", ".idea/", "__pycache__/")
 REFUSE_FILES = ("objdiff.json", "compile_commands.json", "build.ninja")
 REFUSE_SUFFIXES = (".o", ".elf", ".dol", ".rel", ".map", ".MAP", ".exe", ".stackdump", ".pyc")
+# Ground truth (docs/plan.md 7.18): `build.sha1` states the original DOL's hash and `config.yml` is the analyzer
+# config the whole campaign is measured against. A commit that rewrites either would make every later
+# `ninja build/RMHE08/ok` meaningless, so they are refused here *and* cross-checked against the real DOL below.
+GROUND_TRUTH_FILES = ("config/RMHE08/build.sha1", "config/RMHE08/config.yml")
+ORIGINAL_DOL = "orig/RMHE08/sys/main.dol"
 
 
 def git(*args: str, check: bool = True) -> str:
@@ -62,6 +67,8 @@ def localonly_markers() -> int:
 
 def classify(path: str) -> tuple[str, str]:
     """-> ('stage' | 'refuse', reason)."""
+    if path in GROUND_TRUTH_FILES:
+        return "refuse", "ground truth - rewriting it would void every later `ok` (plan 7.18)"
     if path in REFUSE_FILES or path.endswith(REFUSE_SUFFIXES):
         return "refuse", "build output or scratch, never committed"
     if path.startswith(REFUSE_PREFIXES):
@@ -69,6 +76,29 @@ def classify(path: str) -> tuple[str, str]:
     if path in STAGE_FILES or path.startswith(STAGE_PREFIXES):
         return "stage", "project content"
     return "refuse", "unknown - decide by hand rather than sweeping it in"
+
+
+def ground_truth_error(dol_path: str | None = None, sha_path: str | None = None) -> list[str]:
+    """The DOL's hash is the campaign's yardstick - check the file that states it against the real DOL.
+
+    A refusal in `classify` stops `build.sha1` from being staged here, but the invariant worth holding is
+    stronger: the hash it states must be the hash of the original DOL. So a rewritten `build.sha1` - whoever
+    wrote it, or by whatever path - cannot survive this check.
+    """
+    dol = dol_path or os.path.join(ROOT, ORIGINAL_DOL)
+    sha = sha_path or os.path.join(ROOT, "config", "RMHE08", "build.sha1")
+    if not (os.path.exists(dol) and os.path.exists(sha)):
+        return []
+    import hashlib
+    real = hashlib.sha1(open(dol, "rb").read()).hexdigest().upper()
+    stated = open(sha, "r", encoding="utf-8").read().split()
+    stated = stated[0].upper() if stated else ""
+    if real != stated:
+        return [
+            f"{os.path.relpath(sha, ROOT)} says {stated or '(nothing)'} but {os.path.relpath(dol, ROOT)} "
+            f"hashes to {real}" 
+        ]
+    return []
 
 
 def status_paths() -> list[tuple[str, str]]:
@@ -205,6 +235,15 @@ def main() -> int:
     for code, path in rows:
         verdict, reason = classify(path)
         (stage if verdict == "stage" else refuse).append((code, path, reason))
+
+    # The ground-truth cross-check runs before anything is staged: if the DOL's recorded hash and the DOL itself
+    # disagree, no commit is worth making until that is resolved by hand.
+    truth = ground_truth_error()
+    if truth:
+        print("GROUND TRUTH MISMATCH - refusing to stage anything:")
+        for line in truth:
+            print(f"  {line}")
+        return 2
 
     print("to stage:")
     for code, path, _ in stage:
