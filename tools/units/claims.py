@@ -202,6 +202,20 @@ def registry_path(main: str) -> str:
     return os.path.join(main, ".pi", "claims.json")
 
 
+def norm_unit(unit: str) -> str:
+    """The key a claim is held under: the unit path without its source extension.
+
+    The registry is keyed by the unit's *name*, and the same unit reaches it spelled two ways - `auto/X` and
+    `auto/X.c` - which is enough to defeat the mutex: on 2026-09-23 two breadth workers claimed
+    `auto/802B2978_fn_802B2978` under those two spellings and duplicated the round. Strip the extension at every
+    entry point so the branch (the real lock) is only ever created once.
+    """
+    for ext in (".cpp", ".cp", ".c"):
+        if unit.endswith(ext):
+            return unit[: -len(ext)]
+    return unit
+
+
 def seed_worktree_build(main: str, wt: str) -> str:
     """Give a fresh worktree its own `build/tools` (the toolchain is ~15 MB of read-only binaries).
 
@@ -541,7 +555,7 @@ def claims_view(main: str) -> list[dict]:
 
 
 def claim(unit: str, main: str, worker: str | None, dry_run: bool) -> dict:
-    unit = unit.strip("/")
+    unit = norm_unit(unit.strip("/"))
     branch = branch_for(unit)
     path = worktree_for(unit, main)
     if branch_exists(main, branch):
@@ -569,7 +583,7 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool) -> dict:
 
 
 def release(unit: str, main: str, force: bool, dry_run: bool) -> dict:
-    unit = unit.strip("/")
+    unit = norm_unit(unit.strip("/"))
     registry = load_registry(main)
     record = registry.get(unit, {})
     branch = record.get("branch") or branch_for(unit)
@@ -712,6 +726,9 @@ def selftest() -> int:
         seed_worktree_build(_seed_main, _seed_wt)
         check("a claim seeds the worktree's toolchain",
               os.path.exists(os.path.join(_seed_wt, "build", "tools", "dtk.exe")), True)
+        check("the claim key ignores the source extension",
+              norm_unit("auto/802B2978_fn_802B2978.c") == norm_unit("auto/802B2978_fn_802B2978"), True)
+        check("the claim key ignores a .cpp too", norm_unit("Pl/pl_act.cpp") == norm_unit("Pl/pl_act"), True)
         check("seeding reports what it did", seed_worktree_build(_seed_main, _seed_wt).startswith("seeded"), True)
         check("seeding skips cleanly when MAIN has no toolchain",
               seed_worktree_build(os.path.join(tmp, "nowhere"), os.path.join(tmp, "ws-x")).startswith("skipped"), True)
