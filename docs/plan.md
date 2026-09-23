@@ -814,6 +814,24 @@ Concretely, for a unit `auto/<addr>_fn_<addr>.<ext>`:
 Four units qualify today - their bodies landed on 2026-09-23 and each is byte-identical or near it:
 `auto/803066F0` (100 %, flipped), `auto/80324F7C` (100 %), `auto/802D0DCC` (100 %), `auto/802B2978` (99.93 %).
 
+### A branch is never the only copy of work (2026-09-23)
+
+`claims.py release` deletes the branch. That is right for a **landed** unit - its work is in `main` and the branch is
+redundant - and wrong for an **unreported** one, where the branch is the only copy. The tool makes a
+`refs/rescue/<slug>` ref before every branch deletion, and that is the difference between this being a scare and
+being data loss: `auto/800E46E8` (185 functions, the campaign's largest single landing) was landed **from** its rescue
+ref after a `--force` release had taken its branch.
+
+The rules that follow:
+
+* a rescue ref is **never deleted**, by anything;
+* `--force` on an unreported claim is defensible *only* because the ref exists - so the refusal message names the
+  exact restore command, and the release says what it is about to remove before it removes it;
+* after any `--force` release the recovery list is `git for-each-ref refs/rescue`, and the restore is
+  `git branch worker/<slug> refs/rescue/<slug>`;
+* a branch whose work is *in main* - merged, or cherry-picked and gated - may be deleted silently. That is the normal
+  teardown, and it is why `land.py` releasing a landed unit is safe.
+
 ### Teardown is part of landing (owner's rule, 2026-09-23)
 
 **When a worker finishes, its claim is released and its worktree and branch are removed** - and `claims.py` is the tool
