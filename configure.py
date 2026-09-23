@@ -505,7 +505,7 @@ config.libs = [
             Object(NonMatching, "auto/80101DF4_fn_80101DF4.c"),
             Object(NonMatching, "auto/80101FA4_fn_80101FA4.cpp"),
             Object(NonMatching, "auto/80103D28_fn_80103D28.cpp"),
-            Object(NonMatching, "auto/80104BD0_fn_80104BD0.c"),
+            Object(Matching, "auto/80104BD0_fn_80104BD0.c"),
             Object(NonMatching, "auto/8010D1A8_fn_8010D1A8.c"),
             Object(NonMatching, "auto/80114E34_fn_80114E34.cpp"),
             Object(NonMatching, "auto/8011722C_fn_8011722C.c"),
