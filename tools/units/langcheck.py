@@ -1,16 +1,21 @@
 """Decide a translation unit's *language* (C or C++) from evidence, not from our convenience.
 
 `docs/plan.md`, "The language comes from the symbol, not from our convenience" (owner's rule,
-2026-09-23). A unit is **C++** when either of these says so:
+2026-09-23). A unit is **C++** only on **conclusive** evidence:
 
-* **its symbol is mangled** - `Panic__Q24nw4r2dbFPCciPCce` is C++, and so is anything else whose name
-  carries MWCC's `__F`/`__Q` argument-list mangling (`fn_800CD584__FP9ResHandle`). At the object level
-  this is the target's own definitions (`SetPosition__Q34nw4r3g3d6CameraFRCQ34nw4r4math4VEC3`) *and*
-  the names its relocations reference: a C front-end cannot spell a mangled callee, so a unit that
-  calls `get_now_areano__Fv` was a C++ translation unit.
+* **its own symbol is mangled** - a *definition* carrying MWCC's `__F`/`__Q` argument-list mangling
+  (`SetPosition__Q34nw4r3g3d6CameraFRCQ34nw4r4math4VEC3`, `fn_800CD584__FP9ResHandle`);
 * **its panic/log string names a `.cpp`** - the `__FILE__` assert strings are original source names
   (`ef_line.cpp`, `g3d_resanm.cpp`, `menu_message.cpp`). A unit whose *object* references one is a C++
   file even when its `.text` reads like C, and a unit whose object references a `.c` name is C.
+
+A mangled name on the *referenced* side (`get_now_areano__Fv`, `Panic__Q24nw4r2dbFPCciPCce`) is
+**suggestive, not conclusive**: it is still reported, with its reason, but it must not raise
+confidence to `high` nor drive an extension change by itself. A C translation unit can call a mangled
+function - it declares it with the map's spelling - and `auto/800FD520_fn_800FD520` does exactly that:
+it calls mangled `SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3` and was reconstructed as
+`.c`, matching at 100.00 % with all 26 relocations identical (`auto/803066F0_fn_803066F0.c` is the
+same shape).
 
 That decides three things and none of them is stylistic: the **file extension**, the **`-lang`** the
 front-end is run with, and the **name objdiff pairs by** (a C++ definition is mangled unless it is
@@ -110,10 +115,16 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
     `mangled_defined`/`mangled_undefined` are symbol names; `sources` is the list of `__FILE__` names
     the object references or defines. Confidence is about the *evidence*, not the odds:
 
-    * `high`   - a mangled definition (the unit's own symbol) or a `__FILE__` string;
-    * `medium` - only mangled names on the *referenced* side (`Panic`, `get_now_areano__Fv`): the
-       original was C++, but the evidence is a callee rather than the unit's own name;
+    * `high`   - **conclusive**: a mangled definition (the unit's own symbol) or a `__FILE__` string;
+    * `medium` - **suggestive**: only mangled names on the *referenced* side (`Panic`,
+       `get_now_areano__Fv`). A C unit can call a mangled function by declaring it with the map's
+       spelling, so this is reported (`suggested: True`) but is **not** a verdict: it must not drive a
+       rename or an extension change (`conclusive: False`). `auto/800FD520_fn_800FD520` calls mangled
+       `SetRootMtxTrans__...` and matched at 100.00 % as `.c`.
     * `low`    - nothing mangled and no source string: C is the default, not a measurement.
+
+    `conclusive` is True only when the unit's own name or a `__FILE__` string decides the language;
+    `suggested` is True when the only C++ evidence is a mangled callee.
     """
     md = sorted(set(mangled_defined))
     mu = sorted(set(mangled_undefined))
@@ -129,9 +140,11 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
         evidence.append({"kind": "mangled-undefined", "detail": mu[0], "count": len(mu)})
     if c_src:
         evidence.append({"kind": "source-c", "detail": ", ".join(c_src), "count": len(c_src)})
+    conclusive = bool(md or cpp_src or c_src)
     if md or cpp_src:
         lang, confidence = "c++", "high"
     elif mu:
+        # a mangled *callee* only: report it, but it does not decide the language (see the docstring)
         lang, confidence = "c++", "medium"
     elif c_src:
         lang, confidence = "c", "high"
@@ -140,6 +153,8 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
     return {
         "lang": lang,
         "confidence": confidence,
+        "conclusive": conclusive,
+        "suggested": bool(mu) and not conclusive,
         "evidence": evidence,
         "sources": srcs,
         "conflict": len(srcs) > 1,
@@ -375,16 +390,20 @@ def brief_paragraph(v: dict | None) -> str:
         return ("**The unit's language is not on record** - the target object is missing, so nothing here "
                 "could read it. If the source must be C++, put it in the outbox (`docs/plan.md`, \"The "
                 "language comes from the symbol\").")
+    if v["lang"] == "c++" and v.get("suggested"):
+        return ("**This unit is probably C++, but the evidence is only suggestive** (%s). A mangled "
+                "*callee* does not prove the caller is C++: a C unit can call a mangled function by "
+                "declaring it with the map's spelling, and `auto/800FD520_fn_800FD520` calls mangled "
+                "`SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3` and was reconstructed as `.c`, "
+                "matching at 100.00 %% with all 26 relocations identical. **Keep `.c` unless a mangled "
+                "definition or a `.cpp` `__FILE__` string turns up** - only conclusive evidence changes "
+                "the language (`docs/plan.md`, \"The language comes from the symbol\")." % _evidence_text(v))
     if v["lang"] == "c++":
         why = _evidence_text(v)
-        head = "**This unit is C++**" if v["confidence"] == "high" else "**This unit is C++, probable**"
-        body = ("%s (%s). Name the file `.cpp`; MWCC mangles a C++ free function (`fn_800CCFB0` becomes "
-                "`fn_800CCFB0__FP9ResHandle`), and objdiff pairs by name, so put `extern \"C\"` on every "
-                "definition whose name `symbols.txt` spells plainly or it measures 0 %% (`docs/matching.md` "
-                "row 42)." % (head, why))
-        if v["confidence"] != "high":
-            body += (" The evidence is a callee, not the unit's own name - if a `__FILE__` string turns up in "
-                     "the target's data and names a `.c` file, report the contradiction instead of switching.")
+        body = ("**This unit is C++** (%s). Name the file `.cpp`; MWCC mangles a C++ free function "
+                "(`fn_800CCFB0` becomes `fn_800CCFB0__FP9ResHandle`), and objdiff pairs by name, so put "
+                "`extern \"C\"` on every definition whose name `symbols.txt` spells plainly or it "
+                "measures 0 %% (`docs/matching.md` row 42)." % why)
         if v.get("conflict"):
             body += (" **Two source names are referenced from one object** (%s): the split range spans two "
                      "original files, so the boundary needs a re-check before the extension is trusted."
@@ -423,6 +442,8 @@ def language_cell(v: dict | None) -> str:
     """The brief's `| language |` cell: the verdict, the confidence and the evidence, one line."""
     if not v or not v.get("lang"):
         return "not on record (no target object to read)"
+    if v.get("suggested"):
+        return "**C++** (suggested - mangled callee only, not conclusive: %s)" % _evidence_text(v)
     return "**%s** (%s: %s)" % ("C++" if v["lang"] == "c++" else "C", v["confidence"], _evidence_text(v))
 
 
@@ -447,8 +468,11 @@ def sweep(main: str) -> dict:
         v["flag_agrees"] = (v["lang"] is None) or (v["effective_lang"] is None) or (v["effective_lang"] == v["lang"])
         v["unit"] = os.path.splitext(reg["path"])[0]
         rows.append(v)
-    ext_dis = [r for r in rows if not r["extension_agrees"] and r["confidence"] != "low"]
-    flag_dis = [r for r in rows if r["effective_lang"] not in (None, r["lang"]) and r["confidence"] != "low"]
+    ext_dis = [r for r in rows if not r["extension_agrees"] and r["conclusive"]]
+    flag_dis = [r for r in rows if r["effective_lang"] not in (None, r["lang"]) and r["conclusive"]]
+    # a mangled *callee* only: reported, with its reason, but never a rename driver - a C unit can call
+    # a mangled function by declaring it with the map's spelling (auto/800FD520_fn_800FD520)
+    suggested = [r for r in rows if r.get("suggested")]
     # a `.cpp` file whose object shows no evidence at all: the extension is a deliberate choice, and
     # nothing contradicts it - a note for a human, never a rename
     unevidenced = [r for r in rows if r["lang"] == "c" and r["confidence"] == "low" and r["extension_lang"] == "c++"]
@@ -460,8 +484,15 @@ def sweep(main: str) -> dict:
         # JSON-safe keys: a tuple key is not serialisable, and the report is machine-read too
         "counts": {"%s/%s" % k: v for k, v in Counter((r["lang"], r["confidence"]) for r in rows).items()},
         "langs": dict(Counter(r["lang"] or "none" for r in rows)),
+        "split": {
+            "conclusive_cpp": sum(1 for r in rows if r["conclusive"] and r["lang"] == "c++"),
+            "conclusive_c": sum(1 for r in rows if r["conclusive"] and r["lang"] == "c"),
+            "suggested": len(suggested),
+            "c": sum(1 for r in rows if r["lang"] == "c"),
+        },
         "extension_disagreements": ext_dis,
         "flag_disagreements": flag_dis,
+        "suggested": suggested,
         "unevidenced": unevidenced,
         "conflicts": [r for r in rows if r.get("conflict")],
     }
@@ -471,8 +502,11 @@ def render_row(r: dict) -> str:
     lang = r["lang"] or "?"
     ev = _evidence_text(r) if r["lang"] else (r.get("error") or "no object")
     warn = ""
-    if not r["extension_agrees"]:
+    # only *conclusive* evidence drives an extension change; a suggested unit keeps its extension
+    if not r["extension_agrees"] and r["conclusive"]:
         warn = "  <- extension %s" % r["extension"]
+    if r.get("suggested"):
+        warn += "  <- suggested C++ (mangled callee only, not conclusive)"
     if r.get("conflict"):
         warn += "  <- 2 source files"
     if r.get("lang_flag") and r["lang"] and r["lang_flag"] != r["lang"]:
@@ -487,20 +521,27 @@ def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
         print(render_row(r), file=out)
     print("", file=out)
     if only_disagree:
-        print("SWEEP: %d of %d registered unit(s) disagree with their extension and therefore with the "
-              "`-lang` dtk derives from it; %d lib(s) set `-lang` in cflags."
-              % (len(s["extension_disagreements"]), len(s["units"]),
+        n_dis = len(s["extension_disagreements"])
+        n_sug = len(s["suggested"])
+        print("SWEEP: %d of %d registered unit(s) disagree with their extension **on conclusive "
+              "evidence** (own mangled symbol or `__FILE__` string) and therefore with the `-lang` dtk "
+              "derives from it; %d more are only *suggested* C++ (mangled callees) and must not be "
+              "renamed on that alone; %d lib(s) set `-lang` in cflags."
+              % (n_dis, len(s["units"]), n_sug,
                  sum(1 for r in s["units"] if r["lang_flag"])), file=out)
         if s["flag_disagreements"] and len(s["flag_disagreements"]) != len(s["extension_disagreements"]):
             print("  `-lang` disagreements: %d" % len(s["flag_disagreements"]), file=out)
         print("Fix rides the promotion pass (rename + extension + `-lang`, one re-split), not a per-unit "
               "patch: `docs/plan.md`, \"The language comes from the symbol\".", file=out)
-        strong = [r for r in s["extension_disagreements"] if r["confidence"] == "high"]
-        print("  strong (own mangled symbol or `__FILE__` string): %d" % len(strong), file=out)
+        # the list is already conclusive-only (see `sweep`); a mangled callee is not in it
+        strong = s["extension_disagreements"]
+        print("  conclusive (own mangled symbol or `__FILE__` string): %d" % len(strong), file=out)
         for r in strong:
             print("      %s -> %s   %s" % (r["path"], os.path.splitext(r["path"])[0] + ".cpp",
                                            _evidence_text(r)), file=out)
-        print("  probable (mangled callees only): %d" % (len(s["extension_disagreements"]) - len(strong)), file=out)
+        print("  suggested only (mangled callees - reported, never renamed on this alone): %d" % n_sug, file=out)
+        for r in s["suggested"]:
+            print("      %s   %s" % (r["path"], _evidence_text(r)), file=out)
         if s["unevidenced"]:
             print("  not a disagreement (a `.cpp` the object does not contradict): %d" % len(s["unevidenced"]),
                   file=out)
@@ -513,15 +554,19 @@ def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
         return
     total = len(s["units"])
     print("%d registered unit(s); oracle=%s" % (total, "map+DOL" if s["oracle"] else "unavailable"), file=out)
+    sp = s["split"]
+    print("  conclusive c++   %d" % sp["conclusive_cpp"], file=out)
+    print("  suggested c++    %d   (mangled callees only - reported, not a verdict)" % sp["suggested"], file=out)
+    print("  c                %d" % sp["c"], file=out)
     for key in ("high", "medium", "low"):
         n = s["counts"].get("c++/" + key, 0) + s["counts"].get("c/" + key, 0)
         print("  %-6s %d" % (key, n), file=out)
     print("  c++    %d   c    %d%s" % (s["langs"].get("c++", 0), s["langs"].get("c", 0),
                                      ("   unreadable %d" % s["langs"]["none"]) if s["langs"].get("none") else ""),
           file=out)
-    print("  extension disagreements: %d   lib-level `-lang` overrides: %d   unevidenced `.cpp`: %d   "
-          "two-source-file conflicts: %d"
-          % (len(s["extension_disagreements"]), sum(1 for r in s["units"] if r["lang_flag"]),
+    print("  extension disagreements (conclusive only): %d   suggested (not renamed): %d   "
+          "lib-level `-lang` overrides: %d   unevidenced `.cpp`: %d   two-source-file conflicts: %d"
+          % (len(s["extension_disagreements"]), sp["suggested"], sum(1 for r in s["units"] if r["lang_flag"]),
              len(s["unevidenced"]), len(s["conflicts"])), file=out)
 
 
@@ -597,23 +642,34 @@ def selftest() -> int:
     # the verdict table, one row per combination that matters
     v = classify(["fn__Fv"], [], [])
     check("a mangled definition is C++/high", (v["lang"], v["confidence"]), ("c++", "high"))
+    check("a mangled definition is conclusive", (v["conclusive"], v["suggested"]), (True, False))
     v = classify([], [], ["ef_line.cpp"])
     check("a `.cpp` __FILE__ is C++/high", (v["lang"], v["confidence"]), ("c++", "high"))
+    check("a `.cpp` __FILE__ is conclusive", (v["conclusive"], v["suggested"]), (True, False))
     v = classify([], ["Panic__Q24nw4r2dbFPCciPCce"], [])
     check("only mangled callees is C++/medium", (v["lang"], v["confidence"]), ("c++", "medium"))
+    check("a mangled callee is NOT conclusive", v["conclusive"], False)
+    check("a mangled callee is reported as suggested", v["suggested"], True)
     v = classify([], [], ["OSAlarm.c"])
     check("a `.c` __FILE__ is C/high", (v["lang"], v["confidence"]), ("c", "high"))
+    check("a `.c` __FILE__ is conclusive", (v["conclusive"], v["suggested"]), (True, False))
     v = classify([], [], [])
     check("no evidence is C/low (the default)", (v["lang"], v["confidence"]), ("c", "low"))
+    check("no evidence is not conclusive", (v["conclusive"], v["suggested"]), (False, False))
     v = classify([], [], ["g3d_resanm.cpp", "g3d_resanmamblight.cpp"])
     check("two source names is a conflict", (v["lang"], v["conflict"], len(v["sources"])), ("c++", True, 2))
     v = classify(["fn__Fv"], ["Panic__Q24nw4r2dbFPCciPCce"], ["ef_line.cpp"])
     check("the evidence list carries all three kinds",
           [e["kind"] for e in v["evidence"]],
           ["mangled-defined", "source-cpp", "mangled-undefined"])
+    check("a definition plus a callee is conclusive, not suggested",
+          (v["conclusive"], v["suggested"]), (True, False))
     v = classify([], [], ["foo.cpp", "foo.c"])
     check("a `.cpp` and a `.c` name together is a conflict, C++ wins the verdict",
           (v["lang"], v["conflict"]), ("c++", True))
+    v = classify([], ["get_now_areano__Fv"], ["TPL.c"])
+    check("a conclusive `.c` string overrides a mangled callee",
+          (v["lang"], v["conclusive"], v["suggested"]), ("c", True, False))
     v = classify(["fn__Fv", "fn__Fv"], [], [])
     check("duplicate evidence is de-duplicated", (v["mangled_defined"], v["evidence"][0]["count"]), (["fn__Fv"], 1))
     check("only `.c` is a C source (`.cp` is C++)",
@@ -654,6 +710,27 @@ def selftest() -> int:
         buf = io.StringIO()
         report(s, only_disagree=True, out=buf)
         check("the sweep report names the promotion pass", "promotion pass" in buf.getvalue(), True)
+        check("every extension disagreement is conclusive",
+              all(r["conclusive"] for r in s["extension_disagreements"]), True)
+        check("the suggested units are reported separately", len(s["suggested"]) > 0, True)
+        check("a suggested unit is not in the disagreement list",
+              all(not r["conclusive"] for r in s["suggested"]), True)
+        check("the report prints the suggested section",
+              "suggested only" in buf.getvalue(), True)
+
+        # the counter-example: auto/800FD520_fn_800FD520 calls mangled SetRootMtxTrans__... and was
+        # reconstructed as `.c`, matching at 100.00 % with all 26 relocations identical. Its mangled
+        # callee must stay a suggestion and must not appear in the rename list.
+        cx = os.path.join(ROOT, "build", "RMHE08", "obj", "auto", "800FD520_fn_800FD520.o")
+        if os.path.exists(cx):
+            v = object_verdict(cx, labels, dol)
+            check("the 800FD520 counter-example is C++/medium", (v["lang"], v["confidence"]), ("c++", "medium"))
+            check("the 800FD520 counter-example is not conclusive", (v["conclusive"], v["suggested"]), (False, True))
+            check("800FD520 does not drive an extension rename",
+                  any(r["path"].endswith("800FD520_fn_800FD520.c") for r in s["extension_disagreements"]),
+                  False)
+            check("800FD520 is listed as suggested",
+                  any(r["path"].endswith("800FD520_fn_800FD520.c") for r in s["suggested"]), True)
 
     # `-lang` resolution: both spellings, and a nested spread
     conf_text = (
