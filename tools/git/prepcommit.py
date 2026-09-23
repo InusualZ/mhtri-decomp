@@ -33,7 +33,7 @@ STATE_FILE = os.path.join(ROOT, ".pi", "local-only.state.json")
 BEGIN_MARKER = "<!-- LOCAL-ONLY-BEGIN"
 
 STAGE_PREFIXES = ("src/", "include/", "tools/", "docs/", ".agents/skills/", "config/")
-STAGE_FILES = ("configure.py", "AGENTS.md")
+STAGE_FILES = ("configure.py", "AGENTS.md", ".gitignore")
 REFUSE_PREFIXES = ("build/", "orig/", ".lavish/", ".pi/", ".vscode/", ".idea/", "__pycache__/")
 REFUSE_FILES = ("objdiff.json", "compile_commands.json", "build.ninja")
 REFUSE_SUFFIXES = (".o", ".elf", ".dol", ".rel", ".map", ".MAP", ".exe", ".stackdump", ".pyc")
