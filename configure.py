@@ -616,7 +616,7 @@ config.libs = [
             # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.
             # `fn_8026FFBC` (0x8026FFBC..0x80270018) sits on the ambiguous side of that seam and is
             # deliberately left unclaimed rather than guessed in.
-            Object(NonMatching, "Pl/pl_master.cpp"),
+            Object(Matching, "Pl/pl_master.cpp"),
         ],
     },
     {
