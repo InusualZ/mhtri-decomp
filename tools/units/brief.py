@@ -262,7 +262,8 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("## 4 · Where your output goes")
     lines.append("")
     lines.append("* your source, committed **on your branch** (one commit): `%s`" % b["source"])
-    lines.append("* `%s`" % os.path.join(main, ".pi", "outbox", b["slug"] + ".json"))
+    lines.append("* `%s` - note land.py looks for `<slug>-<hash>.json`; the hash is the batch's, so copy your "
+                 "outbox to that name before handing off" % os.path.join(main, ".pi", "outbox", b["slug"] + ".json"))
     lines.append("* `%s`" % os.path.join(main, ".pi", "notes", b["slug"] + ".md"))
     lines.append("* a ≤ 15-line digest in your reply")
     lines.append("")
