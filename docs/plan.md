@@ -508,6 +508,25 @@ tool is not done until `land.py` calls it or the plan says who runs it**.
 | 7.5 + 7.16 `land.py` | **done (build path dry-run only)** | 13 checks; the gate refuses on a moved base, a shared-file edit, a missing/invalid outbox, a regression, and requires `ok` to be recreated by *this* run; baseline refresh |
 | 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **not yet** | `brief.py` already reads the queue and `land.py` reports the missing lint as skipped |
 
+**Flip campaign (7.6), first batch 2026-09-23.** `Runtime.PPCEABI.H/memset` is flipped and committed
+(`3e5a072`): the gate deleted `build/RMHE08/main.elf` (the branch that had never run), relinked, and `main.dol`
+is still `bf4850739478caaedfe675949eb7c28595a7fde9` = `config/RMHE08/build.sha1`. The byte-identity proofs of the
+remaining candidates (`.pi/notes/flip-proofs.md`) give the safe order - `Network/NetworkWiiMediator`,
+`OS/OSAlarm`, `Runtime.PPCEABI.H/memcpy`, `lobby/lobby_scene`, `Runtime.PPCEABI.H/global_destructor_chain`,
+`Runtime.PPCEABI.H/__init_cpp_exceptions`, `sys_mem` - and they found two blockers with their cause, which are
+findings rather than failures:
+
+* `Runtime.PPCEABI.H/__start` and `__ppc_eabi_init` are short by exactly the 16-byte zero padding the retail DOL
+  has at `0x800062E8` / `0x800065E4`: those two files need `-func_align 16` (a flag/`#pragma`, not a code fix),
+  which is the inverse of the lib-wide `-func_align 4` landed in batch 5;
+* `g3d/g3d_resanmamblight` lacks the target's `extab`/`extabindex` (2 entries): that object needs exceptions on,
+  the same finding as `Pl` and `Gecko_ExceptionPPC.cp` in playbook row 30.
+
+Every `.rela.*` byte difference in the whole candidate set is only byte 6 of an `Elf32_Rela` (the `r_info`
+symbol index), proven to reference the same symbol, and `sys_mem`'s `@13` vs `@etb_80006770` is a name-only
+difference - so those objects are DOL-identical and can be flipped.
+
+
 **End-to-end dry round (2026-09-23).** claim → brief → measure inside the worktree → outbox → gate: `claims.py
 claim` → `brief.py` → (in the worktree) `recompile.py --measure` → `handoff.py --check` → `land.py verify
 --dry-run` exited **0** with all five cheap checks passing, then the claim was released. The heavy path
