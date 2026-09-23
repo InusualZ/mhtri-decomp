@@ -558,6 +558,93 @@ auto/8036640C_fn_8036640C.c:
 	extabindex  start:0x80037218 end:0x80037224
 	.text       start:0x8036640C end:0x80366618
 
+auto/80370274_fn_80370274.c:
+	extab       start:0x800179A4 end:0x80017A5C
+	extabindex  start:0x800374DC end:0x800375F0
+	.text       start:0x80370274 end:0x80375084
+
+auto/80382310_fn_80382310.cpp:
+	extab       start:0x80017E2C end:0x80017FDC
+	extabindex  start:0x80037BA8 end:0x80037E30
+	.text       start:0x80382310 end:0x80385CAC
+	.ctors      start:0x8056F3A8 end:0x8056F3AC
+
+auto/80385CAC_fn_80385CAC.c:
+	extab       start:0x80017FDC end:0x80017FE4
+	extabindex  start:0x80037E30 end:0x80037E3C
+	.text       start:0x80385CAC end:0x80385DEC
+
+auto/80385DEC_fn_80385DEC.c:
+	extab       start:0x80017FE4 end:0x8001808C
+	extabindex  start:0x80037E3C end:0x80037F38
+	.text       start:0x80385DEC end:0x80387620
+	.ctors      start:0x8056F3AC end:0x8056F3B0
+
+auto/80387620_fn_80387620.c:
+	extab       start:0x8001808C end:0x80018094
+	extabindex  start:0x80037F38 end:0x80037F44
+	.text       start:0x80387620 end:0x80387844
+
+auto/8038EFEC_fn_8038EFEC.c:
+	extab       start:0x800181DC end:0x8001833C
+	extabindex  start:0x80038130 end:0x80038340
+	.text       start:0x8038EFEC end:0x80394038
+
+auto/803963F4_fn_803963F4.c:
+	extab       start:0x8001842C end:0x80018434
+	extabindex  start:0x800384A8 end:0x800384B4
+	.text       start:0x803963F4 end:0x80396654
+
+auto/80396654_fn_80396654.c:
+	extab       start:0x80018434 end:0x8001843C
+	extabindex  start:0x800384B4 end:0x800384C0
+	.text       start:0x80396654 end:0x803967F0
+
+auto/803AFF34_fn_803AFF34.c:
+	extab       start:0x80018C2C end:0x80018C54
+	extabindex  start:0x800390A8 end:0x800390E4
+	.text       start:0x803AFF34 end:0x803B0F98
+
+auto/803B0F98_fn_803B0F98.c:
+	extab       start:0x80018C54 end:0x80018C5C
+	extabindex  start:0x800390E4 end:0x800390F0
+	.text       start:0x803B0F98 end:0x803B177C
+
+auto/803B177C_fn_803B177C.c:
+	extab       start:0x80018C5C end:0x80018DBC
+	extabindex  start:0x800390F0 end:0x80039300
+	.text       start:0x803B177C end:0x803B43B0
+
+auto/803B43B0_fn_803B43B0.c:
+	extab       start:0x80018DBC end:0x80018DC4
+	extabindex  start:0x80039300 end:0x8003930C
+	.text       start:0x803B43B0 end:0x803B465C
+
+auto/803D6F98_fn_803D6F98.c:
+	extab       start:0x8001A340 end:0x8001A348
+	extabindex  start:0x8003A8A8 end:0x8003A8B4
+	.text       start:0x803D6F98 end:0x803D70B8
+
+auto/803E1A14_fn_803E1A14.c:
+	extab       start:0x8001AC30 end:0x8001AC78
+	extabindex  start:0x8003AF38 end:0x8003AFA4
+	.text       start:0x803E1A14 end:0x803E2B10
+
+auto/803E3678_fn_803E3678.c:
+	extab       start:0x8001ACA0 end:0x8001ACA8
+	extabindex  start:0x8003AFE0 end:0x8003AFEC
+	.text       start:0x803E3678 end:0x803E38D8
+
+auto/803E3CE8_fn_803E3CE8.c:
+	extab       start:0x8001ACB8 end:0x8001ACC0
+	extabindex  start:0x8003B004 end:0x8003B010
+	.text       start:0x803E3CE8 end:0x803E44C8
+
+auto/803E44C8_fn_803E44C8.c:
+	extab       start:0x8001ACC0 end:0x8001ACC8
+	extabindex  start:0x8003B010 end:0x8003B01C
+	.text       start:0x803E44C8 end:0x803E4888
+
 Network/NetworkWiiMediator.c:
 	.text       start:0x80413F3C end:0x80413F50
 
