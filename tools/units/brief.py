@@ -26,6 +26,13 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# the brief carries the plan's text verbatim (<=, >=, em dashes), and a Windows console is cp1252: without this
+# `--stdout` dies on the first such character while the file write (UTF-8) is fine
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
@@ -198,6 +205,24 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
+    lines.append("## 0 · Acknowledge first, then heartbeat")
+    lines.append("")
+    lines.append("Before anything else, say you are alive:")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python tools/units/claims.py ack %s --agent <your-name> --pane <your-pane>" % b["unit"])
+    lines.append("```")
+    lines.append("")
+    lines.append("That writes `%s`. Re-run it **with `--progress <symbol>` every time you finish a "
+                 "function** - it is the heartbeat by which the orchestrator tells a stalled worker from a "
+                 "working one, and it takes a second." % os.path.join(main, ".pi", "ack", b["slug"] + ".json"))
+    lines.append("")
+    lines.append("**The timeout policy:** if there is no ack within **%d seconds**, or no progress for "
+                 "**%d minutes**, the orchestrator reclaims the unit - your commits are copied to "
+                 "`refs/rescue/%s` first, then the worktree goes away and the unit is re-briefed to someone "
+                 "else. Talk to the orchestrator with the ack and the outbox, not by being busy."
+                 % (120, 20, b["slug"]))
+    lines.append("")
     lines.append("## 1 · The unit")
     lines.append("")
     lines.append("| | |")
@@ -276,6 +301,13 @@ def render(main: str, b: dict, task: str | None) -> str:
                  "`ninja`/the split/the link/`ok`, and never commits on `main`. Everything you need changed goes "
                  "into the outbox's `config_requests`.")
     lines.append("")
+    lines.append("**You may fan out subagents** for parallel work. They run in *your* worktree, on *your* branch; "
+                 "they never commit (you make the one commit); you assign them disjoint files or functions; and you "
+                 "are accountable for what they produce - **re-measure every claim they make**, exactly as the "
+                 "orchestrator re-measures yours. Hand each of them this whole part verbatim: a subagent that has "
+                 "not read it will name a field `unk4`, reach it with a pointer cast, or use a `goto`, and that "
+                 "becomes repair work charged to you.")
+    lines.append("")
     lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
     lines.append("")
     lines.append(plan_section(main, "## 8. Invariants"))
@@ -298,6 +330,11 @@ def selftest() -> int:
           and len(splits_range(".", "Pl/pl_act")[".text"]) == 3, True)
     check("splits ignores an unknown unit", splits_range(".", "Nope/nothing"), {})
     check("plan_section finds §6.5", "Type and naming discipline" in plan_section(".", "### 6.5 Type and naming discipline"), True)
+    check("§6.5 now carries the goto rule", "`goto` is forbidden" in plan_section(".", "### 6.5 Type and naming discipline"), True)
+    check("the plan has the acknowledgement section",
+          "Acknowledgement" in plan_section(".", "### 5.6 Acknowledgement"), True)
+    check("the subagent contract is in §5.5",
+          "fan out subagents" in plan_section(".", "### 5.5 A worker may fan out subagents"), True)
     check("plan_section finds §8", "Invariants" in plan_section(".", "## 8. Invariants"), True)
     check("plan_section is empty for nonsense", plan_section(".", "### 99 nope"), "")
     if fails:

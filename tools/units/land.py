@@ -64,7 +64,7 @@ def record_base(main: str) -> dict:
     head = git(["rev-parse", "HEAD"], main).strip()
     data = {"base": head, "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "subject": git(["log", "-1", "--format=%s"], main).strip(),
-            "ledger": ledger_numbers(main)}
+            "ledger": ledger_numbers(main), "report": report_snapshot(main)}
     os.makedirs(os.path.join(main, ".pi"), exist_ok=True)
     with open(os.path.join(main, BASE_FILE), "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1)
@@ -137,6 +137,60 @@ def regression_rows(changes_json: str) -> list[tuple[str, str, float, float]]:
     return [r for r in rows if "auto_" not in r[0]]
 
 
+def report_snapshot(main: str) -> dict:
+    """Per-unit measures and the sub-100 % symbols - the evidence a batch's delta is judged against.
+
+    `build/RMHE08/report_changes.json` only carries DOL-level totals, and `ninja baseline` (which this tool runs
+    at the end of a batch) rewrites the very baseline the comparison would need: two consecutive verifies of the
+    same tree therefore both report "no regression" while the ledger says matched 231 -> 228. So the snapshot is
+    taken at `record-base` and kept in `.pi/`, where nothing overwrites it.
+    """
+    path = os.path.join(main, "build", "RMHE08", "report.json")
+    if not os.path.exists(path):
+        return {}
+    data = json.loads(open(path, encoding="utf-8").read())
+    out = {}
+    for unit in data.get("units", []):
+        name = unit.get("name") or ""
+        measures = unit.get("measures") or {}
+        symbols = {}
+        for fn in unit.get("functions") or []:
+            pct = fn.get("fuzzy_match_percent", fn.get("match_percent"))
+            if fn.get("name") and isinstance(pct, (int, float)) and pct < 100.0:
+                symbols[fn["name"]] = round(float(pct), 4)
+        if measures or symbols:
+            out[name] = {
+                "fuzzy": measures.get("fuzzy_match_percent"),
+                "matched_code": measures.get("matched_code"),
+                "symbols": symbols,
+            }
+    return out
+
+
+def report_regressions(before: dict, after: dict, allow: list[str]) -> tuple[list[tuple], list[tuple]]:
+    """-> (unauthorised, authorised) regressions as (unit, what, before, after).
+
+    A unit's own `fuzzy` dropping, or any symbol dropping, is a regression; `allow` names units whose
+    regression an explicit rule authorised (rule 8 of §6.5 costs score, and that cost is measured, not hidden).
+    """
+    unauthorised, authorised = [], []
+    for unit, after_vals in after.items():
+        prior = before.get(unit)
+        if not prior or "auto_" in unit and "/auto/" not in unit:
+            continue          # the auto_* scaffold losing symbols to a real unit is bookkeeping, not a regression
+        hit_allowed = any(a in unit for a in allow)
+        af, bf = prior.get("fuzzy"), after_vals.get("fuzzy")
+        if isinstance(af, (int, float)) and isinstance(bf, (int, float)) and bf < af - 1e-9:
+            (authorised if hit_allowed else unauthorised).append((unit, "unit fuzzy", af, bf))
+        for sym, bpct in (prior.get("symbols") or {}).items():
+            apct = (after_vals.get("symbols") or {}).get(sym)
+            if apct is None:
+                continue          # reached 100 %: not a regression
+            if isinstance(apct, (int, float)) and apct < bpct - 1e-9:
+                (authorised if hit_allowed else unauthorised).append((unit, sym, bpct, apct))
+    return unauthorised, authorised
+
+
 def ledger_numbers(main: str) -> dict:
     """The ledger's totals, mapped to the names the message uses (`ledger.py --json` nests them)."""
     p = run([sys.executable, os.path.join("tools", "units", "ledger.py"), "--json"], main)
@@ -175,6 +229,15 @@ def summary(before: dict, after: dict) -> str:
     return ", ".join(parts) or "(ledger numbers unavailable)"
 
 
+def branch_commits(main: str, unit: str, base: str | None) -> int:
+    """How many commits the unit's worker branch has beyond the batch base - the artefact that cannot lie."""
+    branch = claims.branch_for(unit)
+    if not base or not claims.branch_exists(main, branch):
+        return 0
+    p = run(["git", "rev-list", "--count", "%s..%s" % (base, branch)], main)
+    return int(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip().isdigit() else 0
+
+
 def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
     """-> (units whose outbox validates, problems)."""
     ok, problems = [], []
@@ -194,7 +257,9 @@ def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
     return ok, problems
 
 
-def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool) -> int:
+def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
+           allow_regression: list[str] | None = None) -> int:
+    allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str]] = []
 
     def check(name: str, good: bool, detail: str = "", info: str = "") -> None:
@@ -222,6 +287,9 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     if units:
         ok_units, problems = outbox_units(main, units)
         check("every unit's outbox validates", not problems, "; ".join(problems[:4]))
+        uncommitted = [u for u in units if branch_commits(main, u, want_base) == 0]
+        check("every unit's branch carries its work as commits", not uncommitted,
+              "no commits on the branch (work left uncommitted in the worktree?): %s" % ", ".join(uncommitted))
     else:
         check("batch units named", False, "pass --units (the outboxes are what the batch is judged by)")
 
@@ -268,9 +336,25 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     built = gate("configure.py", [sys.executable, "configure.py"])
     built = gate("ninja", ["ninja"]) and built
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
-    regressed = regression_rows(os.path.join(main, "build", "RMHE08", "report_changes.json"))
-    check("no measure regressed", not regressed,
-          "; ".join("%s %s %.2f -> %.2f" % r for r in regressed[:4]))
+    # the regression scan reads build/RMHE08/report_changes.json, which only `ninja changes` writes: without
+    # this the scan reads the PREVIOUS batch's file and passes for the wrong reason (the first real run did
+    # exactly that, while the ledger showed matched 231 -> 228).
+    gate("ninja changes (DOL-level totals, informational)", ["ninja", "changes"])
+    before_report = recorded.get("report") or {}
+    after_report = report_snapshot(main)
+    unauthorised, authorised = report_regressions(before_report, after_report, allow_regression)
+    for row in authorised:
+        print("note: regression ALLOWED by --allow-regression: %s %s %.2f -> %.2f" % row)
+    check("no symbol or unit regressed", not unauthorised,
+          "; ".join("%s %s %.2f -> %.2f" % r for r in unauthorised[:5]),
+          info=("%d authorised regression(s)" % len(authorised)) if authorised else "")
+    used = {a for a in allow_regression if any(a in row[0] for row in authorised)}
+    check("every --allow-regression was actually needed", not [a for a in allow_regression if a not in used],
+          "stale allowance(s), remove them: %s" % ", ".join(a for a in allow_regression if a not in used))
+    if not before_report:
+        check("the batch base carries a report snapshot", False,
+              "record-base did not snapshot report.json (rebuild it and re-record the base)")
+    all_regressed = [("", "", 0.0, 0.0)][:0] + [(u, w, b, a) for u, w, b, a in unauthorised + authorised]
     gate("ok (main.dol verified)", ["ninja", "build/RMHE08/ok"])
     fresh = os.path.exists(ok_file) and os.stat(ok_file).st_mtime_ns >= started
     check("ok was recreated by THIS run", fresh, "the ok stamp predates the run - it proves nothing")
@@ -298,8 +382,9 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     body = ["land: %s" % ("; ".join(units) if units else "batch"),
             "",
             "ledger: %s" % summary(before, after),
-            "gates: ground truth ok, base %s, %d check(s), ok recreated=%s%s"
-            % ((want_base or "?")[:8], len(checks), fresh, ", main.elf relinked" if flip else ""),
+            "gates: ground truth ok, base %s, %d check(s), ok recreated=%s%s%s"
+            % ((want_base or "?")[:8], len(checks), fresh, ", main.elf relinked" if flip else "",
+               ", authorised regressions: %s" % ", ".join(sorted(allow_regression)) if allow_regression else ""),
             ""]
     with open(message, "w", encoding="utf-8") as fh:
         fh.write("\n".join(body))
@@ -370,6 +455,8 @@ def main() -> int:
     v.add_argument("--units", default=None, help="comma-separated units in this batch")
     v.add_argument("--dry-run", action="store_true", help="run the cheap checks only; touch nothing")
     v.add_argument("--no-build", action="store_true", help="skip the split/link/ok/baseline steps")
+    v.add_argument("--allow-regression", action="append", default=[],
+                   help="unit whose measured regression is authorised by a rule (recorded in the message); repeatable")
     v.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -382,7 +469,7 @@ def main() -> int:
         return 0
     if args.cmd == "verify":
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
-        return verify(main, units, args.base, args.dry_run, args.no_build)
+        return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression)
     ap.print_help()
     return 0
 
