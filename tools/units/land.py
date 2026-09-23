@@ -63,7 +63,8 @@ def git(args: list[str], cwd: str, check: bool = True) -> str:
 def record_base(main: str) -> dict:
     head = git(["rev-parse", "HEAD"], main).strip()
     data = {"base": head, "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "subject": git(["log", "-1", "--format=%s"], main).strip()}
+            "subject": git(["log", "-1", "--format=%s"], main).strip(),
+            "ledger": ledger_numbers(main)}
     os.makedirs(os.path.join(main, ".pi"), exist_ok=True)
     with open(os.path.join(main, BASE_FILE), "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1)
@@ -137,20 +138,38 @@ def regression_rows(changes_json: str) -> list[tuple[str, str, float, float]]:
 
 
 def ledger_numbers(main: str) -> dict:
+    """The ledger's totals, mapped to the names the message uses (`ledger.py --json` nests them)."""
     p = run([sys.executable, os.path.join("tools", "units", "ledger.py"), "--json"], main)
     if p.returncode != 0:
         return {}
     try:
-        return json.loads(p.stdout)
+        data = json.loads(p.stdout)
     except json.JSONDecodeError:
         return {}
+    totals = data.get("totals") or data
+    return {
+        "covered": totals.get("claimed_functions"),
+        "closed": totals.get("closed"),
+        "partial": totals.get("partial"),
+        "unclaimed": totals.get("unclaimed"),
+        "matched": totals.get("matched_functions"),
+        "bytes": totals.get("matched_code"),
+        "total_code": totals.get("total_code"),
+        "matched_percent": totals.get("fuzzy_match_percent"),
+    }
 
 
 def summary(before: dict, after: dict) -> str:
-    keys = ("covered", "closed", "matched", "bytes")
+    def num(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value if isinstance(value, (int, float)) else None
+
+    keys = ("covered", "closed", "partial", "matched", "bytes")
     parts = []
     for key in keys:
-        b, a = before.get(key), after.get(key)
+        b, a = num(before.get(key)), num(after.get(key))
         if isinstance(b, (int, float)) and isinstance(a, (int, float)):
             parts.append("%s %s -> %s" % (key, b, a))
     return ", ".join(parts) or "(ledger numbers unavailable)"
@@ -214,7 +233,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     else:
         check("style lint (§6.5)", True, info="not built yet (roadmap 7.21) - skipped")
 
-    before = ledger_numbers(main)
+    before = recorded.get("ledger") or ledger_numbers(main)
     flip = flips_objects(main)
     ok_file = os.path.join(main, "build", "RMHE08", "ok")
     elf_file = os.path.join(main, "build", "RMHE08", "main.elf")
