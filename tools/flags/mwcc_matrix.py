@@ -6,6 +6,13 @@ the unit's `cflags` is honoured); `--flags-extra` overrides same-family flags, a
 argument swaps the MWCC executable. The object is written to the unit's real output path so that
 objdiff's project mode can diff it against the split target object.
 
+The `match` column is the **official report metric** (`report generate`'s `fuzzy_match_percent`,
+`unitutil.report_functions`) - the number that closes a symbol, not objdiff's positional `diff` value.
+The diff JSON is still generated and used for the two sizes and the `first-diff@` index, because the
+report carries neither. This matters for flag decisions: `diff` defaults `functionRelocDiffs` to
+`data_value` while the report defaults to `none`, so relocation-only differences used to read as
+sub-100 % code here (`pl_skill` fn_80270018: 99.88 % positionally, **100.0 %** officially).
+
 Usage:
     python tools/flags/mwcc_matrix.py                          # the unit's own compiler, no overrides
     python tools/flags/mwcc_matrix.py -u <unit>
@@ -48,18 +55,32 @@ def od_size(e):
 
 
 def diff_unit(unit, label, symbol):
+    """Row detail (first divergence, sizes) for one variant; the score comes from the report.
+
+    `-c functionRelocDiffs=none` matches the report's default, so the `first-diff@` index is not a
+    relocation-only difference the official metric ignores.
+    """
     out = os.path.join(OUTDIR, label.replace("/", "_") + ".json")
-    cmd = [OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol, "--format", "json", "-o", out]
+    cmd = [OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
+           "-c", "functionRelocDiffs=none", "--format", "json", "-o", out]
     p = subprocess.run(cmd, cwd=uu.ROOT, capture_output=True, text=True)
     if p.returncode != 0:
         return None, (p.stdout or "") + (p.stderr or "")
     return out, ""
 
 
-def summarize(path):
+def summarize(path, official=None):
+    """Rows for one variant: (name, target size, ours size, match percent, first diff).
+
+    `official` is `{function: fuzzy_match_percent}` from `unitutil.report_functions` for the same object
+    pair - the score a flag decision must be made on. The diff JSON's own `match_percent` is positional
+    and relocation-sensitive, so it is only a fallback for a function the report did not score (marked
+    with `~` in the printed row).
+    """
     d = json.load(open(path))
     # Project mode (`-p . -u UNIT`): left = target, right = our build.
     ours = dict(od_symbols(d, "right"))
+    official = official or {}
     rows = []
     for name, e in od_symbols(d, "left"):
         if not e.get("instructions"):
@@ -73,8 +94,11 @@ def summarize(path):
                 continue
             first = (i, ins["instruction"]["formatted"])
             break
-        rows.append((name, od_size(e), od_size(ri) if ri else -1,
-                     round(e.get("match_percent") or 0.0, 2), first))
+        if name in official and isinstance(official[name], (int, float)):
+            pct, approx = round(official[name], 2), False
+        else:
+            pct, approx = round(e.get("match_percent") or 0.0, 2), True
+        rows.append((name, od_size(e), od_size(ri) if ri else -1, pct, first, approx))
     return rows
 
 
@@ -121,11 +145,18 @@ def main():
             print(msg)
             lines.append(msg)
             continue
-        rows = summarize(path)
-        block = ["== %s" % label]
-        for name, tsz, osz, pct, first in rows:
+        official = uu.report_functions(unit.target, unit.obj, unit.name,
+                                       os.path.join(uu.ROOT, "build", "tmp", "matrix"))
+        if "_error" in official:
+            print("%s: WARNING the report metric is unavailable, positional values below are marked ~:\n  %s"
+                  % (label, official["_error"][:200]))
+            official = {}
+        rows = summarize(path, official)
+        block = ["== %s   (match = official report metric)" % label]
+        for name, tsz, osz, pct, first, approx in rows:
             fd = ("first-diff@%d %s" % first) if first else "IDENTICAL"
-            block.append("   %-28s target %6d  ours %6d  %6.2f%%  %s" % (name, tsz, osz, pct, fd))
+            block.append("   %-28s target %6d  ours %6d  %6.2f%%%s  %s"
+                         % (name, tsz, osz, pct, "~" if approx else " ", fd))
         block.append("")
         lines += block
         print("\n".join(block))
