@@ -59,15 +59,12 @@ def claim_for(main: str, unit: str) -> dict:
 def claim_slug(claim: dict) -> str | None:
     """The handoff slug `land.py` keys the outbox by: the claim's branch minus `worker/`.
 
-    Read from the branch instead of re-deriving it from the unit path. `claims.py` builds the branch as
-    `worker/` + `claims.slug(unit)`, so the two agree today - but the branch *is* the claim's identity (it is
-    the lock), a round may name it with its own suffix, and the gate looks the outbox up by the branch. An
+    The one implementation is `claims.slug_of_branch`; this is the dict-shaped wrapper `handoff_paths` uses.
+    Read from the branch instead of re-deriving it from the unit path: the branch *is* the claim's identity (it
+    is the lock), a round may name it with its own suffix, and the gate looks the outbox up by the branch. An
     unclaimed unit has no branch and therefore no slug: never invent one.
     """
-    branch = (claim or {}).get("branch") or ""
-    if branch.startswith(claims.BRANCH_PREFIX):
-        return branch[len(claims.BRANCH_PREFIX):]
-    return branch or None
+    return claims.slug_of_branch((claim or {}).get("branch"))
 
 
 def unclaimed_notice(main: str, unit: str) -> str:
@@ -93,8 +90,8 @@ def handoff_paths(main: str, unit: str) -> dict:
         "slug": slug,
         "ack": claims.ack_path(main, unit),
         "rescue": "refs/rescue/%s" % claims.slug(unit),
-        "outbox": os.path.join(main, ".pi", "outbox", slug + ".json") if slug else None,
-        "notes": os.path.join(main, ".pi", "notes", slug + ".md") if slug else None,
+        "outbox": claims.outbox_path(main, unit) if slug else None,
+        "notes": claims.notes_path(main, unit) if slug else None,
     }
 
 
@@ -415,14 +412,18 @@ def selftest() -> int:
         check("no branch means no slug", claim_slug({}), None)
         check("the slug is the branch minus worker/", claim_slug(claim_for(main, "Pl/pl_act")),
               claims.slug("Pl/pl_act"))
+        check("claim_slug is claims.py's one rule", claim_slug(claim_for(main, "Pl/pl_skill")),
+              claims.claim_slug(main, "Pl/pl_skill"))
         h = handoff_paths(main, "Pl/pl_act")
         check("a claimed unit is marked claimed", h["claimed"], True)
         check("the outbox is <slug>.json", os.path.basename(h["outbox"]), claims.slug("Pl/pl_act") + ".json")
         check("the outbox is the one handoff.py names", os.path.basename(h["outbox"]),
               os.path.basename(handoff_mod.outbox_path(main, "Pl/pl_act")))
+        check("the outbox is claims.py's own outbox path", h["outbox"], claims.outbox_path(main, "Pl/pl_act"))
         check("the outbox lives in MAIN/.pi/outbox", os.path.dirname(h["outbox"]),
               os.path.join(main, ".pi", "outbox"))
         check("the notes path uses the same slug", os.path.basename(h["notes"]), claims.slug("Pl/pl_act") + ".md")
+        check("the notes path is claims.py's own", h["notes"], claims.notes_path(main, "Pl/pl_act"))
         check("a branch suffix survives into the slug", handoff_paths(main, "Pl/pl_skill")["slug"],
               claims.slug("Pl/pl_skill") + "-dd6e")
         check("the ack stays claims.py's own path", h["ack"], claims.ack_path(main, "Pl/pl_act"))

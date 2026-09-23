@@ -39,7 +39,8 @@ CONFIG_KINDS = ("range", "rename", "flag", "shared-file")
 
 
 def outbox_path(main: str, unit: str) -> str:
-    return os.path.join(main, ".pi", "outbox", claims.slug(unit) + ".json")
+    """`claims.outbox_path` - the claim's branch minus `worker/`, the one name brief.py writes and land.py reads."""
+    return claims.outbox_path(main, unit)
 
 
 def template(unit: str, worker: str = "worker-a") -> dict:
@@ -162,6 +163,18 @@ def selftest() -> int:
                                          "residual": "none"}, {"fn_1"})[0], [])
     d = digest("u", [{"name": "fn_1", "percent": 50.0}])
     check("digest has a header and the row", ("| symbol | measured % | note |" in d and "| `fn_1` | 50.00 |" in d), True)
+
+    # the outbox this tool names is the branch-derived one land.py's gate reads, not a name re-derived here
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, ".pi"), exist_ok=True)
+        claims.save_registry(tmp, {"Pl/pl_act": {"branch": claims.branch_for("Pl/pl_act") + "-abcd"}})
+        check("the outbox is the claim's branch minus worker/",
+              os.path.basename(outbox_path(tmp, "Pl/pl_act")), claims.slug("Pl/pl_act") + "-abcd.json")
+        check("handoff's outbox is claims.py's outbox",
+              outbox_path(tmp, "Pl/pl_act"), claims.outbox_path(tmp, "Pl/pl_act"))
+        check("an unclaimed unit still names a path to look at",
+              os.path.basename(outbox_path(tmp, "RSO/runtime")), claims.slug("RSO/runtime") + ".json")
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -219,7 +232,7 @@ def main() -> int:
         return 0
     print(digest(unit, rows))
     print("\noutbox: %s" % outbox_path(main, unit))
-    print("notes:  %s" % os.path.join(main, ".pi", "notes", claims.slug(unit) + ".md"))
+    print("notes:  %s" % claims.notes_path(main, unit))
     return 0
 
 

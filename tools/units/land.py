@@ -505,6 +505,22 @@ def selftest() -> int:
         repo_commit(tmp, "claim-time main")
         check("a missing worker branch fails", branch_commits(tmp, unit), 0)
 
+    # outbox_units() must look where brief.py wrote: the claim's branch minus worker/, not slug(unit)
+    entry = {"unit": "Pl/pl_act", "worker": "a", "finished_at": "2026-01-01T00:00:00", "unit_percent": 50.0,
+             "symbols": [{"name": "fn_1", "percent": 50.0}], "residual": "none",
+             "measured_with": "recompile.py", "config_requests": [], "flags_probed": [], "blockers": []}
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
+        claims.save_registry(tmp, {"Pl/pl_act": {"branch": claims.branch_for("Pl/pl_act") + "-dd6e"}})
+        json.dump(entry, open(os.path.join(tmp, ".pi", "outbox", claims.slug("Pl/pl_act") + "-dd6e.json"), "w"))
+        check("a branch-derived outbox is found", outbox_units(tmp, ["Pl/pl_act"]), (["Pl/pl_act"], []))
+        # the same entry under the unit-path slug is not what brief.py wrote, so the gate must not accept it
+        os.remove(os.path.join(tmp, ".pi", "outbox", claims.slug("Pl/pl_act") + "-dd6e.json"))
+        json.dump(entry, open(os.path.join(tmp, ".pi", "outbox", claims.slug("Pl/pl_act") + ".json"), "w"))
+        ok_units, problems = outbox_units(tmp, ["Pl/pl_act"])
+        check("an outbox under the unit-path slug is not found", ok_units, [])
+        check("and is reported as missing", "no outbox" in (problems[0] if problems else ""), True)
+
     check("summary delta", summary({"closed": 284, "matched": 217}, {"closed": 290, "matched": 223}),
           "closed 284 -> 290, matched 217 -> 223")
     check("summary tolerates a missing side", summary({}, {}), "(ledger numbers unavailable)")
