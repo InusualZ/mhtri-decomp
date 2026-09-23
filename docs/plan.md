@@ -790,6 +790,31 @@ Two smaller findings from the same round, both already fixed or decided:
 * the claim's key was the unit's *spelling*, so `auto/X` and `auto/X.c` defeated the lock and two workers took one
   unit. `claims.norm_unit` now strips the source extension at claim and release (commit `c36ab86f`).
 
+### The binary is the ground truth, and compilation is lossy (owner's principle, 2026-09-23)
+
+This is a *matching* decompilation, so the binary is the only authority - and because compilation is a **lossy**
+process, what survives in it is *evidence about the source*, not an accident. The method: **extract the maximum from
+the binary first, then fill only the blanks it cannot answer.**
+
+What the binary actually carries, and what each trace is evidence *for*:
+
+| the trace | what it tells us |
+| --- | --- |
+| `__FILE__` strings in `.data` | the original **source file name** (`ef_line.cpp`, `ef_point.cpp`, ...) - hence the module and the language |
+| mangled symbols | the **language** (C++ vs C) and the **signature** |
+| `Panic` line numbers | the **source line** of each assert - which orders the source and shows how much is missing |
+| assert message text and format strings | the **semantics**, in the original author's words |
+| the `.sdata2`/`.data` pool order | the **order the literals appear** in the source |
+| relocations | which **named symbol** each load refers to |
+| jump tables | the **switch structure**, including the case count |
+| `extab`/`extabindex`, `.ctors`/`.dtors` | the **exception and constructor structure**, hence the function shapes |
+| section sizes and the map | the **unit's extent** and every symbol's size |
+
+The corollary is a working rule: when a tool or a brief can carry one of these, it should. A worker that has to
+*rediscover* that a unit is `ef_cube.cpp`, or that a symbol is C++, is doing work the binary already did for us - and
+this session showed six workers independently rediscovering the same peephole lever, which is the same waste in a
+different place.
+
 ### The language comes from the symbol, not from our convenience (owner's rule, 2026-09-23)
 
 A unit is **C++** when either of these says so:
