@@ -310,18 +310,102 @@ def function_names(obj):
 OBJDIFF = os.path.join(ROOT, "build", "tools", "objdiff-cli.exe")
 
 
-def objdiff(unit, symbol, out=None):
+def objdiff(unit, symbol, out=None, runner=subprocess.run):
     """Run `objdiff-cli diff` for a unit in project mode; returns (json path, output).
 
     A symbol argument is required for symbol/instruction level output in the pinned objdiff-cli.
+
+    `-c functionRelocDiffs=none` is passed explicitly: `report generate`'s default is `none` while
+    `diff`'s is `data_value`, so without it the rows a tool sees disagree with the official
+    classification (relocation-only differences show up as `DIFF_ARG_MISMATCH`).
+
+    The per-symbol `match_percent` in this JSON is objdiff's **positional** value, not the campaign's
+    metric - it is neither the reloc-independent numbers nor the report's normalisation. Use
+    `report_measure()` / `report_functions()` for a score, and this only for row detail.
     """
     out = out or os.path.join(ROOT, "build", "tmp", "%s_%s_diff.json"
                               % (unit.lib, unit.file))
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    p = subprocess.run([OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
-                        "--format", "json", "-o", out],
-                       cwd=ROOT, capture_output=True, text=True, errors="replace")
+    p = runner([OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
+                "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
+               cwd=ROOT, capture_output=True, text=True, errors="replace")
     return (out if p.returncode == 0 else None), (p.stdout or "") + (p.stderr or "")
+
+
+# --- official scoring: `report generate`, not `diff` --------------------------------------------
+#
+# objdiff-cli's `diff` mode is not the metric that closes a symbol, and two differences compound:
+#   * `diff` defaults `functionRelocDiffs` to `data_value` while `report generate` defaults to `none`,
+#     so relocation-only differences are counted as mismatches by the former (measured on this repo:
+#     `pl_skill` fn_80270018 reads 99.88 % in diff mode and **100.0 %** in the report);
+#   * even at the same setting, the diff JSON's `match_percent` is a different normalisation from the
+#     report's `fuzzy_match_percent` (`RSOStaticLocateObject` 99.38461 vs 99.64103; the gap reaches
+#     1.25 pt on `main`'s fn_8003F730).
+# `report generate` over a one-unit project is the report code path by construction - the number
+# `build/RMHE08/report.json`, `ledger.py`, `brief.py` and `land.py` read - and it costs ~0.04 s.
+# `tools/units/recompile.py` carries the same primitive for the no-ninja worker path; keep them in sync.
+
+MIN_PROJECT_VERSION = "2.0.0-beta.5"
+
+
+def measure_project(target, base, unit_name, tmpdir):
+    """Write a one-unit objdiff project for (`target`, `base`); return its directory.
+
+    `report generate` resolves `target_path`/`base_path` against the project directory, and on Windows
+    only a backslash-rooted path counts as absolute (`C:/...` is joined and mangled into `C:...`), so
+    both are absolutised with `os.path.abspath` - that shape on Windows, a plain absolute path elsewhere.
+    """
+    proj = os.path.join(tmpdir, "unitutil_project")
+    os.makedirs(proj, exist_ok=True)
+    with open(os.path.join(proj, "objdiff.json"), "w", encoding="utf-8") as fh:
+        json.dump({"min_version": MIN_PROJECT_VERSION,
+                   "units": [{"name": unit_name or "measure",
+                              "target_path": os.path.abspath(target),
+                              "base_path": os.path.abspath(base)}]}, fh, indent=2)
+    return proj
+
+
+def report_functions(target, base, unit_name=None, tmpdir=None, runner=subprocess.run):
+    """{function: report entry} for one object pair, scored by `report generate` - the official metric.
+
+    Each entry carries `fuzzy_match_percent` and `size` exactly as `build/RMHE08/report.json` does, so
+    a consumer that wants the official score reads `[name]["fuzzy_match_percent"]`. An error is returned
+    as `{"_error": <text>}` (never as a 0.0 score); the one-unit project's report is left in `tmpdir`.
+    """
+    tmpdir = tmpdir or os.path.join(ROOT, "build", "tmp", "unitutil")
+    os.makedirs(tmpdir, exist_ok=True)
+    proj = measure_project(target, base, unit_name, tmpdir)
+    out = os.path.join(tmpdir, "unitutil_report.json")
+    if os.path.exists(out):
+        os.remove(out)
+    p = runner([OBJDIFF, "report", "generate", "-p", proj, "-o", out],
+               cwd=ROOT, capture_output=True, text=True, errors="replace")
+    if p.returncode != 0 or not os.path.exists(out):
+        return {"_error": "objdiff report generate failed: " + (p.stdout or "") + (p.stderr or "")}
+    data = json.load(open(out, encoding="utf-8"))
+    units = data.get("units") or []
+    return {f.get("name"): f for f in ((units[0].get("functions") if units else []) or [])}
+
+
+def report_measure(target, base, symbol, unit_name=None, tmpdir=None, runner=subprocess.run):
+    """The official (`fuzzy_match_percent`) score for one symbol of an object pair.
+
+    Returns `{"symbol", "match_percent", "target_size", "report_json"}` or `{"error": ...}`.
+    `match_percent` is deliberately the **report** metric so that any consumer reading it gets the
+    number that closes a symbol; the positional objdiff value is not exposed here (use `objdiff()` if
+    row detail is what is wanted).
+    """
+    entries = report_functions(target, base, unit_name=unit_name, tmpdir=tmpdir, runner=runner)
+    if "_error" in entries:
+        return {"symbol": symbol, "error": entries["_error"]}
+    fn = entries.get(symbol)
+    if fn is None:
+        return {"symbol": symbol,
+                "error": "symbol is not in the target object (renamed? not in this unit?)"}
+    report_json = os.path.join(tmpdir or os.path.join(ROOT, "build", "tmp", "unitutil"),
+                               "unitutil_report.json")
+    return {"symbol": symbol, "match_percent": fn.get("fuzzy_match_percent"),
+            "target_size": fn.get("size"), "report_json": report_json}
 
 
 def any_function(obj):

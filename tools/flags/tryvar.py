@@ -6,6 +6,13 @@ the unit's exact ninja command line, and diffs it against the split target objec
 never modified and the unit's object is never clobbered. Variants live in a separate data file, so the
 rewrites for one unit do not leak into the tool.
 
+The per-function number this prints is the **official report metric** (`report generate`'s
+`fuzzy_match_percent`, via `unitutil.report_functions`) - the same number `build/RMHE08/report.json`,
+`ledger.py` and `land.py` read. objdiff's explicit `diff` mode is deliberately not used for the score:
+it defaults `functionRelocDiffs` to `data_value` (the report defaults to `none`, so relocation-only
+differences counted as mismatches there) and its `match_percent` is a different normalisation (measured
+on this repo: `pl_skill` fn_80270018 reads 99.88 % positionally and **100.0 %** officially).
+
 Usage:
     python tools/flags/tryvar.py                        # every variant of the default variant file
     python tools/flags/tryvar.py --list
@@ -28,16 +35,13 @@ afterwards - the recorded evidence must come from the real source, not from the 
 """
 import argparse
 import importlib.util
-import json
 import os
-import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
 import unitutil as uu
 
 SCRATCH = os.path.join(uu.ROOT, "build", "tmp", "probe")
-OBJDIFF = os.path.join(uu.ROOT, "build", "tools", "objdiff-cli.exe")
 
 
 def load_variants(path):
@@ -56,36 +60,26 @@ def default_variants_path(unit):
     return os.path.join(d, unit.lib + ".py")
 
 
-def od_symbols(d, side):
-    """Symbols of one diff side; handles objdiff-cli v3.6.1 (flat top-level `symbols[]`, only present
-    when a symbol argument was passed) and the older nested layout."""
-    top = d[side].get("symbols")
-    if top:
-        return [(e.get("name") or e.get("symbol", {}).get("name"), e) for e in top]
-    out = []
-    for s in d[side].get("sections", []):
-        for e in s.get("symbols") or []:
-            out.append((e.get("name") or e.get("symbol", {}).get("name"), e))
-    return out
+def match_pcts(probe_obj, target_obj, symbol=None):
+    """{function: (official_match_percent, ours_size, target_size)} for a probe object.
 
-
-def match_pcts(probe_obj, target_obj, symbol):
-    """{function: (match_percent, ours_size, target_size)} for the probe object."""
-    out = os.path.join(SCRATCH, "variant.json")
-    cmd = [OBJDIFF, "diff", "-1", probe_obj, "-2", target_obj, symbol, "--format", "json", "-o", out]
-    p = subprocess.run(cmd, cwd=uu.ROOT, capture_output=True, text=True, errors="replace")
-    if p.returncode != 0:
-        print("objdiff FAILED: %s%s" % (p.stdout, p.stderr))
+    The percent is the report metric for the object pair (`unitutil.report_functions`), not the positional
+diff value. The two sizes come from the objects' own symbol tables, so every function the probe emitted
+    is listed; `symbol` is accepted for backwards compatibility and ignored - the report scores the whole
+    object pair, which is what a variant comparison needs.
+    """
+    entries = uu.report_functions(target_obj, probe_obj)
+    if "_error" in entries:
+        print("objdiff report failed: " + entries["_error"][:400])
         return None
-    d = json.load(open(out))
-    right = dict(od_symbols(d, "right"))
+    ours = {n: sz for n, sz, _f in uu.frames(probe_obj)}
+    tgt = {n: sz for n, sz, _f in uu.frames(target_obj)}
     res = {}
-    for name, e in od_symbols(d, "left"):          # file mode: left = the -1 object (ours)
-        if not e.get("instructions"):
-            continue
-        r = right.get(name)
-        res[name] = (round(e.get("match_percent") or 0.0, 2),
-                     int(e.get("size") or 0), int((r or {}).get("size") or 0))
+    for name, e in entries.items():
+        pct = e.get("fuzzy_match_percent")
+        if not isinstance(pct, (int, float)) or name not in ours:
+            continue                     # function the probe did not emit (or an unpaired row)
+        res[name] = (round(pct, 2), int(ours.get(name) or 0), int(tgt.get(name) or 0))
     return res
 
 
@@ -121,10 +115,10 @@ def run(unit, tokens, symbol, name, repls):
         if os.path.exists(probe_src):
             os.remove(probe_src)
     if not pcts:
-        print("%-26s no diff result" % name)
+        print("%-26s no report result" % name)
         return
     bad = ["%s=%.2f%%(%d/%d)" % (n, p, o, t) for n, (p, o, t) in pcts.items() if p != 100.0]
-    verdict = "ALL %d FUNCTIONS IDENTICAL" % len(pcts) if not bad else "; ".join(bad)
+    verdict = "ALL %d FUNCTIONS AT 100%%" % len(pcts) if not bad else "; ".join(bad)
     print("%-26s .text=%-6d %s" % (name, size, verdict))
 
 

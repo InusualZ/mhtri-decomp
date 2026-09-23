@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""r1-relative stack-slot map for one symbol of an objdiff-cli file diff.
+"""r1-relative stack-slot map for one symbol of an objdiff-cli diff.
 
 Usage:
     python tools/objdiff/slotmap.py -u <unit> <symbol> [--map] [--slot 0xc8] [--around 700,730]
-    python tools/objdiff/slotmap.py <diff.json> <symbol> [--map] [--slot 0xc8] [--around 700,730]
+    python tools/objdiff/slotmap.py <diff.json> <symbol> [--map] [--slot 0xc8] [--left ours|target]
 
-Invocation (file mode): `objdiff-cli diff -1 <ours> -2 <target> <symbol> --format json -o f.json`,
-i.e. **left = the -1 object (ours)**, right = the -2 object (target); pass -1/-2 the other way round
-and the TARGET/OURS labels in the output swap.  Because the two instruction streams are identical
-except for the r1 offsets, the offset mapping is recovered by index-aligned majority vote.
+Invocation: the `-u` path runs objdiff in **project mode** (`-p . -u <unit>`), where **left = the target
+object and right = our build**. A pre-existing `diff.json` is assumed to be file mode
+(`-1 <ours> -2 <target>`, left = ours), as this docstring always said; `--left` overrides that guess.
+Because the two instruction streams are identical except for the r1 offsets, the offset mapping is
+recovered by index-aligned majority vote.
+
+The rows come from a diff run with `-c functionRelocDiffs=none` (unitutil.objdiff) - `report generate`'s
+default - so a relocation-only difference is not reported here as an argument mismatch. This tool prints
+no score on purpose: objdiff's `match_percent` is positional and not the campaign's metric; use
+`mt.py diff -u <unit> <symbol>` for the official number.
 """
 import json
 import os
@@ -19,9 +25,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 import unitutil as uu
 
 
+LEFT_IS_TARGET = False   # set by cli(): project mode has left = target, file mode left = ours
+
+
 def cli():
-    """(diff json path, symbol), from either `-u <unit> <symbol>` or `<diff.json> <symbol>`."""
+    """(diff json path, symbol), from either `-u <unit> <symbol>` or `<diff.json> <symbol>`.
+
+    Sets the module-level LEFT_IS_TARGET: objdiff's project mode (`-p . -u <unit>`) puts the **target**
+    on the left, while the file mode this tool documents passes `-1 <ours>`.
+    """
+    global LEFT_IS_TARGET
     a = sys.argv[1:]
+    override = None
+    if "--left" in a:
+        i = a.index("--left")
+        override = a[i + 1]
+        del a[i:i + 2]
     for flag in ("-u", "--unit"):
         if flag in a:
             i = a.index(flag)
@@ -32,10 +51,12 @@ def cli():
             if not path:
                 raise SystemExit("objdiff failed: " + log)
             sys.argv = [sys.argv[0], path, symbol] + rest[1:]
+            LEFT_IS_TARGET = override != "ours"
             return path, symbol
     if len(a) < 2:
         raise SystemExit("usage: slotmap.py -u <unit> <symbol> [--map]"
-                         " | slotmap.py <diff.json> <symbol> [--map]")
+                         " | slotmap.py <diff.json> <symbol> [--map] [--left ours|target]")
+    LEFT_IS_TARGET = override == "target"
     return a[0], a[1]
 
 OFF = re.compile(r"(-?0x[0-9a-f]+)\(r1\)")
@@ -52,7 +73,7 @@ def load(path):
     """
     d = json.load(open(path))
     out = {}
-    for side in ("left", "right"):  # left = ours (-1), right = target (-2)
+    for side in ("left", "right"):
         syms = d[side].get("symbols")
         if syms:
             cands = [{"symbol": {"name": e.get("name"), "size": e.get("size")},
@@ -83,10 +104,14 @@ def offsets(e):
 
 def main():
     cli()
-    d = load(sys.argv[1])
-    o, t = offsets(d["left"]), offsets(d["right"])   # left = ours, right = target
+    sym = load(sys.argv[1])
+    ours_side = "left" if not LEFT_IS_TARGET else "right"
+    tgt_side = "right" if not LEFT_IS_TARGET else "left"
+    o, t = offsets(sym[ours_side]), offsets(sym[tgt_side])
+    tgt_ins = sym[tgt_side].get("instructions") or []
+    our_ins = sym[ours_side].get("instructions") or []
     print("target accesses %d, ours %d, target insns %d, ours %d"
-          % (len(t), len(o), len(d["left"]["instructions"]), len(d["right"]["instructions"])))
+          % (len(t), len(o), len(tgt_ins), len(our_ins)))
     votes = {}
     for (i1, a1, k1), (i2, a2, k2) in zip(t, o):
         if i1 != i2 or k1 != k2:
@@ -123,8 +148,8 @@ def main():
         lo, hi = (int(x) for x in sys.argv[sys.argv.index("--around") + 1].split(","))
         print("%4s  %-46s | %s" % ("idx", "TARGET", "OURS"))
         for i in range(lo, hi):
-            ti = (d["right"]["instructions"][i].get("instruction") or {}).get("formatted")
-            oi = (d["left"]["instructions"][i].get("instruction") or {}).get("formatted")
+            ti = (tgt_ins[i].get("instruction") or {}).get("formatted") if i < len(tgt_ins) else None
+            oi = (our_ins[i].get("instruction") or {}).get("formatted") if i < len(our_ins) else None
             mark = "  " if ti == oi else "->"
             print("%s %4d  %-46s | %s" % (mark, i, ti, oi))
 

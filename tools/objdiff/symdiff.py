@@ -8,9 +8,12 @@ Usage:
 Left  = the -1 object, Right = the -2 object (file mode), or target/base in project mode
 (`-p . -u <unit>`, where left = target and right = our build).
 
-objdiff's per-symbol `match_percent` is positional: one inserted/deleted
-instruction shifts every later instruction, so a single early divergence can
-report ~0 %. Read the first divergence, not the percentage.
+The `match` figure printed with `-u` is the **official report metric** (`report generate`'s
+`fuzzy_match_percent` - what `build/RMHE08/report.json`, `ledger.py` and `land.py` read), with the
+positional `diff` value shown beside it when it differs. A pre-existing `diff.json` has no unit context,
+so that path prints the positional value and says so: objdiff's `match_percent` is positional (one
+inserted/deleted instruction shifts every later instruction, so a single early divergence can report
+~0 %) and its relocation default differs from the report's. Read the first divergence, not the percentage.
 """
 import json
 import os
@@ -21,7 +24,7 @@ import unitutil as uu
 
 
 def cli():
-    """(diff json path, symbol), from either `-u <unit> <symbol>` or `<diff.json> <symbol>`."""
+    """(diff json path, symbol, unit or None), from `-u <unit> <symbol>` or `<diff.json> <symbol>`."""
     a = sys.argv[1:]
     for flag in ("-u", "--unit"):
         if flag in a:
@@ -33,11 +36,11 @@ def cli():
             if not path:
                 raise SystemExit("objdiff failed: " + log)
             sys.argv = [sys.argv[0], path, symbol] + rest[1:]
-            return path, symbol
+            return path, symbol, unit
     if len(a) < 2:
         raise SystemExit("usage: symdiff.py -u <unit> <symbol> [n] [--all]"
                          " | symdiff.py <diff.json> <symbol> [n] [--all]")
-    return a[0], a[1]
+    return a[0], a[1], None
 
 
 def norm(d, side):
@@ -90,11 +93,22 @@ def kind(ins):
     return k.replace("DIFF_", "")
 
 
+def official_match(unit, name):
+    """The report metric for `name`, or None when it cannot be obtained (never a fabricated score)."""
+    if unit is None:
+        return None
+    m = uu.report_measure(unit.target, unit.obj, name, unit.name)
+    if "error" in m:
+        return None
+    return m.get("match_percent")
+
+
 def main():
-    path, name = cli()
+    path, name, unit = cli()
     n = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else 30
     show_all = "--all" in sys.argv
     left, right = load(path)
+    official = official_match(unit, name)
     for sec in (".text", ".rodata", ".data"):
         if sec not in left:
             continue
@@ -104,9 +118,16 @@ def main():
         re_ = find(right.get(sec, {}), name)
         li = le.get("instructions") or []
         ri = (re_.get("instructions") or []) if re_ else []
+        pos = le.get("match_percent")
+        if official is None:
+            match = "%s (positional diff - not the report metric; pass -u <unit> for the official score)" % pos
+        elif official == pos or pos is None:
+            match = "%s (report metric)" % official
+        else:
+            match = "%s (report metric; objdiff positional diff says %s)" % (official, pos)
         print(f"== {sec} {name}: target {le['symbol'].get('size')} B / {len(li)} ins, "
               f"ours {re_['symbol'].get('size') if re_ else '?'} B / {len(ri)} ins, "
-              f"match {le.get('match_percent')}")
+              f"match {match}")
         print(f"{'i':>5} {'T':>4} {'kind':<12} {'target':<40} | {'ours':<40} ours-kind")
         limit = max(len(li), len(ri)) if show_all else min(n, max(len(li), len(ri)))
         for i in range(limit):
