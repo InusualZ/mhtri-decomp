@@ -107,4 +107,8 @@ inline int IsValidPointer(u32 ptr) {
     if (!IsValidPointer((u32)(ptr))) \
         Panic__Q24nw4r2dbFPCciPCce(file, __LINE__, msg, (ptr))
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* EF_H */

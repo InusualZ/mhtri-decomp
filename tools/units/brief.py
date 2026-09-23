@@ -322,11 +322,21 @@ def header_comment(main: str, wt: str, unit: str) -> str:
 
 
 def flags_for(main: str, unit: str) -> tuple[list[str], str]:
+    """The unit's real flags, **values included** - `-proc gekko`, not `-proc`.
+
+    The old filter (`[t for t in tokens if t.startswith("-")]`) dropped every value token, so the brief's
+    "real command line" rendered `-proc -align -enum -fp -Cpp_exceptions -pragma -pragma -maxerrors ...
+    -i -i ... -inline -lang=c++ -MMD -c -o` - a line that tells a worker nothing about the flags it is
+    reading the brief for. `unitutil.split_flags` is the one definition of where the flags start and end, so
+    the rendering cannot drift from the command line `recompile.py` and the flag tools run. The
+    `-c <src> -o <dir>` tail is dropped on purpose: `recompile.py` builds it, and it is MAIN's.
+    """
     try:
         tokens = rc.ninja_command(main, unit)
     except (SystemExit, OSError) as exc:
         return [], str(exc)
-    return [t for t in tokens if t.startswith("-")], ""
+    _head, flags, _tail = unitutil.split_flags(tokens)
+    return flags, ""
 
 
 def lib_for(main: str, unit: str) -> str:
@@ -475,8 +485,15 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("The real command line (flags only; `recompile.py` builds the full one):")
         lines.append("")
         lines.append("```")
-        lines.append(" ".join(b["flags"]))
+        # a valued flag can be one token with a space in it (`-pragma cats off`); quote it back so the line
+        # reads as the tokens the compiler actually gets
+        lines.append(" ".join('"%s"' % t if " " in t else t for t in b["flags"]))
         lines.append("```")
+        lines.append("")
+        lines.append("The `-i` directories are MAIN's and are searched **in the order shown**, so never run "
+                     "this line with MAIN as the working directory: `recompile.py` rewrites them to your "
+                     "worktree's (yours first) and that is the compile a measurement has to come from - a "
+                     "header you edited in your worktree is otherwise shadowed by MAIN's copy, silently.")
     lines.append("")
     lines.append(lc.brief_paragraph(b.get("language")))
     sh = b.get("shared_headers") or []

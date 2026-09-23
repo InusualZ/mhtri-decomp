@@ -21,6 +21,7 @@ import os
 import re
 import struct
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 
@@ -49,6 +50,34 @@ def repo_root(start=None):
 
 
 ROOT = repo_root()
+
+
+def caller_worktree(start=None):
+    """The git worktree the *caller* is in, or None when git cannot say."""
+    try:
+        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=start or os.getcwd(),
+                           capture_output=True, text=True, errors="replace")
+    except OSError:
+        return None
+    return (p.stdout or "").strip() or None if p.returncode == 0 else None
+
+
+def warn_if_foreign_worktree() -> None:
+    """Say so when the caller sits in a worktree other than ROOT - a silent wrong-source measurement.
+
+    Everything here resolves the unit, its source and its object from ROOT (the tree this file lives in)
+    and runs the compiler with `cwd=ROOT`, and the command line's `-i include -i build/RMHE08/include` are
+    *relative to ROOT*. That is right for the MAIN-side flag tools, whose subject is MAIN's source. A
+    worker is not: its subject is its own worktree, so a worker that reaches these helpers through
+    `MAIN/tools/...` (rather than its own tree, which has no `build.ninja`) would compile and measure
+    MAIN's source and read the number as a matching problem. It cannot be detected from the numbers, so it
+    is said out loud. `tools/units/recompile.py` is the worktree-aware path - it rewrites the source, the
+    `-o` directory and the `-i` order to the caller's tree.
+    """
+    top = caller_worktree()
+    if top and os.path.normcase(os.path.abspath(top)) != os.path.normcase(os.path.abspath(ROOT)):
+        print("note: this tool compiles MAIN's source (%s) - you are in %s, whose edits it cannot see. "
+              "Use tools/units/recompile.py to measure your own tree." % (ROOT, top), file=sys.stderr)
 
 
 @dataclass
@@ -135,6 +164,7 @@ def resolve_unit(spec=None):
 
 def compile_command(unit):
     """The exact command line ninja would run for this unit, as a token list."""
+    warn_if_foreign_worktree()
     target = os.path.relpath(unit.obj, ROOT)
     p = subprocess.run(["ninja", "-t", "commands", target], cwd=ROOT,
                        capture_output=True, text=True, errors="replace")
@@ -215,6 +245,7 @@ def run_compile(tokens, expect=None, scratch_dir=None, src=None, verbose=False):
     * `src`     - replace the `-c` source argument (used for source-rewrite experiments).
     """
     tokens = list(tokens)
+    warn_if_foreign_worktree()
     obj = expect
     if src is not None:
         i = tokens.index("-c")
