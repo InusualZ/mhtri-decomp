@@ -485,7 +485,7 @@ config.libs = [
             Object(NonMatching, "auto/800E46E8_fn_800E46E8.cpp"),
             Object(NonMatching, "auto/80300080_fn_80300080.c"),
             Object(NonMatching, "auto/80305C08_fn_80305C08.c"),
-            Object(NonMatching, "auto/803066F0_fn_803066F0.c"),
+            Object(Matching, "auto/803066F0_fn_803066F0.c"),
             Object(NonMatching, "auto/8031D3B4_fn_8031D3B4.c"),
             Object(NonMatching, "auto/8031DA54_fn_8031DA54.c"),
             Object(NonMatching, "auto/803234EC_fn_803234EC.c"),
