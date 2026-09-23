@@ -55,11 +55,13 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
+import sharedfiles as sf  # noqa: E402  (the one writer for shared files - docs/plan.md 7.12)
 import symbolpreflight as preflight  # noqa: E402  (the splits.txt / symbols.txt parsers)
 
 # dtk's section order (mirrors tudiscover.SECTION_ORDER) - the queue's deterministic sort key.
@@ -257,12 +259,20 @@ def render(entries: list[dict]) -> str:
 
 
 def write_queue(path: str, text: str) -> None:
-    """Atomic write: a crash leaves either the old queue or the new one, never a half one."""
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(text)
-    os.replace(tmp, path)
+    """Atomic write through the shared-file layer: a crash leaves the old queue or the new one.
+
+    The queue is deterministic LF JSON, so the write is byte-identical to the old temp+`os.replace`;
+    routing it through `sharedfiles.Transaction` inherits the exact-bytes rollback and the single
+    temp-file primitive the other shared-file writers use (docs/plan.md 7.12).
+    """
+    tx = sf.Transaction()
+    try:
+        tx.write(Path(path), text)
+    except BaseException:
+        tx.rollback()
+        raise
+    finally:
+        tx.cleanup()
 
 
 # -- the impure edges: read the repository, print a summary --------------------------------------------------
@@ -445,6 +455,8 @@ def selftest() -> int:
         first = open(path, "rb").read()
         write_queue(path, text)
         check("writing twice is byte-identical", open(path, "rb").read(), first)
+        check("the shared-file layer leaves no temp file",
+              sorted(str(p) for p in Path(tmp).rglob("*" + sf.TMP_SUFFIX)), [])
 
         # --- round-trip through brief.py's own reader
         from units import brief as brief_mod  # noqa: E402
