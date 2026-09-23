@@ -35,10 +35,19 @@ runs are recorded as comments and cannot move the DOL. A batch that lands exactl
 With `--json`, `plan` prints the capped batch (the proposals that would land) and the refusal goes to
 stderr, so a consumer parsing the JSON still sees a consistent list.
 
+**The size defaults (roadmap 7.13).** `--min-bytes` and `--max-bytes` are derived from the 15 units
+already registered, not guessed. Their `.text` spans run 16 B .. 27436 B, but the sub-100 B entries
+(`OSAlarm`, `NetworkWiiMediator`, `lobby_scene`, `g3d_resanmamblight`, `global_destructor_chain`) are
+fragments and `__init_cpp_exceptions` (112 B) is a stub, so the smallest *unit-sized* one is
+`sys_mem.cpp` at **288 B** and the largest is `Pl/pl_act.cpp` at **27436 B (~27 KB)**. Hence
+`MIN_BYTES_DEFAULT = 288` (below it, a piece is not a file of its own) and
+`MAX_BYTES_DEFAULT = 27436` (above it, a piece is too big and is split, flagged as a guess).
+
 **Transactional apply (roadmap 7.20).** `apply` validates the whole batch before writing anything (no
 proposal overlaps another or a range `splits.txt` already owns, no unit twice, every function
 resolvable in the map at the address and size claimed, both `configure.py` anchors present), then
-writes every file through a `*.attribute-tmp` temp file and `os.replace`, and restores the exact
+hands the whole batch to `tools/units/sharedfiles.py`, which preserves each file's line ending, asserts
+every anchor, and writes through a `*.sharedfiles-tmp` temp file and `os.replace` - restoring the exact
 previous bytes of every file it already replaced if any write fails. `--dry-run` touches nothing.
 """
 
@@ -46,10 +55,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -57,7 +64,7 @@ sys.path.insert(0, str(ROOT / "tools" / "splits"))
 sys.path.insert(0, str(ROOT / "tools" / "units"))
 
 import tudiscover as td  # noqa: E402  (path set above)
-import symbolpreflight as pf  # noqa: E402
+import sharedfiles as sf  # noqa: E402
 
 SPLITS = ROOT / "config" / "RMHE08" / "splits.txt"
 CONFIGURE = ROOT / "configure.py"
@@ -71,9 +78,10 @@ NAME_MAX = 48
 # ceiling, not a target). `0` disables the cap.
 CAP_DEFAULT = 0x80000
 
-# Every file `apply` writes goes to `<name>.attribute-tmp` first and is renamed in; the suffix is also
-# what the selftest sweeps for, so it lives in one place.
-TMP_SUFFIX = ".attribute-tmp"
+# The two size defaults, derived from the registered units (roadmap 7.13): 288 B is `sys_mem.cpp`, the
+# smallest unit-sized `.text`; 27436 B is `Pl/pl_act.cpp`, the largest (~27 KB). See the docstring.
+MIN_BYTES_DEFAULT = 288
+MAX_BYTES_DEFAULT = 27436
 
 # The two anchors `configure.py` must have or the registration cannot land. The selftest uses a fixture
 # layout with these instead of the real files.
@@ -81,14 +89,14 @@ CONFIG_LIBS_ANCHOR = "config.libs = ["
 CONFIG_CAT_ANCHOR = "config.progress_categories = ["
 
 
-@dataclass(frozen=True)
-class Layout:
-    """Where `apply` writes: the two shared files and the root of the stub sources."""
-
-    splits: Path
-    configure: Path
-    src: Path
-
+# The write layer lives in `sharedfiles.py` (roadmap 7.12); re-exported so existing callers and the
+# selftest keep their names.
+TMP_SUFFIX = sf.TMP_SUFFIX
+Layout = sf.Layout
+Transaction = sf.Transaction
+read_text = sf.read_text
+parse_ranges = sf.parse_ranges
+overlaps = sf.overlaps
 
 LAYOUT = Layout(SPLITS, CONFIGURE, ROOT / "src")
 
@@ -205,8 +213,8 @@ def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
     return out
 
 
-def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = 0x200,
-            max_bytes: int = 0x4000) -> list[dict]:
+def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_BYTES_DEFAULT,
+            max_bytes: int = MAX_BYTES_DEFAULT) -> list[dict]:
     """One proposal per unit the region's evidence supports, in address order.
 
     The walk is over maximal *unclaimed* runs of functions inside `[start, end)`, not over seeds: a run
@@ -344,34 +352,8 @@ def cap_report(kept: list[dict], detail: dict | None, cap: int, file=None) -> No
 
 
 # --------------------------------------------------------------------------------------------------
-# transactional apply (docs/plan.md 7.20)
+# validation and apply (docs/plan.md 7.20; the writes themselves are in sharedfiles.py)
 # --------------------------------------------------------------------------------------------------
-SPLIT_HEAD = re.compile(r"^(\S[^:]*):\s*$")
-SPLIT_RANGE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
-
-
-def read_text(path: Path) -> str:
-    """The file's text with its line endings intact - what goes back in on a rollback."""
-    return open(path, encoding="utf-8", newline="").read()
-
-
-def parse_ranges(text: str) -> list[tuple[str, str, int, int]]:
-    """Every `start:`/`end:` range in a `splits.txt` text, as (unit, section, start, end)."""
-    out, cur = [], None
-    for line in text.splitlines():
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
-            cur = line.strip()[:-1]
-            continue
-        m = SPLIT_RANGE.match(line)
-        if m and cur is not None:
-            out.append((cur, m.group(1), int(m.group(2), 16), int(m.group(3), 16)))
-    return out
-
-
-def overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:
-    return a[0] < b[1] and b[0] < a[1]
-
-
 def validate(proposals: list[dict], layout: Layout, fns: dict | None = None) -> list[str]:
     """Everything that must hold before a byte is written. An empty list means the batch may land.
 
@@ -385,10 +367,10 @@ def validate(proposals: list[dict], layout: Layout, fns: dict | None = None) -> 
     gone = [str(p) for p in (layout.splits, layout.configure) if not p.exists()]
     if gone:
         return ["%s: does not exist" % g for g in gone]
-    splits = read_text(layout.splits)
-    conf = read_text(layout.configure)
-    nl_conf = "\r\n" if "\r\n" in conf else "\n"
-    have = parse_ranges(splits)
+    splits = sf.read_text(layout.splits)
+    conf = sf.read_text(layout.configure)
+    nl_conf = sf.line_ending(conf)
+    have = sf.parse_ranges(splits)
 
     seen: dict[str, tuple[int, int]] = {}
     for p in proposals:
@@ -424,14 +406,13 @@ def validate(proposals: list[dict], layout: Layout, fns: dict | None = None) -> 
         for section in p["runs"]:
             if section not in td.SECTION_ORDER:
                 errs.append("%s: unknown section %r - not in tudiscover.SECTION_ORDER" % (u, section))
-        for other, section, s, e in have:
-            if other == u and section == ".text" and (s, e) == (t0, t1):
-                continue                       # idempotent re-apply of the same block
-            if overlaps((t0, t1), (s, e)):
-                errs.append("%s: .text 0x%08X..0x%08X overlaps %s's %s range 0x%08X..0x%08X"
-                            % (u, t0, t1, other, section, s, e))
+        hit = sf.find_overlap(have, t0, t1, unit=u)
+        if hit is not None:
+            other, section, s, e = hit
+            errs.append("%s: .text 0x%08X..0x%08X overlaps %s's %s range 0x%08X..0x%08X"
+                        % (u, t0, t1, other, section, s, e))
         for other, (s, e) in seen.items():
-            if overlaps((t0, t1), (s, e)):
+            if sf.overlaps((t0, t1), (s, e)):
                 errs.append("%s: .text 0x%08X..0x%08X overlaps %s earlier in the batch" % (u, t0, t1, other))
         own = [(s, e) for o, sec, s, e in have if o == u and sec == ".text"]
         if own and (t0, t1) not in own:
@@ -449,75 +430,6 @@ def validate(proposals: list[dict], layout: Layout, fns: dict | None = None) -> 
     return errs
 
 
-class Transaction:
-    """All-or-nothing writes over a fixed set of paths.
-
-    Every target is staged to `<name>.attribute-tmp` beside it and renamed in with `os.replace`, so a
-    reader never sees a half-written file. If a write fails, `rollback()` puts every already-renamed
-    target back to the bytes it had before - and deletes the ones that did not exist - newest first;
-    `cleanup()` removes the temp files on both paths. `rename` is the injection point the selftest
-    uses to fail a write on purpose; recovery deliberately does not go through it, because recovery
-    must not be breakable by the fault it is recovering from.
-    """
-
-    def __init__(self, rename=None):
-        self._rename = rename or os.replace
-        self.prev: dict[Path, bytes | None] = {}
-        self.order: list[Path] = []
-        self.dirs: list[Path] = []
-        self.temps: list[Path] = []
-
-    def write(self, path: Path, text: str) -> None:
-        if not path.parent.exists():
-            made, d = [], path.parent
-            while not d.exists() and d != d.parent:
-                made.append(d)
-                d = d.parent
-            path.parent.mkdir(parents=True, exist_ok=True)
-            self.dirs.extend(made)          # deepest first: rollback removes children before parents
-        if path not in self.prev:
-            self.prev[path] = path.read_bytes() if path.exists() else None
-        tmp = path.with_name(path.name + TMP_SUFFIX)
-        self.temps.append(tmp)
-        tmp.write_bytes(text.encode("utf-8"))
-        self._rename(tmp, path)
-        self.order.append(path)
-
-    def cleanup(self) -> None:
-        for tmp in self.temps:
-            try:
-                tmp.unlink()
-            except FileNotFoundError:
-                pass
-
-    def rollback(self) -> None:
-        """Undo every rename already made, newest first, back to the exact previous bytes.
-
-        The temp files go first: the write that failed left one in the directory this is about to
-        remove, and a directory with a file in it cannot be removed. The restore then re-creates a
-        temp per file, so a second `cleanup()` follows. Recovery uses `os.replace` directly - an
-        injected fault must not be able to break the recovery from itself.
-        """
-        self.cleanup()
-        for path in reversed(self.order):
-            prev = self.prev[path]
-            try:
-                if prev is None:
-                    path.unlink(missing_ok=True)
-                else:
-                    tmp = path.with_name(path.name + TMP_SUFFIX)
-                    tmp.write_bytes(prev)
-                    os.replace(tmp, path)
-            except OSError:
-                pass
-        self.cleanup()
-        for d in self.dirs:                     # deepest first, so a child is gone before its parent
-            try:
-                d.rmdir()                       # only if empty: never destroy a pre-existing tree
-            except OSError:
-                pass
-
-
 def split_block(p: dict, nl: str) -> str:
     """The `splits.txt` block for one proposal: `.text` claimed, the data runs recorded as comments."""
     t0, t1 = p["text"]
@@ -533,24 +445,22 @@ def split_block(p: dict, nl: str) -> str:
     return nl.join(b) + nl
 
 
-def configure_insertion(conf: str, nl_conf: str, units: list[str]) -> str:
-    """`conf` with a new `auto` lib holding `units`, the progress category declared if it is new."""
+def configure_insertion(conf: str, units: list[str]) -> str:
+    """`conf` with a new `auto` lib holding `units`, the progress category declared if it is new.
+
+    Both edits go through `sharedfiles.insert_after_anchor`: the anchor is asserted (never silently
+    skipped) and the insertion takes configure.py's own CRLF line ending.
+    """
     objects = "".join('            Object(NonMatching, "%s"),\n' % u for u in units)
     lib = ('    {\n        "lib": "auto",\n        "mw_version": "Wii/1.3",\n'
            '        "cflags": cflags_main,\n        "progress_category": "auto",\n'
            '        "objects": [\n%s        ],\n    },\n' % objects)
-    marker = CONFIG_LIBS_ANCHOR + nl_conf
-    # configure.py is CRLF: match its line ending, and fail loudly when the anchor is not there -
-    # a silently skipped registration is a unit that exists in splits.txt and nowhere else.
-    assert marker in conf, "configure.py: `%s` not found (line endings?)" % CONFIG_LIBS_ANCHOR
-    conf = conf.replace(marker, marker + nl_conf + lib.replace("\n", nl_conf), 1)
+    conf, _ = sf.insert_after_anchor(conf, CONFIG_LIBS_ANCHOR, lib)
     # dtk refuses a progress_category it does not know (`Progress category 'auto' missing from
     # config.progress_categories`), so registering the first auto unit declares the category too.
-    cat = CONFIG_CAT_ANCHOR + nl_conf
-    assert cat in conf, "configure.py: `%s` not found" % CONFIG_CAT_ANCHOR
-    if 'ProgressCategory("auto"' not in conf:
-        conf = conf.replace(cat, cat + nl_conf +
-                            '    ProgressCategory("auto", "Auto (bulk attribution)"),', 1)
+    conf, _ = sf.insert_after_anchor(conf, CONFIG_CAT_ANCHOR,
+                                     '    ProgressCategory("auto", "Auto (bulk attribution)"),\n',
+                                     present='ProgressCategory("auto"')
     return conf
 
 
@@ -561,28 +471,25 @@ def plan_writes(proposals: list[dict], layout: Layout) -> dict:
     I/O - so a failure can only be a failed rename, and the rollback is a list of renames rather than
     a guess about what the file looked like.
     """
-    splits = read_text(layout.splits)
-    conf = read_text(layout.configure)
-    nl = "\r\n" if "\r\n" in splits else "\n"
-    nl_conf = "\r\n" if "\r\n" in conf else "\n"   # the two files do not share a line ending
+    splits = sf.read_text(layout.splits)
+    conf = sf.read_text(layout.configure)
+    nl = sf.line_ending(splits)
     writes: list[tuple[Path, str]] = []
 
-    blocks = [split_block(p, nl) for p in proposals]
-    fresh = [b for b in blocks if b.split(":", 1)[0] not in splits]
-    if fresh:
-        if not splits.endswith(nl):
-            splits += nl
-        writes.append((layout.splits, splits + nl + "".join(fresh)))
+    blocks = [(p["unit"], split_block(p, nl)) for p in proposals]
+    new_splits, added = sf.append_blocks(splits, blocks)
+    if added:
+        writes.append((layout.splits, new_splits))
     missing = [p["unit"] for p in proposals if '"%s"' % p["unit"] not in conf]
     if missing:
-        writes.append((layout.configure, configure_insertion(conf, nl_conf, missing)))
+        writes.append((layout.configure, configure_insertion(conf, missing)))
     stubs = 0
     for p in proposals:
         path = layout.src / p["unit"]
         if not path.exists():
             writes.append((path, stub_text(p)))
             stubs += 1
-    return {"writes": writes, "splits": len(fresh), "objects": len(missing), "stubs": stubs}
+    return {"writes": writes, "splits": added, "objects": len(missing), "stubs": stubs}
 
 
 def apply(proposals: list[dict], dry_run: bool = False, cap: int = CAP_DEFAULT,
@@ -613,6 +520,9 @@ def apply(proposals: list[dict], dry_run: bool = False, cap: int = CAP_DEFAULT,
     except OSError as exc:
         print("cannot read %s (%s) - nothing was touched" % (exc.filename, exc))
         return 1
+    except sf.AnchorError as exc:
+        print("refusing to write: %s - nothing was touched" % exc)
+        return 1
     cap_report(kept, detail, cap)
     if len(kept) > plan["splits"]:
         print("skipped %d split block(s) already in splits.txt" % (len(kept) - plan["splits"]))
@@ -623,7 +533,7 @@ def apply(proposals: list[dict], dry_run: bool = False, cap: int = CAP_DEFAULT,
                                        len(text.encode("utf-8"))))
         print("--- dry run: nothing written")
         return 0
-    tx = Transaction(rename=rename)
+    tx = sf.Transaction(rename=rename)
     try:
         for path, text in plan["writes"]:
             tx.write(path, text)
@@ -648,10 +558,12 @@ def build_parser() -> argparse.ArgumentParser:
         a = sub.add_parser(cmd)
         a.add_argument("start")
         a.add_argument("end")
-        a.add_argument("--min-bytes", type=lambda v: int(v, 0), default=0x200,
-                       help="a piece smaller than this joins its neighbour (default 0x200)")
-        a.add_argument("--max-bytes", type=lambda v: int(v, 0), default=0x4000,
-                       help="a piece larger than this is split, flagged as a guess (default 0x4000)")
+        a.add_argument("--min-bytes", type=lambda v: int(v, 0), default=MIN_BYTES_DEFAULT,
+                       help="a piece smaller than this joins its neighbour (default %d = sys_mem.cpp)"
+                            % MIN_BYTES_DEFAULT)
+        a.add_argument("--max-bytes", type=lambda v: int(v, 0), default=MAX_BYTES_DEFAULT,
+                       help="a piece larger than this is split, flagged as a guess (default %d = "
+                            "Pl/pl_act.cpp)" % MAX_BYTES_DEFAULT)
         a.add_argument("--max-total-bytes", type=lambda v: int(v, 0), default=CAP_DEFAULT,
                        help="register at most this many .text bytes in one batch (default 0x80000, the "
                             "plan's 0.5 MB registration cap; 0 disables)")
