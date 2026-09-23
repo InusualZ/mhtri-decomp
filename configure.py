@@ -523,7 +523,7 @@ config.libs = [
         "cflags": cflags_lobby,
         "host": False,
         "objects": [
-            Object(NonMatching, "lobby/lobby_scene.c"),
+            Object(Matching, "lobby/lobby_scene.c"),
         ],
     },
     {
