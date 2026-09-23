@@ -1013,3 +1013,135 @@ and it will fight the rest of the unit (RSO's level-3 pragma costs `RSOUnLink` a
 
 **Example.** The RSO and `pl_skill` pragmas each closed a function while costing a sibling its 100 %, which is the
 signature: one flag set cannot be right for a unit and wrong for one function inside it.
+## 39. A unit whose retail code keeps unfused peephole folds needs the peephole pass off
+
+**Problem.** The unit's retail object keeps instructions our peephole pass folds away: a masked `clrlwi` before a narrowing store, a separate `clrlwi`+`cmpwi`, a record-form `clrlwi.` the target does not have, or an `li r0,<slot>` + `psq_lx`/`psq_stx` epilogue. Our build, with the command line's peephole on, emits the fused form and lands one or two instructions short - a 4-25 % gap that reads as a source problem.
+
+**Why try it.** `#pragma peephole off` is the source spelling of `-opt nopeephole`; it turns the pass off for the file or a scoped region and restores the target's unfused form. Several units in the `auto` bucket were built with it off, so it is the first lever to try when the diff is a *fold*, not a shape. Note the level is not the lever: `#pragma optimization_level 1` leaves the command line's peephole on (see the trap below).
+
+**Result.** 14 unit(s) measured the same lever independently, so the evidence is grouped here rather than written once per outbox:
+
+* `auto/80073398_fn_80073398` - #pragma peephole off (scoped to fn_8007403C) - fn_8007403C: 28.0 -> 100.0
+* `auto/800898B0_fn_800898B0` - #pragma peephole off (file scope, cflags_main has peephole on) - fn_80089F94 95.8 -> 100.0, fn_8008A220 95.8 -> 100.0 (record-form `clrlwi.` removed; retail object has zero record forms)
+* `auto/8009AA78_fn_8009AA78` - #pragma peephole off (file-scoped) - all 8 symbols -> 100.0 (fn_8009AA78 98.90 -> 100, fn_8009AB28/38 71.25 -> 100, fn_8009AB8C 77.93 -> 100); .text 0x26C / extab 0x28 / extabindex 0x3C byte-identical
+* `auto/800C9DD0_fn_800C9DD0` - #pragma peephole off  (== -opt nopeephole) - fn_800C9DD0: 94.24254 -> 99.94403 %; retail's `li r0,136; psq_lx f31,r1,r0,0,0` epilogue and the `clrlwi r4,r30,16` argument narrowing restored; the pragma's object is byte-identical in .text/extab/extabindex to the same source compiled with `-opt nopeephole`
+* `auto/800CB948_fn_800CB948` - -opt nopeephole - fn_800CB948: paired-single epilogue restored to retail's `li r0,<slot>; psq_lx` form (0x5a4..0x660 byte-identical); 90.89 -> 97.29 together with -fp_contract off
+* `auto/800CC5B0_fn_800CC5B0` - -opt nopeephole - fn_800CC5B0: 84.92 -> 88.64 %
+* `auto/800CCCF8_fn_800CCCF8` - #pragma peephole off (per-unit, whole file - the source spelling of -opt nopeephole) - fn_800CCE38: 97.5 -> 100.0; fn_800CCDFC: 99.33 -> 100.0; all 10 symbols 100.0
+* `auto/800CCFB0_fn_800CCFB0` - -opt nopeephole (via #pragma peephole off) - fn_800CCFB0: 94.63 -> 97.79, .text 0x5B8 -> 0x5D4 (target 0x5D4). Without it MWCC's peephole folds the epilogue's `li r0,off; psq_lx f,r1,r0` into `psq_l f,off(r1)`, 7 instructions short; the target keeps the indexed form. Same stand-in as the other auto unit (docs/plan.md 6.5)
+* `auto/800D7F54_fn_800D7F54` - -opt nopeephole - sysSE_req/fn_800DBC84/fn_800DB4EC/fn_800DC53C 95.0/95.0/92.8/64.4 -> 100/100/100/100; no other function changed
+* `auto/800DCFEC_fn_800DCFEC` - -O3 -opt nopeephole + `#pragma peephole off` - fn_800DCFEC 100.0 % (516 B / 516 B) - the committed state
+* `auto/800E46E8_fn_800E46E8` - a per-region cflags group with `-opt nopeephole` (everything else as cflags_main), so the whole-file `#pragma peephole off` in this unit's source can go - Same source, real command line from build.ninja, measured with recompile.py: cflags_main as committed (peephole on) = fn_800E46E8 94.81 %, set_stream_main_vol_flag__FUcUc 71.25 %, fn_800E48E4 87.22 %, fn_800E4908 76.67 %; `#pragma peephole off` (the committed state) = 100 % on all four. The signature is the unfused `clrlwi r0,r3,24` (+ `cmp...
+* `auto/800FCED4_fn_800FCED4` - #pragma peephole off, scoped to the five functions from fn_800FCED4 on (file scope NOT used) - fn_800FCED4 99.92 -> 100.0, eft002_set 97.73 -> 100.0, eft002_set_shell 99.62 -> 100.0; unit 99.59 -> 100.0; .text 0x64C and extab/extabindex byte-identical; the other five stay 100.0
+* `auto/802B2978_fn_802B2978` - -opt nopeephole - fn_802B2978 99.932434 % (296 B, 73/74 rows)
+* `auto/80324F7C_fn_80324F7C` - -O3 -opt nopeephole + `#pragma peephole off` - fn_80324F7C 100.0 % (308 B / 308 B) - the committed state
+
+**Example.**
+
+```c
+#pragma peephole off   /* the whole unit, or a scoped pair around one function */
+```
+## 40. A unit whose retail code keeps unfused multiply-adds needs `-fp_contract off`
+
+**Problem.** Retail keeps `a*b + c` as two instructions (`fmuls` + `fadds`/`fsubs`) where our default `-fp_contract on` emits one fused `fmadds`/`fmsubs`, so the function is a few instructions short and every later register shifts. It reads as a source-shape problem and sends you rewriting expressions that were already right.
+
+**Why try it.** `#pragma fp_contract off` (or `-fp_contract off`) turns the contraction off, the two instructions come back, and the expression can stay natural. The recurring shapes are `2.0f*x - 1.0f` and `1.0f + rate*t`.
+
+**Result.** 7 unit(s) measured the same lever independently, so the evidence is grouped here rather than written once per outbox:
+
+* `auto/80073398_fn_80073398` - #pragma fp_contract off (file-scoped) - fn_80075940: 87.42 -> 93.47; unit 72.0 -> 73.14
+* `auto/800898B0_fn_800898B0` - #pragma fp_contract off (file scope) - fn_80089B88 79.12 -> 100.0 (MWCC fused four fmuls+fadds pairs; retail has none)
+* `auto/800C9DD0_fn_800C9DD0` - #pragma fp_contract off - fn_800C9DD0: 99.94403 % (unchanged - temporaries reproduce the same unfused pairs); the natural expressions become usable, and auto/800CB948 measured 4 fused ops removed by the same flag
+* `auto/800CB948_fn_800CB948` - -fp_contract off - fn_800CB948: 4 `fmadds`/`fmsubs` -> retail's separate `fmuls`+`fadds`/`fsubs`; no other function moves
+* `auto/800CC5B0_fn_800CC5B0` - -fp_contract off - fn_800CC5B0: 84.92 -> 85.92 %
+* `auto/800CCFB0_fn_800CCFB0` - -fp_contract on (auto lib default) vs #pragma fp_contract off - fn_800CCFB0: with `on` MWCC contracts two a*b+c chains into fmadds; the target has only fmuls+fadds. `off` restores the target's FP exactly (the whole 0x408-0x45C block becomes instruction-identical)
+* `auto/800CD584_fn_800CD584` - #pragma fp_contract off (scoped to this unit's source) - fn_800CD584: 0 % (fused fmsubs/fmadds/fnmsubs) -> 93.69 % (fmuls/fadds/fsubs as in the target)
+
+**Example.**
+
+```c
+#pragma fp_contract off
+```
+## 41. `#pragma optimization_level 1` does not turn the peephole off
+
+**Problem.** A unit needs the peephole pass off and `#pragma optimization_level 1` looks like the way to get it: `-O1` resolves to `-opt level=1`, and the level's switch set reads as if it includes the peephole. It compiles, the level moves, and the narrowing still folds.
+
+**Why try it.** The peephole is a separate switch on the command line and the pragma only sets the level, so the command line's `peephole on` survives. Several workers measured the same non-result independently. On the command line `-O1` produces the same object as `-O3` + the pragma here, so the level is not a proxy for the pass either.
+
+**Result.** Measured independently by 3 worker(s):
+
+* `auto/8009AA78_fn_8009AA78` - -O1 (= -opt level=1) on the command line - same object as -O3 + the pragma for every function in this unit (checked on a scratch helper and on the unit)
+* `auto/800E46E8_fn_800E46E8` - `#pragma optimization_level 1` (probe) - not tried - the brief records that it does not turn the peephole off
+* `auto/800FCED4_fn_800FCED4` - #pragma optimization_level 1 - fn_800FCED4 94.00, eft002_set 94.09, eft002_set_shell 93.17 - the level does not turn the peephole pass off
+
+**Example.**
+
+```c
+#pragma peephole off        /* not `#pragma optimization_level 1` */
+```
+## 42. A C++ free function needs `extern "C"` so objdiff can pair it by name
+
+**Problem.** A `fn_*` function defined in a `.cpp` file measures 0 % while its bytes are right: MWCC mangles the free function (`fn_80073398__FP9ResHandle`) and objdiff pairs symbols by name, so neither side pairs and the function contributes nothing.
+
+**Why try it.** Wrap the `fn_*` definitions in `extern "C"`: the emitted symbol becomes the plain map name and every symbol pairs. This is the source half of playbook 31 (the map rename is the other half).
+
+**Result.** 1 unit(s) measured the same lever independently, so the evidence is grouped here rather than written once per outbox:
+
+* `auto/80073398_fn_80073398` - extern "C" on the fn_* definitions - every fn_* symbol: 0 -> 100 (MWCC mangles a C++ free function as fn_80073398__FP9ResHandle, which objdiff cannot pair)
+
+**Example.**
+
+```cpp
+extern "C" void fn_80073398(ResHandle* self) { ... }
+```
+## 43. Retail's per-string `lis`/`addi` addressing means the unit was built with `-pool off`
+
+**Problem.** Our string literals are addressed through one `@stringBase0` base register (one `lis`, then `addi` displacements) where retail materialises each string with its own `lis`/`addi` - 0x20 bytes of `.text` short, and the `.rela.text` records name a base symbol retail never had.
+
+**Why try it.** `-pool off` stops the string pooling; the relocations become per-string and `.data` reproduces retail's pool. It has no source pragma, so it is a lib/per-unit flag request.
+
+**Result.** 1 unit(s) measured the same lever independently, so the evidence is grouped here rather than written once per outbox:
+
+* `auto/800CB948_fn_800CB948` - -pool off - string literals: .rela.text 0x2C4 -> 0x3B4 (retail's per-string lis/addi), .data 0x00AD == retail 0x80594D20; without it a @stringBase0 base register and .text 0xC44
+
+**Example.**
+
+```
+-pool off
+```
+## 44. A string pool in `.data` means the build was not `-str readonly`
+
+**Problem.** The unit's retail string pool sits in `.data`, but our `cflags` carry `-str reuse,pool,readonly`, so our strings land in `.rodata` and the section does not pair. It reads as a missing data range.
+
+**Why try it.** The section is chosen by the string flag: `-str reuse,pool` without `readonly` emits the pool into `.data`. It is a diagnostic first - the RSO unit's literal reconstruction scored lower than the `extern` form until the pool was written the way the flag needs - but it tells you which `-str` the original build used.
+
+**Result.** 1 unit(s) measured the same lever independently, so the evidence is grouped here rather than written once per outbox:
+
+* `RSO/runtime` - -str reuse,pool - Retail's pool is in .data, so the original build was not readonly. Measured with the pool written as string literals: `-str reuse,pool,readonly` -> .text 0x12F8, .rodata 0xDA, .data 0x38; `-str reuse,pool` -> .text 0x12F8, .data 0x112 (retail's unit .data is 0x118). NO score gain today: the literal reconstruction scores RSOStaticLocateObject 98.2974 / RSORelocate 98.5217 / RSORelocateSmallDataSection 96.8649 vs 99.641030 / 99.478264 / 99.560814 for the extern form, because a...
+
+**Example.**
+
+```
+-str reuse,pool
+```
+## 45. A hand-written string literal's `\n` becomes CRLF on this host
+
+**Problem.** A data range's string pool cannot be written in-source because MWCC on this host translates the `\n` in the literals to CRLF, so the emitted bytes do not match the DOL's LF. It reads as a data-claim problem and invites a hand-written definition that will not match.
+
+**Why try it.** Record it before spending a pass on the pool: the bytes come from the compiler's literal path, which is host-newline sensitive. Leave the range to the data pass, or reference the strings as `extern` declarations so the object does not emit them.
+
+**Result.** Measured independently by 1 worker(s):
+
+* `800cc5b0-fn-800cc5b0-39c9.md` - possible but MWCC on this host turns the `\n` in the literals into CRLF, so the bytes do not match the DOL's LF - left as a follow-up for the data pass.
+## 46. A flipped unit's `.ctors$10` fragment is reordered by the linker
+
+**Problem.** A unit's object is byte-identical, `flipcheck.py` says READY, and the flip still breaks the DOL on the unit's `.ctors$10`/`.dtors$15` words, shifting the merged `.ctors`/`.dtors` tables. It reads as a linker/ordering mystery, and `flipcheck.py` cannot see it.
+
+**Why try it.** Check the target object's freshness first: the blocker that motivated the 7.19 audit was a *stale target object, cured by a re-split*. If a fresh re-split does not cure it, the linker's built-in `.ctors`/`.dtors` path is the remaining suspect: it collects `$NN` fragments in a fixed name order (`.ctors$00, .ctors$10, .ctors, .ctors$99`), not link order, so compare the merged `.ctors`/`.dtors` words, not only the object's section sizes.
+
+**Result.** Measured independently by 4 worker(s):
+
+* `ctors-rule.md` - # The `.ctors`/`.dtors` flip blocker (roadmap 7.19) - read-only investigation Read-only pass (no ninja/configure/link, no repo file touched except this note). Goal: decide why flipping
+* `flip-round-1.md` - ## The open one: a flipped object's .ctors/.dtors fragments do not land where the original's did `Runtime.PPCEABI.H/__init_cpp_exceptions` passes all three checks and still fails:
+* `linkorder-7.19.md` - * The `.ctors`/`_reference` blocker that motivated 7.19 was a **stale target object cured by a re-split**: `__init_cpp_exceptions` is `Object(Matching, ...)` today and the green link keeps all three of its words (`__init_cpp_exceptions_reference` at `.ctors[0]`, `__fini_cpp_exceptions_reference` at `.dtors[1]`).
+* `sysmem-flip-recheck.md` - Same shape as the `.ctors` blocker: the measurement predates the forced re-split, and the re-split cured it. ## 1. Object equivalence (current objects, all regenerated at 12:56)
