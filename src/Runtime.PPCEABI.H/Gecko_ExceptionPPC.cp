@@ -62,46 +62,36 @@
  *      `__init_cpp_exceptions.cpp` *gains* extab/extabindex under it while its target object has none, so it
  *      belongs in the object's own `extra_cflags`.
  *
- * Residual / open items (all measured against the target object this session):
- *   - **The residual is the scheduler, not symbol pairing.** `fragmentinfo` used to be spelled
- *     `fragmentinfo_806F4B48` in the target object because the map marked it `scope:local` and dtk spells a
- *     local symbol `<name>_<address>`; declaring it `scope:global` makes both sides say `fragmentinfo` (both
- *     objects verified). **That change did not move the score** - `__register_fragment` is still 93.68 % - so
- *     the name was a latent trap, not the cause. The cause is the order of two independent instructions at the
- *     top of the loop: ours emits `li r6,0` then `addi r5,r5,0` (the `fragmentinfo` base), retail the other way
- *     round, and nothing else differs (1132 B both). Eleven variants were tried this session and none flips it:
- *     source shapes (`i = 0` at the declaration, `i` declared before `f`, separate `f = fragmentinfo`, a
- *     `while` shape) and pragma *pairs* (`scheduling off/on`, `peephole off/on`, `opt level=4/3`,
- *     `opt level=2/3`, `opt_propagation off/on`, `opt_lifetimes off/on`). This is playbook 22 territory - a
- *     scheduler tie-break, not a source shape. Do **not** claim `.bss 0x806F4B48-0x806F4CC8`: it would add a
- *     0x180 `.bss` this object does not have and drop the unit's `matched_data` (same decision as the lib's
- *     unclaimed `__global_destructor_chain`, `.sbss` 0x80794DF8).
+ * Residual / open items (measured against the target object; the percentages are per-symbol objdiff):
+ *   - `__register_fragment` 93.68 % is the unit's only remaining code difference: the two independent preheader
+ *     instructions `addi r5,r5,fragmentinfo@l` (the base) and `li r6,0` (the index) come out in the opposite
+ *     order (76/76 B, 19/19 ins, identical relocations). It is a `-O4,p` scheduler tie-break, not a source
+ *     shape: ~1000 shapes (every declaration / for-init / increment / condition / body combination, the
+ *     `f = fragmentinfo + i` and `f[i]` derived-pointer forms, `while` / `do` / `for(;;)`, `register`,
+ *     `u32`/`long` indices) reproduce the same two-row swap, and the `-opt` axis (`no<pass>` for every
+ *     documented pass, `-O3`, `-schedule off`, `-opt display`) plus the internal `#pragma opt_*` set (85 names,
+ *     on and off) only permutes the same three instructions. Three things do emit retail's exact order and
+ *     none is usable: `-proc 7450`/`744X`/`e600` (and the pre-3.0 GC compilers) fix this function but drop the
+ *     walkers (to 94.47 / 97.04 / 99.44 % under 7450),
+ *     `-inline deferred` fixes all five but reverses `.text` (it emits in reverse source order, so
+ *     `__register_fragment` lands last), and `#pragma opt_repositioncode on` / `opt_rotateloops on` change the
+ *     loop itself. `-opt nopeephole` scores 99.37 % here, but it is the same two-row swap with `li r0,32` and
+ *     `li r6,0` transposed - the number moves, the code does not - so it is a metric artifact and is
+ *     deliberately **not** landed (a scoped pragma would also be a per-function flag, playbook 33).
+ *   - Do **not** claim `.bss 0x806F4B48-0x806F4CC8`: it would add a 0x180 `.bss` this object does not have and
+ *     drop the unit's `matched_data` (same decision as the lib's unclaimed `__global_destructor_chain`,
+ *     `.sbss` 0x80794DF8). The `.data` jump table `0x8060E8A0-0x8060E8E4` *is* claimed in `splits.txt`, which
+ *     is what pairs our `@204` with `jumptable_8060E8A0` and takes `ExPPC_NextAction` to 100 %; this object
+ *     loads no `.sdata2`/`.sdata` constant (no such section, no pool relocation).
  *   - The three walkers are `static`; the map's `fn_80457504`, `fn_8045759C` and `fn_8045774C` were renamed to
- *     this file's mangled names and all three now measure 100 %. (Was: objdiff found no counterpart for the
- *     map's names and scored all three 0 %: with the map renamed to this file's mangled
- *     names (a rename, not a source edit - the code is byte-identical either way) they measure 100.0, 100.0
- *     and 99.86 %, and the unit goes from 9.82 % (1/5 functions, 40/1132 B) to ~99.5 %. `fn_8045670C` has
- *     the same shape (see below).
- *   - `__register_fragment` 93.68 %: the only code difference left is the order of two independent preheader
- *     instructions - retail `addi r5,r5,fragmentinfo@l` (the pointer) before `li r6,0` (the index), ours the
- *     reverse; 76/76 B, 19/19 ins, relocations identical. 35 source shapes (declaration order, comma for-init
- *     both ways, separate statements, initialiser instead of for-init, `while`, `do`/`while`, `goto`, indexed
- *     `f[i]`/`fragmentinfo[i]`, `f + i`, pointer-end compare, literal and cast bound, `f += 1`, reversed and
- *     swapped increments, `!f->active`) leave it untouched or move registers too (89.47 / 86.05 / 9.68 %).
- *     `-O4,p` emits the counter init before the SDA address `addi` for every shape: a preheader scheduling
- *     tie-break, not reachable from the source. No `-opt` lever moves it either (`noloop`/`nostrength`/
- *     `nolifetimes`/`nodeadcode` unchanged, everything else regresses).
- *   - `.data 0x8060E8A0-0x8060E8E4` (0x44) is this file's jump table and is unclaimed: only
- *     `ExPPC_NextAction` uses it (3 rows - the `lis`/`addi` base and the `lwzx`), and `objdiff` sees our
- *     compiler-local `@204` against the map's `jumptable_8060E8A0`, which is the 99.86 %. Claiming the range
- *     should pair it by (section, offset) - this very object's `extabindex` relocations already pair that way
- *     (target `@etb_8001E3F0`/`@etb_8001E3F8` against our `@134`/`@205`, both `extab`-local, 100 %), and
- *     `RSO/runtime`'s claimed `.data` pairs too (`@1845` vs `@176`) - so expect `ExPPC_NextAction`
- *     99.86 -> 100. This object loads no `.sdata2` or `.sdata` constant (no such section, no pool
- *     relocation), so there is nothing else to claim.
- *   - `fn_8045670C` is MSL's `terminate` - three instructions tail-calling the SDA's terminate handler. The
- *     reference below uses the map's generated name so the relocation pairs; renaming it is the usual two
- *     edits (symbols.txt + this file).
+ *     this file's mangled names and all three measure 100 %. `fragmentinfo` used to be spelled
+ *     `fragmentinfo_806F4B48` in the target object (the map marked it `scope:local`, and dtk spells a local
+ *     symbol `<name>_<address>`); declaring it `scope:global` makes both sides say `fragmentinfo`. Neither
+ *     rename moved the score - both were latent pairing traps, not the residual.
+ *   - `fn_8045670C` (0xC: `lwz r12,-20832(r13); mtctr r12; bctr`) is MSL's `terminate`, tail-calling the SDA
+ *     terminate handler; it is the unit's only `stylelint` rule-7 finding (3 references). It cannot be renamed
+ *     from this file alone - a rename is `symbols.txt` + this file together, and a source-only rename would
+ *     stop the `bl` relocation from pairing - so it is an outbox `config_requests` item.
  */
 
 /* The target object carries its own extab/extabindex (0x10 + 0x18) and the lib's flags say
@@ -114,6 +104,7 @@
 #define RETURN_ADDRESS 4
 #define MAXFRAGMENTS   32
 
+/* size: 0x10 */
 typedef struct __eti_init_info {
     void* eti_start;         /* +0x00 */
     void* eti_end;           /* +0x04 */
@@ -121,35 +112,41 @@ typedef struct __eti_init_info {
     unsigned long code_size; /* +0x0C */
 } __eti_init_info;
 
+/* size: 0x6 */
 typedef struct ExceptionRangeSmall {
-    u16 start;
-    u16 end;
-    u16 action;
+    u16 start;  /* +0x00 */
+    u16 end;    /* +0x02 */
+    u16 action; /* +0x04 */
 } ExceptionRangeSmall;
 
+/* size: 0x2 */
 typedef struct ExceptionTableSmall {
-    u16 et_field;
-    ExceptionRangeSmall ranges[0];
+    u16 et_field;                  /* +0x00 */
+    ExceptionRangeSmall ranges[0]; /* +0x02 */
 } ExceptionTableSmall;
 
+/* size: 0x8 */
 typedef struct ExceptionRangeLarge {
-    u32 start;
-    u16 size;
-    u16 action;
+    u32 start;  /* +0x00 */
+    u16 size;   /* +0x04 */
+    u16 action; /* +0x06 */
 } ExceptionRangeLarge;
 
+/* size: 0x4 */
 typedef struct ExceptionTableLarge {
-    u16 et_field;
-    u16 et_field2;
-    ExceptionRangeLarge ranges[];
+    u16 et_field;                 /* +0x00 */
+    u16 et_field2;                /* +0x02 */
+    ExceptionRangeLarge ranges[]; /* +0x04 */
 } ExceptionTableLarge;
 
+/* size: 0xC */
 typedef struct ExceptionTableIndex {
-    u32 functionoffset;
-    u32 eti_field;
-    u32 exceptionoffset;
+    u32 functionoffset;  /* +0x00 */
+    u32 eti_field;       /* +0x04 */
+    u32 exceptionoffset; /* +0x08 */
 } ExceptionTableIndex;
 
+/* size: 0x18 */
 typedef struct MWExceptionInfo {
     ExceptionTableSmall* exception_record; /* +0x00 */
     char* current_function;                /* +0x04 */
@@ -159,6 +156,7 @@ typedef struct MWExceptionInfo {
     char* TOC;                             /* +0x14 */
 } MWExceptionInfo;
 
+/* size: 0x20 */
 typedef struct FragmentInfo {
     ExceptionTableIndex* exception_start; /* +0x00 */
     ExceptionTableIndex* exception_end;   /* +0x04 */
@@ -170,17 +168,19 @@ typedef struct FragmentInfo {
     int active;                           /* +0x1C */
 } FragmentInfo;
 
+/* size: 0xC */
 typedef struct ProcessInfo {
     __eti_init_info* exception_info; /* +0x00 */
     char* TOC;                       /* +0x04 */
     int active;                      /* +0x08 */
 } ProcessInfo;
 
+/* size: 0x24 */
 typedef struct ActionIterator {
-    MWExceptionInfo info;
-    char* current_SP;
-    char* current_FP;
-    s32 current_R31;
+    MWExceptionInfo info; /* +0x00 */
+    char* current_SP;     /* +0x18 */
+    char* current_FP;     /* +0x1C */
+    s32 current_R31;      /* +0x20 */
 } ActionIterator;
 
 /* et-field getters this file reads; see the note on the layout in the header. */
@@ -216,115 +216,130 @@ typedef u8 exaction_type;
 #define EXACTION_CATCHBLOCK_32      16
 
 /* The cleanup records `ExPPC_NextAction` steps over; only their sizes are used, each is the number of bytes
- * the action pointer advances by. */
+ * the action pointer advances by.  The sizes are the `addi r0,r4,N` immediates of that function's switch,
+ * in source-case order: 8, 12, 8, 12, 12, 16, 20, 8, 12, 12, 16, 4, and 12 + specs * 4. */
+/* size: 0x4 */
 typedef struct ex_branch {
-    exaction_type action;
-    u8 unused;
-    u16 target;
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    u16 target;           /* +0x02 */
 } ex_branch;
 
+/* size: 0x8 */
 typedef struct ex_destroylocal {
-    exaction_type action;
-    u8 unused;
-    s16 local;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    s16 local;            /* +0x02 */
+    void* dtor;           /* +0x04 */
 } ex_destroylocal;
 
+/* size: 0xC */
 typedef struct ex_destroylocalcond {
-    exaction_type action;
-    u8 dlc_field;
-    s16 cond;
-    s16 local;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 dlc_field;         /* +0x01 */
+    s16 cond;             /* +0x02 */
+    s16 local;            /* +0x04 */
+    void* dtor;           /* +0x08 */
 } ex_destroylocalcond;
 
+/* size: 0x8 */
 typedef struct ex_destroylocalpointer {
-    exaction_type action;
-    u8 dlp_field;
-    s16 pointer;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 dlp_field;         /* +0x01 */
+    s16 pointer;          /* +0x02 */
+    void* dtor;           /* +0x04 */
 } ex_destroylocalpointer;
 
+/* size: 0xC */
 typedef struct ex_destroylocalarray {
-    exaction_type action;
-    u8 unused;
-    s16 localarray;
-    u16 elements;
-    u16 element_size;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    s16 localarray;       /* +0x02 */
+    u16 elements;         /* +0x04 */
+    u16 element_size;     /* +0x06 */
+    void* dtor;           /* +0x08 */
 } ex_destroylocalarray;
 
+/* size: 0xC */
 typedef struct ex_destroymember {
-    exaction_type action;
-    u8 dm_field;
-    s16 objectptr;
-    s32 offset;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 dm_field;          /* +0x01 */
+    s16 objectptr;        /* +0x02 */
+    s32 offset;           /* +0x04 */
+    void* dtor;           /* +0x08 */
 } ex_destroymember;
 
+/* size: 0x10 */
 typedef struct ex_destroymembercond {
-    exaction_type action;
-    u8 dmc_field;
-    s16 cond;
-    s16 objectptr;
-    s32 offset;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 dmc_field;         /* +0x01 */
+    s16 cond;             /* +0x02 */
+    s16 objectptr;        /* +0x04 */
+    s32 offset;           /* +0x08 */
+    void* dtor;           /* +0x0C */
 } ex_destroymembercond;
 
+/* size: 0x14 */
 typedef struct ex_destroymemberarray {
-    exaction_type action;
-    u8 dma_field;
-    s16 objectptr;
-    s32 offset;
-    s32 elements;
-    s32 element_size;
-    void* dtor;
+    exaction_type action; /* +0x00 */
+    u8 dma_field;         /* +0x01 */
+    s16 objectptr;        /* +0x02 */
+    s32 offset;           /* +0x04 */
+    s32 elements;         /* +0x08 */
+    s32 element_size;     /* +0x0C */
+    void* dtor;           /* +0x10 */
 } ex_destroymemberarray;
 
+/* size: 0x8 */
 typedef struct ex_deletepointer {
-    exaction_type action;
-    u8 dp_field;
-    s16 objectptr;
-    void* deletefunc;
+    exaction_type action; /* +0x00 */
+    u8 dp_field;          /* +0x01 */
+    s16 objectptr;        /* +0x02 */
+    void* deletefunc;     /* +0x04 */
 } ex_deletepointer;
 
+/* size: 0xC */
 typedef struct ex_deletepointercond {
-    exaction_type action;
-    u8 dpc_field;
-    s16 cond;
-    s16 objectptr;
-    void* deletefunc;
+    exaction_type action; /* +0x00 */
+    u8 dpc_field;         /* +0x01 */
+    s16 cond;             /* +0x02 */
+    s16 objectptr;        /* +0x04 */
+    void* deletefunc;     /* +0x08 */
 } ex_deletepointercond;
 
+/* size: 0xC */
 typedef struct ex_catchblock {
-    exaction_type action;
-    u8 unused;
-    char* catch_type;
-    u16 catch_pcoffset;
-    s16 cinfo_ref;
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    char* catch_type;     /* +0x04 */
+    u16 catch_pcoffset;   /* +0x08 */
+    s16 cinfo_ref;        /* +0x0A */
 } ex_catchblock;
 
+/* size: 0x4 */
 typedef struct ex_activecatchblock {
-    exaction_type action;
-    u8 unused;
-    s16 cinfo_ref;
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    s16 cinfo_ref;        /* +0x02 */
 } ex_activecatchblock;
 
+/* size: 0x10 */
 typedef struct ex_catchblock_32 {
-    exaction_type action;
-    u8 unused;
-    char* catch_type;
-    s32 catch_pcoffset;
-    s32 cinfo_ref;
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    char* catch_type;     /* +0x04 */
+    s32 catch_pcoffset;   /* +0x08 */
+    s32 cinfo_ref;        /* +0x0C */
 } ex_catchblock_32;
 
+/* size: 0xC */
 typedef struct ex_specification {
-    exaction_type action;
-    u8 unused;
-    u16 specs;
-    s32 pcoffset;
-    s32 cinfo_ref;
-    char* spec[];
+    exaction_type action; /* +0x00 */
+    u8 unused;            /* +0x01 */
+    u16 specs;            /* +0x02 */
+    s32 pcoffset;         /* +0x04 */
+    s32 cinfo_ref;        /* +0x08 */
+    char* spec[];         /* +0x0C */
 } ex_specification;
 
 /* The 32-slot fragment table is `.bss:0x806F4B48`, owned by the linker's own scaffolding, not by this
