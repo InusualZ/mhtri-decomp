@@ -514,7 +514,7 @@ config.libs = [
         "cflags": cflags_os,
         "host": False,
         "objects": [
-            Object(NonMatching, "OS/OSAlarm.c"),
+            Object(Matching, "OS/OSAlarm.c"),
         ],
     },
     {
