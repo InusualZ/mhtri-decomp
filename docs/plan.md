@@ -508,24 +508,32 @@ tool is not done until `land.py` calls it or the plan says who runs it**.
 | 7.5 + 7.16 `land.py` | **done (build path dry-run only)** | 13 checks; the gate refuses on a moved base, a shared-file edit, a missing/invalid outbox, a regression, and requires `ok` to be recreated by *this* run; baseline refresh |
 | 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **not yet** | `brief.py` already reads the queue and `land.py` reports the missing lint as skipped |
 
-**Flip campaign (7.6), first batch 2026-09-23.** `Runtime.PPCEABI.H/memset` is flipped and committed
-(`3e5a072`): the gate deleted `build/RMHE08/main.elf` (the branch that had never run), relinked, and `main.dol`
-is still `bf4850739478caaedfe675949eb7c28595a7fde9` = `config/RMHE08/build.sha1`. The byte-identity proofs of the
-remaining candidates (`.pi/notes/flip-proofs.md`) give the safe order - `Network/NetworkWiiMediator`,
-`OS/OSAlarm`, `Runtime.PPCEABI.H/memcpy`, `lobby/lobby_scene`, `Runtime.PPCEABI.H/global_destructor_chain`,
-`Runtime.PPCEABI.H/__init_cpp_exceptions`, `sys_mem` - and they found two blockers with their cause, which are
-findings rather than failures:
+**Flip campaign (7.6), round 1 2026-09-23.** Six objects are flipped and committed, each alone in its commit -
+`memset` (3e5a072), `NetworkWiiMediator` (6e0ed8c), `OSAlarm` (0806eae), `memcpy` (eadd4bd), `lobby_scene`
+(a247195), `global_destructor_chain` (1e6f93c) - with `main.dol` still
+`bf4850739478caaedfe675949eb7c28595a7fde9`. Two further candidates failed, and each failure wrote a rule the
+proof has to contain (detail: `.pi/notes/flip-round-1.md`):
 
-* `Runtime.PPCEABI.H/__start` and `__ppc_eabi_init` are short by exactly the 16-byte zero padding the retail DOL
-  has at `0x800062E8` / `0x800065E4`: those two files need `-func_align 16` (a flag/`#pragma`, not a code fix),
-  which is the inverse of the lib-wide `-func_align 4` landed in batch 5;
-* `g3d/g3d_resanmamblight` lacks the target's `extab`/`extabindex` (2 entries): that object needs exceptions on,
-  the same finding as `Pl` and `Gecko_ExceptionPPC.cp` in playbook row 30.
+1. **Alignment is part of the proof.** `NetworkWiiMediator` and `OSAlarm` matched the target in every section
+   size and every byte, and still broke the DOL: their `.text` was `align 2**4` (from `cflags_base`'s `-O4,p`
+   implying `-func_align 16`) where retail's is `2**2`, so the linker rounded the object's start to the next
+   16-byte boundary - `fn_80413F3C` moved to `0x80413F40`, every later symbol shifted by 4, 1 223 723 DOL bytes
+   differed. Fixed per lib (`cflags_network`, `cflags_os`, commit b523f3d). Every retail object in the project
+   is `.text`/`.init align 2**2`, so 4-byte alignment is the default expectation - and the two units that
+   genuinely want 16-byte padding (`__start`, `__ppc_eabi_init`) want it from their own section pragmas.
+2. **Our object must provide every section the unit's `splits.txt` entry claims.** `sys_mem.cpp` claims
+   `extab` (0xA0) + `extabindex` (0x30) + `.text` (0x120) but our object emits only `.text`; flipping it
+   removes those 208 bytes from the link and the whole DOL shifts (`_eti_init_info` 0x8003F1C8 -> 0x8003F17C,
+   5.5 MB of differing bytes). A flip substitutes our object for the original *region*, so anything the region
+   had and our object does not emit is lost.
 
-Every `.rela.*` byte difference in the whole candidate set is only byte 6 of an `Elf32_Rela` (the `r_info`
-symbol index), proven to reference the same symbol, and `sys_mem`'s `@13` vs `@etb_80006770` is a name-only
-difference - so those objects are DOL-identical and can be flipped.
-
+`tools/units/flipcheck.py` checks all three conditions per unit (claim vs emitted sections, sizes/alignment,
+and the bytes against the target object) and reports **7 of 19 ready**. Its one false positive is
+`Runtime.PPCEABI.H/__init_cpp_exceptions`, which passes all three and still fails: `dtk dol diff` reports
+`__init_cpp_exceptions_reference` expected at `0x8056F2C0` - the *first* `.ctors` entry - and ours holds a
+different value there. The unit's `.ctors`/`.dtors`/`.sdata` fragments are claimed and emitted, so this is
+not the sys_mem mechanism: a flipped object's `.ctors$10` entry does not land where the original's did. That is
+the link-order question roadmap **7.19** has to answer, and it is the flip campaign's own remaining unknown.
 
 **End-to-end dry round (2026-09-23).** claim → brief → measure inside the worktree → outbox → gate: `claims.py
 claim` → `brief.py` → (in the worktree) `recompile.py --measure` → `handoff.py --check` → `land.py verify
