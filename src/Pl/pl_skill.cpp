@@ -44,13 +44,11 @@
  *     `(f32)(s32)` and 0x8079A048 `(f32)(u32)`). MWCC synthesises those for a cast, so they cannot be named
  *     from source; the unit's own pool run is 0x8079A030-0x8079A080 (80 B, 19 entries) but the magics live
  *     in the preceding unit's run, outside any contiguous claim.
- *   fn_80271BD4 98.59 - the kind dispatch is the `goto` label chain described below; what is left is one
- *     instruction slot. Ours emits `mr r28, r29` (the C block's `p = rec`) one row earlier than the target,
- *     so it sits before `li r27, 0` instead of after it. Moving the assignment into the guard, into the
- *     `for` init or into a `while` body does not move it. Size matches (568 B).
- *   fn_80271E0C 97.97 - the same dispatch, plus the C block's `rec[1]` bound: the target keeps it in r0 and
- *     re-masks it into r5 for the `(s32)(u8)rec[1] < 3` test, ours keeps it in r5 and drops that `clrlwi`
- *     (628 B against the target's 632).
+ *   fn_80271BD4 98.01 / fn_80271E0C 97.46 - the kind dispatch after the rule 8 sweep took the label chain
+ *     out (see below). Everything but the dispatch matches; what is left is MWCC's `switch` decision tree
+ *     against the target's three linear `subi`/`cmplwi` range tests, and - in fn_80271E0C - the C block's
+ *     `deco_count` bound, which the target keeps in r0 and re-masks (`clrlwi r5, r0, 24`) for the `< 3`
+ *     test where we reuse the register. The removed label-chain shapes measured 98.59 / 97.97.
  *   fn_8027350C 95.50 - after the fn_802693C4/fn_80269474 call ours recomputes `plw + i*4` for the
  *     `set_applied[i] = set_pending[i]` copy; the target reuses the base it had already kept for
  *     `&plw->set_pending[i]` (three instructions and 12 B over the target). Keeping the base alive in a
@@ -61,12 +59,19 @@
  *     `u16*`/`u8*` pointer walks, an explicit `q` local and a two-arm `||` measure the same or worse.
  *
  * Source shapes that are load-bearing, not guesses (the ones below were all found by measuring):
- *   - fn_80271BD4 / fn_80271E0C's kind dispatch is a `goto` label chain (`blockA`/`blockB`/`blockC`/`done`)
- *     and the labels are load-bearing: only that shape gives the target's taken `ble`/`ble`/`beq` range
- *     tests with all three bodies out of line in the order B, C, A (95.77 against 93.41 for the best
- *     if/else form). A `switch` gives the same block order but MWCC's own two-sided
- *     `cmpwi/blt/cmpwi/ble` range form (90.6); an if/else chain gives the range form but inverted branches
- *     and the first body inline (93.4).
+ *   - fn_80271BD4 / fn_80271E0C's kind dispatch is `switch ((u32)kind)` with cases 1-5 (block B), 6 (block
+ *     C) and the 7-15 range as `default` (block A): MWCC lays the case blocks out in ascending case order,
+ *     i.e. the target's B, C, A body order, and reaches each body with a taken branch like the target. The
+ *     `default` form is the only one that keeps that order *and* a short tree (98.01 / 97.46); giving A its
+ *     own 7-15 range instead measures 97.34, an if/else chain (A inline) 80.56 / 90.34, a `for (;;)` with
+ *     `break` 80.56 / 90.34. The old label chain (a `goto` dispatch, banned by rule 8) is the only shape
+ *     that reproduces the target exactly (98.59 / 97.97); it is gone. The full shape table is in the batch
+ *     outbox (`pl-skill-6109.json`).
+ *   - the walk over a record's three skill ids must index the typed array (`rec->skill_id[i]`), not step a
+ *     byte pointer: the typed form is what keeps the record in the target's register (r29) and closes the
+ *     old `mr r28, r29` placement residual.
+ *   - fn_80272E30's "skip the second lookup when the spare-slot one resolved" is a single-iteration
+ *     `for (;;)` with `break` (rule 8; the label chain it replaces measured the same 100 %).
  *   - fn_80273044 / fn_80273228's 24-entry slot scan has to be a *flat* `for (i = 0; i < 24; i++)` over
  *     `plw->slot_id[i]`, not the nested 3x8: MWCC unrolls the flat form eight-wide under an `mtctr 3` outer
  *     loop (55.84 -> 100 and 97.40 -> 100). fn_80273228's 8-entry `spare_slot_id` scan additionally wants
@@ -96,7 +101,14 @@
  *   - fn_80272B10's second slot lookup indexes `plw->slot_id` with a `?:` *and* calls GetItemData in each
  *     arm of the if/else; written as one arm the two loads get merged.
  *
- * All 50 functions are written in address order (unit fuzzy 99.68 %).
+ * 6.5 conformance for this batch: `_EQUIP` is a typed 12-byte record (`kind`, `deco_count`, `item_id`,
+ * `deco_level`, `skill_id[3]`) and `_SLOTENT`'s fields are `item_id`/`value`, so the converted dispatch
+ * functions reach every field by name instead of a byte offset. `fn_80271BD4`/`fn_80271E0C` keep their map
+ * names because objdiff pairs on them (the rename belongs in symbols.txt - see the outbox's
+ * `config_requests`), and `_PLW`'s skill-selection group (`unk269`, `unk26A`, `unk26E`, `unk270`, `unk304`)
+ * stays `unk`: naming it needs evidence from outside this unit.
+ *
+ * All 50 functions are written in address order (unit fuzzy 99.63 %).
  */
 
 #include "types.h"
@@ -126,17 +138,22 @@ extern f32 lbl_8079A07C;
 }
 
 
-/* One 12-byte equipment record (an item id plus its decoration/skill bytes). */
+/* One 12-byte equipment record: the equipment kind, its decoration count, the item id it holds and the
+ * skill ids / decoration levels the record carries. */
 /* size: 0xC */
 struct _EQUIP {
-    u8 unk[12];
+    /* 0x0 */ u8 kind;         /* equipment kind; picks which skill fields apply (1-5, 6, 7-15) */
+    /* 0x1 */ u8 deco_count;   /* number of decoration skill ids in skill_id */
+    /* 0x2 */ u16 item_id;     /* 0 when the slot is empty */
+    /* 0x4 */ u16 deco_level;  /* two decoration skill levels, low byte first */
+    /* 0x6 */ u16 skill_id[3]; /* the decoration skill ids */
 };
 
 /* One 4-byte equipment-slot entry: an item id and a signed value. */
 /* size: 0x4 */
 struct _SLOTENT {
-    /* 0x0 */ u16 unk0;
-    /* 0x2 */ s16 unk2;
+    /* 0x0 */ u16 item_id;
+    /* 0x2 */ s16 value;
 };
 
 struct _PLW {
@@ -1186,9 +1203,9 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
         u8* item;
 
         if (cur & 0x80) {
-            item = GetItemData__FUs(plw->slot_id[(cur & 0x7F) + 26].unk0);
+            item = GetItemData__FUs(plw->slot_id[(cur & 0x7F) + 26].item_id);
         } else {
-            item = GetItemData__FUs(plw->slot_id[cur].unk0);
+            item = GetItemData__FUs(plw->slot_id[cur].item_id);
         }
         if (item[0] != 1) {
             plw->unk26E = fn_8027993C(plw, plw->unk26E, 0);
@@ -1204,20 +1221,22 @@ extern "C" s16 fn_80272E30(_PLW* plw, u16 item, s16 value) {
     s16 v;
     u16 slot;
 
-    if (data[0] == 1 && fn_8026FE44(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
-        v = fn_8004BA3C(item, value, plw->spare_slot_id, 8, 1, 0);
-        slot = fn_80273044(plw, item);
-        if ((u32)v <= 4) {
-            goto found;
+    for (;;) {
+        if (data[0] == 1 && fn_8026FE44(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
+            v = fn_8004BA3C(item, value, plw->spare_slot_id, 8, 1, 0);
+            slot = fn_80273044(plw, item);
+            if ((u32)v <= 4) {
+                break;
+            }
         }
+        v = fn_8004BA3C(item, value, plw->slot_id, 24, 1, 0);
+        slot = fn_80273044(plw, item);
+        break;
     }
-    v = fn_8004BA3C(item, value, plw->slot_id, 24, 1, 0);
-    slot = fn_80273044(plw, item);
-found:
     switch (v) {
     case 0:
         {
-            u8* d = GetItemData__FUs(plw->slot_id[plw->unk304].unk0);
+            u8* d = GetItemData__FUs(plw->slot_id[plw->unk304].item_id);
 
             if ((d[2] & 8) == 0 || d[0] == 1) {
                 plw->unk304 = fn_8025DF78(plw, plw->unk304, 0);
@@ -1283,7 +1302,7 @@ extern "C" s32 fn_80273228(_PLW* plw, u16 item, s16 value) {
         }
     }
     for (int i = 0; i < 24; i++) {
-        if (plw->slot_id[i].unk0 == 0) {
+        if (plw->slot_id[i].item_id == 0) {
             return value;
         }
     }
@@ -1363,87 +1382,75 @@ extern "C" void fn_802736A0(_PLW* plw) {
 
 /* The skill level one player equipment record contributes for `skill`: a per-kind record layout,
  * with the per-decoration levels summed for the kinds that carry them. */
-extern "C" s8 fn_80271BD4(u8* rec, u8 skill) {
+extern "C" s8 fn_80271BD4(u8* raw, u8 skill) {
+    _EQUIP* rec = (_EQUIP*)raw;
     s8 v = 0;
     int i;
-    u8* p;
 
-    if (*(u16*)(rec + 2) == 0 || skill == 0) {
+    if (rec->item_id == 0 || skill == 0) {
         return 0;
     }
     {
-        s32 kind = rec[0];
+        s32 kind = rec->kind;
 
-        if ((u32)(kind - 7) <= 8) {
-            goto blockA;
-        }
-        if ((u32)(kind - 1) <= 4) {
-            goto blockB;
-        }
-        if (kind == 6) {
-            goto blockC;
-        }
-        goto done;
+        switch ((u32)kind) {
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+            {
+                u8* r = (u8*)fn_8027E344();
 
-blockB:
-        p = rec;
-        {
-            u8* r = (u8*)fn_8027E344();
-
-            if (r[14] == skill) {
-                v = (s8)r[15];
+                if (r[14] == skill) {
+                    v = (s8)r[15];
+                }
+                if (r[16] == skill) {
+                    v += r[17];
+                }
+                if (r[18] == skill) {
+                    v += r[19];
+                }
+                if (r[20] == skill) {
+                    v += r[21];
+                }
+                if (r[22] == skill) {
+                    v += r[23];
+                }
+                for (i = 0; i < 3; i++) {
+                    if (rec->skill_id[i] != 0) {
+                        v += fn_80271AD8(rec->skill_id[i], skill);
+                    }
+                }
             }
-            if (r[16] == skill) {
-                v += r[17];
+            break;
+        case 6:
+            if (rec->deco_count != 0) {
+                for (i = 0; i < rec->deco_count; i++) {
+                    if (rec->skill_id[i] != 0) {
+                        v += fn_80271AD8(rec->skill_id[i], skill);
+                    }
+                }
             }
-            if (r[18] == skill) {
-                v += r[19];
+            if ((s32)rec->deco_count < 3) {
+                if (rec->skill_id[rec->deco_count] == skill) {
+                    v += (s8)((s8)(u8)rec->deco_level - 10);
+                }
+                if ((s32)rec->deco_count + 1 < 3 &&
+                    rec->skill_id[rec->deco_count + 1] == skill) {
+                    v += (s8)((s8)(u8)((rec->deco_level >> 8) & 0xFF) - 10);
+                }
             }
-            if (r[20] == skill) {
-                v += r[21];
-            }
-            if (r[22] == skill) {
-                v += r[23];
-            }
+            break;
+        default:
             for (i = 0; i < 3; i++) {
-                if (*(u16*)(p + 6) != 0) {
-                    v += fn_80271AD8(*(u16*)(p + 6), skill);
+                if (rec->skill_id[i] != 0) {
+                    v += fn_80271AD8(rec->skill_id[i], skill);
                 }
-                p += 2;
             }
-        }
-        goto done;
-
-blockC:
-        if (rec[1] != 0) {
-            p = rec;
-            for (i = 0; i < rec[1]; i++) {
-                if (*(u16*)(p + 6) != 0) {
-                    v += fn_80271AD8(*(u16*)(p + 6), skill);
-                }
-                p += 2;
-            }
-        }
-        if ((s32)rec[1] < 3) {
-            if (*(u16*)(rec + rec[1] * 2 + 6) == skill) {
-                v += (s8)((s8)(u8)*(u16*)(rec + 4) - 10);
-            }
-            if ((s32)rec[1] + 1 < 3 && *(u16*)(rec + (rec[1] + 1) * 2 + 6) == skill) {
-                v += (s8)((s8)(u8)((*(u16*)(rec + 4) >> 8) & 0xFF) - 10);
-            }
-        }
-        goto done;
-
-blockA:
-        p = rec;
-        for (i = 0; i < 3; i++) {
-            if (*(u16*)(p + 6) != 0) {
-                v += fn_80271AD8(*(u16*)(p + 6), skill);
-            }
-            p += 2;
+            break;
         }
     }
-done:
     return v;
 }
 
@@ -1487,89 +1494,77 @@ extern "C" s8 fn_80272084(u8* rec, u8 skill) {
 }
 
 /* Whether one player equipment record provides `skill` at a non-zero level. */
-extern "C" u32 fn_80271E0C(u8* rec, u8 skill) {
+extern "C" u32 fn_80271E0C(u8* raw, u8 skill) {
+    _EQUIP* rec = (_EQUIP*)raw;
     u32 ok = 0;
     int i;
-    u8* p;
 
-    if (*(u16*)(rec + 2) == 0 || skill == 0) {
+    if (rec->item_id == 0 || skill == 0) {
         return 0;
     }
     {
-        s32 kind = rec[0];
+        s32 kind = rec->kind;
 
-        if ((u32)(kind - 7) <= 8) {
-            goto blockA;
-        }
-        if ((u32)(kind - 1) <= 4) {
-            goto blockB;
-        }
-        if (kind == 6) {
-            goto blockC;
-        }
-        goto done;
+        switch ((u32)kind) {
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+            {
+                u8* r = (u8*)fn_8027E344();
 
-blockB:
-        p = rec;
-        {
-            u8* r = (u8*)fn_8027E344();
-
-            if (r[14] == skill && (s8)r[15] != 0) {
-                ok = 1;
+                if (r[14] == skill && (s8)r[15] != 0) {
+                    ok = 1;
+                }
+                if (r[16] == skill && (s8)r[17] != 0) {
+                    ok = 1;
+                }
+                if (r[18] == skill && (s8)r[19] != 0) {
+                    ok = 1;
+                }
+                if (r[20] == skill && (s8)r[21] != 0) {
+                    ok = 1;
+                }
+                if (r[22] == skill && (s8)r[23] != 0) {
+                    ok = 1;
+                }
+                for (i = 0; i < 3; i++) {
+                    if (rec->skill_id[i] != 0 && fn_80271B4C(rec->skill_id[i], skill) == 1) {
+                        ok = 1;
+                    }
+                }
             }
-            if (r[16] == skill && (s8)r[17] != 0) {
-                ok = 1;
+            break;
+        case 6:
+            if (rec->deco_count != 0) {
+                for (i = 0; i < rec->deco_count; i++) {
+                    if (rec->skill_id[i] != 0 && fn_80271B4C(rec->skill_id[i], skill) == 1) {
+                        ok = 1;
+                    }
+                }
             }
-            if (r[18] == skill && (s8)r[19] != 0) {
-                ok = 1;
+            if ((s32)rec->deco_count < 3) {
+                if (rec->skill_id[rec->deco_count] == skill &&
+                    (s8)(u8)rec->deco_level - 10 != 0) {
+                    ok = 1;
+                }
+                if ((s32)rec->deco_count + 1 < 3 &&
+                    rec->skill_id[rec->deco_count + 1] == skill &&
+                    (s8)(u8)((rec->deco_level >> 8) & 0xFF) - 10 != 0) {
+                    ok = 1;
+                }
             }
-            if (r[20] == skill && (s8)r[21] != 0) {
-                ok = 1;
-            }
-            if (r[22] == skill && (s8)r[23] != 0) {
-                ok = 1;
-            }
+            break;
+        default:
             for (i = 0; i < 3; i++) {
-                if (*(u16*)(p + 6) != 0 && fn_80271B4C(*(u16*)(p + 6), skill) == 1) {
+                if (rec->skill_id[i] != 0 && fn_80271B4C(rec->skill_id[i], skill) == 1) {
                     ok = 1;
                 }
-                p += 2;
             }
-        }
-        goto done;
-
-blockC:
-        if (rec[1] != 0) {
-            p = rec;
-            for (i = 0; i < rec[1]; i++) {
-                if (*(u16*)(p + 6) != 0 && fn_80271B4C(*(u16*)(p + 6), skill) == 1) {
-                    ok = 1;
-                }
-                p += 2;
-            }
-        }
-        if ((s32)(u8)rec[1] < 3) {
-            if (*(u16*)(rec + rec[1] * 2 + 6) == skill &&
-                (s8)(u8)*(u16*)(rec + 4) - 10 != 0) {
-                ok = 1;
-            }
-            if ((s32)(u8)rec[1] + 1 < 3 && *(u16*)(rec + (rec[1] + 1) * 2 + 6) == skill &&
-                (s8)(u8)((*(u16*)(rec + 4) >> 8) & 0xFF) - 10 != 0) {
-                ok = 1;
-            }
-        }
-        goto done;
-
-blockA:
-        p = rec;
-        for (i = 0; i < 3; i++) {
-            if (*(u16*)(p + 6) != 0 && fn_80271B4C(*(u16*)(p + 6), skill) == 1) {
-                ok = 1;
-            }
-            p += 2;
+            break;
         }
     }
-done:
     return ok;
 }
 
@@ -1725,13 +1720,13 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 
     if (GetItemData__FUs(slot)[0] == 1 && fn_8026FE44(plw) == 1) {
         for (i = 0; i < 8; i++) {
-            if (slot == plw->spare_slot_id[i].unk0) {
+            if (slot == plw->spare_slot_id[i].item_id) {
                 return (u16)(i | 0x80);
             }
         }
     }
     for (i = 0; i < 24; i++) {
-        if (slot == plw->slot_id[i].unk0) {
+        if (slot == plw->slot_id[i].item_id) {
             return (u16)i;
         }
     }
