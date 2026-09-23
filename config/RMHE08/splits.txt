@@ -107,6 +107,107 @@ auto/800E46E8_fn_800E46E8.cpp:
 	.text       start:0x800E46E8 end:0x800E8E60
 	.ctors      start:0x8056F2F4 end:0x8056F300
 
+auto/800FCED4_fn_800FCED4.cpp:
+	extab       start:0x8000BDDC end:0x8000BDFC
+	extabindex  start:0x80025BB4 end:0x80025BE4
+	.text       start:0x800FCED4 end:0x800FD520
+
+auto/800FD520_fn_800FD520.c:
+	extab       start:0x8000BDFC end:0x8000BE04
+	extabindex  start:0x80025BE4 end:0x80025BF0
+	.text       start:0x800FD520 end:0x800FD718
+
+auto/800FD718_fn_800FD718.c:
+	extab       start:0x8000BE04 end:0x8000BE0C
+	extabindex  start:0x80025BF0 end:0x80025BFC
+	.text       start:0x800FD718 end:0x800FD864
+
+auto/800FF8D4_fn_800FF8D4.cpp:
+	extab       start:0x8000BE34 end:0x8000BEF4
+	extabindex  start:0x80025C38 end:0x80025D58
+	.text       start:0x800FF8D4 end:0x80101DF4
+
+auto/80101DF4_fn_80101DF4.c:
+	extab       start:0x8000BEF4 end:0x8000BEFC
+	extabindex  start:0x80025D58 end:0x80025D64
+	.text       start:0x80101DF4 end:0x80101FA4
+
+auto/80101FA4_fn_80101FA4.cpp:
+	extab       start:0x8000BEFC end:0x8000BF7C
+	extabindex  start:0x80025D64 end:0x80025E24
+	.text       start:0x80101FA4 end:0x80103D28
+
+auto/80103D28_fn_80103D28.cpp:
+	extab       start:0x8000BF7C end:0x8000BFB4
+	extabindex  start:0x80025E24 end:0x80025E78
+	.text       start:0x80103D28 end:0x80104BD0
+
+auto/80104BD0_fn_80104BD0.c:
+	extab       start:0x8000BFB4 end:0x8000BFBC
+	extabindex  start:0x80025E78 end:0x80025E84
+	.text       start:0x80104BD0 end:0x80105314
+
+auto/8010D1A8_fn_8010D1A8.c:
+	extab       start:0x8000C25C end:0x8000C32C
+	extabindex  start:0x80026274 end:0x800263AC
+	.text       start:0x8010D1A8 end:0x801121DC
+
+auto/80114E34_fn_80114E34.cpp:
+	extab       start:0x8000C3D4 end:0x8000C494
+	extabindex  start:0x800264A8 end:0x800265C8
+	.text       start:0x80114E34 end:0x8011722C
+	.ctors      start:0x8056F310 end:0x8056F314
+
+auto/8011722C_fn_8011722C.c:
+	extab       start:0x8000C494 end:0x8000C49C
+	extabindex  start:0x800265C8 end:0x800265D4
+	.text       start:0x8011722C end:0x801173AC
+
+auto/80119C44_fn_80119C44.c:
+	extab       start:0x8000C554 end:0x8000C56C
+	extabindex  start:0x800266E8 end:0x8002670C
+	.text       start:0x80119C44 end:0x80119DEC
+
+auto/8012BA00_fn_8012BA00.c:
+	extab       start:0x8000CBDC end:0x8000CBE4
+	extabindex  start:0x800270B4 end:0x800270C0
+	.text       start:0x8012BA00 end:0x8012BDF4
+
+auto/8012BDF4_fn_8012BDF4.cpp:
+	extab       start:0x8000CBE4 end:0x8000CD2C
+	extabindex  start:0x800270C0 end:0x800272AC
+	.text       start:0x8012BDF4 end:0x8012E968
+
+auto/80138074_fn_80138074.c:
+	extab       start:0x8000D2D4 end:0x8000D414
+	extabindex  start:0x80027B28 end:0x80027D08
+	.text       start:0x80138074 end:0x8013ACC4
+
+auto/8013BE60_fn_8013BE60.c:
+	extab       start:0x8000D424 end:0x8000D5A4
+	extabindex  start:0x80027D20 end:0x80027F60
+	.text       start:0x8013BE60 end:0x8013F764
+
+auto/80149D6C_fn_80149D6C.c:
+	extab       start:0x8000DACC end:0x8000DAD4
+	extabindex  start:0x8002871C end:0x80028728
+	.text       start:0x80149D6C end:0x8014A1BC
+
+auto/8014A1BC_fn_8014A1BC.c:
+	extab       start:0x8000DAD4 end:0x8000DC54
+	extabindex  start:0x80028728 end:0x80028968
+	.text       start:0x8014A1BC end:0x801502C8
+
+auto/801502C8_fn_801502C8.c:
+	extab       start:0x8000DC54 end:0x8000DCDC
+	extabindex  start:0x80028968 end:0x80028A34
+	.text       start:0x801502C8 end:0x80154B04
+
+auto/80154FAC_fn_80154FAC.c:
+	extab       start:0x8000DD0C end:0x8000DD14
+	extabindex  start:0x80028A7C end:0x80028A88
+	.text       start:0x80154FAC end:0x801550FC
+
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8
 
