@@ -8,6 +8,7 @@ object in the build emits), which is how a byte-identical object still scrambles
 Usage:
     python tools/units/flipcheck.py                 # every registered unit
     python tools/units/flipcheck.py <unit> [...]    # named units
+    python tools/units/flipcheck.py --selftest      # the `.comment` check, against fixtures only
 Exit status is non-zero when any unit is not flip-ready.
 """
 from __future__ import annotations
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import struct
 import subprocess
 import sys
 
@@ -22,6 +24,11 @@ MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 OBJDUMP = os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objdump.exe")
 SPLITS = os.path.join(MAIN, "config", "RMHE08", "splits.txt")
 SRC = os.path.join(MAIN, "build", "RMHE08", "src")
+
+# the unit spelling rule has exactly one definition (`claims.norm_unit`), so `flipcheck.py runtime.c` and
+# `flipcheck.py runtime` name the same unit and the same object (aliased: `claims` is a local function here)
+sys.path.insert(0, os.path.join(MAIN, "tools"))
+from units import claims as claims_mod  # noqa: E402
 
 # section names may or may not start with a dot: extab/extabindex do not.
 SEC_RE = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
@@ -87,7 +94,182 @@ def raw_section(path: str, name: str) -> bytes | None:
     return data
 
 
-def check(unit: str, claim: dict[str, tuple[int, int]]) -> tuple[list[str], list[str]]:
+# Row 36 (docs/matching.md): `dol split` writes the target objects with `export_all: true`, which stamps
+# `active_flags=0x08` (force-active / export) on every entry of the `.comment` symbol table, while MWCC writes
+# 0x00. The linker honours the flag, so a symbol the target exports and our object does not - *and that
+# nothing in the link references* - is deadstripped, taking its extab/extabindex with it and shifting every
+# later section. The comparison must pair entries by symbol name: the two `.comment` tables are in ELF
+# symbol-table order and the orders differ (measured on `sys_mem`: the target groups the extab symbols first,
+# ours interleaves the 0-size labels). A symbol counts as referenced when any object relocates it from a
+# code/data section, or when the linker script's FORCEACTIVE block roots it; only an extabindex entry (which
+# covers the function and cannot root it) does not.
+COMMENT_HEADER = 0x2C
+ACTIVE_EXPORT = 0x08
+# Relocation sections whose target is bookkeeping: an extabindex entry points at the function it covers, so
+# it cannot keep that function alive on its own. `.ctors`/`.dtors` DO root their targets (a static ctor).
+BOOKKEEPING_SECTIONS = ("extab", "extabindex")
+# A symbol defined in one of these is fragment/metadata data, not trimmable code.
+FRAGMENT_PREFIXES = ("extab", "extabindex", ".ctors", ".dtors")
+LDSCRIPT = os.path.join(MAIN, "build", "RMHE08", "ldscript.lcf")
+# mwldeppc's default entry symbol: the linker roots it, but it is not in FORCEACTIVE and no object relocates it.
+ENTRY_SYMBOLS = ("__start",)
+
+
+def elf_sections(path: str) -> tuple[list[str], dict[str, bytes]]:
+    """([section names in shndx order], {name: raw bytes}) read straight from the ELF.
+
+    `raw_section` above goes through objcopy, whose `-O binary` drops non-allocatable sections - `.comment`
+    is one of them - so the flag table has to be read from the file itself.
+    """
+    if not os.path.exists(path):
+        return [], {}
+    data = open(path, "rb").read()
+    if data[:4] != b"\x7fELF" or data[4] != 1 or data[5] != 2:      # ELF32, big-endian
+        return [], {}
+    shoff, = struct.unpack_from(">I", data, 0x20)
+    shentsize, = struct.unpack_from(">H", data, 0x2E)
+    shnum, = struct.unpack_from(">H", data, 0x30)
+    shstrndx, = struct.unpack_from(">H", data, 0x32)
+    if not shoff or not shnum or shstrndx >= shnum:
+        return [], {}
+    raw = []
+    for i in range(shnum):
+        name, _typ, _flags, _addr, offset, size, _link, _info, _align, _entsize = struct.unpack_from(
+            ">IIIIIIIIII", data, shoff + i * shentsize)
+        raw.append((name, offset, size))
+    stroff = raw[shstrndx][1]
+
+    def name_at(o: int) -> str:
+        end = data.find(b"\0", stroff + o)
+        return data[stroff + o:end].decode("latin1")
+
+    order = [name_at(n) for n, _, _ in raw]
+    return order, {order[i]: data[raw[i][1]:raw[i][1] + raw[i][2]] for i in range(shnum)}
+
+
+def comment_symbols(path: str) -> list[dict] | None:
+    """The `.comment` symbol table as [{name, size, section, active_flags}], or None without a `.comment`.
+
+    One 8-byte entry per ELF symbol, starting at 0x2C: `[align:4][visibility:1][active_flags:1][pad:2]`
+    (docs/comment_section.md). The table follows ELF symbol-table order, so callers pair entries by name.
+    """
+    order, secs = elf_sections(path)
+    com = secs.get(".comment")
+    symtab = secs.get(".symtab")
+    strtab = secs.get(".strtab")
+    if com is None:
+        return None
+    if symtab is None or strtab is None or len(com) < COMMENT_HEADER:
+        return []
+    out = []
+    for i in range((len(com) - COMMENT_HEADER) // 8):
+        entry = com[COMMENT_HEADER + 8 * i:COMMENT_HEADER + 8 * i + 8]
+        name = size = shndx = 0
+        if (i + 1) * 16 <= len(symtab):
+            name, _value, size, _info, _other, shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
+        end = strtab.find(b"\0", name) if name < len(strtab) else -1
+        out.append({"name": strtab[name:end].decode("latin1") if end != -1 else "",
+                    "size": size,
+                    "section": order[shndx] if shndx < len(order) else "",
+                    "active_flags": entry[5]})
+    return out
+
+
+def code_references_in(path: str) -> set[str]:
+    """The symbol names `path` references from a non-bookkeeping section (code, data or ctors)."""
+    _order, secs = elf_sections(path)
+    symtab = secs.get(".symtab")
+    strtab = secs.get(".strtab")
+    if symtab is None or strtab is None:
+        return set()
+    names = []
+    for i in range(len(symtab) // 16):
+        name, _value, _size, _info, _other, _shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
+        end = strtab.find(b"\0", name) if name < len(strtab) else -1
+        names.append(strtab[name:end].decode("latin1") if end != -1 else "")
+    refs = set()
+    for sec, data in secs.items():
+        if not sec.startswith(".rela") or sec[5:].startswith(BOOKKEEPING_SECTIONS):
+            continue
+        for i in range(len(data) // 12):
+            _off, info, _add = struct.unpack_from(">IIi", data, i * 12)
+            index = info >> 8
+            if index < len(names) and names[index]:
+                refs.add(names[index])
+    return refs
+
+
+def forced_active(path: str = LDSCRIPT) -> set[str]:
+    """The FORCEACTIVE symbols in the linker script - roots the linker will not deadstrip."""
+    if not os.path.exists(path):
+        return set()
+    out: set[str] = set()
+    inside = False
+    for line in open(path, encoding="utf-8", errors="replace"):
+        stripped = line.strip()
+        if stripped.startswith("FORCEACTIVE"):
+            inside = True
+            continue
+        if inside:
+            if stripped == "}":
+                break
+            if stripped and stripped != "{" and not stripped.startswith(("/*", "//")):
+                out.add(stripped.split()[0])
+    return out
+
+
+def code_reference_index(roots: list[str]) -> tuple[set[str], int]:
+    """Every symbol name the link references from code/data, and how many objects were read."""
+    refs: set[str] = set()
+    count = 0
+    for root in roots:
+        for dirpath, _dirs, files in os.walk(root):
+            for f in sorted(files):
+                if f.endswith(".o"):
+                    count += 1
+                    refs |= code_references_in(os.path.join(dirpath, f))
+    return refs, count
+
+
+def comment_trim_risks(unit: str, obj_path: str, src_path: str,
+                       refs: set[str]) -> tuple[list[str], int, bool]:
+    """Row 36: target-exported symbols our object leaves un-exported that nothing in the link references.
+
+    Returns (problems, exported symbols examined, whether both `.comment` sections were readable).
+    """
+    target = comment_symbols(obj_path)
+    ours = comment_symbols(src_path)
+    if target is None or ours is None:
+        return [], 0, False
+    mine: dict[str, list[int]] = {}
+    for entry in ours:
+        mine.setdefault(entry["name"], []).append(entry["active_flags"])
+    problems = []
+    checked = 0
+    for entry in target:
+        if not entry["active_flags"] & ACTIVE_EXPORT:
+            continue
+        checked += 1
+        name = entry["name"]
+        if not name or entry["size"] == 0:
+            continue                     # a 0-size label has nothing to trim
+        if entry["section"].startswith(FRAGMENT_PREFIXES):
+            continue                     # extab/extabindex/.ctors/.dtors data is a fragment, not trimmable code
+        flags = mine.get(name)
+        if flags is None:
+            continue                     # absent from our object: a missing-symbol problem, not a trim one
+        if any(f & ACTIVE_EXPORT for f in flags):
+            continue                     # already exported
+        if name in refs:
+            continue                     # referenced from code/data somewhere: the linker keeps it
+        problems.append("%s: .comment marks %s (0x%X bytes) force-active (0x08) but our object does not, and "
+                        "no code/data relocation in the link references it - the linker will deadstrip it and "
+                        "shift every later section (row 36); mark it __declspec(export)"
+                        % (unit, name, entry["size"]))
+    return problems, checked, True
+
+
+def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None) -> tuple[list[str], list[str]]:
     ours = sections(os.path.join(SRC, unit + ".o"))
     if not ours:
         return ["no compiled object (build/RMHE08/src/%s.o) - compile it first" % unit], []
@@ -122,6 +304,18 @@ def check(unit: str, claim: dict[str, tuple[int, int]]) -> tuple[list[str], list
             problems.append("%s: bytes differ from the target object at +0x%X (ours %02x, target %02x) - "
                             "the object is not the original's code"
                             % (name, at, mine[at] if at < len(mine) else 0, tgt[at] if at < len(tgt) else 0))
+
+    # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
+    # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
+    flag_problems, checked, compared = ([], 0, False)
+    if refs is not None:
+        flag_problems, checked, compared = comment_trim_risks(
+            unit, os.path.join(MAIN, "build", "RMHE08", "obj", unit + ".o"),
+            os.path.join(SRC, unit + ".o"), refs)
+    problems += flag_problems
+    if compared and not flag_problems:
+        notes.append(".comment: no un-exported symbol at deadstrip risk (row 36, %d target-exported symbol(s) "
+                     "checked)" % checked)
     return problems, notes
 
 
@@ -131,11 +325,25 @@ def main() -> int:
                     "its splits.txt entry makes (sections, sizes, alignment) and against the target object's "
                     "bytes. The DOL itself remains the only proof.")
     ap.add_argument("units", nargs="*")
+    ap.add_argument("--selftest", action="store_true", help="run the self-test and exit")
     args = ap.parse_args()
+    if args.selftest:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import flipcheck_selftest
+        return flipcheck_selftest.selftest()
+
+    refs, objects = code_reference_index([os.path.join(MAIN, "build", "RMHE08", "obj"), SRC])
+    if objects:
+        refs |= forced_active() | set(ENTRY_SYMBOLS)
+    else:
+        refs = None
 
     all_claims = claims()
     if args.units:
-        wanted = {u: all_claims.get(u) for u in args.units}
+        wanted = {}
+        for u in args.units:
+            key = claims_mod.norm_unit(u.strip("/"))
+            wanted[key] = all_claims.get(key)
         missing = [u for u, c in wanted.items() if c is None]
         for u in missing:
             print("%s: no splits.txt entry" % u)
@@ -151,7 +359,7 @@ def main() -> int:
 
     bad = 0
     for unit, claim in sorted(wanted.items()):
-        problems, notes = check(unit, claim)
+        problems, notes = check(unit, claim, refs)
         if problems:
             bad += 1
             print("NOT READY  %s" % unit)
