@@ -291,7 +291,7 @@ extern "C" void MEMInitAllocatorForExpHeap(void* allocator, void* heap, int alig
 extern "C" u8 fn_804DCB40(void);
 extern "C" u8 fn_804DC9E0(void);
 extern "C" u8 SCGetLanguage(void);
-extern "C" u32 fn_804E8DA0(void);
+extern "C" u32 VIGetDTVStatus(void);
 extern "C" void fn_804E8D40(void);
 extern "C" u32 VIGetTvFormat(void);
 extern "C" void OSPanic(const char* file, int line, const char* msg, ...);
@@ -300,34 +300,34 @@ extern "C" void fn_804B6C00(void* src, void* dst, u32 offset, u32 size);
 extern "C" void fn_8003F940(GXRenderModeObj* dst, GXRenderModeObj* src);
 extern "C" u32 GXInit(void* base, u32 size);
 extern "C" void fn_804BA7A0(f32, f32, f32, f32, f32, f32);
-extern "C" void fn_804BA7E0(f32, f32, f32, f32, f32, f32);
-extern "C" void fn_804BA830(u32, u32, u32, u32);
-extern "C" void fn_804B7270(void* buf, u32 mask);
-extern "C" void fn_804B6D60(u32, u32, u32, u32);
-extern "C" void fn_804B6DE0(u32, u32);
+extern "C" void GXSetViewport(f32, f32, f32, f32, f32, f32);
+extern "C" void GXSetScissor(u32, u32, u32, u32);
+extern "C" void GXSetCopyClear(void* buf, u32 mask);
+extern "C" void GXSetDispCopySrc(u32, u32, u32, u32);
+extern "C" void GXSetDispCopyDst(u32, u32);
 extern "C" void fn_804B6F70(u32, u32);
-extern "C" void fn_804B71A0(void);
+extern "C" void GXSetDispCopyYScale(void);
 extern "C" void GXSetCopyFilter(u8 aa, u8* pattern, u32 enable, u8* filter);
 extern "C" void GXSetDispCopyGamma(u32);
 extern "C" void fn_804B9FC0(u32);
-extern "C" void fn_804B9FF0(u32, u32);
+extern "C" void GXSetPixelFmt(u32, u32);
 extern "C" void fn_804B7500(void* fb, u32);
 extern "C" void GXDrawDone(void);
 extern "C" void fn_804B64B0(void*);
 extern "C" void fn_804E7F60(void*);
-extern "C" void fn_804E8AB0(void*);
-extern "C" void fn_804E8BB0(void);
-extern "C" void fn_804B5B20(void);
+extern "C" void VISetNextFrameBuffer(void*);
+extern "C" void VIGetNextField(void);
+extern "C" void GXInvalidateVtxCache(void);
 extern "C" void GXInvalidateTexAll(void);
 extern "C" void GXSetAlphaCompare(u32, u32, u32, u32, u32);
 extern "C" void GXSetZMode(u32, u32, u32);
 extern "C" void GXSetAlphaUpdate(u32);
 extern "C" void VISetBlack(u32);
 extern "C" void VIFlush(void);
-extern "C" void fn_804E79D0(void);
-extern "C" void fn_804EAC70(u8);
-extern "C" void fn_80477150(void);
-extern "C" void fn_804D4CA0(u32, u32);
+extern "C" void VIWaitForRetrace(void);
+extern "C" void VISetTrapFilter(u8);
+extern "C" void PPCSync(void);
+extern "C" void OSSleepTicks(u32, u32);
 extern "C" s8 fn_800CF384(void);
 
 /* The bus clock lives in the DOL header at a fixed address; the frame wait converts it to ticks. */
@@ -489,7 +489,7 @@ int main(void)
 extern u32 lbl_80794798;
 extern s32 lbl_807947A0;
 
-extern "C" u32 fn_804AA710(void);
+extern "C" u32 DVDGetDriveStatus(void);
 
 /* Sets GQR2-GQR5 to the (4,4)...(7,7) quantisation pairs. */
 asm void fn_8003F4D8(void)
@@ -528,7 +528,7 @@ extern "C" void fn_8003F554(void);
 extern "C" void fn_8003F52C(void)
 {
     fn_8003F554();
-    lbl_80794798 = fn_804AA710();
+    lbl_80794798 = DVDGetDriveStatus();
 }
 
 /* Bumps the periodic request counter. */
@@ -541,7 +541,7 @@ extern "C" void fn_8003F554(void)
 extern "C" void fn_8003F564(void)
 {
     fn_8003F554();
-    lbl_80794798 = fn_804AA710();
+    lbl_80794798 = DVDGetDriveStatus();
 }
 
 /* ---- 0x8003F58C-0x8003F730: the periodic alarm and the memory arenas ---- */
@@ -617,7 +617,7 @@ extern "C" void fn_8003F730(s32 arg)
     lbl_80794780 = fn_804DCB40();
     lbl_80794781 = fn_804DC9E0();
     lbl_80794782 = SCGetLanguage();
-    lbl_80794785 = fn_804E8DA0();
+    lbl_80794785 = VIGetDTVStatus();
     fn_804E8D40();
     lbl_80794783 = VIGetTvFormat();
     lbl_80794784 = 0;
@@ -827,21 +827,21 @@ extern "C" void fn_8003FCCC(void)
 
     lbl_80794764 = GXInit((void*)lbl_80794760, 0x80000);
 
-    fn_804BA7E0(lbl_80795AC8, lbl_80795AC8, (f32)Rmode->fbWidth, (f32)Rmode->efbHeight,
+    GXSetViewport(lbl_80795AC8, lbl_80795AC8, (f32)Rmode->fbWidth, (f32)Rmode->efbHeight,
                 lbl_80795AC8, lbl_80795ACC);
-    fn_804BA830(0, 0, Rmode->fbWidth, Rmode->efbHeight);
+    GXSetScissor(0, 0, Rmode->fbWidth, Rmode->efbHeight);
 
-    fn_804B7270(&copySize, 0xFFFFFF);
+    GXSetCopyClear(&copySize, 0xFFFFFF);
 
-    fn_804B6D60(0, 0, Rmode->fbWidth, Rmode->efbHeight);
-    fn_804B6DE0(Rmode->fbWidth, Rmode->xfbHeight);
+    GXSetDispCopySrc(0, 0, Rmode->fbWidth, Rmode->efbHeight);
+    GXSetDispCopyDst(Rmode->fbWidth, Rmode->xfbHeight);
     GXSetCopyFilter(Rmode->aa, Rmode->sample_pattern[0], 1, Rmode->vfilter);
     GXSetDispCopyGamma(0);
     fn_804B9FC0(0);
     if (Rmode->aa != 0) {
-        fn_804B9FF0(2, 0);
+        GXSetPixelFmt(2, 0);
     } else {
-        fn_804B9FF0(0, 0);
+        GXSetPixelFmt(0, 0);
     }
     fn_804B7500(lbl_80794770[0], 1);
     fn_804B7500(lbl_80794770[0], 0);
@@ -867,15 +867,15 @@ extern "C" void fn_8003FE24(void)
 extern "C" void fn_8003FE30(void)
 {
     fn_804B6F70(Rmode->efbHeight, Rmode->xfbHeight);
-    fn_804B71A0();
+    GXSetDispCopyYScale();
     fn_804E7F60(Rmode);
-    fn_804E8AB0(lbl_80794770[lbl_8079477C]);
+    VISetNextFrameBuffer(lbl_80794770[lbl_8079477C]);
     lbl_8079477C ^= 1;
     lbl_80794778 = lbl_80794770[lbl_8079477C];
     VIFlush();
-    fn_804E79D0();
+    VIWaitForRetrace();
     if ((Rmode->viTVMode & 1) != 0) {
-        fn_804E79D0();
+        VIWaitForRetrace();
     }
 }
 
@@ -887,14 +887,14 @@ extern "C" void fn_8003FEBC(void)
     GXRenderModeObj* mode = Rmode;
 
     if (mode->field_rendering != 0) {
-        fn_804E8BB0();
+        VIGetNextField();
         fn_804BA7A0(lbl_80795AC8, lbl_80795AC8, (f32)mode->fbWidth, (f32)mode->efbHeight,
                     lbl_80795AC8, lbl_80795ACC);
     } else {
-        fn_804BA7E0(lbl_80795AC8, lbl_80795AC8, (f32)mode->fbWidth, (f32)mode->efbHeight,
+        GXSetViewport(lbl_80795AC8, lbl_80795AC8, (f32)mode->fbWidth, (f32)mode->efbHeight,
                     lbl_80795AC8, lbl_80795ACC);
     }
-    fn_804B5B20();
+    GXInvalidateVtxCache();
     GXInvalidateTexAll();
     GXSetAlphaCompare(7, 0, 1, 7, 0);
 }
@@ -925,9 +925,9 @@ extern "C" void fn_80040144(void)
 {
     while (lbl_807947A0 < fn_8003F524() - 1) {
         u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;
-        fn_804D4CA0(0, ticks);
+        OSSleepTicks(0, ticks);
     }
-    fn_804E8AB0(lbl_80794778);
+    VISetNextFrameBuffer(lbl_80794778);
     if (lbl_80790E20 != 0) {
         VISetBlack(0);
         lbl_80790E20 = 0;
@@ -938,13 +938,13 @@ extern "C" void fn_80040144(void)
         set_widemode_param = -1;
     }
     VIFlush();
-    fn_804EAC70(lbl_807947A4);
+    VISetTrapFilter(lbl_807947A4);
     lbl_8079477C ^= 1;
     lbl_80794778 = lbl_80794770[lbl_8079477C];
-    fn_80477150();
+    PPCSync();
     while (lbl_807947A0 < fn_8003F524()) {
         u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;
-        fn_804D4CA0(0, ticks);
+        OSSleepTicks(0, ticks);
     }
     lbl_80794868++;
     lbl_807947A0 = 0;
@@ -1001,7 +1001,7 @@ extern "C" void fn_8004030C(_MH_VEC2* v)
 /* ---- 0x80040360-0x80040478: the screen-size accessors and the game's expansion-heap allocator ---- */
 
 extern "C" void* fn_804C2200(void* heap, u32 size, u32 align);
-extern "C" void fn_804C22B0(void* heap, void* block);
+extern "C" void MEMFreeToExpHeap(void* heap, void* block);
 extern "C" void fn_800403AC(_MH_VEC2* dst, const _MH_VEC2* src);
 
 /* Copies the two screen-size rectangles out of the calibration block. */
@@ -1061,6 +1061,6 @@ extern "C" void* fn_80040420(u32 size)
 extern "C" void fn_80040460(void* block)
 {
     if (block != NULL) {
-        fn_804C22B0(lbl_80794788, block);
+        MEMFreeToExpHeap(lbl_80794788, block);
     }
 }
