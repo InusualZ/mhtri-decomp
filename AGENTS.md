@@ -141,6 +141,7 @@ measured unit).
 | 35 | A dead copy chain steers the allocator's web priority | Two webs sharing one register pair look unreachable from the source - but the allocator colours in web-list order and the IR's *dead* copy webs count, so a chain of dead copies of the competing value plus one live load flips the pair without changing an instruction. | done |
 | 36 | A flipped unit's unreferenced trailing function is trimmed | The object is byte-identical and the flip still breaks the DOL by exactly the last function's size: `dol split` stamps `active_flags=0x08` in `.comment` (export_all) while MWCC writes `0x00`, so the linker drops the unreferenced tail. `__declspec(export)` fixes it. | done |
 | 37 | A switch's `default` arm goes first in the source | MWCC emits the default body after the compare chain wherever it is written, so `default:` written first lands where retail has it - written last the chain is ordered the other way and the function grows by a word. | done |
+| 38 | An `s16` parameter with a compound assignment makes a narrow field store raw | A masked `stb`/`sth` (a `clrlwi` retail does not have) means MWCC is narrowing the value to the field - taking it through an `s16` parameter and writing with `+=` leaves it the right width, so it stores raw. | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
