@@ -32,13 +32,24 @@
 /*
  * Monster Hunter Tri, RMHE08 -- Camellia (NTT 1.2.0, MPL 1.1; see the vendor header above).
  *
- * Nine of the ten functions are byte-identical to the retail object.  camellia_setup256 does not
- * match: our frame is -0x1e0 where retail uses -0x1d0, one extra 4-byte local slot, because
- * `subL[29]`'s split live range takes two slots (0x64 and 0xcc) where retail keeps one (0xc8).
- * Every instruction is otherwise identical, so it is allocator ordering, not semantics: statement
- * shape, comma splitting, `x ^= y` spelling, declaration order and the whole `-O`/`-opt` axis are
- * ruled out (the per-function `#pragma optimization_level 4` pair reaches the retail frame but
- * reorders the absorb `dw` chain).  Details: docs/matching.md 16, .pi/notes/camellia-match-process.md.
+ * Nine of the ten functions are byte-identical to the retail object.  `camellia_setup256` is 9 rows
+ * short of it (1215 instructions), and the residual is now known exactly:
+ *
+ *   * at `-O3` (the unit's real level) the instruction stream is byte-identical to retail except the
+ *     r1 offsets: `subr(29)`'s split live range takes two stack slots (0x64 and 0xcc) where retail
+ *     keeps one (0xc8), which pushes the locals from 0x180 to 0x184 and the frame from -0x1d0 to
+ *     -0x1e0.  It is a greedy slot-colouring tie-break; 14 source perturbations around the write
+ *     (line 810) and the reads (903/907) do not flip it.
+ *   * `#pragma optimization_level 4` is the only way to reach the retail frame (-0x1d0), but it is
+ *     also the pass that flattens one XOR chain: in the 5th `tl`/`tr` group (SubkeyL/R(23)) it emits
+ *     `(subr(22) ^ subr(26)) ^ RL1(dw)` where retail keeps `tr = subr(26) ^ RL1(dw)` in a register.
+ *     `dw = CAMELLIA_RL1(dw);` (reusing `dw`, see the group's comment) is what keeps that at 9 rows;
+ *     256 operand-order/grouping/temp variants over the group bottom out there.
+ *
+ * The two are inseparable: every level-4 `-opt` combination that reaches the frame either is plain
+ * level 4 or restores the level-3 frame, and `optimization_level`/`opt_*` pragmas are whole-function
+ * (a mid-function switch is silently ignored).  Row -> source-line evidence and the full negative
+ * list: .pi/notes/camellia-match-process.md and .pi/notes/camellia-67ed.md.
  *
  * Flags: `cflags_camellia` in configure.py.
  */
@@ -677,6 +688,7 @@ void camellia_setup128(const unsigned char *key, u32 *subkey)
 }
 
 /* Derives the 34 subkeys of the 256-bit Camellia key schedule from eight 32-bit key words. */
+#pragma optimization_level 4
 void camellia_setup256(const unsigned char *key, u32 *subkey)
 {
     u32 kll,klr,krl,krr;           /* left half of key */
@@ -886,9 +898,14 @@ void camellia_setup256(const unsigned char *key, u32 *subkey)
     CamelliaSubkeyL(22) = subl(21) ^ subl(23);
     CamelliaSubkeyR(22) = subr(21) ^ subr(23);
     tl = subl(26) ^ (subr(26) & ~subr(24));
-    dw = tl & subl(24), tr = subr(26) ^ CAMELLIA_RL1(dw);
+    /* Reusing `dw` for the rotate keeps the intermediate in a register: writing this as
+       `dw = tl & subl(24), tr = subr(26) ^ CAMELLIA_RL1(dw);` lets level 4 fold `subr(22)` into the
+       XOR tree and costs four more rows in this window. */
+    dw = tl & subl(24);
+    dw = CAMELLIA_RL1(dw);
+    tr = subr(26) ^ dw;
     CamelliaSubkeyL(23) = subl(22) ^ tl;
-    CamelliaSubkeyR(23) = subr(22) ^ tr;
+    CamelliaSubkeyR(23) = tr ^ subr(22);
     CamelliaSubkeyL(24) = subl(24);
     CamelliaSubkeyR(24) = subr(24);
     CamelliaSubkeyL(25) = subl(25);
@@ -963,6 +980,11 @@ void camellia_setup256(const unsigned char *key, u32 *subkey)
     return;
 }
 
+#pragma optimization_level 3
+#pragma peephole off
+#pragma scheduling off
+#pragma opt_common_subs on
+#pragma opt_propagation on
 void camellia_setup192(const unsigned char *key, u32 *subkey)
 {
     unsigned char kk[32];

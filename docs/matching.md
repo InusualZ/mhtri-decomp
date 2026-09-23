@@ -393,6 +393,21 @@ void camellia_setup192(const unsigned char *key, u32 *subkey) { ... }
 python tools/flags/tryvar.py -u <unit> v26_pragma_opt4   # frame -0x1d0, 99.32 % (only the window differs)
 ```
 
+**A pragma is per *function*, not per region** (measured on the same unit, 2026-09-23). The scope looks
+like it starts where the pragma is written, but `optimization_level` and the `opt_*` passes are read once
+per function: inserting `#pragma optimization_level 3` (or `4`) mid-function changes nothing at all, and the
+same is true of `opt_common_subs off` / `opt_propagation off` / `opt_lifetimes off` - 18 marker positions x
+both directions and 36 regional `opt_*` variants all produced results byte-identical to the same pragma at
+the function head. So "level 4 for the part that needs the frame, level 3 for the part that needs the
+order" is not available: a pragma pair scopes a setting to **one whole function**, and two levers that
+pull in opposite directions inside one function cannot be separated this way. The window above is also
+worth re-locating before rewriting it - the recorded `v40`-`v44` probes rewrote the *first* `tl`/`tr` group
+of the function (`sub256(..., count=1)` matches only the first occurrence), while the reorder was in the
+*fifth*; the object's own MWCC `.line` section (`u32 size`, then 10-byte `{u32 addr, u32 line, u16 flags}`
+records - note `addr2line` cannot read it) is what maps a diff row to a source line. Rewriting the right
+group and reusing the rotated value's own variable (`dw = CAMELLIA_RL1(dw);`, which stops the global
+optimizer folding the next XOR operand into the tree) took that window from 14 rows to 9.
+
 ## 17. Cross-family version matrix: a unit's compiler is per unit, not per project
 
 **Problem.** `mw_version` is set once per library in `configure.py` and every unit inherits the same one
