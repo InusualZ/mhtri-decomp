@@ -53,6 +53,129 @@ Pl/pl_act.cpp:
 	extabindex  start:0x8002FC70 end:0x8002FF7C
 	.text       start:0x80276B58 end:0x8027D684
 
+auto/80280050_fn_80280050.c:
+	extab       start:0x80012D14 end:0x80012E8C
+	extabindex  start:0x8003021C end:0x80030450
+	.text       start:0x80280050 end:0x802843F0
+
+auto/802843F0_fn_802843F0.c:
+	extab       start:0x80012E8C end:0x80012F84
+	extabindex  start:0x80030450 end:0x800305C4
+	.text       start:0x802843F0 end:0x80286DF8
+
+auto/80286DF8_fn_80286DF8.c:
+	extab       start:0x80012F84 end:0x80012F8C
+	extabindex  start:0x800305C4 end:0x800305D0
+	.text       start:0x80286DF8 end:0x80287244
+
+auto/80287244_fn_80287244.c:
+	extab       start:0x80012F8C end:0x80012FF4
+	extabindex  start:0x800305D0 end:0x8003066C
+	.text       start:0x80287244 end:0x80288848
+
+auto/802A0650_fn_802A0650.c:
+	extab       start:0x8001369C end:0x800136A4
+	extabindex  start:0x80031068 end:0x80031074
+	.text       start:0x802A0650 end:0x802A07A0
+
+auto/802B2978_fn_802B2978.c:
+	extab       start:0x80013D2C end:0x80013D34
+	extabindex  start:0x80031A40 end:0x80031A4C
+	.text       start:0x802B2978 end:0x802B2AA0
+
+auto/802B2AA0_fn_802B2AA0.c:
+	extab       start:0x80013D34 end:0x80013DC4
+	extabindex  start:0x80031A4C end:0x80031B24
+	.text       start:0x802B2AA0 end:0x802B4E58
+
+auto/802B4E58_fn_802B4E58.c:
+	extab       start:0x80013DC4 end:0x80013DCC
+	extabindex  start:0x80031B24 end:0x80031B30
+	.text       start:0x802B4E58 end:0x802B535C
+
+auto/802B535C_fn_802B535C.c:
+	extab       start:0x80013DCC end:0x80013E3C
+	extabindex  start:0x80031B30 end:0x80031BD8
+	.text       start:0x802B535C end:0x802B5C58
+	.ctors      start:0x8056F37C end:0x8056F380
+
+auto/802C474C_fn_802C474C.c:
+	extab       start:0x8001442C end:0x80014474
+	extabindex  start:0x800324A8 end:0x80032514
+	.text       start:0x802C474C end:0x802C58DC
+
+auto/802C58DC_fn_802C58DC.c:
+	extab       start:0x80014474 end:0x8001447C
+	extabindex  start:0x80032514 end:0x80032520
+	.text       start:0x802C58DC end:0x802C5ACC
+
+auto/802C5ACC_fn_802C5ACC.c:
+	extab       start:0x8001447C end:0x80014484
+	extabindex  start:0x80032520 end:0x8003252C
+	.text       start:0x802C5ACC end:0x802C5D10
+
+auto/802C5D10_fn_802C5D10.c:
+	extab       start:0x80014484 end:0x80014674
+	extabindex  start:0x8003252C end:0x80032814
+	.text       start:0x802C5D10 end:0x802CC57C
+
+auto/802CC57C_fn_802CC57C.c:
+	extab       start:0x80014674 end:0x8001467C
+	extabindex  start:0x80032814 end:0x80032820
+	.text       start:0x802CC57C end:0x802CC794
+
+auto/802CC794_fn_802CC794.c:
+	extab       start:0x8001467C end:0x80014844
+	extabindex  start:0x80032820 end:0x80032ACC
+	.text       start:0x802CC794 end:0x802D0C9C
+
+auto/802D0C9C_fn_802D0C9C.c:
+	.text       start:0x802D0C9C end:0x802D0DCC
+
+auto/802D0DCC_fn_802D0DCC.c:
+	.text       start:0x802D0DCC end:0x802D0F34
+
+auto/802D0F34_fn_802D0F34.cpp:
+	extab       start:0x80014844 end:0x80014964
+	extabindex  start:0x80032ACC end:0x80032C7C
+	.text       start:0x802D0F34 end:0x802D4248
+
+auto/802D4248_fn_802D4248.c:
+	extab       start:0x80014964 end:0x8001496C
+	extabindex  start:0x80032C7C end:0x80032C88
+	.text       start:0x802D4248 end:0x802D44F4
+
+auto/802E919C_fn_802E919C.c:
+	extab       start:0x80015164 end:0x8001516C
+	extabindex  start:0x8003387C end:0x80033888
+	.text       start:0x802E919C end:0x802E932C
+
+auto/802E932C_fn_802E932C.cpp:
+	extab       start:0x8001516C end:0x8001528C
+	extabindex  start:0x80033888 end:0x80033A38
+	.text       start:0x802E932C end:0x802EBBD0
+
+auto/802EF0FC_fn_802EF0FC.c:
+	extab       start:0x8001539C end:0x8001541C
+	extabindex  start:0x80033BD0 end:0x80033C90
+	.text       start:0x802EF0FC end:0x802F12A4
+
+auto/802F12A4_fn_802F12A4.c:
+	extab       start:0x8001541C end:0x80015424
+	extabindex  start:0x80033C90 end:0x80033C9C
+	.text       start:0x802F12A4 end:0x802F140C
+
+auto/802F5138_fn_802F5138.c:
+	extab       start:0x80015514 end:0x80015684
+	extabindex  start:0x80033E04 end:0x8003402C
+	.text       start:0x802F5138 end:0x802F9994
+	.ctors      start:0x8056F390 end:0x8056F394
+
+auto/802F9C2C_fn_802F9C2C.c:
+	extab       start:0x80015694 end:0x800156B4
+	extabindex  start:0x80034044 end:0x80034074
+	.text       start:0x802F9C2C end:0x802FA9A0
+
 Network/NetworkWiiMediator.c:
 	.text       start:0x80413F3C end:0x80413F50
 
