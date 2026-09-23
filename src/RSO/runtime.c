@@ -12,20 +12,46 @@
  *
  * Flags and compiler live in configure.py (`cflags_rso`, `mw_version: GC/3.0a3`), with the evidence in
  * the comment there; the short version is that this unit needs peephole + scheduling + level 4 where
- * Camellia needs `-opt nopeephole` (playbook 17 and 21).
+ * Camellia needs `-opt nopeephole` (playbook 17 and 21).  `-opt level=4` is needed by RSOUnLink and
+ * FindExportIndex (each loses a row at level 3); RSORelocate wants level 3 and carries a scoped
+ * `#pragma optimization_level 3` instead of moving the lib flag.
  *
- * Residuals: five of the nine functions are byte-identical (RSOLink, RSOUnLink, fn_804DA7E4,
- * FindExportIndex, RSOUnLocateObject).  The other four are instruction-identical and lose only
- * register colouring (LocateObject, RSORelocate) or colouring plus one folded `addi` / a pool-base
- * swap (RSOStaticLocateObject, RSORelocateSmallDataSection); two of them also carry objdiff rows that
- * are nothing but the target's synthetic data-symbol names.  All four are allocator state, not source
- * shape - hundreds of source shapes and all 31 installed compilers give the same stream - so they are
- * recorded here rather than chased.  Numbers, sweeps and probes: `.pi/scratch/rso/`.
+ * `.data` 0x80629B90 is this TU's MWCC string pool, read out of the DOL: "Warrning! .ctors
+ * section[%d]! size=%x\n" / ".dtors" / "unknown section" at +0/+0x28/+0x50, "OSLink: unknown
+ * relocation type %3d\n" at +0xB0, "_SDA_BASE_" / "_SDA2_BASE_" / "ERROR: incorrect
+ * R_PPC_EMB_SDA21 data.\n" at +0xD8/+0xE4/+0xF0 (the +0x78..+0xB0 hole is RSOStaticLocateObject's
+ * jump table, so the pool is emitted per function, in TU order).  It sits in `.data`, i.e. the retail
+ * build had `-str reuse,pool` without `readonly` (with the pool as literals, `reuse,pool` gives
+ * `.data` 0x112 and `reuse,pool,readonly` `.rodata` 0xDA).  This source references the pool through
+ * `lbl_80629B90`/`lbl_80629C40` rather than defining it; claiming the pool for this unit's split and
+ * the `-str` setting are config requests, not source changes.
+ *
+ * Residuals: five of the nine functions are byte-identical (RSOUnLocateObject, RSOLink, RSOUnLink,
+ * fn_804DA7E4, FindExportIndex).  The other four are instruction-identical (same opcodes, immediates,
+ * branch targets, relocations) and lose only register colouring, except RSOStaticLocateObject, which
+ * also has 2 words: LocateObject 21 rows (the loop-2/loop-3 induction webs are r24/r25 in retail and
+ * r27/r28 here), RSORelocate 9 rows, RSOStaticLocateObject 2 rows (retail forms the offset-0 message
+ * as `addi r3,r19,0`, we fold it to `mr r3,r19`) plus reloc-name rows objdiff resolves from the map,
+ * RSORelocateSmallDataSection 12 rows (the pool base and the descriptor pointer swap r31/r30).
+ *
+ * Ideas closed with measurements, so nobody re-runs them: the compiler build is not the explanation -
+ * all ten GC 3.0a3.x/3.0a5.x builds and all nine Wii builds give the identical stream
+ * (`.pi/scratch/vermatrix.py`); neither are `-O4`/`-O4,p`, `-proc 750/740/603`, `-ipa`, `-str
+ * reuse,pool`, or the `-opt` sub-options; a per-function `#pragma` sweep (peephole, scheduling,
+ * optimization_level, opt_common_subs, opt_propagation, opt_lifetimes) moves nothing but the level,
+ * and mid-function pragmas do nothing at all; the string-literal reconstruction of the pool scores
+ * 98.30 / 98.52 / 96.86; and ~40 further source shapes (declaration orders, explicit induction
+ * variables, typed indexing, `for(;;)`, pointer walks, case-10 orderings) are neutral or worse.
+ * Numbers, sweeps and probes: `.pi/scratch/rso/` and `.pi/scratch/` in this worktree.
  *
  * Load-bearing source shapes (do not "clean up" without re-measuring): RSOLink's `idx == -1` is a value
  * merge and its `offset` a real second induction variable; RSOUnLink routes `(u32)pObject + 0x54`
  * through a `u32 buf[1]`; RSORelocate keeps `u32 value` as its third parameter and needs its case-10
- * comparison order; LocateObject needs RSOHdr's relocation-table field pointer-typed.
+ * comparison order; LocateObject needs RSOHdr's relocation-table field pointer-typed; and
+ * FindExportIndex's backward scan needs its `off = i << 4` byte-offset read - the stylelint-conformant
+ * `p2->name_offset` costs it 20 rows (97.84 %), `((u32*)tbl)[i * 4]` costs 13 (98.53 %).  That is the
+ * unit's only rule-6 finding; rules 3/4/5/8 are clean, and rule 7 is `fn_804DA7E4`, whose rename needs
+ * `symbols.txt` (the memory dump has no name for it).
  *
  * TU boundary unproven: the four `RSONotify*` thunks immediately before the range may belong here, and
  * the `unlink_rso_module` group after it is a separate unit.
@@ -39,6 +65,7 @@
  * the *12 stride -- RSOLink, RSOUnLink, fn_804DA7E4, LocateObject.  RSOLink/RSOUnLink overwrite
  * code_offset with the resolved symbol address, and entry_offset chains the external relocation
  * records (RSORelocation.info >> 8) that belong to this import. */
+/* size: 0xC */
 typedef struct RSOImport {
     u32 name_offset;  /* +0x00: offset into the import symbol name table (+0x54) */
     u32 code_offset;  /* +0x04: resolved symbol address, written by RSOLink / RSOUnLink */
@@ -49,6 +76,7 @@ typedef struct RSOImport {
  * r_offset/r_info/r_addend triple, dolphin's RSO.h `RSOInternalsEntry` /
  * `RSOExternalsEntry` (struct RSORelocationTableEntry).  +0x04's low byte is the R_PPC_* type,
  * its upper 24 bits are the section index (internal) or import symbol index (external). */
+/* size: 0xC */
 typedef struct RSORelocation {
     u32 offset; /* +0x00: address of the word/halfword to patch */
     u32 info;   /* +0x04: relocation type in the low byte, index in the upper 24 bits */
@@ -59,6 +87,7 @@ typedef struct RSORelocation {
  * RSO.h `RSOSection`), indexed by the section-index bytes at +0x20..0x23.  LocateObject /
  * RSOStaticLocateObject rebase offset into a runtime address, RSOUnLocateObject subtracts the base
  * again. */
+/* size: 0x8 */
 typedef struct RSOSection {
     u32 offset; /* +0x00 */
     u32 size;   /* +0x04 */
@@ -68,6 +97,7 @@ typedef struct RSOSection {
  * real SDK layout: dolphin's RSO.h `RSOExport`.  name_offset indexes the export name table at
  * +0x48, code_offset is the addend of the section offset, section_index indexes the 8-byte section
  * table at +0x0C, and hash is the ELF string hash FindExportIndex binary-searches on. */
+/* size: 0x10 */
 typedef struct RSOExport {
     u32 name_offset;   /* +0x00 */
     u32 code_offset;   /* +0x04 */
@@ -86,6 +116,7 @@ typedef struct RSOExport {
  * internal/external_relocation_table_offset stay u32 here (the annotation types them
  * RSORelocation*): four functions cast to RSORelocation* at the use site, and the u32 arithmetic is
  * what their matches were measured with. */
+/* size: 0x58 */
 typedef struct RSOModule {
     struct RSOModule* next_module_link;   /* +0x00 */
     struct RSOModule* prev_module_link;   /* +0x04 */
@@ -121,6 +152,7 @@ typedef struct RSOModule {
  * table offsets are plain u32, and the two symbol tables are typed as their descriptor structs.
  * The 0x00..0x3F prefix is never touched through this view but is kept spelled out so the views
  * stay field-for-field comparable. */
+/* size: 0x58 */
 typedef struct RSORelTable {
     struct RSOModule* next_module_link;   /* +0x00 */
     struct RSOModule* prev_module_link;   /* +0x04 */
@@ -158,6 +190,7 @@ typedef struct RSORelTable {
  *   * section_info_offset, internal_relocation_table_offset and import_symbol_table_offset stay
  *     u32 (the annotation types them RSOSection *, RSORelocation * and RSOImport *): this function
  *     walks those tables as raw words, and that is the shape its 99.39 % was measured with. */
+/* size: 0x58 */
 typedef struct RSOHdr {
     struct RSOModule* next_module_link;   /* +0x00 */
     struct RSOModule* prev_module_link;   /* +0x04 */
@@ -610,6 +643,10 @@ int FindExportIndex(RSORelTable* pRel, const char* symbol)
 
 /* Applies one R_PPC_* relocation to the word it points at, then flushes both caches over the
  * patched word. */
+/* The lib's `-opt level=4` reloads the range-check's addend into a register that is already live and
+ * loses 3 rows here; level 3 for this function only is the colouring the target has.  RSOUnLink and
+ * FindExportIndex do need level 4, so this stays a scoped pragma rather than a lib flag. */
+#pragma optimization_level 3
 void RSORelocate(RSORelocation* relocation, u32 index, u32 value)
 {
     u32* addr = (u32*)relocation[index].offset;
@@ -687,6 +724,8 @@ void RSORelocate(RSORelocation* relocation, u32 index, u32 value)
     DCFlushRange(addr, 32);
     ICInvalidateRange(addr, 32);
 }
+
+#pragma optimization_level 4
 
 /* Patches every embedded SDA21 relocation belonging to one import symbol, resolving the
  * _SDA_BASE_/_SDA2_BASE_ symbols the patched instruction references. */
