@@ -757,21 +757,31 @@ and when a slot frees, prefer a new unit, a new symbol or the next attribution b
 The 11 units that *are* flipped: `Runtime.PPCEABI.H/{__start,__ppc_eabi_init,global_destructor_chain,__init_cpp_exceptions,memcpy,memset}`,
 `g3d/g3d_resanmamblight`, `Network/NetworkWiiMediator`, `OS/OSAlarm`, `lobby/lobby_scene`, `Pl/pl_master`.
 
-### The breadth blocker: rule 7 versus the `auto` bucket (2026-09-23)
+### The breadth blocker: rule 7 versus the `auto` bucket - settled (2026-09-23)
 
 Every `auto/*` unit is named `fn_XXXXXXXX` by construction - the symbol map has no better name and the naming rule
 forbids inventing one - and a reconstructed body necessarily *calls* other `fn_XXXXXXXX` functions. Section 6.5's
-rule 7 counts both, so `stylelint --diff` adds a violation for any breadth landing and `land.py` refuses the batch.
-Measured on `auto/802B2978_fn_802B2978`, whose first body reached 99.93 % on its only function with `.text` exact
-296 B: the lint reports `+1 rule 7` and the gate stops there. Its branch (`worker/802b2978-fn-802b2978-90ed`,
-commit `98c8931f`) is safe and ready to land the moment this is settled.
+rule 7 counts both, so `stylelint --diff` added a violation for any breadth landing and `land.py` refused the batch
+(measured on `auto/802B2978_fn_802B2978`: `+1 rule 7` on a 99.93 % function whose `.text` was exact, 296 B).
 
-**This is a policy question, not a code one**: rule 7 should not be enforced under `src/auto/`. Those files are the
-attribution scaffolding - their names come from the map, their bodies are reconstructed *before* the symbol is
-understood, and renaming one is a separate batch (`symedit.py` + re-split) that the naming rule itself forbids while
-the name is unknown. Everything else in 6.5 still applies to them (types with sizes, fields with offsets and context
-names, no pointer arithmetic). Until the exemption exists, breadth work can be prepared and committed on a branch
-but not landed, so this is the first thing to settle before the next breadth round lands.
+**Decided: rule 7 is not enforced under `src/auto/`.** The exemption lives in one table in `stylelint.py`
+(`EXEMPT = [(7, "src/auto/", ...)]`) and `rule_enforced()` consults it per file, keyed on the repo-relative path
+prefix, so `--diff` counts no `src/auto/` rule-7 finding on either side of the comparison.
+
+* **What it covers**: both halves of rule 7 - a file's own `fn_XXXXXXXX` definition, every `fn_XXXXXXXX` call it
+  makes, and (same reason) a bare `unk*` local. These files are the attribution scaffolding: their names and
+  identifiers come from the symbol map, their bodies are reconstructed *before* the symbol is understood, and a
+  rename is a separate `symedit.py` + re-split batch that the naming rule itself forbids while the name is unknown.
+* **What it deliberately does not**: rules 1-6 and 8 still apply under `src/auto/` (types with sizes, fields with
+  offsets and context names, no pointer arithmetic, no `goto`) - and rule 5 in particular still catches an `unk*`
+  *field* there. Rule 7 stays enforced everywhere else: the prefix is exact, so `src/auto_tools/` or any file that
+  merely looks like scaffolding is not exempt. The exemption is about the name's provenance, not about breadth work.
+* **Evidence (same tree, old vs new tool)**: findings 3627 -> 3603, rule 7 2609 -> 2585 - exactly the two written
+  `auto` units (`80040598_fn_80040598.cpp` 23 -> 0, `802B2978_fn_802B2978.c` 1 -> 0). `stylelint --diff a5e07fc6^`
+  went from `+1 rule 7` to "no new violation", and `src/Pl/pl_act.cpp`'s 980 rule-7 findings are unchanged.
+* **Guard**: the selftest checks the exemption and the leak direction - an `auto` file's own `fn_` name is clean, an
+  `auto` body calling `fn_` is clean, a `src/auto/` subdirectory is covered, `src/auto_tools/` is not, and the same
+  code under `src/Pl/` is still a violation while rules 4/6/8 still fire under `src/auto/`.
 
 Two smaller findings from the same round, both already fixed or decided:
 * the `auto` bucket's first landed body wanted `-opt nopeephole` as the *unit's* flag (its neighbour `fn_802B2AA0`'s
@@ -779,6 +789,23 @@ Two smaller findings from the same round, both already fixed or decided:
   pragma pair is the stand-in until a per-region `cflags` group exists;
 * the claim's key was the unit's *spelling*, so `auto/X` and `auto/X.c` defeated the lock and two workers took one
   unit. `claims.norm_unit` now strips the source extension at claim and release (commit `c36ab86f`).
+
+### Teardown is part of landing (owner's rule, 2026-09-23)
+
+**When a worker finishes, its claim is released and its worktree and branch are removed** - and `claims.py` is the tool
+that does it, because the claim owns all three (branch, worktree, registry entry). Landing a unit is not finished until
+its teardown is: a landed unit must not leave a worktree, a merged branch or a registry entry behind, and the same is
+true of a worker whose round produced nothing.
+
+`claims.py release <unit>` is the one-shot: rescue ref -> pane close -> `git worktree remove --force` -> `branch -D` ->
+`prune`, then the registry entry. It must be **idempotent and total** - every step says what it did or why it was
+skipped (already gone, never existed, pane still active) - because aborting on an already-removed target is how the
+2026-09-23 Camellia tangle happened: its claim could not be released, a merged branch then blocked the re-claim, and a
+leftover directory blocked the new worktree, all three cleared by hand. The one real refusal is a **live pane**, which
+pins the worktree as its cwd on Windows (5.1) - that stays an abort, naming the pane.
+
+The flow calls it, so nobody has to remember: `land.py` releases the claim of the unit it just gated, and
+`claims.py release --all-merged` sweeps every finished worker in one command.
 
 ### Production mode (owner, 2026-09-23)
 
