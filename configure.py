@@ -457,7 +457,7 @@ config.libs = [
             Object(Matching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
             # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
             Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
-            Object(NonMatching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
+            Object(Matching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
             # The .init runtime, in the order the retail section lays it out. memcpy.c is the provisional
             # half of MSL's __mem.o (the other half is memset.c, already at 100 %); making them one file
             # is proposed in the escalation queue - see the unit's file header comment.
