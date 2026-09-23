@@ -267,6 +267,11 @@ cflags_rel = [
 cflags_g3d = [
     *[f for f in cflags_base if f != "-O4,p"],
     "-O3",
+    # Evidence: the retail object carries extab 0x8 + extabindex 0xC, and its single function fn_800680A8 is
+    # byte-identical to ours (9 instructions, 0x24 B) - the records are unwind-only (a 4-byte flag word plus a
+    # zero terminator, no PC-action ranges, no exception actions), so the flag alone reproduces them. Same
+    # finding as cflags_pl and Gecko_ExceptionPPC.cp; analysis in .pi/notes/extab-gap.md.
+    "-Cpp_exceptions on",
 ]
 
 # Network and OS flags (src/Network/NetworkWiiMediator.c, src/OS/OSAlarm.c): cflags_base + -func_align 4.
