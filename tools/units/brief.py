@@ -13,7 +13,10 @@ the brief has to be self-contained and has to say the same thing every time. It 
     python tools/units/brief.py <unit> [--task "..."] [--stdout] [--json] [--selftest]
 
 The brief is written into MAIN (`<main>/tools/units/briefs/`), not into a worker's worktree, so it outlives
-the worktree the same way the outbox does.
+the worktree the same way the outbox does. Its file name and the paths in part 4 come from the unit's
+**active claim**: the slug is the claim's branch minus `worker/` - the name `land.py`'s gate keys the outbox
+by - never a name re-derived from the unit path, and a brief for an unclaimed unit says so instead of
+inventing one.
 """
 
 from __future__ import annotations
@@ -46,6 +49,53 @@ BAR = 80.0
 def source_name(unit: str) -> str:
     """`Pl/pl_act` -> `Pl/pl_act.cpp`; a full name is left alone."""
     return unit if unit.endswith(SRC_EXT) else unit + ".cpp"
+
+
+def claim_for(main: str, unit: str) -> dict:
+    """The unit's active claim from `MAIN/.pi/claims.json` - `{}` when it is unclaimed."""
+    return claims.load_registry(main).get(unit.strip("/"), {})
+
+
+def claim_slug(claim: dict) -> str | None:
+    """The handoff slug `land.py` keys the outbox by: the claim's branch minus `worker/`.
+
+    Read from the branch instead of re-deriving it from the unit path. `claims.py` builds the branch as
+    `worker/` + `claims.slug(unit)`, so the two agree today - but the branch *is* the claim's identity (it is
+    the lock), a round may name it with its own suffix, and the gate looks the outbox up by the branch. An
+    unclaimed unit has no branch and therefore no slug: never invent one.
+    """
+    branch = (claim or {}).get("branch") or ""
+    if branch.startswith(claims.BRANCH_PREFIX):
+        return branch[len(claims.BRANCH_PREFIX):]
+    return branch or None
+
+
+def unclaimed_notice(main: str, unit: str) -> str:
+    """The plain statement a brief for an unclaimed unit carries in place of an invented slug."""
+    return ("**This unit has no active claim.** `%s` carries no `branch` for `%s`, so there is no slug to key "
+            "the outbox by - the gate reads `MAIN/.pi/outbox/<branch minus worker/>.json`, and a made-up name "
+            "is refused. Claim the unit first (`python tools/units/claims.py claim %s`) and use the brief "
+            "written afterwards." % (claims.registry_path(main), unit, unit))
+
+
+def handoff_paths(main: str, unit: str) -> dict:
+    """Where a worker's artefacts go, derived from the claim (see `claim_slug`).
+
+    The ack file and the rescue ref stay `claims.py`'s own (`claims.ack_path`/`claims.slug`): the heartbeat is
+    written by `claims.py ack`, so the brief has to name the file that command actually writes.
+    """
+    unit = unit.strip("/")
+    claim = claim_for(main, unit)
+    slug = claim_slug(claim)
+    return {
+        "claimed": bool(slug),
+        "branch": claim.get("branch"),
+        "slug": slug,
+        "ack": claims.ack_path(main, unit),
+        "rescue": "refs/rescue/%s" % claims.slug(unit),
+        "outbox": os.path.join(main, ".pi", "outbox", slug + ".json") if slug else None,
+        "notes": os.path.join(main, ".pi", "notes", slug + ".md") if slug else None,
+    }
 
 
 def splits_range(main: str, unit: str) -> dict:
@@ -185,8 +235,10 @@ def build(main: str, wt: str, unit: str, task: str | None) -> dict:
     for sym in syms:
         sym["percent"] = scores.get(sym["name"])
     below = [s for s in syms if (s.get("percent") is None or s["percent"] < BAR)]
+    handoff = handoff_paths(main, unit)
     return {
-        "unit": unit, "slug": claims.slug(unit), "lib": lib, "worktree": wt, "main": main,
+        "unit": unit, "slug": handoff["slug"], "claimed": handoff["claimed"],
+        "branch": handoff["branch"], "handoff": handoff, "lib": lib, "worktree": wt, "main": main,
         "source": os.path.join(wt, "src", *source_name(unit).split("/")),
         "object": obj, "target": target,
         "sections": rng, "flags": tokens, "flag_error": err,
@@ -215,13 +267,13 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("")
     lines.append("That writes `%s`. Re-run it **with `--progress <symbol>` every time you finish a "
                  "function** - it is the heartbeat by which the orchestrator tells a stalled worker from a "
-                 "working one, and it takes a second." % os.path.join(main, ".pi", "ack", b["slug"] + ".json"))
+                 "working one, and it takes a second." % b["handoff"]["ack"])
     lines.append("")
     lines.append("**The timeout policy:** if there is no ack within **%d seconds**, or no progress for "
                  "**%d minutes**, the orchestrator reclaims the unit - your commits are copied to "
-                 "`refs/rescue/%s` first, then the worktree goes away and the unit is re-briefed to someone "
+                 "`%s` first, then the worktree goes away and the unit is re-briefed to someone "
                  "else. Talk to the orchestrator with the ack and the outbox, not by being busy."
-                 % (120, 20, b["slug"]))
+                 % (120, 20, b["handoff"]["rescue"]))
     lines.append("")
     lines.append("## 1 · The unit")
     lines.append("")
@@ -262,10 +314,15 @@ def render(main: str, b: dict, task: str | None) -> str:
     lines.append("## 4 · Where your output goes")
     lines.append("")
     lines.append("* your source, committed **on your branch** (one commit): `%s`" % b["source"])
-    lines.append("* `%s` - note land.py looks for `<slug>-<hash>.json`; the hash is the batch's, so copy your "
-                 "outbox to that name before handing off" % os.path.join(main, ".pi", "outbox", b["slug"] + ".json"))
-    lines.append("* `%s`" % os.path.join(main, ".pi", "notes", b["slug"] + ".md"))
-    lines.append("* a ≤ 15-line digest in your reply")
+    if b["handoff"]["claimed"]:
+        lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch "
+                     "(`%s` minus `worker/`), so write it exactly here; do not invent a name."
+                     % (b["handoff"]["outbox"], b["handoff"]["branch"]))
+        lines.append("* `%s`" % b["handoff"]["notes"])
+        lines.append("* a ≤ 15-line digest in your reply")
+    else:
+        lines.append("* %s" % unclaimed_notice(main, b["unit"]))
+        lines.append("* a ≤ 15-line digest in your reply")
     lines.append("")
     lines.append("**End your turn by calling the `subagent_done` tool** (a one-line summary). Do not just reply "
                  "with text: the completion signal the orchestrator is woken by is the sidecar that tool writes, "
@@ -343,6 +400,39 @@ def selftest() -> int:
           "fan out subagents" in plan_section(".", "### 5.5 A worker may fan out subagents"), True)
     check("plan_section finds §8", "Invariants" in plan_section(".", "## 8. Invariants"), True)
     check("plan_section is empty for nonsense", plan_section(".", "### 99 nope"), "")
+
+    # the slug is the claim's branch minus worker/, because that is what land.py's gate keys the outbox by
+    import tempfile
+    from units import handoff as handoff_mod
+    with tempfile.TemporaryDirectory() as tmp:
+        main = os.path.join(tmp, "mhtri-dtk")
+        claims.save_registry(main, {
+            "Pl/pl_act": {"branch": claims.branch_for("Pl/pl_act"), "worktree": os.path.join(tmp, "ws"),
+                          "base": "0" * 40},
+            "Pl/pl_skill": {"branch": claims.branch_for("Pl/pl_skill") + "-dd6e"},
+        })
+        check("an unclaimed unit has no claim", claim_for(main, "RSO/runtime"), {})
+        check("no branch means no slug", claim_slug({}), None)
+        check("the slug is the branch minus worker/", claim_slug(claim_for(main, "Pl/pl_act")),
+              claims.slug("Pl/pl_act"))
+        h = handoff_paths(main, "Pl/pl_act")
+        check("a claimed unit is marked claimed", h["claimed"], True)
+        check("the outbox is <slug>.json", os.path.basename(h["outbox"]), claims.slug("Pl/pl_act") + ".json")
+        check("the outbox is the one handoff.py names", os.path.basename(h["outbox"]),
+              os.path.basename(handoff_mod.outbox_path(main, "Pl/pl_act")))
+        check("the outbox lives in MAIN/.pi/outbox", os.path.dirname(h["outbox"]),
+              os.path.join(main, ".pi", "outbox"))
+        check("the notes path uses the same slug", os.path.basename(h["notes"]), claims.slug("Pl/pl_act") + ".md")
+        check("a branch suffix survives into the slug", handoff_paths(main, "Pl/pl_skill")["slug"],
+              claims.slug("Pl/pl_skill") + "-dd6e")
+        check("the ack stays claims.py's own path", h["ack"], claims.ack_path(main, "Pl/pl_act"))
+        check("the rescue ref stays claims.py's slug", h["rescue"], "refs/rescue/%s" % claims.slug("Pl/pl_act"))
+        u = handoff_paths(main, "RSO/runtime")
+        check("an unclaimed unit has no slug", u["slug"], None)
+        check("an unclaimed unit has no outbox path", u["outbox"], None)
+        check("an unclaimed unit is marked", u["claimed"], False)
+        check("the unclaimed notice says so plainly",
+              "no active claim" in unclaimed_notice(main, "RSO/runtime"), True)
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -378,7 +468,13 @@ def main() -> int:
     if args.stdout:
         print(text)
         return 0
-    out = args.out or os.path.join(main, "tools", "units", "briefs", b["slug"] + ".md")
+    if not b["slug"]:
+        # the brief still has to have a home, but the file name must not pass itself off as the handoff slug:
+        # it falls back to claims.py's own slug and the brief says the unit is unclaimed
+        print("WARNING: %s has no active claim in %s - the brief says so and offers no outbox path; the file "
+              "name falls back to the registry slug" % (args.unit, claims.registry_path(main)), file=sys.stderr)
+    out = args.out or os.path.join(main, "tools", "units", "briefs",
+                                   (b["slug"] or claims.slug(args.unit)) + ".md")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w", encoding="utf-8", newline="\n").write(text)
     print("wrote %s (%d lines, %d symbols, %d below the bar)"
