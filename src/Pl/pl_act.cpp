@@ -53,13 +53,15 @@
  *   * storing an int into a `u8` field: MWCC inserts a redundant `clrlwi r0,r0,24` where retail's `stb`
  *     truncates. The compound operators (`++`, `--`, `+=`, `-=`) on the lvalue avoid it in some arms only,
  *     so B0BC keeps a residual `clrlwi` on the two `w +- 40` clamp stores.
- *   * the `x > N ? 2 : 1` threshold idiom: retail is branchless and signed
- *     (`xoris r3,x,0x8000; subfic r0,x,N; addc; subfe; addi 2`); our build picks the unsigned-bool form
- *     (`xori/srawi/srwi/...`), so a threshold compare never pairs (791FC, Get_Shell_bure_type).
- *   * array base/index order for an offset access: `*(u8*)(lbl + idx * 4 + k)` makes MWCC compute the
- *     index first and fold the base into a scratch register; retail computes the base (`lis/addi`) first
- *     and then `add r3,r3,r0`. The plain `lbl[idx * 4]` form (no trailing `+k`) matches (79490, 791FC,
- *     Get_Shell_bure_type).
+ *   * the `x > N ? 2 : 1` threshold idiom - **resolved this pass**: the branchless form MWCC picks is
+ *     decided by which side of the comparison is written first. `x > N ? 2 : 1` gives the unsigned-bool
+ *     form (`xori/srawi/srwi/...`), the negated `x <= N ? 1 : 2` gives retail's
+ *     `xoris; subfic; addc; subfe; addi 2`, and the equality form `x == N ? a : b` gives retail's
+ *     `addi/subfic/nor/srawi` (Get_Shell_bure_type 90.2 -> 96.7, 791FC 86.8 -> 90.8, 79490 94.2 -> 97.5).
+ *   * array base/index order for an offset access - **resolved this pass**: `*(u8*)(lbl + idx * 4 + k)`
+ *     makes MWCC compute the index first and fold the base into a scratch register; moving the constant
+ *     *before* the index (`*(u8*)(lbl + k + idx * 4)`) makes it compute the base (`lis/addi`) first and
+ *     then `add r3,r3,r0`, which is retail (Get_Shell_bure_type 90.2 -> 93.6, 791FC).
  *   * `!= 0` on a `u8` load pairs as `cmpwi` only through a `(s32)` cast (78D1C, B918, B0BC).
  *   * an `if`/`else if` chain whose arm bodies MWCC lays out in reverse has to be written as m2c's
  *     negated/nested form (`>`, `!=`, with the bodies as the `else` arms); the natural `<=` chain flips
@@ -117,11 +119,38 @@
  *   * `extern u8 lbl_80792150;` + `&lbl_80792150` gives retail's `li r3, X@sda21` address form where
  *     `extern u8 lbl_80792150[]` gave `lis/addi` (Get_Shell_bure_type 78.6 -> 79.9).
  *
+ * This pass (worker `pl-act-09c6`) took the unit 93.73 -> 97.61 % (matched 25714 -> 26780 B; 73 of the 115
+ * functions byte-exact) and closed all five symbols below the 80 % bar. The shapes that did it, in order
+ * of payoff:
+ *   * a sparse `switch` whose first case *falls through into `default:`*: retail's `cmpwi; beq A; cmpwi; beq A;
+ *     cmpwi 9; beq B; b default` with A out of line and A's failure falling into `default` is
+ *     `switch (m) { case 6: case 17: <body> (falls through) default: ...; case 9: ... }` - `default`
+ *     written *between* the cases so the bodies land in address order (784B8 66.6 -> 100.0).
+ *   * a big `if` whose failing edge falls into the *next* arm's body: move the shared tail out of the `else`
+ *     of the first arm and make it the `switch`'s `default:` after the last case (A57C 66.0 -> 96.0; its
+ *     only residual is the two implicit int->float magics, which cannot be named from source - playbook 29).
+ *   * a `return` block MWCC refuses to merge: write `goto ret1; ret0: return 0;` at the end of the block so
+ *     the shared label lands *before* the other return (78144 95.6 -> 100.0, 78310 94.9 -> 100.0,
+ *     BC48 94.5 -> 100.0, and BC48's `case 4: return 1;` shares that block with an earlier `if (...) return 1;`).
+ *   * `(s32)arg0 == N` for a `u8` parameter gives retail's `cmpwi` where `arg0 == N` gives `cmplwi`
+ *     (78144, 78310).
+ *   * an accumulator retail keeps in 32 bits and sign-extends only at each *compare*: declare it `s32`, write
+ *     the widening adds as `b = (s16)(b + N)` on exactly the arms that need the conversion, and let the final
+ *     difference reuse the minuend's register by writing `a -= b` on an `s32 a` (79490, 791FC 97.8 -> 100.0,
+ *     BCE0 85.3 -> 93.4).
+ *   * `n = (f32)(s16)arg1` hoisted into a local is wrong: retail recomputes the int->float magic at every
+ *     use, so the conversion has to be written inline at each division (AE28 74.6 -> 99.9, frame 32 -> 48 B).
+ *   * the 24-entry `{u16 id; s16 count}` table at 0x278 has to be a *typed array field*, not
+ *     `*(u16*)((u8*)self + 0x278 + i * 4)`: the field form gives retail's `lhz r4,632(r3)` displacement loads
+ *     and drops the two pointer-materialising `addi`s (BCE0).
+ *
  * Still open in the new bodies: C208 keeps 16 extra `li r3,0` rows (bodies that `return 0` inline where
  * retail branches to the merged return-0 block at 0x5d28) and its frame is 0x30 against retail's 0x40
- * (two locals short); 78144/78310 keep the `case 6: case 7:` range test as two signed compares where
- * retail emits `subi/cmplwi`, plus one `cmpwi`-vs-`cmplwi` on `(u8)m != 9`; 77FF8 has ~6 rows left in the
- * `t`-vs-`arg1` test polarity.
+ * (two locals short); 77FF8 has ~6 rows left in the `t`-vs-`arg1` test polarity; 7885C's five
+ * `(s16)fn_802753E4(...)` call sites schedule `extsh r4,r3` before `mr r3,self` where retail copies the
+ * result first (`mr r0,r3; mr r3,self; extsh r4,r0`); BCE0 keeps only a `v`/`id` callee-saved swap (retail
+ * v=r6/id=r4, ours the mirror); 78590's `* 14` stays `mulli` where retail emits `slwi/subf/slwi` (MWCC folds
+ * `* 7 * 2` before strength reduction).
  *
  * Source-order caveat: the bodies were appended in per-batch address order, not as one address-ordered
  * list, so the file is *not* in `.text` order any more (Pl_attack_set_sub in particular sits in the
@@ -136,8 +165,11 @@
  *     `cmplwi` (A198, C030, 78C7C, 78CD0, A4EC, BCE0); the range tests stay `(u32)(id - lo) <= n`.
  *   * counted loops unroll with `mtctr`: `i < 10` -> by 1, `i < 24` -> by 4 (BCE0), `i < 32` -> by 8 with
  *     `mtctr 4` (D40C).
- *   * one-off field offsets are written as `*(s16*)((u8*)self + N)` (789EC, BCE0, AF88); the struct only
- *     names fields more than one function touches. 0x278 is a 24-entry {u16 id; s16 count} table.
+ *   * one-off field offsets are written as `*(s16*)((u8*)self + N)` (789EC, AF88); the struct only names
+ *     fields more than one function touches. The 24-entry `{u16 id; s16 count}` table at 0x278 is named
+ *     (`slot_table`, with a `_SLOTENT` entry type) because two functions index it and the field form is what
+ *     gives retail's displacement loads; `_SLOTENT` is a copy of `Pl/pl_skill.cpp`'s and the two belong in one
+ *     Pl-wide header (see the `_PLW` sharing note in the campaign's `config_requests`).
  *   * the exported helpers are C++ functions so the compiler emits the map's mangled names (Pl_bari_ck,
  *     Pl_condition_ck, Pl_dm_condition_ck, Pl_suimen_ck, Pl_get_gunner_pos/vec, Pl_zanzo_set,
  *     Get_Shell_rate_adj); every `fn_*` callee and the SDK entry points are `extern "C"`.
@@ -169,6 +201,13 @@ struct MTX34 {
 }  // namespace nw4r
 
 extern u8 lbl_806AB848[];
+
+/* One 4-byte entry of the actor's 24-slot item table at 0x278: an item id and a signed value.
+ * Pl/pl_skill.cpp carries the same type as `_SLOTENT`; the two belong in one Pl-wide header. */
+struct _SLOTENT {
+    /* 0x0 */ u16 id;
+    /* 0x2 */ s16 value;
+};
 
 struct _PLW {
     /* 0x000 */ u8 unk000[2];
@@ -206,7 +245,12 @@ struct _PLW {
     /* 0x0B4 */ s16 unk0B4;
     /* 0x0B6 */ u8 unk0B6[0x13C - 0xB6];
     /* 0x13C */ u8* unk13C;
-    /* 0x140 */ u8 unk140[0x264 - 0x140];
+    /* 0x140 */ u8 unused_0x140[0x1D0 - 0x140];
+    /* 0x1D0 */ u8 equipB[0xC];
+    /* 0x1DC */ u8 unused_0x1DC[0x1E8 - 0x1DC];
+    /* 0x1E8 */ u8 equipC[0xC];
+    /* 0x1F4 */ u8 equipD[0xC];
+    /* 0x200 */ u8 unused_0x200[0x264 - 0x200];
     /* 0x264 */ s16 unk264;
     /* 0x266 */ u8 unk266[0x269 - 0x266];
     /* 0x269 */ u8 unk269;
@@ -218,7 +262,9 @@ struct _PLW {
     /* 0x270 */ s16 unk270;
     /* 0x272 */ u8 unk272[0x276 - 0x272];
     /* 0x276 */ u8 unk276;
-    /* 0x277 */ u8 unk277[0x306 - 0x277];
+    /* 0x277 */ u8 unk277[0x278 - 0x277];
+    /* 0x278 */ _SLOTENT slot_table[24];
+    /* 0x2D8 */ u8 unk2D8[0x306 - 0x2D8];
     /* 0x306 */ u16 unk306;
     /* 0x308 */ u8 unk308[0x30C - 0x308];
     /* 0x30C */ u8 unk30C;
@@ -1308,19 +1354,26 @@ extern "C" s32 fn_8027BC48(s32 arg1)
     }
     s32 x = p[0xFA];
     if ((u32)(x - 6) <= 2) {
-        return 1;
+        goto ret1;
     }
-    if (x == 3) {
+    switch (x) {
+    case 3:
         if (arg1 == 0) {
             return 1;
         }
-    } else if (x == 5) {
+        break;
+    case 5:
         if (arg1 != 2) {
             return 1;
         }
-    } else if (x == 4) {
-        return 1;
+        break;
+    case 4:
+        goto ret1;
     }
+    goto ret0;
+ret1:
+    return 1;
+ret0:
     return 0;
 }
 
@@ -1521,11 +1574,10 @@ extern "C" void fn_8027AE28(_PLW* self, s32 arg1)
         self->unk0A0 = lbl_8079A084;
         self->unk0A4 = lbl_8079A084;
     } else {
-        f32 n = (f32)(s16)arg1;
         self->unk0B4 = arg1;
-        self->unk09C = (self->unk090[0] - self->unk03C) / n;
-        self->unk0A0 = (self->unk090[1] - self->unk040) / n;
-        self->unk0A4 = (self->unk090[2] - self->unk044) / n;
+        self->unk09C = (self->unk090[0] - self->unk03C) / (f32)(s16)arg1;
+        self->unk0A0 = (self->unk090[1] - self->unk040) / (f32)(s16)arg1;
+        self->unk0A4 = (self->unk090[2] - self->unk044) / (f32)(s16)arg1;
     }
 }
 
@@ -1590,18 +1642,25 @@ u32 Pl_bari_ck(_PLW* self, s32 arg1)
 extern "C" s32 fn_802784B8(_PLW* self)
 {
     s32 m = (u8)fn_802B0668((u8)get_now_mapno());
-    if ((m == 6 || m == 17) && self->unk016 == 2) {
-        return 0;
-    }
-    if (m == 9) {
-        if (fn_802B0688((u8*)self + 60) == 1) {
+    switch (m) {
+    case 6:
+    case 17:
+        if (self->unk016 == 2) {
             return 0;
         }
-    } else {
+        /* falls through */
+    default: {
         u8* p = get_move_work_adrs(0);
         if (p != 0 && self->unk016 == p[0xF6]) {
             return 0;
         }
+        break;
+    }
+    case 9:
+        if (fn_802B0688((u8*)self + 60) == 1) {
+            return 0;
+        }
+        break;
     }
     return 1;
 }
@@ -1700,10 +1759,11 @@ extern "C" void fn_802789EC(_PLW* self, s32 arg1)
 /* 0x8027BCE0: the highest of the actor's 24 stored item ids that is in the carve set. */
 extern "C" u32 fn_8027BCE0(_PLW* self)
 {
+    s32 id;
     u16 v = 0xFFFF;
     for (s32 i = 0; i < 24; i++) {
-        if (*(s16*)((u8*)self + 0x27A + i * 4) > 0) {
-            s32 id = *(u16*)((u8*)self + 0x278 + i * 4);
+        if (self->slot_table[i].value > 0) {
+            id = self->slot_table[i].id;
             if ((u32)(id - 381) <= 1 || id == 139 || id == 395) {
                 v = (u16)id;
             }
@@ -2751,39 +2811,37 @@ extern "C" void fn_8027885C(_PLW* self, s32 arg1, s32 arg2)
  * are applied. */
 extern "C" s32 fn_802791FC(_PLW* self, u8 arg1)
 {
-    s16 b;
-    s16 d;
     if ((s32)fn_8026FE44(self) == 0) {
         return 1;
     }
-    u8 a = *(u8*)(lbl_805BF538 + arg1 * 4 + 1);
-    b = *(u8*)(fn_8027ED18((u8*)self + 0x1D0) + 9);
-    if (*(u8*)((u8*)self + 0x1F4) == 0xD) {
-        b += *(u8*)(fn_8027ED18((u8*)self + 0x1F4) + 9);
+    s32 a = *(u8*)(lbl_805BF538 + 1 + arg1 * 4);
+    s32 b = *(u8*)(fn_8027ED18(&self->equipB) + 9);
+    if (self->equipD[0] == 0xD) {
+        b += *(u8*)(fn_8027ED18(&self->equipD) + 9);
     }
     if (Pl_Skill_ck(self, 0x27) == 1) {
-        b += 2;
+        b = (s16)(b + 2);
     }
     if (Pl_Skill_ck(self, 0x28) == 1) {
-        b += 3;
+        b = (s16)(b + 3);
     }
     if (Pl_Skill_ck(self, 0x29) == 1) {
-        b += 4;
+        b = (s16)(b + 4);
     }
     if (Pl_Skill_ck(self, 0x2A) == 1) {
-        b -= 1;
+        b = (s16)(b - 1);
     }
     if (Pl_Skill_ck(self, 0x2B) == 1) {
-        b -= 2;
+        b = (s16)(b - 2);
     }
     if (Pl_Skill_ck(self, 0x2C) == 1) {
-        b -= 3;
+        b = (s16)(b - 3);
     }
-    d = a - b;
-    if (d <= 4) {
+    a -= b;
+    if ((s16)a <= 4) {
         return 0;
     }
-    return (d > 7) ? 2 : 1;
+    return ((s16)a <= 7) ? 1 : 2;
 }
 
 extern u8 lbl_805BFCD8[];
@@ -2793,91 +2851,91 @@ extern u8 lbl_80792150;
 /* 0x80275A80: the shell "bure" type (0/1/2) the actor's equipped shell and its skills resolve to. */
 u32 Get_Shell_bure_type(_PLW* self, u8 arg1)
 {
-    u8* t31 = lbl_805BFCD8 + *(u8*)(fn_8027ED18((u8*)self + 0x1D0) + 0x10) * 2;
-    s32 v29 = *(u8*)(t31 + 1);
-    v29 += *(s8*)(lbl_805BF538 + arg1 * 4 + 3);
-    u8 r29;
-    if (*(u8*)((u8*)self + 0x1E8) == 0xC) {
-        v29 -= *(u8*)((u8*)&lbl_80792150 + *(u8*)(fn_8027ED18((u8*)self + 0x1E8) + 0x10));
+    u8* t31 = lbl_805BFCD8 + *(u8*)(fn_8027ED18(&self->equipB) + 0x10) * 2;
+    s32 v29 = t31[1];
+    v29 += *(s8*)(lbl_805BF538 + 3 + arg1 * 4);
+    s32 r29;
+    if (self->equipC[0] == 0xC) {
+        v29 -= (&lbl_80792150)[*(u8*)(fn_8027ED18(&self->equipC) + 0x10)];
     }
     if ((s8)v29 <= 5) {
         r29 = 0;
     } else {
-        r29 = ((s8)v29 > 15) ? 2 : 1;
+        r29 = ((s8)v29 <= 15) ? 1 : 2;
     }
     if (Pl_Skill_ck(self, 0xAC) == 1) {
         if (Pl_cat_skill_ck(self, 0x1E) == 1) {
-            if ((s32)r29 != 0) {
+            if ((u8)r29 != 0) {
                 r29 -= 1;
             }
         } else {
             r29 = 0;
         }
     } else if (Pl_Skill_ck(self, 0xAB) == 1) {
-        if (Pl_cat_skill_ck(self, 0x1E) == 0 && (s32)r29 != 0) {
+        if (Pl_cat_skill_ck(self, 0x1E) == 0 && (u8)r29 != 0) {
             r29 -= 1;
         }
     } else if (Pl_Skill_ck(self, 0xAD) == 1) {
         if (Pl_cat_skill_ck(self, 0x1E) == 1) {
             r29 = 2;
-        } else if (r29 < 2) {
+        } else if ((u8)r29 < 2) {
             r29 += 1;
         }
-    } else if (Pl_cat_skill_ck(self, 0x1E) == 1 && r29 < 2) {
-        r29 = r29 + 1;
+    } else if (Pl_cat_skill_ck(self, 0x1E) == 1 && (u8)r29 < 2) {
+        r29 = (u8)((u8)r29 + 1);
     }
-    u8 t3 = *(u8*)t31;
-    return *(u8*)(lbl_805C6100 + r29 + (t3 * 4 - t3));
+    u8 t3 = t31[0];
+    return lbl_805C6100[(u8)r29 + (t3 * 4 - t3)];
 }
 
 /* 0x80279490: the shell capacity one equipment slot contributes after the actor's skill modifiers,
  * mapped onto the 0-3 capacity class the caller uses. */
-extern "C" s16 fn_80279490(_PLW* self, u8 arg1)
+extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
 {
     if ((s32)fn_8026FE44(self) == 0) {
         return 2;
     }
-    u8 a = *(u8*)(lbl_805BF538 + arg1 * 4);
+    s32 a = *(u8*)(lbl_805BF538 + arg1 * 4);
     u8* p = fn_80279414(self, arg1);
     if (p != 0) {
         return (s16)(*(u8*)(p + 3) + 3);
     }
-    s16 b = 0;
+    s32 b = 0;
     if (fn_80279414(self, arg1) == 0) {
-        b = *(u8*)(fn_8027ED18((u8*)self + 0x1D0) + 7);
-        if (*(u8*)((u8*)self + 0x1F4) == 0xD) {
-            b += *(u8*)(fn_8027ED18((u8*)self + 0x1F4) + 7);
+        b = *(u8*)(fn_8027ED18(&self->equipB) + 7);
+        if (self->equipD[0] == 0xD) {
+            b += *(u8*)(fn_8027ED18(&self->equipD) + 7);
         }
         if (Pl_Skill_ck(self, 0x2D) == 1) {
             b += 2;
         } else if (Pl_Skill_ck(self, 0x2E) == 1) {
             b += 3;
         } else if (Pl_Skill_ck(self, 0x2F) == 1) {
-            b += 4;
+            b = (s16)(b + 4);
         }
         if (Pl_Skill_ck(self, 0x30) == 1) {
             b -= 1;
         } else if (Pl_Skill_ck(self, 0x31) == 1) {
             b -= 2;
         } else if (Pl_Skill_ck(self, 0x32) == 1) {
-            b -= 3;
+            b = (s16)(b - 3);
         }
     }
-    s16 d = a - b;
+    a -= b;
     s32 r3 = 2;
-    if (d <= 0) {
-        d = 0;
+    if ((s16)a <= 0) {
+        a = 0;
     }
-    if (d <= 8) {
+    if ((s16)a <= 8) {
         r3 = 0;
-    } else if (d <= 0xA) {
+    } else if ((s16)a <= 0xA) {
         r3 = 1;
     }
     if ((u32)(arg1 - 0x27) <= 2) {
         if (r3 == 0) {
             return 3;
         }
-        return (r3 > 1) + 8;
+        return (r3 == 1) ? 8 : 9;
     }
     return r3;
 }
@@ -2901,14 +2959,16 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
     u8 sp8;
     f32 spC;
     s32* t;
-    u8 f27 = 0;
-    u8 f26 = 0;
-    u8 f25 = 0;
-    u8 f24 = 0;
-    s32 mag = 0;
-    s32 dir = 0;
-    s32 step = 0;
-    s32 speed = *(s32*)((u8*)self + 0xA8);
+    s32 mag, dir, speed, step;
+    u8 f27, f26, f25, f24;
+    f27 = 0;
+    f26 = 0;
+    f25 = 0;
+    f24 = 0;
+    mag = 0;
+    dir = 0;
+    step = 0;
+    speed = *(s32*)((u8*)self + 0xA8);
 
     if (Pl_master_ck(self) == 0) {
         return;
@@ -2926,11 +2986,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
         if ((u32)fn_8026A6F4(self, 0xB) != 1) {
             switch (arg2) {
             case 0:
-                if (self->unk00A != 4) {
-                    if (fn_8027A340(self) != 0) {
-                        goto block_16;
-                    }
-                } else {
+                if (self->unk00A == 4 || fn_8027A340(self) != 0) {
                     goto block_16;
                 }
                 break;
@@ -2976,79 +3032,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                     goto block_75;
                 }
             } else {
-            default:
-            block_53:
-                if ((s32)self->unk5E5 != 0 || (s32)self->unk5E6 != 0) {
-                    u16 w = *(u16*)((u8*)self + 0xC8);
-                    u8 r;
-                    u8 c;
-                    if ((s32)(w & 0x3C00) != 0 && (u16)*(u16*)((u8*)self + 0xD4) >= 0x32) {
-                        if ((s32)(w & 0x2000) != 0) {
-                            f25 = 1;
-                        } else if ((s32)(w & 0x1000) != 0) {
-                            f24 = 1;
-                        }
-                        if ((s32)(w & 0x800) != 0) {
-                            f27 = 1;
-                        } else if ((s32)(w & 0x400) != 0) {
-                            f26 = 1;
-                        }
-                        r = fn_803BECA0(self->unk008, 9);
-                        if (r == 1 || r == 3) {
-                            c = f25;
-                            f25 = f24;
-                            f24 = c;
-                        }
-                        if ((u8)(r + 0xFE) <= 1) {
-                            c = f27;
-                            f27 = f26;
-                            f26 = c;
-                        }
-                        spC = lbl_8079A080;
-                        fn_802B9740(self, &sp9, &sp8, &spC);
-                        mag = 1;
-                        step = 0x4C;
-                        t = (s32*)lbl_805C6118;
-                    loop_74:
-                        if (t[0] != -1) {
-                            if ((s32)*(u16*)((u8*)self + 0xD4) >= t[0]) {
-                                f32 a = (f32)t[1];
-                                f32 b = (f32)t[3];
-                                mag = (s32)(a + (spC * ((f32)t[2] - a)));
-                                step = (s32)(b + (spC * ((f32)t[4] - b)));
-                            } else {
-                                t += 5;
-                                goto loop_74;
-                            }
-                        }
-                    }
-                }
-            block_75:
-                {
-                    s32 c = f25 + f24;
-                    if (c != 0 && (s32)(f27 + f26) != 0) {
-                        step = (s32)(lbl_8079A0F0 * (f32)step);
-                        mag = (s32)(lbl_8079A0F0 * (f32)mag);
-                        if (mag < 1) {
-                            mag = 1;
-                        }
-                    }
-                    if (c != 0) {
-                        dir = mag;
-                        if ((s32)f25 == 0) {
-                            dir = -mag;
-                        }
-                        self->unk5E5 = 5;
-                    }
-                    if ((s32)f27 != 0) {
-                        self->unk5E5 = 0xA;
-                        speed += step;
-                    }
-                    if ((s32)f26 != 0) {
-                        self->unk5E5 = 0xA;
-                        speed -= step;
-                    }
-                }
+                goto block_53;
             }
             break;
         case 2:
@@ -3085,6 +3069,79 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                 goto block_53;
             }
             break;
+        default:
+        block_53:
+            if ((s32)self->unk5E5 != 0 || (s32)self->unk5E6 != 0) {
+                u16 w = *(u16*)((u8*)self + 0xC8);
+                u8 r;
+                u8 c;
+                if ((s32)(w & 0x3C00) != 0 && (u16)*(u16*)((u8*)self + 0xD4) >= 0x32) {
+                    if ((s32)(w & 0x2000) != 0) {
+                        f25 = 1;
+                    } else if ((s32)(w & 0x1000) != 0) {
+                        f24 = 1;
+                    }
+                    if ((s32)(w & 0x800) != 0) {
+                        f27 = 1;
+                    } else if ((s32)(w & 0x400) != 0) {
+                        f26 = 1;
+                    }
+                    r = fn_803BECA0(self->unk008, 9);
+                    if (r == 1 || r == 3) {
+                        c = f25;
+                        f25 = f24;
+                        f24 = c;
+                    }
+                    if ((u8)(r + 0xFE) <= 1) {
+                        c = f27;
+                        f27 = f26;
+                        f26 = c;
+                    }
+                    spC = lbl_8079A080;
+                    fn_802B9740(self, &sp9, &sp8, &spC);
+                    mag = 1;
+                    step = 0x4C;
+                    t = (s32*)lbl_805C6118;
+                    while (t[0] != -1) {
+                        if ((s32)*(u16*)((u8*)self + 0xD4) >= t[0]) {
+                            f32 a = (f32)t[1];
+                            f32 m = spC * ((f32)t[2] - a);
+                            mag = (s32)(a + m);
+                            f32 b = (f32)t[3];
+                            f32 s = spC * ((f32)t[4] - b);
+                            step = (s32)(b + s);
+                            break;
+                        }
+                        t += 5;
+                    }
+                }
+            }
+        block_75:
+            {
+                s32 c = f25 + f24;
+                if (c != 0 && (s32)(f27 + f26) != 0) {
+                    step = (s32)(lbl_8079A0F0 * (f32)step);
+                    mag = (s32)(lbl_8079A0F0 * (f32)mag);
+                    if (mag < 1) {
+                        mag = 1;
+                    }
+                }
+                if (c != 0) {
+                    dir = mag;
+                    if ((s32)f25 == 0) {
+                        dir = -mag;
+                    }
+                    self->unk5E5 = 5;
+                }
+                if ((s32)f27 != 0) {
+                    self->unk5E5 = 0xA;
+                    speed += step;
+                }
+                if ((s32)f26 != 0) {
+                    self->unk5E5 = 0xA;
+                    speed -= step;
+                }
+            }
         }
     }
     switch (arg2) {
@@ -3254,39 +3311,43 @@ extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
         if (w != 0 && arg0 == *(u8*)(w + 0xF6)) {
             return 0;
         }
+        if ((u32)((u8)m - 6) <= 1) {
+            goto ret0;
+        }
         switch ((s32)(u8)m) {
         case 1:
-            if (arg0 == 7 || arg0 == 0xB) {
+            if ((s32)arg0 == 7 || (s32)arg0 == 0xB) {
                 return 0;
             }
             break;
         case 2:
-            if (arg0 == 0xB) {
+            if ((s32)arg0 == 0xB) {
                 return 0;
             }
             break;
         case 3:
-            if (arg0 == 2 || arg0 == 4 || arg0 == 8) {
+            if ((s32)arg0 == 2 || (s32)arg0 == 4 || (s32)arg0 == 8) {
                 return 0;
             }
             break;
         case 5:
-            if (arg0 == 0xA) {
+            if ((s32)arg0 == 0xA) {
                 return 0;
             }
             break;
-        case 6:
-        case 7:
         case 10:
-            return 0;
+            goto ret0;
         }
-        return 1;
+        goto ret1;
+    ret0:
+        return 0;
     } else {
         if (fn_802B0688(arg1) == 1U) {
             return 0;
         }
-        return 1;
     }
+ret1:
+    return 1;
 }
 
 /* 0x80278310: the same map/move-work gate as 80278144, for the smaller action set. */
@@ -3301,34 +3362,38 @@ extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
         if (w != 0 && arg0 == *(u8*)(w + 0xF6)) {
             return 0;
         }
+        if ((u32)((u8)m - 6) <= 1) {
+            goto ret0;
+        }
         switch ((s32)(u8)m) {
         case 1:
-            if (arg0 == 0xB) {
+            if ((s32)arg0 == 0xB) {
                 return 0;
             }
             break;
         case 2:
-            if (arg0 == 0xB) {
+            if ((s32)arg0 == 0xB) {
                 return 0;
             }
             break;
         case 5:
-            if (arg0 == 0xA) {
+            if ((s32)arg0 == 0xA) {
                 return 0;
             }
             break;
-        case 6:
-        case 7:
         case 10:
-            return 0;
+            goto ret0;
         }
-        return 1;
+        goto ret1;
+    ret0:
+        return 0;
     } else {
         if (fn_802B0688(arg1) == 1U) {
             return 0;
         }
-        return 1;
     }
+ret1:
+    return 1;
 }
 
 /* 0x80277974: builds the attack entry an incoming hit produces and runs the shared attack set-up. */
