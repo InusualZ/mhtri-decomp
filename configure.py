@@ -436,7 +436,7 @@ config.libs = [
         "progress_category": "sdk",
         "host": False,
         "objects": [
-            Object(NonMatching, "Runtime.PPCEABI.H/__start.c"),
+            Object(Matching, "Runtime.PPCEABI.H/__start.c"),
             Object(Matching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
         ],
     },

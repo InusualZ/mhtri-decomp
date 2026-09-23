@@ -87,7 +87,13 @@ extern void __flush_cache(void* addr, u32 size);
 extern void* memcpy(void* dst, const void* src, u32 size);
 extern void* memset(void* dst, int val, u32 size);
 
-extern u8 Debug_BBA;
+/* This file's own static (the map marks it scope:local at .sbss:0x807953C8, and its only users are
+   __set_debug_bba/__get_debug_bba below). The split spells a local symbol's name as <name>_<address>, so the
+   object the linker is given calls it Debug_BBA_807953C8; referencing that name is what makes both the
+   relocations and the link resolve - a probe with it measures 100 % on both functions, and a claim for the
+   byte alone is rejected by the splitter ("Invalid alignment for split: auto_10_807953C9_sbss"). */
+extern u8 Debug_BBA_807953C8;
+#define Debug_BBA Debug_BBA_807953C8
 
 /* Linker-script addresses loaded by __init_registers. */
 extern u8 _stack_addr[];
