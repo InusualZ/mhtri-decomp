@@ -630,8 +630,10 @@ def render(report: dict, units: list[dict]) -> str:
     out.append("entry %s  bss %s+0x%X  image %d bytes (DOL %d)"
                % (fmt_addr(report["entry"]["elf"]), fmt_addr(report["bss"]["elf_addr"]),
                   report["bss"]["elf_size"], report["image_size"], report["dol_size"]))
-    if report.get("stale"):
-        out.append("WARN  %s" % report["stale"]["detail"])
+    # the wrapper dict is present whenever the check ran, so test the inner flag, not the dict
+    stale = report.get("stale") or {}
+    if stale.get("stale"):
+        out.append("WARN  %s" % stale["detail"])
     text = " ".join(r["name"] for r in report["sections"] if r["group"] == "text")
     data = " ".join(r["name"] for r in report["sections"] if r["group"] == "data")
     out.append("order %s text %s | data %s"

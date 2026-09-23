@@ -291,6 +291,15 @@ def rows():
     # rendering says which way it went
     yield "render match", "RESULT MATCH" in lo.render(lo.audit_link(elf, dol, SPLITS, CONFIGURED, ORIG_SYMBOLS, AUTO), []), True
     yield "render diverge", "RESULT DIVERGE" in lo.render(lo.audit_link(elf, corrupt(dol, 0x140), SPLITS, CONFIGURED, ORIG_SYMBOLS, AUTO), []), True
+    # a report whose staleness check ran but found nothing must still render (the wrapper dict is
+    # truthy either way, so testing it instead of the inner flag made every run raise KeyError)
+    _fresh = lo.audit_link(elf, dol, SPLITS, CONFIGURED, ORIG_SYMBOLS, AUTO)
+    _fresh["stale"] = {"stale": False, "newest_object": "build/RMHE08/src/x.o"}
+    yield "render not-stale", "RESULT MATCH" in lo.render(_fresh, []), True
+    _old = dict(_fresh)
+    _old["stale"] = {"stale": True, "elf_time": 1.0, "newest_time": 2.0,
+                     "newest_object": "build/RMHE08/src/x.o", "detail": "x.o is newer than main.elf"}
+    yield "render stale warns", "WARN  x.o is newer than main.elf" in lo.render(_old, []), True
 
 
 def main() -> int:
