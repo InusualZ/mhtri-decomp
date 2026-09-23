@@ -19,9 +19,12 @@ sys.path.insert(0, os.path.join(ROOT, "tools", "git"))
 import prepcommit as pc  # noqa: E402
 
 FAIL: list[str] = []
+CHECKS = 0
 
 
 def check(name: str, got, want) -> None:
+    global CHECKS
+    CHECKS += 1
     if got != want:
         FAIL.append(f"{name}: got {got!r}, want {want!r}")
 
@@ -81,4 +84,4 @@ if FAIL:
     for line in FAIL:
         print("  " + line)
     sys.exit(1)
-print(f"ok - {38} checks")
+print(f"ok - {CHECKS} checks")
