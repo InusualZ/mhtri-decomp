@@ -63,18 +63,22 @@
  *      belongs in the object's own `extra_cflags`.
  *
  * Residual / open items (all measured against the target object this session):
- *   - **The unit's real residual is symbol pairing, not code.** `fragmentinfo` is the only reference the
- *     target object spells differently (`fragmentinfo_806F4B48` vs our `fragmentinfo`), and `objdiff`
- *     compares an undefined relocation target by name: it costs 1.58 points on `__register_fragment`
- *     (92.11 -> 93.68) and 1.5 on `__unregister_fragment` (98.5 -> 100). The target object is simply stale -
- *     it was split before the map renamed `.bss:0x806F4B48` to `fragmentinfo` (target object 09:52, symbols.txt
- *     10:23), and dtk names unclaimed
- *     relocation targets from the map (the sibling `jumptable_8060E8A0` carries its map name), so a re-split
- *     fixes it. Do **not** claim `.bss 0x806F4B48-0x806F4CC8`: it would add a 0x180 `.bss` this object does
- *     not have and drop the unit's `matched_data` (same decision as the lib's unclaimed
- *     `__global_destructor_chain`, `.sbss` 0x80794DF8).
- *   - The three walkers are `static`, so objdiff finds no counterpart for the map's `fn_80457504`,
- *     `fn_8045759C` and `fn_8045774C` and scores all three 0 %: with the map renamed to this file's mangled
+ *   - **The residual is the scheduler, not symbol pairing.** `fragmentinfo` used to be spelled
+ *     `fragmentinfo_806F4B48` in the target object because the map marked it `scope:local` and dtk spells a
+ *     local symbol `<name>_<address>`; declaring it `scope:global` makes both sides say `fragmentinfo` (both
+ *     objects verified). **That change did not move the score** - `__register_fragment` is still 93.68 % - so
+ *     the name was a latent trap, not the cause. The cause is the order of two independent instructions at the
+ *     top of the loop: ours emits `li r6,0` then `addi r5,r5,0` (the `fragmentinfo` base), retail the other way
+ *     round, and nothing else differs (1132 B both). Eleven variants were tried this session and none flips it:
+ *     source shapes (`i = 0` at the declaration, `i` declared before `f`, separate `f = fragmentinfo`, a
+ *     `while` shape) and pragma *pairs* (`scheduling off/on`, `peephole off/on`, `opt level=4/3`,
+ *     `opt level=2/3`, `opt_propagation off/on`, `opt_lifetimes off/on`). This is playbook 22 territory - a
+ *     scheduler tie-break, not a source shape. Do **not** claim `.bss 0x806F4B48-0x806F4CC8`: it would add a
+ *     0x180 `.bss` this object does not have and drop the unit's `matched_data` (same decision as the lib's
+ *     unclaimed `__global_destructor_chain`, `.sbss` 0x80794DF8).
+ *   - The three walkers are `static`; the map's `fn_80457504`, `fn_8045759C` and `fn_8045774C` were renamed to
+ *     this file's mangled names and all three now measure 100 %. (Was: objdiff found no counterpart for the
+ *     map's names and scored all three 0 %: with the map renamed to this file's mangled
  *     names (a rename, not a source edit - the code is byte-identical either way) they measure 100.0, 100.0
  *     and 99.86 %, and the unit goes from 9.82 % (1/5 functions, 40/1132 B) to ~99.5 %. `fn_8045670C` has
  *     the same shape (see below).
