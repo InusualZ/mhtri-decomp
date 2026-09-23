@@ -191,12 +191,36 @@
  * Still open in the new bodies: 77FF8 has ~6 rows left in the `t`-vs-`arg1` test polarity; 7885C's five
  * `(s16)fn_802753E4(...)` call sites schedule `extsh r4,r3` before `mr r3,self` where retail copies the
  * result first (`mr r0,r3; mr r3,self; extsh r4,r0`); BCE0 keeps only a `v`/`id` callee-saved swap (retail
- * v=r6/id=r4, ours the mirror); 78590's `* 14` stays `mulli` where retail emits `slwi/subf/slwi` (MWCC folds
- * `* 7 * 2` before strength reduction); B0BC's six `clrlwi r0,r0,24` in front of the `stb`s into
+ * v=r6/id=r4, ours the mirror); B0BC's six `clrlwi r0,r0,24` in front of the `stb`s into
  * `q + 0x5E1` are a flag-level residual, not source-shaped - the peephole removes them but also turns
  * `extsb`/`clrlwi` + `cmpwi` into record forms retail does not have (whole-function `#pragma peephole on`:
  * 93.95 -> 92.28), and `+= (s8)7`, an `s8` field, a `u8` local and an explicit `(u8)` cast all measured
  * identically.
+ *
+ * Round 3 (worker `pl-act-09c6`, 80 byte-exact functions): 97.87 -> 98.39 %, seven more functions to 100 %,
+ * no flag change. The shapes that did it, in order of payoff:
+ *   * an `s16` *parameter* plus a compound assignment is what stores a field raw. With `s32 arg1` and
+ *     `field = field + arg1` MWCC materialises the `s16` at the store and reuses it for the following
+ *     compare; declaring the parameter `s16` and writing `field += arg1` stores the raw sum and extends only
+ *     for the compare (A044 82.2 -> 100, 76CE8 92.7 -> 100, CA48 94.0 -> 100, 76E08 98.0 -> 99.9,
+ *     78674 97.0 -> 99.0). The float form is the same: `field += (s16)f` (C8B4 95.6 -> 100, D5A4 96.3 ->
+ *     100), and `field -= (s16)v` stores raw where `field -= v` / `field = t` extend at the store (76E08);
+ *     `field--` stores raw where `field = field - 1` extends (B0BC 94.0 -> 95.7).
+ *   * a byte load followed by pointer formation has to use the *field* form, not the field's address: 79414
+ *     93.4 -> 100 and Get_Shell_rate_adj 95.0 -> 99.9 read `self->equipC[0]`/`self->equipC` where
+ *     `*((u8*)self + 488)` made MWCC form the pointer before the load.
+ *   * `(u32)` on an `s32`-returning helper turns `cmpwi` into retail's `cmplwi` (`(u32)Pl_master_ck`,
+ *     `(u32)fn_802753E4`): C8B4, 789EC.
+ *   * a negative 16-bit constant written `-0x1006` gives `li r4,-0x1006` where the unsigned `0xEFFA` needs
+ *     `lis/subi` (77C94 94.9 -> 97.1).
+ *   * 78590's `* 14`: `(x * 7) << 1` keeps MWCC's strength reduction (`slwi/subf/slwi`) where `x * 7 * 2`
+ *     folds to `mulli`, and `v <= t[5] ? 5 : 6` gives the negated branchless form (87.0 -> 99.2).
+ *   * a `u16` loop index cast to `s16` per iteration reproduces retail's `extsh` (7993C 95.4 -> 96.2);
+ *     local declaration order decides the stack slots (swapping the `VEC3`/buffer pair fixed C064 97.9 ->
+ *     98.1).
+ *   * two real layout bugs: 789EC stored `fn_802753E4(self, 5)` into `unk449` (0x449) where retail writes
+ *     0x44C; and `_MOVE_WORK`'s `unk44F[0x464 - 0x44F]` was mis-sized by one byte, so `unk464`/`unk466`
+ *     landed at 0x466/0x468 - renaming it `unk450[0x464 - 0x450]` puts them back at 0x464/0x466 (D0D4).
  *
  * Source-order caveat: the bodies were appended in per-batch address order, not as one address-ordered
  * list, so the file is *not* in `.text` order any more (Pl_attack_set_sub in particular sits in the
@@ -206,7 +230,11 @@
  *
  * Load-bearing source shapes (do not "simplify"):
  *   * an `s16`/`s8` *parameter* (not `s32` + a cast) is what keeps the raw register live for a store while
- *     the comparison still sign-extends at its use (79154, 79194, C89C).
+ *     the comparison still sign-extends at its use (79154, 79194, C89C); with a compound assignment it is
+ *     also what makes the store raw (A044, 76CE8, CA48, 76E08, 78674, D5A4).
+ *   * a `field += value` / `field -= (s16)value` compound assignment stores raw and sign-extends only at the
+ *     compare that follows; `field = field + value` and `s16 t = field + value; field = t;` extend at the
+ *     store and cost a row (78674, C8B4, D5A4).
  *   * a `u16` id equality needs a signed local (`s32 id = self->unk00C;`) to pair as `cmpwi` rather than
  *     `cmplwi` (A198, C030, 78C7C, 78CD0, A4EC, BCE0); the range tests stay `(u32)(id - lo) <= n`.
  *   * counted loops unroll with `mtctr`: `i < 10` -> by 1, `i < 24` -> by 4 (BCE0), `i < 32` -> by 8 with
@@ -462,7 +490,7 @@ u32 Pl_cat_skill_ck(_PLW*, u16);
 
 extern "C" u32 fn_8027681C(_PLW*);
 extern "C" void fn_80276868(_PLW*, s16);
-extern "C" void fn_80276CE8(_PLW*, s32);
+extern "C" void fn_80276CE8(_PLW*, s16);
 extern "C" u8 fn_802B0598(u8);
 extern "C" s32 fn_80331104(void);
 extern "C" void fn_8010D688(_PLW*);
@@ -597,24 +625,23 @@ extern "C" void fn_80276B58(_PLW* self, s32 arg1)
 }
 
 /* 0x80276CE8: adds a signed amount to the actor's stamina pool and clamps it, with a lower bound reset. */
-extern "C" void fn_80276CE8(_PLW* self, s32 arg1)
+extern "C" void fn_80276CE8(_PLW* self, s16 arg1)
 {
     if (Pl_master_ck(self) == 0) {
         return;
     }
-    if ((s16)arg1 < 0 && fn_8027681C(self) == 1) {
+    if (arg1 < 0 && fn_8027681C(self) == 1) {
         return;
     }
     {
-        s16 v = self->unk37A + (s16)arg1;
-        self->unk37A = v;
-        if (v <= 0x96) {
+        self->unk37A += arg1;
+        if (self->unk37A <= 0x96) {
             self->unk37A = 0x96;
-        } else if (v > 0x384) {
+        } else if (self->unk37A > 0x384) {
             self->unk37A = 0x384;
             self->unk37C = 0x2A30;
         }
-        v = self->unk37A;
+        s16 v = self->unk37A;
         if (self->unk378 > v) {
             self->unk378 = v;
         }
@@ -675,14 +702,13 @@ extern "C" void fn_80276E08(_PLW* self)
                 if (Pl_Skill_ck(self, 0x47) == 1) {
                     v += 1;
                 } else if (Pl_Skill_ck(self, 0x46) == 1 && (self->unk020 & 1) == 0) {
-                    v += 1;
+                    v = (s16)(v + 1);
                 }
             }
         }
         if ((s16)v > 0) {
-            s32 t = self->unk37C - v;
-            self->unk37C = t;
-            if ((s16)t <= 0) {
+            self->unk37C -= (s16)v;
+            if ((s16)self->unk37C <= 0) {
                 if (fn_8027681C(self) == 1) {
                     self->unk37C = 1;
                     return;
@@ -859,10 +885,10 @@ extern "C" void fn_8027A000(_PLW* self, s32 arg1)
 }
 
 /* 0x8027A044: adds a signed amount to the actor's aim angle and clamps it to +/-90 degrees. */
-extern "C" void fn_8027A044(_PLW* self, s32 arg1)
+extern "C" void fn_8027A044(_PLW* self, s16 arg1)
 {
-    self->unk5E8 = self->unk5E8 + arg1;
-    if ((s16)arg1 >= 0) {
+    self->unk5E8 += arg1;
+    if (arg1 >= 0) {
         if (self->unk5E8 >= 8192) {
             self->unk5E8 = 8192;
         }
@@ -1335,9 +1361,9 @@ extern "C" u8* fn_80279414(_PLW* self, u8 arg1)
     if (p != 0) {
         return p;
     }
-    u8 n = *((u8*)self + 488);
+    u8 n = self->equipC[0];
     if (n == 12) {
-        u8* q = fn_80279360(fn_8027ED18((u8*)self + 488), arg1);
+        u8* q = fn_80279360(fn_8027ED18(self->equipC), arg1);
         if (q != 0) {
             return q;
         }
@@ -1432,13 +1458,13 @@ extern "C" void fn_8027CFC0(_PLW* self)
 {
     if (Pl_master_ck(self) != 0 && self->unk404 > 0) {
         if (Pl_dm_condition_ck(self, 2) == 1) {
-            self->unk404 = self->unk404 - 90;
+            self->unk404 = (s16)(self->unk404 - 90);
         } else {
-            self->unk404 = self->unk404 - 120;
+            self->unk404 = (s16)(self->unk404 - 120);
         }
         if (self->unk404 <= 0) {
             self->unk404 = 0;
-            self->unk3DC &= 0x3FFFFFFF;
+            self->unk3DC &= 0xFFFFFFFC;
         }
     }
 }
@@ -1473,7 +1499,7 @@ extern "C" void fn_8027D5A4(_PLW* self, s32 arg1)
             f *= lbl_8079A0FC;
         }
     }
-    self->unk36C += (s32)f;
+    self->unk36C += (s16)f;
     if (self->unk36C < 0) {
         self->unk36C = 0;
     } else if (self->unk36C > 100) {
@@ -1516,13 +1542,13 @@ extern "C" s32 fn_8027CE74(_PLW* self)
 }
 
 /* 0x8027CA48: applies a charge delta to the weapon's charge timer. */
-extern "C" void fn_8027CA48(_PLW* self, s32 arg1)
+extern "C" void fn_8027CA48(_PLW* self, s16 arg1)
 {
     if (self->unk002 != 7) {
         return;
     }
     self->unk386 += arg1;
-    if ((s16)arg1 >= 0) {
+    if (arg1 >= 0) {
         self->unk46A = 1800;
         if (self->unk386 >= 100) {
             self->unk386 = 100;
@@ -1576,8 +1602,8 @@ extern "C" s32 fn_8027D40C(_PLW* self)
 /* 0x8027CD10: builds the gunner's aim matrix from its rotation and gun position. */
 extern "C" void fn_8027CD0C(_PLW* self, nw4r::math::MTX34* mtx)
 {
-    nw4r::math::VEC3 v;
     _CP_VECTOR pos;
+    nw4r::math::VEC3 v;
     fn_80043EA8(&v);
     fn_800FC0D4(&pos, (u8*)self + 84);
     f32 t = (f32)self->unk64F / lbl_8079A0D0;
@@ -1649,11 +1675,11 @@ extern "C" void fn_8027C8B4(_PLW* self, s32 arg1)
             f *= lbl_8079A0FC;
         }
     }
-    self->unk384 += (s32)f;
+    self->unk384 += (s16)f;
     if (f >= lbl_8079A084) {
         if (self->unk384 >= 100) {
             self->unk384 = 100;
-            if (Pl_master_ck(self) == 1 && self->unk468 == 0) {
+            if ((u32)Pl_master_ck(self) == 1 && self->unk468 == 0) {
                 fn_80114C20(self, 1);
             }
             fn_8027C89C(self, 900);
@@ -1722,7 +1748,7 @@ extern "C" s32 fn_80278590(_PLW* self)
         return 0;
     }
     s16* t = (s16*)(lbl_805BFFA8[self->unk002]
-                    + *((u8*)self + 0x56A) * 7 * 2);
+                    + ((*((u8*)self + 0x56A) * 7) << 1));
     s16 v = *((s16*)self + 0x2B6);
     if (v <= t[0]) {
         return 0;
@@ -1739,7 +1765,7 @@ extern "C" s32 fn_80278590(_PLW* self)
     if (v <= t[4]) {
         return 4;
     }
-    return 5 + (v > t[5]);
+    return v <= t[5] ? 5 : 6;
 }
 
 /* 0x802789EC: resets the actor's whole action state and re-applies the armour skill values. */
@@ -1799,9 +1825,9 @@ extern "C" void fn_802789EC(_PLW* self, s32 arg1)
     *(s16*)((u8*)self + 1058) = 0;
     *(s16*)((u8*)self + 1114) = 0;
     *(s16*)((u8*)self + 1116) = 0;
-    if (Pl_master_ck(self) == 1 && (arg1 == 0 || Pl_cat_skill_ck(self, 39) == 1)) {
+    if ((u32)Pl_master_ck(self) == 1 && (arg1 == 0 || Pl_cat_skill_ck(self, 39) == 1)) {
         self->unk448 = (s8)fn_802753E4(self, 4);
-        self->unk449 = (s8)fn_802753E4(self, 5);
+        self->unk44C = (s8)fn_802753E4(self, 5);
     }
     fn_80278D1C(self);
 }
@@ -1826,8 +1852,8 @@ extern "C" u32 fn_8027BCE0(_PLW* self)
 f32 Get_Shell_rate_adj(_PLW* self, u8 arg1)
 {
     f32 v = (f32)*(s16*)(fn_8027ED18((u8*)self + 464) + 10);
-    if (*((u8*)self + 488) == 12) {
-        v = v * (f32)*(s16*)(fn_8027ED18((u8*)self + 488) + 10) / lbl_8079A0D0;
+    if (self->equipC[0] == 12) {
+        v = v * (f32)*(s16*)(fn_8027ED18(self->equipC) + 10) / lbl_8079A0D0;
     }
     return v / lbl_8079A0D0;
 }
@@ -1847,7 +1873,7 @@ extern "C" s32 fn_80277C94(_PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3
     v.x = v.x + self->unk03C;
     v.y = v.y + self->unk040;
     v.z = v.z + self->unk044;
-    f32 h = GetGroundHit2(&v, 0xEFFA, self->unk016, &hit);
+    f32 h = GetGroundHit2(&v, -0x1006, self->unk016, &hit);
     f32 c = self->unk040 + arg2;
     if (h >= c && h <= arg3 + c && hit != 0) {
         out->x = h;
@@ -2323,12 +2349,11 @@ extern "C" void fn_8027B0BC(_PLW* self)
     if (q == 0) {
         return;
     }
-    s16 t5c2 = *(s16*)((u8*)self + 0x5C2);
-    if (t5c2 != 0) {
-        *(s16*)((u8*)self + 0x5C2) = t5c2 - 1;
+    if (*(s16*)((u8*)self + 0x5C2) != 0) {
+        (*(s16*)((u8*)self + 0x5C2))--;
     }
     if (*(s16*)((u8*)self + 0x65A) != 0) {
-        *(s16*)((u8*)self + 0x65A) = *(s16*)((u8*)self + 0x65A) - 1;
+        (*(s16*)((u8*)self + 0x65A))--;
         if (*(s16*)((u8*)self + 0x65A) == 0) {
             *(u8*)((u8*)self + 0x659) = 0;
         }
@@ -2614,7 +2639,7 @@ struct _MOVE_WORK {
     s16 unk44A;
     u8 unk44C[0x44E - 0x44C];
     s16 unk44E;
-    u8 unk44F[0x464 - 0x44F];
+    u8 unk450[0x464 - 0x450];
     s16 unk464;
     s16 unk466;
 };
@@ -3508,7 +3533,7 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
                 if (v == -1 && (ran_suu__Fl(1) & 1) != 0) {
                     return;
                 }
-                v = (s16)((v + (s32)((u32)v >> 31)) >> 1);
+                v = (s16)((((s32)((u32)v >> 31)) + v) >> 1);
                 if (v == 0) {
                     v = -1;
                 }
@@ -3516,9 +3541,8 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
                 v = (s16)(v * 2);
             }
         }
-        s16 t = *(s16*)((u8*)self + 0x56C) + v;
-        *(s16*)((u8*)self + 0x56C) = t;
-        if (t <= 0) {
+        *(s16*)((u8*)self + 0x56C) += v;
+        if (*(s16*)((u8*)self + 0x56C) <= 0) {
             *(s16*)((u8*)self + 0x56C) = 0;
         }
         s16 lim = *(s16*)((u8*)self + 0x56E);
@@ -3556,7 +3580,8 @@ extern "C" u16 fn_8027993C(_PLW* self, u16 arg1, u8 arg2)
         fn_8004A1F8(ring + i * 4, (u8*)self + 0x278 + i * 4);
     }
     for (i = 0; i < 9; i++) {
-        fn_8004A1F8(ring + (i + 0x18) * 4, (u8*)self + 0x278 + (i + 0x1A) * 4);
+        s16 j = (s16)i;
+        fn_8004A1F8(ring + (j + 0x18) * 4, (u8*)self + 0x278 + (j + 0x1A) * 4);
     }
     slot = arg1;
     if ((slot & 0x80) != 0) {
@@ -3844,10 +3869,10 @@ extern "C" void fn_8027AC2C(_PLW* self, u8 arg1, u8 arg2)
  * hit matrix and the actor's world offset. */
 extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
 {
-    u8 buf[12];
     nw4r::math::VEC3 v;
-    u8 m2[0x30];
+    u8 buf[12];
     nw4r::math::MTX34 m;
+    u8 m2[0x30];
     s32 part;
     fn_8005050C(&m);
     fn_8005050C(m2);
