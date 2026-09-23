@@ -253,6 +253,37 @@ def save_registry(main: str, data: dict) -> None:
         json.dump(data, fh, indent=1, sort_keys=True)
 
 
+def registry_record(main: str, unit: str) -> dict:
+    """The claim record for `unit`, found under *either* spelling of its name.
+
+    The registry key is the unit's name without its source extension (`norm_unit`), but a claim written before
+    that rule existed can still carry the extension (`Gecko/Gecko_ExceptionPPC.cp`). Look the raw spelling up
+    first, then the normalized one, then scan: a caller that says `Camellia/camellia.c` and a registry that
+    says `Camellia/camellia` (or the reverse) must reach the same record - otherwise the branch - the lock -
+    looks missing and a worker's outbox is read from the wrong slug.
+    """
+    registry = load_registry(main)
+    unit = unit.strip("/")
+    if unit in registry:
+        return registry[unit]
+    normalized = norm_unit(unit)
+    if normalized in registry:
+        return registry[normalized]
+    for key, record in registry.items():
+        if norm_unit(key) == normalized:
+            return record
+    return {}
+
+
+def claim_branch(main: str, unit: str) -> str:
+    """The branch holding `unit`'s claim - the stored branch when there is one, else `branch_for(unit)`.
+
+    Prefer the stored value: the branch is the claim's identity and a round may have named it with its own
+    suffix, so recomputing it from the unit path can miss a live branch.
+    """
+    return (registry_record(main, unit).get("branch") or branch_for(norm_unit(unit.strip("/"))))
+
+
 def branch_exists(main: str, branch: str) -> bool:
     out = subprocess.run(["git", "show-ref", "--verify", "--quiet", "refs/heads/%s" % branch],
                          cwd=main, capture_output=True)
@@ -282,8 +313,12 @@ def slug_of_branch(branch: str | None) -> str | None:
 
 
 def claim_slug(main: str, unit: str) -> str | None:
-    """The handoff slug of the unit's active claim, or `None` when the unit is unclaimed."""
-    return slug_of_branch((load_registry(main).get(unit.strip("/")) or {}).get("branch"))
+    """The handoff slug of the unit's active claim, or `None` when the unit is unclaimed.
+
+    Spelled either way: `registry_record` finds the entry whether the caller or the registry key carries the
+    source extension.
+    """
+    return slug_of_branch(registry_record(main, unit).get("branch"))
 
 
 def handoff_slug(main: str, unit: str) -> str:
@@ -307,7 +342,12 @@ def notes_path(main: str, unit: str) -> str:
 
 
 def ack_path(main: str, unit: str) -> str:
-    """The heartbeat, keyed by the *unit*: `claims.py ack` writes it, so the brief has to name this file."""
+    """The heartbeat, keyed by the *unit*: `claims.py ack` writes it, so the brief has to name this file.
+
+    Deliberately unit-keyed, not claim-keyed: a round's branch suffix must not move the heartbeat, or a
+    worker's own ack would land somewhere the stall check is not looking. The worker acks with the spelling
+    its brief names, which is the spelling the claim was made with.
+    """
     return os.path.join(main, ".pi", "ack", slug(unit) + ".json")
 
 
@@ -661,6 +701,25 @@ def selftest() -> int:
         check("registry starts empty", load_registry(main), {})
         save_registry(main, {"Pl/pl_act": {"branch": "worker/pl-act-1234", "claimed_at": "2026-01-01T00:00:00"}})
         check("registry round-trips", load_registry(main)["Pl/pl_act"]["branch"], "worker/pl-act-1234")
+        # the registry key may or may not carry the source extension, and the caller may spell it either way:
+        # both must reach the same record, branch, outbox and ack (the 2026-09-23 `land.py --units` failure)
+        save_registry(main, {"Camellia/camellia": {"branch": "worker/camellia-67ed"},
+                             "Gecko/Gecko_ExceptionPPC.cp": {"branch": "worker/gecko-exceptionppc-313d"}})
+        check("a registry record is found under the raw key",
+              registry_record(main, "Gecko/Gecko_ExceptionPPC.cp")["branch"], "worker/gecko-exceptionppc-313d")
+        check("and under the extensionless spelling",
+              registry_record(main, "Gecko/Gecko_ExceptionPPC")["branch"], "worker/gecko-exceptionppc-313d")
+        check("an unknown unit has no record", registry_record(main, "Nope/nothing"), {})
+        check("the claim branch prefers the stored value",
+              claim_branch(main, "Gecko/Gecko_ExceptionPPC"), "worker/gecko-exceptionppc-313d")
+        check("the claim branch falls back to a computed branch for an unclaimed unit",
+              claim_branch(main, "RSO/runtime"), branch_for("RSO/runtime"))
+        check("claim_slug ignores the spelling",
+              claim_slug(main, "Camellia/camellia.c"), claim_slug(main, "Camellia/camellia"))
+        check("the outbox path ignores the spelling",
+              outbox_path(main, "Camellia/camellia.c"), outbox_path(main, "Camellia/camellia"))
+        check("the outbox is the stored branch's slug",
+              os.path.basename(outbox_path(main, "Camellia/camellia")), "camellia-67ed.json")
 
     # ack/status/timeout against a throwaway registry
     import tempfile as _tf
