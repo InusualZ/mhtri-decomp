@@ -70,6 +70,15 @@ one built after it (the re-split rebuilds the object at its new path). The "befo
 into `MAIN/.pi/promote/` by `apply` (and by `check --save`) because a clean `build/` would otherwise
 lose it. It exits non-zero on any meaningful difference.
 
+`check` also refuses to pass a unit that is **not in the build graph**. Bytes are not membership: a
+stale `build/RMHE08/src/<unit>.o` from an earlier build compares clean while the unit is missing from
+`build/RMHE08/config.json` and `build.ninja` - which is exactly what a promotion whose registration did
+not reach the build looks like, and it makes the unit disappear from `report.json`. The graph gate checks
+the three places the unit *key* must agree: the source file, the split's `config.json`, and the
+`build.ninja` rule for the object. `ninja` (which re-splits before re-running `configure.py`) is the fix;
+running `configure.py` *before* the split is what produces the stale state, so `apply` no longer suggests
+it.
+
 `plan` also reports two consequences that are not edits: the source leaves the `src/auto/` rule-7
 exemption, so every `fn_XXXXXXXX` left in it becomes a `stylelint.py` finding at the new path (which
 `land.py` refuses a batch for adding) - rename them with `--symbol old=new`; and a live claim on the
@@ -104,6 +113,7 @@ MAPFILE = "config/RMHE08/symbols.txt"
 SPLITS = "config/RMHE08/splits.txt"
 CONFIGURE = "configure.py"
 BUILD_NINJA = "build.ninja"
+BUILD_CONFIG = "build/RMHE08/config.json"
 OBJECT_DIR = "build/RMHE08/src"
 SCRATCH = ".pi/promote"
 POOL = "tools/units/briefs/pool"
@@ -345,6 +355,52 @@ def ninja_unit_flags(path: Path, out_obj: str) -> dict | None:
     return None
 
 
+def build_config_units(path: Path) -> set[str] | None:
+    """Every unit name in the split's `config.json` - the DOL plus every module - or None.
+
+    This is the file `dtk dol split` writes from `splits.txt` and the one `configure.py` reads to
+    decide which units get a build rule: a unit whose key is not in here has no rule, however correct
+    its `Object(...)` line is. None means the file is absent or unreadable, i.e. the tree has not been
+    split yet.
+    """
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(read_text(path))
+    except ValueError:
+        return None
+    names: set[str] = set()
+    for module in [data, *(data.get("modules") or [])]:
+        for unit in module.get("units") or []:
+            if unit.get("name"):
+                names.add(unit["name"])
+    return names
+
+
+def build_graph(ctx: "Ctx", unit: str, ext: str) -> dict:
+    """Whether `unit` is actually in the build graph, not merely present as bytes.
+
+    A promotion renames the unit *key*, and the key has to agree in three places: the source file on
+    disk, `splits.txt` (which the split turns into `build/RMHE08/config.json`) and `configure.py`
+    (which turns it into a `build.ninja` rule). `check` compares object bytes, and those bytes exist
+    whether or not the unit is in the graph - a stale `build/RMHE08/src/<unit>.o` from an earlier build
+    passes a byte compare while the unit is missing from the report, which is the bug this catches.
+    """
+    stem = unit[: -len(ext)] if ext else unit
+    obj = ctx.object_dir / (stem + ".o")
+    units = build_config_units(ctx.build_config)
+    src_ok = (ctx.src / unit).is_file()
+    config_ok = units is not None and unit in units
+    ninja_ok = ninja_unit_flags(ctx.build_ninja, ctx.rel(obj)) is not None
+    missing = [name for name, ok in (("the source file", src_ok),
+                                     ("%s" % ctx.rel(ctx.build_config), config_ok),
+                                     ("a %s rule" % ctx.rel(ctx.build_ninja), ninja_ok)) if not ok]
+    return {"unit": unit, "object": ctx.rel(obj), "source": src_ok, "config_json": config_ok,
+            "build_ninja": ninja_ok, "config_units": None if units is None else len(units),
+            "in_graph": src_ok and config_ok and ninja_ok, "missing": missing,
+            "config_path": ctx.rel(ctx.build_config), "ninja_path": ctx.rel(ctx.build_ninja)}
+
+
 # --------------------------------------------------------------------------------------------------
 # ELF - the byte-identity comparator
 # --------------------------------------------------------------------------------------------------
@@ -491,6 +547,7 @@ class Ctx:
     pool: Path = field(default=None)            # type: ignore[assignment]
     mapfile: Path = field(default=None)         # type: ignore[assignment]
     build_ninja: Path = field(default=None)     # type: ignore[assignment]
+    build_config: Path = field(default=None)    # type: ignore[assignment]
     object_dir: Path = field(default=None)      # type: ignore[assignment]
     scratch: Path = field(default=None)         # type: ignore[assignment]
 
@@ -502,6 +559,7 @@ class Ctx:
         self.pool = self.pool or r / POOL
         self.mapfile = self.mapfile or r / MAPFILE
         self.build_ninja = self.build_ninja or r / BUILD_NINJA
+        self.build_config = self.build_config or r / BUILD_CONFIG
         self.object_dir = self.object_dir or r / OBJECT_DIR
         self.scratch = self.scratch or r / SCRATCH
 
@@ -622,7 +680,12 @@ def plan(ctx: Ctx, unit: str, name: str, module: str, lib: str | None,
     old_obj = ctx.object_dir / (registered[: -len(old_ext)] + ".o")
     new_obj = ctx.object_dir / (new_unit[: -len(ext)] + ".o")
     src_ninja = ninja_unit_flags(ctx.build_ninja, ctx.rel(old_obj)) or {}
-    cmd_before = {"mw_version": normalise_path(src_ninja.get("mw_version")) or "?",
+    # `build.ninja` can be stale (the last `configure.py` ran against the previous split), so the
+    # unit's own lib in `configure.py` is the fallback for the version - a new lib must never be
+    # written with an unknown one, or the compile rule it produces names a compiler that does not
+    # exist ("?") and the promoted unit fails to build permanently.
+    lib_mw = normalise_path(libs[src_lib].get("mw_version")) if src_lib in libs else ""
+    cmd_before = {"mw_version": normalise_path(src_ninja.get("mw_version")) or lib_mw or "?",
                   "cflags": src_ninja.get("cflags", ""), "lang": lang_flag(old_ext),
                   "group": (libs[src_lib]["cflags"] if src_lib in libs else None),
                   "source": "auto lib", "from": registered}
@@ -834,9 +897,12 @@ def human_plan(p: dict, ctx: Ctx) -> None:
     print("             after  %s (not built yet - the re-split builds it)" % r(p["new_obj"]))
     print("  check      python tools/units/promote.py check %s --name %s --module %s"
           % (p["unit"], p["name"], p["module"] or "."))
-    print("next: python configure.py && ninja   (one re-split for the whole batch of promotions)")
+    print("next: ninja build/RMHE08/report.json   (re-splits first, then re-runs configure.py, "
+          "compiles and reports)")
+    print("      do not run configure.py before the split: it reads the *old* "
+          "build/RMHE08/config.json, so the new unit gets no build rule and vanishes from the report")
     print("      ninja build/RMHE08/ok        (the gate)")
-    print("      the `check` above            (byte-identity of the object across the move)")
+    print("      the `check` above            (byte-identity + the unit is in the build graph)")
 
 
 # --------------------------------------------------------------------------------------------------
@@ -870,6 +936,11 @@ def configure_move(p: dict) -> str:
     joined = p["conf_nl"].join(lines)
     if p["creating_lib"]:
         s = p["new_lib_settings"]
+        if not s["mw_version"] or s["mw_version"] == "?":
+            raise sf.AnchorError(
+                "refusing: the new lib %r would be written with an unknown mw_version (%r) - the "
+                "unit's own lib in configure.py has none either; run the re-split first"
+                % (p["lib"], s["mw_version"]))
         block = new_lib_block(p["lib"], s["mw_version"], s["cflags"], s["category"],
                               "            " + new_row + "\n",
                               "Promoted from %s (docs/plan.md: an auto unit stops being scaffolding)."
@@ -989,7 +1060,8 @@ def apply_plan(ctx: Ctx, p: dict, dry_run: bool = False, allow_claimed: bool = F
     print("promoted %s -> %s (lib %s)" % (p["unit"], p["new_unit"], p["lib"]))
     if snap:
         print("object before: %s  (the `check` baseline)" % ctx.rel(snap))
-    print("next: python configure.py && ninja   (one re-split)   then   ninja build/RMHE08/ok")
+    print("next: ninja build/RMHE08/report.json   (re-splits first, then re-runs configure.py and "
+          "reports)")
     print("      python tools/units/promote.py check %s --name %s --module %s"
           % (p["unit"], p["name"], p["module"] or "."))
     return 0
@@ -1000,7 +1072,13 @@ def apply_plan(ctx: Ctx, p: dict, dry_run: bool = False, allow_claimed: bool = F
 # --------------------------------------------------------------------------------------------------
 def check(ctx: Ctx, p: dict, before: str | None, after: str | None, save: bool,
           json_out: bool) -> int:
-    """Compare the object before and after the promotion - the byte-identity gate."""
+    """The promotion's two gates: the unit is *in the build graph*, and the bytes survive the move.
+
+    The byte compare alone is not enough: `build/RMHE08/src/<unit>.o` can exist from an earlier build
+    while the unit is missing from `build/RMHE08/config.json`/`build.ninja`/`report.json` (the bug
+    that let a promoted unit vanish). So the graph is checked first, and it is checked even when the
+    object exists - a stale object is exactly the false pass this gate exists to stop.
+    """
     snap = ctx.scratch / (p["unit"].replace("/", "_") + ".before.o")
     if save:
         if snapshot(ctx, p):
@@ -1011,15 +1089,32 @@ def check(ctx: Ctx, p: dict, before: str | None, after: str | None, save: bool,
         print("no 'before' object: %s and %s are both absent - snapshot it with `check --save` "
               "before the re-split, or pass --before" % (ctx.rel(b), ctx.rel(p["old_obj"])))
         return 2
+    graph = build_graph(ctx, p["new_unit"], p["ext"])
+    if not graph["in_graph"]:
+        if json_out:
+            print(json.dumps({"verdict": "not-in-build", "unit": p["new_unit"],
+                              "build_graph": graph}, indent=2))
+        else:
+            print("check %s: NOT IN THE BUILD GRAPH" % p["new_unit"])
+            print("  missing: %s" % ", ".join(graph["missing"]))
+            print("  object %s%s"
+                  % (graph["object"], " exists (stale - that is what a byte compare would pass on)"
+                     if (ctx.root / graph["object"]).is_file() else " is not built"))
+            print("  run the re-split:  ninja build/RMHE08/report.json   (re-splits first, then re-runs "
+                  "configure.py, compiles and reports)")
+        return 2
     if not a.is_file():
-        print("no 'after' object: %s is not built yet - the re-split builds it (`python configure.py "
-              "&& ninja`), then re-run this check" % ctx.rel(a))
+        print("no 'after' object: %s is not built yet - the re-split builds it (`ninja`, which "
+              "re-splits first), then re-run this check" % ctx.rel(a))
         return 2
     res = compare_objects(b, a)
+    res["build_graph"] = graph
     if json_out:
         print(json.dumps(res, indent=2))
     else:
         print("check %s -> %s" % (ctx.rel(b), ctx.rel(a)))
+        print("  in build graph: %s" % ("yes" if graph["in_graph"] else "NO (%s)"
+                                         % ", ".join(graph["missing"])))
         for name, sa, sb, verdict in res["sections"]:
             print("  %-14s %-8s %-8s %s" % (name, "-" if sa is None else "%d" % sa,
                                             "-" if sb is None else "%d" % sb, verdict))
