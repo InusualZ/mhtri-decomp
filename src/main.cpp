@@ -59,22 +59,25 @@
  *     (`SetSystemVcnt__Fl`, `change_widemode_req__FUc`, `get_tv_mode__Fv`, `hbm_InitGX__Fv` are the mangled
  *     ones and are written by their *source* names so the compiler emits the map's spelling), so a plain C++
  *     definition of `fn_8003F200` would emit `fn_8003F200__Fv` and objdiff would pair nothing.
- *   * `#pragma peephole off` is scoped, and scoped per statement range, because the peephole is what makes
- *     three different retail shapes disappear: it deletes the dead sign-extend of `change_widemode_req`'s
- *     byte parameter, fuses that function's `srwi`+`clrlwi` into one `rlwinm`, and (the same fusion) turns
- *     `clrlwi r0,r0,31; cmpwi r0,0` into the record form `clrlwi.` in `fn_8003FE30`. It also strips the
- *     `clrlwi r0,r3,24` that retail keeps in front of `stb` in `fn_8003F730` and at the head of
+ *   * `#pragma peephole off` is scoped, and scoped per statement range. The peephole is what removes
+ *     several retail shapes: the dead sign-extend of `change_widemode_req`'s byte parameter, that function's
+ *     `srwi`+`clrlwi` fusion into one `rlwinm`, `clrlwi r0,r0,31; cmpwi r0,0` -> the record form `clrlwi.` in
+ *     `fn_8003FE30`, the `clrlwi r0,r3,24` retail keeps in front of `stb` in `fn_8003F730`, and `main`'s
+ *     redundant `clrlwi`s in front of the two `sth r0,0x3e(r4)` (with the whole-unit `-opt nopeephole` those
+ *     two appear and `main` drops to 94.49 %). It also fuses the *second* `lis r0,0x4330` of the two
+ *     int->float conversion temps in `fn_8003FEBC`/`fn_8003FF98` away, so those two run with it off - each is
+ *     then the target's own 220 B/428 B (98.00 -> 99.82 %, 99.02 -> 99.95 %).
+ *   * a pragma region is **not local**: moving that `reset` down from before `fn_8003FEBC` to before
+ *     `fn_80040144` also flipped `fn_8004029C`/`fn_80040360` from our coalesced `lis r31` to retail's
+ *     scratch `lis r3` (99.52/99.47 -> 100 %) without touching any other function. Adding anything earlier
+ *     in this file can move a later function's register tie-break, so re-measure the whole unit.
+ *   * the reset can also sit *inside* a function: `fn_8003F9E4`'s head needs the truncation kept (peephole
+ *     off) but its `Screen_w` tail and the trailing `stb r31, lbl_80794791` need it removed (peephole on).
+ *     `#pragma peephole off` is the only spelling this compiler honours (`opt_peephole`/`peep` parse but do
+ *     nothing).
  *   * the unit's extab/extabindex are emitted by the lib's -Cpp_exceptions on: the target carries extab 0x90 +
  *     extabindex 0xD8 (18 unwind-only records, one per framed function) and our object emitted none. With the
  *     flag both sections equal the target's exactly and no function's .text moves.
- *     `fn_8003F9E4` - while the rest of the unit needs the peephole *on* (it is what removes `main`'s
- *     redundant `clrlwi`s in front of the two `sth r0,0x3e(r4)`; with the whole-unit `-opt nopeephole` those
- *     two appear and `main` drops to 94.49 %). `fn_8003F9E4` shows why the reset can sit *inside* a function:
- *     its head needs the truncation kept (peephole off) but the `Screen_w` tail and the trailing
- *     `stb r31, lbl_80794791` need it removed (peephole on), and both halves measure exactly when the reset
- *     is placed between them (85.70 % with the pragma over the whole body, 95.73 % with the mid-function
- *     reset). `#pragma peephole off` is the only spelling this compiler honours (`opt_peephole`/`peep` parse
- *     but do nothing).
  *   * `main`'s loop shape - four per-frame calls, three `system_w` byte polls, the two latch polls, the three
  *     function-pointer calls through `system_w`, and the two trailing `if`s - is what puts every `continue`
  *     on the loop head and keeps `&system_w` and the constant `1` in r31/r30.
@@ -91,6 +94,16 @@
  *     rematerialise it into a volatile register: `GXRenderModeObj* mode = Rmode;` in `fn_8003FEBC`
  *     (92.00 -> 98.00 %) and `u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;` inside `fn_80040144`'s wait loops
  *     (argument-setup order: retail computes the tick count before the `li r3,0`).
+ *   * the `Screen_w` block reads and writes a *local* base pointer (`ScreenWork* sw = &Screen_w;`) in both
+ *     `main` and `fn_8003F9E4`: one live range across the `if`/`else` merge keeps the base in retail's r4 for
+ *     the tail stores instead of re-materialising `lis r3; addi r3` there (+2 instructions, the whole 8 B
+ *     overshoot of both functions). `main` 96.70 -> 99.91 %, `fn_8003F9E4` 95.73 -> 100 %.
+ *   * `GXSetCopyClear` takes its 4-byte clear colour **by value** (`GXColor`), not by pointer. With the
+ *     by-value aggregate MWCC passes its address and keeps the zero in a callee-saved register from the
+ *     definition to the call (`li r31,0` at the top, `stw r31,8(r1)` at the call), which is retail's
+ *     `fn_8003FCCC`: 0x30 frame with r31 saved. Taking `&clearColor` explicitly instead makes the local
+ *     memory-resident and stores it at the definition (0x20 frame, 8 B short). The SDK's own `__GXInitGX`
+ *     (0x804B3C38) shows the same shape.
  *   * `fn_8003F620`'s second framebuffer is written as `lbl_80794770[1] = (u32)lbl_80794770[0] + 0xA5000;`
  *     - reading the base back through the global keeps it in a register and gives retail's
  *     `addis`+`addi` delta pair; folding the two literals costs 4 ARG rows (98.92 -> 100.00 %).
@@ -103,44 +116,31 @@
  * F50C, F524, F52C, F554, F564, F58C, F620, F728, F730, F940, F9E4, FBE8, FBFC, FC04, FC48, FC50, FC58,
  * FC5C, FC64, FCC4, FCCC, FE20, FE24, FE30, FEBC, FF98, 40144, 4026C, 40274, 40280, 4028C, 4029C,
  * get_ScreenSize, 4030C, 40360, 403AC, ck_WideMode, 403DC, 403F8, 40414, 4041C, 40420, 40460. Nothing is
- * left to add: 36 of the 47 are at 100 % and the residuals below are what keeps the rest off 100 %.
+ * left to add: 39 of the 47 are at 100 % and the residuals below are what keeps the rest off 100 %.
  *
- * Residual (all measured with the committed `cflags_main`, i.e. `-O3 -inline noauto`):
- *   * `fn_80040360` 99.47 % - 76 B both, 19 instructions, rows 6-7 only: retail `lis r4, Screen_w@ha;`
- *     `addi r31, r4, Screen_w@l`, ours `lis r31, Screen_w@ha; addi r31, r31, Screen_w@l` - the same
- *     lis-scratch-vs-coalesced residual as `fn_8004029C`. Six source shapes tried (a named `ScreenWork*`
- *     local, a `u32` base local, a `char*` base local, an `f32*` parameter, a `_MH_VEC2*` source local, and
- *     two spelled-out `(char*)&Screen_w + off` expressions), all byte-identical, so it is an allocator
- *     tie-break, not source-shaped.
+ * Residual (all measured with the committed `cflags_main`, i.e. `-O3 -inline noauto`; the five functions
+ * whose `.text` sizes were wrong now match the target's size exactly):
+ *   * the pool `lfd` ARG rows - `main` 99.91 %, `fn_8003FEBC` 99.82 %, `fn_8003FF98` 99.95 %,
+ *     `fn_8003FCCC` 99.94 %, `fn_8004030C` 99.76 %: the int->float conversions `lfd` the target's
+ *     `lbl_80795AC0`/`lbl_80795AD0` (the signed/unsigned 2^52 doubles) where our object loads its own
+ *     synthesised pool entry (`@91`/`@302`). Our `.sdata2` is 0x10 B - those two f64s - against the target's
+ *     0x38 B (the 8 f32 constants at 0x80795AA0-0x80795ABC, `lbl_80795AC0`, 0.0f/1.0f at AC8/ACC,
+ *     `lbl_80795AD0`), so the section and the five relocations cannot pair yet. The labels are declared,
+ *     never defined; defining the twelve constants in retail order is the next step here, but it is a data
+ *     claim and has not been measured (playbook 23).
+ *   * `main` 99.91 % - 704 B, one `lis` left: retail `lis r3, system_w@ha; addi r31, r3, system_w@l`, ours
+ *     `lis r31, system_w@ha; addi r31, r31, system_w@l` - the same scratch-vs-coalesced tie-break as
+ *     `fn_8003FC64`.
  *   * `fn_8003F58C` 90.81 % - 148 B both. Two argument-setup order swaps (`mr r5,r3` before `mr r6,r4`;
  *     `addi r8,r4,0x7314` before `li r7,0`) and one coalesced `lis r9` where retail uses a scratch `r4`.
- *   * `main` 96.70 % - 704 B target vs 712 B ours. First divergence is instruction 19: retail emits
- *     `lis r3, Screen_w@ha; addi r4, r3, Screen_w@l; li r0,640; sth r0,Screen_w@l(r3); li r0,448;
- *     sth r0,2(r4)`, we emit `li r0,640` one slot earlier and the `addi r4` one slot later (same six
- *     instructions, scheduler tie-break). The other two are allocator tie-breaks of the same kind: the
- *     `&Screen_w` base is re-materialized into r3 at the `if/else` merge (+2 instructions, `main`'s whole
- *     8 B overshoot) where retail keeps r4, and the pool `lfd` above. Source variants tried for the
- *     re-materialization: a local `s32 vcnt` temp, the conversion reading `Screen_w.w16` back, explicit
- *     `(s32)`/`(char)` casts - no change.
  *   * `fn_8003F730` 96.25 % - 528 B both, 8 ARG rows and nothing else. All of them are the r30/r31 split
  *     between the `arg` parameter and the `_f_bss` base in the `arg != 0` body: retail keeps the argument in
  *     r30 and the base in r31, we do it the other way round (`mr r30,r3` vs `mr r31,r3`). Tried: a
  *     top-of-function `GXRenderModeObj* mode = (GXRenderModeObj*)_f_bss;` local (worse - 81.80 %, the base
  *     is hoisted and a third callee-saved register appears) and a `void*` parameter (no change).
- *   * `fn_8003F9E4` 95.73 % - 524 B target vs 516 ours. The `Screen_w` base materialisation order at the top
- *     of the `Screen_w` block (the same tie-break as `main`, 4 rows) and, after the `if`/`else` merge, the
- *     base re-materialized into r3 for the `f44`/`f48`/`f52`/`f56` stores where retail keeps the r4 it
- *     loaded before the first `sth` (6 rows).
- *   * `fn_8003FCCC` 95.06 % - 340 B target vs 332 ours: retail's frame is 0x30 (it saves r31 and keeps the
- *     zero for the `copySize` local in it from `li r31,0` at the top) where ours is 0x20 and re-materialises
- *     `li r0,0` at the `stw r0,8(r1)`. Moving the `u32 copySize = 0;` declaration to the top of the function
- *     does not stop the sink. Plus one pool `lfd` ARG row.
- *   * `fn_8003FEBC` 98.00 % / `fn_8003FF98` 99.02 % - one instruction each: retail initialises *two*
- *     int->float conversion temps (`lis r0,0x4330` twice, stack slots 16/24 or 8/16) where our build CSEs
- *     the second `lis` away, plus one pool `lfd` ARG row each.
- *   * `fn_8003FC64` 99.58 % - one `lis r4` vs `lis r3` scratch-register choice on the warning-counter base.
- *   * `fn_8004029C` 99.52 % - `lis r3, Screen_w@ha; addi r31, r3, Screen_w@l` in retail vs our
- *     `lis r31, Screen_w@ha; addi r31, r31, Screen_w@l`. `fn_8004030C` 99.76 % - one pool `lfd` ARG row.
+ *   * `fn_8003FC64` 99.58 % - one `lis r4` vs `lis r3` scratch-register choice on the warning-counter base -
+ *     the same tie-break the pragma-region move flipped in `fn_8004029C`/`fn_80040360`, but an off/reset
+ *     pair placed at this function does not reach it (97.50 % with the pragma over its own body).
  */
 
 #include "types.h"
@@ -302,7 +302,14 @@ extern "C" u32 GXInit(void* base, u32 size);
 extern "C" void fn_804BA7A0(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetViewport(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetScissor(u32, u32, u32, u32);
-extern "C" void GXSetCopyClear(void* buf, u32 mask);
+/* The SDK clear-colour argument: an RGBA value, passed by value. */
+typedef struct {
+    u8 r; /* +0x0 */
+    u8 g; /* +0x1 */
+    u8 b; /* +0x2 */
+    u8 a; /* +0x3 */
+} GXColor; /* size: 0x4 */
+extern "C" void GXSetCopyClear(GXColor clr, u32 mask);
 extern "C" void GXSetDispCopySrc(u32, u32, u32, u32);
 extern "C" void GXSetDispCopyDst(u32, u32);
 extern "C" void fn_804B6F70(u32, u32);
@@ -395,32 +402,33 @@ int main(void)
     SetSystemVcnt(2);
     fn_8003FE24();
 
-    Screen_w.w0 = 640;
-    Screen_w.w2 = 448;
+    ScreenWork* sw = &Screen_w;
+    sw->w0 = 640;
+    sw->w2 = 448;
     if (lbl_80794781 == 1) {
         f32 fb = lbl_80795AA0;
-        Screen_w.f4 = fb;
-        Screen_w.f8 = lbl_80795AA4;
-        Screen_w.f12 = lbl_80795AA8;
-        Screen_w.h60 = (s32)fb;
-        Screen_w.h62 = Rmode->efbHeight;
-        Screen_w.b25 = 1;
+        sw->f4 = fb;
+        sw->f8 = lbl_80795AA4;
+        sw->f12 = lbl_80795AA8;
+        sw->h60 = (s32)fb;
+        sw->h62 = Rmode->efbHeight;
+        sw->b25 = 1;
     } else {
         f32 fb = lbl_80795AAC;
-        Screen_w.f4 = fb;
-        Screen_w.f8 = lbl_80795AA4;
-        Screen_w.f12 = lbl_80795AB0;
-        Screen_w.b25 = 0;
-        Screen_w.h60 = (s32)fb;
-        Screen_w.h62 = Rmode->efbHeight;
+        sw->f4 = fb;
+        sw->f8 = lbl_80795AA4;
+        sw->f12 = lbl_80795AB0;
+        sw->b25 = 0;
+        sw->h60 = (s32)fb;
+        sw->h62 = Rmode->efbHeight;
     }
-    Screen_w.w16 = lbl_8079479C;
-    Screen_w.f20 = lbl_80795AB4 / (f32)lbl_8079479C;
-    Screen_w.b24 = lbl_80794780;
-    Screen_w.f44 = lbl_80795AB8;
-    Screen_w.f48 = lbl_80795ABC;
-    Screen_w.f52 = Screen_w.f4 - Screen_w.f44;
-    Screen_w.f56 = Screen_w.f8 - Screen_w.f48;
+    sw->w16 = lbl_8079479C;
+    sw->f20 = lbl_80795AB4 / (f32)lbl_8079479C;
+    sw->b24 = lbl_80794780;
+    sw->f44 = lbl_80795AB8;
+    sw->f48 = lbl_80795ABC;
+    sw->f52 = sw->f4 - sw->f44;
+    sw->f56 = sw->f8 - sw->f48;
 
     fn_804D56B0(_f_text);
     fn_804D57A0((void*)fn_8003F20C);
@@ -715,29 +723,30 @@ extern "C" void fn_8003F9E4(u32 arg)
     Rmode->viXOrigin = mode.viXOrigin;
     fn_804E7F60(Rmode);
 
-    Screen_w.w0 = 640;
-    Screen_w.w2 = 448;
+    ScreenWork* sw = &Screen_w;
+    sw->w0 = 640;
+    sw->w2 = 448;
     if ((u8)arg == 1) {
         f32 fb = lbl_80795AA0;
-        Screen_w.f4 = fb;
-        Screen_w.f8 = lbl_80795AA4;
-        Screen_w.f12 = lbl_80795AA8;
-        Screen_w.h60 = (s32)fb;
-        Screen_w.h62 = Rmode->efbHeight;
-        Screen_w.b25 = 1;
+        sw->f4 = fb;
+        sw->f8 = lbl_80795AA4;
+        sw->f12 = lbl_80795AA8;
+        sw->h60 = (s32)fb;
+        sw->h62 = Rmode->efbHeight;
+        sw->b25 = 1;
     } else {
         f32 fb = lbl_80795AAC;
-        Screen_w.f4 = fb;
-        Screen_w.f8 = lbl_80795AA4;
-        Screen_w.f12 = lbl_80795AB0;
-        Screen_w.b25 = 0;
-        Screen_w.h60 = (s32)fb;
-        Screen_w.h62 = Rmode->efbHeight;
+        sw->f4 = fb;
+        sw->f8 = lbl_80795AA4;
+        sw->f12 = lbl_80795AB0;
+        sw->b25 = 0;
+        sw->h60 = (s32)fb;
+        sw->h62 = Rmode->efbHeight;
     }
-    Screen_w.f44 = lbl_80795AB8;
-    Screen_w.f48 = lbl_80795ABC;
-    Screen_w.f52 = Screen_w.f4 - Screen_w.f44;
-    Screen_w.f56 = Screen_w.f8 - Screen_w.f48;
+    sw->f44 = lbl_80795AB8;
+    sw->f48 = lbl_80795ABC;
+    sw->f52 = sw->f4 - sw->f44;
+    sw->f56 = sw->f8 - sw->f48;
     lbl_80794791 = arg;
 }
 
@@ -823,7 +832,7 @@ void hbm_InitGX(void)
  * configuration from the render-mode object, then binds both framebuffers. */
 extern "C" void fn_8003FCCC(void)
 {
-    u32 copySize = 0;
+    GXColor clearColor = { 0, 0, 0, 0 };
 
     lbl_80794764 = GXInit((void*)lbl_80794760, 0x80000);
 
@@ -831,7 +840,7 @@ extern "C" void fn_8003FCCC(void)
                 lbl_80795AC8, lbl_80795ACC);
     GXSetScissor(0, 0, Rmode->fbWidth, Rmode->efbHeight);
 
-    GXSetCopyClear(&copySize, 0xFFFFFF);
+    GXSetCopyClear(clearColor, 0xFFFFFF);
 
     GXSetDispCopySrc(0, 0, Rmode->fbWidth, Rmode->efbHeight);
     GXSetDispCopyDst(Rmode->fbWidth, Rmode->xfbHeight);
@@ -879,7 +888,7 @@ extern "C" void fn_8003FE30(void)
     }
 }
 
-#pragma peephole reset
+#pragma peephole off
 
 /* Sets the copy/projection state that the frame's first draw needs, and clears the texture cache. */
 extern "C" void fn_8003FEBC(void)
@@ -918,6 +927,8 @@ extern "C" void fn_8003FF98(void)
     GXSetCopyFilter(Rmode->aa, Rmode->sample_pattern[0], 1, Rmode->vfilter);
     GXDrawDone();
 }
+
+#pragma peephole reset
 
 /* Waits for the pending VI requests, presents the frame, applies a queued video-mode change and then
  * waits out the second half of the frame before flipping the framebuffer. */
