@@ -887,6 +887,24 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     return "\n".join(lines).rstrip() + "\n"
 
 
+def brief_for(main: str, wt: str, unit: str, task: str | None = None, assume_claim: bool = False,
+              pool: bool = False) -> tuple[dict, str]:
+    """`(brief, text)` for a unit spelled either way: a proposal on its queue entry, else on its unit.
+
+    Single-unit mode and the pool must agree on which renderer a unit gets. They did not: `main()` always
+    took the registered-unit path, so the first proposal round came back with the registered-unit template
+    and an **empty inventory** (`splits_range()` is empty for an unregistered proposal, so every symbol list
+    is blank and the dossier reads "target object not found"), which the brief's own §5 turns into "do not
+    start". One helper, one decision.
+    """
+    p = proposal_by_label(main, unit)
+    if p is not None:
+        b = build_proposal(main, p, task, assume_claim=assume_claim)
+        return b, render_proposal(main, b, task, pool=pool)
+    b = build(main, wt, unit, task, assume_claim=assume_claim)
+    return b, render(main, b, task, pool=pool)
+
+
 def _lang_hint(p: dict) -> str:
     """The region's language verdict, as a *hint* - the worker's own evidence outranks it."""
     lang = p.get("language") or {}
@@ -946,13 +964,8 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
         if os.path.exists(path) and not force:
             skipped.append(unit)
             continue
-        if kind == "proposal":
-            p = proposal_by_label(main, unit)
-            b = build_proposal(main, p, None, assume_claim=True)
-            text = render_proposal(main, b, None, pool=True)
-        else:
-            b = build(main, claims.worktree_for(unit, main), unit, None, assume_claim=True)
-            text = render(main, b, None, pool=True)
+        b, text = brief_for(main, claims.worktree_for(unit, main), unit, None,
+                            assume_claim=True, pool=True)
         open(path, "w", encoding="utf-8", newline="\n").write(text)
         wrote.append(unit)
     if prune:
@@ -1077,6 +1090,16 @@ def selftest() -> int:
         check("the proposal brief carries the outbox path", str(b["handoff"]["outbox"]) in text, True)
         check("a proposal brief still says where the report goes",
               "final message" in text and "subagent_done" not in text, True)
+
+        # the dispatch itself: the round that came back empty was handed a registered-unit brief for a
+        # proposal, so single-unit mode must route a proposal to the proposal renderer - from either spelling
+        for spelling in (entry["label"], "proposal/80161660_fn_80161660"):
+            _b, t = brief_for(tmp, os.path.join(tmp, "nowt"), spelling, None, assume_claim=True)
+            check("single-unit mode renders a proposal as a proposal (%s)" % spelling,
+                  t.startswith("# Proposal brief:"), True)
+            check("... and therefore has an inventory (%s not empty)" % spelling, len(_b["symbols"]) >= 0,
+                  True)
+            check("... and names its range (%s)" % spelling, "0x80161660" in t, True)
 
         # the rules themselves are read from docs/plan.md, so that part is checked against the real tree
         # (the temp fixture above has no docs/)
@@ -1282,8 +1305,7 @@ def main() -> int:
         return 0
 
     wt = rc.worktree_root()
-    b = build(main, wt, args.unit, args.task)
-    text = render(main, b, args.task)
+    b, text = brief_for(main, wt, args.unit, args.task)
     if args.json:
         print(json.dumps({k: v for k, v in b.items() if k != "header"}, indent=2))
         return 0

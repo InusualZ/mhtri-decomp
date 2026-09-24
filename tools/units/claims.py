@@ -229,6 +229,12 @@ def pane_probe(row: dict, interval: float | None = None, lister=None, reader=Non
 
 def slug(unit: str) -> str:
     """A stable, filesystem- and git-safe name for a unit path, unique by a short hash of the full path."""
+    # Normalise FIRST: the same unit arrives spelled with and without its source extension, and hashing the
+    # spelling as given gave one unit two slugs - and therefore two branches - which defeats the claim mutex
+    # that norm_unit() exists for. Found 2026-09-24: slug('proposal/801679B0_fn_801679B0') = ...-4ac8 (the
+    # live claim) while slug('proposal/801679B0_fn_801679B0.cpp') = ...-b977 (the pooled brief and the ack),
+    # so a worker's correct ack left its own claim unacked.
+    unit = norm_unit(unit)
     # the unit's basename is what a reader recognises; the hash of the full path keeps it unique,
     # since two units can share a basename (Pl/pl_act vs auto/pl_act)
     stem = os.path.splitext(os.path.basename(unit.strip("/")))[0]
@@ -1032,6 +1038,10 @@ def selftest() -> int:
     check("slug: stable", slug("Pl/pl_act"), slug("Pl/pl_act"))
     check("slug: unique per unit", slug("Pl/pl_act") == slug("Pl/pl_skill"), False)
     check("slug: sanitised", bool(re.fullmatch(r"[a-z0-9-]+", slug("auto/80040598_fn_80040598"))), True)
+    # one unit, one slug: `proposal/X` and `proposal/X.cpp` must not fork the branch, which is the real lock
+    check("slug: the source extension does not fork it",
+          slug("proposal/801679B0_fn_801679B0"), slug("proposal/801679B0_fn_801679B0.cpp"))
+    check("... nor for a .c unit", slug("auto/x_fn_x"), slug("auto/x_fn_x.c"))
     check("slug: length cap", len(slug("auto/" + "x" * 200)) <= SLUG_MAX, True)
     check("branch prefix", branch_for("main.cpp").startswith("worker/"), True)
     check("worktree is a sibling of main", os.path.basename(worktree_for("Pl/pl_act", "/tmp/mhtri-dtk"))
