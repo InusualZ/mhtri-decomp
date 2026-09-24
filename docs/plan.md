@@ -827,6 +827,35 @@ The corollary is a working rule: when a tool or a brief can carry one of these, 
 this session showed six workers independently rediscovering the same peephole lever, which is the same waste in a
 different place.
 
+### The two tools that changed how a round is worked (2026-09-23)
+
+Both were built as experiments on `experiment/*` branches, tested by the owner, and integrated after approval.
+
+**`tools/flags/shapesearch.py`** (with `shapes.py`; `mt.py shapes`) - the **source-shape searcher**. The residual on a
+stubborn function is *codegen*, not comprehension: MWCC colours registers from the source's temporary structure, so the
+same logic spelled differently scores 96 % or 100 %. It generates variants - 13 generators: statement and declaration
+order, `for`-declaration hoisting, signedness and `volatile`, casts, compound assignment, ternary, named temporaries,
+loop shape, switch arm order, `default`-first, `break` to `return C`, the field form, and row 35's dead copies -
+compiles each with the unit's **real command line** into a scratch copy, scores each with the **official** metric,
+dedupes by normalised source *and* object sha1, and ranks; depth > 1 is a beam search. `src/` is never written.
+
+*On `Pl/pl_act`'s worst 20 it improved 12 and took two to 100.000 % byte-identical in 30 seconds* (550 candidates, 12
+threads): `fn_8027D40C` by hoisting a declaration, `Pl_get_gunner_vec` by a dead copy. **A miss is informative**: a
+function with *zero differing rows* that still scores 99.9 % is relocation naming, so the `.sdata2` claim is the fix,
+not a shape (rows 23/29).
+
+**`tools/flags/infer.py`** - the **flag inferencer**. Reads a split *target* object and names the flags its unit was
+built with, each with evidence and a confidence: record forms and the `li r0,N; psq_lx` epilogue for the peephole,
+fused FMA vs `fmuls`+`fadds` for `fp_contract`, per-symbol `lis`+`addi` vs a shared base for the pool, `stmw`/`lmw` vs
+`_savegpr_*` for `use_lmw_stmw`, function starts and `gap_*` padding for `func_align`, and a `bl` to a tiny
+same-object function for `inline`. **36 confident claims, 100 % correct, zero confident misses**, and it abstains on 78
+units rather than guess. It answers the round that **fourteen** workers each spent rediscovering
+`#pragma peephole off`. It decodes PPC by hand because GNU objdump mis-decodes Gekko paired-single as VMX.
+
+It cannot infer the `-O` level, `mw_version`/compiler family (`.comment` is synthesised), `-Cpp_exceptions`,
+`-schedule` or the C++ front-end - and it found that **no object in the project contains a fused FMA**, so
+`-fp_contract` may be inert here and the seven workers who reported it may have been seeing something else.
+
 ### The leaked SDK source is forbidden (owner's rule, 2026-09-23)
 
 The `oracle-mine` experiment indexed the leaked RVL SDK / `wii_development_package` archive and a public decomp
