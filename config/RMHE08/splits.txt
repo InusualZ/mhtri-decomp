@@ -101,6 +101,11 @@ ef/ef_drawfreestrategy.cpp:
 	extabindex  start:0x80023838 end:0x8002388C
 	.text       start:0x800BE154 end:0x800BEF98
 
+ef/ef_drawpointstrategy.cpp:
+	extab       start:0x8000A36C end:0x8000A394
+	extabindex  start:0x800238C8 end:0x80023904
+	.text       start:0x800BF818 end:0x800BFFD4
+
 ef/ef_drawsmoothstripestrategy.cpp:
 	extab       start:0x8000A394 end:0x8000A49C
 	extabindex  start:0x80023904 end:0x80023A90
