@@ -158,6 +158,16 @@ def write_land_message(main: str, body: str) -> str:
     return path
 
 
+def message_body_with_subject(body: str, subject: str) -> str:
+    """Replace the gate message's subject line with a deliberate `--message`, keeping the gate's body.
+
+    `verify` writes `land: <units>` followed by the ledger and gate summary. A caller's `--message` replaces
+    only that first line, so the landed commit still records the ledger delta it was gated against.
+    """
+    _first, sep, rest = body.partition("\n")
+    return subject + sep + rest
+
+
 def clear_land_message(main: str) -> str | None:
     """Remove a stale message so a failed gate cannot be committed through `git commit -F .git/land_msg.txt`."""
     path = land_message_path(main)
@@ -179,6 +189,25 @@ def land_decision(gate_ok: bool, stageable: list[str]) -> tuple[str, str]:
     if not stageable:
         return "refuse", "the gate passed but no batch path is stageable - nothing to commit"
     return "commit", ""
+
+
+def message_error(subject: str | None) -> str | None:
+    """Refuse an empty or whitespace-only `--message` before the gate does any work.
+
+    The incident (2026-09-24, `71c244f9`): `--message "$(cat /tmp/msg1.txt)"`, where the shell's `/tmp` is not
+    the one the file was written to, expands to the empty string. An empty override used to be dropped by
+    `if subject:`, so the batch landed under the gate's fallback subject `land: <units>` instead of the message
+    the worker wrote. Omitting `--message` is how a caller deliberately asks for that fallback; an empty or
+    blank argument is the caller's bug, refused here - loudly, naming the argument - at the same cost as a lint
+    refusal, and before `verify` runs.
+    """
+    if subject is None:
+        return None
+    if not subject.strip():
+        kind = "empty" if subject == "" else "whitespace-only"
+        return ("--message is %s (%r): pass the subject you meant, or omit --message to use the gate's "
+                "default subject" % (kind, subject))
+    return None
 
 
 def changed_status(main: str) -> list[tuple[str, str]]:
@@ -700,6 +729,8 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     `ok` stayed green (the unit is `NonMatching`). So the gate's verdict is now the decision, not a report:
 
     * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message;
+    * an empty or whitespace-only `--message` is refused before the gate runs (`message_error`): the empty
+      shell substitution that expanded `$(cat /tmp/msg1.txt)` must not silently land the fallback subject;
     * the commit uses the gate's own message, so there is no separate `git commit -F` to get wrong;
     * the commit is `git commit -F msg -- <the batch's paths>`: no pathspec means the whole index, which
       swept another stream's staged edit into a land twice on 2026-09-23 (`85f3d4b5`, `d50fdd32`). Paths the
@@ -712,6 +743,12 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     only copy.
     """
     norm_units = [claims.norm_unit(u.strip("/")) for u in units]
+    bad_message = message_error(subject)
+    if bad_message:
+        # a refusal must not leave a message `git commit -F .git/land_msg.txt` could pick up (2026-09-23)
+        clear_land_message(main)
+        print("REFUSED %s | %s" % (",".join(norm_units), bad_message))
+        return 1
     with contextlib.redirect_stdout(sys.stderr):
         gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
                          allow_regression=allow_regression, check_outbox=check_outbox,
@@ -730,10 +767,9 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         print("REFUSED %s | %s" % (",".join(norm_units), why))
         return 1
     msg_file = land_message_path(main)
-    if subject:
-        raw = open(msg_file, encoding="utf-8").read()
-        _first, sep, rest = raw.partition("\n")
-        write_land_message(main, subject + sep + rest)
+    if subject is not None:
+        # the guard above means subject is a real one here, never the empty shell substitution
+        write_land_message(main, message_body_with_subject(open(msg_file, encoding="utf-8").read(), subject))
     agents_md = "AGENTS.md" in stageable
     if agents_md:
         pc.localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
@@ -837,6 +873,25 @@ def selftest() -> int:
           ("refuse", "the gate passed but no batch path is stageable - nothing to commit"))
     check("a green gate with a batch commits", land_decision(True, ["src/Pl/pl_act.cpp"]),
           ("commit", ""))
+
+    # the 2026-09-24 incident: a `--message "$(cat /tmp/msg1.txt)"` whose file lived at a different `/tmp`
+    # expanded to the empty string, `if subject:` dropped the override, and the batch landed under the gate's
+    # fallback subject instead of the one the worker wrote (`71c244f9`). An empty or blank argument is refused
+    # before the gate runs; omitting --message still asks for the gate's default subject; a real one lands.
+    check("no --message uses the gate's default subject", message_error(None), None)
+    empty_err = message_error("")
+    check("an empty --message is refused", empty_err is not None, True)
+    check("... and the refusal names --message", "--message" in (empty_err or ""), True)
+    check("... and names it empty", "is empty" in (empty_err or ""), True)
+    blank_err = message_error("  \t\n ")
+    check("a whitespace-only --message is refused", blank_err is not None, True)
+    check("... and the refusal names --message", "--message" in (blank_err or ""), True)
+    check("... and names it whitespace-only", "whitespace-only" in (blank_err or ""), True)
+    check("a real --message is accepted", message_error("ef: land fn_800FAE08 (41/41 symbols)"), None)
+    check("a real --message replaces the gate subject and keeps its body",
+          message_body_with_subject("land: Pl/pl_act\n\nledger: closed 1 -> 2\n",
+                                    "ef: land fn_800FAE08 (41/41 symbols)"),
+          "ef: land fn_800FAE08 (41/41 symbols)\n\nledger: closed 1 -> 2\n")
 
     # the warning that keeps a foreign staged edit visible: `land` leaves it alone and names it
     check("the foreign-index warning names the path",
