@@ -49,6 +49,7 @@
 #include "nw4r/math.h"
 #include "ef.h"
 #include "ef/eft001.h"
+#include "ef/effect.h"
 #include "ef/eft004.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 
@@ -88,7 +89,6 @@ extern "C" void fn_80043EA8(nw4r::math::VEC3* out);
 /* The nw4r::ef / engine helpers, reached through their real signatures (rule 9). */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
 extern "C" nw4r::ef::Effect* fn_800F91C4(u16 id, u16 kind, s32 a, s32 b);
-extern "C" void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
 extern "C" void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 extern "C" void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
 void setVector3(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);

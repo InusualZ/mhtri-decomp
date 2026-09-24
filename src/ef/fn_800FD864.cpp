@@ -64,6 +64,7 @@
 
 #include "types.h"
 #include "ef/fn_800FE978.h"
+#include "ef/effect.h"
 #include "nw4r/math.h"
 #include "ef.h"
 #include "ef/eft004.h"
@@ -106,7 +107,6 @@ struct _EFT_MAP_WORK {
  * documented rule-2 gap the shared band header leaves. */
 extern "C" void* fn_800F8788(u32 work_size);
 extern "C" void fn_800F886C(void* self);
-extern "C" void fn_800F9DF4(void* self, s32 a, s32 b);
 extern "C" u8 fn_803AAF88(void);
 
 /* The mangled callees, called through their real signatures (rule 9). */

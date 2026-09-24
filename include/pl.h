@@ -42,6 +42,23 @@ typedef struct _SLOTENT {
  * `sound/fn_800D7F54.cpp`.  They agree on every shared field; the full record is at least 0x140
  * (`ef/eft007.cpp` states 0x140 as `Pl/pl_act.cpp`'s extent, matching `fn_80114E34.cpp`'s +0x13C
  * pointer). size: 0x140 */
+#ifdef __cplusplus
+/* The GX channel selector the `get/setTevKColor` and `get/setMatColor` members take; it is an enum
+ * because MWCC mangles the enum's name into the symbol (`...12_GXChannelID...`).  `_GXTevKColorID`
+ * and the blend/logic selectors come from `gx.h`, which owns them (docs/plan.md 6.5 rule 1). */
+enum _GXChannelID {
+    GX_COLOR0,
+    GX_COLOR1,
+    GX_ALPHA0,
+    GX_ALPHA1,
+    GX_COLOR0A0,
+    GX_COLOR1A1,
+    GX_COLORZERO,
+    GX_ALPHA0A0,
+    GX_ALPHA1A1,
+    GX_ALPHAZERO
+};
+#endif
 typedef struct MHchar {
     /* +0x000 */ u32 field_0x00;
     /* +0x004 */ VEC3 pos_0x04;
@@ -71,12 +88,15 @@ typedef struct MHchar {
      * (`setVisibility__6MHcharFUlb`, ...), so they are declared here once and called as members
      * (docs/plan.md 6.5 rule 9).  A member adds no storage, so the C view is unchanged. */
     void setVisibility(u32 index, bool visible);                                   /* ef/eft001.cpp, ef/eft007.cpp */
-    void setTevKColor(u32 index, _GXTevKColorID id, _GXColor* color);              /* ef/eft001.cpp, ef/eft007.cpp */
-    void setMatAlphaBlendMode(u32 index, _GXBlendMode mode, _GXBlendFactor src,
-                              _GXBlendFactor dst, _GXLogicOp op);                  /* ef/eft001.cpp */
     void get_joint_wpos(u32 joint, nw4r::math::VEC3* out);                         /* ef/eft001.cpp, ef/eft007.cpp */
     void move(u16 flags);                                                          /* ef/eft001.cpp */
     void move2(nw4r::math::MTX34* mtx, u16 flags);                                 /* ef/eft001.cpp */
+    void getTevKColor(u32 index, _GXTevKColorID id, _GXColor* out);                /* ef/effect.cpp */
+    void setTevKColor(u32 index, _GXTevKColorID id, _GXColor* color);              /* ef/eft001.cpp, ef/effect.cpp */
+    void getMatColor(u32 index, _GXChannelID channel, _GXColor* out);              /* ef/effect.cpp */
+    void setMatColor(u32 index, _GXChannelID channel, _GXColor color, bool keep);  /* ef/effect.cpp */
+    void setMatAlphaBlendMode(u32 index, _GXBlendMode mode, _GXBlendFactor src,
+                              _GXBlendFactor dst, _GXLogicOp op);                  /* ef/eft001.cpp */
 #endif
 } MHchar;
 
