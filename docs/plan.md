@@ -464,7 +464,7 @@ never rewritten; nothing is ever pushed.
 
 ### 6.5 Type and naming discipline — mandatory in phases B and C
 
-Seven rules, all of them checkable. They are **not style preferences**: a wrong or unnamed type is what makes
+Nine rules, all of them checked. They are **not style preferences**: a wrong or unnamed type is what makes
 the *next* function in the same unit cost twice as much, and pointer arithmetic hides exactly the layout that
 rules 3 and 4 exist to record.
 
@@ -478,9 +478,10 @@ rules 3 and 4 exist to record.
 | 6 | **Pointer arithmetic to reach a field is forbidden** | `*(u32*)((u8*)self + 0x1C) = v;` is not acceptable; declare the type and write `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise copy, a `sizeof`/offset computation) — and even there prefer `offsetof(Type, field)` |
 | 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used. Neither `fn_XXXXXXXX` nor `unkNN` may survive in `src/` |
 | 8 | **`goto` is forbidden** | No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read |
+| 9 | **A mangled symbol is called through its owner** | a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and stays legal (row 7's deferral) |
 
 **These rules are part of phase C, not a separate chore.** The residual sweep already revisits every unit that
-is not byte-identical; the conformance work (rules 1-8) rides the same pass, unit by unit, in address order.
+is not byte-identical; the conformance work (rules 1-9) rides the same pass, unit by unit, in address order.
 
 **The `goto` backlog from the first protocol round (2026-09-23).** Four functions reached 100 % with a `goto`
 shape before rule 8 existed: `Pl/pl_act`'s `fn_80278144` and `fn_80278310` (`goto ret1; ret0: return 0;`) and
@@ -492,8 +493,13 @@ tried.
 **Enforcement is a tool, not a promise.** `tools/units/stylelint.py` (roadmap 7.21) reports each rule with
 `file:line`, per unit and as a backlog, and **`land.py verify` refuses a batch that adds a violation** — a rule
 enforced by remembering is not a rule. The rules apply to new work immediately; existing units are brought into
-conformance as they are touched. Rule 7 has one exemption: a registered unit with **no bodies yet** is not held
-to it (§12) - its names are still the map's until the worker writes the bodies from the evidence. The audit of
+conformance as they are touched. **Rules 1, 2 and 9 are checked, not deferred**: rule 1 compares every `src/`
+type definition, rule 9 rejects a mangled spelling used as a callable identifier, and rule 2 resolves every
+`extern` through `config/RMHE08/symbols.txt` + `splits.txt` to the unit that owns the symbol. Rule 2 has one
+**named** gap rather than a guess: an unsplit address whose bracketing registered units name different modules
+has no sound header to move to (a `sound` unit sits inside the `ef` band), so those sites are counted in the
+report and left alone. Rule 7 has one exemption: a registered unit with **no bodies yet** is not held to it
+(§12) - its names are still the map's until the worker writes the bodies from the evidence. The audit of
 2026-09-22 says how much there is to bring:
 
 | measure | count | rule |
@@ -503,7 +509,9 @@ to it (§12) - its names are still the map's until the worker writes the bodies 
 | fields still named `unk*` | **320** | 5 |
 | struct fields that already carry an offset annotation | 52 | 4 (partial) |
 | struct/class size annotations | **0** | 3 |
-| types defined in more than one unit's source | `Vec3` (and the `_PLW` family) | 1 |
+| types defined in more than one unit's source | **20** names, **68** extra definitions | 1 |
+| `extern` declarations not in the owner's file | **126** foreign sites over 27 owner units, plus **209** unsplit sites the address band places in 6 modules | 2 |
+| mangled spellings used as a callable identifier | **598** sites (**446** calls, **152** declarations), **83** names | 9 |
 
 A batch that touches a unit closes its rows in that table for that unit. The lint's backlog number is the
 campaign's second burn-down (§7.11 is the first, bytes).
@@ -535,7 +543,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.18 | **ground-truth guard**: `prepcommit.py` refuses `config/RMHE08/build.sha1` and `config/RMHE08/config.yml`, and a tracked **`tools/git/hooks/pre-commit`** (enabled with `git config core.hooksPath tools/git/hooks` — local config, so 7.18 also states the checks that do *not* depend on a hook: `prepcommit.py`'s and `land.py`'s path refusals) refuses `orig/**`, `build/` and the LOCAL-ONLY block on **any** commit path | `prepcommit.classify('config/RMHE08/build.sha1')` returns `stage` today: a worker or I could rewrite the DOL's expected hash and commit it, after which green `ok` means nothing | a staged `build.sha1` is refused, and the hash is checked against `orig/RMHE08/sys/main.dol`'s own sha1 | ~40 |
 | 7.19 | link-order audit for flips | 13 584 objects link in 66-131 s now; with hundreds of `Matching` units the order, pool placement and symbol collisions become real | after a batch of flips, compare `main.MAP`'s section/symbol order against the original and diff the DOL | ~60 |
 | 7.20 | transactional `attribute.py apply` | `apply` writes `splits.txt` first and can leave a half-registration; `plan` can propose overlapping data spans | no proposal overlaps a claimed range, both shared files are written via temp+rename, and a failure restores them | ~40 |
-| 7.21 | `tools/units/stylelint.py` - the eight rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b`), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
+| 7.21 | `tools/units/stylelint.py` - the nine rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b`), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
@@ -551,7 +559,7 @@ tool is not done until `land.py` calls it or the plan says who runs it**.
 | 7.3 `brief.py` | **done** | six parts, rules extracted verbatim from §6.5/§8, inventory parsed in-process; for `Pl/pl_act`: 115 symbols, 5 below the bar, every score real |
 | 7.4 `handoff.py` | **done** | outbox schema + validation (13 checks): unowned symbols, out-of-range percentages, a rename without evidence, a missing `measured_with` are all refused |
 | 7.5 + 7.16 `land.py` | **done (build path dry-run only)** | 13 checks; the gate refuses on a moved base, a shared-file edit, a missing/invalid outbox, a regression, and requires `ok` to be recreated by *this* run; baseline refresh |
-| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **done 2026-09-23** | `dataqueue.py` writes the queue `brief.py` reads (3728 runs / 2.27 MB, 42 checks); `attribute.py` has `--max-total-bytes` (0.5 MB cap) and a transactional `apply` that restores byte-exactly on failure (103 checks); `stylelint.py` reports §6.5 rules 3-8 as `file:line` and the gate refuses a batch that adds one (79 checks) |
+| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **done 2026-09-23** | `dataqueue.py` writes the queue `brief.py` reads (3728 runs / 2.27 MB, 42 checks); `attribute.py` has `--max-total-bytes` (0.5 MB cap) and a transactional `apply` that restores byte-exactly on failure (103 checks); `stylelint.py` reports §6.5 rules 1-9 as `file:line` and the gate refuses a batch that adds one (151 checks) |
 
 **Flip campaign (7.6), round 1 2026-09-23.** Six objects are flipped and committed, each alone in its commit -
 `memset` (3e5a072), `NetworkWiiMediator` (6e0ed8c), `OSAlarm` (0806eae), `memcpy` (eadd4bd), `lobby_scene`

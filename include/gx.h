@@ -1,9 +1,15 @@
-/* The write-gather-pipe window and the small pipe writers the engine's draw code emits out of line.
+/* The write-gather-pipe window, the small pipe writers and the SDK colour record.
  *
  * The window at 0xCC008000 is the Wii's GX FIFO; one union member per store width is exactly what the
- * SDK's `GXWGFifo` is, so a writer body reads as `GXWGFifo.u16 = value;`. The union is defined once here
+ * SDK's `GXWGFifo` is, so a writer body reads as `GXWGFifo.u16 = value;`. The union is defined once
  * because more than one unit of the `auto` library owns a copy of the writer family (AGENTS.md ->
  * Conventions, rule 1: a shared type lives in one header).
+ *
+ * The colour is the SDK's `_GXColor` (`typedef struct _GXColor { ... } GXColor;`).  The tag is
+ * `_GXColor` because that is the type the mangled setters encode (`...8_GXColor`); the typedef `GXColor`
+ * is the SDK's C spelling and what the draw units use.  Both are the same four bytes.  Consumers:
+ * `ef/eft002.cpp`, `ef/eft007.cpp`, `ef/eft009.cpp` and `ef/fn_80114E34.cpp` carry private `_GXColor`
+ * copies that move here in wave 2; `ef/ef_drawsmoothstripestrategy.cpp` and `main.cpp` use `GXColor`.
  */
 #ifndef MHTRI_GX_H
 #define MHTRI_GX_H
@@ -24,10 +30,9 @@ typedef union GXWGFifo_t {
 
 #define GXWGFifo (*(volatile GXWGFifo_t*)0xCC008000)
 
-/* size: 0x4.  The SDK spells the four colour components `r`/`g`/`b`/`a`; the shape unit
- * (`auto/800FCED4`) and `main.cpp` still carry private copies that move here the next time those units are
- * touched (AGENTS.md -> Conventions, rule 1). */
-typedef struct GXColor {
+/* The SDK colour record.  `_GXColor` is the struct tag (and the name the mangled setters encode); the
+ * `GXColor` typedef is the spelling the SDK's own prototypes use. size: 0x4 */
+typedef struct _GXColor {
     u8 r; /* +0x0 */
     u8 g; /* +0x1 */
     u8 b; /* +0x2 */

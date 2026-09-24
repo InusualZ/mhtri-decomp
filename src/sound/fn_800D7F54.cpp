@@ -1879,13 +1879,8 @@ extern "C" void fn_800DCF0C(_se_w* work, nw4r::math::VEC3* pos) {
 /* The engine's enemy work object; only its address is ever passed on from this part (the map's
  * `em_act_ck__FP11_ENEMY_WORKUcUc`/`em_area_ck__FP11_ENEMY_WORK` spell the class this way). */
 struct _ENEMY_WORK;
-
-/* A 3x4 float matrix (the SDK's `Mtx`): the camera helpers copy one into each of the pool's two view
- * matrices.
- * size: 0x30 */
-struct Mtx34 {
-    /* +0x00 */ f32 m[3][4];
-};
+/* A 3x4 float matrix is `Mtx34` from `nw4r/math.h` (the SDK's `Mtx`): the camera helpers copy one into
+ * each of the pool's two view matrices. */
 
 /* The NPC sound-hook object: the word at +0x04 is the callback the per-frame driver fires when the SE
  * system reports mode 2.

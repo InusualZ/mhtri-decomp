@@ -2,6 +2,7 @@
 #define EF_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,7 +11,13 @@ extern "C" {
 /* nw4r effect-library (`nw4r::ef`) shared declarations for the emitter-shape units.  The shape files
  * (`ef_disc.cpp`, `ef_cylinder.cpp`, `ef_line.cpp`, ...) each define one `EmitterForm` subclass whose
  * single virtual method is its `CreateEmitter`; they all take the same `em`/`pm`/`params` triple and
- * build a particle transform from the same helper set, so the types and prototypes live here once. */
+ * build a particle transform from the same helper set, so the types and prototypes live here once.
+ *
+ * The game-side effect records live here too: `_EFT` is the 0x48-byte effect instance, `_EFT_WORK` the
+ * counter block it carries at +0x38, `_CP_VECTOR` the three-word rotation `cpSetRotMatrix` takes, and
+ * `_SHELL_W` the shell actor the player effect holds at +0x2C.  Each was copied into 2-6 units; the
+ * canonical layouts below are the union of every copy's fields (see each type's note).
+ */
 
 /* A 3-float vector (nw4r::math::VEC3). */
 typedef struct Vec {
@@ -60,6 +67,106 @@ typedef struct EfWork {
     u32 spawn_extra;    /* +0xF8  passed through to the particle's spawn slot */
     u8 spawn_data;      /* +0xFC  address passed through to the particle's spawn slot */
 } EfWork; /* size: at least 0xFD (the record continues past what this unit reads) */
+
+/* --------------------------------------------------------------------------------------------------
+ * the game-side effect records (union of every unit's private copy)
+ * -------------------------------------------------------------------------------------------------- */
+
+/* The rotation triple `cpSetRotMatrix` takes.  Three sites (`Pl/pl_act.cpp`, `ef/eft007.cpp`,
+ * `ef/eft009.cpp`) agree on `u32 x/y/z`; `ef/fn_80104BD0.c` declares the same names as `f32`.  The
+ * `u32` reading is canonical (the consumer is `cpSetRotMatrix`, and `_EFT::rot_0x24` is fed to it);
+ * the `f32` spelling in `fn_80104BD0.c` is the one that disagrees and is reported as a finding.
+ * size: 0x0C */
+typedef struct _CP_VECTOR {
+    /* +0x000 */ u32 x;
+    /* +0x004 */ u32 y;
+    /* +0x008 */ u32 z;
+} _CP_VECTOR;
+
+/* The effect's per-family work block.  `count/scale/param_id` agree everywhere; the `effect` pointer is
+ * `nw4r::ef::Effect*` in `ef/eft002.cpp` and `void*` in the two C units -- a type-only disagreement
+ * (both are 4-byte pointers), kept as `void*` so the type needs no C++ name here.
+ * size: 0x10 */
+typedef struct _EFT_WORK {
+    /* +0x000 */ s32 count;
+    /* +0x004 */ void* effect;
+    /* +0x008 */ f32 scale;
+    /* +0x00C */ u32 param_id;
+} _EFT_WORK;
+
+/* The 0x48-byte effect instance.  Union of the copies in `ef/eft002.cpp`, `ef/eft009.cpp`,
+ * `ef/fn_800FD520.c`, `ef/fn_800FD718.c`, `ef/fn_80114E34.cpp` and `ef/fn_80119C44.c`.
+ *
+ * Disagreements found (all reported): `type_0x02` is `u8` in five sites but `s8` in `ef/fn_800FD718.c`;
+ * `source_0x30` is `void*` / `_ENEMY_WORK*`; `work_0x38` is `_EFT_WORK*` in five sites, `void*` in
+ * `fn_80114E34.cpp`, `_EFT_HEAP_WORK*` in `fn_80119C44.c`, and stored BY VALUE as `_EFTWork` in
+ * `ef/eft009.cpp` (the one that matters: a by-value store cannot be a pointer).  The pointer spelling
+ * is canonical here. size: 0x48 */
+typedef struct _EFT _EFT;
+struct _EFT {
+    /* +0x000 */ u8 pad_0x0[0x1];
+    /* +0x001 */ u8 flag_0x01;
+    /* +0x002 */ u8 type_0x02;
+    /* +0x003 */ u8 field_0x03;
+    /* +0x004 */ u8 field_0x04;
+    /* +0x005 */ u8 state_0x05;
+    /* +0x006 */ u8 field_0x06;
+    /* +0x007 */ u8 field_0x07;
+    /* +0x008 */ u8 demo_flag_0x08;
+    /* +0x009 */ u8 pad_0x9[0x3];
+    /* +0x00C */ s32 timer_0x0C;
+    /* +0x010 */ s32 field_0x10;
+    /* +0x014 */ u8 pad_0x14[0x4];
+    /* +0x018 */ VEC3 pos_0x18;
+    /* +0x024 */ _CP_VECTOR rot_0x24;
+    /* +0x030 */ void* source_0x30;
+    /* +0x034 */ void (*dispatch_0x34)(_EFT*);
+    /* +0x038 */ _EFT_WORK* work_0x38;
+    /* +0x03C */ u8 pad_0x3C[0x4];
+    /* +0x040 */ void (*release_0x40)(_EFT*);
+    /* +0x044 */ u8 area_0x44;
+    /* +0x045 */ u8 pad_0x45[0x3];
+};
+
+/* The shell actor the player effect and the shell family read: `_PLW::equip_0x2C` points at one, and
+ * `ef/eft002.cpp` / `ef/fn_800FD718.c` each carried a copy.  Union of both. size: 0x10C */
+typedef struct _SHELL_W {
+    /* +0x000 */ u8 field_0x00;
+    /* +0x001 */ u8 pad_0x1[0x2];
+    /* +0x003 */ u8 type_0x03;
+    /* +0x004 */ u8 pad_0x4[0x4];
+    /* +0x008 */ u8 area_0x08;
+    /* +0x009 */ u8 pad_0x9[0xF];
+    /* +0x018 */ VEC3 pos_0x18;
+    /* +0x024 */ u32 rot_x_0x24;
+    /* +0x028 */ u8 pad_0x28[0x4];
+    /* +0x02C */ u32 rot_z_0x2C;
+    /* +0x030 */ u8 pad_0x30[0xDC];
+} _SHELL_W;
+
+/* The effect-model entry the ef units carry (`ef/fn_8010D1A8.c` and `ef/fn_803066F0.c`).  The two
+ * views are compatible: `model`/`created` sit inside the first view's +0x00..0x35 block, the +0x35
+ * byte and the +0x10C/+0x118 fields inside the second's.  Union of both. size: 0x11C */
+struct EftModelSlot; /* ef/fn_8010D1A8.c; only pointed at here */
+typedef struct EftModel {
+    /* +0x000 */ struct MHchar* model;
+    /* +0x004 */ void* volatile created;
+    /* +0x008 */ u8 pad_0x8[0x2D];
+    /* +0x035 */ u8 field_0x35;
+    /* +0x036 */ u8 pad_0x36[0xD6];
+    /* +0x10C */ struct EftModelSlot* field_0x10C;
+    /* +0x110 */ u8 pad_0x110[0x8];
+    /* +0x118 */ u32 field_0x118;
+} EftModel;
+
+/* The sound-request handle `se_req_pos_ps` takes (defined in `sound/fn_800D7F54.cpp`); only ever
+ * reached through a pointer, so the incomplete type is enough.  Guarded so that a unit including both
+ * `pl.h` and `enemy.h` sees the typedef once. */
+#ifndef MHTRI_SE_W_DEFINED
+#define MHTRI_SE_W_DEFINED
+struct _se_w;
+typedef struct _se_w _se_w;
+#endif
 
 /* nw4r::db::Panic - the assert failure handler (variadic). */
 extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
@@ -113,6 +220,23 @@ inline int IsValidPointer(u32 ptr) {
 
 #ifdef __cplusplus
 }
+#endif
+
+/* nw4r::ef::Effect - the pooled effect object.  It is a C++ class (the `change_color_eff` /
+ * `setTevKColor` / `setMatColor` mangled names encode `Q34nw4r2ef6Effect`), so it can only be declared
+ * from C++.  A C unit reaches it as `void*` through `_EFT_WORK::effect`.  Union of the three private
+ * copies (`ef/eft004.cpp` `RetireEmitterAll`, `ef/eft007.cpp` both methods, `ef/eft009.cpp` `SetRootMtx`).
+ * size: 0x04 - lower bound, an approximation (the class carries no data here; only reached through a
+ * pointer) */
+#ifdef __cplusplus
+namespace nw4r {
+namespace ef {
+struct Effect {
+    void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
+    void RetireEmitterAll();                        /* eft004/eft007 */
+};
+}  // namespace ef
+}  // namespace nw4r
 #endif
 
 #endif /* EF_H */

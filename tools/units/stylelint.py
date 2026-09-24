@@ -15,15 +15,23 @@ Rules checked (each finding is `file:line`):
 
 | # | rule | how it is decided |
 | --- | --- | --- |
+| 1 | a shared type lives in one header | the same `struct`/`class`/`union` name defined with a body in more than one `src/` file: one finding per (type, extra file), naming both files |
+| 2 | an extern lives with the TU that owns it | an `extern` declaration of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of an unsplit symbol whose address band names a module (`include/unsplit/<module>.h`) |
 | 3 | a reconstructed `struct`/`class` states its size | a `size: 0xNN` comment within four lines of the definition (or two lines after its closing brace) |
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
 | 6 | no pointer arithmetic reaches a field | a `(T*)base + 0xNN` / `(T*)(base + 0xNN)` cast-plus-literal-offset expression, except an offset passed straight to `memset`/`memcpy`/`memmove` (the rule's own byte-range exception) |
 | 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's); **exempt per file** - see below |
 | 8 | `goto` is forbidden | the `goto` keyword |
+| 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
 
-Rules 1 (a shared type lives in one header) and 2 (an extern lives with the TU that owns it) need
-cross-file analysis and are **not checked** - they are reported as such so nobody assumes coverage.
+Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt`
+(each registered unit's ranges): an `extern` a file declares for a symbol another registered unit owns is a
+finding - move it to that unit's header and `#include` it. An unsplit symbol (no registered owner) is judged
+the same way, into `include/unsplit/<module>.h`, but only where the module is sound: the registered bands
+interleave across modules (a `sound` unit sits inside the `ef` band), so an address whose bracketing units
+name different modules is left as a counted gap (`Ownership.gaps`) rather than a guessed header. A symbol
+missing from the map, a duplicate map row, and an address the map gives no section are gaps too.
 
 Comments and string/char literals are stripped before matching, and the two are stripped separately: the
 size/offset annotations of rules 3-4 live *in comments*, while every other rule must not fire on text
@@ -51,13 +59,14 @@ its violations are all additions - new work is held to the rules from its first 
 
 A key is checkable from the file alone, and a **finished** unit cannot hide behind keys 2 or 3 silently:
 key 2 needs the absence of every body, and key 3 is one greppable line whose reason must name the evidence.
-**Rules 1-6 and 8 still apply under every key** (sized types, fields with offsets and context names, no
-pointer arithmetic, no `goto`).
+**Rules 1-6, 8 and 9 still apply under every key** (sized types, fields with offsets and context names, no
+pointer arithmetic, no `goto`, no mangled spelling used as a callable identifier).
 """
 
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
 import re
@@ -89,17 +98,19 @@ RULE7_NOTES = [
 ]
 
 RULE_NAMES = {
+    1: "a shared type is defined once (in the owner's header)",
+    2: "an extern lives with the TU that owns it (or include/unsplit/<module>.h)",
     3: "struct/class states its size (/* size: 0xNN */)",
     4: "field carries its offset (/* +0xNN */)",
     5: "no field left named unkNN (pad_0xNN / unused_0xNN are the exception)",
     6: "no pointer arithmetic to reach a field",
     7: "no fn_XXXXXXXX / bare unkNN identifier",
     8: "goto is forbidden",
+    9: "no mangled spelling used as a callable identifier (call/declare the owner)",
 }
-UNCHECKED = [
-    (1, "a shared type lives in one header"),
-    (2, "an extern lives with the TU that owns it"),
-]
+# No rule is unchecked any more. Rule 2's remaining gap is dynamic (an unsplit address whose bracketing
+# registered units name different modules), so it is reported from `Ownership.gaps`, not from here.
+UNCHECKED: list[tuple[int, str]] = []
 
 
 # --------------------------------------------------------------------------------------------------
@@ -299,6 +310,268 @@ def struct_has_size(src: Source, defs: list[dict]) -> set[int]:
 
 
 # --------------------------------------------------------------------------------------------------
+# rule 1: a shared type is defined once (cross-file)
+# --------------------------------------------------------------------------------------------------
+# `union` is included (the rule names struct/class/union), and an anonymous `typedef struct { ... } Foo;`
+# takes `Foo` from the tail exactly as `struct_defs` does. A forward declaration (`struct Foo;`) has no
+# body and is not a definition, so it never counts.
+RULE1_TYPE_RE = re.compile(r"\b(?:struct|class|union)\s+([A-Za-z_]\w*)?\s*(?::[^{;]*)?\{")
+
+
+def type_defs(src: Source) -> list[tuple[str, int]]:
+    """`(name, line)` for every named struct/class/union definition in `src`, first definition per name."""
+    out = []
+    seen: set[str] = set()
+    for m in RULE1_TYPE_RE.finditer(src.code):
+        open_pos = m.end() - 1
+        name = m.group(1)
+        if not name:  # `typedef struct { ... } Foo;`
+            close_pos = match_brace(src.code, open_pos)
+            if close_pos < 0:
+                continue
+            tail = re.match(r"\s*([A-Za-z_]\w*)", src.code[close_pos + 1:])
+            name = tail.group(1) if tail else None
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append((name, src.line_of(m.start())))
+    return out
+
+
+def rule1_findings(sources: list[Source]) -> list[dict]:
+    """One finding per (type, extra file) for a type defined in more than one file.
+
+    The lexicographically first file is the owner; every later file that defines the same name gets a
+    finding that names both files, so a type in N files yields N-1 findings - the count is the number of
+    extra definitions to delete, not the number of files involved. Reporting per extra file (rather than
+    one finding per type) keeps the budget actionable and lets a batch that only adds a duplicate be
+    refused on the file it touched.
+    """
+    where: dict[str, dict[str, int]] = {}
+    by_rel = {src.rel: src for src in sources}
+    for src in sources:
+        for name, line in type_defs(src):
+            where.setdefault(name, {}).setdefault(src.rel, line)
+    out: list[dict] = []
+    for name in sorted(where):
+        files = sorted(where[name])
+        if len(files) < 2:
+            continue
+        owner = files[0]
+        for extra in files[1:]:
+            out.append(_finding(by_rel[extra], 1, where[name][extra],
+                                "type `%s` is defined in `%s` and again in `%s` - one definition, in the "
+                                "owner's header" % (name, owner, extra)))
+    return out
+
+
+# --------------------------------------------------------------------------------------------------
+# rule 2: an extern lives with the TU that owns it (symbols.txt + splits.txt)
+# --------------------------------------------------------------------------------------------------
+def module_name(unit: str) -> str:
+    """The module of a registered unit: its directory, or its stem for a root-level file."""
+    unit = unit.replace("\\", "/")
+    d = unit.rsplit("/", 1)[0] if "/" in unit else ""
+    return d or os.path.splitext(unit)[0]
+
+
+class Ownership:
+    """`symbol -> owning registered unit`, from `symbols.txt` + `splits.txt`.
+
+    Both files are parsed programmatically and never printed (`symbols.txt` is 4.5 MB); the result is
+    cached per mtime by `load_ownership`, as `brief.py` caches the map. `gaps`, `unsplit_modules` and
+    `foreign_units` accumulate what the lookup can and cannot judge, so the report states the classes it
+    leaves alone instead of guessing them.
+    """
+
+    def __init__(self, symbols: dict, ranges: dict):
+        self.symbols = symbols
+        self.ranges = {s: sorted(v) for s, v in ranges.items()}
+        self.gaps: "collections.Counter" = collections.Counter()
+        self.unsplit_modules: "collections.Counter" = collections.Counter()
+        self.unsplit_symbols: dict[str, set] = {}
+        self.foreign_units: "collections.Counter" = collections.Counter()
+
+    def resolve(self, name: str) -> "dict | None":
+        """`None` when the name is not in the map; else a dict with `kind` owned/unsplit/dup."""
+        entries = self.symbols.get(name)
+        if not entries:
+            return None
+        if len(entries) != 1:
+            return {"kind": "dup"}
+        section, address, type_ = entries[0]
+        for start, end, unit in self.ranges.get(section, []):
+            if start <= address < end:
+                return {"kind": "owned", "unit": unit, "section": section,
+                        "address": address, "type": type_}
+        return {"kind": "unsplit", "section": section, "address": address, "type": type_,
+                "module": self.module(section, address)}
+
+    def module(self, section: str, address: int) -> "str | None":
+        """The module of the registered units bracketing `address` in `section`, or None.
+
+        The registered bands interleave across modules - a `sound` unit sits inside the `ef` band - so
+        when the nearest unit below and the nearest above disagree there is no sound answer and this
+        returns None. The caller leaves those sites a documented gap rather than name a wrong module.
+        """
+        rows = self.ranges.get(section)
+        if not rows:
+            return None
+        lo = hi = None
+        for start, _end, unit in rows:
+            if start <= address:
+                lo = unit
+            elif hi is None:
+                hi = unit
+        if lo is None or hi is None:
+            return None
+        a, b = module_name(lo), module_name(hi)
+        return a if a == b else None
+
+
+def _parse_symbols(path: str) -> dict:
+    pattern = re.compile(r"^(\S+)\s*=\s*([.\w]+):(0x[0-9A-Fa-f]+);\s*//\s*type:(\w+)")
+    symbols: dict = {}
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            m = pattern.match(line)
+            if m:
+                symbols.setdefault(m.group(1), []).append(
+                    (m.group(2), int(m.group(3), 16), m.group(4)))
+    return symbols
+
+
+def _parse_splits(path: str) -> dict:
+    ranges: dict = {}
+    current = None
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith("Sections:"):
+                continue
+            m = re.match(r"^([^\s:][^:]*):\s*$", line)
+            if m and not line.startswith(("\t", " ")):
+                current = m.group(1)
+                continue
+            m = re.match(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
+            if m and current:
+                ranges.setdefault(m.group(1), []).append(
+                    (int(m.group(2), 16), int(m.group(3), 16), current))
+    return ranges
+
+
+_OWNERSHIP_CACHE: dict = {}
+
+
+def load_ownership(root: str) -> "Ownership | None":
+    """Parse `symbols.txt` + `splits.txt` once per mtime; None when either is absent.
+
+    A scratch lint with no map simply has rule 2 unchecked rather than dying. The cache is keyed on both
+    MTimes, so a rename or a re-split invalidates it within one process (a pool brief, a batch check).
+    """
+    sym = os.path.join(root, "config", "RMHE08", "symbols.txt")
+    spl = os.path.join(root, "config", "RMHE08", "splits.txt")
+    if not os.path.exists(sym) or not os.path.exists(spl):
+        return None
+    key = (sym, spl, os.path.getmtime(sym), os.path.getmtime(spl))
+    if key not in _OWNERSHIP_CACHE:
+        _OWNERSHIP_CACHE[key] = Ownership(_parse_symbols(sym), _parse_splits(spl))
+    return _OWNERSHIP_CACHE[key]
+
+
+EXTERN_RE = re.compile(r"\bextern\b")
+
+
+def _declared_name(segment: str) -> "str | None":
+    """The identifier an `extern` declaration introduces (function, function pointer, or variable).
+
+    The first `(` is always at depth 0, so what follows it decides the shape: `(*name)` is a function
+    pointer variable, `(*name(` is a function returning a function pointer, anything else is a function
+    whose name is the last identifier before the `(`. A function-pointer *parameter* is nested, so it is
+    never reached from the first `(`.
+    """
+    i = segment.find("(")
+    if i >= 0:
+        tail = segment[i:]
+        m = re.match(r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", tail)
+        if m:
+            return m.group(1)
+        m = re.match(r"\(\s*\*\s*([A-Za-z_]\w*)\s*\(", tail)
+        if m:
+            return m.group(1)
+        ids = re.findall(r"[A-Za-z_]\w*", segment[:i])
+        return ids[-1] if ids else None
+    segment = re.sub(r"\[[^\]]*\]", " ", segment.split("=")[0])
+    ids = re.findall(r"[A-Za-z_]\w*", segment)
+    return ids[-1] if ids else None
+
+
+def extern_declarations(src: Source) -> list[tuple[str, int, int]]:
+    """`(name, pos, line)` for every `extern` function/variable declaration in the file.
+
+    A definition (`extern "C" void f(void) { ... }`) is skipped: it defines the symbol, so the file owns
+    it by construction. A linkage block (`extern "C" {`) has no name and is skipped too.
+    """
+    out = []
+    for m in EXTERN_RE.finditer(src.code):
+        j = m.end()
+        while j < len(src.code) and src.code[j] not in ";{}":
+            j += 1
+        if j < len(src.code) and src.code[j] == "{":
+            continue  # a definition, not a declaration
+        name = _declared_name(src.code[m.end():j])
+        if name is None:
+            continue
+        out.append((name, m.start(), src.line_of(m.start())))
+    return out
+
+
+def _owns(rel: str, unit: str) -> bool:
+    """Whether the `src/` file `rel` is the registered unit `unit` (its source file or its header)."""
+    rel = rel.replace("\\", "/")
+    if rel == SRC + "/" + unit:
+        return True
+    stem = os.path.splitext(unit)[0]
+    return any(rel == SRC + "/" + stem + ext for ext in (".h", ".hpp", ".hh"))
+
+
+def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
+    """Every `extern` declaration the file makes for a symbol it does not own.
+
+    Three outcomes: `owned` by this file (no finding), owned by another registered unit (move the
+    declaration to that unit's header and `#include` it), or `unsplit` (move it to
+    `include/unsplit/<module>.h`). A name not in the map, a name with duplicate map rows, and an unsplit
+    address whose bracketing units name different modules are left as counted gaps rather than guessed.
+    """
+    out = []
+    for name, _pos, line in extern_declarations(src):
+        r = ownership.resolve(name)
+        if r is None:
+            ownership.gaps["not in symbols.txt"] += 1
+            continue
+        if r["kind"] == "dup":
+            ownership.gaps["duplicate symbol name in the map"] += 1
+            continue
+        if r["kind"] == "owned":
+            if _owns(src.rel, r["unit"]):
+                continue
+            ownership.foreign_units[r["unit"]] += 1
+            out.append(_finding(src, 2, line,
+                                "`%s` is owned by `src/%s` - declare it in that unit's header and "
+                                "#include it" % (name, r["unit"])))
+            continue
+        module = r["module"]
+        if module is None:
+            ownership.gaps["unsplit: address band interleaves modules"] += 1
+            continue
+        ownership.unsplit_modules[module] += 1
+        ownership.unsplit_symbols.setdefault(module, set()).add(name)
+        out.append(_finding(src, 2, line,
+                            "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
+                            % (name, module)))
+    return out
+
+
+# --------------------------------------------------------------------------------------------------
 # rules
 # --------------------------------------------------------------------------------------------------
 _PTR_TYPE = (r"(?:const\s+)?(?:unsigned\s+|signed\s+)?"
@@ -318,6 +591,52 @@ RULE7_UNK_RE = re.compile(r"\bunk\w*\b")
 RULE7_DEFER_RE = re.compile(r"rule[ \t]*7[ \t]+deferred[ \t]*:[ \t]*\S")
 _COMMENT_DELIM_RE = re.compile(r"/\*|\*/|//")
 RULE8_RE = re.compile(r"\bgoto\b")
+
+# Rule 9: a compiler-mangled name used as a callable identifier. MWCC's manglings carry an argument list
+# (`Name__FP...`, `Name__Fv`) or a qualified owner (`Name__Q34nw4r...`), and a class member is
+# `member__<len>Class<Fargs>` (`move__6MHcharFUs`). An `fn_XXXXXXXX` stem has no `__` and is the map's own
+# placeholder (rule 7's), not a mangling, so it is never matched here.
+RULE9_MANGLED_RE = re.compile(r"^[A-Za-z_]\w*__(?:[FQ]\w*|\d\w*F\w*)$")
+RULE9_CALL_RE = re.compile(r"(?<![\w])([A-Za-z_]\w*)\s*\(")
+# The statement head of a declaration: an optional `extern` (its `"C"` is blanked by `strip`, so it shows
+# as spaces), declaration specifiers, a return type (a builtin, a unit alias or a namespaced name), and
+# nothing an expression could end with. A call's head is empty (`foo()`), has an operator, or is a control
+# keyword, so it fails this and is reported as a call.
+_DECL_HEAD_RE = re.compile(
+    r"^\s*(?:extern\s+)?"
+    r"(?:(?:static|inline|virtual|const|unsigned|signed|struct|class|union|register|typedef)\s+)*"
+    r"(?:void|bool|BOOL|char|short|int|long|float|double"
+    r"|[us](?:8|16|32|64)|f(?:32|64)"
+    r"|[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*)"
+    r"\s*[\*&]*\s*$"
+)
+_DECL_KEYWORDS = {"return", "if", "while", "for", "switch", "case", "else", "do",
+                  "sizeof", "break", "continue", "goto"}
+
+
+def _statement_head(code: str, pos: int) -> str:
+    """The text between the previous statement terminator and `pos` (a mangled identifier)."""
+    start = 0
+    for i in range(pos - 1, -1, -1):
+        if code[i] in ";{}":
+            start = i + 1
+            break
+    return code[start:pos]
+
+
+def looks_like_declaration(code: str, pos: int) -> bool:
+    """Whether the mangled identifier at `pos` is being declared rather than called.
+
+    A declaration puts a return type (or `extern`) in front of the identifier and nothing an expression
+    could end with, so the statement head decides it: `void foo__Fv(void);` and `extern "C" void
+    foo__Fv(void);` are declarations, while `foo__Fv()`, `x = foo__Fv()`, `return foo__Fv()` and
+    `if (foo__Fv())` are calls.
+    """
+    head = _statement_head(code, pos)
+    ids = re.findall(r"[A-Za-z_]\w*", head)
+    if ids and ids[-1] in _DECL_KEYWORDS:
+        return False
+    return bool(_DECL_HEAD_RE.match(head))
 
 # rule 6's own exception: a raw byte offset is allowed where no field is being named - a `memset`/`memcpy`
 # range is the common case, so a cast-plus-offset that is an argument to one of these is not reported.
@@ -348,8 +667,12 @@ def _finding(src: Source, rule: int, line: int, detail: str) -> dict:
             "text": src.line_text(line).strip()[:160], "detail": detail}
 
 
-def lint_source(src: Source) -> list[dict]:
-    """All section 6.5 findings for one file, in rule then line order."""
+def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]:
+    """All section 6.5 findings for one file, in rule then line order.
+
+    `ownership` carries the symbols.txt + splits.txt index for rule 2; when it is None (the map is
+    absent, or a caller that only wants the source-local rules), rule 2 is not reported for `src`.
+    """
     out: list[dict] = []
     defs = struct_defs(src)
     sized = struct_has_size(src, defs)
@@ -401,6 +724,25 @@ def lint_source(src: Source) -> list[dict]:
     for m in RULE8_RE.finditer(src.code):
         out.append(_finding(src, 8, src.line_of(m.start()), "goto statement"))
 
+    # Rule 9: the mangled spelling is forbidden as the callable identifier. Both halves are reported -
+    # a call (`foo__Fv()`) and a declaration (`extern void foo__Fv(void);`) - because the declaration is
+    # where playbook row 50's double-mangle is born, and the fix differs only in emphasis: a call is
+    # rewritten `obj->method(args)` / `ns::function(args)`, a declaration to the owner's real declaration.
+    for m in RULE9_CALL_RE.finditer(src.code):
+        name = m.group(1)
+        if not RULE9_MANGLED_RE.match(name):
+            continue
+        line = src.line_of(m.start())
+        if looks_like_declaration(src.code, m.start()):
+            out.append(_finding(src, 9, line,
+                                "mangled name `%s` is declared - declare its owner and include it" % name))
+        else:
+            out.append(_finding(src, 9, line,
+                                "mangled name `%s` is called - call it through its owner" % name))
+
+    if ownership is not None:
+        out.extend(rule2_findings(src, ownership))
+
     out.sort(key=lambda f: (f["rule"], f["line"]))
     return out
 
@@ -428,10 +770,40 @@ def read_text(path: str) -> str:
         return fh.read()
 
 
-def lint_tree(root: str, paths: list[str] | None = None) -> list[dict]:
+def all_sources(root: str) -> list["Source"]:
+    """Every `src/` file as a `Source`, in path order."""
+    return [Source(path, rel_of(root, path), read_text(path)) for path in source_files(root)]
+
+
+def lint_tree(root: str, paths: list[str] | None = None,
+              ownership: "Ownership | None" = None) -> list[dict]:
+    """Per-file findings (rules 2-9) for `paths`, or for the whole tree when `paths` is None.
+
+    Rule 1 is cross-file and is *not* included here: with `paths` limited to a batch's changed files it
+    would miss a duplicate whose partner is untouched. Use `lint_all` for the whole rule set. `ownership`
+    is the rule-2 index; it is loaded from `root` when not passed, and the map being absent simply leaves
+    rule 2 unreported.
+    """
+    if ownership is None:
+        ownership = load_ownership(root)
     out = []
-    for path in (paths if paths is not None else source_files(root)):
-        out.extend(lint_source(Source(path, rel_of(root, path), read_text(path))))
+    sources = all_sources(root) if paths is None else [
+        Source(path, rel_of(root, path), read_text(path)) for path in paths]
+    for src in sources:
+        out.extend(lint_source(src, ownership))
+    return out
+
+
+def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
+    """Every checked finding: the per-file rules plus cross-file rule 1, in rule/file/line order."""
+    if ownership is None:
+        ownership = load_ownership(root)
+    sources = all_sources(root)
+    out = []
+    for src in sources:
+        out.extend(lint_source(src, ownership))
+    out.extend(rule1_findings(sources))
+    out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out
 
 
@@ -454,7 +826,9 @@ def unique_names(findings: list[dict]) -> dict:
         return {m.group(1) for f in findings if f["rule"] == rule and f["detail"].startswith(prefix)
                 for m in [re.search(r"`([^`]+)`", f["detail"])] if m}
     return {"fn_names": len(names(7, "auto")), "unk_identifiers": len(names(7, "bare")),
-            "unk_fields": len(names(5, "")), "types": len(names(3, ""))}
+            "unk_fields": len(names(5, "")), "types": len(names(3, "")),
+            "shared_types": len(names(1, "")), "extern_symbols": len(names(2, "")),
+            "mangled_names": len(names(9, ""))}
 
 
 def rule7_deferral(comments: str) -> bool:
@@ -559,11 +933,13 @@ def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
     return out
 
 
-def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> dict[tuple[int, str], int]:
+def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
+                    ownership: "Ownership | None" = None) -> dict[tuple[int, str], int]:
     """Rule counts for the ref's copy of each file, keyed by the file's path *now*.
 
     A file absent at the ref (`before is None`) counts as zero: it is new, so every violation in it is an
-    addition. Keying a rename by its new path keeps the two sides comparable.
+    addition. Keying a rename by its new path keeps the two sides comparable. `ownership` is the rule-2
+    index (the working tree's, which is what the batch lands against).
     """
     findings = []
     for before, after in pairs:
@@ -573,14 +949,69 @@ def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) ->
             text = git_bytes(root, "show", "%s:%s" % (ref, before)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        findings.extend(lint_source(Source(before, after, text)))
+        findings.extend(lint_source(Source(before, after, text), ownership))
     return rule_counts(findings)
+
+
+def merge_counts(*counts: dict) -> dict:
+    """Sum several `rule_counts` dicts (each `{(rule, file): n}`) into one."""
+    out: dict = {}
+    for c in counts:
+        for key, n in c.items():
+            out[key] = out.get(key, 0) + n
+    return out
+
+
+def src_paths_at_ref(root: str, ref: str) -> list[str]:
+    """Every `src/` path (relative, slash-separated) that exists at `ref`."""
+    return [line for line in git(root, "ls-tree", "-r", "--name-only", ref, "--", SRC).splitlines()
+            if line.endswith(SUFFIXES)]
+
+
+def rule1_counts_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> dict:
+    """Rule-1 counts for the ref's whole `src/` tree, keyed by the path each file has now.
+
+    Rule 1 is cross-file, so unlike `findings_at_ref` (which lints only the changed files) it has to see
+    every file: a batch can duplicate a type that already lives in an untouched file. A rename is keyed by
+    its new path so the two sides stay comparable.
+    """
+    rename = {before: after for before, after in pairs if before and before != after}
+    sources = []
+    for path in src_paths_at_ref(root, ref):
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        sources.append(Source(path, rename.get(path, path), text))
+    return rule_counts(rule1_findings(sources))
 
 
 # --------------------------------------------------------------------------------------------------
 # reporting
 # --------------------------------------------------------------------------------------------------
-def print_budget(findings: list[dict]) -> None:
+def print_rule2_report(ownership: "Ownership | None") -> None:
+    """The rule-2 backlog shape: owners needing a header, the unsplit modules, and the counted gaps."""
+    if ownership is None:
+        print("rule 2: unchecked (config/RMHE08/symbols.txt or splits.txt is absent)")
+        return
+    if ownership.foreign_units:
+        print("rule 2: %d declaration site(s) into %d other owner unit(s); top: %s"
+              % (sum(ownership.foreign_units.values()), len(ownership.foreign_units),
+                 ", ".join("%s (%d)" % (u, n) for u, n in ownership.foreign_units.most_common(5))))
+    if ownership.unsplit_modules:
+        print("rule 2: include/unsplit/*.h would carry %d declaration site(s) for %d symbol(s): %s"
+              % (sum(ownership.unsplit_modules.values()),
+                 sum(len(v) for v in ownership.unsplit_symbols.values()),
+                 ", ".join("%s %d site(s)/%d symbol(s)"
+                           % (m, n, len(ownership.unsplit_symbols.get(m, ())))
+                           for m, n in sorted(ownership.unsplit_modules.items()))))
+    for reason, n in sorted(ownership.gaps.items()):
+        print("rule 2 gap: %d declaration site(s) - %s (documented, not guessed)" % (n, reason))
+    if not ownership.foreign_units and not ownership.unsplit_modules and not ownership.gaps:
+        print("rule 2: every extern declaration was judged")
+
+
+def print_budget(findings: list[dict], ownership: "Ownership | None" = None) -> None:
     b = budget(findings)
     width = max([len(row["file"]) for row in b["units"]] + [len("TOTAL")])
     head = "".join("  r%d" % r for r in RULE_NAMES)
@@ -592,10 +1023,13 @@ def print_budget(findings: list[dict]) -> None:
                            "".join("  %2d" % b["totals"][str(r)] for r in RULE_NAMES)))
     print("")
     u = unique_names(findings)
-    print("distinct names: rule 3 %d type(s), rule 5 %d field(s), rule 7 %d fn_* + %d unk identifier(s)"
-          % (u["types"], u["unk_fields"], u["fn_names"], u["unk_identifiers"]))
+    print("distinct names: rule 1 %d shared type(s), rule 2 %d extern symbol(s), rule 3 %d type(s), "
+          "rule 5 %d field(s), rule 7 %d fn_* + %d unk identifier(s), rule 9 %d mangled name(s)"
+          % (u["shared_types"], u["extern_symbols"], u["types"], u["unk_fields"], u["fn_names"],
+             u["unk_identifiers"], u["mangled_names"]))
     print("%d finding(s) over %d unit(s), %d file(s) with findings"
           % (b["findings"], len(b["units"]), len(source_files_of(findings))))
+    print_rule2_report(ownership)
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))
     for rule, prefix, why in EXEMPT:
@@ -632,11 +1066,11 @@ def selftest() -> int:
         if got != want:
             fails.append("%s: got %r want %r" % (name, got, want))
 
-    def rules_of(text: str, rel: str = "x.c") -> list[tuple[int, int]]:
-        return [(f["rule"], f["line"]) for f in lint_source(Source("x.c", rel, text))]
+    def rules_of(text: str, rel: str = "x.c", ownership=None) -> list[tuple[int, int]]:
+        return [(f["rule"], f["line"]) for f in lint_source(Source("x.c", rel, text), ownership)]
 
-    def lines_of(text: str, rule: int, rel: str = "x.c") -> list[int]:
-        return [f["line"] for f in lint_source(Source("x.c", rel, text)) if f["rule"] == rule]
+    def lines_of(text: str, rule: int, rel: str = "x.c", ownership=None) -> list[int]:
+        return [f["line"] for f in lint_source(Source("x.c", rel, text), ownership) if f["rule"] == rule]
 
     # --- stripping --------------------------------------------------------------------------------
     code, comm = strip("a /* goto */ b\nc // goto\nd \"goto\" 'x'\n")
@@ -817,6 +1251,128 @@ def selftest() -> int:
     check("rule8: a plain label is not reported by this check", lines_of("void f(void) {\nout:\n    return;\n}\n", 8), [])
     check("rule8: a name containing goto is clean", lines_of("void f(void) {\n    u32 gotot = 1;\n}\n", 8), [])
 
+    # --- rule 9: a mangled symbol is reached through its owner -----------------------------------
+    check("rule9: a mangled call is a violation",
+          lines_of("void f(void) {\n    get_now_areano__Fv();\n}\n", 9), [2])
+    check("rule9: a namespaced mangled call is a violation",
+          lines_of("void f(void) {\n    Panic__Q24nw4r2dbFPCciPCce(a, 1, b);\n}\n", 9), [2])
+    check("rule9: a class-member mangling is a violation",
+          lines_of("void f(void) {\n    move__6MHcharFUs(x, 0);\n}\n", 9), [2])
+    check("rule9: an fn_XXXXXXXX call is not a mangling",
+          lines_of("void f(void) {\n    fn_80040598();\n}\n", 9), [])
+    check("rule9: a member call through its owner is clean",
+          lines_of("void f(A* a) {\n    a->method(1);\n}\n", 9), [])
+    check("rule9: a namespaced call through its owner is clean",
+          lines_of("void f(void) {\n    ns::func(1);\n}\n", 9), [])
+    check("rule9: a declaration is a finding too (row 50's other half)",
+          lines_of("extern void get_now_areano__Fv(void);\n", 9), [1])
+    check("rule9: an extern \"C\" mangled declaration is a finding",
+          lines_of('extern "C" void Panic__Q24nw4r2dbFPCciPCce(const char*, int, const char*);\n', 9), [1])
+    check("rule9: a mangled name in a comment is clean",
+          lines_of("/* call get_now_areano__Fv() through the owner */\nvoid f(void) {}\n", 9), [])
+    check("rule9: a mangled name in a string is clean",
+          lines_of('const char* s = "get_now_areano__Fv";\n', 9), [])
+    check("rule9: an ordinary name with underscores is clean",
+          lines_of("void f(void) {\n    get_thing();\n}\n", 9), [])
+    check("rule9: a call in an expression is a call",
+          lines_of("void f(void) {\n    if (get_now_areano__Fv() == 1) {}\n}\n", 9), [2])
+    check("rule9: a definition is a declaration",
+          lines_of("void get_now_areano__Fv(void) {\n}\n", 9), [1])
+    decl = "extern void get_now_areano__Fv(void);\n"
+    call = "void f(void) {\n    get_now_areano__Fv();\n}\n"
+    check("rule9: the classifier reads a declaration",
+          looks_like_declaration(decl, decl.index("get_now_areano__Fv")), True)
+    check("rule9: the classifier reads a call",
+          looks_like_declaration(call, call.index("get_now_areano__Fv")), False)
+    check("rule9: the classifier reads a return expression as a call",
+          looks_like_declaration("return get_now_areano__Fv();\n",
+                                 "return get_now_areano__Fv();".index("get_now")), False)
+
+    # --- rule 1: a shared type is defined once (cross-file) ---------------------------------------
+    def r1(*files: tuple[str, str]) -> list[tuple[int, str, int]]:
+        sources = [Source("%s.c" % name, "src/%s.c" % name, text) for name, text in files]
+        return [(f["rule"], f["file"], f["line"]) for f in rule1_findings(sources)]
+
+    dup = "/* size: 0x8 */\nstruct Foo {\n    /* +0x00 */ u32 x;\n};\n"
+    check("rule1: the same type in two files is a finding in the extra file",
+          r1(("a", dup), ("b", dup)), [(1, "src/b.c", 2)])
+    check("rule1: a type defined once is clean", r1(("a", dup)), [])
+    check("rule1: three files give two findings, one per extra file",
+          [f for _r, f, _l in r1(("a", dup), ("b", dup), ("c", dup))], ["src/b.c", "src/c.c"])
+    check("rule1: the message names both files",
+          [f["detail"] for f in rule1_findings([Source("x", "src/a.c", dup), Source("y", "src/b.c", dup)])],
+          ["type `Foo` is defined in `src/a.c` and again in `src/b.c` - one definition, in the owner's header"])
+    check("rule1: the owner is the lexicographically first file",
+          [f["detail"] for f in rule1_findings([Source("x", "src/z.c", dup), Source("y", "src/a.c", dup)])],
+          ["type `Foo` is defined in `src/a.c` and again in `src/z.c` - one definition, in the owner's header"])
+    check("rule1: a union is a type too",
+          [f["rule"] for f in rule1_findings([
+              Source("x", "src/a.c", "/* size: 0x8 */\nunion Foo {\n    /* +0x00 */ u32 x;\n};\n"),
+              Source("y", "src/b.c", "/* size: 0x8 */\nunion Foo {\n    /* +0x00 */ u32 x;\n};\n")])],
+          [1])
+    check("rule1: a forward declaration is not a definition",
+          r1(("a", "struct Foo;\n"), ("b", "struct Foo;\n")), [])
+    check("rule1: an anonymous typedef gets the name after the brace",
+          [f["rule"] for f in rule1_findings([
+              Source("x", "src/a.c", "typedef struct {\n    u32 x;\n} Foo;\n"),
+              Source("y", "src/b.c", "typedef struct {\n    u32 x;\n} Foo;\n")])],
+          [1])
+    check("rule1: two different types are not duplicates",
+          [f["rule"] for f in rule1_findings([
+              Source("x", "src/a.c", dup), Source("y", "src/b.c", dup.replace("Foo", "Bar"))])],
+          [])
+
+    # --- rule 2: an extern lives with the TU that owns it -----------------------------------------
+    idx = Ownership({"foo": [(".text", 0x1000, "function")], "bar": [(".text", 0x3000, "function")]},
+                    {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "mod/b.c")]})
+    check("rule2: an extern for another unit's symbol is a finding",
+          lines_of("extern void foo(void);\n", 2, "src/other/c.c", idx), [1])
+    check("rule2: the detail names the owner and the fix",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void foo(void);\n"), idx)
+           if f["rule"] == 2],
+          ["`foo` is owned by `src/mod/a.c` - declare it in that unit's header and #include it"])
+    check("rule2: the same extern for a symbol the file owns is clean",
+          lines_of("extern void foo(void);\n", 2, "src/mod/a.c", idx), [])
+    check("rule2: the owner's header is clean too",
+          lines_of("extern void foo(void);\n", 2, "src/mod/a.h", idx), [])
+    check("rule2: an extern variable for another unit's symbol is a finding",
+          lines_of("extern u16 bar[2];\n", 2, "src/other/c.c", idx), [1])
+    check("rule2: a symbol not in the map is not a finding",
+          lines_of("extern void not_in_map(void);\n", 2, "src/other/c.c", idx), [])
+    check("rule2: the missing name is counted as a gap",
+          idx.gaps["not in symbols.txt"], 1)
+    mid = Ownership({"mid": [(".text", 0x2500, "function")]},
+                    {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "mod/b.c")]})
+    check("rule2: an unsplit symbol with one bracketing module is a finding",
+          lines_of("extern void mid(void);\n", 2, "src/other/c.c", mid), [1])
+    check("rule2: the unsplit detail names the module header",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void mid(void);\n"), mid)
+           if f["rule"] == 2],
+          ["`mid` has no registered owner - declare it in `include/unsplit/mod.h`"])
+    gap = Ownership({"gap": [(".text", 0x2500, "function")]},
+                    {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "other/b.c")]})
+    check("rule2: an unsplit symbol whose brackets disagree is a documented gap",
+          lines_of("extern void gap(void);\n", 2, "src/other/c.c", gap), [])
+    check("rule2: the interleaved case is counted in ownership.gaps",
+          gap.gaps["unsplit: address band interleaves modules"], 1)
+    check("rule2: extern declarations are found by the scanner",
+          [n for n, _p, _l in extern_declarations(Source("x", "x.c",
+              "extern void a(void);\nextern u16 b[2];\nextern void (*c)(int);\n"))], ["a", "b", "c"])
+    check("rule2: a function-pointer parameter is not the declared name",
+          [n for n, _p, _l in extern_declarations(Source("x", "x.c",
+              "extern void* f(s32 a, void (*cb)(void));\n"))], ["f"])
+    check("rule2: a function returning a function pointer is named",
+          [n for n, _p, _l in extern_declarations(Source("x", "x.c",
+              "extern void (*f(int))(void);\n"))], ["f"])
+    # the real map: the ownership lookup resolves a symbol we name, from the tree's own data
+    if os.path.exists(os.path.join(".", "config", "RMHE08", "symbols.txt")):
+        real = load_ownership(".")
+        r = real.resolve("em_act_ck__FP11_ENEMY_WORKUcUc") if real else None
+        check("rule2: the real map resolves a named symbol to its owner unit",
+              (r or {}).get("kind"), "owned")
+        check("rule2: the real map names the enemy unit that owns it",
+              (r or {}).get("unit"), "enemy/fn_8012BDF4.cpp")
+
     # --- budget aggregation -----------------------------------------------------------------------
     text = ("/* size: 0x8 */\nstruct A {\n    u32 unk00;\n};\n"
             "void f(u8* p) {\n    *(u32*)((u8*)p + 0x4) = 1;\n}\n")
@@ -834,6 +1390,9 @@ def selftest() -> int:
     check("budget: unique fn names", b["unique"]["fn_names"], 1)
     check("budget: unique unk fields", b["unique"]["unk_fields"], 1)
     check("budget: unique types", b["unique"]["types"], 0)
+    check("budget: unique shared types", b["unique"]["shared_types"], 0)
+    check("budget: unique extern symbols", b["unique"]["extern_symbols"], 0)
+    check("budget: unique mangled names", b["unique"]["mangled_names"], 0)
     check("unique: repeated sites collapse", unique_names([
         {"rule": 5, "detail": "field `unk1`"}, {"rule": 5, "detail": "field `unk1`"},
         {"rule": 7, "detail": "bare `unk1` identifier"},
@@ -851,8 +1410,8 @@ def selftest() -> int:
           [(x["rule"]) for x in diff_deltas({(5, "x"): 1, (8, "x"): 0}, {(5, "x"): 1, (8, "x"): 1})], [8])
 
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [3, 4, 5, 6, 7, 8])
-    check("e2e: rules 1 and 2 are declared unchecked", [n for n, _ in UNCHECKED], [1, 2])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9])
+    check("e2e: no rule is declared unchecked", UNCHECKED, [])
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
 
@@ -882,16 +1441,20 @@ def main(argv: list[str] | None = None) -> int:
 
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
     root = root.stdout.strip() if root.returncode == 0 else os.getcwd()
+    ownership = load_ownership(root)
 
     if args.diff is not None:
         try:
             pairs = changed_src_files(root, args.diff)
             rels = [after for _before, after in pairs]
-            before = findings_at_ref(root, args.diff, pairs)
+            before = merge_counts(findings_at_ref(root, args.diff, pairs, ownership),
+                                  rule1_counts_at_ref(root, args.diff, pairs))
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
             return 2
-        after = rule_counts(lint_tree(root, [os.path.join(root, a) for _b, a in pairs]))
+        after = merge_counts(
+            rule_counts(lint_tree(root, [os.path.join(root, a) for _b, a in pairs], ownership)),
+            rule_counts(rule1_findings(all_sources(root))))
         added = diff_deltas(before, after)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
@@ -910,17 +1473,20 @@ def main(argv: list[str] | None = None) -> int:
                 print("  not enforced: rule 7 for %s (%s)" % (cond, why))
         else:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
-                  "(rules 1-2 not checked: cross-file; rule 7 exempt per rule7_state)"
-                  % len(rels))
+                  "(rule 2 checked where an owner resolves; rule 7 exempt per rule7_state)" % len(rels))
         return 1 if added else 0
 
-    findings = lint_tree(root)
+    findings = lint_all(root, ownership)
     if args.json:
         print(json.dumps({"budget": budget(findings),
+                          "rule2_gaps": dict(ownership.gaps) if ownership else {},
+                          "rule2_unsplit_modules": (
+                              {m: {"sites": n, "symbols": len(ownership.unsplit_symbols.get(m, ()))}
+                               for m, n in ownership.unsplit_modules.items()} if ownership else {}),
                           "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
                           "exempt": exemptions()}, indent=2))
     elif args.budget:
-        print_budget(findings)
+        print_budget(findings, ownership)
     else:
         print_findings(findings)
     return 0
