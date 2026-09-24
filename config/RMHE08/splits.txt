@@ -29,20 +29,40 @@ fn_80040598.cpp:
 	extabindex  start:0x8001E588 end:0x8001E5A0
 	.text       start:0x80040598 end:0x800408A8
 
-g3d/g3d_resanmamblight.c:
+g3d/g3d_anmscn.cpp:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68
 	.text       start:0x800680A8 end:0x800680CC
 
-auto/80073398_fn_80073398.cpp:
-	extab       start:0x80008060 end:0x800081F8
-	extabindex  start:0x800206B8 end:0x8002091C
-	.text       start:0x80073398 end:0x80075DCC
+g3d/g3d_calcvtx.cpp:
+	extab       start:0x80008060 end:0x800080B8
+	extabindex  start:0x800206B8 end:0x8002073C
+	.text       start:0x80073398 end:0x800736F8
 
-auto/800898B0_fn_800898B0.c:
-	extab       start:0x80008EB0 end:0x80008F08
-	extabindex  start:0x800219E4 end:0x80021A68
-	.text       start:0x800898B0 end:0x8008A28C
+g3d/g3d_calcworld.cpp:
+	extab       start:0x800080B8 end:0x80008138
+	extabindex  start:0x8002073C end:0x800207FC
+	.text       start:0x800736F8 end:0x800746DC
+
+g3d/g3d_camera.cpp:
+	extab       start:0x80008138 end:0x800081F8
+	extabindex  start:0x800207FC end:0x8002091C
+	.text       start:0x800746DC end:0x80075DCC
+
+g3d/g3d_resanm.c:
+	extab       start:0x80008EB0 end:0x80008EE8
+	extabindex  start:0x800219E4 end:0x80021A38
+	.text       start:0x800898B0 end:0x80089F94
+
+g3d/g3d_resanmamblight.c:
+	extab       start:0x80008EE8 end:0x80008F00
+	extabindex  start:0x80021A38 end:0x80021A5C
+	.text       start:0x80089F94 end:0x8008A220
+
+g3d/g3d_resanmcamera.c:
+	extab       start:0x80008F00 end:0x80008F08
+	extabindex  start:0x80021A5C end:0x80021A68
+	.text       start:0x8008A220 end:0x8008A28C
 
 gx/fn_8009AA78.c:
 	extab       start:0x800099F0 end:0x80009A18
