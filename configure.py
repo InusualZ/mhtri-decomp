@@ -535,6 +535,7 @@ config.libs = [
             # Panic__Q24nw4r2dbFPCciPCce.
             Object(NonMatching, "ef/fn_800AEE48.cpp"),
                         Object(NonMatching, "ef/ef_drawpointstrategy.cpp"),
+                        Object(NonMatching, "ef/ef_drawlinestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
             # Registered from proposal/800C9540_fn_800C9540.cpp (a 0x800C9540 run discovery proposed).
