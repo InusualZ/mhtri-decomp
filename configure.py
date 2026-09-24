@@ -533,6 +533,7 @@ config.libs = [
             # Panic__Q24nw4r2dbFPCciPCce.
             Object(NonMatching, "ef/fn_800AEE48.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
+            Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
             Object(NonMatching, "ef/ef_disc.cpp"),

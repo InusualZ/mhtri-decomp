@@ -37,6 +37,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/ef_particlemanager.h"
 
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
@@ -454,6 +455,6 @@ extern "C" void fn_800AD9CC() {}
 extern "C" void fn_800ADA5C() {}
 extern "C" void fn_800ADED8() {}
 extern "C" void fn_800AE2A4() {}
-extern "C" void fn_800AE360() {}
+extern "C" void fn_800AE360(void* target, MTX34* out) { (void)target; (void)out; }
 extern "C" void fn_800AE628() {}
 extern "C" void fn_800AE6A8() {}
