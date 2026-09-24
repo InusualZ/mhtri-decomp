@@ -98,6 +98,7 @@ python scripts/mt.py frames -u <unit> [--flags-extra "..."] [--versions ...]
 python scripts/mt.py matrix -u <unit> [--flags-extra "..."] [versions...]
 python scripts/mt.py sweep  -u <unit> [subs...]
 python scripts/mt.py variants -u <unit> [--variants f.py] [names...]
+python scripts/mt.py shapes -u <unit> [-f <function>] [--scan N] [--gens ...] [--depth N]  # source shapes
 python scripts/mt.py diff   -u <unit> <symbol> [n] [--all]
 python scripts/mt.py slots  -u <unit> <symbol> [--map] [--slot 0x64]
 python scripts/mt.py sections -u <unit>

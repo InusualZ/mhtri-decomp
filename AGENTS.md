@@ -150,6 +150,7 @@ measured unit).
 | 44 | A string pool in `.data` means the build was not `-str readonly` | Retail's string pool in `.data` (not `.rodata`) says the build did not use `-str readonly`; it is a placement diagnostic even when the score does not move on its own. | done |
 | 45 | A hand-written string literal's `\n` becomes CRLF on this host | MWCC on this host translates the `\n` in a literal to CRLF, so a string pool written in-source does not match the DOL's LF bytes; leave the range to the data pass. | done |
 | 46 | A flipped unit's `.ctors$10` fragment is reordered by the linker | The object is byte-identical and `flipcheck.py` says READY, and the flip still loses the unit's `.ctors$10`/`.dtors$15` words; re-split first, then suspect the linker's fixed ctor/dtor name order. | done |
+| 47 | Automate the shape search: generate, compile, score and rank source variants | The residual is codegen, so finding the source shape was a hand-run search of hundreds of variants per function; `tools/flags/shapesearch.py` does it mechanically (declaration order/types, `for`-decl hoisting, temps, casts, statement order, compound assignment, field form, dead copies, switch/cond/ternary/loop shape) and ranks by the official report metric. On `Pl/pl_act`'s worst 20: 12/20 improved, two byte-identical to 100 % (`fn_8027D40C` via `loop_decl_top`, `Pl_get_gunner_vec` via `deadcopy_plain_x`), combined unit mean 98.888 -> 99.086. | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
@@ -229,8 +230,9 @@ build/                    Everything generated: build.ninja, compilers/, tools/,
 tools/                    Tooling. dtk-template's scripts at the top level (project.py, download_tool.py, ...),
                           plus ours, grouped by what they do:
                             unitutil.py  shared unit/flag/ELF layer used by the tools below
-                            flags/    compiler-flag experiments (frame.py, mwcc_matrix.py,
-                                      optsweep.py, tryvar.py) + variants/<lib>.py data
+                            flags/    compiler-flag and source-shape experiments (frame.py,
+                                      mwcc_matrix.py, optsweep.py, tryvar.py,
+                                      shapesearch.py + shapes.py) + variants/<lib>.py data
                                       - see docs/matching.md
                             objdiff/  objdiff consumers (symdiff.py, slotmap.py)
                             elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
