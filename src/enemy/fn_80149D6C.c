@@ -89,7 +89,6 @@ extern void fn_80134004(_ENEMY_WORK* self, f32 scale, u16 id);
 extern u32 fn_8012EC3C(_ENEMY_WORK* self);
 extern u32 fn_80131BD4(_ENEMY_WORK* self);
 extern void fn_8012B380(_ENEMY_WORK* self, u8 a, u8 b, u8 c);
-extern void fn_80128A14(_ENEMY_WORK* self, u8 a, u8 b);
 extern void fn_801277F4(_ENEMY_WORK* self, s32 a);
 extern void fn_80128A70(_ENEMY_WORK* self, u8 a, u8 b);
 extern f32 calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(Vec3* a, Vec3* b);

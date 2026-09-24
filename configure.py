@@ -498,6 +498,8 @@ config.libs = [
             # proposal/80177890_fn_80177890: the enemy motion-state update set (0x80177890..0x80178128,
             # 12 functions). The neighbour TU's dispatch evidence pins the seam; cflags are this lib's.
             Object(NonMatching, "enemy/fn_80177890.cpp"),
+            # Registered from proposal/80170FA8_fn_80170FA8.cpp (a 0x80170FA8 run discovery proposed).
+            Object(NonMatching, "enemy/fn_80170FA8.cpp"),
         ],
     },
 
