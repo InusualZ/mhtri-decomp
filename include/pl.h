@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "gx.h"
 #include "ef.h"
 
 #ifdef __cplusplus
@@ -64,6 +65,19 @@ typedef struct MHchar {
     /* +0x118 */ s32 field_0x118;
     /* +0x11C */ u8 pad_0x11C[0x20];
     /* +0x13C */ u8* field_0x13C;
+
+#ifdef __cplusplus
+    /* The engine model/joint entry points the effect units drive; their map names are `MHchar` members
+     * (`setVisibility__6MHcharFUlb`, ...), so they are declared here once and called as members
+     * (docs/plan.md 6.5 rule 9).  A member adds no storage, so the C view is unchanged. */
+    void setVisibility(u32 index, bool visible);                                   /* ef/eft001.cpp, ef/eft007.cpp */
+    void setTevKColor(u32 index, _GXTevKColorID id, _GXColor* color);              /* ef/eft001.cpp, ef/eft007.cpp */
+    void setMatAlphaBlendMode(u32 index, _GXBlendMode mode, _GXBlendFactor src,
+                              _GXBlendFactor dst, _GXLogicOp op);                  /* ef/eft001.cpp */
+    void get_joint_wpos(u32 joint, nw4r::math::VEC3* out);                         /* ef/eft001.cpp, ef/eft007.cpp */
+    void move(u16 flags);                                                          /* ef/eft001.cpp */
+    void move2(nw4r::math::MTX34* mtx, u16 flags);                                 /* ef/eft001.cpp */
+#endif
 } MHchar;
 
 /* The player work record.  Union of `Pl/pl_act.cpp` (the most complete view, 0x668), `Pl/pl_master.cpp`,
@@ -112,7 +126,7 @@ struct _PLW {
     /* +0x054 */ u32 param_0x54;
     /* +0x058 */ u32 unk58;
     /* +0x05C */ u32 unk5C;
-    /* +0x060 */ u8 pad_0x60[0x4];
+    /* +0x060 */ f32 ground_y_0x060;  /* the player's base/target y the effect sits on */
     /* +0x064 */ f32 unk064;
     /* +0x068 */ u8 pad_0x68[0x4];
     /* +0x06C */ f32 unk6C;

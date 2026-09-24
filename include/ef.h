@@ -310,9 +310,9 @@ inline int IsValidPointer(u32 ptr) {
 /* nw4r::ef::Effect - the pooled effect object.  It is a C++ class (the `change_color_eff` /
  * `setTevKColor` / `setMatColor` mangled names encode `Q34nw4r2ef6Effect`), so it can only be declared
  * from C++.  A C unit reaches it as `void*` through `_EFT_WORK::effect`.  Union of the three private
- * copies (`ef/eft004.cpp` `RetireEmitterAll`, `ef/eft007.cpp` both methods, `ef/eft009.cpp` `SetRootMtx`).
- * size: 0x04 - lower bound, an approximation (the class carries no data here; only reached through a
- * pointer) */
+ * copies (`ef/eft004.cpp` `RetireEmitterAll`, `ef/eft007.cpp` both methods, `ef/eft009.cpp` `SetRootMtx`,
+ * `ef/eft001.cpp`/`ef/effect.cpp` `ForeachParticleManager`); the two leading words are the storage the
+ * spawn handler writes, so the size is stated at the closing brace. */
 #ifdef __cplusplus
 namespace nw4r {
 namespace ef {
@@ -321,6 +321,9 @@ struct Effect {
     /* +0x44 */ void* owner_0x44;   /* back-pointer to the spawning `_EFT` (ef/fn_800FE978.cpp) */
     void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
     void RetireEmitterAll();                        /* eft004/eft007 */
+    /* Walks the effect's particle-manager pool, calling `cb` with each entry and its index; the
+     * third argument is the per-walk flag (eft001's `fn_800FCEC8` is the only callback observed). */
+    void ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
 }; /* size: 0x48 (lower bound: +0x44 is the highest offset the spawn handler reads) */
 }  // namespace ef
 }  // namespace nw4r

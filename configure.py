@@ -576,6 +576,7 @@ config.libs = [
             # proposed at a --max-bytes cap; the seam is a guess and the range is several
             # original TUs - see the unit's file header).
             Object(NonMatching, "ef/fn_800CDB2C.cpp"),
+            Object(NonMatching, "ef/eft001.cpp"),
             Object(NonMatching, "ef/eft002.cpp"),
             Object(Matching, "ef/fn_800FD520.c"),
             Object(Matching, "ef/fn_800FD718.c"),

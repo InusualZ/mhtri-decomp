@@ -39,4 +39,27 @@ typedef struct _GXColor {
     u8 a; /* +0x3 */
 } GXColor;
 
+/* The TEV/blend selectors the `MHchar` material setters encode (`setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor`,
+ * `setMatAlphaBlendMode__6MHcharFUl12_GXBlendMode14_GXBlendFactor14_GXBlendFactor10_GXLogicOp`).  The
+ * mangling names the type, so these are the SDK's own tag names; only the names matter for the map, the
+ * values are the SDK's enumeration (the call sites use GX_BM_BLEND/GX_BL_SRCALPHA/GX_BL_INVSRCALPHA/GX_LO_CLEAR
+ * and GX_KCOLOR3). */
+typedef enum _GXBlendMode {
+    GX_BM_NONE, GX_BM_BLEND, GX_BM_LOGIC, GX_BM_SUBTRACT, GX_MAX_BLENDMODE
+} _GXBlendMode;
+
+typedef enum _GXBlendFactor {
+    GX_BL_ZERO, GX_BL_ONE, GX_BL_SRCCLR, GX_BL_INVSRCCLR,
+    GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_BL_DSTALPHA, GX_BL_INVDSTALPHA
+} _GXBlendFactor;
+
+typedef enum _GXLogicOp {
+    GX_LO_CLEAR, GX_LO_AND, GX_LO_REVAND, GX_LO_COPY, GX_LO_INVAND, GX_LO_NOOP, GX_LO_XOR, GX_LO_OR,
+    GX_LO_NOR, GX_LO_EQUIV, GX_LO_INV, GX_LO_REVOR, GX_LO_INVCOPY, GX_LO_INVOR, GX_LO_NAND, GX_LO_SET
+} _GXLogicOp;
+
+typedef enum _GXTevKColorID {
+    GX_KCOLOR0, GX_KCOLOR1, GX_KCOLOR2, GX_KCOLOR3
+} _GXTevKColorID;
+
 #endif /* MHTRI_GX_H */
