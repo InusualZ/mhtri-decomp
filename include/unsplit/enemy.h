@@ -123,6 +123,30 @@ void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 void get_joint_wpos_em(struct _ENEMY_WORK* enemy, u32 joint, Vec3* out);
+
+/* The enemy action band 0x80127F48.. and the handler band 0x80170A54..0x80170EF4, owned by the
+ * not-yet-registered proposals `proposal/8016xxxx`/`proposal/8017xxxx`.  Added by the
+ * `enemy/fn_80170FA8.cpp` registration: its dispatcher tail-calls the 0x80170xxx handlers and the
+ * state machines call `fn_80127F48`/`fn_80128A14`.  The band brackets as `enemy` on both sides
+ * (fn_8014A1BC .. fn_80170FA8), so rule 2 sends the declarations here.  Signatures: `self` only for
+ * the handlers that take one argument, and `fn_80170EF4` takes the action's extra selector in r4.
+ *
+ * `fn_80128A14`'s last two narrow to u8 in its own body (`clrlwi r4,r4,24`), so they are declared u8
+ * here.  Three landed units used to declare them three ways in their own files (`u8` in
+ * fn_80149D6C, `u32` in fn_8014A1BC, `s32` in fn_80177890) - the same rule-2 debt - and since this
+ * header is the owner's home, fn_8014A1BC's and fn_80149D6C's local copies were dropped.  Every
+ * call site passes a constant, so the spelling is codegen-neutral. */
+void fn_80127F48(struct _ENEMY_WORK* self);
+void fn_80128A14(struct _ENEMY_WORK* self, u8 a, u8 b);
+void fn_80170A54(struct _ENEMY_WORK* self);
+void fn_80170AD0(struct _ENEMY_WORK* self);
+void fn_80170B4C(struct _ENEMY_WORK* self);
+void fn_80170C68(struct _ENEMY_WORK* self);
+void fn_80170D04(struct _ENEMY_WORK* self);
+void fn_80170D74(struct _ENEMY_WORK* self);
+void fn_80170DF0(struct _ENEMY_WORK* self);
+void fn_80170E78(struct _ENEMY_WORK* self);
+void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 #ifdef __cplusplus
 }
 #endif

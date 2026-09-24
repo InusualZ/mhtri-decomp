@@ -153,7 +153,6 @@ extern f32 lbl_80796F08;
 extern f32 lbl_80796F0C;
 extern f32 lbl_80796F10;
 extern f32 lbl_80796F14;
-extern void fn_80128A14(_ENEMY_WORK *self, u32 a, u32 b);
 extern void fn_80134004(_ENEMY_WORK *self, u32 a, f32 b);
 extern void fn_801280AC(_ENEMY_WORK *self);
 extern f32 lbl_80796F18;
