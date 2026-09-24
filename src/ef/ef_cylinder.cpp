@@ -89,8 +89,12 @@ struct EfParticle {
     EfParticleSlots* slots; /* +0x1C */
 };                        /* size: 0x20 */
 
-extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
-
+/* nw4r::db::Panic. The map already carries its real C++ mangling
+ * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
+ * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
+ * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
+ * map's spelling exactly: tools/units/mangle.py confirms it. */
+namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 extern void fn_80043EA8(void* p);
 extern void fn_80041E8C(Vec* out, f32 x, f32 y, f32 z);
 extern void fn_8009C484(Vec* out, Vec* in);
@@ -124,7 +128,7 @@ inline int IsValidPointer(u32 ptr) {
 /* The file's pointer guard: the message comes from the call site, the line from `__LINE__`. */
 #define CHECK_PTR(msg, ptr) \
     if (!IsValidPointer((u32)(ptr))) \
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594D20, __LINE__, msg, (ptr))
+        nw4r::db::Panic(lbl_80594D20, __LINE__, msg, (ptr))
 
 /* Emits the effect's particles: for each of `count` steps it rebuilds the emission transform from the
  * parameter block and the effect's progress, hands the result to the particle manager's spawn slot and

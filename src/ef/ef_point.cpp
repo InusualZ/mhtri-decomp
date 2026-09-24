@@ -100,8 +100,12 @@ typedef struct EfPm {
  * own (docs/plan.md 8.4), so they stay undefined externs here. */
 /* --------------------------------------------------------------------------------------------- */
 
-extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
-
+/* nw4r::db::Panic. The map already carries its real C++ mangling
+ * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
+ * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
+ * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
+ * map's spelling exactly: tools/units/mangle.py confirms it. */
+namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 extern const char lbl_80594F98[]; /* "ef_point.cpp" */
 extern const char lbl_80594FA8[]; /* "NW4R:Pointer Error\nem(=%p) is not valid pointer." */
 extern const char lbl_80594FDC[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer." */
@@ -149,7 +153,7 @@ extern void fn_80043EA8(struct EfVec3 *out);
         if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                           \
             ok1_ = FALSE;                                                                    \
         if (!ok1_)                                                                           \
-            Panic__Q24nw4r2dbFPCciPCce(lbl_80594F98, __LINE__, msg, (ptr));                   \
+            nw4r::db::Panic(lbl_80594F98, __LINE__, msg, (ptr));                   \
     }
 
 /* --------------------------------------------------------------------------------------------- */

@@ -1151,6 +1151,27 @@ extern "C" void fn_80073398(ResHandle* self) { ... }
 * `flip-round-1.md` - ## The open one: a flipped object's .ctors/.dtors fragments do not land where the original's did `Runtime.PPCEABI.H/__init_cpp_exceptions` passes all three checks and still fails:
 * `linkorder-7.19.md` - * The `.ctors`/`_reference` blocker that motivated 7.19 was a **stale target object cured by a re-split**: `__init_cpp_exceptions` is `Object(Matching, ...)` today and the green link keeps all three of its words (`__init_cpp_exceptions_reference` at `.ctors[0]`, `__fini_cpp_exceptions_reference` at `.dtors[1]`).
 * `sysmem-flip-recheck.md` - Same shape as the `.ctors` blocker: the measurement predates the forced re-split, and the re-split cured it. ## 1. Object equivalence (current objects, all regenerated at 12:56)
+
+**Sharpened 2026-09-24 - the blocker is `_rom_copy_info`, and it is off by one word.** `800CCCF8` (now
+`ef/ef_emform`) had this recorded as "the `.ctors` class", and the real first cause was a *different* bug
+(row 50) that hid it: the link failed outright with an undefined `Panic__Q24nw4r2dbFPCciPCce__FPCciPCce`.
+With that fixed the link **succeeds**, and `ninja diff` then reports exactly one thing:
+
+```
+ERROR Data mismatch for _rom_copy_info (type Object, size 0x84) at 0x80006624
+ERROR Original: ...8056F2C0 8056F2C0 00000017...
+ERROR Linked:   ...8056F2C0 8056F2C0 00000016...
+```
+
+That is worth more than "suspect the ordering": **every symbol matches** - the only difference anywhere in
+the linked image is `_rom_copy_info`, the *linker's own* table describing the `.ctors` range it copies at
+startup, and the entry that describes `.ctors` (`from == to == 0x8056F2C0`, i.e. the whole table) is one unit
+smaller in our link. So the merged `.ctors` **content** is right and the count is wrong. The next step is
+concrete: read `_rom_copy_info` entry by entry from the original DOL and from our link and find the entry
+whose size differs, then work out which `.ctors$NN` input fragment the linker did not see. Useful sizes on
+this tree: the linked ELF's `.ctors` is 0x16C at 0x8056F2C0, `.dtors` is 0xC; six `.ctors` words are claimed
+by registered units (`ef/ef_emform` 0x8056F2E8-0x8056F2EC, `sound/fn_800E46E8` 0x8056F2F4-0x8056F300,
+`ef/fn_80114E34` 0x8056F310-0x8056F314, `Runtime.PPCEABI.H/__init_cpp_exceptions` 0x8056F2C0-0x8056F2C4).
 ## 47. Automate the shape search: generate, compile, score and rank source variants
 
 **Problem.** Every near-match residual in this project has been *codegen* - an allocator web order, a
@@ -1276,3 +1297,46 @@ python tools/units/langcheck.py --unit RSO/runtime
 The selftest pins the three properties that make the signal safe: an `extab` object in a no-exceptions lib
 is C++/medium and **never conclusive**; a lib that enables `-Cpp_exceptions` silences it; and an object with
 no `extab` is not evidence of C.
+
+## 50. An already-mangled map name must not be declared as a C++ identifier
+
+**Problem.** The map carries a *real* C++ mangling - `Panic__Q24nw4r2dbFPCciPCce`, not a `fn_XXXXXXXX`
+placeholder - and a C++ source declares it with that spelling as an identifier:
+
+```cpp
+extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
+```
+
+The front-end then mangles it **again**, appending its own argument list, and the object references
+`Panic__Q24nw4r2dbFPCciPCce__FPCciPCce` - which nothing defines. The link fails with an undefined symbol
+whose name looks like the right one with a suffix stuck on. It is **invisible while the unit is
+`NonMatching`** - a `NonMatching` object is never linked, so the bug sits latent until the unit is flipped,
+and then it is easy to mis-attribute (this is what hid the real `.ctors` cause of `800CCCF8`, see 46).
+
+**Why try it.** The map's name *is* the correct mangling of the real declaration, so the fix is **not** a
+rename and **not** `extern "C"`: write the real declaration and let the front-end reproduce the map's
+spelling. `tools/units/mangle.py` (48) confirms it before you touch anything:
+
+```sh
+python tools/units/mangle.py 'namespace nw4r { namespace db { void Panic(const char*, int, const char*, ...) { } } }'
+# Panic__Q24nw4r2dbFPCciPCce          <- byte-identical to symbols.txt; no rename needed
+```
+
+This is the complement of 48, and between them they settle the whole `extern "C"` question: **a
+`fn_XXXXXXXX` stem is a placeholder, so write C++ and rename the map to the mangling (48); a map name that is
+already mangled is the *real* name, so write the real declaration and it matches (50).** `extern "C"` is then
+only for a symbol whose real name you genuinely cannot express.
+
+**Result.** Found by flipping the parked `800CCCF8`. Five units carried it - `ef/ef_cube`, `ef/ef_cylinder`,
+`ef/ef_emform`, `ef/ef_line`, `ef/ef_point` - and the reason they had it is instructive: the promotion pass
+correctly flipped them from `.c` to `.cpp` (each names a `.cpp` `__FILE__`), and under **C** the declaration
+`extern void Panic__Q24nw4r2dbFPCciPCce(...)` is verbatim, so it was right before the flip and wrong after.
+Fixing the declaration made all five emit the map's exact name; the measurement is unchanged (the fix is
+codegen-neutral), and it unblocked `ef/ef_emform`'s flip, whose link now succeeds.
+
+**Example.** The check is a one-liner over our objects - a reference whose name ends in a *second* argument
+list is this bug:
+
+```sh
+# read each object's symbol table and flag `X__...__...` where `X__...` is already a map name
+```

@@ -111,7 +111,12 @@ extern f32 lbl_8079624C; /* 0.0f */
 extern f32 lbl_80796250; /* 0.01f */
 extern f64 lbl_80796258; /* 0x4330000080000000, the u32 -> f64 magic */
 
-extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* msg, ...);
+/* nw4r::db::Panic. The map already carries its real C++ mangling
+ * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
+ * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
+ * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
+ * map's spelling exactly: tools/units/mangle.py confirms it. */
+namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 extern void fn_8009C484(Vec3* dst, Vec3* src);
 extern void fn_80051490(Vec3* dst, const Vec3* src);
 extern f32 fn_80050EDC(const Vec3* v);
@@ -178,11 +183,11 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
 
     ok = IS_VALID_PTR(em);
     if (!ok) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594C68, 43, lbl_80594C74, em);
+        nw4r::db::Panic(lbl_80594C68, 43, lbl_80594C74, em);
     }
     ok = IS_VALID_PTR(pm);
     if (!ok) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594C68, 44, lbl_80594CA8, pm);
+        nw4r::db::Panic(lbl_80594C68, 44, lbl_80594CA8, pm);
     }
 
     fn_8009C484(c, c);
@@ -221,14 +226,14 @@ void fn_800CA200(u32 a, Em* em, Pm* pm, u32 n, u32 flags, void* params, u16 d, u
 
     ok = IS_VALID_PTR(em);
     if (!ok) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594C68, 94, lbl_80594C74, em);
+        nw4r::db::Panic(lbl_80594C68, 94, lbl_80594C74, em);
     }
     ok = IS_VALID_PTR(pm);
     if (!ok) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594C68, 95, lbl_80594CA8, pm);
+        nw4r::db::Panic(lbl_80594C68, 95, lbl_80594CA8, pm);
     }
     ok = IS_VALID_PTR(params);
     if (!ok) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594C68, 96, lbl_80594CDC, params);
+        nw4r::db::Panic(lbl_80594C68, 96, lbl_80594CDC, params);
     }
 }

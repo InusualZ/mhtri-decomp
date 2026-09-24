@@ -77,7 +77,12 @@ struct Emitter {
     /* +0xFC */ u32 mInheritSetting;
 }; /* size: 0x100 */
 
-extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
+/* nw4r::db::Panic. The map already carries its real C++ mangling
+ * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
+ * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
+ * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
+ * map's spelling exactly: tools/units/mangle.py confirms it. */
+namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 extern void fn_8009C760(f32* sin, f32* cos, f32 rad);      /* PSSinCosRad */
 extern void fn_80043EA8(VEC3* v);                          /* VEC3::VEC3() */
 extern void fn_80041E8C(VEC3* v, f32 x, f32 y, f32 z);     /* VEC3::VEC3(f32, f32, f32) */
@@ -103,7 +108,7 @@ extern const f32 lbl_807962F4;
      ((u32)(p) & 0xFFFFC000) == 0xE0000000)
 
 #define NW4R_POINTER_ASSERT(p, line, msg)                                                          \
-    (NW4R_VALID_PTR(p) ? (void)0 : Panic__Q24nw4r2dbFPCciPCce(lbl_80594EE0, line, msg, (p)))
+    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(lbl_80594EE0, line, msg, (p)))
 
 /* EmitterFormLine::Emission */
 void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 optionFlag, f32* params,
