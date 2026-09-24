@@ -555,8 +555,6 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "auto",
         "objects": [
-            Object(NonMatching, "auto/80073398_fn_80073398.cpp"),
-            Object(NonMatching, "auto/800898B0_fn_800898B0.c"),
         ],
     },
     {
@@ -650,7 +648,22 @@ config.libs = [
         "cflags": cflags_g3d,
         "host": False,
         "objects": [
-            Object(Matching, "g3d/g3d_resanmamblight.c"),
+            # 36-byte `ResAnmAmbLight`-cluster accessor.  Re-homed from the mis-named
+            # `g3d/g3d_resanmamblight.c` when the wQ-recut carved the real `g3d_resanmamblight.cpp`
+            # (0x80089F94) out of auto/800898B0: its neighbours cite `g3d_anmscn.cpp` and the region's
+            # data fragment is g3d_anmscn.cpp's, so the file took its own TU's name (C++, extern "C").
+            Object(Matching, "g3d/g3d_anmscn.cpp"),
+            # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
+            # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
+            # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function
+            # scores here are measured with the flag lane's fix still outstanding (see the cflags_g3d
+            # note above and .pi/notes/g3d-flags.probe.py).
+            Object(NonMatching, "g3d/g3d_calcvtx.cpp"),      # 0x80073398-0x800736F8
+            Object(NonMatching, "g3d/g3d_calcworld.cpp"),    # 0x800736F8-0x800746DC
+            Object(NonMatching, "g3d/g3d_camera.cpp"),       # 0x800746DC-0x80075DCC
+            Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
+            Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
+            Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
         ],
     },
     {
