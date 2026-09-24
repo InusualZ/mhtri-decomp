@@ -16,7 +16,7 @@ Rules checked (each finding is `file:line`):
 | # | rule | how it is decided |
 | --- | --- | --- |
 | 1 | a shared type lives in one header | the same `struct`/`class`/`union` name defined with a body in more than one `src/` file: one finding per (type, extra file), naming both files |
-| 2 | an extern lives with the TU that owns it | an `extern` declaration of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of an unsplit symbol whose address band names a module (`include/unsplit/<module>.h`) |
+| 2 | an extern lives with the TU that owns it | an `extern` declaration of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of an unsplit symbol whose address band names a module (`include/unsplit/<module>.h`); and, in `include/unsplit/*.h` itself, any declaration of a symbol a registered unit owns (that header is a fallback, not the owner) |
 | 3 | a reconstructed `struct`/`class` states its size | a `size: 0xNN` comment within four lines of the definition (or two lines after its closing brace) |
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
@@ -31,7 +31,11 @@ finding - move it to that unit's header and `#include` it. An unsplit symbol (no
 the same way, into `include/unsplit/<module>.h`, but only where the module is sound: the registered bands
 interleave across modules (a `sound` unit sits inside the `ef` band), so an address whose bracketing units
 name different modules is left as a counted gap (`Ownership.gaps`) rather than a guessed header. A symbol
-missing from the map, a duplicate map row, and an address the map gives no section are gaps too.
+missing from the map, a duplicate map row, and an address the map gives no section are gaps too. The band
+is checked as well - `include/unsplit/*.h` is a file a batch may change, and a declaration there of a
+symbol a registered unit owns is a finding, because the owner's typed definition collides with it
+(`(10197) illegal function overloading`); an unowned symbol stays, which is the band's purpose. A
+definition in the band is not a declaration and is left alone.
 
 Comments and string/char literals are stripped before matching, and the two are stripped separately: the
 size/offset annotations of rules 3-4 live *in comments*, while every other rule must not fire on text
@@ -82,6 +86,11 @@ except ImportError:  # `python tools/units/stylelint.py ...`
     import brief as _brief  # type: ignore  # noqa: E402
 
 SRC = "src"
+# The unsplit band (`include/unsplit/<module>.h`) is the legitimate home for a symbol with no registered
+# owner. It is declaration-only glue, so only rule 2 applies to it - but rule 2 *does*: an owned symbol
+# declared here collides with the owner's typed definition (MWCC `(10197) illegal function overloading`)
+# in every translation unit that includes the band.
+UNSPLIT = "include/unsplit"
 SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
 
 # Rule 7's path-keyed exemption table. This is now only a **temporary grandfather** for the legacy
@@ -478,6 +487,12 @@ def load_ownership(root: str) -> "Ownership | None":
     return _OWNERSHIP_CACHE[key]
 
 
+def is_unsplit_header(rel: str) -> bool:
+    """Whether `rel` is a declaration-only header in the unsplit band."""
+    rel = rel.replace("\\", "/")
+    return rel.startswith(UNSPLIT + "/") and rel.endswith(SUFFIXES)
+
+
 EXTERN_RE = re.compile(r"\bextern\b")
 
 
@@ -532,6 +547,69 @@ def _owns(rel: str, unit: str) -> bool:
         return True
     stem = os.path.splitext(unit)[0]
     return any(rel == SRC + "/" + stem + ext for ext in (".h", ".hpp", ".hh"))
+
+
+_LINKAGE_OPEN_RE = re.compile(r"\bextern\s*$")
+_TYPE_ONLY_RE = re.compile(r"^\s*(?:typedef\s+)?(?:struct|class|union|enum)\b")
+
+
+def header_declarations(src: Source) -> list[tuple[str, int]]:
+    """`(name, line)` for every declaration a header makes at file scope.
+
+    An unsplit-band prototype sits inside `extern "C" { ... }`; `strip` blanks the `"C"`, so the
+    linkage block is just a brace opened by an `extern`, and it is *transparent*: its contents are file
+    scope, which is where the band's declarations live. A file-scope statement ending in `;` that
+    introduces a name is returned; a type forward declaration (`struct Foo;`) introduces no symbol from
+    the map and is skipped; a function body's `{` is a real scope, so a definition is never returned.
+    """
+    out: list[tuple[str, int]] = []
+    code = src.code
+    depth = 0
+    transparent: list[bool] = []
+    stmt_start = 0
+    for i, c in enumerate(code):
+        if c == "{":
+            linkage = bool(_LINKAGE_OPEN_RE.search(code[stmt_start:i]))
+            transparent.append(linkage)
+            if not linkage:
+                depth += 1
+            stmt_start = i + 1
+        elif c == "}":
+            if transparent:
+                if not transparent.pop():
+                    depth -= 1
+            stmt_start = i + 1
+        elif c == ";" and depth == 0:
+            seg = code[stmt_start:i]
+            seg_start = stmt_start
+            stmt_start = i + 1
+            if _TYPE_ONLY_RE.match(seg) and "(" not in seg:
+                continue
+            name = _declared_name(seg)
+            if name is None:
+                continue
+            m = re.search(r"\b%s\b" % re.escape(name), seg)
+            out.append((name, src.line_of(seg_start + (m.start() if m else 0))))
+    return out
+
+
+def rule2_band_findings(src: Source, ownership: "Ownership") -> list[dict]:
+    """Declarations in `include/unsplit/<band>.h` of a symbol a registered unit already owns.
+
+    The band exists for a symbol with no owner, so only an `owned` resolution is a finding; an unsplit
+    name stays (that is the band's purpose), and a name the map cannot judge is left alone rather than
+    counted - the band is where such names legitimately live. The message matches the `src/` rule
+    exactly; a definition here is not a declaration (`header_declarations` never returns one).
+    """
+    out = []
+    for name, line in header_declarations(src):
+        r = ownership.resolve(name)
+        if r is None or r["kind"] != "owned":
+            continue
+        out.append(_finding(src, 2, line,
+                            "`%s` is owned by `src/%s` - declare it in that unit's header and "
+                            "#include it" % (name, r["unit"])))
+    return out
 
 
 def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
@@ -672,8 +750,17 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
 
     `ownership` carries the symbols.txt + splits.txt index for rule 2; when it is None (the map is
     absent, or a caller that only wants the source-local rules), rule 2 is not reported for `src`.
+
+    The unsplit band is declaration-only glue, so for a file under `include/unsplit/` only rule 2 runs -
+    and there it means the opposite of its `src/` reading: a symbol a registered unit owns must not be
+    declared here.
     """
     out: list[dict] = []
+    if is_unsplit_header(src.rel):
+        if ownership is not None:
+            out.extend(rule2_band_findings(src, ownership))
+        out.sort(key=lambda f: (f["rule"], f["line"]))
+        return out
     defs = struct_defs(src)
     sized = struct_has_size(src, defs)
 
@@ -910,13 +997,15 @@ def git_bytes(root: str, *args: str) -> bytes:
 
 
 def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
-    """`(path_at_ref, path_now)` for every `src/` file the tree changed against `ref`.
+    """`(path_at_ref, path_now)` for every `src/` file and unsplit-band header the tree changed against `ref`.
 
     A rename is one entry carrying both names, so the file's violations are compared against its old
-    copy rather than counting as new.
+    copy rather than counting as new. The band is included because rule 2 applies to it too - it is the
+    file a batch adds an owned symbol's declaration to when it treats the band as a fallback.
     """
     out: list[tuple[str | None, str]] = []
-    for line in git(root, "diff", "--name-status", "-M", "--diff-filter=d", ref, "--", SRC).splitlines():
+    for line in git(root, "diff", "--name-status", "-M", "--diff-filter=d", ref, "--",
+                    SRC, UNSPLIT).splitlines():
         parts = line.split("\t")
         if len(parts) < 2:
             continue
@@ -1364,6 +1453,36 @@ def selftest() -> int:
     check("rule2: a function returning a function pointer is named",
           [n for n, _p, _l in extern_declarations(Source("x", "x.c",
               "extern void (*f(int))(void);\n"))], ["f"])
+
+    # --- rule 2 in the unsplit band: an owned symbol must not be declared there --------------------
+    band = "include/unsplit/mod.h"
+    check("rule2 band: another unit's owned symbol declared in the band is a finding",
+          lines_of("void foo(void);\n", 2, band, idx), [1])
+    check("rule2 band: the detail names the owner and the same fix",
+          [f["detail"] for f in lint_source(Source("x", band, "void foo(void);\n"), idx)
+           if f["rule"] == 2],
+          ["`foo` is owned by `src/mod/a.c` - declare it in that unit's header and #include it"])
+    check("rule2 band: the extern \"C\" linkage wrapper is transparent",
+          lines_of('extern "C" {\nvoid foo(void);\n}\n', 2, band, idx), [2])
+    check("rule2 band: a semicolon in a comment does not split a declaration",
+          lines_of("/* a; b */\nvoid foo(void);\n", 2, band, idx), [2])
+    check("rule2 band: an unowned symbol stays in the band",
+          lines_of("void mid(void);\n", 2, band, mid), [])
+    bandmid = Ownership({"mid": [(".text", 0x2500, "function")]},
+                        {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "mod/b.c")]})
+    check("rule2 band: an unowned name is not turned into a counted gap",
+          (lines_of("void mid(void);\n", 2, band, bandmid), sum(bandmid.gaps.values()))[1], 0)
+    check("rule2 band: a name not in the map stays in the band",
+          lines_of("void not_in_map(void);\n", 2, band, idx), [])
+    check("rule2 band: a definition is not a declaration",
+          lines_of("void foo(void) {\n}\n", 2, band, idx), [])
+    check("rule2 band: a type forward declaration is not a symbol declaration",
+          lines_of("struct Vec;\n", 2, band, idx), [])
+    check("rule2 band: only rule 2 applies, so a fn_ prototype is not rule 7",
+          rules_of("void fn_80040598(void);\n", band, idx), [])
+    check("rule2 band: a plain prototype in a src/ file is still not rule 2's",
+          lines_of("void foo(void);\n", 2, "src/other/c.c", idx), [])
+
     # the real map: the ownership lookup resolves a symbol we name, from the tree's own data
     if os.path.exists(os.path.join(".", "config", "RMHE08", "symbols.txt")):
         real = load_ownership(".")
