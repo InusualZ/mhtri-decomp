@@ -391,7 +391,7 @@ extern "C" u32 get_joint_num__6MHcharFv(void* chr);
 extern "C" void setVisibility__6MHcharFUlb(void* chr, u32 joint, u32 visible);
 extern "C" void setMatColor__6MHcharFUl12_GXChannelID8_GXColorb(void* chr, u32 idx,
                                                                 _GXChannelID channel,
-                                                                _GXColor color, u32 unk);
+                                                                _GXColor color, u32 keep);
 extern "C" void move__6MHcharFUs(void* chr, u16 a);
 extern "C" void move2__6MHcharFPQ34nw4r4math5MTX34Us(void* chr, nw4r::math::MTX34* m, u16 a);
 extern "C" u16 Get_motion_no__FP4_PLW(_PLW* plw);

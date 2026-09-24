@@ -11,8 +11,10 @@
  * game's free-memory pool tops (`lbl_807947B8`/`C0`/`C4`, selected by the mode argument it is passed)
  * at the end of the module's BSS.  The rest of the range is a nine-slot keyboard interface over the
  * `system_w` interface block (+0x8E8..+0x90C): the named `kbd_*` entry points are tail-call dispatchers
- * into `system_w`, the four unnamed ones (`fn_8004080C`, `fn_8004082C`, `fn_80040874`) have no name in
- * the name source either.
+ * into `system_w`.  `fn_8004080C`/`fn_8004082C`/`fn_80040874` dispatch its three slots the name source
+ * left unnamed (+0x8FC/+0x900/+0x908); the registration at 0x804561AC shows those slots run 0x80451E3C
+ * (clears the input state bytes -> `kbd_reset`), 0x80455A48 (ends the session and teardown -> `kbd_close`)
+ * and 0x80456150 (processes the pending key -> `kbd_input`).
  *
  * Names: the region's names come from the shared memory dump's symbol list (`docs/memory-dump.md`).  Of
  * the five `fn_*` names the map carries in this range, four have no name in that dump either; the one
@@ -108,10 +110,10 @@ typedef struct SystemWork {
     int (*kbd_move)(void);             /* +0x8F0 */
     void (*set_kbd_param)(char*, u32); /* +0x8F4 */
     u8 (*get_kbd_setup_type)(void);    /* +0x8F8 */
-    void (*unk_0x8FC)(void);           /* +0x8FC */
-    int (*unk_0x900)(void);            /* +0x900 */
+    void (*kbd_reset)(void);           /* +0x8FC */
+    int (*kbd_close)(void);            /* +0x900 */
     void (*kbd_exit)(void);            /* +0x904 */
-    int (*unk_0x908)(void);            /* +0x908 */
+    int (*kbd_input)(void);            /* +0x908 */
 } SystemWork;
 
 extern "C" SystemWork system_w;
@@ -230,18 +232,18 @@ u8 get_kbd_setup_type(void)
 
 extern "C" void fn_8004080C(void)
 {
-    if (system_w.unk_0x8FC != NULL) {
-        system_w.unk_0x8FC();
+    if (system_w.kbd_reset != NULL) {
+        system_w.kbd_reset();
     }
 }
 
 extern "C" int fn_8004082C(void)
 {
-    if (system_w.unk_0x900 == NULL) {
+    if (system_w.kbd_close == NULL) {
         return 1;
     }
 
-    return system_w.unk_0x900();
+    return system_w.kbd_close();
 }
 
 void kbd_exit(void)
@@ -253,11 +255,11 @@ void kbd_exit(void)
 
 extern "C" int fn_80040874(void)
 {
-    if (system_w.unk_0x900 == NULL) {
+    if (system_w.kbd_close == NULL) {
         return 0;
     }
 
-    return system_w.unk_0x908();
+    return system_w.kbd_input();
 }
 
 u8 ck_sub_ovl_idx(void)

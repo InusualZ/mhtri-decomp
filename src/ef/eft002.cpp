@@ -138,8 +138,8 @@ struct MHchar {
     /* +0x000 */ u8 unused_0x000[0x118];
     /* +0x118 */ nw4r::g3d::ScnMdl* scnmdl_0x118;
 
-    void setMatColor(u32 idx, _GXChannelID channel, _GXColor color, bool unk);
-    void move2(nw4r::math::MTX34* mtx, u16 unk);
+    void setMatColor(u32 idx, _GXChannelID channel, _GXColor color, bool keep);
+    void move2(nw4r::math::MTX34* mtx, u16 flags);
 };
 
 /* ---------------------------------------------------------------------------------------------------
