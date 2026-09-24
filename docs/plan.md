@@ -196,13 +196,14 @@ git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
   outlives the worktree. **`<slug>` is the claim's branch minus `worker/`** (`claims.slug_of_branch`), the one rule
   `brief.py`, `handoff.py`, `land.py` and `claims.py` all read: a unit's *path* is not its *name* (`Pl/pl_act` vs
   `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
-* **The handoff is automatic now.** `subagent_done` is no longer required to be *delivered*: the herdr extension
-  publishes on `agent_end` after a 10 s grace period (`HERDR_AGENT_END_GRACE_MS` to override), writes the same
-  sidecar `subagent_done` writes and shuts the pane down, so a worker that merely replies is delivered. The timer is
-  cancelled by any new turn (`before_agent_start`/`turn_start`/`input`/`session_shutdown`), so a compaction or retry
-  still delivers exactly once, with the final summary - measured on four fixtures. `subagent_done` stays the
-  authoritative path and workers are still told to call it, but nothing depends on the instruction being followed.
-  Trade-off, recorded: a *user-driven* subagent pane would also auto-complete 10 s after a turn.
+* **The handoff is the worker's final message.** A worker spawned through the default `subagent` tool
+  (`~/.pi/agent/extensions/subagent`) is a `pi --mode json` child the tool waits for: when it exits, its last
+  assistant message is returned to the orchestrator as the tool result. A pane-launched worker (the manual
+  route below) delivers the same last message into its pane, plus its outbox, and the orchestrator wakes on the
+  pane going idle. Either way there is no completion *tool* to call - the `subagent_done` sidecar and its
+  `agent_end`/`agent_settled` grace timer belonged to `pi-herdr-subagents`, which is no longer installed, so a
+  brief that asked for that tool would name a tool the worker does not have. `brief.py` emits the final-message
+  instruction in part 4, and a hand-written brief must carry it too.
 * **`tools/m2c` is a submodule - do not initialise it in a worktree.** `git worktree remove` refuses to remove a
   worktree that contains a checked-out submodule ("working trees containing submodules cannot be moved or
   removed"), which would leave the branch - the lock - alive forever. The brief points the worker at
@@ -223,38 +224,49 @@ git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
   Python interpreter absolutely (`C:\…\Python312\python.exe`) — which is why `MAIN` resolution matters and why
   `configure.py` is re-run only in `MAIN`.
 
-**Spawning a worker (herdr).** Workers live in the session's **Worker tab** - never in the orchestrator's own
-pane: a split of the orchestrator's pane drops four agents into the middle of its own work, and the round's
-teardown then has to close the orchestrator's pane to release a worktree. Find the tab once, then one pane per
-worker:
+**Spawning a worker.** `queue.py next` claims the unit and prints the paste-ready call for the default
+`subagent` tool - single mode, with `cwd` set to the worker's worktree:
+
+```python
+subagent(agent="worker", cwd="<the worker's worktree>", task="Read <brief> in MAIN and do exactly what it
+says. Ack first: python tools/units/claims.py ack <unit> --agent worker-<slug>. You may fan out subagents.
+End your turn with your report: your final message is the result the orchestrator receives.")
+```
+
+The tool runs the worker as a `pi` child process with its own context window and **blocks until it exits**,
+returning the worker's final message to the orchestrator. `cwd` is what makes the rest work: the worker's
+`recompile.py` resolves that worktree from its cwd and MAIN's toolchain and target object from git - no
+junction, no environment variable. The tool takes no `name` parameter, so the printed slug is only a label.
+
+**The manual route (herdr panes).** A worker the orchestrator launches by hand in a herdr pane never reports
+through the tool, so the orchestrator wakes on the pane going idle (`herdr agent wait <name> --until idle
+--until blocked`) and reads the outbox. Keep such workers out of the orchestrator's own pane - a split of it
+drops agents into the middle of its work - and use the session's **Worker tab**:
 
 ```sh
 herdr tab list                                     # the tab labelled Worker, e.g. w1:t2
 herdr pane split <a pane inside that tab> --cwd <the worker's worktree> --direction down
 herdr agent start <name> --kind pi --pane <the new pane id>
-herdr agent prompt <name> "<read your brief; ack first; you may fan out; then deliver>"
+herdr agent prompt <name> "<read your brief; ack first; you may fan out; then end with your report>"
 herdr agent wait <name> --until idle --until blocked
 ```
-
-`--cwd` is what makes the rest work: the pane starts *inside* the worktree, so `recompile.py` resolves that
-worktree from its cwd and MAIN's toolchain and target object from git - no junction, no environment variable.
 
 **Teardown is part of the round.** After the handoff and after the integration: close the worker's pane
 (`herdr pane close <pane id>`), **then** `claims.py release <unit>`. A live pane holds its worktree as its cwd
 and Windows refuses to delete a directory a process is sitting in ("Device or resource busy", or
 `git worktree remove` failing with "Permission denied"), so releasing first fails and leaves a directory that
 nothing can remove until that pane goes away. If a worktree cannot be removed, ask who is sitting in it - it may
-be the owner's own pane.
+be the owner's own pane. **A tool-spawned worker has no pane**, so this step is skipped for it and
+`claims.py release` only removes the worktree and the branch.
 
 ### 5.2 The worker's input — one generated file, nothing else
 
-**A brief ends by requiring `subagent_done`.** The completion signal the orchestrator is woken by is the exit
-sidecar `<sessionFile>.exit`, and the extension writes it only when its `agent_settled` handler runs - which does
-not happen for long runs. A worker that merely replies with text reaches `agent_end`, parks in `phase: waiting`,
-never writes the sidecar and never shuts down, so its result is never delivered even though its work is complete.
-The `subagent_done` tool writes the sidecar directly; two workers stuck for 45+ turns delivered the moment they
-were asked to call it (`.pi/notes/handoff-root-cause.md`). `brief.py` therefore emits the instruction in part 4,
-and a hand-written brief must carry it too.
+**A brief ends by requiring the report as the final message.** The orchestrator is handed a tool-spawned
+worker's result by the `subagent` tool when the worker's `pi` process exits, and reads a pane-launched
+worker's pane and outbox once it is idle. Neither path needs a completion tool, and neither survives the worker
+ending on a tool call or saying nothing - so the brief's part 4 makes the ≤ 15-line digest the last thing the
+worker writes. (The old `subagent_done` instruction belonged to `pi-herdr-subagents`; it is gone.) `brief.py`
+emits the instruction, and a hand-written brief must carry it too.
 
 
 `tools/units/brief.py <unit>` writes `tools/units/briefs/<unit>.md`, containing:
