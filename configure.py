@@ -526,6 +526,12 @@ config.libs = [
         "objects": [
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The `proposal/800AEE48_fn_800AEE48`
+            # range: 119 functions / 0xABA0 bytes of `nw4r::ef`, three original TUs kept whole
+            # (ef_postfield.cpp, ef_resource.cpp, ef_drawstripestrategy.cpp) because the discovery's
+            # seam was capped at --max-bytes.  C++ from the `.cpp` __FILE__ strings and
+            # Panic__Q24nw4r2dbFPCciPCce.
+            Object(NonMatching, "ef/fn_800AEE48.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
