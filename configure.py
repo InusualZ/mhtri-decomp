@@ -525,6 +525,10 @@ config.libs = [
             # prim_init_all/set_blendmode/set_zmode name the functions, not the TU (see the file header).
             Object(NonMatching, "sound/fn_800E3CBC.cpp"),
             Object(NonMatching, "sound/fn_800E46E8.cpp"),
+            # Registered from proposal/800E8E60_fn_800E8E60.cpp (a 0x800E8E60 run discovery proposed).
+            # The quest/challenge sound work system: 149 functions / 0x6978 bytes.  C++ from the range's
+            # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
+            Object(NonMatching, "sound/fn_800E8E60.cpp"),
         ],
     },
 
