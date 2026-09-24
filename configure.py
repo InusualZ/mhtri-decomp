@@ -521,6 +521,7 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+                        Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
