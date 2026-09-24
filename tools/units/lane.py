@@ -37,6 +37,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
+from units import wtsafe  # noqa: E402
 
 # The prefixes a lane may use. `main` and a release ref are never lanes.
 LANE_PREFIXES = ("experiment/", "worker/", "wip/", "lane/")
@@ -113,9 +114,21 @@ def teardown(branch: str, base: str = BASE, dry_run: bool = False, force: bool =
     wt = worktree_for(branch)
     steps = []
     if wt:
+        # Measured 2026-09-24: `git worktree remove --force` follows a Windows directory junction and
+        # deletes the TARGET's contents - that is how MAIN's orig/RMHE08/sys and files were emptied when
+        # this loop ran over seven worktrees. wtsafe unlinks the reparse points first, and the snapshot
+        # pair turns any other loss into a loud failure instead of a silent one.
+        before = wtsafe.snapshot()
+        links: list[str] = []
         if not dry_run:
-            git(["worktree", "remove", "--force", wt])
+            links = wtsafe.remove_worktree(wt)
+            after = wtsafe.snapshot()
+            if after != before:
+                raise SystemExit("orig/ changed while removing %s - restore it from the pinned hashes:\n%s"
+                                 % (wt, after))
         steps.append(("worktree", wt))
+        if links:
+            steps.append(("unlinked reparse points", ", ".join(os.path.basename(p) for p in links)))
     if not dry_run:
         git(["branch", "-D", branch])
         git(["worktree", "prune"])

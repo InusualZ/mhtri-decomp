@@ -51,6 +51,19 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
 from units import recompile as rc  # noqa: E402
+from units import wtsafe  # noqa: E402
+
+
+def safe_worktree_remove(path: str, main: str) -> None:
+    """Remove a worktree without recursing through a junction into somebody else's tree.
+
+    Measured 2026-09-24: `git worktree remove --force` follows a Windows directory junction - documented
+    practice in this repo's worktrees - and deletes the *target's* contents, which is how MAIN's
+    `orig/RMHE08/sys` and `orig/RMHE08/files` were emptied by a lane teardown.  Unlinking the reparse
+    points first (a link delete, never a recurse) costs nothing and retires the whole class of accident.
+    """
+    wtsafe.unlink_reparse_points(path)
+    git(["worktree", "remove", "--force", path], main)
 
 SLUG_MAX = 40
 BRANCH_PREFIX = "worker/"
@@ -585,7 +598,7 @@ def timeout(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
             plan.append(("herdr pane close %s (subagent pane)" % child, _close_step(child, close)))
         if worktree and os.path.isdir(worktree):
             plan.append(("git worktree remove --force %s" % worktree,
-                         lambda w=worktree: git(["worktree", "remove", "--force", w], main)))
+                         lambda w=worktree: safe_worktree_remove(w, main)))
         if branch and branch_exists(main, branch):
             plan.append(("git branch -D %s" % branch, lambda b=branch: git(["branch", "-D", b], main)))
         plan.append(("git worktree prune", lambda: git(["worktree", "prune"], main)))
@@ -734,7 +747,7 @@ def remove_worktree(main: str, path: str) -> str:
       blocks the next claim's `git worktree add`, so the leftover tree is removed here.
     """
     try:
-        git(["worktree", "remove", "--force", path], main)
+        safe_worktree_remove(path, main)
         return "removed"
     except SystemExit as first:
         message = str(first)
@@ -743,6 +756,7 @@ def remove_worktree(main: str, path: str) -> str:
             return "removed (force twice, for the submodule)"
         known = registered_worktree_paths(main)
         if known is not None and not any(_same_path(p, path) for p in known):
+            wtsafe.unlink_reparse_points(path)
             shutil.rmtree(path)
             return "removed the leftover directory (git no longer tracked it)"
         raise
