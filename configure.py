@@ -528,6 +528,8 @@ config.libs = [
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
             Object(NonMatching, "ef/ef_disc.cpp"),
+            Object(NonMatching, "ef/ef_emitterform.cpp"),
+            Object(NonMatching, "ef/ef_particle.cpp"),
             Object(NonMatching, "ef/ef_emform.cpp"),
             Object(NonMatching, "ef/ef_line.cpp"),
             Object(NonMatching, "ef/ef_point.cpp"),

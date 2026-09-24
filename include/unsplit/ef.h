@@ -15,6 +15,10 @@ extern "C" {
 #endif
 
 f32 fn_800C9DCC(f32 arg0);
+/* 0x800AB740 / 0x800AB658 - the particle owner's teardown entry and the sibling unit's ramp helper
+ * (callers: ef/ef_particle.cpp). */
+void* fn_800AB740(void* table, void* self);
+f32 fn_800AB658(void* self, f32 v);
 
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it

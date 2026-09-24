@@ -42,6 +42,72 @@ typedef struct EfParams {
 
 typedef struct EfParticle EfParticle;
 
+/* The emitter-parameter sub-record the particle carries at +0x20 (`ef/ef_particle.cpp`).  Offsets
+ * 0x44..0x4F and 0x7A..0x7F are present in the object but untouched by every function that unit
+ * owns, so they stay padding.  `colors` is the 2x2 {r, g, b, a} table the two colour getters read;
+ * the four floats are the scale factors their product reads; `manager` is the record's owner. */
+typedef struct EfParticleParams EfParticleParams;
+
+/* One 8-byte sub-object the constructor builds with fn_800834F0; three of them form each array. */
+typedef struct EfParticleNode {
+    /* +0x00 */ u8 data[8];
+} EfParticleNode; /* size: 0x08 */
+
+/* A pair of scale factors the constructor builds and the scale helpers multiply. */
+typedef struct EfParticleScale {
+    /* +0x00 */ f32 x;
+    /* +0x04 */ f32 y;
+} EfParticleScale; /* size: 0x08 */
+
+struct EfParticleParams {
+    /* +0x00 */ u8 colors[2][2][4];
+    /* +0x10 */ EfParticleScale scale_0x10; /* the phases select which pair multiplies */
+    /* +0x18 */ EfParticleScale scale_0x18;
+    /* +0x20 */ VEC3 field_0x20;
+    /* +0x2C */ EfParticleNode field_0x2C[3];
+    /* +0x44 */ u8 pad_0x44[0x0C];
+    /* +0x50 */ EfParticleNode field_0x50[3];
+    /* +0x68 */ u8 field_0x68[0x11]; /* fn_800AB3D0 returns this address */
+    /* +0x79 */ s8 field_0x79;      /* read as a signed flag by fn_800AB3FC */
+    /* +0x7A */ u8 pad_0x7A[0x06];
+    /* +0x80 */ VEC3 field_0x80;
+    /* +0x8C */ VEC3 field_0x8C;
+    /* +0x98 */ VEC3 field_0x98;
+    /* +0xA4 */ u8 pad_0xA4[0x04];
+    /* +0xA8 */ struct EfParticleMgr* manager;
+}; /* size: 0xAC (bounded by the particle's field_0xCC) */
+
+/* The parameter record `fn_800A4864` walks to (reached through the owner's +0x24 pointer).  Only the
+ * offsets this unit's functions read are named. */
+typedef struct EfParticleChain EfParticleChain;
+struct EfParticleChain {
+    /* +0x000 */ u8 pad_0x000[0x105];
+    /* +0x105 */ u8 mode;       /* 0 = no colour; 1..5 select a ramp, anything else asserts */
+    /* +0x106 */ u16 count;
+    /* +0x108 */ u8 count_step; /* per-frame step, in 1/12700ths of the count */
+    /* +0x109 */ u8 amplitude;  /* the ramp's half-range */
+}; /* size: 0x10A (lower bound: the highest offset any function of this unit reads) */
+
+/* The record's owner: the effect manager the spawn path reaches through.  Only the offsets this
+ * unit's functions read are named. */
+typedef struct EfParticleMgr EfParticleMgr;
+struct EfParticleMgr {
+    /* +0x00 */ u8 pad_0x00[0x24];
+    /* +0x24 */ void* context;   /* the object fn_800AB388 walks into */
+    /* +0x28 */ u8 pad_0x28[0x30];
+    /* +0x58 */ f32 scale_a;     /* read by fn_800AB3AC (inlined) */
+    /* +0x5C */ f32 scale_b;     /* read by fn_800AB37C */
+
+#ifdef __cplusplus
+    /* The factor fn_800AB3AC multiplies its scale product by.  It is an inline member in the original:
+     * retail keeps the argument setup (`mr r4,r3`) and the call's branch (`b +4`) with the body inlined
+     * right after it - so it stays a MEMBER and cannot move out of the struct.  Guarded because this
+     * header is included by C units (ef/fn_8011722C.c), which must see the data fields only; a member
+     * function adds no storage, so the layout is identical either way. */
+    f32 GetScaleA(EfParticle* self, f32 v) { return v * scale_a; }
+#endif
+}; /* size: 0x60 (lower bound: the highest offset any function of this unit reads) */
+
 /* The particle manager's dispatch table; +0x14 is the spawn entry. */
 typedef struct EfParticleSlots {
     u8 pad_0x00[0x14]; /* +0x00 */
@@ -50,19 +116,35 @@ typedef struct EfParticleSlots {
 } EfParticleSlots; /* size: at least 0x18 */
 
 struct EfParticle {
-    u8 pad_0x00[0x1C];      /* +0x00 */
-    EfParticleSlots* slots; /* +0x1C */
-}; /* size: at least 0x20 */
+    /* +0x00 */ u8 pad_0x00[0x1C];
+    /* +0x1C */ EfParticleSlots* slots;
+    /* +0x20 */ EfParticleParams params;
+    /* +0xCC */ VEC3 field_0xCC;
+    /* +0xD8 */ u8 pad_0xD8[0x04];
+    /* +0xDC */ u16 field_0xDC;
+    /* +0xDE */ u8 pad_0xDE[0x02];
+}; /* size: 0xE0 (lower bound: +0xDC is the highest offset any function of this unit reads) */
 
 /* The per-emitter work record `em`.  Only the fields the shape files read are named. */
 typedef struct EfWork {
     u8 pad_0x00[0x32];  /* +0x00 */
     u16 split_count;    /* +0x32  number of steps the sweep is divided into */
-    u8 pad_0x34[0x33];  /* +0x34 */
+    u8 pad_0x34[0x32];  /* +0x34 */
+    s8 size_jitter;     /* +0x66  per-frame size jitter, in hundredths (read as signed) */
     s8 scale_rate;      /* +0x67  per-frame scale step, in hundredths */
-    u8 pad_0x68[0x10];  /* +0x68 */
-    f32 spread;         /* +0x78  orientation spread; 0 means axis-aligned */
-    u8 pad_0x7C[0x6C];  /* +0x7C */
+    /* The five transform stages of the emitter form, each "off" at 0.0f.  The names come from what
+     * the stage does in `ef/ef_emitterform.cpp` (fn_800A99B4), the only reader. */
+    f32 dir_weight;       /* +0x68  blend the emitter direction into the result */
+    f32 rot_weight;       /* +0x6C  blend the emitter's rotated axis into the result */
+    f32 spread_scale;     /* +0x70  scale of the random Euler spread */
+    f32 offset_scale;     /* +0x74  scale of the emitter position offset */
+    f32 spread;           /* +0x78  orientation spread; 0 means axis-aligned (ef_disc family) */
+    f32 axis_angle_scale; /* +0x7C  scale of the axis-angle spread */
+    f32 axis_angle_y;     /* +0x80  its second angle; 0 selects the plain Euler path */
+    f32 euler_x;          /* +0x84  Euler angles of the axis-angle stage */
+    f32 euler_y;          /* +0x88 */
+    f32 euler_z;          /* +0x8C */
+    u8 pad_0x90[0x58];    /* +0x90 */
     u16 spawn_flag;     /* +0xE8  passed through to the particle's spawn slot */
     u8 pad_0xEA[0x02];  /* +0xEA */
     u32 progress;       /* +0xEC  fixed-point progress read by fn_800A8A08 */
