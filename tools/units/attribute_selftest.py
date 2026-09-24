@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import sys
 import tempfile
@@ -110,14 +111,14 @@ def selftest() -> int:
 
     # --- names -------------------------------------------------------------------------------------
     check("placeholder: plain", at.placeholder("fn_80040598", 0x80040598, False),
-          "auto/80040598_fn_80040598.c")
+          "proposal/80040598_fn_80040598.c")
     check("placeholder: mangled symbol", at.placeholder("Pl_Skill_ck__FP4_PLWUs", 0x80270F50, True),
-          "auto/80270F50_Pl_Skill_ck__FP4_PLWUs.cpp")
+          "proposal/80270F50_Pl_Skill_ck__FP4_PLWUs.cpp")
     check("placeholder: leading digit", at.placeholder("9lives", 0x80000000, False),
-          "auto/80000000_u9lives.c")
-    check("placeholder: illegal characters", at.placeholder("a b*c", 0x1, False), "auto/00000001_a_b_c.c")
+          "proposal/80000000_u9lives.c")
+    check("placeholder: illegal characters", at.placeholder("a b*c", 0x1, False), "proposal/00000001_a_b_c.c")
     check("placeholder: truncated", len(at.placeholder("x" * 200, 0x1, False)),
-          len("auto/00000001_") + at.NAME_MAX + len(".c"))
+          len("proposal/00000001_") + at.NAME_MAX + len(".c"))
 
     check("mangled: C name", at.mangled("fn_802784A8"), False)
     check("mangled: C++ free function", at.mangled("fn__Fv"), True)
@@ -155,7 +156,7 @@ def selftest() -> int:
             "language": at.lc.classify([], [], ["ef_line.cpp"])}
     check("the placeholder derives C++ from the region verdict",
           at.placeholder("Pl_Skill_ck__FP4_PLWUs", 0x1000, langcxx["lang"] == "c++"),
-          "auto/00001000_Pl_Skill_ck__FP4_PLWUs.cpp")
+          "proposal/00001000_Pl_Skill_ck__FP4_PLWUs.cpp")
     check("the stub header states the language and its evidence",
           "Language: C++ (high: `__FILE__` string `ef_line.cpp`)" in at.stub_text(stub), True)
     check("the stub header states an unevidenced C default as such",
@@ -522,6 +523,54 @@ def selftest() -> int:
         check("rollback: a failure on the first write leaves both files alone",
               (read(layout.splits), read(layout.configure)), (FIXTURE_SPLITS, FIXTURE_CONF))
         check("rollback: a failure on the first write cleans its temp file", temps(tmp), [])
+
+    # --- option A: the proposal queue, not registrations (owner, 2026-09-24) ------------------------
+    # A proposal is work to hand out, never a registered unit: `queue` writes the queue and touches none of
+    # the four shared files, and the retired registration path (`apply`) refuses unless asked explicitly.
+    def capture(fn):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = fn()
+        return code, buf.getvalue()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        layout, fns = fixture(tmp), {}
+        props = [proposal("proposal/a.c", 0x80002000, 0x100, fns),
+                 proposal("proposal/b.c", 0x80003000, 0x80, fns)]
+        doc = at.queue_doc(props, at.CAP_DEFAULT)
+        check("queue: the document is versioned", doc["version"], 1)
+        check("queue: one entry per proposal", len(doc["units"]), 2)
+        check("queue: the total is the sum of the proposals", doc["total_bytes"], 0x180)
+        check("queue: an entry carries everything a brief needs",
+              sorted(doc["units"][0]), ["bytes", "count", "cxx", "functions", "label", "language",
+                                        "runs", "seam", "seam_note", "text"])
+        check("queue: a label is not a src/ path", doc["units"][0]["label"].startswith("proposal/"), True)
+        check("queue: a label never claims to be a registered unit",
+              any(doc["units"][0]["label"].startswith(p) for p in ("src/", "auto/", "main/")), False)
+
+        qpath = Path(tmp) / "attribution-queue.json"
+        before = (read(layout.splits), read(layout.configure))
+        code, out = capture(lambda: at.write_queue(props, at.CAP_DEFAULT, path=qpath))
+        check("queue: exits 0", code, 0)
+        check("queue: writes a parseable document", json.loads(read(qpath))["units"][0]["label"],
+              "proposal/a.c")
+        check("queue: leaves splits.txt and configure.py byte-identical",
+              (read(layout.splits), read(layout.configure)), before)
+        check("queue: leaves no temp file behind", temps(tmp), [])
+        check("queue: writes no source stub", (layout.src).exists(), False)
+        code, out = capture(lambda: at.write_queue(props, at.CAP_DEFAULT, path=qpath, dry_run=True))
+        check("queue: a dry run leaves the queue as it was", json.loads(read(qpath))["units"][0]["label"],
+              "proposal/a.c")
+
+    ap = at.build_parser()
+    check("cli: `queue` is a subcommand", ap.parse_args(["queue", "0x0", "0x1"]).cmd, "queue")
+    check("cli: `plan` still parses", ap.parse_args(["plan", "0x0", "0x1"]).cmd, "plan")
+    check("cli: `apply` defaults to refusing (no --legacy-register)",
+          ap.parse_args(["apply", "0x0", "0x1"]).legacy_register, False)
+    check("cli: `--legacy-register` is accepted on apply",
+          ap.parse_args(["apply", "0x0", "0x1", "--legacy-register"]).legacy_register, True)
+    check("cli: `queue` takes --max-total-bytes like the others",
+          ap.parse_args(["queue", "0x0", "0x1", "--max-total-bytes", "0x1000"]).max_total_bytes, 0x1000)
 
     if fails:
         print("FAIL (%d)" % len(fails))

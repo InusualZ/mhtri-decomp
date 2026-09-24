@@ -20,12 +20,22 @@ Usage:
 
     python tools/units/attribute.py plan 0x80040598 0x800408A8
     python tools/units/attribute.py plan 0x80040598 0x800408A8 --json
-    python tools/units/attribute.py apply 0x80040598 0x800408A8 --dry-run
-    python tools/units/attribute.py apply 0x80040598 0x800408A8 --max-total-bytes 0x80000
+    python tools/units/attribute.py queue 0x80040598 0x800408A8
     python tools/units/attribute.py --selftest
 
-`plan` is read-only. `apply` writes the `splits.txt` blocks, the `configure.py` objects and a stub
-source per unit; nothing is measured by it - run `ninja` (which re-splits) and read the ledger after.
+`plan` is read-only. `queue` caps and validates the batch, then writes the **proposal queue**
+(`tools/units/attribution-queue.json`): the discovered units as *work to hand out*, not as registrations.
+That is option A (owner, 2026-09-24) - the `src/auto/` scaffolding bucket is retired, and the worker that
+takes a proposal registers the unit at its final `src/<module>/<name>.<ext>` home, from the evidence it has
+by then. So neither `plan` nor `queue` touches `splits.txt`, `configure.py` or `src/`.
+
+`apply` is the **retired** behaviour - it wrote the `splits.txt` blocks, the `configure.py` objects and a
+stub source per unit under `src/auto/`. It now refuses unless `--legacy-register` is passed, which exists
+only to reproduce a batch landed before the policy changed.
+
+The queue records the data runs a proposal saw (a `.text` line is safe - a `NonMatching` unit's bytes are
+not linked, so the DOL hash cannot move - while a data line can make dtk drop the target's pool relocations
+and *lower* a neighbouring unit's score, playbook idea 23). Claiming data stays a separate, measured pass.
 The `configure.py` objects extend the existing `auto` lib when one is already declared, and only the
 first batch appends the block - a second `"lib": "auto"` block would be a different lib with the same
 name.
@@ -68,6 +78,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,8 +93,11 @@ SPLITS = ROOT / "config" / "RMHE08" / "splits.txt"
 CONFIGURE = ROOT / "configure.py"
 AUTO_DIR = ROOT / "src" / "auto"
 
-# A unit's name is a placeholder until someone has evidence for the real path. The header comment of
-# each stub says so; this is the only place that decides what a placeholder looks like.
+# A proposal's *label* is provisional identity for the queue and the claim machinery, never a unit: under
+# option A the worker that takes a proposal registers the unit at its final path. The label is deliberately
+# not a `src/` path so it cannot be mistaken for one, and this is the only place that decides its shape.
+# The extension it carries is a *hint* from the region's language verdict - the worker re-derives it from
+# the unit's own evidence (its `__FILE__` string, a mangled definition) which outranks a region verdict.
 NAME_MAX = 48
 
 # docs/plan.md §3 clause 2: one registration batch claims at most 0.5 MB of `.text` (a blast-radius
@@ -117,6 +131,11 @@ overlaps = sf.overlaps
 
 LAYOUT = Layout(SPLITS, CONFIGURE, ROOT / "src")
 
+# The proposal queue (option A). It lives beside the tool rather than under `.pi/` because it is campaign
+# state every agent reads, not one session's scratch; it is gitignored because it is regenerated from the
+# DOL and the map by `attribute.py queue`.
+QUEUE_PATH = ROOT / "tools" / "units" / "attribution-queue.json"
+
 
 def load(span_max: int = 0x4000, source_span_max: int = 0x8000):
     """The map, the graph and the analysis - the three expensive inputs, loaded once."""
@@ -145,11 +164,11 @@ def in_claimed(addr: int, claimed: list[tuple[int, int, str]]) -> tuple[int, int
 
 
 def placeholder(first: str, addr: int, cxx: bool) -> str:
-    """`auto/<addr>_<symbol>.c` - unique, greppable, and obviously provisional."""
+    """`proposal/<addr>_<symbol>.<ext>` - unique, greppable, and obviously *not* a registered unit."""
     stem = re.sub(r"[^A-Za-z0-9_]", "_", first)[:NAME_MAX] or "unit"
     if stem[0].isdigit():
         stem = "u" + stem
-    return "auto/%08X_%s%s" % (addr, stem, ".cpp" if cxx else ".c")
+    return "proposal/%08X_%s%s" % (addr, stem, ".cpp" if cxx else ".c")
 
 
 def mangled(name: str) -> bool:
@@ -619,6 +638,59 @@ def plan_writes(proposals: list[dict], layout: Layout) -> dict:
     return {"writes": writes, "splits": added, "objects": len(missing), "stubs": stubs}
 
 
+def queue_doc(proposals: list[dict], cap: int) -> dict:
+    """The proposal queue as a plain dict - the shape `brief.py` and `queue.py` read.
+
+    `label` is a *provisional identity* for the claim/queue machinery only (`claims.py` keys on a string,
+    and a proposal has no unit yet). It is never a registered unit and never a `configure.py` path.
+    """
+    return {
+        "version": 1,
+        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "cap": cap,
+        "total_bytes": sum(p["bytes"] for p in proposals),
+        "units": [{
+            "label": p["unit"],
+            "text": p["text"],
+            "count": p["count"],
+            "bytes": p["bytes"],
+            "cxx": p["cxx"],
+            "language": p.get("language"),
+            "seam": p.get("seam"),
+            "seam_note": p.get("seam_note"),
+            "functions": p["functions"],
+            "runs": p["runs"],
+        } for p in proposals],
+    }
+
+
+def write_queue(proposals: list[dict], cap: int, path: Path | None = None,
+                dry_run: bool = False) -> int:
+    """Write the proposal queue - discovered units as work, never as registrations (option A).
+
+    Touches none of the four shared files. The write is temp + replace, the same discipline as
+    `sharedfiles.Transaction`, so a reader never sees a half-written queue.
+    """
+    path = path or QUEUE_PATH
+    text = json.dumps(queue_doc(proposals, cap), indent=1) + "\n"
+    units = len(proposals)
+    funcs = sum(p["count"] for p in proposals)
+    byts = sum(p["bytes"] for p in proposals)
+    if dry_run:
+        print("--- would write %s - %d unit(s), %d function(s), %d .text bytes"
+              % (path, units, funcs, byts))
+        return 0
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + sf.TMP_SUFFIX)
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+    print("wrote %s" % path)
+    print("  %d proposed unit(s), %d function(s), %d .text bytes (cap 0x%X)" % (units, funcs, byts, cap))
+    print("  a proposal is not a unit: the worker that takes one registers it at its final")
+    print("  src/<module>/<name>.<ext> home, from the evidence it has by then.")
+    return 0
+
+
 def apply(proposals: list[dict], dry_run: bool = False, cap: int = CAP_DEFAULT,
           layout: Layout | None = None, fns: dict | None = None, rename=None) -> int:
     """Register a batch: cap it, validate it, then write every file through temp + rename.
@@ -681,8 +753,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     sub = ap.add_subparsers(dest="cmd")
-    for cmd in ("plan", "apply"):
+    parsers = {}
+    for cmd in ("plan", "apply", "queue"):
         a = sub.add_parser(cmd)
+        parsers[cmd] = a
         a.add_argument("start")
         a.add_argument("end")
         a.add_argument("--min-bytes", type=lambda v: int(v, 0), default=MIN_BYTES_DEFAULT,
@@ -697,6 +771,10 @@ def build_parser() -> argparse.ArgumentParser:
         a.add_argument("--json", action="store_true")
         a.add_argument("--dry-run", action="store_true")
         a.add_argument("--limit", type=int, default=0, help="apply at most N units")
+    parsers["apply"].add_argument(
+        "--legacy-register", action="store_true",
+        help="the retired behaviour: write src/auto stubs plus the configure.py and splits.txt entries. "
+             "Option A forbids it; it exists only to reproduce a batch landed before 2026-09-24.")
     return ap
 
 
@@ -725,6 +803,15 @@ def main() -> int:
             human(kept)
         cap_report(kept, detail, args.max_total_bytes, file=sys.stderr if args.json else sys.stdout)
         return 0
+    if args.cmd == "queue":
+        cap_report(kept, detail, args.max_total_bytes)
+        return write_queue(kept, args.max_total_bytes, dry_run=args.dry_run)
+    if not args.legacy_register:
+        print("refusing: option A retired registration - `apply` no longer writes src/auto stubs,")
+        print("`configure.py` entries or `splits.txt` blocks (owner, 2026-09-24).")
+        print("Use `attribute.py queue <start> <end>` to record the proposals; the worker that takes")
+        print("one registers the unit at its final home. `--legacy-register` reproduces an old batch.")
+        return 2
     return apply(props, args.dry_run, args.max_total_bytes, fns=fns)
 
 
