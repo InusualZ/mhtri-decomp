@@ -113,7 +113,7 @@ extern u32 fn_800F92F4(struct _EFT* self, u32 mode);
 extern void fn_800FD718(struct _EFT* self);
 extern void fn_800FD860(struct _EFT* self);
 
-extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 unk);
+extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 idx);
 extern void mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(VEC3* out, MTX34* mtx);
 extern void SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(void* effect, VEC3* pos);
 
