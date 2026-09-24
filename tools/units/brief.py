@@ -601,7 +601,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("**Before you hand-roll a search, use the two tools that do it mechanically:**")
     lines.append("")
     lines.append("```")
-    lines.append("python tools/flags/infer.py --unit %s      # which flags the TARGET object implies" % b["unit"])
+    lines.append("python tools/flags/infer.py %s            # which flags the TARGET object implies" % b["unit"])
     lines.append("python tools/flags/shapesearch.py -u %s --scan 20   # generate/compile/score/rank source variants" % b["unit"])
     lines.append("```")
     lines.append("")
