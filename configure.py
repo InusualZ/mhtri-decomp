@@ -703,6 +703,9 @@ config.libs = [
             # builder) and names it; the range's own data has no `__FILE__` string, so the name stays
             # the map's `fn_` stem (docs/plan.md 12, the register-once rule).
             Object(NonMatching, "g3d/fn_800D77B0.cpp"),     # 0x800D77B0-0x800D79B4
+            # The `g3d_basic.cpp` SRT/matrix cluster, named by its own `__FILE__` string
+            # (`lbl_80595840` = "g3d_basic.cpp", reached by fn_800D79B4's `nw4r::db::Panic` asserts).
+            Object(NonMatching, "g3d/g3d_basic.cpp"),        # 0x800D79B4-0x800D7F54
         ],
     },
     {
