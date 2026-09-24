@@ -539,6 +539,10 @@ def selftest() -> int:
                  proposal("proposal/b.c", 0x80003000, 0x80, fns)]
         doc = at.queue_doc(props, at.CAP_DEFAULT)
         check("queue: the document is versioned", doc["version"], 1)
+        check("queue: carries no timestamp (so the same inputs give the same bytes)",
+              any(k in doc for k in ("generated", "timestamp", "generated_at")), False)
+        check("queue: carries the input fingerprints",
+              all(k in doc for k in ("dol_sha1", "symbols_sha1", "splits_sha1", "configure_sha1")), True)
         check("queue: one entry per proposal", len(doc["units"]), 2)
         check("queue: the total is the sum of the proposals", doc["total_bytes"], 0x180)
         check("queue: an entry carries everything a brief needs",
@@ -571,6 +575,32 @@ def selftest() -> int:
           ap.parse_args(["apply", "0x0", "0x1", "--legacy-register"]).legacy_register, True)
     check("cli: `queue` takes --max-total-bytes like the others",
           ap.parse_args(["queue", "0x0", "0x1", "--max-total-bytes", "0x1000"]).max_total_bytes, 0x1000)
+
+    # determinism: the queue is a pure function of its inputs, so regenerating over an unchanged tree is
+    # not a diff. This is what the removed wall-clock timestamp used to break.
+    with tempfile.TemporaryDirectory() as tmp:
+        props = [proposal("proposal/a.c", 0x80002000, 0x100, {})]
+        fp = {"dol_sha1": "d" * 40, "symbols_sha1": "s" * 40,
+              "splits_sha1": "p" * 40, "configure_sha1": "c" * 40}
+        a = json.dumps(at.queue_doc(props, 0, fp), indent=1)
+        b = json.dumps(at.queue_doc(props, 0, fp), indent=1)
+        check("queue: the same inputs produce byte-identical documents", a == b, True)
+        # and a changed input is visible as a change, naming which input moved
+        fp2 = dict(fp, symbols_sha1="t" * 40)
+        check("queue: a changed input changes the document",
+              json.dumps(at.queue_doc(props, 0, fp2), indent=1) != a, True)
+        check("queue: the fingerprints are the whole difference",
+              json.loads(a)["symbols_sha1"] != json.loads(json.dumps(at.queue_doc(props, 0, fp2)))["symbols_sha1"],
+              True)
+
+    real_fp = at.input_fingerprints()
+    check("fingerprints: the DOL is hashed from the real tree",
+          bool(real_fp.get("dol_sha1")) and len(real_fp["dol_sha1"]) == 40, True)
+    check("fingerprints: the symbol map is hashed too",
+          bool(real_fp.get("symbols_sha1")) and len(real_fp["symbols_sha1"]) == 40, True)
+    check("fingerprints: a missing input is None, never an exception",
+          at.input_fingerprints(at.Layout(Path(tmp) / "nope", Path(tmp) / "nope2", Path(tmp)))["splits_sha1"],
+          None)
 
     if fails:
         print("FAIL (%d)" % len(fails))
