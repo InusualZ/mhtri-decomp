@@ -694,6 +694,11 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
             Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
             Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
+            # Registered from proposal/800D77B0_fn_800D77B0 (the 0x800D77B0 two-function run).  `g3d`
+            # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
+            # builder) and names it; the range's own data has no `__FILE__` string, so the name stays
+            # the map's `fn_` stem (docs/plan.md 12, the register-once rule).
+            Object(NonMatching, "g3d/fn_800D77B0.cpp"),     # 0x800D77B0-0x800D79B4
         ],
     },
     {
