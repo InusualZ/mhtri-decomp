@@ -17,6 +17,20 @@ it calls mangled `SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3` and wa
 `.c`, matching at 100.00 % with all 26 relocations identical (`auto/803066F0_fn_803066F0.c` is the
 same shape).
 
+A third signal is **suggestive, not conclusive** too, and it is cheap and mechanical: an object that
+carries the `extab`/`extabindex` sections was compiled as C++ - **C has no exceptions**, so a C
+translation unit has no `__eh` records to emit. The confound is a lib whose `cflags` set
+`-Cpp_exceptions on` (`cflags_pl`, `cflags_main`, `cflags_g3d`, `cflags_camellia`): that makes a **C**
+unit emit `extab` as well, so the signal is only usable when the lib leaves the flag off, which
+`cflags_exceptions` resolves from the unit's cflags variable. Even then it is **one-directional** - a
+C++ file with no `try`/`catch`/`throw` emits no `extab`, so an object *without* the section evidences
+nothing (`Runtime.PPCEABI.H/__init_cpp_exceptions.cpp` is C++ and has none). It therefore joins the
+mangled-callee signal as `suggested`: reported with its reason, keeps the extension, and never
+renames on its own. On today's tree its decisive hit count is **0** - the `.c` units that carry
+`extab` all sit in libs that enable exceptions (`auto`/`main`), where the hint is silent - but it is
+decisive for the no-exceptions libs and catches a wrong extension the moment a new unit is registered
+there.
+
 That decides three things and none of them is stylistic: the **file extension**, the **`-lang`** the
 front-end is run with, and the **name objdiff pairs by** (a C++ definition is mangled unless it is
 `extern "C"` - playbook row 42 seen from the other side).
@@ -77,6 +91,12 @@ C_EXT = (".c",)
 # as a `__FILE__` string. A path separator is allowed because some assert strings carry one.
 SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp|c\+\+)$")
 
+# MWCC's C++ exception tables. C has no exceptions, so their presence in an object is evidence the
+# translation unit was compiled as C++ - unless the lib sets `-Cpp_exceptions on` (the confound
+# `cflags_exceptions` resolves). `.relaextab`/`.relaextabindex` are the reloc companions, not the
+# sections themselves.
+EXTAB_SECTIONS = ("extab", "extabindex")
+
 # MWCC's C++ mangling appends the argument list after `__` (`fn__Fv`, `Pl_Skill_ck__FP4_PLWUs`), and
 # the `__F`/`__Q` form is what every mangled name in this image uses. `__start`, `__init_data`,
 # `_savegpr_21` and `lbl_80594DE0` are C/EABI spellings and deliberately do not match.
@@ -89,6 +109,15 @@ CONF_TOKEN_RE = re.compile(
     r'|"cflags":\s*(?P<cflags>[A-Za-z_]\w*)'
     r'|Object\(\s*(?P<flag>[A-Za-z_]\w*)\s*,\s*"(?P<path>[^"]+)"(?P<rest>[^)]*)\)')
 INLINE_CFLAGS_RE = re.compile(r"cflags\s*=\s*([A-Za-z_]\w*)")
+
+# One cflags-list body is read as an ordered stream of literal tokens and spreads, because both `-lang`
+# and `-Cpp_exceptions` mean "last one wins". A spread can be `*cflags_x` or a filtered comprehension
+# `*[f for f in cflags_x if ...]`; the tokens a filter removes are re-added explicitly by the same list
+# where that matters (`cflags_pl` filters `-Cpp_exceptions off` from `cflags_base` and then sets `on`).
+_CFLAGS_TOKEN_RE = re.compile(
+    r'"([^"]*)"'
+    r'|\*\s*([A-Za-z_]\w*)'
+    r'|\*\[[^\]]*?\bfor\s+\w+\s+in\s+([A-Za-z_]\w*)')
 
 
 # --------------------------------------------------------------------------------------------------
@@ -109,28 +138,35 @@ def ext_lang(ext: str) -> str | None:
     return None
 
 
-def classify(mangled_defined, mangled_undefined, sources) -> dict:
-    """The verdict from the three evidence sets. Pure, so the selftest can drive it directly.
+def classify(mangled_defined, mangled_undefined, sources, extab=False, exceptions_on=False) -> dict:
+    """The verdict from the evidence sets. Pure, so the selftest can drive it directly.
 
     `mangled_defined`/`mangled_undefined` are symbol names; `sources` is the list of `__FILE__` names
-    the object references or defines. Confidence is about the *evidence*, not the odds:
+    the object references or defines; `extab` is whether the object carries `extab`/`extabindex`, and
+    `exceptions_on` whether the unit's lib enables `-Cpp_exceptions` (which would make a C unit emit
+    `extab` too). Confidence is about the *evidence*, not the odds:
 
     * `high`   - **conclusive**: a mangled definition (the unit's own symbol) or a `__FILE__` string;
     * `medium` - **suggestive**: only mangled names on the *referenced* side (`Panic`,
-       `get_now_areano__Fv`). A C unit can call a mangled function by declaring it with the map's
-       spelling, so this is reported (`suggested: True`) but is **not** a verdict: it must not drive a
-       rename or an extension change (`conclusive: False`). `auto/800FD520_fn_800FD520` calls mangled
-       `SetRootMtxTrans__...` and matched at 100.00 % as `.c`.
-    * `low`    - nothing mangled and no source string: C is the default, not a measurement.
+       `get_now_areano__Fv`), or an `extab` object in a lib that does not enable exceptions. A C unit
+       can call a mangled function by declaring it with the map's spelling, and C cannot emit `extab`
+       unless exceptions are on - so both are reported (`suggested: True`) but are **not** a verdict:
+       they must not drive a rename or an extension change (`conclusive: False`). In particular the
+       `extab` signal is one-directional: its absence is not evidence of C.
+    * `low`    - nothing mangled, no source string and no usable `extab`: C is the default, not a
+       measurement.
 
     `conclusive` is True only when the unit's own name or a `__FILE__` string decides the language;
-    `suggested` is True when the only C++ evidence is a mangled callee.
+    `suggested` is True when the only C++ evidence is a mangled callee or an `extab` object.
     """
     md = sorted(set(mangled_defined))
     mu = sorted(set(mangled_undefined))
     srcs = sorted(set(sources))
     cpp_src = [s for s in srcs if os.path.splitext(s)[1].lower() in CXX_EXT]
     c_src = [s for s in srcs if os.path.splitext(s)[1].lower() == ".c"]
+    # C has no exceptions, so `extab` in an object is C++ evidence - but only when the lib does not set
+    # `-Cpp_exceptions on`, which would make a C unit emit it too (the confound this signal must respect).
+    extab_signal = bool(extab) and not exceptions_on
     evidence = []
     if md:
         evidence.append({"kind": "mangled-defined", "detail": md[0], "count": len(md)})
@@ -140,12 +176,18 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
         evidence.append({"kind": "mangled-undefined", "detail": mu[0], "count": len(mu)})
     if c_src:
         evidence.append({"kind": "source-c", "detail": ", ".join(c_src), "count": len(c_src)})
+    if extab_signal:
+        evidence.append({"kind": "extab", "detail": "extab/extabindex present and the lib does not enable "
+                                                      "-Cpp_exceptions", "count": 1})
     conclusive = bool(md or cpp_src or c_src)
     if md or cpp_src:
         lang, confidence = "c++", "high"
     elif c_src:
-        # a `.c` __FILE__ is conclusive C and outranks a mangled callee (the counter-example's shape)
+        # a `.c` __FILE__ is conclusive C and outranks every suggested signal
         lang, confidence = "c", "high"
+    elif extab_signal:
+        # C cannot emit extab without -Cpp_exceptions on, and the lib does not set it - C++ (suggested)
+        lang, confidence = "c++", "medium"
     elif mu:
         # a mangled *callee* only: report it, but it does not decide the language (see the docstring)
         lang, confidence = "c++", "medium"
@@ -155,7 +197,7 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
         "lang": lang,
         "confidence": confidence,
         "conclusive": conclusive,
-        "suggested": bool(mu) and not conclusive,
+        "suggested": bool(mu or extab_signal) and not conclusive,
         "evidence": evidence,
         "sources": srcs,
         "conflict": len(srcs) > 1,
@@ -163,18 +205,21 @@ def classify(mangled_defined, mangled_undefined, sources) -> dict:
         "mangled_undefined": mu,
         "cpp_sources": cpp_src,
         "c_sources": c_src,
+        "extab": bool(extab),
+        "extab_signal": extab_signal,
+        "extab_conflict": bool(extab_signal and c_src),
+        "exceptions_on": bool(exceptions_on),
     }
 
 
 # --------------------------------------------------------------------------------------------------
 # the object oracle
 # --------------------------------------------------------------------------------------------------
-def elf_symbols(path: str) -> list[dict]:
-    """Every symbol in an ELF32 big-endian object, **including undefined and `STT_FILE`**.
+def _elf_sections(path: str) -> list[dict]:
+    """Every section header of an ELF32 big-endian object, with `sname` resolved.
 
-    `unitutil.read_elf` drops `shndx == 0` (undefined) and keeps but does not label `STT_FILE`; both
-    matter here - the undefined names *are* the relocation targets (the strongest callee evidence),
-    and the FILE symbol is the circular one this tool must not read. Values are section-relative.
+    Shared by `elf_symbols` (it needs `.symtab`/`.strtab`) and `object_has_extab` (it needs the section
+    names). Values are section-relative; `data` is the raw section content.
     """
     data = open(path, "rb").read()
     if data[:4] != b"\x7fELF":
@@ -192,6 +237,17 @@ def elf_symbols(path: str) -> list[dict]:
     for s in secs:
         e = shstr.find(b"\0", s["name"])
         s["sname"] = shstr[s["name"]:e].decode("latin-1")
+    return secs
+
+
+def elf_symbols(path: str) -> list[dict]:
+    """Every symbol in an ELF32 big-endian object, **including undefined and `STT_FILE`**.
+
+    `unitutil.read_elf` drops `shndx == 0` (undefined) and keeps but does not label `STT_FILE`; both
+    matter here - the undefined names *are* the relocation targets (the strongest callee evidence),
+    and the FILE symbol is the circular one this tool must not read. Values are section-relative.
+    """
+    secs = _elf_sections(path)
     symtab = next((s for s in secs if s["typ"] == 2), None)
     if symtab is None:
         return []
@@ -207,6 +263,19 @@ def elf_symbols(path: str) -> list[dict]:
                     # SHN_ABS is where MWCC files the source-file (STT_FILE) symbol
                     "file": (info & 0xF) == 4})
     return out
+
+
+def object_has_extab(path: str) -> bool:
+    """True when the object carries an `extab`/`extabindex` section.
+
+    MWCC emits those only for a C++ translation unit - **C has no exceptions** - unless the lib sets
+    `-Cpp_exceptions on`, which is the confound the caller resolves (`cflags_exceptions`). A missing or
+    unreadable object has no extab and therefore no signal.
+    """
+    try:
+        return any(s["sname"] in EXTAB_SECTIONS for s in _elf_sections(path))
+    except (OSError, ValueError, struct.error):
+        return False
 
 
 def object_names(target: str) -> tuple[set, set]:
@@ -271,22 +340,28 @@ def string_sources(names, labels, dol) -> list[str]:
     return sorted(out)
 
 
-def object_verdict(target: str, labels=None, dol=None) -> dict:
+def object_verdict(target: str, labels=None, dol=None, exceptions_on: bool = True) -> dict:
     """The verdict for one target object, with its evidence. `lang=None` when there is no object.
 
     Falls back to the module-level oracle for the map/DOL when the caller does not have them; that is
-    the only I/O besides reading the object.
+    the only I/O besides reading the object. `exceptions_on` is the unit's lib setting (see
+    `cflags_exceptions`): when the lib enables `-Cpp_exceptions` a C unit emits `extab` too, so the
+    section is not C++ evidence and the caller passes True. It **defaults to True** - a caller that has
+    not resolved the lib flags must not emit the hint (a false positive is worse than no hint);
+    `unit_verdict`/`sweep` pass the value they resolved from the cflags variable.
     """
     if not os.path.exists(target):
         return {"lang": None, "confidence": "none", "conclusive": False, "suggested": False,
                 "evidence": [], "sources": [], "conflict": False, "mangled_defined": [],
                 "mangled_undefined": [], "cpp_sources": [], "c_sources": [], "target": target,
-                "error": "no target object"}
+                "extab": False, "extab_signal": False, "extab_conflict": False,
+                "exceptions_on": bool(exceptions_on), "error": "no target object"}
     if labels is None or dol is None:
         labels, dol = oracle()
     defined, undefined = object_names(target)
     sources = string_sources(defined | undefined, labels, dol)
-    v = classify([n for n in defined if mangled(n)], [n for n in undefined if mangled(n)], sources)
+    v = classify([n for n in defined if mangled(n)], [n for n in undefined if mangled(n)], sources,
+                 extab=object_has_extab(target), exceptions_on=exceptions_on)
     v["target"] = target
     return v
 
@@ -317,10 +392,13 @@ def registered_units(main: str | None = None) -> list[dict]:
 
 
 def cflags_tokens(text: str, name: str, seen=None) -> list[str]:
-    """The literal `"-x y"` tokens reachable from a cflags variable, following `*cflags_x` spreads.
+    """The literal `"-x y"` tokens reachable from a cflags variable, **in source order**.
 
-    Not a full Python evaluator: it is enough to find `-lang`, which no `if f != "…"` filter in this
-    file removes. Recursion is bounded so a cycle cannot hang the tool.
+    Follows `*cflags_x` spreads and filtered `*[f for f in cflags_x if ...]` spreads, because both
+    `-lang` and `-Cpp_exceptions` are "last one wins" and the order decides the answer. Not a full
+    Python evaluator: a filter's own quoted literals are collected too, which is harmless here (the one
+    filter this tool cares about, `-Cpp_exceptions off`, is followed by an explicit `on` wherever it is
+    filtered). Recursion is bounded so a cycle cannot hang the tool.
     """
     seen = set(seen or ())
     if not name or name in seen:
@@ -329,10 +407,12 @@ def cflags_tokens(text: str, name: str, seen=None) -> list[str]:
     m = re.search(r"(?m)^%s\s*=\s*\[(.*?)\n\]" % re.escape(name), text, re.S)
     if not m:
         return []
-    body = m.group(1)
-    tokens = [t for t in re.findall(r'"([^"]*)"', body)]
-    for ref in set(re.findall(r"\*\s*([A-Za-z_]\w*)", body)):
-        tokens.extend(cflags_tokens(text, ref, seen))
+    tokens = []
+    for mt in _CFLAGS_TOKEN_RE.finditer(m.group(1)):
+        if mt.group(1) is not None:
+            tokens.append(mt.group(1))
+        else:
+            tokens.extend(cflags_tokens(text, mt.group(2) or mt.group(3), seen))
     return tokens
 
 
@@ -360,17 +440,45 @@ def cflags_lang(main: str | None = None, cflags_name: str | None = None, text: s
     return "c++" if "++" in v else "c"
 
 
-def unit_verdict(main: str, path: str, labels=None, dol=None) -> dict:
+def cflags_exceptions(main: str | None = None, cflags_name: str | None = None, text: str | None = None) -> str | None:
+    """Whether a cflags variable enables MWCC C++ exceptions: `"on"`, `"off"`, or `None` if unmentioned.
+
+    This is the confound the `extab` language signal must respect: with `-Cpp_exceptions on` a **C** unit
+    emits `extab`/`extabindex` too, so the section is only evidence of C++ when the lib leaves the flag
+    off. Both spellings are accepted (`"-Cpp_exceptions on"` and the two-token form), matching
+    `cflags_lang`. `None` means no token at all; the caller treats that as "not known to be off" and the
+    signal stays unused (MWCC's default is on, and a false positive is worse than no hint).
+    """
+    if text is None:
+        text = open(os.path.join(_root(main), "configure.py"), encoding="utf-8", errors="replace").read()
+    tokens = cflags_tokens(text, cflags_name or "")
+    values = []
+    for i, tok in enumerate(tokens):
+        m = re.match(r"^-Cpp_exceptions(?:\s+(\S+))?$", tok)
+        if m:
+            if m.group(1):
+                values.append(m.group(1))
+            elif i + 1 < len(tokens):
+                values.append(tokens[i + 1])
+    if not values:
+        return None
+    return "on" if values[-1] == "on" else "off"
+
+
+def unit_verdict(main: str, path: str, labels=None, dol=None, exceptions_on: bool = True) -> dict:
     """The full verdict for one registered path: language, evidence, current extension and `-lang`.
 
     `path` is the object path as registered (`auto/800CCFB0_fn_800CCFB0.c`); the target object is the
     split object under `build/RMHE08/obj/`, and the extension says what the build currently does.
+    `exceptions_on` is the lib setting that decides whether the `extab` signal is usable; it defaults to
+    True (signal off) so an unresolved flag cannot invent a hint - `sweep`/`--unit` pass the value from
+    `cflags_exceptions`.
     """
     main = _root(main)
     ext = os.path.splitext(path)[1]
     ext_l = ext_lang(ext)
     target = os.path.join(main, "build", "RMHE08", "obj", os.path.splitext(path)[0] + ".o")
-    v = object_verdict(target, labels, dol)
+    v = object_verdict(target, labels, dol, exceptions_on=exceptions_on)
     v["path"] = path
     v["extension"] = ext
     v["extension_lang"] = ext_l
@@ -393,6 +501,13 @@ def brief_paragraph(v: dict | None) -> str:
                 "could read it. If the source must be C++, put it in the outbox (`docs/plan.md`, \"The "
                 "language comes from the symbol\").")
     if v["lang"] == "c++" and v.get("suggested"):
+        if v.get("extab_signal"):
+            return ("**This unit is probably C++**: its target object carries `extab`/`extabindex` and its "
+                    "lib's cflags do not enable `-Cpp_exceptions`, so a C translation unit could not have "
+                    "emitted them (%s). That is *suggested*, not conclusive - and one-directional, because a "
+                    "C++ file with no `try`/`catch`/`throw` emits no `extab`. **Keep `.c` - and its flag set - "
+                    "unless a mangled definition or a `.cpp` `__FILE__` string turns up** (the promotion field "
+                    "is prepared for it)." % _evidence_text(v))
         return ("**This unit is probably C++, but the evidence is only suggestive** (%s). A mangled "
                 "*callee* does not prove the caller is C++: a C unit can call a mangled function by "
                 "declaring it with the map's spelling, and `auto/800FD520_fn_800FD520` calls mangled "
@@ -432,6 +547,8 @@ def _evidence_text(v: dict) -> str:
             bits.append("`__FILE__` string `%s`" % e["detail"])
         elif e["kind"] == "source-c":
             bits.append("`__FILE__` string `%s`" % e["detail"])
+        elif e["kind"] == "extab":
+            bits.append("`extab`/`extabindex` present (C has no exceptions; the lib leaves `-Cpp_exceptions` off)")
     return "; ".join(bits) or "no evidence"
 
 
@@ -445,7 +562,8 @@ def language_cell(v: dict | None) -> str:
     if not v or not v.get("lang"):
         return "not on record (no target object to read)"
     if v.get("suggested"):
-        return "**C++** (suggested - mangled callee only, not conclusive: %s)" % _evidence_text(v)
+        why = "extab in a no-exceptions lib" if v.get("extab_signal") else "mangled callee only"
+        return "**C++** (suggested - %s, not conclusive: %s)" % (why, _evidence_text(v))
     return "**%s** (%s: %s)" % ("C++" if v["lang"] == "c++" else "C", v["confidence"], _evidence_text(v))
 
 
@@ -457,14 +575,21 @@ def sweep(main: str) -> dict:
     main = _root(main)
     conf = open(os.path.join(main, "configure.py"), encoding="utf-8", errors="replace").read()
     labels, dol = oracle(main)
-    rows, cache = [], {}
+    rows, cache, exc_cache = [], {}, {}
     for reg in registered_units(main):
         name = reg["cflags"] or ""
         if name not in cache:
             cache[name] = cflags_lang(main, name, conf)
-        v = unit_verdict(main, reg["path"], labels, dol)
+        if name not in exc_cache:
+            exc_cache[name] = cflags_exceptions(main, name, conf)
+        # a lib that enables `-Cpp_exceptions` (or whose setting cannot be read) makes the `extab` signal
+        # unusable; only an explicit `off` lets it fire (a false positive is worse than no hint)
+        exc_setting = exc_cache[name]
+        exceptions_on = exc_setting != "off"
+        v = unit_verdict(main, reg["path"], labels, dol, exceptions_on=exceptions_on)
         v["lib"] = reg["lib"]
         v["cflags"] = reg["cflags"]
+        v["exceptions"] = exc_setting
         v["lang_flag"] = cache[name]
         v["effective_lang"] = cache[name] or v["extension_lang"]
         v["flag_agrees"] = (v["lang"] is None) or (v["effective_lang"] is None) or (v["effective_lang"] == v["lang"])
@@ -478,6 +603,16 @@ def sweep(main: str) -> dict:
     # a `.cpp` file whose object shows no evidence at all: the extension is a deliberate choice, and
     # nothing contradicts it - a note for a human, never a rename
     unevidenced = [r for r in rows if r["lang"] == "c" and r["confidence"] == "low" and r["extension_lang"] == "c++"]
+    # the `extab` language signal, measured on the real tree. `extab_signal` is True only when the object
+    # carries extab AND the lib does not enable exceptions - the only case where the hint is decisive.
+    extab_units = [r for r in rows if r.get("extab")]
+    extab_c = [r for r in extab_units if r["extension_lang"] == "c"]
+    extab_cpp = [r for r in extab_units if r["extension_lang"] == "c++"]
+    extab_other = [r for r in extab_units if r["extension_lang"] is None]
+    candidates = [r for r in extab_c if r.get("extab_signal")]           # hint says C++, registration says C
+    confounded = [r for r in extab_c if not r.get("extab_signal")]       # extab but lib enables exceptions
+    contradictions = [r for r in rows if r["extension_lang"] == "c++" and r["lang"] is not None
+                      and not r.get("extab") and not r.get("mangled_defined") and not r.get("mangled_undefined")]
     from collections import Counter
     return {
         "main": main,
@@ -491,6 +626,15 @@ def sweep(main: str) -> dict:
             "conclusive_c": sum(1 for r in rows if r["conclusive"] and r["lang"] == "c"),
             "suggested": len(suggested),
             "c": sum(1 for r in rows if r["lang"] == "c"),
+        },
+        "extab": {
+            "objects": extab_units,          # every object carrying extab/extabindex
+            "registered_c": extab_c,         # ... of which the registration says C
+            "registered_cpp": extab_cpp,     # ... of which the registration says C++
+            "registered_other": extab_other,
+            "candidates": candidates,        # decisive: no-exceptions lib, so the hint says C++
+            "confounded": confounded,        # lib enables exceptions: the hint is silent
+            "contradictions": contradictions,  # registered .cpp, no extab and no mangled symbol
         },
         "extension_disagreements": ext_dis,
         "flag_disagreements": flag_dis,
@@ -508,7 +652,12 @@ def render_row(r: dict) -> str:
     if not r["extension_agrees"] and r.get("conclusive"):
         warn = "  <- extension %s" % r["extension"]
     if r.get("suggested"):
-        warn += "  <- suggested C++ (mangled callee only, not conclusive)"
+        if r.get("extab_signal"):
+            warn += "  <- suggested C++ (extab in a no-exceptions lib, not conclusive)"
+        else:
+            warn += "  <- suggested C++ (mangled callee only, not conclusive)"
+    if r.get("extab_conflict"):
+        warn += "  <- extab vs a `.c` __FILE__ string"
     if r.get("conflict"):
         warn += "  <- 2 source files"
     if r.get("lang_flag") and r["lang"] and r["lang_flag"] != r["lang"]:
@@ -535,8 +684,8 @@ def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
         n_sug = len(s["suggested"])
         print("SWEEP: %d of %d registered unit(s) disagree with their extension **on conclusive "
               "evidence** (own mangled symbol or `__FILE__` string) and therefore with the `-lang` dtk "
-              "derives from it; %d more are only *suggested* C++ (mangled callees) and must not be "
-              "renamed on that alone; %d lib(s) set `-lang` in cflags."
+              "derives from it; %d more are only *suggested* C++ (mangled callees or an `extab` object in a "
+              "no-exceptions lib) and must not be renamed on that alone; %d lib(s) set `-lang` in cflags."
               % (n_dis, len(s["units"]), n_sug,
                  sum(1 for r in s["units"] if r["lang_flag"])), file=out)
         if s["flag_disagreements"] and len(s["flag_disagreements"]) != len(s["extension_disagreements"]):
@@ -549,7 +698,8 @@ def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
         for r in strong:
             print("      %s -> %s   %s" % (r["path"], os.path.splitext(r["path"])[0] + ".cpp",
                                            _evidence_text(r)), file=out)
-        print("  suggested only (mangled callees - reported, never renamed on this alone): %d" % n_sug, file=out)
+        print("  suggested only (mangled callees / extab objects - reported, never renamed on this alone): %d"
+              % n_sug, file=out)
         for r in s["suggested"]:
             print("      %s   %s" % (r["path"], _evidence_text(r)), file=out)
         if s["unevidenced"]:
@@ -561,12 +711,20 @@ def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
             print("  one object, two source files (boundary needs a re-check): %d" % len(s["conflicts"]), file=out)
             for r in s["conflicts"]:
                 print("      %s  %s" % (r["path"], ", ".join(r["sources"])), file=out)
+        e = s["extab"]
+        if e["candidates"] or e["contradictions"] or e["confounded"]:
+            print("  extab signal: %d object(s) carry extab; %d decisive candidate(s), %d confounded "
+                  "(lib enables exceptions), %d contradiction(s) (registered .cpp, no extab, no mangled "
+                  "symbol). Full breakdown: without `--disagree`."
+                  % (len(e["objects"]), len(e["candidates"]), len(e["confounded"]),
+                     len(e["contradictions"])), file=out)
         return
     total = len(s["units"])
     print("%d registered unit(s); oracle=%s" % (total, "map+DOL" if s["oracle"] else "unavailable"), file=out)
     sp = s["split"]
     print("  conclusive c++   %d" % sp["conclusive_cpp"], file=out)
-    print("  suggested c++    %d   (mangled callees only - reported, not a verdict)" % sp["suggested"], file=out)
+    print("  suggested c++    %d   (mangled callees / extab objects - reported, not a verdict)"
+          % sp["suggested"], file=out)
     print("  c                %d" % sp["c"], file=out)
     for key in ("high", "medium", "low"):
         n = s["counts"].get("c++/" + key, 0) + s["counts"].get("c/" + key, 0)
@@ -578,6 +736,52 @@ def report(s: dict, only_disagree: bool = False, out=sys.stdout) -> None:
           "lib-level `-lang` overrides: %d   unevidenced `.cpp`: %d   two-source-file conflicts: %d"
           % (len(s["extension_disagreements"]), sp["suggested"], sum(1 for r in s["units"] if r["lang_flag"]),
              len(s["unevidenced"]), len(s["conflicts"])), file=out)
+    render_extab(s, out)
+
+
+def render_extab(s: dict, out=sys.stdout) -> None:
+    """The `extab` language-signal measurement - the buckets the owner's hint is worth.
+
+    C has no exceptions, so `extab`/`extabindex` in an object means the unit was compiled as C++ **unless
+    the lib enables `-Cpp_exceptions`** (`cflags_pl`, `cflags_main`, ...), which lets a C unit emit them
+    too. Only the no-exceptions case is decisive, and even then the signal is one-directional: a C++
+    file with no `try`/`catch`/`throw` emits no `extab`, so its absence is not evidence of C.
+    """
+    e = s["extab"]
+    print("", file=out)
+    print("extab language signal (C has no exceptions; decisive only when the lib does NOT set "
+          "-Cpp_exceptions on):", file=out)
+    print("  objects carrying extab/extabindex: %d" % len(e["objects"]), file=out)
+    print("    of those registered .c:    %d" % len(e["registered_c"]), file=out)
+    print("    of those registered .cpp:  %d" % len(e["registered_cpp"]), file=out)
+    if e["registered_other"]:
+        print("    of those registered other: %d" % len(e["registered_other"]), file=out)
+    print("  decisive candidates (registered .c, no-exceptions lib -> hint says C++): %d"
+          % len(e["candidates"]), file=out)
+    for r in e["candidates"]:
+        print("      %s  (lib %s; cflags %s do not enable -Cpp_exceptions)"
+              % (r["path"], r["lib"], r["cflags"]), file=out)
+    print("  confounded (registered .c, lib enables -Cpp_exceptions -> hint is silent): %d"
+          % len(e["confounded"]), file=out)
+    if e["confounded"]:
+        by_lib = {}
+        for r in e["confounded"]:
+            by_lib.setdefault(r["lib"], []).append(r["path"])
+        for lib in sorted(by_lib):
+            print("      %-8s %d" % (lib, len(by_lib[lib])), file=out)
+    print("  contradictions (registered .cpp, no extab and no mangled symbol): %d"
+          % len(e["contradictions"]), file=out)
+    for r in e["contradictions"]:
+        print("      %s  (lib %s; no extab - a C++ file with no exceptions emits none, so this is not evidence of C)"
+              % (r["path"], r["lib"]), file=out)
+    # which libs the signal can use at all - the four no-exceptions libs are where it is prospective
+    settings = {}
+    for r in s["units"]:
+        settings.setdefault(r["lib"], r.get("exceptions"))
+    off = sorted(lib for lib, v in settings.items() if v == "off")
+    on = sorted(lib for lib, v in settings.items() if v != "off")
+    print("  libs that leave it off (signal usable): %s" % (", ".join(off) or "none"), file=out)
+    print("  libs that enable/leave-unknown (signal unused): %s" % (", ".join(on) or "none"), file=out)
 
 
 def main(argv=None) -> int:
@@ -603,8 +807,11 @@ def main(argv=None) -> int:
             return 1
         conf = open(os.path.join(main_dir, "configure.py"), encoding="utf-8", errors="replace").read()
         labels, dol = oracle(main_dir)
-        v = unit_verdict(main_dir, match["path"], labels, dol)
+        exc_setting = cflags_exceptions(main_dir, match["cflags"], conf)
+        exceptions_on = exc_setting != "off"
+        v = unit_verdict(main_dir, match["path"], labels, dol, exceptions_on=exceptions_on)
         v["lib"], v["cflags"] = match["lib"], match["cflags"]
+        v["exceptions"] = exc_setting
         v["lang_flag"] = cflags_lang(main_dir, match["cflags"], conf)
         v["effective_lang"] = v["lang_flag"] or v["extension_lang"]
         if args.json:
@@ -686,6 +893,83 @@ def selftest() -> int:
           (classify([], [], ["a.c"])["c_sources"], classify([], [], ["a.cp", "a.cpp"])["c_sources"]),
           (["a.c"], []))
 
+    # the `extab` language signal: C has no exceptions, so the section is C++ evidence - unless the lib
+    # enables `-Cpp_exceptions` and a C unit can emit it too (the confound). Always *suggested*, never
+    # conclusive, and one-directional: a C++ file with no try/catch/throw emits no extab.
+    v = classify([], [], [], extab=True)
+    check("extab in a no-exceptions lib is C++/medium", (v["lang"], v["confidence"]), ("c++", "medium"))
+    check("extab alone is NOT conclusive", (v["conclusive"], v["suggested"]), (False, True))
+    check("extab is reported as an evidence kind", [e["kind"] for e in v["evidence"]], ["extab"])
+    check("the extab evidence says what it read", "extab/extabindex present" in v["evidence"][0]["detail"], True)
+    check("extab evidence names the flag it checked", "-Cpp_exceptions" in v["evidence"][0]["detail"], True)
+    v = classify([], [], [], extab=True, exceptions_on=True)
+    check("an exceptions-ON lib makes extab silent", (v["lang"], v["confidence"]), ("c", "low"))
+    check("a confounded extab is not even suggested", (v["conclusive"], v["suggested"], v["extab_signal"]),
+          (False, False, False))
+    check("a confounded extab is not evidence", v["evidence"], [])
+    v = classify([], [], [], extab=False)
+    check("no extab is not evidence of C", (v["lang"], v["evidence"]), ("c", []))
+    check("no extab leaves the field off", (v["extab"], v["extab_signal"]), (False, False))
+    v = classify([], [], ["OSAlarm.c"], extab=True)
+    check("a conclusive `.c` string outranks the extab hint", (v["lang"], v["confidence"]), ("c", "high"))
+    check("a `.c` string against extab is flagged", v["extab_conflict"], True)
+    v = classify([], ["get_now_areano__Fv"], [], extab=True)
+    check("extab + a mangled callee stays suggested, not conclusive",
+          (v["lang"], v["conclusive"], v["suggested"]), ("c++", False, True))
+    check("the extab evidence is listed after the callee", [e["kind"] for e in v["evidence"]],
+          ["mangled-undefined", "extab"])
+    v = classify(["fn__Fv"], [], [], extab=True)
+    check("extab does not change a conclusive C++ verdict", (v["lang"], v["confidence"], v["conclusive"]),
+          ("c++", "high", True))
+
+    # the ELF section oracle, on a synthetic object with and without extab - deterministic, so the check
+    # runs even in a fresh worktree with no `build/` (where the real-object block below is skipped)
+    def make_elf(section_names):
+        import struct as _st
+        shstr, off = b"\0", {}
+        for n in list(section_names) + [".shstrtab"]:
+            off[n] = len(shstr)
+            shstr += n.encode("latin-1") + b"\0"
+        body, content_off = bytearray(), {}
+        for n in section_names:
+            content_off[n] = 52 + len(body)
+            body += b"\0\0\0\0"
+        shstr_off = 52 + len(body)
+        body += shstr
+        shoff = 52 + len(body)
+        shdrs = [(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]
+        for n in section_names:
+            shdrs.append((off[n], 1, 0, 0, content_off[n], 4, 0, 0, 4, 0))
+        shdrs.append((off[".shstrtab"], 3, 0, 0, shstr_off, len(shstr), 0, 0, 1, 0))
+        shnum = len(shdrs)
+        hdr = (b"\x7fELF" + bytes([1, 2, 1, 0]) + b"\0" * 8
+               + _st.pack(">HHIIIIIHHHHHH", 1, 20, 1, 0, 0, shoff, 0, 52, 0, 0, 40, shnum, shnum - 1))
+        out = bytearray(hdr) + body
+        for s in shdrs:
+            out += _st.pack(">IIIIIIIIII", *s)
+        return bytes(out)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        with_extab = os.path.join(tmp, "with_extab.o")
+        no_extab = os.path.join(tmp, "no_extab.o")
+        junk = os.path.join(tmp, "junk.o")
+        open(with_extab, "wb").write(make_elf(["extab", "extabindex", ".text"]))
+        open(no_extab, "wb").write(make_elf([".text"]))
+        open(junk, "wb").write(b"not an ELF\n")
+        check("object_has_extab sees the section", object_has_extab(with_extab), True)
+        check("object_has_extab is false without it", object_has_extab(no_extab), False)
+        check("object_has_extab is false for a missing object", object_has_extab(no_extab + ".nope"), False)
+        check("object_has_extab is false for a non-ELF file", object_has_extab(junk), False)
+        # object_verdict threads the lib setting end to end; a truthy dummy dol skips the map/DOL oracle
+        v = object_verdict(with_extab, {}, object(), exceptions_on=False)
+        check("object_verdict fires the extab signal for a no-exceptions lib",
+              (v["lang"], v["confidence"], v["conclusive"], v["suggested"]), ("c++", "medium", False, True))
+        v = object_verdict(with_extab, {}, object(), exceptions_on=True)
+        check("object_verdict silences the signal when the lib enables exceptions",
+              (v["lang"], v["confidence"], v["extab_signal"]), ("c", "low", False))
+        v = object_verdict(no_extab, {}, object(), exceptions_on=False)
+        check("object_verdict does not infer C from a missing extab", (v["lang"], v["evidence"]), ("c", []))
+
     # the synthesized STT_FILE is the trap: the selftest proves the reader hands it back and that the
     # verdict filter drops it by reading the real target when it is there
     real = os.path.join(ROOT, "build", "RMHE08", "obj", "auto", "800CCFB0_fn_800CCFB0.o")
@@ -707,15 +991,46 @@ def selftest() -> int:
               (False, False))
 
         # the sweep report, end to end, against the real tree - it is what the promotion pass consumes
+        #
+        # These checks used to name units by PATH (`800CCFB0_fn_800CCFB0.c`), which the promotion pass
+        # renamed (`ef/ef_line.cpp`) - so they broke the moment the work they describe succeeded. Look the
+        # unit up by the ADDRESS it holds instead: the address never changes, and the assertion then states
+        # the current truth rather than a historical path.
         import io
+
+        def unit_at(addr: int) -> str | None:
+            """The registered unit whose `.text` range contains `addr`, from `splits.txt`."""
+            cur, rng = None, None
+            for line in open(os.path.join(ROOT, "config", "RMHE08", "splits.txt"),
+                             encoding="utf-8", errors="replace"):
+                m = re.match(r"^(\S+):\s*$", line)
+                if m:
+                    cur = m.group(1)
+                    continue
+                t = re.match(r"\s*\.text\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
+                if t and cur:
+                    a, b = int(t.group(1), 16), int(t.group(2), 16)
+                    if a <= addr < b:
+                        rng = cur
+            return rng
+
+        def obj_of(unit: str) -> str:
+            return os.path.splitext(os.path.join(ROOT, "build", "RMHE08", "obj",
+                                                 *unit.split("/")))[0] + ".o"
+
         s = sweep(ROOT)
         check("sweep covers every registered unit", len(s["units"]), len(registered_units(ROOT)))
         check("the sweep is JSON-serialisable (no tuple keys)", json.dumps(s)[:1], "{")
-        check("the sweep reports the known 800CCFB0 extension disagreement",
-              any(r["path"].endswith("800CCFB0_fn_800CCFB0.c") for r in s["extension_disagreements"]), True)
-        check("800CCFB0's verdict is C++/high in the sweep",
-              [(r["lang"], r["confidence"]) for r in s["units"]
-               if r["path"].endswith("800CCFB0_fn_800CCFB0.c")], [("c++", "high")])
+        # `800CCFB0` was the known extension disagreement (a `.cpp` __FILE__ registered as `.c`). The
+        # promotion pass renamed it to `ef/ef_line.cpp`, which is the fix - so the assertion is now that it
+        # is NOT a disagreement, and that its verdict is still the C++ one that drove the rename.
+        cccfb0 = unit_at(0x800CCFB0)
+        check("the 800CCFB0 unit is still registered (by address, not path)", bool(cccfb0), True)
+        check("800CCFB0 is registered as C++ now (the promotion fixed it)", cccfb0.endswith(".cpp"), True)
+        check("800CCFB0 is no longer an extension disagreement",
+              any(r["path"] == cccfb0 for r in s["extension_disagreements"]), False)
+        check("800CCFB0's verdict is still C++/high in the sweep",
+              [(r["lang"], r["confidence"]) for r in s["units"] if r["path"] == cccfb0], [("c++", "high")])
         check("a C unit is not in the disagreement list",
               any(r["path"] == "Camellia/camellia.c" for r in s["extension_disagreements"]), False)
         check("the unresolved `-lang` override count is reported",
@@ -731,19 +1046,40 @@ def selftest() -> int:
         check("the report prints the suggested section",
               "suggested only" in buf.getvalue(), True)
 
-        # the counter-example: auto/800FD520_fn_800FD520 calls mangled SetRootMtxTrans__... and was
-        # reconstructed as `.c`, matching at 100.00 % with all 26 relocations identical. Its mangled
-        # callee must stay a suggestion and must not appear in the rename list.
-        cx = os.path.join(ROOT, "build", "RMHE08", "obj", "auto", "800FD520_fn_800FD520.o")
-        if os.path.exists(cx):
+        # the extab signal measured on the real tree: the buckets must be internally consistent
+        check("the sweep measures the extab signal", "objects" in s["extab"], True)
+        check("every extab object is registered .c, .cpp or another buildable extension",
+              len(s["extab"]["registered_c"]) + len(s["extab"]["registered_cpp"])
+              + len(s["extab"]["registered_other"]), len(s["extab"]["objects"]))
+        check("an object with extab in an exceptions-ON lib is not a decisive candidate",
+              all(r["exceptions"] == "off" for r in s["extab"]["candidates"]), True)
+        check("a decisive candidate is a `.c` unit",
+              all(r["extension_lang"] == "c" for r in s["extab"]["candidates"]), True)
+        check("a confounded unit's lib enables (or does not state off) exceptions",
+              all(r["exceptions"] != "off" for r in s["extab"]["confounded"]), True)
+        check("every contradiction is a `.cpp` with no extab and no mangled symbol",
+              all(r["extension_lang"] == "c++" and not r["extab"] and not r["mangled_defined"]
+                  and not r["mangled_undefined"] for r in s["extab"]["contradictions"]), True)
+        check("the extab buckets survive JSON", json.dumps(s["extab"])[:1], "{")
+        buf = io.StringIO()
+        render_extab(s, out=buf)
+        check("the extab report names the decisive bucket", "decisive candidates" in buf.getvalue(), True)
+
+        # the counter-example: the unit at 0x800FD520 calls mangled SetRootMtxTrans__... and was
+        # reconstructed as `.c`, matching at 100.00 % with all 26 relocations identical. Its mangled callee
+        # must stay a suggestion and must not appear in the rename list. Looked up by ADDRESS: the promotion
+        # pass renamed this unit to `ef/fn_800FD520.c` and the check must survive that.
+        fd520 = unit_at(0x800FD520)
+        cx = obj_of(fd520) if fd520 else ""
+        check("the 800FD520 unit is still registered", bool(fd520), True)
+        if fd520 and os.path.exists(cx):
             v = object_verdict(cx, labels, dol)
             check("the 800FD520 counter-example is C++/medium", (v["lang"], v["confidence"]), ("c++", "medium"))
             check("the 800FD520 counter-example is not conclusive", (v["conclusive"], v["suggested"]), (False, True))
             check("800FD520 does not drive an extension rename",
-                  any(r["path"].endswith("800FD520_fn_800FD520.c") for r in s["extension_disagreements"]),
-                  False)
+                  any(r["path"] == fd520 for r in s["extension_disagreements"]), False)
             check("800FD520 is listed as suggested",
-                  any(r["path"].endswith("800FD520_fn_800FD520.c") for r in s["suggested"]), True)
+                  any(r["path"] == fd520 for r in s["suggested"]), True)
 
     # `-lang` resolution: both spellings, and a nested spread
     conf_text = (
@@ -766,6 +1102,35 @@ def selftest() -> int:
     check("the two-token spelling is found", cflags_lang(None, "cflags_c", conf_text), "c")
     check("no -lang is None", cflags_lang(None, "cflags_d", conf_text), None)
     check("a cycle terminates", cflags_lang(None, "nope", "nope = [\n  *nope,\n]\n"), None)
+
+    # `-Cpp_exceptions` resolution: the confound the extab signal must respect. A filtered spread
+    # (`*[f for f in cflags_base if ...]`) is the shape `cflags_lobby`/`cflags_rso`/`cflags_pl_skill` use.
+    exc_text = (
+        "cflags_base = [\n"
+        '    "-Cpp_exceptions off",\n'
+        "]\n"
+        "cflags_on = [\n"
+        "    *cflags_base,\n"
+        '    "-Cpp_exceptions on",\n'
+        "]\n"
+        "cflags_filtered = [\n"
+        '    *[f for f in cflags_base if f != "-O4,p"],\n'
+        '    "-O3",\n'
+        "]\n"
+        "cflags_filtered_on = [\n"
+        '    *[f for f in cflags_base if f not in ("-O4,p", "-Cpp_exceptions off")],\n'
+        '    "-Cpp_exceptions on",\n'
+        "]\n"
+        "cflags_two = [\n"
+        '    "-Cpp_exceptions",\n'
+        '    "on",\n'
+        "]\n")
+    check("an explicit -Cpp_exceptions off resolves", cflags_exceptions(None, "cflags_base", exc_text), "off")
+    check("a later -Cpp_exceptions on wins", cflags_exceptions(None, "cflags_on", exc_text), "on")
+    check("a filtered spread resolves", cflags_exceptions(None, "cflags_filtered", exc_text), "off")
+    check("a filtered spread plus an explicit on resolves", cflags_exceptions(None, "cflags_filtered_on", exc_text), "on")
+    check("the two-token -Cpp_exceptions spelling resolves", cflags_exceptions(None, "cflags_two", exc_text), "on")
+    check("no -Cpp_exceptions token is None", cflags_exceptions(None, "cflags_none", exc_text), None)
 
     # the registered-unit parser, against a fixture shaped like the real configure.py
     with tempfile.TemporaryDirectory() as tmp:
@@ -799,6 +1164,10 @@ def selftest() -> int:
     check("a suggested C++ says only conclusive evidence changes the language", "only conclusive" in p, True)
     check("a suggested C++ cites the 800FD520 counter-example", "800FD520" in p, True)
     check("a suggested C++ says keep .c unless conclusive evidence appears", "Keep `.c`" in p, True)
+    p = brief_paragraph(classify([], [], [], extab=True))
+    check("an extab-suggested C++ says it is not conclusive", "not conclusive" in p, True)
+    check("an extab-suggested C++ says the signal is one-directional", "one-directional" in p, True)
+    check("an extab-suggested C++ says keep .c", "Keep `.c`" in p, True)
     p = brief_paragraph(classify([], [], []))
     check("an unevidenced unit says C is the default", "default" in p and "`.c`" in p, True)
     p = brief_paragraph(classify([], [], ["OSAlarm.c"]))

@@ -594,8 +594,15 @@ def selftest() -> int:
               True)
 
     real_fp = at.input_fingerprints()
-    check("fingerprints: the DOL is hashed from the real tree",
-          bool(real_fp.get("dol_sha1")) and len(real_fp["dol_sha1"]) == 40, True)
+    # A worktree has no `orig/` (it is gitignored), so the DOL cannot be hashed there. Assert the shape only
+    # when the input exists: a selftest that needs the original binary fails in every worktree, which is where
+    # most of this repo's work happens.
+    if os.path.exists(at.td.DOL):
+        check("fingerprints: the DOL is hashed from the real tree",
+              bool(real_fp.get("dol_sha1")) and len(real_fp["dol_sha1"]) == 40, True)
+    else:
+        check("fingerprints: a missing DOL is None, not an exception (worktrees have no orig/)",
+              real_fp.get("dol_sha1"), None)
     check("fingerprints: the symbol map is hashed too",
           bool(real_fp.get("symbols_sha1")) and len(real_fp["symbols_sha1"]) == 40, True)
     check("fingerprints: a missing input is None, never an exception",
