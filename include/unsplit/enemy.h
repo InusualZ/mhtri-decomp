@@ -70,7 +70,7 @@ u16 fn_80133DB0();
 void fn_80133E3C(struct _ENEMY_WORK *self, s32 a, f32 b, f32 c);
 void fn_80133F4C(struct _ENEMY_WORK *self, f32 a, f32 b);
 u32 fn_80134114(struct _ENEMY_WORK* self, s32 a, s32 b);
-void fn_80134964();
+void fn_80134964(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
 u32 fn_80134B0C(struct _ENEMY_WORK *self, void *tbl);
 void fn_80134DF4(struct _ENEMY_WORK *self);
 void fn_80134E28(struct _ENEMY_WORK *self);
@@ -154,6 +154,18 @@ void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);
 void fn_80135C5C(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80147E2C(void* self);
+/* Declarations moved here from `enemy/fn_801679B0.cpp` (docs/plan.md 6.5 rule 2): enemy-band
+ * symbols no registered unit owns.  Guarded for C++ because the C consumers carry their own
+ * ABI-equivalent spellings of `fn_80134004` (`f32,u16` in `enemy/fn_80149D6C.c`, `u32,f32` in
+ * `enemy/fn_8014A1BC.c`), which MWCC's C front-end treats as a conflicting redeclaration. */
+#ifdef __cplusplus
+void fn_80131D84(struct _ENEMY_WORK* self);
+void fn_80134004(struct _ENEMY_WORK* self, u32 a, f32 b);
+void fn_80167404(struct _ENEMY_WORK* self);
+void fn_80167968(struct _ENEMY_WORK* self);
+void fn_801321C4(struct _ENEMY_WORK* self);
+void fn_801321D0(struct _ENEMY_WORK* self);
+#endif
 #ifdef __cplusplus
 }
 #endif
