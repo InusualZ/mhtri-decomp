@@ -22,6 +22,10 @@ u8 fn_8013A900(struct _ENEMY_WORK* enemy);
 void fn_8013AAC4(struct _ENEMY_WORK* enemy);
 u32 fn_8013AB74(struct _ENEMY_WORK *self, u32 a, u32 b);
 
+/* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
+s32 fn_801391E8(struct _ENEMY_WORK* self);
+void fn_801390FC(struct _ENEMY_WORK* self, void* arg1);
+
 #ifdef __cplusplus
 }
 #endif

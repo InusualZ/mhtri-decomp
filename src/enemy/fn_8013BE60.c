@@ -489,7 +489,6 @@ typedef struct _ENEMY_PARAM _ENEMY_PARAM;
 extern _ENEMY_DATA *get_enemy_data__FP11_ENEMY_WORK(_ENEMY_WORK *self);
 extern u32 fn_803438E4(u8 a, u8 b);
 extern u32 fn_80345A6C(void *a, u8 b, Vec3 *c, f32 d);
-extern u32 fn_8012EC3C(void);
 extern u32 fn_80131BD4(void);
 extern u32 PlayMode_ck__Fv(void);
 extern f32 lbl_80796DA0; /* 0.0f */
@@ -651,7 +650,7 @@ s16 fn_8013D9B8(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (fn_8012EC3C() == 0) {
+        if (fn_8012EC3C(self) == 0) {
             in += (u8)fn_801406E0(36, in[0]);
             fn_8013BDE4(&in, 36, &result);
         }
@@ -919,7 +918,7 @@ s16 fn_8013EBC8(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (self->counter_0x8A2 > in[1] * 10 && fn_8012EC3C() == 0) {
+        if (self->counter_0x8A2 > in[1] * 10 && fn_8012EC3C(self) == 0) {
             in += (u8)fn_801406E0(65, in[0]);
             fn_8013BDE4(&in, 65, &result);
         }
@@ -1054,7 +1053,7 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
     if (value == 0 && sub == 255) {
         switch (self->state_0x1E2) {
         case 2:
-            if (fn_8012EC3C() == 1 && (self->flags_0x1C8 & 0x40) != 0) {
+            if (fn_8012EC3C(self) == 1 && (self->flags_0x1C8 & 0x40) != 0) {
                 sub = 5;
             } else {
                 sub = 4;
@@ -1080,7 +1079,7 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
             sub = 7;
             break;
         default:
-            if (fn_8012EC3C() == 1 && (self->flags_0x1C8 & 0x40) != 0) {
+            if (fn_8012EC3C(self) == 1 && (self->flags_0x1C8 & 0x40) != 0) {
                 sub = 2;
             } else {
                 sub = (self->state_0x43D == 1);
