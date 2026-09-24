@@ -33,6 +33,8 @@ void fn_800E8294(void);
 void fn_800E84F0(s32 volume);
 void fn_800E85E8(u32 idx);
 void fn_800E8634(u32 idx, u32 entry_idx);
+/* The stream stop `bgm_stop_all()` in `sound/fn_800F2A94.cpp` tail-calls. */
+void fn_800E4A7C(void);
 
 #ifdef __cplusplus
 }
