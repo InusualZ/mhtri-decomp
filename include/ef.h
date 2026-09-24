@@ -36,8 +36,8 @@ typedef struct EfParams {
     f32 rate;        /* +0x04  sweep/scale rate, in percent */
     f32 angle_base;  /* +0x08  start angle of the sweep */
     f32 angle_end;   /* +0x0C  end angle of the sweep */
-    f32 scale_z;     /* +0x10  z radius */
-    f32 unused_0x14; /* +0x14  not read by the disc shape */
+    f32 scale_z;     /* +0x10  second radius (the disc's z, the torus's y) */
+    f32 scale_c;     /* +0x14  third radius (read by the torus shape; the disc ignores it) */
 } EfParams; /* size: 0x18 */
 
 typedef struct EfParticle EfParticle;
