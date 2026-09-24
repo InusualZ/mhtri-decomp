@@ -63,8 +63,12 @@ extern EmForm lbl_80794950;
 /* nw4r::db::Panic's file/format strings and the variadic entry point. */
 extern const char lbl_80594E98[];
 extern const char lbl_80594EA8[];
-extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
-
+/* nw4r::db::Panic. The map already carries its real C++ mangling
+ * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
+ * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
+ * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
+ * map's spelling exactly: tools/units/mangle.py confirms it. */
+namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 void fn_800CCE38(EmForm* self);
 EmForm* fn_800CCDFC(EmForm* self);
 EmForm* fn_800CCE48(EmForm* self);
@@ -87,7 +91,7 @@ EmForm* fn_800CCCF8(void* self, int id)
     case 5:  return &lbl_8079494C;
     case 9:  return &lbl_80794950;
     default:
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594E98, 65, lbl_80594EA8);
+        nw4r::db::Panic(lbl_80594E98, 65, lbl_80594EA8);
         return 0;
     }
 }
