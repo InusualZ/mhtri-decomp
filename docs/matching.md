@@ -1432,3 +1432,51 @@ list is this bug:
 ```sh
 # read each object's symbol table and flag `X__...__...` where `X__...` is already a map name
 ```
+
+## 51. A shared type, an extern and a mangled name each have one owner
+
+**Problem.** Three defects are the same mistake in three shapes: an identifier that belongs to someone else
+is spelled out locally instead of reached through its owner. A type two units share is **copied** into each
+unit's source (20 names, 68 extra definitions under `src/`); a function or variable another unit **defines**
+is `extern`-declared in the consumer's file "to save an include" (126 declarations into 27 owner units); and a
+compiler **mangling** - `get_now_areano__Fv`, `move__6MHcharFUs`, `Panic__Q24nw4r2dbFPCciPCce` - is written as
+the callable identifier. The last is 50's bug waiting to happen: a mangling is a *compiler* spelling, so a C++
+front-end handed `Panic__Q24nw4r2dbFPCciPCce` as a name mangles it a second time (`...__FPCciPCce`) and the
+link cannot resolve it, invisibly while the unit is `NonMatching`.
+
+**Why try it.** Each defect is decidable from data we already have, so none of them needs a reviewer's
+memory. A `struct`/`class`/`union` definition is textual, so a duplicate is one cross-file scan. A mangling
+has a signature - an argument list (`__F`) or a qualifier (`__Q`), or the class-member form `__<len>ClassF` -
+and the map's own `fn_XXXXXXXX` placeholder has no `__` at all, so it never matches. And ownership is
+derivable: `config/RMHE08/symbols.txt` gives a symbol's section and address, `config/RMHE08/splits.txt` gives
+each registered unit's ranges, so the unit that owns a symbol is a lookup. `tools/units/stylelint.py` does all
+three; `--diff <base>` refuses only *new* violations, so the backlog can burn down unit by unit and a batch
+that touches a unit with 300 old findings is still allowed.
+
+**Result.** Rules 1, 2 and 9 are checked (they were prose in 6.5). Measured on the tree: rule 1 **68** extra
+definitions of **20** names; rule 9 **598** sites (**446** calls, **152** declarations) over **83** mangled
+names - and it does **not** fire on an `fn_XXXXXXXX` stem, on `obj->method()`, or on `ns::func()`; rule 2
+**126** declarations into 27 other registered units, plus **209** unsplit declarations the address band places
+in six modules (`enemy` 125, `g3d` 32, `sound` 31, `Pl` 13, `ef` 7, `Runtime.PPCEABI.H` 1). Rule 2's gap is
+named, not guessed: the registered bands interleave across modules (a `sound` unit sits inside the `ef` band),
+so an unsplit address whose bracketing units disagree has no sound header to move to and is counted rather
+than flagged - 1 324 such sites and 20 names absent from the map are reported as gaps. `--diff HEAD` is clean
+on the current tree, so the gate is live without blocking work that touches a unit with a backlog.
+
+**Example.** The fix is the same refactor in each case:
+
+```cpp
+// rule 1: one definition, in the owner's header, included where needed
+// include/ef/effect.h
+struct Effect { /* size: 0x10 */ /* +0x00 */ u32 flags; };
+// src/ef/eft004.cpp
+#include "ef/effect.h"
+
+// rule 2: the declaration lives with the unit that defines the symbol; the consumer includes it
+// src/ef/eft002.cpp
+#include "ef/fn_800FD520.h"
+
+// rule 9: call the owner, never the mangling
+obj->move(0);                        // not move__6MHcharFUs(obj, 0)
+nw4r::db::Panic(file, line, fmt);    // not Panic__Q24nw4r2dbFPCciPCce(file, line, fmt)
+```

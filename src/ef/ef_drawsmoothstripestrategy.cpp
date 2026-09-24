@@ -263,10 +263,7 @@ void fn_800C26FC(EfVec3x2* dst, EfVec3x2* src) {
  * The ahead-context initialiser, the particle-walker selectors and the tail of the unit.
  * --------------------------------------------------------------------------------------------- */
 
-/* An `nw4r::math::MTX34`: three rows of four floats. */
-typedef struct Mtx34 {
-    f32 m[3][4]; /* +0x00 */
-} Mtx34; /* size: 0x30 */
+/* An `nw4r::math::MTX34` (three rows of four floats) comes from `nw4r/math.h`. */
 
 /* The per-draw ahead state `nw4r::ef::DrawStrategyImpl::AheadContext`: the emitter and manager
  * transforms plus the two axes the stripe/tube walkers advance along. */
