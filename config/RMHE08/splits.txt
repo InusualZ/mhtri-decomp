@@ -189,6 +189,12 @@ sound/fn_800DCFEC.c:
 	extabindex  start:0x8002475C end:0x80024768
 	.text       start:0x800DCFEC end:0x800DD1F0
 
+sound/fn_800DD1F0.cpp:
+	extab       start:0x8000AF6C end:0x8000B1DC
+	extabindex  start:0x80024768 end:0x80024B10
+	.text       start:0x800DD1F0 end:0x800E3CBC
+	.ctors      start:0x8056F2F0 end:0x8056F2F4
+
 sound/fn_800E46E8.cpp:
 	extab       start:0x8000B21C end:0x8000B554
 	extabindex  start:0x80024B70 end:0x80024FFC
