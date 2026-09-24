@@ -116,6 +116,12 @@ ef/ef_drawsmoothstripestrategy.cpp:
 	extabindex  start:0x80023904 end:0x80023A90
 	.text       start:0x800BFFD4 end:0x800C5DB8
 
+ef/ef_drawstrategyimpl.cpp:
+	extab       start:0x8000A49C end:0x8000A554
+	extabindex  start:0x80023A90 end:0x80023BA4
+	.text       start:0x800C5DB8 end:0x800C9540
+	.ctors      start:0x8056F2E4 end:0x8056F2E8
+
 ef/ef_torus.cpp:
 	extab       start:0x8000A554 end:0x8000A55C
 	extabindex  start:0x80023BA4 end:0x80023BB0

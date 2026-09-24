@@ -537,6 +537,7 @@ config.libs = [
                         Object(NonMatching, "ef/ef_drawpointstrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawlinestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
+            Object(NonMatching, "ef/ef_drawstrategyimpl.cpp"),
             Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
             # Registered from proposal/800C9540_fn_800C9540.cpp (a 0x800C9540 run discovery proposed).
             Object(NonMatching, "ef/ef_torus.cpp"),

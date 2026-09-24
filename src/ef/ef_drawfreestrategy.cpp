@@ -41,6 +41,7 @@
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_drawstrategyimpl.h"
 #include "ef/ef_particle.h"
 #include "ef/ef_particlemanager.h"
 #include "unsplit/ef.h"
@@ -411,7 +412,7 @@ void fn_800BED2C(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
         nw4r::db::Panic(lbl_805941F8, 278, lbl_80594240, pm);
 
     ed = fn_800AB388(pm->state);
-    fn_800C6064(self, pm, ed, a2);
+    fn_800C6064((EfDrawStrategyImpl*)self, (u32)pm, (u16*)ed, (void*)a2);
 
     GXEnableTexOffsets(0, 1, 1);
     GXSetArray(0x0D, lbl_80791340, 2);
@@ -440,7 +441,7 @@ void* fn_800BEF00(void* self, s16 flag) {
 }
 
 void* fn_800BEF5C(void* self) {
-    fn_800C5F74(self);
+    fn_800C5F74((EfParticleLayers*)self);
     ((EfDrawStrategy*)self)->vtbl = (EfDrawStrategyVtbl*)lbl_805943F0;
     return self;
 }

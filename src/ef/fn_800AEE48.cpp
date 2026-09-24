@@ -44,6 +44,8 @@
 #include "types.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_drawstrategyimpl.h"
+#include "ef/fn_800AEE48.h"
 #include "sys_mem.h"
 #include "unsplit/ef.h"
 
@@ -190,18 +192,6 @@ int fn_800B6534(u32 value) {
 
 /* The draw-time particle record the flag accessors read.  `field_0xB2` packs three 2-3 bit fields,
  * `field_0xB0` the layer/parameter index, `flags_0x00` the particle state bits. */
-typedef struct EfParticleState {
-    u16 flags_0x00;    /* +0x00 */
-    u8 pad_0x02[0x36]; /* +0x02 */
-    u32 field_0x38;    /* +0x38 */
-    u32 field_0x3C;    /* +0x3C */
-    u8 pad_0x40[0x58]; /* +0x40 */
-    Vec field_0x98;    /* +0x98 */
-    Vec field_0xA4;    /* +0xA4 */
-    u8 field_0xB0;     /* +0xB0 */
-    u8 pad_0xB1;       /* +0xB1 */
-    u8 field_0xB2;     /* +0xB2  packed flags */
-} EfParticleState; /* size: 0xB3 */
 
 /* The particle's stored word at +0x38. */
 u32 fn_800B9628(EfParticleState* self) {
@@ -330,7 +320,7 @@ void fn_800B2840(void* self, void* src) {
 
 /* Constructs the resource record and installs its vtable. */
 void* fn_800B4AC8(void* self) {
-    fn_800C5F74(self);
+    fn_800C5F74((EfParticleLayers*)self);
     *(void**)self = lbl_80593CB4;
     return self;
 }
@@ -382,12 +372,6 @@ typedef struct EfStripeSample {
     Vec c; /* +0x18 */
 } EfStripeSample; /* size: 0x24 */
 
-/* The draw strategy's two particle list heads. */
-typedef struct EfDrawList {
-    u8 pad_0x00[0x38]; /* +0x00 */
-    u32 field_0x38;    /* +0x38  an auxiliary head (the smooth-stripe sibling) */
-    u32 field_0x3C;    /* +0x3C  the particle list head */
-} EfDrawList; /* size: 0x40 */
 
 extern f32 lbl_80796124; /* a scale factor  .sdata2 0x80796124 */
 extern f32 lbl_80796130; /* a scale factor  .sdata2 0x80796130 */

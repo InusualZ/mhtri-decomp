@@ -3,6 +3,10 @@
  * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
  * an extern lives with the TU that owns the symbol).  The signature set is what the
  * consumers used; where only the parameter spelling differed the wider form is kept.
+ *
+ * An *owned* symbol is NOT declared here: `fn_800C5F74`/`fn_800C6064` live in
+ * `include/ef/ef_drawstrategyimpl.h` and `fn_800B5A64` in `include/ef/fn_800AEE48.h`, so the callers
+ * generic `void(...)` copies cannot collide with the owners' typed definitions in C++.
  */
 #ifndef MHTRI_UNSPLIT_EF_H
 #define MHTRI_UNSPLIT_EF_H
@@ -29,35 +33,23 @@ void fn_80105560(void* self);
 void fn_801173AC(void* self);
 void fn_80043EA8(Vec3* out);
 struct Vec;
-void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector to nw4r's */                                  /* out = (0, 0, 0) */
+void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector to nw4r's */
 
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_801057A4(void* self, u32 a, Vec3* v, f32 scale, u32 id);
 void fn_8010A7D4(void* self, u32 a);
-/* Declarations moved here from `ef/fn_800AEE48.cpp` (docs/plan.md 6.5 rule 2): no registered unit
- * owns `fn_800C5F74`, so its extern lives beside the other not-yet-attributed `ef`-band symbols. */
-void fn_800C5F74(void* self);
-/* 0x800C5F74..0x800C68E8 - the `nw4r::ef` DrawStrategy family helpers the free/line/point/smooth
- * strategies call (callers: ef/ef_drawfreestrategy.cpp).  fn_800C5F74 is the base constructor,
- * fn_800C6064 the per-particle GX state setup, fn_800C68E8 the per-particle draw. */
-void fn_800C5F74(void* self);
-void fn_800C6064(void* self, void* a, void* b, void* c);
-void fn_800C68E8(void* self, void* particle, void* ed, void* a, u32 first, u32 arg);
+
+/* 0x800C68E8 - the per-particle draw helper the free/line/point/smooth strategies call.  It has no
+ * reconstructed owner yet, so it stays here.  `fn_800C5F74` (the base texture-set constructor) and
+ * `fn_800C6064` (the per-draw setup) are owned by `ef/ef_drawstrategyimpl.cpp` and declared in
+ * `include/ef/ef_drawstrategyimpl.h`. */
+void fn_800C68E8(void* self, void* particle, void* ed, void* em, u32 first, u32 rebindColor);
 
 /* Unsplit ef-band helpers the free-strategy draw calls (callers: ef/ef_drawfreestrategy.cpp). */
 void fn_800B7DB0(void* a, MTX34* out);
 void* fn_800B4B04(void* self, s16 flag);   /* the owner defines it; this is the ABI */
 void fn_800B54B4(const void* src, Vec3* out);
 
-/* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
-void fn_801057A4(void* self, u32 a, Vec3* v, f32 scale, u32 id);
-void fn_8010A7D4(void* self, u32 a);
-/* The ef-band draw-strategy helpers `ef/ef_drawlinestrategy.cpp` calls; their owning units are not
- * reconstructed yet, so the declarations live here (docs/plan.md 6.5 rule 2).  Signatures from that
- * unit's call sites. */
-void fn_800C5F74(void* self);                                       /* the base DrawStrategy ctor */
-void fn_800C6064(void* self, void* pm, void* resource, void* em);   /* per-draw init */
-void fn_800C68E8(void* self, void* particle, void* ed, void* em, u32 first, u32 rebindColor);
 
 #ifdef __cplusplus
 }
