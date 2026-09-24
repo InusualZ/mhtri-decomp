@@ -52,6 +52,12 @@ void fn_800B54B4(const void* src, Vec3* out);
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_801057A4(void* self, u32 a, Vec3* v, f32 scale, u32 id);
 void fn_8010A7D4(void* self, u32 a);
+/* The ef-band draw-strategy helpers `ef/ef_drawlinestrategy.cpp` calls; their owning units are not
+ * reconstructed yet, so the declarations live here (docs/plan.md 6.5 rule 2).  Signatures from that
+ * unit's call sites. */
+void fn_800C5F74(void* self);                                       /* the base DrawStrategy ctor */
+void fn_800C6064(void* self, void* pm, void* resource, void* em);   /* per-draw init */
+void fn_800C68E8(void* self, void* particle, void* ed, void* em, u32 first, u32 rebindColor);
 
 #ifdef __cplusplus
 }

@@ -27,13 +27,15 @@ struct _ENEMY_WORK {
     /* +0x006 */ u8 state_0x006;        /* fn_80177D54's weapon sub-state */
     /* +0x007 */ u8 state_0x007;        /* fn_80177D54's second sub-state */
     /* +0x008 */ u8 field_0x008;
-    /* +0x009 */ u8 unused_0x009;
+    /* +0x009 */ u8 field_0x009;        /* `fn_80170610` gates the position seat on it */
     /* +0x00A */ u8 field_0x00A;
     /* +0x00B */ u8 unused_0x00B[0x011 - 0x00B];
     /* +0x011 */ u8 field_0x011;        /* the attack timer  arms */
     /* +0x012 */ u8 unused_0x012[2];
     /* +0x014 */ u8 field_0x014;        /* the mode  maps to a two-state mask */
-    /* +0x015 */ u8 unused_0x015[0x020 - 0x015];
+    /* +0x015 */ u8 unused_0x015[0x01A - 0x015];
+    /* +0x01A */ u16 field_0x01A;       /* passed to `fn_80141B88` */
+    /* +0x01C */ u8 unused_0x01C[0x020 - 0x01C];
     /* +0x020 */ s32 timer_0x020;       /* fn_8017799C runs this down */
     /* +0x024 */ u8 unused_0x024[0x188 - 0x024];
     /* +0x188 */ nw4r::math::VEC3 pos;
@@ -54,7 +56,10 @@ struct _ENEMY_WORK {
     /* +0x1F5 */ u8 field_0x1F5;
     /* +0x1F6 */ u8 unused_0x1F6[0x1F8 - 0x1F6];
     /* +0x1F8 */ u8 field_0x1F8;
-    /* +0x1F9 */ u8 unused_0x1F9[0x378 - 0x1F9];
+    /* +0x1F9 */ u8 unused_0x1F9[0x328 - 0x1F9];
+    /* +0x328 */ s16 field_0x328;      /* the countdown `fn_80170804` ticks */
+    /* +0x32A */ u8 field_0x32A;       /* the flag `fn_80170600`/`fn_80170758` clear */
+    /* +0x32B */ u8 unused_0x32B[0x378 - 0x32B];
     /* +0x378 */ f32 value_0x378;       /* fn_80177F30/fn_8017801C clamp this against a pool float */
     /* +0x37C */ u8 unused_0x37C[0x38C - 0x37C];
     /* +0x38C */ u8 field_0x38C;        /* bit 0 gates `fn_8012C870` */
@@ -68,7 +73,9 @@ struct _ENEMY_WORK {
     /* +0x43B */ u8 unused_0x43B[2];
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
-    /* +0x43F */ u8 unused_0x43F[0x784 - 0x43F];
+    /* +0x43F */ u8 unused_0x43F[0x46C - 0x43F];
+    /* +0x46C */ u8 field_0x46C;       /* the area/entry byte `fn_80170804` latches to 0xFF */
+    /* +0x46D */ u8 unused_0x46D[0x784 - 0x46D];
     /* +0x784 */ u8 field_0x784;
     /* +0x785 */ u8 unused_0x785[0x794 - 0x785];
     /* +0x794 */ u16 field_0x794;

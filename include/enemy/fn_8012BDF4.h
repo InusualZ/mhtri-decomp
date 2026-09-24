@@ -45,4 +45,10 @@ void fn_8012CF20(struct _ENEMY_WORK* self);
 }
 #endif
 
+#ifdef __cplusplus
+/* The real C++ spelling of `em_die_ck__FP11_ENEMY_WORK` (mangle.py verified), so a caller
+ * never spells the mangling (docs/plan.md 6.5 rule 9). */
+s32 em_die_ck(struct _ENEMY_WORK* work);
+#endif
+
 #endif /* MHTRI_ENEMY_FN_8012BDF4_H */

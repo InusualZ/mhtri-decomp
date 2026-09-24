@@ -502,6 +502,7 @@ config.libs = [
             # Registered from proposal/80170FA8_fn_80170FA8.cpp (a 0x80170FA8 run discovery proposed).
             Object(NonMatching, "enemy/fn_80170FA8.cpp"),
             Object(NonMatching, "enemy/fn_80176C58.cpp"),
+            Object(NonMatching, "enemy/fn_80170600.cpp"),
         ],
     },
 

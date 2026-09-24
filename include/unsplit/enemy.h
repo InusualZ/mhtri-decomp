@@ -166,8 +166,18 @@ void fn_80167968(struct _ENEMY_WORK* self);
 void fn_801321C4(struct _ENEMY_WORK* self);
 void fn_801321D0(struct _ENEMY_WORK* self);
 #endif
+void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
+void fn_80132224(struct _ENEMY_WORK* self);
+void fn_80132264(struct _ENEMY_WORK* self);
+void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s32 j, s32 k);
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* The C++ spellings of the mangled callees this band calls, so a call site never spells the
+ * mangling (docs/plan.md 6.5 rule 9); each mangles back to its map name. */
+u32 em_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
 #endif
 
 #endif /* MHTRI_UNSPLIT_ENEMY_H */
