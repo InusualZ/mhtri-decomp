@@ -926,7 +926,10 @@ def brief_unit(path: str) -> str | None:
             for line in fh:
                 m = re.match(r"# (?:Proposal )?[Bb]rief: (\S+)", line)
                 if m:
-                    return m.group(1)
+                    # normalise: a proposal brief's title carries the label WITH its source extension, and
+                    # the claim machinery keys on the extensionless unit, so returning it raw handed the
+                    # caller a key that matched nothing (same trap as claims.slug(), 2026-09-24)
+                    return claims.norm_unit(m.group(1))
     except OSError:
         return None
     return None
@@ -1112,7 +1115,9 @@ def selftest() -> int:
         check("the pool is built from the queue", out["kind"], "proposal")
         check("the pool wrote one brief per proposal", len(out["wrote"]), 1)
         pooled = os.path.join(out["dir"], claims.slug(entry["label"]) + ".md")
-        check("a pooled proposal brief is parseable", brief_unit(pooled), entry["label"])
+        check("a pooled proposal brief is parseable", brief_unit(pooled), claims.norm_unit(entry["label"]))
+        check("... and parses to the same key as its title without the extension",
+              claims.slug(brief_unit(pooled)), claims.slug(entry["label"]))
         check("pool is idempotent for a proposal", pool(tmp)["skipped"], [entry["label"]])
         # the queue drops a proposal once its range is registered, and the pool prunes the brief with it
         with open(queue_path(tmp), "w", encoding="utf-8") as fh:
@@ -1120,7 +1125,7 @@ def selftest() -> int:
         dropped = pool(tmp)
         check("an empty queue falls back to the registered no-body pool", dropped["kind"], "unit")
         check("a proposal brief is pruned when the queue drops it",
-              [r["unit"] for r in dropped["pruned"]], [entry["label"]])
+              [r["unit"] for r in dropped["pruned"]], [claims.norm_unit(entry["label"])])
         check("the pruned brief is gone from disk", os.path.exists(pooled), False)
 
     # the brief's own schema table is what a worker follows, so an outbox shaped by it must validate clean
