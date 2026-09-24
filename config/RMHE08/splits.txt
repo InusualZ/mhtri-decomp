@@ -164,6 +164,11 @@ ef/fn_800CDB2C.cpp:
 	.text       start:0x800CDB2C end:0x800D45AC
 	.ctors      start:0x8056F2EC end:0x8056F2F0
 
+nw_resource.cpp:
+	extab       start:0x8000AA9C end:0x8000AC54
+	extabindex  start:0x80024030 end:0x800242C4
+	.text       start:0x800D45AC end:0x800D77B0
+
 g3d/fn_800D77B0.cpp:
 	extab       start:0x8000AC54 end:0x8000AC5C
 	extabindex  start:0x800242C4 end:0x800242D0

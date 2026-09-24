@@ -760,6 +760,11 @@ config.libs = [
             # evidenced - the unit is defined by its extab group (see the file header comment).
             Object(Matching, "sys_mem.cpp"),
             Object(NonMatching, "fn_80040598.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `800D45AC` - the
+            # resource/"work" manager (RESmemAlloc/RESmemFree/pull_res_mem/push_res_mem, ckResourceName,
+            # nwAddResource/nwDelResource, nwWorkInitialize/nwMoveStart/nwMoveEnd).  Same lib and flags as
+            # the game-root system files beside it (cflags_main matches the sound/ef neighbours too).
+            Object(NonMatching, "nw_resource.cpp"),
         ],
     },
 ]
