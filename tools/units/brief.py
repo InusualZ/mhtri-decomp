@@ -628,12 +628,272 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+# --------------------------------------------------------------------------------------------------
+# option A: the proposal brief (owner, 2026-09-24)
+#
+# The `src/auto/` scaffolding bucket is retired: a translation unit is registered ONCE, at its final
+# `src/<module>/<name>.<ext>` home, by the worker that works it. Discovery therefore produces *proposals*
+# (`attribute.py queue`), and the pool is built from the queue rather than from registered no-body units.
+# The worker's first act is the registration - it has to be, because a unit that is not in the build graph
+# cannot be measured - and that registration lands on `main` with the worker's own commit.
+# --------------------------------------------------------------------------------------------------
+def queue_path(main: str) -> str:
+    return os.path.join(main, "tools", "units", "attribution-queue.json")
+
+
+# mtime-keyed: see `proposals`. A module-level dict rather than an lru_cache so a rewritten queue is picked
+# up without a new process.
+_QUEUE_CACHE: dict = {}
+
+
+def proposals(main: str) -> list[dict]:
+    """The proposal queue, or `[]` when discovery has not been run.
+
+    Read from the file rather than from the build tree on purpose: a proposal has no split object yet, so
+    there is nothing in `build/` to read. A missing or malformed queue is `[]`, never an exception - the
+    pool then falls back to the registered no-body units, which is the pre-option-A behaviour.
+
+    Cached per (path, mtime): `queue.py` asks for the queue once per pooled entry, and the file is a few
+    hundred KB.
+    """
+    path = queue_path(main)
+    if not os.path.exists(path):
+        return []
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        key = None
+    if key is not None and _QUEUE_CACHE.get("key") == key:
+        return _QUEUE_CACHE["units"]
+    try:
+        doc = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print("WARNING: cannot read %s (%s) - falling back to registered no-body units" % (path, exc),
+              file=sys.stderr)
+        return []
+    units = doc.get("units")
+    units = units if isinstance(units, list) else []
+    if key is not None:
+        _QUEUE_CACHE["key"], _QUEUE_CACHE["units"] = key, units
+    return units
+
+
+def proposal_by_label(main: str, label: str) -> dict | None:
+    want = claims.norm_unit(label)
+    for p in proposals(main):
+        if claims.norm_unit(p.get("label") or "") == want:
+            return p
+    return None
+
+
+def proposal_labels(main: str) -> list[str]:
+    """The queue's labels, in address order (the queue is written in address order already)."""
+    return [p["label"] for p in proposals(main) if p.get("label")]
+
+
+def build_proposal(main: str, p: dict, task: str | None = None, assume_claim: bool = False) -> dict:
+    """The brief data for one proposal. Unit-shaped keys are present but empty/unknown by design.
+
+    There is no `sections` (nothing is split yet), no `flags`/`lib` (the worker picks from the evidence the
+    target object will give it), no `report_scores` (no object) and no `source` (the path does not exist
+    until the worker decides the module and name). Everything that *is* known comes from the queue entry.
+    """
+    label = p["label"]
+    t0, t1 = p["text"]
+    return {
+        "unit": label,
+        "proposal": p,
+        "range": [t0, t1],
+        "symbols": symbols_in_range(main, t0, t1),
+        "below_bar": p.get("count", 0),
+        "slug": claims.slug(label),
+        "handoff": handoff_paths(main, label, assume_claim=assume_claim),
+        "source": None,
+    }
+
+
+def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) -> str:
+    """The brief a worker gets for a *proposal*: work this range, then register it where it belongs."""
+    p = b["proposal"]
+    label = b["unit"]
+    t0, t1 = b["range"]
+    seam = p.get("seam") or []
+    lines: list[str] = []
+    lines.append("# Proposal brief: %s" % label)
+    lines.append("")
+    if pool:
+        lines.append("> **Pooled brief** - prepared by `brief.py --pool` before the claim. `queue.py next` claims")
+        lines.append("> this proposal and hands you this file; the worktree and outbox paths below are the ones")
+        lines.append("> your claim will have. Do not act on a pooled brief you were not handed.")
+        lines.append("")
+    lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
+    lines.append("")
+    lines.append("## 0 · Acknowledge first, then heartbeat")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python tools/units/claims.py ack %s --agent <your-name>" % label)
+    lines.append("```")
+    lines.append("")
+    lines.append("Re-run it **with `--progress <symbol>` every time you finish a function** - it is the heartbeat")
+    lines.append("by which the orchestrator tells a stalled worker from a working one.")
+    lines.append("")
+    lines.append("## 1 · This is a proposal, not a unit")
+    lines.append("")
+    lines.append("| | |")
+    lines.append("| --- | --- |")
+    lines.append("| `.text` range | `0x%08X`-`0x%08X` (%d bytes) |" % (t0, t1, t1 - t0))
+    lines.append("| functions | %d |" % p.get("count", 0))
+    lines.append("| language hint | %s |" % _lang_hint(p))
+    lines.append("| seam | %s |" % ("**pinned** (%s)" % ", ".join(s.get("kind", "?") for s in seam) if seam
+                                     else "**unproven** - this is one maximal unclaimed run"))
+    lines.append("")
+    lines.append("**The `src/auto/` scaffolding bucket is retired** (owner, 2026-09-24). Discovery proposed this")
+    lines.append("range; it registered nothing. Your first act is to **register it once, at its final home**, and")
+    lines.append("you are the only one who can: you will have understood the code by then.")
+    lines.append("")
+    if p.get("seam_note"):
+        lines.append("**WARNING from discovery:** %s" % p["seam_note"])
+        lines.append("")
+    lines.append("## 2 · Register it at its final home (do this first)")
+    lines.append("")
+    lines.append("A unit that is not in the build graph cannot be measured, so registration comes before the")
+    lines.append("bodies. Decide, in this evidence order, and say in your report which class decided it:")
+    lines.append("")
+    lines.append("1. **A `__FILE__` string.** `python tools/units/dossier.py <unit>` will not work yet (no object),")
+    lines.append("   so read the region's `.data`/`.sdata` pool yourself: an assert or log string that is a bare")
+    lines.append("   source-file name (`ef_line.cpp`) IS the original source file. Module and name are then decided,")
+    lines.append("   and the extension comes from its suffix. `langcheck.py` is the authority for C vs C++.")
+    lines.append("2. **A real runtime-dump name.** `python tools/symbols/dumpmap.py lookup <addr>`. A `zz_XXXXXXXX_`")
+    lines.append("   name is NOT evidence.")
+    lines.append("3. **What the code does, plus the naming scheme of its neighbours.** A descriptive name that fits")
+    lines.append("   the siblings' scheme. If several proposals are plainly one subsystem, say so - they belong in")
+    lines.append("   one module directory.")
+    lines.append("4. **Nothing supports a name.** Keep the map's `fn_XXXXXXXX` stem as the file name and say so.")
+    lines.append("   Inventing a name to fill the gap is forbidden, and this is a legitimate outcome. Do not invent")
+    lines.append("   a module either - if the module is genuinely unknown, ask the orchestrator.")
+    lines.append("")
+    lines.append("Then make the registration, **in your worktree**, as three edits in one commit:")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("# 1. the source, at its final path")
+    lines.append("mkdir -p src/<module> && $EDITOR src/<module>/<name>.<ext>")
+    lines.append("# 2. its object line, in configure.py's config.libs, in the lib its neighbours use")
+    lines.append("#    Object(NonMatching, \"<module>/<name>.<ext>\"),")
+    lines.append("# 3. its splits.txt block: one line per section, exact start:/end: addresses")
+    lines.append("#    <module>/<name>.<ext>:")
+    lines.append("#    \t.text       start:0x%08X end:0x%08X" % (t0, t1))
+    lines.append("python configure.py && ninja build/RMHE08/src/<module>/<name>.o   # registers it in YOUR worktree")
+    lines.append("python tools/units/recompile.py <module>/<name>.<ext> --measure <symbol>")
+    lines.append("```")
+    lines.append("")
+    lines.append("**This is the one exception to the shared-file rule.** Everywhere else a worker never touches")
+    lines.append("`splits.txt`, `configure.py`, `symbols.txt` or `AGENTS.md`. Here you must, because measurement needs")
+    lines.append("the unit in the graph - but **only in your own worktree**. The orchestrator applies your")
+    lines.append("registration on `main` with the rest of the batch, one re-split for all of them. Do not add a")
+    lines.append("second `config.libs` block: extend the block your neighbours are in.")
+    lines.append("")
+    lines.append("If the unit needs sections beyond `.text` (a `.ctors`/`.dtors` word, `extab`/`extabindex`), claim")
+    lines.append("them in the same `splits.txt` block and say so in your report.")
+    lines.append("")
+    lines.append("**Naming, and the one line the gate needs.** If the symbol map has only `fn_XXXXXXXX` for this")
+    lines.append("range then your source must use those names - the project's naming rule forbids inventing a")
+    lines.append("better one - and stylelint's rule 7 would refuse the landing. Put this line in the unit's file")
+    lines.append("header, with a reason that names the evidence:")
+    lines.append("")
+    lines.append("```c")
+    lines.append(" * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked <how>)")
+    lines.append("```")
+    lines.append("")
+    lines.append("It is a per-unit, greppable deferral - `grep -rn \"rule 7 deferred\" src/` is the complete list,")
+    lines.append("so write it only when it is true. `unkNN` identifiers are still violations and must be named.")
+    lines.append("")
+    lines.append("## 3 · The inventory (from the symbol map)")
+    lines.append("")
+    if b["symbols"]:
+        lines.append("| symbol | address |")
+        lines.append("| --- | --- |")
+        for r in b["symbols"][:60]:
+            lines.append("| `%s` | 0x%X |" % (r.get("name", "?"), r.get("address", 0)))
+        if len(b["symbols"]) > 60:
+            lines.append("| ... and %d more | |" % (len(b["symbols"]) - 60))
+    else:
+        lines.append("**The inventory came back empty** - the range is not in the map, or the map proxy failed.")
+        lines.append("Report it instead of guessing.")
+    lines.append("")
+    lines.append("## 4 · Where your output goes")
+    lines.append("")
+    lines.append("* your source **and its registration**, committed **on your branch** (one commit)")
+    if b["handoff"]["claimed"]:
+        lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch, so"
+                     % b["handoff"]["outbox"])
+        lines.append("  write it exactly here; do not invent a name.")
+        lines.append("* `%s`" % b["handoff"]["notes"])
+    else:
+        lines.append("* %s" % unclaimed_notice(main, label))
+    lines.append("* a ≤ 15-line digest in your reply")
+    lines.append("")
+    lines.append("**End your turn with your report as the final message.** Your last assistant message *is* the")
+    lines.append("handoff; ending on a tool call (or saying nothing) hands back an empty result.")
+    lines.append("")
+    lines.append("## 5 · The task")
+    lines.append("")
+    if task:
+        lines.append(task)
+    else:
+        lines.append("Reconstruct this range's %d function(s) to at least the %.0f %% bar, in address order,"
+                     % (p.get("count", 0), BAR))
+        lines.append("biggest first where two are equal.")
+        lines.append("")
+        lines.append("Work them one at a time and re-measure each: `python tools/units/recompile.py <unit>")
+        lines.append("--measure <symbol>`. A function that resists is a residual to record, not a reason to stop -")
+        lines.append("**apply the best-scoring variant even if it is not a full match** and write what still differs")
+        lines.append("into the unit's file header.")
+    lines.append("")
+    lines.append("## 6 · The rules")
+    lines.append("")
+    lines.append("**Build in your worktree, never in MAIN's.** Several workers share this machine.")
+    lines.append("")
+    lines.append("**Before you hand-roll a search, use the tools that do it mechanically:**")
+    lines.append("")
+    lines.append("```")
+    lines.append("python tools/flags/infer.py <unit>                    # which flags the TARGET object implies")
+    lines.append("python tools/flags/shapesearch.py -u <unit> --scan 20 # generate/compile/score/rank variants")
+    lines.append("```")
+    lines.append("")
+    lines.append("A worker never runs `ninja`/the split/the link/`ok`, and never commits on `main`. Apart from the")
+    lines.append("registration §2 requires, everything you need changed goes into the outbox's `config_requests`.")
+    lines.extend(config_schema_lines())
+    lines.append("")
+    lines.append("**You may fan out subagents** for parallel work, in *your* worktree, on *your* branch. They never")
+    lines.append("commit; you assign them disjoint functions; you re-measure every claim they make. Hand each of them")
+    lines.append("this whole part verbatim.")
+    lines.append("")
+    lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
+    lines.append("")
+    lines.append(plan_section(main, "## 8. Invariants"))
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _lang_hint(p: dict) -> str:
+    """The region's language verdict, as a *hint* - the worker's own evidence outranks it."""
+    lang = p.get("language") or {}
+    if lang.get("lang"):
+        return "%s (%s) - re-derive it from the unit's own evidence" % (
+            "C++" if lang["lang"] == "c++" else "C", lang.get("confidence", "?"))
+    return "C++ (a mangled name is in the region)" if p.get("cxx") else "C (no evidence; the default)"
+
+
 def brief_unit(path: str) -> str | None:
-    """The unit a written brief names, from its `# Brief: <unit>` title - `None` when it is not a brief."""
+    """The unit or proposal a written brief names, from its title - `None` when it is not a brief.
+
+    Two titles exist: `# Brief: <unit>` for a registered unit and `# Proposal brief: <label>` for option A's
+    proposal briefs. Both return the identifier the claim machinery keys on, so a caller does not have to
+    know which kind it read.
+    """
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
-                m = re.match(r"# Brief: (\S+)", line)
+                m = re.match(r"# (?:Proposal )?[Bb]rief: (\S+)", line)
                 if m:
                     return m.group(1)
     except OSError:
@@ -646,20 +906,24 @@ def pool_dir(main: str) -> str:
 
 
 def pool(main: str, force: bool = False, prune: bool = True) -> dict:
-    """Write a brief for every registered unit with no bodies yet into `tools/units/briefs/pool/`.
+    """Write a brief for every piece of work the pool can hand out, into `tools/units/briefs/pool/`.
 
-    The point (owner's ask, 2026-09-23): the brief's content is unit-derived, so it can be prepared before any
-    worker exists. Only its *file name* used to need a claim, and the pooled name is the same
-    `claims.slug(unit)` the default claim's branch yields - so the orchestrator starts a worker the moment a
-    slot frees with `queue.py next` and no derivation.
+    Under option A (owner, 2026-09-24) the work is the **proposal queue** written by `attribute.py queue`,
+    and each pooled brief is a proposal brief. The pre-option-A source - registered units with no bodies -
+    is the fallback when there is no queue, so an existing pool is not orphaned and the tool still works on
+    a tree whose discovery has not been re-run.
 
     No claim is made and the claims registry is never touched. `assume_claim` renders each brief against the
     worktree and branch the claim *will* create, so promoting it later is a copy.
 
-    Idempotent: an existing brief is skipped unless `force`. A pooled brief whose unit has gained a body (a
-    worker's source landed) is pruned, so the pool always equals the current no-body set.
+    Idempotent: an existing brief is skipped unless `force`. A pooled brief whose proposal has left the queue
+    (its range was worked and registered) is pruned, so the pool always equals the current queue.
     """
-    units = pool_units(main)
+    queue = proposals(main)
+    if queue:
+        kind, units = "proposal", proposal_labels(main)
+    else:
+        kind, units = "unit", pool_units(main)
     outdir = pool_dir(main)
     os.makedirs(outdir, exist_ok=True)
     wrote, skipped, pruned = [], [], []
@@ -669,8 +933,14 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
         if os.path.exists(path) and not force:
             skipped.append(unit)
             continue
-        b = build(main, claims.worktree_for(unit, main), unit, None, assume_claim=True)
-        open(path, "w", encoding="utf-8", newline="\n").write(render(main, b, None, pool=True))
+        if kind == "proposal":
+            p = proposal_by_label(main, unit)
+            b = build_proposal(main, p, None, assume_claim=True)
+            text = render_proposal(main, b, None, pool=True)
+        else:
+            b = build(main, claims.worktree_for(unit, main), unit, None, assume_claim=True)
+            text = render(main, b, None, pool=True)
+        open(path, "w", encoding="utf-8", newline="\n").write(text)
         wrote.append(unit)
     if prune:
         for name in sorted(os.listdir(outdir)):
@@ -679,7 +949,8 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
             path = os.path.join(outdir, name)
             pruned.append({"slug": name[:-3], "unit": brief_unit(path)})
             os.remove(path)
-    return {"dir": outdir, "units": units, "wrote": wrote, "skipped": skipped, "pruned": pruned}
+    return {"dir": outdir, "kind": kind, "units": units, "wrote": wrote, "skipped": skipped,
+            "pruned": pruned}
 
 
 def selftest() -> int:
@@ -753,6 +1024,66 @@ def selftest() -> int:
         open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("int f(void) { return 1; }\n")
         check("pool prunes a unit that gained a body",
               [p["unit"] for p in pool(tmp)["pruned"]], ["auto/stub"])
+
+    # option A: the pool IS the proposal queue, and a proposal brief carries the registration protocol. A
+    # proposal has no source, no splits block and no registration, so it exercises a different path than
+    # every check above.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "tools", "units"))
+        entry = {"label": "proposal/80161660_fn_80161660.cpp", "text": [0x80161660, 0x801679B0],
+                 "count": 52, "bytes": 25424, "cxx": True,
+                 "language": {"lang": "c++", "confidence": "medium"},
+                 "seam": None, "seam_note": None, "functions": [], "runs": {}}
+        with open(queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [entry]}, fh)
+        with open(os.path.join(tmp, "configure.py"), "w", encoding="utf-8") as fh:
+            fh.write("config.libs = [\n]\n")
+        check("proposals reads the queue", proposal_labels(tmp), ["proposal/80161660_fn_80161660.cpp"])
+        check("proposal_by_label finds it from the extensionless spelling",
+              (proposal_by_label(tmp, "proposal/80161660_fn_80161660") or {}).get("count"), 52)
+        check("proposal_by_label refuses a stranger", proposal_by_label(tmp, "Pl/pl_act"), None)
+        check("a proposal is not a registered unit", pool_units(tmp), [])
+        check("proposals is [] without a queue", proposals(os.path.join(tmp, "nope")), [])
+
+        b = build_proposal(tmp, proposal_by_label(tmp, entry["label"]), None, assume_claim=True)
+        text = render_proposal(tmp, b, None)
+        check("the proposal brief titles itself as a proposal",
+              text.startswith("# Proposal brief: proposal/80161660_fn_80161660.cpp"), True)
+        check("the proposal brief names the range", "0x80161660`-`0x801679B0" in text, True)
+        check("the proposal brief carries the register-at-final-home protocol",
+              "Register it at its final home" in text, True)
+        check("the proposal brief states the shared-file exception",
+              "one exception to the shared-file rule" in text, True)
+        check("the proposal brief carries the rule-7 deferral spelling", "rule 7 deferred:" in text, True)
+        check("the proposal brief keeps the ban on inventing a name",
+              "Inventing a name to fill the gap is forbidden" in text, True)
+        check("the proposal brief keeps the section 6.5 rules",
+              "## 6 · The rules" in text and "rule 7 deferred:" in text, True)
+        check("the proposal brief carries the outbox path", str(b["handoff"]["outbox"]) in text, True)
+        check("a proposal brief still says where the report goes",
+              "final message" in text and "subagent_done" not in text, True)
+
+        # the rules themselves are read from docs/plan.md, so that part is checked against the real tree
+        # (the temp fixture above has no docs/)
+        real = render_proposal(".", build_proposal(".", entry, None, assume_claim=True), None)
+        check("the proposal brief embeds the section 6.5 text",
+              "Type and naming discipline" in real and "A reconstructed class/struct states its size" in real, True)
+        check("the proposal brief embeds the invariants", "## 8. Invariants" in real, True)
+
+        out = pool(tmp)
+        check("the pool is built from the queue", out["kind"], "proposal")
+        check("the pool wrote one brief per proposal", len(out["wrote"]), 1)
+        pooled = os.path.join(out["dir"], claims.slug(entry["label"]) + ".md")
+        check("a pooled proposal brief is parseable", brief_unit(pooled), entry["label"])
+        check("pool is idempotent for a proposal", pool(tmp)["skipped"], [entry["label"]])
+        # the queue drops a proposal once its range is registered, and the pool prunes the brief with it
+        with open(queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": []}, fh)
+        dropped = pool(tmp)
+        check("an empty queue falls back to the registered no-body pool", dropped["kind"], "unit")
+        check("a proposal brief is pruned when the queue drops it",
+              [r["unit"] for r in dropped["pruned"]], [entry["label"]])
+        check("the pruned brief is gone from disk", os.path.exists(pooled), False)
 
     # the brief's own schema table is what a worker follows, so an outbox shaped by it must validate clean
     from units import handoff as handoff_mod
@@ -921,7 +1252,8 @@ def main() -> int:
             print(json.dumps(out, indent=2))
             return 0
         print("pool %s" % out["dir"])
-        print("  %d registered unit(s) with no bodies" % len(out["units"]))
+        print("  %d %s(s) to hand out" % (len(out["units"]),
+                                            "proposal" if out.get("kind") == "proposal" else "registered unit"))
         print("  wrote    %d" % len(out["wrote"]))
         for unit in out["wrote"]:
             print("      + %s" % unit)
