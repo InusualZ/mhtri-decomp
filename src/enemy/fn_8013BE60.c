@@ -52,13 +52,15 @@
  * `extab`/`extabindex` travel with the code unit (`dataqueue.py`'s `FRAGMENT_SECTIONS`); the rest
  * waits for the measured data pass (`tools/units/dataclaim.py`).
  *
- * Types.  `_ENEMY_WORK`, `_ENEMY_DATA`, `_ENEMY_TABLE`/`_ENEMY_LIST_*`/`_ENEMY_QUEUE_ENTRY` and `Vec3`
- * are reconstructed here.  `Vec3` duplicates `include/ef.h`'s `Vec` and `include/nw4r/math.h`'s
- * `VEC3` because this unit is C and neither header can be included from C; a shared C `Vec3` header is
- * the right home for it.
+ * Types.  `_ENEMY_WORK`, `_ENEMY_DATA`, `_ENEMY_TABLE`/`_ENEMY_LIST_*`/`_ENEMY_QUEUE_ENTRY` are
+ * reconstructed here.  `Vec3` comes from `nw4r/math.h` (the same three `f32` as `nw4r::math::VEC3`,
+ * now includable from C as well as C++).
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "enemy/fn_80138074.h"
+#include "unsplit/enemy.h"
 
 #pragma peephole off
 #pragma fp_contract off
@@ -68,12 +70,8 @@
  * handlers never touch.  size: at least 0xA04 (the largest field read is +0xA00). */
 /* --------------------------------------------------------------------------------------------- */
 
-/* size: 0xC */
-typedef struct Vec3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} Vec3;
+/* size: 0xC
+ * `Vec3` is the C spelling from `nw4r/math.h` (layout x/y/z at +0x00/+0x04/+0x08). */
 
 /* The enemy-data table chain: `get_enemy_data`'s +0x18 word points at the head record, whose +0x00 word
  * is the first 8-byte action entry; an entry's +0x04 word is its own list of 8-byte item entries. */
@@ -237,8 +235,6 @@ typedef struct _ENEMY_WORK {
 /* Callees owned by other translation units.  Addresses and the mangled spellings are the map's. */
 extern void fn_80043EA8(void *out);
 extern u32 fn_803439D4(u8 a, u8 b);
-extern void fn_80140AF8(_ENEMY_WORK *self, u32 a, u32 b);
-extern void fn_80140B10(_ENEMY_WORK *self, u32 a, u32 b);
 
 /* --------------------------------------------------------------------------------------------- */
 /* The generic parameter interpreter and its two-argument tail. */
@@ -493,14 +489,7 @@ typedef struct _ENEMY_PARAM _ENEMY_PARAM;
 extern _ENEMY_DATA *get_enemy_data__FP11_ENEMY_WORK(_ENEMY_WORK *self);
 extern u32 fn_803438E4(u8 a, u8 b);
 extern u32 fn_80345A6C(void *a, u8 b, Vec3 *c, f32 d);
-extern u32 fn_801406E0(u32 id, u32 cmd);
-extern s16 fn_80140778(u8 *stream, u32 id, u32 mode);
-extern void fn_8013BDE4(u8 **in, u32 id, s16 *out);
-extern void fn_801409C8(_ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s32 value);
 extern u32 fn_8012EC3C(void);
-extern u32 fn_8012EC60(void);
-extern u32 fn_8012ECF0(void);
-extern u32 fn_80132184(void);
 extern u32 fn_80131BD4(void);
 extern u32 PlayMode_ck__Fv(void);
 extern f32 lbl_80796DA0; /* 0.0f */
@@ -511,7 +500,6 @@ extern f32 fn_80050F80(Vec3 *a, Vec3 *b);
 extern f32 fn_80050BC0(f32 x);
 extern f32 fn_80463E08(f32 y, f32 x);
 extern u32 fn_80125FF0(u8 a, u8 b);
-extern u32 fn_8013AB74(_ENEMY_WORK *self, u32 a, u32 b);
 extern void fn_801285C0(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80126278(_ENEMY_WORK *self, u16 a, Vec3 *out);
 extern void fn_80041E40(Vec3 *dst, Vec3 *src);
@@ -522,14 +510,12 @@ extern u32 fn_80126F80(_ENEMY_WORK *self, u32 a, u32 b);
 extern u32 fn_801272C4(_ENEMY_WORK *self, Vec3 *pos, u32 a);
 extern u32 fn_8034539C(void);
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
-extern u32 fn_8013A884(_ENEMY_WORK *self, u32 a);
 extern u32 fn_801275F0(_ENEMY_WORK *self, u32 a);
 extern u32 fn_80127A7C(_ENEMY_WORK *self, u32 a);
 extern void fn_8012A658(_ENEMY_WORK *self, u32 a);
 extern void fn_802B01AC(Vec3 *out, Vec3 *in, u32 idx);
 extern f32 fn_802B0430(u32 idx);
 extern void get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(Vec3 *out, Vec3 *pos, u8 act);
-extern u32 fn_80130DF8(void);
 
 /* A neighbouring record `fn_80130DF8` returns; only the two bytes this unit reads are named. */
 /* size: 0x8 (lower bound: the unit reads +0x05 and +0x06) */

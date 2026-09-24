@@ -1,0 +1,38 @@
+/* The enemy action/status unit `enemy/fn_8012BDF4.cpp` (0x8012BDF4..0x8012E968): its public `em_*` entry points and the `fn_8012C*`/`fn_8012D*` helpers its neighbours call.
+ *
+ * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
+ * an extern lives with the TU that owns the symbol).  The signature set is what the
+ * consumers used; where only the parameter spelling differed the wider form is kept.
+ */
+#ifndef MHTRI_ENEMY_FN_8012BDF4_H
+#define MHTRI_ENEMY_FN_8012BDF4_H
+
+#include "types.h"
+#include "nw4r/math.h"
+
+struct _ENEMY_WORK;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+s32 em_act_ck__FP11_ENEMY_WORKUcUc(struct _ENEMY_WORK* work, u8 a, u8 b);
+u32 em_area_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
+u32 em_die_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
+void fn_8012BDF4(struct _ENEMY_WORK* work);
+void fn_8012C600(struct _ENEMY_WORK* work);
+void fn_8012C9AC(struct _ENEMY_WORK* work);
+s32 fn_8012D0B4(struct _ENEMY_WORK* enemy, void* move);
+s32 fn_8012D188(struct _ENEMY_WORK* enemy, struct _ENEMY_WORK* other);
+u32 fn_8012D1A0(struct _ENEMY_WORK* work);
+s32 fn_8012D1A8(u8 arg0);
+u32 fn_8012D23C();
+u8 fn_8012D3E0();
+u32 fn_8012D7FC(struct _ENEMY_WORK* other);
+u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_ENEMY_FN_8012BDF4_H */

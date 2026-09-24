@@ -14,6 +14,7 @@
 #define MHTRI_UNSPLIT_G3D_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 /* The `g3d_calcworld`/`g3d_camera` resource types the returned pointers name; only ever used through a
  * pointer here, so the incomplete type is enough. */
@@ -23,6 +24,19 @@ struct RenderModeObj;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* The `enemy` lane's declarations for the same band (its units call these too).  Merged 2026-09-24: two
+ * lanes formalized into this one header, and their signatures disagreed only on `fn_8006FDCC`
+ * (`u32(const void*)` here vs `s32(void*)`); neither consumer's codegen depends on it (one assigns it to
+ * a `u32 mtxID`, the other uses it as an array index), so the verified `const void*` form is kept and the
+ * return-type question is recorded rather than silently settled. */
+
+/* 0x80069664..0x800883C4 - the g3d node/resource helpers (callers: enemy/fn_80138074.c). */
+void fn_80069664(void* self);
+void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
+void fn_80080B10(void* arg0, u32 arg1);
+void fn_800810DC(void* arg0, s32 arg1);
+void fn_800883C4(Mtx34* out, const Mtx34* src);
 
 /* 0x800696E4..0x80069754 - the `g3d_resvtx_ac.h` accessor group (callers: g3d_calcvtx.cpp). */
 void* fn_800696E4(const void* p);
