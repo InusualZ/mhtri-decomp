@@ -34,6 +34,9 @@ void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_801057A4(void* self, u32 a, Vec3* v, f32 scale, u32 id);
 void fn_8010A7D4(void* self, u32 a);
+/* Declarations moved here from `ef/fn_800AEE48.cpp` (docs/plan.md 6.5 rule 2): no registered unit
+ * owns `fn_800C5F74`, so its extern lives beside the other not-yet-attributed `ef`-band symbols. */
+void fn_800C5F74(void* self);
 
 #ifdef __cplusplus
 }
