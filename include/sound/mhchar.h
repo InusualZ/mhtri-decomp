@@ -17,8 +17,10 @@
 
 #ifdef __cplusplus
 
-/* The GX selectors the material methods take.  They are named after the SDK tags because MWCC encodes
- * the tag in the mangling (`setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`).  Values are the SDK's. */
+/* The GX channel selector the material methods take.  It is named after the SDK tag because MWCC
+ * encodes the tag in the mangling (`setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`).  Values are
+ * the SDK's.  The other selector enums (`_GXTevKColorID`, `_GXBlendMode`, `_GXBlendFactor`,
+ * `_GXLogicOp`) live in `gx.h`, the one header that owns them (docs/plan.md 6.5 rule 1). */
 enum _GXChannelID {
     GX_COLOR0,
     GX_COLOR1,
@@ -30,55 +32,6 @@ enum _GXChannelID {
     GX_ALPHA0A0,
     GX_ALPHA1A1,
     GX_ALPHAZERO
-};
-
-enum _GXTevKColorID {
-    GX_KCOLOR0,
-    GX_KCOLOR1,
-    GX_KCOLOR2,
-    GX_KCOLOR3,
-    GX_KCOLOR0A0,
-    GX_KCOLOR1A1,
-    GX_KCOLOR2A2,
-    GX_KCOLOR3A3
-};
-
-enum _GXBlendMode {
-    GX_BM_NONE,
-    GX_BM_BLEND,
-    GX_BM_LOGIC,
-    GX_BM_SUBTRACT,
-    GX_MAX_BLENDMODE
-};
-
-enum _GXBlendFactor {
-    GX_BL_ZERO,
-    GX_BL_ONE,
-    GX_BL_SRCCLR,
-    GX_BL_INVSRCCLR,
-    GX_BL_SRCALPHA,
-    GX_BL_INVSRCALPHA,
-    GX_BL_DSTALPHA,
-    GX_BL_INVDSTALPHA
-};
-
-enum _GXLogicOp {
-    GX_LO_CLEAR,
-    GX_LO_AND,
-    GX_LO_REVAND,
-    GX_LO_COPY,
-    GX_LO_INVAND,
-    GX_LO_NOOP,
-    GX_LO_XOR,
-    GX_LO_OR,
-    GX_LO_NOR,
-    GX_LO_EQUIV,
-    GX_LO_INV,
-    GX_LO_REVOR,
-    GX_LO_INVCOPY,
-    GX_LO_INVOR,
-    GX_LO_NAND,
-    GX_LO_SET
 };
 
 class MHchar {
