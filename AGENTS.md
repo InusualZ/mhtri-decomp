@@ -15,9 +15,9 @@ The original binary is split into relocatable objects by decomp-toolkit (no hand
 assets in the repo), and the final `main.dol` is verified against `config/RMHE08/build.sha1`.
 
 * Original binary: `orig/RMHE08/sys/main.dol` — SHA-1 `BF4850739478CAAEDFE675949EB7C28595A7FDE9`
-* Current state: `src/Camellia/camellia.c` is the only unit with source, and it does **not** match yet.
-  `Runtime.PPCEABI.H` holds two stubs registered as `NonMatching` (= not linked). Everything else is
-  still unsplit.
+* Current state: `src/` holds many registered units (see `docs/plan.md` §2 for the measured totals); the
+  `src/auto/` units are moved to their final homes under the register-once rule (`docs/plan.md` §12), and a
+  region still unclaimed in `symbols.txt` is a proposal backlog, not a defect.
 
 ## Non-negotiables
 
@@ -130,7 +130,7 @@ measured unit).
 | 24 | Merging a probe into the unit is its own step | Probe numbers are not unit numbers, and one struct definition has to serve every function, so types need use-site casts and everything must be re-measured. | done |
 | 25 | Shared memory dump as a name/signature/struct oracle | Unnamed `fn_*` functions and untyped structs can be resolved in one query from the game's runtime dump (`docs/memory-dump.md`). | done |
 | 26 | The target's section is part of the match | objdiff pairs sections, so a unit whose code landed in `.text` while the target object says `.init` diffs perfectly and still reports `None` (`__declspec(section "...")`). | done |
-| 27 | Same instructions, different order names the `-O` level - probe it per unit | An epilogue swap looks like an unreachable scheduling residual and is not source-shaped. `-O4,p` vs `-O3` is per unit (g3d/lobby want `-O3`, OSAlarm/NetworkWiiMediator want `-O4,p`), and the two-variant probe can be run against the `auto_*` blob before the unit is registered. The level also decides function packing (`-O4,p` implies `-func_align 16`), which is the second reason to probe it. | done |
+| 27 | Same instructions, different order names the `-O` level - probe it per unit | An epilogue swap looks like an unreachable scheduling residual and is not source-shaped. `-O4,p` vs `-O3` is per unit (g3d/lobby want `-O3`, OSAlarm/NetworkWiiMediator want `-O4,p`), and the two-variant probe can be run against the split target object that covers the region before the unit is registered. The level also decides function packing (`-O4,p` implies `-func_align 16`), which is the second reason to probe it. | done |
 | 28 | A kept `bl` to a tiny static names the unit's inlining setting | The callee is inlined away, so the caller is an instruction short and it reads as a missing helper. `-O3` + `-inline noauto` closed four `main.cpp` functions (74 -> 100, 21.18 -> 100, 71.12 -> 96.73) - `noauto`, not `off`, because `off` also de-inlines retail's aggregate copy (fn_8003F940 99.02). `#pragma peephole off` is the only spelling the compiler honours. | done |
 | 29 | A claimed literal pool: declare the constants, never define them | With the unit's `.sdata2`/`.sdata` claimed, the map's pool names can be `extern`-declared and used as load operands so they pair; *defining* them rebuilds the pool and moves the whole section. | done |
 | 30 | A C++ unit's exception settings live in its object, not in the source | Every function matches and the unit still falls short because the target has `extab`/`extabindex` and ours has none: `-Cpp_exceptions on` per lib (Pl, unchanged `.text`, all 12 entries equal) or `#pragma exceptions on` per file (`sys_mem.cpp`'s `throw()` specs, `Gecko_ExceptionPPC.cp`'s `0x10`+`0x18`). Compare the two objects' extab sizes and bytes, and use the pragma *pair* for a `$`-section. | done |
@@ -217,7 +217,8 @@ config/RMHE08/config.yml  Analyzer/build settings, DOL path + hash, selfile (RSO
 config/RMHE08/symbols.txt Symbol map: name = section:address; // type/size/scope  (generated, hand-editable)
 config/RMHE08/splits.txt  Which address ranges belong to which translation unit / section
 config/RMHE08/build.sha1  SHA-1 of each built artifact — the pass/fail check for the whole project
-src/                      Our C/C++ source (currently Camellia/)
+src/                      Our C/C++ source; a unit is registered once, at its final home
+                          src/<module>/<name>.<ext> (no src/auto/ bucket - docs/plan.md §12)
 include/types.h            The project's common scalar types (u8..s64, f32/f64, BOOL/TRUE/FALSE/NULL) - one
                           definition, included by every unit that needs them; `cflags` already get `-i include`.
                           A declaration moves here the *second* time a unit needs it, never the first (a type
