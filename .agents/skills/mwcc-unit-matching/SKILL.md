@@ -109,7 +109,8 @@ python scripts/mt.py dwarf  <obj> <function>
 
 This repository also has access to a second, independent Ghidra project holding a **runtime memory dump
 of the game** (`MH3Shared`, program `/DolphinDump85.raw.keep`, reachable through the `ghidra` MCP
-server). For the matching loop it answers questions the retail object cannot:
+server). It is shared and **read-only** - consult it, never modify it. For the matching loop it answers
+questions the retail object cannot:
 
 * **The real name of a `fn_XXXX`.** Look it up before reading any code: `search_functions` (by pattern)
   or `get_function_by_address` (by address); one `mcpScript` fanning a list of addresses through

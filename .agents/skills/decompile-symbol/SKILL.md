@@ -61,7 +61,8 @@ A stop of kind 1 is not "report and give up": check whether the owning unit's so
 ## 2. Evidence, in this order
 
 1. **Ghidra decompiler C** as the shape: `get_function_by_address` / `decompile_function` on the shared
-   runtime dump (`docs/memory-dump.md`).
+   runtime dump (`docs/memory-dump.md`). The project is shared and **read-only**: query it, never
+   rename/type/comment/import/save, and put our names in `symbols.txt` (`symedit.py`).
 2. **The disassembly is authoritative**: every instruction-level decision is checked against
    `disassemble_function` / the target object. The decompiler is wrong in details often enough that the
    diff is the arbiter.

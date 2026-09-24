@@ -16,6 +16,14 @@ decompilation **for names, signatures and data**, never for codegen.
   qualified with the section it lives in.
 * Reachable through the `ghidra` MCP server (instance `MH3Shared`).
 
+**READ-ONLY: `MH3Shared` is shared with another effort, so this repo only ever reads it.**
+
+* Never modify it: no renames, no type/struct creation, no comments, no imports, no re-analysis, no saves.
+* Our names live in `config/RMHE08/symbols.txt`; change one with
+  `python tools/symbols/symedit.py rename <old> <new>` - in this repo, never in Ghidra.
+* Why it matters: a change there is invisible to this repo (no diff, no review) and can silently break the
+  other effort working in the same project.
+
 ## The symbol map of the same dump (`DumpSymbols.zip`)
 
 A second, cheaper oracle sits next to the dump: `D:/WiiExperiment/DumpSymbols.zip` holds
