@@ -206,6 +206,12 @@ sound/fn_800E46E8.cpp:
 	.text       start:0x800E46E8 end:0x800E8E60
 	.ctors      start:0x8056F2F4 end:0x8056F300
 
+sound/fn_800E8E60.cpp:
+	extab       start:0x8000B554 end:0x8000B91C
+	extabindex  start:0x80024FFC end:0x80025494
+	.text       start:0x800E8E60 end:0x800EF7D8
+	.ctors      start:0x8056F300 end:0x8056F30C
+
 ef/eft002.cpp:
 	extab       start:0x8000BDDC end:0x8000BDFC
 	extabindex  start:0x80025BB4 end:0x80025BE4
