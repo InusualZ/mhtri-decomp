@@ -141,9 +141,10 @@ def promote(main: str, unit: str, pool_path: str, claim_slug: str) -> str:
     if claim_slug == claims.slug(unit):
         shutil.copyfile(pool_path, dest)
         return dest
-    b = brief.build(main, claims.worktree_for(unit, main), unit, None)
+    # A proposal must still dispatch on its queue entry here, not on a registered unit it does not have yet.
+    b, text = brief.brief_for(main, claims.worktree_for(unit, main), unit, None)
     with open(dest, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(brief.render(main, b, None))
+        fh.write(text)
     return dest
 
 
