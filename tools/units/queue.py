@@ -35,6 +35,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from units import brief  # noqa: E402
+
+# A unit that reconstructs a whole 100+-function range legitimately outruns the 30-minute
+# single-run backstop: three rounds died mid-work on 2026-09-24 and one lost an uncommitted
+# registration.  The spawn line carries the budget explicitly so it cannot silently regress, and
+# the runner steers a checkpoint 5 minutes before it (see the pi-subagents config).
+TIMEOUT_MS = 5400000
 from units import claims  # noqa: E402
 from units import recompile as rc  # noqa: E402
 
@@ -124,8 +130,8 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dic
             "your final message is the result the orchestrator receives."
             % (brief_path.replace("\\", "/"), unit, slug))
     return {"agent": "worker", "name": "worker-%s" % slug, "cwd": wt, "task": task,
-            "call": "subagent(agent=\"worker\", cwd=\"%s\", task=%s)"
-                    % (wt.replace("\\", "/"), json.dumps(task))}
+            "call": "subagent(agent=\"worker\", cwd=\"%s\", task=%s, timeoutMs=%d)"
+                    % (wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
 
 
 def promote(main: str, unit: str, pool_path: str, claim_slug: str) -> str:
