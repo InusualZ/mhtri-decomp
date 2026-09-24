@@ -549,6 +549,10 @@ config.libs = [
             Object(NonMatching, "ef/ef_emform.cpp"),
             Object(NonMatching, "ef/ef_line.cpp"),
             Object(NonMatching, "ef/ef_point.cpp"),
+            # Registered from proposal/800CDB2C_fn_800CDB2C.cpp (a 0x800CDB2C run discovery
+            # proposed at a --max-bytes cap; the seam is a guess and the range is several
+            # original TUs - see the unit's file header).
+            Object(NonMatching, "ef/fn_800CDB2C.cpp"),
             Object(NonMatching, "ef/eft002.cpp"),
             Object(Matching, "ef/fn_800FD520.c"),
             Object(Matching, "ef/fn_800FD718.c"),
