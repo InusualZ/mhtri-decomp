@@ -177,11 +177,13 @@ def unit_owned_paths(units: list[str]) -> set[str]:
 def land_stageable(units: list[str], rows: list[tuple[str, str]]) -> list[str]:
     """The paths `land` stages: the batch's own files, never another stream's in-flight work.
 
-    A *tracked* change inside the allowed set is part of the batch (the cherry-pick, the shared-file edits).
-    An **untracked** file is staged when it is a named unit's own path or lives under `src/`/`include/` (source
-    is the batch's), but not otherwise: a fresh `tools/*.py` from a different worker sitting in MAIN's tree is
-    their in-flight work, and sweeping it into the batch's commit is exactly the kind of accident the
-    one-command landing exists to prevent.
+    A *tracked* change inside the allowed set is part of the batch (the cherry-pick, the shared-file edits) -
+    except under `tools/`: that tree is where every worker keeps its own in-flight tools, so a tracked
+    `tools/` change belongs to the batch only when the batch *names* that path as one of its units. Without
+    this, `tools/units/langcheck.py` was a tracked change inside the allowed set, `land` staged it, and the
+    batch's commit carried another stream's work (`85f3d4b5`, `d50fdd32`). An **untracked** file is staged
+    when it is a named unit's own path or lives under `src/`/`include/` (source is the batch's), but not
+    otherwise.
     """
     owned = unit_owned_paths(units)
     stageable = []
@@ -189,6 +191,8 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]]) -> list[str]:
         if outside_batch([path]):
             continue
         if code.startswith("??") and path not in owned and not path.startswith(("src/", "include/")):
+            continue
+        if path.startswith("tools/") and path not in owned:
             continue
         stageable.append(path)
     return stageable
@@ -216,6 +220,16 @@ def foreign_warning(foreign: list[str]) -> str:
 def commit_pathspec(main: str, msg_file: str, stageable: list[str]) -> subprocess.CompletedProcess:
     """Commit exactly the batch's paths. `git commit` with no pathspec commits the whole index; with one it
     commits the named paths (read from the working tree) and leaves every other staged path staged."""
+    return run(["git", "commit", "-F", msg_file, "--", *stageable], main)
+
+
+def stage_batch(main: str, stageable: list[str]) -> None:
+    """`git add` the batch's paths. Deleted paths are left to the commit's pathspec: `git add` refuses a
+    pathspec that matches no working-tree file, while `git commit -- <path>` records the deletion (staged or
+    not) on its own. So a rename's source path can stay in the pathspec without breaking the staging step."""
+    existing = [p for p in stageable if os.path.exists(os.path.join(main, p))]
+    if existing:
+        git(["add", "--", *existing], main)
 
 
 def outside_batch(paths: list[str], allowed: tuple[str, ...] = ALLOWED_PREFIXES,
@@ -660,7 +674,7 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     if agents_md:
         pc.localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
     try:
-        git(["add", "--", *stageable], main)
+        stage_batch(main, stageable)
         foreign = staged_elsewhere(main, stageable)
         if foreign:
             print(foreign_warning(foreign), file=sys.stderr)
@@ -729,6 +743,11 @@ def selftest() -> int:
           "tools/units/land.py" in land_stageable(["tools/units/land.py"], rows), True)
     check("a shared-file edit is staged", "configure.py" in land_stageable(["Pl/pl_act"], rows), True)
     check("build output is never staged", "build/RMHE08/main.dol" in land_stageable(["Pl/pl_act"], rows), False)
+    # the incident: a *tracked* `tools/` change is another stream's work unless the batch names it
+    check("another worker's tracked tool edit is not staged",
+          "tools/units/langcheck.py" in land_stageable(["Pl/pl_act"], [(" M", "tools/units/langcheck.py")]), False)
+    check("a tool the batch names is still staged",
+          "tools/units/land.py" in land_stageable(["tools/units/land.py"], [(" M", "tools/units/land.py")]), True)
 
     # the one-command path: the gate's verdict is the decision, so a red gate can never reach `git commit`
     check("a failed gate refuses the commit", land_decision(False, ["src/Pl/pl_act.cpp"]),
@@ -737,6 +756,13 @@ def selftest() -> int:
           ("refuse", "the gate passed but no batch path is stageable - nothing to commit"))
     check("a green gate with a batch commits", land_decision(True, ["src/Pl/pl_act.cpp"]),
           ("commit", ""))
+
+    # the warning that keeps a foreign staged edit visible: `land` leaves it alone and names it
+    check("the foreign-index warning names the path",
+          foreign_warning(["tools/units/langcheck.py"]),
+          "WARNING: the index holds 1 path outside this batch - left staged, not committed: "
+          "tools/units/langcheck.py")
+    check("... and pluralises two", foreign_warning(["a", "b"]).count("paths"), 1)
 
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, ".git"), exist_ok=True)
@@ -781,6 +807,49 @@ def selftest() -> int:
             fh.write(msg + "\n")
         repo_git(path, "add", "-A")
         repo_git(path, "commit", "-q", "-m", msg)
+
+    # `land` commits with a pathspec. `git commit` with none takes the whole index, which is how another
+    # stream's staged `tools/units/langcheck.py` landed under two unrelated unit commits on 2026-09-23
+    # (`85f3d4b5`, `d50fdd32`). The proof is a real repo, run through the real `land_stageable` and the real
+    # commit helper: the batch's paths are committed, the foreign edit is not, and it is still staged
+    # afterwards. A rename's deletion is part of the batch, so both of its paths go in the pathspec.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        for name in ("src/batch.c", "src/old.c", "tools/units/langcheck.py"):
+            os.makedirs(os.path.dirname(os.path.join(tmp, name)), exist_ok=True)
+            with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
+                fh.write("base\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        with open(os.path.join(tmp, "src/batch.c"), "w", encoding="utf-8") as fh:
+            fh.write("the batch\n")
+        repo_git(tmp, "mv", "src/old.c", "src/new.c")   # a rename: its deletion belongs to the batch too
+        with open(os.path.join(tmp, "tools/units/langcheck.py"), "w", encoding="utf-8") as fh:
+            fh.write("another stream\n")
+        repo_git(tmp, "add", "tools/units/langcheck.py")  # foreign, staged by another worker
+        rows = changed_status(tmp)
+        check("a rename reports both of its paths",
+              ("src/old.c" in [p for _c, p in rows] and "src/new.c" in [p for _c, p in rows]), True)
+        stageable = land_stageable(["Pl/pl_act"], rows)
+        check("the tracked tool edit is not part of the batch", "tools/units/langcheck.py" in stageable, False)
+        check("the foreign staged edit is named", staged_elsewhere(tmp, stageable), ["tools/units/langcheck.py"])
+        stage_batch(tmp, stageable)
+        msg_file = os.path.join(tmp, "msg.txt")
+        with open(msg_file, "w", encoding="utf-8") as fh:
+            fh.write("land: the batch\n")
+        p = commit_pathspec(tmp, msg_file, stageable)
+        check("the pathspec commit succeeds", p.returncode, 0)
+        check("the batch's file is committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "the batch")
+        check("the rename's new path is committed",
+              run(["git", "cat-file", "-e", "HEAD:src/new.c"], tmp).returncode, 0)
+        check("the rename's deletion is committed",
+              run(["git", "cat-file", "-e", "HEAD:src/old.c"], tmp).returncode != 0, True)
+        check("the foreign edit is NOT committed",
+              repo_git(tmp, "show", "HEAD:tools/units/langcheck.py"), "base")
+        check("... and is still staged", repo_git(tmp, "diff", "--cached", "--name-only"),
+              "tools/units/langcheck.py")
+        check("... and still uncommitted", repo_git(tmp, "status", "--porcelain").startswith("M"), True)
 
     with tempfile.TemporaryDirectory() as tmp:
         repo_git(tmp, "init", "-q")
