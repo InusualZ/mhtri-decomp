@@ -94,6 +94,7 @@
  */
 
 #include "types.h"
+#include "sound/fn_800F2A94.h"
 #include "sound/sound_work.h"
 #include "ef/fn_800CDB2C.h"
 #include "nw4r/math.h"
@@ -235,7 +236,6 @@ u8  get_now_mapno(void);
 void get_gm_daynight(void);
 u32 get_move_work_adrs(u8 kind);
 u16 get_move_work_max(u8 kind);
-extern "C" void fn_800F48F4(void);
 
 extern "C" int sprintf(char* dst, const char* fmt, ...);
 extern "C" char* strcat(char* dst, const char* src);

@@ -534,6 +534,11 @@ config.libs = [
             # the link band and the neighbours; the name is the map's own stem (no `__FILE__` string
             # in the range, and `dumpmap.py lookup` answers `zz_XXXXXXXX_`).
             Object(NonMatching, "sound/fn_800EF7D8.cpp"),
+            # Registered from proposal/800F2A94_fn_800F2A94.cpp (a 0x800F2A94 run discovery proposed,
+            # 88 functions / 27408 B).  Same lib and same cflags as its neighbours: the range continues the
+            # sound band up to the effect (eft_control) block at 0x800F6520.  Flags are this lib's
+            # cflags_main; the per-symbol measurements are in the worker's outbox.
+            Object(NonMatching, "sound/fn_800F2A94.cpp"),
         ],
     },
 
