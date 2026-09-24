@@ -222,6 +222,12 @@ sound/fn_800F2A94.cpp:
 	extabindex  start:0x8002568C end:0x8002580C
 	.text       start:0x800F2A94 end:0x800F6520
 
+ef/effect.cpp:
+	extab       start:0x8000BC5C end:0x8000BD6C
+	extabindex  start:0x80025974 end:0x80025B0C
+	.text       start:0x800F95A4 end:0x800FAE08
+	.ctors      start:0x8056F30C end:0x8056F310
+
 ef/eft001.cpp:
 	extab       start:0x8000BD6C end:0x8000BDDC
 	extabindex  start:0x80025B0C end:0x80025BB4
