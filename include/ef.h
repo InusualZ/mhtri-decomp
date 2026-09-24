@@ -3,6 +3,10 @@
 
 #include "types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* nw4r effect-library (`nw4r::ef`) shared declarations for the emitter-shape units.  The shape files
  * (`ef_disc.cpp`, `ef_cylinder.cpp`, `ef_line.cpp`, ...) each define one `EmitterForm` subclass whose
  * single virtual method is its `CreateEmitter`; they all take the same `em`/`pm`/`params` triple and
