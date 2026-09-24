@@ -16,6 +16,14 @@ extern "C" {
 
 void fn_80101428(MTX34* out, VEC3* pos);
 
+/* The three per-frame handlers states 1-3 of the map/area family's dispatcher (`ef/fn_800FD864.cpp`)
+ * tail-call into.  They are plain C symbols owned by this unit; the caller only ever passes the 0x48-byte
+ * effect slot, so they are declared against that view here (`struct _EFT` is `ef.h`'s). */
+struct _EFT;
+void fn_800FF8D4(struct _EFT* self);
+void fn_800FFC98(struct _EFT* self);
+void fn_800FFCA8(struct _EFT* self);
+
 #ifdef __cplusplus
 }
 #endif

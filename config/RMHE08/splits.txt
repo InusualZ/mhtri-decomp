@@ -232,6 +232,11 @@ ef/fn_800FD718.c:
 	extabindex  start:0x80025BF0 end:0x80025BFC
 	.text       start:0x800FD718 end:0x800FD864
 
+ef/fn_800FD864.cpp:
+	extab       start:0x8000BE0C end:0x8000BE1C
+	extabindex  start:0x80025BFC end:0x80025C14
+	.text       start:0x800FD864 end:0x800FE978
+
 ef/eft004.cpp:
 	extab       start:0x8000BE34 end:0x8000BEF4
 	extabindex  start:0x80025C38 end:0x80025D58

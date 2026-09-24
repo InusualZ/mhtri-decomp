@@ -50,6 +50,11 @@ void fn_800B7DB0(void* a, MTX34* out);
 void* fn_800B4B04(void* self, s16 flag);   /* the owner defines it; this is the ABI */
 void fn_800B54B4(const void* src, Vec3* out);
 
+/* 0x800FE978 - the state-0 handler of the map/area family's dispatcher (`ef/fn_800FD864.cpp`)
+ * tail-calls.  It sits at the head of the next unclaimed range, so it has no registered owner yet. */
+struct _EFT;
+void fn_800FE978(struct _EFT* self);
+
 
 #ifdef __cplusplus
 }
