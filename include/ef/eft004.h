@@ -23,7 +23,7 @@ struct _EFT;
 void fn_800FF8D4(struct _EFT* self);
 void fn_800FFC98(struct _EFT* self);
 void fn_800FFCA8(struct _EFT* self);
-
+void fn_80100088(void* effect, s32 flag);
 #ifdef __cplusplus
 }
 #endif

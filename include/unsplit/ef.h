@@ -53,7 +53,6 @@ void fn_800B54B4(const void* src, Vec3* out);
 /* 0x800FE978 - the state-0 handler of the map/area family's dispatcher (`ef/fn_800FD864.cpp`)
  * tail-calls.  It sits at the head of the next unclaimed range, so it has no registered owner yet. */
 struct _EFT;
-void fn_800FE978(struct _EFT* self);
 
 
 #ifdef __cplusplus

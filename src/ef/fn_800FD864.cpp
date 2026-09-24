@@ -63,6 +63,7 @@
  */
 
 #include "types.h"
+#include "ef/fn_800FE978.h"
 #include "nw4r/math.h"
 #include "ef.h"
 #include "ef/eft004.h"
