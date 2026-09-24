@@ -63,6 +63,7 @@
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef/fn_800AEE48.h"
+#include "ef/ef_drawstrategyimpl.h"
 #include "ef/ef_particle.h"
 #include "ef/ef_particlemanager.h"
 #include "unsplit/ef.h"
@@ -318,7 +319,7 @@ f32* fn_800BF5B0(f32* a, f32* b) {
 /* DrawLineStrategy per-draw setup: bind the resource and the line vertex format. */
 void fn_800BF5C8(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleManager* pm) {
     NW4R_POINTER_ASSERT(pm, 174, lbl_80594348);
-    fn_800C6064(self, pm, fn_800AB388(pm->mResource), em);
+    fn_800C6064((EfDrawStrategyImpl*)self, (u32)pm, (u16*)fn_800AB388(pm->mResource), (void*)em);
 
     GXEnableTexOffsets(0, 1, 1);
     GXClearVtxDesc();
@@ -344,7 +345,7 @@ void* fn_800BF780(void* self, s16 flag) {
 
 /* DrawLineStrategy constructor: chain to the base and install the vtable. */
 void* fn_800BF7DC(DrawLineStrategy* self) {
-    fn_800C5F74(self);
+    fn_800C5F74((EfParticleLayers*)self);
     self->vtbl = (DrawLineStrategyVtbl*)lbl_805944C8;
     return self;
 }
