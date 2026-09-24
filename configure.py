@@ -493,6 +493,7 @@ config.libs = [
             Object(Matching, "enemy/fn_80149D6C.c"),
             Object(NonMatching, "enemy/fn_8014A1BC.c"),
             Object(NonMatching, "enemy/fn_80171194.cpp"),
+            Object(NonMatching, "enemy/fn_80178128.cpp"),
         ],
     },
 
