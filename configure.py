@@ -651,7 +651,10 @@ config.libs = [
             # 36-byte `ResAnmAmbLight`-cluster accessor.  Re-homed from the mis-named
             # `g3d/g3d_resanmamblight.c` when the wQ-recut carved the real `g3d_resanmamblight.cpp`
             # (0x80089F94) out of auto/800898B0: its neighbours cite `g3d_anmscn.cpp` and the region's
-            # data fragment is g3d_anmscn.cpp's, so the file took its own TU's name (C++, extern "C").
+            # data fragment is g3d_anmscn.cpp's, so the file took its own TU's name.  Real C++ since the
+            # wR-mangling pass: the map's `fn_800680A8`/`fn_80066C8C` were placeholders, so the source mangles
+            # and the MAP was renamed to `fn_800680A8__FPv`/`fn_80066C8C__FPv` (playbook 48); the object is
+            # byte-identical, so the DOL hash holds.
             Object(Matching, "g3d/g3d_anmscn.cpp"),
             # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
             # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
