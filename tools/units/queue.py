@@ -312,12 +312,12 @@ def selftest() -> int:
         open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"), "w").write(
             "# Proposal brief: %s\n" % label)
         entry = pool_entries(tmp)[0]
-        check("a pooled proposal brief is parseable", entry["unit"], label)
+        check("a pooled proposal brief is parseable", entry["unit"], claims.norm_unit(label))
         check("a proposal is not a registered unit", is_proposal(tmp, label), True)
         check("a proposal in the queue is ready", state(tmp, entry), "ready")
         check("a proposal's address comes from the queue, not splits.txt",
               text_start(tmp, label), 0x80161660)
-        check("next_entry picks the proposal", next_entry(tmp)["unit"], label)
+        check("next_entry picks the proposal", next_entry(tmp)["unit"], claims.norm_unit(label))
         claims.save_registry(tmp, {claims.norm_unit(label): {"branch": "worker/x", "worker": "me"}})
         check("a claimed proposal is not ready", state(tmp, entry), "claimed")
         check("a claimed proposal is not handed out", next_entry(tmp), None)
