@@ -605,7 +605,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("python tools/flags/shapesearch.py -u %s --scan 20   # generate/compile/score/rank source variants" % b["unit"])
     lines.append("```")
     lines.append("")
-    lines.append("`infer.py` reads the target bytes and names the flags (it is 100 %% correct on 36 confident claims and abstains rather than guess); `shapesearch.py` writes variants of your source, compiles each with the real command line into a scratch copy and ranks them by the official metric - it took two functions to 100 % on `Pl/pl_act` in 30 seconds. A shapesearch *miss* is informative: zero differing rows with a 99.9 % score means relocation naming, so the data claim is the fix, not a shape.")
+    lines.append("`infer.py` reads the target bytes and names the flags (it is 100 % correct on 36 confident claims and abstains rather than guess); `shapesearch.py` writes variants of your source, compiles each with the real command line into a scratch copy and ranks them by the official metric - it took two functions to 100 % on `Pl/pl_act` in 30 seconds. A shapesearch *miss* is informative: zero differing rows with a 99.9 % score means relocation naming, so the data claim is the fix, not a shape.")
     lines.append("")
     lines.append("python tools/units/recompile.py %s --measure <symbol>   # compiles YOUR source in YOUR worktree" % b["unit"])
     lines.append("```")
