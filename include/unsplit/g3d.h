@@ -37,6 +37,7 @@ void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
 void fn_80080B10(void* arg0, u32 arg1);
 void fn_800810DC(void* arg0, s32 arg1);
 void fn_800883C4(Mtx34* out, const Mtx34* src);
+void fn_800834F0(void* p); /* constructs one 8-byte sub-object (ef_particle's parameter record) */
 
 /* 0x800696E4..0x80069754 - the `g3d_resvtx_ac.h` accessor group (callers: g3d_calcvtx.cpp). */
 void* fn_800696E4(const void* p);
