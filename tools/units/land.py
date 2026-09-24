@@ -33,6 +33,14 @@ The pathspec is the other half of that safety: without it, another stream's *sta
 batch's commit twice on 2026-09-23 (`85f3d4b5`, `d50fdd32` took `tools/units/langcheck.py`). Paths the index
 holds but the batch does not are left staged and named in a warning.
 
+The pathspec still takes every *allowed* dirty path, so an unrelated edit that was already sitting in the
+working tree rode the next commit twice on 2026-09-24 (a prepared `docs/plan.md` under `85ddd7b6`, a
+`src/RSO/runtime.c` header under `890631e8`). `record-base` now snapshots the paths already dirty when the
+batch opens (`dirty_at_base`), and `land_stageable` excludes one unless the batch names it as a unit - the
+snapshot is the only way to tell "already dirty at the base" from "dirty because of this batch". AGENTS.md's
+LOCAL-ONLY block is the one exception: it is live state that is always dirty, not foreign work, so only a
+real edit outside the block enters the snapshot.
+
 `verify` never commits. It writes the message to `.git/land_msg.txt` **only when every check passed**, and
 removes a stale one when it refuses; committing it stays a deliberate step for the rare manual case.
 
@@ -55,9 +63,11 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, os.path.dirname(HERE) + os.sep + "git")
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "agents"))
 
 import unitutil  # noqa: E402
 import prepcommit as pc  # noqa: E402
+import localonly  # noqa: E402
 from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
 from units import handoff as handoff_mod  # noqa: E402
@@ -80,11 +90,45 @@ def git(args: list[str], cwd: str, check: bool = True) -> str:
     return p.stdout
 
 
+def agents_md_real_change(main: str) -> bool:
+    """True when AGENTS.md differs from HEAD beyond its LOCAL-ONLY working-state section.
+
+    AGENTS.md is dirty between every commit because the LOCAL-ONLY block is live state (non-negotiable 8),
+    so recording it as foreign in the base snapshot would stop `land` committing *any* AGENTS.md edit - the
+    block would be the only thing the snapshot ever saw. `localonly.find_block` is the marker parser of
+    record, so reuse it rather than re-deriving the cut (rule 8's own text mentions the markers).
+    """
+    path = os.path.join(main, "AGENTS.md")
+    if not os.path.exists(path):
+        return False
+    head = git(["show", "HEAD:AGENTS.md"], main, check=False)
+    if not head:
+        return False          # untracked: `land_stageable` already refuses it, so the answer does not matter
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            text = fh.read()
+        found = localonly.find_block(text)
+    except (OSError, SystemExit):
+        return True           # unreadable or malformed: treat it as a real change, the conservative choice
+    if not found:
+        return True
+    start, _end, trimmed = found
+    stripped = text[:start] + text[trimmed:]
+    return stripped.replace("\r\n", "\n") != head.replace("\r\n", "\n")
+
+
 def record_base(main: str) -> dict:
     head = git(["rev-parse", "HEAD"], main).strip()
+    # HEAD == base here, so `changed_paths` is exactly "what was already dirty when the batch opened":
+    # tracked edits and untracked files alike. `land_stageable` reads it back as the foreign-path guard.
+    # AGENTS.md is the one exception: its LOCAL-ONLY block is live state, so only a real edit counts.
+    dirty = changed_paths(main)
+    if "AGENTS.md" in dirty and not agents_md_real_change(main):
+        dirty = [p for p in dirty if p != "AGENTS.md"]
     data = {"base": head, "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "subject": git(["log", "-1", "--format=%s"], main).strip(),
-            "ledger": ledger_numbers(main), "report": report_snapshot(main)}
+            "ledger": ledger_numbers(main), "report": report_snapshot(main),
+            "dirty_at_base": dirty}
     os.makedirs(os.path.join(main, ".pi"), exist_ok=True)
     with open(os.path.join(main, BASE_FILE), "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1)
@@ -174,7 +218,19 @@ def unit_owned_paths(units: list[str]) -> set[str]:
     return owned
 
 
-def land_stageable(units: list[str], rows: list[tuple[str, str]]) -> list[str]:
+def base_dirty_paths(main: str) -> set[str]:
+    """The paths already dirty when the batch base was recorded - another stream's in-flight work.
+
+    `record_base` snapshots them while HEAD == base, so a path in this set was dirty *before* the batch
+    touched anything. A base recorded before this snapshot existed has none, and the guard is off for that
+    batch (re-record the base to arm it). `--base` only asserts HEAD; the recorded snapshot still names the
+    batch's foreign work.
+    """
+    return set(read_base(main).get("dirty_at_base") or [])
+
+
+def land_stageable(units: list[str], rows: list[tuple[str, str]],
+                   base_dirty: set[str] | None = None) -> list[str]:
     """The paths `land` stages: the batch's own files, never another stream's in-flight work.
 
     A *tracked* change inside the allowed set is part of the batch (the cherry-pick, the shared-file edits) -
@@ -184,12 +240,20 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]]) -> list[str]:
     batch's commit carried another stream's work (`85f3d4b5`, `d50fdd32`). An **untracked** file is staged
     when it is a named unit's own path or lives under `src/`/`include/` (source is the batch's), but not
     otherwise.
+
+    `base_dirty` is the set `record_base` snapshotted when the batch opened: a path that was already dirty
+    then is foreign, not batch material, even inside the allowed set (`docs/plan.md` under `85ddd7b6`,
+    `src/RSO/runtime.c` under `890631e8`). The batch still stages a path it *names* as one of its units, so a
+    unit the batch is genuinely working on keeps its existing behaviour.
     """
     owned = unit_owned_paths(units)
+    foreign = base_dirty or set()
     stageable = []
     for code, path in rows:
         if outside_batch([path]):
             continue
+        if path in foreign and path not in owned:
+            continue          # already dirty at the batch base: another stream's work, leave it alone
         if code.startswith("??") and path not in owned and not path.startswith(("src/", "include/")):
             continue
         if path.startswith("tools/") and path not in owned:
@@ -659,7 +723,7 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         print("REFUSED %s | paths outside the batch appeared during the build: %s"
               % (",".join(norm_units), ", ".join(outside)))
         return 1
-    stageable = land_stageable(norm_units, rows)
+    stageable = land_stageable(norm_units, rows, base_dirty_paths(main))
     action, why = land_decision(gate_ok, stageable)
     if action != "commit":
         clear_land_message(main)
@@ -748,6 +812,23 @@ def selftest() -> int:
           "tools/units/langcheck.py" in land_stageable(["Pl/pl_act"], [(" M", "tools/units/langcheck.py")]), False)
     check("a tool the batch names is still staged",
           "tools/units/land.py" in land_stageable(["tools/units/land.py"], [(" M", "tools/units/land.py")]), True)
+
+    # the 2026-09-24 hazard: a path that was already dirty when the batch base was recorded is another
+    # stream's work, not batch material, even though it sits inside the allowed set - a prepared `docs/plan.md`
+    # rode `85ddd7b6` and a `src/RSO/runtime.c` header rode `890631e8`. The snapshot comes from `record_base`.
+    foreign_rows = [(" M", "docs/plan.md"), (" M", "src/RSO/runtime.c"), (" M", "src/Pl/pl_act.cpp"),
+                    (" M", "configure.py")]
+    dirty_at_base = {"docs/plan.md", "src/RSO/runtime.c"}
+    check("a path dirty at the batch base is not staged",
+          "docs/plan.md" in land_stageable(["Pl/pl_act"], foreign_rows, dirty_at_base), False)
+    check("... and neither is a foreign unit header",
+          "src/RSO/runtime.c" in land_stageable(["Pl/pl_act"], foreign_rows, dirty_at_base), False)
+    check("a path the batch names is staged even if dirty at the base",
+          "src/Pl/pl_act.cpp" in land_stageable(["Pl/pl_act"], foreign_rows, {"src/Pl/pl_act.cpp"}), True)
+    check("a path clean at the base is still batch material",
+          "configure.py" in land_stageable(["Pl/pl_act"], foreign_rows, dirty_at_base), True)
+    check("without the base snapshot the old sweep is reproduced (the failure mode)",
+          "docs/plan.md" in land_stageable(["Pl/pl_act"], foreign_rows), True)
 
     # the one-command path: the gate's verdict is the decision, so a red gate can never reach `git commit`
     check("a failed gate refuses the commit", land_decision(False, ["src/Pl/pl_act.cpp"]),
@@ -850,6 +931,34 @@ def selftest() -> int:
         check("... and is still staged", repo_git(tmp, "diff", "--cached", "--name-only"),
               "tools/units/langcheck.py")
         check("... and still uncommitted", repo_git(tmp, "status", "--porcelain").startswith("M"), True)
+
+    # the snapshot the guard reads: `record_base` must capture what was dirty when it ran, so a path the
+    # batch edits afterwards is batch material and one that was dirty before it is foreign. AGENTS.md is
+    # special: its LOCAL-ONLY block is live state and always dirty, so only a real edit may enter the set.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+        with open(os.path.join(tmp, "src", "a.c"), "w", encoding="utf-8") as fh:
+            fh.write("base\n")
+        with open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8") as fh:
+            fh.write("base agents\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        with open(os.path.join(tmp, "src", "a.c"), "w", encoding="utf-8") as fh:
+            fh.write("foreign\n")
+        data = record_base(tmp)
+        check("record_base snapshots the dirty set", data.get("dirty_at_base"), ["src/a.c"])
+        check("the snapshot is read back", base_dirty_paths(tmp), {"src/a.c"})
+        with open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8") as fh:
+            fh.write("base agents\n" + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
+        check("a LOCAL-ONLY-only AGENTS.md is not foreign",
+              "AGENTS.md" in (record_base(tmp).get("dirty_at_base") or []), False)
+        with open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8") as fh:
+            fh.write("base agents\nedited outside the block\n"
+                     + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
+        check("a real AGENTS.md edit is foreign",
+              "AGENTS.md" in (record_base(tmp).get("dirty_at_base") or []), True)
 
     with tempfile.TemporaryDirectory() as tmp:
         repo_git(tmp, "init", "-q")
