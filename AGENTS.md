@@ -232,7 +232,8 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                             unitutil.py  shared unit/flag/ELF layer used by the tools below
                             flags/    compiler-flag and source-shape experiments (frame.py,
                                       mwcc_matrix.py, optsweep.py, tryvar.py,
-                                      shapesearch.py + shapes.py) + variants/<lib>.py data
+                                      shapesearch.py + shapes.py,
+                                      infer.py) + variants/<lib>.py data
                                       - see docs/matching.md
                             objdiff/  objdiff consumers (symdiff.py, slotmap.py)
                             elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
