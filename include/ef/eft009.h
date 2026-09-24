@@ -16,6 +16,13 @@ extern "C" {
 
 void fn_801049D0();
 
+
+/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
+ * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+void fn_80103D28(void* self);
+void fn_801041BC(void* self);
+void fn_801048A0(void* self);
+void fn_801048B0(void* self);
 #ifdef __cplusplus
 }
 #endif

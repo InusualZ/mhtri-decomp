@@ -23,9 +23,16 @@ u32 fn_800E28E4(struct MHchar* ch);
 void fn_800E2EBC(struct MHchar* ch, u32 index, s32 arg2);
 void fn_800E30DC(struct MHchar* ch, u32 index, s32 arg2);
 void fn_800E3264(void* arg0, u32 arg1);
-void move__6MHcharFUs(struct MHchar* ch, u16 arg1);
 void setScaleAll__6MHcharFf(struct MHchar* ch, f32 scale);
 
+
+/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
+ * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+void fn_800DD7E0(struct MHchar* model, Vec3* pos, s32 flag);
+void fn_800E0A14(void* mhchar, u32 joint, Mtx34* out);
+int fn_800E2994(void* handle);
+void fn_800E3B2C(void);
+void* fn_800E3B8C(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void));
 #ifdef __cplusplus
 }
 #endif

@@ -119,6 +119,10 @@ f32 get_em_chg_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 f32 get_em_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* work, u32 joint, Vec3* out);
 
+
+/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
+ * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+void get_joint_wpos_em(struct _ENEMY_WORK* enemy, u32 joint, Vec3* out);
 #ifdef __cplusplus
 }
 #endif

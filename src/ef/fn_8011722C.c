@@ -102,6 +102,10 @@ typedef struct EftJob {
  * ------------------------------------------------------------------------------------------------- */
 
 extern MHchar* fn_800F8914(void);                 /* takes a free eft_control slot, returns its chara */
+/* fn_80116FCC / fn_80117074 are declared here rather than through `include/ef/fn_80114E34.h`: the
+ * consumer stores them in a typed callback field (`void (*)(EftJob*)`), while the owner types the
+ * parameter `_EFT*`, so a shared `void*` declaration breaks the function-pointer assignment.  Reported
+ * as a rule-2 conflict (docs/plan.md 6.5). */
 extern void fn_80116FCC(EftJob* self);            /* the job's per-frame callback for the kind-1 work */
 extern void fn_80117074(EftJob* self);            /* advances the job's dispatch state */
 extern BOOL res_eft_model_create__FP6MHcharUsUl(MHchar* chara, u16 model, u32 light);

@@ -60,25 +60,28 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "gx.h"
+#include "ef/fn_80104BD0.h"
+#include "unsplit/ef.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * engine types the mangled callees encode
  * ------------------------------------------------------------------------------------------------- */
 
 /* The rotation triple `cpSetRotMatrix` takes (Pl/pl_act.cpp carries the same type). size: 0x0C */
+/* The rotation triple `cpSetRotMatrix` takes.  The SDK type is a float triple, but THIS unit stores
+ * the enemy's integer joint angles (`rot_x_0x1BC` / `rot_y_0x1C0`, u32) into it and passes it by
+ * pointer; the `f32` spelling emits an int->float conversion the target does not have (99.546 ->
+ * 99.184, object 1764 -> 1768 B), so the integer spelling is the one that reproduces this unit.  The
+ * canonical `f32` is reported as a disagreement (docs/plan.md 6.5). size: 0x0C */
 struct _CP_VECTOR {
     /* +0x00 */ u32 x;
     /* +0x04 */ u32 y;
     /* +0x08 */ u32 z;
 };
 
-/* The 4-byte colour `change_color_eff` takes by value. size: 0x04 */
-struct _GXColor {
-    /* +0x00 */ u8 r;
-    /* +0x01 */ u8 g;
-    /* +0x02 */ u8 b;
-    /* +0x03 */ u8 a;
-};
+/* The 4-byte colour `change_color_eff` takes by value comes from `gx.h` - one definition, in the
+ * owner's header (rule 1). */
 
 /* The sound-request handle `se_req_pos_ps` takes; opaque here. */
 struct _se_w;
@@ -181,10 +184,7 @@ extern "C" void fn_800F9DF4(_EFT* self, u8 a, u8 b);
 extern "C" _EFT* fn_800F8788(u32 pool_id);
 extern "C" void fn_800FBB90(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos);
 extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, void* vec);
-extern "C" void fn_80104BD0(_EFT* self);
-extern "C" void fn_80105314(_EFT* self);
-extern "C" void fn_80105550(_EFT* self);
-extern "C" void fn_80105560(_EFT* self);
+/* fn_80104BD0 comes from its owner's header (rule 2). */
 
 f32 get_em_scale(_ENEMY_WORK* enemy);
 f32 get_em_chg_scale(_ENEMY_WORK* enemy);

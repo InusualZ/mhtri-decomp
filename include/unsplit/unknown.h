@@ -15,6 +15,18 @@
 #define MHTRI_UNSPLIT_UNKNOWN_H
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "gx.h"
+
+struct MHchar;
+struct _CP_VECTOR;
+struct _PLW;
+
+#ifdef __cplusplus
+/* Declared, never included: these declarations only need the type by pointer, and
+ * including `pl.h`/`ef.h` here would pull their full records into units that carry their own view. */
+namespace nw4r { namespace ef { struct Effect; } }
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,8 +81,30 @@ typedef struct SystemWork {
 
 extern SystemWork system_w;
 
+
+/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
+ * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+u8 get_now_areano();
+u8 get_now_mapno();
+void* res_eft_model_create(struct MHchar* chr, u16 id, u32 arg);
+void* res_eft_model_create_light(struct MHchar* chr, u16 id, u32 a, long b);
+u32 get_stg_eft_col(u8 area, u8 which);
+u8 eftGetKeyAlpha(u8* key, long frame);
+void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
+u16 Get_motion_no(struct _PLW* plw);
+void cpSetRotMatrix(struct _CP_VECTOR* rot, Mtx34* mtx);
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus /* C++-only: outside the extern "C" block, so C++ linkage is kept */
+void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
+u32 effect_move(nw4r::ef::Effect* effect);
+void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale);
+void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* vec);
+void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
+void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, _GXColor color);
+nw4r::ef::Effect* res_eft_create(u16 id, u16 param, u32 idx);
 #endif
 
 #endif /* MHTRI_UNSPLIT_UNKNOWN_H */

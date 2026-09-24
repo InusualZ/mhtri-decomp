@@ -67,8 +67,17 @@ u16 fn_80082F18(f32 value);
 void fn_800868A0(u32 value);
 void fn_80077420(u16 command, u8 value);
 
+
+/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
+ * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+s32 fn_80082BCC(s32 model);
+void fn_8007F0CC(s32 root, u32 id);
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus /* C++-only: outside the extern "C" block, so C++ linkage is kept */
+void fn_8006F304(void* dst, const u32& src);
 #endif
 
 #endif /* MHTRI_UNSPLIT_G3D_H */

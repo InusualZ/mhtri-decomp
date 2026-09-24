@@ -56,24 +56,14 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * types
  * ------------------------------------------------------------------------------------------------- */
 
-/* A 3-float engine vector (`nw4r::math::VEC3`); the C++ header cannot be included from a `-lang=c`
- * file, so the layout is declared here (the same thing `800DCFEC_fn_800DCFEC.c` does).  size: 0x0C */
-typedef struct VEC3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} VEC3;
-
-/* A 3x4 float matrix (the SDK's `Mtx`).  The sibling units carry private copies; the second unit to
- * need it moves it into `include/nw4r/math.h`.  size: 0x30 */
-typedef struct MTX34 {
-    /* +0x00 */ f32 m[3][4];
-} MTX34;
+/* `VEC3` / `MTX34` come from `nw4r/math.h` - one definition, in the owner's header (rule 1).  The
+ * header is C-visible, so a `-lang=c` unit can include it. */
 
 /* The rotation source `cpSetRotMatrix` converts into a matrix.  size: 0x0C */
 typedef struct _CP_VECTOR {
