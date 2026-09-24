@@ -75,10 +75,10 @@ previous bytes of every file it already replaced if any write fails. `--dry-run`
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -91,6 +91,7 @@ import langcheck as lc  # noqa: E402
 
 SPLITS = ROOT / "config" / "RMHE08" / "splits.txt"
 CONFIGURE = ROOT / "configure.py"
+SYMBOLS = ROOT / "config" / "RMHE08" / "symbols.txt"
 AUTO_DIR = ROOT / "src" / "auto"
 
 # A proposal's *label* is provisional identity for the queue and the claim machinery, never a unit: under
@@ -638,16 +639,41 @@ def plan_writes(proposals: list[dict], layout: Layout) -> dict:
     return {"writes": writes, "splits": added, "objects": len(missing), "stubs": stubs}
 
 
-def queue_doc(proposals: list[dict], cap: int) -> dict:
+def input_fingerprints(layout: Layout | None = None) -> dict:
+    """The inputs the partition is a function of, hashed - provenance that is *deterministic*.
+
+    A wall-clock timestamp made every regeneration a diff and hid the case that matters: **the same inputs
+    must produce the same queue.** These hashes are stable for the same inputs, so `attribute.py queue` is
+    reproducible - regenerating over an unchanged tree writes a byte-identical file and `git status` stays
+    clean - while a rename (which changes `symbols.txt`) or a re-split (which changes `splits.txt`) shows up
+    as a real change, with the input that moved named in the file itself.
+
+    The DOL is the ground truth the seams are read from; `symbols.txt` decides the labels' stems and the
+    function names; `splits.txt` decides which ranges are already claimed, i.e. excluded.
+    """
+    layout = layout or LAYOUT
+    out = {}
+    for key, path in (("dol", Path(td.DOL)), ("symbols", SYMBOLS), ("splits", layout.splits),
+                      ("configure", layout.configure)):
+        try:
+            out[key + "_sha1"] = hashlib.sha1(path.read_bytes()).hexdigest()
+        except OSError:
+            out[key + "_sha1"] = None
+    return out
+
+
+def queue_doc(proposals: list[dict], cap: int, fingerprints: dict | None = None) -> dict:
     """The proposal queue as a plain dict - the shape `brief.py` and `queue.py` read.
 
     `label` is a *provisional identity* for the claim/queue machinery only (`claims.py` keys on a string,
     and a proposal has no unit yet). It is never a registered unit and never a `configure.py` path.
+
+    Deliberately carries no timestamp: see `input_fingerprints`.
     """
     return {
         "version": 1,
-        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cap": cap,
+        **(fingerprints if fingerprints is not None else input_fingerprints()),
         "total_bytes": sum(p["bytes"] for p in proposals),
         "units": [{
             "label": p["unit"],
@@ -669,10 +695,12 @@ def write_queue(proposals: list[dict], cap: int, path: Path | None = None,
     """Write the proposal queue - discovered units as work, never as registrations (option A).
 
     Touches none of the four shared files. The write is temp + replace, the same discipline as
-    `sharedfiles.Transaction`, so a reader never sees a half-written queue.
+    `sharedfiles.Transaction`, so a reader never sees a half-written queue. **Deterministic**: the same
+    inputs produce the same bytes, so a re-run over an unchanged tree is not a diff.
     """
     path = path or QUEUE_PATH
-    text = json.dumps(queue_doc(proposals, cap), indent=1) + "\n"
+    doc = queue_doc(proposals, cap)
+    text = json.dumps(doc, indent=1) + "\n"
     units = len(proposals)
     funcs = sum(p["count"] for p in proposals)
     byts = sum(p["bytes"] for p in proposals)
@@ -686,6 +714,8 @@ def write_queue(proposals: list[dict], cap: int, path: Path | None = None,
     tmp.replace(path)
     print("wrote %s" % path)
     print("  %d proposed unit(s), %d function(s), %d .text bytes (cap 0x%X)" % (units, funcs, byts, cap))
+    print("  inputs: dol %s  symbols %s" % ((doc.get("dol_sha1") or "?")[:12],
+                                              (doc.get("symbols_sha1") or "?")[:12]))
     print("  a proposal is not a unit: the worker that takes one registers it at its final")
     print("  src/<module>/<name>.<ext> home, from the evidence it has by then.")
     return 0

@@ -1,7 +1,10 @@
 {
  "version": 1,
- "generated": "2026-09-24T14:41:36Z",
  "cap": 0,
+ "dol_sha1": "bf4850739478caaedfe675949eb7c28595a7fde9",
+ "symbols_sha1": "bbdf70717682ee93b85404c6be580ad35eb8e8e0",
+ "splits_sha1": "09e1049b2265212ab44e612bcf47ccbf2e3d874e",
+ "configure_sha1": "16ba576316cf3ab6047653562672207d4afe232d",
  "total_bytes": 4514296,
  "units": [
   {
