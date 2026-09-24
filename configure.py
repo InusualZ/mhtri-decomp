@@ -536,6 +536,8 @@ config.libs = [
             Object(NonMatching, "ef/fn_800AEE48.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
+            # Registered from proposal/800C9540_fn_800C9540.cpp (a 0x800C9540 run discovery proposed).
+            Object(NonMatching, "ef/ef_torus.cpp"),
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
             Object(NonMatching, "ef/ef_disc.cpp"),
