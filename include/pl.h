@@ -80,22 +80,26 @@ typedef struct MHchar {
 typedef struct _PLW _PLW;
 typedef struct _PLW_PHYSICS _PLW_PHYSICS; /* defined in ef/fn_80114E34.cpp; only pointed at here */
 struct _PLW {
-    /* +0x000 */ u8 unk000[2];
+    /* +0x000 */ u8 slot_active;   /* the slot is in use (`fn_800EFAC0`/`fn_800EFDD8`) */
+    /* +0x001 */ u8 pad_0x001[0x1];
     /* +0x002 */ u8 unk2;
     /* +0x003 */ u8 unk003[0x008 - 0x003];
-    /* +0x008 */ u8 unk08;
+    /* +0x008 */ u8 chunk_ofs;     /* plus 0x14 is the chunk index its files go to */
     /* +0x009 */ u8 unk009;
     /* +0x00A */ u8 field_0x00A;
     /* +0x00B */ u8 unk00B;
     /* +0x00C */ u16 unk00C;
-    /* +0x00E */ u8 unk00E[0x15 - 0x0E];
+    /* +0x00E */ u8 unk00E[0x14 - 0x0E];
+    /* +0x014 */ u8 se_name_set;   /* picks the SE/BGM name table (`fn_800EFAC0`) */
     /* +0x015 */ u8 unk015;
     /* +0x016 */ u8 area_0x16;
     /* +0x017 */ u8 unk017[0x18 - 0x17];
     /* +0x018 */ u8 unk18;
     /* +0x019 */ u8 pad_0x19[0x1];
     /* +0x01A */ u16 field_0x01A;
-    /* +0x01C */ u8 pad_0x1C[0x4];
+    /* +0x01C */ u8 pad_0x1C[0x1];
+    /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
+    /* +0x01E */ u8 pad_0x01E[0x2];
     /* +0x020 */ u32 unk020;
     /* +0x024 */ u8 pad_0x24[0x8];
     /* +0x02C */ _SHELL_W* equip_0x2C;
