@@ -490,7 +490,7 @@ config.libs = [
             Object(NonMatching, "enemy/fn_8012BDF4.cpp"),
             Object(NonMatching, "enemy/fn_80138074.c"),
             Object(NonMatching, "enemy/fn_8013BE60.c"),
-            Object(NonMatching, "enemy/fn_80149D6C.c"),
+            Object(Matching, "enemy/fn_80149D6C.c"),
             Object(NonMatching, "enemy/fn_8014A1BC.c"),
         ],
     },
