@@ -31,6 +31,10 @@ void fn_80043EA8(Vec3* out);
 struct Vec;
 void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector to nw4r's */                                  /* out = (0, 0, 0) */
 
+/* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
+void fn_801057A4(void* self, u32 a, Vec3* v, f32 scale, u32 id);
+void fn_8010A7D4(void* self, u32 a);
+
 #ifdef __cplusplus
 }
 #endif

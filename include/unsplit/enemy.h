@@ -147,6 +147,13 @@ void fn_80170D74(struct _ENEMY_WORK* self);
 void fn_80170DF0(struct _ENEMY_WORK* self);
 void fn_80170E78(struct _ENEMY_WORK* self);
 void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
+/* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
+void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+void fn_80130F74(struct _ENEMY_WORK* self);
+void fn_801376B4(struct _ENEMY_WORK* self);
+void fn_80135C5C(struct _ENEMY_WORK* self, u32 a, u32 b);
+void fn_80147E2C(void* self);
 #ifdef __cplusplus
 }
 #endif
