@@ -559,10 +559,12 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("* %s" % unclaimed_notice(main, b["unit"]))
         lines.append("* a ≤ 15-line digest in your reply")
     lines.append("")
-    lines.append("**End your turn by calling the `subagent_done` tool** (a one-line summary). Do not just reply "
-                 "with text: the completion signal the orchestrator is woken by is the sidecar that tool writes, "
-                 "and the automatic path does not fire for long runs - a worker that only replies parks in "
-                 "`phase: waiting` and its result is never delivered (`.pi/notes/handoff-root-cause.md`).")
+    lines.append("**End your turn with your report as the final message.** The orchestrator runs you through the "
+                 "`subagent` tool, which returns to it when your process exits, so your last assistant message "
+                 "*is* the handoff; a pane-launched worker delivers the same message plus its outbox, and the "
+                 "orchestrator reads them once the pane is idle. There is no completion tool to call - ending on a "
+                 "tool call (or saying nothing) hands back an empty result, so make the digest the last thing you "
+                 "write.")
     lines.append("")
     lines.append("## 5 · The task")
     lines.append("")
@@ -735,6 +737,9 @@ def selftest() -> int:
         check("the pooled brief is parseable", brief_unit(brief_path), "auto/stub")
         check("the pooled brief carries the claim's outbox", "outbox" in open(brief_path, encoding="utf-8").read()
               and "no active claim" not in open(brief_path, encoding="utf-8").read(), True)
+        brief_text = open(brief_path, encoding="utf-8").read()
+        check("the handoff is the final message, not a subagent_done sidecar",
+              "final message" in brief_text and "subagent_done" not in brief_text, True)
         check("pool is idempotent", pool(tmp)["skipped"], ["auto/stub"])
         open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("int f(void) { return 1; }\n")
         check("pool prunes a unit that gained a body",

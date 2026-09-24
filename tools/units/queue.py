@@ -96,18 +96,21 @@ def next_entry(main: str, entries: list[dict] | None = None) -> dict | None:
 
 
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dict:
-    """The paste-ready spawn: cwd, name and task text for the orchestrator.
+    """The paste-ready spawn: agent, cwd and task text for the orchestrator.
 
     The task names the brief by its absolute MAIN path: the brief is written into MAIN *after* the worktree
-    was created, so the worktree's own checkout does not contain it.
+    was created, so the worktree's own checkout does not contain it. The call is the default `subagent`
+    tool's single mode (`agent`/`task`/`cwd`); it has no `name` parameter, so the slug is a label only, and
+    it blocks and returns the worker's final message to the orchestrator when the child process exits.
     """
     task = ("Read %s (in MAIN) and do exactly what it says. "
             "Ack first: python tools/units/claims.py ack %s --agent worker-%s. "
-            "You may fan out subagents. End your turn by calling subagent_done."
+            "You may fan out subagents. End your turn with your report: "
+            "your final message is the result the orchestrator receives."
             % (brief_path.replace("\\", "/"), unit, slug))
     return {"agent": "worker", "name": "worker-%s" % slug, "cwd": wt, "task": task,
-            "call": "subagent(agent=\"worker\", name=\"worker-%s\", cwd=\"%s\", task=%s)"
-                    % (slug, wt.replace("\\", "/"), json.dumps(task))}
+            "call": "subagent(agent=\"worker\", cwd=\"%s\", task=%s)"
+                    % (wt.replace("\\", "/"), json.dumps(task))}
 
 
 def promote(main: str, unit: str, pool_path: str, claim_slug: str) -> str:
@@ -234,6 +237,10 @@ def selftest() -> int:
         check("dry-run's spawn task names the brief", dry["brief"].replace("\\", "/") in dry["spawn"]["task"], True)
         check("dry-run's spawn task names the unit", "auto/stubB" in dry["spawn"]["task"], True)
         check("dry-run's spawn is a subagent call", dry["spawn"]["call"].startswith("subagent(agent=\"worker\""), True)
+        check("the spawn omits the `name` the default tool has no parameter for",
+              "name=" not in dry["spawn"]["call"], True)
+        check("the spawn asks for a final-message handoff, not a tool",
+              "final message" in dry["spawn"]["task"] and "subagent_done" not in dry["spawn"]["task"], True)
 
         # the real flow with an injected claim (no git worktree): promote, then remove the pool brief
         def fake_claim(unit, main, worker, dry_run):
@@ -351,7 +358,7 @@ def main() -> int:
                   % (out["unit"], out["claim"].get("branch"), out["worktree"], out["brief"]))
         print("spawn this worker:")
         print("  agent: %s" % sp["agent"])
-        print("  name:  %s" % sp["name"])
+        print("  label: %s  (the tool takes no name)" % sp["name"])
         print("  cwd:   %s" % sp["cwd"])
         print("  task:  %s" % sp["task"])
         print("\n%s" % sp["call"])

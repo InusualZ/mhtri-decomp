@@ -30,18 +30,37 @@
  * fn_804DA7E4, FindExportIndex).  The other four are instruction-identical (same opcodes, immediates,
  * branch targets, relocations) and lose only register colouring, except RSOStaticLocateObject, which
  * also has 2 words: LocateObject 21 rows (the loop-2/loop-3 induction webs are r24/r25 in retail and
- * r27/r28 here), RSORelocate 9 rows, RSOStaticLocateObject 2 rows (retail forms the offset-0 message
- * as `addi r3,r19,0`, we fold it to `mr r3,r19`) plus reloc-name rows objdiff resolves from the map,
- * RSORelocateSmallDataSection 12 rows (the pool base and the descriptor pointer swap r31/r30).
+ * r27/r28 here), RSORelocate 9 rows (the addend/target and insn webs swap r6/r0, then page r8 vs r7),
+ * RSOStaticLocateObject 2 rows (retail forms the offset-0 message as `addi r3,r19,0`, we fold it to
+ * `mr r3,r19`) plus reloc-name rows the *report* metric resolves from the map,
+ * RSORelocateSmallDataSection 12 rows (the pool base and the descriptor pointer swap r31/r30).  The
+ * report's numbers are the official ones: 99.391890 / 99.641030 / 99.478264 / 99.560814; the `-1/-2`
+ * explicit-object diff reads 99.282050 / 99.358110 for the last two because it does not resolve this
+ * source's `lbl_80629B90` to the map's `@1841_80629B90`.
  *
  * Ideas closed with measurements, so nobody re-runs them: the compiler build is not the explanation -
  * all ten GC 3.0a3.x/3.0a5.x builds and all nine Wii builds give the identical stream
  * (`.pi/scratch/vermatrix.py`); neither are `-O4`/`-O4,p`, `-proc 750/740/603`, `-ipa`, `-str
- * reuse,pool`, or the `-opt` sub-options; a per-function `#pragma` sweep (peephole, scheduling,
- * optimization_level, opt_common_subs, opt_propagation, opt_lifetimes) moves nothing but the level,
- * and mid-function pragmas do nothing at all; the string-literal reconstruction of the pool scores
- * 98.30 / 98.52 / 96.86; and ~40 further source shapes (declaration orders, explicit induction
- * variables, typed indexing, `for(;;)`, pointer walks, case-10 orderings) are neutral or worse.
+ * reuse,pool`, `-func_align 8/16`, `-use_lmw_stmw on`, `-inline off/all`, `-schedule off`, `-rostr`,
+ * `-pool on`, `-fp_contract off`, `-Cpp_exceptions on`, or the `-opt` sub-options; a per-function
+ * `#pragma` sweep (peephole, scheduling, optimization_level, opt_common_subs, opt_propagation,
+ * opt_lifetimes, opt_dead_code/store, opt_strength_reduction, opt_loop_invariants, opt_space,
+ * opt_global) moves nothing but the level, and mid-function pragmas do nothing at all; the
+ * string-literal reconstruction of the pool scores 98.30 / 98.52 / 96.86; and ~40 further source
+ * shapes (declaration orders, explicit induction variables, typed indexing, `for(;;)`, pointer walks,
+ * case-10 orderings) are neutral or worse.
+ *
+ * Second-round probes, all neutral or worse - no source shape closes the colouring:
+ *   * the full 360-permutation declaration-order sweep of RSORelocateSmallDataSection; the current
+ *     order is the best of all 360, every other order loses at least 2 rows;
+ *   * dead-copy chains (playbook 35) on every local of RSORelocate's case 10 and of
+ *     RSORelocateSmallDataSection, chained and independent, 1-6 deep, before and after the live
+ *     definition: only a >= 3-deep chain of `low` moves anything, and it lands a *worse* 14-row
+ *     arrangement - the trick that closed `Pl/pl_master`'s fn_8026F908 does not transfer here;
+ *   * level 3 before LocateObject / RSOStaticLocateObject / RSORelocateSmallDataSection: byte-identical
+ *     to level 4, so the level-3 pragma really is RSORelocate-only;
+ *   * case 10 with `relocation->addend` named, reused, cast, operand-swapped or summed into a local
+ *     before the range-check, `*addr` inlined, `diff`/masks named, parameter types varied: all neutral.
  * Numbers, sweeps and probes: `.pi/scratch/rso/` and `.pi/scratch/` in this worktree.
  *
  * Load-bearing source shapes (do not "clean up" without re-measuring): RSOLink's `idx == -1` is a value
