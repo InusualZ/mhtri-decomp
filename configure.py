@@ -447,47 +447,116 @@ config.warn_missing_source = True
 config.libs = [
 
     {
+        # Promoted from auto/802D0DCC_fn_802D0DCC.c (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "ai",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(Matching, "ai/fn_802D0DCC.c"),
+        ],
+    },
+
+    {
+        # Promoted from auto/802B2978_fn_802B2978.c (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "stage",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(NonMatching, "stage/fn_802B2978.c"),
+        ],
+    },
+
+    {
+        # Promoted from auto/80324F7C_fn_80324F7C.c (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "hud",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(Matching, "hud/fn_80324F7C.c"),
+        ],
+    },
+
+    {
+        # Promoted from auto/8012BA00_fn_8012BA00.c (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "enemy",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(NonMatching, "enemy/fn_8012BA00.c"),
+            Object(NonMatching, "enemy/fn_8012BDF4.cpp"),
+            Object(NonMatching, "enemy/fn_80138074.c"),
+            Object(NonMatching, "enemy/fn_8013BE60.c"),
+            Object(NonMatching, "enemy/fn_80149D6C.c"),
+            Object(NonMatching, "enemy/fn_8014A1BC.c"),
+        ],
+    },
+
+    {
+        # Promoted from auto/800D7F54_fn_800D7F54.cpp (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "sound",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(NonMatching, "sound/fn_800D7F54.cpp"),
+            Object(NonMatching, "sound/fn_800DCFEC.c"),
+            Object(NonMatching, "sound/fn_800E46E8.cpp"),
+        ],
+    },
+
+    {
+        # Promoted from auto/800BFFD4_fn_800BFFD4.cpp (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "ef",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
+            Object(NonMatching, "ef/ef_cube.cpp"),
+            Object(NonMatching, "ef/ef_cylinder.cpp"),
+            Object(NonMatching, "ef/ef_disc.cpp"),
+            Object(NonMatching, "ef/ef_emform.cpp"),
+            Object(NonMatching, "ef/ef_line.cpp"),
+            Object(NonMatching, "ef/ef_point.cpp"),
+            Object(NonMatching, "ef/eft002.cpp"),
+            Object(Matching, "ef/fn_800FD520.c"),
+            Object(Matching, "ef/fn_800FD718.c"),
+            Object(NonMatching, "ef/eft004.cpp"),
+            Object(NonMatching, "ef/fn_80101DF4.cpp"),
+            Object(NonMatching, "ef/eft007.cpp"),
+            Object(NonMatching, "ef/eft009.cpp"),
+            Object(Matching, "ef/fn_80104BD0.c"),
+            Object(NonMatching, "ef/fn_8010D1A8.c"),
+            Object(NonMatching, "ef/fn_80114E34.cpp"),
+            Object(Matching, "ef/fn_8011722C.c"),
+            Object(NonMatching, "ef/fn_80119C44.c"),
+            Object(Matching, "ef/fn_803066F0.c"),
+        ],
+    },
+
+    {
+        # Promoted from auto/8009AA78_fn_8009AA78.c (docs/plan.md: an auto unit stops being scaffolding).
+        "lib": "gx",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_main,
+        "progress_category": "game",
+        "objects": [
+                        Object(Matching, "gx/fn_8009AA78.c"),
+        ],
+    },
+
+    {
         "lib": "auto",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
         "progress_category": "auto",
         "objects": [
-            Object(NonMatching, "auto/80040598_fn_80040598.cpp"),
-            Object(NonMatching, "auto/802B2978_fn_802B2978.c"),
-            Object(Matching, "auto/802D0DCC_fn_802D0DCC.c"),
             Object(NonMatching, "auto/80073398_fn_80073398.cpp"),
             Object(NonMatching, "auto/800898B0_fn_800898B0.c"),
-            Object(Matching, "auto/8009AA78_fn_8009AA78.c"),
-            Object(NonMatching, "auto/800BFFD4_fn_800BFFD4.cpp"),
-            Object(NonMatching, "auto/800C9DD0_fn_800C9DD0.c"),
-            Object(NonMatching, "auto/800CB948_fn_800CB948.c"),
-            Object(NonMatching, "auto/800CC5B0_fn_800CC5B0.c"),
-            Object(NonMatching, "auto/800CCCF8_fn_800CCCF8.c"),
-            Object(NonMatching, "auto/800CCFB0_fn_800CCFB0.c"),
-            Object(NonMatching, "auto/800CD584_fn_800CD584.c"),
-            Object(NonMatching, "auto/800D7F54_fn_800D7F54.cpp"),
-            Object(NonMatching, "auto/800DCFEC_fn_800DCFEC.c"),
-            Object(NonMatching, "auto/800E46E8_fn_800E46E8.cpp"),
-            Object(Matching, "auto/803066F0_fn_803066F0.c"),
-            Object(Matching, "auto/80324F7C_fn_80324F7C.c"),
-            Object(NonMatching, "auto/800FCED4_fn_800FCED4.cpp"),
-            Object(Matching, "auto/800FD520_fn_800FD520.c"),
-            Object(Matching, "auto/800FD718_fn_800FD718.c"),
-            Object(NonMatching, "auto/800FF8D4_fn_800FF8D4.cpp"),
-            Object(NonMatching, "auto/80101DF4_fn_80101DF4.cpp"),
-            Object(NonMatching, "auto/80101FA4_fn_80101FA4.cpp"),
-            Object(NonMatching, "auto/80103D28_fn_80103D28.cpp"),
-            Object(Matching, "auto/80104BD0_fn_80104BD0.c"),
-            Object(NonMatching, "auto/8010D1A8_fn_8010D1A8.c"),
-            Object(NonMatching, "auto/80114E34_fn_80114E34.cpp"),
-            Object(Matching, "auto/8011722C_fn_8011722C.c"),
-            Object(NonMatching, "auto/80119C44_fn_80119C44.c"),
-            Object(NonMatching, "auto/8012BA00_fn_8012BA00.c"),
-            Object(NonMatching, "auto/8012BDF4_fn_8012BDF4.cpp"),
-            Object(NonMatching, "auto/80138074_fn_80138074.c"),
-            Object(NonMatching, "auto/8013BE60_fn_8013BE60.c"),
-            Object(NonMatching, "auto/80149D6C_fn_80149D6C.c"),
-            Object(NonMatching, "auto/8014A1BC_fn_8014A1BC.c"),
         ],
     },
     {
@@ -638,6 +707,7 @@ config.libs = [
             # lib because it is the same module and the same measured flags; its retail file name is not
             # evidenced - the unit is defined by its extab group (see the file header comment).
             Object(Matching, "sys_mem.cpp"),
+            Object(NonMatching, "fn_80040598.cpp"),
         ],
     },
 ]
