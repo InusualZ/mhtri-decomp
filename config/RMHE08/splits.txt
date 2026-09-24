@@ -195,6 +195,11 @@ sound/fn_800DD1F0.cpp:
 	.text       start:0x800DD1F0 end:0x800E3CBC
 	.ctors      start:0x8056F2F0 end:0x8056F2F4
 
+sound/fn_800E3CBC.cpp:
+	extab       start:0x8000B1DC end:0x8000B21C
+	extabindex  start:0x80024B10 end:0x80024B70
+	.text       start:0x800E3CBC end:0x800E46E8
+
 sound/fn_800E46E8.cpp:
 	extab       start:0x8000B21C end:0x8000B554
 	extabindex  start:0x80024B70 end:0x80024FFC

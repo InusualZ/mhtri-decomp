@@ -520,6 +520,10 @@ config.libs = [
             # 0x6ACC bytes.  `sound` module (both bracketing units are `sound`, include/unsplit/sound.h
             # is their band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
             Object(NonMatching, "sound/fn_800DD1F0.cpp"),
+            # Registered from proposal/800E3CBC_fn_800E3CBC.cpp (the 0x800E3CBC run discovery
+            # proposed).  Module from the placed link-neighbour sound/fn_800E46E8.cpp; the dump's
+            # prim_init_all/set_blendmode/set_zmode name the functions, not the TU (see the file header).
+            Object(NonMatching, "sound/fn_800E3CBC.cpp"),
             Object(NonMatching, "sound/fn_800E46E8.cpp"),
         ],
     },
