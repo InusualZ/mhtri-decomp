@@ -28,10 +28,13 @@
 /* nw4r::db::Panic(const char*, int, const char*, ...) */
 extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
 
-/* nw4r math / resource helpers owned by unsplit units. */
-extern u32 *fn_80066C8C(void *obj);
+/* nw4r math / resource helpers owned by unsplit units.  Their map names are the C++ manglings, so a C
+ * declaration spells the mangled name verbatim - exactly what a C unit calling a C++ function looks
+ * like (`fn_80066C8C` is `fn_80066C8C__FPv`, renamed in the map with the unit that calls it,
+ * `g3d/g3d_anmscn.cpp`). */
+extern u32 *fn_80066C8C__FPv(void *obj);
 
-/* The resolved animation object fn_80066C8C returns: a type word, a frame count and the
+/* The resolved animation object `fn_80066C8C__FPv` returns: a type word, a frame count and the
  * channel data at +0x18. */
 typedef struct {
     u32 unused_0x00;  /* +0x00 */
@@ -89,7 +92,7 @@ void fn_8008A000(void *arg0, ResAnmAmbLightResult *pResult, f32 frame)
         Panic__Q24nw4r2dbFPCciPCce("g3d_resanmamblight.cpp", 44,
             "NW4R:Pointer Error\npResult(=%p) is not valid pointer.", pResult);
     }
-    res = (ResAnmAmbLightData *)fn_80066C8C(arg0);
+    res = (ResAnmAmbLightData *)fn_80066C8C__FPv(arg0);
     flags = res->field_0x14;
     fn_8008A1A8((u16 *)(fn_8008A204((u32 *)arg0, res->field_0x04) + 0x34), frame);
     pResult->field_0x00 = flags & 3;

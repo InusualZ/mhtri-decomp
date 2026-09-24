@@ -683,7 +683,9 @@ Compile the candidate source under both levels into a scratch directory and comp
 that reproduces it byte-for-byte (mnemonic + operands, reloc names normalised) is the one for the per-library
 `cflags_*` override.
 
-Example: `src/g3d/g3d_resanmamblight.c` (`fn_800680A8`, 0x24 B / 9 instructions). Under `cflags_base`
+Example: `src/g3d/g3d_anmscn.cpp` (`fn_800680A8__FPv`, 0x24 B / 9 instructions; `g3d_resanmamblight.c`
+until the wQ-recut re-homed it, and the map name gained its argument list in the wR-mangling pass - playbook 48).
+Under `cflags_base`
 (`-O4,p`) the unit measured 97.56 % with `lwz r0,0x14(r1)` before `lwz r3,0xc(r3)`; the same source under
 `-O3` is byte-identical (100 %), now `cflags_g3d`. The same two-variant probe then landed
 `src/OS/OSAlarm.c` (`-O4,p` identical, `-O3` differs) and `src/lobby/lobby_scene.c` (`-O3` identical) at
