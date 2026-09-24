@@ -19,7 +19,7 @@ Rules checked (each finding is `file:line`):
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
 | 6 | no pointer arithmetic reaches a field | a `(T*)base + 0xNN` / `(T*)(base + 0xNN)` cast-plus-literal-offset expression, except an offset passed straight to `memset`/`memcpy`/`memmove` (the rule's own byte-range exception) |
-| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's); **not enforced under `src/auto/`** - see below |
+| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's); **exempt per file** - see below |
 | 8 | `goto` is forbidden | the `goto` keyword |
 
 Rules 1 (a shared type lives in one header) and 2 (an extern lives with the TU that owns it) need
@@ -35,14 +35,24 @@ The backlog is a burn-down, not a gate: `--diff` fails only when a (rule, file) 
 unit with 300 `unk*` fields is allowed as long as the touch adds none. A **new** file starts from zero, so
 its violations are all additions - new work is held to the rules from its first commit.
 
-**Rule 7 is not enforced under `src/auto/`** (`EXEMPT` below, decided 2026-09-23 - docs/plan.md, "The
-breadth blocker: rule 7 versus the `auto` bucket"). Those files are the attribution scaffolding: the symbol
-map has no better name for them and the naming rule forbids inventing one while the name is unknown, so
-their own `fn_XXXXXXXX` name and every call they make to another `fn_XXXXXXXX` are exactly what the rule
-would flag - it would reject every breadth landing. Renaming one is a separate `symedit.py` + re-split
-batch, not a source edit. **Rules 1-6 and 8 still apply there** (sized types, fields with offsets and
-context names, no pointer arithmetic, no `goto`), and rule 7 is enforced everywhere else - the exemption is
-keyed on the `src/auto/` path prefix, so it cannot leak into a neighbouring unit.
+**Rule 7 is keyed on the file, not the directory.** Three exemption keys, narrowest last (`rule7_state`):
+
+1. under `src/auto/` - a **temporary grandfather** for the legacy scaffolding units that already have
+   bodies. The `auto/` bucket is retired and its units are being named and moved to their final homes,
+   so this entry goes with the migration (`EXEMPT` below).
+2. **no bodies yet** - a stub is a file-header comment and forward declarations; it has nothing to name,
+   so rule 7 cannot apply. This is exactly `brief.text_has_bodies` (a brace outside the comments), so the
+   pool and the gate never disagree about what a stub is.
+3. **`rule 7 deferred: <reason>`** in a comment - the durable key, and the one that covers a unit that
+   already has bodies at its final `src/<module>/<name>` home: a worker's landing commit registers the
+   stub and writes the bodies together, so keys 1 and 2 cannot. It is per-unit and reviewable -
+   `grep -rn "rule 7 deferred" src/` is the complete list - and key 3 defers the `fn_` half only: a bare
+   `unk*` local is nameable from its context, so it still reports.
+
+A key is checkable from the file alone, and a **finished** unit cannot hide behind keys 2 or 3 silently:
+key 2 needs the absence of every body, and key 3 is one greppable line whose reason must name the evidence.
+**Rules 1-6 and 8 still apply under every key** (sized types, fields with offsets and context names, no
+pointer arithmetic, no `goto`).
 """
 
 from __future__ import annotations
@@ -54,12 +64,29 @@ import re
 import subprocess
 import sys
 
+# `brief.text_has_bodies` is the one definition of "a file with no bodies yet" (rule 7 key 2, `rule7_state`).
+# Reuse it rather than keep a second brace scanner. Imported as a package module under land.py/promote.py,
+# as a sibling script for `python tools/units/stylelint.py`.
+try:
+    from units import brief as _brief  # noqa: E402
+except ImportError:  # `python tools/units/stylelint.py ...`
+    import brief as _brief  # type: ignore  # noqa: E402
+
 SRC = "src"
 SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
 
-# The attribution scaffolding is exempt from rule 7 (docs/plan.md, "The breadth blocker"). One entry per
-# (rule, path prefix); every other rule still applies under the prefix.
-EXEMPT = [(7, "src/auto/", "attribution scaffolding: the name comes from the symbol map")]
+# Rule 7's path-keyed exemption table. This is now only a **temporary grandfather** for the legacy
+# `src/auto/` units that already have bodies; the auto/ migration is naming and moving them, and this
+# entry is removed with it. Do not add entries: the durable keys are per-file (`rule7_state`).
+# One entry per (rule, path prefix); every other rule still applies under the prefix.
+EXEMPT = [(7, "src/auto/", "temporary grandfather: legacy scaffolding with bodies, until the auto/ migration lands")]
+
+# The per-file rule-7 keys, reported alongside `EXEMPT` because they are conditions, not path prefixes.
+# `rule7_state` is the authority; these strings only keep the human/JSON output honest.
+RULE7_NOTES = [
+    ("a file with no bodies yet", "a stub has nothing to name"),
+    ("a file declaring `rule 7 deferred: <reason>` in a comment", "per-unit and greppable; defers `fn_` only"),
+]
 
 RULE_NAMES = {
     3: "struct/class states its size (/* size: 0xNN */)",
@@ -284,6 +311,12 @@ RULE6_RE = re.compile(
 )
 RULE7_FN_RE = re.compile(r"\bfn_[0-9A-Fa-f]{8}\b")
 RULE7_UNK_RE = re.compile(r"\bunk\w*\b")
+# Rule 7 key 3: the per-unit `rule 7 deferred: <reason>` declaration, matched only against the comment
+# view (see `rule7_deferral`). `[ \t]*` rather than `\s*` keeps the declaration and its non-empty reason
+# on one line, so `rule 7 deferred:` at the end of a comment cannot borrow the next line's first token,
+# and a normal comment's closing `*/` cannot count as the reason.
+RULE7_DEFER_RE = re.compile(r"rule[ \t]*7[ \t]+deferred[ \t]*:[ \t]*\S")
+_COMMENT_DELIM_RE = re.compile(r"/\*|\*/|//")
 RULE8_RE = re.compile(r"\bgoto\b")
 
 # rule 6's own exception: a raw byte offset is allowed where no field is being named - a `memset`/`memcpy`
@@ -352,15 +385,18 @@ def lint_source(src: Source) -> list[dict]:
             continue
         out.append(_finding(src, 6, src.line_of(m.start()), "pointer arithmetic: `%s`" % m.group(0).strip()))
 
-    if rule_enforced(7, src.rel):
+    fn7_enforced, unk7_enforced = rule7_state(src)
+    if fn7_enforced or unk7_enforced:
         def in_field(pos: int) -> bool:
             return any(a <= pos < b for a, b in field_spans)
 
-        for m in RULE7_FN_RE.finditer(src.code):
-            out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
-        for m in RULE7_UNK_RE.finditer(src.code):
-            if not in_field(m.start()):
-                out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
+        if fn7_enforced:
+            for m in RULE7_FN_RE.finditer(src.code):
+                out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
+        if unk7_enforced:
+            for m in RULE7_UNK_RE.finditer(src.code):
+                if not in_field(m.start()):
+                    out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
 
     for m in RULE8_RE.finditer(src.code):
         out.append(_finding(src, 8, src.line_of(m.start()), "goto statement"))
@@ -421,15 +457,50 @@ def unique_names(findings: list[dict]) -> dict:
             "unk_fields": len(names(5, "")), "types": len(names(3, ""))}
 
 
-def rule_enforced(rule: int, rel: str) -> bool:
-    """Whether `rule` is enforced for the repo-relative path `rel` (see `EXEMPT`)."""
+def rule7_deferral(comments: str) -> bool:
+    """Whether a file's comment view carries a `rule 7 deferred: <reason>` declaration.
+
+    `comments` is `Source.comments`, which keeps comment bodies and blanks string/char literals, so a
+    declaration inside a literal cannot match. Comment delimiters are blanked before the search: an empty
+    `rule 7 deferred:` followed by a `*/` must not borrow the `*` as its reason.
+    """
+    return bool(RULE7_DEFER_RE.search(_COMMENT_DELIM_RE.sub(" ", comments)))
+
+
+def rule7_state(src: "Source") -> tuple[bool, bool]:
+    """`(fn_enforced, unk_enforced)` for rule 7 in `src`, per the three keys.
+
+    1. under `src/auto/` (temporary grandfather, `EXEMPT`): the whole rule is off;
+    2. no bodies yet (`brief.text_has_bodies`): the whole rule is off;
+    3. a `rule 7 deferred: <reason>` comment declaration: the `fn_` half is off, the `unk` half stays.
+    """
+    rel = src.rel.replace("\\", "/")
+    if any(r == 7 and rel.startswith(prefix) for r, prefix, _why in EXEMPT):
+        return (False, False)
+    if not _brief.text_has_bodies(src.text):
+        return (False, False)
+    if rule7_deferral(src.comments):
+        return (False, True)
+    return (True, True)
+
+
+def rule_enforced(rule: int, rel: str, src: "Source | None" = None) -> bool:
+    """Whether `rule` is enforced at all for `rel` (rule 7 may be half-deferred, see `rule7_state`).
+
+    With `src` this consults all three rule-7 keys; without it only the path-keyed `EXEMPT` table can be
+    consulted. Rules other than 7 are enforced everywhere.
+    """
+    if rule == 7 and src is not None:
+        return any(rule7_state(src))
     norm = rel.replace("\\", "/")
     return not any(rule == r and norm.startswith(prefix) for r, prefix, _why in EXEMPT)
 
 
 def exemptions() -> list[dict]:
-    """The `EXEMPT` table in the shape the JSON output reports it."""
-    return [{"rule": r, "prefix": p, "why": w} for r, p, w in EXEMPT]
+    """The `EXEMPT` table plus the per-file rule-7 keys, in the shape the JSON output reports it."""
+    out = [{"rule": r, "prefix": p, "why": w} for r, p, w in EXEMPT]
+    out += [{"rule": 7, "prefix": None, "condition": cond, "why": why} for cond, why in RULE7_NOTES]
+    return out
 
 
 def rule_counts(findings: list[dict]) -> dict[tuple[int, str], int]:
@@ -529,6 +600,8 @@ def print_budget(findings: list[dict]) -> None:
         print("not checked (cross-file): rule %d - %s" % (num, what))
     for rule, prefix, why in EXEMPT:
         print("not enforced: rule %d under %s (%s)" % (rule, prefix, why))
+    for cond, why in RULE7_NOTES:
+        print("not enforced: rule 7 for %s (%s)" % (cond, why))
 
 
 def source_files_of(findings: list[dict]) -> set[str]:
@@ -542,6 +615,8 @@ def print_findings(findings: list[dict]) -> None:
         print("not checked (cross-file): rule %d - %s" % (num, what))
     for rule, prefix, why in EXEMPT:
         print("not enforced: rule %d under %s (%s)" % (rule, prefix, why))
+    for cond, why in RULE7_NOTES:
+        print("not enforced: rule 7 for %s (%s)" % (cond, why))
 
 
 # --------------------------------------------------------------------------------------------------
@@ -682,12 +757,57 @@ def selftest() -> int:
           lines_of("void fn_802B2978(u8* p) {\n    *(u32*)((u8*)p + 4) = 1;\n}\n", 6, auto), [2])
     check("rule7 exempt: rule 8 still fires under src/auto/",
           lines_of("void fn_802B2978(void) {\n    goto out;\nout:\n    return;\n}\n", 8, auto), [2])
-    check("rule7 exempt: rule_enforced is path-keyed",
-          [rule_enforced(7, "src/auto/x.c"), rule_enforced(7, "src/Pl/x.c"),
+    check("rule7 keys: rule_enforced consults all three keys when given the file",
+          [rule_enforced(7, "src/auto/x.c"),
+           rule_enforced(7, "src/Pl/x.c", Source("x.c", "src/Pl/x.c", "/* stub: only a header comment */\n")),
+           rule_enforced(7, "src/Pl/x.c", Source("x.c", "src/Pl/x.c", "void fn_80040598(void) {}\n")),
+           rule_enforced(7, "src/Pl/x.c", Source("x.c", "src/Pl/x.c",
+                         "/* rule 7 deferred: the map has no name */\nvoid fn_80040598(void) {}\n")),
            rule_enforced(6, "src/auto/x.c"), rule_enforced(7, "src/auto\\x.c")],
-          [False, True, True, False])
-    check("rule7 exempt: the exemption table names rule 7 and src/auto/",
+          [False, False, True, True, True, False])
+    check("rule7 keys: the temporary src/auto/ entry is still in the table",
           [(r, p) for r, p, _w in EXEMPT], [(7, "src/auto/")])
+
+    # --- rule 7 key 2: no bodies yet (the re-key - the first landing at a final path) -------------
+    pl = "src/Pl/pl_act.cpp"
+    check("rule7 bodyless: a src/Pl fn_ prototype is clean",
+          lines_of("void fn_802B2978(void);\n", 7, pl), [])
+    check("rule7 bodyless: a src/Pl fn_ call with no body is clean",
+          lines_of("fn_80040598();\n", 7, pl), [])
+    check("rule7 bodyless: a src/Pl bare unk local is clean",
+          lines_of("u32 unk4;\n", 7, pl), [])
+    check("rule7 bodyless: adding a body and no declaration removes the exemption",
+          lines_of("void fn_802B2978(void) {}\n", 7, pl), [1])
+    check("rule7 bodyless: a bodyfull unit at another final path is a violation too",
+          lines_of("void fn_802B2978(void) {}\n", 7, "src/enemy/em_act.c"), [1])
+    check("rule7 bodyless: rule 6 still fires without a body",
+          lines_of("u32 v = *(u32*)((u8*)p + 4);\n", 6, pl), [1])
+    check("rule7 bodyless: rule 8 still fires without a body",
+          lines_of("goto out;\n", 8, pl), [1])
+    check("rule7 unk: a bare unk local in a bodyfull, undeclared src/Pl file still violates",
+          lines_of("void f(void) {\n    u32 unk4 = 0;\n}\n", 7, pl), [2])
+
+    # --- rule 7 key 3: the per-unit `rule 7 deferred: <reason>` declaration ------------------------
+    defer = "/* rule 7 deferred: the map has only fn_XXXXXXXX for this range */\n"
+    check("rule7 deferred: a declared bodyfull src/Pl fn_ definition is clean",
+          lines_of(defer + "void fn_802B2978(void) {}\n", 7, pl), [])
+    check("rule7 deferred: a declared fn_ call inside a body is clean",
+          lines_of(defer + "void f(void) {\n    fn_80040598();\n}\n", 7, pl), [])
+    check("rule7 deferred: an empty reason does not defer",
+          lines_of("/* rule 7 deferred: */\nvoid fn_802B2978(void) {}\n", 7, pl), [2])
+    check("rule7 deferred: a declaration inside a string does not defer",
+          lines_of('const char* s = "rule 7 deferred: x";\nvoid fn_802B2978(void) {}\n', 7, pl), [2])
+    check("rule7 deferred: a declaration in a line comment defers",
+          lines_of("// rule 7 deferred: the map has no name\nvoid fn_802B2978(void) {}\n", 7, pl), [])
+    check("rule7 deferred: the declaration does not defer a bare unk local",
+          lines_of(defer + "void f(void) {\n    u32 unk4 = 0;\n}\n", 7, pl), [3])
+    check("rule7 deferred: rules 4/5/6/8 still fire in a deferred file",
+          [r for r, _l in rules_of(
+              defer
+              + "/* size: 0x8 */\nstruct A {\n    u32 x;\n    /* +0x04 */ u32 unk04;\n};\n"
+              + "void fn_802B2978(u8* p) {\n    *(u32*)((u8*)p + 4) = 1;\n    goto out;\nout:\n    return;\n}\n",
+              pl)],
+          [4, 5, 6, 8])
 
     # --- rule 8: goto -----------------------------------------------------------------------------
     check("rule8: goto is a violation", lines_of("void f(void) {\n    goto out;\nout:\n    return;\n}\n", 8), [2])
@@ -786,9 +906,11 @@ def main(argv: list[str] | None = None) -> int:
                 print("  not checked (cross-file): rule %d - %s" % (num, what))
             for rule, prefix, why in EXEMPT:
                 print("  not enforced: rule %d under %s (%s)" % (rule, prefix, why))
+            for cond, why in RULE7_NOTES:
+                print("  not enforced: rule 7 for %s (%s)" % (cond, why))
         else:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
-                  "(rules 1-2 not checked: cross-file; rule 7 not enforced under src/auto/)"
+                  "(rules 1-2 not checked: cross-file; rule 7 exempt per rule7_state)"
                   % len(rels))
         return 1 if added else 0
 

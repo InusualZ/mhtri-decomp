@@ -87,17 +87,23 @@ def strip_comments(text: str) -> str:
     return re.sub(r"//[^\n]*", "", text)
 
 
-def has_bodies(path: str) -> bool:
-    """Whether a source file defines at least one function body.
+def text_has_bodies(text: str) -> bool:
+    """Whether source `text` defines at least one body (a brace outside its comments).
 
-    The attribution placeholders (`src/auto/*`) are a file-header comment and nothing else, so a brace outside
-    the comments is the honest, cheap signal that a body exists. This is deliberately a source-level
-    heuristic: it decides which units the *pool* has nothing to hand a worker for, never whether a unit is
-    finished.
+    The attribution placeholders (`src/auto/*`) are a file-header comment and nothing else, so a brace
+    outside the comments is the honest, cheap signal that a body exists. This is deliberately a
+    source-level heuristic: it decides which units the *pool* has nothing to hand a worker for, never
+    whether a unit is finished. `stylelint.py` reuses this exact notion for its rule-7 "no bodies yet"
+    key, so a stub cannot be read as bodyless by one tool and bodied by the other.
     """
+    return "{" in strip_comments(text)
+
+
+def has_bodies(path: str) -> bool:
+    """Whether the source file at `path` defines at least one body (see `text_has_bodies`)."""
     if not os.path.exists(path):
         return False
-    return "{" in strip_comments(open(path, encoding="utf-8", errors="replace").read())
+    return text_has_bodies(open(path, encoding="utf-8", errors="replace").read())
 
 
 def registered_units(main: str) -> list[str]:
@@ -624,6 +630,13 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("")
     lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
     lines.append("")
+    lines.append("**Rule 7 at your final path.** The lint stops enforcing rule 7 while a unit has no bodies "
+                 "yet, and once it has bodies it defers rule 7 for a unit whose file header carries one "
+                 "line:\n\n    rule 7 deferred: <the evidence, e.g. the map has only fn_XXXXXXXX for this "
+                 "range>\n\nUse it only when the map really offers no name. It defers the `fn_XXXXXXXX` "
+                 "half only - a bare `unk*` local still fails - and the complete set of deferrals is "
+                 "`grep -rn \"rule 7 deferred\" src/`.")
+    lines.append("")
     lines.append(plan_section(main, "## 8. Invariants"))
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1020,6 +1033,8 @@ def selftest() -> int:
         brief_text = open(brief_path, encoding="utf-8").read()
         check("the handoff is the final message, not a subagent_done sidecar",
               "final message" in brief_text and "subagent_done" not in brief_text, True)
+        check("the brief names the rule-7 deferral declaration",
+              "rule 7 deferred:" in brief_text, True)
         check("pool is idempotent", pool(tmp)["skipped"], ["auto/stub"])
         open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("int f(void) { return 1; }\n")
         check("pool prunes a unit that gained a body",

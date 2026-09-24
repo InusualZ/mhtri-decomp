@@ -808,7 +808,7 @@ def rule7_report(ctx: Ctx, new_file: Path, text: str) -> dict:
     rel = ctx.rel(new_file)
     try:
         from units import stylelint
-        enforced = stylelint.rule_enforced(7, rel)
+        enforced = stylelint.rule_enforced(7, rel, stylelint.Source(str(new_file), rel, text))
         if not enforced:
             return {"count": 0, "names": [], "enforced": False, "lines": []}
         findings = [f for f in stylelint.lint_source(stylelint.Source(str(new_file), rel, text))
