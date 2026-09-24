@@ -1,0 +1,450 @@
+/*
+ * ef/ef_drawfreestrategy.cpp - nw4r::ef `DrawFreeStrategy`, 0x800BE154..0x800BEF98 (11 functions).
+ *
+ * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name
+ * this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ *
+ * The unit's `.data` pool names the original source file: the assert at 0x805941F8 is the bare string
+ * "ef_drawfreestrategy.cpp", read from the DOL's `.data` (0x805941F8, size 0x18) and handed to
+ * `nw4r::db::Panic` as the `pFile` argument by fn_800BE154 (line 88), fn_800BE3C0 (200/204/206),
+ * fn_800BEA00 (136) and fn_800BED2C (278).  A `.cpp` `__FILE__` string is conclusive evidence for the
+ * language (docs/plan.md, "The language comes from the symbol") and the mangled
+ * `Panic__Q24nw4r2dbFPCciPCce` callee says the same, so the unit is C++ and lives at
+ * `src/ef/ef_drawfreestrategy.cpp` in the `ef` lib.  The seam against the neighbours (0x800B99E8's
+ * ef_drawbillboard/directional run below, 0x800BEF98's ef_drawlinestrategy run above) is the proposal's
+ * own boundary; it is unproven (docs/plan.md 8.3) and this header says so.
+ *
+ * The functions, in address order:
+ *   0x800BE154  the four-vertex emitter: transform four Vec3 through the draw matrix, `GXBegin` a quad,
+ *               `GXPosition3f32` each corner and, when the flag is set, the 1-byte per-vertex index.
+ *   0x800BE374  GXEnd (empty).
+ *   0x800BE378  `GXWGFifo.u8 = value` (out-of-line narrowing FIFO store).
+ *   0x800BE388  the low-bit test of a status word.
+ *   0x800BE39C  `GXPosition3f32(v->x, v->y, v->z)` (out-of-line writer).
+ *   0x800BE3C0  DrawFreeStrategy::Draw: set up the GX vertex/tex array state, then walk the particle
+ *               list and emit the camera-facing quad (and the second, YZ quad) per particle.
+ *   0x800BE938  build a rotation/billboard matrix into an `MTX34` from a source matrix and four scalars.
+ *   0x800BEA00  build an axis (or full Euler) rotation `MTX34` from a particle's angle vector.
+ *   0x800BED2C  set up the GX vertex descriptors / attribute formats for the direct position draw.
+ *   0x800BEF00  scalar deleting destructor.
+ *   0x800BEF5C  constructor (base ctor + install the vtable).
+ *
+ * Codegen lever: `#pragma peephole off`.  Retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of
+ * every narrowing FIFO store and byte load (matching the sibling `ef_drawsmoothstripestrategy.cpp` and
+ * the `auto` GX-writer units); `-O3`'s peephole folds them away without the pragma.
+ *
+ * Residuals are recorded per function in the comments below and in
+ * `.pi/notes/800be154-fn-800be154-b8b2.md`.
+ */
+
+#include "types.h"
+#include "nw4r/math.h"
+#include "gx.h"
+#include "ef.h"
+#include "ef/ef_particle.h"
+#include "ef/ef_particlemanager.h"
+#include "unsplit/ef.h"
+#include "unsplit/g3d.h"
+
+/* nw4r::db::Panic.  The map already carries its real C++ mangling (Panic__Q24nw4r2dbFPCciPCce); declaring
+ * that spelling as a C++ identifier re-mangles it, so the owner is declared instead and the front-end
+ * reproduces the map's name (docs/matching.md 50, docs/plan.md 6.5 rule 9). */
+namespace nw4r {
+namespace db {
+void Panic(const char* file, int line, const char* fmt, ...);
+}  // namespace db
+}  // namespace nw4r
+
+/* The runtime's scalar deleter.  `__dl__FPv` is its compiler mangling; the source calls the owner
+ * (docs/plan.md 6.5 rule 9). */
+void operator delete(void* ptr) throw();
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma peephole off
+#pragma fp_contract off
+
+/* This unit's pooled `.data`/`.rodata`/`.sdata`/`.sdata2` symbols.  They are declared, never defined here:
+ * the data pass claims the ranges once the source emits them (docs/plan.md 8.4), so a definition would
+ * move the pool.  A `range` request for them rides the outbox. */
+extern char lbl_805941F8[]; /* "ef_drawfreestrategy.cpp"                                 .data 0x805941F8 */
+extern char lbl_80594210[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."        .data 0x80594210 */
+extern char lbl_80594240[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."       .data 0x80594240 */
+extern char lbl_80594274[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data 0x80594274 */
+extern char lbl_805942B0[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data 0x805942B0 */
+extern char lbl_805942E4[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."       .data 0x805942E4 */
+extern char lbl_805943F0[]; /* the DrawStrategy vtable incl. its offset-to-top words    .data 0x805943F0 */
+extern Vec3 lbl_8056F7D0[]; /* quad corners in the XY plane (-1,-1,0)..(1,-1,0)         .rodata 0x8056F7D0 */
+extern Vec3 lbl_8056F800[]; /* quad corners in the YZ plane (0,-1,1)..(0,-1,-1)         .rodata 0x8056F800 */
+extern u8 lbl_80791340[];   /* the GXSetArray coordinate table                          .sdata 0x80791340 */
+extern f32 lbl_80796190;    /* 100.0f                                                   .sdata2 0x80796190 */
+extern f32 lbl_80796194;    /* FLT_EPSILON                                              .sdata2 0x80796194 */
+extern f64 lbl_80796198;    /* the int->double conversion magic (2^52 + 2^31)           .sdata2 0x80796198 */
+extern f32 lbl_807961A0;    /* 1.0f                                                     .sdata2 0x807961A0 */
+extern f32 lbl_807961A4;    /* 0.0f                                                     .sdata2 0x807961A4 */
+
+/* The GX entry points this unit calls (the SDK spells them, so they are `extern "C"`). */
+extern void GXBegin(u32 prim, u32 vtxfmt, u32 nverts);
+extern void GXLoadPosMtxImm(const MTX34* mtx, u32 id);
+extern void GXEnableTexOffsets(u32 coord, u32 line, u32 point);
+extern void GXSetArray(u32 attr, const void* base, u32 stride);
+extern void GXClearVtxDesc(void);
+extern void GXSetVtxDesc(u32 attr, u32 type);
+extern void GXSetVtxAttrFmt(u32 vtxfmt, u32 attr, u32 cnt, u32 type, u32 frac);
+extern void GXSetCurrentMtx(u32 id);
+
+/* nw4r::math / effect-library helpers, still `fn_*` in the symbol map.  The ones with a registered
+ * owner (fn_800AB388/AB3AC/AB2DC -> ef/ef_particle.h, fn_800AE360 -> ef/ef_particlemanager.h) and the
+ * unowned ef-band helpers (fn_800B7DB0/B4B04/B54B4 -> unsplit/ef.h) are declared in those headers. */
+extern void fn_800514FC(Vec3* out, const MTX34* mtx, const Vec3* in); /* out = mtx * in */
+extern MTX34* fn_80050508(MTX34* mtx);                               /* returns its argument (size 0x4) */
+extern void fn_8005050C(MTX34* mtx);
+
+/* The effect-particle record this unit walks.  Only the fields the walk reads are named; the record
+ * continues past what is touched here.  `EfDrawState` (below) is a *different* view: its +0xAD byte lies
+ * where this record stores the low byte of the +0xAC float, so the two are kept apart.
+ * size: 0xCC (lower bound) */
+typedef struct EfDrawParticle {
+    /* +0x00 */ u16 flags;
+    /* +0x02 */ u8 pad_0x02[0x2E];
+    /* +0x30 */ f32 scale_x;
+    /* +0x34 */ u8 pad_0x34[0x04];
+    /* +0x38 */ f32 scale_z;
+    /* +0x3C */ u8 pad_0x3C[0x04];
+    /* +0x40 */ Vec3 pos;
+    /* +0x4C */ u8 pad_0x4C[0x4E];
+    /* +0x9A */ u8 jitter_x;
+    /* +0x9B */ u8 jitter_y;
+    /* +0x9C */ u8 jitter_z;
+    /* +0x9D */ u8 pad_0x9D[0x0F];
+    /* +0xAC */ f32 offset_x;
+    /* +0xB0 */ f32 offset_y;
+    /* +0xB4 */ f32 offset_z;
+    /* +0xB8 */ u8 pad_0xB8[0x10];
+    /* +0xC8 */ void* scale_owner;
+} EfDrawParticle; /* size: 0xCC - a lower bound (the record continues past what this unit reads) */
+
+/* The draw-state record `ed` returned by fn_800AB388. size: 0xB0 - a lower bound */
+typedef struct EfDrawState {
+    /* +0x00 */ u16 flags;
+    /* +0x02 */ u8 pad_0x02[0xA7];
+    /* +0xA9 */ s8 scale_a;         /* per-100 fade/scale factor (signed) */
+    /* +0xAA */ s8 scale_b;
+    /* +0xAB */ u8 pad_0xAB[0x02];
+    /* +0xAD */ u8 draw_yz_quad;    /* == 1: also emit the YZ-plane quad */
+    /* +0xAE */ u8 pad_0xAE;
+    /* +0xAF */ u8 drawer_mode;     /* the rotation-axis selector fn_800BEA00 switches on */
+} EfDrawState; /* size: 0xB0 - a lower bound (the record continues past what this unit reads) */
+
+/* The particle manager `pm` this unit receives; only its +0x24 state pointer is read. */
+typedef struct EfParticleManager {
+    /* +0x00 */ u16 flags;
+    /* +0x02 */ u8 pad_0x02[0x22];
+    /* +0x24 */ void* state;        /* the object fn_800AB388 turns into the EfDrawState */
+} EfParticleManager; /* size: 0x28 - a lower bound (the record continues past what this unit reads) */
+
+/* The particle-list walkers the strategy's vtable hands out. */
+typedef void* (*EfFirstParticleFn)(void* mgr);
+typedef void* (*EfNextParticleFn)(void* mgr, void* particle);
+typedef EfFirstParticleFn (*EfSelectFirstFn)(void* self, u32 light_bit);
+typedef EfNextParticleFn (*EfSelectNextFn)(void* self, u32 light_bit);
+
+/* The DrawStrategy vtable, up to the two slots this unit dispatches.  The offset-to-top / typeinfo words
+ * sit ahead of slot 0x00. */
+typedef struct EfDrawStrategyVtbl {
+    /* +0x00 */ void* slot_0x00;
+    /* +0x04 */ void* slot_0x04;
+    /* +0x08 */ void* slot_0x08;
+    /* +0x0C */ void* slot_0x0C;
+    /* +0x10 */ EfSelectFirstFn select_first;
+    /* +0x14 */ EfSelectNextFn select_next;
+} EfDrawStrategyVtbl; /* size: 0x18 */
+
+typedef struct EfDrawStrategy {
+    /* +0x00 */ EfDrawStrategyVtbl* vtbl;
+    /* +0x04 */ u8 pad_0x04[0xCC];
+    /* +0xD0 */ u8 field_0xD0;
+} EfDrawStrategy; /* size: 0xD1 - a lower bound (the record continues past what this unit reads) */
+
+/* --------------------------------------------------------------------------------------------- *
+ * Forward declarations, so the definitions can sit in address order.
+ * --------------------------------------------------------------------------------------------- */
+void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag);
+void fn_800BE374(void);
+void fn_800BE378(u8 value);
+int fn_800BE388(u32 value);
+void fn_800BE39C(const Vec3* v);
+void fn_800BE3C0(EfDrawStrategy* self, void* a2, EfParticleManager* pm);
+void fn_800BE938(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v);
+void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode);
+void fn_800BED2C(EfDrawStrategy* self, void* a2, EfParticleManager* pm);
+void* fn_800BEF00(void* self, s16 flag);
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BE154 - the four-vertex emitter.
+ * --------------------------------------------------------------------------------------------- */
+
+/* Transforms four input vectors through `mtx` and writes them as a GX_QUADS primitive; when `flag` is
+ * set each corner is preceded by its 1-byte index.  The guard is the file's `__FILE__` assert. */
+void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag) {
+    Vec3 v0, v1, v2, v3;
+
+    if (!IsValidPointer((u32)verts))
+        nw4r::db::Panic(lbl_805941F8, 88, lbl_80594210, verts);
+
+    fn_80043EA8(&v0);
+    fn_80043EA8(&v1);
+    fn_80043EA8(&v2);
+    fn_80043EA8(&v3);
+    fn_800514FC(&v0, mtx, &verts[0]);
+    fn_800514FC(&v1, mtx, &verts[1]);
+    fn_800514FC(&v2, mtx, &verts[2]);
+    fn_800514FC(&v3, mtx, &verts[3]);
+
+    GXBegin(0x80, 0, 4);
+    fn_800BE39C(&v0);
+    if (fn_800BE388(flag)) {
+        fn_800BE378(0);
+    }
+    fn_800BE39C(&v1);
+    if (fn_800BE388(flag)) {
+        fn_800BE378(1);
+    }
+    fn_800BE39C(&v2);
+    if (fn_800BE388(flag)) {
+        fn_800BE378(2);
+    }
+    fn_800BE39C(&v3);
+    if (fn_800BE388(flag)) {
+        fn_800BE378(3);
+    }
+    fn_800BE374();
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BE374..0x800BE39C - the out-of-line GX FIFO writers and predicates.
+ * --------------------------------------------------------------------------------------------- */
+
+/* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
+void fn_800BE374(void) {}
+
+/* Writes one u8 to the pipe. */
+void fn_800BE378(u8 value) {
+    GXWGFifo.u8 = value;
+}
+
+/* Tests the low bit of a status word. */
+int fn_800BE388(u32 value) {
+    return (value & 1) != 0;
+}
+
+/* Writes one vector's three components to the pipe.  Residual: retail keeps a `b` (branch to the next
+ * instruction) between the three loads and the `lis` FIFO base - a scheduler artefact the simple body
+ * cannot reproduce (same residual as the sibling's fn_800BA710/fn_800BC070, 85.6 %). */
+void fn_800BE39C(const Vec3* v) {
+    f32 x = v->x;
+    f32 y = v->y;
+    f32 z = v->z;
+    GXWGFifo.f32 = x;
+    GXWGFifo.f32 = y;
+    GXWGFifo.f32 = z;
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BE3C0 - DrawFreeStrategy::Draw.
+ * --------------------------------------------------------------------------------------------- */
+
+void fn_800BE3C0(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
+    EfDrawState* ed;
+    EfDrawParticle* p;
+    EfFirstParticleFn first;
+    EfNextParticleFn next;
+    MTX34 mtx_view, mtx_mgr;
+    u32 flag;
+    u32 first_pass;
+    f32 scale_a, scale_b, scale_x, scale_z;
+
+    if (!IsValidPointer((u32)pm))
+        nw4r::db::Panic(lbl_805941F8, 200, lbl_80594240, pm);
+
+    fn_800BED2C(self, a2, pm);
+
+    if (!IsValidPointer((u32)pm->state))
+        nw4r::db::Panic(lbl_805941F8, 204, lbl_80594274, pm->state);
+
+    ed = (EfDrawState*)fn_800AB388(pm->state);
+
+    if (!IsValidPointer((u32)ed))
+        nw4r::db::Panic(lbl_805941F8, 206, lbl_805942B0, ed);
+
+    flag = (self->field_0xD0 != 0);
+
+    fn_8005050C(&mtx_view);
+    fn_800AE360(pm, &mtx_view);
+    fn_8005050C(&mtx_mgr);
+    fn_800B7DB0(a2, &mtx_mgr);
+    fn_800710BC(&mtx_mgr, &mtx_mgr, &mtx_view);
+    GXLoadPosMtxImm(fn_80050508(&mtx_mgr), 0);
+
+    scale_a = (f32)ed->scale_a / 100.0f;
+    scale_b = (f32)ed->scale_b / 100.0f;
+
+    first = self->vtbl->select_first(self, ed->flags & 0x800);
+    next = self->vtbl->select_next(self, ed->flags & 0x800);
+
+    first_pass = 1;
+    for (p = (EfDrawParticle*)first(pm); p != NULL; p = (EfDrawParticle*)next(pm, p)) {
+        MTX34 mtx_rot;
+        MTX34 mtx_final;
+
+        scale_x = fn_800AB3AC((EfParticle*)p);
+        if (scale_x < 1.1920929e-7f) {
+            continue;
+        }
+        scale_z = fn_800AB2DC((EfParticle*)p);
+        if (scale_z < 1.1920929e-7f) {
+            continue;
+        }
+        fn_800C68E8(self, p, ed, a2, first_pass, 0);
+        first_pass = 0;
+
+        fn_800BEA00(&mtx_rot, &p->pos, ed->drawer_mode);
+        fn_800BE938(&mtx_final, &mtx_rot, scale_a, scale_b, scale_x, scale_z);
+
+        mtx_final.m[0][3] += p->offset_x;
+        mtx_final.m[1][3] += p->offset_y;
+        mtx_final.m[2][3] += p->offset_z;
+
+        fn_800BE154(&mtx_final, lbl_8056F7D0, flag);
+        if (ed->draw_yz_quad == 1) {
+            fn_800BE154(&mtx_final, lbl_8056F800, flag);
+        }
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BE938 - the rotation/billboard matrix builder.
+ * --------------------------------------------------------------------------------------------- */
+
+/* Builds a `MTX34` from a source matrix and four scalars: rows 0/1 are the source rows scaled by
+ * (u,v,u) with the trailing column a `s`/`t` correction, row 2 is the source row scaled by (u,v,u).
+ * Every value lands through `fn_80077DF0`, the 12-float `MTX34` assembler. */
+void fn_800BE938(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
+    f32 us = u * s;
+    f32 vt = v * t;
+
+    fn_80077DF0(dst,
+                m->m[0][0] * u,
+                m->m[0][1] * v,
+                m->m[0][2] * u,
+                s + (-m->m[0][0] * us - m->m[0][1] * vt),
+                m->m[1][0] * u,
+                m->m[1][1] * v,
+                m->m[1][2] * u,
+                t + (-m->m[1][0] * us - m->m[1][1] * vt),
+                m->m[2][0] * u,
+                m->m[2][1] * v,
+                m->m[2][2] * u,
+                -m->m[2][0] * us - m->m[2][1] * vt);
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BEA00 - the Euler/axis rotation builder.
+ * --------------------------------------------------------------------------------------------- */
+
+/* Builds an `MTX34` rotation from the particle's angle vector `pp`: mode 0 rotates about X, 1 about Y,
+ * 2 about Z and any other value composes the full Euler rotation.  `fn_8009C760` is the sin/cos pair. */
+void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode) {
+    Vec3 v;
+    f32 sx, cx, sy, cy, sz, cz;
+
+    if (!IsValidPointer((u32)pp))
+        nw4r::db::Panic(lbl_805941F8, 136, lbl_805942E4, pp);
+
+    fn_80043EA8(&v);
+    fn_800B54B4((const void*)pp, &v);
+
+    switch (mode) {
+    case 0:
+        fn_8009C760(&sx, &cx, v.x);
+        fn_80077DF0(dst, 1.0f, 0.0f, 0.0f, 0.0f,
+                    0.0f, cx, -sx, 0.0f,
+                    0.0f, sx, cx, 0.0f);
+        break;
+    case 1:
+        fn_8009C760(&sy, &cy, v.y);
+        fn_80077DF0(dst, cy, 0.0f, sy, 0.0f,
+                    0.0f, 1.0f, 0.0f, 0.0f,
+                    -sy, 0.0f, cy, 0.0f);
+        break;
+    case 2:
+        fn_8009C760(&sz, &cz, v.z);
+        fn_80077DF0(dst, cz, -sz, 0.0f, 0.0f,
+                    sz, cz, 0.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, 0.0f);
+        break;
+    default:
+        fn_8009C760(&sx, &cx, v.x);
+        fn_8009C760(&sy, &cy, v.y);
+        fn_8009C760(&sz, &cz, v.z);
+        fn_80077DF0(dst,
+                    cy * cz, sx * sy * cz - cx * sz, cx * sy * cz + sx * sz, 0.0f,
+                    cy * sz, sx * sy * sz + cx * cz, cx * sy * sz - sx * cz, 0.0f,
+                    -sy, cy * sx, cx * cy, 0.0f);
+        break;
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BED2C - the GX vertex-descriptor setup.
+ * --------------------------------------------------------------------------------------------- */
+
+/* Sets the direct-position vertex format for the free draw: clears the descriptor, enables the position
+ * array and, when the state's +0xD0 byte is set, the indexed texcoord array, then fixes the two attribute
+ * formats and the current matrix. */
+void fn_800BED2C(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
+    void* ed;
+
+    if (!IsValidPointer((u32)pm))
+        nw4r::db::Panic(lbl_805941F8, 278, lbl_80594240, pm);
+
+    ed = fn_800AB388(pm->state);
+    fn_800C6064(self, pm, ed, a2);
+
+    GXEnableTexOffsets(0, 1, 1);
+    GXSetArray(0x0D, lbl_80791340, 2);
+    GXClearVtxDesc();
+    GXSetVtxDesc(9, 1);
+    if (self->field_0xD0) {
+        GXSetVtxDesc(0x0D, 2);
+    }
+    GXSetVtxAttrFmt(0, 9, 1, 4, 0);
+    GXSetVtxAttrFmt(0, 0x0D, 1, 0, 0);
+    GXSetCurrentMtx(0);
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * 0x800BEF00 - scalar deleting destructor, and 0x800BEF5C - constructor.
+ * --------------------------------------------------------------------------------------------- */
+
+void* fn_800BEF00(void* self, s16 flag) {
+    if (self != NULL) {
+        fn_800B4B04(self, 0);
+        if ((s16)flag > 0) {
+            operator delete(self);
+        }
+    }
+    return self;
+}
+
+void* fn_800BEF5C(void* self) {
+    fn_800C5F74(self);
+    ((EfDrawStrategy*)self)->vtbl = (EfDrawStrategyVtbl*)lbl_805943F0;
+    return self;
+}
+
+#ifdef __cplusplus
+}
+#endif

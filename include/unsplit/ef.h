@@ -37,6 +37,21 @@ void fn_8010A7D4(void* self, u32 a);
 /* Declarations moved here from `ef/fn_800AEE48.cpp` (docs/plan.md 6.5 rule 2): no registered unit
  * owns `fn_800C5F74`, so its extern lives beside the other not-yet-attributed `ef`-band symbols. */
 void fn_800C5F74(void* self);
+/* 0x800C5F74..0x800C68E8 - the `nw4r::ef` DrawStrategy family helpers the free/line/point/smooth
+ * strategies call (callers: ef/ef_drawfreestrategy.cpp).  fn_800C5F74 is the base constructor,
+ * fn_800C6064 the per-particle GX state setup, fn_800C68E8 the per-particle draw. */
+void fn_800C5F74(void* self);
+void fn_800C6064(void* self, void* a, void* b, void* c);
+void fn_800C68E8(void* self, void* particle, void* ed, void* a, u32 first, u32 arg);
+
+/* Unsplit ef-band helpers the free-strategy draw calls (callers: ef/ef_drawfreestrategy.cpp). */
+void fn_800B7DB0(void* a, MTX34* out);
+void* fn_800B4B04(void* self, s16 flag);   /* the owner defines it; this is the ABI */
+void fn_800B54B4(const void* src, Vec3* out);
+
+/* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
+void fn_801057A4(void* self, u32 a, Vec3* v, f32 scale, u32 id);
+void fn_8010A7D4(void* self, u32 a);
 
 #ifdef __cplusplus
 }

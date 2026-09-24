@@ -56,8 +56,13 @@ s32* fn_80070054(void* pOut, const void* pKey);
 void* fn_8007012C(void);
 void fn_8007100C(void* pDst, const void* pSrc);
 
-/* 0x80075DCC/0x80075DD8/0x80088584 - the trig and render-mode helpers (callers: g3d_camera.cpp). */
+/* 0x80075DCC/0x80075DD8/0x80088584/0x80077DF0 - the trig, render-mode and matrix helpers (callers:
+ * g3d_camera.cpp, ef/ef_drawfreestrategy.cpp).  fn_80077DF0 assembles an MTX34 from twelve floats (the
+ * first eight in FPRs, the last four on the stack). */
 void fn_80075DCC(f32* pOutSin, f32* pOutCos, f32 angle);
+void fn_80077DF0(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03,
+                 f32 m10, f32 m11, f32 m12, f32 m13,
+                 f32 m20, f32 m21, f32 m22, f32 m23);
 void fn_80075DD8(void* p);
 struct RenderModeObj* fn_80088584(void);
 
