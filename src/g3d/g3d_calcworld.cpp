@@ -22,6 +22,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
+#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -56,12 +57,7 @@ extern "C" ResNodeData* fn_8005D0C4(const void* p);
 extern "C" void fn_8005D2C0(void* pOut, const void* pIn);
 extern "C" s32 fn_8005D2FC(const void* p);
 extern "C" void fn_80061068(void* pOut);
-extern "C" u32 fn_8006FDCC(const void* p);
-extern "C" G3DWorkObj* fn_8006FF50(void);
-extern "C" s32* fn_80070054(void* pOut, const void* pKey);
-extern "C" void* fn_8007012C(void);
-extern "C" void fn_8007100C(void* pDst, const void* pSrc);
-extern "C" void fn_8008E1C0(void* pOut, const void* pIn);
+extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
 extern "C" void fn_8008F148(void* pOut, const void* pIn);
 extern "C" void* fn_80097D40(void* pA, const void* pB);
 extern "C" s32 fn_80097F18(void* pA, u32 idx);

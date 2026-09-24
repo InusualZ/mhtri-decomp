@@ -21,6 +21,8 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -48,8 +50,6 @@ extern "C" void GXSetProjection(const f32* pMtx, s32 type);
 extern "C" void GXSetScissor(u32 left, u32 top, u32 width, u32 height);
 extern "C" void GXSetScissorBoxOffset(s32 x, s32 y);
 extern "C" void GXSetViewport(f32 x, f32 y, f32 width, f32 height, f32 near, f32 far);
-extern "C" ScissorSize* fn_8004028C(void);
-extern "C" f32 fn_8004029C(void);
 extern "C" void fn_80041E40(void* pDst, const void* pSrc);
 extern "C" void fn_80041E8C(void* pOut, f32 x, f32 y, f32 z);
 extern "C" void fn_80043EA8(void* pOut);
@@ -61,10 +61,6 @@ extern "C" s32 fn_800508A8(const void* pIn);
 extern "C" void fn_80051820(void* pOut, const void* pA, const void* pB);
 extern "C" f32 fn_80052214(const void* pA, const void* pB);
 extern "C" s32 fn_80067EE8(const void* p);
-extern "C" void fn_8007100C(void* pDst, const void* pSrc);
-extern "C" void fn_80075DCC(f32* pOutSin, f32* pOutCos, f32 angle);
-extern "C" void fn_80075DD8(void* p);
-extern "C" RenderModeObj* fn_80088584(void);
 extern "C" void fn_804BA230(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
                             void* pB, void* pC, f32 x, f32 y, f32 z);
 extern "C" void fn_804BA7A0(s32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g);

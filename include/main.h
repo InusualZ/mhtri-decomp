@@ -1,0 +1,30 @@
+/*
+ * `main.cpp`'s shared declarations (docs/plan.md 6.5 rule 2: a declaration lives with the TU that owns
+ * the symbol).  `main.cpp` defines these; the consumers - `g3d/g3d_camera.cpp`, `sys_mem.cpp`, later the
+ * rest of the SDK units - include this header instead of re-declaring them.
+ *
+ * Keep it minimal: only the declarations a consumer needs.
+ */
+#ifndef MHTRI_MAIN_H
+#define MHTRI_MAIN_H
+
+#include "types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* The screen scissor geometry `fn_8004028C` points at (only the two u16 dims are read). `main.cpp`
+ * defines the accessor with a `u16*` return; the type stays opaque to the consumers. */
+u16* fn_8004028C(void);
+f32 fn_8004029C(void);
+
+/* The game allocator pair `sys_mem.cpp` wraps around the exp heap. */
+void* fn_80040420(u32 size);
+void fn_80040460(void* block);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_MAIN_H */

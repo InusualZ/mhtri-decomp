@@ -74,6 +74,7 @@
 #pragma exceptions on
 
 #include "types.h"
+#include "unsplit/unknown.h" /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
 
 #define ALIGN32(x) (((u32)(x) + 31) & ~31)
 
@@ -101,23 +102,9 @@ extern u32 lbl_807947C0;
 extern u32 lbl_807947C4;
 extern u8 lbl_807947C8;
 
-/* The keyboard tail of the game's system interface block (`system_w`, .bss 0x806585E0, 0xA5C bytes):
- * nine entry points at +0x8E8..+0x90C.  Only that tail is spelled out here. */
-typedef struct SystemWork {
-    u8 pad_0x000[0x8E8];
-    void (*kbd_init)(u8);              /* +0x8E8 */
-    int (*kbd_open)(u8);               /* +0x8EC */
-    int (*kbd_move)(void);             /* +0x8F0 */
-    void (*set_kbd_param)(char*, u32); /* +0x8F4 */
-    u8 (*get_kbd_setup_type)(void);    /* +0x8F8 */
-    void (*kbd_reset)(void);           /* +0x8FC */
-    int (*kbd_close)(void);            /* +0x900 */
-    void (*kbd_exit)(void);            /* +0x904 */
-    int (*kbd_input)(void);            /* +0x908 */
-} SystemWork;
-
-extern "C" SystemWork system_w;
-
+/* The keyboard tail of the game's system interface block `system_w` lives in
+ * `include/unsplit/unknown.h` (rule 1/2: the type and its declaration are shared with `main.cpp` and
+ * `enemy/fn_8014A1BC.c`, and the symbol's module is undecided). */
 /* Loads the object at `path` into `buffer`, registers it with the RSO runtime, and publishes the end of
  * its BSS as the top of the memory pool `mode` selects.  Returns the buffer, or NULL if the open or the
  * read failed. */

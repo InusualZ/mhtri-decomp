@@ -65,8 +65,8 @@
 #pragma exceptions on
 #pragma peephole off
 
-extern "C" void* fn_80040420(unsigned long size);
-extern "C" void fn_80040460(void* ptr);
+/* The allocator pair is owned by `main.cpp` (rule 2); its declarations live in include/main.h. */
+#include "main.h"
 
 void* operator new(unsigned long size) throw()
 {
