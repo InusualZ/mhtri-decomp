@@ -265,8 +265,17 @@ cflags_rel = [
 # -inline noauto / -opt nopeephole) all reproduce the retail order, so the level is the lever. Camellia and
 # RSO settled on -O3 as well; -O4,p is cflags_base's default, not this build's.
 cflags_g3d = [
-    *[f for f in cflags_base if f != "-O4,p"],
+    *[f for f in cflags_base if f not in ("-O4,p", "-inline auto")],
     "-O3",
+    # `-inline noauto`, not cflags_base's `-inline auto`: the lib is taking in units whose reconstruction was
+    # measured under `-inline noauto` (the same inlining as cflags_main), and under `-inline auto` they lose
+    # 13.03 and 1.27 points. Measured 2026-09-24 with a scratch compile of the exact proposed command line,
+    # official report metric plus a raw per-section byte compare, over the whole lib: `-inline noauto`
+    # reproduces both units' baselines byte-for-byte (83.20733 / 94.86212) where `-inline auto` gives 70.17290
+    # / 93.59429, and it makes this group token-identical to cflags_main. The lib's existing unit is
+    # unaffected: g3d/g3d_resanmamblight.c's object is sha-identical under both flags, so the DOL hash cannot
+    # move. Evidence: .pi/notes/g3d-flags.report.md.
+    "-inline noauto",
     # Evidence: the retail object carries extab 0x8 + extabindex 0xC, and its single function fn_800680A8 is
     # byte-identical to ours (9 instructions, 0x24 B) - the records are unwind-only (a 4-byte flag word plus a
     # zero terminator, no PC-action ranges, no exception actions), so the flag alone reproduces them. Same
