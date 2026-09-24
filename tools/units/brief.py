@@ -555,6 +555,14 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("## 4 · Where your output goes")
     lines.append("")
     lines.append("* your source, committed **on your branch** (one commit): `%s`" % b["source"])
+    lines.append("")
+    lines.append("**Self-check before you commit.** The land gate REFUSES a batch that adds any section 6.5")
+    lines.append("violation, and a refusal costs the whole round - so run")
+    lines.append("`python tools/units/stylelint.py --diff HEAD` and fix what it reports for your files. The two")
+    lines.append("that catch a new unit are **rule 2** (a declaration belongs in the symbol's owner's header,")
+    lines.append("never in your source; `include/unsplit/<band>.h` is the home when no unit owns it) and")
+    lines.append("**rule 9** (never spell a mangled name - call the owner's member or function through its real")
+    lines.append("signature; `tools/units/mangle.py` proves the signature).")
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch "
                      "(`%s` minus `worker/`), so write it exactly here; do not invent a name."
@@ -836,6 +844,14 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("## 4 · Where your output goes")
     lines.append("")
     lines.append("* your source **and its registration**, committed **on your branch** (one commit)")
+    lines.append("")
+    lines.append("**Self-check before you commit.** The land gate REFUSES a batch that adds any section 6.5")
+    lines.append("violation, and a refusal costs the whole round - so run")
+    lines.append("`python tools/units/stylelint.py --diff HEAD` and fix what it reports for your files. The two")
+    lines.append("that catch a new unit are **rule 2** (a declaration belongs in the symbol's owner's header,")
+    lines.append("never in your source; `include/unsplit/<band>.h` is the home when no unit owns it) and")
+    lines.append("**rule 9** (never spell a mangled name - call the owner's member or function through its real")
+    lines.append("signature; `tools/units/mangle.py` proves the signature).")
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch, so"
                      % b["handoff"]["outbox"])
