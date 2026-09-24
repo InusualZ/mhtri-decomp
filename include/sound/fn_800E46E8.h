@@ -1,6 +1,9 @@
 /*
  * Declarations owned by `sound/fn_800E46E8.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
  * header instead of declaring the symbol itself.  Keep it minimal.
+ * Declarations owned by `sound/fn_800E46E8.cpp` (docs/plan.md 6.5 rule 2): the sound-manager entry
+ * points the rest of the `sound` band calls.  A consumer includes this header instead of declaring the
+ * symbol itself.  Keep it minimal - the signatures are the ones `sound/fn_800E46E8.cpp` defines.
  */
 #ifndef MHTRI_SOUND_FN_800E46E8_H
 #define MHTRI_SOUND_FN_800E46E8_H
@@ -13,6 +16,23 @@ extern "C" {
 
 /* The depth-compare selector `set_zmode` maps a `_GXCompare` value through. */
 s32 fn_800E46E8(u32 kind);
+/* Volume / stream-state entry points. */
+void fn_800E4908(u8 is_bgm, f32 volume);
+void set_stream_main_vol_flag(u8 slot, u8 is_bgm);
+void PlayStream(u32 a, u32 b);
+void fn_800E4D60(u32 idx);
+
+/* The relocation-table installer and the slot lookups. */
+void fn_800E4B4C(u32 idx, void* desc, u32 a, u32 b);
+void* fn_800E4F4C(u32 idx, u32 entry_idx);
+void* fn_800E7FC4(u32 idx, u32 key);
+void* fn_800E80DC(u32 a, u32 b, u32 c);
+
+/* Player reset / level-table entry points. */
+void fn_800E8294(void);
+void fn_800E84F0(s32 volume);
+void fn_800E85E8(u32 idx);
+void fn_800E8634(u32 idx, u32 entry_idx);
 
 #ifdef __cplusplus
 }

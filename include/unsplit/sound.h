@@ -32,6 +32,7 @@ void fn_800DD7E0(struct MHchar* model, Vec3* pos, s32 flag);
 void fn_800E0A14(void* mhchar, u32 joint, Mtx34* out);
 int fn_800E2994(void* handle);
 void fn_800E3B2C(void);
+/* Merged 2026-09-24: the 0x800EF7D8 proposal's consumer needed this one. */
 void* fn_800E3B8C(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void));
 #ifdef __cplusplus
 }

@@ -316,6 +316,10 @@ void MEMFreeToExpHeap(void* heap, void* ptr);
 void __construct_array(void* array, void* ctor, void* dtor, int size, int count);
 void __destroy_arr(void* array, void* dtor, int size, int count);
 
+/* Owned by sound/fn_800E8E60.cpp (rule 2); its first caller outside the owner is
+ * sound/fn_800EF7D8.cpp. */
+void fn_800EEA44(u32 ctx, u32 chunk);
+
 #ifdef __cplusplus
 }
 #endif

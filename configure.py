@@ -529,6 +529,11 @@ config.libs = [
             # The quest/challenge sound work system: 149 functions / 0x6978 bytes.  C++ from the range's
             # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
             Object(NonMatching, "sound/fn_800E8E60.cpp"),
+            # Registered from proposal/800EF7D8_fn_800EF7D8 (a 0x800EF7D8 run discovery proposed):
+            # the SE/BGM loader cluster, 0x800EF7D8..0x800F2A94 (62 functions).  Module `sound` from
+            # the link band and the neighbours; the name is the map's own stem (no `__FILE__` string
+            # in the range, and `dumpmap.py lookup` answers `zz_XXXXXXXX_`).
+            Object(NonMatching, "sound/fn_800EF7D8.cpp"),
         ],
     },
 
