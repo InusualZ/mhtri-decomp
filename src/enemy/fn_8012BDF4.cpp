@@ -49,6 +49,11 @@
 #include "types.h"
 
 #include "nw4r/math.h"
+#include "Pl/pl_act.h"
+#include "Pl/pl_skill.h"
+#include "enemy/fn_8012BA00.h"
+#include "enemy/fn_80138074.h"
+#include "unsplit/enemy.h"
 
 #pragma peephole off
 
@@ -81,7 +86,7 @@ struct _ENEMY_WORK {
     /* +0x1E2 */ u8 field_0x1E2;
     /* +0x1E3 */ u8 field_0x1E3;
     /* +0x1E4 */ u8 unused_0x1E4;
-    /* +0x1E5 */ u8 state;           /* activity state; `em_act_ck` matches the first parameter */
+    /* +0x1E5 */ u8 action;          /* the action id `em_act_ck` matches (canonical enemy.h: action_0x1E5) */
     /* +0x1E6 */ u8 state_sub;       /* `em_act_ck`'s second parameter */
     /* +0x1E7 */ u8 unused_0x1E7;
     /* +0x1E8 */ u8 field_0x1E8;
@@ -227,20 +232,12 @@ struct GameState {
 
 extern "C" f32 fn_80050EAC(void* ref, nw4r::math::VEC3* pos);
 extern "C" u8 fn_80133BCC(void);
-extern "C" void fn_80133BB4(_ENEMY_WORK* enemy);
-extern "C" u32 fn_801322CC(_ENEMY_WORK* enemy, s32 value);
-extern "C" u32 fn_8013A884(_ENEMY_WORK* enemy, s32 value);
-extern "C" u32 fn_8013A8B4(_ENEMY_WORK* enemy, s32 a, s32 b);
-extern "C" u8 fn_8013A900(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8027AC18(void* arg);
 extern "C" void* fn_8028EF7C(u16 id);
-extern "C" void fn_80144584(s32 kind);
 extern "C" u32 fn_8012B5C4(_ENEMY_WORK* enemy, u32 a, u32 b, u8 slot);
 extern "C" f32 fn_80050EF4(void* ref, nw4r::math::VEC3* pos);
 extern "C" f32 fn_80050F80(void* ref, nw4r::math::VEC3* pos);
 extern "C" s32 fn_803A8858(void);
 extern "C" s32 fn_803A87E0(void);
-extern "C" u32 fn_8027BC48(s32 arg);
 extern "C" u8 fn_8012B86C(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
 extern "C" u32 fn_8012D23C(_ENEMY_WORK* enemy, u32 kind, u32 slot);
@@ -277,8 +274,6 @@ extern "C" u8 fn_8012E884(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E8C0(_ENEMY_WORK* enemy);
 extern "C" void fn_8012E8DC(_ENEMY_WORK* record);
 extern "C" s32 fn_8012E8F4(f32 seconds);
-extern "C" void fn_8013AAC4(_ENEMY_WORK* enemy);
-extern "C" void fn_80130A10(_ENEMY_WORK* enemy, s32 value);
 extern "C" void fn_8012B8F8(_ENEMY_WORK* enemy);
 extern "C" u8 fn_802B0668(u32 map_no);
 extern "C" u32 fn_802B0688(void* pos);
@@ -291,17 +286,12 @@ extern "C" void fn_8012CE8C(_ENEMY_WORK* enemy, u16 flag);
 extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u32 flag);
 extern "C" void fn_8012CDF4(_ENEMY_WORK* enemy, u32 state, u32 sub);
 extern "C" u32 fn_8012CF04(_ENEMY_WORK* enemy, u32 flag);
-extern "C" void fn_80130858(_ENEMY_WORK* enemy, s16 value);
-extern "C" u32 fn_80130778(s32 kind);
 
 /* Map-mangled callees, kept as the map spells them (see the signature note in the file header). */
-extern "C" u8 get_now_areano__Fv(void);
-extern "C" EnemyData* get_enemy_data__FP11_ENEMY_WORK(_ENEMY_WORK* enemy);
-extern "C" _PLW* get_move_work_adrs__FUc(u8 kind);
-extern "C" u16 get_move_work_max__FUc(u8 kind);
-extern "C" u32 Pl_Skill_ck__FP4_PLWUs(_PLW* work, u16 skill);
-extern "C" u32 Pl_condition_ck__FP4_PLWUl(_PLW* work, u32 condition);
-extern "C" u32 Pl_dm_condition_ck__FP4_PLWUl(_PLW* work, u32 condition);
+u8 get_now_areano(void);
+EnemyData* get_enemy_data(_ENEMY_WORK* enemy);
+_PLW* get_move_work_adrs(u8 kind);
+u16 get_move_work_max(u8 kind);
 
 extern "C" GameState lbl_806BD360;
 extern "C" EnemyActionTable* lbl_805A0FF8[4];
@@ -312,7 +302,6 @@ extern "C" f32 lbl_80796C58;
 extern "C" f32 lbl_80796C90;
 extern "C" f32 lbl_80796C94;
 
-extern "C" s32 fn_8012BA00(_ENEMY_WORK* enemy, EnemyActionTable* table, void* work, s32 kind, u16 index);
 extern "C" s32 fn_8012D0B4(_ENEMY_WORK* enemy, _PLW* work);
 extern "C" s32 fn_8012D1A8(u32 index);
 extern "C" s32 fn_8012D188(_ENEMY_WORK* enemy, _PLW* work);
@@ -341,20 +330,20 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
     u16 j;
     s32 value;
 
-    set = get_enemy_data__FP11_ENEMY_WORK(enemy)->extra->action_set;
+    set = get_enemy_data(enemy)->extra->action_set;
     if (set == NULL || (table = set->table_0x000) == NULL) {
         table = lbl_805A0FF8[0];
     }
-    max = get_move_work_max__FUc(2);
-    work = get_move_work_adrs__FUc(2);
+    max = get_move_work_max(2);
+    work = get_move_work_adrs(2);
     for (i = 0; i < max; i++) {
         if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0) {
             value = fn_8012BA00(enemy, table, work, 1, i);
             if (value > 0) {
-                if (Pl_Skill_ck__FP4_PLWUs(work, 0xC) == 1) {
+                if (Pl_Skill_ck(work, 0xC) == 1) {
                     value = (s32)((f32)value * lbl_80796C90);
                 }
-                if (Pl_Skill_ck__FP4_PLWUs(work, 0xB) == 1) {
+                if (Pl_Skill_ck(work, 0xB) == 1) {
                     value = (s32)((f32)value * lbl_80796C94);
                     if (value <= 0) {
                         value = 1;
@@ -378,11 +367,11 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
     if (set == NULL || (table = set->table_0x008) == NULL) {
         table = lbl_805A106C[0];
     }
-    enemy_max = get_move_work_max__FUc(3);
-    target = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
+    enemy_max = get_move_work_max(3);
+    target = (_ENEMY_WORK*)get_move_work_adrs(3);
     for (j = 0; j < enemy_max; j++, target++) {
         if (enemy->group == j || target->active == 0 || enemy->team == target->team ||
-            fn_8012CF90(enemy, target->team) == 1 || (u8)(target->state - 0x0B) <= 1) {
+            fn_8012CF90(enemy, target->team) == 1 || (u8)(target->action - 0x0B) <= 1) {
             enemy->values_0x3A4[j] = 0;
         } else {
             fn_8012B9BC(enemy, (u8)j, fn_8012BA00(enemy, table, target, 3, j));
@@ -404,8 +393,8 @@ extern "C" s32 fn_8012C0EC(_ENEMY_WORK* enemy, u32 index)
     _PLW* work;
     s32 value;
 
-    work = get_move_work_adrs__FUc(2);
-    set = get_enemy_data__FP11_ENEMY_WORK(enemy)->extra->action_set;
+    work = get_move_work_adrs(2);
+    set = get_enemy_data(enemy)->extra->action_set;
     value = enemy->values_0x390[(u8)index];
     if (set == NULL || (table = set->table_0x000) == NULL) {
         table = lbl_805A0FF8[0];
@@ -413,10 +402,10 @@ extern "C" s32 fn_8012C0EC(_ENEMY_WORK* enemy, u32 index)
     work += (u8)index;
     if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0 && fn_8012D0B4(enemy, work) == 1) {
         entry = table->entry;
-        if (entry->condition_0x00C != 0 && Pl_condition_ck__FP4_PLWUl(work, entry->condition_0x00C) == 1) {
+        if (entry->condition_0x00C != 0 && Pl_condition_ck(work, entry->condition_0x00C) == 1) {
             value += entry->value_0x010;
         }
-        if (entry->condition_0x014 != 0 && Pl_dm_condition_ck__FP4_PLWUl(work, entry->condition_0x014) == 1) {
+        if (entry->condition_0x014 != 0 && Pl_dm_condition_ck(work, entry->condition_0x014) == 1) {
             value += entry->value_0x018;
         }
     }
@@ -454,10 +443,10 @@ extern "C" s32 fn_8012C220(u32 team, u32 state_sub)
     u16 max;
     u16 i;
 
-    work = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
-    max = get_move_work_max__FUc(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     for (i = 0; i < max; i++, work++) {
-        if (work->active != 0 && work->state != 0x0B && work->state != 0x0C && work->team == (u8)team &&
+        if (work->active != 0 && work->action != 0x0B && work->action != 0x0C && work->team == (u8)team &&
             work->area_no != (u8)state_sub) {
             if ((work->flags_0xA04 & 1) == 0) {
                 work->flags_0xA04 |= 1;
@@ -483,11 +472,11 @@ extern "C" s32 fn_8012C300(u32 team, u32 state_sub)
     u16 i;
     u32 found;
 
-    work = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
-    max = get_move_work_max__FUc(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     found = 0;
     for (i = 0; i < max; i++, work++) {
-        if (work->active != 0 && work->state != 0x0B && work->state != 0x0C && work->team == (u8)team &&
+        if (work->active != 0 && work->action != 0x0B && work->action != 0x0C && work->team == (u8)team &&
             work->area_no == (u8)state_sub) {
             work->flags_0xA04 |= 2;
             found = 1;
@@ -510,12 +499,12 @@ extern "C" s32 fn_8012C3C8(u32 team, u32 state_sub, void* ref, f32 radius)
     u32 found;
     f32 zero;
 
-    work = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
-    max = get_move_work_max__FUc(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     found = 0;
     zero = lbl_80796C58;
     for (i = 0; i < max; i++, work++) {
-        if (work->active != 0 && work->state != 0x0B && work->state != 0x0C && work->team == (u8)team &&
+        if (work->active != 0 && work->action != 0x0B && work->action != 0x0C && work->team == (u8)team &&
             work->area_no == (u8)state_sub) {
             if (ref == NULL || radius < zero ||
                 fn_80050EAC(ref, &work->pos) <= radius * radius) {
@@ -540,11 +529,11 @@ extern "C" void fn_8012C4E8(u32 team, u32 state_sub, s16 arg3, void* ref, f32 ra
     u16 i;
     f32 zero;
 
-    work = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
-    max = get_move_work_max__FUc(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     zero = lbl_80796C58;
     for (i = 0; i < max; i++, work++) {
-        if (work->active != 0 && work->state != 0x0B && work->state != 0x0C && work->team == (u8)team &&
+        if (work->active != 0 && work->action != 0x0B && work->action != 0x0C && work->team == (u8)team &&
             work->area_no == (u8)state_sub) {
             if (ref == NULL || radius < zero ||
                 fn_80050EAC(ref, &work->pos) <= radius * radius) {
@@ -618,8 +607,8 @@ extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2)
     }
     fn_80130778(1);
     if (fn_8013A884(enemy, 5) == 1) {
-        max = get_move_work_max__FUc(2);
-        work = get_move_work_adrs__FUc(2);
+        max = get_move_work_max(2);
+        work = get_move_work_adrs(2);
         enemy->field_0x798 = 0xFF;
         if ((u8)mask != 0xFF) {
             for (i = 0; i < max; i++, work++) {
@@ -665,8 +654,8 @@ extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask)
     }
     fn_80130778(2);
     if (fn_8013A884(enemy, 4) == 1) {
-        max = get_move_work_max__FUc(2);
-        work = get_move_work_adrs__FUc(2);
+        max = get_move_work_max(2);
+        work = get_move_work_adrs(2);
         enemy->field_0x798 = 0xFF;
         for (i = 0; i < max; i++, work++) {
             if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0 &&
@@ -762,7 +751,7 @@ extern "C" s32 fn_8012CF2C(_ENEMY_WORK* enemy)
 /* Whether the enemy's own value list contains `value` (0x28 is always a hit). */
 extern "C" s32 fn_8012CF90(_ENEMY_WORK* enemy, u32 value)
 {
-    u8* list = get_enemy_data__FP11_ENEMY_WORK(enemy)->values;
+    u8* list = get_enemy_data(enemy)->values;
 
     if ((u8)value == 0x28) {
         return 1;
@@ -784,7 +773,7 @@ extern "C" s32 fn_8012CF90(_ENEMY_WORK* enemy, u32 value)
 
 /* Whether the enemy record is still alive: an inactive record, or one whose death flag has run past
  * 2, counts as dead. */
-extern "C" s32 em_work_die_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy)
+s32 em_work_die_ck(_ENEMY_WORK* enemy)
 {
     if (enemy->active != 0 && enemy->field_0x004 < 2) {
         return 0;
@@ -793,18 +782,18 @@ extern "C" s32 em_work_die_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy)
 }
 
 /* Whether the enemy is in its death state. */
-extern "C" s32 em_die_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy)
+s32 em_die_ck(_ENEMY_WORK* enemy)
 {
-    if (enemy->state == 0x0B || em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xC, 0xFF) == 1) {
+    if (enemy->action == 0x0B || em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xC, 0xFF) == 1) {
         return 1;
     }
     return 0;
 }
 
 /* Whether the enemy is in the area the game is currently in. */
-extern "C" s32 em_area_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy)
+s32 em_area_ck(_ENEMY_WORK* enemy)
 {
-    return get_now_areano__Fv() == enemy->area_no;
+    return get_now_areano() == enemy->area_no;
 }
 
 /* Whether the enemy and the given work record share an area. */
@@ -825,7 +814,7 @@ extern "C" s32 fn_8012D1A8(u32 index)
     _PLAYER_ROOT* root;
 
     if (fn_8042CB9C(index) == 1) {
-        root = (_PLAYER_ROOT*)get_move_work_adrs__FUc(0);
+        root = (_PLAYER_ROOT*)get_move_work_adrs(0);
         if (root != NULL && root->player_state[(u8)index] == 4) {
             return 1;
         }
@@ -836,7 +825,7 @@ extern "C" s32 fn_8012D1A8(u32 index)
 /* Whether the enemy is in the given state pair. */
 extern "C" u32 em_act_ck__FP11_ENEMY_WORKUcUc(_ENEMY_WORK* enemy, u32 state, u32 sub)
 {
-    if (enemy->state == (u8)state && enemy->state_sub == (u8)sub) {
+    if (enemy->action == (u8)state && enemy->state_sub == (u8)sub) {
         return 1;
     }
     return 0;
@@ -883,7 +872,7 @@ extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
     u16 max;
     s32 i;
 
-    max = get_move_work_max__FUc(2);
+    max = get_move_work_max(2);
     for (i = 0; i < max; i++) {
         if (fn_8012D23C(enemy, kind, (u8)i) == 1) {
             return (u8)i;
@@ -905,7 +894,7 @@ extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag)
 /* Whether the actor has the "charge" skill, or the pair is on its last frame. */
 extern "C" s32 fn_8012D7FC(void* arg)
 {
-    if (Pl_Skill_ck__FP4_PLWUs((_PLW*)arg, 0xCD) == 1) {
+    if (Pl_Skill_ck((_PLW*)arg, 0xCD) == 1) {
         return 1;
     }
     return (fn_8027AC18(arg) - 1) == 0;
@@ -914,7 +903,7 @@ extern "C" s32 fn_8012D7FC(void* arg)
 /* Whether the enemy is in the low part of its action state. */
 extern "C" s32 fn_8012D850(_ENEMY_WORK* enemy)
 {
-    if (enemy->state == 0x0A && enemy->state_sub <= 0x12) {
+    if (enemy->action == 0x0A && enemy->state_sub <= 0x12) {
         return 1;
     }
     return 0;
@@ -923,7 +912,7 @@ extern "C" s32 fn_8012D850(_ENEMY_WORK* enemy)
 /* Whether the enemy is in the mid-range part of its action state. */
 extern "C" s32 fn_8012D878(_ENEMY_WORK* enemy)
 {
-    if (enemy->state == 0x0A && (u32)(enemy->state_sub - 0x58) <= 0x1F) {
+    if (enemy->action == 0x0A && (u32)(enemy->state_sub - 0x58) <= 0x1F) {
         return 1;
     }
     return 0;
@@ -932,7 +921,7 @@ extern "C" s32 fn_8012D878(_ENEMY_WORK* enemy)
 /* Whether the enemy is in the high part of its action state. */
 extern "C" s32 fn_8012D8A4(_ENEMY_WORK* enemy)
 {
-    if (enemy->state == 0x0A && (u32)(enemy->state_sub - 0xC3) <= 0x0F) {
+    if (enemy->action == 0x0A && (u32)(enemy->state_sub - 0xC3) <= 0x0F) {
         return 1;
     }
     return 0;
@@ -979,7 +968,7 @@ extern "C" u32 ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(
     if (enemy->area_no != (u8)area) {
         return 0;
     }
-    if ((u8)flag == 0 && enemy->state == 0x0B) {
+    if ((u8)flag == 0 && enemy->action == 0x0B) {
         return 0;
     }
     if (fn_8012D8D0(enemy) == 0) {
@@ -996,8 +985,8 @@ extern "C" void* ana_em_ck__FUcPQ34nw4r4math4VEC3fUc(
     s16 i;
     u16 max;
 
-    work = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
-    max = get_move_work_max__FUc(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     for (i = 0; i < max; i++, work++) {
         if (ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(work, (u8)area, pos, (u8)flag,
                                                                 radius) == 1) {
@@ -1040,8 +1029,8 @@ extern "C" void* shibire_em_ck__FUcPQ34nw4r4math4VEC3fUc(
     s16 i;
     u16 max;
 
-    work = (_ENEMY_WORK*)get_move_work_adrs__FUc(3);
-    max = get_move_work_max__FUc(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     for (i = 0; i < max; i++, work++) {
         if (shibire_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(work, (u8)area, pos,
                                                                     (u8)flag, radius) == 1) {
@@ -1113,7 +1102,7 @@ extern "C" s32 fn_8012DF68(_ENEMY_WORK* enemy)
 /* Three-way action-state query: 0/1 for the two states it knows, 0xFF otherwise. */
 extern "C" s32 fn_8012E040(_ENEMY_WORK* enemy)
 {
-    switch (enemy->state) {
+    switch (enemy->action) {
     case 0x0A:
         if ((u32)(enemy->state_sub - 0xE6) <= 3) {
             return 0;
@@ -1288,7 +1277,7 @@ extern "C" s32 fn_8012E548(_ENEMY_WORK* enemy)
 /* Whether the enemy is in the four-state part of the second action state. */
 extern "C" s32 fn_8012E5A8(_ENEMY_WORK* enemy)
 {
-    if (enemy->state == 0x0B && (u32)(enemy->state_sub - 0x10) <= 3) {
+    if (enemy->action == 0x0B && (u32)(enemy->state_sub - 0x10) <= 3) {
         return 1;
     }
     return 0;
@@ -1369,7 +1358,7 @@ extern "C" s32 fn_8012E6A0(u32 kind, u16 id)
 /* Whether the enemy is in the "charge" state pair. */
 extern "C" u8 fn_8012E884(_ENEMY_WORK* enemy)
 {
-    return (u8)((fn_8012E2A8(enemy->state, enemy->state_sub) - 1) == 0);
+    return (u8)((fn_8012E2A8(enemy->action, enemy->state_sub) - 1) == 0);
 }
 
 /* The two-state mask the record's mode byte selects. */

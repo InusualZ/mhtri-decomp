@@ -38,18 +38,18 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "ef/eft007.h"
+#include "ef/eft009.h"
+#include "enemy/fn_8012BDF4.h"
+#include "enemy/fn_80149D6C.h"
+#include "unsplit/enemy.h"
 
 /* ---------------------------------------------------------------------------------------------------
- * nw4r math types (this unit is C; `include/nw4r/math.h` is C++-only, see the outbox's config_requests)
+ * nw4r math types
  * ------------------------------------------------------------------------------------------------- */
 
-/* size: 0x0C */
-typedef struct VEC3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} VEC3;
-
+/* `VEC3` (three `f32` at +0x00/+0x04/+0x08) comes from `nw4r/math.h`, which is includable from C. */
 /* ---------------------------------------------------------------------------------------------------
  * the enemy work record
  * ------------------------------------------------------------------------------------------------- */
@@ -136,15 +136,6 @@ extern f32 lbl_80796EF4;
 extern f32 lbl_805A1CC8[];
 
 extern void fn_8012CF20();
-extern f32 fn_80130248(_ENEMY_WORK *self);
-extern void fn_801305C4(_ENEMY_WORK *self);
-extern void fn_8012F5B8(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
-extern void fn_801353E4(_ENEMY_WORK *self);
-extern f32 fn_80135644(_ENEMY_WORK *self, void *tbl);
-extern void fn_80135418(_ENEMY_WORK *self);
-extern u32 fn_8012F93C(_ENEMY_WORK *self);
-extern void fn_80134DF4(_ENEMY_WORK *self);
-extern void fn_80134E28(_ENEMY_WORK *self);
 extern f32 fn_802B0430(u8 id);
 extern void fn_80127FE4(_ENEMY_WORK *self);
 
@@ -162,42 +153,16 @@ extern f32 lbl_80796F08;
 extern f32 lbl_80796F0C;
 extern f32 lbl_80796F10;
 extern f32 lbl_80796F14;
-extern u32 fn_80133C50(_ENEMY_WORK *self, u32 a);
 extern void fn_80128A14(_ENEMY_WORK *self, u32 a, u32 b);
-extern f32 get_em_chg_scale__FP11_ENEMY_WORK(_ENEMY_WORK *self);
-extern void fn_80133C3C(_ENEMY_WORK *self);
-extern void fn_80133CC8(_ENEMY_WORK *self, u32 a, u32 b);
-extern u32 em_frame_check__FP11_ENEMY_WORKUsff(_ENEMY_WORK *self, u16 a, f32 b, f32 c);
-extern void fn_801353F8(_ENEMY_WORK *self);
 extern void fn_80134004(_ENEMY_WORK *self, u32 a, f32 b);
-extern u32 fn_80135600();
-extern u32 fn_80134114(_ENEMY_WORK *self, u32 a, u32 b);
-extern void fn_80130478(_ENEMY_WORK *self, u32 a);
-extern u32 fn_8012D1A0(_ENEMY_WORK *self);
 extern void fn_801280AC(_ENEMY_WORK *self);
 extern f32 lbl_80796F18;
-extern void fn_8012F62C(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
-extern void fn_801481FC(_ENEMY_WORK *self);
-extern void fn_801498C8();
-extern void fn_80149A08();
-extern void fn_80149AFC();
-extern void fn_80149C54();
-extern void fn_80149C58();
-extern void fn_80149D6C();
 extern void fn_80154CA4(_ENEMY_WORK *self);
 extern f32 lbl_80796EBC;
 extern f32 lbl_80796F1C;
-extern f32 fn_8012F8E4(_ENEMY_WORK *self);
-extern void CancelFade(_ENEMY_WORK *self);
 extern f32 lbl_80796E20;
 extern f32 lbl_80796EA8;
 extern u32 lbl_8056F9A0[];
-extern void fn_80134E8C(_ENEMY_WORK *self);
-extern void fn_80134F18(_ENEMY_WORK *self);
-extern u32 fn_80130008();
-extern void fn_80134964();
-extern u32 fn_80134B0C(_ENEMY_WORK *self, void *tbl);
-extern void fn_801355C8();
 extern u32 lbl_8056FA0C[];
 extern f32 lbl_805A1D88[];
 extern f32 lbl_805A1FF0[];
@@ -210,12 +175,6 @@ extern f32 lbl_80796F20;
 extern f32 lbl_80796F24;
 extern f32 lbl_80796F28;
 extern f32 lbl_80796F2C;
-extern void fn_80134F70(_ENEMY_WORK *self, void *tbl);
-extern void fn_80135000(_ENEMY_WORK *self, u32 a, void *tbl);
-extern void fn_80135584(_ENEMY_WORK *self, void *p);
-extern f32 fn_801356A8(_ENEMY_WORK *self, f32 a, f32 b, f32 c);
-extern void fn_80133E3C(_ENEMY_WORK *self, s32 a, f32 b, f32 c);
-extern void fn_801354F4(_ENEMY_WORK *self, void *p);
 extern void fn_80043EA8(void *p);
 extern void fn_80056A54(_ENEMY_WORK *self, u32 a, u32 b);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(VEC3 *v, f32 x, f32 y, f32 z);
@@ -229,8 +188,6 @@ extern f32 lbl_80796F34;
 extern f32 lbl_80796F38;
 extern f32 lbl_80796F3C;
 extern void fn_80154C74(_ENEMY_WORK *self);
-extern void fn_801303FC();
-extern void fn_801303EC();
 extern void fn_8012933C(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80129724(_ENEMY_WORK *self, u32 a);
 
@@ -251,7 +208,6 @@ extern f32 lbl_80796FD4;
 extern f32 lbl_80796FD8;
 extern void fn_80127F48();
 extern void fn_8012B380();
-extern u8 fn_8012D3E0();
 
 extern f32 lbl_805A2AA0[];
 extern f32 lbl_805A2B00[];
@@ -263,11 +219,7 @@ extern f32 lbl_80796F9C;
 extern f32 lbl_80796FA0;
 extern void fn_8011E6EC();
 extern void fn_801251D8();
-extern u32 fn_8012D23C();
 extern u32 fn_8012EC3C();
-extern void fn_80130CDC();
-extern void fn_80131EC0();
-extern s32 fn_80135748();
 extern u32 fn_80154638();
 extern void fn_802B9574();
 extern void fn_803B9BA0();
@@ -325,9 +277,6 @@ extern f32 lbl_80796F6C;
 extern f32 lbl_80796F70;
 extern void fn_80041E40();
 extern void fn_80050CA0();
-extern void fn_801049D0();
-extern u16 fn_80133DB0();
-extern void fn_80136D4C();
 
 extern f32 lbl_8056F960[];
 extern f32 lbl_80796F94;
@@ -341,9 +290,6 @@ extern void fn_80154B04();
 
 extern f32 lbl_80796F8C;
 extern f32 lbl_80796F90;
-extern void fn_80103960();
-extern void fn_801039B0();
-extern void fn_80149788();
 extern void fn_801545B8();
 
 extern f32 lbl_805A1F98[];
@@ -354,7 +300,6 @@ extern f32 lbl_80796F44;
 extern f32 lbl_80796F48;
 extern f32 lbl_80796F5C;
 extern f32 lbl_80796F80;
-extern void fn_8012F8C8();
 
 
 extern f32 lbl_80796F88;
@@ -1356,10 +1301,6 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
 }
 
 extern f32 lbl_80796F4C;
-extern void fn_801493A8();
-extern void fn_80133F4C(_ENEMY_WORK *self, f32 a, f32 b);
-extern f32 fn_8012F8EC(_ENEMY_WORK *self);
-extern f32 fn_8012F8F4(_ENEMY_WORK *self);
 
 /* ---------------------------------------------------------------------------------------------------
  * fn_8014BDAC - pick one of four action ids from two flags and hand it to the action starter

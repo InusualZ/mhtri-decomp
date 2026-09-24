@@ -38,15 +38,15 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "enemy/fn_8012BDF4.h"
+#include "enemy/fn_80138074.h"
+#include "unsplit/enemy.h"
 
 /* ---- the enemy work record ---- */
 
-/* The engine's three-float vector; the distance check and the position update both take one. size: 0x0C */
-typedef struct Vec3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} Vec3; /* size: 0x0C */
+/* The engine's three-float vector (`nw4r::math::VEC3`, C spelling `Vec3`) comes from `nw4r/math.h`
+ * (same layout: x/y/z at +0x00/+0x04/+0x08, size 0x0C). */
 
 /* The enemy work record.  Only the bytes this unit reads are named, and their names agree with the
  * sibling units that already reconstruct the record (`80101FA4_fn_80101FA4.cpp`,
@@ -85,22 +85,13 @@ typedef struct _ENEMY_WORK {
 /* ---- callees ---- */
 
 extern void fn_8012CF20(_ENEMY_WORK* self);
-extern void fn_80134F70(_ENEMY_WORK* self, u8* params);
 extern void fn_80134004(_ENEMY_WORK* self, f32 scale, u16 id);
-extern void fn_80130248(_ENEMY_WORK* self);
-extern void fn_80135584(_ENEMY_WORK* self, Vec3* pos);
 extern u32 fn_8012EC3C(_ENEMY_WORK* self);
-extern _ENEMY_WORK* fn_80131034(_ENEMY_WORK* self, u8 kind, u8 distance_check);
-extern u32 fn_8012E5A8(_ENEMY_WORK* self);
 extern u32 fn_80131BD4(_ENEMY_WORK* self);
 extern void fn_8012B380(_ENEMY_WORK* self, u8 a, u8 b, u8 c);
 extern void fn_80128A14(_ENEMY_WORK* self, u8 a, u8 b);
-extern void fn_8013AAC4(_ENEMY_WORK* self);
-extern u32 fn_80134114(_ENEMY_WORK* self, s32 a, s32 b);
-extern void fn_801481FC(_ENEMY_WORK* self);
 extern void fn_801277F4(_ENEMY_WORK* self, s32 a);
 extern void fn_80128A70(_ENEMY_WORK* self, u8 a, u8 b);
-extern void fn_80135000(_ENEMY_WORK* self, u8 a, u8* params);
 extern f32 calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(Vec3* a, Vec3* b);
 
 /* Shared pool literals: declared, never defined here (the pool belongs to the data pass). */

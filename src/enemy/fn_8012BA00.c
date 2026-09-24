@@ -62,18 +62,17 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "Pl/pl_master.h"
+#include "enemy/fn_8012BDF4.h"
+#include "unsplit/enemy.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * types
  * ------------------------------------------------------------------------------------------------- */
 
-/* A 3-float engine vector (`nw4r::math::VEC3`); the C++ header cannot be included from a `-lang=c`
- * file, so the layout is declared here (as the sibling `80104BD0`/`80103D28` do).  size: 0x0C */
-typedef struct VEC3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} VEC3;
+/* A 3-float engine vector (`nw4r::math::VEC3`, the C spelling `VEC3`) comes from `nw4r/math.h`
+ * (same layout: three `f32` at +0x00/+0x04/+0x08, size 0x0C). */
 
 /* One motion set, the record `fn_8012BA00`'s second argument points at.  The three `.data` defaults
  * the callers fall back to fix the arrays' shapes: `lbl_805A0FF8` -> thresholds `lbl_805A0FB0`
@@ -129,12 +128,7 @@ typedef struct _ENEMY_WORK {
 extern void fn_80041E40(VEC3* dst, const VEC3* src); /* vector copy */
 extern void fn_80043EA8(VEC3* v);                    /* v = (0, 0, 0) */
 extern f32 fn_80050EF4(const VEC3* a, const VEC3* b); /* the distance between two positions */
-extern s32 fn_8012D0B4(_ENEMY_WORK* enemy, _ENEMY_WORK* other);
-extern s32 fn_8012D188(_ENEMY_WORK* enemy, _ENEMY_WORK* other);
-extern u32 fn_8012D7FC(_ENEMY_WORK* other);
-extern s32 fn_8026FE98(_ENEMY_WORK* other, u32 mask); /* tests a bit of other's `+0x35C`/`+0x360` */
 extern s32 fn_802D2B78(_ENEMY_WORK* other, u16 mask); /* tests a bit of other's `+0x1EC` */
-extern u32 em_sleep_ck__FP11_ENEMY_WORKUc(_ENEMY_WORK* enemy, u8 kind);
 
 /* The constants the source reaches, all in the pool run the split leaves unowned
  * (0x80796C58..0x80796C90): declared, never defined (playbook 29).  The int -> f64 conversion magic

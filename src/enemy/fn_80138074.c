@@ -48,6 +48,15 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "enemy/fn_8012BDF4.h"
+#include "g3d/g3d_calcworld.h"
+#include "g3d/g3d_resanmcamera.h"
+#include "sys_mem.h"
+#include "unsplit/ef.h"
+#include "unsplit/enemy.h"
+#include "unsplit/g3d.h"
+#include "unsplit/sound.h"
 
 /* --------------------------------------------------------------------------------------------- */
 /* shared pool symbols (another unit owns the bytes)                                              */
@@ -99,15 +108,8 @@ extern const f32 lbl_80796D8C;
 /* math types (the mangled callees take nw4r::math spellings)                                     */
 /* --------------------------------------------------------------------------------------------- */
 
-typedef struct Vec3 { /* size: 0x0C */
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} Vec3;
-
-typedef struct Mtx34 { /* size: 0x30 */
-    /* +0x00 */ f32 m[3][4];
-} Mtx34;
+/* `Vec3` (three `f32`) and `Mtx34` (a 3x4 `f32` matrix) are the `nw4r/math.h` types, now includable
+ * from C; the mangled callees below take those spellings. */
 
 /* `_CP_VECTOR` as `cpSetRotMatrix` takes it: three 16-bit angles widened to words. */
 typedef struct CPVector { /* size: 0x0C */
@@ -120,7 +122,10 @@ typedef struct CPVector { /* size: 0x0C */
 /* forward declarations of this unit's own symbols                                               */
 /* --------------------------------------------------------------------------------------------- */
 
-typedef struct EnemyWork EnemyWork;
+/* The record's own tag is `_ENEMY_WORK` (the name the map's `em_*__FP11_ENEMY_WORK...` manglings
+ * encode); `EnemyWork` is this unit's local spelling of it.  The fields below are this unit's names
+ * for the offsets it reads. */
+typedef struct _ENEMY_WORK EnemyWork;
 typedef struct EnemyData EnemyData;
 typedef struct EmDataRecord EmDataRecord;
 typedef struct UserDataItem UserDataItem;
@@ -217,7 +222,6 @@ u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2);
 /* --------------------------------------------------------------------------------------------- */
 
 extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, s32 line, const char* msg, ...);
-extern void __dl__FPv(void* p);
 extern s32 strcmp(const char* a, const char* b);
 
 extern void fn_80041E40(void* dst, const void* src);
@@ -238,27 +242,10 @@ extern void fn_8005D0CC(void* out, const void* src);
 extern s32 fn_8005D124(void* arg0);
 extern void fn_8005D1AC(void* out, s32 arg1);
 extern void fn_80062914(void* self, void* p);
-extern void fn_80069664(void* self);
-extern s32 fn_8006FDCC(void* arg0);
-extern void fn_8007100C(void* dst, const void* src);
-extern void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
-extern void fn_80073F68(void* dst, const void* src);
-extern void fn_80080B10(void* arg0, u32 arg1);
-extern void fn_800810DC(void* arg0, s32 arg1);
-extern void fn_800883C4(Mtx34* out, const Mtx34* src);
-extern void fn_8008A220(void* out, s32 arg1);
 extern void fn_8008DF8C(void* arg0, Mtx34* out);
 extern void fn_8008EE68(void* arg0, Mtx34* mtx);
 extern void fn_8008F148(void* arg0, const Vec3* v);
 extern void fn_80092250(void* self, const char* key);
-extern f32 fn_800C9DCC(f32 arg0);
-extern u32 fn_800E28E4(MHchar* ch);
-extern void fn_800E2EBC(MHchar* ch, u32 index, s32 arg2);
-extern void fn_800E30DC(MHchar* ch, u32 index, s32 arg2);
-extern void fn_800E3264(void* arg0, u32 arg1);
-extern void fn_800E0914(MHchar* ch);
-extern void fn_800E09D0(MHchar* ch, const Vec3* v, f32 arg2);
-extern void fn_800E25B0(void* arg0, void* arg1);
 extern f32 getKeyData__FPff(s32 key, f32 t);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPVector* angles, Mtx34* mtx);
 extern void rotMatrixX__FUlPQ34nw4r4math5MTX34(u16 angle, Mtx34* mtx);
@@ -268,21 +255,12 @@ extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
 extern s32 calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(const Vec3* a, const Vec3* b);
 extern void rotVecY__FPQ34nw4r4math4VEC3Ul(Vec3* v, u32 angle);
 extern void get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(Vec3* out, const Vec3* v, u8 area);
-extern void setScaleAll__6MHcharFf(MHchar* ch, f32 scale);
-extern void move__6MHcharFUs(MHchar* ch, u16 arg1);
 extern EnemyData* get_enemy_data__FP11_ENEMY_WORK(EnemyWork* work);
-extern f32 get_em_scale__FP11_ENEMY_WORK(EnemyWork* work);
-extern f32 get_em_chg_scale__FP11_ENEMY_WORK(EnemyWork* work);
-extern void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(EnemyWork* work, u32 joint, Vec3* out);
 extern void* get_move_work_adrs__FUc(u8 area);
 extern u16 get_move_work_max__FUc(u8 area);
 extern u8 get_now_areano__Fv(void);
 extern s32 event_demo_ck__Fv(void);
 extern s32 ran_suu__Fl(s32 n);
-extern s32 em_act_ck__FP11_ENEMY_WORKUcUc(EnemyWork* work, u8 a, u8 b);
-extern u32 em_area_ck__FP11_ENEMY_WORK(EnemyWork* work);
-extern u32 em_die_ck__FP11_ENEMY_WORK(EnemyWork* work);
-extern u32 em_sleep_ck__FP11_ENEMY_WORKUc(EnemyWork* work, u8 a);
 
 extern void fn_8011F5C0(EnemyWork* work);
 extern u32 fn_8011F654(EnemyWork* work);
@@ -301,46 +279,8 @@ extern void fn_8012A3B4(EnemyWork* work);
 extern void fn_8012A414(EnemyWork* work);
 extern void fn_8012A658(EnemyWork* work, s32 arg1);
 extern void fn_8012B64C(EnemyWork* work);
-extern void fn_8012BDF4(EnemyWork* work);
-extern void fn_8012C600(EnemyWork* work);
-extern void fn_8012C9AC(EnemyWork* work);
 extern void fn_8012CF20(EnemyWork* work);
-extern s32 fn_8012D0B4(EnemyWork* work, void* move);
-extern u32 fn_8012D1A0(EnemyWork* work);
-extern s32 fn_8012D1A8(u8 arg0);
-extern void fn_8012F5B8(EnemyWork* work, s32 a, s32 b, s32 c);
-extern void fn_8012FC60(EnemyWork* work);
-extern void fn_8012FCC4(EnemyWork* work, s32 arg1, f32 arg2);
-extern void fn_8012FCE4(EnemyWork* work);
-extern void fn_8012FF38(EnemyWork* work);
-extern u8 fn_8013023C(EnemyWork* work);
-extern f32 fn_801302E4(EnemyWork* work);
-extern void fn_80130438(EnemyWork* work);
-extern void fn_80131150(EnemyWork* work);
-extern void fn_80131D9C(EnemyWork* work);
-extern void fn_80131DB4(EnemyWork* work);
-extern void fn_80131DF4(EnemyWork* work);
-extern void fn_80131E0C(EnemyWork* work);
-extern void fn_80131E74(EnemyWork* work);
-extern void fn_801320A4(EnemyWork* work);
-extern void fn_801324E0(EnemyWork* work);
-extern void fn_801333E0(EnemyWork* work);
-extern void fn_80133B5C(EnemyWork* work);
-extern void fn_80133BB4(EnemyWork* work);
-extern void fn_80133BC0(EnemyWork* work);
 extern u32 fn_80133BCC(EnemyWork* work);
-extern void fn_80133C30(EnemyWork* work);
-extern u32 fn_80135BC4(EnemyWork* work, s32 arg1);
-extern void fn_801363F8(EnemyWork* work);
-extern void fn_80136D14(EnemyWork* work);
-extern void fn_80136E38(EnemyWork* work, s32 arg1);
-extern void fn_801373D0(EnemyWork* work);
-extern s32 fn_80137C9C(EnemyWork* work, void* arg1);
-extern void fn_80137DD0(EnemyWork* work);
-extern s32 fn_80137EE0(EnemyWork* work, s32 arg1);
-extern void fn_80138024(EnemyWork* work, s32 a, s32 b);
-extern s32 fn_801408B4(EnemyWork* work);
-extern void fn_80143190(void);
 extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
 extern void fn_8029EFDC(void* arg0);
 extern void fn_8029F5B4(void* arg0, s32 arg1);
@@ -504,7 +444,7 @@ struct ResUserData { /* size: 0x08 */
 
 /* The enemy work block.  Only the fields this unit touches are named; the rest are padding that
  * keeps every measured offset in place. */
-struct EnemyWork { /* size: 0xB00 */
+struct _ENEMY_WORK { /* size: 0xB00 */
     /* +0x000 */ u8 field_0x000;
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 pad_0x002[0x02];
