@@ -63,18 +63,30 @@ def registered_norm(main: str) -> set[str]:
     return {claims.norm_unit(u) for u in brief.registered_units(main)}
 
 
+def is_proposal(main: str, unit: str) -> bool:
+    """Whether `unit` is a queue *label* rather than a registered unit path (option A)."""
+    want = claims.norm_unit(unit)
+    return any(claims.norm_unit(l) == want for l in brief.proposal_labels(main))
+
+
 def state(main: str, entry: dict) -> str:
     """Where a pooled brief stands: `claimed`, `written`, `stale`, `unreadable` or `ready`.
 
     Only `ready` may be handed out. A claimed unit is in flight (its brief has already been promoted), a
     `written` unit has gained a body (the pool will prune it), and `stale` is no longer registered - so none
     of them is offered as new work.
+
+    A **proposal** (option A) is the simpler case and takes a different route: it has no source and no
+    registration to check, so while it is in the queue it is work to hand out, and once the queue drops it -
+    which happens when `attribute.py queue` is re-run after its range was registered - it is stale.
     """
     unit = entry.get("unit")
     if not unit:
         return "unreadable"
     if brief.claim_for(main, unit):
         return "claimed"
+    if is_proposal(main, unit):
+        return "ready"
     if claims.norm_unit(unit) not in registered_norm(main):
         return "stale"
     path = os.path.join(main, "src", *brief.source_name(unit, main).split("/"))
@@ -82,7 +94,10 @@ def state(main: str, entry: dict) -> str:
 
 
 def text_start(main: str, unit: str) -> int | None:
-    """The unit's `.text` start from `splits.txt` - `None` when it has no `.text` range."""
+    """The unit's `.text` start - from the proposal queue for a proposal, else from `splits.txt`."""
+    p = brief.proposal_by_label(main, unit)
+    if p:
+        return p["text"][0]
     rng = brief.splits_range(main, unit)
     return rng[".text"][0] if ".text" in rng else None
 
@@ -281,6 +296,36 @@ def selftest() -> int:
               state(tmp, {"unit": None, "path": "x"}), "unreadable")
 
         check("spawn_line's call is one line", "\n" not in spawn_line(tmp, "auto/x", "s", "/w", "/b")["call"], True)
+
+    # option A: a proposal is ready while it is in the queue, and stale once the queue drops it (which is
+    # what happens when its range is registered and `attribute.py queue` is re-run)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src"))
+        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
+        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
+        claims.save_registry(tmp, {})
+        label = "proposal/80161660_fn_80161660.cpp"
+        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [{"label": label, "text": [0x80161660, 0x801679B0],
+                                                   "count": 52, "bytes": 25424, "cxx": True}]}, fh)
+        open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"), "w").write(
+            "# Proposal brief: %s\n" % label)
+        entry = pool_entries(tmp)[0]
+        check("a pooled proposal brief is parseable", entry["unit"], label)
+        check("a proposal is not a registered unit", is_proposal(tmp, label), True)
+        check("a proposal in the queue is ready", state(tmp, entry), "ready")
+        check("a proposal's address comes from the queue, not splits.txt",
+              text_start(tmp, label), 0x80161660)
+        check("next_entry picks the proposal", next_entry(tmp)["unit"], label)
+        claims.save_registry(tmp, {claims.norm_unit(label): {"branch": "worker/x", "worker": "me"}})
+        check("a claimed proposal is not ready", state(tmp, entry), "claimed")
+        check("a claimed proposal is not handed out", next_entry(tmp), None)
+        claims.save_registry(tmp, {})
+        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": []}, fh)
+        check("a proposal dropped from the queue is stale", state(tmp, entry), "stale")
+        check("a dropped proposal is not handed out", next_entry(tmp), None)
+        check("is_proposal is false for an ordinary unit", is_proposal(tmp, "auto/stubA"), False)
 
     # an empty pool must refuse, not hand out a brief for a unit nobody prepared
     with tempfile.TemporaryDirectory() as empty:
