@@ -276,10 +276,13 @@ of `fn_XXXX` into named SDK functions, to get a function's real signature, to co
 offsets/names, or to read a data blob this repo does not own yet. Example: it named the `RSO/runtime`
 unit's thunks `RSONotifyPreRSOLink`/`RSONotifyPostRSOLink`, its `fn_804DA834` `FindExportIndex` and its
 `fn_804DAA24` `RSORelocate`, and its `RSOModule` layout matched every offset we had derived by hand.
-Two rules: it is **not** codegen evidence (flags and the compiler family still come from diffing the
-retail bytes, see playbook 17), and a `splits.txt` range derived from it must be **measured before and
+Three rules: it is **not** codegen evidence (flags and the compiler family still come from diffing the
+retail bytes, see playbook 17), a `splits.txt` range derived from it must be **measured before and
 after** - claiming the RSO unit's string pool *lowered* a function by 1.35 points, claiming its jump
-table raised another by 0.08. Details and the recipes: `docs/memory-dump.md`.
+table raised another by 0.08 - and it is **read-only**: the project is shared with another effort, so we
+consult it and never modify it (no renames, no types, no comments, no imports, no saves), and our names
+go in `config/RMHE08/symbols.txt` through `symedit.py`, never into Ghidra. Details and the recipes:
+`docs/memory-dump.md`.
 
 Inside `build/RMHE08/`:
 
