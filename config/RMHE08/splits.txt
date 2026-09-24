@@ -158,6 +158,11 @@ ef/ef_point.cpp:
 	extabindex  start:0x80023C64 end:0x80023C70
 	.text       start:0x800CD584 end:0x800CDB2C
 
+g3d/fn_800D77B0.cpp:
+	extab       start:0x8000AC54 end:0x8000AC5C
+	extabindex  start:0x800242C4 end:0x800242D0
+	.text       start:0x800D77B0 end:0x800D79B4
+
 sound/fn_800D7F54.cpp:
 	extab       start:0x8000AC74 end:0x8000AF64
 	extabindex  start:0x800242F4 end:0x8002475C
