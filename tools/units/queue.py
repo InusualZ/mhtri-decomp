@@ -19,8 +19,9 @@ instead, so the outbox path in the brief is always the claim's own. The unit is 
 is handed out, so a worker never gets a brief whose outbox does not exist.
 
 `list` shows the pool's state: briefs written, ready (unclaimed, no bodies), claimed (in flight), written (a
-unit that has gained a body - `brief.py --pool` prunes those) and stale (no longer registered), plus the next
-few ready candidates in address order.
+unit that has gained a body - `brief.py --pool` prunes those), covered (its range is registered already,
+under whatever name - never handed out) and stale (no longer registered), plus the next few ready
+candidates in address order.
 """
 
 from __future__ import annotations
@@ -69,6 +70,39 @@ def registered_norm(main: str) -> set[str]:
     return {claims.norm_unit(u) for u in brief.registered_units(main)}
 
 
+def registered_text_ranges(main: str) -> list[tuple[int, int]]:
+    """Every registered unit's `.text` block from `splits.txt`, as half-open `(start, end)` pairs."""
+    out = []
+    for unit in brief.registered_units(main):
+        rng = brief.splits_range(main, unit)
+        if ".text" in rng:
+            start, end = rng[".text"][0], rng[".text"][1]   # splits_range may carry a third field
+            out.append((start, end))
+    return out
+
+
+def ranges_cover(ranges: list[tuple[int, int]], start: int) -> bool:
+    """Whether `start` falls inside any half-open `(start, end)` range."""
+    return any(s <= start < e for s, e in ranges)
+
+
+def covered_by_registered(main: str, unit: str) -> bool:
+    """Whether a proposal's range already belongs to a registered translation unit.
+
+    The proposal the pool holds registers under whatever unit **name** its worker chose, so the pool's
+    "has no body yet" test cannot see that the range is gone - `800A99B4` and `800B99E8` were each handed
+    out again after landing, under different names, which costs a whole round.  The addresses are the
+    honest test: a proposal whose `.text` start sits inside a registered unit's `.text` is finished work.
+    """
+    p = brief.proposal_by_label(main, unit)
+    if not p:
+        return False
+    text = p.get("text") or []
+    if not text:
+        return False
+    return ranges_cover(registered_text_ranges(main), text[0])
+
+
 def is_proposal(main: str, unit: str) -> bool:
     """Whether `unit` is a queue *label* rather than a registered unit path (option A)."""
     want = claims.norm_unit(unit)
@@ -84,7 +118,8 @@ def state(main: str, entry: dict) -> str:
 
     A **proposal** (option A) is the simpler case and takes a different route: it has no source and no
     registration to check, so while it is in the queue it is work to hand out, and once the queue drops it -
-    which happens when `attribute.py queue` is re-run after its range was registered - it is stale.
+    which happens when `attribute.py queue` is re-run after its range was registered - it is stale.  Until
+    the queue is re-run, a proposal whose range is *already* registered under another name is `covered`.
     """
     unit = entry.get("unit")
     if not unit:
@@ -92,7 +127,7 @@ def state(main: str, entry: dict) -> str:
     if brief.claim_for(main, unit):
         return "claimed"
     if is_proposal(main, unit):
-        return "ready"
+        return "covered" if covered_by_registered(main, unit) else "ready"
     if claims.norm_unit(unit) not in registered_norm(main):
         return "stale"
     path = os.path.join(main, "src", *brief.source_name(unit, main).split("/"))
@@ -328,6 +363,23 @@ def selftest() -> int:
         check("a claimed proposal is not ready", state(tmp, entry), "claimed")
         check("a claimed proposal is not handed out", next_entry(tmp), None)
         claims.save_registry(tmp, {})
+
+        # the re-hand bug: once the range is registered - under whatever name its worker chose - the
+        # proposal is finished work, so neither the state nor next_entry may offer it again.
+        check("a range inside a registered unit is covered",
+              ranges_cover([(0x80160000, 0x80170000)], 0x80161660), True)
+        check("a range end is not covered (half-open)", ranges_cover([(0x80160000, 0x80161660)], 0x80161660), False)
+        check("no ranges covers nothing", ranges_cover([], 0x80161660), False)
+        saved_units, saved_range = brief.registered_units, brief.splits_range
+        brief.registered_units = lambda m: ["enemy/ef_emitterform"]
+        brief.splits_range = lambda m, u: {".text": (0x80160000, 0x80170000, "extra")}
+        check("a registered range covers the proposal", covered_by_registered(tmp, label), True)
+        check("a covered proposal is not ready", state(tmp, entry), "covered")
+        check("a covered proposal is not handed out", next_entry(tmp), None)
+        brief.splits_range = lambda m, u: {".text": (0x80170000, 0x80180000)}
+        check("a proposal outside every range stays ready", state(tmp, entry), "ready")
+        check("an unregistered proposal is not covered", covered_by_registered(tmp, "proposal/80161670_fn_80161670"), False)
+        brief.registered_units, brief.splits_range = saved_units, saved_range
         with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
             json.dump({"version": 1, "units": []}, fh)
         check("a proposal dropped from the queue is stale", state(tmp, entry), "stale")
@@ -387,6 +439,7 @@ def main() -> int:
         print("  claimed        : %d  (in flight)" % c.get("claimed", 0))
         print("  written        : %d  (unit has a body - prune with `brief.py --pool`)" % c.get("written", 0))
         print("  stale          : %d  (no longer registered - prune with `brief.py --pool`)" % c.get("stale", 0))
+        print("  covered        : %d  (range already registered under another name)" % c.get("covered", 0))
         print("  unreadable     : %d" % c.get("unreadable", 0))
         if st["ready"]:
             print("\nnext %d ready (address order):" % min(POOL_DEPTH, len(st["ready"])))
