@@ -317,9 +317,11 @@ inline int IsValidPointer(u32 ptr) {
 namespace nw4r {
 namespace ef {
 struct Effect {
+    /* +0x00 */ u8 pad_0x00[0x44];
+    /* +0x44 */ void* owner_0x44;   /* back-pointer to the spawning `_EFT` (ef/fn_800FE978.cpp) */
     void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
     void RetireEmitterAll();                        /* eft004/eft007 */
-};
+}; /* size: 0x48 (lower bound: +0x44 is the highest offset the spawn handler reads) */
 }  // namespace ef
 }  // namespace nw4r
 #endif

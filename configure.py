@@ -575,6 +575,8 @@ config.libs = [
             Object(Matching, "ef/fn_800FD520.c"),
             Object(Matching, "ef/fn_800FD718.c"),
             Object(NonMatching, "ef/fn_800FD864.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  proposal/800FE978_fn_800FE978.
+            Object(NonMatching, "ef/fn_800FE978.cpp"),
             Object(NonMatching, "ef/eft004.cpp"),
             Object(NonMatching, "ef/fn_80101DF4.cpp"),
             Object(NonMatching, "ef/eft007.cpp"),
