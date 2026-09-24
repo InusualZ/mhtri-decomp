@@ -21,6 +21,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
+#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off
@@ -28,9 +29,9 @@
 /* nw4r::db::Panic(const char*, int, const char*, ...) */
 extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
 
-/* nw4r math / resource helpers owned by unsplit units. */
+/* nw4r math / resource helpers owned by unsplit units.  `fn_80082F18` comes from
+ * `include/unsplit/g3d.h` (rule 2). */
 extern f32 fn_800501E4(u16 value);
-extern u16 fn_80082F18(f32 value);
 extern f32 fn_800610AC(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
 extern f32 fn_80463F34(f32 *out, f32 frame);

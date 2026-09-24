@@ -22,6 +22,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
+#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -43,12 +44,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" void DCStoreRange(void* pBase, u32 size);
-extern "C" void* fn_800696E4(const void* p);
-extern "C" const char* fn_80069748(void);
-extern "C" s32 fn_80069754(const void* p);
-extern "C" void fn_800731EC(void* p, u32 v);
-extern "C" void* fn_800732F0(const void* p);
-extern "C" const char* fn_80073354(void);
+/* fn_800696E4/fn_80069748/fn_80069754/fn_800731EC/fn_800732F0/fn_80073354 come from
+ * include/unsplit/g3d.h (unsplit g3d units, rule 2). */
 
 /* The panic file/format strings the target references as map symbols. They are extern here rather
  * than literals: MWCC's `-str reuse` would pool a literal into one blob and address it through a

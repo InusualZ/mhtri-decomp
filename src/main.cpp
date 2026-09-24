@@ -144,6 +144,10 @@
  */
 
 #include "types.h"
+#include "gx.h"                  /* the SDK colour record `GXColor` (rule 1) */
+#include "unsplit/unknown.h"     /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
+#include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
+#include "sound/fn_800D7F54.h"   /* owned by sound/fn_800D7F54.cpp (rule 2) */
 
 /* The retail `.sbss`/`.bss`/`.sdata2` labels this unit references; they live in the unclaimed scaffolding
  * until the data ranges are split, so these are declarations only and objdiff pairs the relocations by the
@@ -221,31 +225,8 @@ typedef struct {
 
 extern ScreenWork Screen_w;
 
-/* Game/system state block (0xA5C B in retail). */
-typedef struct {
-    u8 pad0[1];
-    u8 unk1;
-    u8 pad2[6];
-    u8 unk8;
-    u8 pad9[2138];
-    u8 unk2147;
-    u8 unk2148;
-    u8 unk2149;
-    u8 pad2150[8];
-    u8 unk2158;
-    u8 unk2159;
-    u8 pad2160[1];
-    u8 unk2161;
-    u8 pad2162[102];
-    u32 (*unk2264)(void);
-    u8 pad2268[4];
-    void (*unk2272)(void);
-    void (*unk2276)(void);
-    u8 pad2280[73];
-    u8 unk2353;
-} SystemWork;
-
-extern SystemWork system_w;
+/* The game/system state block `system_w` (0xA5C B) comes from `include/unsplit/unknown.h`: its module
+ * is undecided (no `.bss` range is registered), so the type and the declaration live there (rule 1/2). */
 
 extern char _f_text[];
 extern char _f_bss[];
@@ -302,13 +283,7 @@ extern "C" u32 GXInit(void* base, u32 size);
 extern "C" void fn_804BA7A0(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetViewport(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetScissor(u32, u32, u32, u32);
-/* The SDK clear-colour argument: an RGBA value, passed by value. */
-typedef struct {
-    u8 r; /* +0x0 */
-    u8 g; /* +0x1 */
-    u8 b; /* +0x2 */
-    u8 a; /* +0x3 */
-} GXColor; /* size: 0x4 */
+/* The SDK clear-colour record `GXColor` comes from `include/gx.h` (rule 1). */
 extern "C" void GXSetCopyClear(GXColor clr, u32 mask);
 extern "C" void GXSetDispCopySrc(u32, u32, u32, u32);
 extern "C" void GXSetDispCopyDst(u32, u32);
@@ -344,7 +319,7 @@ extern "C" void OSInit(void);
 extern "C" void DVDInit(void);
 extern "C" void NANDInit(void);
 extern "C" void OSRestart(u32 resetCode);
-extern "C" void* memset(void* dst, int val, u32 size);
+/* memset comes from include/Runtime.PPCEABI.H/memset.h (rule 2). */
 
 extern "C" void fn_8003F4D8(void);
 extern "C" void fn_8003F58C(u8 arg);
@@ -369,7 +344,6 @@ extern "C" void fn_804D2520(void);
 extern "C" void fn_804D56B0(void* arg);
 extern "C" void fn_804D57A0(void* arg);
 extern "C" void fn_8043F290(void);
-extern "C" void fn_800D8438(void);
 
 /* C++ symbols: declared by their real (unmangled) source names so the compiler emits the map's mangled
  * forms, exactly as the retail callers do. */
