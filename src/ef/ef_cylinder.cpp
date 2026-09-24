@@ -43,6 +43,7 @@
 #pragma fp_contract off
 
 #include "types.h"
+#include "unsplit/ef.h"
 
 /* A 3-float vector. */
 typedef struct Vec {
@@ -104,7 +105,6 @@ extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b,
 extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
 extern f32  fn_800A8A08(void* progress);
 extern f32  fn_80050BC0(f32 a, f32 b);
-extern f32  fn_800C9DCC(f32 a);
 extern f32  fn_80463F10(f32 a, f32 b);
 
 extern char lbl_80594D20[]; /* "ef_cylinder.cpp"                .data  0x80594D20 */

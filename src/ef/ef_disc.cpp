@@ -79,8 +79,8 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         f32 fC, f8;
         f32 scale, rate, t;
 
-        fn_80043EA8(&v88);
-        fn_80043EA8(&v76);
+        fn_80043EA8((VEC3*)&v88);   /* the declaration takes the nw4r vector; same 3-float layout */
+        fn_80043EA8((VEC3*)&v76);
         t = fn_800A8A08(&em->progress);
         rate = params->rate / 100.0f;
         if (flags & 0x01000000) {
@@ -97,7 +97,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         v88.y = 0.0f;
         v88.z = scale_b * (v64.z * scale);
         fn_80051490(&v52, &v64);
-        fn_80043EA8(&v40);
+        fn_80043EA8((VEC3*)&v40);
         if (0.0f == em->spread) {
             v40.x = 0.0f;
             v40.y = 1.0f;

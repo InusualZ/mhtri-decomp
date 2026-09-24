@@ -62,6 +62,13 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "gx.h"
+#include "ef/fn_800FD520.h"
+#include "ef/fn_800FD718.h"
+#include "unsplit/g3d.h"
+#include "unsplit/sound.h"
+#include "sound/fn_800D7F54.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the Dolphin types the material calls take
@@ -81,30 +88,17 @@ enum _GXChannelID {
     GX_ALPHAZERO
 };
 
-/* The 4-byte colour `setMatColor` takes by value. size: 0x04 */
-struct _GXColor {
-    /* +0x00 */ u8 r;
-    /* +0x01 */ u8 g;
-    /* +0x02 */ u8 b;
-    /* +0x03 */ u8 a;
-};
+/* The 4-byte colour `setMatColor` takes by value comes from `gx.h` - one definition, in the owner's
+ * header (rule 1). */
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r engine types this unit calls through
  * ------------------------------------------------------------------------------------------------- */
 
-namespace nw4r {
-namespace math {
-struct VEC3 { /* size: 0x0C */
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-};
-struct MTX34 { /* size: 0x30 */
-    /* +0x00 */ f32 m[3][4];
-};
-}  // namespace math
+/* `nw4r::math::VEC3` / `MTX34` come from `nw4r/math.h` - one definition, in the owner's header
+ * (rule 1). */
 
+namespace nw4r {
 namespace ef {
 struct Effect;
 }  // namespace ef
@@ -243,22 +237,15 @@ struct _EFT_MODEL {
 extern "C" void fn_8005050C(void* mtx);
 extern "C" void fn_800504D4(void* mtx);
 extern "C" void fn_800532DC(void* dst, const nw4r::math::MTX34& src);
-extern "C" void fn_800883C4(void* dst, void* src);
 extern "C" void fn_80051574(void* dst, void* src);
-extern "C" void fn_800DB608(u8 flag, nw4r::math::VEC3* pos, u8 arg);
 extern "C" void fn_800FBB90(void* mtx, nw4r::math::VEC3* pos);
 extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg);
-extern "C" int fn_800E2994(void* handle);
-extern "C" void fn_8006F304(void* dst, const u32& src);
 extern "C" _EFT* fn_800F8788(u32 pool_id);
 extern "C" void fn_800F9DF4(_EFT* self, u8 a, u8 b);
 extern "C" void fn_800F886C(void* self);
 extern "C" void fn_800FD4A8(_EFT* self);
 extern "C" void fn_800FD4E4(_EFT* self);
-extern "C" void fn_800FD520(_EFT* self);
-extern "C" void fn_800FD718(_EFT* self);
-extern "C" void fn_800FD850(_EFT* self);
-extern "C" void fn_800FD860(_EFT* self);
+/* fn_800FD520 / fn_800FD718 / fn_800FD850 / fn_800FD860 come from their owners' headers (rule 2). */
 
 u32 get_now_areano();
 nw4r::math::MTX34 get_current_view_mtx();

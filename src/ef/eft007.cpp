@@ -49,10 +49,26 @@
 #include "types.h"
 
 #include "nw4r/math.h"
+#include "gx.h"
+#include "ef/eft004.h"
+#include "ef/eft009.h"
+#include "unsplit/ef.h"
+#include "unsplit/g3d.h"
+#include "unsplit/sound.h"
+#include "unsplit/unknown.h"
+
+/* The engine's own 3-float vector.  It is NOT `nw4r::math::VEC3`: `vec_to_mh_vec3` exists to convert
+ * between the two (`nw4r::math::VEC3* dst, Vec* src`), so they are distinct types that happen to share
+ * a layout.  `ef.h` carries the canonical copy; this unit views its records locally, so it repeats the
+ * type here (docs/plan.md 6.5 rule 1 debt, tracked in the campaign note). size: 0x0C */
+typedef struct Vec {
+    /* +0x00 */ f32 x;
+    /* +0x04 */ f32 y;
+    /* +0x08 */ f32 z;
+} Vec; /* size: 0x0C */
 
 /* --- callees and pool constants the whole unit shares ------------------------------------------- */
 
-extern "C" void fn_80043EA8(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg);
 extern "C" void fn_800F886C(void* self);
 
@@ -69,14 +85,8 @@ extern "C" void fn_800FC0D4(_CP_VECTOR* dst, const _CP_VECTOR* src);
 
 /* --- types -------------------------------------------------------------------------------------- */
 
-/* The GX colour record (`_GXColor`), four bytes in r/g/b/a order.
- * size: 0x4 */
-struct _GXColor {
-    /* +0x0 */ u8 r;
-    /* +0x1 */ u8 g;
-    /* +0x2 */ u8 b;
-    /* +0x3 */ u8 a;
-};
+/* The GX colour record (`_GXColor`) comes from `gx.h` - one definition, in the owner's header
+ * (rule 1). */
 
 /* One emitter handle: the character record the effect drives.  Only the fields this block reads are
  * named; the rest is padding.
@@ -171,7 +181,6 @@ struct EmEffectWork {
 
 /* --- callees ------------------------------------------------------------------------------------ */
 
-extern "C" void fn_80043EA8(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" void* fn_80041E40(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" f32 fn_80050EDC(const nw4r::math::VEC3* work);
 extern "C" void fn_80050CA0(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
@@ -183,7 +192,6 @@ extern "C" void fn_80051378(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, co
 extern "C" void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 extern "C" void fn_80073F68(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
-extern "C" s32 fn_80082BCC(s32 model);
 extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
 extern "C" void fn_800FA420(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 fn_8028F4B4(const EmEffectSegment* seg, const EmEffectQuad* quad);
@@ -192,15 +200,19 @@ extern "C" s32 fn_802AFF38(void);
 extern "C" u32 fn_802B45D4(void);
 extern "C" u32 fn_802BE39C(void);
 extern "C" u8 fn_803BEE04(void);
-extern "C" u8 get_now_areano__Fv(void);
+/* get_now_areano / get_now_mapno / eftGetKeyAlpha / vec_to_mh_vec3 come from `unsplit/unknown.h` as
+ * their real declarations (rule 9).  get_camera_pos / get_camera_direction are NOT converted: their map
+ * names are no-argument manglings (`__Fv`) but every call site passes an out pointer, so the only
+ * declaration that reproduces the target's codegen is the `extern "C"` map spelling - the real
+ * `nw4r::math::VEC3 get_camera_pos()` (struct return, sret) grows the frame 0x1C0 -> 0x1F0 and drops the
+ * unit's score, so it is left and reported (rule 9, no real name expressible without a score change).
+ * move/setTevKColor are `MHchar` members whose owner (the canonical `pl.h` struct) does not carry them
+ * yet - left as the map spelling and reported. */
 extern "C" void get_camera_pos__Fv(nw4r::math::VEC3* out);
 extern "C" void get_camera_direction__Fv(nw4r::math::VEC3* out);
 extern "C" void move__6MHcharFUs(_EmHandle* self, u32 motion);
 extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* self, u32 index, u32 id,
                                                                   _GXColor* color);
-extern "C" u8 eftGetKeyAlpha__FPUcl(u8* key, s32 frame);
-extern "C" void vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(nw4r::math::VEC3* out,
-                                                          const nw4r::math::VEC3* in);
 
 extern s32 pRoot;
 
@@ -284,7 +296,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     fn_80043EA8(&vDC);
     fn_80043EA8(&vD0);
     unit = work->unit;
-    if (work->area != get_now_areano__Fv()) {
+    if (work->area != get_now_areano()) {
         work->active = 0;
         work->frame++;
         return;
@@ -433,7 +445,7 @@ extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos) 
         work->state++;
         /* fallthrough */
     case 2:
-        unit->color.a = eftGetKeyAlpha__FPUcl(&lbl_80791790, work->timer);
+        unit->color.a = eftGetKeyAlpha(&lbl_80791790, work->timer);
         work->timer++;
         if (work->timer > 52) {
             work->state++;
@@ -493,7 +505,7 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
     hit = fn_8028F4B4((EmEffectSegment*)&seg, &quad);
     zero = lbl_807966F4;
     for (i = 0; unit->probes[i].scale > zero; i++) {
-        vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(&point.pos, &unit->probes[i].pos);
+        vec_to_mh_vec3(&point.pos, (Vec*)&unit->probes[i].pos);
         point.scale = unit->probes[i].scale;
         hit = fn_80290598(&quad, &point.pos, 0, 0);
         if (hit != 0) {
@@ -552,7 +564,11 @@ struct Effect { /* size: 0x04 - lower bound, an approximation (opaque here) */
 }  // namespace nw4r
 
 /* The engine's three-word rotation vector the setters copy in; `fn_800FC0D4` fills it and
- * `rotLocalMatX/Y` take its x/y as the joint ids. size: 0x0C - Pl/pl_act.cpp's extent. */
+ * `rotLocalMatX/Y` take its x/y as the joint ids.  The SDK type is a float triple, but THIS unit reads
+ * x/y as the joint ids `rotLocalMatX/Y` take (unsigned long) and passes the triple by pointer, so the
+ * `f32` spelling changes the codegen (546 instructions in the object) even though the single-symbol
+ * score happens to hold; the integer spelling is the one that reproduces this unit.  The canonical
+ * `f32` is reported as a disagreement (docs/plan.md 6.5). size: 0x0C - Pl/pl_act.cpp's extent. */
 struct _CP_VECTOR {
     /* +0x00 */ u32 x;
     /* +0x04 */ u32 y;
@@ -640,11 +656,8 @@ struct _EFT007 { /* size: 0x48 */
 
 extern "C" s32 fn_800F92F4(void* self, u32 arg);
 extern "C" void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
-extern "C" void fn_800DD7E0(MHchar* model, nw4r::math::VEC3* pos, s32 flag);
-extern "C" void fn_800E0A14(void* joints, u32 param_id, nw4r::math::MTX34* mtx);
 extern "C" void fn_800FBB90(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
-extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
-extern "C" void fn_80101428(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
+extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec); /* conflicting arity: reported (rule 2) */
 extern "C" u8 fn_803311A0(MHchar* model);
 extern "C" void fn_8005050C(nw4r::math::MTX34* mtx);
 extern "C" u8 fn_80331210(_PLW* self);
@@ -709,7 +722,7 @@ extern f32 lbl_8079674C;
  * installs the two handlers. */
 void eft007_set(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VEC3* vec, f32 scale)
 {
-    if (self->area_0x16 != (u8)get_now_areano__Fv()) {
+    if (self->area_0x16 != (u8)get_now_areano()) {
         return;
     }
     _EFT007* effect = (_EFT007*)fn_800F8788(44);
@@ -765,7 +778,7 @@ void eft007_set(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VE
 void eft007_set_vec(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VEC3* vec, f32 scale,
                     _CP_VECTOR* rot)
 {
-    if (self->area_0x16 != (u8)get_now_areano__Fv()) {
+    if (self->area_0x16 != (u8)get_now_areano()) {
         return;
     }
     _EFT007* effect = (_EFT007*)fn_800F8788(44);
@@ -1295,14 +1308,6 @@ struct Effect;
 }  // namespace ef
 }  // namespace nw4r
 
-/* The engine's own 3-float vector, which `vec_to_mh_vec3` converts to an `nw4r::math::VEC3`.
- * `include/ef.h` typedefs the same type; it cannot be included from this file because it declares
- * `fn_80043EA8` with C++ linkage while BLOCK A declares it `extern "C"`. */
-typedef struct Vec {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} Vec; /* size: 0x0C */
 
 /* The engine's 3-word position/rotation triple that `fn_800FC0D4` copies (`Pl/pl_act.cpp` spells it
  * the same way). */
@@ -1365,13 +1370,9 @@ struct _EFT_EMITTER {
 
 /* Callees: a plain name is what `symbols.txt` spells, so it is declared `extern "C"`; the three
  * mangled ones are declared as C++ functions so the mangling reproduces the map's symbol. */
-extern "C" u8 get_now_mapno__Fv(void);
 extern "C" void fn_80103CB0(_EFT_EMITTER* self);
 extern "C" void fn_80103CEC(_EFT_EMITTER* self);
-extern "C" void fn_80103D28(_EFT_EMITTER* self);
-extern "C" void fn_801041BC(_EFT_EMITTER* self);
-extern "C" void fn_801048A0(_EFT_EMITTER* self);
-extern "C" void fn_801048B0(_EFT_EMITTER* self);
+/* fn_80103D28 / fn_801041BC / fn_801048A0 / fn_801048B0 come from their owner's header (rule 2). */
 extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part);
 
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
@@ -1405,7 +1406,7 @@ extern "C" void fn_80103968(_ENEMY_WORK* enemy, u32 part, nw4r::math::VEC3* offs
 #pragma peephole off
 extern "C" void fn_801039B0(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)
 {
-    if (enemy->area_no == get_now_areano__Fv()) {
+    if (enemy->area_no == get_now_areano()) {
         _EFT_EMITTER* emitter = (_EFT_EMITTER*)fn_800F8788(0x48);
 
         if (emitter != NULL) {
@@ -1417,7 +1418,7 @@ extern "C" void fn_801039B0(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)
             emitter->type = part;
 
             if ((s32)emitter->type == 0x24) {
-                switch (get_now_mapno__Fv()) {
+                switch (get_now_mapno()) {
                 case 4:
                 case 15:
                     emitter->type = 0x26;
@@ -1469,7 +1470,7 @@ extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part)
     _EFT_EMITTER* emitter;
     _EFT_JOINT* joint;
 
-    if (enemy->area_no != get_now_areano__Fv() || (u32)part == 7) {
+    if (enemy->area_no != get_now_areano() || (u32)part == 7) {
         return NULL;
     }
 

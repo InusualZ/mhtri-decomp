@@ -43,6 +43,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/eft007.h"
 
 #pragma peephole off
 
@@ -128,7 +129,7 @@ extern "C" void fn_800B4A70(void* obj, u16 index);
 /* The `nw4r::math::VEC3` copy the map still spells `fn_80041E40`. */
 extern "C" void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 /* The library's error path (`fn_800F886C`). */
-extern "C" void fn_801025F8(EftState* self);
+/* fn_801025F8 comes from its owner's header (rule 2). */
 /* Builds the current area's effect vector from the per-map table at 0x806C87C0. */
 extern "C" void fn_802B00AC(nw4r::math::VEC3* out, u8 area);
 

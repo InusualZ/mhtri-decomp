@@ -44,22 +44,15 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "ef/fn_800FD718.h"
+#include "unsplit/sound.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math types the mangled callees take
  * ------------------------------------------------------------------------------------------------- */
 
-/* size: 0x0C */
-typedef struct VEC3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} VEC3;
-
-/* The 3x4 row-major matrix the joint query fills; the translation is column 3. size: 0x30 */
-typedef struct MTX34 {
-    /* +0x00 */ f32 m[3][4];
-} MTX34;
+/* `VEC3` / `MTX34` come from `nw4r/math.h` - one definition, in the owner's header (rule 1). */
 
 /* ---------------------------------------------------------------------------------------------------
  * the 0x48-byte effect record and its pool block
@@ -108,10 +101,8 @@ struct _PLW {
 
 extern void fn_80043EA8(VEC3* out);      /* a `blr` stub in the DOL: a no-op, but the call is in the bytes */
 extern void fn_8005050C(MTX34* mtx);     /* likewise */
-extern void fn_800E0A14(void* mhchar, u32 joint, MTX34* out);
 extern u32 fn_800F92F4(struct _EFT* self, u32 mode);
-extern void fn_800FD718(struct _EFT* self);
-extern void fn_800FD860(struct _EFT* self);
+/* fn_800FD718 / fn_800FD860 come from their owner's header (rule 2). */
 
 extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 idx);
 extern void mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(VEC3* out, MTX34* mtx);

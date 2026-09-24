@@ -32,15 +32,12 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
 
 #pragma fp_contract off
 #pragma peephole off
 
-typedef struct {
-    f32 x; /* +0x00 */
-    f32 y; /* +0x04 */
-    f32 z; /* +0x08 */
-} VEC3; /* size: 0x0C */
+/* `VEC3` comes from `nw4r/math.h` - one definition, in the owner's header (rule 1). */
 
 /* nw4r::ef::Random - `RandFloat()` stays out of line under `-inline noauto`. */
 typedef struct {
@@ -83,13 +80,15 @@ struct Emitter {
  * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
  * map's spelling exactly: tools/units/mangle.py confirms it. */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
-extern void fn_8009C760(f32* sin, f32* cos, f32 rad);      /* PSSinCosRad */
-extern void fn_80043EA8(VEC3* v);                          /* VEC3::VEC3() */
-extern void fn_80041E8C(VEC3* v, f32 x, f32 y, f32 z);     /* VEC3::VEC3(f32, f32, f32) */
-extern f32 fn_800A8A08(Random* r);                         /* Random::RandFloat */
-extern void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
+/* The nw4r helper callees are C functions: the target object's relocations carry their plain names
+ * (`fn_80043EA8`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
+extern "C" void fn_8009C760(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
+extern "C" void fn_80043EA8(VEC3* v);                     /* VEC3::VEC3() */
+extern "C" void fn_80041E8C(VEC3* v, f32 x, f32 y, f32 z); /* VEC3::VEC3(f32, f32, f32) */
+extern "C" f32 fn_800A8A08(Random* r);                    /* Random::RandFloat */
+extern "C" void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
                         VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */
-extern u16 fn_800A9FB0(void* self, u16 aPtclLife, f32 aPtclLifeRnd, Emitter* em); /* CalcLife */
+extern "C" u16 fn_800A9FB0(void* self, u16 aPtclLife, f32 aPtclLifeRnd, Emitter* em); /* CalcLife */
 
 extern char lbl_80594EE0[];
 extern char lbl_80594EEC[];

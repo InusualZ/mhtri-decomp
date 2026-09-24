@@ -19,11 +19,14 @@ extern "C" {
  * canonical layouts below are the union of every copy's fields (see each type's note).
  */
 
-/* A 3-float vector (nw4r::math::VEC3). */
+/* The engine's 3-float vector.  Same LAYOUT as `nw4r::math::VEC3`, but a different type: the
+ * engine's vector library works on this one and `vec_to_mh_vec3` converts it to nw4r's
+ * (`vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src)`), so a `Vec*` and a `Vec3*` are NOT
+ * interchangeable. size: 0x0C */
 typedef struct Vec {
-    f32 x; /* +0x00 */
-    f32 y; /* +0x04 */
-    f32 z; /* +0x08 */
+    /* +0x00 */ f32 x;
+    /* +0x04 */ f32 y;
+    /* +0x08 */ f32 z;
 } Vec; /* size: 0x0C */
 
 /* The emission parameter block.  Its interpretation is per-shape; the disc reads the two radii, the
@@ -172,7 +175,7 @@ typedef struct _se_w _se_w;
 extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
 
 /* nw4r::math and effect-library helpers, all still `fn_*` in the symbol map. */
-extern void fn_80043EA8(Vec* out);                                  /* out = (0, 0, 0) */
+extern void fn_80043EA8(VEC3* out);                                 /* out = (0, 0, 0) */
 extern void fn_80041E8C(Vec* out, f32 x, f32 y, f32 z);             /* out = (x, y, z) */
 extern void fn_80051490(Vec* out, Vec* in);                         /* out = in */
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */

@@ -16,6 +16,17 @@ extern "C" {
 
 f32 fn_800C9DCC(f32 arg0);
 
+
+/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
+ * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+void fn_80105314(void* self);
+void fn_80105550(void* self);
+void fn_80105560(void* self);
+void fn_801173AC(void* self);
+void fn_80043EA8(Vec3* out);
+struct Vec;
+void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector to nw4r's */                                  /* out = (0, 0, 0) */
+
 #ifdef __cplusplus
 }
 #endif

@@ -57,17 +57,13 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math type the mangled callees take
  * ------------------------------------------------------------------------------------------------- */
 
-/* size: 0x0C */
-typedef struct VEC3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} VEC3;
+/* `VEC3` comes from `nw4r/math.h` - one definition, in the owner's header (rule 1). */
 
 /* ---------------------------------------------------------------------------------------------------
  * the 0x48-byte effect record, its pool block, and the two actors it follows
@@ -94,7 +90,8 @@ struct _SHELL_W {
 struct _EFT {
     /* +0x00 */ u8 unused_0x00;
     /* +0x01 */ u8 flag_0x01;      /* 1 while the effect is live, 0 once it has been dropped */
-    /* +0x02 */ s8 type_0x02;      /* the effect type; 0 is the player family, 1 the shell family */
+    /* +0x02 */ s8 type_0x02;      /* the effect type; 0 is the player family, 1 the shell family; s8 is
+                                    * this unit's codegen (u8: 100.0 -> 99.23), reported vs `_EFT`'s u8 */
     /* +0x03 */ u8 field_0x03;
     /* +0x04 */ u8 field_0x04;
     /* +0x05 */ u8 state_0x05;     /* the `fn_800FD4E4` state index the handlers advance */

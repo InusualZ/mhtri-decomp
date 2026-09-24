@@ -53,6 +53,17 @@
 #include "ef.h"
 #include "gx.h"
 
+/* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
+ * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled
+ * spelling instead would re-mangle it and break the link (docs/matching.md 50); rule 9. */
+#ifdef __cplusplus
+namespace nw4r {
+namespace db {
+void Panic(const char* file, int line, const char* fmt, ...);
+}  // namespace db
+}  // namespace nw4r
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -231,16 +242,16 @@ void fn_800C1508(EfVec3x3* dst, EfVec3x3* src) {
 
 /* Zeroes a three-vector record and returns it. */
 EfVec3x3* fn_800C16F8(EfVec3x3* self) {
-    fn_80043EA8(&self->a);
-    fn_80043EA8(&self->b);
-    fn_80043EA8(&self->c);
+    fn_80043EA8((VEC3*)&self->a);   /* the declaration takes the nw4r vector; same 3-float layout */
+    fn_80043EA8((VEC3*)&self->b);
+    fn_80043EA8((VEC3*)&self->c);
     return self;
 }
 
 /* Zeroes a two-vector record and returns it. */
 EfVec3x2* fn_800C1B7C(EfVec3x2* self) {
-    fn_80043EA8(&self->a);
-    fn_80043EA8(&self->b);
+    fn_80043EA8((VEC3*)&self->a);
+    fn_80043EA8((VEC3*)&self->b);
     return self;
 }
 
@@ -292,8 +303,8 @@ EfAheadContext* fn_800C9434(EfAheadContext* self) {
     fn_8005050C(&self->emitter_mtx);
     fn_8005050C(&self->manager_mtx);
     fn_8005050C(&self->manager_mtx_inv);
-    fn_80043EA8(&self->emitter_axis_y);
-    fn_80043EA8(&self->emitter_center);
+    fn_80043EA8((VEC3*)&self->emitter_axis_y);
+    fn_80043EA8((VEC3*)&self->emitter_center);
     return self;
 }
 
@@ -343,7 +354,7 @@ typedef struct EfParticleLayers {
 u32 fn_800C8954(EfParticleLayers* self, u32 layer);
 u32 fn_800C8954(EfParticleLayers* self, u32 layer) {
     if (!(layer <= 2)) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594AAC, 414, lbl_80594A7C);
+        nw4r::db::Panic(lbl_80594AAC, 414, lbl_80594A7C);
     }
     return ((s32)self->texture_wrap_bits >> (layer * 4 + 2)) & 3;
 }
@@ -351,7 +362,7 @@ u32 fn_800C8954(EfParticleLayers* self, u32 layer) {
 /* The second wrap mode of one texture layer. */
 u32 fn_800C89D0(EfParticleLayers* self, u32 layer) {
     if (!(layer <= 2)) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_80594A70, 375, lbl_80594A40);
+        nw4r::db::Panic(lbl_80594A70, 375, lbl_80594A40);
     }
     return ((s32)self->texture_wrap_bits >> (layer * 4)) & 3;
 }

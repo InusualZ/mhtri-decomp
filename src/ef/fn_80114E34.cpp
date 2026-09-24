@@ -54,15 +54,29 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "gx.h"
+#include "unsplit/unknown.h"
+#include "unsplit/enemy.h"
+#include "enemy/fn_8012BDF4.h"
+#include "sys_mem.h"
+#include "Pl/pl_master.h"
+#include "ef/fn_8011722C.h"
+#include "unsplit/g3d.h"
+#include "unsplit/sound.h"
+#include "unsplit/Pl.h"
+#include "unsplit/ef.h"
+#include "sound/fn_800D7F54.h"
 
-/* A 3-float vector.  `include/ef.h` declares the same type as `Vec`, but its `extern "C"` prototypes
- * for the effect helpers take `Vec*` where this unit's map spellings take `nw4r::math::VEC3*`, so the
- * two headers cannot both be included; the unit uses `nw4r::math::VEC3` throughout. */
+/* The engine's own 3-float vector.  It is NOT `nw4r::math::VEC3`: `vec_to_mh_vec3` exists to convert
+ * between the two (`nw4r::math::VEC3* dst, Vec* src`), so they are distinct types that happen to share
+ * a layout.  `ef.h` carries the canonical copy; this unit views its records locally, so it repeats the
+ * type here (docs/plan.md 6.5 rule 1 debt, tracked in the campaign note). size: 0x0C */
 typedef struct Vec {
     /* +0x00 */ f32 x;
     /* +0x04 */ f32 y;
     /* +0x08 */ f32 z;
 } Vec; /* size: 0x0C */
+
 
 /* ---------------------------------------------------------------------------------------------------
  * the effect record and its per-family work blocks
@@ -88,13 +102,8 @@ enum _GXChannelID {
     GX_ALPHAZERO
 };
 
-/* The 4-byte colour the effect material calls take by value. size: 0x04 */
-struct _GXColor {
-    /* +0x00 */ u8 r;
-    /* +0x01 */ u8 g;
-    /* +0x02 */ u8 b;
-    /* +0x03 */ u8 a;
-};
+/* The 4-byte colour the effect material calls take by value comes from `gx.h` - one definition, in the
+ * owner's header (rule 1). */
 
 struct _EFT;
 struct MHchar;
@@ -322,71 +331,35 @@ extern "C" u32 fn_800F92F4(_EFT* self, u32 mode);
 extern "C" u32 fn_800F9380(_PLW* plw);
 extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg);
 
-extern "C" u32 get_now_areano__Fv(void);
-extern "C" u8 get_now_mapno__Fv(void);
 extern "C" u8 fn_800CF208(void);
-extern "C" void fn_800810DC(void* p, s32 flag);
-extern "C" void __dl__FPv(void* p);
-extern "C" void* __nw__FUl(u32 size);
 
 extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 extern "C" void fn_80041E8C(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
-extern "C" void fn_80043EA8(nw4r::math::VEC3* out);
 extern "C" void fn_8005050C(nw4r::math::MTX34* mtx);
 extern "C" void fn_800532DC(void* dst, void* src);
 extern "C" void fn_80073F68(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos, f32 z);
-extern "C" void fn_800DA864(nw4r::math::VEC3* pos);
-extern "C" void fn_800DA8F4(nw4r::math::VEC3* pos);
-extern "C" void fn_800DA93C(nw4r::math::VEC3* pos);
-extern "C" void fn_800DA95C(nw4r::math::VEC3* pos);
-extern "C" void fn_800DCB18(s32 id, nw4r::math::VEC3* pos);
 extern "C" void fn_80059374(s32 a);
 extern "C" void fn_80059420(void);
-extern "C" void fn_800E0A14(void* mhchar, u32 joint, nw4r::math::MTX34* out);
-extern "C" void fn_800E25B0(void* a, void* b);
-extern "C" void fn_800E3264(s32 a, s32 b);
-extern "C" void fn_800E3B2C(void);
-extern "C" void setVector3__FPQ34nw4r4math4VEC3fff(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 extern "C" void fn_8005D1AC(void* out, s32 a);
 extern "C" void fn_8005D0CC(void* ctx, void* val);
 extern "C" s32 fn_8005D050(void* ctx);
 extern "C" u32 fn_8005AAEC(void* ctx);
-extern "C" s32 fn_8006FDCC(void* ctx);
 extern "C" s32 fn_80097DE4(void* a, void* b);
 extern "C" s32 fn_80097F18(s32 a, u32 b);
-extern "C" void fn_80080B10(s32 a, s32 b);
 extern "C" void fn_8050131C(void* a);
-extern "C" s8 fn_802748C8(void* a);
 extern "C" f32 fn_80463EE0(s16 a, f32 b);
 extern "C" void fn_80051894(void* a, void* b, void* c, s32 d, f32 e, f32 f);
 
-extern "C" void fn_8011722C(_EFT*);
-extern "C" void fn_801173AC(_EFT*);
+/* fn_8011722C comes from its owner's header (rule 2). */
 
-/* The mangled library entry points, declared by their map spelling. */
-extern "C" void SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(nw4r::ef::Effect* e,
-                                                                       nw4r::math::VEC3* pos);
-extern "C" void change_paramscale_eff__FPQ34nw4r2ef6Effectf(nw4r::ef::Effect* e, f32 scale);
-extern "C" u32 effect_move__FPQ34nw4r2ef6Effect(nw4r::ef::Effect* e);
-extern "C" void change_color_eff__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC38_GXColor(
-    nw4r::ef::Effect* e, nw4r::math::VEC3* pos, _GXColor color);
-extern "C" void eftGetKeyRGB__FPUclPUcPUcPUc(u8* keys, s32 frame, u8* r, u8* g, u8* b);
-extern "C" void mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(nw4r::math::VEC3* v,
-                                                                  nw4r::math::MTX34* m);
-extern "C" void copyMat33__FPQ34nw4r4math5MTX34PQ34nw4r4math5MTX34(nw4r::math::MTX34* dst,
-                                                                   nw4r::math::MTX34* src);
-extern "C" void vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(nw4r::math::VEC3* out,
-                                                          nw4r::math::VEC3* in);
-extern "C" void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effects, s32 count);
-extern "C" void* res_eft_create__FUsUsUl(u16 id, u16 kind, u32 arg);
-extern "C" void* res_eft_model_create__FP6MHcharUsUl(void* chr, u16 id, u32 arg);
-extern "C" void* res_eft_model_create_light__FP6MHcharUsUll(void* chr, u16 id, u32 a, u32 b);
+/* The library entry points are reached through their real declarations (rule 9): the free functions
+ * come from `unsplit/unknown.h`, `unsplit/enemy.h`, `enemy/fn_8012BDF4.h`, `sys_mem.h` and
+ * `Pl/pl_master.h`; the nw4r math ones from `nw4r/math.h`.  Only the `MHchar` members are left as the
+ * map spelling - their owner (the canonical `pl.h` struct) carries no methods, so no real name can be
+ * expressed and they are reported (rule 9). */
 extern "C" void get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(void* chr, u32 joint,
                                                              nw4r::math::VEC3* out);
-extern "C" void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(_ENEMY_WORK* enemy,
-                                                                       u32 joint,
-                                                                       nw4r::math::VEC3* out);
 extern "C" u32 get_joint_num__6MHcharFv(void* chr);
 extern "C" void setVisibility__6MHcharFUlb(void* chr, u32 joint, u32 visible);
 extern "C" void setMatColor__6MHcharFUl12_GXChannelID8_GXColorb(void* chr, u32 idx,
@@ -394,9 +367,6 @@ extern "C" void setMatColor__6MHcharFUl12_GXChannelID8_GXColorb(void* chr, u32 i
                                                                 _GXColor color, u32 keep);
 extern "C" void move__6MHcharFUs(void* chr, u16 a);
 extern "C" void move2__6MHcharFPQ34nw4r4math5MTX34Us(void* chr, nw4r::math::MTX34* m, u16 a);
-extern "C" u16 Get_motion_no__FP4_PLW(_PLW* plw);
-extern "C" u32 Pl_master_ck__FP4_PLW(_PLW* plw);
-extern "C" s32 em_work_die_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy);
 
 /* The shared pool.  The `.data` tables are unsized arrays (large-data `lis`/`addi` addressing in the
  * target); the `.sdata`/`.sdata2` scalars stay scalars so their `@sda21` loads are unchanged. */
@@ -448,7 +418,7 @@ extern "C" _EFT* fn_80114E34(u8 type, u8 area, f32 scale)
     _EFT* effect;
     _EFT_WORK_A* work;
 
-    if ((u8)area != (u8)get_now_areano__Fv()) {
+    if ((u8)area != (u8)get_now_areano()) {
         return 0;
     }
     if (scale <= lbl_80796A28) {
@@ -476,7 +446,7 @@ extern "C" void fn_80114F34(_EFT* self)
 {
     _EFT_WORK_A* work = (_EFT_WORK_A*)self->work_0x38;
 
-    push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl((void**)work->effects, work->count);
+    push_eft_effect_heap_num(work->effects, work->count);
     work->count = 0;
 }
 
@@ -520,7 +490,7 @@ extern "C" void fn_80114FAC(_EFT* self)
         n = 9;
     }
     for (i = 0; i < work->count; i++) {
-        work->effects[i] = (nw4r::ef::Effect*)res_eft_create__FUsUsUl(id, n, 0);
+        work->effects[i] = res_eft_create(id, n, 0);
         if (work->effects[i] == 0) {
             fn_801153B4(self);
             return;
@@ -572,17 +542,17 @@ extern "C" void fn_80115100(_EFT* self)
         get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(
             &((_PLW*)self->source_0x30)->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
         fn_80073F68(&self->pos_0x18, &v);
-        if (Pl_master_ck__FP4_PLW((_PLW*)self->source_0x30) == 1) {
+        if (Pl_master_ck((_PLW*)self->source_0x30) == 1) {
             flags = fn_800F9380((_PLW*)self->source_0x30) | 1;
         }
         break;
     case 1:
-        if (em_work_die_ck__FP11_ENEMY_WORK((_ENEMY_WORK*)self->source_0x30) != 0) {
+        if (em_work_die_ck((_ENEMY_WORK*)self->source_0x30) != 0) {
             self->flag_0x01 = 0;
             self->state_0x05++;
             return;
         }
-        get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3((_ENEMY_WORK*)self->source_0x30,
+        get_joint_wpos_em((_ENEMY_WORK*)self->source_0x30,
                                                                 work->joint, &self->pos_0x18);
         break;
     case 2:
@@ -598,9 +568,9 @@ extern "C" void fn_80115100(_EFT* self)
         break;
     }
     for (i = 0; i < work->count; i++) {
-        SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effects[i], &self->pos_0x18);
-        change_paramscale_eff__FPQ34nw4r2ef6Effectf(work->effects[i], work->scale);
-        if (effect_move__FPQ34nw4r2ef6Effect(work->effects[i]) == 0) {
+        SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+        change_paramscale_eff(work->effects[i], work->scale);
+        if (effect_move(work->effects[i]) == 0) {
             dead++;
         }
     }
@@ -612,12 +582,12 @@ extern "C" void fn_80115100(_EFT* self)
     if ((u32)(self->type_0x02 - 1) > 1U && self->type_0x02 != 9) {
         self->timer_0x0C++;
         for (i = 0; i < 2; i++) {
-            eftGetKeyRGB__FPUclPUcPUcPUc((i == 0) ? lbl_805A01B8[self->type_0x02]
+            eftGetKeyRGB((i == 0) ? lbl_805A01B8[self->type_0x02]
                                                   : lbl_805A01E0[self->type_0x02],
                                          self->timer_0x0C, &work->color[i].r, &work->color[i].g,
                                          &work->color[i].b);
             color = work->color[i];
-            change_color_eff__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC38_GXColor(work->effects[i],
+            change_color_eff(work->effects[i],
                                                                              &self->pos_0x18, color);
         }
     }
@@ -653,7 +623,7 @@ extern "C" void* fn_801153D0(void* source, s32 timer, u8 type)
         return 0;
     }
     work = (_EFT_WORK_B*)effect->work_0x38;
-    work->field_0x258 = Get_motion_no__FP4_PLW((_PLW*)source);
+    work->field_0x258 = Get_motion_no((_PLW*)source);
     work->field_0x25A = -1;
     effect->source_0x30 = source;
     effect->area_0x44 = ((_PLW*)source)->area_0x16;
@@ -724,7 +694,7 @@ extern "C" s32 fn_80115608(void* p, s16 flag)
     if (p != 0) {
         fn_800810DC(p, 0);
         if (flag > 0) {
-            __dl__FPv(p);
+            operator delete(p);
         }
     }
     return (s32)p;
@@ -773,11 +743,11 @@ extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
     fn_8005D1AC(&h, 0);
     for (i = 0; i < work->count; i++) {
         s32 handle = work->models[i]->field_0x118;
-        fn_80080B10(handle, 4);
+        fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
         id = fn_80097DE4(&work->models[i]->field_0x114, lbl_80791930);
         fn_8005D0CC(&h, &id);
         if (fn_8005AAEC(&h) == 1U) {
-            fn_800E3264(handle, fn_8005D050(&h));
+            fn_800E3264((void*)handle, fn_8005D050(&h));
         }
     }
 }
@@ -794,7 +764,7 @@ extern "C" void fn_801164F0(_EFT* self)
 {
     _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
 
-    push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl((void**)work->effects, work->count);
+    push_eft_effect_heap_num(work->effects, work->count);
     work->count = 0;
 }
 
@@ -820,19 +790,19 @@ extern "C" void fn_80116568(_EFT* self)
     _ENEMY_WORK* enemy;
 
     self->state_0x05++;
-    work->effects[0] = (nw4r::ef::Effect*)res_eft_create__FUsUsUl(0x2D, 7, 0);
+    work->effects[0] = res_eft_create(0x2D, 7, 0);
     if (work->effects[0] == 0) {
         fn_8011676C(self);
         return;
     }
-    SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effects[0], &self->pos_0x18);
+    SetRootMtxTrans(work->effects[0], &self->pos_0x18);
     fn_8011661C(self);
     if (self->type_0x02 != 1) {
         fn_800DA864(&self->pos_0x18);
         return;
     }
     enemy = (_ENEMY_WORK*)self->source_0x30;
-    if (em_work_die_ck__FP11_ENEMY_WORK(enemy) == 0) {
+    if (em_work_die_ck(enemy) == 0) {
         fn_800DCB18(enemy->field_0xB14, &self->pos_0x18);
     }
 }
@@ -842,7 +812,7 @@ extern "C" void fn_8011661C(_EFT* self)
 {
     _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
 
-    if (effect_move__FPQ34nw4r2ef6Effect(work->effects[0]) == 1) {
+    if (effect_move(work->effects[0]) == 1) {
         fn_800F93D8(self, &work->effects[0], 1, work->count, 0);
     }
     switch (self->field_0x07) {
@@ -896,7 +866,7 @@ void eft022_set(nw4r::math::VEC3* pos, u8 area)
     _EFT* effect;
     _EFT_WORK_C* work;
 
-    if ((u8)area != (u8)get_now_areano__Fv()) {
+    if ((u8)area != (u8)get_now_areano()) {
         return;
     }
     effect = fn_800F8788(8);
@@ -922,7 +892,7 @@ extern "C" void fn_80116430(void* source, nw4r::math::VEC3* pos, u8 area)
     _EFT* effect;
     _EFT_WORK_C* work;
 
-    if ((u8)area != (u8)get_now_areano__Fv()) {
+    if ((u8)area != (u8)get_now_areano()) {
         return;
     }
     effect = fn_800F8788(8);
@@ -963,8 +933,8 @@ extern "C" void fn_80116770(void)
     effect->release_0x40 = fn_8011688C;
     work = (_EFT_JOB_WORK*)effect->work_0x38;
     work->count = 1;
-    effect->area_0x44 = (u8)get_now_areano__Fv();
-    map = get_now_mapno__Fv();
+    effect->area_0x44 = (u8)get_now_areano();
+    map = get_now_mapno();
     if (map == 6 || map == 0x11) {
         if (effect->area_0x44 == 1) {
             work->count = 5;
@@ -1017,7 +987,7 @@ extern "C" void fn_801168D8(_EFT* self)
     s32 id;
 
     self->state_0x05++;
-    map = get_now_mapno__Fv();
+    map = get_now_mapno();
     switch (map) {
     case 1:
         id = 0x11;
@@ -1036,7 +1006,7 @@ extern "C" void fn_801168D8(_EFT* self)
         break;
     }
     for (i = 0; i < work->count; i++) {
-        switch (get_now_mapno__Fv()) {
+        switch (get_now_mapno()) {
         case 1:
         case 12:
             if (self->area_0x44 == 1) {
@@ -1052,7 +1022,7 @@ extern "C" void fn_801168D8(_EFT* self)
             }
             break;
         }
-        if (res_eft_model_create_light__FP6MHcharUsUll(work->models[i], id, 0x28, 2) == 0) {
+        if (res_eft_model_create_light(work->models[i], id, 0x28, 2) == 0) {
             fn_80116DA0(self);
             return;
         }
@@ -1060,9 +1030,8 @@ extern "C" void fn_801168D8(_EFT* self)
     self->flag_0x01 = 1;
     self->field_0x10 = 0;
     for (i = 0; i < work->count; i++) {
-        vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(&work->models[i]->pos_0x04,
-                                                &work->tables[i]->pos_0x04);
-        setVector3__FPQ34nw4r4math4VEC3fff(&work->models[i]->scale_0x1C, lbl_80796A60, lbl_80796A60,
+        vec_to_mh_vec3(&work->models[i]->pos_0x04, (Vec*)&work->tables[i]->pos_0x04);
+        setVector3(&work->models[i]->scale_0x1C, lbl_80796A60, lbl_80796A60,
                                            lbl_80796A60);
         work->models[i]->field_0x28 = 0;
         work->models[i]->field_0x2C = work->tables[i]->field_0x12;
@@ -1102,7 +1071,7 @@ extern "C" void fn_80116DA4(void)
         effect->field_0x03 = 24;
         fn_800F9DF4(effect, 8, 0);
         effect->flag_0x01 = 1;
-        effect->area_0x44 = (u8)get_now_areano__Fv();
+        effect->area_0x44 = (u8)get_now_areano();
     }
 }
 
@@ -1131,7 +1100,7 @@ extern "C" void fn_80116E1C(_EFT* self, s16 type)
     effect->type_0x02 = (u8)type;
     effect->dispatch_0x34 = fn_80116FDC;
     fn_800F9DF4(effect, 8, 0);
-    effect->area_0x44 = (u8)get_now_areano__Fv();
+    effect->area_0x44 = (u8)get_now_areano();
     work->slots[slot] = effect;
     work->per_type[type - 1]++;
     work->total++;
@@ -1269,7 +1238,7 @@ extern "C" void fn_801156A0(_EFT* self)
     work = (_EFT_WORK_B*)self->work_0x38;
     self->state_0x05++;
     for (i = 0; i < work->count; i++) {
-        if (res_eft_model_create__FP6MHcharUsUl(work->models[i], 8, 0xC) == 0) {
+        if (res_eft_model_create(work->models[i], 8, 0xC) == 0) {
             fn_80115FB0(self);
             return;
         }
@@ -1300,7 +1269,7 @@ extern "C" void fn_801156A0(_EFT* self)
         return;
     }
     for (i = 0; i < work->count; i++) {
-        obj = (_EFT_MODEL_OBJ*)__nw__FUl(0xC);
+        obj = (_EFT_MODEL_OBJ*)operator new(0xC);
         if (obj != 0) {
             fn_80115A44((void**)&obj);
         }
@@ -1315,11 +1284,11 @@ extern "C" void fn_801156A0(_EFT* self)
         (*(void (*)(void*))obj->vtable[6])(obj);
         work->models[i]->field_0x40 = 0;
         work->joint_num = get_joint_num__6MHcharFv(work->models[i]);
-        vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(&v, &lbl_805A0208[self->type_0x02]);
+        vec_to_mh_vec3(&v, (Vec*)&lbl_805A0208[self->type_0x02]);
         if (i == 1) {
             v.x *= lbl_80796A30;
         }
-        mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&v, &work->mtx[i][0]);
+        mulVecMat(&v, &work->mtx[i][0]);
         z = work->mtx[i][0].m[2][3];
         work->mtx[i][0].m[0][3] += v.x;
         work->mtx[i][0].m[1][3] += v.y;
@@ -1489,7 +1458,7 @@ extern "C" void fn_80115A80(_EFT* self)
             setVisibility__6MHcharFUlb(work->models[i], 1, 0);
             setVisibility__6MHcharFUlb(work->models[i], 2, 1);
         }
-        motion = Get_motion_no__FP4_PLW(plw);
+        motion = Get_motion_no(plw);
         if (plw->field_0x662 <= 0 || (plw->field_0x664 != motion && plw->field_0x666 != motion)) {
             moved = 0;
             fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
@@ -1507,11 +1476,11 @@ extern "C" void fn_80115A80(_EFT* self)
         self->field_0x24 = plw->pos_x_0x54;
         self->field_0x28 = plw->pos_y_0x58;
         self->field_0x2C = plw->pos_z_0x5C;
-        vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(&v, &lbl_805A0208[self->type_0x02]);
+        vec_to_mh_vec3(&v, (Vec*)&lbl_805A0208[self->type_0x02]);
         if (i == 1) {
             v.x *= f25;
         }
-        mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&v, &work->mtx[i][0]);
+        mulVecMat(&v, &work->mtx[i][0]);
         f1 = work->mtx[i][0].m[2][3];
         work->mtx[i][0].m[0][3] += v.x;
         work->mtx[i][0].m[1][3] += v.y;
@@ -1567,7 +1536,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     src = &work->mtx[obj->index_0x08][0];
     id0 = fn_80097F18(arg2, 3U);
     fn_8005D0CC(&h0, &id0);
-    copyMat33__FPQ34nw4r4math5MTX34PQ34nw4r4math5MTX34(&mtx_arr[fn_8006FDCC(&h0)], src);
+    copyMat33(&mtx_arr[fn_8006FDCC(&h0)], src);
     k = 4;
     for (group = 0; group < 4; group++) {
         fn_800532DC(&ma, &src[group]);

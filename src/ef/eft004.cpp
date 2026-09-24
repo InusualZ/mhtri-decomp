@@ -49,6 +49,10 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef.h"
+#include "ef/fn_80101DF4.h"
+#include "ef/eft007.h"
+#include "sound/fn_800D7F54.h"
 
 /* The retail object keeps the unfused forms of several peephole folds (a `rlwinm` + `cmpwi` where the
  * pass would emit a record-form `rlwinm.`, a function pointer through `r0`); the whole file is compiled
@@ -71,11 +75,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 namespace nw4r {
 namespace ef {
 
-/* The effect object the retire helpers take; `RetireEmitterAll` is a direct (non-virtual) call. */
-struct Effect {
-    void RetireEmitterAll();
-};
-/* size: 0x04 - lower bound, an approximation (an opaque handle here) */
+/* `nw4r::ef::Effect` comes from its owner `ef.h` (rule 1) and already carries
+ * `RetireEmitterAll`. */
 
 /* The effect system; `RetireEffect` is direct, and `virtual_0x0C` is the fourth vtable slot the
  * per-frame handler calls through `fn_800A4420`. */
@@ -188,18 +189,6 @@ struct EftControl {
 };
 /* size: 0xC44 */
 
-/* The pointer-range guard the retail `res_emitter_ac.h` inlines; copied here because the shared `ef.h`
- * spells the same test but drags in C++-mangled declarations this unit cannot use. */
-inline BOOL IsValidPointer(u32 ptr)
-{
-    return ((ptr & 0xFF000000) == 0x80000000)
-        || ((ptr & 0xFF800000) == 0x81000000)
-        || ((ptr & 0xF8000000) == 0x90000000)
-        || ((ptr & 0xFF000000) == 0xC0000000)
-        || ((ptr & 0xFF800000) == 0xC1000000)
-        || ((ptr & 0xF8000000) == 0xD0000000)
-        || ((ptr & 0xFFFFC000) == 0xE0000000);
-}
 
 /* ---------------------------------------------------------------------------------------------------
  * externs
@@ -217,14 +206,11 @@ extern "C" Eft004* fn_801007BC(void* owner, u32 arg1, u32 arg2, u32 arg3, s32* a
 extern "C" u32 fn_80100330(u32* p);
 extern "C" void* fn_800A485C(u32 color);
 extern "C" void fn_80041E40(void* dst, const void* src);
-extern "C" void fn_80043EA8(nw4r::math::VEC3* out);
 extern "C" void* fn_800A60C0(void* self);
 extern "C" void fn_800A4AF8(nw4r::ef::Effect* effect);
 extern "C" nw4r::ef::EffectSystem* fn_800A4420(nw4r::ef::EffectSystem* system);
 extern "C" EftEmitter* fn_800A51C8(void* self);
 extern "C" u8 fn_800CF208(Eft004* self);
-extern "C" void* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos);
-extern "C" void fn_800DCF0C(s32 handle, nw4r::math::VEC3* pos);
 extern "C" f32 lbl_807966B8; /* 0.0f  .sdata2 */
 extern "C" void fn_80100024(EftEmitter* self, nw4r::math::VEC3* out);
 extern "C" void fn_80100AA8(Eft004* self);
@@ -235,10 +221,7 @@ extern "C" void fn_801017B0(Eft004* self);
 extern "C" void fn_80101980(Eft004* self);
 extern "C" void fn_80101C60(Eft004* self);
 extern "C" void fn_80101C70(Eft004* self);
-extern "C" void fn_80101DF4(Eft004* self);
-extern "C" void fn_80101FA4(Eft004* self);
-extern "C" void fn_801025E8(Eft004* self);
-extern "C" void fn_801025F8(Eft004* self);
+/* fn_80101DF4 / fn_80101FA4 / fn_801025E8 / fn_801025F8 come from their owners' headers (rule 2). */
 
 extern "C" u8 get_now_areano();
 

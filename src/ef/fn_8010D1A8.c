@@ -48,23 +48,20 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "unsplit/g3d.h"
+#include "unsplit/sound.h"
+#include "ef/eft004.h"
 
 /* ---- math types ---- */
-typedef struct Vec3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} Vec3; /* size: 0x0C */
+/* `Vec3` (and the `VEC3`/`MTX34`/`Mtx34` spellings) come from `nw4r/math.h` - one definition, in the
+ * owner's header (rule 1). */
 
 typedef struct CPMtxVec {
     /* +0x00 */ f32 x;
     /* +0x04 */ f32 y;
     /* +0x08 */ f32 z;
 } CPMtxVec; /* size: 0x0C */
-
-typedef struct Mtx34 {
-    /* +0x00 */ f32 m[3][4];
-} Mtx34; /* size: 0x30 */
 
 /* ---- the effect record ---- */
 struct EftWork;
@@ -229,7 +226,6 @@ extern void fn_800F886C(Eft* eft);
 extern void fn_800F9DF4(Eft* eft, s32 a, s32 b);
 extern void fn_80041E40(void* dst, void* src);
 extern void fn_8005050C(Mtx34* mtx);
-extern void fn_80101428(Mtx34* out, Vec3* pos);
 extern void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effect, s32 n);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPMtxVec* rot, Mtx34* mtx);
 extern void SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34(void* effect, Mtx34* mtx);
@@ -267,9 +263,7 @@ extern void fn_80111344(Eft* self);
 extern s32 res_eft_model_create_light__FP6MHcharUsUll(EftLight* light, u16 id, u32 a, s32 b);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
 extern s16 fn_802BF814(void);
-extern void fn_8007F0CC(s32 root, u32 id);
 extern void fn_80111870(void);
-extern void* fn_800E3B8C(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void));
 extern s32 fn_8026A328(s32 a, f32 b, f32 c);
 extern s32 pRoot;
 extern u16 Get_motion_no__FP4_PLW(Plw* plw);
@@ -289,7 +283,6 @@ extern f32 lbl_807969D4;
 extern u16 lbl_80791838[];
 extern f32 lbl_80796848; /* 1.0f */
 extern void setVisibility__6MHcharFUlb(void* mhchar, u32 id, u32 visible);
-extern void fn_800E0A14(void* mhchar, u32 joint, Mtx34* out);
 
 void fn_8010D388(Eft* self);
 void fn_8010D3C4(Eft* self);
