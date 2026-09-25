@@ -41,6 +41,12 @@ u32 fn_800638F8(void *self, u32 *other);
 u32 fn_800639D0(u32 **a, u32 **b);
 u32 fn_80063964(void *self, u32 *other);
 
+/* 0x800649B4 - the animation-object flag setter the ScnMdl unit's fn_8007EA08 calls (rule 2).  The
+ * target object references the plain name, so C linkage: it sits inside this `extern "C"` block.
+ * The object is spelled `void*` here - the same opaque-pointer convention the rest of this header
+ * uses - and the owner casts it to its local `G3dFlagWord` view of the +0xC flag word. */
+s32 fn_800649B4(void* pSelf, u32 bits);
+
 #ifdef __cplusplus
 }
 #endif
@@ -119,6 +125,4 @@ ResAnmLightConfig *fn_80066E80(void *p); /* 0x80066E80 - the checked light-confi
 #endif
 
 #endif /* MHTRI_G3D_FN_80063888_H */
-/* 0x800649B4 - the animation-object flag setter the ScnMdl unit's fn_8007EA08 calls (rule 2). */
-s32 fn_800649B4(void* pSelf, u32 bits);
 

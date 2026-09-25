@@ -29,7 +29,15 @@ void drawSpr2TF(u8 id, fltSpr2TF* spr, u8 flag);
 void subTransSet(u32 a, s32 b, u32* c);
 #endif
 
-#endif /* MHTRI_FN_80047398_H */
-/* 0x800497AC - the node-buffer allocator the ScnMdl replacement passes call (rule 2). */
+#ifdef __cplusplus
+/* 0x800497AC - the node-buffer allocator the ScnMdl replacement passes call (rule 2).  The target
+ * object references the plain name, so C linkage - it belongs inside the `extern "C"` block. */
+extern "C" {
+#endif
 s32 fn_800497AC(void* pSelf);
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_FN_80047398_H */
 
