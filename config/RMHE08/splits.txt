@@ -73,6 +73,11 @@ g3d/fn_8005AA28.cpp:
 	.text       start:0x8005AA28 end:0x8005ABD8
 	.ctors      start:0x8056F2D0 end:0x8056F2D4
 
+g3d/g3d_anmchr.cpp:
+	extab       start:0x80007328 end:0x800076C4
+	extabindex  start:0x8001F62C end:0x8001FB00
+	.text       start:0x8005ABD8 end:0x80063888
+
 g3d/fn_80063888.cpp:
 	extab       start:0x800076C4 end:0x80007B14
 	extabindex  start:0x8001FB00 end:0x8001FF5C
