@@ -34,7 +34,6 @@ u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
-s32 em_work_die_ck(struct _ENEMY_WORK* enemy);
 /* Declared for the C++ consumers (docs/plan.md 6.5 rule 2): this unit owns the symbol.  The C
  * consumers spell it themselves with ABI-equivalent prototypes, and MWCC's C front-end rejects a
  * fixed prototype after one of those, so the declaration is C++-only. */
@@ -46,6 +45,9 @@ void fn_8012CF20(struct _ENEMY_WORK* self);
 #endif
 
 #ifdef __cplusplus
+/* The owner defines these at C++ scope and the target objects reference their C++ manglings
+ * (`em_work_die_ck__FP11_ENEMY_WORK`), so they are declared with C++ linkage (relocaudit). */
+s32 em_work_die_ck(struct _ENEMY_WORK* enemy);
 /* The real C++ spelling of `em_die_ck__FP11_ENEMY_WORK` (mangle.py verified), so a caller
  * never spells the mangling (docs/plan.md 6.5 rule 9). */
 s32 em_die_ck(struct _ENEMY_WORK* work);

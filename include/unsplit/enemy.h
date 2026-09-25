@@ -119,11 +119,6 @@ f32 get_em_chg_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 f32 get_em_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* work, u32 joint, Vec3* out);
 
-
-/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
- * needed that the first did not; a symbol both named keeps the first (verified) signature. */
-void get_joint_wpos_em(struct _ENEMY_WORK* enemy, u32 joint, Vec3* out);
-
 /* The enemy action band 0x80127F48.. and the handler band 0x80170A54..0x80170EF4, owned by the
  * not-yet-registered proposals `proposal/8016xxxx`/`proposal/8017xxxx`.  Added by the
  * `enemy/fn_80170FA8.cpp` registration: its dispatcher tail-calls the 0x80170xxx handlers and the
@@ -176,8 +171,11 @@ void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s3
 
 #ifdef __cplusplus
 /* The C++ spellings of the mangled callees this band calls, so a call site never spells the
- * mangling (docs/plan.md 6.5 rule 9); each mangles back to its map name. */
+ * mangling (docs/plan.md 6.5 rule 9); each mangles back to its map name.  `get_joint_wpos_em`
+ * itself is C++ in the target (`get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3`), so the
+ * declaration moves here from the extern "C" block (relocaudit). */
 u32 em_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
+void get_joint_wpos_em(struct _ENEMY_WORK* enemy, u32 joint, Vec3* out);
 #endif
 
 #endif /* MHTRI_UNSPLIT_ENEMY_H */
