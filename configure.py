@@ -939,7 +939,7 @@ config.libs = [
             # `Pl_act_ck__FP4_PLWUcUs`.  No `__FILE__` string covers the range (the .data pool around
             # the jump table carries none), so the stem is the map's `fn_80241558` with a rule-7
             # deferral.  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_80241558.cpp"),
+            Object(Matching, "Pl/fn_80241558.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
