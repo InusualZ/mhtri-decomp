@@ -40,7 +40,8 @@
  */
 
 #include "types.h"
-#include "unsplit/g3d.h"      /* fn_8007A724 (rule 2) */
+#include "unsplit/g3d.h"      /* unsplit g3d neighbours (rule 2) */
+#include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_80063888.h"
 #include "mh3_pad.h"        /* fn_80043EA8, owned by mh3_pad.cpp (rule 2) */
 

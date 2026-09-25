@@ -46,6 +46,7 @@
 #include "ef/ef_particlemanager.h"
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
+#include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling (Panic__Q24nw4r2dbFPCciPCce); declaring
  * that spelling as a C++ identifier re-mangles it, so the owner is declared instead and the front-end

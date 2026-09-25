@@ -800,6 +800,14 @@ config.libs = [
             # module is `g3d`: every caller is nw4r g3d (`ScnMdl::CopiedMatAccess`, g3d_calcworld.cpp's
             # fn_80073E8C, g3d_basic.cpp's fn_800D7ED0 twin).  See the file header.
             Object(NonMatching, "g3d/fn_8005AA28.cpp"),       # 0x8005AA28-0x8005ABD8
+            # Registered once, at its final home (docs/plan.md 12): proposal `80075DCC` - the nw4r g3d
+            # render/dispatch cluster (216 functions / 0x6774 B, 0x80075DCC..0x8007C540).  The run spans
+            # five original TUs (g3d_dcc.cpp, g3d_draw1mat1shp.cpp, g3d_draw.cpp, g3d_fog.cpp,
+            # g3d_light.cpp - `tools/units/attribution-queue.json`), so it keeps the map's `fn_80075DCC`
+            # stem (brief evidence class 4); the module is `g3d` and the lib's flags are cflags_g3d.  The
+            # left edge 0x80075DCC is a tudiscover strong cut, the right edge 0x8007C540 is the proposal
+            # cap, not a seam.  See the file header and `include/g3d/fn_80075DCC.h` (rule 2).
+            Object(NonMatching, "g3d/fn_80075DCC.cpp"),      # 0x80075DCC-0x8007C540
         ],
     },
     {

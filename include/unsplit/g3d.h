@@ -58,30 +58,20 @@ s32* fn_80070054(void* pOut, const void* pKey);
 void* fn_8007012C(void);
 void fn_8007100C(void* pDst, const void* pSrc);
 
-/* 0x80075DCC/0x80075DD8/0x80088584/0x80077DF0 - the trig, render-mode and matrix helpers (callers:
- * g3d_camera.cpp, ef/ef_drawfreestrategy.cpp).  fn_80077DF0 assembles an MTX34 from twelve floats (the
- * first eight in FPRs, the last four on the stack). */
-void fn_80075DCC(f32* pOutSin, f32* pOutCos, f32 angle);
-void fn_80077DF0(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03,
-                 f32 m10, f32 m11, f32 m12, f32 m13,
-                 f32 m20, f32 m21, f32 m22, f32 m23);
-void fn_80075DD8(void* p);
+/* 0x80088584 - the render-mode helper (callers: g3d_camera.cpp, ef/ef_drawfreestrategy.cpp).  The
+ * 0x80075DCC/0x80075DD8/0x80077DF0 group moved to its owner header `include/g3d/fn_80075DCC.h` once
+ * `g3d/fn_80075DCC.cpp` registered (rule 2, 2026-09-25). */
 struct RenderModeObj* fn_80088584(void);
 
 /* 0x80082F18 - the frame-round helper (caller: g3d_resanm.c). */
 u16 fn_80082F18(f32 value);
 
-/* 0x8007A724 - the 3-float setter (caller: g3d/fn_80063888.cpp).  The caller passes the object in r3 and
- * the three values in f1-f3. */
-void fn_8007A724(void* self, f32 x, f32 y, f32 z);
+/* 0x8007A724/0x8007A5E4/0x8007A5A8 - the 3-float setters moved to their owner header
+ * `include/g3d/fn_80075DCC.h` once `g3d/fn_80075DCC.cpp` registered (rule 2, 2026-09-25). */
 
-/* 0x8007A5E4/0x8007A5A8 - the two 3-float setters the g3d animation cluster forwards to. */
-void fn_8007A5E4(void* self, f32 x, f32 y, f32 z);
-void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);
-
-/* 0x800868A0/0x80077420 - the pipe-command writers (caller: gx/fn_8009AA78.c). */
+/* 0x800868A0 - the pipe-command writer (caller: gx/fn_8009AA78.c).  fn_80077420 moved to its owner
+ * header `include/g3d/fn_80075DCC.h` (rule 2, 2026-09-25). */
 void fn_800868A0(u32 value);
-void fn_80077420(u16 command, u8 value);
 
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it

@@ -21,6 +21,9 @@ struct ScnMdl { /* size: 0x04 - lower bound, an approximation (only ever used th
         /* +0x04 */ u8 pad_0x04[0x30];
 
         CopiedMatAccess(ScnMdl* mdl, u32 idx);
+
+        /* 0x8007BBAC - the material handle accessor, defined by `g3d/fn_80075DCC.cpp` (rule 2 owner). */
+        u32 GetResTexSrt(bool arg1);
     };
 };
 

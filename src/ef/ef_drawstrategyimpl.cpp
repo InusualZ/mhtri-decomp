@@ -36,6 +36,7 @@
 #include "gx.h"
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
+#include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
 /* `nw4r::db::Panic` - the real declaration; the front end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled

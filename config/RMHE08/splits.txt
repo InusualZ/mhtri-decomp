@@ -123,6 +123,11 @@ g3d/g3d_camera.cpp:
 	extabindex  start:0x800207FC end:0x8002091C
 	.text       start:0x800746DC end:0x80075DCC
 
+g3d/fn_80075DCC.cpp:
+	extab       start:0x800081F8 end:0x80008588
+	extabindex  start:0x8002091C end:0x80020E74
+	.text       start:0x80075DCC end:0x8007C540
+
 g3d/g3d_resanm.c:
 	extab       start:0x80008EB0 end:0x80008EE8
 	extabindex  start:0x800219E4 end:0x80021A38
