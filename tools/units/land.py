@@ -228,6 +228,20 @@ def branch_error(main: str) -> str | None:
     return None
 
 
+def caller_branch_error(start: str | None = None) -> str | None:
+    """`branch_error` asked about the tree the *caller* is in - the guard `record-base`/`verify` run under.
+
+    Both are manual entry points on the landing path, and both read MAIN's tree. But `main` is resolved by
+    `rc.main_root`, which walks the worktree list from wherever the caller stands and always answers with the
+    first worktree git lists - MAIN. So a `record-base` run from inside a worker's worktree would quietly
+    record MAIN's HEAD (or, if MAIN's HEAD had left `main`, a stale one) with nothing saying the wrong tree
+    was asked. `land` refuses a HEAD that is not `main` through `branch_error(main)`; these two ask the same
+    helper about the caller's own tree (`rc.worktree_root`), so a call from any worktree but MAIN is refused
+    and names the branch it found.
+    """
+    return branch_error(rc.worktree_root(start))
+
+
 def changed_status(main: str) -> list[tuple[str, str]]:
     """[(status, path)] for every change git reports, untracked files listed individually (`-uall`)."""
     out = git(["status", "--porcelain", "-uall"], main)
@@ -1168,6 +1182,43 @@ def selftest() -> int:
         check("a land off main refuses with exit 1", code, 1)
         check("... the refusal names the branch", "throwaway-check" in buf.getvalue(), True)
         check("... and the stale message is cleared", os.path.exists(land_message_path(tmp)), False)
+
+    # `record-base` and `verify` are the landing path's two other manual entry points. They read MAIN's tree,
+    # but MAIN is resolved from wherever the caller stands (`rc.main_root`), so both must refuse a caller that
+    # is not on `main` - a worker's worktree is on the claim's branch, not main, and a MAIN left on a throwaway
+    # branch would record the wrong HEAD. `caller_branch_error` is `branch_error` asked about the caller's tree;
+    # the entry points themselves are exercised through `main()` with the worktree root pointed at a temp repo.
+    import io
+    import unittest.mock
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        check("record-base/verify on main pass the caller guard", caller_branch_error(tmp), None)
+        repo_git(tmp, "checkout", "-q", "-b", "throwaway-check")
+        err = caller_branch_error(tmp)
+        check("a record-base/verify off main is refused", err is not None, True)
+        check("... the refusal names the branch it found", "throwaway-check" in (err or ""), True)
+        check("... and tells the caller to checkout main", "git checkout main" in (err or ""), True)
+        # the normal path: `record-base` from a tree on `main` still records that HEAD
+        repo_git(tmp, "checkout", "-q", "main")
+        with unittest.mock.patch.object(rc, "worktree_root", return_value=tmp), \
+                unittest.mock.patch.object(sys, "argv", ["land.py", "record-base", "--json"]):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = main()
+        check("record-base on main still runs", code, 0)
+        check("... and records the base it read", read_base(tmp).get("base"), repo_git(tmp, "rev-parse", "HEAD"))
+        # both entry points refuse a caller off `main`, before reading or writing anything
+        repo_git(tmp, "checkout", "-q", "throwaway-check")
+        for cmd in ("record-base", "verify"):
+            with unittest.mock.patch.object(rc, "worktree_root", return_value=tmp), \
+                    unittest.mock.patch.object(sys, "argv", ["land.py", cmd]):
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    code = main()
+            check("land.py %s off main refuses" % cmd, code, 1)
+            check("... names the branch it found", "throwaway-check" in buf.getvalue(), True)
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1214,10 +1265,19 @@ def main() -> int:
         return selftest()
     main = rc.main_root(rc.worktree_root())
     if args.cmd == "record-base":
+        # manual entry point: it reads MAIN's tree, so it must refuse a caller that is not in MAIN on main
+        bad_branch = caller_branch_error()
+        if bad_branch:
+            print("REFUSED record-base | %s" % bad_branch)
+            return 1
         data = record_base(main)
         print(json.dumps(data, indent=2) if args.json else "base %s (%s)" % (data["base"], data["subject"]))
         return 0
     if args.cmd == "verify":
+        bad_branch = caller_branch_error()
+        if bad_branch:
+            print("REFUSED verify | %s" % bad_branch)
+            return 1
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
                       check_outbox=not args.no_outbox, release_claims=not args.no_release)
