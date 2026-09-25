@@ -845,7 +845,6 @@ config.libs = [
             # fn_800938EC before and fn_800947A4 after (the first body of the next TU, which cites
             # "g3d_resmat.cpp").
             Object(NonMatching, "g3d/g3d_resfile.cpp"),      # 0x80093990-0x800947A4
-            Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
             # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass
