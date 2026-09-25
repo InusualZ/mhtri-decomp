@@ -31,6 +31,9 @@ bool fn_8006946C(const void* p, s32 id);
 /* 0x80068634 - the checked resource resolver: panics when the handle's reference is invalid, then
  * returns the body word at +0x0 (the resolved data pointer).  Owner: g3d/fn_800680CC.cpp. */
 u32 fn_80068634(void* p);
+/* 0x800689B0 - the debug-checked resource accessor (caller: g3d_resanmcamera.cpp).  Returns the
+ * resolved data pointer for a `ResCommon`-style handle. */
+u32 fn_800689B0(void* p);
 
 #ifdef __cplusplus
 }
