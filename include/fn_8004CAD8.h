@@ -73,6 +73,14 @@ void* fn_80050508(void* pOut);
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
 f32 fn_80050EF4(void* a, void* b);
+/* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
+ * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `fn_80050CA0(out, a, b)` is
+ * `fn_80043EA8(out); PSVECSubtract(out, a, b)`, and `fn_80050F80(a, b)` calls `fn_80050CA0(&local, b, a)`
+ * then the length helper `fn_80050F24(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
+ * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
+ * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
+void fn_80050CA0(void* out, const void* a, const void* b);
+f32 fn_80050F80(const void* a, const void* b);
 /* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
  * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
