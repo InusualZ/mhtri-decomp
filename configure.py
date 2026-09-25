@@ -598,6 +598,11 @@ config.libs = [
             Object(NonMatching, "ef/eft007.cpp"),
             Object(NonMatching, "ef/eft009.cpp"),
             Object(Matching, "ef/fn_80104BD0.c"),
+            # Registered once, at its final home (docs/plan.md 12).  proposal/80105314_fn_80105314:
+            # a maximal unclaimed run, seam unproven; class 4 decided the name (the map's
+            # fn_80105314 stem, the scheme the bracketing fn_80104BD0/fn_8010D1A8 units use) and
+            # the range holds several original effect families - see the unit's file header.
+            Object(NonMatching, "ef/fn_80105314.cpp"),
             Object(NonMatching, "ef/fn_8010D1A8.c"),
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(Matching, "ef/fn_8011722C.c"),

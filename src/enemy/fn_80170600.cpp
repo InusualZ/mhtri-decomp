@@ -34,6 +34,7 @@
 #include "enemy/fn_80171194.h"
 #include "unsplit/enemy.h"
 #include "unsplit/ef.h"
+#include "ef/fn_80105314.h"
 
 #pragma peephole off
 

@@ -10,6 +10,7 @@
 #define MHTRI_EF_EFFECT_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 struct _EFT;
 
@@ -28,6 +29,9 @@ void fn_800F9DF4(struct _EFT* self, u8 a, u8 b);
 
 /* Calls vtable slot 6 of the pooled effect with `flag != 0` (its retire/flag hook). */
 void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
+
+/* Places the pooled effect at a world position (the enemy/emitter state-0 handlers' per-effect call). */
+void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
 
 #ifdef __cplusplus
 }
