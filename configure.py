@@ -486,6 +486,17 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+            # Registered once, at its final home (docs/plan.md 12).  The `proposal/8011D448_fn_8011D448.cpp`
+            # range (`.text` 0x8011D448..0x801251D0, 101 functions / 32136 B): the enemy module's
+            # effect-spawner band - the `_EFT` creators whose owner is an `_ENEMY_WORK` (they install
+            # `fn_8011D8C0`/`fn_8011D9B8` release/dispatch callbacks exactly like `ef/eft001.cpp`) and
+            # the action/state machine that follows them.  Module `enemy` from the code (`_ENEMY_WORK`,
+            # `em_parts_damage_level_get`) and the naming scheme of the neighbour above; no `__FILE__`
+            # string survives and the dump's only in-range real name is a function name, so the map stem
+            # is kept (brief section 2, class 3+4).  Sections: extab 0x8000C63C..0x8000C8AC (78 records),
+            # extabindex 0x80026844..0x80026BEC (78 x 12 B), .text 0x8011D448..0x801251D0.  C++ from the
+            # range's mangled callees; every plain `fn_XXXXXXXX` definition is `extern "C"`.
+            Object(NonMatching, "enemy/fn_8011D448.cpp"),
                         # proposal/801251D0_fn_801251D0.cpp: the enemy control unit
             # (0x801251D0..0x8012BA00, 145 symbols). Registered once, at its final home
             # (docs/plan.md 12); cflags are this lib's.
