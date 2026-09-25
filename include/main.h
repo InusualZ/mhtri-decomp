@@ -28,7 +28,13 @@ struct _MH_VEC2;
 void fn_8004030C(struct _MH_VEC2* v);
 
 #ifdef __cplusplus
-}
+}  /* extern "C" */
+
+/* The two `main.cpp` symbols whose map names are C++ manglings (`get_ScreenSize__FP8_MH_VEC2`,
+ * `ck_WideMode__Fv`); they keep C++ linkage so the linker sees those names. */
+struct _MH_VEC2;
+void get_ScreenSize(_MH_VEC2* v);
+int ck_WideMode(void);
 #endif
 
 #endif /* MHTRI_MAIN_H */
