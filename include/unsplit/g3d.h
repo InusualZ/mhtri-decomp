@@ -31,16 +31,22 @@ extern "C" {
  * a `u32 mtxID`, the other uses it as an array index), so the verified `const void*` form is kept and the
  * return-type question is recorded rather than silently settled. */
 
-/* 0x80069664..0x800883C4 - the g3d node/resource helpers (callers: enemy/fn_80138074.c).
- * `fn_80069664`'s return type corrected to `s32` when g3d/g3d_resanmlight.cpp became a consumer and uses
- * the word it returns (the target reads `*(u32*)(*self + 4)`); the two existing callers use it as a
- * statement, so the type is source-compatible. */
+/* 0x80069664..0x800883C4 - the g3d node/resource helpers (callers: enemy/fn_80138074.c,
+ * g3d/g3d_resanmlight.cpp, g3d/g3d_resanmtexsrt.cpp).
+ * `fn_80069664`'s return type is main's landed `s32` (unchanged): the `g3d/fn_800680CC.h` owner
+ * header now declares it `s32` too, so the three landed units that include both headers
+ * (g3d_calcvtx.cpp, g3d_resanmfog.cpp, g3d_resfile.cpp) see one type.  The owner defines it
+ * `extern "C" u32`; the types are register-identical and the word is used as 32 bits everywhere. */
 s32 fn_80069664(void* self);
-/* 0x80092330 - the `ResAnmScn` channel-record resolve chain (caller: g3d/g3d_resanmlight.cpp).
+/* 0x80092330 - the `ResAnmScn` channel-record resolve chain.  main's landed `s32` is kept: the
+ * branch's unit `g3d/g3d_resanmtexsrt.cpp` owns 0x80092330 (inside its 0x800916FC-0x80093990 range)
+ * and includes this header, so its own declaration/definition were made `s32` to agree (the
+ * "illegal function overloading" trap); main's caller g3d/g3d_resanmlight.cpp is untouched.
  * 0x80463E74 - the global frame thunk that `fn_8008FFFC` tail-calls.  Both are unsplit, so the band
  * header is their home (rule 2).  Added when g3d/g3d_resanmlight.cpp registered. */
 s32 fn_80092330(void* self, void* key);
 f32 fn_80463E74(void);
+
 void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
 void fn_80080B10(void* arg0, u32 arg1);
 void fn_800810DC(void* arg0, s32 arg1);
@@ -104,9 +110,12 @@ extern u32 lbl_8079124C;
 
 /* 0x80092584..0x80093690 - the ten resource-category count/item accessors of the `ResFile`
  * container (0x80092588/84, 0x80092B10/0C, 0x8009284C/48, 0x80092CC4/C0, 0x80092E78/74,
- * 0x8009302C/28, 0x800931E0/DC, 0x80093394/90, 0x80093548/44, 0x80093690/8C).  The band sits between
- * the registered `g3d/g3d_resanmfog.cpp` and `g3d/g3d_resfile.cpp` (both `g3d`), so it is a sound
- * g3d-module home (rule 2).  Each pair is `<category> count(self)` and `<category> item(self, i)`. */
+ * 0x8009302C/28, 0x800931E0/DC, 0x80093394/90, 0x80093548/44, 0x80093690/8C).  Added when
+ * `g3d/g3d_resfile.cpp` registered; the branch's `g3d/g3d_resanmtexsrt.cpp` OWNS these addresses
+ * (0x800916FC-0x80093990) and defines them, so it includes this header and its ten item accessors
+ * were taken as main's `void*` (they feed `ResHandle::mpData`, a `void*`) so that no translation
+ * unit sees two declarations of one C-linkage symbol.  Each pair is `<category> count(self)` and
+ * `<category> item(self, i)`. */
 u32 fn_80092588(void* p);
 void* fn_80092584(void* p, u32 i);
 u32 fn_80092B10(void* p);

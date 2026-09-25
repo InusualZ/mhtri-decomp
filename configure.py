@@ -903,6 +903,19 @@ config.libs = [
             # `extabindex` 0x80021A74-0x80021D5C (62 entries); the boundaries are the functions before
             # (fn_8008A644) and after (fn_8008F6E8).
             Object(NonMatching, "g3d/g3d_resanmchr.cpp"),   # 0x8008A664-0x8008F6E8
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `800916FC_fn_800916FC` - the nw4r g3d `ResAnmTexSrt` SRT-animation TU and the inline
+            # resource-accessor bodies emitted beside it (75 functions / 0x2294 B,
+            # 0x800916FC-0x80093990).  Its own `nw4r::db::Panic` asserts pass the bare source name
+            # "g3d_resanmtexsrt.cpp" (`.data` 0x80590928, the file argument of all four asserts in
+            # fn_800916FC), so the lib is `g3d` and the file takes its evidenced TU name (class 1 in
+            # the brief).  `langcheck` agrees: the name is a `.cpp` and the `Panic` relocation is a
+            # C++ mangling, so the unit is `src/g3d/g3d_resanmtexsrt.cpp` in this lib.  The run also
+            # cites the `g3d_res*_ac.h` inlined-assert headers, which share the same `.data`
+            # fragment, so they are this TU's inlined accessor bodies, not a second object.  Sections:
+            # `.text` 0x800916FC-0x80093990, `extab` 0x80009208-0x800093A8 (52 records),
+            # `extabindex` 0x80021EE8-0x80022158 (52 entries).  See the file header.
+            Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"), # 0x800916FC-0x80093990
             # Registered from proposal/800D77B0_fn_800D77B0 (the 0x800D77B0 two-function run).  `g3d`
             # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
             # builder) and names it; the range's own data has no `__FILE__` string, so the name stays

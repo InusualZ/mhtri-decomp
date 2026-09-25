@@ -42,7 +42,6 @@ u32 fn_800697A4(void);
  * `g3d/g3d_resfile.cpp` registered (rule 2). */
 u32 fn_8006E6B4(void* p);   /* 0x8006E6B4 - `*(u32*)p != 0` */
 u32 fn_800695EC(void* p);   /* 0x800695EC - the checked resource resolver */
-u32 fn_8006CDBC(void* p);   /* 0x8006CDBC - the checked resource resolver */
 u32 fn_8006993C(void* p);   /* 0x8006993C - the checked resource resolver */
 /* 0x8006E2AC - the `ResTexSrt` non-const slot-array resolver (`ResTexSrt::SetEffectMtx` panics through
  * it when the handle word is invalid, then returns the base of the 0x34-byte slot array).  Declared
@@ -50,6 +49,25 @@ u32 fn_8006993C(void* p);   /* 0x8006993C - the checked resource resolver */
  * sides' declarations survive. */
 u8* fn_8006E2AC(void* pSelf);
 
+/* 0x8006CDBC - the checked resource resolver the `g3d_resfile.cpp` getters and this branch's
+ * `g3d/g3d_resanmtexsrt.cpp` field readers both call.  ONE declaration: both sides spelled it
+ * `u32 fn_8006CDBC(void*)` (only the parameter name differed), so main's landed line is kept and
+ * the branch's duplicate is dropped (a second declaration of one C-linkage symbol in one
+ * translation unit is the "illegal function overloading" trap). */
+u32 fn_8006CDBC(void* p);
+/* 0x80069664 - the indexed resource reader (the `ResFile` accessor family's tail): with a valid
+ * handle returns the body word at +0x4 of the resolved record, else 0.  Declared here for
+ * `g3d/g3d_resanmtexsrt.cpp` (rule 2).  It is `s32` here to AGREE with main's landed band
+ * declaration `include/unsplit/g3d.h` (`s32 fn_80069664(void*)`): `g3d/g3d_calcvtx.cpp`,
+ * `g3d/g3d_resanmfog.cpp` and `g3d/g3d_resfile.cpp` all include BOTH headers, so a `u32` here
+ * would put two disagreeing declarations of one C-linkage symbol in those translation units.
+ * The owner `g3d/fn_800680CC.cpp` defines it `extern "C" u32` (it does not include this header);
+ * the types are register-identical and every consumer uses the word as 32 bits. */
+s32 fn_80069664(void* self);
+/* 0x8006D9FC - the indexed handle reader the `g3d_resanmtexsrt.cpp` field readers call (rule 2). */
+u32 fn_8006D9FC(void* self, u32 idx);
+/* 0x8006D9A4 - the keyed field reader (a sibling of the `g3d_resanmtexsrt.cpp` reader). */
+u32 fn_8006D9A4(void* self, void* key);
 
 #ifdef __cplusplus
 }

@@ -94,10 +94,18 @@ u32* fn_80076794(u32* pDst, u32 value); /* 0x80076794 - the 0x20-aligned handle 
 s32 fn_8007673C(void* p);              /* 0x8007673C - `*(u32*)p != 0` */
 s32 fn_80076750(void* p);              /* 0x80076750 - `*(u32*)p != 0` */
 s32 fn_80076800(void* p);              /* 0x80076800 - `*(u32*)p != 0` */
-u32 fn_8007B878(s32 pDst, s32 offset); /* 0x8007B878 - the alignment-asserting offset helper */
+/* 0x8007B878 - the alignment-asserting offset helper (the owner defines it
+ * `s32 fn_8007B878(s32, s32)` in `g3d/fn_80075DCC.cpp`).  ONE declaration: main's landed form is
+ * kept and this branch's `void* fn_8007B878(void* out, u32 v)` spelling is dropped - two differing
+ * declarations of one C-linkage symbol in one translation unit is the "illegal function
+ * overloading" trap, and `g3d/g3d_resanmtexsrt.cpp` includes this header.  The argument and return
+ * types are register-identical, so that unit's two call sites take plain casts and its object is
+ * unchanged. */
+u32 fn_8007B878(s32 pDst, s32 offset);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* MHTRI_G3D_FN_80075DCC_H */
+

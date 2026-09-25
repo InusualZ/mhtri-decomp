@@ -28,6 +28,10 @@ s32 fn_8008A188(u32 *self, f32 frame, s32 flag);
 /* 0x8008A1A8 - clamps `frame` into [0, count]. */
 f32 fn_8008A1A8(u16 *count, f32 frame);
 
+/* 0x80089F94 - the `ResAnmAmbLight` value-type constructor (writes `v` to `out`); called by the
+ * `g3d/g3d_resanmtexsrt.cpp` `ResFile` accessor family. */
+void* fn_80089F94(void* out, u32 v);
+
 #ifdef __cplusplus
 }
 #endif
