@@ -486,6 +486,10 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+                        # proposal/801251D0_fn_801251D0.cpp: the enemy control unit
+            # (0x801251D0..0x8012BA00, 145 symbols). Registered once, at its final home
+            # (docs/plan.md 12); cflags are this lib's.
+            Object(NonMatching, "enemy/fn_801251D0.cpp"),
                         Object(NonMatching, "enemy/fn_8012BA00.c"),
             Object(NonMatching, "enemy/fn_8012BDF4.cpp"),
             Object(NonMatching, "enemy/fn_80138074.c"),
