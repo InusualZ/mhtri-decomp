@@ -737,6 +737,17 @@ config.libs = [
             # and the MAP was renamed to `fn_800680A8__FPv`/`fn_80066C8C__FPv` (playbook 48); the object is
             # byte-identical, so the DOL hash holds.
             Object(Matching, "g3d/g3d_anmscn.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8005ABD8_disp_beta_tex__FP3VecP4Vec28_GXColorP9_GXTexObj` - the nw4r g3d character-
+            # animation TU plus the game's font/debug-print accessors (183 functions / 0x8CB0 B,
+            # 0x8005ABD8..0x80063888).  Its own `nw4r::db::Panic` asserts pass the bare source name
+            # `"g3d_anmchr.cpp"` (`.data` 0x8058B410, 98 sites, 0x8005CF50..0x8006385C) with the
+            # `g3d_resnode_ac.h`/`g3d_anmobj.h`/`g3d_resanmchr_ac.h` cluster beside it, so the lib is
+            # `g3d` and the file takes its evidenced TU name (class 1 in the brief) rather than the map's
+            # `disp_beta_tex` stem.  The range is a capped slice: its first ~0x2338 B (0x8005ABD8..
+            # 0x8005CF10) carry no g3d assert and read a different `.data` pool, so the seam is a proposal
+            # cap, not a proven TU boundary - the header records it.
+            Object(NonMatching, "g3d/g3d_anmchr.cpp"),     # 0x8005ABD8-0x80063888
             # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
             # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
             # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function
