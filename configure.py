@@ -514,7 +514,7 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(NonMatching, "sound/fn_800D7F54.cpp"),
-            Object(NonMatching, "sound/fn_800DCFEC.c"),
+            Object(NonMatching, "sound/fn_800DCFEC.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from proposal/800DD1F0_fn_800DD1F0.cpp:
             # the SE (`se_w`) request cluster's tail plus the `MHchar` model class, 125 symbols /
             # 0x6ACC bytes.  `sound` module (both bracketing units are `sound`, include/unsplit/sound.h
