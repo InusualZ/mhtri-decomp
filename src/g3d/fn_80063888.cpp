@@ -463,19 +463,8 @@ extern "C" void fn_80065804(void)
  * one field of the resolved config record.
  * --------------------------------------------------------------------------------------------- */
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x34];
-    /* +0x34 */ u16 field_0x34;
-    /* +0x36 */ u16 field_0x36;
-    /* +0x38 */ u32 field_0x38;
-    /* +0x3C */ u16 field_0x3C;
-    /* +0x3E */ u16 field_0x3E;
-    /* +0x40 */ u16 field_0x40;
-    /* +0x42 */ u16 field_0x42;
-    /* +0x44 */ u16 field_0x44;
-} ResAnmScnConfig; /* size: 0x46 (approximate - only the fields this cluster reads are evidenced) */
-
-extern "C" ResAnmScnConfig *fn_8006584C(void *p);
+/* `ResAnmScnConfig` moved to include/g3d/fn_80063888.h (rule 1) when g3d/g3d_resanmlight.cpp became
+ * the second consumer; `fn_8006584C`'s declaration moved with it (rule 2). */
 
 extern "C" u16 fn_80065828(void *p)
 {
@@ -582,18 +571,8 @@ typedef struct {
     /* +0x10 */ u32 field_0x10;
 } ResAnmAmbLightWord; /* size: 0x14 (approximate - only the +0x10 word this accessor reads is evidenced) */
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u16 field_0x18;
-    /* +0x1A */ u8 field_0x1A;
-    /* +0x1B */ u8 pad_0x1B;
-    /* +0x1C */ u32 field_0x1C;
-} ResAnmLightConfig; /* size: 0x20 (approximate - only the fields this cluster reads are evidenced) */
-
-extern "C" ResAnmLightConfig *fn_80066DB4(void *p);
-extern "C" ResAnmLightConfig *fn_80066E80(void *p);
+/* `ResAnmLightConfig` and the `fn_80066DB4`/`fn_80066E80` declarations moved to
+ * include/g3d/fn_80063888.h (rules 1 and 2) when g3d/g3d_resanmlight.cpp became the second consumer. */
 
 extern "C" u32 fn_80066C68(void *p)
 {
