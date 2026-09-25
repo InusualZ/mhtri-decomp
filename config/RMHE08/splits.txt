@@ -93,6 +93,16 @@ g3d/fn_800680CC.cpp:
 	extabindex  start:0x8001FF68 end:0x8002040C
 	.text       start:0x800680CC end:0x8006EAC0
 
+g3d/g3d_calcmaterial.cpp:
+	extab       start:0x80007EC0 end:0x80007F40
+	extabindex  start:0x80020448 end:0x80020508
+	.text       start:0x8006EE78 end:0x8006F738
+
+g3d/g3d_calcview.cpp:
+	extab       start:0x80007F40 end:0x80008008
+	extabindex  start:0x80020508 end:0x80020634
+	.text       start:0x8006F738 end:0x8007270C
+
 g3d/g3d_calcvtx.cpp:
 	extab       start:0x80008060 end:0x800080B8
 	extabindex  start:0x800206B8 end:0x8002073C

@@ -755,6 +755,13 @@ config.libs = [
             # cluster keeps the map's own stem, as `g3d/fn_80063888.cpp` did beside it; internal seam
             # near 0x8006946C/0x800697D4/0x80069CF4 (see the file header).
             Object(NonMatching, "g3d/fn_800680CC.cpp"),   # 0x800680CC-0x8006EAC0
+            # Registered from proposal/8006EE78_fn_8006EE78 (the 0x8006EE78 range).  The range spans
+            # two original TUs, proven by their own `__FILE__` strings read out of orig/RMHE08/sys/main.dol:
+            # fn_8006EE78's Panic cites `lbl_8058D7E0` = "g3d_calcmaterial.cpp", and fn_8006F738 - the
+            # file's first body - cites `lbl_8058D938` = "g3d_calcview.cpp".  Each is registered once at
+            # its final home; the seam is 0x8006F738 and is also the extab/extabindex boundary.
+            Object(NonMatching, "g3d/g3d_calcmaterial.cpp"), # 0x8006EE78-0x8006F738
+            Object(NonMatching, "g3d/g3d_calcview.cpp"),     # 0x8006F738-0x8007270C
             # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
             # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
             # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function
