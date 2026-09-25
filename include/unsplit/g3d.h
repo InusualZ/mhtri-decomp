@@ -39,15 +39,17 @@ void fn_800810DC(void* arg0, s32 arg1);
 void fn_800883C4(Mtx34* out, const Mtx34* src);
 void fn_800834F0(void* p); /* constructs one 8-byte sub-object (ef_particle's parameter record) */
 
-/* 0x800696E4..0x80069754 - the `g3d_resvtx_ac.h` accessor group (callers: g3d_calcvtx.cpp). */
-void* fn_800696E4(const void* p);
-const char* fn_80069748(void);
-s32 fn_80069754(const void* p);
+/* 0x8006946C..0x80069768 - the `g3d_resvtx_ac.h` accessor group moved to its owner's header,
+ * `include/g3d/fn_800680CC.h`, once `g3d/fn_800680CC.cpp` registered as the owner (rule 2). */
 
-/* 0x800731EC..0x80073354 (callers: g3d_calcvtx.cpp). */
-void fn_800731EC(void* p, u32 v);
-void* fn_800732F0(const void* p);
-const char* fn_80073354(void);
+/* 0x80088E84..0x8008918C - the three `GetBaseVtx` shapes the 0x8007270C blend starts from (callers:
+ * g3d_calcvtx.cpp).  Each fills the base-vertex pointer and the vertex stride for one resource. */
+void fn_80088E84(const void* p, const void** ppBaseVtx, u8* pStride);
+void fn_80088FFC(const void* p, const void** ppBaseVtx, u8* pStride);
+void fn_8008918C(const void* p, const void** ppBaseVtx, u8* pStride);
+
+/* 0x800731EC..0x80073354 (callers: g3d_calcvtx.cpp).  Moved into the unit's own forward-declaration
+ * block once `g3d/g3d_calcvtx.cpp` was registered as their owner (rule 2, 2026-09-24). */
 
 /* 0x8006FDCC..0x8007100C - the `g3d_calcworld` node/resource helpers (callers: g3d_calcworld.cpp). */
 u32 fn_8006FDCC(const void* p);
