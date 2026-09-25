@@ -510,6 +510,16 @@ config.libs = [
             Object(NonMatching, "enemy/fn_80137604.cpp"),
             Object(NonMatching, "enemy/fn_80138074.c"),
             Object(NonMatching, "enemy/fn_8013BE60.c"),
+            # Registered from proposal/8013F764_fn_8013F764 (a 0x8013F764 run discovery proposed):
+            # the enemy program interpreter's second half - the run driver, the 0x4E..0x6A stream
+            # readers and the command-length/stream-walk helpers, 45 functions / 0x1A54 bytes.
+            # Module `enemy` from the link band (both bracketing units are `enemy`) and from the
+            # code (it calls `get_enemy_data(_ENEMY_WORK*)`, `get_move_work_adrs`, and the
+            # neighbour unit's `fn_8013BE60`/`fn_8013C244`); C++ because four of its callees are
+            # mangled and rule 9 forbids spelling a mangling at the call site.  No `__FILE__`
+            # string survives in the range and the dump answers only `zz_` placeholders, so the
+            # file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_8013F764.cpp"),
             Object(Matching, "enemy/fn_80149D6C.c"),
             Object(NonMatching, "enemy/fn_8014A1BC.c"),
             # proposal/801550FC_fn_801550FC.cpp: the em003 action unit (0x801550FC..0x8015D860,
