@@ -276,13 +276,9 @@ u32 fn_802AFFF4(void);
 u32 fn_802AFF38(void);
 void fn_8028F558(void* a, void* b);
 u32 fn_802907BC(void* a, void* b);
-s32 ran_suu(s32 max);
 f32 fn_80050EDC(void* v);
 
 /* the file/alloc helpers */
-void* work_mem_alloc(u32 size);
-void work_mem_free(void* p);
-void load_file(char* name, void* dst, u32 size);
 void __construct_array(void* base, void* ctor, u32 a, u32 elemsize, u32 count);
 
 /* the compiler-generated array constructors the unit hands to `__construct_array` */
@@ -295,7 +291,6 @@ void fn_800FBBAC(void* self);
 void fn_800FBBBC(void* self);
 
 /* the shared SDK entry points */
-void Panic(const char* file, int line, const char* msg, ...);
 void* memset(void* dst, int v, u32 n);
 void* memcpy(void* dst, const void* src, u32 n);
 
@@ -308,6 +303,16 @@ void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r:
 void fn_800FADCC(EftFrameState* self);
 
 }  // extern "C"
+
+/* C++ callees: the target object references their manglings (`ran_suu__Fl`,
+ * `work_mem_alloc__FUl`, `work_mem_free__FPv`, `load_file__FPcUll`,
+ * `Panic__Q24nw4r2dbFPCciPCce`), so they are declared at C++ scope, outside the extern "C"
+ * block above (relocaudit). */
+s32 ran_suu(s32 max);
+void* work_mem_alloc(u32 size);
+void work_mem_free(void* p);
+void load_file(char* name, u32 dst, s32 size);
+namespace nw4r { namespace db { void Panic(const char* file, int line, const char* msg, ...); } }
 
 /* the effect manager's control block and the two name tables live in the shared data run */
 extern "C" EftManager eft_control;
@@ -416,7 +421,7 @@ extern "C" s32 fn_800F9884(void* effect) {
     for (s32 i = 0; i < (s32)count; i++) {
         void* handle = fn_800A51D8(effect, (u16)i);
         if (handle == NULL) {
-            Panic((const char*)lbl_8059B5D0, 2854, (const char*)lbl_8059B5E0);
+            nw4r::db::Panic((const char*)lbl_8059B5D0, 2854, (const char*)lbl_8059B5E0);
         } else {
             total += fn_800A970C(handle);
         }
@@ -523,7 +528,7 @@ extern "C" void fn_800F9C20(void* dst, u8 area, u8 slot) {
     }
     u32 rounded = (size + 0x1F) & ~0x1Fu;
     void* buf = work_mem_alloc(rounded);
-    load_file(entry[slot].name_0x04, buf, rounded);
+    load_file(entry[slot].name_0x04, (u32)buf, (s32)rounded);
     memcpy(dst, buf, 0xD0);
     work_mem_free(buf);
 }
