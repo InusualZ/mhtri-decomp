@@ -254,6 +254,29 @@ def selftest() -> int:
               max_bytes=0x12C),
           [(1, 3, None), (3, 6, None)])
 
+    # --- a byte budget is not a TU boundary (2026-09-25) -------------------------------------------
+    # The two size repairs used to cut wherever the byte count said, so a proposal could hold half of
+    # one file and the cap could put a boundary inside a name. The evidence outranks the byte count now.
+    check("segments: the cap ends a piece at the file's own edge, not at a byte",
+          seg(source_names=[fake_source("a.cpp", 1, 3, FUNCS)], min_bytes=0, max_bytes=0x190),
+          [(0, 1, None), (1, 4, "ends at the edge of source file a.cpp, not at the byte cap"),
+           (4, 6, None)])
+    check("segments: a cap smaller than the file slides out of it",
+          seg(source_names=[LONG], min_bytes=0, max_bytes=0x12C),
+          [(0, 1, None),
+           (1, 5, "over --max-bytes: the cut is the edge of source file a.cpp, not a byte position"),
+           (5, 6, None)])
+    check("segments: ... and then no cut lands inside the file at all",
+          [c for c in {b for _a, b, _n in seg(source_names=[LONG], min_bytes=0, max_bytes=0x12C)}
+           if 1 < c <= 4], [])
+    check("segments: the piece that ends at the file edge is not over the cap",
+          seg(source_names=[fake_source("a.cpp", 1, 3, FUNCS)], min_bytes=0, max_bytes=0x190)[1][1], 4)
+    check("segments: a small piece that starts a source file is never merged away (B is 200 B)",
+          seg(source_names=[B], min_bytes=0x200, lo=0, hi=6), [(0, 4, None), (4, 6, None)])
+    check("segments: ... the merge still runs where no name starts",
+          seg(source_names=[B], soft=[(2, 2, 4.0, "pool", "x")], min_bytes=0x200, lo=0, hi=6),
+          [(0, 4, None), (4, 6, None)])
+
     # --- the TU probe: what the queue entry records so the brief can warn --------------------------
     def probe(source_names, lo=0, hi=6, soft=()):
         an = fake_an(FUNCS, source_names=source_names, soft=soft)
@@ -269,6 +292,84 @@ def selftest() -> int:
           at.tu_probe(fake_an(FUNCS, source_names=[A, B]), 0, 6)["sources"], ["a.cpp", "b.cpp"])
     check("probe: the partial file is named",
           at.tu_probe(fake_an(FUNCS, source_names=[LONG]), 0, 3)["partial_source"], "a.cpp")
+    # a size-only edge is flagged as the size decision it is: no name bounds the range, so "unproven"
+    # would read as if the range were merely unexamined (2026-09-25)
+    check("probe: a piece the cap decided is capped, not unproven",
+          at.tu_probe(fake_an(FUNCS), 0, 6, "capped at --max-bytes, seam is a guess")["verdict"], "capped")
+    check("probe: the same range without a cap note is unproven", probe([], 0, 6), "unproven")
+    check("probe: a named file outranks the cap note",
+          at.tu_probe(fake_an(FUNCS, source_names=[A]), 0, 6,
+                      "capped at --max-bytes, seam is a guess")["verdict"], "one-tu")
+
+    # --- the invariant: two proposals never overlap, and none overlaps a registered range -----------
+    def prop(unit, a, b):
+        return {"unit": unit, "text": [a, b]}
+
+    check("overlap: adjacent half-open ranges do not overlap",
+          at.overlap_report([prop("a", 0x1000, 0x1100), prop("b", 0x1100, 0x1200)]), [])
+    check("overlap: one shared byte is an overlap",
+          len(at.overlap_report([prop("a", 0x1000, 0x1100), prop("b", 0x10FF, 0x1200)])), 1)
+    check("overlap: the report names both ranges",
+          "0x00001000..0x00001100" in at.overlap_report([prop("a", 0x1000, 0x1100),
+                                                         prop("b", 0x10FF, 0x1200)])[0], True)
+    check("overlap: a proposal over a registered unit is reported",
+          len(at.overlap_report([prop("a", 0x1000, 0x1100)], [(0x0F00, 0x1080, "main/foo.c")])), 1)
+    check("overlap: ... and the registered unit is named",
+          "main/foo.c" in at.overlap_report([prop("a", 0x1000, 0x1100)],
+                                            [(0x0F00, 0x1080, "main/foo.c")])[0], True)
+    check("overlap: a claim that only touches the edge is not an overlap",
+          at.overlap_report([prop("a", 0x1100, 0x1200)], [(0x1000, 0x1100, "main/foo.c")]), [])
+    check("overlap: a clean batch reports nothing",
+          at.overlap_report([prop("a", 0x1000, 0x1100), prop("b", 0x2000, 0x2100)],
+                            [(0x3000, 0x3100, "main/foo.c")]), [])
+    kept, dropped = at.drop_overlaps([prop("b", 0x10FF, 0x1200), prop("a", 0x1000, 0x1100)])
+    check("overlap: the lowest address wins the overlap", [p["unit"] for p in kept], ["a"])
+    check("overlap: the loser is not emitted", len(kept), 1)
+    check("overlap: the drop is reported, never silent", len(dropped), 1)
+    check("overlap: a disjoint batch survives whole",
+          len(at.drop_overlaps([prop("a", 0x1000, 0x1100), prop("b", 0x1100, 0x1200)])[0]), 2)
+    check("overlap: one that sits on a registered range is dropped",
+          len(at.drop_overlaps([prop("a", 0x1000, 0x1100)], [(0x0F00, 0x1080, "main/foo.c")])[0]), 0)
+    check("intervals: touching and nested ranges merge into one",
+          at.merge_intervals([(0x10, 0x20), (0x20, 0x30), (0x14, 0x18)]), [(0x10, 0x30)])
+    check("intervals: a gap stays a gap",
+          at.merge_intervals([(0x10, 0x20), (0x21, 0x30)]), [(0x10, 0x20), (0x21, 0x30)])
+    check("intervals: coverage needs the whole range",
+          (at.interval_covered([(0x10, 0x30)], 0x10, 0x30),
+           at.interval_covered([(0x10, 0x30)], 0x20, 0x31)), (True, False))
+
+    # --- propose: the region is half-open on function boundaries, so adjacent regions never overlap -
+    def props_for(start, end, claimed=()):
+        return at.propose(fake_an(FUNCS), {}, {}, {}, start, end, min_bytes=0, max_bytes=0x4000,
+                          claimed=list(claimed))
+
+    whole_end = FUNCS[-1][0] + FUNCS[-1][1]
+    check("propose: the whole region is one run", [p["count"] for p in props_for(0x1000, whole_end)], [6])
+    check("propose: its range is the span of its functions",
+          props_for(0x1000, whole_end)[0]["text"], [0x1000, whole_end])
+    cut = FUNCS[3][0]
+    left, right = props_for(0x1000, cut), props_for(cut, whole_end)
+    check("propose: two adjacent regions tile the functions",
+          [p["text"] for p in left] + [p["text"] for p in right], [[0x1000, cut], [cut, whole_end]])
+    check("propose: two adjacent regions never overlap", at.overlap_report(left + right), [])
+    # a function that straddles `end` belongs to the next region: the region that cuts it drops it (and
+    # `main` says so), rather than emitting a range past the region it was asked for
+    check("propose: a function ending past `end` is not part of the region",
+          [p["count"] for p in props_for(0x1000, FUNCS[2][0] + 0x20)], [2])
+    check("propose: ... and the next region does not start inside it either",
+          props_for(FUNCS[2][0] + 0x20, whole_end)[0]["text"][0], FUNCS[3][0])
+    check("propose: a region over a registered range excludes those functions",
+          [p["count"] for p in props_for(0x1000, whole_end, [(FUNCS[1][0], FUNCS[2][0], "main/foo.c")])],
+          [1, 4])
+    check("propose: ... and nothing it emits overlaps the registered range",
+          at.overlap_report(props_for(0x1000, whole_end, [(FUNCS[1][0], FUNCS[2][0], "main/foo.c")]),
+                            [(FUNCS[1][0], FUNCS[2][0], "main/foo.c")]), [])
+    # a function whose *bytes* run into a claim is a boundary defect, and it must not be proposed: the
+    # old start-only test proposed it and the proposal then overlapped a live unit's range
+    check("propose: a function whose bytes run into a claim is excluded",
+          [p["count"] for p in props_for(0x1000, whole_end,
+                                         [(FUNCS[1][0] + 0x10, FUNCS[1][0] + 0x20, "main/foo.c")])],
+          [1, 4])
 
     # --- the cap arithmetic (roadmap 7.14) ----------------------------------------------------------
     def cap_prop(unit, addr, size):
