@@ -51,10 +51,20 @@ void fn_800DA9F4(Vec3* pos);
 void fn_800DC46C(Vec3* pos);
 void fn_800DC4B4(Vec3* pos);
 
-/* The per-frame-set helper `Pl/fn_80241558.cpp` calls: an unmangled `fn_` name, so C linkage. */
+/* 0x800DA428 - the player's frame-set request; the owner defines it `extern "C"`.  Added with
+ * `Pl/fn_80229ECC.cpp`, which calls it once per motion. */
 void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);
+
 #ifdef __cplusplus
 }
+
+/* 0x800DA154 / the sound-code generator: the two entry points `Pl/fn_80229ECC.cpp` drives.  The map
+ * spells them `se_req_frame_set__FP5_se_wllll` / `SE_Code_Make__Flsls`, so they are C++ free
+ * functions and their declarations sit at C++ scope where the front-end reproduces the mangling
+ * (docs/plan.md 6.5 rule 9).  The owner defines them without `extern "C"`. */
+struct _se_w;
+void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e);
+/* The per-frame-set helper `Pl/fn_80241558.cpp` calls: an unmangled `fn_` name, so C linkage. */
 
 /* The SE request layer's own workhorse and code builder, defined by `sound/fn_800D7F54.cpp`.  The map
  * spells them mangled (`se_req_frame_set__FP5_se_wllll`, `SE_Code_Make__Flsls`), so a consumer calls the

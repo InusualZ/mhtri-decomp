@@ -35,6 +35,10 @@ u8* fn_800D0568(s32 index);
  * the owner defines it (`src/ef/fn_800CDB2C.cpp:559`, `u16 ran_suu(long index)`).  Added with
  * `enemy/fn_801B7020.cpp`, which calls it as `ran_suu(0)`. */
 u16 ran_suu(s32 index);
+
+/* 0x800CF218 - the play-mode byte `PlayMode_ck__Fv`; the consumers use `u8` (values < 7).  Added
+ * with `Pl/fn_80229ECC.cpp`, which gates on `(u8)PlayMode_ck() == 3`. */
+u8 PlayMode_ck(void);
 #endif
 
 #endif /* MHTRI_EF_FN_800CDB2C_H */
