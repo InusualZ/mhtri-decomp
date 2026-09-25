@@ -639,6 +639,11 @@ config.libs = [
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(Matching, "ef/fn_8011722C.c"),
             Object(NonMatching, "ef/fn_80119C44.c"),
+            # Registered once, at its final home (docs/plan.md 12).  The `proposal/80119DEC_fn_80119DEC`
+            # range, at the TU-bounded 0x80119DEC..0x8011D448 the attribution queue carries: the runtime
+            # dump's own `eft029_set_scale` / `eft029_set_kaihou` name the TU (dumpmap.py); C++ from
+            # their mangled definitions.  See the unit's file header for the stale-brief record.
+            Object(NonMatching, "ef/eft029.cpp"),
             Object(Matching, "ef/fn_803066F0.c"),
         ],
     },
