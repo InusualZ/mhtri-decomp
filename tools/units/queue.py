@@ -30,6 +30,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -189,14 +190,40 @@ def promote(main: str, unit: str, pool_path: str, claim_slug: str) -> str:
     return dest
 
 
+def branch_error(main: str) -> str | None:
+    """Refuse to claim from a HEAD that is not `main`.
+
+    The claim is rooted at MAIN's HEAD (`git worktree add -b <branch> <wt> <HEAD>`), so a claim made while
+    MAIN sits on another branch roots the worker on that branch's tip instead of main's - the same
+    2026-09-24 incident that moved 14 landings onto `tools/stylelint-rule2-unsplit`. Checked before the
+    worktree exists, so a refusal leaves nothing behind. `None` when git cannot be asked (the selftests run
+    in temp dirs that are not repositories).
+    """
+    p = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=main,
+                       capture_output=True, text=True, errors="replace")
+    branch = p.stdout.strip()
+    if p.returncode != 0 or not branch:
+        return None
+    if branch != "main":
+        return ("HEAD is on %r, not main: `git checkout main` first - a claim is rooted at MAIN's HEAD, "
+                "so one made off main roots the worker on the wrong base" % branch)
+    return None
+
+
 def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
     The unit is claimed first and the brief is only promoted once the claim exists, so a worker is never
     handed an outbox path that does not exist. `claim_fn` is injectable so the selftest can exercise the
-    whole flow without a git worktree.
+    whole flow without a git worktree. Before the claim, `branch_error` refuses a MAIN whose HEAD is not
+    `main`, because the worktree and branch are cut from that HEAD.
     """
     claim_fn = claim_fn or claims.claim
+    if not dry_run:
+        # the worktree/branch is cut from MAIN's HEAD, so a claim made on another branch is rooted wrong
+        bad_branch = branch_error(main)
+        if bad_branch:
+            raise SystemExit("REFUSED queue next | %s" % bad_branch)
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(
@@ -397,6 +424,37 @@ def selftest() -> int:
             check("an empty pool refuses to hand out a brief", "no error", "SystemExit")
         except SystemExit as exc:
             check("an empty pool refuses to hand out a brief", "no ready brief" in str(exc), True)
+
+    # the claim is rooted at MAIN's HEAD: `queue.py next` must refuse when MAIN is not on `main`, or the
+    # worker's worktree and branch are cut from the wrong tip (the 2026-09-24 stale-`main` incident)
+    def qgit(path, *args):
+        p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=path, capture_output=True, text=True)
+        if p.returncode != 0:
+            raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
+        return p.stdout.strip()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = os.path.join(tmp, "mhtri-dtk")
+        os.makedirs(repo)
+        qgit(repo, "init", "-q")
+        qgit(repo, "checkout", "-q", "-b", "main")
+        open(os.path.join(repo, "f.txt"), "w").write("base\n")
+        qgit(repo, "add", "-A")
+        qgit(repo, "commit", "-q", "-m", "claim-time main")
+        check("a claim on main passes the branch guard", branch_error(repo), None)
+        qgit(repo, "checkout", "-q", "-b", "throwaway-check")
+        err = branch_error(repo)
+        check("a claim off main is refused", err is not None, True)
+        check("... the refusal names the branch it found", "throwaway-check" in (err or ""), True)
+        check("... and tells the caller to checkout main", "git checkout main" in (err or ""), True)
+        try:
+            next_brief(repo, None, dry_run=False)
+            check("queue next refuses off main", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("queue next refuses off main", "throwaway-check" in str(exc), True)
+        check("... and claims nothing", os.path.exists(claims.registry_path(repo)), False)
 
     if fails:
         print("FAIL (%d)" % len(fails))
