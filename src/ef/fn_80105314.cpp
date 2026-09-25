@@ -303,15 +303,17 @@ extern "C" f32 lbl_8059F028[];
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
 void se_req_pos_ps(_se_w* se, long id, long mode, nw4r::math::VEC3* pos);
-void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
+extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 u8 get_now_areano();
 u32 em_sleep_ck(_ENEMY_WORK* enemy, u8 kind);
 void get_joint_wmat_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::MTX34* mtx);
-void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, _GXColor* color);
+void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, _GXColor color);
 int event_demo_ck();
 f32 get_em_scale(_ENEMY_WORK* enemy);
 void* get_enemy_data(_ENEMY_WORK* enemy);
-extern "C" void push_g3d_wk(void* work);
+/* target references push_g3d_wk__FP9_g3d_work: C++ linkage with the _g3d_work* parameter */
+struct _g3d_work;
+void push_g3d_wk(struct _g3d_work* work);
 extern "C" u16 fn_800A51D0(void* obj);
 extern "C" void* fn_800A51D8(void* obj, u16 index);
 void getKeyData3(f32* keys, f32 frame, f32* out0, f32* out1, f32* out2);
@@ -886,7 +888,7 @@ extern "C" void fn_80107D20(_EFT013* self) {
     push_eft_effect_heap_num(work->effects, work->count);
     for (s32 i = 1; i >= 0; i--) {
         if (work->models[i] != NULL) {
-            push_g3d_wk(work->models[i]);
+            push_g3d_wk((struct _g3d_work*)work->models[i]);
         }
     }
     fn_800F8A44(work->unused_0x08, 1);
@@ -1186,7 +1188,7 @@ extern "C" void fn_8010710C(_EFT013* self) {
         color.g = lbl_8059EAF0[idx * 4 + 1];
         color.b = lbl_8059EAF0[idx * 4 + 2];
         color.a = lbl_8059EAF0[idx * 4 + 3];
-        change_color_eff(work->effects[0], &self->pos_0x18, &color);
+        change_color_eff(work->effects[0], &self->pos_0x18, color);
         break;
     }
     case 4:
@@ -1198,7 +1200,7 @@ extern "C" void fn_8010710C(_EFT013* self) {
         color.g = lbl_8059EB04[idx * 4 + 1];
         color.b = lbl_8059EB04[idx * 4 + 2];
         color.a = lbl_8059EB04[idx * 4 + 3];
-        change_color_eff(work->effects[0], &self->pos_0x18, &color);
+        change_color_eff(work->effects[0], &self->pos_0x18, color);
         break;
     }
     default:
@@ -1372,7 +1374,7 @@ extern "C" void fn_80106ACC(_EFT013* self) {
         return;
     }
     _GXColor color = work->color_0x0C;
-    change_color_eff(work->effects[0], &self->pos_0x18, &color);
+    change_color_eff(work->effects[0], &self->pos_0x18, color);
     fn_800F93D8((_EFT*)self, (void**)work->effects, 1, work->count, 0);
 }
 
