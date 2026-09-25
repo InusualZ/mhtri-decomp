@@ -251,6 +251,7 @@
  */
 
 #include "types.h"
+#include "enemy/enemy_control.h"
 
 /* The actor the whole Pl_* family takes as its first argument. Only the offsets this unit touches are named;
  * everything in between is padding. */
@@ -3268,7 +3269,6 @@ extern "C" void fn_800504D4(void*);
 extern "C" void fn_8008C484(void*, f32, f32, f32);
 extern "C" void fn_80051574(void*, void*);
 extern "C" void fn_80041E40(nw4r::math::VEC3*, void*);
-extern "C" void* fn_80143174(void*, void*, s32);
 extern "C" u8 fn_80224E28(_PLW*, u8);
 extern "C" void fn_8026A394(_PLW*, s32, void*);
 extern "C" void fn_8026A230(_PLW*, s32, u16, s32, s32);

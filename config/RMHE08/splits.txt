@@ -592,6 +592,12 @@ enemy/fn_8013F764.cpp:
 	extabindex  start:0x80027F60 end:0x80028080
 	.text       start:0x8013F764 end:0x801411B8
 
+enemy/enemy_control.cpp:
+	extab       start:0x8000D664 end:0x8000D9DC
+	extabindex  start:0x80028080 end:0x800285B4
+	.text       start:0x801411B8 end:0x80147CE0
+	.ctors      start:0x8056F31C end:0x8056F320
+
 enemy/fn_80147CE0.cpp:
 	extab       start:0x8000D9DC end:0x8000DACC
 	extabindex  start:0x800285B4 end:0x8002871C
