@@ -1235,6 +1235,18 @@ config.libs = [
             # class 3+4).  `.text` only: the naive switch tables live in a `.data` run this range only
             # partly references, so no data range is claimed yet.
             Object(NonMatching, "lobby/fn_80212810.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8021E1EC_fn_8021E1EC.cpp` (`.text` 0x8021E1EC..0x80224AC4, 108 functions / 26840 B) -
+            # the lobby item/equipment page family.  Module `lobby` from the code (`LbStr`,
+            # `draw_sprite_ary`, `draw_font_idx`, `get_lsp_data`, `ItemName`, `put_menu_cursor`) and
+            # from the band (both bracketing registered units are `lobby`); no `__FILE__` string
+            # survives and the dump answers only `zz_` placeholders, so the file keeps the map stem
+            # (brief section 2, class 4).  C++ from the range's mangled callees.  The extab /
+            # extabindex runs agree with both edges exactly (77 records, `fn_8021E1EC` first,
+            # `fn_80224A28` last), which is why the capped range is registered whole.  `.text` only:
+            # the `.data` run this range partly references leaks outside it, so no data range is
+            # claimed yet.
+            Object(NonMatching, "lobby/fn_8021E1EC.cpp"),
         ],
     },
     {
