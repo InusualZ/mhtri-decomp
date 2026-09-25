@@ -143,8 +143,8 @@ u32 calcVecAng3(nw4r::math::VEC3* v);
 void rotLocalMatX(u32 angle, nw4r::math::MTX34* m);
 void rotLocalMatY(u32 angle, nw4r::math::MTX34* m);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
-void get_joint_wpos_em(void* enemy, u32 joint, nw4r::math::VEC3* out);
-f32 fn_80135998(void* enemy);
+void get_joint_wpos_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* out);
+extern "C" f32 fn_80135998(void* enemy); /* target references the plain name (relocaudit) */
 f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
 
 /* The unmangled `fn_XXXXXXXX` callees (unsplit, or owned by a registered unit whose header is
@@ -622,7 +622,7 @@ extern "C" void fn_800FAE08(_EFT* self)
             if (enemy->joint_0x204 == (u32)-1) {
                 fn_80041E40(&self->pos_0x18, &enemy->pos_0x188);
             } else {
-                get_joint_wpos_em(enemy, enemy->joint_0x204, &self->pos_0x18);
+                get_joint_wpos_em((_ENEMY_WORK*)enemy, enemy->joint_0x204, &self->pos_0x18);
             }
 
             if ((((enemy->flags_0x228 & 2) != 0) ||
