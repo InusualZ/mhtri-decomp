@@ -327,7 +327,7 @@ struct Effect {
     /* +0x00 */ u8 pad_0x00[0x44];
     /* +0x44 */ void* owner_0x44;   /* back-pointer to the spawning `_EFT` (ef/fn_800FE978.cpp) */
     void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
-    void RetireEmitterAll();                        /* eft004/eft007 */
+    u32 RetireEmitterAll();                         /* eft004/eft007; ef/ef_effectsystem.cpp adds it */
     /* Walks the effect's particle-manager pool, calling `cb` with each entry and its index; the
      * third argument is the per-walk flag (eft001's `fn_800FCEC8` is the only callback observed). */
     void ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
@@ -336,12 +336,20 @@ struct Effect {
 /* The effect system the manager keeps at `eft_control` +0x04 (`fn_800D3C0C` builds it).  `RetireEffect`
  * is a direct call; `virtual_0x0C` is the fourth vtable slot the per-frame handler reaches through
  * `fn_800A4420` (ef/eft004.cpp).  One definition, here (rule 1) - the per-frame handler and the
- * resource manager both need it. */
+ * resource manager both need it.
+ *
+ * `RetireEffect` returns `u32` because its owner `ef/ef_effectsystem.cpp` does (`li r3, 1` / `li r3, 0`
+ * in the target, and the range's sweep adds the result); the consumers call it as a statement, whose
+ * `.text` is unaffected.  NOTE: the two `virtual_0xN` below are ef/eft004.cpp's model of the *memory
+ * manager* `fn_800A4420` returns (that object's table is [0x08, 0x0C]), not of this class' own layout -
+ * the system's first word is a data member, not a vptr.  The system's real layout is stated once in
+ * `src/ef/ef_effectsystem.cpp` (`EfSys`, size 0xC068 = the map's size for lbl_806884D0); the two have
+ * to become one definition (booked in that unit's outbox). */
 class EffectSystem {
 public:
     virtual void virtual_0x08();
     virtual void virtual_0x0C();
-    void RetireEffect(Effect* effect);
+    u32 RetireEffect(Effect* effect);
 };
 /* size: 0x04 - lower bound, an approximation (an opaque handle here) */
 }  // namespace ef
