@@ -120,6 +120,10 @@ ResAnmScnConfig *fn_8006584C(void *p);   /* 0x8006584C - the checked `ResAnmScn`
 ResAnmLightConfig *fn_80066DB4(void *p); /* 0x80066DB4 - the checked light-config getter */
 ResAnmLightConfig *fn_80066E80(void *p); /* 0x80066E80 - the checked light-config getter */
 
+/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the checked resource resolver its revision
+ * checks read.  `fn_8006584C` (above) already returns the `ResAnmScnConfig` this file defines. */
+u32 fn_80063FD0(void *p);                /* 0x80063FD0 - the checked `ResAnmScn` resource resolver */
+
 #ifdef __cplusplus
 }
 #endif

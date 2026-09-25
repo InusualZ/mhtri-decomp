@@ -833,6 +833,18 @@ config.libs = [
             # module is `g3d` and the name is the evidenced TU name; the seam between the two TUs sits
             # inside the range (see the unit's file header).  Flags are this lib's `cflags_g3d`.
             Object(NonMatching, "g3d/g3d_resanmscn.cpp"),  # 0x800908FC-0x800916FC
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80093990_fn_80093990` - the nw4r g3d `ResFile` translation unit (53 functions /
+            # 0xE14 B, 0x80093990..0x800947A4).  Its own `nw4r::db::Panic` assert passes the bare
+            # source name "g3d_resfile.cpp" (`.data` 0x80590BA0, the file argument of the
+            # CheckRevision assert at the head of fn_80093990), so the lib is `g3d` and the file
+            # takes its evidenced TU name (class 1 in the brief).  `langcheck` agrees: the name is a
+            # `.cpp` and the `Panic__Q24nw4r2dbFPCciPCce` relocation is a C++ mangling, so the unit
+            # is `src/g3d/g3d_resfile.cpp` in this lib.  Sections: `.text` 0x80093990-0x800947A4,
+            # `extab` 0x800093A8-0x800094E0, `extabindex` 0x80022158-0x8002232C; the boundaries are
+            # fn_800938EC before and fn_800947A4 after (the first body of the next TU, which cites
+            # "g3d_resmat.cpp").
+            Object(NonMatching, "g3d/g3d_resfile.cpp"),      # 0x80093990-0x800947A4
             Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU

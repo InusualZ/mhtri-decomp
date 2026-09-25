@@ -20,6 +20,9 @@ extern "C" {
 const char* fn_8006FFBC(void);      /* 0x8006FFBC - the `ResMdl` type name the assert prints */
 u32 fn_8006FFC8(void* pSelf);       /* 0x8006FFC8 - the `ResMdl` handle validity test */
 
+/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the checked resource resolver. */
+u32 fn_800700C0(void* p); /* 0x800700C0 - the checked resource resolver */
+
 #ifdef __cplusplus
 }
 #endif
