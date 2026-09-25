@@ -762,6 +762,10 @@ config.libs = [
             # its final home; the seam is 0x8006F738 and is also the extab/extabindex boundary.
             Object(NonMatching, "g3d/g3d_calcmaterial.cpp"), # 0x8006EE78-0x8006F738
             Object(NonMatching, "g3d/g3d_calcview.cpp"),     # 0x8006F738-0x8007270C
+            # Registered from proposal/8006EAC0_fn_8006EAC0 (the 0x8006EAC0-0x8006EE78 maximal
+            # unclaimed run).  `g3d` from the region's own `__FILE__` string (`lbl_8058D6C0` =
+            # "g3d_anmvis.cpp", reached by fn_8006EAC0/ECB4/ED84's nw4r::db::Panic asserts).
+            Object(NonMatching, "g3d/g3d_anmvis.cpp"),     # 0x8006EAC0-0x8006EE78
             # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
             # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
             # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function
