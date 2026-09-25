@@ -8,8 +8,9 @@ table of real repo data, so a symbols.txt / splits.txt / configure.py parser reg
 milliseconds. The table is the contract - when the repo legitimately changes one of these symbols, the
 row has to change with it.
 
-Three rows have moved since the table was first written, all because the `.init` runtime was reconstructed,
-never because the tool changed (`severity_for` is byte-identical to its first commit):
+Four rows have moved since the table was first written, always because the repo's splits.txt / configure.py
+moved under the snapshot, never because the tool changed (`severity_for` is byte-identical to its first
+commit):
 
 * `memset` at `.init:0x80004350` started as collision kind 2 (no owner) and became kind 1 (approve) once
   `Runtime.PPCEABI.H/memset.c` existed in splits.txt + configure.py. Commit 3e5a0727 then flipped that
@@ -18,8 +19,13 @@ never because the tool changed (`severity_for` is byte-identical to its first co
   re-attributing the region would move main.dol's hash for everyone.
 * `memcpy` at `.init:0x80004000` was the kind-2 (no owner) representative. Commit 480f5b0d ("close the
   .init runtime") added `Runtime.PPCEABI.H/memcpy.c` to splits.txt and configure.py as Matching, so it
-  too is now kind 8. The uncovered (kind 2) path is exercised instead by `CleanUpTracks`, a still-unsplit
-  `.text` function.
+  too is now kind 8.
+* `CleanUpTracks` at `.text:0x800938EC` replaced `memcpy` as the kind-2 (no owner) representative. Commit
+  ad862bf34 ("g3d: land g3d_resanmtexsrt") registered `g3d/g3d_resanmtexsrt.cpp` with `.text`
+  0x800916FC-0x80093990 (`NonMatching`), a range that covers this address, so it is now kind 1
+  (`approve`, owner `g3d/g3d_resanmtexsrt.cpp`). The kind-2 path is exercised instead by `memmove` at
+  `.text:0x8045B598`, a still-unsplit MSL C runtime function whose canonical name will not be renamed and
+  whose address no splits.txt block claims.
 
 A row is only a snapshot of the repo: when configure.py / splits.txt legitimately move one of these
 symbols, the row has to move with it - but the change is checked against the commit that moved it, never
@@ -51,9 +57,13 @@ ROWS = (
     # 480f5b0d closed the .init runtime: memcpy.c now owns 0x80004000 and is Matching -> kind 8.
     ("memcpy", "0x80004000",
      {"name": "memcpy", "kind": 8, "severity": "never touch", "owner": "Runtime.PPCEABI.H/memcpy.c"}),
-    # The kind-2 (no splits.txt owner) path: still-unsplit .text, nothing claims this address.
+    # ad862bf34 registered g3d_resanmtexsrt.cpp (.text 0x800916FC-0x80093990) over this address, so the
+    # 0x800938EC function now has a NonMatching .text owner: kind 1, not the kind-2 it was added for.
     ("CleanUpTracks", "0x800938ec",
-     {"name": "CleanUpTracks", "kind": 2, "severity": "proceed", "owner": None}),
+     {"name": "CleanUpTracks", "kind": 1, "severity": "approve", "owner": "g3d/g3d_resanmtexsrt.cpp"}),
+    # The kind-2 (no splits.txt owner) path: MSL C runtime, still unsplit, nothing claims this address.
+    ("memmove", "0x8045b598",
+     {"name": "memmove", "kind": 2, "severity": "proceed", "owner": None}),
     ("camellia_sp1110 boundary", "camellia_sp1110",
      {"next_name": "camellia_sp0222", "next_addr": 0x80571298}),
 )
