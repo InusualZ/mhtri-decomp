@@ -763,6 +763,12 @@ Pl/pl_act.cpp:
 	extabindex  start:0x8002FC70 end:0x8002FF7C
 	.text       start:0x80276B58 end:0x8027D684
 
+Pl/fn_80288CEC.cpp:
+	extab       start:0x80012FFC end:0x8001323C
+	extabindex  start:0x80030678 end:0x800309D8
+	.text       start:0x80288CEC end:0x8028F66C
+	.ctors      start:0x8056F36C end:0x8056F370
+
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C
 	extabindex  start:0x80031710 end:0x80031A40

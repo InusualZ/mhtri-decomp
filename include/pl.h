@@ -119,10 +119,12 @@ struct _PLW {
     /* +0x002 */ u8 field_0x002;
     /* +0x003 */ u8 unk003[0x008 - 0x003];
     /* +0x008 */ u8 chunk_ofs;     /* plus 0x14 is the chunk index its files go to */
-    /* +0x009 */ u8 unk009;
+    /* +0x009 */ u8 kind_0x09;   /* compared against 3; `ef/eft019.cpp` names this same `_PLW` byte
+                                  * `kind_0x09` and `enemy.h` names the analogous byte `state_0x009` */
     /* +0x00A */ u8 field_0x00A;
     /* +0x00B */ u8 unk00B;
-    /* +0x00C */ u16 unk00C;
+    /* +0x00C */ u16 act_no;      /* the action number `Pl_act_ck` compares as its `u16` argument
+                                  * (`Pl_bari_ck` matches the rage actions 169..174 against it) */
     /* +0x00E */ u8 unk00E[0x14 - 0x0E];
     /* +0x014 */ u8 se_name_set;   /* picks the SE/BGM name table (`fn_800EFAC0`) */
     /* +0x015 */ u8 unk015;
@@ -337,7 +339,10 @@ struct _PLW {
     /* +0x4EE */ u8 unk4EE;
     /* +0x4EF */ u8 unk4EF[0x538 - 0x4EF];
     /* +0x538 */ u8 unk538;
-    /* +0x539 */ u8 unk539[0x580 - 0x539];
+    /* +0x539 */ u8 unk539[0x565 - 0x539];
+    /* +0x565 */ u8 field_0x565;  /* the primary-act latch `Pl/fn_80288CEC.cpp` sets */
+    /* +0x566 */ u8 field_0x566;  /* the arming byte `Pl/fn_80288CEC.cpp` sets once */
+    /* +0x567 */ u8 unk567[0x580 - 0x567];
     /* +0x580 */ s16 unk580;
     /* +0x582 */ u8 unk582;
     /* +0x583 */ s8 unk583;
