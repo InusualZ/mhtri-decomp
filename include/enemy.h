@@ -25,6 +25,15 @@ typedef struct _ENEMY_QUEUE_ENTRY {
 } _ENEMY_QUEUE_ENTRY;
 
 struct _se_w; /* the sound-request handle; opaque here (defined in sound/fn_800D7F54.cpp) */
+/* One 6-byte record of `_ENEMY_WORK::parts_0x838`: `em_parts_damage_level_get` reads +0x00 and
+ * `fn_8011E7D8` accumulates into it, `fn_8011E7F4` writes the +0x02 value. size: 0x06 */
+typedef struct _ENEMY_PART {
+    /* +0x00 */ u8 damage_level;
+    /* +0x01 */ u8 pad_0x01[0x1];
+    /* +0x02 */ u16 value_0x02;
+    /* +0x04 */ u8 pad_0x04[0x2];
+} _ENEMY_PART;
+
 
 /* The per-enemy work record.  Union of `ef/eft007.cpp`, `ef/eft009.cpp`, `ef/fn_80104BD0.c`,
  * `ef/fn_80114E34.cpp`, `enemy/fn_8012BA00.c`, `enemy/fn_8012BDF4.cpp`, `enemy/fn_8013BE60.c`,
@@ -183,13 +192,19 @@ struct _ENEMY_WORK {
     /* +0x799 */ u8 field_0x799;
     /* +0x79A */ u8 field_0x79A;
     /* +0x79B */ u8 field_0x79B;
-    /* +0x79C */ u8 pad_0x79C[0x8];
+    /* +0x79C */ u8 pad_0x79C[0x4];
+    /* +0x7A0 */ s32 amount_0x7A0;   /* the clamped gauge fn_8011E658/6EC/760 keep in [0, max] */
     /* +0x7A4 */ u32 field_0x7a4;
     /* +0x7A8 */ u8 pad_0x7A8[0x8];
     /* +0x7B0 */ f32 field_0x7B0;
     /* +0x7B4 */ u8 pad_0x7B4[0x14];
     /* +0x7C8 */ u8 field_0x7c8;
-    /* +0x7C9 */ u8 pad_0x7C9[0x9F];
+    /* +0x7C9 */ u8 pad_0x7C9[0x45];
+    /* +0x80E */ u16 mask_0x80E;     /* the bit mask fn_8011F230 ORs into */
+    /* +0x810 */ u8 pad_0x810[0x14];
+    /* +0x824 */ u32 bits_0x824;     /* the per-enemy status bits fn_8011E5EC..E640 own */
+    /* +0x828 */ u8 pad_0x828[0x10];
+    /* +0x838 */ _ENEMY_PART parts_0x838[8]; /* the per-part damage table (stride 6, 8 parts) */
     /* +0x868 */ u32 values_0x868[14];
     /* +0x8A0 */ u8 pad_0x8A0[0x2];
     /* +0x8A2 */ u16 counter_0x8A2;
@@ -283,7 +298,9 @@ typedef struct EnemyData {
     /* +0x01C */ u32 field_0x1C;
     /* +0x020 */ u32 field_0x20;
     /* +0x024 */ u32 field_0x24;
-    /* +0x028 */ u8 pad_0x28[0x3C];
+    /* +0x028 */ u8 pad_0x28[0x8];
+    /* +0x030 */ u32 bits_0x30;     /* copied into `_ENEMY_WORK::bits_0x824` by fn_8011E5EC */
+    /* +0x034 */ u8 pad_0x34[0x30];
     /* +0x064 */ u8* values;
     /* +0x068 */ u8 pad_0x68[0x2C];
     /* +0x094 */ UserDataItem* items;
