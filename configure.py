@@ -1226,6 +1226,14 @@ config.libs = [
             # class 3).  Sections: extab 0x80010ADC..0x80010DBC, extabindex 0x8002CF34..0x8002D384
             # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
             Object(NonMatching, "lobby/lb_npc.cpp"),
+            # `80212810_fn_80212810.cpp` (`.text` 0x80212810..0x80219260, 105 functions / 27216 B) -
+            # the lobby item/equipment page layer.  Module `lobby` from the code (`LbStr`,
+            # `LbPutAnaPageArrow`, `get_lsp_data`, `draw_sprite_ary`, `GetMenuFontColor`) and from the
+            # `.bss` run it reads (`lobby_w`, `lb_npc`); no `__FILE__` string survives and the dump
+            # answers only `zz_` placeholders, so the file keeps the map stem (brief section 2,
+            # class 3+4).  `.text` only: the naive switch tables live in a `.data` run this range only
+            # partly references, so no data range is claimed yet.
+            Object(NonMatching, "lobby/fn_80212810.cpp"),
         ],
     },
     {
