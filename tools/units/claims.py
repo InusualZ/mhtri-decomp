@@ -720,6 +720,7 @@ def claims_view(main: str) -> list[dict]:
             "base": record.get("base"),
             "merged": merged_into_main(main, branch),
             "outbox": bool(unit and os.path.exists(outbox_path(main, unit))),
+            "acked": bool(unit) and os.path.exists(ack_path(main, unit)),
             "exists": os.path.isdir(entry["path"]),
         })
     # A registry entry whose worktree git no longer lists is the half-torn-down state: `git worktree remove`
@@ -739,6 +740,7 @@ def claims_view(main: str) -> list[dict]:
             "base": record.get("base"),
             "merged": bool(branch) and merged_into_main(main, branch),
             "outbox": os.path.exists(outbox_path(main, unit)),
+            "acked": os.path.exists(ack_path(main, unit)),
             "exists": os.path.isdir(path),
         })
     return sorted(rows, key=lambda r: r["unit"])
@@ -1694,11 +1696,23 @@ def main() -> int:
         if not rows:
             print("no active claims")
             return 0
-        print("%-34s %-30s %-10s %-7s %-7s %s" % ("unit", "branch", "worker", "merged", "outbox", "claimed"))
+        print("%-34s %-30s %-10s %-7s %-7s %-7s %s" % ("unit", "branch", "worker", "merged", "outbox", "acked", "claimed"))
         for row in rows:
-            print("%-34s %-30s %-10s %-7s %-7s %s"
+            print("%-34s %-30s %-10s %-7s %-7s %-7s %s"
                   % (row["unit"][:34], (row["branch"] or "")[:30], (row.get("worker") or "")[:10],
-                     row["merged"], row["outbox"], row.get("claimed_at") or ""))
+                     row["merged"], row["outbox"], row.get("acked", False), row.get("claimed_at") or ""))
+        # A claim is a LOCK: if it is taken in one call and the worker is launched in another, anything that
+        # comes between them strands the lock invisibly - the worktree and brief look busy while the slot sits
+        # idle.  `claims.py ack` writes the ack file within seconds of a real launch, so a claim with no ack
+        # file is the cheap honest signal.  `status` already computes this as `unacked`; `list` shows it too.
+        stranded = [r for r in rows if not r.get("acked", False)]
+        if stranded:
+            print()
+            print("%d claim(s) below have NO ack file - no worker may ever have been launched for them."
+                  % len(stranded))
+            print("Check `python tools/units/claims.py status` (it reports them as `unacked`), then either")
+            print("launch the spawn line from the brief or release the claim: %s"
+                  % ", ".join(r["unit"] for r in stranded[:6]))
         return 0
     if args.cmd == "release":
         if args.all_merged:
