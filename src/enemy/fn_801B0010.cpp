@@ -112,7 +112,6 @@
 extern "C" u32 fn_801E01BC(_ENEMY_WORK* work);
 /* 0x80267270 - same named gap (below `lobby/lobby_scene.c`, above `Pl/pl_master.cpp`).  r3 the
  * player work, r4/r5 two scalars and r6 the id it latches. */
-extern "C" void fn_80267270(_PLW* plw, u32 a, u32 b, u32 c);
 /* 0x8029F6DC - the item-table accessor, owned by the not-yet-registered band between
  * `Pl/pl_act.cpp` and `stage/fn_802B2978.c` (another named gap).  Declared at C++ scope so the call
  * site spells the owner's real signature (`GetItemData__FUs`), not the mangling (rule 9); the return
