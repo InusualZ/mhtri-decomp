@@ -629,6 +629,40 @@ config.libs = [
             # answers only `zz_` placeholders for the other 58 rows, so the file keeps the map's
             # own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_801B0010.cpp"),
+            # Registered from proposal/801D428C_fn_801D428C.cpp (the 0x801D428C run discovery
+            # proposed): the enemy action band 0x801D428C..0x801D80EC, 42 functions / 0x3E60 bytes,
+            # plus the 34 extab/extabindex entries its framed functions carry.  Module `enemy` from
+            # the link band (the unit below ends at 0x80191598 and every callee out of the range is
+            # enemy-band) and from the code (`_ENEMY_WORK` state machines, the enemy action
+            # dispatchers).  C++ because the range reaches mangled callees (`setVector3__FP...`,
+            # `em_frame_check__FP11_ENEMY_WORKUsff`, `getTevKColor__6MHchar...`) and a class
+            # descriptor.  No `__FILE__` string survives in the range and the dump answers only
+            # `zz_` placeholders, so the file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801D428C.cpp"),
+            # Registered from proposal/801993E0_fn_801993E0.cpp (a 0x801993E0 run discovery
+            # proposed): the enemy "em" action band 0x801993E0..0x8019ED34, 35 functions / 0x5954
+            # bytes, plus the 25 extab/extabindex records its framed functions carry.
+            # Module `enemy` from the link band (the unit below ends at 0x801926EC) and from the
+            # code (every callee out of the range is `_ENEMY_WORK`-based); C++ because the range
+            # reaches mangled callees through their real signatures.  No `__FILE__` string is
+            # referenced by the range and the dump answers only `zz_` placeholders, so the file
+            # keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801993E0.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/801B7020_fn_801B7020.cpp (a 0x801B7020 run discovery proposed): the enemy
+            # motion/act-instruction group, 123 functions / 0x669C bytes plus its extab/extabindex
+            # run and one `.ctors` word.  Module `enemy` from the link band (both bracketing
+            # registered units are `enemy/*`, and every callee out of the range is the enemy work
+            # API); C++ because the range reaches mangled members (`setMatColor__6MHchar...`,
+            # `rotVecY__FPQ34nw4r4math4VEC3Ul`).  No `__FILE__` string survives and the runtime dump
+            # answers only `zz_` placeholders, so the file keeps the map's own stem (see header).
+            Object(NonMatching, "enemy/fn_801B7020.cpp"),
+            # Registered from proposal/801A4504_fn_801A4504.cpp (a 0x801A4504 run discovery proposed):
+            # the enemy per-motion action dispatcher and its four helpers, 5 functions / 0x503C bytes
+            # plus the extab run 0x8000F304..0x8000F324 and the extabindex run 0x8002AB70..0x8002ABA0.
+            # Module `enemy` from `em_get_mot_no(_ENEMY_WORK*)` and every callee; the name keeps the
+            # map's `fn_` stem (no `__FILE__` string, the dump answers only `zz_`/`FUN_`).  C++.
+            Object(NonMatching, "enemy/fn_801A4504.cpp"),
         ],
     },
 
@@ -1175,6 +1209,14 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "lobby/lobby_scene.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `801E7530_fn_801E7530.cpp` (`.text` 0x801E7530..0x801EC9E0, 77 functions / 21680 B) -
+            # the lobby menu-layer group.  Module `lobby` from the code (`lobby_w`, `lb_param_w`,
+            # `LbStr`, `GetMenuFontColor`, `draw_font_idx`) and from the neighbour above; no `__FILE__`
+            # string survives and the dump answers only `zz_` placeholders, so the file keeps the map
+            # stem (brief section 2, class 3+4).  Sections: extab 0x800105B4..0x8001079C (61 records),
+            # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
+            Object(NonMatching, "lobby/fn_801E7530.cpp"),
         ],
     },
     {

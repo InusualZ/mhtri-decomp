@@ -9,6 +9,9 @@
 #define MHTRI_ENEMY_FN_8012EC74_H
 
 #include "types.h"
+#ifdef __cplusplus
+#include "nw4r/math.h"
+#endif
 
 struct _ENEMY_WORK;
 
@@ -50,6 +53,16 @@ u32 fn_801339AC(struct _ENEMY_WORK* self);
  * `enemy/fn_8014A1BC.c` calls it with three `(u16)`-cast arguments; the answer is a 16-bit angle. */
 u16 fn_80133DB0(u16 a, u16 b, u16 c);
 
+/* 0x80130350 - r3 (`self`) and r4 (the `VEC3*` the caller builds); the body writes through r4 only, so
+ * no caller reads a return value.  Added with `enemy/fn_801B7020.cpp`, which calls it the same way. */
+void fn_80130350(struct _ENEMY_WORK* self, void* vec);
+/* 0x8013072C - r3 (`self`), r4 (narrowed with `clrlwi r4,r4,24`) and r5; the action-mode/latch setter
+ * the enemy program functions call.  Names of the two scalars are this unit's call sites' (2/0 and
+ * 0/0); the body compares r4 against `self->+0x43B`. */
+void fn_8013072C(struct _ENEMY_WORK* self, u32 mode, u32 value);
+/* 0x80131FA0 - r3 (`self`) and r4 (the scalar the motion modes pass: 80). */
+void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
+
 #ifdef __cplusplus
 }
 #endif
@@ -59,6 +72,26 @@ u16 fn_80133DB0(u16 a, u16 b, u16 c);
  * (`em_get_mot_no__FP11_ENEMY_WORK`), so it is declared at C++ scope (rule 9) and answers the
  * motion id in r3 (its callers mask it to 16 bits).  Added by `enemy/fn_801B0010.cpp` (rule 2). */
 u16 em_get_mot_no(struct _ENEMY_WORK* work);
+/* The C++ spellings of this unit's mangled callees, so a call site never spells the mangling
+ * (docs/plan.md 6.5 rule 9); each mangles back to its map name.  Added with the registration of
+ * `enemy/fn_801993E0.cpp`, which calls all three. */
+f32 em_water_check(struct _ENEMY_WORK* self);
+f32 get_em_chg_scale(struct _ENEMY_WORK* self);
+/* `fn_80131034` is deliberately NOT declared here: its map name is the plain `fn_80131034`, so its
+ * consumers reach the `extern "C"` form `include/unsplit/enemy.h` already carries.  A C++-linkage
+ * copy here is an MWCC 10505 "illegal overloading" against that one. */
+/* 0x80135940 - the model scale.  The target's symbol is the C++ mangling
+ * `get_em_scale__FP11_ENEMY_WORK` (mangle.py: `f32 get_em_scale(_ENEMY_WORK*)`), so it is declared at
+ * C++ scope (docs/plan.md 6.5 rule 9: a caller never spells the mangling). */
+f32 get_em_scale(struct _ENEMY_WORK* self);
+/* This unit owns three C++-mangled callees the enemy action units reach: the map names
+ * `em_get_mot_no__FP11_ENEMY_WORK`, `em_after_frame_check__FP11_ENEMY_WORKUsff` and
+ * `get_joint_wmat_em__FP11_ENEMY_WORKUlPQ34nw4r4math5MTX34`.  Declared at C++ scope so a caller
+ * never spells the mangling (docs/plan.md 6.5 rule 9), added with `enemy/fn_801A4504.cpp` (its first
+ * consumer to need all three). */
+u16 em_get_mot_no(struct _ENEMY_WORK* self);
+u32 em_after_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
+void get_joint_wmat_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* out);
 #endif
 
 #endif

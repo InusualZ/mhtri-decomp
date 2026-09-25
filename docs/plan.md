@@ -464,7 +464,8 @@ never rewritten; nothing is ever pushed.
 
 ### 6.5 Type and naming discipline — mandatory in phases B and C
 
-Nine rules, all of them checked. They are **not style preferences**: a wrong or unnamed type is what makes
+Ten rules. Rules 1-9 are checked by the lint; rule 10 is a **landing-review rule** (the vtable-ownership
+audit in the backlog makes it mechanical - playbook row 52). They are **not style preferences**: a wrong or unnamed type is what makes
 the *next* function in the same unit cost twice as much, and pointer arithmetic hides exactly the layout that
 rules 3 and 4 exist to record.
 
@@ -479,9 +480,10 @@ rules 3 and 4 exist to record.
 | 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used. Neither `fn_XXXXXXXX` nor `unkNN` may survive in `src/` |
 | 8 | **`goto` is forbidden** | No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read |
 | 9 | **A mangled symbol is called through its owner** | a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and stays legal (row 7's deferral) |
+| 10 | **A vtable we own is compiler output** | a table of code pointers inside the unit's own registered ranges is **emitted by MWCC** from a class that declares its `virtual` methods (plus the constructor that stores the table) - never written out entry by entry, never declared `extern`, never declared through a `void**` member. A table *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC emit a table into our object - extra bytes). **A table we wrote is not evidence of inheritance** - inheritance comes from the object's structure: the slot addresses read out of the DOL, the constructor's store, and the constructor/destructor chain |
 
 **These rules are part of phase C, not a separate chore.** The residual sweep already revisits every unit that
-is not byte-identical; the conformance work (rules 1-9) rides the same pass, unit by unit, in address order.
+is not byte-identical; the conformance work (rules 1-10) rides the same pass, unit by unit, in address order.
 
 **The `goto` backlog from the first protocol round (2026-09-23).** Four functions reached 100 % with a `goto`
 shape before rule 8 existed: `Pl/pl_act`'s `fn_80278144` and `fn_80278310` (`goto ret1; ret0: return 0;`) and
