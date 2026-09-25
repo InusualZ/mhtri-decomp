@@ -9,6 +9,9 @@
 #define MHTRI_ENEMY_FN_8012EC74_H
 
 #include "types.h"
+#ifdef __cplusplus
+#include "nw4r/math.h"
+#endif
 
 struct _ENEMY_WORK;
 
@@ -52,6 +55,14 @@ void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
  * `get_em_scale__FP11_ENEMY_WORK` (mangle.py: `f32 get_em_scale(_ENEMY_WORK*)`), so it is declared at
  * C++ scope (docs/plan.md 6.5 rule 9: a caller never spells the mangling). */
 f32 get_em_scale(struct _ENEMY_WORK* self);
+/* This unit owns three C++-mangled callees the enemy action units reach: the map names
+ * `em_get_mot_no__FP11_ENEMY_WORK`, `em_after_frame_check__FP11_ENEMY_WORKUsff` and
+ * `get_joint_wmat_em__FP11_ENEMY_WORKUlPQ34nw4r4math5MTX34`.  Declared at C++ scope so a caller
+ * never spells the mangling (docs/plan.md 6.5 rule 9), added with `enemy/fn_801A4504.cpp` (its first
+ * consumer to need all three). */
+u16 em_get_mot_no(struct _ENEMY_WORK* self);
+u32 em_after_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
+void get_joint_wmat_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* out);
 #endif
 
 #endif

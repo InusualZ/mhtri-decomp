@@ -80,6 +80,9 @@ s32 em_die_ck(struct _ENEMY_WORK* work);
  * first consumer that must call it; the extern "C" block above spelled the mangling, which rule 9
  * forbids a caller from using). */
 u32 em_area_ck(struct _ENEMY_WORK* work);
+/* The C++ spelling of `em_act_ck__FP11_ENEMY_WORKUcUc` (the extern "C" block above spells the
+ * mangling, which rule 9 forbids a caller from using); added with `enemy/fn_801A4504.cpp`. */
+s32 em_act_ck(struct _ENEMY_WORK* work, u8 a, u8 b);
 #endif
 
 #endif /* MHTRI_ENEMY_FN_8012BDF4_H */
