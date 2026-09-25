@@ -601,6 +601,14 @@ config.libs = [
             Object(NonMatching, "enemy/fn_80170FA8.cpp"),
             Object(NonMatching, "enemy/fn_80176C58.cpp"),
             Object(NonMatching, "enemy/fn_80170600.cpp"),
+            # Registered from proposal/80182D5C_fn_80182D5C.cpp (the 0x80182D5C run discovery
+            # proposed; 115 functions / 0x868C bytes, plus the extab/extabindex entries its 91
+            # framed functions carry).  Module `enemy` from the link band (the unit below ends at
+            # 0x80178378 and every callee in the range is enemy-band) and from the code;
+            # C++ because the range reaches mangled callees through their real signatures.
+            # No `__FILE__` string survives in the range and the dump answers only `zz_`
+            # placeholders, so the file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_80182D5C.cpp"),
             # Registered from proposal/80191598_fn_80191598.cpp (a 0x80191598 run discovery
             # proposed): the enemy aim/action group the per-enemy class tables at 0x805AA960..
             # 0x805AAA60 hold, 26 functions / 0x1154 bytes plus its extab/extabindex run.

@@ -160,7 +160,11 @@ struct _ENEMY_WORK {
     /* +0x1E7 */ u8 field_0x1E7;        /* set to 1 once the action's entry block has run */
     /* +0x1E8 */ u8 field_0x1E8;
     /* +0x1E9 */ u8 field_0x1E9;
-    /* +0x1EA */ u8 unused_0x1EA[0x1F5 - 0x1EA];
+    /* +0x1EA */ u8 unused_0x1EA[0x1EC - 0x1EA];
+    /* +0x1EC */ u16 bits_0x1EC;      /* the 5-bit value `enemy/fn_80182D5C.cpp`'s `fn_8018493C`
+                                        * reads as `lhz` + `clrlwi ...,27` to derive its 0x96/0x5A timer
+                                        * (added by that unit) */
+    /* +0x1EE */ u8 unused_0x1EE[0x1F5 - 0x1EE];
     /* +0x1F5 */ u8 field_0x1F5;
     /* +0x1F6 */ u8 unused_0x1F6[0x1F8 - 0x1F6];
     /* +0x1F8 */ u8 field_0x1F8;
@@ -217,7 +221,11 @@ struct _ENEMY_WORK {
     /* +0x464 */ f32 field_0x464;      /* the motion parameter `fn_80149C58` hands to `fn_8012F7D4` */
     /* +0x468 */ u8 unused_0x468[0x46C - 0x468];
     /* +0x46C */ u8 field_0x46C;       /* the area/entry byte `fn_80170804` latches to 0xFF */
-    /* +0x46D */ u8 unused_0x46D[0x784 - 0x46D];
+    /* +0x46D */ u8 unused_0x46D[0x482 - 0x46D];
+    /* +0x482 */ u8 field_0x482;       /* nonzero picks the second approach float in
+                                        * `enemy/fn_80182D5C.cpp`'s `fn_80184CE0` (added by that unit;
+                                        * the pre-header `include/enemy.h` view of this byte) */
+    /* +0x483 */ u8 unused_0x483[0x784 - 0x483];
     /* +0x784 */ u8 field_0x784;
     /* +0x785 */ u8 unused_0x785[0x794 - 0x785];
     /* +0x794 */ u16 field_0x794;

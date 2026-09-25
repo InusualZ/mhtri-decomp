@@ -34,6 +34,11 @@ void fn_801281F8(struct _ENEMY_WORK* work);
  * consumers that each moved it here (rule 2): `enemy/fn_80147CE0.cpp`, `enemy/fn_8015E854.cpp` and
  * `enemy/fn_80178378.cpp` - the sibling landings and this branch had put it in three times. */
 void fn_80128A8C(struct _ENEMY_WORK* self, u32 a, u32 b);
+/* 0x80126324 - the motion/area setter: r3 (`self`), a byte r4 and a scalar r5 (the body does
+ * `clrlwi r4,r4,24`, folds `self->area_no (0x1E1) & 0xF` into the high byte of the id it builds,
+ * and passes `clrlwi r6,r31,24` on to 0x8012B380) plus the f32 blend f1 it stores at +0x384.
+ * Declared from the callee's own body (docs/plan.md 6.5 rule 6). */
+void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
  * `enemy/fn_801550FC.cpp` on landing (rule 2): this unit owns the addresses. */
@@ -76,6 +81,10 @@ u8* fn_80126044(struct _ENEMY_WORK* self);
 void* fn_80126704(struct _ENEMY_WORK* self);
 void fn_80126898(struct _ENEMY_WORK* self);
 void fn_801280F4(struct _ENEMY_WORK* self);
+/* 0x80128030 - one `self` argument, no return.  Added with its owner by
+ * `enemy/fn_80182D5C.cpp`, whose state machines call it after `fn_8012F93C` reports done; the
+ * existing consumers (`enemy/fn_80176C58.cpp`, `enemy/fn_80178128.cpp`) spell it the same way. */
+void fn_80128030(struct _ENEMY_WORK* self);
 void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in
  * 0x10-byte steps; the caller (`enemy/fn_8015E854.cpp`'s `fn_8015EFAC`) reads the f32 at +0x4. */
