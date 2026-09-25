@@ -868,6 +868,30 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_resmat.cpp"),      # 0x800947A4-0x80098D5C
 
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80098D5C_fn_80098D5C` - the nw4r g3d `ResNode` animation-result TU
+            # (7 functions / 0x6A4 B, 0x80098D5C-0x80099400).  `g3d`/`.cpp` from the range's own
+            # `__FILE__` string (`.data` 0x805915C0 = "g3d_resnode.cpp", the file argument of
+            # fn_80098D5C/F6C/9178/9278's `nw4r::db::Panic` asserts; `langcheck` returns C++
+            # conclusive).  The discovery cap 0x80098D5C-0x800997E0 is NOT one TU: it spans this file
+            # and `g3d_resshp.cpp` (see below), so the unit is registered at its own evidenced extent
+            # only.  Sections: `.text` 0x80098D5C-0x80099400, `extab` 0x80009850-0x80009880
+            # (6 records), `extabindex` 0x80022854-0x8002289C (6 entries).
+            Object(NonMatching, "g3d/g3d_resnode.cpp"),      # 0x80098D5C-0x80099400
+            # Registered once, at its final home (docs/plan.md 12): the head of proposal
+            # `80098D5C_fn_80098D5C` that belongs to the NEXT TU.  fn_80099400 - this range's first
+            # body - calls `fn_80077674` = `ResShp::ref` on its own `this` (its assert names `.sdata`
+            # 0x807911F0 = "ResShp"), while fn_800993B4 calls `fn_8005D218` = `ResNode::ref`
+            # (0x80791148 = "ResNode"), so 0x80099400 is the resnode|resshp boundary; the
+            # `g3d_resshp.cpp` `.data` fragment starts at 0x80591618 and every assert string this
+            # unit's bodies pass ("g3d_resshp.cpp" 0x80591618, "g3d_resshp_ac.h" 0x80591708/748,
+            # "g3d_rescommon_ac.h" 0x80591780/7EC) sits inside it.  The tail of the same TU is
+            # proposal `800997E0` (0x800997E0-0x8009A748), which the queue already labels
+            # `g3d_resshp.cpp`; the re-split must join the two, i.e. widen this unit to
+            # 0x80099400-0x8009A748 (outbox `config_requests`, kind `range`).  Sections: `.text`
+            # 0x80099400-0x800997E0, `extab` 0x80009880-0x800098D8 (11 records), `extabindex`
+            # 0x8002289C-0x80022920 (11 entries).
+            Object(NonMatching, "g3d/g3d_resshp.cpp"),       # 0x80099400-0x800997E0
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
             # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass
             # the bare source name "g3d_resanmchr.cpp" (`.data` 0x80590010, the file argument of every

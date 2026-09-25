@@ -199,6 +199,16 @@ g3d/g3d_resmat.cpp:
 	extabindex  start:0x8002232C end:0x80022854
 	.text       start:0x800947A4 end:0x80098D5C
 
+g3d/g3d_resnode.cpp:
+	extab       start:0x80009850 end:0x80009880
+	extabindex  start:0x80022854 end:0x8002289C
+	.text       start:0x80098D5C end:0x80099400
+
+g3d/g3d_resshp.cpp:
+	extab       start:0x80009880 end:0x800098D8
+	extabindex  start:0x8002289C end:0x80022920
+	.text       start:0x80099400 end:0x800997E0
+
 g3d/g3d_cpu.cpp:
 	extab       start:0x800099E0 end:0x800099F0
 	extabindex  start:0x80022AAC end:0x80022AC4
