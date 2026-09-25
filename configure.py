@@ -492,6 +492,14 @@ config.libs = [
             Object(NonMatching, "enemy/fn_801251D0.cpp"),
                         Object(NonMatching, "enemy/fn_8012BA00.c"),
             Object(NonMatching, "enemy/fn_8012BDF4.cpp"),
+            # Registered from proposal/80137604_fn_80137604 (a 0x80137604 run discovery
+            # proposed): an enemy's per-motion action/rotation update set, 20 functions / 0x2670
+            # bytes.  Module `enemy` from the link band (both bracketing units are `enemy`) and
+            # from the code (it calls `em_act_ck(_ENEMY_WORK*)`, `get_enemy_data`, ...); C++
+            # because every mangled callee must be declared at its real signature (rule 9).
+            # No `__FILE__` string survives in the range and the dump answers only `zz_`
+            # placeholders, so the file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_80137604.cpp"),
             Object(NonMatching, "enemy/fn_80138074.c"),
             Object(NonMatching, "enemy/fn_8013BE60.c"),
             Object(Matching, "enemy/fn_80149D6C.c"),
