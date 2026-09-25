@@ -573,6 +573,14 @@ config.libs = [
             Object(NonMatching, "ef/ef_cylinder.cpp"),
             Object(NonMatching, "ef/ef_disc.cpp"),
             Object(NonMatching, "ef/ef_emitterform.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  `proposal/800A6350_fn_800A6350`:
+            # the range's own `__FILE__` string is "ef_emitter.cpp" (0x80592850, read from the DOL),
+            # it is C++ (the .cpp suffix, the Panic__Q24nw4r2dbFPCciPCce callees and the range's own
+            # vtable at 0x80592BB0), and both seams are proven - the run starts where
+            # ef/ef_effectsystem.cpp ends and stops at ef/ef_emitterform.cpp's first instruction
+            # (0x800A99B4).  Sections: extab 0x80009CD4..0x80009DF4, extabindex
+            # 0x80022EE4..0x80023094, .text 0x800A6350..0x800A99B4.
+            Object(NonMatching, "ef/ef_emitter.cpp"),
             Object(NonMatching, "ef/ef_particle.cpp"),
             Object(NonMatching, "ef/ef_emform.cpp"),
             Object(NonMatching, "ef/ef_line.cpp"),

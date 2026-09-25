@@ -204,6 +204,11 @@ ef/ef_creationqueue.cpp:
 	extabindex  start:0x80022CBC end:0x80022CEC
 	.text       start:0x800A3044 end:0x800A388C
 
+ef/ef_emitter.cpp:
+	extab       start:0x80009CD4 end:0x80009DF4
+	extabindex  start:0x80022EE4 end:0x80023094
+	.text       start:0x800A6350 end:0x800A99B4
+
 ef/ef_emitterform.cpp:
 	extab       start:0x80009DF4 end:0x80009E04
 	extabindex  start:0x80023094 end:0x800230AC
