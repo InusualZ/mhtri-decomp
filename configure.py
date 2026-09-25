@@ -842,6 +842,13 @@ config.libs = [
             # equipment-slot selector (0x8004C9A0..0x8004CAD8), the inverse of the adjacent
             # `fn_8004CAD8` clear routine; same game-root band, lib and flags as the files above.
             Object(NonMatching, "fn_8004C9A0.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80054C64` - the 2D
+            # shape/texture draw layer.  Evidence class 1: every `nw4r::db::Panic` assert reachable from
+            # the range passes the bare source name "draw_shape.cpp" (.data 0x8058178C), referenced
+            # nowhere else in the image.  Same lib and flags as the game-root system files beside it
+            # (cflags_main); the proposal covers only part of the TU - the drawshape_* half lives in the
+            # previous proposal - see the file header.
+            Object(NonMatching, "draw_shape.cpp"),
         ],
     },
 ]
