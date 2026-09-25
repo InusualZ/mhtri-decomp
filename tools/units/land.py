@@ -12,7 +12,10 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
 * refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
   outside the batch's expected set, or whose outbox entry does not validate;
 * runs the style lint when it exists (7.21), reports the ledger delta, and warns when a unit improved with no
-  document or header change to show for it (7.10);
+  document or header change to show for it (7.10); the lint row carries the **head** of stylelint's output -
+  where the findings are - and never its trailing "not enforced: ..." legend, which on 2026-09-25 made a FAIL
+  row read as a pass (`.pi/land.log`: `FAIL style lint (§6.5) adds no violation - (temporary grandfather:
+  legacy scaffolding with bodies, ...)`);
 * refreshes the baseline afterwards (7.16), so `ninja changes` compares against the batch that just landed;
 * and **releases the claim of every unit it just gated** (owner's rule, "Teardown is part of landing"): a
   landed unit must not leave a worktree, a merged branch or a registry entry behind. A release that is
@@ -40,6 +43,15 @@ batch opens (`dirty_at_base`), and `land_stageable` excludes one unless the batc
 snapshot is the only way to tell "already dirty at the base" from "dirty because of this batch". AGENTS.md's
 LOCAL-ONLY block is the one exception: it is live state that is always dirty, not foreign work, so only a
 real edit outside the block enters the snapshot.
+
+The one outside-the-batch path this gate does not refuse is **tool scratch**: `d<digits>.json` /
+`t<digits>.json` in the repo root, the objdiff `diff` dumps a tool leaves behind (`65492794` ignored them, but
+a staged file bypasses `.gitignore` and the landing flow's own `git add -A` staged `d910.json`). The batch
+never received them, so they are never staged, the gate de-indexes a staged copy (`git reset HEAD -- <path>`,
+which leaves the caller's file in the tree), and the tolerance is **named** - in the gate log, in the check's
+`info`, and in the landed message - rather than silently dropped. Every other outside-the-batch path is still
+refused loudly: a foreign edit to `src/`, `include/`, `config/` or `configure.py` is exactly what the guard is
+for, and a `d`/`t`-shaped name elsewhere is not a permission.
 
 `verify` never commits. It writes the message to `.git/land_msg.txt` **only when every check passed**, and
 removes a stale one when it refuses; committing it stays a deliberate step for the rare manual case.
@@ -77,6 +89,16 @@ ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/skills/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
                  "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt")
 BASE_FILE = os.path.join(".pi", "land-base.json")
+
+# Tool scratch a batch never owns, and the only thing outside `ALLOWED_*` this gate tolerates. An
+# `objdiff-cli diff` run from the repo root - typically a caller that names its dump after the symbol it is
+# looking at (`d910.json`, the `diff` of fn_8009A910, plus a byte-identical `t910.json`) - leaves these in the
+# repo root. `65492794` put them in `.gitignore`, but a **staged** file bypasses `.gitignore`, and a stage
+# happened anyway: the landing flow's own `git add -A` (`.pi/bin/applybranch.sh`) swept `d910.json` into the
+# index, land.py then refused the batch over it ("paths outside the batch appeared during the build"), and the
+# batch could not be committed at all. A path the gate refuses must never have reached the index, so this
+# gate now de-indexes what it tolerates instead of refusing it - and names it, every time.
+SCRATCH_JSON = re.compile(r"^[dt][0-9]+\.json$")
 
 
 def run(args: list[str], cwd: str) -> subprocess.CompletedProcess:
@@ -177,15 +199,54 @@ def clear_land_message(main: str) -> str | None:
     return None
 
 
-def land_decision(gate_ok: bool, stageable: list[str]) -> tuple[str, str]:
+def failing_checks(checks: list[tuple[str, bool, str, str]]) -> list[str]:
+    """`"<check name>: <what it printed>"` for every failed check - a refusal must name the gate.
+
+    The check *names* are the assertion they make ("style lint (§6.5) adds no violation"), so a FAIL row's
+    name alone can read as a pass; on 2026-09-25 the gate refused and printed only "the gate failed - nothing
+    staged or committed" while the lint row showed stylelint's trailing legend (`.pi/land.log`), so the reader
+    went hunting for a defect that was not there and the batch was committed by hand. Every refusal now
+    carries the failing check's name *and* the output it printed.
+    """
+    out = []
+    for name, good, detail, info in checks:
+        if good:
+            continue
+        note = " ".join((detail or info or "no detail").split())
+        out.append("%s: %s" % (name, note[:240] or "no detail"))
+    return out
+
+
+def command_detail(p: subprocess.CompletedProcess, limit: int = 300) -> str:
+    """The *head* of a command's output plus its exit code - where a linter puts the reason.
+
+    A tail is the wrong end for `stylelint.py`: it prints its finding header and its findings first and its
+    "not enforced: ..." legend last, so the old `output[-300:]` showed the legend and hid the violation. The
+    2026-09-25 row `FAIL style lint (§6.5) adds no violation - (temporary grandfather: legacy scaffolding with
+    bodies ...)`, read on its own, looked like a pass - and the batch was then committed by hand while the
+    gates looked green (`.pi/land.log`). Two lines (the header and the first finding) are the reason; the
+    legend adds nothing and hides it. `gate()` keeps its tail: ninja's reason is its last line, a linter's is
+    its first.
+    """
+    lines = [l.strip() for l in ((p.stdout or "") + (p.stderr or "")).splitlines() if l.strip()]
+    if not lines:
+        return "no output (exit %d)" % p.returncode
+    return "exit %d: %s" % (p.returncode, "; ".join(lines[:2])[:limit])
+
+
+def land_decision(gate_ok: bool, stageable: list[str],
+                  failed: list[str] | None = None) -> tuple[str, str]:
     """What `land` does after the gate: -> (`"commit"` | `"refuse"`, reason).
 
     The one command has to be safe when its output is piped (the exit status is then lost): the gate's verdict
     *is* the decision, and a red gate can never reach `git commit`. A green gate with nothing to stage is also
-    a refusal - there is no batch to land.
+    a refusal - there is no batch to land. A refusal on a failed gate NAMES the failing check(s) and what each
+    printed (`failing_checks`): a bare "the gate failed" is not actionable, and a reader who cannot see which
+    gate failed cannot tell a real defect from a passing check.
     """
     if not gate_ok:
-        return "refuse", "the gate failed - nothing staged or committed"
+        why = "the gate failed - nothing staged or committed"
+        return "refuse", why + (": %s" % "; ".join(failed) if failed else "")
     if not stageable:
         return "refuse", "the gate passed but no batch path is stageable - nothing to commit"
     return "commit", ""
@@ -306,6 +367,8 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
     then is foreign, not batch material, even inside the allowed set (`docs/plan.md` under `85ddd7b6`,
     `src/RSO/runtime.c` under `890631e8`). The batch still stages a path it *names* as one of its units, so a
     unit the batch is genuinely working on keeps its existing behaviour.
+
+    Tool scratch (`is_scratch`) is never staged - the batch did not receive it (the `d910.json` refusal).
     """
     owned = unit_owned_paths(units)
     foreign = base_dirty or set()
@@ -313,6 +376,8 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
     for code, path in rows:
         if outside_batch([path]):
             continue
+        if is_scratch(path):
+            continue          # an objdiff dump the batch never received, staged or not (the crossing point)
         if path in foreign and path not in owned:
             continue          # already dirty at the batch base: another stream's work, leave it alone
         if code.startswith("??") and path not in owned and not path.startswith(("src/", "include/")):
@@ -366,6 +431,61 @@ def outside_batch(paths: list[str], allowed: tuple[str, ...] = ALLOWED_PREFIXES,
             continue
         bad.append(path)
     return bad
+
+
+def is_scratch(path: str) -> bool:
+    """True for tool scratch output in the repo root (`d<digits>.json` / `t<digits>.json`).
+
+    Deliberately narrow: only the repo root's `d`/`t` + digits `.json` shape. A file with that name anywhere
+    else, or any other path - `src/`, `include/`, `config/`, `configure.py`, a header, a `tools/` script - is
+    the batch guard's business and is still refused loudly (a name is not a permission).
+    """
+    return bool(SCRATCH_JSON.match(path))
+
+
+def scratch_paths(paths: list[str]) -> list[str]:
+    """The tolerated subset of `paths`, in order."""
+    return [p for p in paths if is_scratch(p)]
+
+
+def scratch_note(paths: list[str]) -> str:
+    """The line that NAMES tolerated scratch - a tolerated path is never silently dropped."""
+    noun = "path" if len(paths) == 1 else "paths"
+    return ("NOTE: %d tool scratch %s outside this batch - named here, never staged, never a refusal: %s"
+            % (len(paths), noun, ", ".join(paths)))
+
+
+def unstage_scratch(main: str, paths: list[str]) -> tuple[list[str], list[str]]:
+    """De-index tolerated scratch; -> (paths whose index entry is gone, paths still staged).
+
+    A staged copy is possible (the landing flow's `git add -A`, or a hand `git add`), and a staged file
+    bypasses `.gitignore` - which is exactly how `d910.json` reached a gate that then refused it. `git reset
+    HEAD -- <path>` drops the index entry and leaves the file in the worktree untouched, so the caller's dump
+    is not destroyed. A `git reset` that fails is reported, never claimed: the caller has to unstage by hand
+    before a `git commit` without a pathspec.
+    """
+    staged = set(git(["diff", "--cached", "--name-only"], main).splitlines())
+    victims = [p for p in paths if p in staged]
+    if not victims:
+        return [], []
+    p = run(["git", "reset", "-q", "HEAD", "--", *victims], main)
+    return (victims, []) if p.returncode == 0 else ([], victims)
+
+
+def tolerate_scratch(main: str, paths: list[str], act: bool = True) -> str:
+    """Note (and, unless `act` is False, de-index) tolerated scratch; return the note line.
+
+    `verify --dry-run` touches nothing, so it passes `act=False` and only names what it would have removed.
+    """
+    note = scratch_note(paths)
+    if act:
+        removed, held = unstage_scratch(main, paths)
+        if removed:
+            note += " (a staged copy was removed from the index)"
+        if held:
+            note += (" (WARNING: %s is staged and `git reset` failed - unstage it by hand before any "
+                     "`git commit` without a pathspec)" % ", ".join(held))
+    return note
 
 
 def flips_objects(main: str) -> bool:
@@ -580,7 +700,10 @@ def branch_problems(main: str, units: list[str]) -> list[str]:
 
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, check_outbox: bool = True,
-           release_claims: bool = True) -> int:
+           release_claims: bool = True, problems: list[str] | None = None) -> int:
+    # `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check>: <what it printed>"`
+    # per failed check, so its refusal can name the gate instead of saying only "the gate failed". `verify`'s
+    # own stdout keeps the check table; the exit status stays the answer.
     # a unit's *name* is its path without the source extension (`claims.norm_unit`): `Camellia/camellia` and
     # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
     # whichever the orchestrator typed.
@@ -609,7 +732,14 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # 3. the tree guard + the outbox of every unit in the batch
     paths = changed_paths(main)
     bad = outside_batch(paths)
-    check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad))
+    scratch = scratch_paths(bad)
+    bad = [p for p in bad if p not in scratch]
+    if scratch:
+        # tolerated, but NAMED: the guard's intent is a loud refusal for foreign work, and a path it refuses
+        # must never have been staged by this gate - so tolerated scratch is reported, not swallowed.
+        print(tolerate_scratch(main, scratch, act=not dry_run), file=sys.stderr)
+    check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad),
+          info=("tool scratch tolerated (not staged): %s" % ", ".join(scratch)) if scratch else "")
     if units and check_outbox:
         ok_units, problems = outbox_units(main, units)
         check("every unit's outbox validates", not problems, "; ".join(problems[:4]))
@@ -627,7 +757,9 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     lint = os.path.join(main, "tools", "units", "stylelint.py")
     if os.path.exists(lint):
         p = run([sys.executable, lint, "--diff", want_base or "HEAD"], main)
-        check("style lint (§6.5) adds no violation", p.returncode == 0, (p.stdout or p.stderr)[-300:])
+        # the head of the output, never the tail: stylelint prints its findings first and its "not enforced"
+        # legend last, so a tail hides the violation the batch has to fix (2026-09-25, `.pi/land.log`).
+        check("style lint (§6.5) adds no violation", p.returncode == 0, command_detail(p))
     else:
         check("style lint (§6.5)", True, info="not built yet (roadmap 7.21) - skipped")
 
@@ -642,6 +774,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
             print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
         print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> ninja -> report.json -> "
               "regression scan -> ok -> ledger -> baseline" % (" and main.elf (this batch flips an object)" if flip else ""))
+        if problems is not None:
+            problems.extend(failing_checks(checks))
         return 0 if all(good for _n, good, _d, _i in checks) else 1
 
     failures = [name for name, good, _d, _i in checks if not good]
@@ -649,8 +783,12 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         for name, good, detail, info in checks:
             note = (detail if not good else "") or info
             print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
-        print("\nREFUSING to build or stage anything: %s" % ", ".join(failures))
+        if problems is not None:
+            problems.extend(failing_checks(checks))
+        print("\nREFUSING to build or stage anything: %s" % "; ".join(failing_checks(checks)))
         return 1
+    if problems is not None:
+        problems.extend(failing_checks(checks))
 
     def gate(name: str, args: list[str]) -> bool:
         p = run(args, main)
@@ -733,6 +871,11 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
             % ((want_base or "?")[:8], len(checks), fresh, ", main.elf relinked" if flip else "",
                ", authorised regressions: %s" % ", ".join(sorted(allow_regression)) if allow_regression else ""),
             ""]
+    if scratch:
+        # the tolerance is part of the record, not a silent drop: the commit says what was left alone
+        body.append("scratch: tool scratch outside the batch, not staged, not committed: %s"
+                    % ", ".join(scratch))
+        body.append("")
     failed = [name for name, good, _d, _i in checks if not good]
     if failed:
         # a failed gate must not leave a message a `git commit -F .git/land_msg.txt` could pick up: the old
@@ -742,7 +885,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         if stale:
             print("removed the stale %s (a failed gate has no committable message)" % os.path.relpath(stale, main))
         print("\nledger: %s" % summary(before, after))
-        print("FAILED: %s" % ", ".join(failed))
+        print("FAILED: %s" % "; ".join(failing_checks(checks)))
         return 1
     message = write_land_message(main, "\n".join(body))
     print("\nledger: %s" % summary(before, after))
@@ -760,7 +903,9 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     batch whose gate had *failed* was committed by hand - twice, leaving a partial source on `main` while
     `ok` stayed green (the unit is `NonMatching`). So the gate's verdict is now the decision, not a report:
 
-    * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message;
+    * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message. A
+      refusal NAMES the failing check and what it printed - a bare `the gate failed` is not actionable, and a
+      reader who cannot see which gate failed cannot tell a real defect from a passing check (2026-09-25);
     * an empty or whitespace-only `--message` is refused before the gate runs (`message_error`): the empty
       shell substitution that expanded `$(cat /tmp/msg1.txt)` must not silently land the fallback subject;
     * a HEAD that is not `main` is refused before the gate runs (`branch_error`): a land run off `main` moves
@@ -789,19 +934,27 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         clear_land_message(main)
         print("REFUSED %s | %s" % (",".join(norm_units), bad_branch))
         return 1
+    gate_failures: list[str] = []
     with contextlib.redirect_stdout(sys.stderr):
         gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
                          allow_regression=allow_regression, check_outbox=check_outbox,
-                         release_claims=False) == 0
+                         release_claims=False, problems=gate_failures) == 0
     rows = changed_status(main)
     outside = outside_batch([path for _code, path in rows])
-    if outside:
+    scratch = scratch_paths(outside)
+    foreign = [p for p in outside if p not in scratch]
+    if scratch:
+        # the fix for the `d910.json` self-contradiction: the gate used to refuse this path and (via the
+        # landing flow's `git add -A`) have staged it, so its own refusal was its own doing. Tolerated scratch
+        # is named, de-indexed and left in the tree; the batch lands.
+        print(tolerate_scratch(main, scratch), file=sys.stderr)
+    if foreign:
         clear_land_message(main)
         print("REFUSED %s | paths outside the batch appeared during the build: %s"
-              % (",".join(norm_units), ", ".join(outside)))
+              % (",".join(norm_units), ", ".join(foreign)))
         return 1
     stageable = land_stageable(norm_units, rows, base_dirty_paths(main))
-    action, why = land_decision(gate_ok, stageable)
+    action, why = land_decision(gate_ok, stageable, gate_failures)
     if action != "commit":
         clear_land_message(main)
         print("REFUSED %s | %s" % (",".join(norm_units), why))
@@ -940,6 +1093,38 @@ def selftest() -> int:
           "tools/units/langcheck.py")
     check("... and pluralises two", foreign_warning(["a", "b"]).count("paths"), 1)
 
+    # the 2026-09-25 `d910.json` defect. An objdiff `diff` dump from the repo root is outside the guard's
+    # allowed set, so `outside_batch` still classifies it - the tolerance is a deliberate carve-out *at the
+    # tolerance site*, never a loosening of the guard - and the carve-out is narrow: the `d`/`t` + digits +
+    # `.json` shape in the repo root only. A `d`-shaped name elsewhere, or any other path, is still refused.
+    check("scratch: an objdiff dump is scratch", is_scratch("d910.json"), True)
+    check("scratch: the target-side dump too", is_scratch("t910.json"), True)
+    check("scratch: a single digit", is_scratch("d0.json"), True)
+    check("scratch: uppercase is not the measured shape", is_scratch("D910.json"), False)
+    check("scratch: not a suffix of another name", is_scratch("d910.json.bak"), False)
+    check("scratch: not a letter-only name", is_scratch("dx.json"), False)
+    check("scratch: no letter", is_scratch("910.json"), False)
+    check("scratch: no dot", is_scratch("d.json"), False)
+    check("scratch: not under a subdirectory", is_scratch("src/d910.json"), False)
+    check("scratch: a source file is not scratch", is_scratch("src/Pl/pl_act.cpp"), False)
+    check("scratch: the shared file is not scratch", is_scratch("configure.py"), False)
+    check("scratch: the guard still classifies it outside the batch",
+          outside_batch(["d910.json"]), ["d910.json"])
+    check("scratch: it is named in the note", "d910.json" in scratch_note(["d910.json"]), True)
+    check("scratch: the note says it is not a refusal",
+          "never a refusal" in scratch_note(["d910.json"]), True)
+    check("scratch: the note pluralises", scratch_note(["d910.json", "t910.json"]).count("paths"), 1)
+    check("scratch: the subset keeps order",
+          scratch_paths(["d910.json", "src/a.c", "t12.json"]), ["d910.json", "t12.json"])
+    # the crossing point itself: the gate must never stage a path it did not receive from the batch
+    check("scratch: a scratch path is never stageable",
+          "d910.json" in land_stageable(["Pl/pl_act"], [("??", "d910.json")]), False)
+    check("scratch: the batch's own file in the same rows still is",
+          land_stageable(["Pl/pl_act"], [("??", "d910.json"), (" M", "src/Pl/pl_act.cpp")]),
+          ["src/Pl/pl_act.cpp"])
+    check("scratch: a staged scratch path is not stageable either",
+          "d910.json" in land_stageable(["Pl/pl_act"], [("A ", "d910.json")]), False)
+
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, ".git"), exist_ok=True)
         stale = write_land_message(tmp, "land: old batch\n")
@@ -1026,6 +1211,209 @@ def selftest() -> int:
         check("... and is still staged", repo_git(tmp, "diff", "--cached", "--name-only"),
               "tools/units/langcheck.py")
         check("... and still uncommitted", repo_git(tmp, "status", "--porcelain").startswith("M"), True)
+
+    # the `d910.json` end-to-end: the real `land` on a real repo, with a `verify` stand-in that writes files
+    # DURING the "build" (the only way to reproduce "appeared during the build"). Four cases: tool scratch
+    # lands the batch without being staged, a scratch file the index already holds is de-indexed and still not
+    # committed, a path outside the batch's expected set is still refused loudly (even with scratch beside it),
+    # and a gate that fails names itself in the refusal.
+    import io
+    import unittest.mock as mock
+    module = sys.modules[__name__]
+
+    def fake_verify_with(write, gate_code=0, gate_problems=()):
+        """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
+
+        def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
+                        release_claims=True, problems=None):
+            write(main)
+            if problems is not None:
+                problems.extend(gate_problems)
+            write_land_message(main, "land: batch\n\nledger: (fixture)\n")
+            return gate_code
+
+        return fake_verify
+
+    def land_fixture(tmp, verify_stand_in, stage_scratch=False):
+        """A repo on `main` with one batch file changed; run the real `land` under the stand-in."""
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+        with open(os.path.join(tmp, "src", "batch.c"), "w", encoding="utf-8") as fh:
+            fh.write("base\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        base_sha = repo_git(tmp, "rev-parse", "HEAD")
+        with open(os.path.join(tmp, "src", "batch.c"), "w", encoding="utf-8") as fh:
+            fh.write("the batch\n")
+        if stage_scratch:
+            # exactly what the landing flow's own `git add -A` was measured doing: the scratch in the index
+            with open(os.path.join(tmp, "d910.json"), "w", encoding="utf-8") as fh:
+                fh.write("staged by another step\n")
+            repo_git(tmp, "add", "-A")
+        buf, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(module, "verify", verify_stand_in), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+            code = land(tmp, ["Pl/pl_act"], None, no_build=True, check_outbox=False,
+                        release_claims=False, subject="x")
+        return code, buf.getvalue(), err.getvalue(), base_sha
+
+    def write_scratch(main):
+        with open(os.path.join(main, "d910.json"), "w", encoding="utf-8") as fh:
+            fh.write("during the build\n")
+
+    def write_foreign(main):
+        # outside the batch's expected set, and the file the gate exists to protect: a foreign SOURCE edit may
+        # live under `src/`/`include/`/`configure.py` (those are the batch's own paths by design) - what this
+        # guard refuses is work the batch could not have produced, e.g. the ground truth.
+        os.makedirs(os.path.join(main, "config", "RMHE08"), exist_ok=True)
+        with open(os.path.join(main, "config", "RMHE08", "build.sha1"), "w", encoding="utf-8") as fh:
+            fh.write("someone else's edit\n")
+
+    def write_foreign_root(main):
+        with open(os.path.join(main, "NOTES.md"), "w", encoding="utf-8") as fh:
+            fh.write("a foreign file the batch did not receive\n")
+
+    def write_both(main):
+        write_scratch(main)
+        write_foreign(main)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # (a) scratch appears during the build: the batch lands, the scratch is never staged or committed, and
+        # the caller's dump is left in the tree - the tolerance is named, not silent
+        code, out, err, _base = land_fixture(tmp, fake_verify_with(write_scratch))
+        check("scratch during the build: the landing is not refused", code, 0)
+        check("... the answer line says LANDED", out.startswith("LANDED"), True)
+        check("... the batch is committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "the batch")
+        check("... the scratch is NOT committed",
+              run(["git", "cat-file", "-e", "HEAD:d910.json"], tmp).returncode != 0, True)
+        check("... nothing is left staged", repo_git(tmp, "diff", "--cached", "--name-only"), "")
+        check("... and the caller's dump is left alone",
+              open(os.path.join(tmp, "d910.json"), encoding="utf-8").read(), "during the build\n")
+        check("... the gate log names it", "d910.json" in err, True)
+        check("... and says the tolerance is not a refusal", "never a refusal" in err, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # (b) the index already holds the scratch (the landing flow's `git add -A` did it): `land` de-indexes
+        # it, so the commit can never carry a path the batch did not receive
+        code, out, err, _base = land_fixture(tmp, fake_verify_with(lambda main: None), stage_scratch=True)
+        check("a staged scratch does not block the landing", code, 0)
+        check("... the answer line says LANDED", out.startswith("LANDED"), True)
+        check("... the batch is committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "the batch")
+        check("... the staged scratch is de-indexed and never committed",
+              run(["git", "cat-file", "-e", "HEAD:d910.json"], tmp).returncode != 0, True)
+        check("... and the index is left otherwise empty",
+              repo_git(tmp, "diff", "--cached", "--name-only"), "")
+        check("... the file itself survives",
+              open(os.path.join(tmp, "d910.json"), encoding="utf-8").read(), "staged by another step\n")
+        check("... and the de-indexing is named", "removed from the index" in err, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # a `git reset` that fails must be REPORTED, never claimed as removed: the guarantee is "the batch can
+        # never carry a path it did not receive", and a silent failure would leave that guarantee a fiction
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        with open(os.path.join(tmp, "d910.json"), "w", encoding="utf-8") as fh:
+            fh.write("scratch\n")
+        repo_git(tmp, "add", "-A")
+        real_run = run
+
+        def failing_reset(args, cwd):
+            if args[:2] == ["git", "reset"]:
+                return subprocess.CompletedProcess(args, 1, "", "index.lock exists")
+            return real_run(args, cwd)
+
+        with mock.patch.object(module, "run", failing_reset):
+            note = tolerate_scratch(tmp, ["d910.json"])
+        check("a failed unstage warns", "WARNING" in note, True)
+        check("... and names the path", "d910.json" in note, True)
+        check("... and does not claim it was removed", "removed from the index" in note, False)
+        check("... the path really is still staged",
+              repo_git(tmp, "diff", "--cached", "--name-only"), "d910.json")
+        # and the successful path: `git reset` drops the entry and leaves the file in the tree
+        check("a successful unstage reports what it removed",
+              tolerate_scratch(tmp, ["d910.json"]), scratch_note(["d910.json"])
+              + " (a staged copy was removed from the index)")
+        check("... and the file survives",
+              open(os.path.join(tmp, "d910.json"), encoding="utf-8").read(), "scratch\n")
+        check("... and is no longer staged", repo_git(tmp, "diff", "--cached", "--name-only"), "")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # (c) a foreign path outside the batch that appears during the build is refused loudly - the tolerance is
+        # tool scratch only, and it does not swallow the refusal when scratch appears beside it
+        code, out, _err, base_sha = land_fixture(tmp, fake_verify_with(write_foreign_root))
+        check("a foreign root file during the build is refused", code, 1)
+        check("... the refusal names it", "appeared during the build: NOTES.md" in out, True)
+        check("... the refused batch is not committed", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
+        check("... and its message is cleared", os.path.exists(land_message_path(tmp)), False)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        code, out, _err, base_sha = land_fixture(tmp, fake_verify_with(write_foreign))
+        check("a foreign ground-truth edit is refused", code, 1)
+        check("... the refusal names it",
+              "appeared during the build: config/RMHE08/build.sha1" in out, True)
+        check("... the refused batch is not committed", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        code, out, err, base_sha = land_fixture(tmp, fake_verify_with(write_both))
+        check("foreign + scratch together is still refused", code, 1)
+        check("... and the foreign path is the one named",
+              "appeared during the build: config/RMHE08/build.sha1" in out, True)
+        check("... the refused batch is not committed", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
+        check("... and the tolerated scratch is still named", "d910.json" in err, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # (d) a failing gate NAMES itself: the 2026-09-25 `proposal/800916FC` refusal printed only "the gate
+        # failed - nothing staged or committed" while its lint row showed stylelint's trailing legend, so the
+        # reader hunted for a defect that was not there. Both halves are asserted here - the check's name, what
+        # it printed, and that a passing gate lands.
+        stylelint_row = "style lint (§6.5) adds no violation"
+        failing = [("ground truth (build.sha1 == the DOL's hash)", True, "", ""),
+                   (stylelint_row, False,
+                    "exit 1: the batch adds 3 section 6.5 violation(s) over 2 changed file(s):; "
+                    "+3 rule 2  src/ef/eft029.cpp  (0 -> 3)", "")]
+        named = failing_checks(failing)
+        check("a failing gate produces one line per failed check", len(named), 1)
+        check("... it names the check", named[0].startswith(stylelint_row + ":"), True)
+        check("... and what the check printed", "+3 rule 2 src/ef/eft029.cpp" in named[0], True)
+        check("... a passing check is not reported", "ground truth" in named[0], False)
+        green = [("ground truth (build.sha1 == the DOL's hash)", True, "", "")]
+        check("an all-green gate reports nothing", failing_checks(green), [])
+        check("a bare failed gate keeps the old wording",
+              land_decision(False, ["src/Pl/pl_act.cpp"]),
+              ("refuse", "the gate failed - nothing staged or committed"))
+        check("a failed gate refuses and names the gate",
+              land_decision(False, ["src/Pl/pl_act.cpp"], named)[0], "refuse")
+        check("... the refusal carries the check's name",
+              stylelint_row in land_decision(False, ["src/Pl/pl_act.cpp"], named)[1], True)
+        check("... and what it printed",
+              "+3 rule 2" in land_decision(False, ["src/Pl/pl_act.cpp"], named)[1], True)
+        check("a full set of passing gates lands",
+              land_decision(True, ["src/Pl/pl_act.cpp"], failing_checks(green)), ("commit", ""))
+        code, out, _err, _base = land_fixture(tmp, fake_verify_with(lambda main: None, gate_code=1,
+                                                                  gate_problems=named))
+        check("a red gate never reaches git commit", code, 1)
+        check("... the answer line is a refusal", out.startswith("REFUSED"), True)
+        check("... and it names the failing check", stylelint_row in out, True)
+        check("... and what the check printed", "+3 rule 2" in out, True)
+        check("... the batch file is still uncommitted",
+              repo_git(tmp, "status", "--porcelain").startswith("M"), True)
+
+    # `command_detail` is the detail a FAILED lint row carries: stylelint prints its findings FIRST and its
+    # "not enforced: ..." legend LAST, so the old `output[-300:]` showed the legend and hid the violation.
+    stylelint_out = ("stylelint: the batch adds 3 section 6.5 violation(s) over 2 changed file(s):\n"
+                     "  +3 rule 2  src/ef/eft029.cpp  (0 -> 3)\n"
+                     "  not enforced: rule 7 under src/auto/ (temporary grandfather: legacy scaffolding\n"
+                     "       with bodies, until the auto/ migration lands)\n"
+                     "  not enforced: rule 7 for a file with no bodies yet (a stub has nothing to name)\n")
+    detail = command_detail(subprocess.CompletedProcess([], 1, stdout=stylelint_out, stderr=""))
+    check("a failed lint row carries the violation", "+3 rule 2  src/ef/eft029.cpp" in detail, True)
+    check("... and its exit code", "exit 1" in detail, True)
+    check("... not just the legend", "temporary grandfather" in detail, False)
+    check("a clean lint row says so",
+          command_detail(subprocess.CompletedProcess([], 0, stdout="ok\n", stderr="")), "exit 0: ok")
+    check("an empty output is not a crash",
+          command_detail(subprocess.CompletedProcess([], 3, stdout="", stderr="")), "no output (exit 3)")
 
     # the snapshot the guard reads: `record_base` must capture what was dirty when it ran, so a path the
     # batch edits afterwards is batch material and one that was dirty before it is foreign. AGENTS.md is
