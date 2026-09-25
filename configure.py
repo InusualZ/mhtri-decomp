@@ -638,6 +638,16 @@ config.libs = [
             # descriptor.  No `__FILE__` string survives in the range and the dump answers only
             # `zz_` placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_801D428C.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from proposal/801DB8E0_fn_801DB8E0.cpp
+            # (the 0x801DB8E0 run discovery proposed): the enemy effect/part band 0x801DB8E0..0x801E0ADC,
+            # 28 functions / 0x51FC bytes, plus the 23 extab records 0x8001031C..0x800103D4 and the 23
+            # extabindex records 0x8002C394..0x8002C4A8 its framed functions carry.  Module `enemy` from
+            # the link band (the unit below is `enemy/fn_801D428C.cpp`, the module's naming scheme is the
+            # map stem) and from the code (every callee is `_ENEMY_WORK`-based).  C++ because the range
+            # reaches mangled callees (`setVector3__FP...`, `eft009_set_pos__FUcP...`, `__nw__FUl`).  No
+            # `__FILE__` string survives and the runtime dump answers only `zz_` placeholders, so the file
+            # keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801DB8E0.cpp"),
             # Registered from proposal/801993E0_fn_801993E0.cpp (a 0x801993E0 run discovery
             # proposed): the enemy "em" action band 0x801993E0..0x8019ED34, 35 functions / 0x5954
             # bytes, plus the 25 extab/extabindex records its framed functions carry.
