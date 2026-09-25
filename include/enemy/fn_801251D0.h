@@ -27,6 +27,11 @@ void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
 u16 fn_80127E78(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
+/* 0x80128A8C / 0x8012933C - this unit's own definitions (the first is defined here, the second is an
+ * address inside its range).  Moved here from `enemy/fn_80147CE0.cpp` (rule 2): signatures are the
+ * owner's (`fn_80128A8C` two u32 arguments; `fn_8012933C` narrows its second argument to u8 itself). */
+void fn_80128A8C(struct _ENEMY_WORK* self, u32 a, u32 b);
+void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
  * `enemy/fn_801550FC.cpp` on landing (rule 2): this unit owns the addresses. */
 void fn_80127FE4(struct _ENEMY_WORK* self);

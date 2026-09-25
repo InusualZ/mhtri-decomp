@@ -43,6 +43,7 @@
 #include "ef/eft009.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80149D6C.h"
+#include "enemy/fn_80147CE0.h"
 #include "unsplit/enemy.h"
 
 /* ---------------------------------------------------------------------------------------------------

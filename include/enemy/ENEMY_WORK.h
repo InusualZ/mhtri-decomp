@@ -162,16 +162,29 @@ struct _ENEMY_WORK {
     /* +0x1F6 */ u8 unused_0x1F6[0x1F8 - 0x1F6];
     /* +0x1F8 */ u8 field_0x1F8;
     /* +0x1F9 */ u8 field_0x1F9;        /* nonzero, `fn_801400BC`'s command is skipped */
-    /* +0x1FA */ u8 unused_0x1FA[0x1FD - 0x1FA];
+    /* +0x1FA */ u8 unused_0x1FA[0x1FB - 0x1FA];
+    /* +0x1FB */ u8 field_0x1FB;        /* set by `fn_80147F48`'s case 9 (added by
+                                        * `enemy/fn_80147CE0.cpp`) */
+    /* +0x1FC */ u8 unused_0x1FC[0x1FD - 0x1FC];
     /* +0x1FD */ u8 field_0x1FD;        /* nonzero, `fn_8013FC60`'s command is skipped */
     /* +0x1FE */ u8 unused_0x1FE[0x218 - 0x1FE];
     /* +0x218 */ u32 field_0x218;       /* nonzero, `fn_80137EE0` has slots to average */
     /* +0x21C */ u8 unused_0x21C[0x244 - 0x21C];
     /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `fn_80137EE0` averages */
-    /* +0x30C */ u8 unused_0x30C[0x328 - 0x30C];
+    /* +0x30C */ u8 unused_0x30C[0x314 - 0x30C];
+    /* +0x314 */ f32 field_0x314;      /* the effect scale `fn_80148BD0` writes (added by
+                                        * `enemy/fn_80147CE0.cpp`) */
+    /* +0x318 */ f32 field_0x318;      /* the effect radius `fn_801493A8` writes from `fn_80135644` */
+    /* +0x31C */ u8 unused_0x31C[0x324 - 0x31C];
+    /* +0x324 */ f32 field_0x324;      /* the effect scale `fn_801493A8` clamps */
     /* +0x328 */ s16 field_0x328;      /* the countdown `fn_80170804` ticks */
     /* +0x32A */ u8 field_0x32A;       /* the flag `fn_80170600`/`fn_80170758` clear */
-    /* +0x32B */ u8 unused_0x32B[0x360 - 0x32B];
+    /* +0x32B */ u8 unused_0x32B[0x354 - 0x32B];
+    /* +0x354 */ s16 field_0x354;      /* the 50-frame action counter `fn_801481D8` ticks and wraps */
+    /* +0x356 */ u8 field_0x356;       /* the action's "hold" flag `fn_80147F48` arms/clears */
+    /* +0x357 */ u8 field_0x357;       /* the action's case-6 flag `fn_80147F48` sets */
+    /* +0x358 */ u8 field_0x358;       /* the action's "run" flag `fn_80147F48` arms/clears */
+    /* +0x359 */ u8 unused_0x359[0x360 - 0x359];
     /* +0x360 */ s16 field_0x360;      /* fn_8013FD98's "already in this mode" countdown */
     /* +0x362 */ u8 unused_0x362[0x36C - 0x362];
     /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `fn_80050F80` measures against
@@ -181,7 +194,8 @@ struct _ENEMY_WORK {
     /* +0x382 */ u8 field_0x382;        /* `fn_8013FD1C` writes it from the stream */
     /* +0x383 */ u8 field_0x383;        /* set once `fn_801262BC`'s record is latched */
     /* +0x384 */ f32 field_0x384;       /* the record's +0x04 float, copied in with it */
-    /* +0x388 */ u8 unused_0x388[0x38C - 0x388];
+    /* +0x388 */ u8 unused_0x388[0x38B - 0x388];
+    /* +0x38B */ u8 field_0x38B;       /* `fn_80147F48`'s per-step flag (cleared on entry) */
     /* +0x38C */ u8 field_0x38C;        /* bit 0 gates `fn_8012C870` */
     /* +0x38D */ u8 field_0x38D;        /* `fn_80137C9C`'s action-end block clears it */
     /* +0x38E */ u8 field_0x38E;        /* `fn_80137C9C`'s action-end block clears it */
@@ -195,7 +209,9 @@ struct _ENEMY_WORK {
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
     /* +0x43F */ u8 field_0x43F;        /* `fn_8013763C` sets it, `fn_80137648` reads it back */
-    /* +0x440 */ u8 unused_0x440[0x46C - 0x440];
+    /* +0x440 */ u8 unused_0x440[0x464 - 0x440];
+    /* +0x464 */ f32 field_0x464;      /* the motion parameter `fn_80149C58` hands to `fn_8012F7D4` */
+    /* +0x468 */ u8 unused_0x468[0x46C - 0x468];
     /* +0x46C */ u8 field_0x46C;       /* the area/entry byte `fn_80170804` latches to 0xFF */
     /* +0x46D */ u8 unused_0x46D[0x784 - 0x46D];
     /* +0x784 */ u8 field_0x784;

@@ -68,6 +68,7 @@
 #include "unsplit/ef.h"
 #include "ef/fn_80105314.h"
 #include "enemy/fn_80138074.h"
+#include "enemy/fn_80147CE0.h"
 
 #pragma peephole off
 

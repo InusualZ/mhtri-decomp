@@ -10,12 +10,24 @@
 #include "types.h"
 #include "nw4r/math.h"
 
+struct _ENEMY_WORK;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void fn_80103960();
+
+/* The real signature, from the owner's own definition (`src/ef/eft007.cpp`:
+ * `void fn_801039B0(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)`).  C++ gets it because
+ * `enemy/fn_80147CE0.cpp` calls it with four arguments; the C consumers keep the old-style
+ * declaration (they call it with four arguments too, which C allows).  One view per TU: declaring
+ * both spellings is `(10197) illegal function overloading`. */
+#ifdef __cplusplus
+void fn_801039B0(struct _ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y);
+#else
 void fn_801039B0();
+#endif
 
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it

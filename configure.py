@@ -528,6 +528,20 @@ config.libs = [
             # string survives in the range and the dump answers only `zz_` placeholders, so the
             # file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_8013F764.cpp"),
+            # Registered from proposal/80147CE0_fn_80147CE0.cpp (a 0x80147CE0 run discovery
+            # proposed): the enemy action-handler band - the per-tick entry, the state-machine
+            # family and the three sub-state dispatchers, 36 functions / 0x208C bytes, plus the
+            # extab/extabindex entries its 30 framed functions carry.
+            # Module `enemy` from the link band (both bracketing registered units are `enemy`) and
+            # from the code (every function takes a `_ENEMY_WORK*`, pinned by
+            # `em_frame_check__FP11_ENEMY_WORKUsff`); C++ because four callees are mangled and rule
+            # 9 forbids spelling a mangling at the call site.  No `__FILE__` string survives in the
+            # range and the dump answers only `zz_` placeholders, so the file keeps the map's own
+            # stem.  The right edge (0x80149D6C) is evidence (the registered unit above starts
+            # there, and this unit's extabindex run ends exactly where that unit's begins); the left
+            # edge (0x80147CE0) is `attribute.py`'s `--max-bytes` cut, not evidence - see the unit
+            # header and the outbox.
+            Object(NonMatching, "enemy/fn_80147CE0.cpp"),
             Object(Matching, "enemy/fn_80149D6C.c"),
             Object(NonMatching, "enemy/fn_8014A1BC.c"),
             # proposal/801550FC_fn_801550FC.cpp: the em003 action unit (0x801550FC..0x8015D860,
