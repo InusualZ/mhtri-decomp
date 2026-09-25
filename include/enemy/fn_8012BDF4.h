@@ -30,6 +30,13 @@ u32 fn_8012D23C();
 u8 fn_8012D3E0();
 u32 fn_8012D7FC(struct _ENEMY_WORK* other);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+/* 0x8012E664 - one `self` argument, no return (clear the work record).  Added with its owner by
+ * `enemy/fn_80182D5C.cpp`, which calls it from the enemy-teardown step; the owner itself
+ * declares and defines it with this signature. */
+void fn_8012E664(struct _ENEMY_WORK* self);
+/* 0x8012E694 - one `self` argument, no return (the finish step `enemy/fn_80182D5C.cpp` runs once
+ * `fn_8012F93C` reports done).  Added with its owner (rule 2). */
+void fn_8012E694(struct _ENEMY_WORK* self);
 /* 0x8012D8D0 / 0x8012DB3C / 0x8012E21C - this unit's own definitions, moved here from the consumer
  * `enemy/fn_8012EC74.cpp` (rule 2): the owner is this unit, and the signatures are the ones that
  * file's call sites set (r3 the work record / the two byte-derived values). */
