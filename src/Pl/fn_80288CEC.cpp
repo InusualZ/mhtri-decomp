@@ -68,13 +68,13 @@
  * fn_8028C6CC, fn_8028CC7C, fn_8028CD3C, fn_8028CDB0, fn_8028D0EC, fn_8028D2DC, fn_8028D5F4,
  * fn_8028D778, fn_8028DDCC, fn_8028DF58, fn_8028E0B8, fn_8028E24C, fn_8028E3EC, fn_8028E528,
  * fn_8028E694, fn_8028E718, fn_8028EA84, fn_8028EC28, fn_8028EF7C's tail-call partner
- * `pl_motion_set` (needs the local string-object shape) and the four box builders
- * fn_8028F44C/`B4`/`558`'s exact float forms.  They are the next pass's work rather than guesses.
- * fn_8028F44C itself is at 77.96154 %: its target allocation is the typed-parameter spelling
- * (`PlBox* a/b`, `&b->vec_0x0C`), which measures 100.0 % (byte-identical), but that is a codegen
- * change rather than this pass's rule-6 spelling fix, so the body keeps its `void*` signature and
- * names the field at the access (`((PlBox*)b)->vec_0x0C`) - the spelling that leaves the score at
- * 77.96154 % (the rule-6 fix alone must not move it).
+ * `pl_motion_set` (needs the local string-object shape) and the remaining box builders
+ * fn_8028F4B4/`558`'s exact float forms.  They are the next pass's work rather than guesses.
+ * fn_8028F44C is byte-identical (100.0 %, 104 B): its target allocation is the typed-parameter
+ * spelling (`PlBox* a`/`b`, `&b->vec_0x0C`), which spells the three field reaches through the
+ * `PlBox` members and lets MWCC emit them as immediate offsets; the earlier `void*`-plus-cast
+ * form (the one this pass originally landed) CSE'd the reaches into a saved register and left the
+ * body at 116 B / 77.96154 %.
  * Two rule-1 follow-ups are named, not fixed: `_PL_ROOT` here and `_PLAYER_ROOT` in
  * `src/enemy/fn_8012BDF4.cpp` are the same record (the second user should move one definition into a
  * header), and `Pl_frame_check` has no registered owner, so its declaration belongs in
@@ -552,13 +552,13 @@ void fn_8028F400(void) {
 }
 
 /* 0x8028F44C - build the first 0x24 bytes of a box from two vectors and their cross product. */
-void fn_8028F44C(void* a, void* b) {
+void fn_8028F44C(PlBox* a, PlBox* b) {
     f32 cross[3];
 
     fn_80041E40(b, a);
-    fn_80041E40(&((PlBox*)b)->vec_0x0C, &((PlBox*)a)->vec_0x0C);
-    fn_80050CA0(cross, &((PlBox*)a)->vec_0x0C, a);
-    fn_80041E40(&((PlBox*)b)->vec_0x18, cross);
+    fn_80041E40(&b->vec_0x0C, &a->vec_0x0C);
+    fn_80050CA0(cross, &a->vec_0x0C, a);
+    fn_80041E40(&b->vec_0x18, cross);
 }
 
 } /* extern "C" */
