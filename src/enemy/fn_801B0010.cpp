@@ -79,6 +79,7 @@
 #include "nw4r/math.h"
 
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/fn_801D428C.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012EC74.h"
@@ -105,8 +106,9 @@
 /* 0x801D6694 / 0x801E01BC - the not-yet-registered enemy band 0x801926EC..0x801EC9E0 (rule 2's
  * named gap: the unit below is `enemy/fn_80191598.cpp`, the unit above is `lobby/lobby_scene.c`, so
  * the bracketing registered units name different modules and there is no sound header to move the
- * declaration to).  Each takes one `_ENEMY_WORK*` and answers in r3 (compared against 1). */
-extern "C" u32 fn_801D6694(_ENEMY_WORK* work);
+ * declaration to - until `enemy/fn_801D428C.cpp` was registered, which owns `fn_801D6694`: that one
+ * now comes from its owner header).  Each takes one `_ENEMY_WORK*` and answers in r3 (compared
+ * against 1). */
 extern "C" u32 fn_801E01BC(_ENEMY_WORK* work);
 /* 0x80267270 - same named gap (below `lobby/lobby_scene.c`, above `Pl/pl_master.cpp`).  r3 the
  * player work, r4/r5 two scalars and r6 the id it latches. */
@@ -115,6 +117,7 @@ extern "C" void fn_80267270(_PLW* plw, u32 a, u32 b, u32 c);
  * `Pl/pl_act.cpp` and `stage/fn_802B2978.c` (another named gap).  Declared at C++ scope so the call
  * site spells the owner's real signature (`GetItemData__FUs`), not the mangling (rule 9); the return
  * type is not part of the mangling, so this unit's view of the row is what it declares. */
+/* size: 0x4 */
 struct EmItemRow {
     /* +0x00 */ u8 field_0x00;
     /* +0x01 */ u8 rank_0x01; /* the "kind" byte the em030 picker filters on (`< 3`) */
@@ -136,8 +139,16 @@ extern "C" u8 lbl_806BD360[];
 
 /* The `void (*)(_ENEMY_WORK*, u32)` the stance action reads out of `shell_set_func_ptr`'s +0x58 slot. */
 typedef void (*ShellSetFn)(_ENEMY_WORK* work, u32 id);
+/* The block `shell_set_func_ptr` points at (the map types it `void*`); its +0x58 slot is the shell-set
+ * function the stance action calls, so it is reached as a field rather than by arithmetic (rule 6). */
+/* size: 0x5C */
+struct ShellSetBlock {
+    /* +0x00 */ u8 unused_0x00[0x58];
+    /* +0x58 */ ShellSetFn field_0x58;
+};
 
 /* The 8-byte `lbl_805B1B08` lookup entry: a key byte, a value byte and the list pointer. */
+/* size: 0x8 */
 struct EmLookupEntry {
     /* +0x0 */ u8 code;
     /* +0x1 */ u8 value_0x01;
@@ -146,8 +157,9 @@ struct EmLookupEntry {
 };
 extern "C" EmLookupEntry lbl_805B1B08[];
 
-/* The 0x14-byte ground record `fn_80125F54` fills; `fn_801421E4` takes its base and the copy reads
+/* The 0x18-byte ground record `fn_80125F54` fills; `fn_801421E4` takes its base and the copy reads
  * its +0x08 position. */
+/* size: 0x18 */
 struct EmGroundRec {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u32 field_0x04;
@@ -162,10 +174,8 @@ struct EmGroundRec {
  * outbox carries the unification request. */
 void* get_move_work_adrs(u8 index);
 
-/* The `fn_8004CAD8.cpp` vector helpers this range calls whose owner header does not carry them yet
- * (`fn_80050F80` measures two positions, `fn_80050CA0` subtracts them). */
-extern "C" f32 fn_80050F80(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-extern "C" void fn_80050CA0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+/* The `fn_8004CAD8.cpp` vector helpers this range calls moved into that unit's owner header on
+ * landing (rule 2); `fn_80050F80` measures two positions and `fn_80050CA0` subtracts them. */
 
 /* The shared `.sdata2` pool constants this range loads (never defined here - redefining them would
  * rebuild the pool instead of addressing the target's, playbook 29). */
@@ -1516,7 +1526,7 @@ extern "C" void fn_801B2514(_ENEMY_WORK* work, u32 kind) {
         break;
     case 1:
         if (em_frame_check(work, 0, lbl_80798B74, lbl_80798B48) == 1) {
-            ShellSetFn set = *(ShellSetFn*)((u8*)shell_set_func_ptr + 0x58);
+            ShellSetFn set = ((ShellSetBlock*)shell_set_func_ptr)->field_0x58;
 
             if ((u8)kind == 1) {
                 set(work, 3);
