@@ -36,6 +36,29 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CONFIG = os.path.join("config", "RMHE08", "config.yml")
 
 
+def main_worktree(start: str | None = None) -> str:
+    """The primary worktree (MAIN) - the tree whose `orig/` the pinned hashes describe.
+
+    A worker worktree carries no `orig/` of its own (`claims.py` seeds `build/tools`, not `orig/`), and the
+    teardown being checked deletes the very worktree it runs in, so reading `orig/` through this file's own
+    location is the read that cannot survive the removal it guards.  `git worktree list --porcelain` names
+    the main worktree first, so MAIN is resolved from git rather than guessed from the path.  A caller with
+    a known root passes it as `start` (the lane selftest points this at its throwaway repo).
+    """
+    cwd = start or os.path.dirname(os.path.abspath(__file__))
+    try:
+        p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=cwd,
+                           capture_output=True, text=True, errors="replace")
+    except OSError:
+        return REPO
+    if p.returncode == 0:
+        for line in (p.stdout or "").splitlines():
+            if line.startswith("worktree "):
+                path = line[len("worktree "):].strip()
+                return os.path.abspath(path) if path else REPO
+    return REPO
+
+
 def is_reparse_point(path: str) -> bool:
     """Whether `path` is a junction or a symlink - i.e. a removal must not recurse through it."""
     try:
@@ -77,10 +100,14 @@ def unlink_reparse_points(root: str) -> list[str]:
     return removed
 
 
-def remove_worktree(path: str) -> list[str]:
-    """Unlink the reparse points under `path`, then `git worktree remove --force` it."""
+def remove_worktree(path: str, repo: str | None = None) -> list[str]:
+    """Unlink the reparse points under `path`, then `git worktree remove --force` it.
+
+    `repo` is the working tree git is run from.  The lane teardown passes the main worktree it resolved,
+    so the removal does not depend on the teardown's own cwd - which is inside the worktree being deleted.
+    """
     removed = unlink_reparse_points(path)
-    subprocess.run(["git", "worktree", "remove", "--force", path], check=False,
+    subprocess.run(["git", "worktree", "remove", "--force", path], cwd=repo, check=False,
                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return removed
 
@@ -93,12 +120,14 @@ def sha1(path: str) -> str:
     return h.hexdigest()
 
 
-def ground_truth(repo: str = REPO) -> dict[str, str]:
+def ground_truth(repo: str | None = None) -> dict[str, str]:
     """The pinned original-file hashes, taken from `config.yml` so there is one source of truth.
 
     `hash` pins the DOL and `selfile_hash` the RSO selfile; both are dtk's own verification fields, so a
-    file that fails them was never the one this project builds from.
+    file that fails them was never the one this project builds from.  `repo` defaults to the main worktree,
+    which is the tree the pins describe and the one a bad worktree removal damages.
     """
+    repo = repo or main_worktree()
     cfg = os.path.join(repo, CONFIG)
     text = open(cfg, encoding="utf-8", errors="replace").read()
     out = {}
@@ -110,8 +139,9 @@ def ground_truth(repo: str = REPO) -> dict[str, str]:
     return out
 
 
-def verify_orig(repo: str = REPO, want: dict[str, str] | None = None) -> list[tuple[str, str, str]]:
+def verify_orig(repo: str | None = None, want: dict[str, str] | None = None) -> list[tuple[str, str, str]]:
     """`[(path, want, got)]` for every pinned original that is missing or changed.  Empty means intact."""
+    repo = repo or main_worktree()
     want = ground_truth(repo) if want is None else want
     bad = []
     for rel, expected in sorted(want.items()):
@@ -122,8 +152,14 @@ def verify_orig(repo: str = REPO, want: dict[str, str] | None = None) -> list[tu
     return bad
 
 
-def snapshot(repo: str = REPO) -> str:
-    """One line per pinned original, for a before/after comparison in a teardown log."""
+def snapshot(repo: str | None = None) -> str:
+    """One line per pinned original, for a before/after comparison in a teardown log.
+
+    `repo` defaults to the main worktree and is passed explicitly by the caller when it must outlive the
+    worktree being removed: snapshotting the teardown's own worktree after its removal is the read that
+    crashed the first fix attempt.
+    """
+    repo = repo or main_worktree()
     return "\n".join("%s %s" % (sha1(os.path.join(repo, r)), r) if os.path.exists(os.path.join(repo, r))
                      else "MISSING %s" % r for r in sorted(ground_truth(repo)))
 
@@ -217,9 +253,10 @@ def selftest() -> int:
                   hazard, False)
             check("remove_worktree() stops it (target intact)", protected, True)
 
-    # the real repo's originals must match the hashes config.yml pins
-    check("this checkout's orig/ matches config.yml's pinned hashes", verify_orig(REPO), [])
-    check("ground_truth reads both pins", sorted(ground_truth(REPO)),
+    # the main worktree's originals must match the hashes config.yml pins
+    main = main_worktree()
+    check("the main worktree's orig/ matches config.yml's pinned hashes", verify_orig(main), [])
+    check("ground_truth reads both pins", sorted(ground_truth(main)),
           ["orig/RMHE08/files/mh3.sel", "orig/RMHE08/sys/main.dol"])
 
     for f in fails:
@@ -240,10 +277,12 @@ def main() -> int:
         for p in unlink_reparse_points(a.unlink):
             print("unlinked %s" % p)
         return 0
-    bad = verify_orig(REPO)
+    main = main_worktree()
+    bad = verify_orig(main)
     for rel, want, got in bad:
         print("CHANGED %s want %s got %s" % (rel, want, got))
-    print("orig/: %d pinned file(s), %s" % (len(ground_truth(REPO)), "intact" if not bad else "CHANGED"))
+    print("orig/ (%s): %d pinned file(s), %s"
+          % (main, len(ground_truth(main)), "intact" if not bad else "CHANGED"))
     return 1 if bad else 0
 
 

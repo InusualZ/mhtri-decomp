@@ -23,11 +23,19 @@ work"), so a teardown is always reversible with:
 
 `teardown` refuses to touch a branch that is not a lane prefix (`experiment/`, `worker/`, `wip/`) unless
 `--force`, so a mistyped branch name cannot delete `main`.
+
+A teardown is also **idempotent**: a lane whose worktree and branch are both already gone reports
+`nothing to tear down` and exits 0, and a branch left behind by a half-finished run is still deleted, so
+repeating the command *completes* the teardown instead of aborting.  The `orig/` integrity guard is read
+from MAIN and snapshotted **before** the worktree is removed - a worker worktree has no `orig/` or
+`config.yml` of its own, and reading the worktree that is being deleted, after it is gone, is the bug this
+tool now avoids.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import subprocess
@@ -104,25 +112,47 @@ def rescue(branch: str, base: str = BASE, dry_run: bool = False) -> dict:
 
 
 def teardown(branch: str, base: str = BASE, dry_run: bool = False, force: bool = False) -> dict:
-    """Rescue, then remove the worktree and the branch. Refuses anything that is not a lane."""
+    """Rescue, then remove the worktree and the branch.  Refuses anything that is not a lane.
+
+    Idempotent: when the worktree and the branch are both already gone - a previous run finished, or
+    half-finished and left the worktree removed - this returns a clean `nothing to tear down` instead of
+    raising, matching `claims.py`'s rule that releasing an already-released claim is a no-op.  A branch
+    that survives a half-finished run is still deleted, so a re-run *completes* the teardown rather than
+    refusing it.
+    """
     if not any(branch.startswith(p) for p in LANE_PREFIXES) and not force:
         raise SystemExit("refusing: %r is not a lane branch (%s). Pass --force if it really is one."
                          % (branch, ", ".join(LANE_PREFIXES)))
-    if git(["rev-parse", "--verify", "--quiet", "refs/heads/" + branch], check=False) is None:
-        raise SystemExit("no such branch: %s" % branch)
-    res = rescue(branch, base, dry_run)
+    # Resolve MAIN once, while the caller's worktree still exists: the worktree is deleted below, and the
+    # git calls that follow (the branch delete and the prune) must run from a directory that survives.
+    repo = wtsafe.main_worktree(unitutil.repo_root())
+    branch_present = bool(git(["rev-parse", "--verify", "--quiet", "refs/heads/" + branch], check=False))
     wt = worktree_for(branch)
+    ref = "refs/rescue/" + slug(branch)
+    if not branch_present and wt is None:
+        return {"branch": branch, "ref": ref, "commits": [], "action": "nothing to tear down",
+                "tip": None, "previous": ref_exists(ref), "worktree": None, "steps": [],
+                "dry_run": dry_run}
+    if branch_present:
+        res = rescue(branch, base, dry_run)
+    else:
+        res = {"branch": branch, "ref": ref, "commits": [], "action": "branch already gone",
+               "tip": None, "previous": ref_exists(ref)}
     steps = []
     if wt:
         # Measured 2026-09-24: `git worktree remove --force` follows a Windows directory junction and
         # deletes the TARGET's contents - that is how MAIN's orig/RMHE08/sys and files were emptied when
         # this loop ran over seven worktrees. wtsafe unlinks the reparse points first, and the snapshot
         # pair turns any other loss into a loud failure instead of a silent one.
-        before = wtsafe.snapshot()
+        #
+        # MAIN is resolved and the snapshot is taken BEFORE the removal, and both snapshots read MAIN: a
+        # worker worktree has no orig/ or config.yml of its own, and snapshotting the worktree that is being
+        # removed, after it is gone, is exactly the read that aborted the first attempt.
         links: list[str] = []
         if not dry_run:
-            links = wtsafe.remove_worktree(wt)
-            after = wtsafe.snapshot()
+            before = wtsafe.snapshot(repo)
+            links = wtsafe.remove_worktree(wt, repo)
+            after = wtsafe.snapshot(repo)
             if after != before:
                 raise SystemExit("orig/ changed while removing %s - restore it from the pinned hashes:\n%s"
                                  % (wt, after))
@@ -130,8 +160,9 @@ def teardown(branch: str, base: str = BASE, dry_run: bool = False, force: bool =
         if links:
             steps.append(("unlinked reparse points", ", ".join(os.path.basename(p) for p in links)))
     if not dry_run:
-        git(["branch", "-D", branch])
-        git(["worktree", "prune"])
+        if branch_present:
+            git(["branch", "-D", branch], repo)
+        git(["worktree", "prune"], repo)
     steps.append(("branch", branch))
     return dict(res, worktree=wt, steps=steps, dry_run=dry_run)
 
@@ -211,6 +242,56 @@ def selftest() -> int:
                   len(unlanded("recovered")), 1)
             check("lanes reports a missing rescue ref as missing",
                   _lanes_missing_ref(tmp), True)
+
+            # --- teardown: finishes, is idempotent, and keeps the orig/ guard (the 2026-09-25 half-teardown) ---
+            os.makedirs(os.path.join(tmp, "orig", "RMHE08", "sys"), exist_ok=True)
+            os.makedirs(os.path.join(tmp, "orig", "RMHE08", "files"), exist_ok=True)
+            os.makedirs(os.path.join(tmp, "config", "RMHE08"), exist_ok=True)
+            dol = os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol")
+            sel = os.path.join(tmp, "orig", "RMHE08", "files", "mh3.sel")
+            open(dol, "w").write("the original\n")
+            open(sel, "w").write("the selfile\n")
+            h = hashlib.sha1(open(dol, "rb").read()).hexdigest().upper()
+            hs = hashlib.sha1(open(sel, "rb").read()).hexdigest().upper()
+            open(os.path.join(tmp, "config", "RMHE08", "config.yml"), "w").write(
+                "object: orig/RMHE08/sys/main.dol\nhash: %s\nselfile: orig/RMHE08/files/mh3.sel\n"
+                "selfile_hash: %s\n" % (h, hs))
+            run("add", "-A")
+            run("commit", "-q", "-m", "config and orig")
+            run("worktree", "add", "-q", "-b", "experiment/lane-teardown",
+                os.path.join(tmp, "wt"), "main")
+            # the 2026-09-24 hazard shape: a junction from the worktree into MAIN's orig/
+            link = os.path.join(tmp, "wt", "orig_junc")
+            if not wtsafe._make_junction(link, os.path.join(tmp, "orig")):
+                print("  (junction creation unavailable - teardown tested without one)")
+
+            out = teardown("experiment/lane-teardown", force=True)
+            check("teardown removes the worktree",
+                  out["worktree"] is not None and not os.path.exists(os.path.join(tmp, "wt")), True)
+            check("teardown deletes the branch",
+                  run("rev-parse", "--verify", "--quiet",
+                      "refs/heads/experiment/lane-teardown").returncode != 0, True)
+            check("teardown leaves MAIN's orig/ intact", wtsafe.verify_orig(tmp), [])
+            check("a second teardown is a clean no-op",
+                  teardown("experiment/lane-teardown", force=True)["action"], "nothing to tear down")
+
+            # the guard: a removal that damages MAIN's orig/ must abort, not report success
+            run("worktree", "add", "-q", "-b", "experiment/lane-hazard",
+                os.path.join(tmp, "wt2"), "main")
+            real_remove = wtsafe.remove_worktree
+
+            def _damaging_remove(path, repo=None):
+                links = real_remove(path, repo)
+                open(dol, "w").write("damaged\n")
+                return links
+
+            wtsafe.remove_worktree = _damaging_remove
+            try:
+                check("teardown aborts when MAIN's orig/ changes",
+                      _refuses(lambda: teardown("experiment/lane-hazard", force=True)), True)
+            finally:
+                wtsafe.remove_worktree = real_remove
+                open(dol, "w").write("the original\n")
         finally:
             unitutil.repo_root = real_root
 
@@ -283,6 +364,10 @@ def main() -> int:
         return 0
     if args.cmd == "teardown":
         out = teardown(args.branch, args.base, args.dry_run, args.force)
+        if out.get("action") == "nothing to tear down":
+            print("  nothing to tear down on %s - the worktree and the branch are already gone"
+                  % args.branch)
+            return 0
         for sha, subj in out["commits"]:
             print("  %s unlanded: %s" % (sha[:8], subj))
         if out["commits"]:
