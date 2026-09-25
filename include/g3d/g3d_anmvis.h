@@ -24,6 +24,9 @@ void fn_8006ECB4(void* pModel, void* pSelf);
 /* 0x8006ED84 - the same walk, writing one byte per node into `pByteVec`. */
 void fn_8006ED84(u8* pByteVec, void* pModel, void* pSelf);
 
+/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the checked `ResAnmVis` resolver. */
+u32 fn_8006EC3C(void* p); /* 0x8006EC3C - the checked `ResAnmVis` resolver */
+
 #ifdef __cplusplus
 }
 #endif

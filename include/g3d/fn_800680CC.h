@@ -38,6 +38,12 @@ u32 fn_800689B0(void* p);
  * resolves against (rule 2: declared in its owner's header, not in the consumer). */
 u32 fn_800697A4(void);
 
+/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the `ResFile` revision-check getters. */
+u32 fn_8006E6B4(void* p);   /* 0x8006E6B4 - `*(u32*)p != 0` */
+u32 fn_800695EC(void* p);   /* 0x800695EC - the checked resource resolver */
+u32 fn_8006CDBC(void* p);   /* 0x8006CDBC - the checked resource resolver */
+u32 fn_8006993C(void* p);   /* 0x8006993C - the checked resource resolver */
+
 #ifdef __cplusplus
 }
 #endif

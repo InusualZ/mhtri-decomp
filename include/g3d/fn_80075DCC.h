@@ -69,6 +69,16 @@ s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility tes
 void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
                  u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
 
+/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the `g3d_resmat_ac.h` handle constructors and
+ * validity predicates the accessor cluster calls.  Inside this `extern "C"` block with the rest of the
+ * owner's declarations (the target object references the plain `fn_XXXXXXXX` names). */
+u32* fn_800766D0(u32* pDst, u32 value); /* 0x800766D0 - the 0x20-aligned handle constructor */
+u32* fn_80076794(u32* pDst, u32 value); /* 0x80076794 - the 0x20-aligned handle constructor */
+s32 fn_8007673C(void* p);              /* 0x8007673C - `*(u32*)p != 0` */
+s32 fn_80076750(void* p);              /* 0x80076750 - `*(u32*)p != 0` */
+s32 fn_80076800(void* p);              /* 0x80076800 - `*(u32*)p != 0` */
+u32 fn_8007B878(s32 pDst, s32 offset); /* 0x8007B878 - the alignment-asserting offset helper */
+
 #ifdef __cplusplus
 }
 #endif

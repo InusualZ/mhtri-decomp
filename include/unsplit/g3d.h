@@ -101,6 +101,32 @@ void fn_8007A510(void);
  * The `fn_8007B5F4`/`fn_8007BB8C` lookups that were declared here moved to their owner's header
  * `include/g3d/fn_80075DCC.h` when `g3d/fn_80075DCC.cpp` registered (rule 2, 2026-09-25). */
 extern u32 lbl_8079124C;
+
+/* 0x80092584..0x80093690 - the ten resource-category count/item accessors of the `ResFile`
+ * container (0x80092588/84, 0x80092B10/0C, 0x8009284C/48, 0x80092CC4/C0, 0x80092E78/74,
+ * 0x8009302C/28, 0x800931E0/DC, 0x80093394/90, 0x80093548/44, 0x80093690/8C).  The band sits between
+ * the registered `g3d/g3d_resanmfog.cpp` and `g3d/g3d_resfile.cpp` (both `g3d`), so it is a sound
+ * g3d-module home (rule 2).  Each pair is `<category> count(self)` and `<category> item(self, i)`. */
+u32 fn_80092588(void* p);
+void* fn_80092584(void* p, u32 i);
+u32 fn_80092B10(void* p);
+void* fn_80092B0C(void* p, u32 i);
+u32 fn_8009284C(void* p);
+void* fn_80092848(void* p, u32 i);
+u32 fn_80092CC4(void* p);
+void* fn_80092CC0(void* p, u32 i);
+u32 fn_80092E78(void* p);
+void* fn_80092E74(void* p, u32 i);
+u32 fn_8009302C(void* p);
+void* fn_80093028(void* p, u32 i);
+u32 fn_800931E0(void* p);
+void* fn_800931DC(void* p, u32 i);
+u32 fn_80093394(void* p);
+void* fn_80093390(void* p, u32 i);
+u32 fn_80093548(void* p);
+void* fn_80093544(void* p, u32 i);
+u32 fn_80093690(void* p);
+void* fn_8009368C(void* p, u32 i);
 #ifdef __cplusplus
 }
 #endif

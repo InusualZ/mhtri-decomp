@@ -28,6 +28,9 @@ void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTable, const v
                 const void** pTexTable); /* 0x8007270C - the shape-blend driver (the three tables are its
                                            * vertex-position/colour/tex-coord inputs) */
 
+/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the resource-range store helper. */
+void fn_800734E4(void* pBase, u32 size); /* 0x800734E4 - the resource-range store */
+
 #ifdef __cplusplus
 }
 #endif
