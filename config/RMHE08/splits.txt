@@ -693,6 +693,11 @@ enemy/fn_801B7020.cpp:
 	.text       start:0x801B7020 end:0x801BD6C0
 	.ctors      start:0x8056F34C end:0x8056F350
 
+lobby/fn_801E7530.cpp:
+	extab       start:0x800105B4 end:0x8001079C
+	extabindex  start:0x8002C778 end:0x8002CA54
+	.text       start:0x801E7530 end:0x801EC9E0
+
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8
 
