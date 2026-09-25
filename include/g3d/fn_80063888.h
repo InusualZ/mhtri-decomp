@@ -59,6 +59,65 @@ typedef struct {
     /* +0x00 */ G3dVtbl *vt;
 } G3dObj; /* size: 0x4 */
 
+/*
+ * The resolved-resource records `fn_8006584C`/`fn_80066E80` return (rule 1: the second consumer
+ * `g3d/g3d_resanmlight.cpp` needs them, so they move here from `fn_80063888.cpp`).  The layouts are
+ * the union of the fields both consumers evidence; the record continues past the last field read
+ * here, so sizes are lower bounds.
+ */
+typedef struct {
+    /* +0x00 */ u8 pad_0x00[0x10];
+    /* +0x10 */ u32 field_0x10;
+    /* +0x14 */ u8 pad_0x14[0x20];
+    /* +0x34 */ u16 field_0x34;
+    /* +0x36 */ u16 field_0x36;
+    /* +0x38 */ u32 field_0x38;
+    /* +0x3C */ u16 field_0x3C;
+    /* +0x3E */ u16 field_0x3E;
+    /* +0x40 */ u16 field_0x40;
+    /* +0x42 */ u16 field_0x42;
+    /* +0x44 */ u16 field_0x44;
+} ResAnmScnConfig; /* size: 0x46 (approximate - the record continues past +0x44) */
+
+typedef struct {
+    /* +0x00 */ u8 pad_0x00[0x04];
+    /* +0x04 */ u32 field_0x04;      /* sub-resource offset resolved against the object base */
+    /* +0x08 */ u8 pad_0x08[0x08];
+    /* +0x10 */ u32 field_0x10;
+    /* +0x14 */ u32 field_0x14;      /* the type word copied verbatim into the result */
+    /* +0x18 */ u16 field_0x18;
+    /* +0x1A */ u8 field_0x1A;
+    /* +0x1B */ u8 pad_0x1B;
+    /* +0x1C */ u32 flags;           /* per-channel "inline value" bits */
+    /* +0x20 */ u32 dataOffset;      /* base of the packed channel array */
+    /* +0x24 */ u32 channel_0x24;
+    /* +0x28 */ u32 channel_0x28;
+    /* +0x2C */ u32 channel_0x2C;
+    /* +0x30 */ u32 channel_0x30;
+    /* +0x34 */ u32 channel_0x34;
+    /* +0x38 */ u32 channel_0x38;
+    /* +0x3C */ u32 channel_0x3C;
+    /* +0x40 */ u32 field_0x40;
+    /* +0x44 */ u32 channel_0x44;
+    /* +0x48 */ u32 channel_0x48;
+    /* +0x4C */ u32 field_0x4C;
+    /* +0x50 */ u32 channel_0x50;
+    /* +0x54 */ u32 channel_0x54;
+    /* +0x58 */ u32 channel_0x58;
+} ResAnmLightConfig; /* size: 0x5C (approximate - the record continues past +0x58) */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+ResAnmScnConfig *fn_8006584C(void *p);   /* 0x8006584C - the checked `ResAnmScn` config getter */
+ResAnmLightConfig *fn_80066DB4(void *p); /* 0x80066DB4 - the checked light-config getter */
+ResAnmLightConfig *fn_80066E80(void *p); /* 0x80066E80 - the checked light-config getter */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_G3D_FN_80063888_H */
 /* 0x800649B4 - the animation-object flag setter the ScnMdl unit's fn_8007EA08 calls (rule 2). */
 s32 fn_800649B4(void* pSelf, u32 bits);

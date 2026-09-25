@@ -179,6 +179,11 @@ g3d/g3d_resanmfog.cpp:
 	extabindex  start:0x80021D5C end:0x80021D68
 	.text       start:0x8008F6E8 end:0x8008F8E4
 
+g3d/g3d_resanmlight.cpp:
+	extab       start:0x80009108 end:0x800091A0
+	extabindex  start:0x80021D68 end:0x80021E4C
+	.text       start:0x8008F8E4 end:0x800908FC
+
 gx/fn_8009AA78.c:
 	extab       start:0x800099F0 end:0x80009A18
 	extabindex  start:0x80022AC4 end:0x80022B00

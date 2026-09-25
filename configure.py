@@ -797,6 +797,16 @@ config.libs = [
             # cites "g3d_resanmlight.cpp" (.data 0x80590440), so the seam is proven.  See the file
             # header for the sections and the rule-7 deferral.
             Object(NonMatching, "g3d/g3d_resanmfog.cpp"),    # 0x8008F6E8-0x8008F8E4
+            # Registered once, at its final home (docs/plan.md 12): proposal `8008F8E4` - the nw4r g3d
+            # light-animation channel evaluator and the `ResAnmScn` light channel accessors
+            # (31 functions / 0x1018 B, 0x8008F8E4-0x800908FC).  `g3d`/`.cpp` from the body's own
+            # `__FILE__` string (`.data` 0x80590440 = "g3d_resanmlight.cpp", fn_8008F8E4's Panic file
+            # argument).  The discovery cap 0x8008F8E4-0x80097D40 spans several original TUs (whose own
+            # `__FILE__` strings - g3d_resanmscn.cpp at 0x800908FC, g3d_resanmtexsrt.cpp at 0x800916FC,
+            # g3d_resfile.cpp at 0x80093990, g3d_resmat.cpp at 0x800947A4 - are the pinned seams of the
+            # sibling proposals 800908FC/800916FC/80093990/800947A4), so this unit is registered at its
+            # own evidenced extent only.  See the file header for the sections and the rule-7 deferral.
+            Object(NonMatching, "g3d/g3d_resanmlight.cpp"),   # 0x8008F8E4-0x800908FC
             Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU

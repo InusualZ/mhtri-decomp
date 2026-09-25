@@ -31,8 +31,16 @@ extern "C" {
  * a `u32 mtxID`, the other uses it as an array index), so the verified `const void*` form is kept and the
  * return-type question is recorded rather than silently settled. */
 
-/* 0x80069664..0x800883C4 - the g3d node/resource helpers (callers: enemy/fn_80138074.c). */
-void fn_80069664(void* self);
+/* 0x80069664..0x800883C4 - the g3d node/resource helpers (callers: enemy/fn_80138074.c).
+ * `fn_80069664`'s return type corrected to `s32` when g3d/g3d_resanmlight.cpp became a consumer and uses
+ * the word it returns (the target reads `*(u32*)(*self + 4)`); the two existing callers use it as a
+ * statement, so the type is source-compatible. */
+s32 fn_80069664(void* self);
+/* 0x80092330 - the `ResAnmScn` channel-record resolve chain (caller: g3d/g3d_resanmlight.cpp).
+ * 0x80463E74 - the global frame thunk that `fn_8008FFFC` tail-calls.  Both are unsplit, so the band
+ * header is their home (rule 2).  Added when g3d/g3d_resanmlight.cpp registered. */
+s32 fn_80092330(void* self, void* key);
+f32 fn_80463E74(void);
 void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
 void fn_80080B10(void* arg0, u32 arg1);
 void fn_800810DC(void* arg0, s32 arg1);
