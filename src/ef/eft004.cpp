@@ -217,7 +217,7 @@ extern "C" void fn_80101C60(Eft004* self);
 extern "C" void fn_80101C70(Eft004* self);
 /* fn_80101DF4 / fn_80101FA4 / fn_801025E8 / fn_801025F8 come from their owners' headers (rule 2). */
 
-extern "C" u8 get_now_areano();
+u8 get_now_areano(); /* target references get_now_areano__Fv: C++ linkage (relocaudit) */
 
 /* `push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count)` - the map's mangled spelling. */
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
