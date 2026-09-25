@@ -217,6 +217,7 @@ Ruled out for this project - recorded so nobody re-runs them (details in `docs/m
 | The rest of the `-opt` axis | An unknown sub-option might be what controls fusion or stack allocation. | no |
 | `-Cpp_exceptions` | `extab`/`extabindex` presence suggests exceptions were on; it adds those sections but no `.text` bytes here. | no |
 | `-O4`/`-O4,p`/`-O2`, `-schedule off`, `-fp_contract off`, `-ipa off` | Another optimizer level or codegen switch might be the retail setting. | no |
+| A paired-single op in a function (the SDK's vector library, `fn_8007270C`'s fill loop) | It reads as a codegen lever and eats flag and shape sweeps. Measured 2026-09-25: **176 of 19,916** functions contain one and **0** of ~2,450 matched functions do, so the frontend cannot emit the body-store form. Record it and move on. | no |
 
 The status column is about the **current target** - the one unit/diff being worked on - not about whether
 an idea is any good. The target and the step being worked are kept in the local-only `Current task / plan`
