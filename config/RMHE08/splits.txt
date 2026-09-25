@@ -773,6 +773,12 @@ stage/fn_802B2978.c:
 	extabindex  start:0x80031A40 end:0x80031A4C
 	.text       start:0x802B2978 end:0x802B2AA0
 
+ai/fn_802CC794.cpp:
+	extab       start:0x8001467C end:0x80014844
+	extabindex  start:0x80032820 end:0x80032ACC
+	.text       start:0x802CC794 end:0x802D0DCC
+	.data       start:0x805D4D38 end:0x805D4E80
+
 ai/fn_802D0DCC.c:
 	.text       start:0x802D0DCC end:0x802D0F34
 

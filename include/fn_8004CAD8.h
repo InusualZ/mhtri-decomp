@@ -93,6 +93,11 @@ f32 fn_80050EAC(const void* a, const void* b);
 /* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
  * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
+/* 0x80051378 - the three-pointer vector helper this range owns (unmangled `fn_80051378`, so C
+ * linkage).  Its body saves r3/r4/r5, zeroes the first through `fn_80043EA8`, then tail-forwards all
+ * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
+ * registered as the first consumer (rule 2) - the owner header did not declare it yet. */
+void fn_80051378(VEC3* out, VEC3* a, VEC3* b);
 #ifdef __cplusplus
 }
 #endif
