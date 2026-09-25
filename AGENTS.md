@@ -310,7 +310,11 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       owner and collision pre-flight; m2cinput.py: a target object's
                                       disassembly as `tools/m2c` input) plus their self-tests, and
                                       ledger.py: the campaign's progress and the next symbol to claim
-                                      (docs/plan.md)
+                                      (docs/plan.md), vtableaudit.py: the rule 10 audit (an owned
+                                      vtable our object does not emit, plus non-`.text` section-size
+                                      completeness), and land.py's band-ownership warning (a batch
+                                      that registers a range whose symbols a band header still
+                                      declares - the `illegal overloading` class)
                             m2c/      matt-kempster/m2c as a git submodule - the offline decompiler
                                       units/m2cinput.py feeds - see the `decompile-symbol` skill
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth

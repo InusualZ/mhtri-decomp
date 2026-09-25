@@ -115,6 +115,10 @@ from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
 from units import handoff as handoff_mod  # noqa: E402
 from units import recompile as rc  # noqa: E402
+# `stylelint` owns the rule-2 machinery (the symbols.txt + splits.txt `Ownership` index and the
+# `header_declarations` scanner the band rule uses); the new range-boundary check reuses it rather than
+# growing a second copy of the map parser and a second declaration scanner.
+from units import stylelint as sl  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/skills/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
@@ -622,6 +626,259 @@ def tolerate_scratch(main: str, paths: list[str], act: bool = True) -> str:
     return note
 
 
+# --------------------------------------------------------------------------------------------------
+# rule 2 at the range boundary: a batch that REGISTERS a range is what makes the symbols inside it owned
+# (docs/plan.md 6.5 rule 2), so any declaration of one of them still living in `include/unsplit/<band>.h`
+# has just become a violation - and, when the new unit's own definition disagrees, the `(10505) illegal
+# overloading` that costs a full build (`-maxerrors 1` only shows it one symbol at a time).
+#
+# stylelint `--diff` cannot see it: the band header is NOT a file the batch changed, so it is not in the
+# diff's file set at all, and the registration edit itself (splits.txt + configure.py) carries no
+# declaration to flag. The 2026-09-26 incident: a batch registered `fn_8019E9AC`'s cluster, the band header
+# still declared it `s32` while the new unit defined it `u32`, and the gate only found out after a full
+# build (`(10505) illegal overloading 'fn_8019E9AC(_ENEMY_WORK *, long)'`).
+#
+# The check is deliberately a WARNING, never a refusal: a redeclaration whose signature happens to agree
+# builds cleanly, and the range can own data or functions the band legitimately spelled the same way - so
+# a refusal would not be provably safe (it could block a batch that builds). An extra signal that names the
+# symbol, the owner and the stale header is the whole point; the build remains the arbiter.
+# --------------------------------------------------------------------------------------------------
+
+def _split_rows(text: str) -> list[tuple[str, str, int, int]]:
+    """`(unit, section, start, end)` rows of a `splits.txt` text.
+
+    The same parse `sharedfiles.parse_ranges`/`stylelint._parse_splits` use: a unit header is an
+    unindented `name:` line, every range is an indented `start:0x.. end:0x..` line. Kept local so the
+    check can parse the *base* text `git show` returns without a temp file.
+    """
+    rows: list[tuple[str, str, int, int]] = []
+    cur = None
+    for line in text.splitlines():
+        if line.startswith("Sections:"):
+            continue
+        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
+            cur = line.strip()[:-1]
+            continue
+        m = re.match(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
+        if m and cur:
+            rows.append((cur, m.group(1), int(m.group(2), 16), int(m.group(3), 16)))
+    return rows
+
+
+def _merge_intervals(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Sorted, merged, non-overlapping `(start, end)` spans."""
+    out: list[tuple[int, int]] = []
+    for s, e in sorted(spans):
+        if s >= e:
+            continue
+        if out and s <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out
+
+
+def _subtract_intervals(span: tuple[int, int], coverage: list[tuple[int, int]]
+                        ) -> list[tuple[int, int]]:
+    """The parts of `span` no merged `coverage` interval covers."""
+    s, e = span
+    out: list[tuple[int, int]] = []
+    cur = s
+    for cs, ce in coverage:
+        if ce <= cur:
+            continue
+        if cs >= e:
+            break
+        if cs > cur:
+            out.append((cur, cs))
+        cur = max(cur, ce)
+        if cur >= e:
+            break
+    if cur < e:
+        out.append((cur, e))
+    return out
+
+
+def added_split_ranges(old_rows: list[tuple[str, str, int, int]],
+                       new_rows: list[tuple[str, str, int, int]]) -> list[tuple[str, str, int, int]]:
+    """Ranges `new_rows` claims that `old_rows` did not - i.e. what the batch newly registers.
+
+    A brand-new unit's whole block is added; an existing unit whose `.text` was *widened* contributes only
+    the strip the old range did not already cover (the range the symbols newly inside are owned by). A
+    range the batch did not touch is covered by the old rows and contributes nothing, so a clean batch
+    yields no added range and the check stays silent.
+    """
+    old_cov: dict[str, list[tuple[int, int]]] = {}
+    for _unit, section, s, e in old_rows:
+        old_cov.setdefault(section, []).append((s, e))
+    for section in old_cov:
+        old_cov[section] = _merge_intervals(old_cov[section])
+    out: list[tuple[str, str, int, int]] = []
+    for unit, section, s, e in new_rows:
+        for cs, ce in _subtract_intervals((s, e), old_cov.get(section, [])):
+            out.append((unit, section, cs, ce))
+    return out
+
+
+def _ranges_by_section(rows: list[tuple[str, str, int, int]]) -> dict:
+    """`Stylelint.Ownership`'s ranges shape: {section: [(start, end, unit)]}."""
+    out: dict = {}
+    for unit, section, s, e in rows:
+        out.setdefault(section, []).append((s, e, unit))
+    return out
+
+
+def _band_header_paths(main: str) -> list[str]:
+    """Every `include/unsplit/` header, as an absolute path (the whole band, changed or not)."""
+    base = os.path.join(main, "include", "unsplit")
+    out: list[str] = []
+    for dirpath, _dirnames, filenames in os.walk(base):
+        for name in sorted(filenames):
+            if name.endswith((".h", ".hpp", ".hh")):
+                out.append(os.path.join(dirpath, name))
+    return sorted(out)
+
+
+def _changed_band_headers(main: str, base: str) -> list[str]:
+    """The `include/unsplit/` headers this batch added or modified (a delete is not a declaration site)."""
+    p = run(["git", "diff", "--name-status", "-M", "--diff-filter=d", base, "--", "include/unsplit"],
+            main)
+    if p.returncode != 0:
+        return []
+    out: list[str] = []
+    for line in (p.stdout or "").splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[-1].endswith((".h", ".hpp", ".hh")):
+            out.append(parts[-1])
+    return out
+
+
+def _declared_names(main: str, rel: str) -> set[str]:
+    """The file-scope declaration names of `rel` (absolute path), read from the worktree."""
+    path = os.path.join(main, *rel.replace("/", os.sep).split(os.sep))
+    try:
+        text = open(path, encoding="utf-8", errors="replace", newline="").read()
+    except OSError:
+        return set()
+    return {name for name, _line in sl.header_declarations(sl.Source(path, rel, text))}
+
+
+def _declared_names_at(main: str, base: str, rel: str) -> set[str]:
+    """The file-scope declaration names of `rel` at `base`; empty when it did not exist there."""
+    p = run(["git", "show", "%s:%s" % (base, rel)], main)
+    if p.returncode != 0:
+        return set()
+    return {name for name, _line in sl.header_declarations(sl.Source(rel, rel, p.stdout))}
+
+
+def band_ownership_warnings(main: str, base: str | None) -> list[str]:
+    """Rule-2 warnings a batch introduces at the registration boundary. Never a refusal.
+
+    Two directions, both keyed on the batch's own diff:
+
+    1. the batch REGISTERS a range (splits.txt/configure.py changed): every symbol of `symbols.txt` the
+       range newly covers is now owned, so any `include/unsplit/<band>.h` that still *declares* one is a
+       rule-2 violation and a candidate `illegal overloading` - whether that header was changed or not;
+    2. the batch ADDS a declaration to a band header of a symbol an already-registered unit owns
+       (ownership unchanged): the band is a fallback, not the owner.
+
+    Returns one warning line per finding, sorted. `[]` when the map is absent, `base` is unknown, the batch
+    touches neither registration file, or nothing is newly owned - so a clean batch is silent.
+    """
+    if not base:
+        return []
+    spl_rel = "config/RMHE08/splits.txt"
+    sym_path = os.path.join(main, "config", "RMHE08", "symbols.txt")
+    spl_path = os.path.join(main, "config", "RMHE08", "splits.txt")
+    if not (os.path.exists(sym_path) and os.path.exists(spl_path)):
+        return []
+    touched = run(["git", "diff", "--name-only", base, "--", spl_rel, "configure.py"], main)
+    if touched.returncode != 0 or not (touched.stdout or "").strip():
+        return []
+    old = run(["git", "show", "%s:%s" % (base, spl_rel)], main)
+    if old.returncode != 0:
+        return []
+    new_text = open(spl_path, encoding="utf-8", errors="replace", newline="").read()
+    added = added_split_ranges(_split_rows(old.stdout), _split_rows(new_text))
+    changed_band = _changed_band_headers(main, base)
+    if not added and not changed_band:
+        # no new ownership and no band header the batch touched: nothing this check reasons about
+        return []
+
+    symbols = sl._parse_symbols(sym_path)  # the 4.5 MB map, parsed here and never printed
+    old_own = sl.Ownership(symbols, _ranges_by_section(_split_rows(old.stdout)))
+
+    # 1. symbols the batch's new ranges now cover (via their address), grouped by the owner the range names.
+    newly: dict[str, str] = {}
+    if added:
+        for name, entries in symbols.items():
+            if len(entries) != 1:
+                continue
+            section, address, _type = entries[0]
+            for unit, asec, s, e in added:
+                if asec == section and s <= address < e:
+                    newly[name] = unit
+                    break
+    # A band header may declare a C++ callee by its clean spelling (`em_act_ck(...)`) while symbols.txt
+    # carries the compiler mangling (`em_act_ck__FP11_ENEMY_WORKUcUc`). Match the mangled symbol's base
+    # name too, so the rule-9-correct spelling is not a blind spot; the message names the full symbol.
+    newly_bases: dict[str, list[str]] = {}
+    for name in newly:
+        base = name.split("__", 1)[0]
+        if base != name and sl.RULE9_MANGLED_RE.match(name):
+            newly_bases.setdefault(base, []).append(name)
+
+    warnings: list[str] = []
+    if newly:
+        for path in _band_header_paths(main):
+            rel = os.path.relpath(path, main).replace(os.sep, "/")
+            try:
+                text = open(path, encoding="utf-8", errors="replace", newline="").read()
+            except OSError:
+                continue
+            src = sl.Source(path, rel, text)
+            for name, line in sl.header_declarations(src):
+                owner = newly.get(name)
+                if owner is not None:
+                    warnings.append(
+                        "WARNING: %s:%d declares `%s`, which this batch's registration now makes owned "
+                        "by `src/%s` - move the declaration into that unit's header and #include it "
+                        "(docs/plan.md 6.5 rule 2); a mismatched signature is the `(10505) illegal "
+                        "overloading` that only a full build would show" % (rel, line, name, owner))
+                    continue
+                for full in sorted(newly_bases.get(name, [])):
+                    warnings.append(
+                        "WARNING: %s:%d declares `%s`, the C++ spelling of `%s`, which this batch's "
+                        "registration now makes owned by `src/%s` - declare it in the owner's header "
+                        "and #include it (docs/plan.md 6.5 rule 2)"
+                        % (rel, line, name, full, newly[full]))
+
+    # 2. a declaration this batch ADDS to a band header, of a symbol a unit already owned before the batch.
+    for rel in changed_band:
+        now_names = _declared_names(main, rel)
+        before_names = _declared_names_at(main, base, rel)
+        if not now_names:
+            continue
+        path = os.path.join(main, *rel.replace("/", os.sep).split(os.sep))
+        try:
+            text = open(path, encoding="utf-8", errors="replace", newline="").read()
+        except OSError:
+            continue
+        src = sl.Source(path, rel, text)
+        for name, line in sl.header_declarations(src):
+            if name in before_names or name in newly:
+                continue
+            res = old_own.resolve(name)
+            if res is None or res.get("kind") != "owned":
+                continue
+            warnings.append(
+                "WARNING: %s:%d newly declares `%s`, already owned by `src/%s` - the band is a "
+                "fallback, not the owner: declare it in the owner's header and #include it "
+                "(docs/plan.md 6.5 rule 2)" % (rel, line, name, res["unit"]))
+
+    return sorted(dict.fromkeys(warnings))
+
+
 def flips_objects(main: str) -> bool:
     """True when configure.py gains `Object(Matching, ...)` relative to HEAD - the batch flips something."""
     p = run(["git", "diff", "HEAD", "--", "configure.py"], main)
@@ -989,6 +1246,19 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     else:
         check("style lint (§6.5)", True, info="not built yet (roadmap 7.21) - skipped")
 
+    # 4b. the registration boundary (Backlog #1): a range this batch registers makes the symbols inside it
+    # owned, so a declaration of one of them still sitting in `include/unsplit/<band>.h` is now a rule-2
+    # violation - and the `(10505) illegal overloading` a mismatched signature costs a full build to show.
+    # This is an ADDITIONAL signal: it is a WARNING, never a failed check, because a compatible
+    # redeclaration is legal and no refusal here is provably safe (see `band_ownership_warnings`).
+    band_warnings = band_ownership_warnings(main, want_base)
+    for warning in band_warnings:
+        print(warning, file=sys.stderr)
+    check("rule 2 registration boundary (warning)", True,
+          info=("%d newly-owned symbol declaration(s) still in include/unsplit/*.h - see the WARNING "
+                "lines above" % len(band_warnings)) if band_warnings
+               else "no newly-owned symbol left declared in include/unsplit/*.h")
+
     before = recorded.get("ledger") or ledger_numbers(main)
     flip = flips_objects(main)
     ok_file = os.path.join(main, "build", "RMHE08", "ok")
@@ -1113,6 +1383,15 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         # the tolerance is part of the record, not a silent drop: the commit says what was left alone
         body.append("scratch: tool scratch outside the batch, not staged, not committed: %s"
                     % ", ".join(scratch))
+        body.append("")
+    if band_warnings:
+        # the warning is part of the record too, so a batch that landed with one is greppable from the log
+        body.append("rule 2 boundary: %d newly-owned symbol declaration(s) left in include/unsplit/*.h"
+                    % len(band_warnings))
+        for warning in band_warnings[:10]:
+            body.append("  " + warning)
+        if len(band_warnings) > 10:
+            body.append("  ... (%d more)" % (len(band_warnings) - 10))
         body.append("")
     failed = [row[0] for row in checks if not row[1]]
     if failed:
@@ -2106,6 +2385,107 @@ def selftest() -> int:
                     code = main()
             check("land.py %s off main refuses" % cmd, code, 1)
             check("... names the branch it found", "throwaway-check" in buf.getvalue(), True)
+
+    # --- rule 2 at the registration boundary (Backlog #1): a range this batch registers makes the
+    # symbols inside it owned, so a declaration of one of them still in include/unsplit/<band>.h is now a
+    # rule-2 violation - and a candidate `(10505) illegal overloading`. The old stylelint `--diff` could
+    # not see it: the band header is not a changed file, so it is not in the diff's file set at all. The
+    # checks below are the guard's own bar - delete `band_ownership_warnings` (or the range diff) and they
+    # go red on the fixture, because the warning has to FIRE for the checks to pass.
+    check("range diff: an unchanged range adds nothing",
+          added_split_ranges([("a", ".text", 0x1000, 0x1100)], [("a", ".text", 0x1000, 0x1100)]), [])
+    check("range diff: a widened range contributes only the new strip",
+          added_split_ranges([("a", ".text", 0x1000, 0x1100)], [("a", ".text", 0x1000, 0x1200)]),
+          [("a", ".text", 0x1100, 0x1200)])
+    check("range diff: a brand-new unit contributes its whole block",
+          added_split_ranges([("a", ".text", 0x1000, 0x1100)],
+                             [("a", ".text", 0x1000, 0x1100), ("b", ".text", 0x2000, 0x2100)]),
+          [("b", ".text", 0x2000, 0x2100)])
+    check("range diff: another section is not coverage",
+          added_split_ranges([("a", ".sdata", 0x1000, 0x1100)], [("a", ".text", 0x1000, 0x1100)]),
+          [("a", ".text", 0x1000, 0x1100)])
+    check("range diff: two old spans leave the hole between them",
+          added_split_ranges([("a", ".text", 0x1000, 0x1100), ("b", ".text", 0x1200, 0x1300)],
+                             [("c", ".text", 0x1000, 0x1300)]),
+          [("c", ".text", 0x1100, 0x1200)])
+
+    def _write_tree(tmp, files):
+        for rel, text in files.items():
+            path = os.path.join(tmp, *rel.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "write tree")
+
+    band_fixture = {
+        "config/RMHE08/symbols.txt": (
+            "fn_8019E9AC = .text:0x801993E0; // type:function size:0x10\n"
+            "em_act_ck__FP11_ENEMY_WORKUcUc = .text:0x801993E4; // type:function size:0x8\n"
+            "fn_ALREADY = .text:0x80010000; // type:function size:0x10\n"
+            "fn_WIDENED = .text:0x80010014; // type:function size:0x8\n"
+            "fn_OTHER = .text:0x80020000; // type:function size:0x8\n"),
+        "config/RMHE08/splits.txt": (
+            "Sections:\n\t.text       type:code align:32\n\n"
+            "existing/unit.cpp:\n\t.text       start:0x80010000 end:0x80010010\n"),
+        "configure.py": "config.libs = [\n]\n",
+        "include/unsplit/enemy.h": (
+            "#ifndef B1\n#define B1\n"
+            "void fn_8019E9AC(void);\n"
+            "void fn_OTHER(void);\n"
+            "void fn_ALREADY(void);\n"
+            "#endif\n"),
+        "include/unsplit/widen.h": "#ifndef B2\n#define B2\nvoid fn_WIDENED(void);\n#endif\n",
+        # a C++ callee declared by its clean spelling while symbols.txt holds the mangling
+        "include/unsplit/cxx.h": "#ifndef B4\n#define B4\nu32 em_act_ck(struct _ENEMY_WORK*, u8);\n#endif\n",
+    }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, band_fixture)
+        base_sha = repo_git(tmp, "rev-parse", "HEAD")
+        # the batch: register a new unit's range and WIDEN an existing one; add a band header that declares
+        # a symbol an already-registered unit owns. It does NOT touch enemy.h or widen.h.
+        _write_tree(tmp, {
+            "config/RMHE08/splits.txt": (
+                "Sections:\n\t.text       type:code align:32\n\n"
+                "existing/unit.cpp:\n\t.text       start:0x80010000 end:0x80010020\n\n"
+                "new/fn_801993E0.cpp:\n\t.text       start:0x801993E0 end:0x801993F0\n"),
+            "configure.py": ("config.libs = [\n    Object(NonMatching, \"new/fn_801993E0.cpp\"),\n]\n"),
+            "include/unsplit/band_added.h": "#ifndef B3\n#define B3\nvoid fn_ALREADY(void);\n#endif\n",
+        })
+        warns = band_ownership_warnings(tmp, base_sha)
+        blob = "\n".join(warns)
+        check("band: a newly-registered range that the band still declares warns",
+              any("fn_8019E9AC" in w and "enemy.h" in w and "src/new/fn_801993E0.cpp" in w
+                  for w in warns), True)
+        check("band: a WIDENED range that the band declares warns too",
+              any("fn_WIDENED" in w and "widen.h" in w and "src/existing/unit.cpp" in w
+                  for w in warns), True)
+        check("band: a declaration the batch ADDS of an already-owned symbol warns",
+              any("fn_ALREADY" in w and "band_added.h" in w and "src/existing/unit.cpp" in w
+                  for w in warns), True)
+        check("band: a clean C++ spelling of a newly-owned mangled symbol warns",
+              any("em_act_ck" in w and "cxx.h" in w
+                  and "em_act_ck__FP11_ENEMY_WORKUcUc" in w for w in warns), True)
+        check("band: exactly the four findings fire", len(warns), 4)
+        # a pre-existing band declaration of an already-owned symbol is NOT this batch's defect: a clean
+        # batch must not be spammed with the band's whole backlog.
+        check("band: a pre-existing owned declaration does not warn",
+              any("enemy.h" in w and "fn_ALREADY" in w for w in warns), False)
+        check("band: an unowned symbol in the band is left alone", "fn_OTHER" in blob, False)
+        # the guard's own failure mode: with no base there is no diff to reason about, so it is silent
+        check("band: no base is silent", band_ownership_warnings(tmp, None), [])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # a CLEAN batch - source only, no registration edit - must say nothing
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, dict(band_fixture, **{"src/new/fn_801993E0.cpp": "int f(void) { return 0; }\n"}))
+        base_sha = repo_git(tmp, "rev-parse", "HEAD")
+        _write_tree(tmp, {"src/new/fn_801993E0.cpp": "int f(void) { return 1; }\n"})
+        check("band: a source-only batch is silent", band_ownership_warnings(tmp, base_sha), [])
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
