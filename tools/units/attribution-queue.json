@@ -3,497 +3,10 @@
  "cap": 0,
  "dol_sha1": "bf4850739478caaedfe675949eb7c28595a7fde9",
  "symbols_sha1": "cb8efee2cfc89159a05198ed2894ff6f5c4eb204",
- "splits_sha1": "8a1e59fd436a0f766c234d0c62e2fb44e1eb5a4e",
- "configure_sha1": "8b3dc9aaa770c1afb8c4312bcb6f986d9ab61e6a",
- "total_bytes": 4423808,
+ "splits_sha1": "495a5d8da3bd0e914c6238b084d4c28b554283a0",
+ "configure_sha1": "7f836e0e0e19e9f1fa7a00e8b71bbabff7f01f16",
+ "total_bytes": 4368668,
  "units": [
-  {
-   "label": "proposal/8008F8E4_fn_8008F8E4.cpp",
-   "text": [
-    2148071652,
-    2148075772
-   ],
-   "count": 31,
-   "bytes": 4120,
-   "cxx": true,
-   "language": {
-    "lang": "c++",
-    "confidence": "high",
-    "conclusive": true,
-    "suggested": false,
-    "evidence": [
-     {
-      "kind": "source-cpp",
-      "detail": "g3d_resanmlight.cpp",
-      "count": 1
-     },
-     {
-      "kind": "mangled-undefined",
-      "detail": "Panic__Q24nw4r2dbFPCciPCce",
-      "count": 1
-     }
-    ],
-    "sources": [
-     "g3d_resanmlight.cpp"
-    ],
-    "conflict": false,
-    "mangled_defined": [],
-    "mangled_undefined": [
-     "Panic__Q24nw4r2dbFPCciPCce"
-    ],
-    "cpp_sources": [
-     "g3d_resanmlight.cpp"
-    ],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"g3d_resanmscn.cpp\" starts here"
-    }
-   ],
-   "seam_note": null,
-   "tu": {
-    "sources": [
-     "g3d_resanmlight.cpp"
-    ],
-    "partial_source": null,
-    "open_seams": [],
-    "verdict": "one-tu"
-   },
-   "functions": [
-    {
-     "name": "fn_8008F8E4",
-     "address": 2148071652,
-     "size": 1056
-    },
-    {
-     "name": "fn_8008FD04",
-     "address": 2148072708,
-     "size": 388
-    },
-    {
-     "name": "fn_8008FE88",
-     "address": 2148073096,
-     "size": 372
-    },
-    {
-     "name": "fn_8008FFFC",
-     "address": 2148073468,
-     "size": 4
-    },
-    {
-     "name": "fn_80090000",
-     "address": 2148073472,
-     "size": 28
-    },
-    {
-     "name": "fn_8009001C",
-     "address": 2148073500,
-     "size": 48
-    },
-    {
-     "name": "fn_8009004C",
-     "address": 2148073548,
-     "size": 12
-    },
-    {
-     "name": "fn_80090058",
-     "address": 2148073560,
-     "size": 76
-    },
-    {
-     "name": "fn_800900A4",
-     "address": 2148073636,
-     "size": 100
-    },
-    {
-     "name": "fn_80090108",
-     "address": 2148073736,
-     "size": 8
-    },
-    {
-     "name": "fn_80090110",
-     "address": 2148073744,
-     "size": 156
-    },
-    {
-     "name": "fn_800901AC",
-     "address": 2148073900,
-     "size": 100
-    },
-    {
-     "name": "fn_80090210",
-     "address": 2148074000,
-     "size": 8
-    },
-    {
-     "name": "fn_80090218",
-     "address": 2148074008,
-     "size": 200
-    },
-    {
-     "name": "fn_800902E0",
-     "address": 2148074208,
-     "size": 4
-    },
-    {
-     "name": "fn_800902E4",
-     "address": 2148074212,
-     "size": 156
-    },
-    {
-     "name": "fn_80090380",
-     "address": 2148074368,
-     "size": 100
-    },
-    {
-     "name": "fn_800903E4",
-     "address": 2148074468,
-     "size": 8
-    },
-    {
-     "name": "fn_800903EC",
-     "address": 2148074476,
-     "size": 200
-    },
-    {
-     "name": "fn_800904B4",
-     "address": 2148074676,
-     "size": 4
-    },
-    {
-     "name": "fn_800904B8",
-     "address": 2148074680,
-     "size": 156
-    },
-    {
-     "name": "fn_80090554",
-     "address": 2148074836,
-     "size": 100
-    },
-    {
-     "name": "fn_800905B8",
-     "address": 2148074936,
-     "size": 8
-    },
-    {
-     "name": "fn_800905C0",
-     "address": 2148074944,
-     "size": 200
-    },
-    {
-     "name": "fn_80090688",
-     "address": 2148075144,
-     "size": 4
-    },
-    {
-     "name": "fn_8009068C",
-     "address": 2148075148,
-     "size": 156
-    },
-    {
-     "name": "fn_80090728",
-     "address": 2148075304,
-     "size": 100
-    },
-    {
-     "name": "fn_8009078C",
-     "address": 2148075404,
-     "size": 8
-    },
-    {
-     "name": "fn_80090794",
-     "address": 2148075412,
-     "size": 200
-    },
-    {
-     "name": "fn_8009085C",
-     "address": 2148075612,
-     "size": 4
-    },
-    {
-     "name": "fn_80090860",
-     "address": 2148075616,
-     "size": 156
-    }
-   ],
-   "runs": {
-    ".data": {
-     "start": 2153317440,
-     "end": 2153318576,
-     "labels": 28,
-     "filler": 3,
-     "density": 0.9,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80590440",
-      "lbl_80590454",
-      "lbl_8059048C",
-      "lbl_805904BC",
-      "lbl_80590500",
-      "lbl_80590510",
-      "lbl_80590550",
-      "lbl_80590560",
-      "lbl_80590598",
-      "lbl_805905A8",
-      "lbl_805905F0",
-      "lbl_80590600",
-      "lbl_80590638",
-      "lbl_80590660",
-      "lbl_80590680",
-      "lbl_805906A0",
-      "lbl_805906C0",
-      "lbl_805906E0",
-      "lbl_80590770",
-      "lbl_80590798",
-      "lbl_805907B0",
-      "lbl_805907D8",
-      "lbl_805907EC",
-      "lbl_80590814",
-      "lbl_8059082C",
-      "lbl_80590854",
-      "lbl_8059086C",
-      "lbl_80590898"
-     ]
-    },
-    "extabindex": {
-     "start": 2147622248,
-     "end": 2147622476,
-     "labels": 19,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
-  {
-   "label": "proposal/800908FC_fn_800908FC.cpp",
-   "text": [
-    2148075772,
-    2148079356
-   ],
-   "count": 24,
-   "bytes": 3584,
-   "cxx": true,
-   "language": {
-    "lang": "c++",
-    "confidence": "high",
-    "conclusive": true,
-    "suggested": false,
-    "evidence": [
-     {
-      "kind": "source-cpp",
-      "detail": "g3d_resanmscn.cpp",
-      "count": 1
-     },
-     {
-      "kind": "mangled-undefined",
-      "detail": "Panic__Q24nw4r2dbFPCciPCce",
-      "count": 1
-     }
-    ],
-    "sources": [
-     "g3d_resanmscn.cpp"
-    ],
-    "conflict": false,
-    "mangled_defined": [],
-    "mangled_undefined": [
-     "Panic__Q24nw4r2dbFPCciPCce"
-    ],
-    "cpp_sources": [
-     "g3d_resanmscn.cpp"
-    ],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"g3d_resanmtexsrt.cpp\" starts here"
-    }
-   ],
-   "seam_note": null,
-   "tu": {
-    "sources": [
-     "g3d_resanmscn.cpp"
-    ],
-    "partial_source": null,
-    "open_seams": [],
-    "verdict": "one-tu"
-   },
-   "functions": [
-    {
-     "name": "fn_800908FC",
-     "address": 2148075772,
-     "size": 452
-    },
-    {
-     "name": "fn_80090AC0",
-     "address": 2148076224,
-     "size": 28
-    },
-    {
-     "name": "fn_80090ADC",
-     "address": 2148076252,
-     "size": 452
-    },
-    {
-     "name": "fn_80090CA0",
-     "address": 2148076704,
-     "size": 28
-    },
-    {
-     "name": "fn_80090CBC",
-     "address": 2148076732,
-     "size": 452
-    },
-    {
-     "name": "fn_80090E80",
-     "address": 2148077184,
-     "size": 28
-    },
-    {
-     "name": "fn_80090E9C",
-     "address": 2148077212,
-     "size": 452
-    },
-    {
-     "name": "fn_80091060",
-     "address": 2148077664,
-     "size": 28
-    },
-    {
-     "name": "fn_8009107C",
-     "address": 2148077692,
-     "size": 452
-    },
-    {
-     "name": "fn_80091240",
-     "address": 2148078144,
-     "size": 28
-    },
-    {
-     "name": "fn_8009125C",
-     "address": 2148078172,
-     "size": 36
-    },
-    {
-     "name": "fn_80091280",
-     "address": 2148078208,
-     "size": 84
-    },
-    {
-     "name": "fn_800912D4",
-     "address": 2148078292,
-     "size": 36
-    },
-    {
-     "name": "fn_800912F8",
-     "address": 2148078328,
-     "size": 100
-    },
-    {
-     "name": "fn_8009135C",
-     "address": 2148078428,
-     "size": 8
-    },
-    {
-     "name": "fn_80091364",
-     "address": 2148078436,
-     "size": 48
-    },
-    {
-     "name": "fn_80091394",
-     "address": 2148078484,
-     "size": 12
-    },
-    {
-     "name": "fn_800913A0",
-     "address": 2148078496,
-     "size": 484
-    },
-    {
-     "name": "fn_80091584",
-     "address": 2148078980,
-     "size": 60
-    },
-    {
-     "name": "fn_800915C0",
-     "address": 2148079040,
-     "size": 28
-    },
-    {
-     "name": "fn_800915DC",
-     "address": 2148079068,
-     "size": 28
-    },
-    {
-     "name": "fn_800915F8",
-     "address": 2148079096,
-     "size": 28
-    },
-    {
-     "name": "fn_80091614",
-     "address": 2148079124,
-     "size": 20
-    },
-    {
-     "name": "fn_80091628",
-     "address": 2148079144,
-     "size": 212
-    }
-   ],
-   "runs": {
-    ".data": {
-     "start": 2153318144,
-     "end": 2153318690,
-     "labels": 7,
-     "filler": 10,
-     "density": 0.41,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80590700",
-      "lbl_80590718",
-      "lbl_80590738",
-      "lbl_805908B0",
-      "lbl_805908D8",
-      "lbl_805908F0",
-      "lbl_8059090C"
-     ]
-    },
-    ".sdata": {
-     "start": 2155418216,
-     "end": 2155418220,
-     "labels": 1,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80791268"
-     ]
-    },
-    "extabindex": {
-     "start": 2147622476,
-     "end": 2147622632,
-     "labels": 13,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
   {
    "label": "proposal/800916FC_fn_800916FC.cpp",
    "text": [
@@ -545,12 +58,7 @@
     "extab_conflict": false,
     "exceptions_on": false
    },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"g3d_resfile.cpp\" starts here"
-    }
-   ],
+   "seam": null,
    "seam_note": null,
    "tu": {
     "sources": [
@@ -1013,395 +521,6 @@
      "start": 2147622632,
      "end": 2147623256,
      "labels": 52,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
-  {
-   "label": "proposal/80093990_fn_80093990.cpp",
-   "text": [
-    2148088208,
-    2148091812
-   ],
-   "count": 53,
-   "bytes": 3604,
-   "cxx": true,
-   "language": {
-    "lang": "c++",
-    "confidence": "high",
-    "conclusive": true,
-    "suggested": false,
-    "evidence": [
-     {
-      "kind": "source-cpp",
-      "detail": "g3d_resfile.cpp",
-      "count": 1
-     },
-     {
-      "kind": "mangled-undefined",
-      "detail": "Panic__Q24nw4r2dbFPCciPCce",
-      "count": 1
-     }
-    ],
-    "sources": [
-     "g3d_resfile.cpp"
-    ],
-    "conflict": false,
-    "mangled_defined": [],
-    "mangled_undefined": [
-     "Panic__Q24nw4r2dbFPCciPCce"
-    ],
-    "cpp_sources": [
-     "g3d_resfile.cpp"
-    ],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"g3d_resmat.cpp\" starts here"
-    }
-   ],
-   "seam_note": null,
-   "tu": {
-    "sources": [
-     "g3d_resfile.cpp"
-    ],
-    "partial_source": null,
-    "open_seams": [],
-    "verdict": "one-tu"
-   },
-   "functions": [
-    {
-     "name": "fn_80093990",
-     "address": 2148088208,
-     "size": 264
-    },
-    {
-     "name": "fn_80093A98",
-     "address": 2148088472,
-     "size": 8
-    },
-    {
-     "name": "fn_80093AA0",
-     "address": 2148088480,
-     "size": 108
-    },
-    {
-     "name": "fn_80093B0C",
-     "address": 2148088588,
-     "size": 776
-    },
-    {
-     "name": "fn_80093E14",
-     "address": 2148089364,
-     "size": 44
-    },
-    {
-     "name": "fn_80093E40",
-     "address": 2148089408,
-     "size": 36
-    },
-    {
-     "name": "fn_80093E64",
-     "address": 2148089444,
-     "size": 44
-    },
-    {
-     "name": "fn_80093E90",
-     "address": 2148089488,
-     "size": 36
-    },
-    {
-     "name": "fn_80093EB4",
-     "address": 2148089524,
-     "size": 44
-    },
-    {
-     "name": "fn_80093EE0",
-     "address": 2148089568,
-     "size": 36
-    },
-    {
-     "name": "fn_80093F04",
-     "address": 2148089604,
-     "size": 44
-    },
-    {
-     "name": "fn_80093F30",
-     "address": 2148089648,
-     "size": 36
-    },
-    {
-     "name": "fn_80093F54",
-     "address": 2148089684,
-     "size": 44
-    },
-    {
-     "name": "fn_80093F80",
-     "address": 2148089728,
-     "size": 36
-    },
-    {
-     "name": "fn_80093FA4",
-     "address": 2148089764,
-     "size": 44
-    },
-    {
-     "name": "fn_80093FD0",
-     "address": 2148089808,
-     "size": 36
-    },
-    {
-     "name": "fn_80093FF4",
-     "address": 2148089844,
-     "size": 44
-    },
-    {
-     "name": "fn_80094020",
-     "address": 2148089888,
-     "size": 36
-    },
-    {
-     "name": "fn_80094044",
-     "address": 2148089924,
-     "size": 44
-    },
-    {
-     "name": "fn_80094070",
-     "address": 2148089968,
-     "size": 36
-    },
-    {
-     "name": "fn_80094094",
-     "address": 2148090004,
-     "size": 60
-    },
-    {
-     "name": "fn_800940D0",
-     "address": 2148090064,
-     "size": 76
-    },
-    {
-     "name": "fn_8009411C",
-     "address": 2148090140,
-     "size": 72
-    },
-    {
-     "name": "fn_80094164",
-     "address": 2148090212,
-     "size": 100
-    },
-    {
-     "name": "fn_800941C8",
-     "address": 2148090312,
-     "size": 8
-    },
-    {
-     "name": "fn_800941D0",
-     "address": 2148090320,
-     "size": 12
-    },
-    {
-     "name": "fn_800941DC",
-     "address": 2148090332,
-     "size": 72
-    },
-    {
-     "name": "fn_80094224",
-     "address": 2148090404,
-     "size": 100
-    },
-    {
-     "name": "fn_80094288",
-     "address": 2148090504,
-     "size": 8
-    },
-    {
-     "name": "fn_80094290",
-     "address": 2148090512,
-     "size": 12
-    },
-    {
-     "name": "fn_8009429C",
-     "address": 2148090524,
-     "size": 72
-    },
-    {
-     "name": "fn_800942E4",
-     "address": 2148090596,
-     "size": 100
-    },
-    {
-     "name": "fn_80094348",
-     "address": 2148090696,
-     "size": 8
-    },
-    {
-     "name": "fn_80094350",
-     "address": 2148090704,
-     "size": 12
-    },
-    {
-     "name": "fn_8009435C",
-     "address": 2148090716,
-     "size": 72
-    },
-    {
-     "name": "fn_800943A4",
-     "address": 2148090788,
-     "size": 100
-    },
-    {
-     "name": "fn_80094408",
-     "address": 2148090888,
-     "size": 8
-    },
-    {
-     "name": "fn_80094410",
-     "address": 2148090896,
-     "size": 12
-    },
-    {
-     "name": "fn_8009441C",
-     "address": 2148090908,
-     "size": 72
-    },
-    {
-     "name": "fn_80094464",
-     "address": 2148090980,
-     "size": 24
-    },
-    {
-     "name": "fn_8009447C",
-     "address": 2148091004,
-     "size": 100
-    },
-    {
-     "name": "fn_800944E0",
-     "address": 2148091104,
-     "size": 8
-    },
-    {
-     "name": "fn_800944E8",
-     "address": 2148091112,
-     "size": 72
-    },
-    {
-     "name": "fn_80094530",
-     "address": 2148091184,
-     "size": 100
-    },
-    {
-     "name": "fn_80094594",
-     "address": 2148091284,
-     "size": 8
-    },
-    {
-     "name": "fn_8009459C",
-     "address": 2148091292,
-     "size": 100
-    },
-    {
-     "name": "fn_80094600",
-     "address": 2148091392,
-     "size": 8
-    },
-    {
-     "name": "fn_80094608",
-     "address": 2148091400,
-     "size": 100
-    },
-    {
-     "name": "fn_8009466C",
-     "address": 2148091500,
-     "size": 8
-    },
-    {
-     "name": "fn_80094674",
-     "address": 2148091508,
-     "size": 76
-    },
-    {
-     "name": "fn_800946C0",
-     "address": 2148091584,
-     "size": 76
-    },
-    {
-     "name": "fn_8009470C",
-     "address": 2148091660,
-     "size": 76
-    },
-    {
-     "name": "fn_80094758",
-     "address": 2148091736,
-     "size": 76
-    }
-   ],
-   "runs": {
-    ".data": {
-     "start": 2153319328,
-     "end": 2153321536,
-     "labels": 22,
-     "filler": 43,
-     "density": 0.34,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80590BA0",
-      "lbl_80590BB0",
-      "lbl_80591280",
-      "lbl_80591294",
-      "lbl_805912B0",
-      "lbl_805912C0",
-      "lbl_805912E0",
-      "lbl_805912F0",
-      "lbl_80591308",
-      "lbl_80591328",
-      "lbl_80591338",
-      "lbl_80591358",
-      "lbl_80591368",
-      "lbl_80591378",
-      "lbl_80591398",
-      "lbl_805913A8",
-      "lbl_805913C8",
-      "lbl_805913D8",
-      "lbl_805913E4",
-      "lbl_80591400",
-      "lbl_80591410",
-      "lbl_80591430"
-     ]
-    },
-    ".sdata": {
-     "start": 2155418256,
-     "end": 2155418288,
-     "labels": 8,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80791290",
-      "lbl_80791294",
-      "lbl_80791298",
-      "lbl_8079129C",
-      "lbl_807912A0",
-      "lbl_807912A4",
-      "lbl_807912A8",
-      "lbl_807912AC"
-     ]
-    },
-    "extabindex": {
-     "start": 2147623256,
-     "end": 2147623724,
-     "labels": 39,
      "filler": 0,
      "leak": 0
     }
@@ -2956,83 +2075,6 @@
    }
   },
   {
-   "label": "proposal/8009ACE4_fn_8009ACE4.c",
-   "text": [
-    2148117732,
-    2148118848
-   ],
-   "count": 2,
-   "bytes": 1116,
-   "cxx": false,
-   "language": {
-    "lang": "c",
-    "confidence": "low",
-    "conclusive": false,
-    "suggested": false,
-    "evidence": [],
-    "sources": [],
-    "conflict": false,
-    "mangled_defined": [],
-    "mangled_undefined": [],
-    "cpp_sources": [],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": null,
-   "seam_note": null,
-   "tu": {
-    "sources": [],
-    "partial_source": null,
-    "open_seams": [
-     {
-      "cut": 2510,
-      "why": ".sdata2 run jump lbl_80795F68 -> lbl_80795F6C"
-     }
-    ],
-    "verdict": "unproven"
-   },
-   "functions": [
-    {
-     "name": "fn_8009ACE4",
-     "address": 2148117732,
-     "size": 1012
-    },
-    {
-     "name": "fn_8009B0D8",
-     "address": 2148118744,
-     "size": 104
-    }
-   ],
-   "runs": {
-    ".sdata2": {
-     "start": 2155437916,
-     "end": 2155437932,
-     "labels": 4,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80795F5C",
-      "lbl_80795F60",
-      "lbl_80795F64",
-      "lbl_80795F68"
-     ]
-    },
-    "extabindex": {
-     "start": 2147625728,
-     "end": 2147625752,
-     "labels": 2,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
-  {
    "label": "proposal/8009B140_fn_8009B140.cpp",
    "text": [
     2148118848,
@@ -3076,7 +2118,7 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": null,
+   "seam_note": "one source file (g3d_gpu.cpp): a candidate seam inside it was not taken",
    "tu": {
     "sources": [
      "g3d_gpu.cpp"
@@ -3416,12 +2458,7 @@
     "extab_conflict": false,
     "exceptions_on": false
    },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"ef_creationqueue.cpp\" starts here"
-    }
-   ],
+   "seam": null,
    "seam_note": null,
    "tu": {
     "sources": [
@@ -3628,130 +2665,6 @@
      "start": 2147625920,
      "end": 2147626172,
      "labels": 21,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
-  {
-   "label": "proposal/800A3044_fn_800A3044.cpp",
-   "text": [
-    2148151364,
-    2148153484
-   ],
-   "count": 7,
-   "bytes": 2120,
-   "cxx": true,
-   "language": {
-    "lang": "c++",
-    "confidence": "high",
-    "conclusive": true,
-    "suggested": false,
-    "evidence": [
-     {
-      "kind": "source-cpp",
-      "detail": "ef_creationqueue.cpp",
-      "count": 1
-     },
-     {
-      "kind": "mangled-undefined",
-      "detail": "Panic__Q24nw4r2dbFPCciPCce",
-      "count": 2
-     }
-    ],
-    "sources": [
-     "ef_creationqueue.cpp"
-    ],
-    "conflict": false,
-    "mangled_defined": [],
-    "mangled_undefined": [
-     "Panic__Q24nw4r2dbFPCciPCce",
-     "Warning__Q24nw4r2dbFPCciPCce"
-    ],
-    "cpp_sources": [
-     "ef_creationqueue.cpp"
-    ],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"ef_draworder.cpp\" starts here"
-    }
-   ],
-   "seam_note": null,
-   "tu": {
-    "sources": [
-     "ef_creationqueue.cpp"
-    ],
-    "partial_source": null,
-    "open_seams": [],
-    "verdict": "one-tu"
-   },
-   "functions": [
-    {
-     "name": "fn_800A3044",
-     "address": 2148151364,
-     "size": 824
-    },
-    {
-     "name": "fn_800A337C",
-     "address": 2148152188,
-     "size": 20
-    },
-    {
-     "name": "fn_800A3390",
-     "address": 2148152208,
-     "size": 76
-    },
-    {
-     "name": "fn_800A33DC",
-     "address": 2148152284,
-     "size": 828
-    },
-    {
-     "name": "fn_800A3718",
-     "address": 2148153112,
-     "size": 232
-    },
-    {
-     "name": "fn_800A3800",
-     "address": 2148153344,
-     "size": 136
-    },
-    {
-     "name": "fn_800A3888",
-     "address": 2148153480,
-     "size": 4
-    }
-   ],
-   "runs": {
-    ".data": {
-     "start": 2153325248,
-     "end": 2153325467,
-     "labels": 6,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_805922C0",
-      "lbl_805922D8",
-      "lbl_80592310",
-      "lbl_80592344",
-      "lbl_80592364",
-      "lbl_80592388"
-     ]
-    },
-    "extabindex": {
-     "start": 2147626172,
-     "end": 2147626220,
-     "labels": 4,
      "filler": 0,
      "leak": 0
     }
@@ -4296,12 +3209,7 @@
     "extab_conflict": false,
     "exceptions_on": false
    },
-   "seam": [
-    {
-     "kind": "source",
-     "why": "\"ef_emitter.cpp\" starts here"
-    }
-   ],
+   "seam": null,
    "seam_note": null,
    "tu": {
     "sources": [
@@ -4502,387 +3410,6 @@
      "start": 2147626544,
      "end": 2147626724,
      "labels": 15,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
-  {
-   "label": "proposal/800A6350_fn_800A6350.cpp",
-   "text": [
-    2148164432,
-    2148178356
-   ],
-   "count": 49,
-   "bytes": 13924,
-   "cxx": true,
-   "language": {
-    "lang": "c++",
-    "confidence": "high",
-    "conclusive": true,
-    "suggested": false,
-    "evidence": [
-     {
-      "kind": "source-cpp",
-      "detail": "ef_emitter.cpp",
-      "count": 1
-     },
-     {
-      "kind": "mangled-undefined",
-      "detail": "Panic__Q24nw4r2dbFPCciPCce",
-      "count": 2
-     }
-    ],
-    "sources": [
-     "ef_emitter.cpp"
-    ],
-    "conflict": false,
-    "mangled_defined": [],
-    "mangled_undefined": [
-     "Panic__Q24nw4r2dbFPCciPCce",
-     "Warning__Q24nw4r2dbFPCciPCce"
-    ],
-    "cpp_sources": [
-     "ef_emitter.cpp"
-    ],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": null,
-   "seam_note": null,
-   "tu": {
-    "sources": [
-     "ef_emitter.cpp"
-    ],
-    "partial_source": null,
-    "open_seams": [],
-    "verdict": "one-tu"
-   },
-   "functions": [
-    {
-     "name": "fn_800A6350",
-     "address": 2148164432,
-     "size": 196
-    },
-    {
-     "name": "fn_800A6414",
-     "address": 2148164628,
-     "size": 12
-    },
-    {
-     "name": "fn_800A6420",
-     "address": 2148164640,
-     "size": 308
-    },
-    {
-     "name": "fn_800A6554",
-     "address": 2148164948,
-     "size": 336
-    },
-    {
-     "name": "fn_800A66A4",
-     "address": 2148165284,
-     "size": 8
-    },
-    {
-     "name": "fn_800A66AC",
-     "address": 2148165292,
-     "size": 316
-    },
-    {
-     "name": "fn_800A67E8",
-     "address": 2148165608,
-     "size": 336
-    },
-    {
-     "name": "fn_800A6938",
-     "address": 2148165944,
-     "size": 204
-    },
-    {
-     "name": "fn_800A6A04",
-     "address": 2148166148,
-     "size": 1120
-    },
-    {
-     "name": "fn_800A6E64",
-     "address": 2148167268,
-     "size": 12
-    },
-    {
-     "name": "fn_800A6E70",
-     "address": 2148167280,
-     "size": 52
-    },
-    {
-     "name": "fn_800A6EA4",
-     "address": 2148167332,
-     "size": 32
-    },
-    {
-     "name": "fn_800A6EC4",
-     "address": 2148167364,
-     "size": 888
-    },
-    {
-     "name": "fn_800A723C",
-     "address": 2148168252,
-     "size": 316
-    },
-    {
-     "name": "fn_800A7378",
-     "address": 2148168568,
-     "size": 984
-    },
-    {
-     "name": "fn_800A7750",
-     "address": 2148169552,
-     "size": 1968
-    },
-    {
-     "name": "fn_800A7F00",
-     "address": 2148171520,
-     "size": 320
-    },
-    {
-     "name": "fn_800A8040",
-     "address": 2148171840,
-     "size": 480
-    },
-    {
-     "name": "fn_800A8220",
-     "address": 2148172320,
-     "size": 224
-    },
-    {
-     "name": "fn_800A8300",
-     "address": 2148172544,
-     "size": 76
-    },
-    {
-     "name": "fn_800A834C",
-     "address": 2148172620,
-     "size": 1528
-    },
-    {
-     "name": "fn_800A8944",
-     "address": 2148174148,
-     "size": 36
-    },
-    {
-     "name": "fn_800A8968",
-     "address": 2148174184,
-     "size": 36
-    },
-    {
-     "name": "fn_800A898C",
-     "address": 2148174220,
-     "size": 12
-    },
-    {
-     "name": "fn_800A8998",
-     "address": 2148174232,
-     "size": 8
-    },
-    {
-     "name": "fn_800A89A0",
-     "address": 2148174240,
-     "size": 100
-    },
-    {
-     "name": "fn_800A8A04",
-     "address": 2148174340,
-     "size": 4
-    },
-    {
-     "name": "fn_800A8A08",
-     "address": 2148174344,
-     "size": 84
-    },
-    {
-     "name": "fn_800A8A5C",
-     "address": 2148174428,
-     "size": 364
-    },
-    {
-     "name": "fn_800A8BC8",
-     "address": 2148174792,
-     "size": 48
-    },
-    {
-     "name": "fn_800A8BF8",
-     "address": 2148174840,
-     "size": 44
-    },
-    {
-     "name": "fn_800A8C24",
-     "address": 2148174884,
-     "size": 16
-    },
-    {
-     "name": "fn_800A8C34",
-     "address": 2148174900,
-     "size": 132
-    },
-    {
-     "name": "fn_800A8CB8",
-     "address": 2148175032,
-     "size": 48
-    },
-    {
-     "name": "fn_800A8CE8",
-     "address": 2148175080,
-     "size": 48
-    },
-    {
-     "name": "fn_800A8D18",
-     "address": 2148175128,
-     "size": 24
-    },
-    {
-     "name": "fn_800A8D30",
-     "address": 2148175152,
-     "size": 200
-    },
-    {
-     "name": "fn_800A8DF8",
-     "address": 2148175352,
-     "size": 288
-    },
-    {
-     "name": "fn_800A8F18",
-     "address": 2148175640,
-     "size": 404
-    },
-    {
-     "name": "fn_800A90AC",
-     "address": 2148176044,
-     "size": 1016
-    },
-    {
-     "name": "fn_800A94A4",
-     "address": 2148177060,
-     "size": 308
-    },
-    {
-     "name": "fn_800A95D8",
-     "address": 2148177368,
-     "size": 232
-    },
-    {
-     "name": "fn_800A96C0",
-     "address": 2148177600,
-     "size": 64
-    },
-    {
-     "name": "fn_800A9700",
-     "address": 2148177664,
-     "size": 12
-    },
-    {
-     "name": "fn_800A970C",
-     "address": 2148177676,
-     "size": 8
-    },
-    {
-     "name": "fn_800A9714",
-     "address": 2148177684,
-     "size": 112
-    },
-    {
-     "name": "fn_800A9784",
-     "address": 2148177796,
-     "size": 12
-    },
-    {
-     "name": "fn_800A9790",
-     "address": 2148177808,
-     "size": 324
-    },
-    {
-     "name": "fn_800A98D4",
-     "address": 2148178132,
-     "size": 224
-    }
-   ],
-   "runs": {
-    ".data": {
-     "start": 2153326672,
-     "end": 2153327822,
-     "labels": 24,
-     "filler": 1,
-     "density": 0.96,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80592850",
-      "lbl_80592860",
-      "lbl_805928BC",
-      "lbl_8059291C",
-      "lbl_80592954",
-      "lbl_80592988",
-      "lbl_805929C0",
-      "lbl_805929F8",
-      "lbl_80592A14",
-      "lbl_80592A38",
-      "lbl_80592A6C",
-      "lbl_80592AA8",
-      "lbl_80592AE0",
-      "lbl_80592B14",
-      "lbl_80592B3C",
-      "lbl_80592B70",
-      "lbl_80592BD0",
-      "lbl_80592C08",
-      "lbl_80592C14",
-      "lbl_80592C48",
-      "lbl_80592C54",
-      "lbl_80592C88",
-      "lbl_80592C94",
-      "lbl_80592CC0"
-     ]
-    },
-    ".sbss": {
-     "start": 2155432224,
-     "end": 2155432232,
-     "labels": 1,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80794920"
-     ]
-    },
-    ".sdata2": {
-     "start": 2155438080,
-     "end": 2155438128,
-     "labels": 9,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80796000",
-      "lbl_80796004",
-      "lbl_80796008",
-      "lbl_80796010",
-      "lbl_80796018",
-      "lbl_8079601C",
-      "lbl_80796020",
-      "lbl_80796024",
-      "lbl_80796028"
-     ]
-    },
-    "extabindex": {
-     "start": 2147626724,
-     "end": 2147627156,
-     "labels": 36,
      "filler": 0,
      "leak": 0
     }
@@ -5751,12 +4278,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes with no legal cut - kept whole",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -6353,896 +4880,6 @@
    }
   },
   {
-   "label": "proposal/801251D0_fn_801251D0.cpp",
-   "text": [
-    2148684240,
-    2148710912
-   ],
-   "count": 145,
-   "bytes": 26672,
-   "cxx": true,
-   "language": {
-    "lang": "c++",
-    "confidence": "high",
-    "conclusive": true,
-    "suggested": false,
-    "evidence": [
-     {
-      "kind": "mangled-defined",
-      "detail": "get_enemy_data__FP11_ENEMY_WORK",
-      "count": 1
-     },
-     {
-      "kind": "mangled-undefined",
-      "detail": "PlayMode_ck__Fv",
-      "count": 20
-     }
-    ],
-    "sources": [],
-    "conflict": false,
-    "mangled_defined": [
-     "get_enemy_data__FP11_ENEMY_WORK"
-    ],
-    "mangled_undefined": [
-     "PlayMode_ck__Fv",
-     "ai_torch_ck__FP8_AINPC_W",
-     "calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3",
-     "calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3",
-     "em_die_ck__FP11_ENEMY_WORK",
-     "em_get_mot_no__FP11_ENEMY_WORK",
-     "em_sleep_ck__FP11_ENEMY_WORKUc",
-     "event_demo_ck__Fv",
-     "findInterSection2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3PQ34nw4r4math4VEC3UcUlUcUsPUcP8LandData",
-     "findInterSection__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3PQ34nw4r4math4VEC3UcUlUcUsPUc",
-     "get_enemy_data__FP11_ENEMY_WORK",
-     "get_move_work_adrs__FUc",
-     "get_move_work_max__FUc",
-     "get_now_areano__Fv",
-     "get_now_mapno__Fv",
-     "get_worldworld_pos__FPQ34nw4r4math4VEC3Uc",
-     "hit_flag_set__FP6_HIT_WUl",
-     "ran_suu__Fl",
-     "rotVecY__FPQ34nw4r4math4VEC3Ul",
-     "setVector3__FPQ34nw4r4math4VEC3fff"
-    ],
-    "cpp_sources": [],
-    "c_sources": [],
-    "extab": false,
-    "extab_signal": false,
-    "extab_conflict": false,
-    "exceptions_on": false
-   },
-   "seam": null,
-   "seam_note": null,
-   "tu": {
-    "sources": [],
-    "partial_source": null,
-    "open_seams": [],
-    "verdict": "unproven"
-   },
-   "functions": [
-    {
-     "name": "fn_801251D0",
-     "address": 2148684240,
-     "size": 8
-    },
-    {
-     "name": "fn_801251D8",
-     "address": 2148684248,
-     "size": 8
-    },
-    {
-     "name": "fn_801251E0",
-     "address": 2148684256,
-     "size": 224
-    },
-    {
-     "name": "fn_801252C0",
-     "address": 2148684480,
-     "size": 28
-    },
-    {
-     "name": "fn_801252DC",
-     "address": 2148684508,
-     "size": 624
-    },
-    {
-     "name": "fn_8012554C",
-     "address": 2148685132,
-     "size": 16
-    },
-    {
-     "name": "fn_8012555C",
-     "address": 2148685148,
-     "size": 2552
-    },
-    {
-     "name": "fn_80125F54",
-     "address": 2148687700,
-     "size": 52
-    },
-    {
-     "name": "fn_80125F88",
-     "address": 2148687752,
-     "size": 20
-    },
-    {
-     "name": "fn_80125F9C",
-     "address": 2148687772,
-     "size": 84
-    },
-    {
-     "name": "fn_80125FF0",
-     "address": 2148687856,
-     "size": 68
-    },
-    {
-     "name": "get_enemy_data__FP11_ENEMY_WORK",
-     "address": 2148687924,
-     "size": 16
-    },
-    {
-     "name": "fn_80126044",
-     "address": 2148687940,
-     "size": 84
-    },
-    {
-     "name": "fn_80126098",
-     "address": 2148688024,
-     "size": 36
-    },
-    {
-     "name": "fn_801260BC",
-     "address": 2148688060,
-     "size": 36
-    },
-    {
-     "name": "fn_801260E0",
-     "address": 2148688096,
-     "size": 36
-    },
-    {
-     "name": "fn_80126104",
-     "address": 2148688132,
-     "size": 36
-    },
-    {
-     "name": "fn_80126128",
-     "address": 2148688168,
-     "size": 176
-    },
-    {
-     "name": "fn_801261D8",
-     "address": 2148688344,
-     "size": 160
-    },
-    {
-     "name": "fn_80126278",
-     "address": 2148688504,
-     "size": 68
-    },
-    {
-     "name": "fn_801262BC",
-     "address": 2148688572,
-     "size": 104
-    },
-    {
-     "name": "fn_80126324",
-     "address": 2148688676,
-     "size": 240
-    },
-    {
-     "name": "fn_80126414",
-     "address": 2148688916,
-     "size": 64
-    },
-    {
-     "name": "fn_80126454",
-     "address": 2148688980,
-     "size": 64
-    },
-    {
-     "name": "fn_80126494",
-     "address": 2148689044,
-     "size": 40
-    },
-    {
-     "name": "fn_801264BC",
-     "address": 2148689084,
-     "size": 316
-    },
-    {
-     "name": "fn_801265F8",
-     "address": 2148689400,
-     "size": 152
-    },
-    {
-     "name": "fn_80126690",
-     "address": 2148689552,
-     "size": 116
-    },
-    {
-     "name": "fn_80126704",
-     "address": 2148689668,
-     "size": 20
-    },
-    {
-     "name": "fn_80126718",
-     "address": 2148689688,
-     "size": 144
-    },
-    {
-     "name": "fn_801267A8",
-     "address": 2148689832,
-     "size": 52
-    },
-    {
-     "name": "fn_801267DC",
-     "address": 2148689884,
-     "size": 68
-    },
-    {
-     "name": "fn_80126820",
-     "address": 2148689952,
-     "size": 36
-    },
-    {
-     "name": "fn_80126844",
-     "address": 2148689988,
-     "size": 36
-    },
-    {
-     "name": "fn_80126868",
-     "address": 2148690024,
-     "size": 48
-    },
-    {
-     "name": "fn_80126898",
-     "address": 2148690072,
-     "size": 24
-    },
-    {
-     "name": "fn_801268B0",
-     "address": 2148690096,
-     "size": 80
-    },
-    {
-     "name": "fn_80126900",
-     "address": 2148690176,
-     "size": 116
-    },
-    {
-     "name": "fn_80126974",
-     "address": 2148690292,
-     "size": 116
-    },
-    {
-     "name": "fn_801269E8",
-     "address": 2148690408,
-     "size": 100
-    },
-    {
-     "name": "fn_80126A4C",
-     "address": 2148690508,
-     "size": 132
-    },
-    {
-     "name": "fn_80126AD0",
-     "address": 2148690640,
-     "size": 140
-    },
-    {
-     "name": "fn_80126B5C",
-     "address": 2148690780,
-     "size": 120
-    },
-    {
-     "name": "fn_80126BD4",
-     "address": 2148690900,
-     "size": 120
-    },
-    {
-     "name": "fn_80126C4C",
-     "address": 2148691020,
-     "size": 352
-    },
-    {
-     "name": "fn_80126DAC",
-     "address": 2148691372,
-     "size": 144
-    },
-    {
-     "name": "fn_80126E3C",
-     "address": 2148691516,
-     "size": 152
-    },
-    {
-     "name": "fn_80126ED4",
-     "address": 2148691668,
-     "size": 172
-    },
-    {
-     "name": "fn_80126F80",
-     "address": 2148691840,
-     "size": 68
-    },
-    {
-     "name": "fn_80126FC4",
-     "address": 2148691908,
-     "size": 80
-    },
-    {
-     "name": "fn_80127014",
-     "address": 2148691988,
-     "size": 136
-    },
-    {
-     "name": "fn_8012709C",
-     "address": 2148692124,
-     "size": 96
-    },
-    {
-     "name": "fn_801270FC",
-     "address": 2148692220,
-     "size": 92
-    },
-    {
-     "name": "fn_80127158",
-     "address": 2148692312,
-     "size": 100
-    },
-    {
-     "name": "fn_801271BC",
-     "address": 2148692412,
-     "size": 264
-    },
-    {
-     "name": "fn_801272C4",
-     "address": 2148692676,
-     "size": 68
-    },
-    {
-     "name": "fn_80127308",
-     "address": 2148692744,
-     "size": 344
-    },
-    {
-     "name": "fn_80127460",
-     "address": 2148693088,
-     "size": 116
-    },
-    {
-     "name": "fn_801274D4",
-     "address": 2148693204,
-     "size": 92
-    },
-    {
-     "name": "fn_80127530",
-     "address": 2148693296,
-     "size": 56
-    },
-    {
-     "name": "fn_80127568",
-     "address": 2148693352,
-     "size": 36
-    },
-    {
-     "name": "fn_8012758C",
-     "address": 2148693388,
-     "size": 100
-    },
-    {
-     "name": "fn_801275F0",
-     "address": 2148693488,
-     "size": 244
-    },
-    {
-     "name": "fn_801276E4",
-     "address": 2148693732,
-     "size": 132
-    },
-    {
-     "name": "fn_80127768",
-     "address": 2148693864,
-     "size": 140
-    },
-    {
-     "name": "fn_801277F4",
-     "address": 2148694004,
-     "size": 648
-    },
-    {
-     "name": "fn_80127A7C",
-     "address": 2148694652,
-     "size": 300
-    },
-    {
-     "name": "fn_80127BA8",
-     "address": 2148694952,
-     "size": 116
-    },
-    {
-     "name": "fn_80127C1C",
-     "address": 2148695068,
-     "size": 148
-    },
-    {
-     "name": "fn_80127CB0",
-     "address": 2148695216,
-     "size": 20
-    },
-    {
-     "name": "fn_80127CC4",
-     "address": 2148695236,
-     "size": 92
-    },
-    {
-     "name": "fn_80127D20",
-     "address": 2148695328,
-     "size": 116
-    },
-    {
-     "name": "fn_80127D94",
-     "address": 2148695444,
-     "size": 80
-    },
-    {
-     "name": "fn_80127DE4",
-     "address": 2148695524,
-     "size": 148
-    },
-    {
-     "name": "fn_80127E78",
-     "address": 2148695672,
-     "size": 208
-    },
-    {
-     "name": "fn_80127F48",
-     "address": 2148695880,
-     "size": 156
-    },
-    {
-     "name": "fn_80127FE4",
-     "address": 2148696036,
-     "size": 76
-    },
-    {
-     "name": "fn_80128030",
-     "address": 2148696112,
-     "size": 124
-    },
-    {
-     "name": "fn_801280AC",
-     "address": 2148696236,
-     "size": 72
-    },
-    {
-     "name": "fn_801280F4",
-     "address": 2148696308,
-     "size": 72
-    },
-    {
-     "name": "fn_8012813C",
-     "address": 2148696380,
-     "size": 88
-    },
-    {
-     "name": "fn_80128194",
-     "address": 2148696468,
-     "size": 88
-    },
-    {
-     "name": "fn_801281EC",
-     "address": 2148696556,
-     "size": 12
-    },
-    {
-     "name": "fn_801281F8",
-     "address": 2148696568,
-     "size": 12
-    },
-    {
-     "name": "fn_80128204",
-     "address": 2148696580,
-     "size": 8
-    },
-    {
-     "name": "fn_8012820C",
-     "address": 2148696588,
-     "size": 72
-    },
-    {
-     "name": "fn_80128254",
-     "address": 2148696660,
-     "size": 24
-    },
-    {
-     "name": "fn_8012826C",
-     "address": 2148696684,
-     "size": 8
-    },
-    {
-     "name": "fn_80128274",
-     "address": 2148696692,
-     "size": 148
-    },
-    {
-     "name": "fn_80128308",
-     "address": 2148696840,
-     "size": 56
-    },
-    {
-     "name": "fn_80128340",
-     "address": 2148696896,
-     "size": 592
-    },
-    {
-     "name": "fn_80128590",
-     "address": 2148697488,
-     "size": 16
-    },
-    {
-     "name": "fn_801285A0",
-     "address": 2148697504,
-     "size": 32
-    },
-    {
-     "name": "fn_801285C0",
-     "address": 2148697536,
-     "size": 984
-    },
-    {
-     "name": "fn_80128998",
-     "address": 2148698520,
-     "size": 124
-    },
-    {
-     "name": "fn_80128A14",
-     "address": 2148698644,
-     "size": 28
-    },
-    {
-     "name": "fn_80128A30",
-     "address": 2148698672,
-     "size": 64
-    },
-    {
-     "name": "fn_80128A70",
-     "address": 2148698736,
-     "size": 28
-    },
-    {
-     "name": "fn_80128A8C",
-     "address": 2148698764,
-     "size": 32
-    },
-    {
-     "name": "fn_80128AAC",
-     "address": 2148698796,
-     "size": 32
-    },
-    {
-     "name": "fn_80128ACC",
-     "address": 2148698828,
-     "size": 32
-    },
-    {
-     "name": "fn_80128AEC",
-     "address": 2148698860,
-     "size": 32
-    },
-    {
-     "name": "fn_80128B0C",
-     "address": 2148698892,
-     "size": 116
-    },
-    {
-     "name": "fn_80128B80",
-     "address": 2148699008,
-     "size": 120
-    },
-    {
-     "name": "fn_80128BF8",
-     "address": 2148699128,
-     "size": 1860
-    },
-    {
-     "name": "fn_8012933C",
-     "address": 2148700988,
-     "size": 812
-    },
-    {
-     "name": "fn_80129668",
-     "address": 2148701800,
-     "size": 12
-    },
-    {
-     "name": "fn_80129674",
-     "address": 2148701812,
-     "size": 176
-    },
-    {
-     "name": "fn_80129724",
-     "address": 2148701988,
-     "size": 32
-    },
-    {
-     "name": "fn_80129744",
-     "address": 2148702020,
-     "size": 76
-    },
-    {
-     "name": "fn_80129790",
-     "address": 2148702096,
-     "size": 124
-    },
-    {
-     "name": "fn_8012980C",
-     "address": 2148702220,
-     "size": 88
-    },
-    {
-     "name": "fn_80129864",
-     "address": 2148702308,
-     "size": 24
-    },
-    {
-     "name": "fn_8012987C",
-     "address": 2148702332,
-     "size": 264
-    },
-    {
-     "name": "fn_80129984",
-     "address": 2148702596,
-     "size": 24
-    },
-    {
-     "name": "fn_8012999C",
-     "address": 2148702620,
-     "size": 60
-    },
-    {
-     "name": "fn_801299D8",
-     "address": 2148702680,
-     "size": 68
-    },
-    {
-     "name": "fn_80129A1C",
-     "address": 2148702748,
-     "size": 84
-    },
-    {
-     "name": "fn_80129A70",
-     "address": 2148702832,
-     "size": 716
-    },
-    {
-     "name": "fn_80129D3C",
-     "address": 2148703548,
-     "size": 124
-    },
-    {
-     "name": "fn_80129DB8",
-     "address": 2148703672,
-     "size": 144
-    },
-    {
-     "name": "fn_80129E48",
-     "address": 2148703816,
-     "size": 276
-    },
-    {
-     "name": "fn_80129F5C",
-     "address": 2148704092,
-     "size": 184
-    },
-    {
-     "name": "fn_8012A014",
-     "address": 2148704276,
-     "size": 496
-    },
-    {
-     "name": "fn_8012A204",
-     "address": 2148704772,
-     "size": 80
-    },
-    {
-     "name": "fn_8012A254",
-     "address": 2148704852,
-     "size": 256
-    },
-    {
-     "name": "fn_8012A354",
-     "address": 2148705108,
-     "size": 96
-    },
-    {
-     "name": "fn_8012A3B4",
-     "address": 2148705204,
-     "size": 96
-    },
-    {
-     "name": "fn_8012A414",
-     "address": 2148705300,
-     "size": 528
-    },
-    {
-     "name": "fn_8012A624",
-     "address": 2148705828,
-     "size": 52
-    },
-    {
-     "name": "fn_8012A658",
-     "address": 2148705880,
-     "size": 440
-    },
-    {
-     "name": "fn_8012A810",
-     "address": 2148706320,
-     "size": 232
-    },
-    {
-     "name": "fn_8012A8F8",
-     "address": 2148706552,
-     "size": 64
-    },
-    {
-     "name": "fn_8012A938",
-     "address": 2148706616,
-     "size": 176
-    },
-    {
-     "name": "fn_8012A9E8",
-     "address": 2148706792,
-     "size": 2456
-    },
-    {
-     "name": "fn_8012B380",
-     "address": 2148709248,
-     "size": 580
-    },
-    {
-     "name": "fn_8012B5C4",
-     "address": 2148709828,
-     "size": 64
-    },
-    {
-     "name": "fn_8012B604",
-     "address": 2148709892,
-     "size": 4
-    },
-    {
-     "name": "fn_8012B608",
-     "address": 2148709896,
-     "size": 68
-    },
-    {
-     "name": "fn_8012B64C",
-     "address": 2148709964,
-     "size": 544
-    },
-    {
-     "name": "fn_8012B86C",
-     "address": 2148710508,
-     "size": 140
-    },
-    {
-     "name": "fn_8012B8F8",
-     "address": 2148710648,
-     "size": 76
-    },
-    {
-     "name": "fn_8012B944",
-     "address": 2148710724,
-     "size": 68
-    },
-    {
-     "name": "fn_8012B988",
-     "address": 2148710792,
-     "size": 52
-    },
-    {
-     "name": "fn_8012B9BC",
-     "address": 2148710844,
-     "size": 68
-    }
-   ],
-   "runs": {
-    ".rodata": {
-     "start": 2153183440,
-     "end": 2153183456,
-     "labels": 1,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_8056F8D0"
-     ]
-    },
-    ".data": {
-     "start": 2153386104,
-     "end": 2153388808,
-     "labels": 6,
-     "filler": 28,
-     "density": 0.18,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "jumptable_805A1094",
-      "jumptable_805A10F0",
-      "jumptable_805A12F4",
-      "jumptable_805A132C",
-      "lbl_805A1078",
-      "lbl_805A1ADC"
-     ]
-    },
-    ".bss": {
-     "start": 2154448224,
-     "end": 2154551304,
-     "labels": 3,
-     "filler": 108,
-     "density": 0.03,
-     "leak": 3,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "em_snd_proc_tbl",
-      "lbl_806A4560",
-      "lbl_806BD360"
-     ]
-    },
-    ".sdata": {
-     "start": 2155420112,
-     "end": 2155420140,
-     "labels": 3,
-     "filler": 1,
-     "density": 0.75,
-     "leak": 0,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_807919D0",
-      "lbl_807919D8",
-      "lbl_807919E8"
-     ]
-    },
-    ".sdata2": {
-     "start": 2155441232,
-     "end": 2155441292,
-     "labels": 12,
-     "filler": 0,
-     "density": 1.0,
-     "leak": 11,
-     "owned": 0,
-     "owned_names": [],
-     "names": [
-      "lbl_80796C50",
-      "lbl_80796C54",
-      "lbl_80796C58",
-      "lbl_80796C5C",
-      "lbl_80796C60",
-      "lbl_80796C68",
-      "lbl_80796C70",
-      "lbl_80796C74",
-      "lbl_80796C78",
-      "lbl_80796C7C",
-      "lbl_80796C80",
-      "lbl_80796C88"
-     ]
-    },
-    "extabindex": {
-     "start": 2147642348,
-     "end": 2147643572,
-     "labels": 102,
-     "filler": 0,
-     "leak": 0
-    }
-   }
-  },
-  {
    "label": "proposal/8012E968_fn_8012E968.cpp",
    "text": [
     2148723048,
@@ -7436,12 +5073,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -11419,12 +9056,12 @@
      "why": ".sdata2 run jump lbl_8079736C -> lbl_80797370"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -12544,12 +10181,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -13334,12 +10971,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -14303,12 +11940,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -15933,12 +13570,12 @@
      "why": ".data run jump jumptable_805AE2F8 -> jumptable_805AE318"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -17144,7 +14781,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -18072,7 +15709,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -20645,7 +18282,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -22182,7 +19819,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -24160,7 +21797,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -25375,7 +23012,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -25854,7 +23491,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -29449,7 +27086,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -30826,7 +28463,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -32120,12 +29757,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -33292,12 +30929,12 @@
      "why": ".sdata2 run jump lbl_80799FA8 -> lbl_80799FAC"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -34832,7 +32469,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -36320,7 +33957,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -38476,7 +36113,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -38913,12 +36550,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -40200,10 +37837,161 @@
    "label": "proposal/802A5444_fn_802A5444.cpp",
    "text": [
     2150257732,
+    2150262308
+   ],
+   "count": 8,
+   "bytes": 4576,
+   "cxx": true,
+   "language": {
+    "lang": "c++",
+    "confidence": "high",
+    "conclusive": true,
+    "suggested": false,
+    "evidence": [
+     {
+      "kind": "source-cpp",
+      "detail": "menu_item.cpp",
+      "count": 1
+     },
+     {
+      "kind": "mangled-undefined",
+      "detail": "GetItemData__FUs",
+      "count": 14
+     }
+    ],
+    "sources": [
+     "menu_item.cpp"
+    ],
+    "conflict": false,
+    "mangled_defined": [],
+    "mangled_undefined": [
+     "GetItemData__FUs",
+     "Panic__Q24nw4r2dbFPCciPCce",
+     "draw_font__FRC10_SPR_DATA_PScUlPC10_mh_ivec2_",
+     "draw_sprite_anim_ary__FPCUsUsPC10_mh_ivec2_",
+     "draw_sprite_ary__FPCUsPC10_mh_ivec2_",
+     "font_flush__Fv",
+     "font_print_ex__FsssPSce",
+     "font_set_size__Fss",
+     "get_lsp_data__FUsP10_mh_ivec2_",
+     "get_menu_lsp_tbl__FUs",
+     "get_move_work_adrs__FUc",
+     "get_option_cfg__FUc",
+     "put_menu_cursor__FPUsUsPC10_mh_ivec2_",
+     "sysSE_req__Fl"
+    ],
+    "cpp_sources": [
+     "menu_item.cpp"
+    ],
+    "c_sources": [],
+    "extab": false,
+    "extab_signal": false,
+    "extab_conflict": false,
+    "exceptions_on": false
+   },
+   "seam": [
+    {
+     "kind": "pool",
+     "why": ".sdata2 run jump lbl_8079A494 -> lbl_8079A498"
+    }
+   ],
+   "seam_note": "ends at the edge of source file menu_item.cpp, not at the byte cap",
+   "tu": {
+    "sources": [
+     "menu_item.cpp"
+    ],
+    "partial_source": null,
+    "open_seams": [],
+    "verdict": "one-tu"
+   },
+   "functions": [
+    {
+     "name": "fn_802A5444",
+     "address": 2150257732,
+     "size": 856
+    },
+    {
+     "name": "fn_802A579C",
+     "address": 2150258588,
+     "size": 496
+    },
+    {
+     "name": "fn_802A598C",
+     "address": 2150259084,
+     "size": 1240
+    },
+    {
+     "name": "fn_802A5E64",
+     "address": 2150260324,
+     "size": 1456
+    },
+    {
+     "name": "fn_802A6414",
+     "address": 2150261780,
+     "size": 32
+    },
+    {
+     "name": "fn_802A6434",
+     "address": 2150261812,
+     "size": 4
+    },
+    {
+     "name": "fn_802A6438",
+     "address": 2150261816,
+     "size": 120
+    },
+    {
+     "name": "fn_802A64B0",
+     "address": 2150261936,
+     "size": 372
+    }
+   ],
+   "runs": {
+    ".data": {
+     "start": 2153570248,
+     "end": 2153570316,
+     "labels": 3,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_805CDFC8",
+      "lbl_805CDFD8",
+      "lbl_805CDFF0"
+     ]
+    },
+    ".bss": {
+     "start": 2154554176,
+     "end": 2154557216,
+     "labels": 1,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 1,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_806BE340"
+     ]
+    },
+    "extabindex": {
+     "start": 2147684852,
+     "end": 2147684924,
+     "labels": 6,
+     "filler": 0,
+     "leak": 0
+    }
+   }
+  },
+  {
+   "label": "proposal/802A6624_fn_802A6624.cpp",
+   "text": [
+    2150262308,
     2150291904
    ],
-   "count": 147,
-   "bytes": 34172,
+   "count": 139,
+   "bytes": 29596,
    "cxx": true,
    "language": {
     "lang": "c++",
@@ -40217,19 +38005,12 @@
       "count": 37
      },
      {
-      "kind": "source-cpp",
-      "detail": "menu_item.cpp",
-      "count": 1
-     },
-     {
       "kind": "mangled-undefined",
       "detail": "GetItemData__FUs",
-      "count": 53
+      "count": 52
      }
     ],
-    "sources": [
-     "menu_item.cpp"
-    ],
+    "sources": [],
     "conflict": false,
     "mangled_defined": [
      "GetMenuFontColorRed__Fbbbb",
@@ -40275,7 +38056,6 @@
      "GetMenuFontColor__Fbbbb",
      "ItemExp__FUs",
      "ItemName__FUs",
-     "Panic__Q24nw4r2dbFPCciPCce",
      "PutPageArrow__FPUsssUsPC10_mh_ivec2_Uc",
      "chk_pointer__Fv",
      "color_mult__FUlUl",
@@ -40325,71 +38105,22 @@
      "sysSE_req__Fl",
      "vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec"
     ],
-    "cpp_sources": [
-     "menu_item.cpp"
-    ],
+    "cpp_sources": [],
     "c_sources": [],
     "extab": false,
     "extab_signal": false,
     "extab_conflict": false,
     "exceptions_on": false
    },
-   "seam": [
-    {
-     "kind": "pool",
-     "why": ".sdata2 run jump lbl_8079A494 -> lbl_8079A498"
-    }
-   ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam": null,
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
-    "sources": [
-     "menu_item.cpp"
-    ],
+    "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "one-tu"
+    "verdict": "capped"
    },
    "functions": [
-    {
-     "name": "fn_802A5444",
-     "address": 2150257732,
-     "size": 856
-    },
-    {
-     "name": "fn_802A579C",
-     "address": 2150258588,
-     "size": 496
-    },
-    {
-     "name": "fn_802A598C",
-     "address": 2150259084,
-     "size": 1240
-    },
-    {
-     "name": "fn_802A5E64",
-     "address": 2150260324,
-     "size": 1456
-    },
-    {
-     "name": "fn_802A6414",
-     "address": 2150261780,
-     "size": 32
-    },
-    {
-     "name": "fn_802A6434",
-     "address": 2150261812,
-     "size": 4
-    },
-    {
-     "name": "fn_802A6438",
-     "address": 2150261816,
-     "size": 120
-    },
-    {
-     "name": "fn_802A64B0",
-     "address": 2150261936,
-     "size": 372
-    },
     {
      "name": "fn_802A6624",
      "address": 2150262308,
@@ -41088,18 +38819,15 @@
    ],
    "runs": {
     ".data": {
-     "start": 2153570248,
+     "start": 2153570316,
      "end": 2153573696,
-     "labels": 22,
+     "labels": 19,
      "filler": 8,
-     "density": 0.73,
+     "density": 0.7,
      "leak": 0,
      "owned": 0,
      "owned_names": [],
      "names": [
-      "lbl_805CDFC8",
-      "lbl_805CDFD8",
-      "lbl_805CDFF0",
       "lbl_805CE00C",
       "lbl_805CE090",
       "lbl_805CE0A0",
@@ -41197,9 +38925,9 @@
      ]
     },
     "extabindex": {
-     "start": 2147684852,
+     "start": 2147684924,
      "end": 2147686160,
-     "labels": 109,
+     "labels": 103,
      "filler": 0,
      "leak": 0
     }
@@ -42394,12 +40122,12 @@
      "why": ".sdata2 run jump lbl_8079A698 -> lbl_8079A69C"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -45880,7 +43608,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -47056,7 +44784,7 @@
      "why": "\"cockpit_quest.cpp\" starts here"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [
      "cockpit.cpp",
@@ -50569,7 +48297,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -52041,7 +49769,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -52534,7 +50262,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -53010,7 +50738,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -54630,7 +52358,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -55391,12 +53119,12 @@
      "why": ".data run jump jumptable_805E27B0 -> jumptable_805E27D4"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -56811,7 +54539,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -58140,7 +55868,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -58905,10 +56633,10 @@
    "label": "proposal/8034C0C4_fn_8034C0C4.cpp",
    "text": [
     2150940868,
-    2150991396
+    2150941136
    ],
-   "count": 121,
-   "bytes": 50528,
+   "count": 1,
+   "bytes": 268,
    "cxx": true,
    "language": {
     "lang": "c++",
@@ -58920,16 +56648,85 @@
       "kind": "source-cpp",
       "detail": "menu_note.cpp",
       "count": 1
-     },
+     }
+    ],
+    "sources": [
+     "menu_note.cpp"
+    ],
+    "conflict": false,
+    "mangled_defined": [],
+    "mangled_undefined": [],
+    "cpp_sources": [
+     "menu_note.cpp"
+    ],
+    "c_sources": [],
+    "extab": false,
+    "extab_signal": false,
+    "extab_conflict": false,
+    "exceptions_on": false
+   },
+   "seam": [
+    {
+     "kind": "pool",
+     "why": ".sdata2 run jump lbl_8079B640 -> lbl_8079B648"
+    }
+   ],
+   "seam_note": "ends at the edge of source file menu_note.cpp, not at the byte cap",
+   "tu": {
+    "sources": [
+     "menu_note.cpp"
+    ],
+    "partial_source": null,
+    "open_seams": [],
+    "verdict": "one-tu"
+   },
+   "functions": [
+    {
+     "name": "fn_8034C0C4",
+     "address": 2150940868,
+     "size": 268
+    }
+   ],
+   "runs": {
+    ".data": {
+     "start": 2153681400,
+     "end": 2153681480,
+     "labels": 3,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "jumptable_805E9220",
+      "lbl_805E91F8",
+      "lbl_805E9208"
+     ]
+    }
+   }
+  },
+  {
+   "label": "proposal/8034C1D0_fn_8034C1D0.cpp",
+   "text": [
+    2150941136,
+    2150991396
+   ],
+   "count": 120,
+   "bytes": 50260,
+   "cxx": true,
+   "language": {
+    "lang": "c++",
+    "confidence": "medium",
+    "conclusive": false,
+    "suggested": true,
+    "evidence": [
      {
       "kind": "mangled-undefined",
       "detail": "Pl_Skill_ck__FP4_PLWUs",
       "count": 31
      }
     ],
-    "sources": [
-     "menu_note.cpp"
-    ],
+    "sources": [],
     "conflict": false,
     "mangled_defined": [],
     "mangled_undefined": [
@@ -58965,36 +56762,22 @@
      "sysSE_req__Fl",
      "vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec"
     ],
-    "cpp_sources": [
-     "menu_note.cpp"
-    ],
+    "cpp_sources": [],
     "c_sources": [],
     "extab": false,
     "extab_signal": false,
     "extab_conflict": false,
     "exceptions_on": false
    },
-   "seam": [
-    {
-     "kind": "pool",
-     "why": ".sdata2 run jump lbl_8079B640 -> lbl_8079B648"
-    }
-   ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam": null,
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
-    "sources": [
-     "menu_note.cpp"
-    ],
+    "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "one-tu"
+    "verdict": "capped"
    },
    "functions": [
-    {
-     "name": "fn_8034C0C4",
-     "address": 2150940868,
-     "size": 268
-    },
     {
      "name": "fn_8034C1D0",
      "address": 2150941136,
@@ -59616,24 +57399,21 @@
      ]
     },
     ".data": {
-     "start": 2153681400,
+     "start": 2153681640,
      "end": 2153697472,
-     "labels": 50,
-     "filler": 76,
-     "density": 0.4,
+     "labels": 47,
+     "filler": 74,
+     "density": 0.39,
      "leak": 0,
      "owned": 0,
      "owned_names": [],
      "names": [
-      "jumptable_805E9220",
       "jumptable_805E9AD8",
       "jumptable_805EBD78",
       "jumptable_805EC1C0",
       "jumptable_805ECE88",
       "jumptable_805ECEBC",
       "jumptable_805ECEF4",
-      "lbl_805E91F8",
-      "lbl_805E9208",
       "lbl_805E92E8",
       "lbl_805E9EEC",
       "lbl_805E9F30",
@@ -60885,7 +58665,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -61605,7 +59385,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -62025,7 +59805,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -62856,12 +60636,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -65083,12 +62863,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -66649,7 +64429,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -67336,7 +65116,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -68013,7 +65793,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -69740,12 +67520,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -70710,7 +68490,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -71549,12 +69329,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -72463,12 +70243,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -74078,7 +71858,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -75484,12 +73264,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -75879,7 +73659,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -76748,7 +74528,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -79240,7 +77020,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -81511,7 +79291,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -83317,7 +81097,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -84694,7 +82474,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -88172,12 +85952,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -91697,10 +89477,10 @@
    "label": "proposal/8046D9F0_ARCInitHandle.c",
    "text": [
     2152126960,
-    2152156336
+    2152127120
    ],
-   "count": 107,
-   "bytes": 28772,
+   "count": 1,
+   "bytes": 160,
    "cxx": false,
    "language": {
     "lang": "c",
@@ -91730,7 +89510,7 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "ends at the edge of source file arc.c, not at the byte cap",
    "tu": {
     "sources": [
      "arc.c"
@@ -91744,7 +89524,72 @@
      "name": "ARCInitHandle",
      "address": 2152126960,
      "size": 160
+    }
+   ],
+   "runs": {
+    ".data": {
+     "start": 2153838696,
+     "end": 2153838730,
+     "labels": 1,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_8060F868"
+     ]
     },
+    ".sdata": {
+     "start": 2155429128,
+     "end": 2155429134,
+     "labels": 1,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_80793D08"
+     ]
+    }
+   }
+  },
+  {
+   "label": "proposal/8046DA90_ARCOpen.c",
+   "text": [
+    2152127120,
+    2152156336
+   ],
+   "count": 106,
+   "bytes": 28612,
+   "cxx": false,
+   "language": {
+    "lang": "c",
+    "confidence": "low",
+    "conclusive": false,
+    "suggested": false,
+    "evidence": [],
+    "sources": [],
+    "conflict": false,
+    "mangled_defined": [],
+    "mangled_undefined": [],
+    "cpp_sources": [],
+    "c_sources": [],
+    "extab": false,
+    "extab_signal": false,
+    "extab_conflict": false,
+    "exceptions_on": false
+   },
+   "seam": null,
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
+   "tu": {
+    "sources": [],
+    "partial_source": null,
+    "open_seams": [],
+    "verdict": "capped"
+   },
+   "functions": [
     {
      "name": "ARCOpen",
      "address": 2152127120,
@@ -92280,15 +90125,14 @@
     ".data": {
      "start": 2153835952,
      "end": 2153851264,
-     "labels": 7,
-     "filler": 22,
-     "density": 0.24,
+     "labels": 6,
+     "filler": 23,
+     "density": 0.21,
      "leak": 1,
      "owned": 0,
      "owned_names": [],
      "names": [
       "lbl_8060EDB0",
-      "lbl_8060F868",
       "lbl_8060F88C",
       "lbl_8060F920",
       "lbl_8060F9A0",
@@ -92323,16 +90167,15 @@
      ]
     },
     ".sdata": {
-     "start": 2155429128,
+     "start": 2155429136,
      "end": 2155429150,
-     "labels": 5,
+     "labels": 4,
      "filler": 0,
      "density": 1.0,
      "leak": 0,
      "owned": 0,
      "owned_names": [],
      "names": [
-      "lbl_80793D08",
       "lbl_80793D10",
       "lbl_80793D18",
       "lbl_80793D1A",
@@ -92691,7 +90534,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -94192,7 +92035,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -94947,7 +92790,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -95647,7 +93490,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -96363,7 +94206,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -97160,7 +95003,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -98596,12 +96439,12 @@
      "why": ".data run jump jumptable_8061A7D0 -> jumptable_8061A838"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -100507,12 +98350,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -105510,10 +103353,10 @@
    "label": "proposal/804E7F60_fn_804E7F60.c",
    "text": [
     2152628064,
-    2152655436
+    2152629804
    ],
-   "count": 81,
-   "bytes": 26828,
+   "count": 1,
+   "bytes": 1740,
    "cxx": false,
    "language": {
     "lang": "c",
@@ -105543,7 +103386,7 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "ends at the edge of source file vi.c, not at the byte cap",
    "tu": {
     "sources": [
      "vi.c"
@@ -105557,7 +103400,105 @@
      "name": "fn_804E7F60",
      "address": 2152628064,
      "size": 1740
+    }
+   ],
+   "runs": {
+    ".data": {
+     "start": 2153952200,
+     "end": 2153952269,
+     "labels": 1,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_8062B3C8"
+     ]
     },
+    ".bss": {
+     "start": 2155196808,
+     "end": 2155197016,
+     "labels": 2,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 2,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_8075B188",
+      "lbl_8075B200"
+     ]
+    },
+    ".sdata": {
+     "start": 2155430264,
+     "end": 2155430269,
+     "labels": 1,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_80794178"
+     ]
+    },
+    ".sbss": {
+     "start": 2155435524,
+     "end": 2155435584,
+     "labels": 7,
+     "filler": 7,
+     "density": 0.5,
+     "leak": 6,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_80795604",
+      "lbl_80795606",
+      "lbl_80795608",
+      "lbl_80795610",
+      "lbl_80795614",
+      "lbl_80795628",
+      "lbl_8079563C"
+     ]
+    }
+   }
+  },
+  {
+   "label": "proposal/804E8630_fn_804E8630.c",
+   "text": [
+    2152629808,
+    2152657060
+   ],
+   "count": 90,
+   "bytes": 26640,
+   "cxx": false,
+   "language": {
+    "lang": "c",
+    "confidence": "low",
+    "conclusive": false,
+    "suggested": false,
+    "evidence": [],
+    "sources": [],
+    "conflict": false,
+    "mangled_defined": [],
+    "mangled_undefined": [],
+    "cpp_sources": [],
+    "c_sources": [],
+    "extab": false,
+    "extab_signal": false,
+    "extab_conflict": false,
+    "exceptions_on": false
+   },
+   "seam": null,
+   "seam_note": "capped at --max-bytes, seam is a guess",
+   "tu": {
+    "sources": [],
+    "partial_source": null,
+    "open_seams": [],
+    "verdict": "capped"
+   },
+   "functions": [
     {
      "name": "fn_804E8630",
      "address": 2152629808,
@@ -105957,6 +103898,56 @@
      "name": "WPADProbe",
      "address": 2152655296,
      "size": 140
+    },
+    {
+     "name": "WPADSetSamplingCallback",
+     "address": 2152655440,
+     "size": 136
+    },
+    {
+     "name": "WPADSetConnectCallback",
+     "address": 2152655584,
+     "size": 136
+    },
+    {
+     "name": "WPADSetExtensionCallback",
+     "address": 2152655728,
+     "size": 92
+    },
+    {
+     "name": "fn_804EEBD0",
+     "address": 2152655824,
+     "size": 68
+    },
+    {
+     "name": "fn_804EEC20",
+     "address": 2152655904,
+     "size": 184
+    },
+    {
+     "name": "fn_804EECE0",
+     "address": 2152656096,
+     "size": 84
+    },
+    {
+     "name": "WPADGetInfoAsync",
+     "address": 2152656192,
+     "size": 544
+    },
+    {
+     "name": "WPADControlMotor",
+     "address": 2152656736,
+     "size": 204
+    },
+    {
+     "name": "WPADEnableMotor",
+     "address": 2152656944,
+     "size": 52
+    },
+    {
+     "name": "WPADIsMotorEnabled",
+     "address": 2152657008,
+     "size": 52
     }
    ],
    "runs": {
@@ -105974,11 +103965,11 @@
      ]
     },
     ".data": {
-     "start": 2153952200,
-     "end": 2153955744,
-     "labels": 17,
-     "filler": 8,
-     "density": 0.68,
+     "start": 2153953496,
+     "end": 2153955960,
+     "labels": 19,
+     "filler": 1,
+     "density": 0.95,
      "leak": 0,
      "owned": 0,
      "owned_names": [],
@@ -105986,7 +103977,6 @@
       "@4022",
       "jumptable_8062B8FC",
       "jumptable_8062C00C",
-      "lbl_8062B3C8",
       "lbl_8062B920",
       "lbl_8062BF30",
       "lbl_8062BF78",
@@ -105999,7 +103989,10 @@
       "lbl_8062C0A4",
       "lbl_8062C0DC",
       "lbl_8062C0EC",
-      "lbl_8062C188"
+      "lbl_8062C188",
+      "lbl_8062C1A0",
+      "lbl_8062C1D4",
+      "lbl_8062C228"
      ]
     },
     ".bss": {
@@ -106024,16 +104017,15 @@
      ]
     },
     ".sdata": {
-     "start": 2155430264,
+     "start": 2155430272,
      "end": 2155430339,
-     "labels": 22,
+     "labels": 21,
      "filler": 0,
      "density": 1.0,
      "leak": 0,
      "owned": 0,
      "owned_names": [],
      "names": [
-      "lbl_80794178",
       "lbl_80794180",
       "lbl_80794188",
       "lbl_8079418C",
@@ -106060,10 +104052,10 @@
     ".sbss": {
      "start": 2155434884,
      "end": 2155435773,
-     "labels": 57,
-     "filler": 100,
+     "labels": 56,
+     "filler": 101,
      "density": 0.36,
-     "leak": 26,
+     "leak": 27,
      "owned": 0,
      "owned_names": [],
      "names": [
@@ -106078,7 +104070,6 @@
       "lbl_80795620",
       "lbl_80795624",
       "lbl_80795628",
-      "lbl_8079563C",
       "lbl_80795644",
       "lbl_8079564C",
       "lbl_80795668",
@@ -106142,13 +104133,13 @@
    }
   },
   {
-   "label": "proposal/804EEA50_WPADSetSamplingCallback.c",
+   "label": "proposal/804EF0B0_WPADControlLed.c",
    "text": [
-    2152655440,
+    2152657072,
     2152658788
    ],
-   "count": 16,
-   "bytes": 3232,
+   "count": 6,
+   "bytes": 1680,
    "cxx": false,
    "language": {
     "lang": "c",
@@ -106194,56 +104185,6 @@
    },
    "functions": [
     {
-     "name": "WPADSetSamplingCallback",
-     "address": 2152655440,
-     "size": 136
-    },
-    {
-     "name": "WPADSetConnectCallback",
-     "address": 2152655584,
-     "size": 136
-    },
-    {
-     "name": "WPADSetExtensionCallback",
-     "address": 2152655728,
-     "size": 92
-    },
-    {
-     "name": "fn_804EEBD0",
-     "address": 2152655824,
-     "size": 68
-    },
-    {
-     "name": "fn_804EEC20",
-     "address": 2152655904,
-     "size": 184
-    },
-    {
-     "name": "fn_804EECE0",
-     "address": 2152656096,
-     "size": 84
-    },
-    {
-     "name": "WPADGetInfoAsync",
-     "address": 2152656192,
-     "size": 544
-    },
-    {
-     "name": "WPADControlMotor",
-     "address": 2152656736,
-     "size": 204
-    },
-    {
-     "name": "WPADEnableMotor",
-     "address": 2152656944,
-     "size": 52
-    },
-    {
-     "name": "WPADIsMotorEnabled",
-     "address": 2152657008,
-     "size": 52
-    },
-    {
      "name": "WPADControlLed",
      "address": 2152657072,
      "size": 488
@@ -106276,9 +104217,9 @@
    ],
    "runs": {
     ".data": {
-     "start": 2153955744,
+     "start": 2153955960,
      "end": 2153956064,
-     "labels": 5,
+     "labels": 2,
      "filler": 0,
      "density": 1.0,
      "leak": 0,
@@ -106286,10 +104227,7 @@
      "owned_names": [],
      "names": [
       "jumptable_8062C278",
-      "jumptable_8062C2AC",
-      "lbl_8062C1A0",
-      "lbl_8062C1D4",
-      "lbl_8062C228"
+      "jumptable_8062C2AC"
      ]
     },
     ".bss": {
@@ -106306,16 +104244,15 @@
      ]
     },
     ".sbss": {
-     "start": 2155435744,
+     "start": 2155435759,
      "end": 2155435764,
-     "labels": 3,
-     "filler": 5,
-     "density": 0.38,
-     "leak": 3,
+     "labels": 2,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 2,
      "owned": 0,
      "owned_names": [],
      "names": [
-      "lbl_807956E0",
       "lbl_807956EF",
       "lbl_807956F0"
      ]
@@ -106354,7 +104291,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -106696,7 +104633,7 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of source file WUD.c, not a byte position",
    "tu": {
     "sources": [
      "WUD.c"
@@ -107818,7 +105755,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -108953,7 +106890,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -109846,12 +107783,12 @@
      "why": "\"ncdsystem.c\" starts here"
     }
    ],
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -111370,7 +109307,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -112381,10 +110318,10 @@
    "label": "proposal/80526D40_fn_80526D40.c",
    "text": [
     2152885568,
-    2152915128
+    2152885864
    ],
-   "count": 166,
-   "bytes": 29052,
+   "count": 1,
+   "bytes": 296,
    "cxx": false,
    "language": {
     "lang": "c",
@@ -112392,11 +110329,6 @@
     "conclusive": true,
     "suggested": false,
     "evidence": [
-     {
-      "kind": "mangled-undefined",
-      "detail": "__dl__FPv",
-      "count": 1
-     },
      {
       "kind": "source-c",
       "detail": "kpr_lib.c",
@@ -112408,9 +110340,7 @@
     ],
     "conflict": false,
     "mangled_defined": [],
-    "mangled_undefined": [
-     "__dl__FPv"
-    ],
+    "mangled_undefined": [],
     "cpp_sources": [],
     "c_sources": [
      "kpr_lib.c"
@@ -112421,7 +110351,7 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "ends at the edge of source file kpr_lib.c, not at the byte cap",
    "tu": {
     "sources": [
      "kpr_lib.c"
@@ -112435,7 +110365,82 @@
      "name": "fn_80526D40",
      "address": 2152885568,
      "size": 296
+    }
+   ],
+   "runs": {
+    ".data": {
+     "start": 2154074912,
+     "end": 2154074945,
+     "labels": 2,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_80649320",
+      "lbl_8064932C"
+     ]
     },
+    ".sbss": {
+     "start": 2155436528,
+     "end": 2155436536,
+     "labels": 2,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 1,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "lbl_807959F0",
+      "lbl_807959F4"
+     ]
+    }
+   }
+  },
+  {
+   "label": "proposal/80526E70_fn_80526E70.cpp",
+   "text": [
+    2152885872,
+    2152915128
+   ],
+   "count": 165,
+   "bytes": 28756,
+   "cxx": true,
+   "language": {
+    "lang": "c++",
+    "confidence": "medium",
+    "conclusive": false,
+    "suggested": true,
+    "evidence": [
+     {
+      "kind": "mangled-undefined",
+      "detail": "__dl__FPv",
+      "count": 1
+     }
+    ],
+    "sources": [],
+    "conflict": false,
+    "mangled_defined": [],
+    "mangled_undefined": [
+     "__dl__FPv"
+    ],
+    "cpp_sources": [],
+    "c_sources": [],
+    "extab": false,
+    "extab_signal": false,
+    "extab_conflict": false,
+    "exceptions_on": false
+   },
+   "seam": null,
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
+   "tu": {
+    "sources": [],
+    "partial_source": null,
+    "open_seams": [],
+    "verdict": "capped"
+   },
+   "functions": [
     {
      "name": "fn_80526E70",
      "address": 2152885872,
@@ -113279,18 +111284,16 @@
      ]
     },
     ".data": {
-     "start": 2154074912,
+     "start": 2154075024,
      "end": 2154080056,
-     "labels": 14,
-     "filler": 2,
-     "density": 0.88,
+     "labels": 12,
+     "filler": 1,
+     "density": 0.92,
      "leak": 0,
      "owned": 0,
      "owned_names": [],
      "names": [
       "jumptable_80649840",
-      "lbl_80649320",
-      "lbl_8064932C",
       "lbl_80649390",
       "lbl_806493E8",
       "lbl_806497D0",
@@ -113334,17 +111337,15 @@
      ]
     },
     ".sbss": {
-     "start": 2155436528,
+     "start": 2155436544,
      "end": 2155436600,
-     "labels": 10,
-     "filler": 1,
-     "density": 0.91,
-     "leak": 5,
+     "labels": 8,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 4,
      "owned": 0,
      "owned_names": [],
      "names": [
-      "lbl_807959F0",
-      "lbl_807959F4",
       "lbl_80795A00",
       "lbl_80795A08",
       "lbl_80795A0C",
@@ -116610,7 +114611,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -117108,7 +115109,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -118267,12 +116268,12 @@
     "exceptions_on": false
    },
    "seam": null,
-   "seam_note": "capped at --max-bytes, seam is a guess",
+   "seam_note": "over --max-bytes: the cut is the edge of a must-link anchor, not a byte position",
    "tu": {
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -119522,7 +117523,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
@@ -120380,7 +118381,7 @@
     "sources": [],
     "partial_source": null,
     "open_seams": [],
-    "verdict": "unproven"
+    "verdict": "capped"
    },
    "functions": [
     {
