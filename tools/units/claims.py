@@ -346,6 +346,35 @@ def branch_exists(main: str, branch: str) -> bool:
     return out.returncode == 0
 
 
+def worker_branches(main: str) -> set[str]:
+    """Every live `worker/` branch - the claim locks, in one git call.
+
+    `branch_exists` answers for one branch; a selector weighing a whole pool needs them all, and asking per
+    entry would spawn git per unit. A tree that is not a repository (a selftest's temp dir) has none.
+    """
+    out = subprocess.run(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/" + BRANCH_PREFIX],
+                         cwd=main, capture_output=True, text=True, errors="replace")
+    if out.returncode != 0:
+        return set()
+    return {line.strip() for line in out.stdout.splitlines() if line.strip()}
+
+
+def lock_held(main: str, unit: str, branches: set[str] | None = None) -> bool:
+    """Whether `unit`'s claim lock is taken: its branch exists, or its worktree is still there.
+
+    The registry is a *record* of a claim, not the lock. `claim` refuses on the branch (and on a leftover
+    worktree), so a claim whose registry entry was lost - a half-torn-down release, or two `claim`s racing on
+    the same read-modify-write `save_registry` - still owns its unit. A selector that reads only the registry
+    hands that unit out again and the claim then refuses at the branch (2026-09-24: `queue.py next` on the
+    claim axis, after the covered-axis fix in `queue.covered_by_registered`). This is the same test `claim`
+    makes, exposed for the selectors; `branches` batches `worker_branches` for a caller checking many units.
+    """
+    unit = norm_unit(unit.strip("/"))
+    if branches is None:
+        branches = worker_branches(main)
+    return branch_for(unit) in branches or os.path.exists(worktree_for(unit, main))
+
+
 def merged_into_main(main: str, branch: str) -> bool:
     """True when every commit of `branch` is already reachable from main - merged *or* cherry-picked."""
     out = subprocess.run(["git", "cherry", "main", branch], cwd=main, capture_output=True, text=True)
