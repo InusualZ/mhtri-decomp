@@ -38,11 +38,18 @@ u32 fn_800689B0(void* p);
  * resolves against (rule 2: declared in its owner's header, not in the consumer). */
 u32 fn_800697A4(void);
 
-/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the `ResFile` revision-check getters. */
+/* 0x8006E6B4/0x800695EC/0x8006993C - the `ResFile` revision-check getters, added when
+ * `g3d/g3d_resfile.cpp` registered (rule 2). */
 u32 fn_8006E6B4(void* p);   /* 0x8006E6B4 - `*(u32*)p != 0` */
 u32 fn_800695EC(void* p);   /* 0x800695EC - the checked resource resolver */
 u32 fn_8006CDBC(void* p);   /* 0x8006CDBC - the checked resource resolver */
 u32 fn_8006993C(void* p);   /* 0x8006993C - the checked resource resolver */
+/* 0x8006E2AC - the `ResTexSrt` non-const slot-array resolver (`ResTexSrt::SetEffectMtx` panics through
+ * it when the handle word is invalid, then returns the base of the 0x34-byte slot array).  Declared
+ * here for `g3d/g3d_resmat.cpp` (rule 2); disjoint from the `g3d_resfile.cpp` getters above, so both
+ * sides' declarations survive. */
+u8* fn_8006E2AC(void* pSelf);
+
 
 #ifdef __cplusplus
 }

@@ -845,6 +845,16 @@ config.libs = [
             # fn_800938EC before and fn_800947A4 after (the first body of the next TU, which cites
             # "g3d_resmat.cpp").
             Object(NonMatching, "g3d/g3d_resfile.cpp"),      # 0x80093990-0x800947A4
+            # Registered once, at its final home (docs/plan.md 12): proposal `800947A4` - the nw4r g3d
+            # `ResMat`/`ResTexSrt` resource TU (140 functions / 0x45B8 B, 0x800947A4-0x80098D5C).  `g3d`/
+            # `.cpp` from the range's own `__FILE__` string (`.data` 0x80590D78 = "g3d_resmat.cpp", the
+            # file argument of every `nw4r::db::Panic` assert in the range); the right edge 0x80098D5C is
+            # `g3d_resnode.cpp`'s first body (tudiscover seam, class `source`), so the seam is proven.
+            # Sections: `.text` 0x800947A4-0x80098D5C, `extab` 0x800094E0-0x80009850 (110 8-byte
+            # unwind-only records) and `extabindex` 0x8002232C-0x80022854 (110 12-byte records).
+            # See the file header for the sections, the rebuilt bodies and the rule-7 deferral.
+            Object(NonMatching, "g3d/g3d_resmat.cpp"),      # 0x800947A4-0x80098D5C
+
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
             # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass

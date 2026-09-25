@@ -65,6 +65,23 @@ void fn_8007B8E4(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 void fn_8007B940(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 u32 fn_8007C464(void* pSelf);
 s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
+
+/* 0x800768C8/0x800768DC/0x800768F0 - the three `ResMat`/`ResTex`-style handle validity tests the
+ * `g3d/g3d_resmat.cpp` accessors assert through (callers: g3d_resmat.cpp).  Each reads the handle's
+ * word and returns whether it is non-null; the three differ only by the type of handle they name. */
+u32 fn_800768C8(void* pSelf);
+u32 fn_800768DC(void* pSelf);
+u32 fn_800768F0(void* pSelf);
+/* 0x80076974/0x80076988 - the `ResTex`-style handle validators the `g3d_resmat` texture helpers use. */
+u32 fn_80076974(void* pSelf);
+u32 fn_80076988(void* pSelf);
+/* 0x80077638/0x800776F4 - the `ResTlut`-style validators. */
+u32 fn_80077638(void* pSelf);
+u32 fn_800776F4(void* pSelf);
+/* 0x800774A0/0x80077744/0x800783EC - the resolved-resource readers of the same family. */
+u8* fn_800774A0(void* pSelf);
+u8* fn_80077744(void* pSelf);
+u8* fn_800783EC(void* pSelf);
 s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility test */
 void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
                  u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
