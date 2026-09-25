@@ -174,6 +174,8 @@ def integration_rows() -> int:
         if len(symbols) < 2:
             print("skip  integration cross-check (unit has fewer than two scored functions)")
             return 0
+        failures = _ok("object_has_symbol finds a real target function",
+                       rc.object_has_symbol(unit["target"], symbols[0]), True, failures)
         for sym in symbols:
             m = rc.measure(unit["target"], unit["base"], sym, objdiff, tmp, unit=unit["name"])
             failures = _ok(f"{unit['name']} {sym}: measure == report", m.get("match_percent"),
@@ -313,9 +315,170 @@ def include_order_rows() -> int:
     return failures
 
 
+def _cp(argv, stdout="", returncode=0):
+    return subprocess.CompletedProcess(argv, returncode, stdout, "")
+
+
+def _fake_main(tmp):
+    """A MAIN-shaped tree with the three things the fallback reads: the map, dtk's config, obj files."""
+    main = os.path.join(tmp, "main")
+    for d in (os.path.join(main, "config", "RMHE08"), os.path.join(main, "build", "RMHE08", "obj"),
+              os.path.join(main, "build", "RMHE08", "obj", "prop")):
+        os.makedirs(d, exist_ok=True)
+    open(os.path.join(main, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8").write(
+        "fn_80001000 = .text:0x80001000; // type:function size:0x10\n"
+        "fn_80001020 = .text:0x80001020; // type:function size:0x30\n"
+        "fn_80002000 = .text:0x80002000; // type:function size:0x40\n"
+        "fn_80004000 = .text:0x80004000; // type:function size:0x10\n"
+        "lbl_80000500 = .data:0x80000500; // type:object size:0x4\n")
+    json.dump({"units": [
+        {"name": "auto_03_80001000_text", "object": "build/RMHE08/obj/auto_03_80001000_text.o",
+         "code_size": 64, "data_size": 0},
+        {"name": "main.cpp", "object": "build/RMHE08/obj/main.o", "code_size": 16, "data_size": 0},
+    ]}, open(os.path.join(main, "build", "RMHE08", "config.json"), "w", encoding="utf-8"))
+    # the run, the single-symbol object for fn_80002000, and the registered unit's split object
+    for rel in ("auto_03_80001000_text.o", "auto_fn_80002000_text.o"):
+        open(os.path.join(main, "build", "RMHE08", "obj", rel), "wb").write(b"\x7fELF")
+    open(os.path.join(main, "build", "RMHE08", "obj", "prop", "unit.o"), "wb").write(b"\x7fELF")
+    return main
+
+
+def _fake_worktree(tmp):
+    """A worktree whose `configure.py` registers `prop/unit.cpp` beside `prop/sibling.cpp`."""
+    wt = os.path.join(tmp, "wt")
+    os.makedirs(wt)
+    open(os.path.join(wt, "configure.py"), "w", encoding="utf-8").write(
+        'config.libs = [\n\n    {\n'
+        '        # The comment the real configure.py carries between the brace and the lib line -'
+        ' a\n'
+        '        # lookup that needs whitespace there skips every commented block.\n'
+        '        "lib": "prop",\n        "mw_version": "Wii/1.3",\n'
+        '        "cflags": cflags_main,\n        "objects": [\n'
+        '            Object(NonMatching, "prop/unit.cpp"),\n'
+        '            Object(NonMatching, "prop/sibling.cpp"),\n'
+        '        ],\n    },\n]\n')
+    return wt
+
+
+def _ninja_runner(unit_line=None, sibling_line=None):
+    """A runner answering `ninja -t commands` the way a proposal worktree's trees would.
+
+    Nothing has an edge for `prop/unit.o` unless `unit_line` says so - that is exactly MAIN's (and a stale
+    worktree build.ninja's) answer for a registered proposal, a non-zero exit with an empty stdout.
+    """
+    def runner(argv, **kwargs):
+        target = argv[-1]
+        if target == "build/RMHE08/src/prop/unit.o" and unit_line:
+            return _cp(argv, unit_line + "\n", 0)
+        if target == "build/RMHE08/src/prop/sibling.o" and sibling_line:
+            return _cp(argv, sibling_line + "\n", 0)
+        return _cp(argv, "ninja: error: unknown target\n", 1)
+
+    return runner
+
+
+def proposal_rows() -> int:
+    """The proposal path: the target object and the command line, without MAIN's build graph.
+
+    This is the gap AGENTS.md records - a worker registers a unit in its worktree and then discovers MAIN
+    has neither a ninja rule nor `build/RMHE08/obj/<unit>.o`. The three workers who hit it each hand-built
+    a harness (borrow a sibling's command, score against MAIN's `auto_*_text.o`); these are the assertions
+    that the tool now does it itself, and that a *registered* unit is decided first.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = _fake_main(tmp)
+        wt = _fake_worktree(tmp)
+
+        # --- the target object: a run, a single-symbol object, and the errors
+        run = os.path.join(main, "build", "RMHE08", "obj", "auto_03_80001000_text.o")
+        one = os.path.join(main, "build", "RMHE08", "obj", "auto_fn_80002000_text.o")
+        failures = _ok("a run start resolves to the run object", rc.proposal_target(main, "fn_80001000")[0],
+                       run, failures)
+        failures = _ok("a symbol inside the run resolves to the same object",
+                       rc.proposal_target(main, "fn_80001020")[0], run, failures)
+        failures = _ok("a single-symbol object is found by name",
+                       rc.proposal_target(main, "fn_80002000")[0], one, failures)
+        failures = _ok("a data symbol is refused, not guessed",
+                       rc.proposal_target(main, "lbl_80000500")[0], None, failures)
+        failures = _ok("an unknown symbol is refused", rc.proposal_target(main, "no_such")[0], None, failures)
+        failures = _ok("an uncovered address is refused",
+                       rc.proposal_target(main, "fn_80004000")[0], None, failures)
+        failures = _ok("the refusal names the address",
+                       "0x80004000" in rc.proposal_target(main, "fn_80004000")[1], True, failures)
+
+        # --- the registered path is decided first, unchanged
+        kind = rc.measure_target(main, "prop/unit", "fn_80002000")
+        failures = _ok("a unit with a split object is `registered`", kind[1], "registered", failures)
+        failures = _ok("... and it is the split object, not the auto one",
+                       os.path.normcase(kind[0]),
+                       os.path.normcase(os.path.join(main, "build", "RMHE08", "obj", "prop", "unit.o")),
+                       failures)
+        failures = _ok("registered wins even for an unmappable symbol",
+                       rc.measure_target(main, "prop/unit", "lbl_80000500")[1], "registered", failures)
+        failures = _ok("a unit with no split object falls back to the auto object",
+                       rc.measure_target(main, "prop/other", "fn_80002000")[1], "auto-fallback", failures)
+        failures = _ok("a proposal with no auto object is `missing`, not a silent number",
+                       rc.measure_target(main, "prop/other", "fn_80004000")[1], "missing", failures)
+
+        # --- the command line: MAIN, then the worktree, then a same-lib sibling
+        line = ('build\\tools\\sjiswrap.exe build\\compilers\\Wii\\1.3\\mwcceppc.exe -nodefaults -O3 '
+                '-lang=c++ -MMD -c src\\prop\\sibling.cpp -o build\\RMHE08\\src\\prop')
+        runner = _ninja_runner(sibling_line=line)
+        tokens, source = rc.unit_tokens(main, wt, "prop/unit", runner=runner)
+        failures = _ok("the command comes from the same-lib sibling", source,
+                       "sibling prop/sibling (same lib)", failures)
+        failures = _ok("the sibling's real flags are kept", "-O3" in tokens and "-nodefaults" in tokens,
+                       True, failures)
+        failures = _ok("the borrowed line is pointed at this unit's object directory",
+                       tokens[tokens.index("-o") + 1], os.path.join("build", "RMHE08", "src", "prop"),
+                       failures)
+        failures = _ok("the borrowed line still names the sibling's source (rewrite swaps it last)",
+                       tokens[tokens.index("-c") + 1], "src\\prop\\sibling.cpp", failures)
+
+        # MAIN's own rule wins when it has one
+        main_line = line.replace("sibling", "unit")
+        runner2 = _ninja_runner(unit_line=main_line, sibling_line=line)
+        tokens2, source2 = rc.unit_tokens(main, wt, "prop/unit", runner=runner2)
+        failures = _ok("MAIN's own rule is preferred", source2, "main", failures)
+        failures = _ok("... and its line is not rewritten", tokens2[tokens2.index("-o") + 1],
+                       "build\\RMHE08\\src\\prop", failures)
+
+        # an unregistered unit says which registration is missing
+        plain = os.path.join(tmp, "plain")
+        os.makedirs(plain)
+        open(os.path.join(plain, "configure.py"), "w", encoding="utf-8").write("config.libs = []\n")
+        failures = _ok("an unregistered unit fails with the registration step",
+                       _raises(lambda: rc.unit_tokens(main, plain, "prop/unit", runner=runner)), True,
+                       failures)
+
+        # retarget: the two things a sibling's line gets wrong
+        fixed = rc.retarget(["mwcc", "-lang=c++", "-c", "src\\prop\\sibling.c", "-o", "build\\RMHE08\\src"],
+                            "prop/unit.c")
+        failures = _ok("retarget fixes -lang for a .c unit", "-lang=c" in fixed, True, failures)
+        failures = _ok("retarget keeps -lang=c++ otherwise",
+                       "-lang=c++" in rc.retarget(["mwcc", "-lang=c", "-o", "d"], "prop/unit.cpp"), True,
+                       failures)
+
+        # the pairing note must not claim "renamed" for an object that simply does not define the symbol
+        failures = _ok("object_has_symbol is safe on a non-ELF",
+                       rc.object_has_symbol(os.path.join(main, "build", "RMHE08", "obj", "main.o"),
+                                            "anything"), False, failures)
+    return failures
+
+
+def _raises(fn) -> bool:
+    try:
+        fn()
+        return False
+    except SystemExit:
+        return True
+
+
 def main() -> int:
     failures = wire_rows()
     failures += include_order_rows()
+    failures += proposal_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")
     return 1 if failures else 0
