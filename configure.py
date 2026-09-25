@@ -547,6 +547,18 @@ config.libs = [
             # string survives in the range and the dump answers only `zz_` placeholders, so the
             # file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_8013F764.cpp"),
+            # Registered from proposal/801411B8_fn_801411B8.cpp: the enemy control TU's lower half,
+            # 155 functions / 0x6B28 bytes (0x801411B8..0x80147CE0), plus the extab/extabindex runs
+            # its 107 framed functions carry.  Module `enemy` and file `enemy_control.cpp` from the
+            # `__FILE__` string at 0x805A1BB8 ("enemy_control.cpp"), referenced only by this range's
+            # `fn_801411B8` (0x801411DC/0x80141258) - brief section 2 option 1.  C++ because four
+            # callees are mangled and rule 9 forbids spelling a mangling at the call site.  The
+            # upper edge 0x80147CE0 is `attribute.py`'s `--max-bytes` cut, not evidence: this unit
+            # and the registered `enemy/fn_80147CE0.cpp` are ONE TU (the `__FILE__` string lives
+            # here, `em001_prog_tbl` straddles the cut, and this unit's extab/extabindex runs end
+            # exactly where that unit's begin).  The merge is requested in the outbox; see the unit
+            # header.
+            Object(NonMatching, "enemy/enemy_control.cpp"),
             # Registered from proposal/80147CE0_fn_80147CE0.cpp (a 0x80147CE0 run discovery
             # proposed): the enemy action-handler band - the per-tick entry, the state-machine
             # family and the three sub-state dispatchers, 36 functions / 0x208C bytes, plus the
