@@ -78,6 +78,9 @@ void fn_80077420(u16 command, u8 value);
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 s32 fn_80082BCC(s32 model);
 void fn_8007F0CC(s32 root, u32 id);
+
+/* 0x8007A510 - the softreset/return-to-title request (caller: src/mh3_pad.cpp). */
+void fn_8007A510(void);
 #ifdef __cplusplus
 }
 #endif
