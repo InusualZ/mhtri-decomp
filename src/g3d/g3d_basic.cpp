@@ -32,7 +32,8 @@
  */
 #include "types.h"
 #include "nw4r/math.h"
-#include "unsplit/g3d.h" /* fn_8007100C / fn_800710BC / fn_80075DCC (rule 2) */
+#include "unsplit/g3d.h" /* fn_8007100C / fn_800710BC (rule 2) */
+#include "g3d/fn_80075DCC.h" /* fn_80075DCC, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
 /* The retail object keeps the un-folded `(x & mask) != 0` form in fn_800D7F40 (`rlwinm` + the
  * neg/or/srwi tests) and the un-fused compares elsewhere; the file-scope peephole pass folds both.

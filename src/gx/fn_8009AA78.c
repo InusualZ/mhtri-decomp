@@ -29,7 +29,8 @@
  */
 
 #include "gx.h"
-#include "unsplit/g3d.h" /* fn_800868A0/fn_80077420 (unsplit g3d neighbours, rule 2) */
+#include "unsplit/g3d.h" /* fn_800868A0 (unsplit g3d neighbour, rule 2) */
+#include "g3d/fn_80075DCC.h" /* fn_80077420, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
 /* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `include/gx.h` now that
  * a second `auto` unit (the GX-writer family at 0x800C6F90) needs them too (AGENTS.md -> Conventions,

@@ -22,6 +22,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 #include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
 
