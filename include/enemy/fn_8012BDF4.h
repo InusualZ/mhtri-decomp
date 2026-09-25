@@ -17,6 +17,11 @@ extern "C" {
 #endif
 
 s32 em_act_ck__FP11_ENEMY_WORKUcUc(struct _ENEMY_WORK* work, u8 a, u8 b);
+/* The C++ spelling of the same symbol, for the consumers that must not write the mangling
+ * (docs/plan.md 6.5 rule 9): `enemy/fn_801993E0.cpp`'s `fn_8019E398` calls it. */
+#ifdef __cplusplus
+s32 em_act_ck(struct _ENEMY_WORK* self, u8 a, u8 b);
+#endif
 u32 em_area_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 u32 em_die_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void fn_8012BDF4(struct _ENEMY_WORK* work);

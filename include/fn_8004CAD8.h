@@ -73,6 +73,9 @@ void* fn_80050508(void* pOut);
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
 f32 fn_80050EF4(void* a, void* b);
+/* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
+ * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
+f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 #ifdef __cplusplus
 }
 #endif

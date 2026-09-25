@@ -47,6 +47,7 @@
 #include "unsplit/unknown.h"
 #include "fn_8004CAD8.h"
 #include "mh3_pad.h"
+#include "enemy/fn_801993E0.h" /* fn_8019E960/fn_8019E9AC/fn_8019EA04/fn_8019EC38 */
 
 /* The pooled `.sdata2` floats this range reads (each is a bare marker symbol in the map; the values
  * drive the comparisons/floats below).  Declared, never defined here: the pool belongs to the data
