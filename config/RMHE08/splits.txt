@@ -45,6 +45,11 @@ fn_8004C9A0.cpp:
 	extabindex  start:0x8001ECD8 end:0x8001ECE4
 	.text       start:0x8004C9A0 end:0x8004CAD8
 
+fn_8004CAD8.cpp:
+	extab       start:0x80006CF8 end:0x80007170
+	extabindex  start:0x8001ECE4 end:0x8001F398
+	.text       start:0x8004CAD8 end:0x80054C64
+
 g3d/g3d_anmscn.cpp:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68
