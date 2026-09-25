@@ -831,6 +831,10 @@ config.libs = [
             # nwAddResource/nwDelResource, nwWorkInitialize/nwMoveStart/nwMoveEnd).  Same lib and flags as
             # the game-root system files beside it (cflags_main matches the sound/ef neighbours too).
             Object(NonMatching, "nw_resource.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `8004C9A0` - the user-data
+            # equipment-slot selector (0x8004C9A0..0x8004CAD8), the inverse of the adjacent
+            # `fn_8004CAD8` clear routine; same game-root band, lib and flags as the files above.
+            Object(NonMatching, "fn_8004C9A0.cpp"),
         ],
     },
 ]
