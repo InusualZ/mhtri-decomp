@@ -464,7 +464,17 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-                        Object(NonMatching, "stage/fn_802B2978.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802AD9C0_get_stg_w__Fv.cpp` (`.text` 0x802AD9C0..0x802B2978, 98 functions / 20408 B) -
+            # the stage-work accessors and the block they read (`stage_w`, .bss 0x806B87C0).  Module
+            # `stage` from the code (`get_stg_w`, `get_stg_weapon_work`, `get_stg_eft_col`, and the
+            # `stage_w` name buffer `fn_802B050C` returns) and from the sibling `stage/fn_802B2978.c`;
+            # no `__FILE__` string covers the range and the dump has only `zz_` placeholders, so the
+            # file name is class 3 (brief section 2).  `.text` only: the range references `.bss`
+            # (`stage_w`, `lbl_806BB7A0`) and shares the pool of the earlier units, so no data range
+            # is claimed.
+            Object(NonMatching, "stage/stg_w.cpp"),
+            Object(NonMatching, "stage/fn_802B2978.c"),
         ],
     },
 
