@@ -15,6 +15,11 @@ extern "C" {
 void fn_80116FCC(void* self);
 void fn_80117074(void* self);
 
+/* The eft020 spawner `ef/eft019.cpp`'s actor wrappers call: creates the family-20 record
+ * (`_EFT` from `ef.h`) for `(type, area)` and returns it, or 0 when the area check fails. */
+struct _EFT;
+struct _EFT* fn_80114E34(u8 type, u8 area, f32 scale);
+
 #ifdef __cplusplus
 }
 #endif

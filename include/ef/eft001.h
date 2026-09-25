@@ -17,6 +17,11 @@ extern "C" {
  * spawn handlers call it after they build a rotation matrix for a placed model. */
 void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 
+/* Copies a three-word rotation vector into a `_CP_VECTOR` (`ef/eft007.cpp` and `ef/eft019.cpp` are the
+ * consumers; the owner defines it over the same two pointers). */
+struct _CP_VECTOR;
+void fn_800FC0D4(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
+
 #ifdef __cplusplus
 }
 #endif
