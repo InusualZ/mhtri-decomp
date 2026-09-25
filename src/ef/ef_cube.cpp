@@ -117,6 +117,11 @@ extern f64 lbl_80796258; /* 0x4330000080000000, the u32 -> f64 magic */
  * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
  * map's spelling exactly: tools/units/mangle.py confirms it. */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
+
+/* nw4r::math and effect-library helpers, still `fn_*` in the symbol map.  The target object
+ * references each by its plain map name, so they carry C linkage; a C++ spelling mangles the reloc
+ * (fn_8009C484__FP4Vec3P4Vec3) and it no longer pairs (relocaudit). */
+extern "C" {
 extern void fn_8009C484(Vec3* dst, Vec3* src);
 extern void fn_80051490(Vec3* dst, const Vec3* src);
 extern f32 fn_80050EDC(const Vec3* v);
@@ -124,6 +129,7 @@ extern f32 fn_800A8A08(const void* p);
 extern void fn_80043EA8(Vec3* v);
 extern u16 fn_800A9FB0(u32 a, u16 b, f32 f, void* em);
 extern void fn_800A99B4(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
+}
 
 /* The "em" object this unit is handed: an effect manager. Only the fields the two functions touch are
  * named, and they are named by offset because nothing in the dump names them. */
