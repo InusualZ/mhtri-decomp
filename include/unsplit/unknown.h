@@ -181,6 +181,15 @@ extern SystemWork system_w;
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+#ifdef __cplusplus
+}
+#endif
+
+/* The target objects reference these by their C++ manglings (`get_now_areano__Fv`,
+ * `get_stg_eft_col__FUcUc`, `cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34`, ...), so they are
+ * declared with C++ linkage.  The one remaining C consumer (`sound/fn_800DCFEC.c`) keeps the plain C
+ * declarations below until its own language is resolved (that unit is a follow-up). */
+#ifdef __cplusplus
 u8 get_now_areano();
 u8 get_now_mapno();
 void* res_eft_model_create(struct MHchar* chr, u16 id, u32 arg);
@@ -190,8 +199,16 @@ u8 eftGetKeyAlpha(u8* key, long frame);
 void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
 u16 Get_motion_no(struct _PLW* plw);
 void cpSetRotMatrix(struct _CP_VECTOR* rot, Mtx34* mtx);
-#ifdef __cplusplus
-}
+#else
+u8 get_now_areano();
+u8 get_now_mapno();
+void* res_eft_model_create(struct MHchar* chr, u16 id, u32 arg);
+void* res_eft_model_create_light(struct MHchar* chr, u16 id, u32 a, long b);
+u32 get_stg_eft_col(u8 area, u8 which);
+u8 eftGetKeyAlpha(u8* key, long frame);
+void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
+u16 Get_motion_no(struct _PLW* plw);
+void cpSetRotMatrix(struct _CP_VECTOR* rot, Mtx34* mtx);
 #endif
 
 #ifdef __cplusplus /* C++-only: outside the extern "C" block, so C++ linkage is kept */
