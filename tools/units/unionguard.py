@@ -30,7 +30,16 @@ For every conflicted path the tool prints what each side did (deleted / renamed 
 **non-zero** with the offending paths named, so `applybranch.sh` can stop *before* it stages a tree that
 cannot build.  A tree whose conflicts are all disjoint additions still unions exactly as before.
 
+**A refusal also undoes the apply.**  `applybranch.sh` runs this guard *after* `git apply -3`, which has
+already merged into the index: UU/AA entries for the conflicts and cleanly-applied hunks staged.  Refusing
+and then only printing "resolve these by hand" left `main` mid-conflict - staged files, conflict stages,
+and a `ninja` that cannot regenerate `build.ninja` - until somebody cleaned it up by hand.  So on refusal
+the guard restores every path the branch's diff touched (`git checkout HEAD -- <path>` when HEAD has it,
+a delete when it does not) and runs `git reset` to drop the index stages, printing exactly what it
+restored and anything still dirty.  `--no-cleanup` keeps the old behaviour for a deliberate inspection.
+
     python tools/units/unionguard.py --branch worker/<slug> [--base <ref>] [path ...]
+    python tools/units/unionguard.py --branch worker/<slug> --no-cleanup [--base <ref>] [path ...]
     python tools/units/unionguard.py --selftest
 
 `applybranch.sh` passes the branch and the conflicted paths; with no paths it inspects `git ls-files -u`.
@@ -176,7 +185,73 @@ def classify(cwd: str, path: str, stages: dict[int, str],
     }
 
 
-def report(cwd: str, base: str | None, branch: str | None, paths: list[str]) -> int:
+def diff_paths(cwd: str, base: str | None, branch: str | None) -> list[str]:
+    """Every path the branch's own diff touches, both halves of a rename, in diff order.
+
+    `git apply -3 <merge-base diff>` touches exactly these paths, so undoing them all restores the tree.
+    `--name-status -z` is used so a path with a space (or a rename) parses unambiguously; `--name-only`
+    would drop the source half of a rename.
+    """
+    if not (base and branch):
+        return []
+    fields = _git(cwd, "diff", "--name-status", "-z", "-M", base, branch).decode(
+        "utf-8", "replace").split("\0")
+    paths: list[str] = []
+    i = 0
+    while i < len(fields):
+        status = fields[i]
+        i += 1
+        if not status:
+            continue
+        count = 2 if status[0] in ("R", "C") else 1
+        for _ in range(count):
+            if i < len(fields) and fields[i]:
+                paths.append(fields[i])
+            i += 1
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for path in paths:
+        if path not in seen:
+            seen.add(path)
+            ordered.append(path)
+    return ordered
+
+
+def _in_head(cwd: str, path: str) -> bool:
+    p = subprocess.run(["git", "cat-file", "-e", "HEAD:" + path], cwd=cwd, capture_output=True)
+    return p.returncode == 0
+
+
+def cleanup_applied(cwd: str, base: str | None, branch: str | None
+                    ) -> tuple[list[str], list[str], list[str]]:
+    """Undo `git apply -3 <merge-base diff>` so a refusal leaves a clean tree, not a conflict.
+
+    Every path the diff touched is restored: `git checkout HEAD -- <path>` for a path HEAD has (this also
+    resolves a UU entry back to HEAD's stage-0 blob) and a working-tree delete for a path only the branch
+    adds.  A final `git reset` drops the index stages `git apply -3` wrote, including the cleanly-applied
+    hunks that never conflicted.  Returns (restored, removed, leftover status lines) so the caller prints
+    exactly what happened and reveals anything the cleanup could not fix.
+    """
+    restored: list[str] = []
+    removed: list[str] = []
+    for path in diff_paths(cwd, base, branch):
+        if _in_head(cwd, path):
+            p = subprocess.run(["git", "checkout", "HEAD", "--", path], cwd=cwd, capture_output=True)
+            if p.returncode == 0:
+                restored.append(path)
+        else:
+            target = os.path.join(cwd, path)
+            if os.path.lexists(target):
+                os.remove(target)
+            removed.append(path)
+    subprocess.run(["git", "reset", "-q"], cwd=cwd, capture_output=True)
+    leftover = [line for line in _git(cwd, "status", "--short").decode(
+        "utf-8", "replace").splitlines() if line.strip()]
+    return restored, removed, leftover
+
+
+def report(cwd: str, base: str | None, branch: str | None, paths: list[str],
+           cleanup: bool = True) -> int:
     stages = unmerged(cwd)
     if not paths:
         paths = sorted(stages)
@@ -195,7 +270,27 @@ def report(cwd: str, base: str | None, branch: str | None, paths: list[str]) -> 
     if unsafe:
         print("*** unsafe union: %d path(s): %s" % (
             len(unsafe), ", ".join(f["path"] for f in unsafe)))
-        print("*** resolve these by hand - do not union them.")
+        if cleanup and base and branch:
+            restored, removed, leftover = cleanup_applied(cwd, base, branch)
+            print("*** the apply has been undone - fix the branch's change by hand; do not union them.")
+            for path in restored:
+                print("    restored %s" % path)
+            for path in removed:
+                print("    removed  %s (not in HEAD)" % path)
+            if leftover:
+                print("*** still dirty after cleanup - inspect these by hand:")
+                for line in leftover:
+                    print("    " + line)
+            else:
+                print("*** clean tree: no conflict stages and nothing staged")
+        elif cleanup:
+            print("*** resolve these by hand - do not union them.")
+            print("*** (no --base/--branch given, so the apply could not be undone automatically)")
+        else:
+            print("*** --no-cleanup: leaving the conflicted index in place for inspection.")
+            print("*** resolve these by hand - do not union them:")
+            print("***   git status --short    # UU/AA mark the conflicts")
+            print("***   git diff              # the conflicted hunks")
         return 1
     print("union guard: all conflicted paths are disjoint additions - union is safe")
     return 0
@@ -221,6 +316,33 @@ def _write(cwd: str, name: str, text: str) -> None:
         fh.write(text)
 
 
+def _read(cwd: str, name: str) -> str:
+    with open(os.path.join(cwd, name), encoding="utf-8", newline="") as fh:
+        return fh.read()
+
+
+def _union_file(path: str) -> None:
+    """Local mirror of `.pi/bin/union.py`: ours block, then theirs, for the pass-through test."""
+    with open(path, encoding="utf-8", newline="") as fh:
+        lines = fh.read().replace("\r\n", "\n").split("\n")
+    out, i = [], 0
+    while i < len(lines):
+        if lines[i].startswith("<<<<<<<"):
+            ours, theirs = [], []
+            i += 1
+            while not lines[i].startswith("======="):
+                ours.append(lines[i]); i += 1
+            i += 1
+            while not lines[i].startswith(">>>>>>>"):
+                theirs.append(lines[i]); i += 1
+            i += 1
+            out.extend(ours); out.extend(theirs)
+            continue
+        out.append(lines[i]); i += 1
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write("\n".join(out))
+
+
 def _commit(cwd: str, message: str) -> None:
     _run(cwd, "add", "-A")
     _run(cwd, "commit", "-q", "-m", message)
@@ -230,11 +352,16 @@ def _stages(cwd: str, path: str, sha_map: dict[str, str]) -> None:
     """Build an unmerged index entry directly: sha_map is {stage: blob-sha}.
 
     `git apply -3` cannot express a modify/delete conflict (it aborts instead), so the delete and rename
-    cases are pinned by constructing the same index stages it would leave.  The payload is bytes, not text:
-    the Windows text layer turns `\\n` into `\\r\\n` and git then treats the trailing `\\r` as part of the path.
+    cases are pinned by constructing the same index stages it would leave.  A real conflict has *only*
+    stage 1/2/3 entries, so the path's existing stage-0 entry is cleared first (otherwise the index keeps a
+    stage 0 alongside the conflict stages, which is a state no apply produces).  The payload is bytes, not
+    text: the Windows text layer turns `\\n` into `\\r\\n` and git then treats the trailing `\\r` as part of
+    the path.
     """
-    payload = "".join("100644 %s %s\t%s\n" % (sha, stage, path)
-                      for stage, sha in sorted(sha_map.items())).encode()
+    lines = ["0 0000000000000000000000000000000000000000\t%s\n" % path]
+    lines += ["100644 %s %s\t%s\n" % (sha, stage, path)
+              for stage, sha in sorted(sha_map.items())]
+    payload = "".join(lines).encode()
     p = subprocess.run(["git", "update-index", "--index-info"], cwd=cwd, input=payload,
                        capture_output=True)
     if p.returncode != 0:
@@ -320,6 +447,8 @@ def selftest() -> int:
                            (set(), set()), rename_sets(tmp3, base3, "branch"))
         check("delete-one-side: flagged deleted by ours", finding["ours"], "deleted")
         check("delete-one-side: guard refuses", report(tmp3, base3, "branch", []), 1)
+        check("delete-one-side: cleanup left a clean tree",
+              _run(tmp3, "status", "--porcelain").stdout.strip(), "")
 
     # --- rename pair: the renamed path is conflicted -> refuse ----------------------------------------
     with tempfile.TemporaryDirectory() as tmp4:
@@ -346,6 +475,79 @@ def selftest() -> int:
         check("rename: flagged as renamed", "theirs" in finding["renamed"], True)
         check("rename: flagged as deleted by theirs", finding["theirs"], "deleted")
         check("rename: guard refuses", report(tmp4, base4, "branch", []), 1)
+        check("rename: cleanup left a clean tree",
+              _run(tmp4, "status", "--porcelain").stdout.strip(), "")
+
+    # --- a refusal undoes the apply: clean tree, no UU/AA, nothing staged -----------------------------
+    with tempfile.TemporaryDirectory() as tmp5:
+        _init(tmp5)
+        _write(tmp5, "cfg.txt", "value = 0\n")
+        _write(tmp5, "shared.c", "int keep;\n")
+        _commit(tmp5, "base")
+        _run(tmp5, "checkout", "-q", "-b", "branch")
+        _write(tmp5, "cfg.txt", "value = 1\n")
+        _write(tmp5, "shared.c", "int keep;\nint from_branch;\n")
+        _write(tmp5, "new.c", "int fresh;\n")
+        _commit(tmp5, "branch edits cfg.txt, appends shared.c, adds new.c")
+        _run(tmp5, "checkout", "-q", "main")
+        _write(tmp5, "cfg.txt", "value = 2\n")
+        _commit(tmp5, "main edits cfg.txt")
+        base5 = _run(tmp5, "merge-base", "main", "branch").stdout.strip()
+        check("cleanup: apply landed the conflict",
+              _apply_conflict(tmp5, base5, "branch") in (0, 1), True)
+        head_cfg = _git(tmp5, "show", "HEAD:cfg.txt").decode("utf-8", "replace")
+        check("cleanup: guard refuses", report(tmp5, base5, "branch", []), 1)
+        check("cleanup: no unmerged entries left", _conflict_paths(tmp5), [])
+        check("cleanup: nothing staged or dirty",
+              _run(tmp5, "status", "--porcelain").stdout.strip(), "")
+        check("cleanup: cfg.txt is HEAD's version again", _read(tmp5, "cfg.txt"), head_cfg)
+        check("cleanup: the cleanly-applied hunk was undone too",
+              _read(tmp5, "shared.c"), "int keep;\n")
+        check("cleanup: the branch's added file was removed",
+              os.path.exists(os.path.join(tmp5, "new.c")), False)
+
+    # --- --no-cleanup keeps the conflicted index for a deliberate inspection --------------------------
+    with tempfile.TemporaryDirectory() as tmp6:
+        _init(tmp6)
+        _write(tmp6, "cfg.txt", "value = 0\n")
+        _commit(tmp6, "base")
+        _run(tmp6, "checkout", "-q", "-b", "branch")
+        _write(tmp6, "cfg.txt", "value = 1\n")
+        _commit(tmp6, "branch edits")
+        _run(tmp6, "checkout", "-q", "main")
+        _write(tmp6, "cfg.txt", "value = 2\n")
+        _commit(tmp6, "main edits")
+        base6 = _run(tmp6, "merge-base", "main", "branch").stdout.strip()
+        check("no-cleanup: apply landed the conflict",
+              _apply_conflict(tmp6, base6, "branch") in (0, 1), True)
+        check("no-cleanup: exit stays non-zero",
+              main(["--cwd", tmp6, "--base", base6, "--branch", "branch", "--no-cleanup"]), 1)
+        check("no-cleanup: conflict is still there", _conflict_paths(tmp6), ["cfg.txt"])
+        check("no-cleanup: the stage is still UU",
+              _run(tmp6, "status", "--short").stdout.startswith("UU "), True)
+
+    # --- disjoint additions still pass through and union to both additions ----------------------------
+    with tempfile.TemporaryDirectory() as tmp7:
+        _init(tmp7)
+        _write(tmp7, "reg.txt", "anchor\n")
+        _commit(tmp7, "base")
+        _run(tmp7, "checkout", "-q", "-b", "branch")
+        _write(tmp7, "reg.txt", "anchor\nbranch added\n")
+        _commit(tmp7, "branch append")
+        _run(tmp7, "checkout", "-q", "main")
+        _write(tmp7, "reg.txt", "anchor\nmain added\n")
+        _commit(tmp7, "main append")
+        base7 = _run(tmp7, "merge-base", "main", "branch").stdout.strip()
+        check("disjoint-union: apply landed the conflict",
+              _apply_conflict(tmp7, base7, "branch") in (0, 1), True)
+        check("disjoint-union: guard passes it through", report(tmp7, base7, "branch", []), 0)
+        check("disjoint-union: conflict still present for union.py",
+              _conflict_paths(tmp7), ["reg.txt"])
+        _union_file(os.path.join(tmp7, "reg.txt"))
+        text = _read(tmp7, "reg.txt")
+        check("disjoint-union: union keeps both additions",
+              "main added" in text and "branch added" in text, True)
+        check("disjoint-union: union left no markers", "<<<<<<<" in text, False)
 
     if fails:
         print("unionguard: %d check(s), %d failure(s)" % (checks, len(fails)))
@@ -362,6 +564,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cwd", default=os.getcwd(), help="repository the apply ran in (default: cwd)")
     ap.add_argument("--base", default=None, help="merge-base ref (default: git merge-base main <branch>)")
     ap.add_argument("--branch", default=None, help="the branch being landed")
+    ap.add_argument("--no-cleanup", action="store_true",
+                    help="on refusal, leave the conflicted index in place for inspection")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
 
@@ -372,7 +576,7 @@ def main(argv: list[str] | None = None) -> int:
     if base is None:
         base = (_git(args.cwd, "merge-base", BASE, args.branch).decode("utf-8", "replace").strip()
                 if args.branch else None)
-    return report(args.cwd, base, args.branch, args.paths)
+    return report(args.cwd, base, args.branch, args.paths, cleanup=not args.no_cleanup)
 
 
 if __name__ == "__main__":
