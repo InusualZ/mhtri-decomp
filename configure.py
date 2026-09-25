@@ -808,6 +808,15 @@ config.libs = [
             # own evidenced extent only.  See the file header for the sections and the rule-7 deferral.
             Object(NonMatching, "g3d/g3d_resanmlight.cpp"),   # 0x8008F8E4-0x800908FC
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `800908FC_fn_800908FC` - the nw4r `ResAnmScn` channel getters followed by the
+            # `ResAnmTexPat` accessor/bind cluster (24 functions / 0xE00 B, 0x800908FC-0x800916FC).
+            # The range's own `__FILE__` string is `g3d_resanmscn.cpp` (`.data` 0x80590700, the file
+            # argument of every getter's Panic) and the next TU's is `g3d_resanmtexsrt.cpp`, so the
+            # module is `g3d` and the name is the evidenced TU name; the seam between the two TUs sits
+            # inside the range (see the unit's file header).  Flags are this lib's `cflags_g3d`.
+            Object(NonMatching, "g3d/g3d_resanmscn.cpp"),  # 0x800908FC-0x800916FC
+            Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
             # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass
             # the bare source name "g3d_resanmchr.cpp" (`.data` 0x80590010, the file argument of every
