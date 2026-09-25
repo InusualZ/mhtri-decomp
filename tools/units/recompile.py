@@ -32,6 +32,25 @@ same setting the diff JSON's per-symbol `match_percent` is a different normalisa
 `fuzzy_match_percent`. `report generate` over a one-unit project is the only path that is the report by
 construction, and it costs ~0.04 s.
 
+**A proposal unit measures too** (AGENTS.md, "the proposal-unit measurement gap"). A worker registers a
+fresh proposal in its own worktree first (`configure.py` + `splits.txt`, per the brief) and MAIN has
+neither a ninja rule nor a split object for the range until that registration lands. That used to be the
+end of `--measure`; three workers hand-built a harness each (borrow a sibling's command line, score
+against the retired `auto_*_text.o`, one spent 87 turns on it). Both halves are now the tool's own path,
+and neither MAIN's config nor the worktree is written:
+
+* the **command line** comes from MAIN's ninja (registered), the worktree's ninja (if the worker
+generated one), or - last - a registered sibling in the *same `config.libs` block* of the worktree's
+`configure.py`, with only the source, the `-o` directory and the `-lang` token pointed at this unit.
+Those are the flags `project.py` emits for that lib, not a hand-rolled approximation;
+* the **target object** is MAIN's retired `auto_*_text.o` that owns the symbol's address - the same
+original bytes the split will put in the registered object (`auto_<symbol[:20]>_text.o` for a single
+symbol, else the `auto_<nn>_<address>_text` run that covers it).
+
+The score is still `report generate`'s `fuzzy_match_percent`, and the output names the target object and
+says `[fallback]`, so a worker can tell a real measurement from one against the retired split. A
+*registered* unit takes exactly the path it took before (MAIN's rule, MAIN's object, same output).
+
 `<unit>` is the path from the repository root, e.g. `Pl/pl_act`, `main.cpp`, `auto/80040598_fn_80040598`.
 """
 
@@ -94,15 +113,139 @@ def unit_source(unit: str) -> str:
     return unit if unit.endswith(SRC_EXT) else unit + ".cpp"
 
 
+def _ninja_compile_lines(main: str, unit: str, runner=subprocess.run):
+    """(target, mwcceppc lines, completed process) for a unit, without raising.
+
+    Empty lines is the normal case for a *proposal* unit in MAIN: the source is registered in the
+    worker's worktree, so MAIN's build.ninja has no edge for `build/RMHE08/src/<unit>.o` yet.
+    """
+    target = "build/RMHE08/src/" + os.path.splitext(unit_source(unit))[0] + ".o"
+    p = runner(["ninja", "-t", "commands", target], cwd=main, capture_output=True, text=True,
+               errors="replace")
+    return target, [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l], p
+
+
 def ninja_command(main: str, unit: str, runner=subprocess.run) -> list[str]:
     """The exact compile command MAIN's ninja would run, as tokens."""
-    target = "build/RMHE08/src/" + os.path.splitext(unit_source(unit))[0] + ".o"
-    p = runner(["ninja", "-t", "commands", target], cwd=main, capture_output=True, text=True, errors="replace")
-    lines = [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l]
+    target, lines, p = _ninja_compile_lines(main, unit, runner)
     if not lines:
         raise SystemExit("could not get the compile command for %s from ninja in %s:\n%s%s"
                          % (target, main, p.stdout, p.stderr))
     return unitutil.unquote(lines[-1].split())
+
+
+def _unit_stem(name: str) -> str:
+    """`ef/effect.cpp` / `src/ef/effect.c` / `ef/effect` -> `ef/effect` - registration names and unit
+    spellings differ by prefix and extension, so compare on this."""
+    n = name.replace("\\", "/").strip().lstrip("./")
+    if n.startswith("src/"):
+        n = n[len("src/"):]
+    return os.path.splitext(n)[0]
+
+
+def retarget(tokens: list[str], unit: str) -> list[str]:
+    """Point a borrowed command line at *this* unit's object directory and language.
+
+    MWCC's `-o` is a directory and `project.py` sets it to the source's own directory, and it inserts the
+    `-lang` token from the extension; those are the only two things a same-lib sibling's line gets wrong.
+    Nothing else is touched - the flags stay exactly what ninja printed for the lib.
+    """
+    obj_dir = os.path.join("build", "RMHE08", "src", *unit_source(unit).split("/")[:-1])
+    lang = "-lang=c" if unit_source(unit).lower().endswith(".c") else "-lang=c++"
+    out, i = [], 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "-o" and i + 1 < len(tokens):
+            out += [tok, obj_dir]
+            i += 2
+            continue
+        if tok.startswith("-lang="):
+            out.append(lang)
+            i += 1
+            continue
+        out.append(tok)
+        i += 1
+    return out
+
+
+# One `config.libs` block: its name up to the object list, then the list. The brace-free runs on either
+# side let the block's own comments through - the real `configure.py` puts a long comment between the `{`
+# and the `"lib"` line, and requiring only whitespace there (what `brief.lib_for` does) silently matches
+# just the handful of blocks that have no comment, so those lookups report the lib as `(unknown)`.
+LIB_BLOCK_RE = re.compile(r"\{[^{}]*?\"lib\": \"([^\"]+)\"[^{}]*?\"objects\": \[(.*?)\]\s*,\s*\n\s*\}",
+                          re.S)
+OBJECT_RE = re.compile(r"Object\(\s*\w+\s*,\s*\"([^\"]+)\"")
+
+
+def lib_block(wt: str, unit: str):
+    """(lib name, [object source names]) for the `config.libs` block that registers `unit`.
+
+    Read from the **worktree's** `configure.py` - the registration is the worker's, and it is exactly what
+    MAIN does not have yet. (None, []) when the unit is not registered there.
+    """
+    path = os.path.join(wt, "configure.py")
+    if not os.path.exists(path):
+        return None, []
+    text = open(path, encoding="utf-8", errors="replace").read()
+    want = _unit_stem(unit)
+    for m in LIB_BLOCK_RE.finditer(text):
+        names = OBJECT_RE.findall(m.group(2))
+        if any(_unit_stem(n) == want for n in names):
+            return m.group(1), names
+    return None, []
+
+
+def sibling_for(main: str, wt: str, unit: str, runner=subprocess.run):
+    """(sibling, tokens) - a registered unit in the worktree's lib for `unit`, and its command line.
+
+    Every object in one `config.libs` block shares the `mw_version` and `cflags` `project.py` builds the
+    command from, so a sibling's line IS this unit's flags. Preference is the same module directory and
+    the same extension, so the borrow usually needs no correction at all. Raises with the registration
+    step to run when the unit is not in `configure.py`, or when its lib has no unit MAIN can build.
+    """
+    lib, names = lib_block(wt, unit)
+    want = _unit_stem(unit)
+    if not lib:
+        raise SystemExit(
+            "%s is not registered in %s/configure.py, and MAIN has no compile command for it - a proposal "
+            "unit is measurable only once its own `Object(...)` line and `splits.txt` block are there "
+            "(docs/plan.md: registration comes before the bodies)" % (unit, wt))
+    want_dir, want_ext = os.path.dirname(want), os.path.splitext(unit_source(unit))[1].lower()
+
+    def rank(name: str):
+        stem = _unit_stem(name)
+        return (0 if os.path.dirname(stem) == want_dir else 1,
+                0 if os.path.splitext(name)[1].lower() == want_ext else 1, stem)
+
+    for name in sorted(names, key=rank):
+        stem = _unit_stem(name)
+        if stem == want:
+            continue
+        _target, lines, _p = _ninja_compile_lines(main, stem, runner)
+        if lines:
+            return stem, unitutil.unquote(lines[-1].split())
+    raise SystemExit(
+        "no unit in lib %r (the one %s/configure.py registers %s in) has a compile command in MAIN's "
+        "ninja - a brand-new lib cannot be measured until its registration lands on MAIN"
+        % (lib, wt, unit))
+
+
+def unit_tokens(main: str, wt: str, unit: str, runner=subprocess.run):
+    """(tokens, source) - the real compile command for `unit`, and where it came from.
+
+    In order: MAIN's ninja (the registered unit, unchanged), the worktree's own ninja (a worker who
+    regenerated `build.ninja` after registering), then a registered sibling in the same lib (the proposal
+    path). Only the sibling's line is rewritten, and only its `-c`/`-o`/`-lang` - the flags are the ones
+    ninja printed.
+    """
+    _target, lines, _p = _ninja_compile_lines(main, unit, runner)
+    if lines:
+        return unitutil.unquote(lines[-1].split()), "main"
+    _target, lines, _p = _ninja_compile_lines(wt, unit, runner)
+    if lines:
+        return unitutil.unquote(lines[-1].split()), "worktree"
+    sibling, tokens = sibling_for(main, wt, unit, runner)
+    return retarget(tokens, unit), "sibling %s (same lib)" % sibling
 
 
 def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str], str]:
@@ -362,8 +505,126 @@ def absolutize(tokens: list[str], main: str) -> list[str]:
     return out
 
 
-def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=subprocess.run) -> dict:
-    tokens = ninja_command(main, unit, runner=runner)
+# ---------------------------------------------------------------------------------------------------
+# The target object for a proposal unit: MAIN's retired per-symbol/per-run `auto_*_text.o`
+# ---------------------------------------------------------------------------------------------------
+# A registered unit measures against MAIN's `build/RMHE08/obj/<unit>.o` (the split object). A proposal has
+# no such object until the registration lands, but MAIN *does* still build the range as the `auto_*_text`
+# split objects its previous split produced, with the same original bytes. That is the honest fallback, and
+# it is what each stuck worker re-derived by hand.
+
+SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
+SYMBOL_LINE_RE = re.compile(r"^(\S+)\s*=\s*(.*)$")
+SYMBOL_TEXT_RE = re.compile(r"^\.text:(0x[0-9A-Fa-f]+)$")
+AUTO_RUN_RE = re.compile(r"^auto_\d+_([0-9A-Fa-f]{8})_text$")
+
+
+def text_symbol_addresses(main: str) -> dict:
+    """{name: address} for every `.text` symbol in MAIN's map - the only section `report generate` scores."""
+    out: dict = {}
+    path = os.path.join(main, SYMBOLS_REL)
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding="utf-8", errors="replace"):
+        m = SYMBOL_LINE_RE.match(line.rstrip("\n"))
+        if not m:
+            continue
+        for part in m.group(2).split(";"):
+            a = SYMBOL_TEXT_RE.match(part.strip())
+            if a:
+                out[m.group(1)] = int(a.group(1), 16)
+                break
+    return out
+
+
+def auto_text_runs(main: str) -> list:
+    """[(start, size, object)] for MAIN's retired *run* split objects, ascending by start address.
+
+    dtk names a run `auto_<nn>_<address>_text` (its start in the name) and records its `code_size` in MAIN's
+    `build/RMHE08/config.json`; a run can hold several functions (`fn_80041304` and `fn_8004132C` share
+    `auto_03_80041304_text.o`). A single symbol gets `auto_<symbol[:20]>_text` instead, found by name.
+    """
+    path = os.path.join(main, "build", "RMHE08", "config.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        units = json.load(open(path, encoding="utf-8")).get("units") or []
+    except (ValueError, OSError):
+        return []
+    out = []
+    for u in units:
+        m = AUTO_RUN_RE.match(u.get("name") or "")
+        if m:
+            out.append((int(m.group(1), 16), u.get("code_size") or 0, u.get("object") or ""))
+    out.sort()
+    return out
+
+
+def proposal_target(main: str, symbol: str):
+    """(target object path, note) for `symbol` in a proposal unit, or (None, why not).
+
+    Resolution is by **address**, so a branch that renamed the symbol still finds the object: MAIN's map
+    gives the one name it knows at that address. Two shapes of retired object:
+
+    * the single-symbol object dtk named after the symbol - `auto_<name[:20]>_text.o`. The truncation is
+      dtk's; the existence test plus the name at the address is the test, not a spelling guess;
+    * the run that covers the address - `auto_<nn>_<start>_text.o`, `start <= addr < start + code_size`.
+    """
+    addresses = text_symbol_addresses(main)
+    addr = addresses.get(symbol)
+    if addr is None:
+        return None, ("%s is not a `.text` symbol in MAIN's %s, and the fallback locates the retired split "
+                      "object by address - a symbol this branch renamed has no entry there"
+                      % (symbol, SYMBOLS_REL))
+    objdir = os.path.join(main, "build", "RMHE08", "obj")
+    # 1. a single-symbol object named (by dtk, truncated to 20 chars) after the symbol at this address
+    for name in [symbol] + [n for n, a in addresses.items() if a == addr and n != symbol]:
+        cand = os.path.join(objdir, "auto_%s_text.o" % name[:20])
+        if os.path.exists(cand):
+            return cand, ("retired single-symbol split object %s (%s at 0x%X)"
+                          % (os.path.basename(cand), name, addr))
+    # 2. the run whose range covers the address
+    for start, size, rel in auto_text_runs(main):
+        if start <= addr < start + size:
+            path = os.path.join(main, *rel.replace("\\", "/").split("/"))
+            if os.path.exists(path):
+                return path, ("retired split object %s covers 0x%X-0x%X - the run that owns %s"
+                              % (os.path.basename(rel), start, start + size, symbol))
+    return None, ("0x%X (%s) is not inside any retired `auto_*_text` object in MAIN - it belongs to a "
+                  "already-registered unit or a gap, so MAIN has no original object for it"
+                  % (addr, symbol))
+
+
+def object_has_symbol(obj: str, symbol: str) -> bool:
+    """Whether an object defines `symbol` at all - the check that separates "nothing to pair" from a
+    renamed symbol, both of which `report generate` answers with a null `fuzzy_match_percent`."""
+    try:
+        _secs, syms = unitutil.read_elf(obj)
+    except Exception:
+        return False
+    return any(s[0] == symbol for s in syms)
+
+
+def measure_target(main: str, unit: str, symbol: str):
+    """(target object, kind, note) for `--measure`. `kind` is `registered`, `auto-fallback` or `missing`.
+
+    `registered` is the path a registered unit has always measured against and is decided first, so that
+    path cannot change.
+    """
+    head = os.path.join(main, "build", "RMHE08", "obj", *unit_source(unit).split("/"))
+    registered = os.path.splitext(head)[0] + ".o"
+    if os.path.exists(registered):
+        return registered, "registered", ""
+    found, note = proposal_target(main, symbol)
+    if found is None:
+        return registered, "missing", note
+    return found, "auto-fallback", note
+
+
+def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=subprocess.run,
+                 tokens: list[str] = None) -> dict:
+    if tokens is None:
+        tokens = ninja_command(main, unit, runner=runner)
     cmd, obj = rewrite(tokens, unit, main, wt)
     cmd = absolutize(cmd, main)
     os.makedirs(os.path.dirname(obj), exist_ok=True)
@@ -400,15 +661,41 @@ def main() -> int:
     wt = worktree_root()
     main_wt = args.main or main_root(wt)
     unit = args.unit.strip("/")
-    result = compile_unit(unit, main_wt, wt, dry_run=args.dry_run)
+    tokens, cmd_source = unit_tokens(main_wt, wt, unit)
+    result = compile_unit(unit, main_wt, wt, dry_run=args.dry_run, tokens=tokens)
     result.update({"unit": unit, "worktree": wt, "main": main_wt})
+    if cmd_source != "main":
+        # the registered path must read exactly as it did before; a proposal says where its flags came from
+        result["command_source"] = cmd_source
     target = os.path.join(main_wt, "build", "RMHE08", "obj", *unit_source(unit).split("/"))
     target = os.path.splitext(target)[0] + ".o"
     result["target"] = target
 
-    if args.measure and result.get("compiled") and os.path.exists(target):
-        result["measure"] = measure(target, result["object"], args.measure, unitutil.OBJDIFF,
-                                    os.path.join(wt, "build", "tmp"), unit=unit)
+    if args.measure and result.get("compiled"):
+        target, target_kind, target_note = measure_target(main_wt, unit, args.measure)
+        result["target"] = target
+        if target_kind != "registered":
+            result["target_kind"] = target_kind
+            result["target_note"] = target_note
+        if target_kind == "missing":
+            result["measure"] = {"symbol": args.measure, "error": target_note}
+        else:
+            result["measure"] = measure(target, result["object"], args.measure, unitutil.OBJDIFF,
+                                        os.path.join(wt, "build", "tmp"), unit=unit)
+            m = result["measure"]
+            if target_kind == "auto-fallback" and "error" not in m and m.get("match_percent") is None:
+                # report pairs by name and answers a null (not an error) when pairing fails; say which of
+                # the two causes it is, because the message is what tells the worker where to look
+                if not object_has_symbol(result["object"], args.measure):
+                    m["error"] = ("%s does not define %s (nothing to pair) - MAIN's retired object defines it "
+                                  "at that address, so the unit's own source is what is short"
+                                  % (os.path.basename(result["object"]), args.measure))
+                else:
+                    m["error"] = ("no pairing: %s defines %s, but MAIN's %s spells that address differently - "
+                                  "the report pairs symbols by name, which a renamed symbol breaks"
+                                  % (os.path.basename(result["object"]), args.measure,
+                                     os.path.basename(target)))
+                result.pop("match_percent", None)
 
     if args.json:
         print(json.dumps(result, indent=2))
@@ -423,6 +710,13 @@ def main() -> int:
     print("compiled %s" % result["unit"])
     print("  object  %s  (%d bytes, fresh=%s)" % (result["object"], result["bytes"], result["fresh"]))
     print("  target  %s" % result["target"])
+    if result.get("target_kind") == "auto-fallback":
+        print("  [fallback] MAIN has no split object for %s yet; %s\n             same original bytes, so the"
+              " score is the one the registered unit will report" % (result["unit"], result["target_note"]))
+    elif result.get("target_kind") == "missing":
+        print("  [no target] %s" % result["target_note"])
+    if result.get("command_source"):
+        print("  command %s - real flags from MAIN's ninja" % result["command_source"])
     for name, size in sorted((result.get("sections") or {}).items()):
         print("  %-12s 0x%X" % (name, size))
     if "measure" in result:
