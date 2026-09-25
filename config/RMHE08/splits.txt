@@ -199,6 +199,11 @@ gx/fn_8009ACE4.c:
 	extabindex  start:0x80022B00 end:0x80022B18
 	.text       start:0x8009ACE4 end:0x8009B140
 
+ef/ef_creationqueue.cpp:
+	extab       start:0x80009B40 end:0x80009B60
+	extabindex  start:0x80022CBC end:0x80022CEC
+	.text       start:0x800A3044 end:0x800A388C
+
 ef/ef_emitterform.cpp:
 	extab       start:0x80009DF4 end:0x80009E04
 	extabindex  start:0x80023094 end:0x800230AC

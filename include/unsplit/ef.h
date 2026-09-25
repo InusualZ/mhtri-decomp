@@ -19,6 +19,10 @@ extern "C" {
 #endif
 
 f32 fn_800C9DCC(f32 arg0);
+/* 0x800A7750 - `ef_emitter.cpp`'s per-emitter creation entry, called by the creation queue
+ * (ef/ef_creationqueue.cpp): given the emitter form, the effect handle, the setting record, the
+ * manager, a life and an optional VEC3 position.  No reconstructed owner yet, hence the band. */
+void fn_800A7750(void* form, void* eh, const void* setting, void* manager, u16 life, const void* pos);
 /* 0x800AB740 / 0x800AB658 - the particle owner's teardown entry and the sibling unit's ramp helper
  * (callers: ef/ef_particle.cpp). */
 void* fn_800AB740(void* table, void* self);

@@ -549,6 +549,11 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/800A3044_fn_800A3044` range (0x800A3044..0x800A388C, 7 functions): the NW4R
+            # effect library's creation queue.  The range's own `__FILE__` string (`ef_creationqueue.cpp`
+            # at 0x805922C0) names the TU - see the unit's file header.
+            Object(NonMatching, "ef/ef_creationqueue.cpp"),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The `proposal/800AEE48_fn_800AEE48`
