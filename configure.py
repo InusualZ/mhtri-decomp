@@ -763,6 +763,14 @@ config.libs = [
             # module is `g3d` and the lib's flags are cflags_g3d.  See the file header for the seam and
             # the rule-2 owner header `include/g3d/fn_80063888.h`.
             Object(NonMatching, "g3d/fn_80063888.cpp"),       # 0x80063888-0x800680A8
+            # Registered once, at its final home (docs/plan.md 12): proposal `8005AA28` - the nw4r g3d
+            # `ResMat` accessor cluster (0x8005AA28..0x8005ABD8, 8 functions).  Its own `__FILE__`
+            # string is the accessor header `g3d_resnode_ac.h` (lbl_8058B370, the Panic file argument of
+            # fn_8005AA44), which names the header an inline assert was written in, not the unit - no
+            # `.cpp` string exists for the range, so the file keeps the map's `fn_` stem (class 4).  The
+            # module is `g3d`: every caller is nw4r g3d (`ScnMdl::CopiedMatAccess`, g3d_calcworld.cpp's
+            # fn_80073E8C, g3d_basic.cpp's fn_800D7ED0 twin).  See the file header.
+            Object(NonMatching, "g3d/fn_8005AA28.cpp"),       # 0x8005AA28-0x8005ABD8
         ],
     },
     {
