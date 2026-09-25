@@ -848,8 +848,15 @@ extern "C" void fn_80064988(G3dFlagWord *self, u32 bits, s32 set)
         self->field_0x0C &= ~bits;
 }
 
-extern "C" s32 fn_800649B4(G3dFlagWord *self, u32 bits)
+/* `fn_800649B4` is declared in `include/g3d/fn_80063888.h` with the object as an opaque `void*` (the
+ * ScnMdl pointer `g3d/g3d_scnmdl.cpp`'s fn_8007EA08 passes unchanged, per the target object's
+ * `li r4,4; b` tail call) and this file's definition has to spell the same C-linkage parameter type
+ * or the two declarations collide as illegal overloading.  The body casts to the local
+ * `G3dFlagWord` view, which is the record the target's body reads at +0xC. */
+extern "C" s32 fn_800649B4(void *pSelf, u32 bits)
 {
+    G3dFlagWord *self = (G3dFlagWord *)pSelf;
+
     return (self->field_0x0C & bits) != 0;
 }
 

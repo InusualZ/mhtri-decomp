@@ -52,14 +52,10 @@ void fn_8007A724(void* self, f32 x, f32 y, f32 z);
 u32 fn_8007B5F4(void* pSelf, const u32* pKey);
 void** fn_8007BB8C(void** pOut, const char* pName);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* MHTRI_G3D_FN_80075DCC_H */
 /* The ScnMdl/ScnMdlSimple material and draw-buffer helpers the ScnMdl unit
  * (g3d/g3d_scnmdl.cpp) calls.  Declared here, in the owner's header, once this unit is the owner
- * (rule 2); the consumer includes this header instead of re-declaring them. */
+ * (rule 2); the consumer includes this header instead of re-declaring them.  The target object
+ * references the plain `fn_XXXXXXXX` names, so they sit inside this `extern "C"` block. */
 s32 fn_8007B424(void* pSelf);  /* 0x8007B424 - the material count */
 s32 fn_8007B734(void* pSelf);  /* 0x8007B734 - a name-record reader */
 s32 fn_8007B764(void* pSelf);  /* 0x8007B764 - a name-record reader */
@@ -73,3 +69,8 @@ s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility tes
 void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
                  u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_G3D_FN_80075DCC_H */
