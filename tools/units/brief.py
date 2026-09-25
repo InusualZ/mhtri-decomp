@@ -29,6 +29,15 @@ for every registered unit that has no bodies yet it writes a brief *before* any 
 `tools/units/queue.py next` only has to claim the unit and copy the file. No claim is made and the registry
 is never touched. Re-running is idempotent (existing briefs are skipped) and prunes a brief whose unit has
 gained a body.
+
+**A brief is never written for a range that is not handable work (2026-09-25).** The proposal queue is
+written from the *unclaimed* `.text`, but the file is not regenerated on every landing, so an entry's range
+can be registered by another worker before its brief is pooled - the `proposal/8008F8E4` entry capped
+`0x8008F8E4-0x80097D40`, five translation units, four of them already claimed and live. `--pool` leaves
+such an entry out (and prunes its brief if one exists), single-unit mode refuses it, and both name the unit
+whose range it now overlaps; `queue.py next` therefore only ever offers ranges that are still unclaimed.
+The same test covers a queue that overlaps *itself*: two entries sharing bytes would hand one range to two
+workers, and neither is offered.
 """
 
 from __future__ import annotations
@@ -714,6 +723,74 @@ def proposal_labels(main: str) -> list[str]:
     return [p["label"] for p in proposals(main) if p.get("label")]
 
 
+def registered_text_ranges(main: str) -> list[tuple[int, int, str]]:
+    """Every registered unit's `.text` range from `splits.txt`, as `(start, end, unit)`.
+
+    `queue.py` keeps its own start-only variant for the pool's `covered` state; a brief needs the whole
+    range, because a proposal overlapping *any* part of a live unit is the defect, not only one that
+    starts inside it.
+    """
+    out = []
+    for unit in registered_units(main):
+        rng = splits_range(main, unit)
+        if ".text" in rng:
+            out.append((rng[".text"][0], rng[".text"][1], unit))
+    return sorted(out)
+
+
+def proposal_conflicts(main: str, p: dict) -> list[str]:
+    """Every reason this queue entry must not be handed to a worker - empty when it may be.
+
+    The queue is written from the *unclaimed* `.text`, but the tree moves under it and the file is not
+    regenerated on every landing, so a proposal's range can be registered by another worker before its
+    brief is written. Measured 2026-09-25: the `proposal/8008F8E4` entry capped `0x8008F8E4-0x80097D40` -
+    five translation units, four of them already claimed and live. A brief written for it would set a
+    second worker on four live ranges, so none is written: the range is finished work and `attribute.py
+    queue` re-cuts the region. A range overlapping a *sibling* proposal is the queue's own invariant
+    broken (`attribute.overlap_report`), and is refused the same way rather than handed out twice.
+    """
+    text = p.get("text") or []
+    label = p.get("label", "?")
+    if len(text) != 2:
+        return ["%s: the queue entry carries no .text range" % label]
+    t0, t1 = text
+    out = []
+    for s, e, unit in registered_text_ranges(main):
+        if t0 < e and s < t1:
+            out.append("%s: 0x%08X..0x%08X overlaps %s's registered .text 0x%08X..0x%08X"
+                       % (label, t0, t1, unit, s, e))
+    for q in proposals(main):
+        if q is p or claims.norm_unit(q.get("label") or "") == claims.norm_unit(label):
+            continue
+        qt = q.get("text") or []
+        if len(qt) == 2 and t0 < qt[1] and qt[0] < t1:
+            out.append("%s: 0x%08X..0x%08X overlaps the sibling proposal %s (0x%08X..0x%08X)"
+                       % (label, t0, t1, q.get("label", "?"), qt[0], qt[1]))
+    return out
+
+
+def handable_proposals(main: str) -> tuple[list[dict], list[dict]]:
+    """`(handable, blocked)` - the queue's entries a worker may be given, and the rest with reasons.
+
+    `blocked` carries `why` per entry because a queue entry nobody can take is a *data* defect to fix
+    (`attribute.py queue`), never work to drop silently - `pool` reports every one of them.
+    """
+    handable, blocked = [], []
+    for p in proposals(main):
+        why = proposal_conflicts(main, p)
+        if why:
+            blocked.append(dict(p, why=why))
+        else:
+            handable.append(p)
+    return handable, blocked
+
+
+def proposal_conflict_reasons(main: str, unit: str) -> list[str]:
+    """Why a *named* unit is not handable work, `[]` for a registered unit or a clean proposal."""
+    p = proposal_by_label(main, unit)
+    return proposal_conflicts(main, p) if p is not None else []
+
+
 def build_proposal(main: str, p: dict, task: str | None = None, assume_claim: bool = False) -> dict:
     """The brief data for one proposal. Unit-shaped keys are present but empty/unknown by design.
 
@@ -773,6 +850,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("| language hint | %s |" % _lang_hint(p))
     lines.append("| seam | %s |" % ("**pinned** (%s)" % ", ".join(s.get("kind", "?") for s in seam) if seam
                                      else "**unproven** - this is one maximal unclaimed run"))
+    lines.append("| TU evidence | %s |" % _tu_row(p))
     lines.append("")
     lines.append("**The `src/auto/` scaffolding bucket is retired** (owner, 2026-09-24). Discovery proposed this")
     lines.append("range; it registered nothing. Your first act is to **register it once, at its final home**, and")
@@ -938,14 +1016,32 @@ def _lang_hint(p: dict) -> str:
     return "C++ (a mangled name is in the region)" if p.get("cxx") else "C (no evidence; the default)"
 
 
+def _tu_row(p: dict) -> str:
+    """The §1 line for the queue's TU verdict - what the range's edges rest on, in the worker's words."""
+    probe = p.get("tu") or {}
+    verdict, srcs = probe.get("verdict"), probe.get("sources") or []
+    if verdict == "one-tu":
+        return "one-tu - `%s` spans the range" % (srcs[0] if srcs else "?")
+    if verdict == "partial":
+        return "**partial** - the range cuts `%s`" % (probe.get("partial_source") or "?")
+    if verdict == "multi-tu":
+        return "**multi-tu** - %d names: %s" % (len(srcs), ", ".join("`%s`" % s for s in srcs))
+    if verdict == "merged":
+        return "**merged** - a candidate seam inside `%s` was not taken" % (srcs[0] if srcs else "?")
+    if verdict == "capped":
+        return "**capped** - the edge is a size cap, not a TU boundary (no `__FILE__` evidence)"
+    return "unproven - no accepted `__FILE__` name covers the range"
+
+
 def _tu_warning(p: dict) -> str | None:
     """A plain warning when the range's own evidence does not make it one TU (`attribute.tu_probe`).
 
-    The queue tiles the unclaimed `.text` by size, so a proposal can be a *partial* TU, a union of
-    several, or one file whose internal boundary is a guess - and each of those has cost a worker or a
-    landing cycle. `attribute.tu_probe` reads `tudiscover`'s `__FILE__` anchors, and this is where the
-    verdict reaches the worker, at the top of the brief, before the claim. `None` when the range is one
-    anchored TU (or has no TU evidence at all, which the seam row already states).
+    The queue tiles the unclaimed `.text` by evidence first and size only where no evidence reaches, so a
+    proposal can be a *partial* TU, a union of several, one file whose internal boundary is a guess, or -
+    in a range no `__FILE__` name reaches - a pure `--max-bytes` slice. Each of those has cost a worker or
+    a landing cycle. `attribute.tu_probe` reads `tudiscover`'s anchors and `segments`' notes, and this is
+    where the verdict reaches the worker, at the top of the brief, before the claim. `None` when the range
+    is one anchored TU (or has no TU evidence at all, which the seam row already states).
     """
     probe = p.get("tu") or {}
     verdict = probe.get("verdict")
@@ -967,6 +1063,12 @@ def _tu_warning(p: dict) -> str | None:
                 "may still be two units.** %d candidate seam(s) sit inside one source file's span "
                 "(%s); `python tools/splits/tudiscover.py at 0x%08X` decides before you register."
                 % (len(seams), ", ".join(s.get("why", "?") for s in seams[:3]), at))
+    if verdict == "capped":
+        return ("**WARNING from discovery (TU probe): this range is where `--max-bytes` cut a run that "
+                "offered no `__FILE__` evidence - its edge is a size cap, not a translation-unit "
+                "boundary.** Nothing in the region names a file here; find the real seam with "
+                "`python tools/splits/tudiscover.py at 0x%08X` (or work it as one unit and say why) "
+                "before you register." % at)
     return None
 
 
@@ -1008,10 +1110,17 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
 
     Idempotent: an existing brief is skipped unless `force`. A pooled brief whose proposal has left the queue
     (its range was worked and registered) is pruned, so the pool always equals the current queue.
+
+    An entry whose range is no longer unclaimed - a unit now holds its bytes - is left out and pruned the
+    same way, and comes back in `blocked` with the reason, so a worker is never handed a range another
+    worker already owns (see `proposal_conflicts`).
     """
     queue = proposals(main)
+    blocked: list[dict] = []
     if queue:
-        kind, units = "proposal", proposal_labels(main)
+        kind = "proposal"
+        handable, blocked = handable_proposals(main)
+        units = [p["label"] for p in handable if p.get("label")]
     else:
         kind, units = "unit", pool_units(main)
     outdir = pool_dir(main)
@@ -1035,7 +1144,7 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
             pruned.append({"slug": name[:-3], "unit": brief_unit(path)})
             os.remove(path)
     return {"dir": outdir, "kind": kind, "units": units, "wrote": wrote, "skipped": skipped,
-            "pruned": pruned}
+            "pruned": pruned, "blocked": blocked}
 
 
 def selftest() -> int:
@@ -1150,11 +1259,14 @@ def selftest() -> int:
         check("a proposal brief still says where the report goes",
               "final message" in text and "subagent_done" not in text, True)
 
-        # the TU probe: the queue tags each entry with what `tudiscover`'s source anchors say, and a
-        # range that is not one TU gets a plain warning at the top of the brief (attribute.tu_probe).
+        # the TU probe: the queue tags each entry with what `tudiscover`'s anchors and `segments`' notes
+        # say, and a range that is not one TU gets a plain warning at the top of the brief
+        # (attribute.tu_probe). `capped` is the tag for a range no `__FILE__` name reaches: its edge is
+        # the `--max-bytes` cap, which is a size decision and not a TU boundary.
         for verdict, want in (("multi-tu", "union of translation units"),
                               ("partial", "cuts source file"),
-                              ("merged", "boundary inside this range is a guess")):
+                              ("merged", "boundary inside this range is a guess"),
+                              ("capped", "size cap, not a translation-unit")):
             tagged = dict(entry, tu={"verdict": verdict, "sources": ["a.cpp", "b.cpp"],
                                      "partial_source": "a.cpp",
                                      "open_seams": [{"cut": 3, "why": "a pool jump"}]})
@@ -1168,6 +1280,20 @@ def selftest() -> int:
               "TU probe" not in render_proposal(tmp, build_proposal(tmp, clean, None,
                                                                assume_claim=True), None), True)
         check("an untagged entry gets no TU warning", _tu_warning({}), None)
+        # §1 states what the range's edges rest on, in the worker's words, whether or not it warns
+        check("the §1 table carries the TU evidence row",
+              "| TU evidence |" in render_proposal(tmp, build_proposal(tmp, clean, None,
+                                                                  assume_claim=True), None), True)
+        check("a one-TU range names the file it rests on",
+              _tu_row(clean), "one-tu - `a.cpp` spans the range")
+        check("a capped range says the edge is a size cap",
+              _tu_row({"tu": {"verdict": "capped", "sources": []}}),
+              "**capped** - the edge is a size cap, not a TU boundary (no `__FILE__` evidence)")
+        check("a partial range names the file it cuts",
+              _tu_row({"tu": {"verdict": "partial", "partial_source": "menu_note.cpp"}}),
+              "**partial** - the range cuts `menu_note.cpp`")
+        check("an untagged range says it is unproven",
+              _tu_row({}), "unproven - no accepted `__FILE__` name covers the range")
 
         # the dispatch itself: the round that came back empty was handed a registered-unit brief for a
         # proposal, so single-unit mode must route a proposal to the proposal renderer - from either spelling
@@ -1202,6 +1328,70 @@ def selftest() -> int:
         check("a proposal brief is pruned when the queue drops it",
               [r["unit"] for r in dropped["pruned"]], [claims.norm_unit(entry["label"])])
         check("the pruned brief is gone from disk", os.path.exists(pooled), False)
+
+    # the tree moves under the queue: an entry whose range a unit now holds is NOT handable work. This is
+    # the 8008F8E4 incident - the queue entry capped 0x8008F8E4-0x80097D40, five TUs, four of them already
+    # claimed and live - and a brief written for it would have put a worker on four live ranges (2026-09-25)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "tools", "units"))
+        os.makedirs(os.path.join(tmp, "config", "RMHE08"))
+        stale = {"label": "proposal/8008F8E4_fn_8008F8E4.cpp", "text": [0x8008F8E4, 0x80097D40],
+                 "count": 276, "bytes": 0x847C, "cxx": True, "functions": [], "runs": {}}
+        tail = {"label": "proposal/8017F000_tail.cpp", "text": [0x8017F000, 0x80180080],
+                "count": 4, "bytes": 0x1080, "cxx": True, "functions": [], "runs": {}}
+        live_prop = {"label": "proposal/80161660_fn_80161660.cpp", "text": [0x80161660, 0x801679B0],
+                     "count": 52, "bytes": 25424, "cxx": True, "functions": [], "runs": {}}
+        with open(queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [stale, tail, live_prop]}, fh)
+        with open(os.path.join(tmp, "configure.py"), "w", encoding="utf-8") as fh:
+            fh.write('config.libs = [\n    {\n        "lib": "main",\n        "objects": [\n'
+                     '            Object(NonMatching, "g3d/g3d_resanmlight.cpp"),\n'
+                     '            Object(NonMatching, "g3d/g3d_resmat.cpp"),\n'
+                     "        ],\n    },\n]\n")
+        with open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8") as fh:
+            fh.write("g3d/g3d_resanmlight.cpp:\n\t.text       start:0x8008F8E4 end:0x800908FC\n"
+                     "g3d/g3d_resmat.cpp:\n\t.text       start:0x80180000 end:0x80181000\n")
+        check("a proposal spanning a live unit's .text is a conflict",
+              len(proposal_conflict_reasons(tmp, stale["label"])), 1)
+        check("... and the conflict names the registered unit",
+              "g3d/g3d_resanmlight.cpp" in proposal_conflict_reasons(tmp, stale["label"])[0], True)
+        check("... and the range it holds",
+              "0x8008F8E4..0x800908FC" in proposal_conflict_reasons(tmp, stale["label"])[0], True)
+        check("a proposal that only overlaps a unit's tail is a conflict too",
+              "g3d/g3d_resmat.cpp" in proposal_conflict_reasons(tmp, tail["label"])[0], True)
+        check("a proposal with no overlap is not a conflict",
+              proposal_conflict_reasons(tmp, live_prop["label"]), [])
+        handable, blocked = handable_proposals(tmp)
+        check("the handable list drops the covered proposals",
+              [p["label"] for p in handable], [live_prop["label"]])
+        check("... and reports each one with a reason",
+              [b["label"] for b in blocked], [stale["label"], tail["label"]])
+        out = pool(tmp)
+        check("the pool writes no brief for a covered proposal",
+              out["wrote"], [live_prop["label"]])
+        check("the pool's work list is the handable set", out["units"], [live_prop["label"]])
+        check("the pool reports what it blocked", [b["label"] for b in out["blocked"]],
+              [stale["label"], tail["label"]])
+        check("no brief exists for a blocked proposal",
+              os.path.exists(os.path.join(pool_dir(tmp), claims.slug(stale["label"]) + ".md")), False)
+        # a brief pooled before the range was registered is pruned, so it cannot be promoted later either
+        os.makedirs(pool_dir(tmp), exist_ok=True)
+        open(os.path.join(pool_dir(tmp), claims.slug(stale["label"]) + ".md"), "w").write(
+            "# Proposal brief: %s\n" % stale["label"])
+        out = pool(tmp)
+        check("a stale pooled brief is pruned",
+              [r["unit"] for r in out["pruned"]], [claims.norm_unit(stale["label"])])
+        check("... and it is gone from disk",
+              os.path.exists(os.path.join(pool_dir(tmp), claims.slug(stale["label"]) + ".md")), False)
+        # two entries sharing bytes are the queue's own invariant broken: neither is handed out
+        with open(queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [live_prop, dict(live_prop,
+                                                                label="proposal/80167900_other.cpp",
+                                                                text=[0x80167900, 0x80169000])]}, fh)
+        check("two overlapping proposals are both refused", len(handable_proposals(tmp)[0]), 0)
+        check("... and both are reported", len(handable_proposals(tmp)[1]), 2)
+        check("... naming the sibling they overlap",
+              "sibling" in handable_proposals(tmp)[1][0]["why"][0], True)
 
     # the brief's own schema table is what a worker follows, so an outbox shaped by it must validate clean
     from units import handoff as handoff_mod
@@ -1379,10 +1569,26 @@ def main() -> int:
         print("  pruned   %d  (unit has a body now, or is no longer registered)" % len(out["pruned"]))
         for row in out["pruned"]:
             print("      - %s  (%s)" % (row["unit"] or "?", row["slug"]))
+        print("  blocked  %d  (range no longer unclaimed, or the queue overlaps itself)"
+              % len(out.get("blocked") or []))
+        for row in out.get("blocked") or []:
+            print("      x %s" % row["why"][0])
+            for why in row["why"][1:]:
+                print("        %s" % why)
         return 0
     if not args.unit:
         ap.print_help()
         return 0
+
+    why = proposal_conflict_reasons(main, args.unit)
+    if why:
+        print("refusing to brief %s - it is not handable work (nothing was written):" % args.unit)
+        for w in why:
+            print("  - %s" % w)
+        print("  A proposal is work to hand out, and this range is no longer unclaimed (or the queue's own")
+        print("  tiling overlaps itself). Re-run `python tools/units/attribute.py queue <start> <end>` over")
+        print("  the region - `python tools/units/brief.py --pool` follows it - then take a live proposal.")
+        return 1
 
     wt = rc.worktree_root()
     b, text = brief_for(main, wt, args.unit, args.task)

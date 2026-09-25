@@ -21,6 +21,8 @@ Usage:
     python tools/units/attribute.py plan 0x80040598 0x800408A8
     python tools/units/attribute.py plan 0x80040598 0x800408A8 --json
     python tools/units/attribute.py queue 0x80040598 0x800408A8
+    python tools/units/attribute.py queue 0x80003100 0x80600000 --max-total-bytes 0
+    python tools/units/attribute.py queue 0x80040598 0x800408A8 --replace-region
     python tools/units/attribute.py --selftest
 
 `plan` is read-only. `queue` caps and validates the batch, then writes the **proposal queue**
@@ -28,6 +30,17 @@ Usage:
 That is option A (owner, 2026-09-24) - the `src/auto/` scaffolding bucket is retired, and the worker that
 takes a proposal registers the unit at its final `src/<module>/<name>.<ext>` home, from the evidence it has
 by then. So neither `plan` nor `queue` touches `splits.txt`, `configure.py` or `src/`.
+
+**`queue` rewrites the whole file, so a sub-region run is opt-in (2026-09-25).** The queue *is* one
+region's tiling, not an append log: a run over `[start, end)` writes the proposals that region supports and
+nothing else. That default is destructive - `queue 0x8008F8E4 0x80097D40` used to take a 419-entry queue
+down to 1, and the file had to be restored by hand - so `queue` now refuses unless the run would *lose no
+coverage*: every proposal already in the file must stay covered by the new proposals plus the ranges
+`splits.txt` already owns. A re-cut of the same region (a better tiler, fresh evidence) loses nothing and
+still passes; a narrower region, a `--limit` or a live `--max-total-bytes` cap that drops the tail is
+refused, naming what it would discard and the `--replace-region` flag that overrides the refusal. The
+guard reads the region, not the byte count: the destructive act is a range disappearing, and the error
+names it.
 
 `apply` is the **retired** behaviour - it wrote the `splits.txt` blocks, the `configure.py` objects and a
 stub source per unit under `src/auto/`. It now refuses unless `--legacy-register` is passed, which exists
@@ -67,6 +80,20 @@ proposal also carries `tu_probe()`'s verdict - `one-tu`, `partial` (a range edge
 `multi-tu` (a union) or `merged` (one file with a swallowed seam inside) - which `brief.py --pool`
 turns into a plain warning at the top of the brief. The probe reads `an`, which `load()` already
 builds, so it needs no cache of its own; a whole-queue plan pays ~10 s.
+
+**A proposal's range is TU-bounded, and two proposals never overlap (2026-09-25).** A byte budget is not a
+translation-unit boundary, and neither is a claim boundary: the `--max-total-bytes`/`--max-bytes` caps and
+the `--min-bytes` merge are heuristics that fill the gaps *between* the evidence, so they may no longer
+cross it. A byte cap or a min-bytes merge that would land inside an accepted `__FILE__` name slides to that
+file's own edge instead (`segments`), a piece that starts at a name is never merged into its predecessor,
+and a piece whose range the cap could not cut without splitting a file is emitted whole and flagged (its
+`tu` verdict is `capped` when it has no TU evidence at all, which is the honest label for "this edge is a
+size decision"). The region's own edges are part of the same rule: a function that straddles `end` is not
+part of the region (it belongs to the next one), so two adjacent runs cannot each claim its bytes.
+`overlap_report` is the invariant in one function - no proposal overlaps another proposal, and none
+overlaps a range `splits.txt` already owns - and `propose` emits through it, dropping (and reporting) a
+range that would break it rather than writing it. A stale queue entry that overlaps a unit another worker
+has registered since is the same defect seen from the consumer's side; `brief.py` refuses to brief it.
 
 **The language (docs/plan.md, "The language comes from the symbol").** The extension a stub is named
 with is not cosmetic: `dtk` turns it into the front-end flag (`-lang=c` / `-lang=c++`), so a new unit's
@@ -169,11 +196,83 @@ def claimed_text() -> list[tuple[int, int, str]]:
     return sorted(out)
 
 
-def in_claimed(addr: int, claimed: list[tuple[int, int, str]]) -> tuple[int, int, str] | None:
+def claimed_overlap(addr: int, size: int,
+                    claimed: list[tuple[int, int, str]]) -> tuple[int, int, str] | None:
+    """The claimed range a function's *own bytes* intersect, if any - a start test is not enough.
+
+    A start test is not enough: a function whose bytes run into a claimed range (a boundary defect in
+    `splits.txt`, or a region given with an `end` inside a function) would still be proposed, and the
+    proposal would then overlap a translation unit that is already live. A proposal's range must never
+    do that, so the partitioner takes the function's whole `[addr, addr + size)` span.
+    """
     for s, e, u in claimed:
-        if s <= addr < e:
+        if addr < e and s < addr + size:
             return (s, e, u)
     return None
+
+
+def merge_intervals(ranges) -> list[tuple[int, int]]:
+    """`ranges` as the minimal sorted set of disjoint half-open intervals covering the same addresses."""
+    out: list[tuple[int, int]] = []
+    for s, e in sorted(ranges):
+        if s >= e:
+            continue
+        if out and s <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out
+
+
+def interval_covered(merged: list[tuple[int, int]], start: int, end: int) -> bool:
+    """Whether `[start, end)` sits inside one of `merged`'s disjoint intervals ("is already covered")."""
+    return any(s <= start and end <= e for s, e in merged)
+
+
+def overlap_report(proposals: list[dict], claimed=()) -> list[str]:
+    """Every way a batch breaks the one invariant a proposal queue must hold - empty when it holds.
+
+    Two proposals must never overlap: the tiler walks maximal *unclaimed* runs and cuts each one, so the
+    ranges are disjoint by construction, and this is what keeps them that way when a region edge, a cap or
+    a repair changes. No proposal may overlap a range `splits.txt` already owns either - a proposal there
+    is stale (the range is live work under another name) and handing it out sets two workers on one range,
+    the 8008F8E4 incident: that entry capped five TUs, four of them already claimed and live.
+    """
+    out: list[str] = []
+    spans = sorted((tuple(p["text"]), p["unit"]) for p in proposals)
+    for (s, e), unit in spans:
+        for cs, ce, cu in claimed:
+            if s < ce and cs < e:
+                out.append("%s: 0x%08X..0x%08X overlaps %s's registered .text 0x%08X..0x%08X"
+                           % (unit, s, e, cu, cs, ce))
+    for i, ((s, e), unit) in enumerate(spans):
+        for (s2, e2), unit2 in spans[:i]:
+            if s < e2 and s2 < e:
+                out.append("%s: 0x%08X..0x%08X overlaps %s's 0x%08X..0x%08X"
+                           % (unit, s, e, unit2, s2, e2))
+    return sorted(set(out))
+
+
+def drop_overlaps(proposals: list[dict], claimed=()) -> tuple[list[dict], list[str]]:
+    """`(kept, dropped)` - the lowest-address proposal of every overlap wins, the rest are not emitted.
+
+    `propose` returns through this, so an overlapping range is *never* written to the queue: the earlier
+    proposal wins (it is the one a worker is likelier to have taken already) and the loser is reported,
+    because a silent drop is the destructive default this tool is being fixed for. Address order, so the
+    result is deterministic.
+    """
+    kept: list[dict] = []
+    dropped: list[str] = []
+    for p in sorted(proposals, key=lambda p: tuple(p["text"])):
+        why = overlap_report([p], claimed) + [
+            "%s: 0x%08X..0x%08X overlaps %s earlier in the batch" % (p["unit"], p["text"][0],
+                                                                    p["text"][1], q["unit"])
+            for q in kept if p["text"][0] < q["text"][1] and q["text"][0] < p["text"][1]]
+        if why:
+            dropped.extend(why)
+            continue
+        kept.append(p)
+    return kept, dropped
 
 
 def placeholder(first: str, addr: int, cxx: bool) -> str:
@@ -220,6 +319,16 @@ def accepted_sources(an) -> list[dict]:
     """
     return sorted((r for r in an.get("source_names", ()) if not r.get("reject")),
                   key=lambda r: r["lo"])
+
+
+def is_source_seam(why) -> bool:
+    """Whether a cut's own evidence is an accepted `__FILE__` start - a TU boundary, not a pool guess.
+
+    The distinction the size repairs turn on: a piece starting at a name *is* that file's first piece
+    (however small the file is), while a piece starting at a pool jump is a candidate cut the merge may
+    take back.
+    """
+    return bool(why) and any(k == "source" for k, _ in why)
 
 
 def source_owner(an, index: int) -> str | None:
@@ -304,8 +413,15 @@ def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
     are one file (join them, because a candidate seam inside a file is not a boundary). Everything a
     region offers as evidence is used first; the repairs only apply where there is none.
 
-    Returns `[(lo_i, hi_i, why, note)]`; `tu_probe` re-reads the seams inside each piece to warn a
-    worker that the range may still be two TUs.
+    The two size repairs are bounded by the evidence, because **a byte budget is not a TU boundary**
+    (2026-09-25): a piece that starts at an accepted name is never merged leftward (the name is the TU,
+    however small the file turns out to be), and neither the cap nor the merge may cut inside one. When
+    the cap can end a piece at the edge of a file at or below its byte position, that *is* the cut; when
+    the file itself is over the cap the cut slides out of it and the piece is emitted whole, flagged.
+    `tu_probe` re-reads the seams inside each piece and gives the size-only edges their own verdict, so
+    what the evidence could not decide never reads as if it had.
+
+    Returns `[(lo_i, hi_i, why, note)]`.
     """
     seams = interior_seams(an, lo, hi)
     cuts = sorted(seams) + [hi]
@@ -314,19 +430,42 @@ def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
         if c > prev:
             parts.append((prev, c, seams.get(c) if c != hi else None))
             prev = c
-    # merge from the left: a too-small part joins the part before it (or the one after, if it is first)
+    # merge from the left: a too-small part joins the part before it (or the one after, if it is first) -
+    # unless the cut it would lose is an accepted source start, which is a TU boundary and not a pool
+    # guess. `why` is the seam at a part's *end*, so the cut a merge removes is the previous part's.
     merged: list[list] = []
-    for lo_i, hi_i, why in parts:
+    for k, (lo_i, hi_i, why) in enumerate(parts):
         size = an["addr"][hi_i - 1] + an["size"][hi_i - 1] - an["addr"][lo_i]
-        if merged and size < min_bytes:
+        if merged and size < min_bytes and not is_source_seam(parts[k - 1][2] if k else None):
             merged[-1][1] = hi_i
             merged[-1][2] = None          # the seam it was cut at is gone, so the union has no pin
         else:
             merged.append([lo_i, hi_i, why])
     # split from the left: a part over the cap is cut at the cap, flagged as a guess - but never inside a
-    # must-link anchor, which is the one cut the evidence forbids outright (the anchor is the TU)
+    # must-link anchor or an accepted `__FILE__` name, which are the two cuts the evidence forbids outright
+    srcs = [(r["lo"], r["hi"], r["src"]) for r in accepted_sources(an)]
+
+    def split_source(c: int) -> str | None:
+        """The accepted `__FILE__` name a cut at `c` would split in two, if any."""
+        for r_lo, r_hi, src in srcs:
+            if r_lo < c <= r_hi:
+                return src
+        return None
+
     def legal(c: int) -> bool:
-        return not any(a < c <= b for a, b, _ in an["must_link"])
+        return not any(a < c <= b for a, b, _ in an["must_link"]) and split_source(c) is None
+
+    def end_of_source(lo_i: int, at: int) -> tuple[int, str] | None:
+        """The last cut at or before `at` that ends an accepted `__FILE__` name, with its name.
+
+        The edge the cap should end a piece on: a byte budget is not a TU boundary, so when a file ends
+        at or below the cap the piece ends where the file does (and is *smaller* than the cap).
+        """
+        best = [r_hi + 1 for r_lo, r_hi, _src in srcs if lo_i < r_hi + 1 <= at and legal(r_hi + 1)]
+        if not best:
+            return None
+        cut = max(best)
+        return cut, next(src for _lo, r_hi, src in srcs if r_hi + 1 == cut)
 
     out = []
     for lo_i, hi_i, why in merged:
@@ -338,19 +477,33 @@ def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
                 else:
                     break
             at = best or lo_i + 1           # a single function over the cap is still one function
+            edge = end_of_source(lo_i, at)
+            if edge is not None:
+                # a file ends at or below the cap: end the piece where the file does, not at a byte
+                at, src = edge
+                out.append((lo_i, at, why, "ends at the edge of source file %s, not at the byte cap" % src))
+                lo_i, why = at, None
+                continue
             while at < hi_i and not legal(at):
-                at += 1                      # slide out of an anchor, even past the cap
+                at += 1                      # slide out of an anchor or a file, even past the cap
             if at >= hi_i:
-                out.append((lo_i, hi_i, why, "over --max-bytes with no legal cut - kept whole"))
+                src = split_source(hi_i - 1)
+                note = "over --max-bytes with no legal cut - kept whole" if src is None else \
+                    "over --max-bytes inside one source file (%s) - the file is the TU, kept whole" % src
+                out.append((lo_i, hi_i, why, note))
                 break
-            out.append((lo_i, at, why, "capped at --max-bytes, seam is a guess"))
+            src = split_source(best or lo_i + 1)
+            note = "capped at --max-bytes, seam is a guess" if at == best else \
+                "over --max-bytes: the cut is the edge of %s, not a byte position" % \
+                ("source file %s" % src if src else "a must-link anchor")
+            out.append((lo_i, at, why, note))
             lo_i, why = at, None
         else:
             out.append((lo_i, hi_i, why, None))
     return owner_merge(an, out, max_bytes)
 
 
-def tu_probe(an, lo_i: int, hi_i: int) -> dict:
+def tu_probe(an, lo_i: int, hi_i: int, note: str | None = None) -> dict:
     """What `tudiscover`'s own evidence says about this range - one TU, part of one, or several.
 
     The queue's cut is a heuristic, so a proposal is checked against the evidence that does name a TU:
@@ -358,7 +511,9 @@ def tu_probe(an, lo_i: int, hi_i: int) -> dict:
     is a *partial* TU (the range's edge is inside a file); two names are a *union* of TUs; a candidate
     seam left inside the range is `merged` - the range may still be two TUs and no source name says so
     (this is the g3d_calcvtx case: a pool run jump inside one file's span). No name at all is
-    `unproven`, which is the honest label for a region with no TU evidence.
+    `unproven`, which is the honest label for a region with no TU evidence - and when the range's edge is
+    the `--max-bytes` cap rather than any evidence (`note`, from `segments`) it is `capped`, because a
+    byte budget is not a boundary either.
     """
     t0 = an["addr"][lo_i]
     t1 = an["addr"][hi_i - 1] + an["size"][hi_i - 1]
@@ -384,6 +539,10 @@ def tu_probe(an, lo_i: int, hi_i: int) -> dict:
         verdict = "merged"
     elif inside:
         verdict = "one-tu"
+    elif note and "--max-bytes" in note:
+        # the edge is a byte budget, not evidence: the region has no `__FILE__` name to bound it, so the
+        # honest label is the cap itself rather than a size masquerading as a translated file
+        verdict = "capped"
     else:
         verdict = "unproven"
     return {"sources": inside, "partial_source": partial, "open_seams": open_seams,
@@ -391,24 +550,33 @@ def tu_probe(an, lo_i: int, hi_i: int) -> dict:
 
 
 def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_BYTES_DEFAULT,
-            max_bytes: int = MAX_BYTES_DEFAULT) -> list[dict]:
+            max_bytes: int = MAX_BYTES_DEFAULT, claimed=None) -> list[dict]:
     """One proposal per unit the region's evidence supports, in address order.
 
     The walk is over maximal *unclaimed* runs of functions inside `[start, end)`, not over seeds: a run
     is partitioned at its pinned seams, and a run with no evidence stays one unit (bounded by
     `--max-bytes`), because one function per file is certainly wrong while one file per region is only
     unproven. Every proposal says which of the two it is.
+
+    The region is half-open **on function boundaries**: a function whose last byte is past `end` is not
+    part of this region (it belongs to the next one), so two adjacent runs can never both claim its bytes -
+    the same rule the run walk applies to the ranges `splits.txt` already owns, taking a function's whole
+    span rather than its start. Two proposals that overlap, or that overlap a registered unit, are not
+    emitted at all (`drop_overlaps` reports them); with today's evidence the tiling is disjoint by
+    construction, and this is the invariant that keeps it so. `claimed` is `claimed_text()`'s shape,
+    injectable so the selftest can partition without the repo's `splits.txt`.
     """
-    ordered, claimed = an["ordered"], claimed_text()
+    ordered = an["ordered"]
+    claimed = claimed_text() if claimed is None else claimed
     runs, i = [], 0
     while i < len(ordered):
-        addr = an["addr"][i]
-        if addr < start or addr >= end or in_claimed(addr, claimed):
+        addr, size = an["addr"][i], an["size"][i]
+        if addr < start or addr + size > end or claimed_overlap(addr, size, claimed):
             i += 1
             continue
         j = i + 1
-        while (j < len(ordered) and an["addr"][j] < end
-               and not in_claimed(an["addr"][j], claimed)):
+        while (j < len(ordered) and an["addr"][j] + an["size"][j] <= end
+               and not claimed_overlap(an["addr"][j], an["size"][j], claimed)):
             j += 1
         runs.append((i, j))
         i = j
@@ -434,10 +602,13 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
                 "language": language,
                 "seam": None if why is None else [{"kind": k, "why": w} for k, w in why],
                 "seam_note": note,
-                "tu": tu_probe(an, lo_i, hi_i),
+                "tu": tu_probe(an, lo_i, hi_i, note),
                 "runs": data,
             })
-    return out
+    kept, dropped = drop_overlaps(out, claimed)
+    for why in dropped:
+        print("dropped: %s" % why, file=sys.stderr)
+    return kept
 
 
 def human(proposals: list[dict]) -> None:
@@ -811,6 +982,62 @@ def queue_doc(proposals: list[dict], cap: int, fingerprints: dict | None = None)
     }
 
 
+def queue_guard(path: Path | None, fresh: list[dict], claimed, replace_region: bool = False,
+                ) -> str | None:
+    """Why this `queue` run would lose proposals - `None` when it may write (the destructive default).
+
+    `queue` writes the *whole* file for the region it was given, so a run over a sub-region silently
+    discards every other proposal: `queue 0x8008F8E4 0x80097D40` took a 419-entry queue down to 1, and the
+    file had to be restored by hand. The refusal is a *coverage* test rather than an equality test, because
+    a legitimate re-run does re-cut: the region's proposals change whenever the tiler or the evidence does
+    (`429 -> 230` proposals was one such re-cut), and what must never happen is a range the file proposed
+    being left with no proposal and no registration to hold it. Every existing entry must stay covered by
+    the fresh proposals plus the ranges `splits.txt` already owns; when one does not, the refusal names it.
+    `--replace-region` overrides - the flag is the opt-in the destructive default was missing.
+    """
+    path = path or QUEUE_PATH
+    if replace_region or not path.exists():
+        return None
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None                       # an unreadable queue is not something to refuse *over*
+    old = [p for p in (doc.get("units") or []) if isinstance(p.get("text"), list)
+           and len(p["text"]) == 2]
+    if not old:
+        return None
+    keep = merge_intervals([tuple(p["text"]) for p in fresh]
+                           + [(s, e) for s, e, _u in claimed])
+
+    def lost(p: dict) -> bool:
+        """Whether this entry held a *function* the rewrite leaves unowned.
+
+        Function starts, not the entry's whole range: the bytes between two functions belong to nobody
+        (padding inside `.text`), so a re-cut that lands there drops no work - and the range of an entry
+        written before `functions` was recorded falls back to the whole range.
+        """
+        fns = [f for f in (p.get("functions") or []) if isinstance(f, dict) and "address" in f]
+        if fns:
+            return not all(any(s <= f["address"] < e for s, e in keep) for f in fns)
+        return not interval_covered(keep, p["text"][0], p["text"][1])
+
+    dropped = [p for p in old if lost(p)]
+    if not dropped:
+        return None
+    fns = [f for p in dropped for f in (p.get("functions") or [])
+           if isinstance(f, dict) and "address" in f]
+    t0 = min([f["address"] for f in fns] + [p["text"][0] for p in dropped])
+    t1 = max([f["address"] + f.get("size", 0) for f in fns] + [p["text"][1] for p in dropped])
+    first = dropped[0]
+    return ("refusing to rewrite %s: it holds %d proposal(s) this run would drop (%d of %d), and `queue`\n"
+            "  writes the *whole* queue for the region it is given - 0x%08X..0x%08X is not covered by the\n"
+            "  new proposals or by a registered unit. First dropped: %s (0x%08X..0x%08X).\n"
+            "  Regenerate a region that covers the queue (a re-cut of the same region is allowed), or pass\n"
+            "  --replace-region to replace the whole file anyway."
+            % (path, len(dropped), len(dropped), len(old), t0, t1, first.get("label", "?"),
+               first["text"][0], first["text"][1]))
+
+
 def write_queue(proposals: list[dict], cap: int, path: Path | None = None,
                 dry_run: bool = False) -> int:
     """Write the proposal queue - discovered units as work, never as registrations (option A).
@@ -926,6 +1153,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--legacy-register", action="store_true",
         help="the retired behaviour: write src/auto stubs plus the configure.py and splits.txt entries. "
              "Option A forbids it; it exists only to reproduce a batch landed before 2026-09-24.")
+    parsers["queue"].add_argument(
+        "--replace-region", action="store_true",
+        help="rewrite the whole queue even when the region does not cover the proposals already in it. "
+             "`queue` writes the whole file, so a run that would drop a range is refused without this "
+             "flag (the destructive default is opt-in).")
     return ap
 
 
@@ -942,6 +1174,14 @@ def main() -> int:
 
     start, end = int(args.start, 0), int(args.end, 0)
     fns, labels, graph, an = load()
+    straddling = [(an["addr"][i], an["ordered"][i]) for i in range(len(an["ordered"]))
+                  if start <= an["addr"][i] < end and an["addr"][i] + an["size"][i] > end]
+    if straddling:
+        # the region is half-open on function boundaries: say so instead of dropping a function silently
+        print("note: %d function(s) start inside the region but end past 0x%08X (%s at 0x%08X) - the\n"
+              "      region is half-open on function boundaries, so they belong to the next one; pass an\n"
+              "      `end` on a function edge to include them"
+              % (len(straddling), end, straddling[0][1], straddling[0][0]), file=sys.stderr)
     props = propose(an, fns, labels, graph, start, end, args.min_bytes, args.max_bytes)
     if args.limit:
         props = props[:args.limit]
@@ -955,6 +1195,11 @@ def main() -> int:
         cap_report(kept, detail, args.max_total_bytes, file=sys.stderr if args.json else sys.stdout)
         return 0
     if args.cmd == "queue":
+        reason = queue_guard(QUEUE_PATH, kept, claimed_text(), args.replace_region)
+        if reason:
+            print(reason, file=sys.stderr)
+            print("nothing written", file=sys.stderr)
+            return 1
         cap_report(kept, detail, args.max_total_bytes)
         return write_queue(kept, args.max_total_bytes, dry_run=args.dry_run)
     if not args.legacy_register:
