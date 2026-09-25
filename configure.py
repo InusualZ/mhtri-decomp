@@ -924,6 +924,19 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_scnmdlsmpl.cpp"),   # 0x8007F0E4-0x800813B8
             Object(NonMatching, "g3d/g3d_scnobj.cpp"),       # 0x800813B8-0x800827E4
             Object(NonMatching, "g3d/g3d_scnroot.cpp"),      # 0x800827E4-0x8008452C
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8009A748_fn_8009A748` - the nw4r g3d CPU-side display-list copy/fill helpers
+            # (2 functions / 0x330 B, 0x8009A748..0x8009AA78).  `g3d`/`.cpp` from the range's own
+            # `__FILE__` string (`.data` 0x80591860 = "g3d_cpu.cpp", the file argument of every
+            # `nw4r::db::Panic` assert in both bodies), so the lib is `g3d` and the file takes its
+            # evidenced TU name (class 1 in the brief).  `langcheck` agrees: the name is a `.cpp` and
+            # the `Panic__Q24nw4r2dbFPCciPCce` relocation is a C++ mangling, so the unit is
+            # `src/g3d/g3d_cpu.cpp` in this lib.  Every caller of the range is nw4r g3d
+            # (fn_80075DCC, g3d_state.cpp, g3d_resfile.cpp and the g3d_resmat band).  Sections:
+            # `.text` 0x8009A748-0x8009AA78, `extab` 0x800099E0-0x800099F0, `extabindex`
+            # 0x80022AAC-0x80022AC4; the boundaries are fn_8009A720 before (a different TU) and
+            # gx/fn_8009AA78.c at 0x8009AA78 after.
+            Object(NonMatching, "g3d/g3d_cpu.cpp"),           # 0x8009A748-0x8009AA78
         ],
     },
     {
