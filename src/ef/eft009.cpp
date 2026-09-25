@@ -62,6 +62,7 @@
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef/fn_80104BD0.h"
+#include "ef/fn_80105314.h"
 #include "unsplit/ef.h"
 
 /* ---------------------------------------------------------------------------------------------------

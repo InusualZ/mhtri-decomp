@@ -25,6 +25,14 @@ void fn_800DA93C(Vec3* pos);
 void fn_800DA95C(Vec3* pos);
 void fn_800DCB18(s32 id, Vec3* pos);
 void fn_800DB608(u8 flag, Vec3* pos, u8 arg);
+/* Merged 2026-09-25 (ef/fn_80105314 batch): the two per-position sound requests the enemy-effect
+ * dispatch (`fn_80105564`) tail-calls. */
+void fn_800DC60C(nw4r::math::VEC3* pos, u32 mode);
+void fn_800DB964(nw4r::math::VEC3* pos);
+/* Merged 2026-09-25 (ef/fn_80105314 batch): the per-position sound requests the enemy-effect
+ * state-0 handlers call. */
+void fn_800DC6D8(nw4r::math::VEC3* pos, u32 mode);
+void fn_800DB974(void* src, nw4r::math::VEC3* pos);
 #ifdef __cplusplus
 }
 #endif

@@ -288,6 +288,11 @@ ef/fn_80104BD0.c:
 	extabindex  start:0x80025E78 end:0x80025E84
 	.text       start:0x80104BD0 end:0x80105314
 
+ef/fn_80105314.cpp:
+	extab       start:0x8000BFBC end:0x8000C1F4
+	extabindex  start:0x80025E84 end:0x800261D8
+	.text       start:0x80105314 end:0x8010BDE4
+
 ef/fn_8010D1A8.c:
 	extab       start:0x8000C25C end:0x8000C32C
 	extabindex  start:0x80026274 end:0x800263AC
