@@ -44,6 +44,7 @@
 
 #include "types.h"
 #include "unsplit/ef.h"
+#include "fn_8004CAD8.h"       /* fn_80050BC0 - that unit owns the address and publishes it (rule 2) */
 
 /* A 3-float vector. */
 typedef struct Vec {
@@ -110,7 +111,6 @@ extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
 extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
 extern f32  fn_800A8A08(void* progress);
-extern f32  fn_80050BC0(f32 a, f32 b);
 extern f32  fn_80463F10(f32 a, f32 b);
 }
 
@@ -160,7 +160,9 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         t = fn_800A8A08(&em->progress);
         rate = params->rate_pct / 100.0f;
         if (flags & 0x01000000) {
-            factor = fn_80050BC0(t + (1.0f - t) * (rate * rate), 1.0f - t);
+            /* One argument, not two: the callee (0x80050BC0) reads only f1.  Retail's f2 at
+             * 0x800CBD20 is the hoisted `1.0f - t` the else branch reuses (0x800CBD3C). */
+            factor = fn_80050BC0(t + (1.0f - t) * (rate * rate));
         } else {
             factor = t + rate * (1.0f - t);
         }

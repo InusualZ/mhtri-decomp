@@ -23,6 +23,25 @@ u32 fn_80051570(u32);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
  * owns the address). */
 f32 fn_8005220C(f32 value);
+/* The VEC3 helpers this range owns, added when `src/ef/ef_util.cpp` registered as a consumer (rule 2).
+ * Signatures are the owners' own bodies, not the call sites' guesses: 0x80050EDC is the squared length
+ * (`ps_mul`/`ps_madd`/`ps_sum0` of the vector with itself), 0x80050F24 the length (`PSVECMag`),
+ * 0x80051424 the scale-by-scalar (`out = in * s`), 0x80051820 the cross product (returns `out`),
+ * 0x80052214 the dot product, 0x80050BC0 the square root (`x * FrSqrt(x)`). */
+f32 fn_80050EDC(const f32* v);
+f32 fn_80050F24(const f32* v);
+void fn_80051424(f32* out, const f32* in, f32 s);
+f32* fn_80051820(f32* out, const f32* a, const f32* b);
+f32 fn_80052214(const f32* a, const f32* b);
+/* 0x80050BC0 - the square root: `x * FrSqrt(x)` for x > 0, 0 for x == 0, and a `nw4r::db::Warning`
+ * for x < 0.  ONE float argument, settled from the callee's own body (it reads only f1 and never
+ * touches f2), not from the call sites: the `f2` a retail caller materialises before the call is the
+ * hoisted common subexpression `1.0f - t` that its `else` branch reuses (ef_disc 0x800CCA7C/0x800CCA98,
+ * ef_cylinder 0x800CBD20/0x800CBD3C).  The `(f32, f32)` spelling this symbol used to carry in
+ * `include/ef.h` was the wrong view and made every TU including both headers fail to compile. */
+f32 fn_80050BC0(f32 x);
+/* 0x80050CF4 - the SDK vector subtract (`ps_sub` on two paired loads): `dst = a - b`. */
+void PSVECSubtract(f32* dst, const f32* a, const f32* b);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved
  * out of that unit's local extern block on landing, 2026-09-25). */
 void fn_800504D4(void* pOut);
