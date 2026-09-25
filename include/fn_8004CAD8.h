@@ -81,6 +81,13 @@ void* fn_80050508(void* pOut);
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
 f32 fn_80050EF4(void* a, void* b);
+/* 0x80050CA0 - subtracts two `VEC3`s (r3 the out, r4/r5 the two inputs): the consumer's
+ * `fn_8012BDF4.cpp` range calls it as `(out, a, b)` and its own `fn_80050EF4` does the same.  Moved here
+ * from `enemy/fn_801B0010.cpp` on landing (rule 2): this unit owns the address. */
+void fn_80050CA0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+/* 0x80050F80 - the distance between two positions, answered in f1 (r3/r4 the two `VEC3*`); moved here
+ * from `enemy/fn_801B0010.cpp` on landing (rule 2). */
+f32 fn_80050F80(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 /* 0x80050EAC - the squared-distance helper: r3 is the reference record and r4 the `VEC3*` position it
  * measures (`enemy/fn_8012BDF4.cpp` declares it `(void*, VEC3*)` and reads its f1; the two other
  * consumers pass a record pointer plus a vector).  Added by `enemy/fn_801B0010.cpp` (rule 2): this
