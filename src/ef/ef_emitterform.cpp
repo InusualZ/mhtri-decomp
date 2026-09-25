@@ -50,12 +50,16 @@ extern f64 lbl_80796048; /* 0x4330000080000000, the int -> f64 magic  .sdata2 */
 extern f32 lbl_80796058; /* 65535.0f                .sdata2 */
 
 /* nw4r::math helpers, all still `fn_*` in the symbol map and unsplit (no owner file to move the
- * declaration to - the rule-2 gap the campaign records for an unsplit address). */
-extern void fn_8005050C(void* mtx);                                    /* unit matrix */
-extern void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);               /* Euler rotation */
-extern void fn_800514FC(void* out, const void* mtx, const void* in);   /* mulVecMat */
-extern void fn_80051424(void* out, const void* in);                    /* copy */
-extern void fn_800513CC(void* out, const void* a, const void* b);      /* blend */
+ * declaration to - the rule-2 gap the campaign records for an unsplit address).  The target object
+ * references them by their plain `fn_XXXXXXXX` map name, so they are declared with C linkage here;
+ * a C++ spelling mangles them and the reloc no longer pairs (relocaudit). */
+extern "C" {
+void fn_8005050C(void* mtx);                                    /* unit matrix */
+void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);               /* Euler rotation */
+void fn_800514FC(void* out, const void* mtx, const void* in);   /* mulVecMat */
+void fn_80051424(void* out, const void* in);                    /* copy */
+void fn_800513CC(void* out, const void* a, const void* b);      /* blend */
+}
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling, and declaring the C++ spelling is
  * what reproduces the map's symbol exactly (tools/units/mangle.py). */
