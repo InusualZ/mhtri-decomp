@@ -7,8 +7,10 @@
 The guard exists because a plain ours-then-theirs union is only safe for **disjoint additions**; on a
 delete, a rename, or both sides editing the same region it silently writes a tree that cannot build
 (measured 2026-09-25: `configure.py` registered both halves of a rename; ten shared g3d headers unioned into
-"illegal function overloading").  The four cases below are the contract: the first three must be refused,
-the disjoint union must still succeed.  Every case builds a real git repo and a real unmerged index - no
+"illegal function overloading").  The cases below are the contract: every unsafe case must be refused, and
+the disjoint union must still pass through and union.  A refusal must also undo the `git apply -3` that
+`applybranch.sh` has already run - clean tree, no UU/AA, nothing staged - while `--no-cleanup` keeps the
+conflicted index for inspection.  Every case builds a real git repo and a real unmerged index - no
 repository state, no build, no mocks.
 """
 from __future__ import annotations
