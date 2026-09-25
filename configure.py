@@ -815,6 +815,13 @@ config.libs = [
             # file name is evidenced by the `__FILE__` string `mh3_pad.cpp` (0x80580EF0) that its own
             # `fn_80041AA4` assert references; same lib and flags as the game-root system files beside it.
             Object(NonMatching, "mh3_pad.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80047398` - the character
+            # face/skin TPL render unit (117 functions / 0x5610 B, 0x80047398..0x8004C9A0).  Game-root
+            # band: the link neighbour `mh3_pad.cpp` ends at 0x80047398 and this unit's link neighbours
+            # are the `main` lib's root files, so it takes their lib and flags.  The name stays the map's
+            # `fn_80047398` stem - no `__FILE__` string and no runtime-dump name exists for the range
+            # (class 3/4 in the brief; see the file header).
+            Object(NonMatching, "fn_80047398.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `800D45AC` - the
             # resource/"work" manager (RESmemAlloc/RESmemFree/pull_res_mem/push_res_mem, ckResourceName,
             # nwAddResource/nwDelResource, nwWorkInitialize/nwMoveStart/nwMoveEnd).  Same lib and flags as

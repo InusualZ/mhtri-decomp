@@ -35,6 +35,11 @@ mh3_pad.cpp:
 	.text       start:0x800408A8 end:0x80047398
 	.ctors      start:0x8056F2C4 end:0x8056F2C8
 
+fn_80047398.cpp:
+	extab       start:0x80006A90 end:0x80006CF0
+	extabindex  start:0x8001E948 end:0x8001ECD8
+	.text       start:0x80047398 end:0x8004C9A0
+
 g3d/g3d_anmscn.cpp:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68
