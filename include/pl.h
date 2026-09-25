@@ -115,8 +115,8 @@ typedef struct _PLW _PLW;
 typedef struct _PLW_PHYSICS _PLW_PHYSICS; /* defined in ef/fn_80114E34.cpp; only pointed at here */
 struct _PLW {
     /* +0x000 */ u8 slot_active;   /* the slot is in use (`fn_800EFAC0`/`fn_800EFDD8`) */
-    /* +0x001 */ u8 pad_0x001[0x1];
-    /* +0x002 */ u8 unk2;
+    /* +0x001 */ u8 field_0x001;
+    /* +0x002 */ u8 field_0x002;
     /* +0x003 */ u8 unk003[0x008 - 0x003];
     /* +0x008 */ u8 chunk_ofs;     /* plus 0x14 is the chunk index its files go to */
     /* +0x009 */ u8 unk009;
@@ -348,7 +348,8 @@ struct _PLW {
     /* +0x5A2 */ u8 unk5A2[0x5A4 - 0x5A2];
     /* +0x5A4 */ u16 field_0x5A4;
     /* +0x5A6 */ u8 unk5A6;
-    /* +0x5A7 */ u8 unk5A7[0x5BB - 0x5A7];
+    /* +0x5A7 */ u8 field_0x5A7;
+    /* +0x5A8 */ u8 pad_0x5A8[0x5BB - 0x5A8];
     /* +0x5BB */ u8 unk5BB;
     /* +0x5BC */ u8 unk5BC[0x5C4 - 0x5BC];
     /* +0x5C4 */ u8 unk5C4;
@@ -379,7 +380,9 @@ struct _PLW {
     /* +0x662 */ s16 field_0x662;
     /* +0x664 */ u16 field_0x664;
     /* +0x666 */ u16 field_0x666;
-    /* +0x668 */ u8 pad_0x668[0x494];
+    /* +0x668 */ u8 pad_0x668[0x48C];
+    /* +0xAF4 */ _se_w* field_0xAF4;
+    /* +0xAF8 */ _se_w* field_0xAF8;
     /* +0xAFC */ _se_w* field_0xAFC;
     /* +0xB00 */ u8 pad_0xB00[0x20];
 };

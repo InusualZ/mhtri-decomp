@@ -724,6 +724,12 @@ lobby/fn_80212810.cpp:
 	extabindex  start:0x8002DD38 end:0x8002E1A0
 	.text       start:0x80212810 end:0x80219260
 
+Pl/fn_80229ECC.cpp:
+	extab       start:0x80011C7C end:0x80011C84
+	extabindex  start:0x8002E9A4 end:0x8002E9B0
+	.text       start:0x80229ECC end:0x80230FBC
+	.data       start:0x805C15A8 end:0x805C1F94
+
 Pl/fn_80241558.cpp:
 	extab       start:0x80011CC4 end:0x80011CCC
 	extabindex  start:0x8002EA10 end:0x8002EA1C

@@ -26,6 +26,17 @@ struct _PLW;
 }
 #endif
 
+/* 0x8026FD94 - the master action predicate `Pl/fn_80229ECC.cpp` gates on; the owner defines it
+ * `extern "C"` (its map name is unmangled). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+struct _PLW;
+u32 fn_8026FD94(struct _PLW* self);
+#ifdef __cplusplus
+}
+#endif
+
 /* `Pl/pl_master.cpp` defines it at C++ scope and the target object references
  * `Pl_master_ck__FP4_PLW`, so it is declared with C++ linkage (relocaudit). */
 #ifdef __cplusplus
