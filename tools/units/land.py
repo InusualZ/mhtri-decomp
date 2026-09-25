@@ -210,6 +210,24 @@ def message_error(subject: str | None) -> str | None:
     return None
 
 
+def branch_error(main: str) -> str | None:
+    """Refuse to run the gate anywhere but `main`.
+
+    The incident (2026-09-24): a worker told to "branch and commit there" ran
+    `git checkout -b tools/stylelint-rule2-unsplit` in MAIN's checkout, so MAIN's HEAD left `main` and the
+    next **14 landings** went onto that branch while the `main` ref sat at `e3ade082`. Nothing failed -
+    `.pi/bin/applybranch.sh` and `land.py` both key off `main` - but a stale `main` silently changes what
+    they *mean*: the merge-base slides backwards and the branch's diff starts describing already-landed
+    units, re-applying them or listing them as deletions (it nearly deleted landed units the same day). The
+    gate names the branch it found and refuses before any check runs.
+    """
+    branch = git(["rev-parse", "--abbrev-ref", "HEAD"], main).strip()
+    if branch != "main":
+        return ("HEAD is on %r, not main: `git checkout main` first - a batch landed off main puts its "
+                "commits on the wrong ref and slides the merge-base" % branch)
+    return None
+
+
 def changed_status(main: str) -> list[tuple[str, str]]:
     """[(status, path)] for every change git reports, untracked files listed individually (`-uall`)."""
     out = git(["status", "--porcelain", "-uall"], main)
@@ -731,6 +749,8 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message;
     * an empty or whitespace-only `--message` is refused before the gate runs (`message_error`): the empty
       shell substitution that expanded `$(cat /tmp/msg1.txt)` must not silently land the fallback subject;
+    * a HEAD that is not `main` is refused before the gate runs (`branch_error`): a land run off `main` moves
+      the wrong ref, and every later merge-base and branch diff is computed against a stale `main`;
     * the commit uses the gate's own message, so there is no separate `git commit -F` to get wrong;
     * the commit is `git commit -F msg -- <the batch's paths>`: no pathspec means the whole index, which
       swept another stream's staged edit into a land twice on 2026-09-23 (`85f3d4b5`, `d50fdd32`). Paths the
@@ -748,6 +768,12 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         # a refusal must not leave a message `git commit -F .git/land_msg.txt` could pick up (2026-09-23)
         clear_land_message(main)
         print("REFUSED %s | %s" % (",".join(norm_units), bad_message))
+        return 1
+    bad_branch = branch_error(main)
+    if bad_branch:
+        # same rule as the message guard: a refusal leaves no committable message and touches nothing
+        clear_land_message(main)
+        print("REFUSED %s | %s" % (",".join(norm_units), bad_branch))
         return 1
     with contextlib.redirect_stdout(sys.stderr):
         gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
@@ -1117,6 +1143,31 @@ def selftest() -> int:
     check("summary delta", summary({"closed": 284, "matched": 217}, {"closed": 290, "matched": 223}),
           "closed 284 -> 290, matched 217 -> 223")
     check("summary tolerates a missing side", summary({}, {}), "(ledger numbers unavailable)")
+
+    # the branch guard: `land` runs on `main`, never on a worker's branch. The incident (2026-09-24): a worker
+    # told to "branch and commit there" ran `git checkout -b tools/stylelint-rule2-unsplit` in MAIN's checkout,
+    # so MAIN's HEAD left `main` and the next 14 landings went onto that branch while the `main` ref sat at
+    # `e3ade082`. `applybranch.sh` and `land.py` both key off `main`, so a stale `main` does not fail - it
+    # silently changes what their diff means. The gate must refuse before any check runs.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        repo_commit(tmp, "claim-time main")
+        check("landing on main passes the branch guard", branch_error(tmp), None)
+        repo_git(tmp, "checkout", "-q", "-b", "throwaway-check")
+        err = branch_error(tmp)
+        check("a land off main is refused", err is not None, True)
+        check("... the refusal names the branch it found", "throwaway-check" in (err or ""), True)
+        check("... and tells the caller to checkout main", "git checkout main" in (err or ""), True)
+        # the refusal path itself: exit 1, no gate, and the stale message is cleared like every other refusal
+        import io
+        write_land_message(tmp, "land: stale batch\n")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = land(tmp, ["Pl/pl_act"], None, no_build=True, subject="x")
+        check("a land off main refuses with exit 1", code, 1)
+        check("... the refusal names the branch", "throwaway-check" in buf.getvalue(), True)
+        check("... and the stale message is cleared", os.path.exists(land_message_path(tmp)), False)
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:

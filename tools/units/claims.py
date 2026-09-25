@@ -434,6 +434,40 @@ def load_ack(main: str, unit: str) -> dict:
         return {}
 
 
+def _git_quiet(args: list[str], cwd: str) -> str | None:
+    """`git <args>`'s stripped stdout, or `None` when git fails (a temp dir in the selftests, no repo)."""
+    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, errors="replace")
+    return p.stdout.strip() if p.returncode == 0 else None
+
+
+def ack_place_error(main: str, unit: str, cwd: str | None = None) -> str | None:
+    """Refuse an ack that comes from the wrong tree or the wrong branch - or `None` when it is right.
+
+    `ack` is a worker's proof that it is the right agent in the right place, so it must also prove the
+    *place*: the tree it runs in must be the worktree the claim records, and its HEAD must be the claim's
+    branch. Measured 2026-09-24: a worker told to "branch and commit there" ran `git checkout -b` in MAIN's
+    checkout, so MAIN's HEAD left `main` and 14 landings followed it (`land.py` now refuses that too). An ack
+    from MAIN, or from a worktree on a throwaway branch, would have named the mistake the moment it happened.
+
+    `None` when there is no claim to prove against (an unclaimed unit) or when git cannot be asked, so the
+    heartbeat itself never depends on a git that is unavailable.
+    """
+    record = registry_record(main, unit)
+    want_wt, want_branch = record.get("worktree"), record.get("branch")
+    if not want_wt or not want_branch:
+        return None
+    here = cwd or os.getcwd()
+    top = _git_quiet(["rev-parse", "--show-toplevel"], here)
+    branch = _git_quiet(["rev-parse", "--abbrev-ref", "HEAD"], here)
+    if top is None or branch is None:
+        return None
+    if not _same_path(top, want_wt):
+        return "the ack is not in the claim's worktree (expected %s, found %s)" % (want_wt, top)
+    if branch != want_branch:
+        return "the ack's HEAD is not the claim's branch (expected %s, found %s)" % (want_branch, branch)
+    return None
+
+
 def ack(unit: str, main: str, agent: str | None = None, pane: str | None = None,
         progress: str | None = None) -> dict:
     """A worker's heartbeat: its FIRST action, and again after every measured iteration.
@@ -447,8 +481,16 @@ def ack(unit: str, main: str, agent: str | None = None, pane: str | None = None,
     process in the pane as `HERDR_PANE_ID`, and the brief's `--pane <your-pane>` cannot be filled in by an
     agent that does not know its own id. Omitting them records the real pane, which is what the stall rule
     matches on - a wrong value only costs the pane safety net, never the ack itself.
+
+    Before it writes anything, it proves the *place* too (`ack_place_error`): the tree it runs in must be
+    the worktree the claim records, and its HEAD must be the claim's branch. An ack from MAIN, or from a
+    worktree on a throwaway branch, is refused and names what it found.
     """
     unit = unit.strip("/")
+    place = ack_place_error(main, unit)
+    if place:
+        raise SystemExit("REFUSED ack %s | %s: run the ack from inside the claim's worktree, on its branch"
+                         % (unit, place))
     path = ack_path(main, unit)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data = load_ack(main, unit) or {"unit": unit}
@@ -1313,6 +1355,31 @@ def selftest() -> int:
         registry[unit_name] = {"branch": branch, "worktree": wt}
         save_registry(main, registry)
         return branch, wt
+
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        branch, wt = claimed(main, unit)
+        # ack is where a worker proves it is in the right place: the claim's worktree, on the claim's branch
+        check("ack_place_error accepts the claim's worktree and branch", ack_place_error(main, unit, wt), None)
+        wrong_tree = ack_place_error(main, unit, main)
+        check("ack from MAIN is refused", wrong_tree is not None, True)
+        check("... and names the claim's worktree",
+              wt.replace("\\", "/") in (wrong_tree or "").replace("\\", "/"), True)
+        check("... and the tree it found",
+              main.replace("\\", "/") in (wrong_tree or "").replace("\\", "/"), True)
+        # the right tree, the wrong branch
+        repo_git(wt, "checkout", "-q", "-b", "throwaway-check")
+        wrong_branch = ack_place_error(main, unit, wt)
+        check("ack on the wrong branch is refused", wrong_branch is not None, True)
+        check("... and names the claim's branch", branch in (wrong_branch or ""), True)
+        check("... and the branch it found", "throwaway-check" in (wrong_branch or ""), True)
+        # ack() itself refuses from the wrong place and leaves no heartbeat behind
+        try:
+            ack(unit, main, agent="w-a")
+            check("ack refuses from the wrong place", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("ack refuses from the wrong place", "REFUSED ack" in str(exc), True)
+        check("... and writes no heartbeat", load_ack(main, unit).get("agent"), None)
 
     with tempfile.TemporaryDirectory() as tmp:
         main = new_repo(tmp)
