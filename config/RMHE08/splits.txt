@@ -29,6 +29,12 @@ fn_80040598.cpp:
 	extabindex  start:0x8001E588 end:0x8001E5A0
 	.text       start:0x80040598 end:0x800408A8
 
+mh3_pad.cpp:
+	extab       start:0x80006820 end:0x80006A90
+	extabindex  start:0x8001E5A0 end:0x8001E948
+	.text       start:0x800408A8 end:0x80047398
+	.ctors      start:0x8056F2C4 end:0x8056F2C8
+
 g3d/g3d_anmscn.cpp:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68

@@ -80,7 +80,8 @@ typedef struct SystemWork {
     /* +0x00C */ u32 field_0x0c;
     /* +0x010 */ u8 pad_0x10[0x8];
     /* +0x018 */ u16 field_0x18[4];   /* ran_suu's u16 ring, cells +0x18/+0x1A/+0x1C/+0x1E */
-    /* +0x020 */ u8 pad_0x20[0x2];
+    /* +0x020 */ u8 field_0x20;
+    /* +0x021 */ u8 field_0x21;
     /* +0x022 */ u8 field_0x22;      /* fn_800CFD20: < 2 selects the C64 path */
     /* +0x023 */ u8 pad_0x23[0x1];
     /* +0x024 */ u8 game_mode;        /* GameMode_set/GameMode_ck (values < 4) */
@@ -93,7 +94,11 @@ typedef struct SystemWork {
     /* +0x02C */ u8 field_0x2c;      /* fn_800D2108: 1 or 2, the hbm state */
     /* +0x02D */ u8 pad_0x2d[0x3];
     /* +0x030 */ u8 field_0x30;
-    /* +0x031 */ u8 pad_0x31[0x1B];
+    /* +0x031 */ u8 field_0x31;
+    /* +0x032 */ u8 field_0x32;
+    /* +0x033 */ u8 field_0x33[4]; /* per-channel WPAD motor state */
+    /* +0x037 */ u8 field_0x37[4]; /* per-channel WPAD motor timer */
+    /* +0x03B */ u8 pad_0x3b[0x11];
     /* +0x04C */ u32 field_0x4c;
     /* +0x050 */ u8 pad_0x50[0x10];
     /* +0x060 */ u32 field_0x60;      /* MEMCreateExpHeapEx base */
@@ -116,7 +121,8 @@ typedef struct SystemWork {
     /* +0x7D3 */ u8 field_0x7d3;    /* fn_800D0708: == 1 */
     /* +0x7D4 */ u8 pad_0x7d4[0x1];
     /* +0x7D5 */ u8 field_0x7d5;
-    /* +0x7D6 */ u8 pad_0x7d6[0xA];
+    /* +0x7D6 */ u8 pad_0x7d6[0x6];
+    /* +0x7DC */ u8 field_0x7dc[4]; /* per-channel motor-on state */
     /* +0x7E0 */ u8 field_0x7e0[4];
     /* +0x7E4 */ u8 field_0x7e4[4];
     /* +0x7E8 */ u8 pad_0x7e8[0x7B];
@@ -125,7 +131,8 @@ typedef struct SystemWork {
     /* +0x865 */ u8 unk2149;
     /* +0x866 */ u8 field_0x866;
     /* +0x867 */ u8 field_0x867;      /* TPLtexLoad group: loading display flag */
-    /* +0x868 */ u8 pad_0x868[0x3];
+    /* +0x868 */ u8 field_0x868;
+    /* +0x869 */ u8 pad_0x869[0x2];
     /* +0x86B */ u8 field_0x86b;      /* hbm_enable: == 1 keeps the menu suppressed */
     /* +0x86C */ u8 pad_0x86c[0x2];
     /* +0x86E */ u8 unk2158;

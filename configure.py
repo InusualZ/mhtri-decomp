@@ -809,6 +809,12 @@ config.libs = [
             # evidenced - the unit is defined by its extab group (see the file header comment).
             Object(Matching, "sys_mem.cpp"),
             Object(NonMatching, "fn_80040598.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `800408A8` - the game-root
+            # pad / mode file (initKPAD/shutdownKPAD/setWpadCallback, get_ControlType/get_rcSwitch_*,
+            # GameModeExec/VsGameModeExec/ArenaSelExec, disp_beta, setSoftresetFlag).  Its original source
+            # file name is evidenced by the `__FILE__` string `mh3_pad.cpp` (0x80580EF0) that its own
+            # `fn_80041AA4` assert references; same lib and flags as the game-root system files beside it.
+            Object(NonMatching, "mh3_pad.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `800D45AC` - the
             # resource/"work" manager (RESmemAlloc/RESmemFree/pull_res_mem/push_res_mem, ckResourceName,
             # nwAddResource/nwDelResource, nwWorkInitialize/nwMoveStart/nwMoveEnd).  Same lib and flags as
