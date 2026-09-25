@@ -658,6 +658,14 @@ config.libs = [
             # .text 0x800A388C..0x800A40F4.
             Object(NonMatching, "ef/ef_draworder.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/800A40F4_fn_800A40F4` range (0x800A40F4..0x800A56B0, 39 functions): the NW4R
+            # effect library's `nw4r::ef::Effect` object (its table lbl_80592588, the create/retire
+            # paths, the emitter sweeps and the EffectSystem constructor/destructor).  The range's own
+            # `__FILE__` string (`ef_effect.cpp` at 0x80592430) names the TU - see the unit's file
+            # header.  Sections: extab 0x80009BA0..0x80009C38, extabindex 0x80022D4C..0x80022E30,
+            # .text 0x800A40F4..0x800A56B0.
+            Object(NonMatching, "ef/ef_effect.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
             # `proposal/800A56B0_fn_800A56B0` range (0x800A56B0..0x800A6350, 23 functions): the game side
             # of the NW4R effect library's system object.  The range's own `__FILE__` string
             # (`ef_effectsystem.cpp` at 0x80592698) names the TU - see the unit's file header.  Sections:
