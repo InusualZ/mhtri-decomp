@@ -34,6 +34,12 @@ u32 fn_80062750(void *out, void *key);     /* 0x80062750 - the resource-table lo
 u32 fn_8005DC24(u32 *p);                   /* 0x8005DC24 - loads the word at +0x0 of `p`, +4 */
 void *fn_8005B1E4(void *self, u32 value);  /* 0x8005B1E4 - stores `value` at +0x0 of `self`, returns `self` */
 
+/* Added when `g3d/g3d_resanmchr.cpp` registered (rule 2): the `ResAnmChr` channel evaluators call
+ * back into this cluster's frame/rate helpers.  Types are the ones the target bodies imply. */
+f32 fn_800610AC(f32 value);                /* 0x800610AC - the reciprocal helper */
+void *fn_800618BC(void *self);             /* 0x800618BC - the resource-table base */
+s32 fn_800628C8(void *self, s32 key);      /* 0x800628C8 - the table entry lookup */
+
 #ifdef __cplusplus
 }
 #endif

@@ -19,6 +19,11 @@ extern "C" {
 /* 0x80043EA8 - writes a 0xC-byte float vector record through `sub`. */
 void fn_80043EA8(void *sub);
 
+/* Added when `g3d/g3d_resanmchr.cpp` registered (rule 2): the `ResAnmChr` walkers copy 3-float
+ * records and normalise them through this unit's helpers. */
+void fn_80041E40(void *dst, const void *src); /* 0x80041E40 - copies a 0xC-byte record */
+void fn_80041E8C(f32 *out, f32 x, f32 y, f32 z);     /* 0x80041E8C - builds a record from three floats */
+
 #ifdef __cplusplus
 }
 #endif
