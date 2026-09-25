@@ -123,14 +123,15 @@ void fn_80306D6C(void* self, s32 a, void* b, void* c, u8 d, f32 e);
 u8 fn_80331210(void* self);
 void fn_8005050C(nw4r::math::MTX34* mtx);
 void fn_800E0A14(void* chr, u32 joint, nw4r::math::MTX34* out);
-u32 event_demo_ck(void);
 
 #ifdef __cplusplus
 }
 #endif
 
 /* The mangled callees and this unit's own mangled setters, declared with the signatures their map
- * names encode (rule 9: the real signature, never the mangled spelling as an identifier). */
+ * names encode (rule 9: the real signature, never the mangled spelling as an identifier).  The target
+ * object references event_demo_ck__Fv, so it is declared C++ here (relocaudit). */
+u32 event_demo_ck(void);
 void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type);
 void eft019_set_core(nw4r::math::VEC3* pos, u8 area, u8 type, f32 scale_a, f32 scale_b);
 void eft019_set_vec(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 scale);
@@ -143,12 +144,15 @@ void eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot);
 void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer);
 
 /* The effect-manager id table and the sound-object hooks `fn_80112D58` case 0x88 drives: all
- * unsplit ef-band symbols, so they carry their real signatures here. */
+ * unsplit ef-band symbols the target references by their plain map names, so they carry C
+ * linkage (relocaudit). */
+extern "C" {
 void** fn_800A4420(s32 id);
 void* fn_800A51D8(nw4r::ef::Effect* effect, u32 arg);
 u16 fn_800A970C(void);
 void* fn_800A9714(void* obj, u16 index);
 void fn_800A67E8(void* obj, void* value);
+}
 
 /* The object `fn_800A4420` returns: a vtable word at +0 and the 4th virtual slot at +0x0C, which
  * retail calls with the object itself as `this`. size: 0x04 */
@@ -182,7 +186,7 @@ void rotVecY(nw4r::math::VEC3* v, u32 angle);
  * `ef/eft007.cpp`, which records the same finding) passes an out pointer, so the declaration carries
  * the pointer; the relocation name that emits differs from the map's `__Fv` spelling, which the
  * report's metric ignores (playbook 23). */
-void get_camera_direction(nw4r::math::VEC3* out);
+nw4r::math::VEC3 get_camera_direction(void); /* target references get_camera_direction__Fv (relocaudit) */
 void get_camera_pos(nw4r::math::VEC3* out);
 
 /* `get_enemy_data`'s map spelling is `get_enemy_data__FP11_ENEMY_WORK`; the tag is forward-declared
@@ -324,7 +328,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
 
     switch (type) {
     case 0: {
-        get_camera_direction(&d0);
+        d0 = get_camera_direction();
         fn_80041E40(&v, &d0);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -334,7 +338,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 1: {
         _EFT019_WORK* work;
-        get_camera_direction(&d1);
+        d1 = get_camera_direction();
         fn_80041E40(&v, &d1);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -347,7 +351,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 2: {
         _EFT019_WORK* work;
-        get_camera_direction(&d2);
+        d2 = get_camera_direction();
         fn_80041E40(&v, &d2);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -359,7 +363,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         return;
     }
     case 14: {
-        get_camera_direction(&d3);
+        d3 = get_camera_direction();
         fn_80041E40(&v, &d3);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -368,7 +372,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         return;
     }
     case 15: {
-        get_camera_direction(&d4);
+        d4 = get_camera_direction();
         fn_80041E40(&v, &d4);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -377,7 +381,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         return;
     }
     case 16: {
-        get_camera_direction(&d5);
+        d5 = get_camera_direction();
         fn_80041E40(&v, &d5);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -395,7 +399,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 28: {
         _EFT019_WORK* work;
-        get_camera_direction(&d6);
+        d6 = get_camera_direction();
         fn_80041E40(&v, &d6);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -408,7 +412,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 29: {
         _EFT019_WORK* work;
-        get_camera_direction(&d7);
+        d7 = get_camera_direction();
         fn_80041E40(&v, &d7);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -420,7 +424,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         return;
     }
     case 57: {
-        get_camera_direction(&d8);
+        d8 = get_camera_direction();
         fn_80041E40(&v, &d8);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
@@ -590,7 +594,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
         work = (_EFT019_WORK*)effect->work_0x38;
         switch (type) {
         case 0: {
-            get_camera_direction(&dir);
+            dir = get_camera_direction();
             fn_80041E40(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
@@ -599,7 +603,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             break;
         }
         case 1: {
-            get_camera_direction(&dir);
+            dir = get_camera_direction();
             fn_80041E40(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
@@ -610,7 +614,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             break;
         }
         case 2: {
-            get_camera_direction(&dir);
+            dir = get_camera_direction();
             fn_80041E40(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
@@ -1152,7 +1156,7 @@ void fn_80112D58(_EFT* self)
         SetRootMtxTrans(work->effects[i], &self->pos_0x18);
     }
     if ((u32)(self->type_0x02 - 0x66) <= 1) {
-        get_camera_direction(&cam);
+        cam = get_camera_direction();
         fn_80041E40(&dir, &cam);
         fn_80050850(&dir, &dir);
         fn_800513F0(&dir, lbl_807969D8);
