@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -191,34 +192,118 @@ def next_entry(main: str, entries: list[dict] | None = None) -> dict | None:
     return ready[0] if ready else None
 
 
+# --------------------------------------------------------------------------------------------------
+# wave spread: SYSTEM (the module of the nearest registered unit), then address distance
+# --------------------------------------------------------------------------------------------------
+_SYSTEM_HINTS: dict[str, tuple[tuple[int, int], list[tuple[int, int, str]]]] = {}
+
+
+def system_hints(main: str) -> list[tuple[int, int, str]]:
+    """`(start, end, module)` for every registered `.text` range - the wave picker's system map.
+
+    The module is the first path component of the unit's name (`enemy/fn_801478FC.cpp` -> `enemy`), which is
+    what the linking band and a brief's class-3 evidence agree on.  It spreads a wave; it never decides a
+    unit's home.  The cache is keyed on the file's stat, not just its path: a run that starts before the map
+    exists must not keep answering "no systems" after it appears (the selftest's fixture does exactly that).
+    """
+    path = os.path.join(main, "config", "RMHE08", "splits.txt")
+    try:
+        st = os.stat(path)
+    except OSError:
+        return []
+    key = (st.st_mtime_ns, st.st_size)
+    cached = _SYSTEM_HINTS.get(main)
+    if cached and cached[0] == key:
+        return cached[1]
+    rows: list[tuple[int, int, str]] = []
+    text = open(path, encoding="utf-8").read()
+    unit = None
+    for line in text.replace('\r\n', '\n').split('\n'):
+        if line and not line[0].isspace() and line.rstrip().endswith(':'):
+            unit = line.rstrip()[:-1]
+        m = re.match(r"\s+\.text\s+start:0x([0-9A-Fa-f]+) end:0x([0-9A-Fa-f]+)", line)
+        if m and unit:
+            rows.append((int(m.group(1), 16), int(m.group(2), 16),
+                         unit.split('/')[0] if '/' in unit else unit))
+    rows.sort()
+    _SYSTEM_HINTS[main] = (key, rows)
+    return rows
+
+
+def hint_for(main: str, address: int) -> str:
+    """The system a proposal's address sits in: the module of the nearest registered range ('?' if none)."""
+    best = None
+    for start, end, module in system_hints(main):
+        d = 0 if start <= address < end else min(abs(address - start), abs(address - end))
+        if best is None or d < best[0]:
+            best = (d, module)
+    return best[1] if best else '?'
+
+
+def entry_address(main: str, entry: dict) -> int:
+    """The `.text` address the queue orders by - from the pooled name (which always embeds it)."""
+    name = str(entry.get('unit') or entry.get('label') or '')
+    m = re.search(r'(?<![0-9A-Fa-f])([0-9A-Fa-f]{8})(?![0-9A-Fa-f])', name)
+    if m:
+        return int(m.group(1), 16)
+    try:
+        key = order_key(main, entry)
+        return int(key[0]) if isinstance(key, (tuple, list)) and key else int(key)
+    except Exception:
+        return 0
+
+
+def spread_picks(main: str, ordered: list[dict], is_ready: list[bool], count: int) -> list[int]:
+    """`count` ready indices: SYSTEM diversity first, address distance second, never index-adjacent.
+
+    Greedy and deterministic.  Start at the lowest ready address, then repeatedly take the candidate from a
+    system no pick has used, preferring the farthest; when every system is used, the farthest overall.  A
+    candidate index-adjacent to a pick is never considered (the two halves of one TU), so the wave comes back
+    SHORT when adjacency blocks it - the caller reports the shortfall instead of relaxing into the defect.
+    """
+    ready = [i for i, ok in enumerate(is_ready) if ok]
+    if not ready:
+        return []
+    addr = {i: entry_address(main, ordered[i]) for i in ready}
+    hint = {i: hint_for(main, addr[i]) for i in ready}
+    picks = [ready[0]]
+    used = {hint[ready[0]]}
+    while len(picks) < count:
+        best, best_score = None, None
+        for i in ready:
+            if i in picks or any(abs(i - j) == 1 for j in picks):
+                continue
+            score = (1 if hint[i] not in used else 0, min(abs(addr[i] - addr[j]) for j in picks))
+            if best_score is None or score > best_score:
+                best, best_score = i, score
+        if best is None:
+            break
+        picks.append(best)
+        used.add(hint[best])
+    return sorted(picks)
+
+
 def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]:
-    """The `count` proposals one `--count N` wave claims: a stride of N through the address order.
+    """The `count` proposals one `--count N` wave claims: spread by SYSTEM, then by address distance.
 
-    The picks are indices `i, i+N, i+2N, ...` of the queue in address order - never N neighbours - so two
-    *adjacent* proposals (indexes `j` and `j+1`) can share a wave only if both are congruent mod N, which
-    is impossible for N > 1. With `--count 1` this is exactly `next_entry`'s single pick.
-
-    Walking the whole address-ordered queue (not a re-sorted subset) is what keeps the spread: a claimed,
-    covered or written entry at a stride position is skipped and the walk continues at the *next* stride
-    position, so the wave fills with the same spacing rather than stopping at the blockage. When the stride
-    runs off the end of a short queue, the remainder is filled in address order - a fill is only taken if
-    it is ready and not index-adjacent to a pick, so it cannot re-introduce adjacency either. If fewer than
-    N are ready in total, fewer come back and the caller says so.
+    A wave used to take indices `0, N, 2N, ...` of the address-ordered queue - a COUNT-based stride, so a
+    dense band filled it: six claims all landed in the `enemy` band, every brief edited the same `_ENEMY_WORK`
+    record, and every landing needed a hand merge.  The picker now takes `spread_picks`: SYSTEM first (the
+    module of the nearest registered unit, `hint_for`), address distance second, and never two
+    index-adjacent proposals - adjacent ones are often the two halves of one TU, which is the guard the old
+    stride had and this keeps as a HARD filter.  A wave therefore comes back SHORT when adjacency blocks it,
+    and the caller reports the shortfall rather than relaxing into the defect.  `count == 1` is `next_entry`'s
+    single pick unchanged.  Measured on the live pool, a 6-wave claims six different systems (`enemy`, `Pl`,
+    `ai`, `hud`, `Runtime.PPCEABI.H`, `RSO`) instead of six units from one band.
     """
     if count < 1:
         raise SystemExit("REFUSED queue next | --count must be at least 1")
     ordered = ordered_entries(main, entries)
     branches = claims.worker_branches(main)
     is_ready = [state(main, e, branches) == "ready" for e in ordered]
-    picked = [i for i in range(0, len(ordered), count) if is_ready[i]][:count]
-    if len(picked) < count:
-        for j in range(len(ordered)):
-            if len(picked) >= count:
-                break
-            if not is_ready[j] or j in picked or any(abs(j - i) == 1 for i in picked):
-                continue
-            picked.append(j)
-    return [ordered[i] for i in sorted(picked)]
+    picked = spread_picks(main, ordered, is_ready, count) if count > 1 else \
+        [next(i for i, ok in enumerate(is_ready) if ok)]
+    return [ordered[i] for i in picked]
 
 
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dict:
@@ -555,8 +640,8 @@ def selftest() -> int:
         check("N=1 is the single pick next_entry makes", picks(wave(tmp, 1)), [0])
         check("... and next_entry still agrees", next_entry(tmp)["unit"], units[0])
         w3 = picks(wave(tmp, 3))
-        check("N=3 strides 0, 3", w3[:2], [0, 3])
-        check("... the third hit is the fill - only index 5 is not adjacent to 0 or 3", w3[2], 5)
+        check("N=3 starts at the lowest ready address", w3[:1], [0])
+        check("... and then the two farthest non-adjacent indices", w3[1:], [2, 5])
         check("... and claims three spread proposals", (len(w3), adjacent(w3)), (3, False))
         for n in (2, 3):
             sel = picks(wave(tmp, n))
@@ -566,13 +651,30 @@ def selftest() -> int:
               (len(w6), adjacent(w6)), (3, False))
 
         # a claimed stride position is skipped and the walk continues at the next stride position, so the
-        # wave still fills - index 3 is claimed, and the wave comes back with 0, 2 and 4
+        # wave still fills - index 3 is claimed, and the wave comes back with 0, 2 and 5
         claims.save_registry(tmp, {units[3]: {"branch": "worker/x", "worker": "me"}})
         claimed3 = picks(wave(tmp, 3))
         check("a claimed stride position is skipped", 3 not in claimed3, True)
         check("... the stride keeps going and the wave still fills", (len(claimed3), adjacent(claimed3)), (3, False))
-        check("... taking the nearest ready neighbours that are not adjacent", claimed3, [0, 2, 4])
+        check("... taking the farthest non-adjacent ready neighbours", claimed3, [0, 2, 5])
         claims.save_registry(tmp, {})
+
+        # the SYSTEM property: with a splits.txt naming two modules across the fixture's addresses, a wave
+        # must span both - that is what keeps two workers out of one shared record/header.  It is written
+        # here, at the end of this fixture's checks, so nothing before it sees registered ranges.
+        os.makedirs(os.path.join(tmp, "config", "RMHE08"))
+        open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8").write(
+            "enemy/fn_low.cpp:\n\t.text       start:0x80160000 end:0x80160280\n\n"
+            "Pl/fn_high.cpp:\n\t.text       start:0x80160280 end:0x80160600\n")
+        check("a proposal's system is the module of the nearest registered range",
+              [hint_for(tmp, text_start(tmp, u)) for u in units],
+              ["enemy", "enemy", "enemy", "Pl", "Pl", "Pl"])
+        pair = picks(wave(tmp, 2))
+        check("a wave takes the systems it can reach, not the nearest addresses",
+              [hint_for(tmp, text_start(tmp, units[i])) for i in pair], ["enemy", "Pl"])
+        three = picks(wave(tmp, 3))
+        check("... and a three-wave spans both systems while staying non-adjacent",
+              (len(set(hint_for(tmp, text_start(tmp, units[i])) for i in three)), adjacent(three)), (2, False))
 
         # a covered proposal (its range is already registered under another name) is skipped the same way
         saved_units, saved_range = brief.registered_units, brief.splits_range
@@ -612,14 +714,14 @@ def selftest() -> int:
         dry3 = next_briefs(tmp, "w-wave", dry_run=True, count=3, claim_fn=fake_claim)
         check("a dry-run wave claims nothing", (dry3["claimed"], claims.load_registry(tmp)), (3, {}))
         check("... but returns every spawn the real wave would",
-              [c["unit"] for c in dry3["claims"]], [units[0], units[3], units[5]])
+              [c["unit"] for c in dry3["claims"]], [units[0], units[2], units[5]])
         out = next_briefs(tmp, "w-wave", dry_run=False, count=3, claim_fn=fake_claim)
         wave3 = [units.index(c["unit"]) for c in out["claims"]]
         check("a full wave claims exactly N", (out["claimed"], out["shortfall"]), (3, 0))
-        check("... the three are the stride picks, non-adjacent", (wave3, adjacent(wave3)), ([0, 3, 5], False))
+        check("... the three are the spread picks, non-adjacent", (wave3, adjacent(wave3)), ([0, 2, 5], False))
         check("... and the addresses are the spaced ones",
               [text_start(tmp, c["unit"]) for c in out["claims"]],
-              [0x80160000, 0x80160300, 0x80160500])
+              [0x80160000, 0x80160200, 0x80160500])
         try:
             next_briefs(tmp, None, dry_run=True, count=0)
             check("a --count below 1 is refused", "no error", "SystemExit")
