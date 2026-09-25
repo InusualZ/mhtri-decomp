@@ -21,6 +21,12 @@ void wii_sysmsg_gen(long id, char* buf, long a);
  * name, and `enemy/fn_801550FC.cpp` declares it that way. */
 #ifdef __cplusplus
 s32 calcVecAng2(VEC3* a, VEC3* b);
+/* 0x80050D18 / 0x80051064 - the two nw4r-math helpers this range owns.  C++ linkage (the map names are the
+ * manglings of exactly these signatures: `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl`, `rotVecY__FPQ34nw4r4math4VEC3Ul`),
+ * so they are declared here rather than inside the `extern "C"` block - rule 9.  Consumers used to spell them
+ * locally in their own sources. */
+void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
+void rotVecY(nw4r::math::VEC3* v, u32 angle);
 #endif
 
 /* C linkage: the target symbol is the unmangled `fn_80051570` (.text 0x80051570, a 4-byte `blr`).
