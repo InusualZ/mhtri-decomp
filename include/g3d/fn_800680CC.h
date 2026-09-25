@@ -34,6 +34,9 @@ u32 fn_80068634(void* p);
 /* 0x800689B0 - the debug-checked resource accessor (caller: g3d_resanmcamera.cpp).  Returns the
  * resolved data pointer for a `ResCommon`-style handle. */
 u32 fn_800689B0(void* p);
+/* 0x800697A4 - the name-record reader the ScnMdl type query (g3d/g3d_scnmdl.cpp's fn_8007EA10)
+ * resolves against (rule 2: declared in its owner's header, not in the consumer). */
+u32 fn_800697A4(void);
 
 #ifdef __cplusplus
 }

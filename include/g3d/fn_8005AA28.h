@@ -24,6 +24,10 @@ extern "C" {
  * resource's mat flag word, otherwise it clears it. */
 void fn_8005AA44(void* pSelf, u32 enable);
 
+/* 0x8005AB00 - the `ResMat` handle's resource pointer; the ScnMdl unit's replacement passes read it
+ * (rule 2: declared here, in its owner's header, not in the consumer). */
+u32 fn_8005AB00(const void* pSelf);
+
 #ifdef __cplusplus
 }
 #endif

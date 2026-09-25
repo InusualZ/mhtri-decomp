@@ -128,6 +128,26 @@ g3d/fn_80075DCC.cpp:
 	extabindex  start:0x8002091C end:0x80020E74
 	.text       start:0x80075DCC end:0x8007C540
 
+g3d/g3d_scnmdl.cpp:
+	extab       start:0x80008588 end:0x80008674
+	extabindex  start:0x80020E74 end:0x80020FB8
+	.text       start:0x8007C540 end:0x8007F0E4
+
+g3d/g3d_scnmdlsmpl.cpp:
+	extab       start:0x80008674 end:0x800087B8
+	extabindex  start:0x80020FB8 end:0x80021144
+	.text       start:0x8007F0E4 end:0x800813B8
+
+g3d/g3d_scnobj.cpp:
+	extab       start:0x800087B8 end:0x800088F4
+	extabindex  start:0x80021144 end:0x800212C4
+	.text       start:0x800813B8 end:0x800827E4
+
+g3d/g3d_scnroot.cpp:
+	extab       start:0x800088F4 end:0x80008ADC
+	extabindex  start:0x800212C4 end:0x8002148C
+	.text       start:0x800827E4 end:0x8008452C
+
 g3d/g3d_state.cpp:
 	extab       start:0x80008ADC end:0x80008EB0
 	extabindex  start:0x8002148C end:0x800219E4

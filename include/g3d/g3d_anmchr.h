@@ -39,3 +39,6 @@ void *fn_8005B1E4(void *self, u32 value);  /* 0x8005B1E4 - stores `value` at +0x
 #endif
 
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */
+/* 0x800600C0 - `GetParent()`, the `!GetParent()` assert's test; the ScnMdl destructor calls it. */
+u32 fn_800600C0(u32* p);
+

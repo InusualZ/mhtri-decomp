@@ -56,3 +56,6 @@ typedef struct {
 } G3dObj; /* size: 0x4 */
 
 #endif /* MHTRI_G3D_FN_80063888_H */
+/* 0x800649B4 - the animation-object flag setter the ScnMdl unit's fn_8007EA08 calls (rule 2). */
+s32 fn_800649B4(void* pSelf, u32 bits);
+
