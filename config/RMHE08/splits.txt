@@ -304,7 +304,7 @@ sound/fn_800D7F54.cpp:
 	extabindex  start:0x800242F4 end:0x8002475C
 	.text       start:0x800D7F54 end:0x800DCFEC
 
-sound/fn_800DCFEC.c:
+sound/fn_800DCFEC.cpp:
 	extab       start:0x8000AF64 end:0x8000AF6C
 	extabindex  start:0x8002475C end:0x80024768
 	.text       start:0x800DCFEC end:0x800DD1F0

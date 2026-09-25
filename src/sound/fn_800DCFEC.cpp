@@ -1,4 +1,11 @@
-/* auto/800DCFEC_fn_800DCFEC.c - one function, 0x800DCFEC..0x800DD1F0.
+/* auto/800DCFEC_fn_800DCFEC.cpp - one function, 0x800DCFEC..0x800DD1F0.
+ *
+ * Language: the target object references the two shared getters under their C++ manglings
+ * (`get_now_areano__Fv`/`get_now_mapno__Fv`, read from the target's own `.symtab`), so the original TU
+ * was C++.  This file was `fn_800DCFEC.c`; a `.c` cannot spell those names, which is what the
+ * relocation audit caught.  Renamed to `.cpp` (the registered path follows in configure.py) so an
+ * ordinary declaration mangles; the plain `fn_*` callees and the definition keep C linkage with
+ * `extern "C"`, exactly like `g3d/g3d_resanmcamera.cpp` did on 2026-09-24.
  * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * Requests SE work 46 at the caller's position, with the SE code picked from the current map region
@@ -38,13 +45,16 @@ typedef struct VEC3 {
     /* 0x8 */ f32 z;
 } VEC3;
 
-/* The two getters are C++-mangled in the map (`get_now_mapno__Fv`); they are still unsplit, so the
- * declarations live here.  The `fn_*` callees are C. */
+/* The two getters are C++-mangled in the target (`get_now_mapno__Fv`/`get_now_areano__Fv`); they are
+ * still unsplit, so the declarations live here as ordinary C++ functions.  The `fn_*` callees are
+ * plain (C linkage) in the target, so their declarations are wrapped in `extern "C"`. */
 u8 get_now_mapno(void);
 u8 get_now_areano(void);
+extern "C" {
 u32 fn_802B0668(u8 mapno);
 void fn_80041E8C(VEC3* v, f32 x, f32 y, f32 z);
 u32 fn_800DA72C(u32 se_work, u32 se_code, VEC3* pos);
+}
 
 /* This unit's private .sdata2 position pool (0x80796410..0x8079641C), referenced but not defined here. */
 extern const f32 lbl_80796410;
@@ -57,7 +67,7 @@ extern const f32 lbl_80796418;
 
 /* Requests SE work 46 at the caller's position, with the SE code the current map region and area number
  * select. */
-void fn_800DCFEC(u32 arg0, VEC3* pos)
+extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
 {
     u32 m = fn_802B0668((u8)get_now_mapno());
     u8 areano = get_now_areano();
