@@ -26,4 +26,21 @@ u8* fn_800D0568(s32 index);
 }
 #endif
 
+/* The per-kind work-block accessors and the PRNG, added by `enemy/fn_801B0010.cpp` (rule 2: this unit
+ * owns the addresses).  The target objects reference their MANGLINGS
+ * (`get_move_work_max__FUc`/`get_move_work_adrs__FUc`/`ran_suu__Fl`), so they are declared at C++
+ * scope, outside the `extern "C"` block above (rule 9) - the same spelling `ef/eft_res.cpp` uses.
+ * Signatures are the owner's own definitions: `get_move_work_max` answers a 16-bit count,
+ * `get_move_work_adrs` the block base, `ran_suu` takes the `long` index its map name spells and
+ * answers the 16-bit value its callers mask. */
+#ifdef __cplusplus
+u16 get_move_work_max(u8 index);
+u16 ran_suu(long index);
+#endif
+/* `get_move_work_adrs` is deliberately NOT declared here: three consumers spell its return type
+ * three ways (`void*` in `ef/eft_res.cpp` and this owner, `u32` in `sound/fn_800EF7D8.cpp`), and
+ * MWCC rejects the pair as an illegal overload, so the shared header cannot carry it until one
+ * spelling is chosen.  `enemy/fn_801B0010.cpp` declares it locally and asks for the unification in
+ * its outbox (`shared-file`). */
+
 #endif /* MHTRI_EF_FN_800CDB2C_H */

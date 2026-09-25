@@ -19,4 +19,13 @@ u32 Pl_Skill_ck(struct _PLW* work, u16 skill); /* -> Pl_Skill_ck__FP4_PLWUs */
 u32 Pl_Skill_ck__FP4_PLWUs(struct _PLW* work, u16 skill);
 #endif
 
+#ifdef __cplusplus
+/* 0x802731B4 / 0x80272E30 - this unit's own definitions, added by `enemy/fn_801B0010.cpp` (rule 2:
+ * the owner is this unit).  Signatures are the owner's definitions: `fn_802731B4` answers the slot's
+ * value as an `int` (`> 0` is the test every call site makes) and `fn_80272E30` takes the item id as
+ * a `u16` and answers `s16`. */
+int fn_802731B4(struct _PLW* plw, u16 slot);
+s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
+#endif
+
 #endif /* MHTRI_PL_PL_SKILL_H */

@@ -32,9 +32,33 @@ void fn_80136D4C(struct _ENEMY_WORK* self, f32 a);
 #else
 void fn_80136D4C();
 #endif
+/* 0x8013072C - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2).  Signature is
+ * the owner's: r3 the work record and r4/r5 the two scalars every call site sets. */
+void fn_8013072C(struct _ENEMY_WORK* self, u32 a, u32 b);
+/* `UpdateValue` is this unit's own definition (0x8012FDA0) and its map name is unmangled, so it is
+ * declared at C linkage.  Added by `enemy/fn_801B0010.cpp` (rule 2); the answer is in r3. */
+u32 UpdateValue(struct _ENEMY_WORK* self);
+/* 0x80132154 - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the work
+ * record and nothing else. */
+void fn_80132154(struct _ENEMY_WORK* self);
+/* 0x801339AC - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the work
+ * record, the answer in r3 (compared against 1 by every call site). */
+u32 fn_801339AC(struct _ENEMY_WORK* self);
+/* 0x80133DB0 - the angle stepper this unit owns.  MOVED here from `include/unsplit/enemy.h` (rule 2:
+ * the owner is this unit, and the band header's `u16 fn_80133DB0()` was the no-prototype form).  The
+ * signature is the owner's consumers': `enemy/fn_80137604.cpp` declares `(u16, u16, u16)` and
+ * `enemy/fn_8014A1BC.c` calls it with three `(u16)`-cast arguments; the answer is a 16-bit angle. */
+u16 fn_80133DB0(u16 a, u16 b, u16 c);
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* `em_get_mot_no` is this unit's own definition and the map name is its mangling
+ * (`em_get_mot_no__FP11_ENEMY_WORK`), so it is declared at C++ scope (rule 9) and answers the
+ * motion id in r3 (its callers mask it to 16 bits).  Added by `enemy/fn_801B0010.cpp` (rule 2). */
+u16 em_get_mot_no(struct _ENEMY_WORK* work);
 #endif
 
 #endif

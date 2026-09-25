@@ -43,6 +43,11 @@ void fn_8012E694(struct _ENEMY_WORK* self);
 u32 fn_8012D8D0(struct _ENEMY_WORK* work);
 u32 fn_8012DB3C(struct _ENEMY_WORK* work);
 u32 fn_8012E21C(u32 state, u32 action);
+/* 0x8012C300 / 0x8012C3C8 - this unit's own definitions, added by `enemy/fn_801B0010.cpp` (rule 2).
+ * Signatures are the owner's own definitions: the first is `(u32 team, u32 state_sub)` and the
+ * second `(u32 team, u32 state_sub, void* ref, f32 radius)`. */
+s32 fn_8012C300(u32 team, u32 state_sub);
+s32 fn_8012C3C8(u32 team, u32 state_sub, void* ref, f32 radius);
 
 /* Whether more than `seconds` have passed since the last frame stamp.  Declared here, with its owner
  * (rule 2), because `enemy/fn_8012E968.cpp` calls it and must not re-declare it locally. */
