@@ -214,13 +214,16 @@ void  fn_80056A3C(s32 count);
 }
 
 /* The screen-size pair is a free C++ function (`get_ScreenSize(_MH_VEC2*)`); its map spelling is a
- * mangling, so it is declared by signature (rule 9).  The band neighbours are plain `fn_` thunks. */
+ * mangling, so it is declared by signature (rule 9).  The band neighbours below are plain `fn_`
+ * thunks: the target object references them by their plain map name, so they carry C linkage. */
 void get_ScreenSize(struct _MH_VEC2* v);
+extern "C" {
 void fn_80055EC4(void* block);
 void fn_80056E1C(void* block);
 void fn_80055F58(void);
 void fn_80056F24(void);
 void fn_800579A4(void);
+}
 
 /* ---------------------------------------------------------------------------------------------------
  * The FIFO writers (one store-width each; the same family the other `auto` units carry).
