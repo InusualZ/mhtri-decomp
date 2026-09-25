@@ -90,18 +90,21 @@ extern "C" void fn_80043EA8(nw4r::math::VEC3* out);
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
 extern "C" nw4r::ef::Effect* fn_800F91C4(u16 id, u16 kind, s32 a, s32 b);
 extern "C" void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
-extern "C" void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
+/* C++ callees: the target object references their manglings (cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34,
+ * work_mem_alloc__FUl, work_mem_free__FPv, load_file__FPcUll, ran_suu__Fl), so no extern "C"
+ * (relocaudit).  fn_802FB8EC is the reverse: its target spelling is plain, so it keeps C linkage. */
+void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
 void setVector3(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 extern "C" void fn_800F886C(void* self);
 /* File load (`fn_800CEE2C`/`fn_804A6120`) and the work heap.  The eft004 pool helpers and `memcpy`
  * come from their owners' headers (rule 2). */
 extern "C" s32 fn_804A6120(void* info);
-extern "C" void* work_mem_alloc(u32 size);
-extern "C" void work_mem_free(void* ptr);
-extern "C" void load_file(char* path, u32 dst, s32 size);
-extern "C" u16 ran_suu(s32 index);
+void* work_mem_alloc(u32 size);
+void work_mem_free(void* ptr);
+void load_file(char* path, u32 dst, s32 size);
+u16 ran_suu(s32 index);
 u8 get_now_mapno();
-u8 fn_802FB8EC(u8 index);
+extern "C" u8 fn_802FB8EC(u8 index);
 u32 LbCheckKujiraEvent();
 
 /* ------------------------------------------------------------------------------------------------ */
