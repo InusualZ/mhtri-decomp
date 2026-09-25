@@ -45,6 +45,7 @@
 #include "enemy/fn_80149D6C.h"
 #include "enemy/fn_80147CE0.h"
 #include "unsplit/enemy.h"
+#include "enemy/fn_8012EC74.h" /* fn_80136D4C (its owner) */
 
 /* ---------------------------------------------------------------------------------------------------
  * nw4r math types

@@ -76,6 +76,12 @@ extern "C" {
  * is `src/Pl/pl_act.cpp`'s - it is registered but not yet reconstructed (see the unit source's
  * Status). */
 void* fn_80143174(void* a, void* b, s32 c);
+/* The action band's arming helpers that live inside this unit's range, called by
+ * `enemy/fn_80178378.cpp` (docs/plan.md 6.5 rule 2: an extern lives with the TU that owns it).
+ * The bodies come with this unit's follow-up queue; the signatures are the call sites'. */
+void fn_80146058(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void fn_8014610C(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+
 
 #ifdef __cplusplus
 }

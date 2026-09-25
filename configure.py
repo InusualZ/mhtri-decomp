@@ -587,6 +587,12 @@ config.libs = [
             Object(NonMatching, "enemy/fn_801679B0.cpp"),
             Object(NonMatching, "enemy/fn_80171194.cpp"),
             Object(NonMatching, "enemy/fn_80178128.cpp"),
+            # Registered from proposal/80178378_fn_80178378.cpp (a 0x80178378 run discovery proposed):
+            # the enemy action arming/stepping band 0x80178378..0x80181C88, 64 functions / 0x9920 bytes,
+            # plus the 58 extab/extabindex entries its functions carry.  Module `enemy` from the link
+            # band (the unit below ends exactly at this range's start) and from the code (`_ENEMY_WORK`,
+            # the enemy action callees).  The seam is unproven - see the unit header.
+            Object(NonMatching, "enemy/fn_80178378.cpp"),
             Object(NonMatching, "enemy/fn_80177608.cpp"),
             # proposal/80177890_fn_80177890: the enemy motion-state update set (0x80177890..0x80178128,
             # 12 functions). The neighbour TU's dispatch evidence pins the seam; cflags are this lib's.

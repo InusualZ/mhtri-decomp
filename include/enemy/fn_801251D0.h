@@ -28,8 +28,11 @@ u16 fn_80127E78(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
 /* 0x80128A8C / 0x8012933C - this unit's own definitions (the first is defined here, the second is an
- * address inside its range).  Moved here from `enemy/fn_80147CE0.cpp` (rule 2): signatures are the
- * owner's (`fn_80128A8C` two u32 arguments; `fn_8012933C` narrows its second argument to u8 itself). */
+ * address inside its range).  Signatures are the owner's: `fn_80128A8C` takes two u32; `fn_8012933C`
+ * narrows its second argument to u8 itself (`clrlwi r4,r4,24` on the way into `fn_801251D8`) and the
+ * owner's own body calls it `(self, (u8)a, b, 0)`.  One declaration, hand-merged for the three
+ * consumers that each moved it here (rule 2): `enemy/fn_80147CE0.cpp`, `enemy/fn_8015E854.cpp` and
+ * `enemy/fn_80178378.cpp` - the sibling landings and this branch had put it in three times. */
 void fn_80128A8C(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
@@ -59,6 +62,11 @@ void fn_801251D8(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
 #else
 void fn_801251D8(u32 a, u32 b, u32 c);
 #endif
+/* 0x80128030 - r3 (`self`) only; the action band's completion hook.  Added by
+ * `enemy/fn_80178378.cpp` (docs/plan.md 6.5 rule 2): this unit owns the address. */
+void fn_80128030(struct _ENEMY_WORK* self);
+/* 0x80129724 - r3 (`self`) and one scalar argument (every call site sets r4). */
+void fn_80129724(struct _ENEMY_WORK* self, u32 a);
 void fn_801252C0(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);
@@ -72,9 +80,6 @@ void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in
  * 0x10-byte steps; the caller (`enemy/fn_8015E854.cpp`'s `fn_8015EFAC`) reads the f32 at +0x4. */
 f32* fn_80126454(struct _ENEMY_WORK* self);
-/* 0x8012933C - r3 (`self`), a byte r4 and two scalars r5/r6 (the owner `enemy/fn_801251D0.cpp`
- * declares it `(struct _ENEMY_WORK*, u8, u32, u32)` and calls it `(self, (u8)a, b, 0)`). */
-void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 void fn_80129864(struct _ENEMY_WORK* self);
 void fn_80129984(struct _ENEMY_WORK* self);
 u32 fn_8012B5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
