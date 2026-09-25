@@ -81,6 +81,9 @@ f32 fn_80050EF4(void* a, void* b);
  * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
 void fn_80050CA0(void* out, const void* a, const void* b);
 f32 fn_80050F80(const void* a, const void* b);
+/* 0x80050EAC - the SQUARED distance between two positions (the callers compare it against a squared
+ * radius constant, e.g. `enemy/fn_801B0010.cpp` against `lbl_80798B3C` = 2250000.0f = 1500^2). */
+f32 fn_80050EAC(const void* a, const void* b);
 /* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
  * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
