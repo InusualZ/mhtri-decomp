@@ -929,7 +929,7 @@ config.libs = [
         "progress_category": "game",
         "host": False,
         "objects": [
-            Object(NonMatching, "Pl/fn_80229ECC.cpp"),
+            Object(Matching, "Pl/fn_80229ECC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
             # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
