@@ -86,9 +86,9 @@ extern "C" void fn_801251D0(u32 a, u32 b, u32 c)
     fn_80124C5C(a, b, (u8)c);
 }
 
-extern "C" void fn_801251D8(u32 a, u32 b, u32 c)
+extern "C" void fn_801251D8(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
 {
-    fn_80124C5C(a, b, (u8)c);
+    fn_80124C5C((u32)self, (u32)tbl, (u8)a);
 }
 
 extern "C" void fn_801252C0(struct _ENEMY_WORK* self, u8 a)

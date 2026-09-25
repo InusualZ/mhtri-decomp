@@ -56,6 +56,12 @@ void* fn_800534B0(void* out, u32 v);
  * fn_80050508(&mtx), 0)` in `src/ef/ef_drawlinestrategy.cpp`), so the pointer-returning shape is the
  * one the target's call sites require (added when `src/g3d/g3d_gpu.cpp` registered as the consumer). */
 void* fn_80050508(void* pOut);
+/* 0x80050EF4 - the two-pointer distance helper: r3 and r4 are the two `VEC3*` (its body moves r3
+ * into r5 and calls `fn_80050CA0(&out, r4, r3)`, then `fn_80050F24(&out)`), so it takes two
+ * pointers and returns the float.  Moved here from `enemy/fn_801550FC.cpp` on landing (rule 2):
+ * this unit owns the address, and the three-argument form the consumer used was wrong
+ * (`enemy/fn_8015941C` sets only r3/r4). */
+f32 fn_80050EF4(void* a, void* b);
 #ifdef __cplusplus
 }
 #endif

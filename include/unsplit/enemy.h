@@ -26,8 +26,28 @@ u32 em_sleep_ck__FP11_ENEMY_WORKUc(struct _ENEMY_WORK* enemy, u8 kind);
 u32 fn_8012EC60(void);
 u32 fn_8012ECF0(void);
 void fn_8012F5B8(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
+/* 0x8012F504 - the five-argument motion setter `fn_8012F5B8` tail-calls; moved here from
+ * `enemy/fn_801550FC.cpp` on landing (rule 2).  `fn_8012F5B8` narrows its second argument to u16
+ * (`clrlwi r4,r4,16`) before the tail call, so the owner's first argument is u16. */
+void fn_8012F504(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 void fn_8012F62C(struct _ENEMY_WORK *self, u32 a, u32 b, u32 c);
+/* 0x8012F7D4 - reads r3, r4, r5, r6 and f1 (its body does `mr r4,r5` / `mr r5,r6` before the tail
+ * call to 0x8012F758), so the four scalar arguments and the float are in the call sites' order. */
+void fn_8012F7D4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
+/* 0x8012F810 - one `self` argument, no return (restores the motion state). */
+void fn_8012F810(struct _ENEMY_WORK* self);
+/* 0x8012F860 - reads f1 and f2 (`fcmpo cr0,f1,f0` then `fadds f0,f0,f2`), so it takes two floats;
+ * `enemy/fn_80156EA4` sets f1 (the computed ratio) and f2 (`lbl_80797150`) before the call. */
+void fn_8012F860(struct _ENEMY_WORK* self, f32 a, f32 b);
+/* 0x8012F8C8 - two arguments: r3 (`self`) and f1, which it stores at +0x7c4 and multiplies by the
+ * float at +0x7bc before tail-calling 0x800E1640.  The 0-argument form this band used to carry was
+ * wrong: `enemy/fn_8014A1BC.c` calls it with `self` only and `enemy/fn_801550FC.cpp` with a float,
+ * so C keeps the old-style declaration and C++ gets the real one. */
+#ifdef __cplusplus
+void fn_8012F8C8(struct _ENEMY_WORK* self, f32 a);
+#else
 void fn_8012F8C8();
+#endif
 f32 fn_8012F8E4(struct _ENEMY_WORK *self);
 f32 fn_8012F8EC(struct _ENEMY_WORK *self);
 f32 fn_8012F8F4(struct _ENEMY_WORK *self);
@@ -36,19 +56,39 @@ void fn_8012FC60(struct _ENEMY_WORK* work);
 void fn_8012FCC4(struct _ENEMY_WORK* work, s32 arg1, f32 arg2);
 void fn_8012FCE4(struct _ENEMY_WORK* work);
 void fn_8012FF38(struct _ENEMY_WORK* work);
+/* 0x80130008 - r3 (`self`) and f1 (it does `fmr f31,f1` and uses it against `get_em_scale`), return
+ * in r3 (1/0).  C keeps the old-style declaration because `enemy/fn_8014A1BC.c` calls it both with
+ * one and with two arguments; C++ gets the one-argument form `enemy/fn_801550FC.cpp` uses (it leaves
+ * f1 as the tail of the preceding `fn_80130248` call, exactly as the target does). */
+#ifdef __cplusplus
+u32 fn_80130008(struct _ENEMY_WORK* self);
+#else
 u32 fn_80130008();
+#endif
 u8 fn_8013023C(struct _ENEMY_WORK* work);
 f32 fn_80130248(struct _ENEMY_WORK* self);
 f32 fn_801302E4(struct _ENEMY_WORK* work);
-void fn_801303EC();
+/* 0x801303EC - r3 (`self`) and f1 (stored at +0x1ac); 0x801303FC tail-calls it with `f0 + f1`.
+ * `enemy/fn_8014A1BC.c` calls both with two arguments, so a real two-argument prototype is safe for
+ * C too. */
+void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
+/* 0x801303FC - r3 (`self`) plus the f1 `0x801303EC` consumes (its body does `lfs f0,0x1ac(r3);
+ * fadds f1,f0,f1; b 0x801303EC`).  `enemy/fn_8014A1BC.c` calls it with one and with two arguments,
+ * so C keeps the old-style declaration and C++ gets the one-argument form the call site uses. */
+#ifdef __cplusplus
+void fn_801303FC(struct _ENEMY_WORK* self);
+#else
 void fn_801303FC();
+#endif
 void fn_80130438(struct _ENEMY_WORK* work);
 void fn_80130478(struct _ENEMY_WORK *self, u32 a);
 void fn_801305C4(struct _ENEMY_WORK *self);
 u32 fn_80130778(s32 kind);
 void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
 void fn_80130A10(struct _ENEMY_WORK* enemy, s32 value);
-void fn_80130CDC();
+/* 0x80130CDC - r3 (`self`) and r4, which it sign-extends (`extsh r4,r4`) before tail-calling
+ * 0x80130B6C; `enemy/fn_8014A1BC.c` calls it with two arguments, so the prototype is safe for C. */
+void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
 u32 fn_80130DF8(void);
 struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void fn_80131150(struct _ENEMY_WORK* work);
@@ -87,8 +127,18 @@ void fn_801353F8(struct _ENEMY_WORK *self);
 void fn_80135418(struct _ENEMY_WORK *self);
 void fn_801354F4(struct _ENEMY_WORK *self, void *p);
 void fn_80135584(struct _ENEMY_WORK* self, void* p);
-void fn_801355C8();
+/* 0x801355C8 - r3 (`self`) and r4, the pointer it forwards to `fn_801354F4` unchanged; the C
+ * callers pass `&self->field_0x1bc`, so the owner's argument is a pointer, not the integer the
+ * consumer used to spell. */
+void fn_801355C8(struct _ENEMY_WORK* self, void* p);
+/* 0x80135600 - r3 (`self`), the r4 pointer it forwards to `fn_801355C8`, and the f1 it holds for
+ * `UpdateValue`; `enemy/fn_8014A1BC.c` calls it with two and with three arguments, so C keeps the
+ * old-style declaration and C++ gets the two-argument form the call site uses. */
+#ifdef __cplusplus
+void fn_80135600(struct _ENEMY_WORK* self, void* p);
+#else
 u32 fn_80135600();
+#endif
 f32 fn_80135644(struct _ENEMY_WORK *self, void *tbl);
 f32 fn_801356A8(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
 s32 fn_80135748();
