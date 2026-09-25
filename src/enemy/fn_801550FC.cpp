@@ -67,61 +67,27 @@ extern u32 em003_yobi_boss_em_ck(u8 group);
 extern u32 em_frame_check(_ENEMY_WORK*, u16, f32, f32);
 extern void rotVecY(VEC3*, u32);
 
+/* The unit's foreign callees are declared where their owner is (docs/plan.md 6.5 rule 2): the
+ * unsplit enemy-band symbols in `unsplit/enemy.h`, the registered units' in their own headers.  The
+ * three 0x803B/0x8043 callees the split leaves unsplit but whose bracketing units name different
+ * modules stay here - rule 2's own documented gap, not a guess. */
+#include "unsplit/enemy.h"
+#include "enemy/fn_801251D0.h"
+#include "enemy/fn_8012BDF4.h"
+#include "enemy/fn_80138074.h"
+#include "fn_8004CAD8.h"
+/* `mh3_pad.h` and `ef.h` (through `enemy.h`) both spell `fn_80043EA8` and `fn_80041E8C` with
+ * different parameter types, which is a C-linkage overload error.  This unit wants only the owner's
+ * `fn_80041E40`, so the two stale duplicates are renamed out of the way for this include - the same
+ * workaround `ef/ef_creationqueue.cpp` uses for the band header's copy. */
+#define fn_80043EA8 mhtri_mh3pad_fn_80043EA8
+#define fn_80041E8C mhtri_mh3pad_fn_80041E8C
+#include "mh3_pad.h"
+#undef fn_80043EA8
+#undef fn_80041E8C
+
 /* flat map symbols are C-linkage in a C++ TU */
 extern "C" {
-extern f32 fn_80050EF4(_ENEMY_WORK*, u32, u32);
-extern f32 fn_8012F8E4(_ENEMY_WORK*);
-extern f32 fn_8012F8EC(_ENEMY_WORK*);
-extern f32 fn_80135644(_ENEMY_WORK*, void*);
-extern u32 fn_8012F5B8(_ENEMY_WORK*, u32, u32, u32);
-extern u32 fn_8012F93C(_ENEMY_WORK*);
-extern u32 fn_80130008(_ENEMY_WORK*);
-extern u32 fn_80130248(_ENEMY_WORK*);
-extern u32 fn_80133C50(_ENEMY_WORK*, u32);
-extern u32 fn_80134114(_ENEMY_WORK*, u32, u32);
-extern u32 fn_80134B0C(_ENEMY_WORK*, void*);
-extern void CancelFade(_ENEMY_WORK*);
-extern void fn_80041E40(_ENEMY_WORK*, u32, u32);
-extern void fn_801251D8(_ENEMY_WORK*, void*, u32, u32);
-extern void fn_80127F48(_ENEMY_WORK*);
-extern void fn_80127FE4(_ENEMY_WORK*);
-extern void fn_801280AC(_ENEMY_WORK*);
-extern void fn_80128A14(_ENEMY_WORK*, u32, u32);
-extern void fn_80128A70(_ENEMY_WORK*, u32, u32);
-extern void fn_80128AAC(_ENEMY_WORK*, u32, u32);
-extern void fn_80128BF8(_ENEMY_WORK*, u32);
-extern void fn_80129668(_ENEMY_WORK*, u32, u32);
-extern void fn_8012CF20(_ENEMY_WORK*);
-extern void fn_8012F504(_ENEMY_WORK*, u32, u32, u32, u32);
-extern void fn_8012F62C(_ENEMY_WORK*, u32, u32, u32);
-extern void fn_8012F7D4(_ENEMY_WORK*, u32, u32, u32, f32);
-extern void fn_8012F810(_ENEMY_WORK*);
-extern void fn_8012F860(_ENEMY_WORK*, u32, f32);
-extern void fn_8012F8C8(_ENEMY_WORK*, f32);
-extern void fn_801303EC(_ENEMY_WORK*, f32);
-extern void fn_801303FC(_ENEMY_WORK*);
-extern void fn_80130478(_ENEMY_WORK*, u32);
-extern void fn_801305C4(_ENEMY_WORK*);
-extern void fn_80130CDC(_ENEMY_WORK*, u32);
-extern void fn_8013221C(_ENEMY_WORK*, u32, u32, f32);
-extern void fn_80132224(_ENEMY_WORK*);
-extern void fn_80132264(_ENEMY_WORK*);
-extern void fn_80133BB4(_ENEMY_WORK*);
-extern void fn_80133E3C(_ENEMY_WORK*, u32, f32, f32);
-extern void fn_80134004(_ENEMY_WORK*, u32, f32);
-extern void fn_80134964(_ENEMY_WORK*, void*, u32, u32, u32);
-extern void fn_80134E8C(_ENEMY_WORK*);
-extern void fn_80134F18(_ENEMY_WORK*);
-extern void fn_80134F70(_ENEMY_WORK*, void*);
-extern void fn_80135000(_ENEMY_WORK*, u32, void*);
-extern void fn_801353E4(_ENEMY_WORK*);
-extern void fn_801353F8(_ENEMY_WORK*);
-extern void fn_80135418(_ENEMY_WORK*);
-extern void fn_801354F4(_ENEMY_WORK*, u32);
-extern void fn_80135584(_ENEMY_WORK*, u32);
-extern void fn_801355C8(_ENEMY_WORK*, u32);
-extern void fn_80135600(_ENEMY_WORK*, u32);
-extern void fn_8013A654(_ENEMY_WORK*, u32);
 extern void fn_803B9BA0(_ENEMY_WORK*, u32, u32);
 extern void fn_8043B410(_ENEMY_WORK*);
 extern void fn_8043B424(_ENEMY_WORK*, u32, u32);
@@ -542,7 +508,7 @@ extern "C" void fn_80155E58(_ENEMY_WORK* self) {
         }
         return;
     case 2:
-        fn_8013221C(self, 1, 0xF, lbl_807970FC);
+        fn_8013221C(self, lbl_807970FC, 1, 0xF);
         temp_r0 = self->field_0x20 - 1;
         self->field_0x20 = temp_r0;
         if (temp_r0 <= 0) {
@@ -1064,7 +1030,7 @@ extern "C" void fn_801571F0(_ENEMY_WORK* self) {
     case 2:
         self->v_0x310.y = fn_80135644(self, &lbl_805A45F0);
         fn_80130248(self);
-        fn_80135584(self, (u32) &self->pos_0x1BC);
+        fn_80135584(self, &self->pos_0x1BC);
         if (fn_8012F93C(self) == 1U) {
             self->state_0x05 = (u8) (self->state_0x05 + 1);
             fn_8012F5B8(self, 0x1A, 6, 0);
@@ -1103,7 +1069,7 @@ extern "C" void fn_80157330(_ENEMY_WORK* self) {
     case 2:
         self->v_0x310.y = fn_80135644(self, &lbl_805A45F0);
         fn_80130248(self);
-        fn_80135584(self, (u32) &self->pos_0x1BC);
+        fn_80135584(self, &self->pos_0x1BC);
         if (fn_8012F93C(self) == 1U) {
             fn_80127FE4(self);
         }
@@ -1176,7 +1142,7 @@ extern "C" void fn_8015757C(_ENEMY_WORK* self) {
             fn_80127FE4(self);
             return;
         }
-        fn_801355C8(self, (u32) &self->pos_0x1BC);
+        fn_801355C8(self, &self->pos_0x1BC);
         if (self->v_0x310.z > lbl_80797158) {
             self->v_0x310.z = (f32) lbl_80797158;
         }
@@ -1303,7 +1269,7 @@ extern "C" void fn_80157FD0(_ENEMY_WORK* self) {
             break;
         case 1:                                     /* switch 2 */
             fn_80130248(self);
-            fn_80135600(self, (u32) &self->pos_0x1BC);
+            fn_80135600(self, &self->pos_0x1BC);
             if (self->v_0x310.z > lbl_80797198) {
                 self->v_0x310.z = (f32) lbl_80797198;
             }
@@ -1528,7 +1494,7 @@ extern "C" void fn_80158668(_ENEMY_WORK* self, u8 a1) {
             fn_801280AC(self);
             return;
         }
-        fn_801355C8(self, (u32) &self->pos_0x1BC);
+        fn_801355C8(self, &self->pos_0x1BC);
         if (self->v_0x310.z > lbl_8079718C) {
             self->v_0x310.z = (f32) lbl_8079718C;
         }
@@ -1554,7 +1520,7 @@ extern "C" void fn_80158764(_ENEMY_WORK* self) {
         }
         fn_80135000(self, 0, &lbl_8056FB24);
         fn_80130248(self);
-        fn_80135584(self, (u32) &self->pos_0x1BC);
+        fn_80135584(self, &self->pos_0x1BC);
         return;
     }
 }
@@ -1584,7 +1550,7 @@ extern "C" void fn_80158928(_ENEMY_WORK* self, u8 a1) {
         self->field_0x20 = 0x1E;
         return;
     case 1:
-        fn_801355C8(self, (u32) &self->pos_0x1BC);
+        fn_801355C8(self, &self->pos_0x1BC);
         if (self->v_0x310.z > lbl_807970C0) {
             self->v_0x310.z = (f32) lbl_807970C0;
         }
@@ -1727,7 +1693,7 @@ extern "C" void fn_8015941C(_ENEMY_WORK* self) {
         fn_8012F5B8(self, 0x36, 2, 0);
         fn_80129668(self, 0, 5);
         fn_801353E4(self);
-        temp_f1 = fn_80050EF4(self, (u32) &self->pos, (u32) &self->target);
+        temp_f1 = fn_80050EF4(&self->pos, &self->target);
         if (temp_f1 > lbl_8079717C) {
             self->v_0x310.z = (f32) lbl_807971F4;
             return;
@@ -1740,7 +1706,7 @@ extern "C" void fn_8015941C(_ENEMY_WORK* self) {
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_80797158, lbl_807970C0) == 0) {
-            fn_801354F4(self, (u32) &self->pos_0x1BC);
+            fn_801354F4(self, &self->pos_0x1BC);
             fn_80133C50(self, 0x40);
         }
         if (fn_8012F93C(self) == 1U) {
@@ -1778,7 +1744,7 @@ extern "C" void fn_80159984(_ENEMY_WORK* self) {
             self->field_0x1ac = (f32) lbl_807971DC;
         }
         self->v_0x310.z = fn_80135644(self, &lbl_805A4590);
-        fn_801354F4(self, (u32) &self->pos_0x1BC);
+        fn_801354F4(self, &self->pos_0x1BC);
         if (fn_8012F93C(self) == 1U) {
             fn_801280AC(self);
         }
@@ -1962,7 +1928,7 @@ extern "C" void fn_8015AB08(_ENEMY_WORK* self) {
         fn_80130248(self);
         fn_801305C4(self);
         setVector3(&self->pos, lbl_80797260, lbl_80797264, lbl_80797268);
-        fn_80041E40(self, (u32) &self->prev_pos, (u32) &self->pos);
+        fn_80041E40(&self->prev_pos, &self->pos);
         self->pos_0x1BC.x = 0;
         self->pos_0x1BC.y = 0xC44;
         self->pos_0x1BC.z = 0;

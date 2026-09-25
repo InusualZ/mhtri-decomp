@@ -27,6 +27,14 @@ void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
 u16 fn_80127E78(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
+/* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
+ * `enemy/fn_801550FC.cpp` on landing (rule 2): this unit owns the addresses. */
+void fn_80127FE4(struct _ENEMY_WORK* self);
+void fn_801280AC(struct _ENEMY_WORK* self);
+/* 0x80128A70 / 0x80128AAC - r3 (`self`) and two u8 arguments (`clrlwi r4,r4,24` /
+ * `clrlwi r5,r5,24`); 0x80128AAC supplies the constant third argument itself. */
+void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b);
+void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_80128204(struct _ENEMY_WORK* work);
 void fn_80128308(struct _ENEMY_WORK* work);
 void fn_80128BF8(struct _ENEMY_WORK* work, s32 arg1);
@@ -37,7 +45,15 @@ void fn_8012A658(struct _ENEMY_WORK* work, s32 arg1);
 void fn_8012B64C(struct _ENEMY_WORK* work);
 
 void fn_801251D0(u32 a, u32 b, u32 c);
+/* 0x801251D8 - r3, r4 and r5 (its body does `clrlwi r5,r5,24` then tail-calls 0x80124C5C).
+ * `enemy/fn_8014A1BC.c` calls it with three arguments (the first is the table, not `self`);
+ * `enemy/fn_801550FC.cpp` calls it with four (`self`, table, selector, value), and the target sets
+ * both r5 and r6, so C keeps the three-argument form and C++ gets the four-argument one. */
+#ifdef __cplusplus
+void fn_801251D8(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
+#else
 void fn_801251D8(u32 a, u32 b, u32 c);
+#endif
 void fn_801252C0(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);
