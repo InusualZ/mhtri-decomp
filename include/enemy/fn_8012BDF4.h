@@ -31,6 +31,10 @@ u8 fn_8012D3E0();
 u32 fn_8012D7FC(struct _ENEMY_WORK* other);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
+/* Whether more than `seconds` have passed since the last frame stamp.  Declared here, with its owner
+ * (rule 2), because `enemy/fn_8012E968.cpp` calls it and must not re-declare it locally. */
+s32 fn_8012E8F4(f32 seconds);
+
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
