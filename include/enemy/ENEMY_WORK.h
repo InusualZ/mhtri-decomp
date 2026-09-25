@@ -197,13 +197,21 @@ struct _ENEMY_WORK {
     /* +0x1FA */ u8 unused_0x1FA[0x1FB - 0x1FA];
     /* +0x1FB */ u8 field_0x1FB;        /* set by `fn_80147F48`'s case 9 (added by
                                         * `enemy/fn_80147CE0.cpp`) */
-    /* +0x1FC */ u8 unused_0x1FC[0x1FD - 0x1FC];
+    /* +0x1FC */ u8 field_0x1FC;        /* the "special part request" flag `enemy/fn_801DB8E0.cpp`'s
+                                        * `fn_801DF8EC` arms together with +0x1FE/+0x1FF (added by
+                                        * `enemy/fn_801DB8E0.cpp`) */
     /* +0x1FD */ u8 field_0x1FD;        /* nonzero, `fn_8013FC60`'s command is skipped */
-    /* +0x1FE */ u8 unused_0x1FE[0x20C - 0x1FE];
+    /* +0x1FE */ u8 field_0x1FE;        /* the mode byte `enemy/fn_801DB8E0.cpp`'s `fn_801DF8EC`
+                                        * writes (0x0A) beside +0x1FC/+0x1FF */
+    /* +0x1FF */ u8 field_0x1FF;        /* the id written with +0x1FC/+0x1FE (`enemy/fn_801DB8E0.cpp`) */
+    /* +0x200 */ u8 unused_0x200[0x20C - 0x200];
     /* +0x20C */ f32 field_0x20C;        /* the effect spawn height `fn_801D4DD8`/`fn_801D428C`
                                          * add to the work record's y, and the height
                                          * `fn_801A4504` compares its joint samples against */
-    /* +0x210 */ u8 unused_0x210[0x218 - 0x210];
+    /* +0x210 */ f32 field_0x210;       /* the second effect spawn height `enemy/fn_801DB8E0.cpp`'s
+                                        * `fn_801DB978` adds to the work record's y (the +0x20C
+                                        * sibling is the other branch's) */
+    /* +0x214 */ u8 unused_0x214[0x218 - 0x214];
     /* +0x218 */ u32 field_0x218;       /* nonzero, `fn_80137EE0` has slots to average */
     /* +0x21C */ u8 unused_0x21C[0x228 - 0x21C];
     /* +0x228 */ u16 field_0x228;      /* `enemy/fn_801993E0.cpp`'s `fn_8019D8B8` case 4: the low
@@ -300,7 +308,9 @@ struct _ENEMY_WORK {
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
     /* +0x43F */ u8 field_0x43F;        /* `fn_8013763C` sets it, `fn_80137648` reads it back */
-    /* +0x440 */ u8 unused_0x440[0x452 - 0x440];
+    /* +0x440 */ u8 unused_0x440[0x450 - 0x440];
+    /* +0x450 */ s16 field_0x450;       /* the first of the two `lha` gates `enemy/fn_801DB8E0.cpp`'s
+                                        * `fn_801DF8EC` compares (+0x452 is its sibling) */
     /* +0x452 */ s16 value_0x452;       /* the 0x384-frame gate `fn_801D6DA4` tests (added by
                                          * `enemy/fn_801D428C.cpp`) */
     /* +0x454 */ u8 unused_0x454[0x464 - 0x454];
@@ -311,7 +321,10 @@ struct _ENEMY_WORK {
     /* +0x482 */ u8 field_0x482;       /* nonzero picks the second approach float in
                                         * `enemy/fn_80182D5C.cpp`'s `fn_80184CE0` (added by that unit;
                                         * the pre-header `include/enemy.h` view of this byte) */
-    /* +0x483 */ u8 unused_0x483[0x761 - 0x483];
+    /* +0x483 */ u8 unused_0x483[0x48E - 0x483];
+    /* +0x48E */ u8 field_0x48E;        /* the part-kind byte `enemy/fn_801DB8E0.cpp`'s `fn_801DF2F8`
+                                        * compares against 4 and 6 */
+    /* +0x48F */ u8 unused_0x48F[0x761 - 0x48F];
     /* +0x761 */ u8 field_0x761;       /* one byte, two bands: `enemy/fn_801993E0.cpp`'s slot bit
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
                                         * 8 bits for free slot indices) and `enemy/fn_801D428C.cpp`'s

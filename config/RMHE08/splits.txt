@@ -705,6 +705,11 @@ enemy/fn_801D428C.cpp:
 	.text       start:0x801D428C end:0x801D80EC
 	.ctors      start:0x8056F358 end:0x8056F35C
 
+enemy/fn_801DB8E0.cpp:
+	extab       start:0x8001031C end:0x800103D4
+	extabindex  start:0x8002C394 end:0x8002C4A8
+	.text       start:0x801DB8E0 end:0x801E0ADC
+
 lobby/fn_801E7530.cpp:
 	extab       start:0x800105B4 end:0x8001079C
 	extabindex  start:0x8002C778 end:0x8002CA54
