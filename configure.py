@@ -807,7 +807,6 @@ config.libs = [
             # sibling proposals 800908FC/800916FC/80093990/800947A4), so this unit is registered at its
             # own evidenced extent only.  See the file header for the sections and the rule-7 deferral.
             Object(NonMatching, "g3d/g3d_resanmlight.cpp"),   # 0x8008F8E4-0x800908FC
-            Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
             # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass
