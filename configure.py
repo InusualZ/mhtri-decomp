@@ -627,6 +627,12 @@ config.libs = [
             # `rotVecY__FPQ34nw4r4math4VEC3Ul`).  No `__FILE__` string survives and the runtime dump
             # answers only `zz_` placeholders, so the file keeps the map's own stem (see header).
             Object(NonMatching, "enemy/fn_801B7020.cpp"),
+            # Registered from proposal/801A4504_fn_801A4504.cpp (a 0x801A4504 run discovery proposed):
+            # the enemy per-motion action dispatcher and its four helpers, 5 functions / 0x503C bytes
+            # plus the extab run 0x8000F304..0x8000F324 and the extabindex run 0x8002AB70..0x8002ABA0.
+            # Module `enemy` from `em_get_mot_no(_ENEMY_WORK*)` and every callee; the name keeps the
+            # map's `fn_` stem (no `__FILE__` string, the dump answers only `zz_`/`FUN_`).  C++.
+            Object(NonMatching, "enemy/fn_801A4504.cpp"),
         ],
     },
 

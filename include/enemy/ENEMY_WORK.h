@@ -147,14 +147,15 @@ struct _ENEMY_WORK {
     /* +0x1C8 */ u32 field_0x1C8;       /* bit 0x80 suppresses `fn_8012C6F4` */
     /* +0x1CC */ u8 unused_0x1CC[0x1D0 - 0x1CC];
     /* +0x1D0 */ f32 field_0x1D0;       /* the scale `fn_80142958` returns */
-    /* +0x1D4 */ u8 unused_0x1D4[0x1DE - 0x1D4];
+    /* +0x1D4 */ f32 field_0x1D4;        /* the alpha ratio `fn_801A9210` scales by 255 */
+    /* +0x1D8 */ u8 unused_0x1D8[0x1DE - 0x1D8];
     /* +0x1DE */ u8 field_0x1DE;        /* `fn_8013791C`'s request-to-redraw byte */
     /* +0x1DF */ u8 unused_0x1DF[1];
     /* +0x1E0 */ u8 field_0x1E0;        /* passed to `fn_802B0668` (map lookup) */
     /* +0x1E1 */ u8 area_no;
     /* +0x1E2 */ u8 field_0x1E2;
     /* +0x1E3 */ u8 field_0x1E3;
-    /* +0x1E4 */ u8 unused_0x1E4;
+    /* +0x1E4 */ u8 field_0x1E4;         /* bit 0 is the `fn_801A9384` kind-0 flag */
     /* +0x1E5 */ u8 action;             /* the action id `em_act_ck` matches */
     /* +0x1E6 */ u8 state_sub;          /* fn_80177BA4's dispatch index */
     /* +0x1E7 */ u8 field_0x1E7;        /* set to 1 once the action's entry block has run */
@@ -174,7 +175,9 @@ struct _ENEMY_WORK {
                                         * `enemy/fn_80147CE0.cpp`) */
     /* +0x1FC */ u8 unused_0x1FC[0x1FD - 0x1FC];
     /* +0x1FD */ u8 field_0x1FD;        /* nonzero, `fn_8013FC60`'s command is skipped */
-    /* +0x1FE */ u8 unused_0x1FE[0x218 - 0x1FE];
+    /* +0x1FE */ u8 unused_0x1FE[0x20C - 0x1FE];
+    /* +0x20C */ f32 field_0x20C;        /* the height `fn_801A4504` compares its joint samples against */
+    /* +0x210 */ u8 unused_0x210[0x218 - 0x210];
     /* +0x218 */ u32 field_0x218;       /* nonzero, `fn_80137EE0` has slots to average */
     /* +0x21C */ u8 unused_0x21C[0x244 - 0x21C];
     /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `fn_80137EE0` averages */
@@ -184,9 +187,17 @@ struct _ENEMY_WORK {
     /* +0x318 */ f32 field_0x318;      /* the effect radius `fn_801493A8` writes from `fn_80135644` */
     /* +0x31C */ u8 unused_0x31C[0x324 - 0x31C];
     /* +0x324 */ f32 field_0x324;      /* the effect scale `fn_801493A8` clamps */
-    /* +0x328 */ s16 field_0x328;      /* the countdown `fn_80170804` ticks */
-    /* +0x32A */ u8 field_0x32A;       /* the flag `fn_80170600`/`fn_80170758` clear */
-    /* +0x32B */ u8 unused_0x32B[0x354 - 0x32B];
+    /* +0x328 */ union {
+        struct {
+            /* +0x328 */ s16 field_0x328;  /* the countdown `fn_80170804` ticks */
+            /* +0x32A */ u8 field_0x32A;   /* the flag `fn_80170600`/`fn_80170758` clear */
+            /* +0x32B */ u8 unused_0x32B[0x338 - 0x32B];
+            /* +0x338 */ u8 field_0x338[4]; /* `fn_801A4504`: per-slot data-table index, 0xFF = none */
+        };
+        /* +0x328 */ s32 handles_0x328[4]; /* `fn_801A4504`: per-slot joint-effect handles, -1 = empty */
+    };
+    /* +0x33C */ u8 unused_0x33C[0x353 - 0x33C];
+    /* +0x353 */ u8 field_0x353;       /* `fn_801A9384` kind-1 flag (`n != 0`) */
     /* +0x354 */ s16 field_0x354;      /* the 50-frame action counter `fn_801481D8` ticks and wraps */
     /* +0x356 */ u8 field_0x356;       /* the action's "hold" flag `fn_80147F48` arms/clears */
     /* +0x357 */ u8 field_0x357;       /* the action's case-6 flag `fn_80147F48` sets */

@@ -257,6 +257,24 @@ void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s3
  * `void`, which is wrong for those call sites (recorded in this unit's outbox).  The `u32` return
  * below is the form `enemy/fn_801B7020.cpp`'s `fn_801B73F0` needs. */
 u32 fn_801B701C(struct _ENEMY_WORK* self);
+/* The enemy effect-slot cluster between `enemy/fn_80191598.cpp` and the `fn_801A4504` range (0x8019E9xx-
+ * 0x801A9xxx): unowned (the bracketing registered units are `enemy` below and `lobby` above), so the
+ * declarations live in this band header.  `enemy/fn_801A4504.cpp` calls all of them; the signatures are
+ * its call sites' (r3 the work record; `fn_8019E9AC` returns the r3 word compared against 0, and
+ * `fn_8019EA04` is the per-joint slot release `fn_801A94C0` tail-calls with the same registers). */
+void fn_8019E960(struct _ENEMY_WORK* self, s32 slot);
+void fn_8019EA04(struct _ENEMY_WORK* self);
+s32 fn_8019E9AC(struct _ENEMY_WORK* self, s32 slot);
+void fn_8019EC38(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
+void fn_801A3E90(struct _ENEMY_WORK* self);
+void fn_801A3FD8(struct _ENEMY_WORK* self);
+void fn_801A4218(struct _ENEMY_WORK* self);
+/* r3 the work record, r4 a joint id, r5/r6 two `VEC3*` (the target's call sites set all three). */
+void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
+/* r3 the work record, r4/r5/r6/r7 four scalars and f1 (the target's call sites set all five). */
+void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
+void fn_801A9748(struct _ENEMY_WORK* self);
+void fn_801A98F8(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
 }
 #endif

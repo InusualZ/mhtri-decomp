@@ -77,7 +77,11 @@ public:
     int get_joint_num(void);
     void frame_init(long a, u16 b, f32 c, u32 d, f32 e);
     void setMatColor(u32 idx, _GXChannelID channel, _GXColor color, bool keep);
-    void getMatColor(u32 idx, _GXChannelID channel, _GXColor* out);
+    /* Returns the material-found status in r3 (the owner's body sets 0 on the no-resource and
+     * no-material paths and the inner reader's value otherwise), so the return is `u32`, not `void`:
+     * `enemy/fn_801A4504.cpp`'s `fn_801A9210` compares it against 1 with `cmplwi` (settled from the
+     * callee's body, docs/plan.md 6.5). */
+    u32 getMatColor(u32 idx, _GXChannelID channel, _GXColor* out);
     void setAmbColor(u32 idx, _GXChannelID channel, _GXColor color, bool keep);
     void getTevKColor(u32 idx, _GXTevKColorID id, _GXColor* out);
     void setTevKColor(u32 idx, _GXTevKColorID id, _GXColor color);

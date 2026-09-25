@@ -77,4 +77,11 @@ f32 fn_80050EF4(void* a, void* b);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x800514AC - the `out = mtx * v + trans` helper (map name
+ * `mulVecMatAddTrans__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34`, so C++ linkage at global scope).
+ * Added with `enemy/fn_801A4504.cpp`, its consumer (rule 2/9). */
+void mulVecMatAddTrans(VEC3* v, MTX34* m);
+#endif
+
 #endif /* MHTRI_FN_8004CAD8_H */

@@ -682,6 +682,11 @@ enemy/fn_80191598.cpp:
 	.text       start:0x80191598 end:0x801926EC
 	.ctors      start:0x8056F33C end:0x8056F340
 
+enemy/fn_801A4504.cpp:
+	extab       start:0x8000F304 end:0x8000F324
+	extabindex  start:0x8002AB70 end:0x8002ABA0
+	.text       start:0x801A4504 end:0x801A9540
+
 enemy/fn_801B7020.cpp:
 	extab       start:0x8000F7EC end:0x8000FACC
 	extabindex  start:0x8002B2CC end:0x8002B71C
