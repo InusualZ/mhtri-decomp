@@ -548,6 +548,11 @@ config.libs = [
             # 104 functions).  C++ (the range defines three em003_* manglings).  The boundary is
             # provisional - see the unit header.
             Object(NonMatching, "enemy/fn_801550FC.cpp"),
+            # proposal/8015E854_fn_8015E854.cpp: the enemy action/state unit that follows the em003
+            # block (0x8015E854..0x80165FC8, 55 functions).  C++ (every callee is a mangling reached
+            # through its real signature).  Not a continuation of fn_801550FC.cpp (that unit ends at
+            # 0x8015D860); the boundary is provisional - see the unit header.
+            Object(NonMatching, "enemy/fn_8015E854.cpp"),
             Object(NonMatching, "enemy/fn_801679B0.cpp"),
             Object(NonMatching, "enemy/fn_80171194.cpp"),
             Object(NonMatching, "enemy/fn_80178128.cpp"),

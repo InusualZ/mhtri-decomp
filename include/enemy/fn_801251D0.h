@@ -67,7 +67,14 @@ u32 fn_80125FF0(u32 a, u32 b);
 u8* fn_80126044(struct _ENEMY_WORK* self);
 void* fn_80126704(struct _ENEMY_WORK* self);
 void fn_80126898(struct _ENEMY_WORK* self);
+void fn_801280F4(struct _ENEMY_WORK* self);
 void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
+/* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in
+ * 0x10-byte steps; the caller (`enemy/fn_8015E854.cpp`'s `fn_8015EFAC`) reads the f32 at +0x4. */
+f32* fn_80126454(struct _ENEMY_WORK* self);
+/* 0x8012933C - r3 (`self`), a byte r4 and two scalars r5/r6 (the owner `enemy/fn_801251D0.cpp`
+ * declares it `(struct _ENEMY_WORK*, u8, u32, u32)` and calls it `(self, (u8)a, b, 0)`). */
+void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 void fn_80129864(struct _ENEMY_WORK* self);
 void fn_80129984(struct _ENEMY_WORK* self);
 u32 fn_8012B5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
