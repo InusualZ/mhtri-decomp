@@ -229,6 +229,11 @@ gx/fn_8009ACE4.c:
 	extabindex  start:0x80022B00 end:0x80022B18
 	.text       start:0x8009ACE4 end:0x8009B140
 
+g3d/g3d_gpu.cpp:
+	extab       start:0x80009A28 end:0x80009A38
+	extabindex  start:0x80022B18 end:0x80022B30
+	.text       start:0x8009B140 end:0x8009B374
+
 ef/ef_creationqueue.cpp:
 	extab       start:0x80009B40 end:0x80009B60
 	extabindex  start:0x80022CBC end:0x80022CEC
