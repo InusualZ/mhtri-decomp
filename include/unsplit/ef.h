@@ -52,14 +52,8 @@ void fn_800B54B4(const void* src, Vec3* out);
  * tail-calls.  It sits at the head of the next unclaimed range, so it has no registered owner yet. */
 struct _EFT;
 
-/* 0x8010BDE4..0x8010C0E0 run - the state-0 handler of `ef/fn_80105314.cpp`'s `fn_8010BDA8`
- * dispatcher and its siblings.  They sit at the head of the next unclaimed range, so they have no
- * registered owner yet (callers: ef/fn_80105314.cpp). */
-struct _EFT013;
-void fn_8010BDE4(struct _EFT013* self);
-void fn_8010C0E0(struct _EFT013* self);
-void fn_8010C454(struct _EFT013* self);
-void fn_8010C464(struct _EFT013* self);
+/* fn_8010BDE4..fn_8010C464 are owned by `ef/fn_8010BDE4.cpp` now - see `include/ef/fn_8010BDE4.h`
+ * (rule 2: an owned symbol is declared in the owner's header, not here). */
 
 
 #ifdef __cplusplus
