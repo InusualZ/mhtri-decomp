@@ -862,23 +862,33 @@ def restore_rescued_branch(main: str, unit: str) -> str | None:
     return branch if p.returncode == 0 else None
 
 
+def commits_ahead_of_main(main: str, ref: str) -> bool:
+    """True when `ref` carries commits `main` does not already have - the gate's "the work exists" test."""
+    p = run(["git", "rev-list", "--count", "main..%s" % ref], main)
+    return p.returncode == 0 and p.stdout.strip().isdigit() and int(p.stdout.strip()) > 0
+
+
 def branch_problems(main: str, units: list[str]) -> list[str]:
     """One line per unit whose worker branch does not carry its work as commits.
 
     A missing branch is the 2026-09-23 shape: `release --force` on an unreported worker deleted the branch
-    (its only copy of the work) and left it at `refs/rescue/<slug>`, so the next gate refused with a bare "no
-    branch" and the round had to work out how to get the work back. `verify` now restores the branch from
-    that ref before asking (`restore_rescued_branch`), so this only reports the residue: a branch with no
-    rescue ref behind it, or one that has no commits of its own.
+    (its only copy of the work) and left it at `refs/rescue/<slug>`. What the gate actually needs is that the
+    work *exists as commits*, so a rescue ref that carries commits `main` does not is accepted as the
+    branch's work - the 2026-09-26 report's case (a). The landing path additionally restores the real branch
+    from that ref (`restore_rescued_branch`, and only when not `--dry-run`, which touches nothing), so the
+    teardown still has a branch to release. A missing branch with no rescue ref behind it, or a rescue ref
+    with no commits of its own, is still reported.
     """
     problems = []
     for u in units:
         branch = claims.claim_branch(main, u)
         if not claims.branch_exists(main, branch):
             rescue = claims.rescue_exists(main, u)
+            if rescue and commits_ahead_of_main(main, rescue):
+                continue          # the work exists as commits at the rescue ref: that is what the gate wants
             if rescue:
-                problems.append("%s (no branch %s; its commits are preserved at %s - restore with "
-                                "`git branch %s %s`)" % (u, branch, rescue, branch, rescue))
+                problems.append("%s (rescue ref %s has no commits of its own; no branch %s)"
+                                % (u, rescue, branch))
             else:
                 problems.append("%s (no branch %s)" % (u, branch))
         elif branch_commits(main, u) == 0:
@@ -944,14 +954,16 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
               kind=KIND_BOOKKEEPING,
               remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
                      "with --no-outbox for an orchestrator-only batch")
-        # a `--force` release leaves the work at refs/rescue/<slug>; restore the branch from it rather than
-        # refuse a batch whose work is demonstrably preserved (2026-09-26 case (a))
-        for u in units:
-            restored = restore_rescued_branch(main, u)
-            if restored:
-                print("NOTE: %s's branch %s was gone but its work is preserved at %s - restored the branch "
-                      "from the rescue ref (a `--force` release had parked it there)"
-                      % (u, restored, claims.rescue_ref_name(u)), file=sys.stderr)
+        # a `--force` release leaves the work at refs/rescue/<slug>. `branch_problems` already accepts that
+        # ref as the branch's work, and the landing path (never `--dry-run`, which touches nothing) restores
+        # the real branch from it so the teardown still has a branch to release (2026-09-26 case (a)).
+        if not dry_run:
+            for u in units:
+                restored = restore_rescued_branch(main, u)
+                if restored:
+                    print("NOTE: %s's branch %s was gone but its work is preserved at %s - restored the "
+                          "branch from the rescue ref (a `--force` release had parked it there)"
+                          % (u, restored, claims.rescue_ref_name(u)), file=sys.stderr)
         uncommitted = branch_problems(main, units)
         check("every unit's branch carries its work as commits", not uncommitted,
               "no commits of its own on the branch (work left uncommitted in the worktree?): %s"
@@ -1790,14 +1802,12 @@ def selftest() -> int:
         repo_git(tmp, "branch", "-D", branch)          # the `release --force` shape
         check("case (a): the released branch is really gone", claims.branch_exists(tmp, branch), False)
         check("case (a): its work is preserved at the rescue ref", claims.rescue_exists(tmp, unit), rescue)
-        problems = branch_problems(tmp, [unit])
-        check("case (a): branch_problems reports the missing branch", len(problems), 1)
-        check("... and names the rescue ref", rescue in problems[0], True)
+        check("case (a): the rescue ref is accepted as the branch's work", branch_problems(tmp, [unit]), [])
         restored = restore_rescued_branch(tmp, unit)
-        check("case (a): the gate restores the branch from the rescue ref", restored, branch)
+        check("case (a): the landing path restores the branch from the rescue ref", restored, branch)
         check("... the branch exists again", claims.branch_exists(tmp, branch), True)
         check("... and carries its work as commits", branch_commits(tmp, unit) > 0, True)
-        check("... so branch_problems is empty", branch_problems(tmp, [unit]), [])
+        check("... so branch_problems is still empty", branch_problems(tmp, [unit]), [])
         check("restoring an existing branch is a no-op", restore_rescued_branch(tmp, unit), None)
         # the real `verify`, dry-run: it restores the branch during its own check and reports the gate green
         os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
@@ -1807,17 +1817,18 @@ def selftest() -> int:
                        "residual": "none", "measured_with": "recompile.py", "config_requests": [],
                        "flags_probed": [], "blockers": []}, fh)
         repo_git(tmp, "branch", "-D", branch)           # back to the released shape for the verify run
+        check("case (a): the branch is gone again", claims.branch_exists(tmp, branch), False)
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
             code = verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True)
         check("case (a): the real verify passes on the rescued branch", code, 0)
-        check("... having restored the branch itself", claims.branch_exists(tmp, branch), True)
+        check("... and --dry-run touched nothing (no branch created)",
+              claims.branch_exists(tmp, branch), False)
         # the out-parameter plumbing that the classification depends on: before the fix, reusing the
         # `problems` name for the outbox results rebound it locally and NO failed check reached the caller's
         # list (so `land`'s refusal could not name anything). A real verify must populate it.
         problems = []
         repo_git(tmp, "update-ref", "-d", rescue)      # no rescue ref: the branch is genuinely gone
-        repo_git(tmp, "branch", "-D", branch)
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             code = verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True,
                           check_outbox=True, problems=problems)
@@ -1960,8 +1971,9 @@ def selftest() -> int:
         repo_commit(tmp, "claim-time main")
         check("a missing worker branch fails", branch_commits(tmp, unit), 0)
 
-    # a `--force` release deletes the branch and parks the work at refs/rescue/<slug>; the gate's refusal must
-    # name that ref and the exact command that puts the branch back (the 2026-09-23 "no branch" dead end)
+    # a `--force` release deletes the branch and parks the work at refs/rescue/<slug>. The gate's need is that
+    # the work exists as commits, so a rescue ref carrying commits is ACCEPTED as the branch's work (2026-09-26
+    # case (a)); a rescue ref with no commits of its own, or none at all, is still reported.
     with tempfile.TemporaryDirectory() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
@@ -1969,13 +1981,20 @@ def selftest() -> int:
         rescue = claims.rescue_ref_name(unit)
         repo_git(tmp, "update-ref", rescue, repo_git(tmp, "rev-parse", "HEAD"))
         problems = branch_problems(tmp, [unit])
-        check("a branch gone to a rescue ref is reported", len(problems), 1)
-        check("... the refusal names the rescue ref", rescue in problems[0], True)
-        check("... and the exact restore command",
-              "git branch %s %s" % (claims.branch_for(unit), rescue) in problems[0], True)
+        check("a rescue ref with no commits of its own is reported", len(problems), 1)
+        check("... and names the rescue ref", rescue in problems[0], True)
+        check("... and names the missing branch", claims.branch_for(unit) in problems[0], True)
+        # a rescue ref that carries the worker's commits IS the branch's work
+        repo_git(tmp, "checkout", "-q", "-b", "tmpwork")
+        repo_commit(tmp, "the worker's own work")
+        repo_git(tmp, "update-ref", rescue, repo_git(tmp, "rev-parse", "tmpwork"))
+        repo_git(tmp, "checkout", "-q", "main")
+        repo_git(tmp, "branch", "-D", "tmpwork")
+        check("a rescue ref carrying commits is accepted", branch_problems(tmp, [unit]), [])
+        check("... and restore_rescued_branch puts the real branch back",
+              restore_rescued_branch(tmp, unit), claims.branch_for(unit))
+        check("... which then carries the work", branch_commits(tmp, unit) > 0, True)
         check("a missing branch with no rescue ref is still reported", len(branch_problems(tmp, ["Nope/none"])), 1)
-        check("... and has no restore command to name",
-              "restore with" in branch_problems(tmp, ["Nope/none"])[0], False)
 
     # outbox_units() must look where brief.py wrote: the claim's branch minus worker/, not slug(unit)
     entry = {"unit": "Pl/pl_act", "worker": "a", "finished_at": "2026-01-01T00:00:00", "unit_percent": 50.0,
