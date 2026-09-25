@@ -42,11 +42,16 @@ f32 fn_800610AC(f32 value);                /* 0x800610AC - the reciprocal helper
 void *fn_800618BC(void *self);             /* 0x800618BC - the resource-table base */
 s32 fn_800628C8(void *self, s32 key);      /* 0x800628C8 - the table entry lookup */
 
+/* 0x800600C0 - `GetParent()`, the `!GetParent()` assert's test; the ScnMdl destructor calls it.
+ * Inside the `extern "C"` block: the map name is plain, so a C++ consumer must not mangle it
+ * (`g3d_scnmdl.cpp` referenced `fn_800600C0__FPUl`).  The owner defines it `extern "C" u32
+ * fn_800600C0(u32*)` in `g3d_anmchr.cpp`; `fn_80075DCC.cpp`'s zero-argument declaration is a
+ * separate TU and its object already references the plain name. */
+u32 fn_800600C0(u32* p);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */
-/* 0x800600C0 - `GetParent()`, the `!GetParent()` assert's test; the ScnMdl destructor calls it. */
-u32 fn_800600C0(u32* p);
 
