@@ -7821,6 +7821,366 @@
    }
   },
   {
+   "label": "proposal/800F6520_fn_800F6520.cpp",
+   "text": [
+    2148492576,
+    2148504996
+   ],
+   "count": 43,
+   "bytes": 12420,
+   "cxx": true,
+   "language": {
+    "lang": "c++",
+    "confidence": "high",
+    "conclusive": true,
+    "suggested": false,
+    "evidence": [
+     {
+      "kind": "mangled-defined",
+      "detail": "get_eft_res_name__FUs",
+      "count": 7
+     },
+     {
+      "kind": "mangled-undefined",
+      "detail": "RetireEffect__Q34nw4r2ef12EffectSystemFPQ34nw4r2ef6Effect",
+      "count": 15
+     }
+    ],
+    "sources": [],
+    "conflict": false,
+    "mangled_defined": [
+     "get_eft_res_name__FUs",
+     "push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl",
+     "res_eft_UV_model_create__FP6MHcharUsUllPP9_g3d_worklUc",
+     "res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc",
+     "res_eft_create__FUsUsUl",
+     "res_eft_model_create__FP6MHcharUsUl",
+     "res_eft_model_create_light__FP6MHcharUsUll"
+    ],
+    "mangled_undefined": [
+     "RetireEffect__Q34nw4r2ef12EffectSystemFPQ34nw4r2ef6Effect",
+     "RetireEmitterAll__Q34nw4r2ef6EffectFv",
+     "ckResourceName__FPc",
+     "getResMemAdrs__Fl",
+     "get_move_work_adrs__FUc",
+     "get_move_work_max__FUc",
+     "get_now_areano__Fv",
+     "get_now_mapno__Fv",
+     "load_file_req__FPcUllUllPUl",
+     "nwAddResource__FPcPv",
+     "nwDelResource__Fl",
+     "pull_res_mem__FPcUll",
+     "push_g3d_wk__FP9_g3d_work",
+     "push_res_mem__Fl",
+     "res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc"
+    ],
+    "cpp_sources": [],
+    "c_sources": [],
+    "extab": false,
+    "extab_signal": false,
+    "extab_conflict": false,
+    "exceptions_on": false
+   },
+   "seam": null,
+   "seam_note": null,
+   "functions": [
+    {
+     "name": "fn_800F6520",
+     "address": 2148492576,
+     "size": 148
+    },
+    {
+     "name": "fn_800F65B4",
+     "address": 2148492724,
+     "size": 212
+    },
+    {
+     "name": "fn_800F6688",
+     "address": 2148492936,
+     "size": 136
+    },
+    {
+     "name": "fn_800F6710",
+     "address": 2148493072,
+     "size": 628
+    },
+    {
+     "name": "fn_800F6984",
+     "address": 2148493700,
+     "size": 28
+    },
+    {
+     "name": "fn_800F69A0",
+     "address": 2148493728,
+     "size": 24
+    },
+    {
+     "name": "fn_800F69B8",
+     "address": 2148493752,
+     "size": 108
+    },
+    {
+     "name": "fn_800F6A24",
+     "address": 2148493860,
+     "size": 84
+    },
+    {
+     "name": "fn_800F6A78",
+     "address": 2148493944,
+     "size": 80
+    },
+    {
+     "name": "fn_800F6AC8",
+     "address": 2148494024,
+     "size": 164
+    },
+    {
+     "name": "fn_800F6B6C",
+     "address": 2148494188,
+     "size": 584
+    },
+    {
+     "name": "fn_800F6DB4",
+     "address": 2148494772,
+     "size": 2500
+    },
+    {
+     "name": "fn_800F7778",
+     "address": 2148497272,
+     "size": 812
+    },
+    {
+     "name": "fn_800F7AA4",
+     "address": 2148498084,
+     "size": 332
+    },
+    {
+     "name": "fn_800F7BF0",
+     "address": 2148498416,
+     "size": 132
+    },
+    {
+     "name": "fn_800F7C74",
+     "address": 2148498548,
+     "size": 208
+    },
+    {
+     "name": "fn_800F7D44",
+     "address": 2148498756,
+     "size": 468
+    },
+    {
+     "name": "fn_800F7F18",
+     "address": 2148499224,
+     "size": 1088
+    },
+    {
+     "name": "fn_800F8358",
+     "address": 2148500312,
+     "size": 732
+    },
+    {
+     "name": "fn_800F8634",
+     "address": 2148501044,
+     "size": 340
+    },
+    {
+     "name": "fn_800F8788",
+     "address": 2148501384,
+     "size": 228
+    },
+    {
+     "name": "fn_800F886C",
+     "address": 2148501612,
+     "size": 168
+    },
+    {
+     "name": "fn_800F8914",
+     "address": 2148501780,
+     "size": 144
+    },
+    {
+     "name": "fn_800F89A4",
+     "address": 2148501924,
+     "size": 160
+    },
+    {
+     "name": "fn_800F8A44",
+     "address": 2148502084,
+     "size": 116
+    },
+    {
+     "name": "push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl",
+     "address": 2148502200,
+     "size": 140
+    },
+    {
+     "name": "fn_800F8B44",
+     "address": 2148502340,
+     "size": 308
+    },
+    {
+     "name": "fn_800F8C78",
+     "address": 2148502648,
+     "size": 264
+    },
+    {
+     "name": "fn_800F8D80",
+     "address": 2148502912,
+     "size": 36
+    },
+    {
+     "name": "fn_800F8DA4",
+     "address": 2148502948,
+     "size": 184
+    },
+    {
+     "name": "res_eft_model_create__FP6MHcharUsUl",
+     "address": 2148503132,
+     "size": 12
+    },
+    {
+     "name": "res_eft_model_create_light__FP6MHcharUsUll",
+     "address": 2148503144,
+     "size": 244
+    },
+    {
+     "name": "res_eft_UV_model_create__FP6MHcharUsUllPP9_g3d_worklUc",
+     "address": 2148503388,
+     "size": 172
+    },
+    {
+     "name": "res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc",
+     "address": 2148503560,
+     "size": 408
+    },
+    {
+     "name": "get_eft_res_name__FUs",
+     "address": 2148503968,
+     "size": 20
+    },
+    {
+     "name": "res_eft_create__FUsUsUl",
+     "address": 2148503988,
+     "size": 16
+    },
+    {
+     "name": "fn_800F91C4",
+     "address": 2148504004,
+     "size": 180
+    },
+    {
+     "name": "fn_800F9278",
+     "address": 2148504184,
+     "size": 92
+    },
+    {
+     "name": "fn_800F92D4",
+     "address": 2148504276,
+     "size": 12
+    },
+    {
+     "name": "fn_800F92E0",
+     "address": 2148504288,
+     "size": 20
+    },
+    {
+     "name": "fn_800F92F4",
+     "address": 2148504308,
+     "size": 140
+    },
+    {
+     "name": "fn_800F9380",
+     "address": 2148504448,
+     "size": 88
+    },
+    {
+     "name": "fn_800F93D8",
+     "address": 2148504536,
+     "size": 460
+    }
+   ],
+   "runs": {
+    ".data": {
+     "start": 2153262864,
+     "end": 2153362896,
+     "labels": 15,
+     "filler": 2549,
+     "density": 0.01,
+     "leak": 0,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "jumptable_8059B3B0",
+      "jumptable_8059B3DC",
+      "jumptable_8059B404",
+      "jumptable_8059B430",
+      "jumptable_8059B460",
+      "jumptable_8059B494",
+      "jumptable_8059B4C0",
+      "jumptable_8059B4E8",
+      "jumptable_8059B510",
+      "jumptable_8059B540",
+      "jumptable_8059B574",
+      "lbl_80582F10",
+      "lbl_80582F40",
+      "lbl_80588EE0",
+      "lbl_80589988"
+     ]
+    },
+    ".bss": {
+     "start": 2154438896,
+     "end": 2154448184,
+     "labels": 2,
+     "filler": 0,
+     "density": 1.0,
+     "leak": 1,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "eft_control",
+      "lbl_806A2D34"
+     ]
+    },
+    ".sbss": {
+     "start": 2155432308,
+     "end": 2155432584,
+     "labels": 17,
+     "filler": 41,
+     "density": 0.29,
+     "leak": 3,
+     "owned": 0,
+     "owned_names": [],
+     "names": [
+      "efm_common_proID_tbl_ptr",
+      "efm_em_proID_tbl_ptr",
+      "efm_map_com_proID_tbl_ptr",
+      "efm_map_proID_tbl_ptr",
+      "eft_common_proID_tbl_ptr",
+      "eft_em_proID_tbl_ptr",
+      "eft_map_com_proID_tbl_ptr",
+      "eft_map_proID_tbl_ptr",
+      "efx_common_proID_tbl_ptr",
+      "efx_em_proID_tbl_ptr",
+      "efx_map_com_proID_tbl_ptr",
+      "lb_comn_eft_name_ptr",
+      "lobby_eft_mdl_name_ptr",
+      "pRoot",
+      "q_comn_efm_name_ptr",
+      "q_comn_eft_name_ptr",
+      "res_model_name_ptr"
+     ]
+    },
+    "extabindex": {
+     "start": 2147637260,
+     "end": 2147637620,
+     "labels": 29,
+     "filler": 0,
+     "leak": 0
+    }
+   }
+  },
+  {
    "label": "proposal/800F95A4_fn_800F95A4.cpp",
    "text": [
     2148504996,
