@@ -44,6 +44,14 @@ s32 fn_8012E8F4(f32 seconds);
 #ifdef __cplusplus
 void fn_8012CF20(struct _ENEMY_WORK* self);
 #endif
+/* 0x8012C220 / 0x8012C4E8 - this unit's own definitions, moved here from `include/unsplit/enemy.h`
+ * (rule 2): the band header had them as if no unit owned the address.  Signatures are the owner's
+ * definitions (`s32 fn_8012C220(u32 team, u32 state_sub)`; `void fn_8012C4E8(u32 team, u32 state_sub,
+ * s16 arg3, void* ref, f32 radius)`); `enemy/fn_80147CE0.cpp` calls both with those argument types. */
+#ifdef __cplusplus
+s32 fn_8012C220(u32 team, u32 state_sub);
+void fn_8012C4E8(u32 team, u32 state_sub, s16 arg3, void* ref, f32 radius);
+#endif
 #ifdef __cplusplus
 }
 #endif

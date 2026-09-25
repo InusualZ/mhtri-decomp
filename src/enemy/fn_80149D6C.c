@@ -41,6 +41,7 @@
 #include "nw4r/math.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80138074.h"
+#include "enemy/fn_80147CE0.h"
 #include "unsplit/enemy.h"
 
 /* ---- the enemy work record ---- */

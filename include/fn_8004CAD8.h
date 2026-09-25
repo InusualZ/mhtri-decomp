@@ -7,9 +7,20 @@
 #define MHTRI_FN_8004CAD8_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 #ifdef __cplusplus
 void wii_sysmsg_gen(long id, char* buf, long a);
+#endif
+
+/* 0x80050A90 - `calcVecAng2`, the two-vector angle helper: it loads the two vectors' x/z floats and
+ * tail-calls 0x80050A40, so the angle comes back in r3.  Added when `enemy/fn_80147CE0.cpp`
+ * registered as a consumer (rule 2); the return is the 16-bit angle its three consumers mask
+ * (`clrlwi r3,r3,16`) and sign-extend (`extsh`), spelled `s32` here as `enemy/fn_801550FC.cpp` does.
+ * C++ linkage (outside the `extern "C"` block below): the map name is the mangling, not a plain
+ * name, and `enemy/fn_801550FC.cpp` declares it that way. */
+#ifdef __cplusplus
+s32 calcVecAng2(VEC3* a, VEC3* b);
 #endif
 
 /* C linkage: the target symbol is the unmangled `fn_80051570` (.text 0x80051570, a 4-byte `blr`).

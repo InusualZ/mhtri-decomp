@@ -161,14 +161,6 @@ void fn_80140AF8(struct _ENEMY_WORK *self, u32 a, u32 b);
 void fn_80140B10(struct _ENEMY_WORK *self, u32 a, u32 b);
 void fn_80143190(void);
 void fn_80144584(s32 kind);
-void fn_801481FC(struct _ENEMY_WORK* self);
-void fn_801493A8();
-void fn_80149788();
-void fn_801498C8();
-void fn_80149A08();
-void fn_80149AFC();
-void fn_80149C54();
-void fn_80149C58();
 f32 get_em_chg_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 f32 get_em_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* work, u32 joint, Vec3* out);
@@ -203,7 +195,6 @@ u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);
 void fn_80135C5C(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80147E2C(void* self);
 /* Declarations moved here from `enemy/fn_801679B0.cpp` (docs/plan.md 6.5 rule 2): enemy-band
  * symbols no registered unit owns.  Guarded for C++ because the C consumers carry their own
  * ABI-equivalent spellings of `fn_80134004` (`f32,u16` in `enemy/fn_80149D6C.c`, `u32,f32` in
@@ -219,6 +210,13 @@ void fn_801321D0(struct _ENEMY_WORK* self);
 void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
 void fn_80132224(struct _ENEMY_WORK* self);
 void fn_80132264(struct _ENEMY_WORK* self);
+/* 0x80154CA4 / 0x801545B8 - enemy band, unowned (both bracketing registered units are `enemy`:
+ * `enemy/fn_8014A1BC.c` below, `enemy/fn_801550FC.cpp` above).  Moved here from
+ * `enemy/fn_80147CE0.cpp` (rule 2): `fn_80154CA4` takes `self` only (its body clamps
+ * `self->+0x1AC` after `fn_801303FC`), `fn_801545B8` takes a `void*` record and three scalars (its
+ * body saves r28..r31 and calls `fn_80041E8C(&v, 0.0f, x, y)` with the record at r3). */
+void fn_80154CA4(struct _ENEMY_WORK* self);
+void fn_801545B8(void* v, u32 a, u32 b, u32 c);
 void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s32 j, s32 k);
 #ifdef __cplusplus
 }
