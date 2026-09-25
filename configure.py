@@ -774,6 +774,19 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_calcvtx.cpp"),      # 0x8007270C-0x800736F8 (widened 2026-09-24 from 0x80073398; 0x8007270C-0x80073398 reconstructed, incl. the 80073180 handover, 0x80073398-0x800736F8 earlier cut)
             Object(NonMatching, "g3d/g3d_calcworld.cpp"),    # 0x800736F8-0x800746DC
             Object(NonMatching, "g3d/g3d_camera.cpp"),       # 0x800746DC-0x80075DCC
+            # Registered once, at its final home (docs/plan.md 12): proposal `8008452C` - the maximal
+            # unclaimed run 0x8008452C-0x800898B0 (202 functions).  Module `g3d` and source name
+            # `g3d_state.cpp` come from the run's own `__FILE__` string (`.data` 0x8058F750 =
+            # "g3d_state.cpp", 18 references - the file argument of the `nw4r::db::Panic` asserts from
+            # fn_80084630 on).  The run's data fragment starts at 0x8058F750, exactly where
+            # `g3d_scnroot.cpp`'s ends (0x8058F530-0x8058F74A), so the left seam 0x8008452C is the
+            # scnroot|state TU boundary; the right seam is the registered `g3d/g3d_resanm.c` at
+            # 0x800898B0 (tudiscover: strong).  Interior: a second `.data` fragment starts at
+            # 0x8058FCE8 (`g3d_resvtx_ac.h`/`ResVtxFurVec`/`ResVtxTexCoord` strings plus the static
+            # constructor fn_80088AD0 at .ctors 0x8056F2D4), so the last ~52 functions may be a second
+            # TU; both interior cut candidates (0x80088AD0 / 0x80089330) are tudiscover "weak" only, so
+            # the run is registered whole and the seam is left to settle (brief 8.3).
+            Object(NonMatching, "g3d/g3d_state.cpp"),        # 0x8008452C-0x800898B0
             Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
             Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
             Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C

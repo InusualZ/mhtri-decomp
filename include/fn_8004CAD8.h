@@ -20,6 +20,10 @@ void wii_sysmsg_gen(long id, char* buf, long a);
 extern "C" {
 #endif
 u32 fn_80051570(u32);
+/* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved
+ * out of that unit's local extern block on landing, 2026-09-25). */
+void fn_800504D4(void* pOut);
+void fn_8005050C(void* pOut);
 #ifdef __cplusplus
 }
 #endif

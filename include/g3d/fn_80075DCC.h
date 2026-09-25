@@ -45,6 +45,13 @@ void fn_8007A5E4(void* self, f32 x, f32 y, f32 z);
 void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);
 void fn_8007A724(void* self, f32 x, f32 y, f32 z);
 
+/* 0x8007B5F4/0x8007BB8C - the ScnRoot state lookups `g3d/g3d_state.cpp` calls (rule 2, moved out of
+ * include/unsplit/g3d.h when this unit registered, 2026-09-25).  `fn_8007BB8C` stores what it finds
+ * through its out-parameter and returns that parameter; `fn_8007B5F4` registers `pKey` under the
+ * state object. */
+u32 fn_8007B5F4(void* pSelf, const u32* pKey);
+void** fn_8007BB8C(void** pOut, const char* pName);
+
 #ifdef __cplusplus
 }
 #endif

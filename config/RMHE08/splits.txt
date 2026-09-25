@@ -128,6 +128,12 @@ g3d/fn_80075DCC.cpp:
 	extabindex  start:0x8002091C end:0x80020E74
 	.text       start:0x80075DCC end:0x8007C540
 
+g3d/g3d_state.cpp:
+	extab       start:0x80008ADC end:0x80008EB0
+	extabindex  start:0x8002148C end:0x800219E4
+	.text       start:0x8008452C end:0x800898B0
+	.ctors      start:0x8056F2D4 end:0x8056F2D8
+
 g3d/g3d_resanm.c:
 	extab       start:0x80008EB0 end:0x80008EE8
 	extabindex  start:0x800219E4 end:0x80021A38
