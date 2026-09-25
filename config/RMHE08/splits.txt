@@ -169,6 +169,11 @@ g3d/g3d_resanmcamera.cpp:
 	extabindex  start:0x80021A5C end:0x80021A74
 	.text       start:0x8008A220 end:0x8008A664
 
+g3d/g3d_resanmchr.cpp:
+	extab       start:0x80008F10 end:0x80009100
+	extabindex  start:0x80021A74 end:0x80021D5C
+	.text       start:0x8008A664 end:0x8008F6E8
+
 g3d/g3d_resanmfog.cpp:
 	extab       start:0x80009100 end:0x80009108
 	extabindex  start:0x80021D5C end:0x80021D68

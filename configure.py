@@ -797,6 +797,19 @@ config.libs = [
             # cites "g3d_resanmlight.cpp" (.data 0x80590440), so the seam is proven.  See the file
             # header for the sections and the rule-7 deferral.
             Object(NonMatching, "g3d/g3d_resanmfog.cpp"),    # 0x8008F6E8-0x8008F8E4
+            Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
+            # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass
+            # the bare source name "g3d_resanmchr.cpp" (`.data` 0x80590010, the file argument of every
+            # assert in the range) with the value-type format strings and the `g3d_resanmchr_ac.h`
+            # inlined-assert header beside it, so the lib is `g3d` and the file takes its evidenced TU
+            # name (class 1 in the brief).  `langcheck` agrees: the name is a `.cpp` and the `Panic`
+            # relocation is a C++ mangling, so the unit is `src/g3d/g3d_resanmchr.cpp` in this lib.
+            # Sections: `.text` 0x8008A664-0x8008F6E8, `extab` 0x80008F10-0x80009100 (62 records),
+            # `extabindex` 0x80021A74-0x80021D5C (62 entries); the boundaries are the functions before
+            # (fn_8008A644) and after (fn_8008F6E8).
+            Object(NonMatching, "g3d/g3d_resanmchr.cpp"),   # 0x8008A664-0x8008F6E8
             # Registered from proposal/800D77B0_fn_800D77B0 (the 0x800D77B0 two-function run).  `g3d`
             # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
             # builder) and names it; the range's own data has no `__FILE__` string, so the name stays

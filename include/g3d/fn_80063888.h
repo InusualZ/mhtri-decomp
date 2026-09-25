@@ -27,6 +27,10 @@ u32 fn_800651BC(void *self);                /* 0x800651BC - reads the word at +0
 void *fn_80067E54(void *out, void *in);     /* 0x80067E54 - copies 0x10 B, returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 
+/* Added when `g3d/g3d_resanmchr.cpp` registered (rule 2): the frame walkers clamp a frame through
+ * this cluster's 3-float helper. */
+f32 fn_8006497C(f32 a, f32 b, f32 c);       /* 0x8006497C - the 3-float clamp helper */
+
 /* The name-record store helper (0x800638B8), needed by the right-hand `g3d/fn_800680CC.cpp` cluster
  * (rule 2: the second consumer moves the declaration here from `fn_80063888.cpp`). */
 void **fn_800638B8(void **out, void *v);    /* stores `v` through `out` and returns `out` */
