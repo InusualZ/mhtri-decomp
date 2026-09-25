@@ -329,8 +329,10 @@ struct Effect {
     void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
     u32 RetireEmitterAll();                         /* eft004/eft007; ef/ef_effectsystem.cpp adds it */
     /* Walks the effect's particle-manager pool, calling `cb` with each entry and its index; the
-     * third argument is the per-walk flag (eft001's `fn_800FCEC8` is the only callback observed). */
-    void ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
+     * third argument is the per-walk flag (eft001's `fn_800FCEC8` is the only callback observed).
+     * The owner `ef/ef_effect.cpp` returns the walked count (the target accumulates it and the
+     * sweep units add it); the consumers call it as a statement, whose `.text` is unaffected. */
+    u32 ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
 }; /* size: 0x48 (lower bound: +0x44 is the highest offset the spawn handler reads) */
 
 /* The effect system the manager keeps at `eft_control` +0x04 (`fn_800D3C0C` builds it).  `RetireEffect`

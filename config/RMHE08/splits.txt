@@ -254,6 +254,11 @@ ef/ef_draworder.cpp:
 	extabindex  start:0x80022CEC end:0x80022D4C
 	.text       start:0x800A388C end:0x800A40F4
 
+ef/ef_effect.cpp:
+	extab       start:0x80009BA0 end:0x80009C38
+	extabindex  start:0x80022D4C end:0x80022E30
+	.text       start:0x800A40F4 end:0x800A56B0
+
 ef/ef_effectsystem.cpp:
 	extab       start:0x80009C38 end:0x80009CD4
 	extabindex  start:0x80022E30 end:0x80022EE4
