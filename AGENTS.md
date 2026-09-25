@@ -79,6 +79,41 @@ override below `cflags_runtime`), not in this file; this file only carries the p
 The *how* - the ideas, the problem each one solves and whether it has been tried - is the playbook index
 below, which doubles as the todo list for whatever unit is being worked on.
 
+## Operational mode: production runs
+
+How the campaign is run while a batch of units is being produced (owner's instruction, 2026-09-24). It
+supersedes "keep the queue full": the aim is **steady** throughput, not maximum throughput.
+
+* **Six worker subagents at most, and that budget covers everything** - unit workers and tool fixes share it.
+  Five units plus one fix is fine; six units plus a fix is not.
+* **A slot goes to a problem before it goes to a new unit.** When something breaks - a gate refusal, a blocked
+  or waiting worker, a tool that cannot express what the work needs, MAIN's HEAD on the wrong branch, a hole
+  in the queue - the next free slot fixes that. Only when nothing is outstanding does a freed slot take a new
+  proposal.
+* **Refill one slot per completion, not in waves.** Claim with `queue.py next`, launch that one worker, and let
+  its completion free the slot. The 12-13 worker waves are what produced the repair work this policy exists to
+  avoid: unions mangling struct bodies, declarations whose owner registered mid-wave, an empty `--message`.
+* **Land one unit per commit, one unit at a time, from `main`.** Check `git rev-parse --abbrev-ref HEAD` prints
+  `main` before landing - `land.py` now refuses otherwise, because a batch landed off `main` puts its commits
+  on the wrong ref and slides the merge-base that `applybranch.sh` and the gate both resolve against.
+* Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step (see
+  Non-negotiables).
+
+The steady loop, per unit:
+
+1. `queue.py next` claims one proposal - one worktree, one branch, one brief - and prints the paste-ready spawn.
+2. The worker registers its range at its final home and commits the bodies on its branch, measured.
+3. Apply that branch with `.pi/bin/applybranch.sh` (the merge-base diff; the local-only block records why the
+   two obvious alternatives lose work), resolve the shared-file conflicts, then
+   `land.py record-base` -> `land.py land --units <claim>` -> `claims.py release`.
+4. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
+
+Two tool behaviours the loop leans on, both fixed this session: `queue.py` never offers a proposal whose range
+a registered unit already covers, so re-attributing a region cannot re-hand landed work; and
+`attribute.py queue <start> <end>` **rewrites** the queue file with only that region's proposals rather than
+appending - run it over the whole unclaimed region (the file records this as `cap: 0`), or the rest of the
+backlog disappears.
+
 ## Matching playbook (index of `docs/matching.md`)
 
 `docs/matching.md` is the playbook for making a unit match its original object. Every idea in it is
