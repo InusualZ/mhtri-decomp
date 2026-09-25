@@ -32,6 +32,7 @@ void *fn_800628A4(void *self);             /* 0x800628A4 - loads the word at +0x
 void **fn_80062914(void **out, u32 v);     /* 0x80062914 - stores `v` through `out`, returns `out` */
 u32 fn_80062750(void *out, void *key);     /* 0x80062750 - the resource-table lookup */
 u32 fn_8005DC24(u32 *p);                   /* 0x8005DC24 - loads the word at +0x0 of `p`, +4 */
+void *fn_8005B1E4(void *self, u32 value);  /* 0x8005B1E4 - stores `value` at +0x0 of `self`, returns `self` */
 
 #ifdef __cplusplus
 }

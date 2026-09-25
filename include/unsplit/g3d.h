@@ -68,6 +68,12 @@ u16 fn_80082F18(f32 value);
 
 /* 0x8007A724/0x8007A5E4/0x8007A5A8 - the 3-float setters moved to their owner header
  * `include/g3d/fn_80075DCC.h` once `g3d/fn_80075DCC.cpp` registered (rule 2, 2026-09-25). */
+/* 0x8008A644 - the float analog of `fn_8008A188`: with `flag` set returns the inline float at
+ * +0x0 of `self`, else evaluates the referenced float channel (caller: g3d_resanmfog.cpp).  The
+ * `(self, f32 frame, s32 flag)` order is the one the retail fog call site schedules (MWCC evaluates
+ * arguments left to right); it is ABI-identical to `(self, s32 flag, f32 frame)`.  The owner is the
+ * unclaimed 0x8008A28C+ resanm run, so it stays in the unsplit band for now. */
+f32 fn_8008A644(u32 *self, f32 frame, s32 flag);
 
 /* 0x800868A0 - the pipe-command writer (caller: gx/fn_8009AA78.c).  fn_80077420 moved to its owner
  * header `include/g3d/fn_80075DCC.h` (rule 2, 2026-09-25). */
