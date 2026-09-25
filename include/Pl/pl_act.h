@@ -21,6 +21,13 @@ extern "C" {
 s32 fn_8027AC18(void* arg);
 u32 fn_8027BC48(s32 arg);
 
+/* 0x8027D050 - the actor's stored carve value, scanned out of the item table.  The owner defines the
+ * return `u8`; the retail consumer `Pl/fn_80229ECC.cpp` keeps the raw return in a register and masks
+ * it per use (`clrlwi r0,r29,24` before each shift), which MWCC only emits when the declaration is
+ * wider than a byte, so the consumer view declared here is 32-bit.  Unmangled (`fn_8027D050`), so the
+ * wider return changes no link name. */
+u32 fn_8027D050(struct _PLW* self);
+
 #ifdef __cplusplus
 }
 

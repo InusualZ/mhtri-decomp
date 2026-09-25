@@ -23,14 +23,6 @@ void wii_sysmsg_gen(long id, char* buf, long a);
 s32 calcVecAng2(VEC3* a, VEC3* b);
 #endif
 
-/* The two C++ vector helpers this range owns, added by `enemy/fn_801B0010.cpp` (rule 2: the target
- * objects reference their manglings `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl` and
- * `rotVecY__FPQ34nw4r4math4VEC3Ul`, so they are declared at C++ scope, rule 9). */
-#ifdef __cplusplus
-void calcVecAngXY(VEC3* v, u32* outA, u32* outB);
-void rotVecY(VEC3* v, u32 angle);
-#endif
-
 /* C linkage: the target symbol is the unmangled `fn_80051570` (.text 0x80051570, a 4-byte `blr`).
  * Moved out of `src/g3d/g3d_anmchr.cpp` on landing (docs/plan.md 6.5, rule 2): that range was
  * written before this owner registered, so its local `extern "C"` declaration was a boundary
@@ -81,11 +73,14 @@ void* fn_80050508(void* pOut);
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
 f32 fn_80050EF4(void* a, void* b);
-/* 0x80050EAC - the squared-distance helper: r3 is the reference record and r4 the `VEC3*` position it
- * measures (`enemy/fn_8012BDF4.cpp` declares it `(void*, VEC3*)` and reads its f1; the two other
- * consumers pass a record pointer plus a vector).  Added by `enemy/fn_801B0010.cpp` (rule 2): this
- * unit owns the address. */
-f32 fn_80050EAC(void* ref, VEC3* pos);
+/* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
+ * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `fn_80050CA0(out, a, b)` is
+ * `fn_80043EA8(out); PSVECSubtract(out, a, b)`, and `fn_80050F80(a, b)` calls `fn_80050CA0(&local, b, a)`
+ * then the length helper `fn_80050F24(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
+ * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
+ * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
+void fn_80050CA0(void* out, const void* a, const void* b);
+f32 fn_80050F80(const void* a, const void* b);
 /* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
  * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);

@@ -174,14 +174,9 @@ struct EmGroundRec {
  * outbox carries the unification request. */
 void* get_move_work_adrs(u8 index);
 
-/* The `fn_8004CAD8.cpp` vector helpers this range calls whose owner header does not carry them yet
- * (`fn_80050F80` measures two positions, `fn_80050CA0` subtracts them).  The owner-header migration
- * is blocked, not forgotten: this header is included from C, and the three landed consumers that
- * declare these two (eft001, eft007, ef_drawstripestrategy) spell their parameters differently
- * (`VEC3*` vs `MTX34*` vs `void*`), so a single home needs those three reconciled first - see the
- * campaign's "one symbol, several spellings" backlog item.  Rule 2 counts these two. */
-extern "C" f32 fn_80050F80(void* a, void* b);
-extern "C" void fn_80050CA0(void* out, void* a, void* b);
+/* The two `fn_8004CAD8.cpp` vector helpers this range calls now come from that unit's owner header
+ * (`include/fn_8004CAD8.h`, rule 2): `fn_80050F80` measures the distance between two positions and
+ * `fn_80050CA0` subtracts them.  Their signatures there were settled from the callees' own bodies. */
 
 /* The shared `.sdata2` pool constants this range loads (never defined here - redefining them would
  * rebuild the pool instead of addressing the target's, playbook 29). */

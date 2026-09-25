@@ -317,7 +317,6 @@ void fn_80041E40(void* dst, const void* src);
 void fn_80050850(nw4r::math::VEC3* v, nw4r::math::VEC3* in);
 void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
-void fn_80050CA0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_800532DC(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 void* fn_800F8914(void);
 s32 fn_800F92F4(_EFT* self, u32 flag);

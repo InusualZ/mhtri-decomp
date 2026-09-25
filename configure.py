@@ -940,6 +940,17 @@ config.libs = [
         "progress_category": "game",
         "host": False,
         "objects": [
+            Object(Matching, "Pl/fn_80229ECC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
+            # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
+            # compiled to a 261-entry `.data` jump table (`jumptable_805C3D20`, 0x805C3D20-0x805C4134).
+            # Home is `Pl`: the first argument is passed straight to `Get_motion_no`, whose map
+            # spelling is `Get_motion_no__FP4_PLW`, and the sibling switch `fn_8023C2D0` calls
+            # `Pl_act_ck__FP4_PLWUcUs`.  No `__FILE__` string covers the range (the .data pool around
+            # the jump table carries none), so the stem is the map's `fn_80241558` with a rule-7
+            # deferral.  It uses `cflags_pl` (this lib).
+            Object(Matching, "Pl/fn_80241558.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
@@ -1217,6 +1228,24 @@ config.libs = [
             # stem (brief section 2, class 3+4).  Sections: extab 0x800105B4..0x8001079C (61 records),
             # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
             Object(NonMatching, "lobby/fn_801E7530.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `801FBF78_fn_801FBF78.cpp` (`.text` 0x801FBF78..0x802029B4, 127 functions / 27196 B) -
+            # the lobby NPC / world-update group.  Module `lobby` from the code (the range owns
+            # `lb_npc`, `npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`
+            # and defines `lb_npc_Get_motion_no`/`get_talk_npc_data_ptr`) and from the neighbour
+            # below; no `__FILE__` string covers the range and the dump answers only `zz_`
+            # placeholders, so the file name is the subsystem's own `lb_npc` (brief section 2,
+            # class 3).  Sections: extab 0x80010ADC..0x80010DBC, extabindex 0x8002CF34..0x8002D384
+            # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
+            Object(NonMatching, "lobby/lb_npc.cpp"),
+            # `80212810_fn_80212810.cpp` (`.text` 0x80212810..0x80219260, 105 functions / 27216 B) -
+            # the lobby item/equipment page layer.  Module `lobby` from the code (`LbStr`,
+            # `LbPutAnaPageArrow`, `get_lsp_data`, `draw_sprite_ary`, `GetMenuFontColor`) and from the
+            # `.bss` run it reads (`lobby_w`, `lb_npc`); no `__FILE__` string survives and the dump
+            # answers only `zz_` placeholders, so the file keeps the map stem (brief section 2,
+            # class 3+4).  `.text` only: the naive switch tables live in a `.data` run this range only
+            # partly references, so no data range is claimed yet.
+            Object(NonMatching, "lobby/fn_80212810.cpp"),
         ],
     },
     {
