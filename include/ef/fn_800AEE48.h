@@ -56,6 +56,22 @@ void* fn_800B5ACC(void* self, void* node);
 /* Walks the list starting at the particle record's +0x3C head. */
 void* fn_800B95C0(EfParticleState* self);
 
+
+/* The resource-system entry points this unit owns (the effect modules call them): the walker the
+ * manager builds (+ the per-index registration and the release), and the per-handle helpers the
+ * load callbacks file their results through.  `fn_800B4A90`/`fn_800B4A98` read the post-field list
+ * this unit owns, so they carry its type: the owner's declaration governs (rule 3), and a generic
+ * `void*` copy beside the owner's `EfPostField*` definition is an illegal overload in C++. */
+struct EfPostField;
+void* fn_800B2878(void);
+u16 fn_800B4A90(EfPostField* self);
+void* fn_800B4A98(EfPostField* self, u16 index);
+void  fn_800B44F4(void* work);
+s32 fn_800B3670(void* work, void* data);
+s32 fn_800B3E80(void* work, void* data);
+s32 fn_800B46C0(void* work, void* data);
+s32 fn_800B4898(void* work, void* data);
+
 #ifdef __cplusplus
 }
 #endif

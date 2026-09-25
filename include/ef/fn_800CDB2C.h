@@ -16,6 +16,8 @@ extern "C" {
 u8  fn_800CF208(void);
 u32 fn_800CF280(void);
 s32 fn_800CED10(char* path, u32 dma, u32 size);
+/* Builds the nw4r::ef::EffectSystem the effect manager keeps at `eft_control` +0x04. */
+s32 fn_800D3C0C(void);
 s32 fn_800CEE2C(const char* path, void* info);
 
 #ifdef __cplusplus

@@ -78,15 +78,9 @@ namespace ef {
 /* `nw4r::ef::Effect` comes from its owner `ef.h` (rule 1) and already carries
  * `RetireEmitterAll`. */
 
-/* The effect system; `RetireEffect` is direct, and `virtual_0x0C` is the fourth vtable slot the
- * per-frame handler calls through `fn_800A4420`. */
-class EffectSystem {
-public:
-    virtual void virtual_0x08();
-    virtual void virtual_0x0C();
-    void RetireEffect(Effect* effect);
-};
-/* size: 0x04 - lower bound, an approximation (an opaque handle here) */
+/* `nw4r::ef::EffectSystem` now lives in its owner `ef.h` (rule 1: one definition - the
+ * resource manager and this per-frame handler both need it).  `RetireEffect` is direct and
+ * `virtual_0x0C` is the fourth vtable slot reached through `fn_800A4420`. */
 
 }  // namespace ef
 }  // namespace ef
