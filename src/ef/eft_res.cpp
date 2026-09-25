@@ -276,18 +276,9 @@ void fn_80054FE8(void*, s32);
 void fn_80054FAC(void*, void*);
 void fn_8007B878(void*, s32);
 void fn_8007BA08(void*, void*);
-void push_g3d_wk(void*);
-void* get_move_work_adrs(u8);
-u16 get_move_work_max(u8);
-
-extern s32 nwAddResource(char*, void*);
 extern s32 nwDelResource(s32);
 extern s32 push_res_mem(s32);
-extern s32 pull_res_mem(char*, u32, u32);
-extern s32 getResMemAdrs(s32);
-extern void load_file_req(char*, void*, u32, void (*)(void*, void*, void*, void*), u32, void*);
 extern s32 fn_800A4420(void*);
-extern u8 get_now_areano(void);
 extern void fn_800A8998(void*, u32);
 extern void* fn_800A5484(void*);
 extern void* fn_800A5A90(void*, void*, void*, u32);
@@ -296,6 +287,21 @@ extern void* res_model_name_ptr;
 #ifdef __cplusplus
 }
 #endif
+
+/* C++ callees: the target object references their manglings (`getResMemAdrs__Fl`,
+ * `get_move_work_adrs__FUc`, `get_move_work_max__FUc`, `get_now_areano__Fv`,
+ * `load_file_req__FPcUllUllPUl`, `nwAddResource__FPcPv`, `pull_res_mem__FPcUll`,
+ * `push_g3d_wk__FP9_g3d_work`), so they are declared at C++ scope, outside the extern "C" block
+ * above (relocaudit). */
+struct _g3d_work;
+s32 nwAddResource(char* name, void* data);
+s32 pull_res_mem(char* path, u32 size, s32 mode);
+void* getResMemAdrs(s32 index);
+void* get_move_work_adrs(u8 index);
+u16 get_move_work_max(u8 index);
+u8 get_now_areano(void);
+void load_file_req(char*, u32, s32, u32, s32, u32*);
+void push_g3d_wk(struct _g3d_work* work);
 
 /* g3d's root node (the map spells it `pRoot`; ef/eft007.cpp declares the same) */
 extern s32 pRoot;
@@ -555,7 +561,7 @@ extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, 
         ctx[1] = *name;
         ctx[2] = a8;
         ctx[3] = mode;
-        load_file_req(desc->name_0x04, (void*)getResMemAdrs(handle), desc->size_0x00, fn_800F8358, 4, ctx);
+        load_file_req(desc->name_0x04, (u32)getResMemAdrs(handle), (s32)desc->size_0x00, (u32)fn_800F8358, 4, ctx);
         eft_control.bytes_0xC3C += *(u32*)desc;
         return;
     }
@@ -576,7 +582,7 @@ extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, 
     ctx[1] = *name;
     ctx[2] = a8;
     ctx[3] = mode;
-    load_file_req(desc->name_0x04, (void*)getResMemAdrs(handle), desc->size_0x00, fn_800F8358, 4, ctx);
+    load_file_req(desc->name_0x04, (u32)getResMemAdrs(handle), (s32)desc->size_0x00, (u32)fn_800F8358, 4, ctx);
     eft_control.bytes_0xC3C += *(u32*)desc;
 }
 
@@ -667,7 +673,7 @@ extern "C" void fn_800F89A4(void* self_) {
     EftResControl* ctrl = &eft_control;
 
     if (self->field_0x10C != NULL) {
-        push_g3d_wk(self->field_0x10C);
+        push_g3d_wk((struct _g3d_work*)self->field_0x10C);
         fn_800E0560(self);
         self->field_0x10C = NULL;
     }
