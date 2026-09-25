@@ -558,6 +558,13 @@ config.libs = [
             # effect library's creation queue.  The range's own `__FILE__` string (`ef_creationqueue.cpp`
             # at 0x805922C0) names the TU - see the unit's file header.
             Object(NonMatching, "ef/ef_creationqueue.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/800A388C_fn_800A388C` range (0x800A388C..0x800A40F4, 9 functions): the NW4R
+            # effect library's draw-order helpers.  The range's own `__FILE__` string
+            # (`ef_draworder.cpp` at 0x805923A0) names the TU - see the unit's file header.  Sections:
+            # extab 0x80009B60..0x80009BA0, extabindex 0x80022CEC..0x80022D4C,
+            # .text 0x800A388C..0x800A40F4.
+            Object(NonMatching, "ef/ef_draworder.cpp"),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The `proposal/800AEE48_fn_800AEE48`
