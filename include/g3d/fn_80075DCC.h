@@ -57,3 +57,19 @@ void** fn_8007BB8C(void** pOut, const char* pName);
 #endif
 
 #endif /* MHTRI_G3D_FN_80075DCC_H */
+/* The ScnMdl/ScnMdlSimple material and draw-buffer helpers the ScnMdl unit
+ * (g3d/g3d_scnmdl.cpp) calls.  Declared here, in the owner's header, once this unit is the owner
+ * (rule 2); the consumer includes this header instead of re-declaring them. */
+s32 fn_8007B424(void* pSelf);  /* 0x8007B424 - the material count */
+s32 fn_8007B734(void* pSelf);  /* 0x8007B734 - a name-record reader */
+s32 fn_8007B764(void* pSelf);  /* 0x8007B764 - a name-record reader */
+s32 fn_8007BAF0(void* pSelf, u32* pKey); /* 0x8007BAF0 - the chain's insertion step */
+void fn_8007B564(void* pSelf, u32 mask, void* pArg2, void* pArg3);
+void fn_8007B8E4(void* pSelf, u32 mask, void* pArg2, void* pArg3);
+void fn_8007B940(void* pSelf, u32 mask, void* pArg2, void* pArg3);
+u32 fn_8007C464(void* pSelf);
+s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
+s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility test */
+void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
+                 u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
+

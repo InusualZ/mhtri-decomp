@@ -828,6 +828,20 @@ config.libs = [
             # left edge 0x80075DCC is a tudiscover strong cut, the right edge 0x8007C540 is the proposal
             # cap, not a seam.  See the file header and `include/g3d/fn_80075DCC.h` (rule 2).
             Object(NonMatching, "g3d/fn_80075DCC.cpp"),      # 0x80075DCC-0x8007C540
+            # Registered once, at each real TU's own home (docs/plan.md 12), from the pooled proposal
+            # `8007C540` (185 functions / 0x7FEC B, 0x8007C540-0x8008452C).  The proposal is NOT one TU:
+            # its own `.data` pool pins four different `__FILE__` strings to four disjoint function runs
+            # (`g3d_scnmdl.cpp` at 0x8058EDA0, `g3d_scnmdlsmpl.cpp` at 0x8058F0A0, `g3d_scnobj.cpp` at
+            # 0x8058F3D8, `g3d_scnroot.cpp` at 0x8058F530 - four consecutive per-TU `.data` fragments),
+            # so each is registered at its own home with its own section ranges.  The three small runs
+            # between the anchors (0x8007EF1C, 0x800810DC, 0x80082668) each hold the *name-record reader*
+            # of the class the neighbouring file defines (ScnMdl / ScnMdlSimple / ScnObj+ScnLeaf+ScnGroup),
+            # so each is allocated to that class's file; the extab, extabindex and `.text` ranges are then
+            # contiguous and gapless across the four units.  See each file's header for the seams.
+            Object(NonMatching, "g3d/g3d_scnmdl.cpp"),       # 0x8007C540-0x8007F0E4
+            Object(NonMatching, "g3d/g3d_scnmdlsmpl.cpp"),   # 0x8007F0E4-0x800813B8
+            Object(NonMatching, "g3d/g3d_scnobj.cpp"),       # 0x800813B8-0x800827E4
+            Object(NonMatching, "g3d/g3d_scnroot.cpp"),      # 0x800827E4-0x8008452C
         ],
     },
     {
