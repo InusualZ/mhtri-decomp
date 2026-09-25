@@ -682,11 +682,39 @@ enemy/fn_80191598.cpp:
 	.text       start:0x80191598 end:0x801926EC
 	.ctors      start:0x8056F33C end:0x8056F340
 
+enemy/fn_801993E0.cpp:
+	extab       start:0x8000F084 end:0x8000F14C
+	extabindex  start:0x8002A7B0 end:0x8002A8DC
+	.text       start:0x801993E0 end:0x8019ED34
+	.ctors      start:0x8056F340 end:0x8056F344
+
+enemy/fn_801A4504.cpp:
+	extab       start:0x8000F304 end:0x8000F324
+	extabindex  start:0x8002AB70 end:0x8002ABA0
+	.text       start:0x801A4504 end:0x801A9540
+
 enemy/fn_801B0010.cpp:
 	extab       start:0x8000F54C end:0x8000F6B4
 	extabindex  start:0x8002AEDC end:0x8002B0F8
 	.text       start:0x801B0010 end:0x801B4458
 	.ctors      start:0x8056F344 end:0x8056F348
+
+enemy/fn_801B7020.cpp:
+	extab       start:0x8000F7EC end:0x8000FACC
+	extabindex  start:0x8002B2CC end:0x8002B71C
+	.text       start:0x801B7020 end:0x801BD6C0
+	.ctors      start:0x8056F34C end:0x8056F350
+
+enemy/fn_801D428C.cpp:
+	extab       start:0x800100D4 end:0x800101E4
+	extabindex  start:0x8002C028 end:0x8002C1C0
+	.text       start:0x801D428C end:0x801D80EC
+	.ctors      start:0x8056F358 end:0x8056F35C
+
+lobby/fn_801E7530.cpp:
+	extab       start:0x800105B4 end:0x8001079C
+	extabindex  start:0x8002C778 end:0x8002CA54
+	.text       start:0x801E7530 end:0x801EC9E0
 
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8

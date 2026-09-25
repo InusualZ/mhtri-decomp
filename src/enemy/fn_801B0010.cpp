@@ -268,7 +268,7 @@ extern "C" u32 fn_801B0168(_ENEMY_WORK* work) {
     switch (work->field_0x380) {
     case 1:
         if (work->field_0x382 != 0xFF) {
-            _ENEMY_WORK* target = (_ENEMY_WORK*)fn_801377D0(work->field_0x381, work->field_0x382);
+            _ENEMY_WORK* target = (_ENEMY_WORK*)fn_801377D0(work->state_0x381, work->field_0x382);
             if (target->active) {
                 if (fn_8012D0B4(work, target) == 1) {
                     return 0;
@@ -501,7 +501,7 @@ extern "C" u32 fn_801B0810(_ENEMY_WORK* work) {
         if (other->area_no != work->area_no) {
             continue;
         }
-        fn_80041E40(&work->vec_0x1B0, &other->pos);
+        fn_80041E40(&work->aim, &other->pos);
         return 1;
     }
     return 0;
@@ -1599,7 +1599,7 @@ extern "C" void fn_801B4348(_ENEMY_WORK* work) {
 
     fn_80125F54(&rec);
     if (fn_801421E4(work->field_0x01A, &rec) == 1) {
-        fn_80041E40(&work->vec_0x1B0, &rec.pos_0x08);
+        fn_80041E40(&work->aim, &rec.pos_0x08);
     }
 }
 

@@ -86,8 +86,18 @@ f32 fn_80050EF4(void* a, void* b);
  * consumers pass a record pointer plus a vector).  Added by `enemy/fn_801B0010.cpp` (rule 2): this
  * unit owns the address. */
 f32 fn_80050EAC(void* ref, VEC3* pos);
+/* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
+ * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
+f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* 0x800514AC - the `out = mtx * v + trans` helper (map name
+ * `mulVecMatAddTrans__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34`, so C++ linkage at global scope).
+ * Added with `enemy/fn_801A4504.cpp`, its consumer (rule 2/9). */
+void mulVecMatAddTrans(VEC3* v, MTX34* m);
 #endif
 
 #endif /* MHTRI_FN_8004CAD8_H */

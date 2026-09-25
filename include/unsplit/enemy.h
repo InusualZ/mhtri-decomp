@@ -254,6 +254,46 @@ void fn_80132264(struct _ENEMY_WORK* self);
 void fn_80154CA4(struct _ENEMY_WORK* self);
 void fn_801545B8(void* v, u32 a, u32 b, u32 c);
 void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s32 j, s32 k);
+/* The unclaimed `.text` run 0x801926EC..0x801993E0 (a proposal of its own, registered by nobody
+ * yet): its per-action entry points are what the dispatchers in `enemy/fn_801993E0.cpp` switch
+ * over.  Added with that unit's registration (docs/plan.md 6.5 rule 2): the address band brackets as
+ * `enemy` on both sides (`enemy/fn_80191598.cpp` below, `enemy/fn_801993E0.cpp` above), so the
+ * declarations belong in this band header until the run's own unit claims them.  Every one of them
+ * takes the `_ENEMY_WORK` record and returns nothing - they are called as `fn(self); break;` from a
+ * `void` dispatcher and the target tail-calls the last ones. */
+void fn_80198F28(struct _ENEMY_WORK* self);
+void fn_80198FE8(struct _ENEMY_WORK* self);
+void fn_801990E0(struct _ENEMY_WORK* self);
+void fn_801991E4(struct _ENEMY_WORK* self);
+void fn_80192F24(struct _ENEMY_WORK* self);
+void fn_80193394(struct _ENEMY_WORK* self);
+void fn_801938D8(struct _ENEMY_WORK* self);
+void fn_801953BC(struct _ENEMY_WORK* self);
+void fn_80196618(struct _ENEMY_WORK* self);
+void fn_801987E4(struct _ENEMY_WORK* self);
+void fn_80198910(struct _ENEMY_WORK* self);
+void fn_80198E00(struct _ENEMY_WORK* self);
+void fn_80198F14(struct _ENEMY_WORK* self);
+/* 0x801B701C - unowned (it is the last 4-byte word of the still-unregistered 0x801926EC..0x801B7020
+ * hole; both bracketing registered units are `enemy`).  Its body is a bare `blr`, so it returns its
+ * own r3 argument, and every caller compares that return with 0 - `src/ef/eft001.cpp` declares it
+ * `void`, which is wrong for those call sites (recorded in this unit's outbox).  The `u32` return
+ * below is the form `enemy/fn_801B7020.cpp`'s `fn_801B73F0` needs. */
+u32 fn_801B701C(struct _ENEMY_WORK* self);
+/* The enemy effect-slot cluster below `fn_801A4504`'s range (0x801A3xxx-0x801A9xxx): unowned (the
+ * bracketing registered units are `lobby` above), so the declarations live in this band header.
+ * `enemy/fn_801A4504.cpp` calls all of them; the signatures are its call sites' registers.  The
+ * 0x8019E9xx members are NOT here - they are inside `enemy/fn_801993E0.cpp`'s range, so its owner
+ * header carries them. */
+void fn_801A3E90(struct _ENEMY_WORK* self);
+void fn_801A3FD8(struct _ENEMY_WORK* self);
+void fn_801A4218(struct _ENEMY_WORK* self);
+/* r3 the work record, r4 a joint id, r5/r6 two `VEC3*` (the target's call sites set all three). */
+void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
+/* r3 the work record, r4/r5/r6/r7 four scalars and f1 (the target's call sites set all five). */
+void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
+void fn_801A9748(struct _ENEMY_WORK* self);
+void fn_801A98F8(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
 }
 #endif

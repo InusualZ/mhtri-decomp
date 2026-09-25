@@ -21,6 +21,7 @@
 struct MHchar;
 struct _CP_VECTOR;
 struct _PLW;
+struct _ENEMY_WORK;
 
 #ifdef __cplusplus
 /* Declared, never included: these declarations only need the type by pointer, and
@@ -177,6 +178,17 @@ typedef struct SystemWork {
 } SystemWork;
 
 extern SystemWork system_w;
+
+/* The unowned C helpers `enemy/fn_801A4504.cpp` calls: addresses whose bracketing registered units
+ * name different modules (0x802B/0x803), so no `<module>.h` is sound - the rule 2 named gap.  The
+ * signatures are the call sites' (r3 the work record; `fn_80304510`'s fifth argument is the s32
+ * `0`/0xF4A0/0xB61 the target materialises; `fn_803B50A8` returns the r3 word compared against 1). */
+u8 fn_802B0668(u8 kind);
+void fn_802BE638(struct _ENEMY_WORK* self, s32 a, Vec3* v);
+void fn_80304510(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, s32 d, f32 s);
+void fn_80306A98(struct _ENEMY_WORK* self, u32 a);
+u32 fn_803B50A8(void);
+void fn_803B993C(s32 handle, Vec3* v, u8 area);
 
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
