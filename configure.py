@@ -492,6 +492,14 @@ config.libs = [
             Object(NonMatching, "enemy/fn_801251D0.cpp"),
                         Object(NonMatching, "enemy/fn_8012BA00.c"),
             Object(NonMatching, "enemy/fn_8012BDF4.cpp"),
+            # Registered from proposal/8012E968_fn_8012E968 (a 0x8012E968 run discovery
+            # proposed): the enemy area/group timer set, 3 functions / 0x30C bytes, plus the
+            # extab/extabindex entry its whole first function carries.  Module `enemy` from the
+            # link band and the code (`_ENEMY_WORK`, `get_move_work_adrs(3)`); the boundary at
+            # 0x8012E968 is the band's one strong `tudiscover` seam, so this is not a
+            # continuation of the unit above.  No `__FILE__` string survives and the dump answers
+            # only `zz_` placeholders, so the file keeps the map's own stem (see its header).
+            Object(NonMatching, "enemy/fn_8012E968.cpp"),
             # Registered from proposal/80137604_fn_80137604 (a 0x80137604 run discovery
             # proposed): an enemy's per-motion action/rotation update set, 20 functions / 0x2670
             # bytes.  Module `enemy` from the link band (both bracketing units are `enemy`) and

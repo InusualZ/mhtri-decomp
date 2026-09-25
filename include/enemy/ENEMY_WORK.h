@@ -38,7 +38,8 @@ struct _ENEMY_WORK {
     /* +0x007 */ u8 state_0x007;        /* fn_80177D54's second sub-state */
     /* +0x008 */ u8 field_0x008;
     /* +0x009 */ u8 field_0x009;        /* `fn_80170610` gates the position seat on it */
-    /* +0x00A */ u8 field_0x00A;
+    /* +0x00A */ u8 field_0x00A;        /* the area `fn_8012E968` matches the work records'
+                                        * `area_no` (+0x1E1) and the area table's entries against */
     /* +0x00B */ u8 unused_0x00B[2];
     /* +0x00D */ u8 field_0x00D;        /* the byte `fn_80137604`/`fn_8013760C` latch */
     /* +0x00E */ u8 field_0x00E;        /* `fn_80137C94` hands it to `fn_8012555C` */
@@ -128,7 +129,10 @@ struct _ENEMY_WORK {
     /* +0x89F */ u8 field_0x89F;        /* the mode `fn_80137720` latches */
     /* +0x8A0 */ u8 unused_0x8A0[0x8A4 - 0x8A0];
     /* +0x8A4 */ s16 field_0x8A4;       /* the timer `fn_80137720` arms from `fn_80126494` */
-    /* +0x8A6 */ u8 unused_0x8A6[0x8B3 - 0x8A6];
+    /* +0x8A6 */ u8 unused_0x8A6[0x8AA - 0x8A6];
+    /* +0x8AA */ u8 mode_0x8AA;         /* `fn_80130A10` latches it (0/1); `fn_8012EC60` tests it
+                                        * against 1 */
+    /* +0x8AB */ u8 unused_0x8AB[0x8B3 - 0x8AB];
     /* +0x8B3 */ u8 flags_0x8B3;        /* the action bitmap `fn_801376BC`/`DC`/`04` mask */
     /* +0x8B4 */ u8 unused_0x8B4[0x8C8 - 0x8B4];
     /* +0x8C8 */ u32 field_0x8C8;       /* `fn_801260BC`'s value `fn_80137C20` latches */
