@@ -18,8 +18,6 @@ extern "C" {
 s32 fn_800E46E8(u32 kind);
 /* Volume / stream-state entry points. */
 void fn_800E4908(u8 is_bgm, f32 volume);
-void set_stream_main_vol_flag(u8 slot, u8 is_bgm);
-void PlayStream(u32 a, u32 b);
 void fn_800E4D60(u32 idx);
 
 /* The relocation-table installer and the slot lookups. */
@@ -38,6 +36,15 @@ void fn_800E4A7C(void);
 
 #ifdef __cplusplus
 }
+#endif
+
+/* `sound/fn_800E46E8.cpp` defines these two at C++ scope, so they mangle
+ * (`set_stream_main_vol_flag__FUcUc`, `PlayStream__FUlUl`) and the target object references them that
+ * way.  Declaring them inside the extern "C" block above gave every consumer the plain C name
+ * (relocaudit).  They are declared here, once, with the linkage the owner emits. */
+#ifdef __cplusplus
+void set_stream_main_vol_flag(u8 slot, u8 is_bgm);
+void PlayStream(u32 a, u32 b);
 #endif
 
 #endif /* MHTRI_SOUND_FN_800E46E8_H */
