@@ -11,6 +11,12 @@
 extern "C" {
 #endif
 
+/* The particle-manager ramp helper `ef/ef_animcurve.cpp` calls at a ramp's last key
+ * (fn_800A1504).  The owner's own definition is `fn_800AB880(EfPmManager*, EfPmParticle*)`; the tag
+ * is enough here, so the header declares it with a forward declaration. */
+struct EfPmParticle;
+s32 fn_800AB880(struct EfPmManager* self, struct EfPmParticle* target);
+
 void fn_800AE360(void* target, MTX34* out); /* the per-particle transform fn_800BE3C0 reads */
 
 /* Retires every live particle of the manager and returns how many it walked (`ef/eft019.cpp`'s

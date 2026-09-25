@@ -562,6 +562,13 @@ config.libs = [
         "progress_category": "game",
         "objects": [
             # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/8009CDBC_fn_8009CDBC` range (0x8009CDBC..0x800A3044, 26 functions): the
+            # effect library's key-frame animation curve.  The range's own `__FILE__` string
+            # (`ef_animcurve.cpp` at 0x80591E68) names the TU - see the unit's file header.  Sections:
+            # extab 0x80009A98..0x80009B40, extabindex 0x80022BC0..0x80022CBC,
+            # .text 0x8009CDBC..0x800A3044.
+            Object(NonMatching, "ef/ef_animcurve.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
             # `proposal/800A3044_fn_800A3044` range (0x800A3044..0x800A388C, 7 functions): the NW4R
             # effect library's creation queue.  The range's own `__FILE__` string (`ef_creationqueue.cpp`
             # at 0x805922C0) names the TU - see the unit's file header.
