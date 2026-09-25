@@ -885,20 +885,22 @@ config.libs = [
             # only.  Sections: `.text` 0x80098D5C-0x80099400, `extab` 0x80009850-0x80009880
             # (6 records), `extabindex` 0x80022854-0x8002289C (6 entries).
             Object(NonMatching, "g3d/g3d_resnode.cpp"),      # 0x80098D5C-0x80099400
-            # Registered once, at its final home (docs/plan.md 12): the head of proposal
-            # `80098D5C_fn_80098D5C` that belongs to the NEXT TU.  fn_80099400 - this range's first
-            # body - calls `fn_80077674` = `ResShp::ref` on its own `this` (its assert names `.sdata`
-            # 0x807911F0 = "ResShp"), while fn_800993B4 calls `fn_8005D218` = `ResNode::ref`
-            # (0x80791148 = "ResNode"), so 0x80099400 is the resnode|resshp boundary; the
-            # `g3d_resshp.cpp` `.data` fragment starts at 0x80591618 and every assert string this
-            # unit's bodies pass ("g3d_resshp.cpp" 0x80591618, "g3d_resshp_ac.h" 0x80591708/748,
-            # "g3d_rescommon_ac.h" 0x80591780/7EC) sits inside it.  The tail of the same TU is
-            # proposal `800997E0` (0x800997E0-0x8009A748), which the queue already labels
-            # `g3d_resshp.cpp`; the re-split must join the two, i.e. widen this unit to
-            # 0x80099400-0x8009A748 (outbox `config_requests`, kind `range`).  Sections: `.text`
-            # 0x80099400-0x800997E0, `extab` 0x80009880-0x800098D8 (11 records), `extabindex`
-            # 0x8002289C-0x80022920 (11 entries).
-            Object(NonMatching, "g3d/g3d_resshp.cpp"),       # 0x80099400-0x800997E0
+            # Registered once, at its final home (docs/plan.md 12): the nw4r g3d `ResShp` TU -
+            # proposal `80098D5C_fn_80098D5C`'s head plus proposal `800997E0_fn_800997E0`'s tail,
+            # which are one file.  fn_80099400 - the range's first body - calls `fn_80077674` =
+            # `ResShp::ref` on its own `this` (its assert names `.sdata` 0x807911F0 = "ResShp"), while
+            # fn_800993B4 calls `fn_8005D218` = `ResNode::ref` (0x80791148 = "ResNode"), so 0x80099400
+            # is the resnode|resshp boundary; the `g3d_resshp.cpp` `.data` fragment starts at
+            # 0x80591618 and every assert string the two halves pass ("g3d_resshp.cpp" 0x80591618,
+            # "g3d_resshp_ac.h" 0x80591708/748, "g3d_rescommon_ac.h" 0x80591780/7EC,
+            # "g3d_restev_ac.h" 0x80591820, "g3d_restex_ac.h" 0x80591850) sits inside it, so both
+            # proposals are registered here as ONE unit (one Object line, one splits.txt block).  The
+            # tail's own four `__FILE__`-level asserts pass "g3d_resshp.cpp" (0x80591618) and its
+            # bodies keep calling the head's `ResShp`/`ResTagDL` accessors.  The right edge 0x8009A748
+            # is `g3d_cpu.cpp`'s first body (the next registered unit).  Sections: `.text`
+            # 0x80099400-0x8009A748 (58 functions / 0x1348 B), `extab` 0x80009880-0x800099E0
+            # (44 records, 0x160 B), `extabindex` 0x8002289C-0x80022AAC (44 entries, 0x210 B).
+            Object(NonMatching, "g3d/g3d_resshp.cpp"),       # 0x80099400-0x8009A748
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
             # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass

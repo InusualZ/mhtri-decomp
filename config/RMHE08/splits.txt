@@ -210,9 +210,9 @@ g3d/g3d_resnode.cpp:
 	.text       start:0x80098D5C end:0x80099400
 
 g3d/g3d_resshp.cpp:
-	extab       start:0x80009880 end:0x800098D8
-	extabindex  start:0x8002289C end:0x80022920
-	.text       start:0x80099400 end:0x800997E0
+	extab       start:0x80009880 end:0x800099E0
+	extabindex  start:0x8002289C end:0x80022AAC
+	.text       start:0x80099400 end:0x8009A748
 
 g3d/g3d_cpu.cpp:
 	extab       start:0x800099E0 end:0x800099F0
