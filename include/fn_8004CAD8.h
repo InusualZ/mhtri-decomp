@@ -20,6 +20,9 @@ void wii_sysmsg_gen(long id, char* buf, long a);
 extern "C" {
 #endif
 u32 fn_80051570(u32);
+/* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
+ * owns the address). */
+f32 fn_8005220C(f32 value);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved
  * out of that unit's local extern block on landing, 2026-09-25). */
 void fn_800504D4(void* pOut);
