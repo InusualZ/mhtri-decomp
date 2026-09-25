@@ -849,6 +849,15 @@ config.libs = [
             # (cflags_main); the proposal covers only part of the TU - the drawshape_* half lives in the
             # previous proposal - see the file header.
             Object(NonMatching, "draw_shape.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80056F24` - the screen
+            # fade / filter / glare band (fade_set/fade_reset/get_fade_stat, GlareFilter_on,
+            # filter_reset, setFilterPrio, the FIFO writers and the GX setup bodies), 59 symbols /
+            # 0x262C bytes.  Same lib and flags as the game-root system files beside it (cflags_main);
+            # the name stays the map's `fn_80056F24` stem - the range carries no `__FILE__` string (its
+            # data refs are only the `.sdata2` float pool, the fade table and the two `.bss` blocks) and
+            # the runtime dump answers only `FUN_`/`zz_` placeholders (class 3/4 in the brief; see the
+            # file header).
+            Object(NonMatching, "fn_80056F24.cpp"),
         ],
     },
 ]
