@@ -12,6 +12,17 @@
 
 #include "types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x801421E4 - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the id the
+ * caller reads out of the work record (+0x1A) and r4 the record `fn_80125F54` filled; the answer is
+ * in r3 (compared against 1). */
+u32 fn_801421E4(u16 id, void* rec);
+#ifdef __cplusplus
+}
+#endif
+
 /* one 0x18-byte per-enemy slot of `emc_work` (the array `fn_801413D0` scans and `fn_80141358`
  * clears; `enemy/fn_8013F764.cpp` calls the same record `EmcWork`).
  * size: 0x18 */

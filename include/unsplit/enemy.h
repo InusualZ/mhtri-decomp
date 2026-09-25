@@ -128,7 +128,6 @@ void fn_80133C30(struct _ENEMY_WORK* work);
 void fn_80133C3C(struct _ENEMY_WORK *self);
 u32 fn_80133C50(struct _ENEMY_WORK *self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
-u16 fn_80133DB0();
 void fn_80133E3C(struct _ENEMY_WORK *self, s32 a, f32 b, f32 c);
 /* 0x80133F4C - r3 (`self`), f1, f2 and r4 (the callee's body does `fmr f30,f1` / `fmr f31,f2` /
  * `mr r31,r4`), so the real signature is four-argument; `enemy/fn_8014BDF8` (C) leaves r4 as the
@@ -224,6 +223,10 @@ void fn_80170E78(struct _ENEMY_WORK* self);
 void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+/* 0x80154784 - the enemy band 0x801545B8..0x80154CA4's checker, added by `enemy/fn_801B0010.cpp`
+ * (rule 2: both bracketing registered units are `enemy`, so this band header is its home until the
+ * band is registered).  r3 the work record, the answer in r3 (compared against 1). */
+u32 fn_80154784(struct _ENEMY_WORK* work);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);

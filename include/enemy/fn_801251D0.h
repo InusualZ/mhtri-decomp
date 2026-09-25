@@ -75,6 +75,9 @@ void fn_80129724(struct _ENEMY_WORK* self, u32 a);
 void fn_801252C0(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);
+/* 0x80125F54 - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the record
+ * it fills. */
+void fn_80125F54(void* out);
 u32 fn_80125F9C(u32 a, u32 b);
 u32 fn_80125FF0(u32 a, u32 b);
 u8* fn_80126044(struct _ENEMY_WORK* self);

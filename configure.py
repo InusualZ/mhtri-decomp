@@ -618,6 +618,17 @@ config.libs = [
             # the dump answers only `zz_` placeholders, so the file keeps the map's own stem (see
             # the unit's header).
             Object(NonMatching, "enemy/fn_80191598.cpp"),
+            # Registered from proposal/801B0010_fn_801B0010.cpp (a 0x801B0010 run discovery
+            # proposed): the em030 (enemy #30) program unit, 60 functions / 0x4448 bytes plus the
+            # extab/extabindex entries its 45 framed functions carry.  Module `enemy` from the link
+            # band (both bracketing units are `enemy`) and from the range's own data: the `.data`
+            # table `em030_prog_tbl` (0x805B0FD0) lists this range's entry points, and two of the
+            # range's symbols carry real runtime-dump names (`em030_condition_ck`,
+            # `em030_homing_range_ck`).  C++ because the range reaches mangled callees through
+            # their real signatures.  No `__FILE__` string survives in the range and the dump
+            # answers only `zz_` placeholders for the other 58 rows, so the file keeps the map's
+            # own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801B0010.cpp"),
         ],
     },
 
