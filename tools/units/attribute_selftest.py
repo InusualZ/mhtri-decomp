@@ -88,7 +88,7 @@ FIXTURE_CONF_INLINE = FIXTURE_CONF_AUTO.replace(
     '        "objects": [],')
 
 
-def fake_an(funcs, soft=(), must_link=()):
+def fake_an(funcs, soft=(), must_link=(), source_names=()):
     """`an` with only the keys the partitioner reads, in the shape `tudiscover` produces."""
     return {
         "ordered": ["f%d" % i for i in range(len(funcs))],
@@ -96,7 +96,14 @@ def fake_an(funcs, soft=(), must_link=()):
         "size": [s for _, s in funcs],
         "soft": list(soft),
         "must_link": list(must_link),
+        "source_names": list(source_names),
     }
+
+
+def fake_source(name, lo, hi, funcs, reject=None):
+    """An accepted `__FILE__` name spanning functions `lo..hi` of `funcs`, in tudiscover's shape."""
+    return {"src": name, "lo": lo, "hi": hi, "reject": reject,
+            "start": funcs[lo][0], "end": funcs[hi][0] + funcs[hi][1]}
 
 
 def selftest() -> int:
@@ -186,8 +193,8 @@ def selftest() -> int:
                                           must_link=[(2, 3, "anchor")]), 0, 6)), [])
 
     # --- segments ----------------------------------------------------------------------------------
-    def seg(soft=(), must_link=(), lo=0, hi=6, min_bytes=0x200, max_bytes=0x4000):
-        an = fake_an(FUNCS, soft=soft, must_link=must_link)
+    def seg(soft=(), must_link=(), source_names=(), lo=0, hi=6, min_bytes=0x200, max_bytes=0x4000):
+        an = fake_an(FUNCS, soft=soft, must_link=must_link, source_names=source_names)
         return [(a, b, note) for a, b, _why, note in at.segments(an, lo, hi, min_bytes, max_bytes)]
 
     check("segments: no evidence is one unit", seg(), [(0, 6, None)])
@@ -211,6 +218,57 @@ def selftest() -> int:
     check("segments: the cap still cuts where the anchor allows it",
           [(a, b) for a, b, _n in seg(must_link=[(1, 4, "anchor")], max_bytes=0x64)],
           [(0, 1), (1, 5), (5, 6)])
+
+    # --- source-file ownership: one file is one TU, never half of one, never a union --------------
+    # six 100-byte functions; a name's first referrer is its TU's earliest cut and the next name's is
+    # the latest, so the two names' spans stay whole. These are the two live failure modes.
+    A = fake_source("a.cpp", 1, 2, FUNCS)
+    B = fake_source("b.cpp", 4, 4, FUNCS)
+    LONG = fake_source("a.cpp", 1, 4, FUNCS)
+    check("sources: a source start is a seam whatever the soft vote's width",
+          sorted(at.interior_seams(fake_an(FUNCS, source_names=[B]), 0, 6)), [4])
+    check("sources: a rejected name is not a boundary",
+          sorted(at.interior_seams(fake_an(FUNCS, source_names=[fake_source("c.cpp", 4, 4, FUNCS,
+                                                                            reject="shared")]),
+                                    0, 6)), [])
+    check("sources: the owner is the latest name at or before the index",
+          (at.source_owner(fake_an(FUNCS, source_names=[A, B]), 3),
+           at.source_owner(fake_an(FUNCS, source_names=[A, B]), 4),
+           at.source_owner(fake_an(FUNCS, source_names=[A, B]), 0)), ("a.cpp", "b.cpp", None))
+    # a union of two files is split at the second file's start (the 80063888 case)
+    check("segments: a union of two source files is split at the later start",
+          seg(source_names=[A, B], min_bytes=0), [(0, 1, None), (1, 4, None), (4, 6, None)])
+    # a candidate pool seam inside one file's span does not cut the file in two (the g3d_calcvtx case)
+    check("segments: a seam inside one file joins back into one file",
+          seg(source_names=[A], soft=[(3, 3, 4.0, "pool", "x")], min_bytes=0, lo=1, hi=6),
+          [(1, 6, "one source file (a.cpp): a candidate seam inside it was not taken")])
+    # the join is recorded in the note, and the swallowed seam is re-read by tu_probe (below)
+    check("segments: the join says which file it joined",
+          "g3d" not in seg(source_names=[A], soft=[(3, 3, 4.0, "pool", "x")], min_bytes=0, lo=1,
+                           hi=6)[0][2], True)
+    # a clean one-file range is untouched
+    check("segments: one file with no seam inside is untouched",
+          seg(source_names=[A], min_bytes=0, lo=1, hi=4), [(1, 4, None)])
+    check("segments: a join that would exceed the cap is left split",
+          seg(source_names=[A], soft=[(3, 3, 4.0, "pool", "x")], min_bytes=0, lo=1, hi=6,
+              max_bytes=0x12C),
+          [(1, 3, None), (3, 6, None)])
+
+    # --- the TU probe: what the queue entry records so the brief can warn --------------------------
+    def probe(source_names, lo=0, hi=6, soft=()):
+        an = fake_an(FUNCS, source_names=source_names, soft=soft)
+        return at.tu_probe(an, lo, hi)["verdict"]
+
+    check("probe: one whole name is one TU", probe([A], 0, 6), "one-tu")
+    check("probe: two whole names are a union", probe([A, B], 0, 6), "multi-tu")
+    check("probe: no name is unproven", probe([], 0, 6), "unproven")
+    check("probe: a name the range cuts is partial", probe([LONG], 0, 3), "partial")
+    check("probe: a candidate seam left inside one file is merged",
+          probe([A], 1, 6, soft=[(3, 3, 4.0, "pool", "x")]), "merged")
+    check("probe: the sources are listed for the brief",
+          at.tu_probe(fake_an(FUNCS, source_names=[A, B]), 0, 6)["sources"], ["a.cpp", "b.cpp"])
+    check("probe: the partial file is named",
+          at.tu_probe(fake_an(FUNCS, source_names=[LONG]), 0, 3)["partial_source"], "a.cpp")
 
     # --- the cap arithmetic (roadmap 7.14) ----------------------------------------------------------
     def cap_prop(unit, addr, size):
@@ -547,7 +605,7 @@ def selftest() -> int:
         check("queue: the total is the sum of the proposals", doc["total_bytes"], 0x180)
         check("queue: an entry carries everything a brief needs",
               sorted(doc["units"][0]), ["bytes", "count", "cxx", "functions", "label", "language",
-                                        "runs", "seam", "seam_note", "text"])
+                                        "runs", "seam", "seam_note", "text", "tu"])
         check("queue: a label is not a src/ path", doc["units"][0]["label"].startswith("proposal/"), True)
         check("queue: a label never claims to be a registered unit",
               any(doc["units"][0]["label"].startswith(p) for p in ("src/", "auto/", "main/")), False)

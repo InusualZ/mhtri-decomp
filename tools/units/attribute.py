@@ -56,6 +56,18 @@ fragments and `__init_cpp_exceptions` (112 B) is a stub, so the smallest *unit-s
 `MIN_BYTES_DEFAULT = 288` (below it, a piece is not a file of its own) and
 `MAX_BYTES_DEFAULT = 27436` (above it, a piece is too big and is split, flagged as a guess).
 
+**A proposal is one source file (2026-09-24).** The size tiling above is arbitrary with respect to
+translation-unit boundaries, and both ways it can be wrong have cost a worker: one proposal spanning
+*several* TUs (`proposal/80063888`, three files) and one TU split across two adjacent proposals
+(`proposal/8007270C` and `proposal/80073180`, both `g3d_calcvtx.cpp`). The evidence is already in
+`tudiscover`'s `__FILE__` anchors, so `propose` now uses it: an accepted source name's first referrer
+is a seam whatever the soft vote's width (`interior_seams`), and the pieces one name *owns* are joined
+back (`owner_merge`), because a candidate pool seam inside one file's span is not a boundary. Every
+proposal also carries `tu_probe()`'s verdict - `one-tu`, `partial` (a range edge cuts a file),
+`multi-tu` (a union) or `merged` (one file with a swallowed seam inside) - which `brief.py --pool`
+turns into a plain warning at the top of the brief. The probe reads `an`, which `load()` already
+builds, so it needs no cache of its own; a whole-queue plan pays ~10 s.
+
 **The language (docs/plan.md, "The language comes from the symbol").** The extension a stub is named
 with is not cosmetic: `dtk` turns it into the front-end flag (`-lang=c` / `-lang=c++`), so a new unit's
 extension decides how it is compiled from its first build. `region_language()` reads the verdict from
@@ -198,8 +210,36 @@ def region_language(an, graph, names, t0: int, t1: int) -> dict:
     return lc.classify([n for n in names if lc.mangled(n)], sorted(callees), sources)
 
 
+def accepted_sources(an) -> list[dict]:
+    """The `__FILE__` names `tudiscover` trusts as a TU identity, in address order.
+
+    `tudiscover.analyse` anchors a source name only while its whole referrer span holds no function
+    referencing a *different* name and stays within `--source-span-max`; a rejected name is a shared
+    literal, not a boundary. The name is one TU's identity: its first referrer is the earliest cut its
+    TU can start at, and the next name's first referrer is the latest its TU can end at.
+    """
+    return sorted((r for r in an.get("source_names", ()) if not r.get("reject")),
+                  key=lambda r: r["lo"])
+
+
+def source_owner(an, index: int) -> str | None:
+    """The accepted source file owning function index `index` - the latest name starting at or before.
+
+    None before the run's first name: an unowned stretch has no file identity of its own and keeps the
+    pool-jump tiling. This is the ownership the `segments` repair uses to join the pieces one file was
+    cut into; it is deliberately *not* a claim that every function after a name belongs to it.
+    """
+    owner = None
+    for r in accepted_sources(an):
+        if r["lo"] <= index:
+            owner = r["src"]
+        else:
+            break
+    return owner
+
+
 def interior_seams(an, lo: int, hi: int) -> dict[int, list[tuple[str, str]]]:
-    """Cut indices strictly inside `(lo, hi)` that a narrow, strong observation pins.
+    """Cut indices strictly inside `(lo, hi)` that pin a boundary, plus every accepted source start.
 
     `tudiscover.score_cuts` only scores the cuts *around* an existing closure, which is what extending a
     known unit needs. Partitioning a whole unclaimed region needs the opposite: the seams inside it. An
@@ -207,6 +247,11 @@ def interior_seams(an, lo: int, hi: int) -> dict[int, list[tuple[str, str]]]:
     narrow (<= 4 cuts) and its kind is one of `tudiscover.STRONG` - a wide or weak observation says
     nothing about *where* the boundary is, only that somewhere nearby is possible. A cut inside a
     must-link anchor is illegal by definition.
+
+    A source name's first referrer is added as a seam whatever the soft vote's width: the boundary
+    between two files is real, and a wide vote (a gap between the two names' referrer runs) is exactly
+    the case that left `proposal/80063888` a union of three files. Cutting at the *later* name's first
+    referrer keeps both names' spans whole - a cut after the earlier name's last referrer.
     """
     out: dict[int, list[tuple[str, str]]] = {}
     anchors = an["must_link"]
@@ -217,16 +262,50 @@ def interior_seams(an, lo: int, hi: int) -> dict[int, list[tuple[str, str]]]:
             if any(a < c <= b for a, b, _ in anchors):
                 continue
             out.setdefault(c, []).append((kind, why))
+    for r in accepted_sources(an):
+        c = r["lo"]
+        if lo < c < hi and not any(a < c <= b for a, b, _ in anchors):
+            out.setdefault(c, []).append(("source", '"%s" starts here' % r["src"]))
+    return out
+
+
+def owner_merge(an, pieces: list[tuple], max_bytes: int) -> list[tuple]:
+    """Join the consecutive pieces one accepted source file owns - a source file is one TU.
+
+    `interior_seams` takes a pool-run jump inside a source name's ownership span as a seam, and that is
+    how one file became two proposals (`proposal/8007270C` and `proposal/80073180`, both
+    `g3d_calcvtx.cpp`, set two workers on one TU). A candidate seam inside one file's span is not a
+    boundary, so the pieces join, and `tu_probe` re-reads the seams left inside to warn the worker the
+    range may still be two TUs. A join that would exceed `--max-bytes` is left alone - the cap is a
+    registration ceiling and the pieces stay flagged as a guess.
+
+    `pieces` is `[(lo_i, hi_i, why, note)]`, the shape `segments` builds.
+    """
+    out: list[tuple] = []
+    for lo_i, hi_i, why, note in pieces:
+        if out:
+            plo, _phi, _pwhy, _pnote = out[-1]
+            owner = source_owner(an, lo_i)
+            size = an["addr"][hi_i - 1] + an["size"][hi_i - 1] - an["addr"][plo]
+            if owner is not None and owner == source_owner(an, plo) and size <= max_bytes:
+                out[-1] = (plo, hi_i, None,
+                           "one source file (%s): a candidate seam inside it was not taken" % owner)
+                continue
+        out.append((lo_i, hi_i, why, note))
     return out
 
 
 def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
     """Split `[lo, hi)` at the pinned seams, then repair the pieces that are not TU-shaped.
 
-    Two rules, both about what a translation unit is: a piece below `min_bytes` is too small to be a
-    file of its own (merge it into its neighbour), and a piece above `max_bytes` is too large (split it
-    at its cheapest seam and mark the result as a guess). Everything a region offers as evidence is used
-    first; the repairs only apply where there is none.
+    Three rules, all about what a translation unit is: a piece below `min_bytes` is too small to be a
+    file of its own (merge it into its neighbour), a piece above `max_bytes` is too large (split it at
+    its cheapest seam and mark the result as a guess), and the pieces one accepted `__FILE__` name owns
+    are one file (join them, because a candidate seam inside a file is not a boundary). Everything a
+    region offers as evidence is used first; the repairs only apply where there is none.
+
+    Returns `[(lo_i, hi_i, why, note)]`; `tu_probe` re-reads the seams inside each piece to warn a
+    worker that the range may still be two TUs.
     """
     seams = interior_seams(an, lo, hi)
     cuts = sorted(seams) + [hi]
@@ -268,7 +347,47 @@ def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
             lo_i, why = at, None
         else:
             out.append((lo_i, hi_i, why, None))
-    return out
+    return owner_merge(an, out, max_bytes)
+
+
+def tu_probe(an, lo_i: int, hi_i: int) -> dict:
+    """What `tudiscover`'s own evidence says about this range - one TU, part of one, or several.
+
+    The queue's cut is a heuristic, so a proposal is checked against the evidence that does name a TU:
+    an accepted `__FILE__` source name. A name wholly inside the range is one TU; a name the range cuts
+    is a *partial* TU (the range's edge is inside a file); two names are a *union* of TUs; a candidate
+    seam left inside the range is `merged` - the range may still be two TUs and no source name says so
+    (this is the g3d_calcvtx case: a pool run jump inside one file's span). No name at all is
+    `unproven`, which is the honest label for a region with no TU evidence.
+    """
+    t0 = an["addr"][lo_i]
+    t1 = an["addr"][hi_i - 1] + an["size"][hi_i - 1]
+    inside, partial = [], None
+    for r in accepted_sources(an):
+        if r["start"] >= t0 and r["end"] <= t1:
+            inside.append(r["src"])
+        elif (r["start"] < t0 < r["end"]) or (r["start"] < t1 < r["end"]):
+            partial = r["src"]
+    # A source *change* seam is not "open": it is the boundary the queue already cut at. Any other
+    # candidate seam left strictly inside the piece is one the queue swallowed (a min-bytes merge, a
+    # pool run jump inside a source file's span), and it is what makes the range possibly two TUs.
+    open_seams = [{"cut": c, "why": why[0][1]}
+                  for c, why in sorted(interior_seams(an, lo_i, hi_i).items())
+                  if not any(k == "source" for k, _ in why)]
+    if partial:
+        verdict = "partial"
+    elif len(inside) > 1:
+        verdict = "multi-tu"
+    elif open_seams and inside:
+        # only a *named* file is worth warning about: an unowned range is already "unproven", and a
+        # candidate seam there is the normal tiling, not a file that may have been split in two
+        verdict = "merged"
+    elif inside:
+        verdict = "one-tu"
+    else:
+        verdict = "unproven"
+    return {"sources": inside, "partial_source": partial, "open_seams": open_seams,
+            "verdict": verdict}
 
 
 def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_BYTES_DEFAULT,
@@ -315,6 +434,7 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
                 "language": language,
                 "seam": None if why is None else [{"kind": k, "why": w} for k, w in why],
                 "seam_note": note,
+                "tu": tu_probe(an, lo_i, hi_i),
                 "runs": data,
             })
     return out
@@ -684,6 +804,7 @@ def queue_doc(proposals: list[dict], cap: int, fingerprints: dict | None = None)
             "language": p.get("language"),
             "seam": p.get("seam"),
             "seam_note": p.get("seam_note"),
+            "tu": p.get("tu"),
             "functions": p["functions"],
             "runs": p["runs"],
         } for p in proposals],

@@ -749,6 +749,10 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
         lines.append("> this proposal and hands you this file; the worktree and outbox paths below are the ones")
         lines.append("> your claim will have. Do not act on a pooled brief you were not handed.")
         lines.append("")
+    warning = _tu_warning(p)
+    if warning:
+        lines.append(warning)
+        lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
     lines.append("## 0 · Acknowledge first, then heartbeat")
@@ -934,6 +938,38 @@ def _lang_hint(p: dict) -> str:
     return "C++ (a mangled name is in the region)" if p.get("cxx") else "C (no evidence; the default)"
 
 
+def _tu_warning(p: dict) -> str | None:
+    """A plain warning when the range's own evidence does not make it one TU (`attribute.tu_probe`).
+
+    The queue tiles the unclaimed `.text` by size, so a proposal can be a *partial* TU, a union of
+    several, or one file whose internal boundary is a guess - and each of those has cost a worker or a
+    landing cycle. `attribute.tu_probe` reads `tudiscover`'s `__FILE__` anchors, and this is where the
+    verdict reaches the worker, at the top of the brief, before the claim. `None` when the range is one
+    anchored TU (or has no TU evidence at all, which the seam row already states).
+    """
+    probe = p.get("tu") or {}
+    verdict = probe.get("verdict")
+    sources = probe.get("sources") or []
+    at = p.get("text", [0])[0]
+    if verdict == "partial":
+        return ("**WARNING from discovery (TU probe): this range cuts source file `%s` - part of it "
+                "is outside the range.** Re-check `python tools/splits/tudiscover.py at 0x%08X` before "
+                "you register: the unit may extend past this range, and half a file is not a unit."
+                % (probe.get("partial_source") or "?", at))
+    if verdict == "multi-tu":
+        return ("**WARNING from discovery (TU probe): this range holds %d source files (%s) - it is a "
+                "union of translation units, not one.** Work and register only the file you take; "
+                "re-cut the rest with `python tools/splits/tudiscover.py at 0x%08X`."
+                % (len(sources), ", ".join("`%s`" % s for s in sources), at))
+    if verdict == "merged":
+        seams = probe.get("open_seams") or []
+        return ("**WARNING from discovery (TU probe): the boundary inside this range is a guess - it "
+                "may still be two units.** %d candidate seam(s) sit inside one source file's span "
+                "(%s); `python tools/splits/tudiscover.py at 0x%08X` decides before you register."
+                % (len(seams), ", ".join(s.get("why", "?") for s in seams[:3]), at))
+    return None
+
+
 def brief_unit(path: str) -> str | None:
     """The unit or proposal a written brief names, from its title - `None` when it is not a brief.
 
@@ -1113,6 +1149,25 @@ def selftest() -> int:
         check("the proposal brief carries the outbox path", str(b["handoff"]["outbox"]) in text, True)
         check("a proposal brief still says where the report goes",
               "final message" in text and "subagent_done" not in text, True)
+
+        # the TU probe: the queue tags each entry with what `tudiscover`'s source anchors say, and a
+        # range that is not one TU gets a plain warning at the top of the brief (attribute.tu_probe).
+        for verdict, want in (("multi-tu", "union of translation units"),
+                              ("partial", "cuts source file"),
+                              ("merged", "boundary inside this range is a guess")):
+            tagged = dict(entry, tu={"verdict": verdict, "sources": ["a.cpp", "b.cpp"],
+                                     "partial_source": "a.cpp",
+                                     "open_seams": [{"cut": 3, "why": "a pool jump"}]})
+            _t = render_proposal(tmp, build_proposal(tmp, tagged, None, assume_claim=True), None)
+            check("the TU probe warns on %s" % verdict, want in _t, True)
+            check("the %s warning is at the top of the brief" % verdict,
+                  _t.index(want) < _t.index("## 1 · This is a proposal"), True)
+        clean = dict(entry, tu={"verdict": "one-tu", "sources": ["a.cpp"], "partial_source": None,
+                                "open_seams": []})
+        check("a one-TU range gets no TU warning",
+              "TU probe" not in render_proposal(tmp, build_proposal(tmp, clean, None,
+                                                               assume_claim=True), None), True)
+        check("an untagged entry gets no TU warning", _tu_warning({}), None)
 
         # the dispatch itself: the round that came back empty was handed a registered-unit brief for a
         # proposal, so single-unit mode must route a proposal to the proposal renderer - from either spelling
