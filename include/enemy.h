@@ -118,9 +118,24 @@ struct _ENEMY_WORK {
     /* +0x32E */ u8 pad_0x32E[0x1];
     /* +0x32F */ u8 field_0x32F;
     /* +0x330 */ u8 field_0x330;
-    /* +0x331 */ u8 pad_0x331[0x1];
-    /* +0x332 */ s16 timer_0x332;
-    /* +0x334 */ u8 pad_0x334[0x38];
+    /* +0x331 */ u8 field_0x331;
+    /* +0x332 */ union {
+        /* the signed-short reading `enemy/fn_80176C58.cpp` uses (the death timer) */
+        s16 timer_0x332;
+        /* `fn_8015D194` of `enemy/fn_801550FC.cpp` clears the byte at +0x333 on its own */
+        struct {
+            /* +0x332 */ u8 unused_0x332;
+            /* +0x333 */ u8 field_0x333;
+        } bytes_0x332;
+    };
+    /* +0x334 */ u8 field_0x334;
+    /* +0x335 */ u8 field_0x335;
+    /* +0x336 */ u8 field_0x336;
+    /* +0x337 */ u8 pad_0x337[0x1];
+    /* +0x338 */ s16 timer_0x338;   /* `fn_80155664` counts this down while it is positive */
+    /* +0x33A */ u8 pad_0x33A[0x2];
+    /* +0x33C */ u16 counter_0x33C; /* `fn_80155664` cycles it 0..0x31 */
+    /* +0x33E */ u8 pad_0x33E[0x2E];
     /* +0x36C */ VEC3 target;
     /* +0x378 */ f32 field_0x378;
     /* +0x37C */ u32 field_0x37c;
@@ -231,7 +246,9 @@ struct _ENEMY_WORK {
     /* +0xA05 */ u8 field_0xA05;
     /* +0xA06 */ u8 field_0xA06;
     /* +0xA07 */ u8 field_0xA07;
-    /* +0xA08 */ u8 pad_0xA08[0x61];
+    /* +0xA08 */ u8 pad_0xA08[0x5];
+    /* +0xA0D */ u8 field_0xA0D;      /* `fn_801592CC` gates a request on it being clear */
+    /* +0xA0E */ u8 pad_0xA0E[0x5B];
     /* +0xA69 */ u8 field_0xa69;
     /* +0xA6A */ u8 pad_0xA6A[0x14];
     /* +0xA7E */ u16 field_0xa7e;

@@ -512,6 +512,10 @@ config.libs = [
             Object(NonMatching, "enemy/fn_8013BE60.c"),
             Object(Matching, "enemy/fn_80149D6C.c"),
             Object(NonMatching, "enemy/fn_8014A1BC.c"),
+            # proposal/801550FC_fn_801550FC.cpp: the em003 action unit (0x801550FC..0x8015D860,
+            # 104 functions).  C++ (the range defines three em003_* manglings).  The boundary is
+            # provisional - see the unit header.
+            Object(NonMatching, "enemy/fn_801550FC.cpp"),
             Object(NonMatching, "enemy/fn_801679B0.cpp"),
             Object(NonMatching, "enemy/fn_80171194.cpp"),
             Object(NonMatching, "enemy/fn_80178128.cpp"),
