@@ -744,8 +744,35 @@ def claims_view(main: str) -> list[dict]:
     return sorted(rows, key=lambda r: r["unit"])
 
 
-def claim(unit: str, main: str, worker: str | None, dry_run: bool) -> dict:
+def claim_place_error(main: str, cwd: str | None = None) -> str | None:
+    """Refuse a claim begun outside MAIN, or while MAIN's HEAD is not `main` - or `None` when it is right.
+
+    A claim's worktree and branch are cut from MAIN's HEAD (`git worktree add -b <branch> <wt> <HEAD>`), so
+    one made while MAIN sits on another branch roots the worker on that branch's tip instead of main's - the
+    same 2026-09-24 incident that moved 14 landings onto `tools/stylelint-rule2-unsplit` and that `queue.py
+    next` and `ack` already refuse their halves of. `claim` is the direct entry point those guard, and the
+    claim is also only the orchestrator's to make: a claim begun from a worker's own worktree would cut a
+    second worktree off a tree the caller is not in, so it is refused here too. `None` when git cannot be
+    asked (a temp dir in the selftests, no repo), so a heartbeat-shaped caller never depends on it.
+    """
+    here = cwd or os.getcwd()
+    top = _git_quiet(["rev-parse", "--show-toplevel"], here)
+    branch = _git_quiet(["rev-parse", "--abbrev-ref", "HEAD"], here)
+    if top is None or branch is None:
+        return None
+    if not _same_path(top, main):
+        return "the claim is not run from MAIN (expected %s, found %s)" % (main, top)
+    if branch != "main":
+        return ("MAIN's HEAD is on %r, not main: `git checkout main` first - a claim is rooted at MAIN's "
+                "HEAD, so one made off main roots the worker on the wrong base" % branch)
+    return None
+
+
+def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | None = None) -> dict:
     unit = norm_unit(unit.strip("/"))
+    place = claim_place_error(main, cwd)
+    if place:
+        raise SystemExit("REFUSED claim %s | %s: run the claim from MAIN, on main" % (unit, place))
     branch = branch_for(unit)
     path = worktree_for(unit, main)
     if branch_exists(main, branch):
@@ -1409,6 +1436,34 @@ def selftest() -> int:
         except SystemExit as exc:
             check("ack refuses from the wrong place", "REFUSED ack" in str(exc), True)
         check("... and writes no heartbeat", load_ack(main, unit).get("agent"), None)
+
+    # `claim` is the direct entry point the guarded `queue.py next` drives. Its worktree and branch are cut
+    # from MAIN's HEAD, so it must refuse a caller that is not MAIN (a worker's own worktree) and a MAIN whose
+    # HEAD is not `main`, before anything is created. The refusal leaves the registry, the branch and the
+    # worktree untouched.
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        _worker_branch, worker_wt = claimed(main, "Pl/pl_act")   # a real claim: worktree + branch + registry
+        check("a claim from MAIN on main passes the guard", claim_place_error(main, main), None)
+        outside = claim_place_error(main, worker_wt)
+        check("a claim from a worker's worktree is refused", outside is not None, True)
+        check("... and names the tree it found",
+              worker_wt.replace("\\", "/") in (outside or "").replace("\\", "/"), True)
+        repo_git(main, "checkout", "-q", "-b", "throwaway-check")
+        err = claim_place_error(main, main)
+        check("a claim off main is refused", err is not None, True)
+        check("... and names the branch it found", "throwaway-check" in (err or ""), True)
+        check("... and tells the caller to checkout main", "git checkout main" in (err or ""), True)
+        # `claim` itself refuses off main: the caller is in MAIN, but MAIN is on throwaway-check
+        fresh = "Pl/pl_skill"
+        try:
+            claim(fresh, main, "w-a", False, cwd=main)
+            check("claim refuses off main", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("claim refuses off main", "REFUSED claim" in str(exc), True)
+        check("... and writes no registry entry", fresh in load_registry(main), False)
+        check("... and cuts no branch", branch_exists(main, branch_for(fresh)), False)
+        check("... and makes no worktree", os.path.exists(worktree_for(fresh, main)), False)
 
     with tempfile.TemporaryDirectory() as tmp:
         main = new_repo(tmp)
