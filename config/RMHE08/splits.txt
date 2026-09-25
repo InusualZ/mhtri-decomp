@@ -189,6 +189,11 @@ g3d/g3d_resanmscn.cpp:
 	extabindex  start:0x80021E4C end:0x80021EE8
 	.text       start:0x800908FC end:0x800916FC
 
+g3d/g3d_resanmtexsrt.cpp:
+	extab       start:0x80009208 end:0x800093A8
+	extabindex  start:0x80021EE8 end:0x80022158
+	.text       start:0x800916FC end:0x80093990
+
 g3d/g3d_resfile.cpp:
 	extab       start:0x800093A8 end:0x800094E0
 	extabindex  start:0x80022158 end:0x8002232C

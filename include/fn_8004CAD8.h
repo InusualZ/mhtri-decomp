@@ -27,6 +27,10 @@ f32 fn_8005220C(f32 value);
  * out of that unit's local extern block on landing, 2026-09-25). */
 void fn_800504D4(void* pOut);
 void fn_8005050C(void* pOut);
+/* 0x80052BC0/0x800534B0 - the `ResTex`/`ResPltt` value-type constructors the
+ * `g3d/g3d_resanmtexsrt.cpp` `ResFile` accessors use (rule 2: declared in their owner's header). */
+void* fn_80052BC0(void* out, u32 v);
+void* fn_800534B0(void* out, u32 v);
 #ifdef __cplusplus
 }
 #endif
