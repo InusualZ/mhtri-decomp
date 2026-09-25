@@ -93,6 +93,16 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
 * **Refill one slot per completion, not in waves.** Claim with `queue.py next`, launch that one worker, and let
   its completion free the slot. The 12-13 worker waves are what produced the repair work this policy exists to
   avoid: unions mangling struct bodies, declarations whose owner registered mid-wave, an empty `--message`.
+* **When a wave is claimed, claim it with `queue.py next --count N` - never N adjacent proposals.** The
+  stride takes `i, i+N, i+2N, ...` in the queue's address order, so no two workers hold adjacent proposals.
+  Adjacency is the vector for almost every clash this campaign has had: it is what puts two workers on one
+  translation unit (`proposal/8007270C` + `proposal/80073180`, both `g3d_calcvtx.cpp`), it is what produces
+  the rule-2 boundary artefacts (a neighbour registers a symbol you declare), and neighbouring units share
+  owner headers and types by construction. The stride makes that **provable** - two adjacent proposals can
+  share a wave only if both indices are congruent mod N, impossible for N > 1 - where random selection would
+  only make it unlikely (both halves of one TU in a wave about once in N tries). The caveat is locality:
+  spreading costs cross-unit knowledge reuse, so prefer the spread *within* a band that the address order
+  already gives, and do not defeat it by re-sorting the ready set (by score or otherwise).
 * **Land one unit per commit, one unit at a time, from `main`.** Check `git rev-parse --abbrev-ref HEAD` prints
   `main` before landing - `land.py` now refuses otherwise, because a batch landed off `main` puts its commits
   on the wrong ref and slides the merge-base that `applybranch.sh` and the gate both resolve against.
