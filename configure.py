@@ -561,6 +561,15 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+            # Registered once, at its final home (docs/plan.md 12).  The `proposal/8009B374_fn_8009B374`
+            # range (`.text` 0x8009B374..0x8009CD64, 16 functions / 6640 B): the NW4R effect library's
+            # shared math/utility file.  The range's own `__FILE__` string (`ef_util.cpp` at 0x80591948,
+            # read out of orig/RMHE08/sys/main.dol) names the TU - see the unit's file header.  Sections:
+            # extab 0x80009A38..0x80009A98, extabindex 0x80022B30..0x80022BC0, .text 0x8009B374..0x8009CD64.
+            # The lib is `ef` (the file's own module); its cflags_main is token-identical to the
+            # neighbouring g3d/g3d_gpu.cpp's cflags_g3d, and dtk links by address, so the lib choice
+            # cannot move the object or change its codegen.
+            Object(NonMatching, "ef/ef_util.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
             # `proposal/8009CDBC_fn_8009CDBC` range (0x8009CDBC..0x800A3044, 26 functions): the
             # effect library's key-frame animation curve.  The range's own `__FILE__` string

@@ -234,6 +234,11 @@ g3d/g3d_gpu.cpp:
 	extabindex  start:0x80022B18 end:0x80022B30
 	.text       start:0x8009B140 end:0x8009B374
 
+ef/ef_util.cpp:
+	extab       start:0x80009A38 end:0x80009A98
+	extabindex  start:0x80022B30 end:0x80022BC0
+	.text       start:0x8009B374 end:0x8009CD64
+
 ef/ef_animcurve.cpp:
 	extab       start:0x80009A98 end:0x80009B40
 	extabindex  start:0x80022BC0 end:0x80022CBC

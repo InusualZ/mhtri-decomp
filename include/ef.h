@@ -265,7 +265,14 @@ extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);         /* sin/cos o
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
 extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32 fn_800A8A08(u32* progress);                              /* pseudo-random 0..1 */
-extern f32 fn_80050BC0(f32 a, f32 b);                               /* eased interpolation */
+/* 0x80050BC0 is NOT declared here: `src/fn_8004CAD8.cpp` owns the address and publishes it in
+ * `include/fn_8004CAD8.h` (rule 2), which this unit includes.  The `(f32 a, f32 b)` view that stood
+ * here was wrong about the callee's arity - its body reads only f1 and returns `x * FrSqrt(x)` - and
+ * it collided with the owner's declaration in every TU that included both headers
+ * (`(10197) illegal function overloading`, measured on `src/fn_80059550.cpp`).  The second float the
+ * retail call sites materialise is the hoisted common subexpression `1.0f - t`, which the `else`
+ * branch of those callers also needs (`ef_disc.cpp` 0x800CCA7C `fsubs f2, f30, f1`, reused at
+ * 0x800CCA98 `fsubs f0, f30, f1`), not a second argument. */
 extern f32 fn_800C9DCC(f32 a);                                      /* fabsf */
 extern f32 fn_80463F10(f32 a, f32 b);                               /* fmodf */
 
