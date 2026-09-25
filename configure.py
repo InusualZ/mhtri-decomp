@@ -968,6 +968,16 @@ config.libs = [
             # `fn_8026FFBC` (0x8026FFBC..0x80270018) sits on the ambiguous side of that seam and is
             # deliberately left unclaimed rather than guessed in.
             Object(Matching, "Pl/pl_master.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80288CEC_fn_80288CEC`.
+            # 78 functions, 0x80288CEC-0x8028F66C (0x697C B), with extab 0x80012FFC-0x8001323C and
+            # extabindex 0x80030678-0x800309D8.  Home is `Pl`: the whole unit operates on the player
+            # work (`Pl_frame_check`/`Pl_zanzo_set`/`Pl_act_ck`/`eft029_set_scale` all take `_PLW*`),
+            # it defines `pl_motion_set`, and its accessors read the record `get_move_work_adrs(0)`
+            # returns.  Extent pinned by the `.sdata2` run 0x8079A270-0x8079A314 (the run boundary is
+            # the left edge).  No `__FILE__` string and no runtime-dump name cover the range, so the
+            # stem is the map's `fn_80288CEC` with a rule-7 deferral (the sibling class-4 pattern of
+            # `Pl/fn_80229ECC.cpp` / `Pl/fn_80241558.cpp`).  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80288CEC.cpp"),
         ],
     },
     {
