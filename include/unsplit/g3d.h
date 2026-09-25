@@ -105,8 +105,12 @@ extern u32 lbl_8079124C;
 }
 #endif
 
-#ifdef __cplusplus /* C++-only: outside the extern "C" block, so C++ linkage is kept */
-void fn_8006F304(void* dst, const u32& src);
+#ifdef __cplusplus /* C++-only: the `const u32&` cannot be spelled in C, but the map name is plain
+                    * (C linkage) and the target object references `fn_8006F304`, not the mangled
+                    * `__FPvRCUl`; `extern "C"` on this one declaration keeps the reference parameter
+                    * (load-bearing for the caller's stack layout - see eft002.cpp's file header) while
+                    * emitting the plain symbol. */
+extern "C" void fn_8006F304(void* dst, const u32& src);
 #endif
 
 #endif /* MHTRI_UNSPLIT_G3D_H */
