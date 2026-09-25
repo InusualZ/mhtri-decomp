@@ -67,6 +67,11 @@ fn_80059550.cpp:
 	extabindex  start:0x8001F5A8 end:0x8001F608
 	.text       start:0x80059550 end:0x8005AA28
 
+g3d/fn_80063888.cpp:
+	extab       start:0x800076C4 end:0x80007B14
+	extabindex  start:0x8001FB00 end:0x8001FF5C
+	.text       start:0x80063888 end:0x800680A8
+
 g3d/g3d_anmscn.cpp:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68

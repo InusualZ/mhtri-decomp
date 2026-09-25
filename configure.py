@@ -756,6 +756,13 @@ config.libs = [
             # The `g3d_basic.cpp` SRT/matrix cluster, named by its own `__FILE__` string
             # (`lbl_80595840` = "g3d_basic.cpp", reached by fn_800D79B4's `nw4r::db::Panic` asserts).
             Object(NonMatching, "g3d/g3d_basic.cpp"),        # 0x800D79B4-0x800D7F54
+            # Registered once, at its final home (docs/plan.md 12): proposal `80063888` - the nw4r g3d
+            # animation-object cluster (164 functions / 0x4820 B, 0x80063888..0x800680A8).  The run spans
+            # more than one original TU (`g3d_anmobj.cpp`/`g3d_anmclr.cpp` in its head, `g3d_anmscn.cpp`
+            # from 0x800649CC), so it keeps the map's `fn_80063888` stem (brief evidence class 4); the
+            # module is `g3d` and the lib's flags are cflags_g3d.  See the file header for the seam and
+            # the rule-2 owner header `include/g3d/fn_80063888.h`.
+            Object(NonMatching, "g3d/fn_80063888.cpp"),       # 0x80063888-0x800680A8
         ],
     },
     {

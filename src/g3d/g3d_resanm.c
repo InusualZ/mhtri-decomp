@@ -22,6 +22,7 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
 #include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "g3d/fn_80063888.h" /* fn_800651BC, owned by g3d/fn_80063888.cpp (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off
@@ -35,7 +36,6 @@ extern f32 fn_800501E4(u16 value);
 extern f32 fn_800610AC(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
 extern f32 fn_80463F34(f32 *out, f32 frame);
-extern u32 fn_800651BC(void *self);
 
 /* A single animation key. */
 typedef struct {

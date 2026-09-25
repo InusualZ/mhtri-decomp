@@ -35,6 +35,7 @@
 #include "gx.h"
 #include "ef.h"
 #include "pl.h"
+#include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
 
 /* The retail object keeps the unfused forms (a `rlwinm` + `cmpwi` where the pass would emit a
  * record-form `rlwinm.`); the whole file is compiled with the peephole pass off (playbook 39). */
@@ -265,7 +266,6 @@ void* fn_8007BC2C(void* access, u32 idx);
 void fn_8006F0E8(void* out, void* handle);
 void fn_8005A8E0(void* out, void* handle);
 s32 fn_80076750(void* out);
-s32 fn_80064820(void* out);
 
 /* the emitter data helpers */
 s32 fn_800F6984(u32 a, u32 b, void* table, void* names);

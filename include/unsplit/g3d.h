@@ -69,6 +69,14 @@ struct RenderModeObj* fn_80088584(void);
 /* 0x80082F18 - the frame-round helper (caller: g3d_resanm.c). */
 u16 fn_80082F18(f32 value);
 
+/* 0x8007A724 - the 3-float setter (caller: g3d/fn_80063888.cpp).  The caller passes the object in r3 and
+ * the three values in f1-f3. */
+void fn_8007A724(void* self, f32 x, f32 y, f32 z);
+
+/* 0x8007A5E4/0x8007A5A8 - the two 3-float setters the g3d animation cluster forwards to. */
+void fn_8007A5E4(void* self, f32 x, f32 y, f32 z);
+void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);
+
 /* 0x800868A0/0x80077420 - the pipe-command writers (caller: gx/fn_8009AA78.c). */
 void fn_800868A0(u32 value);
 void fn_80077420(u16 command, u8 value);
