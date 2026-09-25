@@ -144,10 +144,10 @@ g3d/g3d_resanmamblight.c:
 	extabindex  start:0x80021A38 end:0x80021A5C
 	.text       start:0x80089F94 end:0x8008A220
 
-g3d/g3d_resanmcamera.c:
-	extab       start:0x80008F00 end:0x80008F08
-	extabindex  start:0x80021A5C end:0x80021A68
-	.text       start:0x8008A220 end:0x8008A28C
+g3d/g3d_resanmcamera.cpp:
+	extab       start:0x80008F00 end:0x80008F10
+	extabindex  start:0x80021A5C end:0x80021A74
+	.text       start:0x8008A220 end:0x8008A664
 
 g3d/g3d_resanmfog.cpp:
 	extab       start:0x80009100 end:0x80009108

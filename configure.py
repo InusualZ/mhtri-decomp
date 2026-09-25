@@ -789,7 +789,7 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_state.cpp"),        # 0x8008452C-0x800898B0
             Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
             Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
-            Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
+            Object(NonMatching, "g3d/g3d_resanmcamera.cpp"),   # 0x8008A220-0x8008A664 (merged 2026-09-24 from the 0x8008A220-0x8008A28C `.c` cut: same `__FILE__` fragment and contiguous sections, one TU)
             # Registered once, at its final home (docs/plan.md 12): proposal `8008F6E8` - the nw4r
             # g3d fog animation-channel evaluator (2 functions, 0x1FC B, 0x8008F6E8-0x8008F8E4).
             # `g3d`/`.cpp` from the body's own `__FILE__` string (`.data` 0x805903F0 =
