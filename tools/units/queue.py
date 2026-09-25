@@ -110,12 +110,18 @@ def is_proposal(main: str, unit: str) -> bool:
     return any(claims.norm_unit(l) == want for l in brief.proposal_labels(main))
 
 
-def state(main: str, entry: dict) -> str:
+def state(main: str, entry: dict, branches: set[str] | None = None) -> str:
     """Where a pooled brief stands: `claimed`, `written`, `stale`, `unreadable` or `ready`.
 
     Only `ready` may be handed out. A claimed unit is in flight (its brief has already been promoted), a
     `written` unit has gained a body (the pool will prune it), and `stale` is no longer registered - so none
     of them is offered as new work.
+
+    A claim is read the way `claims.claim` refuses one: its registry record **or its claim branch** (the lock,
+    which survives a lost registry record - a half-torn-down release, or two claims racing on `save_registry`).
+    Reading only the registry is what re-offered a claimed proposal on 2026-09-24 and made `queue.py next`
+    refuse at the branch. `branches` is the batch of live `worker/` branches from `claims.worker_branches`,
+    passed by the selectors; `None` asks for it once.
 
     A **proposal** (option A) is the simpler case and takes a different route: it has no source and no
     registration to check, so while it is in the queue it is work to hand out, and once the queue drops it -
@@ -125,7 +131,7 @@ def state(main: str, entry: dict) -> str:
     unit = entry.get("unit")
     if not unit:
         return "unreadable"
-    if brief.claim_for(main, unit):
+    if brief.claim_for(main, unit) or claims.lock_held(main, unit, branches):
         return "claimed"
     if is_proposal(main, unit):
         return "covered" if covered_by_registered(main, unit) else "ready"
@@ -146,7 +152,9 @@ def text_start(main: str, unit: str) -> int | None:
 
 def next_entry(main: str, entries: list[dict] | None = None) -> dict | None:
     """The next ready brief: lowest `.text` address first, then unit name (the campaign's order)."""
-    ready = [e for e in (entries if entries is not None else pool_entries(main)) if state(main, e) == "ready"]
+    entries = entries if entries is not None else pool_entries(main)
+    branches = claims.worker_branches(main)
+    ready = [e for e in entries if state(main, e, branches) == "ready"]
     ready.sort(key=lambda e: (text_start(main, e["unit"]) is None, text_start(main, e["unit"]) or 0,
                               e["unit"] or ""))
     return ready[0] if ready else None
@@ -248,10 +256,14 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> d
 def pool_state(main: str) -> dict:
     """The pool's counts by state, plus the ready candidates in order."""
     entries = pool_entries(main)
+    branches = claims.worker_branches(main)
     counts: dict[str, int] = {}
+    ready = []
     for entry in entries:
-        counts[state(main, entry)] = counts.get(state(main, entry), 0) + 1
-    ready = [e for e in entries if state(main, e) == "ready"]
+        st = state(main, entry, branches)
+        counts[st] = counts.get(st, 0) + 1
+        if st == "ready":
+            ready.append(entry)
     ready.sort(key=lambda e: (text_start(main, e["unit"]) is None, text_start(main, e["unit"]) or 0,
                               e["unit"] or ""))
     return {"dir": pool_dir(main), "entries": entries, "counts": counts, "ready": ready}
@@ -455,6 +467,47 @@ def selftest() -> int:
         except SystemExit as exc:
             check("queue next refuses off main", "throwaway-check" in str(exc), True)
         check("... and claims nothing", os.path.exists(claims.registry_path(repo)), False)
+
+    # The claim lock is the BRANCH, not the registry: `claims.claim` refuses on the branch, so a claim whose
+    # registry entry was lost - a half-torn-down release, or two claims racing on `save_registry` - still owns
+    # its unit. Selection read only the registry and re-offered such a proposal, then `queue.py next` refused
+    # at the branch: the 2026-09-24 pool re-hand on the claim axis (the covered axis is `covered_by_registered`).
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = os.path.join(tmp, "mhtri-dtk")
+        os.makedirs(os.path.join(repo, "src"))
+        os.makedirs(os.path.join(repo, "tools", "units", "briefs", "pool"))
+        open(os.path.join(repo, "configure.py"), "w").write("config.libs = [\n]\n")
+        qgit(repo, "init", "-q")
+        qgit(repo, "checkout", "-q", "-b", "main")
+        claimed_label = "proposal/80100000_fn_80100000.cpp"   # lower address: what selection would offer first
+        fresh_label = "proposal/80200000_fn_80200000.cpp"
+        with open(brief.queue_path(repo), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [
+                {"label": claimed_label, "text": [0x80100000, 0x80100100], "count": 2, "bytes": 256,
+                 "cxx": False},
+                {"label": fresh_label, "text": [0x80200000, 0x80200100], "count": 2, "bytes": 256,
+                 "cxx": False},
+            ]}, fh)
+        for label in (claimed_label, fresh_label):
+            open(os.path.join(repo, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"),
+                 "w", encoding="utf-8").write("# Proposal brief: %s\n" % label)
+        qgit(repo, "add", "-A")
+        qgit(repo, "commit", "-q", "-m", "pool-time main")
+        by_unit = {e["unit"]: e for e in pool_entries(repo)}
+        claimed_unit, fresh_unit = claims.norm_unit(claimed_label), claims.norm_unit(fresh_label)
+        check("a proposal with no claim is ready", state(repo, by_unit[claimed_unit]), "ready")
+        check("selection would offer it first", next_entry(repo)["unit"], claimed_unit)
+        # the branch is the claim (`claims.claim` made it) but the registry record is gone
+        qgit(repo, "branch", claims.branch_for(claimed_unit))
+        check("... the registry records no claim", brief.claim_for(repo, claimed_unit), {})
+        check("... but the branch is a held lock", claims.lock_held(repo, claimed_unit), True)
+        check("a live claim branch makes the proposal claimed", state(repo, by_unit[claimed_unit]), "claimed")
+        check("... and next_entry skips it for the fresh proposal", next_entry(repo)["unit"], fresh_unit)
+        check("... the branch is counted claimed", pool_state(repo)["counts"].get("claimed"), 1)
+        # releasing the claim (branch gone, registry empty) returns the proposal to the pool
+        qgit(repo, "branch", "-D", claims.branch_for(claimed_unit))
+        check("a released claim is ready again", state(repo, by_unit[claimed_unit]), "ready")
+        check("... and next_entry offers it first again", next_entry(repo)["unit"], claimed_unit)
 
     if fails:
         print("FAIL (%d)" % len(fails))
