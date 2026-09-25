@@ -4,13 +4,25 @@
 2026-09-23: "prepare briefs in advance and queue new work right away"), so the orchestrator can start a
 worker the instant a slot frees without deriving anything. This is the other half:
 
-    python tools/units/queue.py next [--worker NAME] [--dry-run] [--json]
+    python tools/units/queue.py next [--count N] [--worker NAME] [--dry-run] [--json]
     python tools/units/queue.py list [--json]
     python tools/units/queue.py --selftest
 
 `next` picks the pooled unit with the lowest `.text` address that is still **unclaimed**, takes the claim
 (`claims.py claim` creates the worktree and the branch), promotes the pooled brief to the claim's own slug
 path, and prints the exact spawn line - cwd, name and task text - to paste.
+
+`next --count N` claims a **wave** of N: a stride of N through the address-ordered queue, never N
+neighbours. Adjacency is the vector for almost every clash this campaign has had - the two halves of one
+translation unit are two adjacent proposals (`proposal/8007270C`+`proposal/80073180`, both
+`g3d_calcvtx.cpp`), a rule-2 boundary artefact appears when a neighbour registers a symbol you declare, and
+neighbouring units share owner headers and types by construction - so a wave takes proposals `i, i+N,
+i+2N, ...` instead. That is a **guarantee**, not a probability: two adjacent proposals can share a wave only
+if both indices are congruent mod N, which is impossible for N > 1. Random sampling would still put both
+halves of one TU in a wave about once in N tries. The stride is taken in the queue's own address order and
+never re-sorted, so a wave is spread across the address bands for free; the cost is cross-unit knowledge
+reuse (adjacent proposals tend to share a TU, a header, a type), so a wave is spread *within* a band rather
+than scattered for its own sake.
 
 A pooled brief is claim-independent by construction: it is rendered against the worktree the claim *will*
 create (`claims.worktree_for`) and against the branch `claims.py claim` *will* make (`worker/<slug(unit)>`),
@@ -150,14 +162,59 @@ def text_start(main: str, unit: str) -> int | None:
     return rng[".text"][0] if ".text" in rng else None
 
 
+def order_key(main: str, entry: dict) -> tuple:
+    """The campaign's order: lowest `.text` address first, then unit name."""
+    start = text_start(main, entry["unit"])
+    return (start is None, start or 0, entry["unit"] or "")
+
+
+def ordered_entries(main: str, entries: list[dict] | None = None) -> list[dict]:
+    """**Every** pooled brief in address order - the queue as `next` walks it, unready entries included.
+
+    The unready ones stay in the list on purpose: a wave strides over this order and skips what is not
+    ready *without breaking the stride*, and two adjacent proposals must be adjacent here for that skip to
+    mean anything.
+    """
+    entries = entries if entries is not None else pool_entries(main)
+    return sorted(entries, key=lambda e: order_key(main, e))
+
+
 def next_entry(main: str, entries: list[dict] | None = None) -> dict | None:
     """The next ready brief: lowest `.text` address first, then unit name (the campaign's order)."""
-    entries = entries if entries is not None else pool_entries(main)
+    ordered = ordered_entries(main, entries)
     branches = claims.worker_branches(main)
-    ready = [e for e in entries if state(main, e, branches) == "ready"]
-    ready.sort(key=lambda e: (text_start(main, e["unit"]) is None, text_start(main, e["unit"]) or 0,
-                              e["unit"] or ""))
+    ready = [e for e in ordered if state(main, e, branches) == "ready"]
     return ready[0] if ready else None
+
+
+def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]:
+    """The `count` proposals one `--count N` wave claims: a stride of N through the address order.
+
+    The picks are indices `i, i+N, i+2N, ...` of the queue in address order - never N neighbours - so two
+    *adjacent* proposals (indexes `j` and `j+1`) can share a wave only if both are congruent mod N, which
+    is impossible for N > 1. With `--count 1` this is exactly `next_entry`'s single pick.
+
+    Walking the whole address-ordered queue (not a re-sorted subset) is what keeps the spread: a claimed,
+    covered or written entry at a stride position is skipped and the walk continues at the *next* stride
+    position, so the wave fills with the same spacing rather than stopping at the blockage. When the stride
+    runs off the end of a short queue, the remainder is filled in address order - a fill is only taken if
+    it is ready and not index-adjacent to a pick, so it cannot re-introduce adjacency either. If fewer than
+    N are ready in total, fewer come back and the caller says so.
+    """
+    if count < 1:
+        raise SystemExit("REFUSED queue next | --count must be at least 1")
+    ordered = ordered_entries(main, entries)
+    branches = claims.worker_branches(main)
+    is_ready = [state(main, e, branches) == "ready" for e in ordered]
+    picked = [i for i in range(0, len(ordered), count) if is_ready[i]][:count]
+    if len(picked) < count:
+        for j in range(len(ordered)):
+            if len(picked) >= count:
+                break
+            if not is_ready[j] or j in picked or any(abs(j - i) == 1 for i in picked):
+                continue
+            picked.append(j)
+    return [ordered[i] for i in sorted(picked)]
 
 
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dict:
@@ -218,26 +275,21 @@ def branch_error(main: str) -> str | None:
     return None
 
 
-def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> dict:
-    """Claim the next ready unit, promote its brief, and return the spawn.
-
-    The unit is claimed first and the brief is only promoted once the claim exists, so a worker is never
-    handed an outbox path that does not exist. `claim_fn` is injectable so the selftest can exercise the
-    whole flow without a git worktree. Before the claim, `branch_error` refuses a MAIN whose HEAD is not
-    `main`, because the worktree and branch are cut from that HEAD.
-    """
-    claim_fn = claim_fn or claims.claim
-    if not dry_run:
-        # the worktree/branch is cut from MAIN's HEAD, so a claim made on another branch is rooted wrong
-        bad_branch = branch_error(main)
-        if bad_branch:
-            raise SystemExit("REFUSED queue next | %s" % bad_branch)
-    entry = next_entry(main)
-    if entry is None:
-        raise SystemExit(
-            "no ready brief in %s\n"
+def no_ready(main: str) -> str:
+    """The refusal both entry points raise when the queue has nothing to hand out."""
+    return ("no ready brief in %s\n"
             "  run `python tools/units/brief.py --pool` first, or every pooled unit is claimed or written\n"
             "  see: python tools/units/queue.py list" % pool_dir(main))
+
+
+def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn) -> dict:
+    """Claim one *selected* entry, promote its brief, and return its spawn.
+
+    `next` and a wave differ only in selection, so this is the one claim path both take: the unit is
+    claimed first and the brief is only promoted once the claim exists, so a worker is never handed an
+    outbox path that does not exist. `claim_fn` is injectable so the selftest can exercise the whole flow
+    without a git worktree.
+    """
     unit = entry["unit"]
     slug = claims.slug(unit)
     wt = claims.worktree_for(unit, main)
@@ -251,6 +303,45 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> d
     return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
             "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
             "spawn": spawn_line(main, unit, claim_slug, wt, brief_path)}
+
+
+def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> dict:
+    """Claim the next ready unit, promote its brief, and return the spawn.
+
+    Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
+    branch are cut from that HEAD. The claim itself is `claim_entry`, shared with the `--count` wave path.
+    """
+    claim_fn = claim_fn or claims.claim
+    if not dry_run:
+        # the worktree/branch is cut from MAIN's HEAD, so a claim made on another branch is rooted wrong
+        bad_branch = branch_error(main)
+        if bad_branch:
+            raise SystemExit("REFUSED queue next | %s" % bad_branch)
+    entry = next_entry(main)
+    if entry is None:
+        raise SystemExit(no_ready(main))
+    return claim_entry(main, entry, worker, dry_run, claim_fn)
+
+
+def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None) -> dict:
+    """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
+
+    Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
+    the single pick uses. `claimed` below `requested` means the queue could not fill the wave: fewer than
+    `count` were ready, or the rest were adjacent to a claim already in it. The wave claims what there is
+    instead of failing, and the caller reports the shortfall.
+    """
+    claim_fn = claim_fn or claims.claim
+    if not dry_run:
+        bad_branch = branch_error(main)
+        if bad_branch:
+            raise SystemExit("REFUSED queue next | %s" % bad_branch)
+    chosen = wave(main, count)
+    if not chosen:
+        raise SystemExit(no_ready(main))
+    out = [claim_entry(main, entry, worker, dry_run, claim_fn) for entry in chosen]
+    return {"requested": count, "claimed": len(out), "shortfall": count - len(out), "dry_run": dry_run,
+            "claims": out}
 
 
 def pool_state(main: str) -> dict:
@@ -425,17 +516,133 @@ def selftest() -> int:
         check("a dropped proposal is not handed out", next_entry(tmp), None)
         check("is_proposal is false for an ordinary unit", is_proposal(tmp, "auto/stubA"), False)
 
+    # a wave (`next --count N`) is a stride of N through the address order: two *adjacent* proposals can
+    # share a wave only if their indices are congruent mod N, impossible for N > 1. That is the property
+    # the campaign needs, because adjacency is what puts two workers on one TU (proposal/8007270C and
+    # proposal/80073180 are both g3d_calcvtx.cpp), makes a neighbour register a symbol you declare
+    # (the rule-2 boundary artefacts), and shares owner headers by construction.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src"))
+        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
+        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
+        claims.save_registry(tmp, {})
+        labels = ["proposal/%08X_fn_%08X.cpp" % (0x80160000 + 0x100 * i, 0x80160000 + 0x100 * i)
+                  for i in range(6)]
+        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [
+                {"label": l, "text": [0x80160000 + 0x100 * i, 0x80160000 + 0x100 * i + 0x80],
+                 "count": 1, "bytes": 128, "cxx": False} for i, l in enumerate(labels)]}, fh)
+        for l in labels:
+            open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(l) + ".md"),
+                 "w", encoding="utf-8").write("# Proposal brief: %s\n" % l)
+        units = [claims.norm_unit(l) for l in labels]
+
+        def picks(chosen: list[dict]) -> list[int]:
+            """The fixture indices a selection made, in the order it returned them."""
+            return [units.index(e["unit"]) for e in chosen]
+
+        def adjacent(indexes: list[int]) -> bool:
+            """Whether any two picks are address-adjacent in the queue - the defect a wave must exclude."""
+            return any(b - a == 1 for a, b in zip(indexes, indexes[1:]))
+
+        check("the fixture is six adjacent ready proposals in address order",
+              [e["unit"] for e in ordered_entries(tmp)], units)
+        check("N=1 is the single pick next_entry makes", picks(wave(tmp, 1)), [0])
+        check("... and next_entry still agrees", next_entry(tmp)["unit"], units[0])
+        w3 = picks(wave(tmp, 3))
+        check("N=3 strides 0, 3", w3[:2], [0, 3])
+        check("... the third hit is the fill - only index 5 is not adjacent to 0 or 3", w3[2], 5)
+        check("... and claims three spread proposals", (len(w3), adjacent(w3)), (3, False))
+        for n in (2, 3):
+            sel = picks(wave(tmp, n))
+            check("N=%d claims N and never two adjacent" % n, (len(sel), adjacent(sel)), (n, False))
+        w6 = picks(wave(tmp, 6))
+        check("a wave of six on six adjacent proposals is capped by adjacency, not by readiness",
+              (len(w6), adjacent(w6)), (3, False))
+
+        # a claimed stride position is skipped and the walk continues at the next stride position, so the
+        # wave still fills - index 3 is claimed, and the wave comes back with 0, 2 and 4
+        claims.save_registry(tmp, {units[3]: {"branch": "worker/x", "worker": "me"}})
+        claimed3 = picks(wave(tmp, 3))
+        check("a claimed stride position is skipped", 3 not in claimed3, True)
+        check("... the stride keeps going and the wave still fills", (len(claimed3), adjacent(claimed3)), (3, False))
+        check("... taking the nearest ready neighbours that are not adjacent", claimed3, [0, 2, 4])
+        claims.save_registry(tmp, {})
+
+        # a covered proposal (its range is already registered under another name) is skipped the same way
+        saved_units, saved_range = brief.registered_units, brief.splits_range
+        brief.registered_units = lambda m: ["enemy/neighbour"]
+        brief.splits_range = lambda m, u: {".text": (0x80160300, 0x80160400)}
+        check("... a covered stride position is not ready either", state(tmp, ordered_entries(tmp)[3]), "covered")
+        covered3 = picks(wave(tmp, 3))
+        check("a covered stride position is skipped, stride intact",
+              (3 in covered3, len(covered3), adjacent(covered3)), (False, 3, False))
+        brief.registered_units, brief.splits_range = saved_units, saved_range
+
+        # fewer than N ready: claim what exists and report the shortfall instead of failing
+        claims.save_registry(tmp, {u: {"branch": "worker/x", "worker": "me"}
+                                   for u in (units[1], units[3], units[4], units[5])})
+        short = picks(wave(tmp, 3))
+        check("fewer than N ready claims what exists", (len(short), adjacent(short)), (2, False))
+        check("... and it is the ready pair, not the claimed neighbours", short, [0, 2])
+
+        def fake_claim(unit, main, worker, dry_run):
+            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
+                                               "worktree": claims.worktree_for(unit, main)}})
+            return {"unit": unit, "branch": claims.branch_for(unit),
+                    "worktree": claims.worktree_for(unit, main)}
+
+        out = next_briefs(tmp, "w-wave", dry_run=False, count=3, claim_fn=fake_claim)
+        check("a short wave reports the shortfall rather than failing",
+              (out["requested"], out["claimed"], out["shortfall"]), (3, 2, 1))
+        check("... every claim carries its own spawn",
+              [c["unit"] for c in out["claims"]], [units[0], units[2]])
+        check("... and every spawn is a subagent call",
+              all(c["spawn"]["call"].startswith("subagent(agent=\"worker\"") for c in out["claims"]), True)
+        check("... claimed through the same path as a single pick",
+              units[2] in claims.load_registry(tmp), True)
+
+        # a full wave claims N proposals and nothing adjacent, on the untouched fixture
+        claims.save_registry(tmp, {})
+        dry3 = next_briefs(tmp, "w-wave", dry_run=True, count=3, claim_fn=fake_claim)
+        check("a dry-run wave claims nothing", (dry3["claimed"], claims.load_registry(tmp)), (3, {}))
+        check("... but returns every spawn the real wave would",
+              [c["unit"] for c in dry3["claims"]], [units[0], units[3], units[5]])
+        out = next_briefs(tmp, "w-wave", dry_run=False, count=3, claim_fn=fake_claim)
+        wave3 = [units.index(c["unit"]) for c in out["claims"]]
+        check("a full wave claims exactly N", (out["claimed"], out["shortfall"]), (3, 0))
+        check("... the three are the stride picks, non-adjacent", (wave3, adjacent(wave3)), ([0, 3, 5], False))
+        check("... and the addresses are the spaced ones",
+              [text_start(tmp, c["unit"]) for c in out["claims"]],
+              [0x80160000, 0x80160300, 0x80160500])
+        try:
+            next_briefs(tmp, None, dry_run=True, count=0)
+            check("a --count below 1 is refused", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("a --count below 1 is refused", "at least 1" in str(exc), True)
+        try:
+            wave(tmp, 0)
+            check("... the selector refuses it too, so no caller can pass it through", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("... the selector refuses it too, so no caller can pass it through", "at least 1" in str(exc), True)
+
     # an empty pool must refuse, not hand out a brief for a unit nobody prepared
     with tempfile.TemporaryDirectory() as empty:
         os.makedirs(os.path.join(empty, "src"))
         open(os.path.join(empty, "configure.py"), "w").write("config.libs = [\n]\n")
         check("an empty pool has no ready brief", pool_state(empty)["ready"], [])
         check("an empty pool has no next entry", next_entry(empty), None)
+        check("an empty pool has no wave", wave(empty, 3), [])
         try:
             next_brief(empty, None, dry_run=True)
             check("an empty pool refuses to hand out a brief", "no error", "SystemExit")
         except SystemExit as exc:
             check("an empty pool refuses to hand out a brief", "no ready brief" in str(exc), True)
+        try:
+            next_briefs(empty, None, dry_run=True, count=3)
+            check("an empty pool refuses a wave", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("an empty pool refuses a wave", "no ready brief" in str(exc), True)
 
     # the claim is rooted at MAIN's HEAD: `queue.py next` must refuse when MAIN is not on `main`, or the
     # worker's worktree and branch are cut from the wrong tip (the 2026-09-24 stale-`main` incident)
@@ -523,6 +730,9 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
     n = sub.add_parser("next", help="claim the next ready unit, promote its brief, print the spawn")
+    n.add_argument("--count", type=int, default=1,
+                   help="claim a wave of N proposals spread with a stride of N through the address order"
+                        " (default 1 - the single next proposal)")
     n.add_argument("--worker", default=None)
     n.add_argument("--dry-run", action="store_true")
     n.add_argument("--json", action="store_true")
@@ -562,6 +772,35 @@ def main() -> int:
         return 0
 
     if args.cmd == "next":
+        if args.count != 1:
+            out = next_briefs(main_wt, args.worker, args.dry_run, args.count)
+            if args.json:
+                print(json.dumps(out, indent=2))
+                return 0
+            if out["dry_run"]:
+                print("DRY RUN - nothing claimed, nothing written\n")
+            else:
+                print("claimed %d of %d proposals (stride %d through the address order):\n"
+                      % (out["claimed"], out["requested"], out["requested"]))
+            for i, c in enumerate(out["claims"], 1):
+                start = text_start(main_wt, c["unit"])
+                print("--- %d/%d  %s  %s"
+                      % (i, out["claimed"], "0x%X" % start if start is not None else "?", c["unit"]))
+                if not c["dry_run"]:
+                    print("  branch   %s\n  worktree %s\n  brief    %s"
+                          % (c["claim"].get("branch"), c["worktree"], c["brief"]))
+                sp = c["spawn"]
+                print("spawn this worker:")
+                print("  agent: %s" % sp["agent"])
+                print("  label: %s  (the tool takes no name)" % sp["name"])
+                print("  cwd:   %s" % sp["cwd"])
+                print("  task:  %s" % sp["task"])
+                print("\n%s\n" % sp["call"])
+            if out["shortfall"]:
+                print("NOTE: claimed %d of the %d requested - the rest of the queue was not ready, or sat"
+                      " next to a claim already in this wave; `python tools/units/brief.py --pool`"
+                      " replenishes it" % (out["claimed"], out["requested"]))
+            return 0
         out = next_brief(main_wt, args.worker, args.dry_run)
         if args.json:
             print(json.dumps(out, indent=2))

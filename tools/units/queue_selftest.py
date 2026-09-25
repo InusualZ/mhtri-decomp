@@ -8,7 +8,10 @@ no repository state are touched. What they pin: the pool's state machine (`ready
 `stale` / `unreadable`), the address order `next` picks, that `--dry-run` claims nothing, that the real flow
 claims the unit *before* promoting the brief, that the promoted brief is a copy of the pooled one at the
 claim's own slug, that a suffixed branch is re-rendered so its outbox path is the claim's, and that the
-printed spawn carries the cwd, name and task the orchestrator pastes.
+printed spawn carries the cwd, name and task the orchestrator pastes. The wave selection is pinned too: a
+`next --count N` wave strides the address order, so no two picks are adjacent; `N=1` is the single pick
+`next_entry` makes; a claimed or covered stride position is skipped without breaking the stride; and fewer
+than N ready claims what exists and reports the shortfall instead of failing.
 
 `queue.selftest()` holds the checks so `queue.py --selftest` and this entry point cannot drift.
 """
