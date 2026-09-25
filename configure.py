@@ -929,6 +929,16 @@ config.libs = [
         "progress_category": "game",
         "host": False,
         "objects": [
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
+            # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
+            # compiled to a 261-entry `.data` jump table (`jumptable_805C3D20`, 0x805C3D20-0x805C4134).
+            # Home is `Pl`: the first argument is passed straight to `Get_motion_no`, whose map
+            # spelling is `Get_motion_no__FP4_PLW`, and the sibling switch `fn_8023C2D0` calls
+            # `Pl_act_ck__FP4_PLWUcUs`.  No `__FILE__` string covers the range (the .data pool around
+            # the jump table carries none), so the stem is the map's `fn_80241558` with a rule-7
+            # deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80241558.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
