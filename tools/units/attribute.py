@@ -1029,12 +1029,12 @@ def queue_guard(path: Path | None, fresh: list[dict], claimed, replace_region: b
     t0 = min([f["address"] for f in fns] + [p["text"][0] for p in dropped])
     t1 = max([f["address"] + f.get("size", 0) for f in fns] + [p["text"][1] for p in dropped])
     first = dropped[0]
-    return ("refusing to rewrite %s: it holds %d proposal(s) this run would drop (%d of %d), and `queue`\n"
-            "  writes the *whole* queue for the region it is given - 0x%08X..0x%08X is not covered by the\n"
-            "  new proposals or by a registered unit. First dropped: %s (0x%08X..0x%08X).\n"
+    return ("refusing to rewrite %s: the run would drop %d of its %d proposal(s) - `queue` writes the *whole* queue\n"
+            "  for the region it is given, and these are covered by neither the new proposals nor a\n"
+            "  registered unit (0x%08X..0x%08X). First dropped: %s (0x%08X..0x%08X).\n"
             "  Regenerate a region that covers the queue (a re-cut of the same region is allowed), or pass\n"
             "  --replace-region to replace the whole file anyway."
-            % (path, len(dropped), len(dropped), len(old), t0, t1, first.get("label", "?"),
+            % (path, len(dropped), len(old), t0, t1, first.get("label", "?"),
                first["text"][0], first["text"][1]))
 
 
