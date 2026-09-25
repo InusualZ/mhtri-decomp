@@ -26,6 +26,7 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 /* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
+void fn_80267270(_PLW* plw, u32 a, u32 b, u32 c);
 #ifdef __cplusplus
 }
 
