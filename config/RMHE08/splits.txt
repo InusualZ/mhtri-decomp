@@ -56,6 +56,12 @@ draw_shape.cpp:
 	.text       start:0x80054C64 end:0x80056F24
 	.ctors      start:0x8056F2C8 end:0x8056F2CC
 
+fn_80056F24.cpp:
+	extab       start:0x80007218 end:0x800072D0
+	extabindex  start:0x8001F494 end:0x8001F5A8
+	.text       start:0x80056F24 end:0x80059550
+	.ctors      start:0x8056F2CC end:0x8056F2D0
+
 g3d/g3d_anmscn.cpp:
 	extab       start:0x80007B14 end:0x80007B1C
 	extabindex  start:0x8001FF5C end:0x8001FF68
