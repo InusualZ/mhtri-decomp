@@ -119,6 +119,10 @@ extern const f32 lbl_80796310; /* 0.34f */
 extern const f32 lbl_80796314; /* 3.14159274f */
 extern const f32 lbl_80796318; /* 0.01f */
 
+/* ef/nw4r math helpers.  The target object references each by its plain `fn_XXXXXXXX` map name,
+ * so they carry C linkage; a C++ spelling mangles the reloc (fn_80041E8C__FP6EfVec3fff) and it no
+ * longer pairs (relocaudit). */
+extern "C" {
 extern f32 fn_800A8A08(struct EfRate *rate);
 extern u16 fn_800A9FB0(void *self, u16 id, struct EfEmitter *em, f32 f);
 extern void fn_800A99B4(void *self, struct EfVec3 *out, struct EfEmitter *em, struct EfVec3 *a,
@@ -128,6 +132,7 @@ extern void fn_8009C760(f32 *a, f32 *b, f32 angle);
 extern void fn_8009C484(struct EfVec3 *a, struct EfVec3 *b);
 extern void fn_80041E8C(struct EfVec3 *out, f32 x, f32 y, f32 z);
 extern void fn_80043EA8(struct EfVec3 *out);
+}
 
 /* --------------------------------------------------------------------------------------------- */
 /* Assert                                                                                         */
