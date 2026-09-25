@@ -479,6 +479,12 @@ ef/fn_80119C44.c:
 	extabindex  start:0x800266E8 end:0x8002670C
 	.text       start:0x80119C44 end:0x80119DEC
 
+ef/eft029.cpp:
+	extab       start:0x8000C56C end:0x8000C63C
+	extabindex  start:0x8002670C end:0x80026844
+	.text       start:0x80119DEC end:0x8011D448
+	.ctors      start:0x8056F314 end:0x8056F318
+
 enemy/fn_801251D0.cpp:
 	extab       start:0x8000C8AC end:0x8000CBDC
 	extabindex  start:0x80026BEC end:0x800270B4
