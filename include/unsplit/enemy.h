@@ -11,10 +11,14 @@
 #include "nw4r/math.h"
 
 struct _ENEMY_WORK;
+struct EnemyData;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct EnemyData* fn_80140C00(u8 group, u8 index);
+u8* fn_8014260C(u8 id);
 
 void CancelFade(struct _ENEMY_WORK *self);
 u32 em_frame_check__FP11_ENEMY_WORKUsff(struct _ENEMY_WORK *self, u16 a, f32 b, f32 c);
@@ -126,13 +130,14 @@ void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* 
  * (fn_8014A1BC .. fn_80170FA8), so rule 2 sends the declarations here.  Signatures: `self` only for
  * the handlers that take one argument, and `fn_80170EF4` takes the action's extra selector in r4.
  *
- * `fn_80128A14`'s last two narrow to u8 in its own body (`clrlwi r4,r4,24`), so they are declared u8
- * here.  Three landed units used to declare them three ways in their own files (`u8` in
- * fn_80149D6C, `u32` in fn_8014A1BC, `s32` in fn_80177890) - the same rule-2 debt - and since this
- * header is the owner's home, fn_8014A1BC's and fn_80149D6C's local copies were dropped.  Every
+ * `fn_80128A14`'s last two are u8 in the consumer's view, but the owner's body narrows them itself
+ * (`clrlwi r4,r4,24`/`clrlwi r5,r5,24`), so the definition takes u32 and the declaration here is
+ * widened to match the owner (enemy/fn_801251D0.cpp).  Three landed units used to declare them three
+ * ways in their own files (`u8` in
+ * fn_80149D6C, `u32` in fn_8014A1BC, `s32` in fn_80177890) - the same rule-2 debt.  Every
  * call site passes a constant, so the spelling is codegen-neutral. */
 void fn_80127F48(struct _ENEMY_WORK* self);
-void fn_80128A14(struct _ENEMY_WORK* self, u8 a, u8 b);
+void fn_80128A14(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80170A54(struct _ENEMY_WORK* self);
 void fn_80170AD0(struct _ENEMY_WORK* self);
 void fn_80170B4C(struct _ENEMY_WORK* self);
