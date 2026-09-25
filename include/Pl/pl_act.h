@@ -21,6 +21,10 @@ extern "C" {
 s32 fn_8027AC18(void* arg);
 u32 fn_8027BC48(s32 arg);
 
+/* 0x8027D310 - the three-argument target-check helper `ai/fn_802CC794.cpp` and the enemy units
+ * call; C linkage (unmangled `fn_80278310`), added with its first consumer (rule 2). */
+u32 fn_80278310(u8 a, nw4r::math::VEC3* v, u8 b);
+
 /* 0x8027D050 - the actor's stored carve value, scanned out of the item table.  The owner defines the
  * return `u8`; the retail consumer `Pl/fn_80229ECC.cpp` keeps the raw return in a register and masks
  * it per use (`clrlwi r0,r29,24` before each shift), which MWCC only emits when the declaration is

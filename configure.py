@@ -454,6 +454,7 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(Matching, "ai/fn_802D0DCC.c"),
+                        Object(NonMatching, "ai/fn_802CC794.cpp"),
         ],
     },
 
