@@ -87,6 +87,12 @@ void fn_8007F0CC(s32 root, u32 id);
 
 /* 0x8007A510 - the softreset/return-to-title request (caller: src/mh3_pad.cpp). */
 void fn_8007A510(void);
+
+/* 0x8079124C - the `.sdata` word the `g3d_state.cpp` cluster hands back the address of (caller:
+ * g3d/g3d_state.cpp).  A data symbol with no registered owner, so the band is its home (rule 2).
+ * The `fn_8007B5F4`/`fn_8007BB8C` lookups that were declared here moved to their owner's header
+ * `include/g3d/fn_80075DCC.h` when `g3d/fn_80075DCC.cpp` registered (rule 2, 2026-09-25). */
+extern u32 lbl_8079124C;
 #ifdef __cplusplus
 }
 #endif
