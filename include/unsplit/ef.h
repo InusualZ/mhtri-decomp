@@ -30,7 +30,6 @@ f32 fn_800AB658(void* self, f32 v);
 void fn_801173AC(void* self);
 void fn_80043EA8(Vec3* out);
 struct Vec;
-void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector to nw4r's */
 
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 
@@ -58,6 +57,12 @@ struct _EFT;
 
 #ifdef __cplusplus
 }
+#endif
+
+/* The target objects reference this by its C++ mangling
+ * (`vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec`), so it is declared with C++ linkage (relocaudit). */
+#ifdef __cplusplus
+void vec_to_mh_vec3(Vec3* dst, struct Vec* src);   /* converts the engine vector to nw4r's */
 #endif
 
 #endif /* MHTRI_UNSPLIT_EF_H */
