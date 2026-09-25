@@ -725,6 +725,55 @@ def selftest() -> int:
         check("queue: a dry run leaves the queue as it was", json.loads(read(qpath))["units"][0]["label"],
               "proposal/a.c")
 
+    # --- the destructive default is opt-in: a rewrite that would drop proposals is refused ----------
+    # `queue` writes the whole file for the region it is given, so a sub-region run used to discard every
+    # other proposal (`queue 0x8008F8E4 0x80097D40` took a 419-entry queue down to 1). The refusal is a
+    # coverage test, because a legitimate re-run does re-cut the same region.
+    with tempfile.TemporaryDirectory() as tmp:
+        qpath = Path(tmp) / "attribution-queue.json"
+        old = [{"label": "proposal/1000_a.c", "text": [0x1000, 0x1100],
+                "functions": [{"name": "fa", "address": 0x1000, "size": 0x80},
+                              {"name": "fb", "address": 0x1080, "size": 0x70}]},
+               {"label": "proposal/2000_b.c", "text": [0x2000, 0x2080],
+                "functions": [{"name": "fc", "address": 0x2000, "size": 0x80}]}]
+        qpath.write_text(json.dumps({"version": 1, "units": old}), encoding="utf-8")
+        first = prop("proposal/1000_a.c", 0x1000, 0x1100)
+        second = prop("proposal/2000_b.c", 0x2000, 0x2080)
+        check("guard: a rewrite that keeps the whole queue is allowed",
+              at.queue_guard(qpath, [first, second], []), None)
+        reason = at.queue_guard(qpath, [first], [])
+        check("guard: a sub-region rewrite is refused", bool(reason), True)
+        check("guard: the refusal says the whole file would be replaced",
+              "writes the *whole* queue" in reason, True)
+        check("guard: the refusal names what it would drop", "proposal/2000_b.c" in reason, True)
+        check("guard: the refusal names the flag that overrides it", "--replace-region" in reason, True)
+        check("guard: --replace-region overrides the refusal",
+              at.queue_guard(qpath, [first], [], replace_region=True), None)
+        check("guard: a range a registered unit now holds is not a loss",
+              at.queue_guard(qpath, [first], [(0x2000, 0x2080, "Pl/pl_act.cpp")]), None)
+        check("guard: an unreadable queue is not refused over",
+              at.queue_guard(Path(tmp) / "gone.json", [first], []), None)
+        empty = Path(tmp) / "empty.json"
+        empty.write_text(json.dumps({"version": 1, "units": []}), encoding="utf-8")
+        check("guard: an empty queue is not refused over", at.queue_guard(empty, [first], []), None)
+        # a re-cut of the same region loses nothing even when every label and every boundary moves
+        recut = [prop("proposal/1000_z.c", 0x1000, 0x1080), prop("proposal/1080_y.c", 0x1080, 0x1100),
+                 prop("proposal/2000_x.c", 0x2000, 0x2080)]
+        check("guard: a re-cut of the whole region is allowed", at.queue_guard(qpath, recut, []), None)
+        # the last function ends at 0x10F0, so the old entry's `text` tail is padding nobody owns: a new
+        # tiling that stops at the function and not at the old range is not a lost proposal
+        padded = [prop("proposal/1000_v.c", 0x1000, 0x10F0), prop("proposal/2000_t.c", 0x2000, 0x2080)]
+        check("guard: a gap after the last function is not a lost proposal",
+              at.queue_guard(qpath, padded, []), None)
+        nofns = Path(tmp) / "nofns.json"
+        nofns.write_text(json.dumps({"version": 1, "units": [{"label": "proposal/3000_w.c",
+                                                                "text": [0x3000, 0x3080]}]}),
+                         encoding="utf-8")
+        check("guard: an entry with no functions falls back to its range",
+              bool(at.queue_guard(nofns, [first], [])), True)
+        check("guard: ... and is kept when its range is covered",
+              at.queue_guard(nofns, [prop("proposal/3000_w.c", 0x3000, 0x3080)], []), None)
+
     ap = at.build_parser()
     check("cli: `queue` is a subcommand", ap.parse_args(["queue", "0x0", "0x1"]).cmd, "queue")
     check("cli: `plan` still parses", ap.parse_args(["plan", "0x0", "0x1"]).cmd, "plan")
@@ -734,6 +783,12 @@ def selftest() -> int:
           ap.parse_args(["apply", "0x0", "0x1", "--legacy-register"]).legacy_register, True)
     check("cli: `queue` takes --max-total-bytes like the others",
           ap.parse_args(["queue", "0x0", "0x1", "--max-total-bytes", "0x1000"]).max_total_bytes, 0x1000)
+    check("cli: `queue` refuses a dropping rewrite by default",
+          ap.parse_args(["queue", "0x0", "0x1"]).replace_region, False)
+    check("cli: `queue --replace-region` opts in",
+          ap.parse_args(["queue", "0x0", "0x1", "--replace-region"]).replace_region, True)
+    check("cli: only `queue` carries --replace-region",
+          hasattr(ap.parse_args(["plan", "0x0", "0x1"]), "replace_region"), False)
 
     # determinism: the queue is a pure function of its inputs, so regenerating over an unchanged tree is
     # not a diff. This is what the removed wall-clock timestamp used to break.
