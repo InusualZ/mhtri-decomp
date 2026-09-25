@@ -24,6 +24,7 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
 
     python tools/units/land.py record-base [--json]
     python tools/units/land.py land --units a,b [--base SHA] [--no-build] [--no-outbox] [--no-release]
+                                  [--already-applied]
     python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-outbox]
                                   [--no-release] [--allow-regression UNIT]
 
@@ -66,6 +67,29 @@ removes a stale one when it refuses; committing it stays a deliberate step for t
 `--no-outbox` and `--no-release` are **separate** opt-outs: skipping the outbox/branch checks does not skip the
 claim teardown (the old `--no-worker-units` did both, and a round that passed it left 18 worktrees and 3 dead
 claims behind). `--no-worker-units` remains as an alias for `--no-outbox`.
+
+Every check is classified by **KIND**, and a refusal says which kind failed, because the two need opposite
+responses. A **GATE** check refuses because the *batch* is bad - the style lint, the regression scan, the
+build/DOL hash, a path outside the batch, a genuine claim conflict - so the landing must stop and the batch
+must be fixed. A **BOOKKEEPING** check refuses because the *landing's own state* is stale while the batch is
+fine - a base that was never recorded (or has moved), a worker branch a `--force` release parked at a rescue
+ref, an outbox the worker has to rewrite, a claim whose teardown did not finish - and the refusal prints the
+exact remedy and **never** says "the gate failed". On 2026-09-26 the old shared wording ("the gate failed -
+nothing staged or committed") made a bookkeeping refusal read as a substantive gate failure, and the reader
+nearly overrode a real gate failure on another batch; the kind is now in the refusal line and in every
+per-check line (`<check> [GATE|BOOKKEEPING]: <what it printed> (remedy: ...)`).
+
+Two bookkeeping states that cost a manual commit the same day have their own handling:
+
+* **a released branch (case (a))** - `release --force` deletes `worker/<label>` and parks its only copy of
+the work at `refs/rescue/<label>`. The gate now restores the branch from that ref automatically
+(`restore_rescued_branch`) instead of refusing a batch whose work is demonstrably preserved, and names what
+it did;
+* **an already-applied batch (case (b))** - if `record-base` ran *after* the batch was applied, the snapshot
+it took recorded the batch's own edits as pre-existing, so `land_stageable` excludes them as foreign work.
+When every changed path is in that snapshot, `land` says plainly that the batch is already applied and the
+ordering was wrong; `--already-applied` stages those paths anyway, so the batch lands without a hand commit.
+The ordering to prefer is still `record-base` on a clean tree *before* applying the batch.
 """
 
 from __future__ import annotations
@@ -106,6 +130,68 @@ BASE_FILE = os.path.join(".pi", "land-base.json")
 # batch could not be committed at all. A path the gate refuses must never have reached the index, so this
 # gate now de-indexes what it tolerates instead of refusing it - and names it, every time.
 SCRATCH_JSON = re.compile(r"^[dt][0-9]+\.json$")
+
+# Every check is classified by KIND, because the two kinds need opposite responses. A GATE check refuses
+# because the *batch* is bad: the style lint, the regression scan, the build/DOL hash, a path outside the
+# batch, a genuine claim conflict. A BOOKKEEPING check refuses because the *landing's own state* is stale
+# while the batch itself is fine: a base that was never recorded (or has moved), a branch a `--force`
+# release parked at a rescue ref, an outbox the worker has to rewrite, a claim whose teardown did not
+# finish. The old refusal said "the gate failed - nothing staged or committed" for both, and on 2026-09-26 a
+# bookkeeping refusal (a released branch) read as a substantive gate failure - the reader reached for the
+# manual-landing fallback and nearly overrode a real gate failure on another batch. The KIND and the remedy
+# are now part of every refusal, and a bookkeeping-only refusal never says "the gate failed".
+KIND_GATE = "gate"
+KIND_BOOKKEEPING = "bookkeeping"
+KIND_TAG = {KIND_GATE: "GATE", KIND_BOOKKEEPING: "BOOKKEEPING"}
+KIND_REMEDY = {
+    KIND_GATE: "the batch itself is bad - fix the batch; do not override the gate",
+    KIND_BOOKKEEPING: ("the batch itself is fine - repair the landing's own state (the remedy above), "
+                       "then re-run"),
+}
+
+
+def check_kind(row: tuple) -> str:
+    """The KIND of a check row. A 4-tuple (an older caller, a test fixture) reads as GATE - a refusal whose
+    kind is unknown must never be soft-pedalled as mere bookkeeping."""
+    return row[4] if len(row) > 4 and row[4] in KIND_TAG else KIND_GATE
+
+
+def check_remedy(row: tuple) -> str:
+    """The remedy a row carries, falling back to the generic remedy of its kind."""
+    return (row[5] if len(row) > 5 and row[5] else "") or KIND_REMEDY[check_kind(row)]
+
+
+def failed_kinds(checks: list) -> set[str]:
+    """The set of KINDs among the failed rows of `checks`."""
+    return {check_kind(row) for row in checks if not row[1]}
+
+
+def kinds_from_failures(failed: list[str]) -> set[str]:
+    """The kinds named by `failing_checks` output tags (`[GATE]` / `[BOOKKEEPING]`).
+
+    `land` reads `verify`'s out-parameter as formatted strings, so the tag is the only kind signal that
+    crosses that boundary; parsing it keeps `verify`'s signature unchanged.
+    """
+    return {kind for kind, tag in KIND_TAG.items() if any("[%s]" % tag in f for f in failed)}
+
+
+def failure_summary(checks: list, prefix: str = "REFUSING to build or stage anything") -> str:
+    """`"<prefix> (<KIND>: what it means): <check> [KIND]: ... (remedy: ...)"` for a failed check list.
+
+    The aggregate names the KIND before the per-check lines, so the first line already tells the reader
+    whether the *batch* is bad or the *landing's own state* is stale. A bookkeeping-only failure says so and
+    never "the gate failed".
+    """
+    kinds = failed_kinds(checks)
+    if kinds == {KIND_BOOKKEEPING}:
+        head = ("%s (BOOKKEEPING: the batch itself passed; the landing's own state is stale - this is NOT a "
+                "gate failure)" % prefix)
+    elif kinds == {KIND_GATE} or not kinds:
+        head = "%s (GATE: the batch itself is bad, so the landing must stop)" % prefix
+    else:
+        head = ("%s (GATE and BOOKKEEPING both failed - GATE: the batch itself; BOOKKEEPING: the landing's "
+                "own state)" % prefix)
+    return head + ": " + "; ".join(failing_checks(checks))
 
 
 def run(args: list[str], cwd: str) -> subprocess.CompletedProcess:
@@ -206,21 +292,28 @@ def clear_land_message(main: str) -> str | None:
     return None
 
 
-def failing_checks(checks: list[tuple[str, bool, str, str]]) -> list[str]:
-    """`"<check name>: <what it printed>"` for every failed check - a refusal must name the gate.
+def failing_checks(checks: list) -> list[str]:
+    """`"<check name> [<KIND>]: <what it printed> (remedy: ...)"` for every failed check.
 
     The check *names* are the assertion they make ("style lint (§6.5) adds no violation"), so a FAIL row's
     name alone can read as a pass; on 2026-09-25 the gate refused and printed only "the gate failed - nothing
     staged or committed" while the lint row showed stylelint's trailing legend (`.pi/land.log`), so the reader
     went hunting for a defect that was not there and the batch was committed by hand. Every refusal now
-    carries the failing check's name *and* the output it printed.
+    carries the failing check's name, the output it printed, its KIND and its remedy.
+
+    The KIND separates "the batch is bad" (GATE) from "the landing's own state is stale" (BOOKKEEPING) - the
+    distinction the 2026-09-26 released-branch refusal lost. A 4-tuple row (an older caller, a fixture) reads
+    as GATE through `check_kind`, the conservative default.
     """
     out = []
-    for name, good, detail, info in checks:
+    for row in checks:
+        name, good, detail, info = row[:4]
         if good:
             continue
+        kind = check_kind(row)
         note = " ".join((detail or info or "no detail").split())
-        out.append("%s: %s" % (name, note[:240] or "no detail"))
+        out.append("%s [%s]: %s (remedy: %s)"
+                   % (name, KIND_TAG[kind], note[:240] or "no detail", check_remedy(row)))
     return out
 
 
@@ -242,7 +335,8 @@ def command_detail(p: subprocess.CompletedProcess, limit: int = 300) -> str:
 
 
 def land_decision(gate_ok: bool, stageable: list[str],
-                  failed: list[str] | None = None) -> tuple[str, str]:
+                  failed: list[str] | None = None,
+                  kinds: set[str] | None = None) -> tuple[str, str]:
     """What `land` does after the gate: -> (`"commit"` | `"refuse"`, reason).
 
     The one command has to be safe when its output is piped (the exit status is then lost): the gate's verdict
@@ -250,9 +344,22 @@ def land_decision(gate_ok: bool, stageable: list[str],
     a refusal - there is no batch to land. A refusal on a failed gate NAMES the failing check(s) and what each
     printed (`failing_checks`): a bare "the gate failed" is not actionable, and a reader who cannot see which
     gate failed cannot tell a real defect from a passing check.
+
+    `kinds` is the set of check KINDS that failed. A BOOKKEEPING-only refusal says so and never "the gate
+    failed": the batch is fine and the fix is to the landing's own state, so a reader must not reach for the
+    manual-landing fallback that a real gate failure would (and must) stop. With no `kinds` the conservative
+    GATE wording is kept, so an unfurnished caller is never told a red batch is merely bookkeeping.
     """
     if not gate_ok:
-        why = "the gate failed - nothing staged or committed"
+        kinds = set(kinds or [KIND_GATE])
+        if kinds == {KIND_BOOKKEEPING}:
+            why = ("BOOKKEEPING refusal - the batch itself passed, the landing's own state is stale (this is "
+                   "NOT a gate failure) - nothing staged or committed")
+        elif kinds == {KIND_GATE}:
+            why = "the gate failed - nothing staged or committed"
+        else:
+            why = ("BOTH kinds failed - GATE (the batch itself) and BOOKKEEPING (the landing's own state) - "
+                   "nothing staged or committed")
         return "refuse", why + (": %s" % "; ".join(failed) if failed else "")
     if not stageable:
         return "refuse", "the gate passed but no batch path is stageable - nothing to commit"
@@ -393,6 +500,26 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
             continue
         stageable.append(path)
     return stageable
+
+
+def looks_already_applied(rows: list[tuple[str, str]], base_dirty: set[str] | None) -> bool:
+    """True when the batch was applied to the tree *before* `record-base` ran.
+
+    The signature: every changed path the batch guard allows is in the base's `dirty_at_base` snapshot, so
+    `land_stageable` excludes them all as another stream's work and there is nothing left to stage. That is
+    exactly what `record-base` running *after* the apply looks like - the snapshot it took recorded the
+    batch's own edits as pre-existing. The batch is fine; the *ordering* was wrong (the 2026-09-26 case (b),
+    where `land` refused with "the gate passed but no batch path is stageable" straight after "READY: every
+    check passed", and the round had to commit by hand).
+
+    A batch with no changed path at all is not this: there is genuinely nothing to commit, and the plain
+    "nothing to commit" refusal is the right one. Neither is a batch that adds a path the base did not
+    already hold - only a *wholly* pre-existing dirty set has the signature.
+    """
+    allowed = [p for _code, p in rows if not outside_batch([p]) and not is_scratch(p)]
+    if not allowed:
+        return False
+    return set(allowed) <= (base_dirty or set())
 
 
 def staged_elsewhere(main: str, stageable: list[str]) -> list[str]:
@@ -709,9 +836,30 @@ def release_plan(checks: list[tuple], units: list[str], release_claims: bool,
     del check_outbox  # independent of the release decision by design
     if not release_claims or not units:
         return []
-    if any(not good for _n, good, _d, _i in checks):
+    if any(not row[1] for row in checks):
         return []
     return list(units)
+
+
+def restore_rescued_branch(main: str, unit: str) -> str | None:
+    """Put a `--force`-released worker's branch back from its rescue ref. Returns the branch, or None.
+
+    A `release --force` deletes the branch (it is the lock and must go) and parks its only copy of the work
+    at `refs/rescue/<slug>`. What the gate cares about is that the work *exists as commits*, so rather than
+    refuse a missing branch whose work is demonstrably preserved - the 2026-09-26 dead end, where land.py's
+    own refusal named the rescue ref and the exact `git branch` command and the round still had to run it by
+    hand before a manual commit - the gate restores the branch itself and carries on. Nothing is destroyed:
+    the branch points at the rescue ref's commit, and a later teardown sees it exactly as the normal flow
+    would (merged into main after the landing, so the release removes it).
+    """
+    branch = claims.claim_branch(main, unit)
+    if claims.branch_exists(main, branch):
+        return None
+    rescue = claims.rescue_exists(main, unit)
+    if not rescue:
+        return None
+    p = run(["git", "update-ref", "refs/heads/%s" % branch, rescue], main)
+    return branch if p.returncode == 0 else None
 
 
 def branch_problems(main: str, units: list[str]) -> list[str]:
@@ -719,8 +867,9 @@ def branch_problems(main: str, units: list[str]) -> list[str]:
 
     A missing branch is the 2026-09-23 shape: `release --force` on an unreported worker deleted the branch
     (its only copy of the work) and left it at `refs/rescue/<slug>`, so the next gate refused with a bare "no
-    branch" and the round had to work out how to get the work back. The refusal now names the rescue ref and
-    the exact restore command.
+    branch" and the round had to work out how to get the work back. `verify` now restores the branch from
+    that ref before asking (`restore_rescued_branch`), so this only reports the residue: a branch with no
+    rescue ref behind it, or one that has no commits of its own.
     """
     problems = []
     for u in units:
@@ -740,18 +889,20 @@ def branch_problems(main: str, units: list[str]) -> list[str]:
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, check_outbox: bool = True,
            release_claims: bool = True, problems: list[str] | None = None) -> int:
-    # `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check>: <what it printed>"`
-    # per failed check, so its refusal can name the gate instead of saying only "the gate failed". `verify`'s
+    # `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check> [<KIND>]: <what
+    # it printed> (remedy: ...)"` per failed check, so its refusal can name the gate and its kind instead of
+    # saying only "the gate failed". `verify`'s
     # own stdout keeps the check table; the exit status stays the answer.
     # a unit's *name* is its path without the source extension (`claims.norm_unit`): `Camellia/camellia` and
     # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
     # whichever the orchestrator typed.
     units = [claims.norm_unit(u.strip("/")) for u in units]
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
-    checks: list[tuple[str, bool, str]] = []
+    checks: list[tuple[str, bool, str, str, str, str]] = []
 
-    def check(name: str, good: bool, detail: str = "", info: str = "") -> None:
-        checks.append((name, good, detail, info))
+    def check(name: str, good: bool, detail: str = "", info: str = "",
+              kind: str = KIND_GATE, remedy: str = "") -> None:
+        checks.append((name, good, detail, info, kind, remedy))
 
     # 1. ground truth
     truth = pc.ground_truth_error()
@@ -764,9 +915,15 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     if want_base:
         check("main has not moved since the batch base", head == want_base,
               "HEAD %s != base %s - a worker committed to main, or another stream landed"
-              % (head[:8], want_base[:8]), info="base %s" % (want_base or "?")[:8])
+              % (head[:8], want_base[:8]), info="base %s" % (want_base or "?")[:8],
+              kind=KIND_BOOKKEEPING,
+              remedy="re-record the batch base (`python tools/units/land.py record-base`) once main is the "
+                     "tree the batch applies to; if a worker committed to main, undo that first")
     else:
-        check("batch base recorded", False, "no base: run `land.py record-base` when the batch opens")
+        check("batch base recorded", False, "no base: run `land.py record-base` when the batch opens",
+              kind=KIND_BOOKKEEPING,
+              remedy="run `python tools/units/land.py record-base` when the batch opens, then re-run the "
+                     "landing")
 
     # 3. the tree guard + the outbox of every unit in the batch
     paths = changed_paths(main)
@@ -780,17 +937,35 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad),
           info=("tool scratch tolerated (not staged): %s" % ", ".join(scratch)) if scratch else "")
     if units and check_outbox:
-        ok_units, problems = outbox_units(main, units)
-        check("every unit's outbox validates", not problems, "; ".join(problems[:4]))
+        # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
+        # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
+        ok_units, outbox_problems = outbox_units(main, units)
+        check("every unit's outbox validates", not outbox_problems, "; ".join(outbox_problems[:4]),
+              kind=KIND_BOOKKEEPING,
+              remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
+                     "with --no-outbox for an orchestrator-only batch")
+        # a `--force` release leaves the work at refs/rescue/<slug>; restore the branch from it rather than
+        # refuse a batch whose work is demonstrably preserved (2026-09-26 case (a))
+        for u in units:
+            restored = restore_rescued_branch(main, u)
+            if restored:
+                print("NOTE: %s's branch %s was gone but its work is preserved at %s - restored the branch "
+                      "from the rescue ref (a `--force` release had parked it there)"
+                      % (u, restored, claims.rescue_ref_name(u)), file=sys.stderr)
         uncommitted = branch_problems(main, units)
         check("every unit's branch carries its work as commits", not uncommitted,
               "no commits of its own on the branch (work left uncommitted in the worktree?): %s"
-              % ", ".join(uncommitted))
+              % ", ".join(uncommitted),
+              kind=KIND_BOOKKEEPING,
+              remedy="if the commits are at refs/rescue/<slug> land.py restores the branch for you; "
+                     "otherwise have the worker commit its work on the branch, then re-run")
     elif units:
         check("orchestrator-only batch (no worker outboxes to check)", True,
               info="%d unit(s): %s" % (len(units), ", ".join(units)))
     else:
-        check("batch units named", False, "pass --units (or --no-outbox for an orchestrator-only batch)")
+        check("batch units named", False, "pass --units (or --no-outbox for an orchestrator-only batch)",
+              kind=KIND_BOOKKEEPING,
+              remedy="pass --units a,b (or --no-outbox for an orchestrator-only batch)")
 
     # 4. the style lint (7.21), when it exists
     lint = os.path.join(main, "tools", "units", "stylelint.py")
@@ -808,23 +983,25 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     elf_file = os.path.join(main, "build", "RMHE08", "main.elf")
 
     if dry_run:
-        for name, good, detail, info in checks:
+        for row in checks:
+            name, good, detail, info = row[:4]
             note = (detail if not good else "") or info
             print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
         print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> ninja -> report.json -> "
               "regression scan -> ok -> ledger -> baseline" % (" and main.elf (this batch flips an object)" if flip else ""))
         if problems is not None:
             problems.extend(failing_checks(checks))
-        return 0 if all(good for _n, good, _d, _i in checks) else 1
+        return 0 if all(row[1] for row in checks) else 1
 
-    failures = [name for name, good, _d, _i in checks if not good]
+    failures = [row[0] for row in checks if not row[1]]
     if failures:
-        for name, good, detail, info in checks:
+        for row in checks:
+            name, good, detail, info = row[:4]
             note = (detail if not good else "") or info
             print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
         if problems is not None:
             problems.extend(failing_checks(checks))
-        print("\nREFUSING to build or stage anything: %s" % "; ".join(failing_checks(checks)))
+        print("\n" + failure_summary(checks))
         return 1
     if problems is not None:
         problems.extend(failing_checks(checks))
@@ -856,11 +1033,16 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
           "; ".join("%s %s %.2f -> %.2f" % r for r in unauthorised[:5]),
           info=("%d authorised regression(s)" % len(authorised)) if authorised else "")
     used = {a for a in allow_regression if any(a in row[0] for row in authorised)}
-    check("every --allow-regression was actually needed", not [a for a in allow_regression if a not in used],
-          "stale allowance(s), remove them: %s" % ", ".join(a for a in allow_regression if a not in used))
+    stale_allow = [a for a in allow_regression if a not in used]
+    check("every --allow-regression was actually needed", not stale_allow,
+          "stale allowance(s), remove them: %s" % ", ".join(stale_allow),
+          kind=KIND_BOOKKEEPING,
+          remedy="remove the stale --allow-regression flag(s) named above and re-run")
     if not before_report:
         check("the batch base carries a report snapshot", False,
-              "record-base did not snapshot report.json (rebuild it and re-record the base)")
+              "record-base did not snapshot report.json (rebuild it and re-record the base)",
+              kind=KIND_BOOKKEEPING,
+              remedy="run `ninja build/RMHE08/report.json` then `python tools/units/land.py record-base`")
     all_regressed = [("", "", 0.0, 0.0)][:0] + [(u, w, b, a) for u, w, b, a in unauthorised + authorised]
     gate("ok (main.dol verified)", ["ninja", "build/RMHE08/ok"])
     fresh = os.path.exists(ok_file) and os.stat(ok_file).st_mtime_ns >= started
@@ -874,7 +1056,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     headers_changed = any(p.startswith("src/") and p.endswith((".c", ".cpp", ".cp")) for p in paths)
     check("knowledge delta present if the batch improved something",
           (not improved) or docs_changed or headers_changed,
-          "a unit improved and no docs/AGENTS.md/unit header changed in this batch (7.10)")
+          "a unit improved and no docs/AGENTS.md/unit header changed in this batch (7.10)",
+          remedy="record the improvement: touch the unit's header or a docs/ / AGENTS.md file in the batch")
 
     # 7. the baseline, so the next batch's `ninja changes` compares against this one (7.16)
     if not no_build:
@@ -892,14 +1075,18 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         info = "branch %s" % out["branch"]
         if out.get("release_ref"):
             info += "; un-merged commits rescued to %s" % out["release_ref"]
-        check("claim released: %s" % unit_name, bool(out.get("complete")), note, info=info)
+        check("claim released: %s" % unit_name, bool(out.get("complete")), note, info=info,
+              kind=KIND_BOOKKEEPING,
+              remedy="the batch is committed - finish the teardown by hand (close the pane / remove the "
+                     "worktree), then re-run")
     if release_claims and units and not to_release:
         check("claim release deferred", True, info="a check above failed - the claim is left alone")
     elif units and not release_claims:
         check("claim release skipped", True, info="--no-release")
 
     print("%-58s %s" % ("check", "result"))
-    for name, good, detail, info in checks:
+    for row in checks:
+        name, good, detail, info = row[:4]
         note = (detail if not good else "") or info
         print("%-58s %s%s" % (name[:58], "PASS" if good else "FAIL", ("  " + note[:80]) if note else ""))
 
@@ -915,7 +1102,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         body.append("scratch: tool scratch outside the batch, not staged, not committed: %s"
                     % ", ".join(scratch))
         body.append("")
-    failed = [name for name, good, _d, _i in checks if not good]
+    failed = [row[0] for row in checks if not row[1]]
     if failed:
         # a failed gate must not leave a message a `git commit -F .git/land_msg.txt` could pick up: the old
         # flow wrote it unconditionally, so a piped `| tail -3` read a green-looking summary and committed a
@@ -924,7 +1111,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         if stale:
             print("removed the stale %s (a failed gate has no committable message)" % os.path.relpath(stale, main))
         print("\nledger: %s" % summary(before, after))
-        print("FAILED: %s" % "; ".join(failing_checks(checks)))
+        print(failure_summary(checks, prefix="FAILED"))
         return 1
     message = write_land_message(main, "\n".join(body))
     print("\nledger: %s" % summary(before, after))
@@ -935,7 +1122,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
 
 def land(main: str, units: list[str], base: str | None, no_build: bool,
          allow_regression: list[str] | None = None, check_outbox: bool = True,
-         release_claims: bool = True, subject: str | None = None) -> int:
+         release_claims: bool = True, subject: str | None = None,
+         already_applied: bool = False) -> int:
     """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
 
     The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
@@ -945,6 +1133,13 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     * a red gate never reaches `git commit` (`land_decision`), and `verify` removes any stale message. A
       refusal NAMES the failing check and what it printed - a bare `the gate failed` is not actionable, and a
       reader who cannot see which gate failed cannot tell a real defect from a passing check (2026-09-25);
+    * the refusal also names each check's KIND and its remedy. A GATE failure says "the gate failed"; a
+      BOOKKEEPING failure (the batch is fine, the landing's own state is stale) says so and never "the gate
+      failed", so a reader does not mistake a released branch or a stale base for a bad batch;
+    * a worker branch a `--force` release parked at `refs/rescue/<slug>` is restored by the gate
+      (`restore_rescued_branch`), because the gate only needs the work to exist as commits;
+    * a batch applied before `record-base` (so its paths are in the base's dirty snapshot) is named as such,
+      and `--already-applied` lands it rather than making the caller revert and re-record;
     * an empty or whitespace-only `--message` is refused before the gate runs (`message_error`): the empty
       shell substitution that expanded `$(cat /tmp/msg1.txt)` must not silently land the fallback subject;
     * a HEAD that is not `main` is refused before the gate runs (`branch_error`): a land run off `main` moves
@@ -992,8 +1187,27 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         print("REFUSED %s | paths outside the batch appeared during the build: %s"
               % (",".join(norm_units), ", ".join(foreign)))
         return 1
-    stageable = land_stageable(norm_units, rows, base_dirty_paths(main))
-    action, why = land_decision(gate_ok, stageable, gate_failures)
+    base_dirty = base_dirty_paths(main)
+    stageable = land_stageable(norm_units, rows, base_dirty)
+    if gate_ok and looks_already_applied(rows, base_dirty):
+        # the batch was applied to the tree *before* `record-base` ran, so the base's dirty snapshot recorded
+        # its own edits as foreign and `land_stageable` excluded them (all of them, or just the shared files).
+        # This is the 2026-09-26 case (b): the gate printed "READY: every check passed" and `land` then
+        # refused with "no batch path is stageable", and the batch had to be committed by hand. Name the
+        # ordering and the two ways out instead.
+        if already_applied:
+            print("NOTE: --already-applied: the batch was applied before `record-base`, so the base's dirty "
+                  "snapshot recorded its own edits as foreign - staging the batch's paths anyway.",
+                  file=sys.stderr)
+            stageable = land_stageable(norm_units, rows, set())
+        else:
+            clear_land_message(main)
+            print("REFUSED %s | the batch is already applied: every changed path was dirty when "
+                  "`record-base` ran, so the gate excluded it as foreign work and has nothing to stage. "
+                  "Revert the batch and re-record the base (`land.py record-base`) with a clean tree, or "
+                  "land it as-is with --already-applied." % ",".join(norm_units))
+            return 1
+    action, why = land_decision(gate_ok, stageable, gate_failures, kinds_from_failures(gate_failures))
     if action != "commit":
         clear_land_message(main)
         print("REFUSED %s | %s" % (",".join(norm_units), why))
@@ -1490,20 +1704,25 @@ def selftest() -> int:
                     "+3 rule 2  src/ef/eft029.cpp  (0 -> 3)", "")]
         named = failing_checks(failing)
         check("a failing gate produces one line per failed check", len(named), 1)
-        check("... it names the check", named[0].startswith(stylelint_row + ":"), True)
+        check("... it names the check", named[0].startswith(stylelint_row + " [GATE]:"), True)
         check("... and what the check printed", "+3 rule 2 src/ef/eft029.cpp" in named[0], True)
         check("... a passing check is not reported", "ground truth" in named[0], False)
+        check("... a gate failure carries its KIND", "[GATE]" in named[0], True)
+        check("... and its remedy", "remedy:" in named[0], True)
         green = [("ground truth (build.sha1 == the DOL's hash)", True, "", "")]
         check("an all-green gate reports nothing", failing_checks(green), [])
         check("a bare failed gate keeps the old wording",
               land_decision(False, ["src/Pl/pl_act.cpp"]),
               ("refuse", "the gate failed - nothing staged or committed"))
-        check("a failed gate refuses and names the gate",
+        named_reason = land_decision(False, ["src/Pl/pl_act.cpp"], named,
+                                     kinds_from_failures(named))[1]
+        check("a failed gate refuses and names the check",
               land_decision(False, ["src/Pl/pl_act.cpp"], named)[0], "refuse")
-        check("... the refusal carries the check's name",
-              stylelint_row in land_decision(False, ["src/Pl/pl_act.cpp"], named)[1], True)
-        check("... and what it printed",
-              "+3 rule 2" in land_decision(False, ["src/Pl/pl_act.cpp"], named)[1], True)
+        check("... the refusal carries the check's name", stylelint_row in named_reason, True)
+        check("... and what it printed", "+3 rule 2" in named_reason, True)
+        check("... and names the kind it failed as", "the gate failed" in named_reason, True)
+        check("... and the per-check line carries [GATE]", "[GATE]" in named_reason, True)
+        check("kinds_from_failures reads the gate tag", kinds_from_failures(named), {KIND_GATE})
         check("a full set of passing gates lands",
               land_decision(True, ["src/Pl/pl_act.cpp"], failing_checks(green)), ("commit", ""))
         code, out, _err, _base = land_fixture(tmp, fake_verify_with(lambda main: None, gate_code=1,
@@ -1512,8 +1731,139 @@ def selftest() -> int:
         check("... the answer line is a refusal", out.startswith("REFUSED"), True)
         check("... and it names the failing check", stylelint_row in out, True)
         check("... and what the check printed", "+3 rule 2" in out, True)
-        check("... the batch file is still uncommitted",
+        check("... and the batch file is still uncommitted",
               repo_git(tmp, "status", "--porcelain").startswith("M"), True)
+
+    # a BOOKKEEPING failure (the batch is fine, the landing's own state is stale) must read differently:
+    # its remedy is printed, and the refusal never says "the gate failed", so a reader does not treat a
+    # released branch or a stale base as a defective batch (2026-09-26 case (a)).
+    bk_row = ("every unit's branch carries its work as commits", False,
+              "no commits of its own on the branch", "", KIND_BOOKKEEPING,
+              "restore the branch from refs/rescue/<slug>, then re-run")
+    bk_named = failing_checks([bk_row])
+    check("a bookkeeping failure names its KIND", "[BOOKKEEPING]" in bk_named[0], True)
+    check("... and prints its remedy", "restore the branch from refs/rescue" in bk_named[0], True)
+    check("... and does not call the batch bad", "the batch itself is bad" in bk_named[0], False)
+    check("kinds_from_failures reads the bookkeeping tag", kinds_from_failures(bk_named), {KIND_BOOKKEEPING})
+    check("... and both tags together", kinds_from_failures(named + bk_named), {KIND_GATE, KIND_BOOKKEEPING})
+    bk_reason = land_decision(False, ["src/Pl/pl_act.cpp"], bk_named,
+                              kinds_from_failures(bk_named))[1]
+    check("a bookkeeping refusal still refuses", bk_reason.startswith("BOOKKEEPING refusal"), True)
+    check("... says the batch itself passed", "the batch itself passed" in bk_reason, True)
+    check("... never says the gate failed", "the gate failed" in bk_reason, False)
+    check("... and names the failing check and its remedy",
+          "every unit's branch carries its work as commits" in bk_reason and "remedy:" in bk_reason, True)
+    mixed_reason = land_decision(False, ["src/Pl/pl_act.cpp"], named + bk_named,
+                                 kinds_from_failures(named + bk_named))[1]
+    check("a mixed refusal names both kinds",
+          "GATE" in mixed_reason and "BOOKKEEPING" in mixed_reason, True)
+    check("failure_summary names the gate kind for a gate-only failure",
+          "(GATE:" in failure_summary(failing), True)
+    check("... and never says 'the gate failed' for a bookkeeping-only failure",
+          "the gate failed" in failure_summary([bk_row]), False)
+    check("... and a bookkeeping-only summary says the batch passed",
+          "the batch itself passed" in failure_summary([bk_row]), True)
+
+    # case (a) end to end: a `--force` release deleted `worker/<label>` and parked its only copy of the work
+    # at refs/rescue/<slug>. The gate cares that the work exists as commits, so it restores the branch from
+    # the rescue ref itself (`restore_rescued_branch`) instead of refusing (2026-09-26). A real temp repo,
+    # because the whole point is git reachability, then the real `verify` on top.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(tmp, "src", "Pl"), exist_ok=True)
+        with open(os.path.join(tmp, "src", "Pl", "pl_act.c"), "w", encoding="utf-8") as fh:
+            fh.write("base\n")
+        with open(os.path.join(tmp, ".gitignore"), "w", encoding="utf-8") as fh:
+            fh.write(".pi/\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        repo_git(tmp, "branch", branch)
+        repo_git(tmp, "checkout", "-q", branch)
+        with open(os.path.join(tmp, "src", "Pl", "pl_act.c"), "w", encoding="utf-8") as fh:
+            fh.write("the worker's work\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "the worker's own work")
+        rescue = claims.rescue_ref_name(unit)
+        repo_git(tmp, "update-ref", rescue, repo_git(tmp, "rev-parse", branch))
+        repo_git(tmp, "checkout", "-q", "main")
+        repo_git(tmp, "branch", "-D", branch)          # the `release --force` shape
+        check("case (a): the released branch is really gone", claims.branch_exists(tmp, branch), False)
+        check("case (a): its work is preserved at the rescue ref", claims.rescue_exists(tmp, unit), rescue)
+        problems = branch_problems(tmp, [unit])
+        check("case (a): branch_problems reports the missing branch", len(problems), 1)
+        check("... and names the rescue ref", rescue in problems[0], True)
+        restored = restore_rescued_branch(tmp, unit)
+        check("case (a): the gate restores the branch from the rescue ref", restored, branch)
+        check("... the branch exists again", claims.branch_exists(tmp, branch), True)
+        check("... and carries its work as commits", branch_commits(tmp, unit) > 0, True)
+        check("... so branch_problems is empty", branch_problems(tmp, [unit]), [])
+        check("restoring an existing branch is a no-op", restore_rescued_branch(tmp, unit), None)
+        # the real `verify`, dry-run: it restores the branch during its own check and reports the gate green
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
+        with open(claims.outbox_path(tmp, unit), "w", encoding="utf-8") as fh:
+            json.dump({"unit": unit, "worker": "a", "finished_at": "2026-01-01T00:00:00",
+                       "unit_percent": 50.0, "symbols": [{"name": "fn_1", "percent": 50.0}],
+                       "residual": "none", "measured_with": "recompile.py", "config_requests": [],
+                       "flags_probed": [], "blockers": []}, fh)
+        repo_git(tmp, "branch", "-D", branch)           # back to the released shape for the verify run
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True)
+        check("case (a): the real verify passes on the rescued branch", code, 0)
+        check("... having restored the branch itself", claims.branch_exists(tmp, branch), True)
+
+    # case (b) end to end: the batch was applied to the working tree *before* `record-base` ran, so the base's
+    # dirty snapshot recorded the batch's own edits as foreign and `land_stageable` had nothing to stage. The
+    # old `land` refused "the gate passed but no batch path is stageable" straight after "READY: every check
+    # passed" and the batch was committed by hand. The new `land` names the ordering, and --already-applied
+    # stages the paths instead (2026-09-26).
+    check("case (b): an applied-before-base batch is detected",
+          looks_already_applied([(" M", "src/batch.c")], {"src/batch.c"}), True)
+    check("case (b): a clean batch is not", looks_already_applied([(" M", "src/batch.c")], set()), False)
+    check("case (b): a batch with no changed path is not", looks_already_applied([], {"src/batch.c"}), False)
+    check("case (b): a path outside the batch is not the signature",
+          looks_already_applied([("??", "orig/RMHE08/sys/main.dol")], {"orig/RMHE08/sys/main.dol"}), False)
+
+    def already_applied_repo(tmp):
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(tmp, "src", "Pl"), exist_ok=True)
+        with open(os.path.join(tmp, "src", "Pl", "pl_act.c"), "w", encoding="utf-8") as fh:
+            fh.write("base\n")
+        with open(os.path.join(tmp, ".gitignore"), "w", encoding="utf-8") as fh:
+            fh.write(".pi/\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        with open(os.path.join(tmp, "src", "Pl", "pl_act.c"), "w", encoding="utf-8") as fh:
+            fh.write("the batch, applied before record-base\n")
+        record_base(tmp)          # the ordering mistake: the batch is already in the tree
+        return repo_git(tmp, "rev-parse", "HEAD")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base_sha = already_applied_repo(tmp)
+        check("case (b): record-base snapshotted the applied path as dirty",
+              "src/Pl/pl_act.c" in base_dirty_paths(tmp), True)
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", fake_verify_with(lambda main: None)), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = land(tmp, ["Pl/pl_act"], None, no_build=True, check_outbox=False,
+                        release_claims=False, subject="x")
+        check("case (b): without --already-applied land refuses", code, 1)
+        check("... and says plainly the batch is already applied", "already applied" in buf.getvalue(), True)
+        check("... and never commits", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
+    with tempfile.TemporaryDirectory() as tmp:
+        base_sha = already_applied_repo(tmp)
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", fake_verify_with(lambda main: None)), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = land(tmp, ["Pl/pl_act"], None, no_build=True, check_outbox=False,
+                        release_claims=False, subject="x", already_applied=True)
+        check("case (b): --already-applied lands the batch (no manual commit)", code, 0)
+        check("... the answer line says LANDED", buf.getvalue().startswith("LANDED"), True)
+        check("... the batch file is committed", repo_git(tmp, "show", "HEAD:src/Pl/pl_act.c"),
+              "the batch, applied before record-base")
+        check("... and the base commit is the commit before it", repo_git(tmp, "rev-parse", "HEAD~1"), base_sha)
 
     # `command_detail` is the detail a FAILED lint row carries: stylelint prints its findings FIRST and its
     # "not enforced: ..." legend LAST, so the old `output[-300:]` showed the legend and hid the violation.
@@ -1763,6 +2113,9 @@ def main() -> int:
     ld.add_argument("--allow-regression", action="append", default=[],
                     help="unit whose measured regression is authorised by a rule; repeatable")
     ld.add_argument("--message", default=None, help="override the gate message's subject line")
+    ld.add_argument("--already-applied", action="store_true", dest="already_applied",
+                    help="the batch was applied before `record-base` ran, so its paths are in the base's "
+                         "dirty snapshot; stage them anyway (otherwise `land` refuses and says so)")
     args = ap.parse_args()
 
     if args.selftest:
@@ -1789,7 +2142,7 @@ def main() -> int:
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
-                    subject=args.message)
+                    subject=args.message, already_applied=args.already_applied)
     ap.print_help()
     return 0
 
