@@ -748,6 +748,13 @@ config.libs = [
             # 0x8005CF10) carry no g3d assert and read a different `.data` pool, so the seam is a proposal
             # cap, not a proven TU boundary - the header records it.
             Object(NonMatching, "g3d/g3d_anmchr.cpp"),     # 0x8005ABD8-0x80063888
+            # Registered once, at its final home (docs/plan.md 12): proposal `800680CC` - the nw4r g3d
+            # animation-object cluster that spans `g3d_anmscn.cpp` -> `g3d_anmshp.cpp` ->
+            # `g3d_anmtexpat.cpp` -> `g3d_anmtexsrt.cpp` (each body's cited `__FILE__` string settles
+            # the TU).  The first TU name already has the provisional `g3d/g3d_anmscn.cpp` home, so the
+            # cluster keeps the map's own stem, as `g3d/fn_80063888.cpp` did beside it; internal seam
+            # near 0x8006946C/0x800697D4/0x80069CF4 (see the file header).
+            Object(NonMatching, "g3d/fn_800680CC.cpp"),   # 0x800680CC-0x8006EAC0
             # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
             # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
             # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function

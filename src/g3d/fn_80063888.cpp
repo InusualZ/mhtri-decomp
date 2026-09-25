@@ -204,15 +204,6 @@ extern "C" u32 fn_80063E30(void)
  * `fn_8005DC24` helper.
  * --------------------------------------------------------------------------------------------- */
 
-typedef u32 (*G3dVtMethod)(void *);
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ G3dVtMethod method_0x14;
-} G3dVtbl; /* size: 0x18 */
-typedef struct {
-    /* +0x00 */ G3dVtbl *vt;
-} G3dObj; /* size: 0x4 */
-
 extern "C" u32 fn_8005DC24(u32 *p);
 
 extern "C" u32 fn_800638C0(void *p)

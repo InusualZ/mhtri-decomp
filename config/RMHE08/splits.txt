@@ -88,6 +88,11 @@ g3d/g3d_anmscn.cpp:
 	extabindex  start:0x8001FF5C end:0x8001FF68
 	.text       start:0x800680A8 end:0x800680CC
 
+g3d/fn_800680CC.cpp:
+	extab       start:0x80007B1C end:0x80007E98
+	extabindex  start:0x8001FF68 end:0x8002040C
+	.text       start:0x800680CC end:0x8006EAC0
+
 g3d/g3d_calcvtx.cpp:
 	extab       start:0x80008060 end:0x800080B8
 	extabindex  start:0x800206B8 end:0x8002073C
