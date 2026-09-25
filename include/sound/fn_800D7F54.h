@@ -7,6 +7,8 @@
 
 #include "types.h"
 
+struct SeSlot;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,7 +19,11 @@ void fn_800D8438(void);
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
-void* fn_800DA72C(s32 kind, s32 id, Vec3* pos);
+/* Reconcile 2026-09-25: the owner (`sound/fn_800D7F54.cpp:134`) declares this
+ * `SeSlot* fn_800DA72C(s32, s32, nw4r::math::VEC3*)`, so the `void*` here was a boundary artefact.
+ * `sound/se.h` carries the owner's spelling - the two now agree and a consumer that includes both
+ * no longer trips `(10505) illegal overloading` (no consumer reads the result). */
+struct SeSlot* fn_800DA72C(s32 kind, s32 id, Vec3* pos);
 void fn_800DCF0C(s32 handle, Vec3* pos);
 void fn_800DA864(Vec3* pos);
 void fn_800DA8F4(Vec3* pos);
@@ -44,8 +50,18 @@ void fn_800DA9E4(Vec3* pos);
 void fn_800DA9F4(Vec3* pos);
 void fn_800DC46C(Vec3* pos);
 void fn_800DC4B4(Vec3* pos);
+
+/* The per-frame-set helper `Pl/fn_80241558.cpp` calls: an unmangled `fn_` name, so C linkage. */
+void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);
 #ifdef __cplusplus
 }
+
+/* The SE request layer's own workhorse and code builder, defined by `sound/fn_800D7F54.cpp`.  The map
+ * spells them mangled (`se_req_frame_set__FP5_se_wllll`, `SE_Code_Make__Flsls`), so a consumer calls the
+ * real C++ declaration and the front-end mangles it back (docs/plan.md 6.5 rule 9).  Merged 2026-09-25
+ * for `Pl/fn_80241558.cpp`, whose whole body is 139 `se_req_frame_set` arming calls. */
+void se_req_frame_set(struct _se_w* work, s32 a, s32 param, s32 d, s32 e);
+s32 SE_Code_Make(s32 low_code, s16 low, s32 mid_code, s16 span);
 #endif
 
 #endif /* MHTRI_SOUND_FN_800D7F54_H */
