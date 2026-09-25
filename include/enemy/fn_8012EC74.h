@@ -51,6 +51,14 @@ void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
 #endif
 
 #ifdef __cplusplus
+/* The C++ spellings of this unit's mangled callees, so a call site never spells the mangling
+ * (docs/plan.md 6.5 rule 9); each mangles back to its map name.  Added with the registration of
+ * `enemy/fn_801993E0.cpp`, which calls all three. */
+f32 em_water_check(struct _ENEMY_WORK* self);
+f32 get_em_chg_scale(struct _ENEMY_WORK* self);
+/* `fn_80131034` is deliberately NOT declared here: its map name is the plain `fn_80131034`, so its
+ * consumers reach the `extern "C"` form `include/unsplit/enemy.h` already carries.  A C++-linkage
+ * copy here is an MWCC 10505 "illegal overloading" against that one. */
 /* 0x80135940 - the model scale.  The target's symbol is the C++ mangling
  * `get_em_scale__FP11_ENEMY_WORK` (mangle.py: `f32 get_em_scale(_ENEMY_WORK*)`), so it is declared at
  * C++ scope (docs/plan.md 6.5 rule 9: a caller never spells the mangling). */

@@ -618,6 +618,15 @@ config.libs = [
             # the dump answers only `zz_` placeholders, so the file keeps the map's own stem (see
             # the unit's header).
             Object(NonMatching, "enemy/fn_80191598.cpp"),
+            # Registered from proposal/801993E0_fn_801993E0.cpp (a 0x801993E0 run discovery
+            # proposed): the enemy "em" action band 0x801993E0..0x8019ED34, 35 functions / 0x5954
+            # bytes, plus the 25 extab/extabindex records its framed functions carry.
+            # Module `enemy` from the link band (the unit below ends at 0x801926EC) and from the
+            # code (every callee out of the range is `_ENEMY_WORK`-based); C++ because the range
+            # reaches mangled callees through their real signatures.  No `__FILE__` string is
+            # referenced by the range and the dump answers only `zz_` placeholders, so the file
+            # keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801993E0.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/801B7020_fn_801B7020.cpp (a 0x801B7020 run discovery proposed): the enemy
             # motion/act-instruction group, 123 functions / 0x669C bytes plus its extab/extabindex
