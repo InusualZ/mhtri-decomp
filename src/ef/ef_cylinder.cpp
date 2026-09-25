@@ -96,7 +96,13 @@ struct EfParticle {
  * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
  * map's spelling exactly: tools/units/mangle.py confirms it. */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
-extern void fn_80043EA8(void* p);
+
+/* nw4r::math and effect-library helpers.  The target object references each by its plain
+ * `fn_XXXXXXXX` map name, so they carry C linkage; a C++ spelling mangles the reloc
+ * (fn_80043EA8__FPv) and it no longer pairs (relocaudit).  The one name `unsplit/ef.h` already
+ * declares (fn_80043EA8) is left to that header; its call sites below cast their `Vec` to the
+ * header's `Vec3`). */
+extern "C" {
 extern void fn_80041E8C(Vec* out, f32 x, f32 y, f32 z);
 extern void fn_8009C484(Vec* out, Vec* in);
 extern void fn_80051490(Vec* out, Vec* in);
@@ -106,6 +112,7 @@ extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
 extern f32  fn_800A8A08(void* progress);
 extern f32  fn_80050BC0(f32 a, f32 b);
 extern f32  fn_80463F10(f32 a, f32 b);
+}
 
 extern char lbl_80594D20[]; /* "ef_cylinder.cpp"                .data  0x80594D20 */
 extern char lbl_80594D30[]; /* "NW4R:Pointer Error\nem(=%p)..." .data  0x80594D30 */
@@ -148,8 +155,8 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         f32 cs, sn;
         f32 factor, rate, t;
 
-        fn_80043EA8(&v88);
-        fn_80043EA8(&v76);
+        fn_80043EA8((Vec3*)&v88); /* C-linkage decl in unsplit/ef.h takes nw4r::math::VEC3* */
+        fn_80043EA8((Vec3*)&v76);
         t = fn_800A8A08(&em->progress);
         rate = params->rate_pct / 100.0f;
         if (flags & 0x01000000) {
