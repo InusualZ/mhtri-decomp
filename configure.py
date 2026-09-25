@@ -691,6 +691,15 @@ config.libs = [
             Object(NonMatching, "ef/eft019.cpp"),
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(Matching, "ef/fn_8011722C.c"),
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/801173AC_fn_801173AC.cpp` range (`.text` 0x801173AC..0x80119C44, 30 functions
+            # / 10392 B): the tail of the eft024 job machine, the whole eft025 player family, the whole
+            # eft026 enemy family and the head of eft028.  Two of the range's own definitions are
+            # manglings (`eft026_set__FP4_PLWUcUlUl`, `eft028_set_koware__FUcPQ34nw4r4math4VEC3Ucl`), so
+            # it is built as C++ and every plain `fn_XXXXXXXX` definition is `extern "C"`.  Sections:
+            # extab 0x8000C49C..0x8000C554, extabindex 0x800265D4..0x800266E8,
+            # .text 0x801173AC..0x80119C44.
+            Object(NonMatching, "ef/fn_801173AC.cpp"),
             Object(NonMatching, "ef/fn_80119C44.c"),
             # Registered once, at its final home (docs/plan.md 12).  The `proposal/80119DEC_fn_80119DEC`
             # range, at the TU-bounded 0x80119DEC..0x8011D448 the attribution queue carries: the runtime

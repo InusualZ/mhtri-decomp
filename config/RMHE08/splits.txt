@@ -515,6 +515,11 @@ ef/fn_8011722C.c:
 	extabindex  start:0x800265C8 end:0x800265D4
 	.text       start:0x8011722C end:0x801173AC
 
+ef/fn_801173AC.cpp:
+	extab       start:0x8000C49C end:0x8000C554
+	extabindex  start:0x800265D4 end:0x800266E8
+	.text       start:0x801173AC end:0x80119C44
+
 ef/fn_80119C44.c:
 	extab       start:0x8000C554 end:0x8000C56C
 	extabindex  start:0x800266E8 end:0x8002670C
