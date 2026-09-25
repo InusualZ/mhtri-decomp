@@ -777,6 +777,13 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
             Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
             Object(NonMatching, "g3d/g3d_resanmcamera.c"),   # 0x8008A220-0x8008A28C
+            # Registered once, at its final home (docs/plan.md 12): proposal `8008F6E8` - the nw4r
+            # g3d fog animation-channel evaluator (2 functions, 0x1FC B, 0x8008F6E8-0x8008F8E4).
+            # `g3d`/`.cpp` from the body's own `__FILE__` string (`.data` 0x805903F0 =
+            # "g3d_resanmfog.cpp"); the right edge 0x8008F8E4 is the next TU's first body, which
+            # cites "g3d_resanmlight.cpp" (.data 0x80590440), so the seam is proven.  See the file
+            # header for the sections and the rule-7 deferral.
+            Object(NonMatching, "g3d/g3d_resanmfog.cpp"),    # 0x8008F6E8-0x8008F8E4
             # Registered from proposal/800D77B0_fn_800D77B0 (the 0x800D77B0 two-function run).  `g3d`
             # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
             # builder) and names it; the range's own data has no `__FILE__` string, so the name stays
