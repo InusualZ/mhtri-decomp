@@ -826,6 +826,13 @@ config.libs = [
             # `fn_80047398` stem - no `__FILE__` string and no runtime-dump name exists for the range
             # (class 3/4 in the brief; see the file header).
             Object(NonMatching, "fn_80047398.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `8004CAD8` - the game-root
+            # draw/gallery band (drawshape_exec, write/read_wpad_memory, gallery_open, set_mydata2vs, the
+            # nw4r-math wrappers).  Same lib and flags as the game-root system files beside it
+            # (cflags_main); the name stays the map's `fn_8004CAD8` stem - no `__FILE__` string exists for
+            # the range (the `draw_shape.cpp` string at 0x8058178C belongs to the next unit) and the
+            # runtime dump carries only `zz_` placeholders (class 3/4 in the brief; see the file header).
+            Object(NonMatching, "fn_8004CAD8.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `800D45AC` - the
             # resource/"work" manager (RESmemAlloc/RESmemFree/pull_res_mem/push_res_mem, ckResourceName,
             # nwAddResource/nwDelResource, nwWorkInitialize/nwMoveStart/nwMoveEnd).  Same lib and flags as
