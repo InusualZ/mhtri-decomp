@@ -53,6 +53,13 @@ which leaves the caller's file in the tree), and the tolerance is **named** - in
 refused loudly: a foreign edit to `src/`, `include/`, `config/` or `configure.py` is exactly what the guard is
 for, and a `d`/`t`-shaped name elsewhere is not a permission.
 
+The regression scan is **per symbol**. A unit's `fuzzy` is an average over its symbols, so an already-registered
+unit that is *extended* - its splits range widened, a head joined to its tail - falls in average as the weaker
+new bodies join it. That is not a regression. The scan compares symbol to symbol: a symbol the previous report
+did not hold is NEW (a body this batch added) and never a regression, however weak, and a symbol that dropped
+refuses loudly with the symbol name and both scores. The unit-average comparison survives only for a unit that
+did **not** grow, where no per-symbol row can name the loss (`report_regressions`).
+
 `verify` never commits. It writes the message to `.git/land_msg.txt` **only when every check passed**, and
 removes a stale one when it refuses; committing it stays a deliberate step for the rare manual case.
 
@@ -550,11 +557,38 @@ def report_snapshot(main: str) -> dict:
     return out
 
 
+def unit_grew(prior: dict, after: dict) -> bool:
+    """True when a unit only **gained** bodies/symbols - an extension, not a loss.
+
+    A widened splits range (or a head joined to its tail) adds functions to an already-registered unit; the
+    unit's average `fuzzy` then falls because the weaker new bodies joined it, which is exactly what an
+    extension does and is not a regression. Two signals say "grew" and either is enough: the unit's sub-100 %
+    symbol set gained a name the previous report did not hold, or its matched-byte count rose. Both are read
+    from the `record-base` snapshot, so a unit re-measured identically is not "grown" and the unit-average
+    comparison still sees it (`report_regressions`).
+    """
+    prior_syms = prior.get("symbols") or {}
+    after_syms = after.get("symbols") or {}
+    if len(after_syms) > len(prior_syms) or any(s not in prior_syms for s in after_syms):
+        return True
+    bm, am = prior.get("matched_code"), after.get("matched_code")
+    return isinstance(bm, (int, float)) and isinstance(am, (int, float)) and am > bm + 1e-9
+
+
 def report_regressions(before: dict, after: dict, allow: list[str]) -> tuple[list[tuple], list[tuple]]:
     """-> (unauthorised, authorised) regressions as (unit, what, before, after).
 
-    A unit's own `fuzzy` dropping, or any symbol dropping, is a regression; `allow` names units whose
-    regression an explicit rule authorised (rule 8 of §6.5 costs score, and that cost is measured, not hidden).
+    A regression is measured **per symbol**: a symbol the previous report held whose own score dropped is a
+    regression, and the row names the symbol and both numbers. A symbol the previous report did not hold is
+    NEW - a body this batch added - and is never a regression, however weak; that is what extending an
+    already-registered unit does, and refusing it blocks every legitimate extension (the gate did exactly
+    that to the g3d_resshp head-plus-tail join and to the 800997e0 extension before 2026-09-25).
+
+    The unit's own `fuzzy` is an average over its symbols, so it can fall while every symbol holds or improves
+    - the weaker new symbols joined. `unit_grew` catches that case and the unit-average row is skipped; it
+    fires only for a unit that did **not** grow, where something really dropped and no per-symbol row would
+    name it, and it names the unit and both numbers. `allow` names units whose measured regression an explicit
+    rule authorised (rule 8 of §6.5 costs score, and that cost is measured, not hidden).
     """
     unauthorised, authorised = [], []
     for unit, after_vals in after.items():
@@ -562,15 +596,20 @@ def report_regressions(before: dict, after: dict, allow: list[str]) -> tuple[lis
         if not prior or "auto_" in unit and "/auto/" not in unit:
             continue          # the auto_* scaffold losing symbols to a real unit is bookkeeping, not a regression
         hit_allowed = any(a in unit for a in allow)
-        af, bf = prior.get("fuzzy"), after_vals.get("fuzzy")
-        if isinstance(af, (int, float)) and isinstance(bf, (int, float)) and bf < af - 1e-9:
-            (authorised if hit_allowed else unauthorised).append((unit, "unit fuzzy", af, bf))
+        rows = []
         for sym, bpct in (prior.get("symbols") or {}).items():
             apct = (after_vals.get("symbols") or {}).get(sym)
             if apct is None:
                 continue          # reached 100 %: not a regression
             if isinstance(apct, (int, float)) and apct < bpct - 1e-9:
-                (authorised if hit_allowed else unauthorised).append((unit, sym, bpct, apct))
+                rows.append((unit, sym, bpct, apct))
+        # the average only speaks when no symbol does, and never for a unit that merely grew: `unit_grew`
+        # already said the fall is the weaker new bodies joining, which is not a regression to name.
+        if not rows and not unit_grew(prior, after_vals):
+            af, bf = prior.get("fuzzy"), after_vals.get("fuzzy")
+            if isinstance(af, (int, float)) and isinstance(bf, (int, float)) and bf < af - 1e-9:
+                rows.append((unit, "unit fuzzy", af, bf))
+        (authorised if hit_allowed else unauthorised).extend(rows)
     return unauthorised, authorised
 
 
@@ -1148,6 +1187,83 @@ def selftest() -> int:
               regression_rows(fixture) != [] and all("main/auto/" not in r[0] for r in rows), True)
         check("a flat measure is not a regression", any(r[1] == "matched_code" and r[2] == 90 for r in rows), False)
         check("a missing changes file is not a crash", regression_rows(os.path.join(tmp, "nope.json")), [])
+
+    # the per-SYMBOL regression rule (2026-09-25). A unit's `fuzzy` is an average over its symbols, so an
+    # already-registered unit that is EXTENDED - a widened splits range, a head joined to its tail - falls in
+    # average as weaker new bodies join it. The old gate called that a regression and refused two legitimate
+    # extensions in one day (g3d_resshp: `no symbol or unit regressed: ... unit fuzzy 99.96 -> 99.26`). The
+    # rule is now symbol by symbol: only a symbol the previous report HELD can regress, and a symbol it did
+    # not hold is NEW and never refuses a batch.
+    def old_unit_avg_regression(before, after):
+        """The pre-2026-09-25 rule, kept as the oracle the fix must beat: any unit average or symbol drop."""
+        rows = []
+        for unit, av in after.items():
+            pv = before.get(unit)
+            if not pv:
+                continue
+            af, bf = pv.get("fuzzy"), av.get("fuzzy")
+            if isinstance(af, (int, float)) and isinstance(bf, (int, float)) and bf < af - 1e-9:
+                rows.append((unit, "unit fuzzy", af, bf))
+            for sym, bp in (pv.get("symbols") or {}).items():
+                ap = (av.get("symbols") or {}).get(sym)
+                if isinstance(ap, (int, float)) and ap < bp - 1e-9:
+                    rows.append((unit, sym, bp, ap))
+        return rows
+
+    # the shape the gate refused: the 21-symbol head at 99.96 % widened to the 58-function TU at 99.26 %,
+    # every head symbol re-measured unchanged and 37 weaker bodies added (fn_8009A1E0 among them at 70.28).
+    head = {"main/g3d/g3d_resshp": {"fuzzy": 99.95968, "matched_code": 964,
+                                    "symbols": {"fn_80099724": 98.5714}}}
+    extended = {"main/g3d/g3d_resshp": {"fuzzy": 99.26, "matched_code": 2108,
+                                        "symbols": {"fn_80099724": 98.5714, "fn_8009A1E0": 70.28,
+                                                    "fn_8009A244": 55.0, "fn_8009A2D0": 31.5}}}
+    check("a unit average that fell only because it grew is not a regression",
+          report_regressions(head, extended, []), ([], []))
+    check("... but the old unit-average rule did fire on it",
+          old_unit_avg_regression(head, extended) != [], True)
+    check("... and unit_grew reads the new symbols as growth",
+          unit_grew(head["main/g3d/g3d_resshp"], extended["main/g3d/g3d_resshp"]), True)
+
+    # an existing symbol's own score dropping must still refuse, naming the symbol and both numbers
+    regressed = {"main/g3d/g3d_resshp": {"fuzzy": 98.5, "matched_code": 2108,
+                                         "symbols": {"fn_80099724": 91.25, "fn_8009A1E0": 70.28}}}
+    check("an existing symbol that dropped is a regression",
+          report_regressions(extended, regressed, []),
+          ([("main/g3d/g3d_resshp", "fn_80099724", 98.5714, 91.25)], []))
+    check("... and the new symbol beside it is never named",
+          report_regressions(extended, regressed, [])[0][0][1], "fn_80099724")
+    # growth plus a real drop is still a refusal: the symbol row wins, the average row does not double it
+    grew_and_dropped = {"main/g3d/g3d_resshp": {"fuzzy": 95.0, "matched_code": 2400,
+                                                "symbols": {"fn_80099724": 90.0, "fn_NEW": 20.0}}}
+    check("an extension that ALSO regressed a held symbol still refuses, once, on the symbol",
+          report_regressions(extended, grew_and_dropped, []),
+          ([("main/g3d/g3d_resshp", "fn_80099724", 98.5714, 90.0)], []))
+
+    # a unit that did NOT grow and whose average fell (matched bytes lost, no held symbol dropped) still
+    # refuses at the unit level - the one place a per-symbol row cannot name the loss
+    shrunk = {"main/g3d/g3d_resshp": {"fuzzy": 90.0, "matched_code": 900,
+                                      "symbols": {"fn_80099724": 98.5714}}}
+    check("a unit that shrank and lost its average still refuses",
+          report_regressions(head, shrunk, []),
+          ([("main/g3d/g3d_resshp", "unit fuzzy", 99.95968, 90.0)], []))
+    check("... and unit_grew is false for it",
+          unit_grew(head["main/g3d/g3d_resshp"], shrunk["main/g3d/g3d_resshp"]), False)
+
+    # the happy paths: unchanged measurements, and a unit the previous report never held, are not regressions
+    check("an unchanged unit is not a regression", report_regressions(head, head, []), ([], []))
+    check("a brand-new unit is not a regression", report_regressions({}, extended, []), ([], []))
+    check("an empty snapshot on both sides is not a regression", report_regressions({}, {}, []), ([], []))
+
+    # --allow-regression still authorises exactly the unit it names, and nothing else
+    check("an authorised drop leaves the unauthorised list empty",
+          report_regressions(extended, regressed, ["g3d_resshp"])[0], [])
+    check("... and is reported as authorised",
+          report_regressions(extended, regressed, ["g3d_resshp"])[1],
+          [("main/g3d/g3d_resshp", "fn_80099724", 98.5714, 91.25)])
+    check("an allowance that does not name the unit does not authorise",
+          len(report_regressions(extended, regressed, ["SomeOther/file.cpp"])[0]), 1)
+    check("... and nothing is authorised by it",
+          report_regressions(extended, regressed, ["SomeOther/file.cpp"])[1], [])
 
     # branch_commits() counts `main..branch`, not `<batch base>..branch`: a worker's branch is cut when the
     # unit is claimed, so in a multi-batch round it predates the base the orchestrator later records. Real
