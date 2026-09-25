@@ -48,6 +48,7 @@
 #include "ef/fn_800AEE48.h"
 #include "sys_mem.h"
 #include "unsplit/ef.h"
+#include "g3d/fn_80063888.h" /* fn_80067E54, owned by g3d/fn_80063888.cpp (rule 2) */
 
 #ifdef __cplusplus
 namespace nw4r {
@@ -334,8 +335,6 @@ Vec* fn_800B0B90(Vec* self, Vec* b) {
 /* --------------------------------------------------------------------------------------------- *
  * The draw-time particle copies (ef_drawstripestrategy.cpp, 0x800B8788..0x800B882C).
  * --------------------------------------------------------------------------------------------- */
-
-extern void* fn_80067E54(void* out, void* in);
 
 /* Copies the particle's +0x98 block into `dst`. */
 void fn_800B87C8(void* dst, EfParticleState* particle) {

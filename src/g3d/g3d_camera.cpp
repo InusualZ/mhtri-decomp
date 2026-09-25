@@ -23,6 +23,7 @@
 #include "nw4r/math.h"
 #include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
+#include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -60,7 +61,6 @@ extern "C" void fn_80050850(void* pOut, const void* pIn);
 extern "C" s32 fn_800508A8(const void* pIn);
 extern "C" void fn_80051820(void* pOut, const void* pA, const void* pB);
 extern "C" f32 fn_80052214(const void* pA, const void* pB);
-extern "C" s32 fn_80067EE8(const void* p);
 extern "C" void fn_804BA230(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
                             void* pB, void* pC, f32 x, f32 y, f32 z);
 extern "C" void fn_804BA7A0(s32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g);

@@ -42,9 +42,9 @@
  * a second time, the link failure of playbook 50.
  */
 
-/* The checked resolver owned by the unsplit unit at 0x80066C8C (one pointer in, the resolved resource
- * out): a C++ free function, so its map name is the mangling `fn_80066C8C__FPv`. */
-void *fn_80066C8C(void *obj);
+#include "types.h"
+#include "g3d/fn_80063888.h" /* fn_80066C8C - the owner is g3d/fn_80063888.cpp (rule 2); its map name
+                              is the mangling `fn_80066C8C__FPv`, so the declaration keeps C++ linkage. */
 
 unsigned int fn_800680A8(void *obj)
 {
