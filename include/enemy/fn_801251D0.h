@@ -94,6 +94,11 @@ void fn_80129984(struct _ENEMY_WORK* self);
 u32 fn_8012B5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void fn_8012B604(void);
 
+/* 0x80125F54 - r3 is the `EmSelRec` the caller owns; the body zeroes its +0x08 vector
+ * (`fn_80043EA8(out + 8)`) and returns r3, so the return value is the same pointer.  Added with
+ * `enemy/fn_801B7020.cpp` (rule 2: this unit owns the address). */
+void* fn_80125F54(void* out);
+
 #ifdef __cplusplus
 }
 #endif

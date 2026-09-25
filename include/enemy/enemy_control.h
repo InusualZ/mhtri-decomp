@@ -83,6 +83,11 @@ void fn_80146058(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 void fn_8014610C(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 
 
+/* 0x801421E4 - r3 is narrowed with `clrlwi r3,r3,16` (a u16 id, 0xFFFF = the "no record" arm) and r4
+ * is the out record `fn_80125F54` prepared; returns a word the enemy program functions compare with 1.
+ * Added with `enemy/fn_801B7020.cpp` (rule 2: this unit owns the address). */
+u32 fn_801421E4(u32 id, void* out);
+
 #ifdef __cplusplus
 }
 #endif

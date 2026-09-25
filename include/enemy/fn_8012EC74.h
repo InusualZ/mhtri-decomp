@@ -33,8 +33,25 @@ void fn_80136D4C(struct _ENEMY_WORK* self, f32 a);
 void fn_80136D4C();
 #endif
 
+/* 0x80130350 - r3 (`self`) and r4 (the `VEC3*` the caller builds); the body writes through r4 only, so
+ * no caller reads a return value.  Added with `enemy/fn_801B7020.cpp`, which calls it the same way. */
+void fn_80130350(struct _ENEMY_WORK* self, void* vec);
+/* 0x8013072C - r3 (`self`), r4 (narrowed with `clrlwi r4,r4,24`) and r5; the action-mode/latch setter
+ * the enemy program functions call.  Names of the two scalars are this unit's call sites' (2/0 and
+ * 0/0); the body compares r4 against `self->+0x43B`. */
+void fn_8013072C(struct _ENEMY_WORK* self, u32 mode, u32 value);
+/* 0x80131FA0 - r3 (`self`) and r4 (the scalar the motion modes pass: 80). */
+void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
+
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* 0x80135940 - the model scale.  The target's symbol is the C++ mangling
+ * `get_em_scale__FP11_ENEMY_WORK` (mangle.py: `f32 get_em_scale(_ENEMY_WORK*)`), so it is declared at
+ * C++ scope (docs/plan.md 6.5 rule 9: a caller never spells the mangling). */
+f32 get_em_scale(struct _ENEMY_WORK* self);
 #endif
 
 #endif

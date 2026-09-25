@@ -251,6 +251,12 @@ void fn_80132264(struct _ENEMY_WORK* self);
 void fn_80154CA4(struct _ENEMY_WORK* self);
 void fn_801545B8(void* v, u32 a, u32 b, u32 c);
 void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s32 j, s32 k);
+/* 0x801B701C - unowned (it is the last 4-byte word of the still-unregistered 0x801926EC..0x801B7020
+ * hole; both bracketing registered units are `enemy`).  Its body is a bare `blr`, so it returns its
+ * own r3 argument, and every caller compares that return with 0 - `src/ef/eft001.cpp` declares it
+ * `void`, which is wrong for those call sites (recorded in this unit's outbox).  The `u32` return
+ * below is the form `enemy/fn_801B7020.cpp`'s `fn_801B73F0` needs. */
+u32 fn_801B701C(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
 }
 #endif
