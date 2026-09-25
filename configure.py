@@ -603,6 +603,10 @@ config.libs = [
             # fn_80105314 stem, the scheme the bracketing fn_80104BD0/fn_8010D1A8 units use) and
             # the range holds several original effect families - see the unit's file header.
             Object(NonMatching, "ef/fn_80105314.cpp"),
+            # Registered from proposal/8010BDE4_fn_8010BDE4.cpp (a 0x8010BDE4 run discovery proposed).
+            # The range's own symbols are plain fn_XXXXXXXX (rule 7 deferred); it is built as C++
+            # because every callee it reaches is a C++ mangling (rule 9) - see the unit's header.
+            Object(NonMatching, "ef/fn_8010BDE4.cpp"),
             Object(NonMatching, "ef/fn_8010D1A8.c"),
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(Matching, "ef/fn_8011722C.c"),

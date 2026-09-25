@@ -54,6 +54,7 @@
 #include "ef/eft004.h"
 #include "ef/fn_80105314.h"
 #include "ef/eft_res.h"
+#include "ef/fn_8010BDE4.h"
 #include "gx.h"
 #include "pl.h"
 #include "unsplit/enemy.h"
@@ -361,7 +362,7 @@ extern "C" void fn_8010B504(_EFT013* self);
 extern "C" void fn_8010B71C(_EFT013* self);
 extern "C" void fn_8010BA48(_EFT013* self);
 s32 ran_suu(long kind);
-/* fn_8010BDE4 / fn_8010C0E0 / fn_8010C454 / fn_8010C464 come from include/unsplit/ef.h (rule 2). */
+/* fn_8010BDE4 / fn_8010C0E0 / fn_8010C454 / fn_8010C464 come from their owner's header (rule 2). */
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies
@@ -587,16 +588,16 @@ extern "C" void fn_8010BBDC(_EFT013* self) {
 extern "C" void fn_8010BDA8(_EFT013* self) {
     switch (self->state_0x05) {
     case 0:
-        fn_8010BDE4(self);
+        fn_8010BDE4((_EFT*)self);
         return;
     case 1:
-        fn_8010C0E0(self);
+        fn_8010C0E0((_EFT*)self);
         return;
     case 2:
-        fn_8010C454(self);
+        fn_8010C454((_EFT*)self);
         return;
     case 3:
-        fn_8010C464(self);
+        fn_8010C464((_EFT*)self);
         return;
     default:
         return;
