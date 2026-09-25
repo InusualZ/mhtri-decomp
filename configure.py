@@ -1179,6 +1179,14 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "lobby/lobby_scene.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `801E7530_fn_801E7530.cpp` (`.text` 0x801E7530..0x801EC9E0, 77 functions / 21680 B) -
+            # the lobby menu-layer group.  Module `lobby` from the code (`lobby_w`, `lb_param_w`,
+            # `LbStr`, `GetMenuFontColor`, `draw_font_idx`) and from the neighbour above; no `__FILE__`
+            # string survives and the dump answers only `zz_` placeholders, so the file keeps the map
+            # stem (brief section 2, class 3+4).  Sections: extab 0x800105B4..0x8001079C (61 records),
+            # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
+            Object(NonMatching, "lobby/fn_801E7530.cpp"),
         ],
     },
     {
