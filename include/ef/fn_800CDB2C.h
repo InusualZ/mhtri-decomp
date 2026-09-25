@@ -15,6 +15,7 @@ extern "C" {
 
 u8  fn_800CF208(void);
 u32 fn_800CF280(void);
+
 s32 fn_800CED10(char* path, u32 dma, u32 size);
 /* Builds the nw4r::ef::EffectSystem the effect manager keeps at `eft_control` +0x04. */
 s32 fn_800D3C0C(void);
@@ -24,6 +25,16 @@ u8* fn_800D0568(s32 index);
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* 0x800CEEBC - the random ring, a C++ free function: the map name `ran_suu__Fl` is a mangling, so the
+ * declaration sits at C++ scope and the front-end reproduces it (docs/plan.md 6.5 rule 9).  r3 is the
+ * ring index (its body scales it by 2 to reach `field_0x18[index]`), it loads the ring's base from
+ * inside, and it returns the narrowed u16 it has just stored (`clrlwi r3,r0,16`) - which is also how
+ * the owner defines it (`src/ef/fn_800CDB2C.cpp:559`, `u16 ran_suu(long index)`).  Added with
+ * `enemy/fn_801B7020.cpp`, which calls it as `ran_suu(0)`. */
+u16 ran_suu(s32 index);
 #endif
 
 #endif /* MHTRI_EF_FN_800CDB2C_H */
