@@ -7,15 +7,15 @@
 /* Declarations for the symbols `src/ef/eft004.cpp` owns (docs/plan.md 6.5, rule 2).  Plain C-linkage
  * names, so C-visible.  Kept minimal.
  *
- * `fn_8010140C`'s consumers that pass two arguments (`eft007.cpp`, `ef/fn_80105314.cpp`) declare the
- * two-argument form here; `ef/fn_80114E34.cpp` passes three and keeps its own declaration (a
- * conflicting arity, reported as a rule-2 conflict).
- */
+ * `fn_8010140C`'s two-argument form is the owner's (and `ef/eft007.cpp`'s); `ef/fn_80114E34.cpp`
+ * passes three and keeps its own declaration, so the two arities coexist. */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void fn_80101428(MTX34* out, VEC3* pos);
+
+/* Reads the translation of an `MTX34` into a `VEC3`. */
 void fn_8010140C(MTX34* mtx, VEC3* out);
 
 /* The three per-frame handlers states 1-3 of the map/area family's dispatcher (`ef/fn_800FD864.cpp`)

@@ -13,6 +13,12 @@ extern "C" {
 
 void fn_800AE360(void* target, MTX34* out); /* the per-particle transform fn_800BE3C0 reads */
 
+/* Retires every live particle of the manager and returns how many it walked (`ef/eft019.cpp`'s
+ * effect-object teardown calls it).  The owner's `EfPmManager` is complete in its own file, so the
+ * declaration only needs the tag. */
+struct EfPmManager;
+s32 fn_800AB9F4(struct EfPmManager* self);
+
 #ifdef __cplusplus
 }
 #endif

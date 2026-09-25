@@ -30,8 +30,10 @@ void fn_800F9DF4(struct _EFT* self, u8 a, u8 b);
 /* Calls vtable slot 6 of the pooled effect with `flag != 0` (its retire/flag hook). */
 void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
 
-/* Places the pooled effect at a world position (the enemy/emitter state-0 handlers' per-effect call). */
+/* Places/moves the pooled effect at a world position (the enemy/emitter state-0 handlers and
+ * eft019's creation path), and reports whether the pooled effect is still alive. */
 void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
+s32 fn_800F9884(nw4r::ef::Effect* effect);
 
 #ifdef __cplusplus
 }

@@ -608,6 +608,10 @@ config.libs = [
             # because every callee it reaches is a C++ mangling (rule 9) - see the unit's header.
             Object(NonMatching, "ef/fn_8010BDE4.cpp"),
             Object(NonMatching, "ef/fn_8010D1A8.c"),
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/801121DC_eft019_set__FPQ34nw4r4math4VEC3UcUc` range: named from the runtime
+            # dump's own `eft019_set` (dumpmap.py), C++ from its mangled definition.
+            Object(NonMatching, "ef/eft019.cpp"),
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(Matching, "ef/fn_8011722C.c"),
             Object(NonMatching, "ef/fn_80119C44.c"),

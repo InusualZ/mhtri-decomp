@@ -33,6 +33,17 @@ void fn_800DB964(nw4r::math::VEC3* pos);
  * state-0 handlers call. */
 void fn_800DC6D8(nw4r::math::VEC3* pos, u32 mode);
 void fn_800DB974(void* src, nw4r::math::VEC3* pos);
+
+/* Merged 2026-09-24: the per-material impact calls `ef/eft019.cpp`'s creation tail dispatches into. */
+void fn_800DA8AC(Vec3* pos);
+void fn_800DA9A4(Vec3* pos);
+void fn_800DA9B4(Vec3* pos);
+void fn_800DA9C4(Vec3* pos);
+void fn_800DA9D4(Vec3* pos);
+void fn_800DA9E4(Vec3* pos);
+void fn_800DA9F4(Vec3* pos);
+void fn_800DC46C(Vec3* pos);
+void fn_800DC4B4(Vec3* pos);
 #ifdef __cplusplus
 }
 #endif

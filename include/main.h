@@ -23,6 +23,10 @@ f32 fn_8004029C(void);
 void* fn_80040420(u32 size);
 void fn_80040460(void* block);
 
+/* Writes the scissor rectangle `main.cpp` keeps (`_MH_VEC2` there; a two-float pair). */
+struct _MH_VEC2;
+void fn_8004030C(struct _MH_VEC2* v);
+
 #ifdef __cplusplus
 }
 #endif
