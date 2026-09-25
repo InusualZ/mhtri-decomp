@@ -1206,6 +1206,16 @@ config.libs = [
             # stem (brief section 2, class 3+4).  Sections: extab 0x800105B4..0x8001079C (61 records),
             # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
             Object(NonMatching, "lobby/fn_801E7530.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `801FBF78_fn_801FBF78.cpp` (`.text` 0x801FBF78..0x802029B4, 127 functions / 27196 B) -
+            # the lobby NPC / world-update group.  Module `lobby` from the code (the range owns
+            # `lb_npc`, `npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`
+            # and defines `lb_npc_Get_motion_no`/`get_talk_npc_data_ptr`) and from the neighbour
+            # below; no `__FILE__` string covers the range and the dump answers only `zz_`
+            # placeholders, so the file name is the subsystem's own `lb_npc` (brief section 2,
+            # class 3).  Sections: extab 0x80010ADC..0x80010DBC, extabindex 0x8002CF34..0x8002D384
+            # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
+            Object(NonMatching, "lobby/lb_npc.cpp"),
         ],
     },
     {
