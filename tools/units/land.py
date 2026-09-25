@@ -1812,6 +1812,20 @@ def selftest() -> int:
             code = verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True)
         check("case (a): the real verify passes on the rescued branch", code, 0)
         check("... having restored the branch itself", claims.branch_exists(tmp, branch), True)
+        # the out-parameter plumbing that the classification depends on: before the fix, reusing the
+        # `problems` name for the outbox results rebound it locally and NO failed check reached the caller's
+        # list (so `land`'s refusal could not name anything). A real verify must populate it.
+        problems = []
+        repo_git(tmp, "update-ref", "-d", rescue)      # no rescue ref: the branch is genuinely gone
+        repo_git(tmp, "branch", "-D", branch)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            code = verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True,
+                          check_outbox=True, problems=problems)
+        check("case (a): a failed check reaches verify's problems out-param", code, 1)
+        check("... and it carries the BOOKKEEPING tag",
+              any("[BOOKKEEPING]" in p for p in problems), True)
+        check("... naming the branch check",
+              any(p.startswith("every unit's branch carries its work as commits") for p in problems), True)
 
     # case (b) end to end: the batch was applied to the working tree *before* `record-base` ran, so the base's
     # dirty snapshot recorded the batch's own edits as foreign and `land_stageable` had nothing to stage. The
