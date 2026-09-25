@@ -771,7 +771,7 @@ config.libs = [
             # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function
             # scores here are measured with the flag lane's fix still outstanding (see the cflags_g3d
             # note above and .pi/notes/g3d-flags.probe.py).
-            Object(NonMatching, "g3d/g3d_calcvtx.cpp"),      # 0x80073398-0x800736F8
+            Object(NonMatching, "g3d/g3d_calcvtx.cpp"),      # 0x8007270C-0x800736F8 (widened 2026-09-24 from 0x80073398; 0x8007270C-0x80073398 reconstructed, incl. the 80073180 handover, 0x80073398-0x800736F8 earlier cut)
             Object(NonMatching, "g3d/g3d_calcworld.cpp"),    # 0x800736F8-0x800746DC
             Object(NonMatching, "g3d/g3d_camera.cpp"),       # 0x800746DC-0x80075DCC
             Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94

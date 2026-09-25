@@ -109,9 +109,9 @@ g3d/g3d_calcview.cpp:
 	.text       start:0x8006F738 end:0x8007270C
 
 g3d/g3d_calcvtx.cpp:
-	extab       start:0x80008060 end:0x800080B8
-	extabindex  start:0x800206B8 end:0x8002073C
-	.text       start:0x80073398 end:0x800736F8
+	extab       start:0x80008008 end:0x800080B8
+	extabindex  start:0x80020634 end:0x8002073C
+	.text       start:0x8007270C end:0x800736F8
 
 g3d/g3d_calcworld.cpp:
 	extab       start:0x800080B8 end:0x80008138
