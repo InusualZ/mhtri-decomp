@@ -169,8 +169,16 @@ f32 fn_801356A8(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
 s32 fn_80135748();
 u32 fn_80135BC4(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801363F8(struct _ENEMY_WORK* work);
+/* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
+ * action functions call and no registered unit owns.  Signatures are the call sites' - the argument
+ * counts are what the callers set in r4..r6/f1..f3 and the functions are in this band. */
+void fn_801823A0(struct _ENEMY_WORK* self, u32 a);
+/* fn_8012F948(self) is declared above with the rest of the 0x8012F band - the sibling landing
+ * `enemy/fn_8015E854.cpp` had added it there first, so this branch's copy was dropped by hand
+ * instead of leaving two identical prototypes. */
+u32 fn_80182430(struct _ENEMY_WORK* self, u32 a);
+void fn_802B1FEC(void);
 void fn_80136D14(struct _ENEMY_WORK* work);
-void fn_80136D4C();
 void fn_80136E38(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801373D0(struct _ENEMY_WORK* work);
 s32 fn_80137C9C(struct _ENEMY_WORK* work, void* arg1);

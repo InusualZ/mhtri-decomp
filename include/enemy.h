@@ -180,7 +180,10 @@ struct _ENEMY_WORK {
     /* +0x452 */ s16 value_0x452;
     /* +0x454 */ f32 frames_0x454[8];
     /* +0x474 */ u8 pad_0x474[0xE];
-    /* +0x482 */ u8 field_0x482;   /* `enemy/fn_8015E854.cpp`'s `fn_8015EA24` gates the run-in float on it */
+    /* +0x482 */ u8 field_0x482;   /* the byte both action bands read: `enemy/fn_80178378.cpp`'s
+                                    * `fn_80178378` picks its fade constant with it, and
+                                    * `enemy/fn_8015E854.cpp`'s `fn_8015EA24` gates the run-in float on it
+                                    */
     /* +0x483 */ u8 pad_0x483[0x141];
     /* +0x5C4 */ u8 flags_0x5C4;
     /* +0x5C5 */ u8 pad_0x5C5[0x1BF];
