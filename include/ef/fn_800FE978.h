@@ -8,6 +8,15 @@
  * uses that view (`struct _EFT` is `ef.h`'s, and the owner defines it against the same tag).
  */
 struct _EFT;
+/* The owner defines it `extern "C"` (the target object references the plain name), so the header
+ * must carry C linkage too; a C++ declaration mangled it (fn_800FE978__FP4_EFT) at the consumer
+ * (relocaudit). */
+#ifdef __cplusplus
+extern "C" {
+#endif
 void fn_800FE978(struct _EFT* self);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MHTRI_EF_FN_800FE978_H */
