@@ -601,6 +601,13 @@ config.libs = [
             # extab 0x80009B60..0x80009BA0, extabindex 0x80022CEC..0x80022D4C,
             # .text 0x800A388C..0x800A40F4.
             Object(NonMatching, "ef/ef_draworder.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/800A56B0_fn_800A56B0` range (0x800A56B0..0x800A6350, 23 functions): the game side
+            # of the NW4R effect library's system object.  The range's own `__FILE__` string
+            # (`ef_effectsystem.cpp` at 0x80592698) names the TU - see the unit's file header.  Sections:
+            # extab 0x80009C38..0x80009CD4, extabindex 0x80022E30..0x80022EE4,
+            # .text 0x800A56B0..0x800A6350, .ctors 0x8056F2D8..0x8056F2DC.
+            Object(NonMatching, "ef/ef_effectsystem.cpp"),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The `proposal/800AEE48_fn_800AEE48`
