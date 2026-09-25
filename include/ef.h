@@ -325,6 +325,18 @@ struct Effect {
      * third argument is the per-walk flag (eft001's `fn_800FCEC8` is the only callback observed). */
     void ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
 }; /* size: 0x48 (lower bound: +0x44 is the highest offset the spawn handler reads) */
+
+/* The effect system the manager keeps at `eft_control` +0x04 (`fn_800D3C0C` builds it).  `RetireEffect`
+ * is a direct call; `virtual_0x0C` is the fourth vtable slot the per-frame handler reaches through
+ * `fn_800A4420` (ef/eft004.cpp).  One definition, here (rule 1) - the per-frame handler and the
+ * resource manager both need it. */
+class EffectSystem {
+public:
+    virtual void virtual_0x08();
+    virtual void virtual_0x0C();
+    void RetireEffect(Effect* effect);
+};
+/* size: 0x04 - lower bound, an approximation (an opaque handle here) */
 }  // namespace ef
 }  // namespace nw4r
 #endif

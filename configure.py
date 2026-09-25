@@ -578,6 +578,12 @@ config.libs = [
             Object(NonMatching, "ef/fn_800CDB2C.cpp"),
             Object(NonMatching, "ef/eft001.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/800F6520_fn_800F6520` range (0x800F6520..0x800F95A4, 43 functions): the game's
+            # eft resource manager (eft_control, the 256-slot proID table, the load/create path and the
+            # effect-heap push).  Module `ef` from both bracketing units; the name follows the siblings'
+            # scheme - see the unit's file header for the evidence.
+            Object(NonMatching, "ef/eft_res.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
             # `proposal/800F95A4_fn_800F95A4` range: the game's `effect.cpp` manager, named from the
             # range's own `__FILE__` string (0x8059B5D0, cited by fn_800F9884's Panic).
             Object(NonMatching, "ef/effect.cpp"),
