@@ -27,11 +27,32 @@ u32 fn_800651BC(void *self);                /* 0x800651BC - reads the word at +0
 void *fn_80067E54(void *out, void *in);     /* 0x80067E54 - copies 0x10 B, returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 
+/* The name-record store helper (0x800638B8), needed by the right-hand `g3d/fn_800680CC.cpp` cluster
+ * (rule 2: the second consumer moves the declaration here from `fn_80063888.cpp`). */
+void **fn_800638B8(void **out, void *v);    /* stores `v` through `out` and returns `out` */
+
+/* The list-insert chain steps (0x800638F8/0x800639D0/0x80063964), also needed by the right-hand
+ * cluster's own insert steps (rule 2). */
+u32 fn_800638F8(void *self, u32 *other);
+u32 fn_800639D0(u32 **a, u32 **b);
+u32 fn_80063964(void *self, u32 *other);
+
 #ifdef __cplusplus
 }
 #endif
 
 /* The one real C++ free function of the cluster: the front-end mangles this to `fn_80066C8C__FPv`. */
 void *fn_80066C8C(void *obj);
+
+/* The object/vtable pair the cluster's dispatch wrappers share (rule 1: moved here from
+ * `fn_80063888.cpp` when the right-hand `g3d/fn_800680CC.cpp` cluster needed the same layout). */
+typedef u32 (*G3dVtMethod)(void *);
+typedef struct {
+    /* +0x00 */ u8 pad_0x00[0x14];
+    /* +0x14 */ G3dVtMethod method_0x14;
+} G3dVtbl; /* size: 0x18 */
+typedef struct {
+    /* +0x00 */ G3dVtbl *vt;
+} G3dObj; /* size: 0x4 */
 
 #endif /* MHTRI_G3D_FN_80063888_H */
