@@ -500,6 +500,14 @@ config.libs = [
             # continuation of the unit above.  No `__FILE__` string survives and the dump answers
             # only `zz_` placeholders, so the file keeps the map's own stem (see its header).
             Object(NonMatching, "enemy/fn_8012E968.cpp"),
+            # Registered from proposal/8012EC74_fn_8012EC74 (a 0x8012EC74 run discovery
+            # proposed): the enemy per-motion frame-window/area set, 281 functions / 0x8990 bytes.  The
+            # seam at 0x8012EC74 is the band's strong `.sdata2` pool-run jump (label_80796CB4 ->
+            # label_80796CB8): the left neighbour's pool run ends at 0x80796CB4 and this range reads the
+            # next one, so it is a different TU, not a continuation.  Module `enemy` from the link band
+            # and the code; no `__FILE__` string survives and the dump answers `zz_` for most rows, so
+            # the file keeps the map's stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_8012EC74.cpp"),
             # Registered from proposal/80137604_fn_80137604 (a 0x80137604 run discovery
             # proposed): an enemy's per-motion action/rotation update set, 20 functions / 0x2670
             # bytes.  Module `enemy` from the link band (both bracketing units are `enemy`) and

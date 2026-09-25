@@ -114,7 +114,8 @@ struct _ENEMY_WORK {
     /* +0x009 */ u8 field_0x009;        /* `fn_80170610` gates the position seat on it */
     /* +0x00A */ u8 field_0x00A;        /* the area `fn_8012E968` matches the work records'
                                         * `area_no` (+0x1E1) and the area table's entries against */
-    /* +0x00B */ u8 unused_0x00B[2];
+    /* +0x00B */ u8 field_0x00B;        /* the byte `fn_8012F504` hands the effect queue as its flag */
+    /* +0x00C */ u8 unused_0x00C;
     /* +0x00D */ u8 field_0x00D;        /* the byte `fn_80137604`/`fn_8013760C` latch */
     /* +0x00E */ u8 field_0x00E;        /* `fn_80137C94` hands it to `fn_8012555C` */
     /* +0x00F */ u8 unused_0x00F[0x010 - 0x00F];
@@ -137,7 +138,9 @@ struct _ENEMY_WORK {
     /* +0x13C */ u32 field_0x13C;       /* the scene-model id `fn_8007F0CC` is handed */
     /* +0x140 */ u8 unused_0x140[0x188 - 0x140];
     /* +0x188 */ nw4r::math::VEC3 pos;
-    /* +0x194 */ u8 unused_0x194[0x1BC - 0x194];
+    /* +0x194 */ u8 unused_0x194[0x1AC - 0x194];
+    /* +0x1AC */ f32 field_0x1AC;       /* the height `fn_8012F39C` compares against 0.9 * the model scale */
+    /* +0x1B0 */ u8 unused_0x1B0[0x1BC - 0x1B0];
     /* +0x1BC */ u32 field_0x1BC;       /* a rotation angle (wraps at 0x10000) */
     /* +0x1C0 */ u32 field_0x1C0;       /* the second rotation angle `fn_80133DB0` steps */
     /* +0x1C4 */ u32 field_0x1C4;       /* the third rotation angle */
@@ -205,7 +208,8 @@ struct _ENEMY_WORK {
     /* +0x438 */ u8 unused_0x438[0x439 - 0x438];
     /* +0x439 */ u8 field_0x439;
     /* +0x43A */ u8 field_0x43A;
-    /* +0x43B */ u8 unused_0x43B[2];
+    /* +0x43B */ u8 field_0x43B;        /* the per-motion kind gate `fn_8012F474` tests against 2 */
+    /* +0x43C */ u8 unused_0x43C;
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
     /* +0x43F */ u8 field_0x43F;        /* `fn_8013763C` sets it, `fn_80137648` reads it back */
@@ -225,12 +229,20 @@ struct _ENEMY_WORK {
     /* +0x79C */ u8 unused_0x79C[0x7A0 - 0x79C];
     /* +0x7A0 */ u32 field_0x7A0;       /* the numerator of the ratio `fn_8014001C` reports */
     /* +0x7A4 */ u32 field_0x7A4;       /* its denominator */
-    /* +0x7A8 */ u8 unused_0x7A8[0x7C8 - 0x7A8];
+    /* +0x7A8 */ u8 unused_0x7A8[0x7AC - 0x7A8];
+    /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `fn_8012EE80` measures against `field_0x7A0` */
+    /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `fn_8012EFDC` tests against 0.0 */
+    /* +0x7B4 */ u8 unused_0x7B4[0x7BC - 0x7B4];
+    /* +0x7BC */ f32 field_0x7BC;       /* the effect radius `fn_8012F474` scales */
+    /* +0x7C0 */ f32 field_0x7C0;       /* its second factor */
+    /* +0x7C4 */ f32 field_0x7C4;       /* the value `fn_8012F504` clears to 1.0f */
     /* +0x7C8 */ u8 field_0x7C8;        /* the action id `fn_8014278C` picks */
     /* +0x7C9 */ u8 unused_0x7C9[0x812 - 0x7C9];
     /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
-    /* +0x816 */ u8 unused_0x816[0x89F - 0x816];
+    /* +0x816 */ u8 unused_0x816[0x818 - 0x816];
+    /* +0x818 */ s16 field_0x818;       /* the motion timer `fn_8012F110` arms before its mode switch */
+    /* +0x81A */ u8 unused_0x81A[0x89F - 0x81A];
     /* +0x89F */ u8 field_0x89F;        /* the mode `fn_80137720` latches */
     /* +0x8A0 */ u8 unused_0x8A0[0x8A4 - 0x8A0];
     /* +0x8A4 */ s16 field_0x8A4;       /* the timer `fn_80137720` arms from `fn_80126494` */
@@ -247,7 +259,9 @@ struct _ENEMY_WORK {
     /* +0x8D3 */ u8 field_0x8D3;        /* `fn_80137614` matches it against 1 */
     /* +0x8D4 */ u8 unused_0x8D4[0x916 - 0x8D4];
     /* +0x916 */ s16 field_0x916;
-    /* +0x918 */ u8 unused_0x918[0x94A - 0x918];
+    /* +0x918 */ u8 unused_0x918[0x938 - 0x918];
+    /* +0x938 */ s16 field_0x938;       /* the motion timer `fn_8012F1D8` gates its window test on */
+    /* +0x93A */ u8 unused_0x93A[0x94A - 0x93A];
     /* +0x94A */ u16 field_0x94A;       /* the action-end block clears it */
     /* +0x94C */ u16 field_0x94C;       /* the action-end block clears it */
     /* +0x94E */ u8 unused_0x94E[0x954 - 0x94E];

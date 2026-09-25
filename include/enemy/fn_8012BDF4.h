@@ -30,6 +30,12 @@ u32 fn_8012D23C();
 u8 fn_8012D3E0();
 u32 fn_8012D7FC(struct _ENEMY_WORK* other);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+/* 0x8012D8D0 / 0x8012DB3C / 0x8012E21C - this unit's own definitions, moved here from the consumer
+ * `enemy/fn_8012EC74.cpp` (rule 2): the owner is this unit, and the signatures are the ones that
+ * file's call sites set (r3 the work record / the two byte-derived values). */
+u32 fn_8012D8D0(struct _ENEMY_WORK* work);
+u32 fn_8012DB3C(struct _ENEMY_WORK* work);
+u32 fn_8012E21C(u32 state, u32 action);
 
 /* Whether more than `seconds` have passed since the last frame stamp.  Declared here, with its owner
  * (rule 2), because `enemy/fn_8012E968.cpp` calls it and must not re-declare it locally. */
@@ -63,6 +69,10 @@ s32 em_work_die_ck(struct _ENEMY_WORK* enemy);
 /* The real C++ spelling of `em_die_ck__FP11_ENEMY_WORK` (mangle.py verified), so a caller
  * never spells the mangling (docs/plan.md 6.5 rule 9). */
 s32 em_die_ck(struct _ENEMY_WORK* work);
+/* The real C++ spelling of `em_area_ck__FP11_ENEMY_WORK`, added with `enemy/fn_8012EC74.cpp` (its
+ * first consumer that must call it; the extern "C" block above spelled the mangling, which rule 9
+ * forbids a caller from using). */
+u32 em_area_ck(struct _ENEMY_WORK* work);
 #endif
 
 #endif /* MHTRI_ENEMY_FN_8012BDF4_H */
