@@ -46,7 +46,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 
@@ -192,95 +191,8 @@ def next_entry(main: str, entries: list[dict] | None = None) -> dict | None:
     return ready[0] if ready else None
 
 
-# --------------------------------------------------------------------------------------------------
-# wave spread: pick by SYSTEM (the module of the nearest registered unit) and by address distance
-# --------------------------------------------------------------------------------------------------
-_SYSTEM_HINTS: dict[str, list[tuple[int, int, str]]] = {}
-
-
-def system_hints(main: str) -> list[tuple[int, int, str]]:
-    """`(start, end, module)` for every registered `.text` range - the wave picker's system map.
-
-    The module is the first path component of the unit's name (`enemy/fn_801478FC.cpp` -> `enemy`), which is
-    what the linking band and the briefs' class-3 evidence agree on. It spreads a wave; it never decides a
-    unit's home.
-    """
-    if main in _SYSTEM_HINTS:
-        return _SYSTEM_HINTS[main]
-    rows: list[tuple[int, int, str]] = []
-    try:
-        text = open(os.path.join(main, "config", "RMHE08", "splits.txt"), encoding="utf-8").read()
-    except OSError:
-        _SYSTEM_HINTS[main] = rows
-        return rows
-    unit = None
-    for line in text.replace('\r\n', '\n').split('\n'):
-        if line and not line[0].isspace() and line.rstrip().endswith(':'):
-            unit = line.rstrip()[:-1]
-        m = re.match(r"\s+\.text\s+start:0x([0-9A-Fa-f]+) end:0x([0-9A-Fa-f]+)", line)
-        if m and unit:
-            rows.append((int(m.group(1), 16), int(m.group(2), 16),
-                         unit.split('/')[0] if '/' in unit else unit))
-    rows.sort()
-    _SYSTEM_HINTS[main] = rows
-    return rows
-
-
-def hint_for(main: str, address: int) -> str:
-    """The system a proposal's address sits in: the module of the nearest registered range."""
-    best = None
-    for start, end, module in system_hints(main):
-        d = 0 if start <= address < end else min(abs(address - start), abs(address - end))
-        if best is None or d < best[0]:
-            best = (d, module)
-    return best[1] if best else '?'
-
-
-def entry_address(main: str, entry: dict) -> int:
-    """The `.text` address the queue orders by - `order_key`'s first component, a name parse as fallback."""
-    name = str(entry.get('unit') or entry.get('label') or '')
-    m = re.search(r'(?<![0-9A-Fa-f])([0-9A-Fa-f]{8})(?![0-9A-Fa-f])', name)
-    if m:
-        return int(m.group(1), 16)                      # every pooled name embeds its `.text` address
-    try:
-        key = order_key(main, entry)
-        return int(key[0]) if isinstance(key, (tuple, list)) and key else int(key)
-    except Exception:
-        return 0
-
-
-def spread_picks(main: str, ordered: list[dict], is_ready: list[bool], count: int) -> list[int]:
-    """`count` ready indices, chosen for SYSTEM diversity first and address distance second.
-
-    Greedy and deterministic: start at the lowest ready address, then repeatedly take the candidate from an
-    unused system when one exists, preferring the farthest; otherwise the farthest overall.  A wave therefore
-    spans different systems instead of one band, which is what keeps two workers out of the same header.
-    """
-    ready = [i for i, ok in enumerate(is_ready) if ok]
-    if len(ready) <= count:
-        return ready
-    addr = {i: entry_address(main, ordered[i]) for i in ready}
-    hint = {i: hint_for(main, addr[i]) for i in ready}
-    picks = [ready[0]]
-    used = {hint[ready[0]]}
-    while len(picks) < count:
-        best, best_score = None, None
-        for i in ready:
-            if i in picks:
-                continue
-            d = min(abs(addr[i] - addr[j]) for j in picks)
-            score = (1 if hint[i] not in used else 0, d)
-            if best_score is None or score > best_score:
-                best, best_score = i, score
-        if best is None:
-            break
-        picks.append(best)
-        used.add(hint[best])
-    return sorted(picks)
-
-
 def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]:
-    """The `count` proposals one `--count N` wave claims: spread by SYSTEM, then by address distance.
+    """The `count` proposals one `--count N` wave claims: a stride of N through the address order.
 
     The picks are indices `i, i+N, i+2N, ...` of the queue in address order - never N neighbours - so two
     *adjacent* proposals (indexes `j` and `j+1`) can share a wave only if both are congruent mod N, which
@@ -298,8 +210,15 @@ def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]
     ordered = ordered_entries(main, entries)
     branches = claims.worker_branches(main)
     is_ready = [state(main, e, branches) == "ready" for e in ordered]
-    picked = spread_picks(main, ordered, is_ready, count) if count > 1 else [next(i for i, ok in enumerate(is_ready) if ok)]
-    return [ordered[i] for i in picked]
+    picked = [i for i in range(0, len(ordered), count) if is_ready[i]][:count]
+    if len(picked) < count:
+        for j in range(len(ordered)):
+            if len(picked) >= count:
+                break
+            if not is_ready[j] or j in picked or any(abs(j - i) == 1 for i in picked):
+                continue
+            picked.append(j)
+    return [ordered[i] for i in sorted(picked)]
 
 
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dict:
@@ -693,14 +612,14 @@ def selftest() -> int:
         dry3 = next_briefs(tmp, "w-wave", dry_run=True, count=3, claim_fn=fake_claim)
         check("a dry-run wave claims nothing", (dry3["claimed"], claims.load_registry(tmp)), (3, {}))
         check("... but returns every spawn the real wave would",
-              [c["unit"] for c in dry3["claims"]], [units[0], units[2], units[5]])
+              [c["unit"] for c in dry3["claims"]], [units[0], units[3], units[5]])
         out = next_briefs(tmp, "w-wave", dry_run=False, count=3, claim_fn=fake_claim)
         wave3 = [units.index(c["unit"]) for c in out["claims"]]
         check("a full wave claims exactly N", (out["claimed"], out["shortfall"]), (3, 0))
-        check("... the three are the spread picks, non-adjacent", (wave3, adjacent(wave3)), ([0, 2, 5], False))
+        check("... the three are the stride picks, non-adjacent", (wave3, adjacent(wave3)), ([0, 3, 5], False))
         check("... and the addresses are the spaced ones",
               [text_start(tmp, c["unit"]) for c in out["claims"]],
-              [0x80160000, 0x80160200, 0x80160500])
+              [0x80160000, 0x80160300, 0x80160500])
         try:
             next_briefs(tmp, None, dry_run=True, count=0)
             check("a --count below 1 is refused", "no error", "SystemExit")
