@@ -194,6 +194,11 @@ gx/fn_8009AA78.c:
 	extabindex  start:0x80022AC4 end:0x80022B00
 	.text       start:0x8009AA78 end:0x8009ACE4
 
+gx/fn_8009ACE4.c:
+	extab       start:0x80009A18 end:0x80009A28
+	extabindex  start:0x80022B00 end:0x80022B18
+	.text       start:0x8009ACE4 end:0x8009B140
+
 ef/ef_emitterform.cpp:
 	extab       start:0x80009DF4 end:0x80009E04
 	extabindex  start:0x80023094 end:0x800230AC
