@@ -9,8 +9,12 @@ worker the instant a slot frees without deriving anything. This is the other hal
     python tools/units/queue.py --selftest
 
 `next` picks the pooled unit with the lowest `.text` address that is still **unclaimed**, takes the claim
-(`claims.py claim` creates the worktree and the branch), promotes the pooled brief to the claim's own slug
-path, and prints the exact spawn line - cwd, name and task text - to paste.
+(`claims.py claim` creates the worktree and the branch), renders the brief **from the current queue entry or
+`splits.txt` range**, writes it to the claim's own slug path, and prints the exact spawn line - cwd, name and
+task text - to paste. The brief is never copied from the pool: `brief.py --pool` skips a brief that already
+exists, so a queue regeneration can leave every pooled file describing the old range, and copying one handed
+a worker the wrong scope (`proposal/80119DEC`, 2026-09-25). The pool still decides *which* unit is next; it
+is not the source of the worker's brief.
 
 `next --count N` claims a **wave** of N: a stride of N through the address-ordered queue, never N
 neighbours. Adjacency is the vector for almost every clash this campaign has had - the two halves of one
@@ -26,9 +30,10 @@ than scattered for its own sake.
 
 A pooled brief is claim-independent by construction: it is rendered against the worktree the claim *will*
 create (`claims.worktree_for`) and against the branch `claims.py claim` *will* make (`worker/<slug(unit)>`),
-so promoting it is a copy. A claim whose branch was named with its own suffix (a manual round) is re-rendered
-instead, so the outbox path in the brief is always the claim's own. The unit is claimed **before** the brief
-is handed out, so a worker never gets a brief whose outbox does not exist.
+so `--pool` can prepare it before a claim exists. The claim path re-renders rather than copies (see
+`promote`), so the brief a worker gets always matches the entry the queue holds at claim time, including a
+manually named branch whose slug (and therefore outbox path) is its own. The unit is claimed **before** the
+brief is written, so a worker never gets a brief whose outbox does not exist.
 
 `list` shows the pool's state: briefs written, ready (unclaimed, no bodies), claimed (in flight), written (a
 unit that has gained a body - `brief.py --pool` prunes those), covered (its range is registered already,
@@ -41,7 +46,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import subprocess
 import sys
 
@@ -235,20 +239,19 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dic
                     % (wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
 
 
-def promote(main: str, unit: str, pool_path: str, claim_slug: str) -> str:
-    """Copy a pooled brief to the claim's slug path, re-rendering it if the branch carries a suffix.
+def promote(main: str, unit: str, claim_slug: str) -> str:
+    """Render the brief for `unit` at the claim's slug path, **from the current entry**.
 
-    The pooled brief was rendered against the branch `claims.py claim` makes (`worker/<slug(unit)>`), so for
-    every claim this tool makes the copy is byte-for-byte correct. A manually named branch is different: its
-    slug (and therefore its outbox path) is not the unit's, so the brief is re-rendered against the real
-    claim rather than copied.
+    The pool is a scheduling device, not the source of truth: `brief.py --pool` used to skip a brief that
+    already existed, so `attribute.py queue` re-cutting a range left every pre-existing pooled brief
+    describing the OLD scope, and copying that file handed the worker the wrong work - `proposal/80119DEC`
+    got `.text 0x80119DEC..0x8011A34C` (two functions) while the queue had `..0x8011D448` (thirty-seven).
+    The brief is therefore re-rendered here against the current queue entry (or `splits.txt` range) and the
+    real claim, never copied, so a stale pooled file cannot reach a worker. The pool brief is still what
+    *selects* the unit; it is just not what the worker is handed.
     """
     dest = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    if claim_slug == claims.slug(unit):
-        shutil.copyfile(pool_path, dest)
-        return dest
-    # A proposal must still dispatch on its queue entry here, not on a registered unit it does not have yet.
     b, text = brief.brief_for(main, claims.worktree_for(unit, main), unit, None)
     with open(dest, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
@@ -299,7 +302,7 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
     if dry_run:
         brief_path = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
     else:
-        brief_path = promote(main, unit, entry["path"], claim_slug)
+        brief_path = promote(main, unit, claim_slug)
     return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
             "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
             "spawn": spawn_line(main, unit, claim_slug, wt, brief_path)}
@@ -442,18 +445,20 @@ def selftest() -> int:
         check("the promoted brief is at the claim's slug path",
               os.path.basename(real["brief"]), claims.claim_slug(tmp, "auto/stubB") + ".md")
         check("the promoted brief exists", os.path.exists(real["brief"]), True)
-        check("the promoted brief is the pooled one",
-              open(real["brief"], encoding="utf-8").read(), pooled_text)
-        check("the pooled brief is copied, not consumed", os.path.exists(by_unit["auto/stubB"]["path"]), True)
+        promoted_text = open(real["brief"], encoding="utf-8").read()
+        check("the promoted brief is re-rendered, not a copy of the pooled file",
+              promoted_text != pooled_text and "Pooled brief" not in promoted_text, True)
+        check("... and it states the unit's current range", "0x80100000" in promoted_text, True)
+        check("the pooled brief is left in place for `--pool` to refresh",
+              os.path.exists(by_unit["auto/stubB"]["path"]), True)
         check("a claimed unit is still counted by pool_state", pool_state(tmp)["counts"].get("claimed"), 1)
-        check("the promoted brief keeps the claim's outbox", "outbox" in open(real["brief"], encoding="utf-8").read(), True)
+        check("the promoted brief keeps the claim's outbox", "outbox" in promoted_text, True)
         claims.save_registry(tmp, {})
 
-        # a branch named with a suffix is re-rendered, so its outbox path is the claim's own
+        # a branch named with a suffix is re-rendered too, so its outbox path is the claim's own
         claims.save_registry(tmp, {"auto/stubA": {"branch": claims.branch_for("auto/stubA") + "-zz",
                                                   "worktree": claims.worktree_for("auto/stubA", tmp)}})
-        suffixed = promote(tmp, "auto/stubA", by_unit["auto/stubA"]["path"],
-                           claims.slug("auto/stubA") + "-zz")
+        suffixed = promote(tmp, "auto/stubA", claims.slug("auto/stubA") + "-zz")
         check("a suffixed claim's brief is re-rendered", "-zz.json" in open(suffixed, encoding="utf-8").read(), True)
         claims.save_registry(tmp, {})
 
@@ -625,6 +630,47 @@ def selftest() -> int:
             check("... the selector refuses it too, so no caller can pass it through", "no error", "SystemExit")
         except SystemExit as exc:
             check("... the selector refuses it too, so no caller can pass it through", "at least 1" in str(exc), True)
+
+    # The pool is NOT the source of truth at claim time. `brief.py --pool` used to skip a brief that already
+    # existed, so `attribute.py queue` re-cutting a range left every pre-existing pooled brief describing the
+    # OLD scope - and `queue.py next` copied it. `proposal/80119DEC` was handed `.text 0x80119DEC..0x8011A34C`
+    # (two functions) while the queue said `..0x8011D448` (thirty-seven). The claim path must render the
+    # current entry, and the stale pooled range must never appear in what the worker reads.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src"))
+        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
+        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
+        claims.save_registry(tmp, {})
+        label = "proposal/80119DEC_fn_80119DEC.cpp"
+        pool_path = os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md")
+        open(pool_path, "w", encoding="utf-8").write(
+            "# Proposal brief: %s\n\n"
+            "> **Pooled brief** - prepared by `brief.py --pool` before the claim.\n\n"
+            "| `.text` range | `0x80119DEC`-`0x8011A34C` (1376 bytes) |\n"
+            "| functions | 2 |\n" % label)
+        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [{"label": label, "text": [0x80119DEC, 0x8011D448],
+                                                "count": 37, "bytes": 13916, "cxx": True,
+                                                "tu": {"verdict": "one-tu", "sources": ["eft029.cpp"],
+                                                       "partial_source": None, "open_seams": []}}]}, fh)
+
+        def fake_claim(unit, main, worker, dry_run):
+            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
+                                               "worktree": claims.worktree_for(unit, main)}})
+            return {"unit": unit, "branch": claims.branch_for(unit),
+                    "worktree": claims.worktree_for(unit, main)}
+
+        check("the stale pool brief still selects the unit", next_entry(tmp)["unit"],
+              claims.norm_unit(label))
+        check("... and the pooled file really states the old range",
+              "0x8011A34C" in open(pool_path, encoding="utf-8").read(), True)
+        claimed = next_brief(tmp, "w-stale", dry_run=False, claim_fn=fake_claim)
+        rendered = open(claimed["brief"], encoding="utf-8").read()
+        check("the claim renders the CURRENT queue range", "0x8011D448" in rendered, True)
+        check("... and never the stale pooled range", "0x8011A34C" not in rendered, True)
+        check("... with the current function count", "| functions | 37 |" in rendered, True)
+        check("the stale pooled file is left untouched",
+              "0x8011A34C" in open(pool_path, encoding="utf-8").read(), True)
 
     # an empty pool must refuse, not hand out a brief for a unit nobody prepared
     with tempfile.TemporaryDirectory() as empty:

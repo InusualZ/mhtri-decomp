@@ -15,7 +15,8 @@ the brief has to be self-contained and has to say the same thing every time. It 
 6. the rules     - `docs/plan.md` §6.5 and §8 verbatim, plus the measurement loop
 
     python tools/units/brief.py <unit> [--task "..."] [--stdout] [--json] [--selftest]
-    python tools/units/brief.py --pool [--force] [--no-prune]
+    python tools/units/brief.py --pool [--force] [--no-prune] [--prune-promoted]
+    python tools/units/brief.py --check-promoted
 
 The brief is written into MAIN (`<main>/tools/units/briefs/`), not into a worker's worktree, so it outlives
 the worktree the same way the outbox does. Its file name and the paths in part 4 come from the unit's
@@ -26,9 +27,13 @@ inventing one.
 `--pool` is the one exception, and it is what lets the orchestrator start a worker the instant a slot frees:
 for every registered unit that has no bodies yet it writes a brief *before* any claim exists, keyed by
 `claims.slug(unit)` and rendered against the worktree and branch the default claim will create, so
-`tools/units/queue.py next` only has to claim the unit and copy the file. No claim is made and the registry
-is never touched. Re-running is idempotent (existing briefs are skipped) and prunes a brief whose unit has
-gained a body.
+`tools/units/queue.py next` only has to claim the unit and hand the worker a brief. No claim is made and the
+registry is never touched. Each brief carries a **stamp** (an invisible HTML comment) of the entry's range,
+function count and TU verdict, so re-running `--pool` is idempotent: an unchanged entry is skipped and the
+file is not rewritten, a changed one is refreshed, and a brief whose unit has gained a body is pruned.
+`queue.py next` no longer copies a pooled brief at all - it re-renders from the current entry - so a stale
+pool cannot reach a worker even between `--pool` runs. `--check-promoted` reports (and `--prune-promoted`
+deletes) a promoted brief in `tools/units/briefs/` whose entry no longer matches the queue.
 
 **A brief is never written for a range that is not handable work (2026-09-25).** The proposal queue is
 written from the *unclaimed* `.text`, but the file is not regenerated on every landing, so an entry's range
@@ -68,6 +73,60 @@ from units import dossier as dossier_mod  # noqa: E402
 
 SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 BAR = 80.0
+
+# A brief carries a stamp of the queue entry it was written from, so `--pool` can tell a current brief from
+# one written against an older entry: a regeneration that re-cuts a range or changes a function count used to
+# leave every pre-existing pooled brief describing the OLD range (the 80119DEC incident, 2026-09-25). The
+# stamp is an HTML comment - invisible in the rendered brief - holding the entry's range, function count and
+# TU verdict. An unchanged entry leaves the file byte-identical (no churn); a changed one is refreshed.
+STAMP_MARK = "<!-- brief-stamp:"
+_STAMP_RE = re.compile(r"^<!-- brief-stamp: (\{.*\}) -->\s*$", re.M)
+
+
+def _stamp_line(stamp: dict) -> str:
+    return "%s %s -->" % (STAMP_MARK, json.dumps(stamp, sort_keys=True, separators=(",", ":")))
+
+
+def proposal_stamp(p: dict) -> dict:
+    """The identifying fields of a queue entry: its range, function count and TU verdict."""
+    tu = p.get("tu") or {}
+    lang = p.get("language") or {}
+    return {"kind": "proposal", "label": p.get("label"),
+            "text": [int(x) for x in (p.get("text") or [])],
+            "count": int(p.get("count") or 0),
+            "tu": {"verdict": tu.get("verdict"),
+                   "sources": list(tu.get("sources") or []),
+                   "partial_source": tu.get("partial_source")},
+            "language": {"lang": lang.get("lang"), "confidence": lang.get("confidence")}}
+
+
+def unit_stamp(unit: str, sections: dict) -> dict:
+    """The identifying fields of the pre-option-A fallback: the unit's section ranges."""
+    return {"kind": "unit", "unit": claims.norm_unit(unit),
+            "sections": {k: [int(v[0]), int(v[1])] for k, v in sorted(sections.items())}}
+
+
+def entry_stamp(main: str, unit: str) -> dict:
+    """The stamp the brief for `unit` should carry right now, from the current queue entry."""
+    p = proposal_by_label(main, unit)
+    if p is not None:
+        return proposal_stamp(p)
+    return unit_stamp(unit, splits_range(main, unit))
+
+
+def brief_stamp(path: str) -> dict | None:
+    """The stamp a written brief carries - `None` for one written before stamps, or unparseable."""
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    m = _STAMP_RE.search(text)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return None
 
 
 def source_name(unit: str, *roots: str) -> str:
@@ -455,6 +514,8 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines = []
     lines.append("# Brief: %s" % b["unit"])
     lines.append("")
+    lines.append(_stamp_line(unit_stamp(b["unit"], rng)))
+    lines.append("")
     if pool:
         lines.append("> **Pooled brief** - prepared by `brief.py --pool` before the claim. `queue.py next` claims")
         lines.append("> this unit and hands you this file; the worktree and outbox paths below are the ones your")
@@ -821,6 +882,8 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines: list[str] = []
     lines.append("# Proposal brief: %s" % label)
     lines.append("")
+    lines.append(_stamp_line(proposal_stamp(p)))
+    lines.append("")
     if pool:
         lines.append("> **Pooled brief** - prepared by `brief.py --pool` before the claim. `queue.py next` claims")
         lines.append("> this proposal and hands you this file; the worktree and outbox paths below are the ones")
@@ -1097,7 +1160,8 @@ def pool_dir(main: str) -> str:
     return os.path.join(main, "tools", "units", "briefs", "pool")
 
 
-def pool(main: str, force: bool = False, prune: bool = True) -> dict:
+def pool(main: str, force: bool = False, prune: bool = True,
+         prune_promoted_litter: bool = False) -> dict:
     """Write a brief for every piece of work the pool can hand out, into `tools/units/briefs/pool/`.
 
     Under option A (owner, 2026-09-24) the work is the **proposal queue** written by `attribute.py queue`,
@@ -1106,10 +1170,14 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
     a tree whose discovery has not been re-run.
 
     No claim is made and the claims registry is never touched. `assume_claim` renders each brief against the
-    worktree and branch the claim *will* create, so promoting it later is a copy.
+    worktree and branch the claim *will* create, so the pooled file already carries the paths the claim makes;
+    `queue.py next` still re-renders at claim time (see `queue.promote`) rather than trusting it.
 
-    Idempotent: an existing brief is skipped unless `force`. A pooled brief whose proposal has left the queue
-    (its range was worked and registered) is pruned, so the pool always equals the current queue.
+    Idempotent: an existing brief is skipped when its stamp still equals the current entry's (no churn),
+    refreshed when the entry changed, and `force` rewrites everything. A pooled brief whose proposal has
+    left the queue (its range was worked and registered) is pruned, so the pool always equals the current
+    queue. The *promoted* directory is audited too: a promoted brief whose entry no longer matches is
+    reported in `litter`, and - only with `prune_promoted_litter` - deleted when no live claim owns it.
 
     An entry whose range is no longer unclaimed - a unit now holds its bytes - is left out and pruned the
     same way, and comes back in `blocked` with the reason, so a worker is never handed a range another
@@ -1125,13 +1193,18 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
         kind, units = "unit", pool_units(main)
     outdir = pool_dir(main)
     os.makedirs(outdir, exist_ok=True)
-    wrote, skipped, pruned = [], [], []
+    wrote, skipped, refreshed, pruned = [], [], [], []
     want = {claims.slug(u): u for u in units}
     for unit in units:
         path = os.path.join(outdir, claims.slug(unit) + ".md")
         if os.path.exists(path) and not force:
-            skipped.append(unit)
-            continue
+            # A pooled brief is current exactly when its stamp (range, function count, TU verdict) equals
+            # what the queue entry says now. An unchanged entry is skipped and the file is not rewritten,
+            # so `--pool` is idempotent; a changed one is refreshed instead of silently kept.
+            if brief_stamp(path) == entry_stamp(main, unit):
+                skipped.append(unit)
+                continue
+            refreshed.append(unit)
         b, text = brief_for(main, claims.worktree_for(unit, main), unit, None,
                             assume_claim=True, pool=True)
         open(path, "w", encoding="utf-8", newline="\n").write(text)
@@ -1143,8 +1216,135 @@ def pool(main: str, force: bool = False, prune: bool = True) -> dict:
             path = os.path.join(outdir, name)
             pruned.append({"slug": name[:-3], "unit": brief_unit(path)})
             os.remove(path)
+    # the *promoted* directory is not the pool: a brief there belongs to a claim, so a stale one is
+    # reported (or, when it owns no claim, pruned) rather than left to be read as current work
+    litter = promoted_litter(main)
+    pruned_promoted = prune_promoted(main, litter) if prune_promoted_litter else []
     return {"dir": outdir, "kind": kind, "units": units, "wrote": wrote, "skipped": skipped,
-            "pruned": pruned, "blocked": blocked}
+            "refreshed": refreshed, "pruned": pruned, "blocked": blocked,
+            "litter": litter, "pruned_promoted": pruned_promoted}
+
+
+def promoted_dir(main: str) -> str:
+    """The promoted directory - `<main>/tools/units/briefs/` - where a claim's brief is handed to a worker."""
+    return os.path.join(main, "tools", "units", "briefs")
+
+
+def brief_text_range(path: str) -> list[int] | None:
+    """The `.text` range a written brief states, as `[start, end]` - `None` when it cannot be read.
+
+    Two renderings exist: the proposal brief's ``| `.text` range | `0x..`-`0x..` |`` row and the registered
+    unit's ``| sections | .text 0x..-0x.., ... |`` row.
+    """
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    m = re.search(r"\| `?\.text`? range \| `(0x[0-9A-Fa-f]+)`-`(0x[0-9A-Fa-f]+)`", text)
+    if not m:
+        m = re.search(r"\| sections \| [^\n]*?\.text (0x[0-9A-Fa-f]+)-(0x[0-9A-Fa-f]+)", text)
+    if not m:
+        return None
+    return [int(m.group(1), 16), int(m.group(2), 16)]
+
+
+def promoted_litter(main: str) -> list[dict]:
+    """Promoted briefs in `tools/units/briefs/` whose current queue entry no longer matches.
+
+    A promoted brief is a claim's copy; it outlives the claim, and `attribute.py queue` can be regenerated
+    under it, so the brief can end up describing a range the queue no longer hands out. Two were found this
+    way on 2026-09-25 - `801502C8` stated `0x801502C8..0x80154B04` while the queue says `..0x801550FC`, and
+    `801FBF78` stated a `.ctors` word where the queue says `0x801FBF78..0x802029B4` (127 functions) - and a
+    live worker (`80119DEC`) had been handed a stale one, so this reports rather than trusts.
+
+    The brief's own title and stated `.text` range are compared, in order, against (a) the entry it names,
+    (b) the entry whose range starts at the same address, (c) the queue entry that now contains that
+    address, and (d) the registered units. A brief whose range is registered work already is history and is
+    left alone; the rest are litter. `claimed` records whether a live claim still owns the brief, so a
+    caller can report a stale in-flight brief instead of deleting it.
+    """
+    d = promoted_dir(main)
+    out: list[dict] = []
+    if not os.path.isdir(d):
+        return out
+    props = proposals(main)
+    by_label = {claims.norm_unit(p.get("label") or ""): p for p in props}
+    by_start: dict[int, dict] = {}
+    for p in props:
+        t = p.get("text") or []
+        if len(t) == 2:
+            by_start[int(t[0])] = p
+    registered = {claims.norm_unit(u) for u in registered_units(main)}
+    covered = registered_text_ranges(main)
+    branches = claims.worker_branches(main)
+    branch_slugs = {claims.slug_of_branch(b) for b in branches}
+    for name in sorted(os.listdir(d)):
+        if not name.endswith(".md"):
+            continue
+        path = os.path.join(d, name)
+        unit = brief_unit(path)
+        if unit is None:
+            continue
+        stated = brief_text_range(path)
+        if stated is None:
+            continue  # not a range brief (or unreadable) - it cannot be judged against the queue
+        entry = by_label.get(claims.norm_unit(unit))
+        expected, reason = None, None
+        if entry is not None:
+            expected = [int(x) for x in (entry.get("text") or [])]
+            stamp = brief_stamp(path)
+            if stamp is not None:
+                if stamp == proposal_stamp(entry):
+                    continue
+                reason = "the brief's stamp no longer matches its queue entry"
+            elif stated == expected:
+                continue
+            else:
+                reason = "the queue entry changed range"
+        elif claims.norm_unit(unit) in registered:
+            rng = splits_range(main, unit).get(".text")
+            expected = [rng[0], rng[1]] if rng else None
+            if expected is None or stated == expected:
+                continue
+            reason = "the unit's split range moved"
+        elif stated[0] in by_start:
+            expected = [int(x) for x in (by_start[stated[0]].get("text") or [])]
+            reason = "the queue re-cut this range as %s" % by_start[stated[0]].get("label")
+        else:
+            holder = None
+            for q in props:
+                qt = q.get("text") or []
+                if len(qt) == 2 and qt[0] <= stated[0] < qt[1]:
+                    holder = q
+                    break
+            if holder is None and any(s <= stated[0] < e for s, e, _u in covered):
+                continue  # the range was worked and landed - history, not litter
+            if holder is not None:
+                expected = [int(x) for x in holder["text"]]
+                reason = "the queue now cuts this range inside %s" % holder.get("label")
+            else:
+                reason = "no current entry or registered unit carries this range"
+        claimed = (bool(claim_for(main, unit)) or claims.lock_held(main, unit, branches)
+                   or name[:-3] in branch_slugs)
+        out.append({"slug": name[:-3], "path": path, "unit": unit, "stated": stated,
+                    "expected": expected, "reason": reason, "claimed": claimed})
+    return out
+
+
+def prune_promoted(main: str, litter: list[dict] | None = None) -> list[dict]:
+    """Delete only the promoted litter no live claim owns - a stale brief for an in-flight worker is kept,
+    so its handoff (and its outbox path) still exists; it is reported, never silently removed."""
+    litter = promoted_litter(main) if litter is None else litter
+    removed = []
+    for row in litter:
+        if row.get("claimed"):
+            continue
+        try:
+            os.remove(row["path"])
+        except OSError:
+            continue
+        removed.append(row)
+    return removed
 
 
 def selftest() -> int:
@@ -1320,6 +1520,26 @@ def selftest() -> int:
         check("... and parses to the same key as its title without the extension",
               claims.slug(brief_unit(pooled)), claims.slug(entry["label"]))
         check("pool is idempotent for a proposal", pool(tmp)["skipped"], [entry["label"]])
+        # an unchanged entry leaks no churn: the file is not rewritten
+        stable = open(pooled, encoding="utf-8").read()
+        again = pool(tmp)
+        check("an unchanged entry refreshes nothing", again["refreshed"], [])
+        check("... and the pooled file is byte-identical", open(pooled, encoding="utf-8").read(), stable)
+        check("... its stamp equals the entry's", brief_stamp(pooled), entry_stamp(tmp, entry["label"]))
+        # a regenerated entry (new range and function count) refreshes the pooled brief instead of
+        # silently keeping the old scope - the 80119DEC defect
+        changed = dict(entry, text=[0x80161660, 0x80169000], count=99)
+        with open(queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [changed]}, fh)
+        _QUEUE_CACHE.clear()   # the mtime can be unchanged within the same second
+        ref = pool(tmp)
+        check("a changed entry is refreshed", ref["refreshed"], [entry["label"]])
+        check("... and the pooled brief states the new range",
+              "0x80169000" in open(pooled, encoding="utf-8").read(), True)
+        check("... and carries a stamp matching the new entry",
+              brief_stamp(pooled), entry_stamp(tmp, entry["label"]))
+        check("... while the old function count is gone",
+              "| functions | 52 |" not in open(pooled, encoding="utf-8").read(), True)
         # the queue drops a proposal once its range is registered, and the pool prunes the brief with it
         with open(queue_path(tmp), "w", encoding="utf-8") as fh:
             json.dump({"version": 1, "units": []}, fh)
@@ -1328,6 +1548,54 @@ def selftest() -> int:
         check("a proposal brief is pruned when the queue drops it",
               [r["unit"] for r in dropped["pruned"]], [claims.norm_unit(entry["label"])])
         check("the pruned brief is gone from disk", os.path.exists(pooled), False)
+
+    # a promoted brief outlives its claim: when the queue is regenerated under it (the 801502C8/801FBF78
+    # litter) its stated range no longer matches the current entry, so the tooling must report it - and
+    # delete it only when no live claim owns it.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src"))
+        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
+        claims.save_registry(tmp, {})
+        label = "proposal/801502C8_fn_801502C8.cpp"
+        os.makedirs(promoted_dir(tmp))
+        with open(queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [{"label": label, "text": [0x801502C8, 0x801550FC],
+                                                "count": 30, "bytes": 20020, "cxx": True}]}, fh)
+        litter_path = os.path.join(promoted_dir(tmp), "801502c8-fn-801502c8-4783.md")
+        open(litter_path, "w", encoding="utf-8").write(
+            "# Brief: auto/801502C8_fn_801502C8\n\n"
+            "| sections | .text 0x801502C8-0x80154B04, extab 0x8000DC54-0x8000DCDC |\n")
+        ok_path = os.path.join(promoted_dir(tmp), "ok.md")
+        open(ok_path, "w", encoding="utf-8").write(
+            "# Proposal brief: %s\n\n| `.text` range | `0x801502C8`-`0x801550FC` (20020 bytes) |\n" % label)
+        litter = promoted_litter(tmp)
+        check("a promoted brief the queue re-cut is litter", [r["slug"] for r in litter],
+              ["801502c8-fn-801502c8-4783"])
+        check("... with the old range it states", litter[0]["stated"], [0x801502C8, 0x80154B04])
+        check("... and the queue's current range", litter[0]["expected"], [0x801502C8, 0x801550FC])
+        check("... and no claim owns it", litter[0]["claimed"], False)
+        check("a promoted brief whose range still matches is not litter",
+              "ok" in [os.path.splitext(n)[0] for n in os.listdir(promoted_dir(tmp))]
+              and all(r["slug"] != "ok" for r in litter), True)
+        check("the matching brief is left on disk", os.path.exists(ok_path), True)
+        removed = prune_promoted(tmp, litter)
+        check("the claim-free litter is pruned", [r["slug"] for r in removed],
+              ["801502c8-fn-801502c8-4783"])
+        check("... and it is gone from disk", os.path.exists(litter_path), False)
+        # a stale brief a live claim owns is reported, never deleted - it is the worker's handoff
+        held_path = os.path.join(promoted_dir(tmp), claims.slug(label) + ".md")
+        open(held_path, "w", encoding="utf-8").write(
+            "# Proposal brief: %s\n\n| `.text` range | `0x801502C8`-`0x80154B04` (20020 bytes) |\n" % label)
+        claims.save_registry(tmp, {claims.norm_unit(label):
+                                   {"branch": claims.branch_for(claims.norm_unit(label))}})
+        held = [r for r in promoted_litter(tmp) if r["unit"] == claims.norm_unit(label)]
+        check("a stale promoted brief with a live claim is marked held",
+              bool(held) and held[0]["claimed"], True)
+        check("... and prune_promoted leaves it alone",
+              [r for r in prune_promoted(tmp, held) if r["path"] == held_path], [])
+        check("... the held file survives", os.path.exists(held_path), True)
+        claims.save_registry(tmp, {})
+        check("an empty promoted directory reports nothing", promoted_litter(os.path.join(tmp, "nope")), [])
 
     # the tree moves under the queue: an entry whose range a unit now holds is NOT handable work. This is
     # the 8008F8E4 incident - the queue entry capped 0x8008F8E4-0x80097D40, five TUs, four of them already
@@ -1548,14 +1816,35 @@ def main() -> int:
     ap.add_argument("--force", action="store_true", help="with --pool, rewrite briefs that already exist")
     ap.add_argument("--no-prune", action="store_true",
                     help="with --pool, keep briefs whose unit has gained a body")
+    ap.add_argument("--prune-promoted", action="store_true",
+                    help="with --pool, delete promoted briefs in tools/units/briefs/ that no live claim owns"
+                         " and whose entry no longer matches")
+    ap.add_argument("--check-promoted", action="store_true",
+                    help="report promoted briefs whose entry no longer matches, then exit (read-only)")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest()
 
     main = rc.main_root(rc.worktree_root())
+    if args.check_promoted:
+        litter = promoted_litter(main)
+        for row in litter:
+            print("%s  %s" % ("HELD  " if row["claimed"] else "LITTER", row["slug"]))
+            print("    unit   %s" % row["unit"])
+            print("    stated %s" % ("0x%08X..0x%08X" % tuple(row["stated"])))
+            print("    queue  %s" % ("0x%08X..0x%08X" % tuple(row["expected"])
+                                      if row["expected"] else "(no current entry)"))
+            print("    reason %s" % row["reason"])
+        if not litter:
+            print("ok - no promoted brief disagrees with the current queue")
+            return 0
+        print("\n%d promoted brief(s) disagree with the current queue (HELD = a live claim owns them,"
+              " do not delete)" % len(litter))
+        return 1
     if args.pool:
-        out = pool(main, force=args.force, prune=not args.no_prune)
+        out = pool(main, force=args.force, prune=not args.no_prune,
+                   prune_promoted_litter=args.prune_promoted)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
@@ -1565,7 +1854,10 @@ def main() -> int:
         print("  wrote    %d" % len(out["wrote"]))
         for unit in out["wrote"]:
             print("      + %s" % unit)
-        print("  skipped  %d  (already written)" % len(out["skipped"]))
+        print("  skipped  %d  (up to date)" % len(out["skipped"]))
+        print("  refreshed %d  (entry changed since the brief was written)" % len(out["refreshed"]))
+        for unit in out["refreshed"]:
+            print("      ~ %s" % unit)
         print("  pruned   %d  (unit has a body now, or is no longer registered)" % len(out["pruned"]))
         for row in out["pruned"]:
             print("      - %s  (%s)" % (row["unit"] or "?", row["slug"]))
@@ -1575,6 +1867,12 @@ def main() -> int:
             print("      x %s" % row["why"][0])
             for why in row["why"][1:]:
                 print("        %s" % why)
+        litter = out.get("litter") or []
+        print("  promoted %d  brief(s) disagree with the current queue" % len(litter))
+        for row in litter:
+            print("      %s %s  (%s)" % ("HOLD" if row["claimed"] else "LITTER", row["slug"], row["reason"]))
+        for row in out.get("pruned_promoted") or []:
+            print("      - pruned %s" % row["slug"])
         return 0
     if not args.unit:
         ap.print_help()
