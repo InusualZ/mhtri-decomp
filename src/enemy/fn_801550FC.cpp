@@ -1735,8 +1735,7 @@ extern "C" void fn_80159984(_ENEMY_WORK* self) {
         if (em_frame_check(self, 1, lbl_807970CC, lbl_807970C0) == 0) {
             fn_80133C50(self, 0x100);
         }
-        fn_80135644(self, &lbl_805A4568);
-        fn_801303FC(self);
+        fn_801303FC(self, fn_80135644(self, &lbl_805A4568));
         temp_f1 = self->field_0x1ac;
         if (temp_f1 > lbl_807970C0) {
             self->field_0x1ac = (f32) lbl_807970C0;

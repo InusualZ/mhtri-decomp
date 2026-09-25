@@ -52,6 +52,7 @@ f32 fn_8012F8E4(struct _ENEMY_WORK *self);
 f32 fn_8012F8EC(struct _ENEMY_WORK *self);
 f32 fn_8012F8F4(struct _ENEMY_WORK *self);
 u32 fn_8012F93C(struct _ENEMY_WORK *self);
+u32 fn_8012F948(struct _ENEMY_WORK *self);
 void fn_8012FC60(struct _ENEMY_WORK* work);
 void fn_8012FCC4(struct _ENEMY_WORK* work, s32 arg1, f32 arg2);
 void fn_8012FCE4(struct _ENEMY_WORK* work);
@@ -73,10 +74,12 @@ f32 fn_801302E4(struct _ENEMY_WORK* work);
  * C too. */
 void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
 /* 0x801303FC - r3 (`self`) plus the f1 `0x801303EC` consumes (its body does `lfs f0,0x1ac(r3);
- * fadds f1,f0,f1; b 0x801303EC`).  `enemy/fn_8014A1BC.c` calls it with one and with two arguments,
- * so C keeps the old-style declaration and C++ gets the one-argument form the call site uses. */
+ * fadds f1,f0,f1; b 0x801303EC`).  The callee READS f1, so the real signature is two-argument
+ * (docs/plan.md 6.5 rule 6: settled from the callee's body).  `enemy/fn_8014A1BC.c` also calls it
+ * with one argument (leaving f1 as the tail of its preceding call), so C keeps the old-style
+ * declaration. */
 #ifdef __cplusplus
-void fn_801303FC(struct _ENEMY_WORK* self);
+void fn_801303FC(struct _ENEMY_WORK* self, f32 a);
 #else
 void fn_801303FC();
 #endif
@@ -97,6 +100,21 @@ void fn_80131DB4(struct _ENEMY_WORK* work);
 void fn_80131DF4(struct _ENEMY_WORK* work);
 void fn_80131E0C(struct _ENEMY_WORK* work);
 void fn_80131E74(struct _ENEMY_WORK* work);
+/* 0x8015D860..0x8015E804 - the action band between `enemy/fn_801550FC.cpp` and
+ * `enemy/fn_8015E854.cpp` (both `enemy`); the unit above calls these, so they live here until the
+ * band is registered. */
+void fn_8015D860(struct _ENEMY_WORK* self);
+void fn_8015D8F0(struct _ENEMY_WORK* self);
+void fn_8015D908(struct _ENEMY_WORK* self);
+void fn_8015D934(struct _ENEMY_WORK* self);
+void fn_8015DDB8(struct _ENEMY_WORK* self);
+void fn_8015DE00(struct _ENEMY_WORK* self);
+void fn_8015E05C(struct _ENEMY_WORK* self);
+void fn_8015E804(struct _ENEMY_WORK* self);
+void fn_80131E00(struct _ENEMY_WORK* work);
+f32 fn_8013032C(struct _ENEMY_WORK* work);
+u32 fn_80132198(struct _ENEMY_WORK* work);
+void fn_801321B0(struct _ENEMY_WORK* work);
 void fn_80131EC0();
 void fn_801320A4(struct _ENEMY_WORK* work);
 u32 fn_80132184(void);
@@ -112,7 +130,14 @@ u32 fn_80133C50(struct _ENEMY_WORK *self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
 u16 fn_80133DB0();
 void fn_80133E3C(struct _ENEMY_WORK *self, s32 a, f32 b, f32 c);
-void fn_80133F4C(struct _ENEMY_WORK *self, f32 a, f32 b);
+/* 0x80133F4C - r3 (`self`), f1, f2 and r4 (the callee's body does `fmr f30,f1` / `fmr f31,f2` /
+ * `mr r31,r4`), so the real signature is four-argument; `enemy/fn_8014BDF8` (C) leaves r4 as the
+ * tail of its preceding call, so C keeps the old-style declaration (docs/plan.md 6.5 rule 6). */
+#ifdef __cplusplus
+void fn_80133F4C(struct _ENEMY_WORK* self, f32 a, f32 b, s32 c);
+#else
+void fn_80133F4C();
+#endif
 u32 fn_80134114(struct _ENEMY_WORK* self, s32 a, s32 b);
 void fn_80134964(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
 u32 fn_80134B0C(struct _ENEMY_WORK *self, void *tbl);
