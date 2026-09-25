@@ -92,6 +92,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "unsplit/enemy.h"
+#include "unsplit/Pl.h" /* fn_80267270 (rule 2: the Pl band home) */
 
 #define fn_80043EA8 mhtri_mh3pad_fn_80043EA8
 #define fn_80041E8C mhtri_mh3pad_fn_80041E8C
