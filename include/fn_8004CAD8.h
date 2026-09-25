@@ -31,6 +31,12 @@ void fn_8005050C(void* pOut);
  * `g3d/g3d_resanmtexsrt.cpp` `ResFile` accessors use (rule 2: declared in their owner's header). */
 void* fn_80052BC0(void* out, u32 v);
 void* fn_800534B0(void* out, u32 v);
+/* 0x80050508 - the 4-byte `blr` twin of fn_8005050C.  Its body does not touch r3, and the retail
+ * call sites use the pointer it hands back as the following call's first argument
+ * (`GXLoadTexMtxImm(fn_80050508(&mtx), id, ...)` in `src/g3d/g3d_gpu.cpp`, `GXLoadPosMtxImm(
+ * fn_80050508(&mtx), 0)` in `src/ef/ef_drawlinestrategy.cpp`), so the pointer-returning shape is the
+ * one the target's call sites require (added when `src/g3d/g3d_gpu.cpp` registered as the consumer). */
+void* fn_80050508(void* pOut);
 #ifdef __cplusplus
 }
 #endif

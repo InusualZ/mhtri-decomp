@@ -974,6 +974,16 @@ config.libs = [
             # 0x80022AAC-0x80022AC4; the boundaries are fn_8009A720 before (a different TU) and
             # gx/fn_8009AA78.c at 0x8009AA78 after.
             Object(NonMatching, "g3d/g3d_cpu.cpp"),           # 0x8009A748-0x8009AA78
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8009B140_fn_8009B140` - the nw4r g3d GPU-path texgen helpers (2 functions / 0x234 B,
+            # 0x8009B140..0x8009B374).  `g3d`/`.cpp` from the range's own `__FILE__` string
+            # (`.data` 0x80591900 = "g3d_gpu.cpp", the `pFile` argument of fn_8009B140's
+            # `nw4r::db::Panic` assert), the same class-1 evidence its sibling `g3d_cpu.cpp` used, so
+            # the lib is `g3d` and the file takes its evidenced TU name.  Section claim:
+            # `.text` 0x8009B140..0x8009B374, `extab` 0x80009A28..0x80009A38, `extabindex`
+            # 0x80022B18..0x80022B30 (gapless against gx/fn_8009ACE4.c below them).  The right edge
+            # 0x8009B374 is the discovery byte cap, not a proven TU end - the file's header records it.
+            Object(NonMatching, "g3d/g3d_gpu.cpp"),           # 0x8009B140-0x8009B374
         ],
     },
     {
