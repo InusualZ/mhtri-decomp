@@ -1985,7 +1985,10 @@ extern "C" u8 fn_802EED0C(SeMoveWork* work);
 extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 extern "C" void fn_800532DC(Mtx34* dst, Mtx34* src);
 extern "C" void fn_800E8498(Mtx34* mtx, s32 index);
-extern "C" u32 em_act_ck(_ENEMY_WORK* enemy, u8 a, u8 b);
+/* The target object references this callee by its C++ mangling
+ * (em_act_ck__FP11_ENEMY_WORKUcUc), so it is C++ - the extern "C" here was the
+ * defect (relocaudit). */
+u32 em_act_ck(_ENEMY_WORK* enemy, u8 a, u8 b);
 extern "C" void fn_800D84E8(_se_w* work);
 extern "C" void fn_800D8678(_se_w* work);
 extern "C" void fn_800D8730(_se_w* work);
