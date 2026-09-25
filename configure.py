@@ -509,6 +509,14 @@ config.libs = [
             # placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_80137604.cpp"),
             Object(NonMatching, "enemy/fn_80138074.c"),
+            # Registered from proposal/8013ACC4_fn_8013ACC4.cpp (a 0x8013ACC4 run discovery
+            # proposed): the enemy user-data command interpreter and its 0x100-entry dispatch
+            # table, 3 functions / 0x119C bytes.  Module `enemy` from the link band (both
+            # bracketing units are `enemy`) and from the code (`_ENEMY_WORK`, `fn_8013A900`);
+            # C++ because the range calls the mangled `ran_suu__Fl`.  No `__FILE__` string
+            # survives and the dump answers only `zz_` placeholders, so the file keeps the map's
+            # own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_8013ACC4.cpp"),
             Object(NonMatching, "enemy/fn_8013BE60.c"),
             # Registered from proposal/8013F764_fn_8013F764 (a 0x8013F764 run discovery proposed):
             # the enemy program interpreter's second half - the run driver, the 0x4E..0x6A stream
