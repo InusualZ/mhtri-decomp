@@ -100,17 +100,6 @@ void fn_80131DB4(struct _ENEMY_WORK* work);
 void fn_80131DF4(struct _ENEMY_WORK* work);
 void fn_80131E0C(struct _ENEMY_WORK* work);
 void fn_80131E74(struct _ENEMY_WORK* work);
-/* 0x8015D860..0x8015E804 - the action band between `enemy/fn_801550FC.cpp` and
- * `enemy/fn_8015E854.cpp` (both `enemy`); the unit above calls these, so they live here until the
- * band is registered. */
-void fn_8015D860(struct _ENEMY_WORK* self);
-void fn_8015D8F0(struct _ENEMY_WORK* self);
-void fn_8015D908(struct _ENEMY_WORK* self);
-void fn_8015D934(struct _ENEMY_WORK* self);
-void fn_8015DDB8(struct _ENEMY_WORK* self);
-void fn_8015DE00(struct _ENEMY_WORK* self);
-void fn_8015E05C(struct _ENEMY_WORK* self);
-void fn_8015E804(struct _ENEMY_WORK* self);
 void fn_80131E00(struct _ENEMY_WORK* work);
 f32 fn_8013032C(struct _ENEMY_WORK* work);
 u32 fn_80132198(struct _ENEMY_WORK* work);
@@ -166,7 +155,13 @@ u32 fn_80135600();
 #endif
 f32 fn_80135644(struct _ENEMY_WORK *self, void *tbl);
 f32 fn_801356A8(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
-s32 fn_80135748();
+/* 0x80135748 - the part-mask probe: r3 (`self`) and r4, which it narrows to u16 (`clrlwi r4,r4,16`)
+ * before ANDing it against the record's `flags_0x836`; the body's `neg`/`or`/`srwi 31` returns 1
+ * when any masked bit is set, so the result is a u32 0/1 and every call site compares it with
+ * `cmplwi`.  The old-style `s32 fn_80135748()` declaration could not carry the two arguments the
+ * landed callers pass (`enemy/fn_8014A1BC.c` and `enemy/fn_801DB8E0.cpp` both call it
+ * `(self, mask)`). */
+u32 fn_80135748(struct _ENEMY_WORK* self, u32 a);
 u32 fn_80135BC4(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801363F8(struct _ENEMY_WORK* work);
 /* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
@@ -250,7 +245,11 @@ void fn_80132264(struct _ENEMY_WORK* self);
  * body saves r28..r31 and calls `fn_80041E8C(&v, 0.0f, x, y)` with the record at r3). */
 void fn_80154CA4(struct _ENEMY_WORK* self);
 void fn_801545B8(void* v, u32 a, u32 b, u32 c);
-void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, s32 j, s32 k);
+/* The tenth argument is a POINTER, settled from the callee's own body (`auto_fn_80141B88_text.s`):
+ * it loads the outgoing stack word into r21 and hands it to `fn_80041E40` as the second argument
+ * when it is non-null, and the two callers pass a `VEC3*` (`enemy/fn_8015D860.cpp`'s `fn_8015DB68`)
+ * or null (`enemy/fn_80170600.cpp`'s `fn_801706B8`). */
+void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, void* j, s32 k);
 /* The unclaimed `.text` run 0x801926EC..0x801993E0 (a proposal of its own, registered by nobody
  * yet): its per-action entry points are what the dispatchers in `enemy/fn_801993E0.cpp` switch
  * over.  Added with that unit's registration (docs/plan.md 6.5 rule 2): the address band brackets as
