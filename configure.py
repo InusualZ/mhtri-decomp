@@ -509,6 +509,17 @@ config.libs = [
             # own named exports are get_camera_pos / get_camera_direction / get_current_view_mtx /
             # set_quake_sub, and the seam at 0x802B5C58 is a .sdata2 pool jump.
             Object(NonMatching, "camera/fn_802B5C58.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802BEAAC_fn_802BEAAC.cpp` (`.text` 0x802BEAAC..0x802C474C, 103 functions / 23712 B) -
+            # the map's light work block.  Module `light` and file `light.cpp` from the range's own
+            # real symbol names (`light_init__Fv`, `light_move__Fv`, `set_amblight__FUc8_GXColor`,
+            # `make_dir_light2__FlPQ34nw4r4math4VEC38_GXColorl`), all confirmed by dumpmap; no
+            # `__FILE__` string covers the range (brief section 2, class 2).  `.text` only: the range
+            # references `lbl_806BB7E0`/`lbl_806BC300`/`lbl_806BD360` (.bss) and shares pooled
+            # constants with its unclaimed neighbours, and the two `.ctors` words that point into the
+            # range (0x8056F380 -> fn_802BEEE0, 0x8056F384 -> fn_802C2530) stay with their auto units
+            # until those static objects are reconstructed.
+            Object(NonMatching, "light/light.cpp"),
         ],
     },
 

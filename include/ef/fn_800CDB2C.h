@@ -17,6 +17,13 @@ extern "C" {
  * `enemy/fn_801A9540.cpp`'s entry point.  Added with that unit's registration (rule 2: this
  * range owns the address). */
 u32 fn_800CF384(void);
+/* 0x800CF394 - the setter paired with it.  The declaration is `s8`, not the owner's own `u8`: every
+ * consumer (`light/light.cpp`'s fn_802BEDE8/fn_802BEE3C) narrows its argument with `extsb` before the
+ * call, which is what a signed parameter type emits, and `u8` does not (`light/light.cpp` measured
+ * 87.14 % on fn_802BEDE8 with `u8` and 100.00 % with `s8`).  Added with that registration (rule 2:
+ * the range owns the address).  The map's name carries no mangling, so the consumer-side declaration
+ * is C linkage; the owner's own definition (`src/ef/fn_800CDB2C.cpp:247`) is still C++ linkage. */
+void fn_800CF394(s8 value);
 u8  fn_800CF208(void);
 u32 fn_800CF280(void);
 
