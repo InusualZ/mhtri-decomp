@@ -1157,6 +1157,10 @@ RSO/runtime.c:
 DWCi/fn_805113B0.c:
 	.text       start:0x805113B0 end:0x805124F4
 
+homebutton/fn_80555374.cpp:
+	.text       start:0x80555374 end:0x8055C894
+	.ctors      start:0x8056F404 end:0x8056F410
+
 homebutton/keyboard_ui.cpp:
 	.text       start:0x8055C894 end:0x805632BC
 	.ctors      start:0x8056F410 end:0x8056F424

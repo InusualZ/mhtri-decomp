@@ -2063,6 +2063,21 @@ config.libs = [
             # config/RMHE08/hbm_data/symbols.txt carries the same class hierarchy.  Link neighbour
             # `tiHKBManager.cpp` is in `main`, so the unit takes the `main` lib and cflags_main; the
             # file is `homebutton/gui.cpp` (the namespace is `gui`).  Claims .text only.
+            # Registered once, at its final home (docs/plan.md 12): proposal `80555374_fn_80555374`
+            # - the 0x80555374-0x8055C894 band (213 functions / 29984 B) below the home-button
+            # software-keyboard slice.  Evidence class 3: no `__FILE__` string covers the range and
+            # the runtime dump answers only `zz_`/`FUN_` placeholders, but the range's `.data`/
+            # `.rodata` vocabulary is the same software-keyboard layout pool the registered
+            # `homebutton/keyboard_ui.cpp` above it documents (`P_SGNkey_01`..`12`,
+            # `B_SGNkey_close`, `T_SGN_pageNumber`, `P_BT_cancel`, `N_UP`/`N_DOWN`), and the band
+            # calls into that neighbour's range (fn_8055C968).  Language C++ from the band's own
+            # structure (adjustor thunks `subi r3, r3, 0x14/0x1C/0x24/0xC4/0xCC`, the deleting
+            # destructors' `__dl__FPv`, the `.ctors` initialisers), so the lib is `main` and the
+            # flags are cflags_main.  The seam is unproven (`--max-bytes` cut, no must-link anchor:
+            # `tudiscover.py at 0x80555374`), the right edge is the registered keyboard_ui.cpp; the
+            # file keeps the map's stem with a rule-7 deferral in the header, and claims .text plus
+            # its three `.ctors` words.
+            Object(NonMatching, "homebutton/fn_80555374.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8055C894_fn_8055C894.cpp` - the lower slice of the home-button software-keyboard band
             # (`.text` 0x8055C894-0x805632BC, 133 functions / 27176 B).  Evidence class 3: the range's
