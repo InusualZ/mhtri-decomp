@@ -669,6 +669,15 @@ config.libs = [
             # `cockpit.cpp` and `cockpit_quest.cpp`, this band's own entry points are the menu
             # library's - `get_menu_lsp_tbl`/`put_menu_cursor`/`GetMenuFontColor`/`ItemName`).
             Object(NonMatching, "menu/fn_802E4978.cpp"),
+            # Registered from proposal/8031A6C0_fn_8031A6C0.cpp (the `.text` 0x8031A6C0..0x8031EA8C
+            # run, 59 functions / 17356 B): the item/equipment selection screen.  Module `menu`,
+            # map stem as file name (brief section 2, class 4 - the band's own `.data` run carries
+            # only the *neighbouring* TU's `menu_infomation.cpp` string, never this range's).  The
+            # extab/extabindex runs are 0x80015F3C..0x80016074 / 0x80034D40..0x80034F14, contiguous
+            # with the previous proposal's, so the 0x8031A6C0 seam is a discovery size cap.  Same
+            # `cflags_menu` as its menu siblings.  This pass registers the range and measures it;
+            # the unit header names the bodies still to write.
+            Object(NonMatching, "menu/fn_8031A6C0.cpp"),
             # Registered from proposal/8031EA8C_fn_8031EA8C.cpp: the continuation of the
             # item/equipment selection-screen band above `menu/fn_8031A6C0.cpp` (`.text`
             # 0x8031EA8C..0x80324F7C, 67 functions / 25840 B; extab 0x80016074..0x8001621C and
