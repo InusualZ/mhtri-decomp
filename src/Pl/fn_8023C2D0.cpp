@@ -49,8 +49,18 @@
  * main.dol sha1 5324C567... and 403822 differing bytes against the original (first at 0x8023101F);
  * `Object(NonMatching, ...)` -> sha1 BF485073... (the original) with `ninja build/RMHE08/ok` green.
  * The sibling `Pl/fn_80241558.cpp` never meets this because its `.data` starts at the 8-aligned
- * 0x805C3D20.  The fix is a tool or registration decision (dtk's per-section alignment, or the .data
- * boundary at 0x805C34D4), not a source one; it is filed in this claim's outbox.
+ * 0x805C3D20.  The fix is a tool or registration decision, not a source one, and the lever is one
+ * field: the `.data` *section header's* `sh_addralign` (8 from MWCC, only 4 allowed by the claim's
+ * start address).  MWCC emits 8 for every file - measured across eight compilers (GC/1.0 … Wii/1.7)
+ * and seven flag spellings (`-pool off`, `-align mac68k4byte`, `-sdata 0`, …), none gives 4 - and the
+ * `.comment` symbol-table alignment (which also says 8 here) is *not* what the linker uses: a scratch
+ * copy of this object with `sh_addralign` alone set to 4 links to sha1 BF485073... with 0 differing
+ * bytes, i.e. the flip is byte-exact once that field is normalised.  The same one field is the whole
+ * blocker for `Pl/fn_80230FBC.cpp` and `enemy/fn_80165FC8.cpp`, the tree's other two 4-mod-8 `.data`
+ * claims.
+ * Resolved: `tools/elf/objalign.py` (landed e242dfecf) lowers a section's `sh_addralign` to what its
+ * claim address allows, is chained into every MWCC rule and is a no-op elsewhere; with it this unit
+ * links in place and the flip to `Matching` is green (c1ed8e946).  See docs/matching.md section 55.
  */
 
 #include "types.h"
