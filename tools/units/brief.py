@@ -671,9 +671,33 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
                      "without regressing anything.")
     if b["data_queue"]:
         lines.append("")
-        lines.append("**Data this unit may own** (measured second pass - propose, do not claim): "
+        lines.append("**Data this unit may own** (measured second pass): "
                      + ", ".join("%s 0x%X-0x%X (%s)" % (e.get("section"), e.get("start", 0), e.get("end", 0),
-                                                        e.get("verdict", "unmeasured")) for e in b["data_queue"]))
+                                                        e.get("verdict", "unmeasured")) for e in b["data_queue"])
+                     + " - claim what your object *emits* (and only while this unit is its sole referencer); "
+                       "propose the rest.")
+    lines.append("")
+    lines.append("### 5d · Data (measure it, then claim what your object emits)")
+    lines.append("")
+    lines.append("objdiff's unit score does not count a wrong data section, so measure it: "
+                 "`python tools/units/datagap.py --unit <unit>` prints the per-section gap between the target "
+                 "object and yours (`build/RMHE08/obj/...o` vs `build/RMHE08/src/...o`). Record it before and "
+                 "after your work.")
+    lines.append("")
+    lines.append("* `ours-extra` - your source defines a table or constant the original TU did not own - is the "
+                 "usual defect. A pooled constant is fixed by declaring the map's symbol `extern` and using it "
+                 "as a load operand, **never** by defining it (playbook 29/58: a definition makes MWCC emit "
+                 "both the named constant and its pool copy, so `.sdata2` grows instead of clearing).")
+    lines.append("* Claim the data your object **emits**: exact `start:`/`end:` in `splits.txt`, then "
+                 "`rm -f build/RMHE08/config.json` and rebuild - a claim edit that never re-splits links the "
+                 "old object and reports a false green. `.data`, `.sdata`, `.ctors` and `.dtors` claims are "
+                 "safe; **a partial `.sdata2` claim breaks the link** (playbook 23).")
+    lines.append("* A pool entry is claimable **only while your unit is its sole referencer** (playbook 58). A "
+                 "private entry is exactly what the claim is for - claim it, flip the unit to "
+                 "`Object(Matching)` and say so; a shared entry can be neither claimed nor named in source, so "
+                 "write the measured blocker in the unit header and report it.")
+    lines.append("* Finish with the numbers: the unit's sections and bytes before/after, and whether "
+                 "`python tools/units/datagap.py --flip-blockers` lists this unit.")
     lines.append("")
     lines.append("## 6 · The rules")
     lines.append("")
