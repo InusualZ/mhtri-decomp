@@ -56,6 +56,12 @@ void fn_8012A8F8(PlBox* box);
  * vector).  Its owner is in the unclaimed band after this unit, so the shape here is that body's. */
 void fn_802977E4(LandData* land);
 
+/* 0x80291B08 - the fixed-layer ground query: the owner's own definition (`fn_8028F66C.cpp:262`) takes
+ * the player work at r3 and forwards the caller's `LandData`/out/kind.  The AI band reads the ground
+ * under its own work record rather than a player's, so its call site casts the record it holds.  Added
+ * with `ai/fn_802C474C.cpp`, the first consumer outside the owner. */
+s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
+
 #ifdef __cplusplus
 }
 #endif

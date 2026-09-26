@@ -473,6 +473,7 @@ config.libs = [
         "objects": [
                         Object(Matching, "ai/fn_802D0DCC.c"),
                         Object(NonMatching, "ai/fn_802CC794.cpp"),
+                        Object(NonMatching, "ai/fn_802C474C.cpp"),
         ],
     },
 
