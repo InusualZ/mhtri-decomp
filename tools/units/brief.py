@@ -508,6 +508,33 @@ def build(main: str, wt: str, unit: str, task: str | None, assume_claim: bool = 
     }
 
 
+def _cpp_step(lines: list[str]) -> None:
+    """Append section 5c (the C++ class rule) - shared by both brief renderers.
+
+    Owner finding, 2026-09-26: a lane reconstructed a C++ class's methods as free functions taking an explicit
+    `self` (403 `self->` uses in Network/fn_8041A87C.cpp) although the target's own string pool spells the two
+    class names. The *shape* is part of the match: MWCC emits retail's canonical `lwz r12,0(r3)` /
+    `lwz r12,<slot>(r12)` dispatch only for a genuine `virtual`, and a member function's `this` and mangling are
+    what the map's names and objdiff pairing expect.
+    """
+    lines.append("")
+    lines.append("### 5c · If the evidence says C++, write the class - not a struct with `self`")
+    lines.append("")
+    lines.append("A `__FILE__` string naming `Class::method`, a mangled definition, the canonical "
+                 "`lwz r12,0(r3)`/`lwz r12,<slot>(r12)` dispatch, an adjustor thunk (`subi r3,r3,0x14`), a "
+                 "ctor/dtor pair or a string pool spelling `Class::` all say the range is a class's methods: "
+                 "write **member functions on the class**, with the layout annotations (sizes, field offsets) "
+                 "kept on the class's fields.")
+    lines.append("* MWCC emits retail's canonical virtual dispatch only for a genuine `virtual`; a struct of "
+                 "function pointers stages the table through a temporary and loses the function's score.")
+    lines.append("* A member function's `this` arrives in r3 and its name mangles the way the map spells it - a "
+                 "free function with an explicit `self` gets neither.")
+    lines.append("* If a function measures worse in the class form, keep the better-scoring shape and record "
+                 "both numbers in the unit header - but never leave `self` style in place because it was "
+                 "written first.")
+    lines.append("")
+
+
 def _data_step(lines: list[str]) -> None:
     """Append section 5d (the data step) - shared by both brief renderers.
 
@@ -709,6 +736,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
                                                         e.get("verdict", "unmeasured")) for e in b["data_queue"])
                      + " - claim what your object *emits* (and only while this unit is its sole referencer); "
                        "propose the rest.")
+    _cpp_step(lines)
     _data_step(lines)
     lines.append("")
     lines.append("## 6 · The rules")
@@ -1070,6 +1098,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
         lines.append("--measure <symbol>`. A function that resists is a residual to record, not a reason to stop -")
         lines.append("**apply the best-scoring variant even if it is not a full match** and write what still differs")
         lines.append("into the unit's file header.")
+    _cpp_step(lines)
     _data_step(lines)
     lines.append("")
     lines.append("## 6 · The rules")
