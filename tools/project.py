@@ -689,6 +689,33 @@ def generate_build_ninja(
     mwcc_sjis_extab_cmd = f'{CHAIN}{mwcc_sjis_cmd} && {dtk} extab clean --padding "$extab_padding" $out $out'
     mwcc_sjis_extab_implicit: List[Optional[Path]] = [*mwcc_sjis_implicit, dtk]
 
+    # Section-alignment normalisation, appended to every MWCC rule (after any extab
+    # post-processing).  MWCC emits sh_addralign = 8 for every section, but a unit whose
+    # claimed section start is only 4-mod-8 cannot be linked there: mwld rounds the
+    # section up to the next 8-byte boundary and shifts every later section with it, so
+    # the object stays byte-identical and the DOL hash still breaks.  dtk's own
+    # `dol split` writes the value the address can honour into the target objects it
+    # synthesises - measured over every registered unit that is exactly
+    # min(8, lowbit(section start)), with no exceptions - and objalign applies the same
+    # rule to the object MWCC just wrote.  It is a strict lowering, so it is a no-op for
+    # every unit whose section starts are already 8-aligned.
+    # Evidence: tools/elf/objalign.py (selftest) and docs/matching.md.
+    objalign = Path("tools") / "elf" / "objalign.py"
+    objalign_cmd = f" && $python {objalign} $out"
+    # The two base rules have no chain of their own, so they need CHAIN (a `cmd /c` on
+    # Windows) to make the `&&` meaningful; the extab rules already start with it.
+    mwcc_cmd = f"{CHAIN}{mwcc_cmd}{objalign_cmd}"
+    mwcc_sjis_cmd = f"{CHAIN}{mwcc_sjis_cmd}{objalign_cmd}"
+    mwcc_extab_cmd += objalign_cmd
+    mwcc_sjis_extab_cmd += objalign_cmd
+    for mwcc_implicit_list in (
+        mwcc_implicit,
+        mwcc_sjis_implicit,
+        mwcc_extab_implicit,
+        mwcc_sjis_extab_implicit,
+    ):
+        mwcc_implicit_list.append(objalign)
+
     # MWLD
     mwld = compiler_path / "mwldeppc.exe"
     mwld_cmd = f"{wrapper_cmd}{mwld} $ldflags -o $out @$out.rsp"
