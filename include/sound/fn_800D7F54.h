@@ -82,6 +82,14 @@ s32 SE_Code_Make(s32 low_code, s16 low, s32 mid_code, s16 span);
  * defined without `extern "C"` in `src/sound/fn_800D7F54.cpp`.  Added for
  * `enemy/fn_801BD6C0.cpp` (rule 2). */
 void shell_se_req(_se_w* work, nw4r::math::VEC3* pos, u8 id, u32 arg);
+/* 0x800DC8C0 - the electric-effect SE request (`em015_denki_eft_se_req__FP5_se_wPQ34nw4r4math4VEC3Uc`),
+ * defined without `extern "C"` in `src/sound/fn_800D7F54.cpp:1766`.  Added with `ef/eft035.cpp`
+ * (rule 2: this TU owns the address). */
+void em015_denki_eft_se_req(_se_w* work, nw4r::math::VEC3* pos, u8 kind);
+/* 0x800D9EA8 - the position-seated SE request (`se_req_pos_ps__FP5_se_wllPQ34nw4r4math4VEC3`),
+ * defined without `extern "C"` in the same file.  Added with `ef/eft035.cpp`, whose effect setters
+ * request the family's SE through it (rule 2: this TU owns the address). */
+SeSlot* se_req_pos_ps(_se_w* work, long id, long param, nw4r::math::VEC3* pos);
 #endif
 
 

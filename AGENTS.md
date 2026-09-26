@@ -55,6 +55,32 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
 
+**Owner round 2026-09-26 (late): branch cleanup + the unlanded-branch guard.** Production is HALTED by the
+owner until every non-main branch is resolved. Done so far: (1) **the guard** - `queue.py` refuses to claim
+while any branch holds content `main` lacks (`strictly_newer`; narrow, so the stale pads and comment wording a
+landed branch leaves behind do not block) - committed `e4341d71c` with AGENTS.md (operational mode) and
+`docs/plan.md` 7.23, 117 selftest checks; (2) **the audit and the sweep** - 23 local branches down to 2
+unlanded. Deleted after the line-superset test: landed content (`8026ffbc`, `802ebed8`, `80382310`, `803d3ce8`,
+`80423e74`, `80474cb0`, `804c1760`, `805113b0`, `80555374`, `802e7408`-class), stale (`8029f3c8`, `802a6624`,
+`802c474c`, `802c5d10`, `802d0f34`, `802d44f4`, `802ddc04`, `802e7408`, `80387844`, `80429b94`,
+`tools/linkage-repair`, `tools/queue-spread-claims`). Notable: `802e7408`'s per-file pragma is superseded by
+`cflags_hud`'s `-opt nopeephole`; `80429b94`'s `.data` line and `linkage-repair`'s `extern "C"` lines are in
+main already; `8029f3c8`/`802a6624`/`802c*/`802d*` differ only in older pad names and older header prose.
+`backup/pre-upstream-merge` is a **tag**, not a branch (kept). (3) **`menu/fn_802E4978.cpp` was a whole unlanded
+unit** (511 source + 186 unit header + 115 unsplit-header lines): my own apply was refused for 54 rule-2
+violations in `include/unsplit/menu.h`, so a `fixer` lane (`7521a53c-92db-46d5-88ec-dc58dbdafcde`, worktree
+`.ws-802e4978-...`) is moving each declaration to its owner's header. (4) `homebutton/fn_80555374.cpp`
+(0x80555374-0x8055C894, 86 of 213 bodies, 55 byte-identical) landed as `868096c2b`. (5) the EF lane
+`worker/802f140c-...` committed `src/ef/eft035.cpp` and is still running; it lands next.
+**INCIDENT + RECOVERY:** `orig/RMHE08/sys/main.dol` and `orig/RMHE08/files/*.sel` were **gone from MAIN**
+(gitignored, so git cannot restore them) and the build died with `orig/RMHE08/sys/main.dol not found`; the
+SHA-1 is back to `bf4850739478caaedfe675949eb7c28595a7fde9`, restored from `../orig-backup/RMHE08/`. AGENTS.md
+non-negotiable 1 now carries the rule (never run a repo-wide clean here, never let a subagent either).
+`build/RMHE08` was wiped and rebuilt green.**
+**Next:** land the fixer's `802e4978` and the EF lane's unit, delete those two branches, then `queue.py list`
+must say "none unlanded" - that is the owner's condition for resuming production.
+
+
    content: pull it out before `git add AGENTS.md`, restore it afterwards, and commit every *other* AGENTS.md
    edit normally. Use the tool, not `sed`: `python tools/agents/localonly.py pull` before staging and
    `python tools/agents/localonly.py push` after the commit (skill: `agents-md-local-only`). Verify with

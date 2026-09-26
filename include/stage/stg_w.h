@@ -29,6 +29,11 @@ void fn_802AEC00(void);
 
 #ifdef __cplusplus
 }
+
+/* 0x802AFC84 - the current area number, a C++ free function (the map spells it `get_now_areano__Fv`),
+ * so the declaration sits at C++ scope (rule 9).  Every effect setter gates its spawn on it; added
+ * with `ef/eft035.cpp` (rule 2: this range owns the address). */
+u8 get_now_areano(void);
 #endif
 
 #endif /* MHTRI_STAGE_STG_W_H */

@@ -64,6 +64,13 @@ u16 ran_suu(s32 index);
 /* 0x800CF218 - the play-mode byte `PlayMode_ck__Fv`; the consumers use `u8` (values < 7).  Added
  * with `Pl/fn_80229ECC.cpp`, which gates on `(u8)PlayMode_ck() == 3`. */
 u8 PlayMode_ck(void);
+
+/* 0x800D3058 - the g3d work-handle release `push_g3d_wk__FP9_g3d_work`: the map name carries an
+ * argument list, so it is a C++ free function and the declaration sits at C++ scope (rule 9).  The
+ * owner uses the same spelling internally (`src/ef/fn_800CDB2C.cpp`).  Added with
+ * `ef/eft035.cpp`, whose release paths hand it the pooled `_g3d_work*` handles. */
+struct _g3d_work;
+void push_g3d_wk(struct _g3d_work* work);
 #endif
 
 #endif /* MHTRI_EF_FN_800CDB2C_H */
