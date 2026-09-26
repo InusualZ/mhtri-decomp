@@ -833,6 +833,11 @@ lobby/fn_80212810.cpp:
 	extabindex  start:0x8002DD38 end:0x8002E1A0
 	.text       start:0x80212810 end:0x80219260
 
+lobby/fn_80219260.cpp:
+	extab       start:0x80011724 end:0x800118CC
+	extabindex  start:0x8002E1A0 end:0x8002E41C
+	.text       start:0x80219260 end:0x8021E1EC
+
 lobby/fn_8021E1EC.cpp:
 	extab       start:0x800118CC end:0x80011B34
 	extabindex  start:0x8002E41C end:0x8002E7B8
