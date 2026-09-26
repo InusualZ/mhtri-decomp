@@ -717,6 +717,16 @@ config.libs = [
             # `rotVecY__FPQ34nw4r4math4VEC3Ul`).  No `__FILE__` string survives and the runtime dump
             # answers only `zz_` placeholders, so the file keeps the map's own stem (see header).
             Object(NonMatching, "enemy/fn_801B7020.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/801CA004_fn_801CA004.cpp: the enemy action/state band, 47 functions /
+            # 0x2BC0 bytes (0x801CA004..0x801CCBC4), plus the extab run 0x8000FDFC..0x8000FF4C and
+            # the extabindex run 0x8002BBE4..0x8002BDDC its 42 framed functions carry.  Module
+            # `enemy` from the link band (both bracketing registered units are `enemy/*`) and from
+            # the code (every function takes the shared `_ENEMY_WORK`); C++ because the range's
+            # callees are mangled (`getTevKColor__6MHchar...`, `__nw__FUl`).  No `__FILE__` string
+            # is reachable and the dump answers only `zz_` placeholders, so the file keeps the
+            # map's own stem (see the unit header).
+            Object(NonMatching, "enemy/fn_801CA004.cpp"),
             # Registered from proposal/801A4504_fn_801A4504.cpp (a 0x801A4504 run discovery proposed):
             # the enemy per-motion action dispatcher and its four helpers, 5 functions / 0x503C bytes
             # plus the extab run 0x8000F304..0x8000F324 and the extabindex run 0x8002AB70..0x8002ABA0.
