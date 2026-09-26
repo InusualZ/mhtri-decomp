@@ -1784,6 +1784,15 @@ config.libs = [
             # the sibling `NetworkWiiMediator.c` is byte-identical at `-O4,p`.
             Object(NonMatching, "Network/fn_803D3CE8.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8041A87C_fn_8041A87C.cpp` (`.text` 0x8041A87C..0x8041DF10, 71 functions / 13972 B).
+            # Per-object flags (brief 8.2), instruction-level evidence: retail *calls* the small
+            # file-static helpers from the big state machines - fn_8041DCDC's target body is
+            # `lwz r3,0x6634; lwz r4,0x6638; bl fn_8041C9D8; extsb` (72 B) while `-inline auto` folds
+            # the 128-byte callee into it (156 B), and fn_8041DD58/fn_8041CA94 grow the same way.
+            # With `-inline noauto` the sizes land on the target and the unit's .text gap shrinks.
+            Object(NonMatching, "Network/fn_8041A87C.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
         ],
     },
     {
