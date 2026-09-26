@@ -1831,8 +1831,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
 
     def gate(name: str, args: list[str]) -> bool:
         p = run(args, main)
-        tail = ((p.stdout or "") + (p.stderr or "")).strip().splitlines()
-        check(name + " (exit %d)" % p.returncode, p.returncode == 0, tail[-1] if tail else "")
+        check(name + " (exit %d)" % p.returncode, p.returncode == 0, command_detail(p))
         return p.returncode == 0
 
     # 5. the build, with the proof that the `ok` we read is this run's
