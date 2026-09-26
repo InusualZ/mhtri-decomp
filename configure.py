@@ -645,6 +645,13 @@ config.libs = [
             # No `__FILE__` string survives in the range and the dump answers only `zz_`
             # placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_80182D5C.cpp"),
+            # Registered from proposal/8018B3B8_fn_8018B3B8.cpp (the 0x8018B3B8 run discovery
+            # proposed; 24 functions / 0x61E0 bytes).  Module `enemy` from the link band (both
+            # bracketing registered units are `enemy/*`) and from the code; C++ because the range
+            # reaches mangled callees.  No `__FILE__` string survives in the range and the dump
+            # answers only `zz_` placeholders, so the file keeps the map's own stem (see the unit
+            # header).
+            Object(NonMatching, "enemy/fn_8018B3B8.cpp"),
             # Registered from proposal/80191598_fn_80191598.cpp (a 0x80191598 run discovery
             # proposed): the enemy aim/action group the per-enemy class tables at 0x805AA960..
             # 0x805AAA60 hold, 26 functions / 0x1154 bytes plus its extab/extabindex run.
