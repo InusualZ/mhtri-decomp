@@ -629,6 +629,17 @@ config.libs = [
             # band (the unit below ends exactly at this range's start) and from the code (`_ENEMY_WORK`,
             # the enemy action callees).  The seam is unproven - see the unit header.
             Object(NonMatching, "enemy/fn_80178378.cpp"),
+            # Registered from proposal/80181C88_fn_80181C88.cpp (the 0x80181C88 run discovery
+            # proposed): the enemy MHchar material/step band 0x80181C88..0x80182D5C, 21 functions /
+            # 0x10D4 bytes, plus the 16 extab/extabindex entries its functions carry.  Module
+            # `enemy` from the link band (fn_80178378.cpp ends at this range's start, fn_80182D5C.cpp
+            # starts at its end) and from the code (`_ENEMY_WORK`, `em_parts_damage_level_get`,
+            # `get_em_chg_scale`, the MHchar TEV setters).  C++ because the range reaches MHchar
+            # members through their real signatures.  No `__FILE__` string survives in the range
+            # (the only `enemy_control.cpp` literal is referenced from the already-registered
+            # enemy_control band, not here) and the dump answers only `zz_` placeholders, so the
+            # file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_80181C88.cpp"),
             Object(NonMatching, "enemy/fn_80177608.cpp"),
             # proposal/80177890_fn_80177890: the enemy motion-state update set (0x80177890..0x80178128,
             # 12 functions). The neighbour TU's dispatch evidence pins the seam; cflags are this lib's.

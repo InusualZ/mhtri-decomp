@@ -9,6 +9,10 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+/* The owner header for the 0x8012E968 predicates (`enemy/fn_8012E968.cpp`) owns `fn_8012EC60`'s
+ * argument-accepting spelling; the band re-exports it so the existing consumers that include this
+ * header (rule 2: a declaration belongs with its owner's TU). */
+#include "enemy/fn_8012E968.h"
 
 struct _ENEMY_WORK;
 struct EnemyData;
@@ -23,7 +27,6 @@ u8* fn_8014260C(u8 id);
 void CancelFade(struct _ENEMY_WORK *self);
 u32 em_frame_check__FP11_ENEMY_WORKUsff(struct _ENEMY_WORK *self, u16 a, f32 b, f32 c);
 u32 em_sleep_ck__FP11_ENEMY_WORKUc(struct _ENEMY_WORK* enemy, u8 kind);
-u32 fn_8012EC60(void);
 u32 fn_8012ECF0(void);
 void fn_8012F5B8(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
 /* 0x8012F504 - the five-argument motion setter `fn_8012F5B8` tail-calls; moved here from

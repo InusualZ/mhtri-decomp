@@ -63,6 +63,13 @@ void fn_8012A658(struct _ENEMY_WORK* work, s32 arg1);
 void fn_8012B64C(struct _ENEMY_WORK* work);
 
 void fn_801251D0(u32 a, u32 b, u32 c);
+u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
+u8 fn_80129DB8(struct _ENEMY_WORK* self);
+u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
+u32 fn_8012A204(struct _ENEMY_WORK* self);
+void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
+void fn_80128B80(struct _ENEMY_WORK* self);
+
 /* 0x801251D8 - r3, r4 and r5 (its body does `clrlwi r5,r5,24` then tail-calls 0x80124C5C).
  * `enemy/fn_8014A1BC.c` calls it with three arguments (the first is the table, not `self`);
  * `enemy/fn_801550FC.cpp` calls it with four (`self`, table, selector, value), and the target sets

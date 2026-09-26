@@ -12,6 +12,16 @@
 
 struct _ENEMY_WORK;
 
+/* The `ResUserDataAc` record `fn_8013A654` runs on (the owner spells the type `ResUserDataAc`): a
+ * work pointer at +0x04 and a flag word at +0x08 (settled from `fn_8013A654`'s own body, which does
+ * `lwz r31,4(r3)` and reads r31's +0x110/+0x13C).  `enemy/fn_801823C0` clears the work's part state
+ * through it.  size: 0x0C */
+struct EmUserData {
+    /* +0x00 */ u8 pad_0x00[4];
+    /* +0x04 */ struct _ENEMY_WORK* work_0x04;
+    /* +0x08 */ u32 flags_0x08;
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
