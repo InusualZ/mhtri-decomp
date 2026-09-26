@@ -1,0 +1,32 @@
+/* The enemy-side consumer of `Pl/fn_80262940.cpp`'s action dispatcher.
+ *
+ * `fn_80267270` (`.text` 0x80267270, inside that unit's range 0x80262940..0x802693C4) was declared
+ * in three wrong places before this header existed (docs/plan.md 6.5 rule 2): `enemy/fn_801B0010.cpp`
+ * carried a local copy, `include/unsplit/Pl.h` - a fallback band - carried another, and
+ * `include/Pl/fn_8025F088.h` carries a third, differently-typed one whose range does not cover the
+ * address.  This is the owner's header; the signature is the owner's own definition
+ * (`src/Pl/fn_80262940.cpp:478`, `void (_PLW*, u32, s32, u16)`), and the return is `void` there.
+ *
+ * The copy in `Pl/fn_8025F088.h` is left alone: it is MAIN's pre-existing boundary artefact from the
+ * unit that registered first, it is only reachable from that unit and its own consumers, and folding
+ * it into this header is a change to another lane's file (recorded in this unit's outbox).
+ */
+#ifndef MHTRI_PL_FN_80262940_H
+#define MHTRI_PL_FN_80262940_H
+
+#include "types.h"
+
+struct _PLW;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* r3 the player work, r4 the action, r5/r6 the two scalars the owner's body stores beside it. */
+void fn_80267270(struct _PLW* self, u32 action, s32 a, u16 b);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_PL_FN_80262940_H */

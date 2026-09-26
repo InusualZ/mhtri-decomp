@@ -536,12 +536,15 @@ config.libs = [
 
     {
         # New module, registered from proposal/8029F3C8_body_set__FP7_BODY_WP10_BODY_DATAUcUlUc: the
-        # item menu's data layer (`.text` 0x8029F3C8..0x802A5444, 91 functions, 0x607C B; extab
-        # 0x8001360C..0x800137A4 and extabindex 0x80030F90..0x800311F4 for the 51 framed functions in
-        # that range).  Module `menu` and file name `menu_item.cpp` come from the range's own
-        # `__FILE__` string (`.data` 0x805CDFC8, 0xE B = "menu_item.cpp"; the dump's local symbol for it
-        # is `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. it is emitted by 0x802A22A4, a function of this
-        # range).  cflags_main: the range keeps `bl`s to its tiny same-file helpers
+        # item menu (`.text` 0x8029F3C8..0x802A6624, 99 functions, 0x725C B; extab
+        # 0x8001360C..0x800137D4 and extabindex 0x80030F90..0x8003123C for the 57 framed functions in
+        # that range - both runs are exactly the gap between the bracketing auto objects).  Module
+        # `menu` and file name `menu_item.cpp` come from the range's own `__FILE__` string
+        # (`.data` 0x805CDFC8, 0xE B = "menu_item.cpp"; the dump's local symbol for it is
+        # `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. it is emitted by 0x802A22A4, a function of this
+        # range, and every `nw4r::db::Panic` assert of the range passes it - including the
+        # 0x802A5444..0x802A6624 half the 2026-09-26 fold brought in).  cflags_main: the range keeps
+        # `bl`s to its tiny same-file helpers
         # (`GetItemData` from `fn_8029F704`/`fn_8029F73C`, `hit_flag_set` from `fn_8029F4C4`), which is
         # cflags_main's `-inline noauto`, and it carries 0 record-form instructions like the stage and
         # Pl bands (the peephole is not proven off here - `infer.py` reads absence as no evidence).
@@ -551,6 +554,14 @@ config.libs = [
         "progress_category": "game",
         "objects": [
             Object(NonMatching, "menu/menu_item.cpp"),
+            # The continuation of the menu band: proposal `802A6624_fn_802A6624.cpp` (`.text`
+            # 0x802A6624..0x802AD9C0, 139 functions / 29596 B; extab 0x800137D4..0x80013B0C and
+            # extabindex 0x8003123C..0x80031710).  Module `menu` from the left neighbour and from the
+            # range's own entry points (`put_message`, `put_frame_dialog`, `GetMenuFontColor`); no
+            # `__FILE__` string covers the range and the dump answers `zz_` for most of it, so the file
+            # keeps the map's stem (see its header).  Same `cflags_menu` as `menu_item.cpp`: the band
+            # carries 0 record-form instructions and keeps its tiny same-file `bl`s.
+            Object(NonMatching, "menu/fn_802A6624.cpp"),
         ],
     },
 
@@ -756,6 +767,17 @@ config.libs = [
             # No `__FILE__` string is reachable from the range and the runtime dump answers only
             # `zz_` placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_801CCBC4.cpp"),
+            # Registered from proposal/801B0010_fn_801B0010.cpp (a 0x801B0010 run discovery
+            # proposed): the em030 (enemy #30) program unit, 60 functions / 0x4448 bytes plus the
+            # extab/extabindex entries its 45 framed functions carry.  Module `enemy` from the link
+            # band (both bracketing units are `enemy`) and from the range's own data: the `.data`
+            # table `em030_prog_tbl` (0x805B0FD0) lists this range's entry points, and two of the
+            # range's symbols carry real runtime-dump names (`em030_condition_ck`,
+            # `em030_homing_range_ck`).  C++ because the range reaches mangled callees through
+            # their real signatures.  No `__FILE__` string survives in the range and the dump
+            # answers only `zz_` placeholders for the other 58 rows, so the file keeps the map's
+            # own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801B0010.cpp"),
             # Registered from proposal/801D428C_fn_801D428C.cpp (the 0x801D428C run discovery
             # proposed): the enemy action band 0x801D428C..0x801D80EC, 42 functions / 0x3E60 bytes,
             # plus the 34 extab/extabindex entries its framed functions carry.  Module `enemy` from

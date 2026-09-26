@@ -120,7 +120,6 @@ void fn_80133C30(struct _ENEMY_WORK* work);
 void fn_80133C3C(struct _ENEMY_WORK *self);
 u32 fn_80133C50(struct _ENEMY_WORK *self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
-u16 fn_80133DB0();
 void fn_80133E3C(struct _ENEMY_WORK *self, s32 a, f32 b, f32 c);
 /* 0x80133F4C - r3 (`self`), f1, f2 and r4 (the callee's body does `fmr f30,f1` / `fmr f31,f2` /
  * `mr r31,r4`), so the real signature is four-argument; `enemy/fn_8014BDF8` (C) leaves r4 as the
@@ -222,6 +221,10 @@ void fn_80170E78(struct _ENEMY_WORK* self);
 void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+/* 0x80154784 - the enemy band 0x801545B8..0x80154CA4's checker, added by `enemy/fn_801B0010.cpp`
+ * (rule 2: both bracketing registered units are `enemy`, so this band header is its home until the
+ * band is registered).  r3 the work record, the answer in r3 (compared against 1). */
+u32 fn_80154784(struct _ENEMY_WORK* work);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);
@@ -294,9 +297,6 @@ void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
 /* Added with `enemy/fn_801A9540.cpp`'s registration (rule 2): the enemy-band callees that
  * range's state machines call and no registered unit owns.  Their bracketing registered units
  * both name `enemy`, so this band header is their home. */
-/* 0x801B0010 - r3 the area byte; the enemy's own area predicate, owned by the still-unregistered
- * proposal/801B0010 range, so the band header carries it (rule 2). */
-u32 fn_801B0010(u8 area);
 void fn_801A9748(struct _ENEMY_WORK* self);
 void fn_801A98F8(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
