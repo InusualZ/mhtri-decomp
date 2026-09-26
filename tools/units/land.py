@@ -824,9 +824,12 @@ def band_ownership_warnings(main: str, base: str | None) -> list[str]:
     # name too, so the rule-9-correct spelling is not a blind spot; the message names the full symbol.
     newly_bases: dict[str, list[str]] = {}
     for name in newly:
-        base = name.split("__", 1)[0]
-        if base != name and sl.RULE9_MANGLED_RE.match(name):
-            newly_bases.setdefault(base, []).append(name)
+        # NOTE: this must not be called `base` - that is this function's own parameter (the batch's
+        # base ref, used further down for `git show`), and the earlier shadowing made every
+        # pre-existing band-header declaration look newly added (46 spurious warnings on one fold).
+        symbol_stem = name.split("__", 1)[0]
+        if symbol_stem != name and sl.RULE9_MANGLED_RE.match(name):
+            newly_bases.setdefault(symbol_stem, []).append(name)
 
     warnings: list[str] = []
     if newly:
