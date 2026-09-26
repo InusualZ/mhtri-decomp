@@ -17,6 +17,16 @@ extern "C" {
  * `u8` where the definition's own return is `u32`. */
 u8 fn_802B0598(u8 id);
 
+/* 0x802B0688 - the stage resource query the light unit's `fn_802BEE3C` hands a block to; added with
+ * the `light/light.cpp` registration (rule 2: this range owns the address).  The owner defines it
+ * `extern "C" u32 fn_802B0688(void* self)` at `stage/stg_w.cpp:275`. */
+u32 fn_802B0688(void* self);
+
+/* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `fn_802C2314` calls; added with that
+ * registration (rule 2: this range owns the address).  The owner's body does not exist yet, so the
+ * signature is the call site's view: no arguments, no result. */
+void fn_802AEC00(void);
+
 #ifdef __cplusplus
 }
 #endif
