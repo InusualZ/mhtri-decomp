@@ -101,6 +101,37 @@ Traps that have cost this project days:
 * `ninja build/RMHE08/ok` is order-only and can print `main.dol: OK` **even when a compile failed**. Check the
   `FAILED` count first; treat that as the primary signal.
 
+## Data (match it *with* the code, not after it)
+
+A unit is not finished when its `.text` matches - the object has to be the target's object, and the data
+sections are part of it. objdiff's unit score does **not** count a wrong data section (an extra section simply
+is not measured), so measure it yourself before you report.
+
+* **Measure**: `python tools/units/datagap.py --unit <unit>` compares `build/RMHE08/obj/<unit>.o` (target)
+  with `build/RMHE08/src/<unit>.o` (yours), section by section. Record it before and after your work.
+* **`ours-extra` is the usual defect**: your source defines a table or constant the original TU did not own.
+  For a pooled constant the fix is playbook 29/58 - declare the map's symbol `extern` and use it as the load
+  operand, **never** define it (a definition makes MWCC emit both the named constant and its pool copy, so
+  `.sdata2` grows instead of clearing). For a table your code builds, restructure the source so the compiler
+  stops emitting it.
+* **Claim the data your object emits**: exact `start:`/`end:` lines in `splits.txt`, then `rm -f
+  build/RMHE08/config.json` and rebuild - a claim edit that never re-splits links the old object and reports a
+  false green. `.data`, `.sdata`, `.ctors` and `.dtors` claims are safe; **a partial `.sdata2` claim breaks the
+  link** (playbook 23), so claim `.sdata2` only when your object emits no pool of its own.
+* **A pool entry is claimable only while your unit is its sole referencer** (playbook 58). Check who else loads
+  the address (`grep -l` the address in the target objects, or ask `datagap.py`'s sibling units): a *private*
+  entry is exactly what the claim is for, and it is what lets you flip the unit; a *shared* entry can be
+  neither claimed nor named in source - write the measured blocker in the unit header, report it, claim nothing.
+* **Never spell out a symbol another unit owns** (rule 2): declare it in that unit's header and `#include` it.
+* **Encouraged, and the reason this section exists**: if the unit's code is at 100 % and the only remaining gap
+  is a data section your object emits (a private pool entry, an unclaimed `.data`/`.ctors` run), finish it in
+  this lane - claim it (or drop the definition), re-split, flip to `Object(Matching)`, and let the
+  orchestrator's gate prove the DOL hash. That is how `ef/fn_80101DF4` landed as `Matching` (data 20/20 ->
+  28/28).
+* **Report the numbers**: the unit's per-section gap before/after (sections and bytes), and whether
+  `python tools/units/datagap.py --flip-blockers` lists this unit. A data blocker you leave behind goes in the
+  unit header's residual list, not only in your message.
+
 ## Verification before you report
 
     rm -f build/RMHE08/ok && ninja -k 0          # must end with zero FAILED targets
