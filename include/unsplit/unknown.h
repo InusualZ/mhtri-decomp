@@ -230,7 +230,6 @@ s32 fn_80331104(void);
 /* Added with `Pl/fn_80273B14.cpp`: 0x80335CE8 (hud below, enemy above) names different modules, so its
  * home is this file.  0x8029F73C moved to `include/menu/menu_item.h` (rule 2): `menu/menu_item.cpp`
  * registered the range 0x8029F3C8..0x802A6624, which owns that address. */
-void fn_80335CE8(struct _PLW* self, s32 kind);
 
 /* 0x8033A920 and 0x80463EE0 - called by `enemy/fn_802F5138.cpp`'s action band (an idle-mode
  * retire request and a release request).  Neither address has a registered unit in either
