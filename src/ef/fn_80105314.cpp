@@ -302,7 +302,8 @@ extern "C" f32 lbl_8059EFB8[];
 extern "C" f32 lbl_8059F028[];
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
-void se_req_pos_ps(_se_w* se, long id, long mode, nw4r::math::VEC3* pos);
+/* `se_req_pos_ps` comes from the owner's header `sound/fn_800D7F54.h` (rule 2); this unit's local
+ * `void` copy collided with the owner's `SeSlot*` once the header declared it. */
 extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 u8 get_now_areano();
 u32 em_sleep_ck(_ENEMY_WORK* enemy, u8 kind);

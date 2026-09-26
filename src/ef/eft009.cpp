@@ -62,6 +62,7 @@
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef/fn_80104BD0.h"
+#include "sound/fn_800D7F54.h"   /* se_req_pos_ps - owner sound/fn_800D7F54.cpp */
 #include "ef/fn_80105314.h"
 #include "unsplit/ef.h"
 
@@ -196,7 +197,8 @@ u32 event_demo_ck();
 u32 get_stg_eft_col(u8 area, u8 kind);
 void get_joint_wmat_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::MTX34* out);
 void get_joint_wpos_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* out);
-void se_req_pos_ps(_se_w* handle, long kind, long arg, nw4r::math::VEC3* pos);
+/* `se_req_pos_ps` comes from the owner's header `sound/fn_800D7F54.h` (rule 2); this unit's local
+ * `void` copy collided with the owner's `SeSlot*` once the header declared it. */
 void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
 void mulVecMat(nw4r::math::VEC3* out, nw4r::math::MTX34* mtx);
 void rotLocalMatX(u32 angle, nw4r::math::MTX34* mtx);

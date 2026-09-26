@@ -1180,6 +1180,16 @@ config.libs = [
             # dump's own `eft029_set_scale` / `eft029_set_kaihou` name the TU (dumpmap.py); C++ from
             # their mangled definitions.  See the unit's file header for the stale-brief record.
             Object(NonMatching, "ef/eft029.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/802F140C_fn_802F140C` range (`.text` 0x802F140C..0x802F5138, 39 functions /
+            # 15660 B): the runtime dump's own `eft035_set`/`eft035_set2` name the TU (dumpmap.py;
+            # every other address is the dump's `zz_XXXXXXXX_` placeholder), so the module is `ef`
+            # and the file follows the `eft00X.cpp` scheme of the neighbours.  Sections: extab
+            # 0x80015424..0x80015514, extabindex 0x80033C9C..0x80033E04, .text
+            # 0x802F140C..0x802F5138 - exactly the bytes the bracketing units leave unclaimed.  The
+            # seam is unproven (one maximal unclaimed run); see the unit's file header for the
+            # two-cluster evidence.
+            Object(NonMatching, "ef/eft035.cpp"),
             Object(Matching, "ef/fn_803066F0.c"),
         ],
     },
