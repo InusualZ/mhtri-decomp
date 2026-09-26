@@ -34,6 +34,13 @@ do not skip the build).
 
 Never modify `orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history.
 
+**Are you sure you are in your worktree?** If your cwd is the repo root `mhtri-dtk` itself - the main worktree,
+where the primary `build/`, the tracked `orig/RMHE08/sys/main.dol` and `config/RMHE08/` live - then you were
+launched in MAIN, and the paragraph above cannot protect anyone. A delegated unit worker is always launched in a
+sibling worktree named `mhtri-dtk.ws-<claim>` (its branch is `worker/<claim>`; `git rev-parse --show-toplevel`
+prints it). If you find yourself in MAIN: do no work, write nothing, and report it - that is the correct answer,
+not a guess at which tree was meant.
+
 ## Order of work
 
 1. **Ack** your claim: `python tools/units/claims.py ack <claim> --agent <your-slug>`, and call it again with
@@ -79,23 +86,49 @@ Traps that have cost this project days:
 The DOL must hash to `BF4850739478CAAEDFE675949EB7C28595A7FDE9`. If a full build is impossible in your
 worktree, say so explicitly in your report - do not imply you verified it.
 
-## Style rules (AGENTS.md section 6.5, enforced by `stylelint.py` at the gate)
+## Style rules (the campaign's section 6.5, section 6.5's canonical table is `docs/plan.md`; `stylelint.py` reports them by `file:line` and **`land.py verify` refuses a batch that adds a violation**)
 
-* **rule 1** - a vtable store is legitimate only when the table is external and unclaimed; never build a
-  vtable by hand for a table this project owns.
-* **rule 2** - a declaration belongs in its **owner's** header (`include/<module>/<owner>.h`); if nothing owns
-  the symbol, it goes in `include/unsplit/<module>.h`. Never declare another unit's symbol locally.
-* **rule 3** - every reconstructed struct states its size (`/* size: 0xNN */`) and every field its offset and
-  a context name.
-* **rule 4** - no duplicated anonymous records; give the shape one named type and use it.
-* **rule 6** - no pointer arithmetic to reach a field: name the record, then use `->member`.
-* **rule 7** - no `unkNN` field or `fn_XXXXXXXX` function name may survive where the context supports a real
-  name. Write `rule 7 deferred` in the header when it genuinely does not.
-* **rule 9** - linkage matters: a mangled map name belongs at C++ scope outside the `extern "C"` block; an
-  unmangled `fn_*` belongs inside it. Use C-compatible spellings (`void*`, `VEC3*`) in headers C files include.
-* **rule 10** - reference external/unclaimed data only; never hand-model owned data.
+The rules apply to new work immediately; existing units are brought into conformance as they are touched.
 
-Style: 4-space indent, UTF-8, LF, match the surrounding file.
+* **1 - a shared type lives in one header.** A type more than one unit uses is defined **once** (under `include/`,
+  or beside its owner and included) and included where needed - never copied into a second `src/` file.
+* **2 - an extern lives with the TU that owns the symbol.** Declare it in the owner's source/header and include
+  that. A symbol nothing owns goes in `include/unsplit/<module>.h`, which is a fallback: that band must not
+  declare a symbol a registered unit owns (the typed definition collides - `(10197)`).
+* **3 - a reconstructed class/struct states its size** (`/* size: 0xNN */`), traced from evidence - the
+  allocations, `memset`/`memcpy` lengths, the object's `.data`/`.rel` records, or the runtime dump. An
+  approximation is allowed **only** if it is marked as one.
+* **4 - every field carries its offset** (`/* +0x1C */`, ascending) so the layout is checkable against the
+  disassembly at a glance.
+* **5 - every field has a name from its context** - what is stored, compared against, passed on. The only
+  exception is padding/unused (`pad_0xNN` / `unused_0xNN`), which keeps its offset.
+* **6 - pointer arithmetic to reach a field is forbidden.** `*(u32*)((u8*)self + 0x1C) = v;` must be
+  `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise
+  copy, a `sizeof`/offset computation) - and even there prefer `offsetof(Type, field)`.
+* **7 - symbols have proper names.** No `fn_XXXXXXXX` and no `unkNN` may survive in `src/`. A function gets a
+  name for what it does plus the naming scheme of its neighbours; a field a name for what it holds. Where the
+  context genuinely does not support a name, a file-wide `rule 7 deferred: <reason>` comment defers the `fn_`
+  half only (the `unk` half stays).
+* **8 - `goto` is forbidden** (and so is a label used as control flow). Where a shared tail or a dispatch
+  layout looks like it needs one, the conformant shapes are a **helper function**, a **`switch` whose cases
+  share a `break`**, or a **`for (;;)` with `break`/`continue`**. If none of them reproduces the target's
+  codegen, that is a **residual to record with both measurements**, not a licence to use `goto`.
+* **9 - a mangled symbol is called through its owner.** A map name carrying an argument list (`Name__FP...`) or
+  a class/namespace qualifier (`Name__Q34nw4r...`) is a *mangling*: declare the class or namespace and call
+  `obj->method(args)` / `ns::function(args)`. The same holds for a *declaration* of the mangled spelling (the
+  C++ front-end mangles it a second time). An `fn_XXXXXXXX` stem is the map's placeholder, not a mangling, and
+  stays legal under rule 7's deferral. (This is *not* about `extern "C"`: putting a genuinely mangled map name
+  at C++ scope, or an `fn_*` inside `extern "C"`, is how objdiff pairs it by name - see `rehome_decls`.)
+* **10 - a vtable we own is compiler output.** A table of code pointers inside the unit's own registered ranges
+  is **emitted by MWCC** from a class declaring its `virtual` methods plus the constructor that stores the
+  table - never written entry by entry, never `extern`, never reached through a `void**` member. A table
+  *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function
+  pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC
+  emit a table into our object - extra bytes). A table we wrote is **not** evidence of inheritance; that comes
+  from the object's structure - the slot addresses in the DOL, the constructor's store, the ctor/dtor chain.
+
+Style: 4-space indent, UTF-8, LF, match the surrounding file. Comments and string/char literals are stripped
+before the lint matches, so rules 3-4 live *in comments* while the others must not fire on comment text.
 
 ## Commenting and naming
 
