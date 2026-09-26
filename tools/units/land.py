@@ -14,6 +14,22 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   "is the DOL still the DOL"; this answers "does our source still compile". A **foreign** dirty object that
   fails is named and tolerated - it is not this batch's defect, and the scoping is by object target, so the
   check cannot make a passing gate fail for another stream's work;
+* **refuses a unit registered in name only** (2026-09-26): a source file can be committed while its
+  `configure.py` `Object(...)` line and its `splits.txt` block are left behind, so the unit is absent
+  from the build while `ok` stays green - and the compile gate cannot see it either, because a unit with
+  no `configure.py` line has no `build/RMHE08/src/<unit>.o` target to scope to. Every batch unit must
+  carry all three: an `Object(...)` line, a `splits.txt` block, and an object target in the build graph.
+  `tools/units/verifyunit.py` owns the check;
+* **re-measures per symbol instead of trusting `report.json`** (2026-09-26): the regression scan reads
+  the same report the batch was measured against, so a stale or wrong report is invisible to it. The
+  gate re-runs `objdiff report generate` over the objects, compares symbol-for-symbol against the
+  report, checks a 100 % claim against the raw bytes, and reproduces the unit's `fuzzy_match_percent`
+  from its listed partials (a function with no `fuzzy_match_percent` key is **0 %**, not 100 %) - the
+  independent ordering the merger lane used, not the report's own consumer;
+* **refuses a split target object that moved for a unit the batch does not name**: target objects come
+  from the DOL split, so a `splits.txt` change that re-ranges a neighbour moves that neighbour's object.
+  The gate hashes the registered units' split targets before and after the build
+  (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md` is the standard), rather than assuming the re-range harmless;
 * checks every command's exit code, `configure.py`'s included - a failed `configure.py` leaves a stale
   `build.ninja` and every later number is a fiction;
 * refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
@@ -156,6 +172,11 @@ from units import stylelint as sl  # noqa: E402
 # directly, so the land path no longer depends on a script a fresh clone cannot see.
 from units import unionguard as ug  # noqa: E402
 from units import unionresolve as ur  # noqa: E402
+# `verifyunit` is the independent half of the gate: registration completeness, a per-symbol re-measure
+# that re-runs `report generate` instead of reading the report it audits, and split-target-object
+# drift. `land` calls it directly so the gate performs the checks the SKILL documents rather than the
+# landing flow trusting `build/RMHE08/report.json` (which the batch was measured against).
+from units import verifyunit as vu  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
@@ -1775,8 +1796,10 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
             name, good, detail, info = row[:4]
             note = (detail if not good else "") or info
             print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
-        print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> compile gate (ninja -k 0, scoped to "
-              "the batch's own objects) -> ninja -> report.json -> regression scan -> ok -> ledger -> baseline"
+        print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> registration gate (configure.py "
+              "+ splits.txt + build graph) -> compile gate (ninja -k 0, scoped to the batch's own "
+              "objects) -> ninja -> report.json -> target-object drift + independent per-symbol "
+              "re-measure -> regression scan -> ok -> ledger -> baseline"
               % (" and main.elf (this batch flips an object)" if flip else ""))
         if problems is not None:
             problems.extend(failing_checks(checks))
@@ -1806,7 +1829,23 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         if os.path.exists(stale):
             os.remove(stale)
     started = time.time_ns()
+    # the split target objects as the gate finds them, i.e. before configure.py/ninja re-split the
+    # batch's ranges: compared after the build, a unit the batch does not name whose object moved is a
+    # `splits.txt` change that re-ranged a neighbour (the merger's strongest form, .pi/notes/8031a6c0).
+    before_targets = vu.target_object_snapshot(main)
     built = gate("configure.py", [sys.executable, "configure.py"])
+    # the registration gate (2026-09-26): a unit can be committed as a *source file* with its
+    # `configure.py` `Object(...)` line and its `splits.txt` block left behind, and then it is
+    # registered in name only and absent from the build - `ok` stays green (`NonMatching` is never
+    # linked) and the compile gate has no `build/RMHE08/src/<unit>.o` target to scope to. Assert all
+    # three axes after configure.py has regenerated the graph.
+    if built:
+        ok_reg, reg_detail = vu.registration_check(main, units)
+        check("every batch unit is registered (configure.py + splits.txt + build graph)", ok_reg,
+              reg_detail,
+              remedy="commit the unit's `Object(...)` line in configure.py and its splits.txt block, "
+                     "then re-run configure.py so build.ninja carries build/RMHE08/src/<unit>.o - a "
+                     "source file alone is registered in name only and never enters the build")
     # the compile gate, before the link proves anything: `ok` cannot see a `NonMatching` unit's object (it is
     # never linked), so this is the only check that answers "does our source still compile". Scoped to the
     # batch's own `build/RMHE08/src/<unit>.o` targets - a foreign dirty object that fails is named and
@@ -1818,6 +1857,23 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                      "`ninja build/RMHE08/ok` cannot see this because a `NonMatching` unit is never linked")
     built = gate("ninja", ["ninja"]) and built
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
+    # the split target objects after the re-split: a unit the batch does not name must be byte-identical.
+    after_targets = vu.target_object_snapshot(main)
+    drift = vu.target_drift_problems(before_targets, after_targets, units)
+    check("no unit's split target object moved under the batch (a neighbour re-ranged)", not drift,
+          "; ".join(drift[:4]),
+          remedy="the batch's splits.txt re-ranged a unit it does not name; include that unit in the "
+                 "batch or fix its registration anchor, then re-run")
+    # the independent per-symbol re-measure (2026-09-26): the regression scan reads the same
+    # report.json the batch was measured against, so a stale or wrong report is invisible to it. This
+    # re-runs `objdiff report generate` itself over the objects and compares symbol-for-symbol, then
+    # checks the score against the raw bytes and the unit's own arithmetic.
+    ok_ind, ind_detail, ind_warn = vu.verify_units(main, units)
+    check("per-symbol re-measure reproduces the report from the objects", ok_ind, ind_detail,
+          info="; ".join(ind_warn[:3]) if ind_warn else "",
+          remedy="a symbol's report score is not reproducible from the objects (a stale report.json, "
+                 "a measuring-tool lie, or a 100% claim whose bytes differ) - rebuild and re-read, or "
+                 "fix the symbol, before landing")
     # the regression scan reads build/RMHE08/report_changes.json, which only `ninja changes` writes: without
     # this the scan reads the PREVIOUS batch's file and passes for the wrong reason (the first real run did
     # exactly that, while the ledger showed matched 231 -> 228).
@@ -2256,6 +2312,71 @@ def selftest() -> int:
     with tempfile.TemporaryDirectory() as no_build:
         ok, detail = compile_check(no_build, ["Pl/pl_act"], runner=lambda args: FakeProc(1, "x"))
         check("compile gate: without build.ninja the configure.py gate owns it", ok, True)
+
+    # the registration gate (2026-09-26): a source file committed without its `configure.py` line and
+    # `splits.txt` block is registered in name only and absent from the build; `ok` stays green because a
+    # `NonMatching` object is never linked, and the compile gate cannot see it because there is no
+    # `build/RMHE08/src/<unit>.o` target to scope to. `vu.registration_problems` owns the three axes.
+    check("registration: a unit in all three places passes",
+          vu.registration_problems(
+              ["Pl/pl_act"],
+              'Object(NonMatching, "Pl/pl_act.cpp")\n',
+              "Sections:\nPl/pl_act.cpp:\n\t\t.text start:0x1 end:0x2\n",
+              "build build\\RMHE08\\src\\Pl\\pl_act.o: mwcc_sjis\n"),
+          [])
+    check("registration: a source-only unit REFUSES",
+          vu.registration_problems(["Pl/pl_act"], "", "Sections:\n", "build a.o: rule\n") != [],
+          True)
+    check("registration: it names all three axes",
+          len(vu.registration_problems(["Pl/pl_act"], "", "Sections:\n", "build a.o: rule\n")), 3)
+    check("registration: an Object line with no splits block still refuses",
+          vu.registration_problems(["Pl/pl_act"],
+                                   'Object(NonMatching, "Pl/pl_act.cpp")\n',
+                                   "Sections:\n",
+                                   "build build\\RMHE08\\src\\Pl\\pl_act.o: mwcc_sjis\n") != [],
+          True)
+    check("registration: a unit missing from a stale build.ninja still refuses",
+          vu.registration_problems(["Pl/pl_act"],
+                                   'Object(NonMatching, "Pl/pl_act.cpp")\n',
+                                   "Sections:\nPl/pl_act.cpp:\n\t\t.text start:0x1 end:0x2\n",
+                                   "") != [],
+          True)
+
+    # the split-target drift (the merger's strongest form): target objects come from the DOL split, so a
+    # unit the batch does not name whose object moved is a `splits.txt` change that re-ranged a neighbour.
+    check("drift: an unchanged tree has no drift",
+          vu.target_drift_problems({"a": "1", "b": "2"}, {"a": "1", "b": "2"}, []), [])
+    check("drift: the batch's own unit may move",
+          vu.target_drift_problems({"a": "1"}, {"a": "2"}, ["a"]), [])
+    check("drift: a re-ranged neighbour REFUSES",
+          any("re-ranged" in p
+              for p in vu.target_drift_problems({"a": "1", "n": "2"}, {"a": "1", "n": "3"}, ["a"])),
+          True)
+
+    # the independent per-symbol re-measure: a `fuzzy_match_percent`-absent function is 0%, not 100%, and
+    # the unit arithmetic that proves the reading must refuse when the two disagree (SKILL 5.2/5.3).
+    check("re-measure: an absent fuzzy key is 0%, so the arithmetic reproduces",
+          vu.arithmetic_crosscheck(
+              {"total_code": 200, "fuzzy_match_percent": 50.0},
+              {"a": {"size": "100", "fuzzy_match_percent": 100.0}, "b": {"size": "100"}})[0],
+          True)
+    check("re-measure: a unit fuzzy that only reproduces if absent=100 REFUSES",
+          vu.arithmetic_crosscheck(
+              {"total_code": 200, "fuzzy_match_percent": 100.0},
+              {"a": {"size": "100", "fuzzy_match_percent": 100.0}, "b": {"size": "100"}})[0],
+          False)
+    check("re-measure: a 100% claim whose bytes differ REFUSES",
+          any("not identical" in p for p in vu.symbol_problems(
+              {"a": {"fuzzy_match_percent": 100.0}}, {"a": {"fuzzy_match_percent": 100.0}},
+              {"a": {"target_size": 16, "candidate_size": 16, "in_target": True,
+                     "in_candidate": True, "identical": False}})[0]),
+          True)
+    check("re-measure: a report not reproducible from a fresh generate REFUSES",
+          any("not reproducible" in p for p in vu.symbol_problems(
+              {"a": {"fuzzy_match_percent": 100.0}}, {"a": {"fuzzy_match_percent": 50.0}},
+              {"a": {"target_size": 16, "candidate_size": 16, "in_target": True,
+                     "in_candidate": True, "identical": True}})[0]),
+          True)
 
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, ".git"), exist_ok=True)
