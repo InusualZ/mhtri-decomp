@@ -90,6 +90,11 @@ Traps that have cost this project days:
     rm -f build/RMHE08/ok && ninja build/RMHE08/ok   # then: build/RMHE08/main.dol: OK
     python tools/units/stylelint.py --diff main  # must add no new section 6.5 violation
 
+The lint compares the tree against a ref. It now includes **untracked** files, but if a verdict ever fails
+to mention the new unit you just wrote, that is the blind spot this line exists for: `git diff` cannot see
+an untracked file, so `git add` the unit (or lint after the commit) before trusting a clean verdict. Two
+lanes reported "no new violation" on 2026-09-25 while the gate found real findings in their new units.
+
 The DOL must hash to `BF4850739478CAAEDFE675949EB7C28595A7FDE9`. If a full build is impossible in your
 worktree, say so explicitly in your report - do not imply you verified it.
 

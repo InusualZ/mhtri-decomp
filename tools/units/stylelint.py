@@ -1019,6 +1019,13 @@ def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
             before = after
         if after.endswith(SUFFIXES):
             out.append((before, after))
+    # `git diff` cannot see an untracked file, so a batch that lints BEFORE staging its new unit would be
+    # checked against the wrong set - and a new unit's violations are all additions, so it is the one file
+    # guaranteed to matter. This blind spot refused two units on 2026-09-25 whose own lint run had reported
+    # "no new section 6.5 violation" (it had compared two headers main changed and not the unit at all).
+    for path in git(root, "ls-files", "--others", "--exclude-standard", "--", SRC, UNSPLIT).splitlines():
+        if path and path.endswith(SUFFIXES):
+            out.append((None, path))
     return out
 
 
