@@ -494,6 +494,15 @@ config.libs = [
             # is claimed.
             Object(NonMatching, "stage/stg_w.cpp"),
             Object(NonMatching, "stage/fn_802B2978.c"),
+            # Registered from proposal/802B2AA0_fn_802B2AA0.cpp (a 0x802B2AA0 run discovery
+            # proposed): the stage band's per-area runtime state - the `stage_w` block's flag
+            # byte/bit mask/4-second timers, the two 0x4F8-byte per-area objects at
+            # `lbl_806BB7E0` and the area colour/effect drivers.  Module `stage` (the lib and the
+            # left neighbour `stage/fn_802B2978.c`); no `__FILE__` string covers the range and the
+            # dump answers `zz_` for every row, so the file keeps the map's stem (see its header).
+            # Sections: .text 0x802B2AA0..0x802B5C58, extab 0x80013D34..0x80013E3C (33 8-byte
+            # records), extabindex 0x80031A4C..0x80031BD8.
+            Object(NonMatching, "stage/fn_802B2AA0.cpp"),
         ],
     },
 
