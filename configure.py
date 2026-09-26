@@ -654,6 +654,14 @@ config.libs = [
             # the dump answers only `zz_` placeholders, so the file keeps the map's own stem (see
             # the unit's header).
             Object(NonMatching, "enemy/fn_80191598.cpp"),
+            # Registered from proposal/801926EC_fn_801926EC.cpp (the 0x801926EC run discovery
+            # proposed): the enemy "em" action band's per-motion step group, 93 functions /
+            # 0x6CF4 bytes plus its extab/extabindex run.  Module `enemy` from the link band (the
+            # unit below ends at 0x801926EC, the unit above starts at 0x801993E0, and every callee
+            # out of the range is enemy-band); C++ because the range reaches the mangled
+            # `em_frame_check`.  No `__FILE__` string survives and the dump answers only `zz_`
+            # placeholders, so the file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801926EC.cpp"),
             # Registered from proposal/801D428C_fn_801D428C.cpp (the 0x801D428C run discovery
             # proposed): the enemy action band 0x801D428C..0x801D80EC, 42 functions / 0x3E60 bytes,
             # plus the 34 extab/extabindex entries its framed functions carry.  Module `enemy` from
