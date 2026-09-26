@@ -733,6 +733,12 @@ enemy/fn_801B7020.cpp:
 	.text       start:0x801B7020 end:0x801BD6C0
 	.ctors      start:0x8056F34C end:0x8056F350
 
+enemy/fn_801CA004.cpp:
+	extab       start:0x8000FDFC end:0x8000FF4C
+	extabindex  start:0x8002BBE4 end:0x8002BDDC
+	.text       start:0x801CA004 end:0x801CCBC4
+	.ctors      start:0x8056F354 end:0x8056F358
+
 enemy/fn_801D428C.cpp:
 	extab       start:0x800100D4 end:0x800101E4
 	extabindex  start:0x8002C028 end:0x8002C1C0

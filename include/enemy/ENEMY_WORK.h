@@ -219,12 +219,26 @@ struct _ENEMY_WORK {
     /* +0x21C */ u8 unused_0x21C[0x228 - 0x21C];
     /* +0x228 */ u16 field_0x228;      /* `enemy/fn_801993E0.cpp`'s `fn_8019D8B8` case 4: the low
                                         * two bits are the "blocked" gate (`lhz` + `clrlwi ...,30`). */
-    /* +0x22A */ u8 unused_0x22A[0x244 - 0x22A];
+    /* +0x22A */ u8 unused_0x22A[0x23C - 0x22A];
+    /* +0x23C */ u8 field_0x23C;       /* the action-ready byte `enemy/fn_801CA004.cpp`'s
+                                        * `fn_801CA40C` case 0 reports (added by that unit) */
+    /* +0x23D */ u8 unused_0x23D[0x244 - 0x23D];
     /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `fn_80137EE0` averages */
-    /* +0x30C */ u8 unused_0x30C[0x314 - 0x30C];
-    /* +0x314 */ f32 field_0x314;      /* the effect scale `fn_80148BD0` writes (added by
-                                        * `enemy/fn_80147CE0.cpp`) */
-    /* +0x318 */ f32 field_0x318;      /* the effect radius `fn_801493A8` writes from `fn_80135644` */
+    union {
+        struct {
+            /* +0x30C */ u8 unused_0x30C[0x314 - 0x30C];
+            /* +0x314 */ f32 field_0x314;  /* the effect scale `fn_80148BD0` writes (added by
+                                            * `enemy/fn_80147CE0.cpp`) */
+            /* +0x318 */ f32 field_0x318;  /* the effect radius `fn_801493A8` writes from `fn_80135644` */
+        };
+        /* the same bytes as the offset vector `enemy/fn_801CA004.cpp`'s `fn_801CC5DC` rotates and
+         * hands the position helpers (added by that unit; `vec_0x310.y`/`.z` are the two floats
+         * above). */
+        struct {
+            /* +0x30C */ u8 unused_0x30Cb[0x310 - 0x30C];
+            /* +0x310 */ nw4r::math::VEC3 vec_0x310;
+        } offset_0x30C;
+    };
     /* +0x31C */ u8 unused_0x31C[0x320 - 0x31C];
     /* +0x320 */ f32 field_0x320;      /* the third effect scale `fn_80167770` seeds (added by
                                         * `enemy/fn_80165FC8.cpp`; the byte range is the +0x31C
@@ -299,6 +313,17 @@ struct _ENEMY_WORK {
             /* +0x32A */ s16 timer_0x32A;  /* armed to 0x384 at action 1's sub-state 6 */
             /* +0x32C */ u8 unused_0x32Cc[0x338 - 0x32C];
         };
+        /* the float/word/short-timer view `enemy/fn_801CA004.cpp`'s action band writes and reads
+         * (`fn_801CAA8C` clears 0x328/0x32C, `fn_801CA40C` reads the three 0x330/0x332/0x334
+         * halfwords; the 0x330 byte flag `armed_0x328.field_0x330` above is the same byte). */
+        struct {
+            /* +0x328 */ f32 field_0x328;
+            /* +0x32C */ s32 field_0x32C;
+            /* +0x330 */ s16 field_0x330;
+            /* +0x332 */ s16 field_0x332;
+            /* +0x334 */ s16 field_0x334;
+            /* +0x336 */ u8 unused_0x336j[0x354 - 0x336];
+        } timer_0x328;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
