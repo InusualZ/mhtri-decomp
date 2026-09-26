@@ -29,10 +29,9 @@ extern "C" {
 s8 fn_802748C8(void* a);
 
 /* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
- * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x8024????-0x80262940 and
- * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home. */
-u32 fn_80257E70(struct _PLW* self);
-u32 fn_8025FA00(void* a, void* b);
+ * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x80258FCC-0x80262940 and
+ * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home.  (`fn_80257E70`
+ * and `fn_8025FA00` moved to `Pl/fn_8024F200.h` when that unit claimed 0x8024F200-0x80258FCC.) */
 u16 fn_80260A18(struct _PLW* self);
 s32 fn_80261770(struct _PLW* self, u8* a, u16* b, u16* c, s32* d, u16* e, u16* f);
 u32 fn_802621B0(struct _PLW* self, void* b);
@@ -134,6 +133,16 @@ void fn_802399C8(struct _PLW* self, u8 part);
 void fn_8023C2D0(struct _PLW* self, u8 part);
 void fn_8023FC20(struct _PLW* self, u8 part);
 void fn_802430E8(struct _PLW* self, u8 part);
+
+/* 0x8026A224 / 0x8026A33C / 0x80275B04 / 0x802761B8 - the unmangled helpers the player-act cluster
+ * `Pl/fn_8024F200.cpp` drives.  They sit in the band's unclaimed runs 0x802693C4-0x8026BA1C and
+ * 0x80273B14-0x80276B58, so no registered unit owns them and this band header is their rule-2 home.
+ * Their signatures are the call sites' (the definitions live where the runs land). */
+void fn_8026A224(struct _PLW* self, u32 motion, s32 a, s32 b);
+u32 fn_8026A33C(struct _PLW* self);
+u32 fn_8026A644(struct _PLW* self, s32 id);
+void fn_80275B04(struct _PLW* self, s32 motion, s32 a, s32 b);
+void fn_802761B8(struct _PLW* self, u8 kind, s32 a, s32 b);
 
 #ifdef __cplusplus
 }

@@ -40,6 +40,12 @@ u32 fn_80278310(u8 a, nw4r::math::VEC3* v, u8 b);
  * wider return changes no link name. */
 u32 fn_8027D050(struct _PLW* self);
 
+/* 0x80277C58 / 0x80278674 - the two unmangled motion helpers `Pl/fn_8024F200.cpp` drives; both are
+ * defined by this unit (`Pl/pl_act.cpp:1073` and `:3526`), so their declarations live here. */
+void fn_80277C48(struct _PLW* self, s32 arg);
+void fn_80277C58(struct _PLW* self);
+void fn_80278674(struct _PLW* self, s16 motion, u8 a);
+
 #ifdef __cplusplus
 }
 

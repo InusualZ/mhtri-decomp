@@ -33,6 +33,9 @@ extern "C" {
 #endif
 struct _PLW;
 u32 fn_8026FD94(struct _PLW* self);
+/* 0x8026FEC0 - the status-bit setter the player act cluster drives; the owner defines it unmangled
+ * (`Pl/pl_master.cpp`), so the declaration is `extern "C"`. */
+void fn_8026FEC0(struct _PLW* self, u32 bits);
 #ifdef __cplusplus
 }
 #endif
@@ -46,6 +49,8 @@ u32 Pl_master_ck(struct _PLW* plw);
  * action-state helpers that unit calls, both owned by this unit (0x8026FD0C / 0x8026FE68). */
 u32 fn_8026FD0C(struct _PLW* self);
 u32 Pl_act_ck(struct _PLW* self, u8 group, u16 action);
+
+
 #endif
 
 #endif /* MHTRI_PL_PL_MASTER_H */
