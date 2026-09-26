@@ -63,7 +63,12 @@ struct _se_w {
 };
 
 /* The actor/motion object the SE work hangs off (`+0xAFC`) - the union of the views the band reads.
- * size: 0xB00 (at least) */
+ * size: 0xB00 (at least)
+ *
+ * `include/pl.h` owns the full union-of-views definition of the same record (docs/plan.md 6.5 rule 1),
+ * and a unit that needs both this header and that one used to fail with a redefinition.  This
+ * narrower view is therefore only defined when pl.h has not been included. */
+#ifndef PL_H
 struct _PLW {
     /* +0x000 */ u8 pad_0x000[2];
     /* +0x002 */ u8 field_0x002;   /* the motion-kind byte the kind dispatch switches on */
@@ -85,6 +90,7 @@ struct _PLW {
     /* +0xAF8 */ _se_w* field_0xAF8;
     /* +0xAFC */ _se_w* field_0xAFC;
 };
+#endif /* !PL_H */
 
 /* The per-kind container `get_move_work_adrs` returns.
  * size: 0x238 (approximate) */
