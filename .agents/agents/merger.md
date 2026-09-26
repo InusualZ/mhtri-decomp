@@ -53,6 +53,11 @@ worth naming in your report rather than dropping silently).
 * **M4 - a field split must re-pad.** Splitting `unused_0xX[0xY - 0xX]` into fields without a trailing `pad_`
   shrinks the struct. That class of bug is invisible to every objdiff score and shows up only as a wrong
   `main.dol` hash - it has already happened once here. The byte total is the invariant.
+* **M5a - anchor a union at the ALIGNED offset.** A union placed at an odd offset makes the compiler round the
+  whole run up to the next word boundary and the struct grows: a union anchored at `+0x075` cost `_PLW` 4
+  bytes, and the same run anchored at `+0x074` (two 0x1C structs) kept it exact. Always re-assert the byte
+  total with an MWCC `sizeof` probe, and **prove the probe can fail** by feeding it a wrong size - a probe
+  that always passes is not evidence.
 * **M5 - keep every pre-existing field name** as a `union` member so no other unit breaks; a rename is a
   separate change, not something a merge smuggles in.
 * **M6 - a declaration clash is a rule-2 problem** (`(10505)` / `(10197) illegal function overloading`): the
