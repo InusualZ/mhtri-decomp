@@ -1834,6 +1834,14 @@ config.libs = [
             # unclaimed run, so it lands as one unit.  Claims .text only; the size/coefficient tables it
             # reads (lbl_80612980 / lbl_80612A40) are an unclaimed auto .data range for the data pass.
             Object(NonMatching, "AX/AXFXReverbHi.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `804B17D0_ProbeBarnacle.c` (`.text` 0x804B17D0..0x804B8020, 118 functions / 26704 B).  Module
+            # `EXI` from the range's head (the dump names ProbeBarnacle / __OSEnableBarnacle / EXIWriteReg,
+            # the EXI library's own entry points) and the sibling SDK modules (OS/, AX/, DWCi/); the band
+            # holds three SDK libraries (EXI, FS/ISFS, GX) - see the file header.  Lib `OS` + cflags_os,
+            # like the AX band above, and the source restores -O4,p's 16-byte function alignment with
+            # `#pragma function_align 16` (every start in the range is 16-aligned).
+            Object(NonMatching, "EXI/ProbeBarnacle.c"),
         ],
     },
     {
