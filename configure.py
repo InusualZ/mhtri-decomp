@@ -716,6 +716,19 @@ config.libs = [
             # API); C++ because the range reaches mangled members (`setMatColor__6MHchar...`,
             # `rotVecY__FPQ34nw4r4math4VEC3Ul`).  No `__FILE__` string survives and the runtime dump
             # answers only `zz_` placeholders, so the file keeps the map's own stem (see header).
+            # Registered once, at its final home (docs/plan.md 12) from
+            # `proposal/801B4458_fn_801B4458.cpp`: the enemy seat/effect-action band
+            # 0x801B4458..0x801B7020, 48 functions / 0x2BC8 bytes, plus the extab run
+            # 0x8000F6B4..0x8000F7EC (39 records), the extabindex run 0x8002B0F8..0x8002B2CC
+            # (39 records) and one `.ctors` word at 0x8056F348 for the static initializer
+            # `fn_801B6FB0`.  Module `enemy` from the link band (the unit below ends at 0x801B4458,
+            # the unit above starts at 0x801B7020, both `enemy/*`) and from the code (every callee
+            # out of the range is enemy-band: `_ENEMY_WORK`, `em_act_ck`, `fn_8012F5B8`,
+            # `get_move_work_adrs(3)`).  C++ because the range reaches mangled callees through
+            # their real signatures (rule 9).  No `__FILE__` string survives in the range and the
+            # runtime dump answers only `zz_` placeholders, so the file keeps the map's own stem
+            # (see the unit's header).
+            Object(NonMatching, "enemy/fn_801B4458.cpp"),
             Object(NonMatching, "enemy/fn_801B7020.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/801CA004_fn_801CA004.cpp: the enemy action/state band, 47 functions /

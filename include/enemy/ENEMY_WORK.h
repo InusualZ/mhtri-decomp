@@ -51,9 +51,15 @@ struct EmCmdRec {
  * size: 0xB20 */
 struct EmAreaWork {
     /* +0x000 */ u8 active;
-    /* +0x001 */ u8 unused_0x001[0x016 - 0x001];
+    /* +0x001 */ u8 unused_0x001[0x008 - 0x001];
+    /* +0x008 */ u8 field_0x008;      /* the kind `fn_8012D1A8` classifies (added by
+                                      * `enemy/fn_801B4458.cpp`'s `fn_801B47A4`) */
+    /* +0x009 */ u8 unused_0x009[0x016 - 0x009];
     /* +0x016 */ u8 area_no;
-    /* +0x017 */ u8 unused_0x017[0xB20 - 0x017];
+    /* +0x017 */ u8 unused_0x017[0x03C - 0x017];
+    /* +0x03C */ nw4r::math::VEC3 vec_0x3C; /* the position `fn_801B45B0` measures the seat
+                                      * records against (added by `enemy/fn_801B4458.cpp`) */
+    /* +0x048 */ u8 unused_0x048[0xB20 - 0x048];
 };
 
 /* One 0x04-byte `{code, value}` action record of the list `fn_80126494` returns the head of
@@ -142,7 +148,8 @@ struct _ENEMY_WORK {
                                         * (3 = the "entry seated" state) */
     /* +0x00D */ u8 field_0x00D;        /* the byte `fn_80137604`/`fn_8013760C` latch */
     /* +0x00E */ u8 field_0x00E;        /* `fn_80137C94` hands it to `fn_8012555C` */
-    /* +0x00F */ u8 unused_0x00F[0x010 - 0x00F];
+    /* +0x00F */ u8 field_0x00F;        /* `enemy/fn_801B4458.cpp`'s `fn_801B4D14` gates its
+                                        * seat re-test on it being zero (added by that unit) */
     /* +0x010 */ u8 field_0x010;       /* the value `fn_80140244`'s command reports */
     /* +0x011 */ u8 field_0x011;        /* the attack timer  arms */
     /* +0x012 */ u8 field_0x012;        /* the second counter `fn_8013791C`'s states run */
@@ -170,7 +177,9 @@ struct _ENEMY_WORK {
     /* +0x1C0 */ u32 field_0x1C0;       /* the second rotation angle `fn_80133DB0` steps */
     /* +0x1C4 */ u32 field_0x1C4;       /* the third rotation angle */
     /* +0x1C8 */ u32 field_0x1C8;       /* bit 0x80 suppresses `fn_8012C6F4` */
-    /* +0x1CC */ u8 unused_0x1CC[0x1D0 - 0x1CC];
+    /* +0x1CC */ f32 field_0x1CC;       /* the seat-preference weight `enemy/fn_801B4458.cpp`'s
+                                        * `fn_801B4D14` scales by 0.85/1.3/1.1 for the seat mode
+                                        * at +0x0A (added by that unit) */
     /* +0x1D0 */ f32 field_0x1D0;       /* the scale `fn_80142958` returns */
     /* +0x1D4 */ f32 field_0x1D4;        /* the alpha ratio `fn_801A9210` scales by 255 */
     /* +0x1D8 */ u8 unused_0x1D8[0x1DE - 0x1D8];
@@ -324,6 +333,13 @@ struct _ENEMY_WORK {
             /* +0x334 */ s16 field_0x334;
             /* +0x336 */ u8 unused_0x336j[0x354 - 0x336];
         } timer_0x328;
+        /* the effect-seat view `enemy/fn_801B4458.cpp` keeps: the selected seat record index at
+         * +0x328 (0xFF = none) and its armed flag at +0x329 (added by that unit). */
+        struct {
+            /* +0x328 */ u8 slot_0x328;
+            /* +0x329 */ u8 flag_0x329;
+            /* +0x32A */ u8 unused_0x32Af[0x354 - 0x32A];
+        };
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
@@ -398,7 +414,9 @@ struct _ENEMY_WORK {
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
     /* +0x43F */ u8 field_0x43F;        /* `fn_8013763C` sets it, `fn_80137648` reads it back */
-    /* +0x440 */ u8 unused_0x440[0x450 - 0x440];
+    /* +0x440 */ s16 field_0x440;    /* the action frame counter `enemy/fn_801B4458.cpp`'s
+                                        * `fn_801B47A4` tests against 0x1C2 (added by that unit) */
+    /* +0x442 */ u8 unused_0x442[0x450 - 0x442];
     /* +0x450 */ s16 field_0x450;       /* the first of the two `lha` gates `enemy/fn_801DB8E0.cpp`'s
                                         * `fn_801DF8EC` compares (+0x452 is its sibling) */
     /* +0x452 */ s16 value_0x452;       /* the 0x384-frame gate `fn_801D6DA4` tests (added by
@@ -459,14 +477,20 @@ struct _ENEMY_WORK {
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
     /* +0x816 */ u8 unused_0x816[0x818 - 0x816];
     /* +0x818 */ s16 field_0x818;       /* the motion timer `fn_8012F110` arms before its mode switch */
-    /* +0x81A */ u8 unused_0x81A[0x834 - 0x81A];
+    /* +0x81A */ u8 unused_0x81A[0x833 - 0x81A];
+    /* +0x833 */ u8 field_0x833;       /* the "approach armed" byte `enemy/fn_801B4458.cpp`'s
+                                        * `fn_801B47A4` branches on (added by that unit) */
     /* +0x834 */ u8 field_0x834;      /* the "already seated" byte `fn_801671AC` tests against 1
                                         * (added by `enemy/fn_80165FC8.cpp`) */
     /* +0x835 */ u8 field_0x835;      /* the seat flag `fn_80166DF8` sets */
     /* +0x836 */ u16 flags_0x836;       /* bit 0x8000 is the "aim target found" flag `fn_801D75D0`
                                          * mirrors `self->action_0x328.field_0x345` into (added by
                                          * `enemy/fn_801D428C.cpp`) */
-    /* +0x838 */ u8 unused_0x838[0x89F - 0x838];
+    /* +0x838 */ u8 unused_0x838[0x888 - 0x838];
+    /* +0x888 */ s32 field_0x888;       /* the effect handle `enemy/fn_801B4458.cpp`'s `fn_801B4E3C`
+                                        * releases through `fn_803B9994` and clears to -1; `fn_801B6C38`
+                                        * tests it against -1 (added by that unit) */
+    /* +0x88C */ u8 unused_0x88C[0x89F - 0x88C];
     /* +0x89F */ u8 field_0x89F;        /* the mode `fn_80137720` latches */
     /* +0x8A0 */ u8 unused_0x8A0[0x8A4 - 0x8A0];
     /* +0x8A4 */ s16 field_0x8A4;       /* the timer `fn_80137720` arms from `fn_80126494` */
