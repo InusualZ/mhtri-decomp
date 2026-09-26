@@ -45,6 +45,10 @@ void fn_80128A8C(struct _ENEMY_WORK* self, u32 a, u32 b);
  * Declared from the callee's own body (docs/plan.md 6.5 rule 6). */
 void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
+/* 0x8012B380 - r3 (`self`) and three scalars; the motion/state setter the action band calls after
+ * `fn_8012F93C` reports done (this unit owns the address).  Added with `enemy/fn_80387844.cpp`
+ * (rule 2; the same signature `include/enemy/fn_80165FC8.h` carried). */
+void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
  * `enemy/fn_801550FC.cpp` on landing (rule 2): this unit owns the addresses. */
 void fn_80127FE4(struct _ENEMY_WORK* self);
@@ -84,6 +88,10 @@ void fn_801251D8(u32 a, u32 b, u32 c);
 void fn_80128030(struct _ENEMY_WORK* self);
 /* 0x80129724 - r3 (`self`) and one scalar argument (every call site sets r4). */
 void fn_80129724(struct _ENEMY_WORK* self, u32 a);
+/* 0x80129744 - r3 (`self`) only; the action band's release hook (`enemy/fn_80387844.cpp`'s
+ * `fn_80389E1C` calls it when its sub-state count reaches 4).  Added with that unit (rule 2: this
+ * range owns the address). */
+void fn_80129744(struct _ENEMY_WORK* self);
 void fn_801252C0(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);

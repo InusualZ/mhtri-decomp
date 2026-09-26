@@ -110,6 +110,10 @@ f32 get_em_scale(struct _ENEMY_WORK* self);
 u16 em_get_mot_no(struct _ENEMY_WORK* self);
 u32 em_after_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
 void get_joint_wmat_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* out);
+/* 0x8013011C - the `em_magma_check__FP11_ENEMY_WORK` predicate: 1 when the work sits on lava.  The
+ * map name is a mangling, so it is declared at C++ scope (rule 9); added with
+ * `enemy/fn_80387844.cpp`, whose action band branches on it before spawning an effect. */
+u32 em_magma_check(struct _ENEMY_WORK* self);
 #endif
 
 #endif

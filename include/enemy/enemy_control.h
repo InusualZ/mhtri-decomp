@@ -68,6 +68,8 @@ struct EmcWork {
 
 #include "types.h"
 
+struct _ENEMY_WORK;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -92,6 +94,18 @@ u32 fn_801421E4(u32 id, void* out);
  * Declared here with the rest of this unit's record helpers (rule 2). */
 u32 fn_80146008(u32 frames);
 void fn_8014619C(struct _ENEMY_WORK* self);
+/* 0x80145FE4 - the joint-effect slot allocator this unit owns (returns the slot index, -1 when the
+ * set is full).  Added with `enemy/fn_80387844.cpp`'s action band (rule 2). */
+s16 fn_80145FE4(void);
+/* 0x8014616C - r3 (`self`) and r4 (the mode); this unit's own definition, added with
+ * `enemy/fn_80387844.cpp` (rule 2). */
+void fn_8014616C(struct _ENEMY_WORK* self, s32 mode);
+/* 0x801461A8 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers (the caller's vectors).  Added with
+ * `enemy/fn_80387844.cpp` (rule 2). */
+void fn_801461A8(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
+/* 0x801462A4 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers and r7/r8 two scalars.  Added with
+ * `enemy/fn_80387844.cpp` (rule 2). */
+void fn_801462A4(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
 
 #ifdef __cplusplus
 }

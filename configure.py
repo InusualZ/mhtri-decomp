@@ -937,6 +937,16 @@ config.libs = [
             # extab 0x80017574..0x800175DC (13 records), extabindex 0x80036E94..0x80036F30 (13 x 12 B),
             # `.text` 0x8035E034..0x8035F2B4.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/fn_8035E034.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from proposal/80387844_fn_80387844.cpp:
+            # the enemy monster-AI action band (`.text` 0x80387844..0x8038E8E8, 43 functions / 0x7084
+            # bytes).  Module `enemy` from the code (every body drives the shared `_ENEMY_WORK` record
+            # through `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check`, `get_joint_wpos_em`,
+            # `em_magma_check`, `get_em_chg_scale`) and from the `.data` `em0XX_prog_tbl` program tables
+            # of the bracketing enemy bands; C++ because the range reaches genuinely mangled callees
+            # (`setVector3__FPQ34nw4r4math4VEC3fff`, `mulVecMatAddTrans`, `rotVecY`) through their real
+            # signatures (rule 9).  No `__FILE__` string is reachable from the range and the runtime dump
+            # answers only `zz_` placeholders, so the file keeps the map's own `fn_80387844` stem.
+            Object(NonMatching, "enemy/fn_80387844.cpp"),
         ],
     },
 
