@@ -118,11 +118,9 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 
 ## 4. Roles and responsibilities
 
-> **Tool status — read this before following §4–§6 literally.** Sections 4–6 describe the **target** state. Of the
-> tools they name, `recompile.py`, `claims.py`, `brief.py`, `handoff.py` and `land.py` **do not exist yet**
-> (§7.1–7.5, first in §12). Until they do, the orchestrator runs their *commands* by hand — that is what §11's
-> checklist is — and workers get their briefs as inline text with the same six parts (§5.2) instead of as a file.
-> Everything else these sections name already exists.
+> **Tool status.** The tools 4-6 name exist and run: `recompile.py`, `claims.py`, `brief.py`, `handoff.py`,
+> `land.py` (7.1-7.5), the data queue `dataqueue.py`/`dataclaim.py` (7.17), `stylelint.py` (7.21) and
+> `recordmerge.py`. The commands below are the ones actually run; 7 keeps the status of anything still open.
 
 **The four shared files (`config/RMHE08/splits.txt`, `configure.py`, `config/RMHE08/symbols.txt`, `AGENTS.md`)
 have exactly one writer: the orchestrator.**
@@ -324,6 +322,27 @@ through `recompile.py` (direct compiler invocation, mtime asserted, section size
 | `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
 | a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live pane is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: `herdr pane close <pane>`, then `claims.py release <unit>` - and if that pane is the owner's, ask first, because a stale claim blocks the unit rather than losing anything |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
+
+### 5.4.1 The agent profiles
+
+The campaign runs each lane under the profile that matches its job (owner's instruction, 2026-09-26). Three of
+them are **project** profiles, tracked in `.agents/agents/`; the rest are the global set.
+
+| profile | job | launched when |
+| --- | --- | --- |
+| **`decompiler`** | unit work: register a proposal range at its final `src/<module>/<name>.<ext>` home, reconstruct its bodies, measure, commit on its branch | **the default lane** - a proposal or a body-completion lane. `queue.py next` emits `agent: "decompiler"` |
+| **`fixer`** | a *refused gate*: a measured regression, a lint failure, a claim or branch that must be repaired | a `land.py verify` refusal, a `ninja changes` regression, a stale claim |
+| **`merger`** | a *refused apply*: two lanes' divergent views of one record/type/header, a fold | `applybranch.sh` / `git apply` refusing a branch, the `recordmerge.py` class |
+| `worker` | the generic lane: anything that is none of the above | the fallback, and the only profile the older rounds used |
+| `scout`, `planner`, `reviewer` | read-only recon, planning, independent review | before a batch, or when a plan/review is the deliverable |
+
+```sh
+python tools/units/queue.py next --count 8            # agent: "decompiler" for every proposal lane
+python tools/units/queue.py next --profile fixer      # a repair lane
+```
+
+The profile decides which rules the lane is held to (its isolation, its evidence file, the style rules it
+knows), so this is not a cosmetic choice - and the orchestrator, not the worker, chooses it.
 
 ### 5.5 A worker may fan out subagents - under the same rules
 

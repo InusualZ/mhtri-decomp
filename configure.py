@@ -1739,6 +1739,14 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "OS/OSAlarm.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `804C1760_FindContainHeap_.c` (`.text` 0x804C1760..0x804C6D68, 68 functions / 22024 B).  Module
+            # `OS`: the nearest registered unit in splits.txt is OS/OSAlarm.c and the mem half's foreign
+            # calls are all the OS library (OSInitMutex / OSLockMutex / OSUnlockMutex).  The run is the SDK
+            # low-level runtime band (`tudiscover at` finds the mtx and vec clusters as separate certain TUs
+            # inside it); the seam is a byte cap, not a boundary.  Real dump names are used where the map has
+            # them; the rest keep their map stem under rule 7's deferral (see the file header).
+            Object(NonMatching, "OS/FindContainHeap_.c"),
         ],
     },
     {

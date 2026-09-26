@@ -109,6 +109,15 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
   on the wrong ref and slides the merge-base that `applybranch.sh` and the gate both resolve against.
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step (see
   Non-negotiables).
+* **A lane is launched with the profile that matches its job - not with the generic `worker` (owner's
+  instruction, 2026-09-26).** The project defines three profiles in `.agents/agents/` (tracked):
+  **`decompiler`** is *unit work* - register a proposal at its final home and reconstruct its bodies;
+  **`fixer`** is a refused gate or a measured regression on a branch; **`merger`** is a refused *apply* -
+  two lanes' views of one record or type, and a fold (the `recordmerge.py` class). `worker` stays the
+  fallback for a task that is none of those, and `scout`/`planner`/`reviewer` are read-only. `queue.py next`
+  already emits the profile in its paste-ready spawn (`agent: "decompiler"` for a proposal lane) and takes
+  `--profile` for the rest; the roster is `docs/plan.md` 5.4.1. A lane launched with the wrong profile is not
+  a cosmetic mistake: it is missing the rules its job is held to.
 
 **KNOWN BUG, measured 2026-09-24 (booked a slot):** `queue.py next` offered `proposal/80063888_fn_80063888` a second
 and third time while that proposal was already claimed and its worker was running, refusing each time with
