@@ -23,6 +23,11 @@ extern "C" {
  * function 1.28 points. */
 u32 fn_8027D738(struct _PLW* self);
 
+/* 0x8027D76C - the owner's own action-complete hook (`fn_8027D684.cpp:147`, `extern "C" void`), the
+ * call the AI band makes once a motion resolves.  Added with `ai/fn_802C474C.cpp`, its first consumer
+ * (docs/plan.md 6.5 rule 2). */
+void fn_8027D76C(struct _PLW* self);
+
 #ifdef __cplusplus
 }
 #endif
