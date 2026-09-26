@@ -1,5 +1,5 @@
 /*
- * include/Network/fn_8041A87C.h - the types and externs the 0x8041A87C Network band needs.
+ * include/Network/fn_8041A87C.h - the classes and externs the 0x8041A87C Network band needs.
  *
  * Everything here is reconstructed from the range's own disassembly (every offset is one the target
  * instructions address) plus the string pool at `.data` 0x80603000..0x806036xx, which names the two
@@ -7,6 +7,15 @@
  * neighbouring `fn_`/SDK helpers the band calls have no registered owner and live in
  * `include/unsplit/Network.h`; `fn_803D6A98` is declared there as `void*` because its result is this
  * unit's own thread object, so the casts stay at the call sites.
+ *
+ * The four object types own member functions, and the three foreign objects the target *dispatches
+ * through* are modelled as classes with real virtuals: that is the only shape MWCC emits as
+ * `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)` (a struct of function pointers loads through a scratch
+ * register instead).  None of the view classes is constructed here, so the compiler emits no `.data`
+ * vtable for them.  The unit's *own* vtables (`lbl_806036A0`, `lbl_80603740`, and the peer's at
+ * 0x80603714) stay referenced rather than declared: their entries are all defined in this file, so a
+ * `virtual` declaration would make MWCC emit a second copy of the table in our object's `.data`
+ * (measured: a class whose virtuals are all defined here gains a 20-byte `.data` vtable).
  */
 
 #ifndef FN_8041A87C_H
@@ -15,8 +24,11 @@
 #include "types.h"
 #include "unsplit/Network.h"
 
+/* the records the two interface classes take pointers to, defined further down */
+struct GameSpyPeerId;
+union GameSpyEventMsg;
 /* --------------------------------------------------------------------------------------------- */
-/* GameSpy interface state machine - `NetworkGameSpyInterface`                                    */
+/* GameSpy interface state machine - the connect/NAT sub-machines                                 */
 /* --------------------------------------------------------------------------------------------- */
 
 typedef struct GameSpyChannel {
@@ -27,7 +39,8 @@ typedef struct GameSpyChannel {
     /* +0x27 */ u8  tail_27;
 } GameSpyChannel;   /* size: 0x28 */
 
-typedef struct NetworkGameSpyInterface {
+class NetworkGameSpyInterface {
+public:
     /* +0x0000 */ u8  pad_00[0x0C];
     /* +0x000C */ u32 flags_0C;
     /* +0x0010 */ s32 task_10;
@@ -43,10 +56,21 @@ typedef struct NetworkGameSpyInterface {
     /* +0x8024 */ GameSpyChannel channels_8024[8];
     /* +0x8164 */ u32 limit_8164;
     /* +0x8168 */ u32 writePos_8168;
-} NetworkGameSpyInterface;   /* size: 0x816C (approximation: the range addresses up to +0x8168) */
+
+    /* one step of the connect-attempt callback sub-machine */
+    void updateCallbackStep();
+    /* dispatches to the search (task 1) or the connect (task 2) sub-machine */
+    s32 dispatchTask();
+    /* one step of the GameSpy search sub-machine */
+    s32 runSearch();
+    /* one step of the GameSpy NAT/connect sub-machine */
+    s32 runConnect();
+    /* applies a DWC event, then folds the event bits into the state machine's flags */
+    void applyEvent(u32 code, s32 a, void* b, const GameSpyEventMsg* msg);
+};   /* size: 0x816C (approximation: the range addresses up to +0x8168) */
 
 /* --------------------------------------------------------------------------------------------- */
-/* `NetworkGameSpyInterface`'s worker thread object                                               */
+/* the GameSpy worker thread object (the string pool's `NetworkGameSpyInterface::<method>`)        */
 /* --------------------------------------------------------------------------------------------- */
 
 typedef struct NetworkErrorInfo {
@@ -56,7 +80,17 @@ typedef struct NetworkErrorInfo {
     /* +0x0C */ s32 reported_0C;
 } NetworkErrorInfo;   /* size: 0x10 */
 
-typedef struct GameSpyInterfaceThread {
+/* The worker thread object (the pool's own logs spell its methods `NetworkGameSpyInterface::<method>`;
+ * the name here is the one this band's other lane chose for the object - see the unit header).
+ *
+ * NOTE, pre-existing and left to its own pass: `thread_130` is declared 0x1E50 B here while the
+ * annotations from `threadParam_4448` on start at +0x4448, so everything past the array is compiled
+ * 0x24C8 low against the target (retail reads `sessionOpen` at +0x4484, our object at +0x1FBC).
+ * Sizing it 0x4318 (OSThread 0x318 + the 0x4000 stack the ctor hands `OSCreateThread`) makes the
+ * declaration agree with its own annotations: unit 92.168 against 92.146 and 30/71 byte-identical,
+ * no row down.  Not applied - it is a field-size defect, not this lane's class-form finding. */
+class GameSpyInterfaceThread {
+public:
     /* +0x0000 */ void* vtable_00;
     /* +0x0004 */ s32 errorCode_04;
     /* +0x0008 */ s32 errorParam1_08;
@@ -121,13 +155,100 @@ typedef struct GameSpyInterfaceThread {
     /* +0x4482 */ s16 bufferSize_4482;
     /* +0x4484 */ u8  sessionOpen_4484;
     /* +0x4485 */ u8  profile_4485[0x14];
-} GameSpyInterfaceThread;   /* size: 0x8450 (approximation: the 0x4000-byte stack at +0x4448 is the upper bound) */
+
+    /* constructs the thread object, resets its tables and spawns the worker thread */
+    void* create();
+    /* the deleting destructor: restores the base vtable, empties the singleton, frees on request */
+    void* destroy(s16 flags);
+    /* resets the per-request tables and the pending-request flags */
+    void  resetState();
+    /* resets the slot tables and the negotiation state */
+    void  resetSlots();
+    /* the empty vtable cleanup hook */
+    void  onDestroy();
+    /* replies to a pending request by filling the first free return handle */
+    s32   replyRequest(s32 handle);
+    /* clears the error record and marks it reported */
+    void  clearError();
+    /* stores the first error the thread sees, unless it has already been reported */
+    void  setError(s32 code, s32 a, s32 b);
+    /* copies the thread's error record out for the game to read */
+    void  getErrorStruct(NetworkErrorInfo* out);
+    /* moves the interface into its running state, or reports the shutdown */
+    s32   initialize();
+    /* ticks the GameSpy clock and counts one more frame */
+    s32   updateClock();
+    /* reports whether a close is already pending, arming the step flag if so */
+    u8    requestClose();
+    /* returns the interface phase */
+    s32   getPhase();
+    /* returns the running state, or -1 while the interface is not running */
+    s32   getState();
+    /* clears the running state and the pending close */
+    void  clearPendingClose();
+    /* arms the cancellation when a close arrives while a request is still in flight */
+    void  armCancel();
+    /* tears the socket, the session and the request pool down under the interface mutex */
+    s32   closeSession();
+    /* reports whether the interface can be closed right now */
+    s32   canClose();
+    /* reports whether a negotiation is running */
+    u8    isNegotiating();
+    /* reports the negotiation's outcome */
+    u8    getNegotiationResult();
+    /* returns this interface's own peer id */
+    u32   getPeerId();
+    /* returns the request result, arming the step flag first */
+    s32   getResult();
+    /* drains the DWC error queue and folds the reported type into the interface state */
+    s32   executeError();
+    /* the worker thread's body: drains the request flags until the stop flag is set */
+    void  tGameSpyInterface(s32 arg);
+    /* spawns the worker thread */
+    s32   GameSpyInterfaceThreadInit();
+    /* sets the socket address buffer size */
+    void  setBufferSize(s16 size);
+    /* starts a NAT negotiation between the two peer ids */
+    void  startNegotiation(const GameSpyPeerId* a, const GameSpyPeerId* b);
+    /* sets the handle the NAS login waits for */
+    void  setWaitHandle(s32 limit);
+    /* runs the NAS-login handshake the timed handler drives, one step per frame */
+    s32   runNasLogin();
+    /* hands the index's receiver slot to the object stored for it (a tail call) */
+    void  dispatchReceiver(u8 index, s32 a, s32 b);
+    /* fails the index's request record when `error` is set, then closes the slot */
+    void  failRequest(s32 error, s32 a, s32 b, u8 index, s32 e);
+    /* records the outcome of the DWC request the interface is waiting on */
+    void  setRequestResult(s32 error, s32 value);
+    /* publishes a completed request: rewrites the slot tables and the negotiation result */
+    void  publishRequest(s32 error, u8 index, u32 value);
+    /* opens the GameSpy socket and installs the callback set, then applies the pending requests */
+    void  ConnectToAnybody();
+    /* starts a GameSpy match for `count` players and stores the peer id it was given */
+    s32   startMatch(s32 count, u32 value, s32 a, u16 b, s32 c, s32 d, s32 e);
+    /* registers a receiver for `id` in the first free slot */
+    u8    registerReceiver(void* receiver, u32 id);
+    /* releases the receiver slot at `index` and clears its id */
+    void  unregisterReceiver(s32 index);
+    /* returns the state of the slot `id` maps to, or the pending negotiation result */
+    u8    getSlotState(u32 id);
+    /* returns the slot index `id` maps to, or -1 */
+    s8    findSlot(u32 id);
+    /* the per-frame step: the negotiation sub-machine, the request sweep and the close/cancel
+       bookkeeping */
+    void  step();
+    /* sends a buffer out over the socket the index maps to */
+    s32   sendUnreliable(u8 index, const void* data, s32 size);
+    /* compares a received peer profile against the one this interface published */
+    s32   checkPeerProfile(const void* profile, u32 size);
+};   /* size: 0x8450 (approximation: the 0x4000-byte stack at +0x4448 is the upper bound) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* the small timed handler whose ctor sits at the end of the range                                */
 /* --------------------------------------------------------------------------------------------- */
 
-typedef struct NetworkTimedHandler {
+class NetworkTimedHandler {
+public:
     /* +0x00 */ void* vtable_00;
     /* +0x04 */ s32 state_04;
     /* +0x08 */ s32 interval_08;
@@ -137,13 +258,23 @@ typedef struct NetworkTimedHandler {
     /* +0x14 */ s32 timeout_14;
     /* +0x18 */ u8  expired_18;
     /* +0x19 */ u8  pad_19[0x03];
-} NetworkTimedHandler;   /* size: 0x1C */
+
+    /* constructs the timed handler */
+    void* create();
+    /* deleting destructor for the timed handler */
+    void* destroy(s16 flags);
+    /* initialises the timed handler's interval, limit and timeout */
+    void  init(s32 a, s32 b, s32 c);
+    /* clears the timed handler's state, ready flag and expiry flag */
+    void  clear();
+};   /* size: 0x1C */
 
 /* --------------------------------------------------------------------------------------------- */
 /* `NetworkPeerGameSpy` - the 0x600-byte send / 0x6000-byte receive buffer pair                   */
 /* --------------------------------------------------------------------------------------------- */
 
-typedef struct NetworkPeerGameSpy {
+class NetworkPeerGameSpy {
+public:
     /* +0x0000 */ void* vtable_00;
     /* +0x0004 */ u8  pad_04[0x0C];
     /* +0x0010 */ u32 received_10;
@@ -153,23 +284,47 @@ typedef struct NetworkPeerGameSpy {
     /* +0x6630 */ s32 field_6630;
     /* +0x6634 */ GameSpyInterfaceThread* interface_6634;
     /* +0x6638 */ u32 peer_6638;
-} NetworkPeerGameSpy;   /* size: 0x663C (approximation: the range addresses up to +0x6638) */
 
-/* the DWC slot callback the peer installs (its vtable slot +0x18 takes the tail-call's five args) */
-typedef struct GameSpyReceiverVtable {
-    /* +0x00 */ u8 pad_00[0x18];
-    /* +0x18 */ void (*handle_18)(void* self, s32 a, s32 b, s32 c, s32 d, s32 e);
-} GameSpyReceiverVtable;   /* size: 0x1C */
+    /* binds the peer to the interface and resets both buffers */
+    void  bind(const u32* id);
+    /* builds and sends a framed peer message from the two optional payloads */
+    s32   send(const u16* a, s32 aLen, const u16* b, s32 bLen, s8 flag);
+    /* pulls one framed message out of the peer's receive buffer */
+    s32   receive(void* a, s32* aLen, void* b, s32* bLen, u8* flag);
+    /* appends a buffer to the peer's receive queue (the pool's `NetworkPeerGameSpy::put`) */
+    s32   put(const void* data, u32 size);
+    /* reports whether the peer has a message queued */
+    s32   isQueued();
+    /* releases the peer's interface slot and drops its receive queue */
+    void  release();
+    /* deleting destructor: destroys the queue mutex and the base, then frees on request */
+    void* destroy(s16 flags);
+};   /* size: 0x663C (approximation: the range addresses up to +0x6638) */
 
-typedef struct GameSpyReceiver {
-    /* +0x00 */ GameSpyReceiverVtable* vtable;
-} GameSpyReceiver;   /* size: 0x04 */
+/* The DWC callback object `fn_8041BD64` tail-calls.  Its slot +0x18 takes the five arguments the
+ * tail call passes; the class is only ever dispatched through, so no vtable is emitted for it. */
+class GameSpyReceiver {
+public:
+    /* +0x08 */ virtual void pad_08();
+    /* +0x0C */ virtual void pad_0C();
+    /* +0x10 */ virtual void pad_10();
+    /* +0x14 */ virtual void pad_14();
+    /* +0x18 */ virtual void handle_18(s32 a, s32 b, s32 c, s32 d, s32 e);
+};   /* size: 0x04 (the object's leading vtable word) */
 
-/* the vtable slot `fn_8041DD28` ticks, reached through the caller's pointer-to-object */
-typedef struct NetworkPeerCallbackVtable {
-    /* +0x00 */ u8 pad_00[0x28];
-    /* +0x28 */ void (*tick_28)(void* self);
-} NetworkPeerCallbackVtable;   /* size: 0x2C */
+/* The callback object `fn_8041DD28` ticks through slot +0x28. */
+class NetworkPeerCallback {
+public:
+    /* +0x08 */ virtual void pad_08();
+    /* +0x0C */ virtual void pad_0C();
+    /* +0x10 */ virtual void pad_10();
+    /* +0x14 */ virtual void pad_14();
+    /* +0x18 */ virtual void pad_18();
+    /* +0x1C */ virtual void pad_1C();
+    /* +0x20 */ virtual void pad_20();
+    /* +0x24 */ virtual void pad_24();
+    /* +0x28 */ virtual s32  tick_28();
+};   /* size: 0x04 (the object's leading vtable word) */
 
 /* the 8-byte GameSpy header `fn_8041B270` builds on the stack */
 typedef struct GameSpyHeader {

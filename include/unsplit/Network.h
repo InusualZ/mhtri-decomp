@@ -19,26 +19,39 @@ typedef void (*NetworkCallback)();
 
 /* ---- the game's debug/log manager (`fn_803C9974` returns the singleton) ---------------------- */
 
-typedef struct NetworkLoggerVtable {
-    /* +0x00 */ void* rtti_00;
-    /* +0x04 */ void* rtti_04;
-    /* +0x08 */ void (*destroy_08)(void* self, u32 flags);
-    /* +0x0C */ void (*signal_0C)(void* self, u32 level, const char* fmt, ...);
-    /* +0x10 */ void (*warn_10)(void* self, const char* fmt, ...);
-    /* +0x14 */ void (*log_14)(void* self, const char* fmt, ...);
-    /* +0x18 */ u8 pad_18[0x24];
-    /* +0x3C */ s32 (*isVerbose_3C)(void* self);
-    /* +0x40 */ u8 pad_40[0x08];
-    /* +0x48 */ s32 (*flag_48)(void* self, u16 value);
-    /* +0x4C */ u16 (*encode_4C)(void* self, u32 value);
-} NetworkLoggerVtable;   /* size: 0x50 */
-
-typedef struct NetworkLogger {
-    /* +0x00 */ NetworkLoggerVtable* vtable;
-} NetworkLogger;   /* size: 0x04 */
+/* The log manager is dispatched through, never constructed here, so it is a class with the real
+ * virtuals and no vtable in our object: retail's `lwz r12, 0x0(r3)` / `lwz r12, 0xC(r12)` shape is
+ * MWCC's virtual-call form, and a struct of function pointers loads through a scratch register
+ * instead.  The slots are the target's own offsets (0x08 is the deleting destructor, then the log
+ * entry points, `isVerbose`, `flag` and `encode`), so the unnamed ones between them are padding. */
+class NetworkLogger {
+public:
+    /* +0x08 */ virtual void destroy_08(u32 flags);
+    /* +0x0C */ virtual void signal_0C(u32 level, const char* fmt, ...);
+    /* +0x10 */ virtual void warn_10(const char* fmt, ...);
+    /* +0x14 */ virtual void log_14(const char* fmt, ...);
+    /* +0x18 */ virtual void pad_18();
+    /* +0x1C */ virtual void pad_1C();
+    /* +0x20 */ virtual void pad_20();
+    /* +0x24 */ virtual void pad_24();
+    /* +0x28 */ virtual void pad_28();
+    /* +0x2C */ virtual void pad_2C();
+    /* +0x30 */ virtual void pad_30();
+    /* +0x34 */ virtual void pad_34();
+    /* +0x38 */ virtual void pad_38();
+    /* +0x3C */ virtual s32  isVerbose_3C();
+    /* +0x40 */ virtual void pad_40();
+    /* +0x44 */ virtual void pad_44();
+    /* +0x48 */ virtual s32  flag_48(u16 value);
+    /* +0x4C */ virtual u16  encode_4C(u32 value);
+};   /* size: 0x04 (the object's leading vtable word) */
 
 /* ---- the network singleton `getInstance_` returns -------------------------------------------- */
 
+/* `postError` sits at vtable slot +0x288, which is 161 declared virtuals away: reaching it through a
+ * real virtual would mean inventing that many slots, so the singleton stays a documented table view
+ * here (a class we only construct in another unit).  Its two dispatch sites in fn_8041A87C.cpp read
+ * the same two loads retail does, off a scratch register. */
 typedef struct NetworkInstanceVtable {
     /* +0x000 */ u8 pad_00[0x288];
     /* +0x288 */ void (*postError_288)(void* self, NetworkErrorInfo* info);
