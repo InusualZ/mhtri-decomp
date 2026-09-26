@@ -82,6 +82,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/fn_801B0010.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"

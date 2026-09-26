@@ -19,6 +19,9 @@
 /* The sound-work record (`include/sound/se.h`) whose handle the `enemy` band's action steps hand
  * `se_req_pos_ps`/`shell_se_req`; forward-declared so this header stays light (rule 4's 0xB14). */
 struct _se_w;
+/* The player work record `_ENEMY_WORK::plw_0x32C`/`plw_0xA34` point at (`include/pl.h` owns its
+ * definition; this header only needs the pointer's type, so it forward-declares it). */
+struct _PLW;
 
 /* One 0x03-byte entry of the enemy program table `_ENEMY_WORK::prog_0xA00` points at (`fn_8013F764`
  * indexes it with a stride of 3: `entries[count - 1 - index]`, or `entries[index]` when the
@@ -50,8 +53,9 @@ struct EmCmdRec {
 };
 
 /* The 0xB20-byte records `get_move_work_adrs(2)` hands back (`fn_8013FD98` steps a whole record at a
- * time and asks `fn_8027D530` whether the candidate is the one it wants).  Only the two bytes the
- * search reads are named; the rest is the record's own layout, not this unit's business.
+ * time and asks `fn_8027D530` whether the candidate is the one it wants).  Only the bytes the search
+ * and the distance test read are named; the rest is the record's own layout, not this unit's
+ * business.
  * size: 0xB20 */
 struct EmAreaWork {
     /* +0x000 */ u8 active;
@@ -61,9 +65,30 @@ struct EmAreaWork {
     /* +0x009 */ u8 unused_0x009[0x016 - 0x009];
     /* +0x016 */ u8 area_no;
     /* +0x017 */ u8 unused_0x017[0x03C - 0x017];
-    /* +0x03C */ nw4r::math::VEC3 vec_0x3C; /* the position `fn_801B45B0` measures the seat
-                                      * records against (added by `enemy/fn_801B4458.cpp`) */
+    /* +0x03C */ nw4r::math::VEC3 vec_0x3C; /* one position, two readers: the record position
+                                      * `fn_801B45B0` measures the seat records against
+                                      * (`enemy/fn_801B4458.cpp`) and the one
+                                      * `enemy/fn_801B0010.cpp`'s `fn_801B06D4` passes to
+                                      * `fn_80050EAC` as its `(void*, VEC3*)` second argument */
     /* +0x048 */ u8 unused_0x048[0xB20 - 0x048];
+};
+
+/* The 0x20-byte ground/seat record `fn_80125F54` prepares and `fn_801421E4` fills: both take it as
+ * a `void* out` (their declarations are in `include/enemy/fn_801251D0.h` and
+ * `include/enemy/enemy_control.h`), so it is the CALLERS' record and the two units that own one
+ * share this one definition (docs/plan.md 6.5 rule 1): `enemy/fn_801B4458.cpp` names the seat flags
+ * at +0x03 and the two trailing words, `enemy/fn_801B0010.cpp`'s em030 program passes its address
+ * and reads `pos_0x08`.  Only the fields those two read are named.
+ * size: 0x20 */
+struct EmGroundRec {
+    /* +0x00 */ u8 field_0x00;
+    /* +0x01 */ u8 unused_0x01[2];
+    /* +0x03 */ u8 field_0x03;   /* the seat flags `fn_801B4C54` tests (bit 1) */
+    /* +0x04 */ u32 field_0x04;
+    /* +0x08 */ nw4r::math::VEC3 pos_0x08;
+    /* +0x14 */ u32 field_0x14;
+    /* +0x18 */ u32 field_0x18;
+    /* +0x1C */ u32 field_0x1C;
 };
 
 /* One 0x04-byte `{code, value}` action record of the list `fn_80126494` returns the head of
@@ -205,8 +230,10 @@ struct _ENEMY_WORK {
     /* +0x188 */ nw4r::math::VEC3 pos;
     /* +0x194 */ u8 unused_0x194[0x1AC - 0x194];
     /* +0x1AC */ f32 field_0x1AC;       /* the height `fn_8012F39C` compares against 0.9 * the model scale */
-    /* +0x1B0 */ nw4r::math::VEC3 aim;   /* the aim point `fn_801D75D0` copies the target
-                                         * record's position into (added by `enemy/fn_801D428C.cpp`) */
+    /* +0x1B0 */ nw4r::math::VEC3 aim;   /* one position, two readers: the second position
+                                         * `enemy/fn_801B0010.cpp`'s `fn_801B0810` copies the matching
+                                         * record's `pos` into, and the aim point `fn_801D75D0`
+                                         * copies the target record's position into (`enemy/fn_801D428C.cpp`) */
     /* +0x1BC */ u32 field_0x1BC;       /* a rotation angle (wraps at 0x10000) */
     /* +0x1C0 */ u32 field_0x1C0;       /* the second rotation angle `fn_80133DB0` steps */
     /* +0x1C4 */ u32 field_0x1C4;       /* the third rotation angle */
@@ -251,9 +278,11 @@ struct _ENEMY_WORK {
     /* +0x1FF */ u8 field_0x1FF;        /* the id `fn_801542D0`/`fn_801DF8EC` arm beside
                                         * +0x1FC/+0x1FE */
     /* +0x200 */ u8 unused_0x200[0x20C - 0x200];
-    /* +0x20C */ f32 field_0x20C;        /* the effect spawn height `fn_801D4DD8`/`fn_801D428C`
-                                         * add to the work record's y, and the height
-                                         * `fn_801A4504` compares its joint samples against */
+    /* +0x20C */ f32 field_0x20C;        /* one height, three readers: the effect spawn height
+                                         * `fn_801D4DD8`/`fn_801D428C` add to the work record's y,
+                                         * the height `fn_801A4504` compares its joint samples
+                                         * against, and the height `enemy/fn_801B0010.cpp`'s
+                                         * `fn_801B1B30` copies onto `pos.y` */
     /* +0x210 */ f32 field_0x210;       /* the second effect spawn height `enemy/fn_801DB8E0.cpp`'s
                                         * `fn_801DB978` adds to the work record's y (the +0x20C
                                         * sibling is the other branch's) */
@@ -274,9 +303,9 @@ struct _ENEMY_WORK {
                                             * `enemy/fn_80147CE0.cpp`) */
             /* +0x318 */ f32 field_0x318;  /* the effect radius `fn_801493A8` writes from `fn_80135644` */
         };
-        /* the same bytes as the offset vector `enemy/fn_801CA004.cpp`'s `fn_801CC5DC` rotates and
-         * hands the position helpers (added by that unit; `vec_0x310.y`/`.z` are the two floats
-         * above). */
+        /* the offset vector TWO units rotate and hand the position helpers: `enemy/fn_801CA004.cpp`'s
+         * `fn_801CC5DC` (added by that unit) and `enemy/fn_801B0010.cpp`'s `fn_801B1F94`, the em030
+         * program's, which rotates it with `rotVecY`; `vec_0x310.y`/`.z` are the two floats above. */
         struct {
             /* +0x30C */ u8 unused_0x30Cb[0x310 - 0x30C];
             /* +0x310 */ nw4r::math::VEC3 vec_0x310;
@@ -287,7 +316,9 @@ struct _ENEMY_WORK {
             /* +0x31C */ u8 unused_0x31C[0x320 - 0x31C];
             /* +0x320 */ f32 field_0x320;  /* the third effect scale `fn_80167770` seeds (added by
                                             * `enemy/fn_80165FC8.cpp`; the byte range is the +0x31C
-                                            * VEC3 clash that unit's header records) */
+                                            * VEC3 clash that unit's header records), and the one
+                                            * `enemy/fn_801B0010.cpp`'s `fn_801B1F94` arms beside
+                                            * the +0x310 triple */
             /* +0x324 */ f32 field_0x324;  /* the effect scale `fn_801493A8` clamps */
         };
         /* the second offset vector `enemy/fn_801D80EC.cpp`'s `fn_801D83C0` rotates (`rotVecY` on
@@ -383,6 +414,21 @@ struct _ENEMY_WORK {
         };
         /* this range's colour/step view (`fn_80181CC0`/`fn_80181E24`/`fn_801820DC`/`fn_801825A4`). */
         struct EmColorBlock color_0x328;
+        /* the em030 program's own field view `enemy/fn_801B0010.cpp` reaches field by field
+         * (`plw_0x32C` is the +0x328 move that unit latched).  Added by that unit; a union member
+         * because the views above already own these bytes. */
+        struct {
+            /* +0x328 */ u8 unused_0x328em[0x32C - 0x328];
+            /* +0x32C */ _PLW* plw_0x32C;  /* the player work `fn_801B0230` latched the +0x328 move
+                                            * on (NULL when nothing is latched) */
+            /* +0x330 */ u8 field_0x330;   /* the value the em030 condition hook
+                                            * (`em030_condition_ck`) reports for action 7 */
+            /* +0x331 */ u8 field_0x331;   /* the em030 hook's own latch */
+            /* +0x332 */ u8 field_0x332;   /* the em030 action-state ring 0..3 */
+            /* +0x333 */ u8 field_0x333;   /* the em030 two-state toggle */
+            /* +0x334 */ u8 field_0x334;   /* the em030 "in range" latch */
+            /* +0x335 */ u8 unused_0x335[0x354 - 0x335];
+        };
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
@@ -433,12 +479,17 @@ struct _ENEMY_WORK {
     /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `fn_80050F80` measures against
                                         * `pos` (`fn_8013F764`'s distance test) */
     /* +0x378 */ f32 value_0x378;       /* fn_80177F30/fn_8017801C clamp this against a pool float */
-    /* +0x37C */ u32 field_0x37C;       /* the rotation word `fn_801CEF44` latches from
-                                        * `field_0x1C0` and hands `fn_801354F4` (added by
-                                        * `enemy/fn_801CCBC4.cpp`) */
+    /* +0x37C */ u32 field_0x37C;       /* the rotation word `fn_801CEF44` latches from `field_0x1C0`
+                                        * and hands `fn_801354F4` (`enemy/fn_801CCBC4.cpp`), and the
+                                        * angle `enemy/fn_801B0010.cpp`'s `fn_801B2298` computes with
+                                        * `calcVecAngXY` and steps through `fn_80133DB0` */
     /* +0x380 */ u8 field_0x380;        /* the "special part armed" selector `fn_801D6758` matches
-                                         * against 1 (added by `enemy/fn_801D428C.cpp`) */
-    /* +0x381 */ u8 state_0x381;        /* its record index, handed to `fn_801377D0` */
+                                         * against 1 (`enemy/fn_801D428C.cpp`), and the em030
+                                         * homing/action state `enemy/fn_801B0010.cpp` keeps here */
+    /* +0x381 */ u8 state_0x381;        /* the picker mode `enemy/fn_801B0010.cpp`'s em030 hands to
+                                         * `fn_801377D0`, and the record index
+                                         * `enemy/fn_801D428C.cpp`'s `fn_801D6758` hands to the same
+                                         * function */
     /* +0x382 */ u8 field_0x382;        /* `fn_8013FD1C` writes it from the stream; 0xFF means
                                          * "no special part", which `fn_801D6758` rejects */
     /* +0x383 */ u8 field_0x383;        /* set once `fn_801262BC`'s record is latched */
@@ -455,12 +506,14 @@ struct _ENEMY_WORK {
     /* +0x439 */ u8 field_0x439;
     /* +0x43A */ u8 field_0x43A;
     /* +0x43B */ u8 field_0x43B;        /* the per-motion kind gate `fn_8012F474` tests against 2 */
-    /* +0x43C */ u8 unused_0x43C;
+    /* +0x43C */ u8 field_0x43C;        /* the second half of the em030 state pair `fn_801B0A28`
+                                        * dispatches on (named by `enemy/fn_801B0010.cpp`) */
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
     /* +0x43F */ u8 field_0x43F;        /* `fn_8013763C` sets it, `fn_80137648` reads it back */
     /* +0x440 */ s16 field_0x440;    /* the action frame counter `enemy/fn_801B4458.cpp`'s
-                                        * `fn_801B47A4` tests against 0x1C2 (added by that unit) */
+                                        * `fn_801B47A4` tests against 0x1C2 and `enemy/fn_801B0010.cpp`'s
+                                        * em030 `fn_801B0A28` against 300/1800 */
     /* +0x442 */ u8 unused_0x442[0x450 - 0x442];
     /* +0x450 */ s16 field_0x450;       /* the first of the two `lha` gates `enemy/fn_801DB8E0.cpp`'s
                                         * `fn_801DF8EC` compares (+0x452 is its sibling) */
@@ -492,14 +545,17 @@ struct _ENEMY_WORK {
     /* +0x740 */ struct EmPartState part_0x740; /* the per-part flags/counters `fn_801823A0`/
                                         * `fn_801823C0` write (added by `enemy/fn_80181C88.cpp`) */
     /* +0x74E */ u8 unused_0x74E[0x761 - 0x74E];
-    /* +0x761 */ u8 field_0x761;       /* one byte, two bands: `enemy/fn_801993E0.cpp`'s slot bit
+    /* +0x761 */ u8 field_0x761;       /* one byte, three readers: `enemy/fn_801993E0.cpp`'s slot bit
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
-                                        * 8 bits for free slot indices) and `enemy/fn_801D428C.cpp`'s
-                                        * `fn_801D4F78`, whose bit 0 is the "aim target live" flag it
-                                        * mirrors from `fn_8012EC60`/the area test and bit 1 its
-                                        * one-shot latch. */
-    /* +0x762 */ u8 field_0x762;       /* the latch `fn_801D4F78` checks before setting bit 1
-                                        * (added by `enemy/fn_801D428C.cpp`) */
+                                        * 8 bits for free slot indices), `enemy/fn_801D428C.cpp`'s
+                                        * `fn_801D4F78` (bit 0 the "aim target live" flag it mirrors
+                                        * from `fn_8012EC60`/the area test, bit 1 its one-shot latch),
+                                        * and `enemy/fn_801B0010.cpp`'s em030 action bitmap (bit 0x01
+                                        * the running flag `fn_801B0A28` arms, 0x10/0x20/0x40/0x80 the
+                                        * exclusive motion-state bits). */
+    /* +0x762 */ u8 field_0x762;       /* `enemy/fn_801D428C.cpp`'s latch `fn_801D4F78` checks before
+                                        * setting bit 1, and the em030 motion flag
+                                        * `enemy/fn_801B0010.cpp`'s `fn_801B055C` state ring reads */
     /* +0x763 */ u8 unused_0x763[0x76C - 0x763];
     /* +0x76C */ nw4r::math::VEC3 vec_0x76C; /* the position `calcVecAngX` is handed in
                                          * `fn_801D4CE0` (added by `enemy/fn_801D428C.cpp`) */
@@ -532,8 +588,9 @@ struct _ENEMY_WORK {
                                         * (<= 0); added by `enemy/fn_80181C88.cpp`, which re-types the
                                         * base filler's first two bytes */
     /* +0x81C */ u8 unused_0x81C[0x833 - 0x81C];
-    /* +0x833 */ u8 field_0x833;       /* the "approach armed" byte `enemy/fn_801B4458.cpp`'s
-                                        * `fn_801B47A4` branches on (added by that unit) */
+    /* +0x833 */ u8 field_0x833;       /* the "approach armed" byte TWO readers branch on:
+                                        * `enemy/fn_801B0010.cpp`'s em030 `fn_801B0A28` and
+                                        * `enemy/fn_801B4458.cpp`'s `fn_801B47A4` */
     /* +0x834 */ u8 field_0x834;      /* the "already seated" byte `fn_801671AC` tests against 1
                                         * (added by `enemy/fn_80165FC8.cpp`) */
     /* +0x835 */ u8 field_0x835;      /* the seat flag `fn_80166DF8` sets */
@@ -613,7 +670,16 @@ struct _ENEMY_WORK {
     /* +0x0A07 */ u8 field_0xA07;
     /* +0x0A08 */ u8 unused_0xA08[0xA0D - 0xA08];
     /* +0x0A0D */ u8 field_0xA0D;       /* fn_80177D54's per-frame gate */
-    /* +0x0A0E */ u8 unused_0xA0E[0xA69 - 0xA0E];
+    /* +0x0A0E */ u8 unused_0xA0E[0xA16 - 0xA0E];
+    /* +0xA16 */ u8 field_0xA16;      /* the byte `enemy/fn_801B0010.cpp`'s `fn_801B203C` tests against
+                                        * 0xFF/5 before it latches the counter-attack (added by that
+                                        * unit) */
+    /* +0xA17 */ u8 unused_0xA17[0xA34 - 0xA17];
+    /* +0xA34 */ _PLW* plw_0xA34;     /* the player work `fn_801B203C` hands `fn_801B0230` (added by
+                                        * `enemy/fn_801B0010.cpp`) */
+    /* +0xA38 */ u8 field_0xA38;      /* the third gate `fn_801B203C` tests (added by
+                                        * `enemy/fn_801B0010.cpp`) */
+    /* +0xA39 */ u8 unused_0xA39[0xA69 - 0xA39];
     /* +0x0A69 */ u8 field_0xA69;       /* fn_80177D54's second gate */
     /* +0x0A6A */ u8 unused_0xA6A[0xAEA - 0xA6A];
     /* +0x0AEA */ u16 field_0xAEA;      /* the eighteen-bit flag word `enemy/fn_801D80EC.cpp`'s
