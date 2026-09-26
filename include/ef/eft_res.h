@@ -25,6 +25,14 @@ void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void* arg);
 EftResSlot* fn_800F8788(u32 size);
 /* Releases `count` handles from `list` back to the heap. */
 void fn_800F8A44(void* list, s32 count);
+/* 0x800F92F4 - the per-mode alive check the effect state bodies make (`mode` 0 is the "may the
+ * record keep stepping" test).  Added with `ef/fn_8030681C.cpp`, whose kind-1 bodies branch on it.
+ * The second parameter is `u32`: `ef/fn_801173AC.cpp` includes this header and carries its own
+ * declaration of the same address with `u32` (its line 323), so any other width here is a second
+ * overload in that TU - `s32` cost the whole tree its build with (10197) illegal function
+ * overloading.  `_EFT*` for `self` is this header's spelling; the owner's own `void*` definition
+ * would be the third overload there, so it stays a rule-2 residual for the consolidation pass. */
+s32 fn_800F92F4(_EFT* self, u32 mode);
 /* Takes one pooled model record out of the effect-model pool and returns it (the `EftModel`
  * `res_eft_*_model_create` then binds a character to).  Added with `ef/eft035.cpp`, which seeds each
  * of its work block's model slots with it. */

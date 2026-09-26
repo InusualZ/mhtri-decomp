@@ -34,6 +34,9 @@ void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
  * eft019's creation path), and reports whether the pooled effect is still alive. */
 void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
 s32 fn_800F9884(nw4r::ef::Effect* effect);
+/* 0x800F9D80 - the effect's state/frame report the kind-1 state-0 body switches on (it compares it
+ * against 1).  Added with `ef/fn_8030681C.cpp`. */
+s32 fn_800F9D80(_EFT* self);
 
 #ifdef __cplusplus
 }

@@ -116,6 +116,7 @@ typedef struct MHchar {
      * (`setVisibility__6MHcharFUlb`, ...), so they are declared here once and called as members
      * (docs/plan.md 6.5 rule 9).  A member adds no storage, so the C view is unchanged. */
     void setVisibility(u32 index, bool visible);                                   /* ef/eft001.cpp, ef/eft007.cpp */
+    int get_joint_num(void);                                                       /* ef/fn_8030681C.cpp */
     void get_joint_wpos(u32 joint, nw4r::math::VEC3* out);                         /* ef/eft001.cpp, ef/eft007.cpp */
     void move(u16 flags);                                                          /* ef/eft001.cpp */
     void move2(nw4r::math::MTX34* mtx, u16 flags);                                 /* ef/eft001.cpp */
