@@ -83,4 +83,28 @@ struct MenuListWork {
     /* +0x1D2 */ char long_name_0x1D2[0x0E];
 };
 
+/* The range's own entry points the neighbouring units call.  `include/unsplit/lobby.h` and
+ * `include/lobby/fn_801F3294.h` published them while the band had no registered unit; this range now
+ * owns 0x802A6624-0x802AD9C0, so the declarations live here and both headers include this one
+ * (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
+ * parameters are what the retail call sites need: a narrow argument must not be narrowed back to `s16`
+ * for the call).  `fn_802A8F50` is unwritten - its callers spell it as below. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void fn_802A7C04(u16 id, u16* item);
+s32 fn_802A8EC0(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
+s32 fn_802A8ED8(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
+s32 fn_802A8EFC(s32 a, s32 b, u16 c, u16 d, u16 e);
+s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
+
+#ifdef __cplusplus
+}
+
+/* 0x802AA3EC - the `bool` row's colour, the front-end's spelling of the map's
+ * `GetMenuFontColor__Fbbbb` (rule 9). */
+s32 GetMenuFontColor(bool a, bool b, bool c, bool d);
+#endif
+
 #endif /* MHTRI_MENU_FN_802A6624_H */

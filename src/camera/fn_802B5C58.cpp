@@ -12,10 +12,13 @@
  * string covers the range (it references no `.rodata` at all) and the shared runtime dump answers only
  * `zz_XXXXXXXX_` for everything but those four names, so the file keeps the map's stem.
  *
- * The camera work.  `fn_802BECD0` (0x802BECD0, the next unit) returns `lbl_806BB7E0` or
- * `lbl_806BB7E0 + 1272`; `lbl_806BB7E0` is a 0x9F0-byte `.bss` object, i.e. two 0x4F8 `CamWork` slots -
- * that is where `CamWork`'s size comes from.  This unit's functions take that pointer as `self`, or
- * call `fn_802BECD0()` for it, and touch fields up to `+0x4F7`.
+ * The camera work.  `fn_802BECD0` (0x802BECD0, `light/light.cpp`'s first function) returns
+ * `lbl_806BB7E0` or `lbl_806BB7E0 + 1272`; `lbl_806BB7E0` is a 0x9F0-byte `.bss` object, i.e. two
+ * 0x4F8 `CamWork` slots - that is where `CamWork`'s size comes from.  This unit's functions take that
+ * pointer as `self`, or call the accessor for it through this unit's own name for the record
+ * (`(CamWork*)fn_802BECD0()`: the owner views the same 0x4F8 bytes as `LightWork` and declares only
+ * that spelling - `include/light/light.h`; folding the two views into one definition is the rule-1
+ * pass `include/unsplit/camera.h` records), and touch fields up to `+0x4F7`.
  *
  * The seam at 0x802B5C58 is pinned by a `.sdata2` pool jump (`lbl_8079A514` -> `lbl_8079A530`);
  * `tudiscover` reports `MATCH SET 0x802B5C58..0x802BEAAC` (132 functions, 5 must-link anchors).  The
@@ -98,8 +101,13 @@ typedef struct CamWorkSrc {
 
 /*
  * The camera work block: 0x4F8 bytes, from `lbl_806BB7E0` (a 0x9F0-byte `.bss` object = two slots) and
- * `fn_802BECD0`'s `base + 1272`.  Only the fields this unit touches are named; untouched runs keep
+ * the accessor's `base + 1272`.  Only the fields this unit touches are named; untouched runs keep
  * their offset as padding.
+ *
+ * `fn_802BECD0` is declared by its owner (`include/light/light.h`) over the same bytes, under that
+ * unit's own view name `LightWork`; this unit's name for the record is `CamWork`, so every read of
+ * the accessor goes through a cast to it - a type adaptation, no instruction (rule 1's two-views
+ * residual, not a rename of either view).
  */
 typedef struct CamWork {
     /* +0x000 */ u8 pad_0x000[0x9];
@@ -325,7 +333,7 @@ void fn_802B81C0(CamWork* self, u8 index, u8 value)
  */
 u8 fn_802B8B68(void)
 {
-    return fn_802BECD0()->field_0x09C;
+    return ((CamWork*)fn_802BECD0())->field_0x09C;
 }
 
 /*
@@ -333,7 +341,7 @@ u8 fn_802B8B68(void)
  */
 u8 fn_802B8E48(void)
 {
-    return fn_802BECD0()->field_0x0B6;
+    return ((CamWork*)fn_802BECD0())->field_0x0B6;
 }
 
 /*
@@ -341,7 +349,7 @@ u8 fn_802B8E48(void)
  */
 void fn_802B954C(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     self->field_0x145 = 1;
 }
@@ -351,7 +359,7 @@ void fn_802B954C(void)
  */
 void fn_802B9574(u8 reset)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     if (reset == 0)
         self->field_0x118 = -1;
@@ -362,7 +370,7 @@ void fn_802B9574(u8 reset)
  */
 bool fn_802B95B4(void)
 {
-    return fn_802BECD0()->field_0x118 > 0;
+    return ((CamWork*)fn_802BECD0())->field_0x118 > 0;
 }
 
 /*
@@ -371,7 +379,7 @@ bool fn_802B95B4(void)
  */
 u8 fn_802B9740(void* unused, u8* out_a, u8* out_b, f32* out_timer)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     *out_a = self->field_0x1ED;
     *out_b = self->field_0x1EE;
@@ -454,7 +462,7 @@ void fn_802BBA2C(u32 mode)
  */
 void fn_802BBA3C(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     self->field_0x47A = 0;
 }
@@ -464,7 +472,7 @@ void fn_802BBA3C(void)
  */
 void fn_802BBA64(u8 value)
 {
-    fn_802BECD0()->field_0x47E = value;
+    ((CamWork*)fn_802BECD0())->field_0x47E = value;
 }
 
 /*
@@ -472,7 +480,7 @@ void fn_802BBA64(u8 value)
  */
 u8 fn_802BBA94(void)
 {
-    return fn_802BECD0()->field_0x460;
+    return ((CamWork*)fn_802BECD0())->field_0x460;
 }
 
 /*
@@ -488,7 +496,7 @@ void fn_802BBAC0(void)
  */
 void fn_802BBAC4(u8 value)
 {
-    fn_802BECD0()->field_0x47F = value;
+    ((CamWork*)fn_802BECD0())->field_0x47F = value;
 }
 
 /*
@@ -512,7 +520,7 @@ void fn_802BBB78(void)
  */
 void fn_802BC000(u8 slot, u8 set)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     if (set == 1)
         self->field_0x4F7 |= 1 << slot;
@@ -541,7 +549,7 @@ bool fn_802BC1CC(CamWork* self)
  */
 void fn_802BC468(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     self->field_0x286 = 0;
     self->field_0x287 = 0;
@@ -558,7 +566,7 @@ void fn_802BC468(void)
  */
 s16 fn_802BC82C(u8 full)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     if (full == 0)
         return self->field_0x288;
@@ -570,7 +578,7 @@ s16 fn_802BC82C(u8 full)
  */
 s16 fn_802BC878(void)
 {
-    return fn_802BECD0()->field_0x344;
+    return ((CamWork*)fn_802BECD0())->field_0x344;
 }
 
 /*
@@ -629,7 +637,7 @@ s32 fn_802BDC2C(s16 a, s16 b, u8 shift)
  */
 u32 fn_802BE060(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     return (u16)self->field_0x4EC;
 }
@@ -639,7 +647,7 @@ u32 fn_802BE060(void)
  */
 u32 fn_802BE038(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     return (u16)self->field_0x4F0;
 }
@@ -649,7 +657,7 @@ u32 fn_802BE038(void)
  */
 bool fn_802BE3EC(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     return self->field_0x284 == 1;
 }
@@ -659,7 +667,7 @@ bool fn_802BE3EC(void)
  */
 bool fn_802BE41C(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     return self->field_0x388 == 1;
 }
@@ -738,7 +746,7 @@ void fn_802BE44C(CamQuake* slot, const nw4r::math::VEC3* origin, u8 kind, u8 fla
  */
 void fn_802BE4FC(u8 kind)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
     nw4r::math::VEC3 origin;
 
     fn_80043EA8(&origin);
@@ -751,7 +759,7 @@ void fn_802BE4FC(u8 kind)
  */
 void fn_802BE568(CamWorkSrc* work, u8 kind)
 {
-    CamQuake* slot = &fn_802BECD0()->quake_0x4A8;
+    CamQuake* slot = &((CamWork*)fn_802BECD0())->quake_0x4A8;
 
     if (fn_8026FD94((_PLW*)work) != 0)
         fn_802BE44C(slot, &work->vec_0x3C, kind, 0);
@@ -762,7 +770,7 @@ void fn_802BE568(CamWorkSrc* work, u8 kind)
  */
 void fn_802BE714(CamWorkSrc* work, u8 kind)
 {
-    CamQuake* slot = &fn_802BECD0()->quake_0x4BC;
+    CamQuake* slot = &((CamWork*)fn_802BECD0())->quake_0x4BC;
 
     if (fn_8026FD94((_PLW*)work) != 0)
         fn_802BE44C(slot, &work->vec_0x3C, kind, 0);
@@ -773,7 +781,7 @@ void fn_802BE714(CamWorkSrc* work, u8 kind)
  */
 void fn_802BE77C(u8 kind)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
     nw4r::math::VEC3 origin;
 
     fn_80043EA8(&origin);
@@ -786,7 +794,7 @@ void fn_802BE77C(u8 kind)
  */
 void fn_802B8B8C(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     self->quake_0x4D0.active_0x0C = 0;
     self->quake_0x4BC.active_0x0C = 0;
@@ -803,7 +811,7 @@ void fn_802B8B8C(void)
  */
 void fn_802BB0EC(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     self->field_0x499 = 4;
     fn_802B8B8C();
@@ -814,7 +822,7 @@ void fn_802BB0EC(void)
  */
 void fn_802BC65C(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     fn_802BC4AC(2, 0);
     self->field_0x285 = 40;
@@ -825,7 +833,7 @@ void fn_802BC65C(void)
  */
 void fn_802BC69C(void)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     fn_802BC4AC(3, 0);
     self->field_0x285 = 8;
@@ -861,7 +869,7 @@ void fn_802BC820(u32 base, u32 arg)
  */
 void fn_802BC7C8(u8 mode, u32 arg)
 {
-    CamWork* self = fn_802BECD0();
+    CamWork* self = (CamWork*)fn_802BECD0();
 
     fn_802BC4AC(mode, arg);
     self->field_0x285 = 8;
@@ -911,5 +919,5 @@ nw4r::math::VEC3 get_camera_pos(void)
  */
 void set_quake_sub(u8 kind, nw4r::math::VEC3* origin)
 {
-    fn_802BE44C(&fn_802BECD0()->quake_0x4A8, origin, kind, 0);
+    fn_802BE44C(&((CamWork*)fn_802BECD0())->quake_0x4A8, origin, kind, 0);
 }

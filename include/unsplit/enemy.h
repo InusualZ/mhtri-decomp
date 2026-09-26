@@ -13,6 +13,10 @@
  * argument-accepting spelling; the band re-exports it so the existing consumers that include this
  * header (rule 2: a declaration belongs with its owner's TU). */
 #include "enemy/fn_8012E968.h"
+/* The same for the enemy range `enemy/fn_801502C8.cpp` owns (0x801502C8-0x801545B8):
+ * `fn_80154784`/`fn_80154CA4`/`fn_801545B8` were declared in this band header, and this re-exports
+ * the owner's header so the consumers that include this one keep them (rule 2). */
+#include "enemy/fn_801502C8.h"
 
 struct _ENEMY_WORK;
 struct EnemyData;
@@ -221,10 +225,11 @@ void fn_80170E78(struct _ENEMY_WORK* self);
 void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
-/* 0x80154784 - the enemy band 0x801545B8..0x80154CA4's checker, added by `enemy/fn_801B0010.cpp`
- * (rule 2: both bracketing registered units are `enemy`, so this band header is its home until the
- * band is registered).  r3 the work record, the answer in r3 (compared against 1). */
-u32 fn_80154784(struct _ENEMY_WORK* work);
+/* `fn_80154784` (0x80154784) was declared here (from `enemy/fn_801B0010.cpp`'s call site) as
+ * `u32 (struct _ENEMY_WORK*)` while the band had no registered unit.  `enemy/fn_801502C8.cpp` owns
+ * 0x801502C8-0x801545B8 now, and its header `include/enemy/fn_801502C8.h` declares the symbol with
+ * that same unsigned spelling (the call site reads the answer unsigned) - this band header includes
+ * it (rule 2). */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);
@@ -244,13 +249,11 @@ void fn_801321D0(struct _ENEMY_WORK* self);
 void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
 void fn_80132224(struct _ENEMY_WORK* self);
 void fn_80132264(struct _ENEMY_WORK* self);
-/* 0x80154CA4 / 0x801545B8 - enemy band, unowned (both bracketing registered units are `enemy`:
- * `enemy/fn_8014A1BC.c` below, `enemy/fn_801550FC.cpp` above).  Moved here from
- * `enemy/fn_80147CE0.cpp` (rule 2): `fn_80154CA4` takes `self` only (its body clamps
- * `self->+0x1AC` after `fn_801303FC`), `fn_801545B8` takes a `void*` record and three scalars (its
- * body saves r28..r31 and calls `fn_80041E8C(&v, 0.0f, x, y)` with the record at r3). */
-void fn_80154CA4(struct _ENEMY_WORK* self);
-void fn_801545B8(void* v, u32 a, u32 b, u32 c);
+/* `fn_80154CA4`/`fn_801545B8` (0x80154CA4/0x801545B8) were declared here (moved from
+ * `enemy/fn_80147CE0.cpp`'s call sites) while the band 0x801545B8..0x80154CA4 had no registered
+ * unit.  `enemy/fn_801502C8.cpp` owns 0x801502C8-0x801545B8 now, so `include/enemy/fn_801502C8.h`
+ * (included above) declares both: `fn_80154CA4` takes the record and `fn_801545B8` the 0x18-byte
+ * spawn record; the spellings here were the call sites' `void*`/`u32` view (rule 2). */
 /* The tenth argument is a POINTER, settled from the callee's own body (`auto_fn_80141B88_text.s`):
  * it loads the outgoing stack word into r21 and hands it to `fn_80041E40` as the second argument
  * when it is non-null, and the two callers pass a `VEC3*` (`enemy/fn_8015D860.cpp`'s `fn_8015DB68`)

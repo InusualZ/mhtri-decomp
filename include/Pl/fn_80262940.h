@@ -7,9 +7,9 @@
  * address.  This is the owner's header; the signature is the owner's own definition
  * (`src/Pl/fn_80262940.cpp:478`, `void (_PLW*, u32, s32, u16)`), and the return is `void` there.
  *
- * The copy in `Pl/fn_8025F088.h` is left alone: it is MAIN's pre-existing boundary artefact from the
- * unit that registered first, it is only reachable from that unit and its own consumers, and folding
- * it into this header is a change to another lane's file (recorded in this unit's outbox).
+ * The copy in `Pl/fn_8025F088.h` is gone: that header includes this one now, so a translation unit
+ * that sees both gets one `void` declaration instead of the `u32` one that used to clash with it
+ * ((10505) illegal overloading).
  */
 #ifndef MHTRI_PL_FN_80262940_H
 #define MHTRI_PL_FN_80262940_H

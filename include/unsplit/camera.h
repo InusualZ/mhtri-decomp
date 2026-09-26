@@ -3,29 +3,18 @@
  * (docs/plan.md 6.5 rule 2).  The camera unit `camera/fn_802B5C58.cpp` consumes them; when the
  * neighbouring camera TUs register, each declaration moves to its owner's header.
  *
- * `fn_802BECD0` (0x802BECD0) is the camera-work accessor: it returns `lbl_806BB7E0` or
- * `lbl_806BB7E0 + 1272`, two 0x4F8-byte camera work slots.  Its own band is unclaimed (the registered
- * units bracketing it are `stage` below and `ai` above, i.e. different modules), so it has no owner
- * header to move to yet.
+ * `fn_802BECD0` (0x802BECD0) used to be declared here as `struct CamWork*`; `light/light.cpp` owns
+ * that address and defines the record's accessor over its own view of the 0x4F8 bytes
+ * (`LightWork`), so the declaration lives in `include/light/light.h` - included below - and this
+ * header re-exports it (the `(10505) illegal overloading` the two spellings would have been).
  */
 
 #ifndef MHTRI_UNSPLIT_CAMERA_H
 #define MHTRI_UNSPLIT_CAMERA_H
 
 #include "types.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-struct CamWork;
-
-/* 0x802BECD0 - the camera work the whole band reads and writes. */
-struct CamWork* fn_802BECD0(void);
-
-#ifdef __cplusplus
-}
-#endif
+/* The owner's header for the 0x802BECD0 accessor (docs/plan.md 6.5 rule 2). */
+#include "light/light.h"
 
 /* `.sdata2` pool constants of the camera band (all inside 0x8079A4D8..0x8079A5FC).  Declared, never
  * defined: the pool belongs to the split, and defining the constants here would rebuild the section

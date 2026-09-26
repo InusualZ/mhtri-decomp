@@ -82,6 +82,7 @@
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_80147CE0.h" /* EmSpawnRec + fn_80147E2C (the owner's header) */
+#include "enemy/fn_801502C8.h" /* this unit's own declarations (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 
 #ifdef __cplusplus
@@ -893,8 +894,9 @@ s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1) {
     return 0;
 }
 
-/* 0x80154784 (0x28) - is the action one of the glide steps? */
-s32 fn_80154784(struct _ENEMY_WORK* self) {
+/* 0x80154784 (0x28) - is the action one of the glide steps?  `u32`: its call site compares the
+ * answer against 1 unsigned (`enemy/fn_801B0010.cpp`). */
+u32 fn_80154784(struct _ENEMY_WORK* self) {
     if (self->action == 0xD && self->state_sub <= 4) {
         return 1;
     }

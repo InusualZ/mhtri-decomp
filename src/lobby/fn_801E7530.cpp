@@ -233,7 +233,8 @@ s32 fn_801E790C(LbMenuWork* self)
         result = 2;
         sysSE_req(1);
     } else if (fn_802121F4(0xC) != 0) {
-        value = fn_802A8EC0(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, self->str_0x24);
+        /* The string block goes through the owner's `s32` tail parameter; the cast emits nothing. */
+        value = fn_802A8EC0(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, (s32)self->str_0x24);
         self->list_mode_0x0C = value;
         fn_801E7530(self, value);
     } else if (fn_802121F4(3) != 0) {

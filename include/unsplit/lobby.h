@@ -16,6 +16,13 @@
 #include "types.h"
 #include "lobby/lb_npc.h"
 
+/* Owner headers (rule 2).  The menu range's list/cursor entry points and the camera range's
+ * `fn_802BBA64` group were declared in this band header while their addresses were unclaimed; both
+ * ranges are registered now (`menu/fn_802A6624.cpp`, `camera/fn_802B5C58.cpp`), so their declarations
+ * live in these headers and this one re-exports them for the units that already include it. */
+#include "camera/camera.h"
+#include "menu/fn_802A6624.h"
+
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
 typedef struct _mh_ivec2_ {
@@ -494,15 +501,15 @@ s32 fn_8021D5BC(void);
 s32 fn_8021F238(void);
 s32 fn_80222848(s32, s16 *);
 s32 fn_80222BC4(void*, s32, u8);
-s32 fn_802A7C04(s32, u16 *);
-s16 fn_802A8EC0(s16, s16, u16, s32, s32, void *);
-s16 fn_802A8ED8(s16, s16, u16, s32, s32, s32);
-s16 fn_802A8EFC(s16, s16, u16, s32, s32);
-s32 fn_802A8F50(void *, u16, s32, s32, s32);
-s32 fn_802BBA64(s32);
-s32 fn_802BBAC0(void);
-s32 fn_802BBAC4(s32);
+/* `fn_802A7C04`/`fn_802A8EC0`/`fn_802A8ED8`/`fn_802A8EFC`/`fn_802A8F50` (0x802A7C04-0x802A8F50) were
+ * declared here while the menu band had no registered unit.  `menu/fn_802A6624.cpp` owns that range
+ * now, so its header `include/menu/fn_802A6624.h` declares them and this header includes it (rule 2).
+ * They stood here with `s16` returns and `void*`/`s32` tails while the owner defines `s32` - that
+ * mismatch is the `(10505) illegal overloading` this move clears. */
 s32 fn_802DE224(void);
+/* `fn_802BBA64`/`fn_802BBAC0`/`fn_802BBAC4` (0x802BBA64-0x802BBAF4) were declared here as `s32 (s32)`;
+ * `camera/fn_802B5C58.cpp` owns that range and `include/camera/camera.h` - included by this header -
+ * declares them `void (u8)` (rule 2). */
 s32 fn_802DF6E4(s32);
 s32 fn_802E0DA8(s16 *, u16, s16 *);
 s32 fn_802FB4BC(u16);
@@ -538,7 +545,9 @@ void fn_8042E9A4(u32 id, u8* table);
  * declarations, and rule 9 forbids spelling the manglings at the call site. */
 #ifdef __cplusplus
 
-s32 GetMenuFontColor(bool, bool, bool, bool);
+/* `GetMenuFontColor` (0x802AA3EC, the map's `GetMenuFontColor__Fbbbb`) was declared here while the
+ * menu band had no registered unit; `menu/fn_802A6624.cpp` owns the address now and the owner's header
+ * `include/menu/fn_802A6624.h`, included above, declares it with this same spelling (rule 2). */
 /* `ItemName` (0x8029F628) and `put_menu_cursor` (0x802A2564) were declared here while the band between
  * `Pl/fn_80295EF4.cpp` and `stage/stg_w.cpp` had no registered unit.  `menu/menu_item.cpp` now owns
  * both addresses, so the declarations live in its header `include/menu/menu_item.h` (rule 2) - the
