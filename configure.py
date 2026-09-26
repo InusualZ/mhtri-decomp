@@ -1443,6 +1443,16 @@ config.libs = [
             # class 3).  Sections: extab 0x80010ADC..0x80010DBC, extabindex 0x8002CF34..0x8002D384
             # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
             Object(NonMatching, "lobby/lb_npc.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8020C588_fn_8020C588.cpp: the lobby player-character control band
+            # (`.text` 0x8020C588..0x80212810, 112 functions / 25224 B, plus its extab run
+            # 0x80011184..0x80011434 and extabindex run 0x8002D930..0x8002DD38 - 86 records).
+            # It sits between this unit and `lobby/fn_80212810.cpp`, so the module is `lobby`
+            # (class 3: the link band); the range **defines** `LbStr__FUcUs`, the lobby string
+            # helper `include/unsplit/lobby.h` declares and `lobby/fn_801E7530.cpp` calls, and
+            # calls the lobby UI API.  No `__FILE__` string survives, so the file keeps the
+            # map's `fn_8020C588` stem (class 4; see the unit's header).
+            Object(NonMatching, "lobby/fn_8020C588.cpp"),
             # `80212810_fn_80212810.cpp` (`.text` 0x80212810..0x80219260, 105 functions / 27216 B) -
             # the lobby item/equipment page layer.  Module `lobby` from the code (`LbStr`,
             # `LbPutAnaPageArrow`, `get_lsp_data`, `draw_sprite_ary`, `GetMenuFontColor`) and from the
