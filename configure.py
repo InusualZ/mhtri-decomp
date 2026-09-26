@@ -354,6 +354,16 @@ cflags_main = [
     "-Cpp_exceptions on",
 ]
 
+# menu flags (src/menu/menu_item.cpp). cflags_main plus `-opt nopeephole`: the retail `ItemName`
+# (0x8029F628, 44 B / 13 ins) keeps `clrlwi r0,r3,16` + `slwi r0,r0,2` separate where the peephole pass
+# folds them into one `clrlslwi r0,r3,16,2` (measured: 34.090908 -> 100.0 with the flag off, 36 B ->
+# 44 B). The fold is a peephole emission, not a source shape - the index is a `u16` in both - and the
+# unit carries 0 record-form instructions, like the Pl and stage bands beside it.
+cflags_menu = [
+    *cflags_main,
+    "-opt nopeephole",
+]
+
 # Camellia flags. Evidence-backed per-object overrides for Camellia/camellia.c, which does not match with
 # the cflags_runtime defaults:
 #   * the retail object has no stmw/lmw -- it calls the EABI _savegpr_14/_restgpr_14 helpers
@@ -495,6 +505,26 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(Matching, "hud/fn_80324F7C.c"),
+        ],
+    },
+
+    {
+        # New module, registered from proposal/8029F3C8_body_set__FP7_BODY_WP10_BODY_DATAUcUlUc: the
+        # item menu's data layer (`.text` 0x8029F3C8..0x802A5444, 91 functions, 0x607C B; extab
+        # 0x8001360C..0x800137A4 and extabindex 0x80030F90..0x800311F4 for the 51 framed functions in
+        # that range).  Module `menu` and file name `menu_item.cpp` come from the range's own
+        # `__FILE__` string (`.data` 0x805CDFC8, 0xE B = "menu_item.cpp"; the dump's local symbol for it
+        # is `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. it is emitted by 0x802A22A4, a function of this
+        # range).  cflags_main: the range keeps `bl`s to its tiny same-file helpers
+        # (`GetItemData` from `fn_8029F704`/`fn_8029F73C`, `hit_flag_set` from `fn_8029F4C4`), which is
+        # cflags_main's `-inline noauto`, and it carries 0 record-form instructions like the stage and
+        # Pl bands (the peephole is not proven off here - `infer.py` reads absence as no evidence).
+        "lib": "menu",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_menu,
+        "progress_category": "game",
+        "objects": [
+            Object(NonMatching, "menu/menu_item.cpp"),
         ],
     },
 
