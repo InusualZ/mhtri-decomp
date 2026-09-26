@@ -1896,6 +1896,15 @@ config.libs = [
             # Evidence class 1; un-moduled game file at the repository root in the `main` (game) lib,
             # cflags_main.  Claims .text 0x8056BBF0-0x8056F2B4 + the .ctors word 0x8056F428-0x8056F42C.
             Object(NonMatching, "tiHKBManager.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80429B94_fn_80429B94` - the 0x80429B94-0x8043065C network/server-control band (114
+            # functions, 27336 B) with extab 0x8001D368-0x8001D558 and extabindex 0x8003DE54-0x8003E0DC.
+            # Game code that drives getPatsObject/getNetworkSessionManagerPat and reads the lobby
+            # singleton `lobby_w`; no `__FILE__` string and no runtime-dump source name cover the
+            # range, so the stem is the map's `fn_80429B94` with a rule-7 deferral (classes 3/4).  It
+            # takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
+            # -Cpp_exceptions on - the target object carries extab/extabindex).
+            Object(NonMatching, "fn_80429B94.cpp"),
         ],
     },
 ]
