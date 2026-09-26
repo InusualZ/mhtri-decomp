@@ -64,6 +64,9 @@ void fn_8026FEF0(struct _PLW* self, s32 v);
 u32 fn_8026FE44(struct _PLW* self);
 u8 fn_8026F908(struct _PLW* self, u32 a);
 u32 fn_8026F888(struct _PLW* self);
+/* 0x8026FB20 - the act's status-bit test `Pl/fn_80273B14.cpp`'s act entry gates its
+ * direction flip on; added with that unit (rule 2). */
+u32 fn_8026FB20(struct _PLW* self, u32 mask);
 #endif
 
 #endif /* MHTRI_PL_PL_MASTER_H */

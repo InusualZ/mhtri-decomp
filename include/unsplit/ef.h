@@ -33,6 +33,12 @@ f32 fn_800AB658(void* self, f32 v);
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 void fn_801173AC(void* self);
 void fn_80043EA8(Vec3* out);
+
+/* 0x800CFA90 / 0x800CFAD0 - the move-work record table and its record count.  No registered unit
+ * owns the run (it sits between `ef/eft001.cpp` and `ef/eft002.cpp`), so this band header is their
+ * rule-2 home.  Added with `Pl/fn_80273B14.cpp`, which walks the records by their +0x008 slot byte. */
+void* get_move_work_adrs(u8 kind);
+u32 get_move_work_max(u8 kind);
 struct Vec;
 
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */

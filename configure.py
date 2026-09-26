@@ -1199,6 +1199,18 @@ config.libs = [
             Object(NonMatching, "Pl/fn_802693C4.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80273B14_fn_80273B14.cpp` - the player act-entry/parameter unit
+            # (0x80273B14-0x80276B58, 68 functions, 0x3044 B), the gap between pl_skill and pl_act.
+            # It owns extab 0x8001280C-0x8001294C and extabindex 0x8002FA90-0x8002FC70: each run is
+            # exactly 40 records and every extabindex record's function address (0x80273B14..
+            # 0x80276A3C) is one of this unit's, read out of the DOL.  Home is `Pl`: every function
+            # takes the player work (`_PLW*`) or an equipment slot out of it, and the gates are the
+            # Pl siblings (`Pl_Skill_ck`, `Pl_master_ck`, `Pl_act_ck`, `Pl_cat_skill_ck`,
+            # `Pl_condition_ck`, `Pl_dm_condition_ck`, `Pl_suimen_ck`, `Pl_chr_setX`).  No `__FILE__`
+            # string covers the range and `dumpmap.py` answers only `zz_0273b14_`, so the stem is the
+            # map's `fn_80273B14` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80273B14.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
             # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.
             Object(Matching, "Pl/pl_master.cpp"),

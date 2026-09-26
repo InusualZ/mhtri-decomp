@@ -67,6 +67,11 @@ void fn_80277C48(struct _PLW* self, s32 arg);
 void fn_80277C58(struct _PLW* self);
 void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 
+/* Added with `Pl/fn_80273B14.cpp`, whose act entry and frame step call them (rule 2):
+ * 0x8027AC2C is the act's status-block store, 0x80278BE4 the act tail the frame step falls into. */
+void fn_8027AC2C(struct _PLW* self, u32 a, u32 b);
+void fn_80278BE4(struct _PLW* self);
+
 #ifdef __cplusplus
 }
 
