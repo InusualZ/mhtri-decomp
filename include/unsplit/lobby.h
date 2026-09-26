@@ -75,7 +75,14 @@ typedef struct LbMenuWork {
 /* The `.bss` lobby work block (`lobby_w`, 0x17C bytes); this unit only reads the menu pointer. */
 typedef struct LbLobbyWork {
     /* +0x000 */ u8 state_0x000;
-    /* +0x001 */ u8 unused_0x001[0x7C];
+    /* +0x001 */ u8 field_0x001;
+    /* +0x002 */ u8 field_0x002;
+    /* +0x003 */ u8 unused_0x003[3];
+    /* +0x006 */ u8 field_0x006;
+    /* +0x007 */ u8 unused_0x007[0x05];
+    /* +0x00C */ u32 slots_0x00C[2];
+    /* +0x014 */ u8 field_0x014;
+    /* +0x015 */ u8 unused_0x015[0x68];
     /* +0x07D */ u8 slots_0x07D[0x2F];
     /* +0x0AC */ LbMenuWork* menu_0xAC;
     /* +0x0B0 */ u8 unused_0x0B0[0x7D];
@@ -161,10 +168,35 @@ typedef struct LbBigBlock {
 extern "C" {
 #endif
 
-extern u8 Psw[3392];
+/* The option parameter block (`lb_param_w`, 0x806590B4, 0x9C bytes): three per-kind flags with the
+ * matching value words, then four trailing shape words.  Only the fields this unit clears are named. */
+typedef struct LbParamWork {
+    /* +0x00 */ u16 field_0x00;
+    /* +0x02 */ u8 pad_0x02[2];
+    /* +0x04 */ u32 field_0x04;
+    /* +0x08 */ u8 pad_0x08[4];
+    /* +0x0C */ u8 flag_0x0C[3];
+    /* +0x0F */ u8 pad_0x0F;
+    /* +0x10 */ u16 value_0x10[3];
+    /* +0x16 */ u16 value_0x16;
+    /* +0x18 */ u16 value_0x18;
+    /* +0x1A */ u16 value_0x1A;
+    /* +0x1C */ u16 value_0x1C;
+    /* +0x1E */ u8 pad_0x1E[0x7E];
+} LbParamWork; /* size: 0x9C */
+
+/* The per-player pad record block `Psw` (0x80659350, 0x350-byte stride - four players); only the
+ * status word this unit tests is named. */
+typedef struct LbPswBlock {
+    /* +0x000 */ u8 pad_0x000[0x2C4];
+    /* +0x2C4 */ u16 status_0x2C4;
+    /* +0x2C6 */ u8 pad_0x2C6[0x8A];
+} LbPswBlock; /* size: 0x350 */
+
+extern LbPswBlock Psw[4];
 extern u8 jumptable_805B7CD8[36];
 extern u8 lb_item_get_data[];
-extern u8 lb_param_w[156];
+extern LbParamWork lb_param_w;
 extern u8 lbex_main_str[];
 extern u8 lbex_zaco_str[];
 extern u8 lbl_805B7A88[64];
@@ -218,6 +250,56 @@ extern u8 lbl_805B8560[20];
 extern u8 lbl_805B8574[12];
 extern u8 lbl_805B8580[56];
 extern u8 lbl_805B85B8[32];
+
+/* The `.data`/`.sdata` tables the character-edit (hair/inner colour) screen unit
+ * (`src/lobby/fn_801F9CD4.cpp`) addresses; no registered unit owns them yet, so they are declared
+ * here rather than in that unit's source (rule 2). */
+extern u32 lbl_80582988[44];
+extern u8 lbl_80582B30[40];
+extern u32 lbl_8058AA98[4];
+extern u32 lbl_8058AFE8[28];
+/* The 0xA-byte colour record the character-edit screen's `lbl_805B8674` table holds, and the two
+ * 14-entry selection index tables beside it (`-2`/`-3` are the "no colour" sentinels the callers test).
+ * Declared here because no registered unit owns the `.data` range (rule 2). */
+typedef struct LbChangeColorRec {
+    /* +0x0 */ u16 id_0x00;
+    /* +0x2 */ u8 unused_0x02;
+    /* +0x3 */ u8 r_0x03;
+    /* +0x4 */ u8 g_0x04;
+    /* +0x5 */ u8 b_0x05;
+    /* +0x6 */ s16 value_0x06;
+    /* +0x8 */ s16 value_0x08;
+} LbChangeColorRec; /* size: 0xA */
+
+extern LbChangeColorRec lbl_805B8674[23];
+extern const s16 lbl_805B875C[6];
+extern const u16 lbl_805B8768[8];
+extern const u16 lbl_805B8778[16];
+extern const u16 lbl_805B8798[8];
+extern const u16 lbl_805B87A8[16];
+extern const u16 lbl_805B87C8[8];
+extern const s16 lbl_805B87D8[14];
+extern const s16 lbl_805B87F4[14];
+extern const u16 lbl_805B89D0[20];
+extern const u16 lbl_805B8A04[6];
+extern const u16 lbl_805B8A10[18];
+extern const u16 lbl_805B8A34[10];
+extern const u16 lbl_805B8A48[20];
+extern const u16 lbl_805B8A70[8];
+extern const u16 lbl_805B8A80[14];
+extern const s16 lbl_805B8A9C[8];
+extern const u16 lbl_805B8AAC[12];
+extern const u16 lbl_805B8AC4[6];
+extern const u16 lbl_805B8AD0[20];
+extern const char lbl_805B8CE0[16];
+extern u8 lbl_806BC1D0[200];
+extern const u16 lbl_80791CA4[4];
+extern const u16 lbl_80791D18[4];
+extern const u16 lbl_80791D20[4];
+extern const f64 lbl_80799878;
+extern u8 jumptable_805B8C74[104];
+extern u8 jumptable_805B8CF0[84];
+
 extern u16 lbl_805BA660[58];
 extern u16 lbl_805BA6D4[34];
 extern u16 lbl_805BA718[28];
