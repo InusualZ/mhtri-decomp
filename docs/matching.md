@@ -1590,6 +1590,27 @@ register residual. A tool that returned READY for everything would have been the
 is byte-identical and a flip is refused, suspect the **link** (`.ctors` ordering, link padding, the `active_flags`
 export bit) before you suspect the data.
 
+**Refinement (2026-09-26, evening): claim the table, not the band - and the row can be 0 %, not 99.999.**
+`stage/fn_802B3270` measured **0 %**: a 23-entry `switch (st->mapno)` with two nested `areano` dispatches,
+whose arms were unreadable for exactly this reason. Claiming **only the table's own range**
+(`0x805CF728-0x805CF784`, 92 B = 4 x 23 - a size the compare chain proves *before* you claim anything) makes
+our object **emit** it, so the unit's `.data` section pairs at **100 %**, and `main.elf` then hands over every
+arm: the function went **0 -> 100.00 % byte-identical at 3688 B**, the unit 59.05 -> 88.75 %, and two more rows
+reached byte-identical on the way (`fn_802B4824` 76.04 -> 100, `fn_802B45D4` 78.75 -> 100).
+Do **not** claim the band around the table. The 19 hand-written labels in `0x805CF60C-0x805CFBE8` are target
+bytes our source reproduces none of, and claiming them *lowers* the score (`tools/flags/dataclaim.py`'s
+`lowers-score` rule, plan 8.4) - file them as `range` config_requests instead, with the reachability evidence:
+the two records `data-queue.json` calls "unreferenced" are reached from this unit's own tables
+(`0x805CF664/690 -> 0x805CF638`, `0x80792470 -> 0x805CF718`), so there "unreferenced" means "not yet
+attributed", not "dead".
+The shapes that finished the 3688 B body are the ones sections 18/19/34/37 describe, worth knowing together:
+writes through the **struct field** (`w->show[show_i] = v; show_i++;`, worth 28 points), a store of
+`*src; src++;` rather than `*src++` (7), the nested `fn_802FB8EC` dispatches as `switch`es while
+`LbCheckKujiraEvent`/`fn_802FB9F8` stay `if`/`else if` (7), the callee returning **`u32`** rather than `s32`,
+and declaring `hide_buf` **before** `show_buf` (the declaration order decides which stack slot MWCC picks -
+reversed, it swaps them). A wrong prototype at a call site is its own measurable defect: `fn_802B4C5C` was
+declared with **1** parameter where retail passes **3**, and fixing the arity moved it 95.69 -> 96.38.
+
 ## 54. Dolphin's `.map` names a jump table's OWNER and a `__FILE__` emitter
 
 **Problem.** Section 53 says to claim a jump table's `.data` range, but not *whose* range it is - so the claim is a
