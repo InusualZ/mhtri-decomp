@@ -1191,6 +1191,10 @@ DWCi/fn_805113B0.c:
 fn_805482CC.cpp:
 	.text       start:0x805482CC end:0x8054E894
 
+homebutton/fn_8054E894.cpp:
+	.text       start:0x8054E894 end:0x80555374
+	.ctors      start:0x8056F3FC end:0x8056F404
+
 homebutton/fn_80555374.cpp:
 	.text       start:0x80555374 end:0x8055C894
 	.ctors      start:0x8056F404 end:0x8056F410
