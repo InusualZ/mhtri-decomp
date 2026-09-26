@@ -539,7 +539,10 @@ void fn_8042E9A4(u32 id, u8* table);
 #ifdef __cplusplus
 
 s32 GetMenuFontColor(bool, bool, bool, bool);
-void* ItemName(u16);
+/* `ItemName` (0x8029F628) and `put_menu_cursor` (0x802A2564) were declared here while the band between
+ * `Pl/fn_80295EF4.cpp` and `stage/stg_w.cpp` had no registered unit.  `menu/menu_item.cpp` now owns
+ * both addresses, so the declarations live in its header `include/menu/menu_item.h` (rule 2) - the
+ * `ItemName` one had a different return type here, which is the `(10505) illegal overloading` class. */
 void* LbStr(u8, u16);
 s32 chk_pointer(void);
 void draw_font(const _SPR_DATA_&, s8*, u32, const _mh_ivec2_*);
@@ -554,7 +557,6 @@ void draw_sprite_idx(u16, const _mh_ivec2_*);
 void font_set_size(s16, s16);
 void* get_lsp_data(u16, _mh_ivec2_*);
 u8 get_option_cfg(u8);
-void put_menu_cursor(u16*, u16, const _mh_ivec2_*);
 
 #endif /* __cplusplus */
 

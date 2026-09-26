@@ -79,7 +79,17 @@ struct _BODY_W {
 /* One item record (0x14 bytes): `.data`-backed, 747 of them, behind the pointer at +0x00 of
  * `lbl_806AC8B8`.  Offsets from `GetItemData`'s 0x14 stride and the byte loads the accessors do. */
 struct ItemDataRecord {
-    /* +0x000 */ u16 unused_0x000;
+    /* +0x000 */ union { /* the record's first pair: the pre-merge `u16` view and the two bytes the
+                          * option list's pick test reads, at the same offset (rule 5: one member
+                          * per offset, so no later field moves).  The folded half of this unit
+                          * (`fn_802A5E64`/`fn_802A64B0`) reads it as `kind_0x00`/`level_0x01` and the
+                          * retail bytes load each one separately (`lbz r0,0x0(r3)`, `cmplwi r0,0x1`). */
+        /* +0x000 */ u16 unused_0x000;   /* the pre-merge spelling, kept as a union member (rule 5) */
+        struct {
+            /* +0x000 */ u8 kind_0x00;   /* `1` marks the entry the cursor may not pass */
+            /* +0x001 */ u8 level_0x01;  /* the same test, against 3 */
+        };
+    };
     /* +0x002 */ u8 field_0x002;      /* the mask `fn_8029F73C` ANDs its second argument with */
     /* +0x003 */ u8 unused_0x003[0x005 - 0x003];
     /* +0x005 */ u8 kind;             /* indexes the .data colour table `lbl_805CDE78` */
@@ -254,7 +264,13 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 #ifndef MHTRI_MENU_MENU_ITEM_DECLARED
 #define MHTRI_MENU_MENU_ITEM_DECLARED
 
-/* This unit's own C++-mangled entry points (the map names are these manglings, rule 9). */
+/* This unit's own C++-mangled entry points (the map names are these manglings, rule 9).
+ * `put_menu_cursor` (0x802A2564) is one of them but has no body yet - it was declared in
+ * `include/unsplit/lobby.h` until this range was registered, and its consumer (`lobby/fn_801E7530.cpp`)
+ * includes this header for it now (rule 2).  Its third parameter is the lobby band's 2D vector, whose
+ * tag is declared here rather than including a band header for it. */
+struct _mh_ivec2_;
+
 void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode);
 void hit_flag_set(_HIT_W* hit, u32 flags);
 u8 hit_result_check(_HIT_W* hit);
@@ -264,6 +280,7 @@ ItemDataRecord* GetItemData(u16 id);
 ItemDataHead* get_item_data_ptr(void);
 MenuTables* get_menu_tbl_ptr(void);
 u32* get_menu_lsp_tbl(u16 idx);
+void put_menu_cursor(u16* rows, u16 index, const _mh_ivec2_* pos);
 
 #ifdef __cplusplus
 extern "C" {
@@ -311,14 +328,20 @@ void fn_802A2C98(u8 idx);
 void fn_802A3190(MenuSlot* slot, s32 index);
 void fn_802A441C(MenuSlot* self);
 void fn_802A47F4(MenuSlot* self);
+/* 0x802A4D98 - one of the range's own symbols and still unwritten.  The folded half of this unit
+ * calls it (`fn_802A598C`'s tail) and ignores the result; retail passes the record pointer with no
+ * extension (`mr r3,r29; bl fn_802A4D98`). */
+void fn_802A4D98(MenuSlot* slot);
 
 /* The callees above this unit. */
 void fn_8027EB18(u8 kind);
 u32 fn_8027E120(_PLW* worker);
-u32 fn_8027D738(_PLW* worker);
+/* `fn_8027D738` is `Pl/fn_8027D684.cpp`'s (its address is inside that unit's range) and it is written
+ * there, so its declaration is the owner's header `include/Pl/fn_8027D684.h` (rule 2).  The two
+ * unwritten siblings above have no owner header entry yet and keep this unit's call-site shape. */
 u32 fn_80047058(void);
 void fn_8004082C(void);
-u32 fn_800CF208(void);
+u8 fn_800CF208(void);
 u32 fn_800CF280(void);
 u32 fn_800D0708(void);
 u32 fn_803AAEC0(void);
