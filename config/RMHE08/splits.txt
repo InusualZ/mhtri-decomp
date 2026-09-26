@@ -1140,6 +1140,9 @@ Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 	.text       start:0x80457490 end:0x804578FC
 	.data       start:0x8060E8A0 end:0x8060E8E4
 
+AX/AXFXReverbHi.c:
+	.text       start:0x80474CB0 end:0x80475E24
+
 OS/FindContainHeap_.c:
 	.text       start:0x804C1760 end:0x804C6D68
 

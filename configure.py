@@ -1802,6 +1802,21 @@ config.libs = [
             # inside it); the seam is a byte cap, not a boundary.  Real dump names are used where the map has
             # them; the rest keep their map stem under rule 7's deferral (see the file header).
             Object(NonMatching, "OS/FindContainHeap_.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80474CB0_AXFXReverbHiInit` -
+            # the Revolution SDK AXFX reverb-hi effect pair (16 functions / 0x1174 B,
+            # 0x80474CB0..0x80475E24): AXFXReverbHiInit/Shutdown/Callback + AXFXReverbHiExpInit and the
+            # shared __AllocDelayLine/__BzeroDelayLines/__FreeDelayLine delay-line helpers.  Module `AX`:
+            # the runtime dump names the range's head AXFXReverbHi* and its neighbours are the rest of the
+            # AX library (`__AXVPBInit` below, `AXFXSetHooks` above), which is a game-independent SDK
+            # library with no config.libs block of its own yet.  Lib `OS` + cflags_os: the range's link
+            # neighbours in the same SDK run are the OS units (OSAlarm.c at 0x804CBC50 above it) and the
+            # runtime block below it is `Runtime.PPCEABI.H`; the source restores -O4,p's 16-byte function
+            # alignment with `#pragma function_align 16` (every start in the range is 16-aligned).
+            # The discovery seam between AXFXReverbHi.c and AXFXReverbHiExp.c was not taken: the same
+            # two-file split exists in a sister SDK build (MotoGP 08), but this run is one maximal
+            # unclaimed run, so it lands as one unit.  Claims .text only; the size/coefficient tables it
+            # reads (lbl_80612980 / lbl_80612A40) are an unclaimed auto .data range for the data pass.
+            Object(NonMatching, "AX/AXFXReverbHi.c"),
         ],
     },
     {
