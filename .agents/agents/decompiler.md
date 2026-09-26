@@ -39,7 +39,7 @@ orchestrator's verification meaningless. If a build needs the original DOL and y
 `orig/RMHE08/sys/main.dol`, **copy** that ~5 MB file in from MAIN (do not junction the toolchain, do not skip the
 build). Two setup traps cost sibling lanes a build each - follow them exactly:
 
-* **A junction to the read-only game data must use the absolute Windows target.** git-bash's `/c/...` spelling
+* **Copy the read-only game data into your worktree - never junction it.** Copy `orig/RMHE08/sys/main.dol` and `orig/RMHE08/files/*.sel` into your own `orig/RMHE08/` (6.6 MB, and it is all the build reads). A junction whose target is MAIN's directory is how MAIN's originals were deleted twice on 2026-09-26: a worktree cleanup that follows the link removes the target, and the files are gitignored so git cannot restore them. The note below about the absolute Windows spelling applies only to a junction you were explicitly told to make - do not make one. git-bash's `/c/...` spelling
   produces a junction that does not resolve, and `dol split` then dies with
   `orig/RMHE08/files/mh3.sel not found`. Use the `C:\...\mhtri-dtk\orig\RMHE08\files` form.
 * **Run one `ninja` before trusting `recompile.py --main .`.** `configure.py` alone writes only the base
