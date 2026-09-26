@@ -32,8 +32,32 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
     python tools/units/land.py record-base [--json]
     python tools/units/land.py land --units a,b [--base SHA] [--no-build] [--no-outbox] [--no-release]
                                   [--already-applied]
+    python tools/units/land.py land --branch worker/<slug> [--units a,b] [--base SHA] [--no-build]
+                                  [--no-outbox] [--no-release] [--message SUBJECT]
     python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-outbox]
                                   [--no-release] [--allow-regression UNIT]
+    python tools/units/land.py resolve --branch worker/<slug> [--worktree PATH] [--main PATH] [--base SHA]
+                                  [--no-commit] [--json]
+
+`resolve` is the land path's one automatic conflict resolution.  Eight of thirteen live branches conflict
+with `main` on a single, safe class: sibling bands register *adjacent address ranges*, so their
+`config/RMHE08/splits.txt` blocks and `configure.py` `Object(...)` lines append at the same anchor.  That is
+an add/add conflict whose resolution is the pure append-union - and `resolve` only ever touches those two
+paths.  It runs in the branch's worktree or a **scratch** one, **never in MAIN** (a gate applying a diff
+inside MAIN is what left MAIN conflicted on 2026-09-26).  The union is gated in order by the path scope,
+`unionguard` (a delete, a rename, or both sides editing one region is refused by name) and the
+`unionresolve` invariants (no duplicate unit key, no duplicate `Object()` line, no overlapping
+`.text`/`extab`/`extabindex` range, and no registration `main` already had is dropped); the union is
+computed in memory and the invariants asserted *before* anything is written.  Staging is explicit
+(`git add -- <the two paths>`), never the untracked `.pi/bin/applybranch.sh`'s `git add -A`.
+
+`land --branch` is the one-command landing, so the orchestrator never assembles it by hand again.  It
+refuses a dirty tree (with the exact clean commands), records the base on the clean tree **before** the
+pick, applies the branch's own delta with three-way (`git apply -3`, which - unlike a cherry-pick - does
+not lose the work a merge carried), resolves a registration conflict with `resolve`'s union instead of
+aborting, runs the gate above (compile gate included), then commits and releases.  It is idempotent and
+loud: any refusal leaves the tree as it was (the apply is undone) and prints one `REFUSED ...` line whose
+exit status is the answer.
 
 `land` is the one command and the one you should use: it runs `verify`, stages the batch's own files, commits
 **with a pathspec** (`git commit -F msg -- <paths>`, so the whole index is never taken), releases the claims,
@@ -108,6 +132,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -126,6 +151,11 @@ from units import recompile as rc  # noqa: E402
 # `header_declarations` scanner the band rule uses); the new range-boundary check reuses it rather than
 # growing a second copy of the map parser and a second declaration scanner.
 from units import stylelint as sl  # noqa: E402
+# unionguard decides whether a conflicted registration is the safe append class; unionresolve is the
+# resolver + invariant assertions moved in from the untracked `.pi/bin/union.py`. `land` calls both
+# directly, so the land path no longer depends on a script a fresh clone cannot see.
+from units import unionguard as ug  # noqa: E402
+from units import unionresolve as ur  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
@@ -565,6 +595,343 @@ def stage_batch(main: str, stageable: list[str]) -> None:
     existing = [p for p in stageable if os.path.exists(os.path.join(main, p))]
     if existing:
         git(["add", "--", *existing], main)
+
+
+# --------------------------------------------------------------------------------------------------
+# The registration append-conflict resolver (docs/plan.md 7.5; the 2026-09-26 merger class).
+#
+# Eight of thirteen live branches conflict with `main` on exactly one class: sibling bands claim adjacent
+# address ranges, so both sides append a block at the same anchor in `config/RMHE08/splits.txt` and a line
+# in `configure.py`'s `Object(...)` list.  The resolution is the pure append-union - and it is the one
+# union that is safe: `unionguard` proves both sides only *inserted*, and `unionresolve` asserts the
+# invariants a wrong union breaks silently.
+#
+# `resolve` runs in the batch's worktree or a **scratch tree**, never in MAIN.  `land --branch` applies the
+# branch's own delta inside MAIN (that is the landing) but uses the same union, which is why the union
+# lives in `_union_conflicts` with the MAIN guard in `resolve_conflicts` around it.
+#
+# Staging is explicit (`git add -- <the two scoped paths>`), never `git add -A`: that sweep - the tail of
+# the untracked `.pi/bin/applybranch.sh` this replaces - staged `d910.json` and has bitten the campaign
+# twice.
+# --------------------------------------------------------------------------------------------------
+
+UNION_SCOPE = ur.UNION_SCOPE
+
+
+def _resolve_result(ok: bool, reason: str, **extra) -> dict:
+    out = {"ok": ok, "reason": reason}
+    out.update(extra)
+    return out
+
+
+def _tree_text(tree: str, ref: str, rel: str) -> str:
+    """`git show <ref>:<rel>` read as text, or "" when the path is absent at that ref."""
+    p = run(["git", "show", "%s:%s" % (ref, rel)], tree)
+    return p.stdout if p.returncode == 0 else ""
+
+
+def _union_conflicts(tree: str, branch: str, base: str | None = None, paths: list[str] | None = None,
+                     commit: bool = False, runner=subprocess.run) -> dict:
+    """Union the in-scope registration conflict in `tree` (the MAIN guard is in `resolve_conflicts`).
+
+    Three ordered gates, any of which refuses: **scope** (every conflicted path must be `configure.py` or
+    `config/RMHE08/splits.txt`), **unionguard** (a disjoint addition, not a delete/rename/overlap), and
+    the **invariants** (`ur.check_union`).  The union is computed in memory and the invariants asserted
+    *before* anything is written, so a union that duplicates a key, overlaps a range or drops a
+    registration never reaches the tree.
+    """
+    try:
+        stages = ug.unmerged(tree)
+    except RuntimeError as exc:
+        return _resolve_result(False, "%s is not a git tree: %s" % (tree, exc))
+    conflicted = sorted(paths if paths is not None else stages)
+    if not conflicted:
+        return _resolve_result(False, "no unmerged path in %s - nothing to resolve" % tree)
+    foreign = [p for p in conflicted if p not in UNION_SCOPE]
+    if foreign:
+        return _resolve_result(
+            False,
+            "conflict outside the registration scope: %s - a header or `src/**` conflict is a real "
+            "content conflict; unioning it stacks `#ifdef`/`#endif` and shifts struct offsets. Resolve "
+            "it by hand." % ", ".join(foreign), scope=list(UNION_SCOPE))
+    if base:
+        ours_renames = ug.rename_sets(tree, base, branch)
+        theirs_renames = ug.rename_sets(tree, base, "main")
+    else:
+        ours_renames = theirs_renames = (set(), set())
+    unsafe = []
+    for path in conflicted:
+        finding = ug.classify(tree, path, stages.get(path, {}), ours_renames, theirs_renames)
+        if finding["unsafe"]:
+            unsafe.append("%s (%s)" % (path, ", ".join(finding["reasons"])))
+    if unsafe:
+        return _resolve_result(
+            False,
+            "unionguard refused, the conflict is not a disjoint addition: %s - resolve by hand, do not "
+            "union them" % "; ".join(unsafe))
+
+    # Compute every union in memory first; a violation must not touch the tree.
+    merged_texts: dict[str, str] = {}
+    for path in conflicted:
+        work = os.path.join(tree, *path.replace("/", os.sep).split(os.sep))
+        try:
+            with open(work, encoding="utf-8", newline="") as fh:
+                text = fh.read()
+        except OSError as exc:
+            return _resolve_result(False, "cannot read %s: %s" % (path, exc))
+        merged, hunks = ur.union_text(text)
+        if hunks == 0 or "<<<<<<<" in merged or ">>>>>>>" in merged:
+            return _resolve_result(False, "%s carries no conflict block to union" % path)
+        merged_texts[path] = merged
+
+    main_splits = _tree_text(tree, "main", "config/RMHE08/splits.txt")
+    main_configure = _tree_text(tree, "main", "configure.py")
+    merged_splits = merged_texts.get("config/RMHE08/splits.txt", main_splits)
+    merged_configure = merged_texts.get("configure.py", main_configure)
+    violations = ur.check_union(main_splits, merged_splits, main_configure, merged_configure)
+    if violations:
+        # The union looked plausible but broke an invariant - the case a green build cannot see. Refuse
+        # and name every violation; nothing was written.
+        return _resolve_result(False, "the union would break %d invariant(s): %s"
+                               % (len(violations), "; ".join(violations)), violations=violations)
+
+    for path, merged in merged_texts.items():
+        work = os.path.join(tree, *path.replace("/", os.sep).split(os.sep))
+        with open(work, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(merged)
+    # the two scoped paths, explicitly - never `git add -A`, the untracked applybranch.sh's sweep.
+    git(["add", "--", *conflicted], tree)
+    committed = None
+    if commit:
+        p = runner(["git", "commit", "-q", "-m",
+                    "resolve: union the registration append-conflict on %s" % branch], cwd=tree,
+                   capture_output=True, text=True, errors="replace")
+        if p.returncode != 0:
+            tail = ((p.stdout or "") + (p.stderr or "")).strip().splitlines()
+            return _resolve_result(False, "the union is sound but the commit failed: %s"
+                                   % (tail[-1] if tail else "unknown error"), paths=conflicted)
+        committed = git(["rev-parse", "--short", "HEAD"], tree).strip()
+    return _resolve_result(True, "union-resolved %d path(s)" % len(conflicted), paths=conflicted,
+                           commit=committed)
+
+
+def resolve_conflicts(tree: str, main_tree: str, branch: str, base: str | None = None,
+                      paths: list[str] | None = None, commit: bool = False,
+                      runner=subprocess.run) -> dict:
+    """`_union_conflicts`, but it refuses to run inside MAIN - the batch's worktree or a scratch tree only.
+
+    MAIN must stay clean while a branch is resolved: the merger lane's whole advantage is that resolving
+    two registrations never touches the gate's own tree, and a gate that applied a diff inside MAIN is what
+    left MAIN mid-conflict on 2026-09-26.
+    """
+    if os.path.abspath(tree) == os.path.abspath(main_tree):
+        return _resolve_result(False, "refusing to resolve inside MAIN - use the batch's worktree or a "
+                                     "scratch tree (`git worktree add`), never the gate's own tree")
+    return _union_conflicts(tree, branch, base, paths=paths, commit=commit, runner=runner)
+
+
+def scratch_resolve(main_tree: str, branch: str, base: str | None = None, commit: bool = True,
+                    runner=subprocess.run) -> dict:
+    """`resolve_conflicts` on a fresh scratch worktree: `git worktree add` + `git merge main`.
+
+    A temporary worktree on a temporary branch at the branch's tip (so the branch itself is not disturbed
+    and `main` stays clean), then `git merge --no-commit main` - exactly the merger lane's hand operation,
+    with ours = the branch.  A clean merge has no conflict to resolve and is reported as such; a conflicted
+    one goes through `resolve_conflicts`.  The scratch worktree is removed on refusal and kept on success,
+    so the caller can fast-forward the branch (`git branch -f <branch> <scratch-branch>`).
+    """
+    if git(["rev-parse", "--verify", "-q", branch], main_tree, check=False).strip() == "":
+        return _resolve_result(False, "no such branch: %s" % branch)
+    base = base or git(["merge-base", "main", branch], main_tree).strip()
+    tmp = tempfile.mkdtemp(prefix="land-resolve-")
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", branch.split("/", 1)[-1])
+    scratch_branch = "land/resolve-%s-%d" % (slug, os.getpid())
+    suffix = 1
+    while git(["rev-parse", "--verify", "-q", scratch_branch], main_tree, check=False).strip():
+        suffix += 1
+        scratch_branch = "land/resolve-%s-%d-%d" % (slug, os.getpid(), suffix)
+    p = runner(["git", "worktree", "add", "-b", scratch_branch, tmp, branch], cwd=main_tree,
+               capture_output=True, text=True, errors="replace")
+    if p.returncode != 0:
+        return _resolve_result(False, "git worktree add failed: %s"
+                               % ((p.stderr or p.stdout or "").strip().splitlines() or [""])[-1])
+
+    def discard(reason: str, **extra) -> dict:
+        runner(["git", "worktree", "remove", "--force", tmp], cwd=main_tree, capture_output=True)
+        runner(["git", "branch", "-D", scratch_branch], cwd=main_tree, capture_output=True)
+        return _resolve_result(False, reason, **extra)
+
+    merge = runner(["git", "merge", "--no-commit", "main"], cwd=tmp, capture_output=True, text=True,
+                   errors="replace")
+    if merge.returncode == 0 and not ug.unmerged(tmp):
+        return discard("the branch merges `main` cleanly - no registration conflict to resolve")
+    if not ug.unmerged(tmp):
+        tail = ((merge.stdout or "") + (merge.stderr or "")).strip().splitlines()
+        return discard("`git merge main` failed without a conflict: %s"
+                       % (tail[-1] if tail else "unknown error"))
+    result = resolve_conflicts(tmp, main_tree, branch, base=base, commit=commit, runner=runner)
+    if not result.get("ok"):
+        return discard(result.get("reason"), **{k: v for k, v in result.items()
+                                                if k not in ("ok", "reason")})
+    result["worktree"] = tmp
+    result["scratch_branch"] = scratch_branch
+    return result
+
+
+# --------------------------------------------------------------------------------------------------
+# The one-command landing: `land.py land --branch worker/<slug>`.
+# --------------------------------------------------------------------------------------------------
+
+def claim_unit_for_branch(main: str, branch: str) -> str | None:
+    """The registry key whose claim records `branch`, or None.
+
+    A unit renamed at registration keeps the *pre-registration* claim key while the name the gate compiles
+    and the outbox lookup use differ.  The branch is the claim's identity, so the key is read from the
+    branch rather than re-derived from the unit path - which is what makes the release of a renamed unit
+    work.
+    """
+    try:
+        registry = claims.load_registry(main)
+    except Exception:
+        return None
+    for key, record in registry.items():
+        if isinstance(record, dict) and record.get("branch") == branch:
+            return key
+    return None
+
+
+def require_clean_tree(main: str) -> str | None:
+    """None when MAIN's tree is clean; else the exact commands to clean it.
+
+    One implementation and one message for every entry point, because a dirty tree blocks the gate twice
+    over: `record-base` records the dirt as foreign work (so `land_stageable` excludes the batch's own
+    paths), and the pick aborts on a file the dirt already touched.  AGENTS.md's LOCAL-ONLY block is always
+    dirty by design and is not a real change (`agents_md_real_change`).
+    """
+    rows = changed_status(main)
+    dirty: list[str] = []
+    for code, path in rows:
+        if path == "AGENTS.md" and not agents_md_real_change(main):
+            continue
+        dirty.append("%s %s" % (code or "??", path))
+    if not dirty:
+        return None
+    paths = " ".join(p for _c, p in rows)
+    return ("main's tree is not clean: %s\n  a dirty tree is recorded as foreign work at `record-base` "
+            "and aborts the pick, so clean it first, e.g.:\n"
+            "    git -C %s stash push --include-untracked -- %s\n"
+            "  (or `git -C %s checkout -- <path>` for a tracked edit and `git -C %s clean -fd` for "
+            "untracked files), then re-run" % (", ".join(dirty), main, paths, main, main))
+
+
+def units_from_branch(main: str, branch: str, base: str) -> list[str]:
+    """The units a branch registers, read from the branch's own registration diff.
+
+    `land --branch` must know which objects to compile, and a registration rename means the branch name
+    cannot always be turned back into the registered unit (the outbox slug is the pre-registration name).
+    The branch's diff is authoritative: its added `Object(...)` lines and `splits.txt` unit headers name the
+    units it registers, in file order.  Returns normalised (extensionless) unit names, de-duplicated.
+    """
+    p = run(["git", "diff", base, branch, "--", "configure.py", "config/RMHE08/splits.txt"], main)
+    found: list[str] = []
+    for line in (p.stdout or "").splitlines():
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+        body = line[1:]
+        found.extend(claims.norm_unit(n) for n in ur.object_names(body))
+        found.extend(claims.norm_unit(u) for u in ur.split_units(body))
+    seen: set[str] = set()
+    out: list[str] = []
+    for unit in found:
+        unit = unit.strip("/")
+        if unit and unit not in seen:
+            seen.add(unit)
+            out.append(unit)
+    return out
+
+
+def apply_branch(main: str, branch: str, base: str | None = None
+                 ) -> tuple[bool, str, str]:
+    """Apply the branch's own delta to MAIN with three-way; resolve a registration conflict.
+
+    -> (ok, reason, base).  `git diff --binary <merge-base> <branch>` is exactly the branch's own work (a
+    merged-in `main` cancels out), which is why it is used instead of a cherry-pick: cherry-picking a
+    branch that merged `main` silently drops the work the merge carried (the untracked
+    `.pi/bin/applybranch.sh`'s own note).  A clean apply is done; a conflict is sent to the scoped union,
+    and a refusal undoes the apply so the tree is exactly as it was found.
+    """
+    base = base or git(["merge-base", "main", branch], main).strip()
+    patch = subprocess.run(["git", "diff", "--binary", base, branch], cwd=main,
+                           capture_output=True).stdout
+    if not patch.strip():
+        return False, "the branch has no diff against %s - nothing to land" % base[:8], base
+    ap = subprocess.run(["git", "apply", "-3", "-"], cwd=main, input=patch, capture_output=True)
+    stages = ug.unmerged(main)
+    if not stages:
+        if ap.returncode == 0:
+            return True, "applied cleanly", base
+        tail = ap.stderr.decode("utf-8", "replace").strip().splitlines()
+        return False, "git apply failed: %s" % (tail[-1] if tail else "unknown error"), base
+    result = _union_conflicts(main, branch, base, paths=sorted(stages))
+    if not result.get("ok"):
+        ug.cleanup_applied(main, base, branch)
+        return False, result.get("reason"), base
+    return True, "applied with the registration union (%s)" % result.get("reason"), base
+
+
+def land_branch(main: str, branch: str, units: list[str] | None = None, base: str | None = None,
+                no_build: bool = False, allow_regression: list[str] | None = None,
+                check_outbox: bool = True, release_claims: bool = True,
+                subject: str | None = None) -> int:
+    """The one-command landing: clean tree -> record-base -> apply+union -> gate -> commit -> release.
+
+    Idempotent and loud: every refusal prints one `REFUSED <branch> | <reason>` line (stdout) and leaves
+    MAIN exactly as it was found - the apply is undone whenever the landing did not reach a commit, so a
+    refused landing is never a half-landing.  The registered unit(s) come from the branch's registration
+    diff when `--units` is not given, so a unit renamed at registration is landed under its real name.
+    """
+    norm = [claims.norm_unit(u.strip("/")) for u in (units or []) if u.strip()]
+    bad_message = message_error(subject)
+    if bad_message:
+        clear_land_message(main)
+        print("REFUSED %s | %s" % (branch, bad_message))
+        return 1
+    bad_branch = branch_error(main)
+    if bad_branch:
+        clear_land_message(main)
+        print("REFUSED %s | %s" % (branch, bad_branch))
+        return 1
+    if not claims.branch_exists(main, branch):
+        clear_land_message(main)
+        print("REFUSED %s | no such branch" % branch)
+        return 1
+    dirty = require_clean_tree(main)
+    if dirty:
+        clear_land_message(main)
+        print("REFUSED %s | %s" % (branch, dirty))
+        return 1
+    merge_base = base or git(["merge-base", "main", branch], main).strip()
+    if not norm:
+        norm = units_from_branch(main, branch, merge_base)
+    if not norm:
+        clear_land_message(main)
+        print("REFUSED %s | could not read the branch's registered unit(s) from its configure.py/"
+              "splits.txt diff; pass --units explicitly" % branch)
+        return 1
+    record_base(main)                      # on the clean tree, BEFORE the pick
+    head_before = git(["rev-parse", "HEAD"], main).strip()
+    ok, why, applied_base = apply_branch(main, branch, base=merge_base)
+    if not ok:
+        clear_land_message(main)
+        print("REFUSED %s | %s (the apply was undone; main is unchanged)" % (branch, why))
+        return 1
+    code = land(main, norm, None, no_build, allow_regression, check_outbox=check_outbox,
+                release_claims=release_claims, subject=subject, branch=branch)
+    if code != 0 and git(["rev-parse", "HEAD"], main).strip() == head_before:
+        # the gate refused before committing: undo the apply so a refused landing is not a half-landing
+        ug.cleanup_applied(main, applied_base, branch)
+        print("NOTE: the apply was undone - main is back at %s" % head_before[:8], file=sys.stderr)
+    return code
 
 
 def outside_batch(paths: list[str], allowed: tuple[str, ...] = ALLOWED_PREFIXES,
@@ -1080,14 +1447,27 @@ def branch_commits(main: str, unit: str) -> int:
     return int(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip().isdigit() else 0
 
 
-def outbox_units(main: str, units: list[str]) -> tuple[list[str], list[str]]:
-    """-> (units whose outbox validates, problems)."""
+def outbox_units(main: str, units: list[str], branch: str | None = None) -> tuple[list[str], list[str]]:
+    """-> (units whose outbox validates, problems).
+
+    `branch`, when given (`land --branch`), locates the outbox by the branch's slug - the name `brief.py`
+    writes - instead of re-deriving it from the unit path.  That is what covers a unit **renamed at
+    registration**: its outbox keeps the pre-registration slug, so the unit-derived path misses it while
+    the branch-derived one finds it.  When the branch-derived path is missing too, the failure names
+    `--no-outbox` as the remedy, because a missing record must be stated plainly, not hidden.
+    """
     ok, problems = [], []
+    branch_slug = claims.slug_of_branch(branch) if branch else None
     for unit in units:
         unit = claims.norm_unit(unit.strip("/"))
-        path = handoff_mod.outbox_path(main, unit)
+        if branch_slug:
+            path = os.path.join(main, ".pi", "outbox", branch_slug + ".json")
+        else:
+            path = handoff_mod.outbox_path(main, unit)
         if not os.path.exists(path):
-            problems.append("%s: no outbox at %s" % (unit, path))
+            hint = (" (a unit renamed at registration keeps its outbox under the pre-registration slug; "
+                    "if the record is demonstrably fine, --no-outbox is the remedy)")
+            problems.append("%s: no outbox at %s%s" % (unit, path, hint))
             continue
         entry = json.loads(open(path, encoding="utf-8").read())
         rng = brief_mod.splits_range(main, unit)
@@ -1148,7 +1528,7 @@ def commits_ahead_of_main(main: str, ref: str) -> bool:
     return p.returncode == 0 and p.stdout.strip().isdigit() and int(p.stdout.strip()) > 0
 
 
-def branch_problems(main: str, units: list[str]) -> list[str]:
+def branch_problems(main: str, units: list[str], branch: str | None = None) -> list[str]:
     """One line per unit whose worker branch does not carry its work as commits.
 
     A missing branch is the 2026-09-23 shape: `release --force` on an unreported worker deleted the branch
@@ -1158,7 +1538,14 @@ def branch_problems(main: str, units: list[str]) -> list[str]:
     from that ref (`restore_rescued_branch`, and only when not `--dry-run`, which touches nothing), so the
     teardown still has a branch to release. A missing branch with no rescue ref behind it, or a rescue ref
     with no commits of its own, is still reported.
+
+    `branch`, when given (`land --branch`), is the branch being landed and is checked directly - a unit
+    renamed at registration is not reachable through its registered name, but its branch is what was named.
     """
+    if branch:
+        if claims.branch_exists(main, branch) and commits_ahead_of_main(main, branch):
+            return []
+        return ["%s (branch %s has no commits of its own)" % (branch, branch)]
     problems = []
     for u in units:
         branch = claims.claim_branch(main, u)
@@ -1273,7 +1660,8 @@ def compile_check(main: str, units: list[str], runner=None) -> tuple[bool, str]:
 
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, check_outbox: bool = True,
-           release_claims: bool = True, problems: list[str] | None = None) -> int:
+           release_claims: bool = True, problems: list[str] | None = None,
+           branch: str | None = None) -> int:
     # `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check> [<KIND>]: <what
     # it printed> (remedy: ...)"` per failed check, so its refusal can name the gate and its kind instead of
     # saying only "the gate failed". `verify`'s
@@ -1324,7 +1712,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     if units and check_outbox:
         # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
         # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
-        ok_units, outbox_problems = outbox_units(main, units)
+        ok_units, outbox_problems = outbox_units(main, units, branch=branch)
         check("every unit's outbox validates", not outbox_problems, "; ".join(outbox_problems[:4]),
               kind=KIND_BOOKKEEPING,
               remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
@@ -1339,7 +1727,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                     print("NOTE: %s's branch %s was gone but its work is preserved at %s - restored the "
                           "branch from the rescue ref (a `--force` release had parked it there)"
                           % (u, restored, claims.rescue_ref_name(u)), file=sys.stderr)
-        uncommitted = branch_problems(main, units)
+        uncommitted = branch_problems(main, units, branch=branch)
         check("every unit's branch carries its work as commits", not uncommitted,
               "no commits of its own on the branch (work left uncommitted in the worktree?): %s"
               % ", ".join(uncommitted),
@@ -1542,7 +1930,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
 def land(main: str, units: list[str], base: str | None, no_build: bool,
          allow_regression: list[str] | None = None, check_outbox: bool = True,
          release_claims: bool = True, subject: str | None = None,
-         already_applied: bool = False) -> int:
+         already_applied: bool = False, branch: str | None = None) -> int:
     """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
 
     The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
@@ -1591,7 +1979,7 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     with contextlib.redirect_stdout(sys.stderr):
         gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
                          allow_regression=allow_regression, check_outbox=check_outbox,
-                         release_claims=False, problems=gate_failures) == 0
+                         release_claims=False, problems=gate_failures, branch=branch) == 0
     rows = changed_status(main)
     outside = outside_batch([path for _code, path in rows])
     scratch = scratch_paths(outside)
@@ -1658,8 +2046,11 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     sha = git(["rev-parse", "--short", "HEAD"], main).strip()
     teardown, incomplete = [], []
     if release_claims:
+        # A unit renamed at registration keeps the pre-registration claim key while the gate compiled its
+        # registered name; the branch is the claim's identity, so release the key the branch records.
+        release_key = claim_unit_for_branch(main, branch) if branch else None
         for u in norm_units:
-            out = claims.release(u, main, force=False, dry_run=False)
+            out = claims.release(release_key or u, main, force=False, dry_run=False)
             if out.get("complete"):
                 teardown.append(u)
             else:
@@ -2043,7 +2434,7 @@ def selftest() -> int:
         """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
 
         def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                        release_claims=True, problems=None):
+                        release_claims=True, problems=None, branch=None):
             write(main)
             if problems is not None:
                 problems.extend(gate_problems)
@@ -2693,6 +3084,278 @@ def selftest() -> int:
         base_sha = repo_git(tmp, "rev-parse", "HEAD")
         _write_tree(tmp, {"src/new/fn_801993E0.cpp": "int f(void) { return 1; }\n"})
         check("band: a source-only batch is silent", band_ownership_warnings(tmp, base_sha), [])
+
+    # --- the registration append-conflict resolver (the 2026-09-26 merger class) -------------------
+    SECTION = "Sections:\n\t.text       type:code align:32\n\n"
+    ANCHOR_SPLIT = "anchor.cpp:\n\t.text       start:0x80000000 end:0x80000800\n"
+    TAIL_SPLIT = "tail.cpp:\n\t.text       start:0x80010000 end:0x80011000\n"
+    CONF_HEAD = 'config.libs = [\n    {\n        "lib": "menu",\n        "objects": [\n'
+    CONF_ANCHOR = '            Object(NonMatching, "anchor.cpp"),\n'
+    CONF_TAIL = '            Object(NonMatching, "tail.cpp"),\n'
+    CONF_FOOT = '        ],\n    },\n]\n'
+
+    def _registration_files(extra_splits="", extra_conf="", anchor_split=ANCHOR_SPLIT,
+                            anchor_conf=CONF_ANCHOR):
+        return {
+            "config/RMHE08/splits.txt": SECTION + anchor_split + extra_splits + "\n" + TAIL_SPLIT,
+            "configure.py": CONF_HEAD + anchor_conf + extra_conf + CONF_TAIL + CONF_FOOT,
+            "src/anchor.cpp": "int a(void) { return 0; }\n",
+            "src/tail.cpp": "int t(void) { return 0; }\n",
+            ".gitignore": ".pi/\n",
+        }
+
+    def _resolve_fixture(tmp, branch_splits="", main_splits="", branch_conf="", main_conf="",
+                         branch_anchor_conf=CONF_ANCHOR, main_anchor_conf=CONF_ANCHOR):
+        """`main` and `worker/x` both append a registration at one anchor; -> the merge-base sha."""
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, _registration_files())
+        base = repo_git(tmp, "rev-parse", "HEAD")
+        repo_git(tmp, "checkout", "-q", "-b", "worker/x")
+        _write_tree(tmp, _registration_files(branch_splits, branch_conf, ANCHOR_SPLIT, branch_anchor_conf))
+        repo_git(tmp, "checkout", "-q", "main")
+        _write_tree(tmp, _registration_files(main_splits, main_conf, ANCHOR_SPLIT, main_anchor_conf))
+        return base
+
+    def _conflicted_worktree(tmp, branch="worker/x", name="scratch"):
+        """A scratch worktree on `branch`, with `git merge main` left mid-conflict (ours=branch)."""
+        wt = os.path.join(tmp, name)
+        repo_git(tmp, "worktree", "add", "-b", name, wt, branch)
+        subprocess.run(["git", "merge", "--no-commit", "main"], cwd=wt,
+                       capture_output=True, text=True)
+        return wt
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = _resolve_fixture(
+            tmp,
+            branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+            main_splits="menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n",
+            branch_conf='            Object(NonMatching, "menu/branch.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/main.cpp"),\n')
+        wt = _conflicted_worktree(tmp)
+        result = resolve_conflicts(wt, tmp, "worker/x", base=base)
+        check("resolve: the append conflict is union-resolved", result.get("ok"), True)
+        text = open(os.path.join(wt, "config", "RMHE08", "splits.txt"), encoding="utf-8").read()
+        check("resolve: both bands are kept",
+              "menu/branch.cpp" in text and "menu/main.cpp" in text, True)
+        check("resolve: main's own unit is not dropped", "anchor.cpp" in text, True)
+        check("resolve: the branch's block is first (address order)",
+              text.index("menu/branch.cpp") < text.index("menu/main.cpp"), True)
+        check("resolve: no conflict marker survives",
+              "<<<<<<<" in text or ">>>>>>>" in text, False)
+        check("resolve: exactly the two scoped paths are staged",
+              sorted(p for p in repo_git(wt, "diff", "--cached", "--name-only").splitlines() if p),
+              ["config/RMHE08/splits.txt", "configure.py"])
+        check("resolve: no unmerged path is left", ug.unmerged(wt), {})
+        repo_git(tmp, "worktree", "remove", "--force", wt)
+        repo_git(tmp, "branch", "-D", "scratch")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # An UNSAFE union: both sides changed the same existing line - unionguard must refuse, and the
+        # tree must keep its markers for a hand resolution.
+        base = _resolve_fixture(
+            tmp,
+            branch_anchor_conf='            Object(NonMatching, "anchor_branch.cpp"),\n',
+            main_anchor_conf='            Object(Matching, "anchor.cpp"),\n')
+        wt = _conflicted_worktree(tmp)
+        result = resolve_conflicts(wt, tmp, "worker/x", base=base)
+        check("unsafe union: land refuses", result.get("ok"), False)
+        check("... and names unionguard", "unionguard refused" in result.get("reason", ""), True)
+        check("... naming the overlap reason", "same region" in result.get("reason", ""), True)
+        conf = open(os.path.join(wt, "configure.py"), encoding="utf-8").read()
+        check("... leaving the conflict for a hand resolution", "<<<<<<<" in conf, True)
+        repo_git(tmp, "worktree", "remove", "--force", wt)
+        repo_git(tmp, "branch", "-D", "scratch")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # The invariant unionguard CANNOT see: both sides append disjointly (empty base), but their brand
+        # bands claim the *same* address range. The union is textually safe and would overlap - the
+        # assertion is what refuses it, and nothing is written.
+        base = _resolve_fixture(
+            tmp,
+            branch_splits="menu/dup.cpp:\n\t.text       start:0x80000900 end:0x80000940\n",
+            main_splits="menu/dup2.cpp:\n\t.text       start:0x80000920 end:0x80000960\n",
+            branch_conf='            Object(NonMatching, "menu/dup.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/dup2.cpp"),\n')
+        wt = _conflicted_worktree(tmp)
+        result = resolve_conflicts(wt, tmp, "worker/x", base=base)
+        check("invariant: a textually-safe but overlapping union is refused",
+              result.get("ok"), False)
+        check("... the reason names the overlap", "overlapping" in result.get("reason", ""), True)
+        check("... and carries the violation list", bool(result.get("violations")), True)
+        text = open(os.path.join(wt, "config", "RMHE08", "splits.txt"), encoding="utf-8").read()
+        check("... nothing was written (markers still present)", "<<<<<<<" in text, True)
+        repo_git(tmp, "worktree", "remove", "--force", wt)
+        repo_git(tmp, "branch", "-D", "scratch")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # A conflict outside the scope (a header) is a content conflict, never a union.
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, {"include/shared.h": "int shared = 0;\n", "src/anchor.cpp": "int a;\n"})
+        repo_git(tmp, "checkout", "-q", "-b", "worker/x")
+        _write_tree(tmp, {"include/shared.h": "int shared = 1;\n"})
+        repo_git(tmp, "checkout", "-q", "main")
+        _write_tree(tmp, {"include/shared.h": "int shared = 2;\n"})
+        wt = _conflicted_worktree(tmp)
+        result = resolve_conflicts(wt, tmp, "worker/x", base=repo_git(tmp, "merge-base", "main", "worker/x"))
+        check("scope: a header conflict is refused", result.get("ok"), False)
+        check("... naming it as outside the registration scope",
+              "outside the registration scope" in result.get("reason", ""), True)
+        check("... and the header is left alone",
+              "<<<<<<<" in open(os.path.join(wt, "include", "shared.h"), encoding="utf-8").read(), True)
+        repo_git(tmp, "worktree", "remove", "--force", wt)
+        repo_git(tmp, "branch", "-D", "scratch")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, {"src/a.cpp": "int a;\n"})
+        result = resolve_conflicts(tmp, tmp, "main", base=None)
+        check("MAIN is refused as a resolution tree", result.get("ok"), False)
+        check("... naming MAIN", "inside MAIN" in result.get("reason", ""), True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # scratch_resolve: the merger lane's operation - a temp worktree, `git merge main`, resolve,
+        # commit - with MAIN's HEAD provably untouched.
+        base = _resolve_fixture(
+            tmp,
+            branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+            main_splits="menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n",
+            branch_conf='            Object(NonMatching, "menu/branch.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/main.cpp"),\n')
+        main_head = repo_git(tmp, "rev-parse", "HEAD")
+        result = scratch_resolve(tmp, "worker/x")
+        check("scratch: the branch resolves in a scratch worktree", result.get("ok"), True)
+        check("... a scratch branch is named", bool(result.get("scratch_branch")), True)
+        check("... MAIN's HEAD is untouched", repo_git(tmp, "rev-parse", "HEAD"), main_head)
+        text = open(os.path.join(result["worktree"], "config", "RMHE08", "splits.txt"),
+                    encoding="utf-8").read()
+        check("... the merge commit carries both bands",
+              "menu/branch.cpp" in text and "menu/main.cpp" in text, True)
+        check("... the merge is committed on the scratch branch",
+              repo_git(result["worktree"], "rev-parse", "HEAD") != main_head, True)
+        repo_git(tmp, "worktree", "remove", "--force", result["worktree"])
+        repo_git(tmp, "branch", "-D", result["scratch_branch"])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _resolve_fixture(
+            tmp,
+            branch_anchor_conf='            Object(NonMatching, "anchor_branch.cpp"),\n',
+            main_anchor_conf='            Object(Matching, "anchor.cpp"),\n')
+        result = scratch_resolve(tmp, "worker/x")
+        check("scratch: an unsafe merge is refused", result.get("ok"), False)
+        check("... and the scratch worktree is removed",
+              repo_git(tmp, "worktree", "list", "--porcelain").count("worktree "), 1)
+
+    # --- the one-command landing (`land --branch`) -------------------------------------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, {"src/a.cpp": "int a;\n", "AGENTS.md": "base\n"})
+        check("clean-tree: a committed tree is clean", require_clean_tree(tmp), None)
+        open(os.path.join(tmp, "src", "a.cpp"), "w", encoding="utf-8").write("dirty\n")
+        dirty = require_clean_tree(tmp)
+        check("clean-tree: a tracked edit is refused", dirty is not None, True)
+        check("... naming the path", "src/a.cpp" in (dirty or ""), True)
+        check("... and the exact clean command", "stash push --include-untracked" in (dirty or ""), True)
+        repo_git(tmp, "checkout", "--", "src/a.cpp")
+        open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8").write(
+            "base\n" + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
+        check("clean-tree: a LOCAL-ONLY-only AGENTS.md is not dirty", require_clean_tree(tmp), None)
+
+    def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
+                        check_outbox=True, release_claims=True, problems=None, branch=None):
+        write_land_message(main, "land: %s\n\nledger: (fixture)\n" % ",".join(units))
+        return 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = _resolve_fixture(
+            tmp,
+            branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+            main_splits="menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n",
+            branch_conf='            Object(NonMatching, "menu/branch.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/main.cpp"),\n')
+        check("units-from-branch: reads the branch's registration",
+              units_from_branch(tmp, "worker/x", base), ["menu/branch"])
+        main_head = repo_git(tmp, "rev-parse", "HEAD")
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", _land_verify_ok), contextlib.redirect_stdout(buf):
+            code = land_branch(tmp, "worker/x", no_build=True, check_outbox=False,
+                               release_claims=False, subject="selftest")
+        check("land --branch: lands the branch in one command", code, 0)
+        check("... the answer line says LANDED", buf.getvalue().startswith("LANDED"), True)
+        check("... main advanced past the base", repo_git(tmp, "rev-parse", "HEAD") != main_head, True)
+        text = open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), encoding="utf-8").read()
+        check("... both bands are in the committed file",
+              "menu/branch.cpp" in text and "menu/main.cpp" in text, True)
+        check("... and the tree is clean afterwards", require_clean_tree(tmp), None)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _resolve_fixture(
+            tmp,
+            branch_anchor_conf='            Object(NonMatching, "anchor_branch.cpp"),\n',
+            main_anchor_conf='            Object(Matching, "anchor.cpp"),\n')
+        main_head = repo_git(tmp, "rev-parse", "HEAD")
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", _land_verify_ok), contextlib.redirect_stdout(buf):
+            code = land_branch(tmp, "worker/x", no_build=True, check_outbox=False, release_claims=False)
+        check("land --branch: an unresolvable conflict is refused", code, 1)
+        check("... the answer line says REFUSED", buf.getvalue().startswith("REFUSED"), True)
+        check("... naming unionguard", "unionguard refused" in buf.getvalue(), True)
+        check("... and the tree is left clean (the apply was undone)", require_clean_tree(tmp), None)
+        check("... with main unchanged", repo_git(tmp, "rev-parse", "HEAD"), main_head)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        _write_tree(tmp, {"src/a.cpp": "int a;\n"})
+        repo_git(tmp, "branch", "worker/x")
+        open(os.path.join(tmp, "src", "a.cpp"), "w", encoding="utf-8").write("dirty\n")
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", _land_verify_ok), contextlib.redirect_stdout(buf):
+            code = land_branch(tmp, "worker/x", no_build=True, check_outbox=False, release_claims=False)
+        check("land --branch: a dirty tree is refused before anything", code, 1)
+        check("... the refusal names the clean command", "stash push --include-untracked" in buf.getvalue(), True)
+        check("... and main did not move", repo_git(tmp, "rev-parse", "HEAD"), repo_git(tmp, "rev-parse", "main"))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # A unit renamed at registration: the outbox keeps the pre-registration branch slug. The
+        # branch-derived lookup finds it; the unit-derived one does not - and says --no-outbox is the
+        # remedy.
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
+        renamed = "worker/old-proposal-name-abcd"
+        slug = claims.slug_of_branch(renamed)
+        json.dump(dict(entry, unit="hud/fn_80334568"),
+                  open(os.path.join(tmp, ".pi", "outbox", slug + ".json"), "w"))
+        ok, problems = outbox_units(tmp, ["hud/fn_80334568"])
+        check("renamed unit: the unit-derived outbox path misses", ok, [])
+        check("... and the problem names --no-outbox", "--no-outbox" in (problems[0] if problems else ""), True)
+        ok, problems = outbox_units(tmp, ["hud/fn_80334568"], branch=renamed)
+        check("renamed unit: the branch-derived path finds the outbox", ok, ["hud/fn_80334568"])
+        check("... with no problems", problems, [])
+        check("renamed unit: the claim key is read from the branch",
+              claim_unit_for_branch(tmp, renamed), None)   # no registry entry: None, not a wrong key
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # the CLI wiring for the one command, through `main()` with MAIN pointed at the fixture
+        _resolve_fixture(
+            tmp,
+            branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+            main_splits="menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n",
+            branch_conf='            Object(NonMatching, "menu/branch.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/main.cpp"),\n')
+        with mock.patch.object(rc, "worktree_root", return_value=tmp), \
+                mock.patch.object(rc, "main_root", return_value=tmp), \
+                mock.patch.object(module, "verify", _land_verify_ok), \
+                mock.patch.object(sys, "argv", ["land.py", "land", "--branch", "worker/x",
+                                                "--no-build", "--no-outbox", "--no-release"]):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = main()
+        check("land --branch runs through main()", code, 0)
+        check("... and prints the one answer line", buf.getvalue().startswith("LANDED"), True)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -2724,7 +3387,11 @@ def main() -> int:
     v.add_argument("--json", action="store_true")
     ld = sub.add_parser("land", help="gate + stage + commit + release; one answer line, exit status is the answer")
     ld.add_argument("--base", default=None, help="expected main HEAD (default: the recorded base)")
-    ld.add_argument("--units", required=True, help="comma-separated units in this batch")
+    ld.add_argument("--units", default=None, help="comma-separated units in this batch")
+    ld.add_argument("--branch", default=None,
+                    help="land a whole branch: refuse a dirty tree, record-base, apply the branch with the "
+                         "registration union, gate, commit and release (derives --units from the branch's "
+                         "registration diff when --units is omitted)")
     ld.add_argument("--no-build", action="store_true", help="skip the baseline step")
     ld.add_argument("--no-outbox", "--no-worker-units", action="store_true", dest="no_outbox",
                     help="skip the outbox/branch checks (release still runs)")
@@ -2736,6 +3403,17 @@ def main() -> int:
     ld.add_argument("--already-applied", action="store_true", dest="already_applied",
                     help="the batch was applied before `record-base` ran, so its paths are in the base's "
                          "dirty snapshot; stage them anyway (otherwise `land` refuses and says so)")
+    rs = sub.add_parser("resolve", help="union-resolve a branch's registration append-conflict in a "
+                                         "scratch tree (never in MAIN); exit status is the answer")
+    rs.add_argument("--branch", required=True, help="the worker branch to resolve")
+    rs.add_argument("--worktree", default=None,
+                    help="a worktree mid-merge on --branch to resolve in (default: a fresh scratch "
+                         "worktree, `git merge main`)")
+    rs.add_argument("--main", default=None, help="MAIN worktree (default: resolved with git)")
+    rs.add_argument("--base", default=None, help="the merge base (default: git merge-base main <branch>)")
+    rs.add_argument("--no-commit", action="store_true",
+                    help="resolve and stage the scoped paths but do not commit")
+    rs.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
@@ -2759,10 +3437,40 @@ def main() -> int:
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
                       check_outbox=not args.no_outbox, release_claims=not args.no_release)
     if args.cmd == "land":
+        if args.branch:
+            units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
+            return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
+                               allow_regression=args.allow_regression,
+                               check_outbox=not args.no_outbox, release_claims=not args.no_release,
+                               subject=args.message)
+        if not args.units:
+            print("REFUSED | land needs --units a,b or --branch worker/<slug>")
+            return 1
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
                     subject=args.message, already_applied=args.already_applied)
+    if args.cmd == "resolve":
+        main = args.main or rc.main_root(rc.worktree_root())
+        if args.worktree:
+            base = args.base or git(["merge-base", "main", args.branch], main).strip()
+            result = resolve_conflicts(args.worktree, main, args.branch, base=base,
+                                       commit=not args.no_commit)
+        else:
+            result = scratch_resolve(main, args.branch, base=args.base, commit=not args.no_commit)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        elif result.get("ok"):
+            tail = ""
+            if result.get("scratch_branch"):
+                tail = (" | scratch branch %s in %s (fast-forward the worker branch with `git branch -f "
+                        "%s %s` when it is not checked out)"
+                        % (result["scratch_branch"], result.get("worktree"), args.branch,
+                           result["scratch_branch"]))
+            print("RESOLVED %s | %s%s" % (args.branch, result.get("reason"), tail))
+        else:
+            print("REFUSED %s | %s" % (args.branch, result.get("reason")))
+        return 0 if result.get("ok") else 1
     ap.print_help()
     return 0
 

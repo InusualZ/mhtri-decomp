@@ -248,6 +248,26 @@ def unit_tokens(main: str, wt: str, unit: str, runner=subprocess.run):
     return retarget(tokens, unit), "sibling %s (same lib)" % sibling
 
 
+def retarget_objalign(tokens: list[str], obj_path: str) -> list[str]:
+    """Point the ninja rule's **chained** `objalign.py <object>` argument at the worktree's object.
+
+    Every `.o` rule ends `... && python tools\\elf\\objalign.py build\\RMHE08\\src\\<unit>.o`, and that
+    argument is neither `-o` nor `-c`, so `rewrite` used to leave it **relative** while `compile_unit`
+    runs the whole line with `cwd=MAIN`.  `objalign` then resolved MAIN's copy of the object - absent for
+    a unit MAIN has not registered - raised `FileNotFoundError`, and the tool reported `FAILED` even
+    though MWCC had compiled the worktree object fine (the exact measurement `docs/plan.md`'s landing
+    recipe names; its `--dry-run` showed the good command and hid the mismatch).  A borrowed sibling's
+    line is worse still: its `objalign.py` carries the *sibling's* object name, so the fix replaces the
+    token after `objalign.py` rather than matching on the object's name.
+    """
+    for i, tok in enumerate(tokens):
+        if tok.replace("\\", "/").endswith("objalign.py") and i + 1 < len(tokens):
+            out = list(tokens)
+            out[i + 1] = os.path.abspath(obj_path)
+            return out
+    return tokens
+
+
 def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str], str]:
     """Point the command at the worktree's source and object, and at its own headers first.
 
@@ -280,6 +300,9 @@ def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str]
         raise SystemExit("no -o in the command line - refusing to guess where the object goes")
     out = order_includes(out, main, wt)
     obj_path = os.path.join(obj_dir, os.path.splitext(os.path.basename(wt_src))[0] + ".o")
+    # the chained objalign argument is not a `-o`/`-c` value, so it was left relative to MAIN; absolutise
+    # it here, after the object path is known, so objalign aligns the object MWCC just wrote.
+    out = retarget_objalign(out, obj_path)
     return out, obj_path
 
 
