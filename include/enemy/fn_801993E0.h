@@ -23,6 +23,9 @@ void fn_8019E960(struct _ENEMY_WORK* self, s32 slot);
 s32 fn_8019E9AC(struct _ENEMY_WORK* self, s32 slot);
 /* r3 the work record; the per-joint slot release `fn_801A94C0` tail-calls. */
 void fn_8019EA04(struct _ENEMY_WORK* self);
+/* 0x8019E840 - r3 the work record; returns the 1/0 flag `enemy/fn_8019ED34.cpp`'s `fn_8019F07C`
+ * tests (declared by that unit; rule 2: this unit owns the address). */
+u32 fn_8019E840(struct _ENEMY_WORK* self);
 /* r3 the work record and three scalars. */
 void fn_8019EC38(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
 
