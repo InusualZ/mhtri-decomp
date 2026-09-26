@@ -2151,6 +2151,21 @@ config.libs = [
             # `tudiscover.py at 0x80555374`), the right edge is the registered keyboard_ui.cpp; the
             # file keeps the map's stem with a rule-7 deferral in the header, and claims .text plus
             # its three `.ctors` words.
+            # Registered once, at its final home (docs/plan.md 12): proposal `8054E894_fn_8054E894`
+            # - the 0x8054E894-0x80555374 slice of the home-button software-keyboard band (199
+            # functions / 27360 B).  Evidence class 3: no `__FILE__` string covers the range and the
+            # runtime dump answers only `zz_054e894_`, but the range's `.data` vocabulary is the same
+            # software-keyboard layout pool the registered `homebutton/keyboard.cpp` /
+            # `homebutton/keyboard_ui.cpp` / `homebutton/fn_80555374.cpp` beside it document
+            # (fs_VK_*.brlyt, T_2l_TextBox, T_prdc_Text_00..19, B_CPkey_00..11, P_SGNkey_00..19,
+            # P_key_00..49) and its vtables point into the neighbouring bands.  Language C++ from the
+            # object's own structure (adjustor thunks `subi r3, r3, 0x10/0x14`, the deleting
+            # destructors' `__dl__FPv`, vtables), so the lib is `main` and the flags are cflags_main.
+            # The seam is unproven (`--max-bytes` cut at both edges, no must-link anchor) and the
+            # file keeps the map's stem with a rule-7 deferral in the header.  Claims .text only -
+            # the `.ctors` word at 0x8056F3FC (the static initialiser fn_8054F550 inside the range) is
+            # left unclaimed while the reconstruction emits no `.ctors` fragment; see the unit header.
+            Object(NonMatching, "homebutton/fn_8054E894.cpp"),
             Object(NonMatching, "homebutton/fn_80555374.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8055C894_fn_8055C894.cpp` - the lower slice of the home-button software-keyboard band
