@@ -119,7 +119,9 @@ struct _PLW {
     /* +0x002 */ u8 field_0x002;
     /* +0x003 */ u8 unk003[0x005 - 0x003];
     /* +0x005 */ u8 act_step_0x05;   /* the per-act state step the lobby act handlers advance */
-    /* +0x006 */ u8 unk006[0x008 - 0x006];
+    /* +0x006 */ u8 field_0x006;      /* the act's follow-up stage: reset when the step advances and
+                                      * bumped once the step's frame check passes (`Pl/fn_8024F200.cpp`) */
+    /* +0x007 */ u8 field_0x007;      /* the act's skill tier, 1-3, picked from the cat-skill level */
     /* +0x008 */ u8 chunk_ofs;     /* plus 0x14 is the chunk index its files go to */
     /* +0x009 */ u8 kind_0x09;   /* compared against 3; `ef/eft019.cpp` names this same `_PLW` byte
                                   * `kind_0x09` and `enemy.h` names the analogous byte `state_0x009` */
@@ -132,8 +134,19 @@ struct _PLW {
     /* +0x015 */ u8 kind_0x015;   /* the NPC/actor kind `pl_act.cpp` reads as its `kind` */
     /* +0x016 */ u8 area_0x16;
     /* +0x017 */ u8 unk017[0x18 - 0x17];
-    /* +0x018 */ u8 field_0x18;  /* the actor mode byte `Pl/fn_80224AC4.cpp` reads (pl_master names it `unk18`) */
-    /* +0x019 */ s8 field_0x19;     /* `Pl/fn_80224AC4.cpp` clears the actor's live flag when > 0 */
+    /* +0x018 */ union { /* the actor mode byte; three spellings of one byte, one member per offset */
+        /* +0x018 */ u8 field_0x18;   /* `Pl/fn_80224AC4.cpp` (main) reads the actor mode here, and
+                                       * `Pl/pl_master.cpp`'s own view of the record calls it `unk18` */
+        /* +0x018 */ u8 field_0x018;  /* `Pl/fn_8024F200.cpp` (this branch) clears it before dispatching
+                                       * an act step */
+        /* +0x018 */ u8 unk18;        /* the pre-merge spelling, kept as a union member so no other
+                                       * consumer breaks (rule 5) */
+    };
+    /* +0x019 */ union {
+        /* +0x019 */ s8 field_0x19;    /* `Pl/fn_80224AC4.cpp` clears the actor's live flag when > 0 */
+        /* +0x019 */ u8 pad_0x19[0x1]; /* the pre-merge padding spelling of the same byte; no consumer
+                                       * reads it, kept so the merge drops no pre-existing name */
+    };
     /* +0x01A */ u16 field_0x01A;
     /* +0x01C */ u8 pad_0x1C[0x1];
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
@@ -165,7 +178,8 @@ struct _PLW {
     /* +0x0A8 */ u32 field_0x0A8;          /* the second counter `fn_80264940` feeds (Pl/fn_80262940.cpp) */
     /* +0x0AC */ u8 unk0AC[0xB4 - 0xAC];
     /* +0x0B4 */ s16 unk0B4;
-    /* +0x0B6 */ u8 pad_0xB6[0x4];
+    /* +0x0B6 */ u16 field_0x0B6;   /* the low 3 bits are the cat-skill level `Pl/fn_8024F200.cpp` reads */
+    /* +0x0B8 */ u16 field_0x0B8;
     /* +0x0BA */ u16 unkBA;
     /* +0x0BC */ u16 unkBC;
     /* +0x0BE */ u16 unkBE;
@@ -216,7 +230,7 @@ struct _PLW {
     /* +0x2E0 */ _SLOTENT spare_slot_id[8];
     /* +0x300 */ u8 unk300[0x304 - 0x300];
     /* +0x304 */ u16 unk304;
-    /* +0x306 */ u16 unk306;
+    /* +0x306 */ u16 field_0x306;   /* the effect/motion id `fn_80272E30` is fed and indexed on */
     /* +0x308 */ u8 unk308[0x30C - 0x308];
     /* +0x30C */ u8 unk30C;
     /* +0x30D */ u8 unk30D;
@@ -299,7 +313,8 @@ struct _PLW {
     /* +0x3FA */ u8 unk3FA[0x3FC - 0x3FA];
     /* +0x3FC */ s16 field_0x3FC;         /* stamina/guard timer (`fn_80264EA4`, `fn_80265374`) */
     /* +0x3FE */ s16 unk3FE;
-    /* +0x400 */ u8 unk400[0x404 - 0x400];
+    /* +0x400 */ u16 field_0x400;   /* the guard/stamina timer family `Pl/fn_8024F200.cpp` resets */
+    /* +0x402 */ u16 field_0x402;
     /* +0x404 */ s16 unk404;
     /* +0x406 */ u8 unk406[0x40E - 0x406];
     /* +0x40E */ s16 unk40E;
@@ -360,10 +375,12 @@ struct _PLW {
     /* +0x580 */ s16 unk580;
     /* +0x582 */ u8 unk582;
     /* +0x583 */ s8 unk583;
-    /* +0x584 */ u8 unk584[0x59C - 0x584];
-    /* +0x59C */ u16 unk59C;
-    /* +0x59E */ u16 unk59E;
-    /* +0x5A0 */ u16 unk5A0;
+    /* +0x584 */ u8 unk584[0x596 - 0x584];
+    /* +0x596 */ u8 field_0x596;   /* the act's "no pitfall" latch `Pl/fn_8024F8A8.cpp` arms */
+    /* +0x597 */ u8 field_0x597;
+    /* +0x598 */ u16 field_0x598;   /* the three act fields `fn_802DE578` is handed the address of */
+    /* +0x59A */ u16 field_0x59A;
+    /* +0x59C */ u16 field_0x59C[3]; /* the three armed-motion words (`x | 0x8000`, `Pl/pl_act.cpp:1067`) */
     /* +0x5A2 */ u8 unk5A2[0x5A4 - 0x5A2];
     /* +0x5A4 */ u16 field_0x5A4;
     /* +0x5A6 */ u8 unk5A6;

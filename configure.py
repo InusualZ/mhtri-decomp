@@ -1155,6 +1155,16 @@ config.libs = [
             # (`player_control_move`/`init_player_work`/`player_move_start`/...).  No `__FILE__`
             # string covers the band, so the stem is the map's `fn_80262940` with a rule-7 deferral.
             Object(NonMatching, "Pl/fn_80262940.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8024F200_fn_8024F200` - the player's per-act state machine cluster
+            # (0x8024F200-0x80258FCC, 92 functions, 40396 B).  Home is `Pl`: every function takes the
+            # player work (`_PLW*`) and the per-part index byte, reads the act step byte at `_PLW`+0x005
+            # and drives one step through `Pl_Skill_ck`/`Pl_cat_skill_ck`/`Pl_frame_check` and the
+            # `Pl` motion helpers.  No `__FILE__` string covers the range (the `.data` pool between
+            # `enemy_control.cpp` at 0x805A1BB8 and `menu_item.cpp` at 0x805CDFC8 carries none for the
+            # whole band), so the stem is the map's `fn_8024F200` with a rule-7 deferral.  It uses
+            # `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8024F200.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
