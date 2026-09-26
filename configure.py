@@ -1905,6 +1905,15 @@ config.libs = [
             # takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
             # -Cpp_exceptions on - the target object carries extab/extabindex).
             Object(NonMatching, "fn_80429B94.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80569DAC` - the
+            # homebutton::gui component/manager band (`.text` 0x80569DAC-0x8056BBF0, 52 functions /
+            # 7748 B).  Evidence class 2: the shared runtime dump names six functions with the real
+            # `homebutton::gui::` spellings (Manager::~Manager, drawLine_, getComponent,
+            # PaneManager::getPaneComponentByPane, PaneComponent::contain), and the RSO export table
+            # config/RMHE08/hbm_data/symbols.txt carries the same class hierarchy.  Link neighbour
+            # `tiHKBManager.cpp` is in `main`, so the unit takes the `main` lib and cflags_main; the
+            # file is `homebutton/gui.cpp` (the namespace is `gui`).  Claims .text only.
+            Object(NonMatching, "homebutton/gui.cpp"),
         ],
     },
 ]
