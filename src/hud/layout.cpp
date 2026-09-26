@@ -72,11 +72,9 @@
 /* Retail keeps the unfused peephole pairs (`clrlwi`+`cmpwi`, `clrlwi`+`beq`) that the peephole pass
  * fuses into the record form (`clrlwi.`): `fn_802E0CE4`'s colour gate is the smallest witness
  * (0x802E0D5C `clrlwi r0,r0,24` + 0x802E0D60 `cmpwi r0,0x0` where our build emits one `clrlwi.`),
- * and the same pair is what `src/hud/fn_80324F7C.c` (the other `hud` lib unit) carries in its own
- * source as the same finding.  Carried as a pragma until the lib flag below lands - playbook 33:
- * the flag is the preferred home, and it is a `config_request` of kind `flag` against `cflags_hud`,
- * which is why it is not applied to the whole lib from here. */
-#pragma peephole off
+ * and the same pair is what `src/hud/fn_80324F7C.c` (the other `hud` lib unit) carries: the lib flag
+ * `cflags_hud = cflags_main + -opt nopeephole` is the preferred home (playbook 33) and is applied there
+ * as of 2026-09-27, so this file no longer carries a `#pragma peephole off`. */
 
 #ifdef __cplusplus
 extern "C" {
