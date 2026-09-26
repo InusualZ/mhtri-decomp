@@ -31,8 +31,13 @@ Fingerprints implemented
 * the string pool's section (`.rodata` = `-str ...,readonly`, `.data` = not readonly).
 * the FPR/`GPR` save/restore shape: `stmw`/`lmw` (`-use_lmw_stmw on`) vs the EABI `_savegpr_*`/
   `_restgpr_*` helpers (off).
-* function start alignment and inter-function `gap_*` padding (`-func_align`, and `-O4,p` implies 16).
-* a kept `bl` to a tiny function defined in the same object (`-inline noauto`; `auto` would inline it).
+* function start alignment and inter-function `gap_*` padding: a start off a 16-byte boundary proves
+  `-func_align 4`; every start 16-byte aligned *with* `gap_*` padding is only consistent with 16
+  (`-O4,p` implies it, and a `#pragma function_align 16` restores it), because a `-func_align 4`
+  unit can land all-16-aligned too, so that direction is a hint.
+* a kept `bl` to a tiny function defined in the same object - consistent with `-inline noauto`, but a
+  hint only: `-inline auto` is a heuristic, a source `#pragma dont_inline` also keeps the call, and in
+  a multi-TU split object the callee may be a different original translation unit.
 * `extab`/`extabindex` presence, `.ctors`/`.dtors` fragments, and the `.comment` byte (reported as
   evidence; the split objects' `.comment` is synthesized from `config.yml` and is uniform here).
 
@@ -351,19 +356,18 @@ class Fingerprint:
     def add(self, flag, value, confidence, evidence):
         self.findings.append(dict(flag=flag, value=value, confidence=confidence, evidence=evidence))
 
-    # 1. peephole: record forms (proof of `on`) and the folds the pass would have made (proof of
-    # `off`): a `clrlwi` kept before a narrowing store, and an unfused `srwi`+`clrlwi`.
+    # 1. peephole: record forms prove the pass ran on *some* function; a sequence the pass would
+    # have folded proves it did not run on the function that kept it: a `clrlwi` before a narrowing
+    # store, an unfused `srwi`+`clrlwi`, a `li r0,N; psq_lx/psq_stx` epilogue, and a kept
+    # `lwz rX,disp(rB)` + `addi rB,rB,disp` (the pass folds that pair into `lwzu rX,disp(rB)`).
+    # When both are present the TU carries a scoped `#pragma peephole off`, so the unit-level -opt
+    # is not settled and the reading is only a hint.
     def _fp_peephole(self):
         rec = sum(1 for i in self.insns if i.is_record())
         idx_psq = sum(1 for i in self.insns if i.is_psq_indexed())
         self.rec_count = rec
         self.idx_psq_count = idx_psq
-        if rec:
-            self.add("peephole", "on", "high",
-                     "%d record-form instruction(s) (rlwinm./and./add./srwi./extsb.) - only the "
-                     "peephole pass emits them" % rec)
-            return
-        clr_store = shift_mask = 0
+        clr_store = shift_mask = load_update = 0
         for _name, start, end in self.funcs:
             body = self.insns_in(start, end)
             for k in range(len(body) - 1):
@@ -371,15 +375,46 @@ class Fingerprint:
                     clr_store += 1
                 if body[k].is_shift() and body[k + 1].is_clr_mask():
                     shift_mask += 1
+            for k, ins in enumerate(body):
+                if ins.op != 32:  # lwz
+                    continue
+                base, disp = ra(ins.word), si(ins.word)
+                if base == 0 or disp == 0:
+                    continue
+                # the first instruction that writes the base is the candidate `addi`; the pass
+                # would have rewritten the pair into `lwzu`, so a surviving pair means the pass was
+                # off in this function.
+                for later in body[k + 1:k + 7]:
+                    w = later.writes_gpr()
+                    if w is None or w != base:
+                        continue
+                    if later.op == 14 and rt(later.word) == base \
+                            and si(later.word) == disp:
+                        load_update += 1
+                    break
         self.clr_store_count = clr_store
         self.shift_mask_count = shift_mask
-        folds = idx_psq + clr_store + shift_mask
-        if folds:
+        self.load_update_count = load_update
+        folds = idx_psq + clr_store + shift_mask + load_update
+        if rec:
+            if folds:
+                self.add("peephole", "mixed", "low",
+                         "%d record form(s) prove the pass ran on some function(s), but %d "
+                         "sequence(s) it would have folded are kept in others (%d `li r0,N; "
+                         "psq_lx/psq_stx`, %d kept `clrlwi` before a narrowing store, %d unfused "
+                         "`srwi`+`clrlwi`, %d kept `lwz`+`addi` load-update) - the TU carries a "
+                         "scoped `#pragma peephole off`, so the unit-level -opt is not `on`"
+                         % (rec, folds, idx_psq, clr_store, shift_mask, load_update))
+            else:
+                self.add("peephole", "on", "high",
+                         "%d record-form instruction(s) (rlwinm./and./add./srwi./extsb.) - only the "
+                         "peephole pass emits them" % rec)
+        elif folds:
             self.add("peephole", "off", "medium",
                      "0 record forms, but %d instruction(s) the peephole pass would have folded: "
                      "%d `li r0,N; psq_lx/psq_stx` epilogue op(s), %d kept `clrlwi` before a "
-                     "narrowing store, %d unfused `srwi`+`clrlwi`"
-                     % (folds, idx_psq, clr_store, shift_mask))
+                     "narrowing store, %d unfused `srwi`+`clrlwi`, %d kept `lwz`+`addi` load-update"
+                     % (folds, idx_psq, clr_store, shift_mask, load_update))
         else:
             self.add("peephole", "unknown", "none",
                      "0 record-form instructions and no fold-shaped sequence - the peephole's folds "
@@ -401,7 +436,13 @@ class Fingerprint:
                     break
         self.fma_count = fma
         self.contract_pairs = pairs
-        if fma:
+        if fma and pairs:
+            self.add("fp_contract", "mixed", "low",
+                     "%d fused multiply-add(s) in some function(s) but %d unfused fmuls+fadds/fsubs "
+                     "chain(s) elsewhere - a file-scoped `#pragma fp_contract off` pair (the chain "
+                     "is not proof the source wrote `a*b+c`, but it is proof the pass did not run "
+                     "everywhere), so the unit-level flag is not settled" % (fma, pairs))
+        elif fma:
             self.add("fp_contract", "on", "high",
                      "%d fused multiply-add(s) (fmadds/fmsubs/fnmadds/fnmsubs) present" % fma)
         elif pairs:
@@ -535,9 +576,15 @@ class Fingerprint:
             self.add("func_align", "4", "high",
                      "%d of %d function(s) start off a 16-byte boundary" % (len(misaligned), len(starts)))
         elif gaps:
-            self.add("func_align", "16", "high",
+            # 16-aligned starts + padding is *consistent* with -func_align 16, but not proof of it:
+            # a -func_align 4 unit can land every function on a 16-byte boundary with padding too
+            # (DWCi/fn_805113B0.c and OS/FindContainHeap_.c document -func_align 4 and look exactly
+            # like this), so this direction is only a hint.  A start *off* 16 is the proof (above).
+            self.add("func_align", "16", "low",
                      "all %d function(s) start on a 16-byte boundary and %d gap_* padding "
-                     "fragment(s) (%d bytes) pad them out" % (len(starts), len(gaps), sum(gaps)))
+                     "fragment(s) (%d bytes) pad them out - consistent with -func_align 16, but a "
+                     "-func_align 4 unit also lands all-16-aligned with padding, so this is a hint"
+                     % (len(starts), len(gaps), sum(gaps)))
             self.add("opt_level_hint", "-O4,p", "low",
                      "-O4,p implies -func_align 16; a -O3 build with an explicit -func_align 16 "
                      "looks the same")
@@ -558,8 +605,14 @@ class Fingerprint:
         tiny = sorted(n for n in called if 0 < sizes.get(n, 0) <= 0x40 and n not in init_syms)
         self.tiny_callees = tiny
         if tiny:
-            self.add("inline", "noauto", "medium",
-                     "kept bl to %d tiny same-object function(s) (%s) that -inline auto would inline"
+            # A kept call is consistent with noauto, but not proof: -inline auto is a heuristic
+            # (it may decline), a source `#pragma dont_inline` also keeps the call, and in these
+            # maximal-run split objects the tiny callee may be a different original TU - a cross-TU
+            # call is never inlined under either flag.  So this is a hint, not a confident claim.
+            self.add("inline", "noauto", "low",
+                     "kept bl to %d tiny same-object function(s) (%s) - consistent with -inline "
+                     "noauto, but a kept call is not proof of it (`-inline auto` is a heuristic and "
+                     "a `#pragma dont_inline` or a different original TU also keeps it)"
                      % (len(tiny), ", ".join("%s %dB" % (n, sizes[n]) for n in tiny[:3])))
         else:
             self.add("inline", "unknown", "none",
@@ -650,7 +703,11 @@ def registered_units(root: str):
     out = []
     for lib in ns["config"].libs:
         for o in lib["objects"]:
-            cflags = list(getattr(o, "cflags", None) or lib["cflags"])
+            # Object() keeps its options in `.options`; a per-object `cflags=` override (Pl/pl_skill,
+            # Network/fn_803D3CE8, Network/fn_8041A87C) must beat the library group.
+            opts = getattr(o, "options", {}) or {}
+            override = opts.get("cflags")
+            cflags = list(override or lib["cflags"])
             out.append((lib["lib"], o.name, obj_path_for(o.name, root), cflags))
     return out
 
@@ -765,6 +822,14 @@ def expected_flags(cflags, pragmas, documented):
     elif pragma("peephole", "on"):
         exp["peephole"] = "on"
 
+    # A source `#pragma function_align N` is a per-unit record, exactly like a peephole/fp_contract
+    # pragma: it overrides the cflags group (AX/AXFXReverbHi.c and EXI/ProbeBarnacle.c restore
+    # -O4,p's 16 under the OS group that says -func_align 4).
+    if pragma("function_align", "16"):
+        exp["func_align"] = "16"
+    elif pragma("function_align", "4"):
+        exp["func_align"] = "4"
+
     if not documented:
         # fp_contract: a pragma is the only record for an auto unit.
         if pragma("fp_contract", "off"):
@@ -786,11 +851,12 @@ def expected_flags(cflags, pragmas, documented):
         exp["lmw_stmw"] = cf["lmw_stmw"]
     if cf.get("inline"):
         exp["inline"] = cf["inline"]
-    if cf.get("func_align"):
-        exp["func_align"] = cf["func_align"]
-    elif cf["opt"].get("level") in ("0", "1", "2", "3") or re.search(r"-O[0-3]", " ".join(cflags)):
-        # the project's documented -O3 units (Camellia, Pl, main) pack on 4-byte boundaries
-        exp["func_align"] = "4"
+    if "func_align" not in exp:  # a source `#pragma function_align N` wins over the cflags group
+        if cf.get("func_align"):
+            exp["func_align"] = cf["func_align"]
+        elif cf["opt"].get("level") in ("0", "1", "2", "3") or re.search(r"-O[0-3]", " ".join(cflags)):
+            # the project's documented -O3 units (Camellia, Pl, main) pack on 4-byte boundaries
+            exp["func_align"] = "4"
     return exp
 
 
