@@ -93,6 +93,27 @@ profiles.
   the ack and the setup, and nothing else, because the profile is supposed to carry the rules.
 * **`merger`** - pending: the next refused apply (the parked `worker/801b0010-...` branch is the natural case).
 
+### The `decompiler` T3 "self-verification defect" was TOOLING, not the profile
+
+Two `decompiler` lanes reported *"no new section 6.5 violation"* and were then refused by the gate for real
+findings in their brand-new units. The cause, root-caused by a `fixer` lane that reproduced it three ways
+(the exact verdict string, a temporary index, and a scratch repo): **`stylelint.py --diff <ref>` builds its
+comparison set from `git diff --name-status`, and `git diff` cannot see an untracked file** - so a lane that runs
+the lint before staging its new unit is checked against the wrong file set entirely, and a new unit's violations
+are all additions, i.e. exactly what it cannot see. The profile's own ordering (lint, then commit) made that
+certain for every new unit.
+
+Fixed on both sides, because the tool is the real bug:
+
+* `tools/units/stylelint.py` now includes untracked files under `src/` and `include/unsplit/` in the comparison
+  set (selftest still 162 checks). Proved with a probe: an untracked `src/zz_lintprobe.c` containing a `goto` was
+  invisible before and is now reported as `+1 rule 8`.
+* the profile says so, so a future reader of a verdict knows what to check.
+
+**Consequence for the test record: those two refusals are not evidence against the profile.** The lanes did what
+they were told; the instruction was blind. What the refusals *did* show is that the gate catches it anyway - which
+is why the tool fix matters for throughput, not for safety.
+
 ### Field comparison: `worker` vs `decompiler` on the same kind of task
 
 The profiles are not only tested in isolation - the campaign kept running `worker` lanes beside `decompiler` ones,
