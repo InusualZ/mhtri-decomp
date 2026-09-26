@@ -252,11 +252,18 @@ struct _ENEMY_WORK {
             /* +0x310 */ nw4r::math::VEC3 vec_0x310;
         } offset_0x30C;
     };
-    /* +0x31C */ u8 unused_0x31C[0x320 - 0x31C];
-    /* +0x320 */ f32 field_0x320;      /* the third effect scale `fn_80167770` seeds (added by
-                                        * `enemy/fn_80165FC8.cpp`; the byte range is the +0x31C
-                                        * VEC3 clash that unit's header records) */
-    /* +0x324 */ f32 field_0x324;      /* the effect scale `fn_801493A8` clamps */
+    union {
+        struct {
+            /* +0x31C */ u8 unused_0x31C[0x320 - 0x31C];
+            /* +0x320 */ f32 field_0x320;  /* the third effect scale `fn_80167770` seeds (added by
+                                            * `enemy/fn_80165FC8.cpp`; the byte range is the +0x31C
+                                            * VEC3 clash that unit's header records) */
+            /* +0x324 */ f32 field_0x324;  /* the effect scale `fn_801493A8` clamps */
+        };
+        /* the second offset vector `enemy/fn_801D80EC.cpp`'s `fn_801D83C0` rotates (`rotVecY` on
+         * +0x31C; `.y`/`.z` are the two floats above, so the two views share the bytes). */
+        /* +0x31C */ nw4r::math::VEC3 vec_0x31C;
+    };
     /* +0x328 */ union {
         /* the countdown/flag view `fn_80170600`/`fn_80170804` use. */
         struct {
@@ -567,7 +574,11 @@ struct _ENEMY_WORK {
     /* +0x0A0D */ u8 field_0xA0D;       /* fn_80177D54's per-frame gate */
     /* +0x0A0E */ u8 unused_0xA0E[0xA69 - 0xA0E];
     /* +0x0A69 */ u8 field_0xA69;       /* fn_80177D54's second gate */
-    /* +0x0A6A */ u8 unused_0xA6A[0xAEE - 0xA6A];
+    /* +0x0A6A */ u8 unused_0xA6A[0xAEA - 0xA6A];
+    /* +0x0AEA */ u16 field_0xAEA;      /* the eighteen-bit flag word `enemy/fn_801D80EC.cpp`'s
+                                        * effect calls hand the shell callback (added by that
+                                        * unit) */
+    /* +0xAEC */ u8 unused_0xAEC[0xAEE - 0xAEC];
     /* +0xAEE */ u8 field_0xAEE;        /* `fn_8013791C`'s one-shot action-setup request */
     /* +0xAEF */ u8 unused_0xAEF[0xB14 - 0xAEF];
     /* +0xB14 */ struct _se_w* se_0xB14;  /* the sound-work handle `enemy/fn_801BD6C0.cpp`'s
