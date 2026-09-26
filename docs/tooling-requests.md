@@ -8,12 +8,12 @@ anything but the **Status.** line (that line is carried across regenerations).
 
 Status is `open` (not built), `done` (built), or `parked` (decided against). Set it with `python tools/units/tooling.py --set-status <key> <status>` or edit the **Status.** line directly; the key is the `tooling-key` comment above it.
 
-_542 sources (237 outboxes, 305 notes), 9 requests, 156 votes._
+_546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 
 | # | request | votes | cost | status |
 | --- | --- | --- | --- | --- |
-| 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 61 | ~29 min | open |
-| 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | open |
+| 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 61 | ~29 min | done |
+| 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
 | 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 30 | - | open |
 | 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 8 | - | open |
 | 5 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | open |
@@ -29,7 +29,7 @@ _542 sources (237 outboxes, 305 notes), 9 requests, 156 votes._
 <!-- tooling-key: scratch-measurer -->
 **Votes.** 61  |  **Cost.** ~29 min (58 measurements)
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
@@ -100,7 +100,7 @@ _542 sources (237 outboxes, 305 notes), 9 requests, 156 votes._
 <!-- tooling-key: seed-worktree -->
 **Votes.** 34  |  **Cost.** -
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
