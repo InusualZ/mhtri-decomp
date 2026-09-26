@@ -79,7 +79,19 @@ profiles.
 
 ### T3 - behaviour
 
-Pending: assigned as real tasks arrive (the next free unit slot for `decompiler`, the next refused apply for
-`merger`, the next refused branch for `fixer`). The `worker`-based baseline this is measured against: five
-branches refused on rule 3/6/7 items, four hand-built merge lanes, one worker editing MAIN, and one lane
-spending 130 turns / 1.36 Mt on a single unit.
+* **`fixer` - PASS** (2026-09-25). The real refusal: `worker/801a9540-fn-801a9540-83fb` was refused for (a) a
+  compile failure in `enemy/fn_8014A1BC.o` and (b) one section 6.5 violation (`+1 rule 9
+  src/enemy/fn_801A9540.cpp`). The lane **reproduced both errors itself** instead of trusting the summary, fixed
+  rule 9 at the *call site* (`__dl__FPv` is `operator delete`, whose C++ declaration was already in `sys_mem.h` -
+  the spelling the sibling units use), and resolved the `(10563)` redeclaration by keeping MAIN's authoritative
+  declaration, explaining why deleting the band copy instead would have widened the diff past the refusal. It held
+  the diff to exactly its 13 paths, showed all 54 rows unchanged **row by row** against the branch's own outbox,
+  and proved neutrality at the **object level** (`.text`/`.rela*`/`.symtab`/`extab` byte-identical; only
+  `.strtab`'s MWCC `@NNN` label numbering differed). It used the profile's primary signal correctly (the `FAILED`
+  count first). **The gate then landed it** (`2c4777b7c`, closed 4465 -> 4519). No prompt defect reported.
+* **`decompiler`** - running on a real unit with a deliberately **short** prompt: the launch names the brief and
+  the ack and the setup, and nothing else, because the profile is supposed to carry the rules.
+* **`merger`** - pending: the next refused apply (the parked `worker/801b0010-...` branch is the natural case).
+
+The `worker`-based baseline this is measured against: five branches refused on rule 3/6/7 items, four hand-built
+merge lanes, one worker editing MAIN, and one lane spending 130 turns / 1.36 Mt on a single unit.
