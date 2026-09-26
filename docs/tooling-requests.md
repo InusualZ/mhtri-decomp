@@ -16,11 +16,11 @@ _546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 | 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
 | 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 30 | - | open |
 | 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 8 | - | open |
-| 5 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | open |
+| 5 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
 | 6 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 5 | ~29 min | open |
-| 7 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 5 | - | open |
+| 7 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 5 | - | done |
 | 8 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 4 | - | open |
-| 9 | `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split. | 2 | - | open |
+| 9 | `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split. | 2 | - | done |
 
 ---
 
@@ -202,7 +202,7 @@ _546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 <!-- tooling-key: junction-unsafe -->
 **Votes.** 7  |  **Cost.** -
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
@@ -234,7 +234,7 @@ _546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 <!-- tooling-key: include-order-shadow -->
 **Votes.** 5  |  **Cost.** -
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
@@ -263,7 +263,7 @@ _546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 <!-- tooling-key: configure-stub-ninja -->
 **Votes.** 2  |  **Cost.** -
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
