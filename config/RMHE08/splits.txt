@@ -738,6 +738,12 @@ enemy/fn_801A9540.cpp:
 	extabindex  start:0x8002ABA0 end:0x8002AEDC
 	.text       start:0x801A9540 end:0x801B0010
 
+enemy/fn_801B0010.cpp:
+	extab       start:0x8000F54C end:0x8000F6B4
+	extabindex  start:0x8002AEDC end:0x8002B0F8
+	.text       start:0x801B0010 end:0x801B4458
+	.ctors      start:0x8056F344 end:0x8056F348
+
 enemy/fn_801B4458.cpp:
 	extab       start:0x8000F6B4 end:0x8000F7EC
 	extabindex  start:0x8002B0F8 end:0x8002B2CC
@@ -975,9 +981,15 @@ Pl/fn_80295EF4.cpp:
 	.ctors      start:0x8056F370 end:0x8056F374
 
 menu/menu_item.cpp:
-	extab       start:0x8001360C end:0x800137A4
-	extabindex  start:0x80030F90 end:0x800311F4
-	.text       start:0x8029F3C8 end:0x802A5444
+	extab       start:0x8001360C end:0x800137D4
+	extabindex  start:0x80030F90 end:0x8003123C
+	.text       start:0x8029F3C8 end:0x802A6624
+
+menu/fn_802A6624.cpp:
+	extab       start:0x800137D4 end:0x80013B0C
+	extabindex  start:0x8003123C end:0x80031710
+	.text       start:0x802A6624 end:0x802AD9C0
+	.ctors      start:0x8056F374 end:0x8056F37C
 
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C

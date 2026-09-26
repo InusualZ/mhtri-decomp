@@ -63,5 +63,17 @@ u32 fn_800600C0(u32* p);
 }
 #endif
 
+/* The font API this range's address owns (0x8005C804 `font_set_size__Fss`, 0x8005C810
+ * `font_print_ex__FsssPSce`, 0x8005C9A4 `font_flush__Fv`).  The owner defines the first and the
+ * third at C++ scope (`g3d_anmchr.cpp:619`/`:639`); the second is the varargs engine the font
+ * cluster wraps, and it is the `font_print_ex` spelling the map records.  Declared at C++ scope,
+ * outside the `extern "C"` block above, so a consumer's call mangles to the map's names.
+ * Added with `menu/menu_item.cpp` (rule 2: this range owns the three addresses); `font_set_size` is
+ * also declared by `include/unsplit/lobby.h`, with the same signature, so a consumer may include
+ * both. */
+void font_set_size(s16 x, s16 y);
+void font_flush(void);
+void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
+
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */
 
