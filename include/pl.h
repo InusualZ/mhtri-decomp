@@ -132,12 +132,13 @@ struct _PLW {
     /* +0x015 */ u8 kind_0x015;   /* the NPC/actor kind `pl_act.cpp` reads as its `kind` */
     /* +0x016 */ u8 area_0x16;
     /* +0x017 */ u8 unk017[0x18 - 0x17];
-    /* +0x018 */ u8 unk18;
-    /* +0x019 */ u8 pad_0x19[0x1];
+    /* +0x018 */ u8 field_0x18;  /* the actor mode byte `Pl/fn_80224AC4.cpp` reads (pl_master names it `unk18`) */
+    /* +0x019 */ s8 field_0x19;     /* `Pl/fn_80224AC4.cpp` clears the actor's live flag when > 0 */
     /* +0x01A */ u16 field_0x01A;
     /* +0x01C */ u8 pad_0x1C[0x1];
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
-    /* +0x01E */ u8 pad_0x01E[0x2];
+    /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `Pl/fn_80224AC4.cpp` */
+    /* +0x01F */ u8 pad_0x01F[0x1];
     /* +0x020 */ u32 unk020;
     /* +0x024 */ u8 pad_0x24[0x8];
     /* +0x02C */ _SHELL_W* equip_0x2C;
@@ -193,7 +194,9 @@ struct _PLW {
     /* +0x250 */ u16 equip_valid;
     /* +0x252 */ u16 set_valid;
     /* +0x254 */ u16 deco_dirty;
-    /* +0x256 */ u8 pad_0x256[0xE];
+    /* +0x256 */ u8 pad_0x256[0x2];
+    /* +0x258 */ u8 field_0x258[0x4];  /* passed to `fn_80223830` by `Pl/fn_80224AC4.cpp` */
+    /* +0x25C */ u8 field_0x25C[0x8];  /* passed to `fn_80223708` by `Pl/fn_80224AC4.cpp` */
     /* +0x264 */ s16 unk264;
     /* +0x266 */ u8 unk266[0x269 - 0x266];
     /* +0x269 */ u8 unk269;
@@ -404,7 +407,8 @@ struct _PLW {
     /* +0xB01 */ u8 field_0xB01;
     /* +0xB02 */ u8 field_0xB02;
     /* +0xB03 */ u8 field_0xB03;
-    /* +0xB04 */ u8 field_0xB04;
+    /* +0xB04 */ u8 field_0xB04;   /* `Pl/fn_80224AC4.cpp`: non-zero suppresses the up-swing gate;
+                                    * the lobby's latch block runs to this byte as well (+0xB00..+0xB04) */
     /* +0xB05 */ u8 name_0xB05[10];  /* the hunter name the lobby compares with the move work */
     /* +0xB0F */ u8 pad_0xB0F[0xB];
     /* +0xB1A */ u8 field_0xB1A;

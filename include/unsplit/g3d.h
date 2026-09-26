@@ -98,6 +98,7 @@ void fn_800868A0(u32 value);
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 s32 fn_80082BCC(s32 model);
 void fn_8007F0CC(s32 root, u32 id);
+extern s32 pRoot; /* .sbss 0x80794974 - the g3d model root the effect units project through */
 
 /* 0x8007A510 - the softreset/return-to-title request (caller: src/mh3_pad.cpp). */
 void fn_8007A510(void);

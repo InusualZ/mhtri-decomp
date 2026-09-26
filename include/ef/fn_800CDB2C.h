@@ -27,6 +27,14 @@ s32 fn_800CEE2C(const char* path, void* info);
 /* The task-table entry `ef/fn_80059550.cpp` reads (its own return view is `_GXTexObj*`). */
 u8* fn_800D0568(s32 index);
 
+/* 0x800D0708 - the owner's own byte read (`src/ef/fn_800CDB2C.cpp:484`, `system_w`'s +0x7D3, whose
+ * consumer compares the result against 1).  The map spells the symbol `fn_800D0708`, a placeholder
+ * stem rather than a mangling, so it is declared at C scope (playbook 42/48) - the consumers
+ * (`Pl/fn_80224AC4.cpp`, `lobby/fn_802076D4.cpp`) declare it `extern "C"` too, and a declaration
+ * in the C++-scope block below clashes with those (`(10505) illegal overloading`).  Added with
+ * `Pl/fn_80224AC4.cpp` (rule 2). */
+u32 fn_800D0708(void);
+
 #ifdef __cplusplus
 }
 #endif

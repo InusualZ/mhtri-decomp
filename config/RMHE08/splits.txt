@@ -849,6 +849,11 @@ lobby/fn_8021E1EC.cpp:
 	.text       start:0x8021E1EC end:0x80224AC4
 	.ctors      start:0x8056F360 end:0x8056F368
 
+Pl/fn_80224AC4.cpp:
+	extab       start:0x80011B34 end:0x80011C7C
+	extabindex  start:0x8002E7B8 end:0x8002E9A4
+	.text       start:0x80224AC4 end:0x80229ECC
+
 Pl/fn_80229ECC.cpp:
 	extab       start:0x80011C7C end:0x80011C84
 	extabindex  start:0x8002E9A4 end:0x8002E9B0

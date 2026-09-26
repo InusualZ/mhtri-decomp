@@ -214,6 +214,18 @@ s32 CalculateEvents();
  * `Pl/fn_80262940.cpp` calls on the actor model; an unmangled `fn_` stem, so C linkage.  Owned here by
  * range (rule 2), so the consumer includes this header rather than declaring it in the unsplit band. */
 s32 fn_80223E54(s32 model);
+/* The model-layer helpers of this range that `Pl/fn_80224AC4.cpp` (the next unit up,
+ * 0x80224AC4-0x80229ECC) calls: they are defined here by range (rule 2), so the consumer includes
+ * this header.  `fn_80223258` was previously spelled `(LbPage*, u8)` in `unsplit/lobby.h`'s
+ * neighbour `lobby/fn_801F3294.h`; its body reads `self->equipA`, so the actor is a `_PLW`.
+ * `fn_80223708`/`fn_80223830` take the actor's +0x25C/+0x258 blocks by pointer. */
+struct _PLW;
+void fn_80223258(struct _PLW* self, u32 slot);
+void fn_80223708(void* rig, void* block_0x25C, u32 slot);
+void fn_8022375C(void* rig, u32 slot);
+void fn_80223830(void* rig, void* block_0x258);
+void fn_80224820(u32 unused, void* model, struct _PLW* plw, f32 scale);
+u32 fn_80224944(struct _PLW* self);
 extern const f32 lbl_80799CDC;       /* .sdata2 0x80799CDC */
 }
 
