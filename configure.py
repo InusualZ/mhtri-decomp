@@ -586,6 +586,15 @@ config.libs = [
             Object(NonMatching, "enemy/fn_80147CE0.cpp"),
             Object(Matching, "enemy/fn_80149D6C.c"),
             Object(NonMatching, "enemy/fn_8014A1BC.c"),
+            # Registered from proposal/801502C8_fn_801502C8.cpp: the enemy em00x action band,
+            # 30 functions / 0x4E34 bytes (0x801502C8..0x801550FC), plus the extab/extabindex runs
+            # its framed functions carry.  Module `enemy` from the link band (both bracketing
+            # registered units are `enemy`) and from the code (every function takes the
+            # `_ENEMY_WORK`, pinned by `em_after_frame_check__FP11_ENEMY_WORKUsff`); C++ because the
+            # callees are mangled and rule 9 forbids spelling a mangling at the call site.  No
+            # `__FILE__` string is reachable from the range and the dump answers only `zz_`
+            # placeholders, so the file keeps the map's own stem.  See the unit header.
+            Object(NonMatching, "enemy/fn_801502C8.cpp"),
             # proposal/801550FC_fn_801550FC.cpp: the em003 action unit (0x801550FC..0x8015D860,
             # 104 functions).  C++ (the range defines three em003_* manglings).  The boundary is
             # provisional - see the unit header.

@@ -197,13 +197,15 @@ struct _ENEMY_WORK {
     /* +0x1FA */ u8 unused_0x1FA[0x1FB - 0x1FA];
     /* +0x1FB */ u8 field_0x1FB;        /* set by `fn_80147F48`'s case 9 (added by
                                         * `enemy/fn_80147CE0.cpp`) */
-    /* +0x1FC */ u8 field_0x1FC;        /* the "special part request" flag `enemy/fn_801DB8E0.cpp`'s
-                                        * `fn_801DF8EC` arms together with +0x1FE/+0x1FF (added by
-                                        * `enemy/fn_801DB8E0.cpp`) */
+    /* +0x1FC */ u8 field_0x1FC;        /* the action-record / "special part" request flag: both
+                                        * `enemy/fn_801502C8.cpp`'s `fn_801542D0` and
+                                        * `enemy/fn_801DB8E0.cpp`'s `fn_801DF8EC` arm it with
+                                        * +0x1FE/+0x1FF */
     /* +0x1FD */ u8 field_0x1FD;        /* nonzero, `fn_8013FC60`'s command is skipped */
-    /* +0x1FE */ u8 field_0x1FE;        /* the mode byte `enemy/fn_801DB8E0.cpp`'s `fn_801DF8EC`
-                                        * writes (0x0A) beside +0x1FC/+0x1FF */
-    /* +0x1FF */ u8 field_0x1FF;        /* the id written with +0x1FC/+0x1FE (`enemy/fn_801DB8E0.cpp`) */
+    /* +0x1FE */ u8 field_0x1FE;        /* the mode/timer byte `fn_801542D0` arms (0x0A/0x1E) and
+                                        * `fn_801DF8EC` writes (0x0A), beside +0x1FC/+0x1FF */
+    /* +0x1FF */ u8 field_0x1FF;        /* the id `fn_801542D0`/`fn_801DF8EC` arm beside
+                                        * +0x1FC/+0x1FE */
     /* +0x200 */ u8 unused_0x200[0x20C - 0x200];
     /* +0x20C */ f32 field_0x20C;        /* the effect spawn height `fn_801D4DD8`/`fn_801D428C`
                                          * add to the work record's y, and the height
@@ -253,6 +255,26 @@ struct _ENEMY_WORK {
             /* +0x353 */ u8 field_0x353;      /* the kind-1 flag `fn_801A9384` tests; `fn_8019ECD4`
                                                * clears it */
         };
+        /* the float/rotation view `enemy/fn_801502C8.cpp`'s `fn_80154988` steps (the same bytes
+         * as the flat s32 view above, read as the animation angles the effect rotates by). */
+        struct {
+            /* +0x328 */ u8 unused_0x328d[0x08];
+            /* +0x330 */ s32 field_0x330;
+            /* +0x334 */ u8 unused_0x334d[0x08];
+            /* +0x33C */ f32 field_0x33C;
+            /* +0x340 */ f32 field_0x340;
+            /* +0x344 */ u8 unused_0x344d[0x04];
+            /* +0x348 */ f32 field_0x348;
+            /* +0x34C */ f32 field_0x34C;
+        } rot_0x328;
+        /* the byte view `enemy/fn_801502C8.cpp`'s `fn_80154E40` resets (the free-slot states of
+         * the effect slot set). */
+        struct {
+            /* +0x328 */ u8 slots_0x328[0x10];
+            /* +0x338 */ s16 field_0x338;
+            /* +0x33A */ u8 unused_0x33Ad[0x02];
+            /* +0x33C */ s16 field_0x33C;
+        } init_0x328;
         /* the action block `enemy/fn_801D428C.cpp` clears (`fn_801D71C4`). */
         struct EmActionBlock action_0x328;
     };
