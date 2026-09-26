@@ -1051,6 +1051,11 @@ ai/fn_802D44F4.cpp:
 	.ctors      start:0x8056F388 end:0x8056F38C
 	.data       start:0x805D5428 end:0x805D5460
 
+hud/layout.cpp:
+	extab       start:0x80014DAC end:0x80014FFC
+	extabindex  start:0x800332E8 end:0x80033660
+	.text       start:0x802E0740 end:0x802E4978
+
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674
