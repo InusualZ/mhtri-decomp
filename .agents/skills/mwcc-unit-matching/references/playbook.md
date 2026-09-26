@@ -1644,3 +1644,25 @@ offsets). It caught `field_0x216` declared `s32` where the code does a `lbz` - t
 later field sat 2 or 8 bytes out and ~20 functions each lost ~20 points. Take a field's size from the **access
 width in the code** (`lbz` = 1, `lhz` = 2, `lwz` = 4, `stb`/`sth` likewise), never from the type you guessed,
 and assert the tiling before you measure.
+
+**Refinement, same session (a second and third view of the same record).** Two traps the first merge walked into,
+both of them invisible to the tiling assert:
+
+* **A header file can define more than one struct.** Keying members by offset alone matched `_AINPC_W`'s offsets
+  against a smaller struct that sits above it in the same file (`0x0`, `0xC`), so the "next member offset" that
+  sizes a field came from the wrong struct - `active` was sized 12 B instead of 1 B, and every splice was then
+  refused for lack of room. Parse **per struct**: name each group, keep its own member list, and compute every
+  size and every covering filler *within* the group. (A byte-wide filler is also written `u8 unused_0xNNN;` with
+  no `[0xE - 0xN]` bracket, so a tiling check that reads only the bracket form should not flag it - the field
+  ends at the next member either way.)
+* **Compare the declaration, not just `(offset, name)`.** Fourteen differences: six were fillers the splices
+  themselves superseded (a filler shrinks as its sub-fields arrive - the expected shape), and one was a genuine
+  conflict the `(offset, name)` rule skipped silently - main had `u8 field_0x3F8;`, the newcomer
+  `u8 field_0x3F8[4];`, and the newcomer's code indexes it. The merged header therefore compiled every *landed*
+  consumer and not the newcomer's own source (`illegal operands 'unsigned char' [ 'unsigned char'`). **The test
+  of a record merge is that both sides' sources compile** - whole-tree `ninja -k 0` at 0 FAILED, not just the
+  consumer's object - **plus the rows** (`ninja changes` must print no line for a unit that already owned the
+  record). Only the same-name-different-size class needs a decision, and the side whose *code* depends on the
+  declaration has the better claim: here the array won, the scalar's neighbouring `unused_0x3F9` filler (which
+  the array now covers) was dropped, and the whole-tree build plus an empty `ninja changes` proved both
+  consumers and the newcomer.
