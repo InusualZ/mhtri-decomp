@@ -1252,6 +1252,15 @@ config.libs = [
             # seam is unproven (one maximal unclaimed run); see the unit's file header for the
             # two-cluster evidence.
             Object(NonMatching, "ef/eft035.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The
+            # `proposal/8033F270_fn_8033F270` range (`.text` 0x8033F270..0x803432B4, 46 functions /
+            # 16452 B): the runtime dump's own `eft050_set` at 0x80342F34 names the TU (dumpmap.py;
+            # every other address is the dump's `zz_XXXXXXXX_` placeholder), so the module is `ef`
+            # and the file follows the `eft00X.cpp` scheme of the neighbours.  Sections: extab
+            # 0x80016CA4..0x80016DB4, extabindex 0x8003615C..0x800362F4, .text
+            # 0x8033F270..0x803432B4 - exactly the bytes the bracketing units leave unclaimed.  The
+            # seam is unproven (one maximal unclaimed run); see the unit's file header.
+            Object(NonMatching, "ef/eft050.cpp"),
             Object(Matching, "ef/fn_803066F0.c"),
         ],
     },
