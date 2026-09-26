@@ -1,0 +1,1224 @@
+/*
+ * Player motion -> SE (sound-effect) frame dispatch for `_PLW` (the player work object), the third
+ * and fourth of the band's per-motion banks: the 0x3EA-0x4F8 half of the family whose 0x3EA-0x4F7
+ * and 0x3EA-0x4EE halves are `Pl/fn_8023C2D0.cpp` and `Pl/fn_80241558.cpp`.
+ *
+ * The range is TWO functions, each a dense `switch` on `Get_motion_no(_PLW*)` (defined at
+ * 0x8026A308) that arms frame-timed sound requests on the three `_se_w` work objects hanging off the
+ * player work (`_PLW`+0xAF4 / +0xAF8 / +0xAFC).  MWCC lowers both switches to `.data` jump tables,
+ * so the unit owns them: `fn_802373AC`'s 271-entry table at `jumptable_805C2C60`
+ * (0x805C2C60-0x805C309C) and `fn_802399C8`'s 270-entry table at `jumptable_805C309C`
+ * (0x805C309C-0x805C34D4), the shape of the sibling units' tables.
+ *
+ * Final home: module `Pl`, file stem kept as the map's `fn_802373AC` (class 4, docs/plan.md 12).  The
+ * map has only `fn_802373AC` / `fn_802399C8` for this range; no `__FILE__` string covers it (the
+ * range's `.data` is the two jump tables and nothing else, and the `enemy_control.cpp` string the
+ * proposal's seam note mentions is referenced from 0x801411B8, a different module), and
+ * `dumpmap.py lookup` returns only `zz_` placeholders.  The subsystem is the player: both functions
+ * pass their first argument straight to `Get_motion_no` (`Get_motion_no__FP4_PLW`) and their other
+ * callees are the Pl SE helpers.
+ *
+ * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * `python tools/symbols/symedit.py show fn_802373AC` / `... fn_802399C8` - the range's sole entries
+ * are the two `type:function` lines, and `dumpmap.py lookup` gives only the `zz_` placeholders).
+ *
+ * Language: C++.  The map's undefined set carries the mangled `Get_motion_no__FP4_PLW` and
+ * `se_req_frame_set__FP5_se_wllll` alongside the C-linkage `fn_80229E10`/`fn_800DA428`, and the
+ * retail object carries an extab/extabindex pair (one unwind-only record per function, r27-r31),
+ * which is why the `Pl` lib sets `-Cpp_exceptions on`.
+ *
+ * Flags: none beyond the lib's `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
+ * mw_version Wii/1.0) - the set the sibling `Pl/fn_8023C2D0.cpp` needs.
+ *
+ * Residual: `fn_802399C8` is byte-identical (100.0 %) and `fn_802373AC` measures 99.9713 % - the only
+ * difference left is the register the shared `partHi` value is coloured onto in four of the first
+ * function's arms (0x465, 0x46A, 0x4C5, 0x4C6): retail keeps it in r27, MWCC reuses r28, the register
+ * `part`'s last read frees in the same instruction that feeds the shift (12 of the function's 2439
+ * instructions; every other instruction and both objects' sizes are identical).  It is an allocator
+ * web-priority residual, not a source one - measured and identical (99.9713) with the declaration
+ * moved, its type spelled `u32`/`int`/`register u32`, an initialiser added, a cast spelling, a dead
+ * copy of `part` before the assignment, and the fully inlined `(part << 0x18)` spelling.  The one arm
+ * where the inline spelling does matter is `fn_802399C8`'s 0x4C5, which it takes from 99.98858 to
+ * 100.0 (the sibling `Pl/fn_8023C2D0.cpp`'s finding, and why that arm spells the shift in each
+ * argument).  Both `.data` jump tables and the extab/extabindex pair are byte-identical.
+ */
+
+#include "types.h"
+#include "sound/se.h"
+#include "sound/fn_800D7F54.h"
+#include "unsplit/Pl.h"
+#include "Pl/fn_802693C4.h"
+
+
+/* Arms the frame-timed sound requests for the player's motions 0x3EA-0x4F8, the bank the player's
+ * `_PLW`+0x002 kind byte selects. */
+
+extern "C" void fn_802373AC(_PLW* work, u8 part) {
+    /* The part byte is shifted into its own byte lane by most arms, so it is a local. */
+    u32 partHi;
+    /* The three per-part `_se_w` work objects.  The declaration order and the assignment
+     * order differ deliberately (the `Pl/fn_8023C2D0.cpp` shape) - it is what reproduces
+     * retail's colouring of the three pointers. */
+    _se_w* seWorkPart;
+    _se_w* seWorkMain;
+    _se_w* seWorkFrame;
+    seWorkPart = work->field_0xAF4;
+    seWorkFrame = work->field_0xAF8;
+    seWorkMain = work->field_0xAFC;
+
+    switch (Get_motion_no(work)) {
+        case 0x3EA:
+            se_req_frame_set(seWorkMain, 0x2, 0x1, 0x7, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0x2, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            fn_80229EA8(seWorkPart, 0xE, 0x7, 0x3);
+            se_req_frame_set(seWorkMain, 0x36, 0x3, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            fn_800DA428(seWorkFrame, 0x28, ((part << 0x18) | 0x1), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x2A, 0x3);
+            return;
+
+        case 0x3EB:
+            se_req_frame_set(seWorkMain, 0x12, 0x5, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0x2, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x36, 0x1, 0x7, 0x3);
+            fn_80229EA8(seWorkPart, 0x2E, 0x7, 0x3);
+            fn_800DA428(seWorkFrame, 0x44, ((part << 0x18) | 0x1), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x46, 0x3);
+            return;
+
+        case 0x3EC:
+            fn_800DA428(seWorkFrame, 0x12, (part << 0x18), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x34, (part << 0x18), 0x11, 0x2);
+            fn_80229EA8(seWorkPart, 0x14, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x36, 0x3);
+            return;
+
+        case 0x3ED:
+            se_req_frame_set(seWorkPart, 0x4, 0x1C, 0xE, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x2, 0x1, 0x7, 0x3);
+            fn_80229EA8(seWorkPart, 0x6, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0xA, 0x3);
+            return;
+
+        case 0x3EF:
+            se_req_frame_set(seWorkPart, 0x4, 0x1C, 0xE, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x2, 0x1, 0x7, 0x3);
+            fn_80229EA8(seWorkPart, 0xE, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x2, 0x3);
+            return;
+
+        case 0x3F1:
+            se_req_frame_set(seWorkMain, 0x12, 0x5, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0x2, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x36, 0x1, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x16, 0x3);
+            fn_80229E10(seWorkPart, 0x3E, 0x3);
+            fn_80229E10(seWorkPart, 0x62, 0x3);
+            fn_800DA428(seWorkFrame, 0x14, (part << 0x18), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x3C, (part << 0x18), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x60, (part << 0x18), 0x11, 0x2);
+            return;
+
+        case 0x3F3:
+            fn_800DA428(seWorkFrame, 0x8, (part << 0x18), 0x14, 0x2);
+            se_req_frame_set(seWorkPart, 0x12, 0x11, 0x11, 0x03000003);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            fn_80229E10(seWorkPart, 0x1E, 0x3);
+            return;
+
+        case 0x3F4:
+            se_req_frame_set(seWorkPart, 0x8, 0x28, 0xC, 0x03000003);
+            fn_800DA428(seWorkFrame, 0x12, ((part << 0x18) | 0x4), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x1E, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            fn_80229E10(seWorkPart, 0x20, 0x3);
+            return;
+
+        case 0x3F5:
+            se_req_frame_set(seWorkPart, 0x8, 0x28, 0xC, 0x03000003);
+            fn_800DA428(seWorkFrame, 0x12, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x1E, ((part << 0x18) | 0x4), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            fn_80229E10(seWorkPart, 0x20, 0x3);
+            return;
+
+        case 0x3F6:
+            se_req_frame_set(seWorkPart, 0x6, 0x28, 0xC, 0x03000003);
+            fn_800DA428(seWorkFrame, 0x16, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x1C, ((part << 0x18) | 0x4), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            fn_80229E10(seWorkPart, 0x20, 0x3);
+            return;
+
+        case 0x3FA:
+            se_req_frame_set(seWorkMain, 0x2, 0x1, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0x2, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x12, 0x3, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            fn_800DA428(seWorkFrame, 0x2, (part << 0x18), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x14, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_80229EA8(seWorkPart, 0xE, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x16, 0x3);
+            return;
+
+        case 0x41B:
+            se_req_frame_set(seWorkMain, 0x2, 0xB, 0x7, 0x3);
+            se_req_frame_set(seWorkMain, 0xA, 0xC, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            fn_80229E10(seWorkPart, 0x2A, 0x3);
+            se_req_frame_set(seWorkMain, 0x1C, 0xD, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x1A, 0x8, 0x7, 0x4);
+            se_req_frame_set(seWorkPart, 0x1E, 0xEA, 0x3, 0x03000003);
+            return;
+
+        case 0x41C:
+            se_req_frame_set(seWorkMain, 0x12, 0xF, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0xC, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x36, 0xB, 0x7, 0x3);
+            se_req_frame_set(seWorkPart, 0x3E, 0xED, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x2, 0xEA, 0x3, 0x03000003);
+            return;
+
+        case 0x41D:
+            se_req_frame_set(seWorkPart, 0x6, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x20, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x41E:
+            se_req_frame_set(seWorkPart, 0x2, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x2, 0xB, 0x7, 0x3);
+            return;
+
+        case 0x420:
+            se_req_frame_set(seWorkPart, 0x6, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkMain, 0xC, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x421:
+            se_req_frame_set(seWorkMain, 0x12, 0xF, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0xC, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x36, 0xB, 0x7, 0x3);
+            se_req_frame_set(seWorkPart, 0xC, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x4A, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x423:
+            se_req_frame_set(seWorkPart, 0x16, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x424:
+        case 0x425:
+        case 0x426:
+            se_req_frame_set(seWorkPart, 0x2, 0xF5, 0x3, 0x03000003);
+            return;
+
+        case 0x428:
+            se_req_frame_set(seWorkPart, 0x2, 0xEA, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x20, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x44, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x429:
+            se_req_frame_set(seWorkPart, 0x2, 0xEA, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0xE, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x42A:
+            se_req_frame_set(seWorkPart, 0x2, 0xEA, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x20, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x44, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x42B:
+            se_req_frame_set(seWorkPart, 0x2, 0xEA, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x12, 0xED, 0x11, 0x03000003);
+            return;
+
+        case 0x42C:
+            se_req_frame_set(seWorkPart, 0x2, 0xF5, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x18, 0xEA, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x44, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x42D:
+            se_req_frame_set(seWorkPart, 0x2, 0xF5, 0xD, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x1C, 0xEA, 0xD, 0x03000003);
+            return;
+
+        case 0x42E:
+            se_req_frame_set(seWorkMain, 0x2, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0xC, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x12, 0xD, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkPart, 0x4, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x6, 0x8, 0x7, 0x4);
+            return;
+
+        case 0x44D:
+            se_req_frame_set(seWorkPart, 0x30, SE_Code_Make(0x2, 0x4, 0x2, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0xC, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0x10, 0x3);
+            fn_800DA428(seWorkFrame, 0xE, ((part << 0x18) | 0x4), 0x11, 0x2);
+            se_req_frame_set(seWorkMain, 0x32, 0xA, 0x3, 0x2);
+            se_req_frame_set(seWorkMain, 0x34, 0x5, 0x11, 0x2);
+            return;
+
+        case 0x44E:
+            fn_800DA428(seWorkFrame, 0xE, ((part << 0x18) | 0x3), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x1E, ((part << 0x18) | 0x3), 0x14, 0x2);
+            se_req_frame_set(seWorkMain, 0xE, 0x5, 0x11, 0x2);
+            se_req_frame_set(seWorkMain, 0x1E, 0x5, 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x6, 0x3);
+            fn_80229E10(seWorkPart, 0x18, 0x3);
+            return;
+
+        case 0x44F:
+            se_req_frame_set(seWorkMain, 0x3E, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_800DA428(seWorkFrame, 0x4, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x3E, ((part << 0x18) | 0x1), 0x14, 0x2);
+            se_req_frame_set(seWorkPart, 0xC, 0x8, 0x11, 0x03000003);
+            fn_80229E10(seWorkPart, 0x10, 0x3);
+            fn_80229E10(seWorkPart, 0x40, 0x3);
+            return;
+
+        case 0x451:
+            se_req_frame_set(seWorkPart, 0x12, SE_Code_Make(0x0, 0x2, 0x1, 0x3), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x16, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x58, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_800DA428(seWorkFrame, 0x16, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x3C, ((part << 0x18) | 0x1), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x64, ((part << 0x18) | 0x1), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x18, 0x3);
+            fn_80229EA8(seWorkPart, 0x5C, 0x7, 0x3);
+            return;
+
+        case 0x452:
+            se_req_frame_set(seWorkPart, 0x12, SE_Code_Make(0x0, 0x3, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x14, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x58, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_800DA428(seWorkFrame, 0x10, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x38, ((part << 0x18) | 0x1), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x64, ((part << 0x18) | 0x1), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x12, 0x3);
+            fn_80229EA8(seWorkPart, 0x64, 0x7, 0x3);
+            return;
+
+        case 0x453:
+            se_req_frame_set(seWorkPart, 0x1E, SE_Code_Make(0x0, 0x3, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x2, 0x1, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x18, 0x6, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x58, 0x1, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x7E, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229EA8(seWorkPart, 0x30, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x82, 0x3);
+            fn_800DA428(seWorkFrame, 0x26, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x78, ((part << 0x18) | 0x1), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x80, ((part << 0x18) | 0x1), 0x14, 0x2);
+            return;
+
+        case 0x454:
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x455:
+            se_req_frame_set(seWorkMain, 0x6, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0xC, 0x3);
+            return;
+
+        case 0x457:
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x1, 0x2, 0x2, 0x3), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkPart, 0x8, 0x8, 0x11, 0x03000003);
+            fn_800DA428(seWorkFrame, 0x6, ((part << 0x18) | 0x3), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x44, ((part << 0x18) | 0x1), 0x14, 0x2);
+            fn_80229EA8(seWorkPart, 0xA, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x48, 0x3);
+            return;
+
+        case 0x458:
+            se_req_frame_set(seWorkPart, 0x6, SE_Code_Make(0x2, 0x4, 0x0, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0xA, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x70, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0xE, 0x8, 0x14, 0x03000003);
+            fn_800DA428(seWorkFrame, 0xC, ((part << 0x18) | 0x4), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x52, (part << 0x18), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x70, ((part << 0x18) | 0x1), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0xE, 0x3);
+            fn_80229E10(seWorkPart, 0x54, 0x3);
+            fn_80229E10(seWorkPart, 0x72, 0x3);
+            return;
+
+        case 0x45C:
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x45D:
+            partHi = ((part << 0x18) | 0x3);
+            fn_800DA428(seWorkFrame, 0xE, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x1C, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x38, ((part << 0x18) | 0x4), 0x11, 0x2);
+            se_req_frame_set(seWorkMain, 0x6, 0x5, 0x14, 0x3);
+            se_req_frame_set(seWorkPart, 0x20, 0x8, 0x14, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x3C, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0x10, 0x3);
+            fn_80229E10(seWorkPart, 0x32, 0x3);
+            return;
+
+        case 0x45E:
+            se_req_frame_set(seWorkPart, 0x8, SE_Code_Make(0x2, 0x4, 0x1, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0xA, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x3C, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229EA8(seWorkPart, 0x1A, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x4C, 0x3);
+            fn_800DA428(seWorkFrame, 0x4A, ((part << 0x18) | 0x1), 0x14, 0x2);
+            return;
+
+        case 0x460:
+            se_req_frame_set(seWorkMain, 0x4, 0x1, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x10, 0x2, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x20, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0x18, 0x3);
+            fn_800DA428(seWorkFrame, 0x16, ((part << 0x18) | 0x4), 0x11, 0x2);
+            return;
+
+        case 0x461:
+            se_req_frame_set(seWorkPart, 0x16, SE_Code_Make(0x2, 0x4, 0x2, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x1, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0xA, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x16, 0x4, 0x3, 0x3);
+            se_req_frame_set(seWorkMain, 0x6C, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_800DA428(seWorkFrame, 0x74, (part << 0x18), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x78, 0x3);
+            return;
+
+        case 0x462:
+            se_req_frame_set(seWorkMain, 0xA, 0x1, 0x6, 0x3);
+            return;
+
+        case 0x463:
+            se_req_frame_set(seWorkMain, 0xE, 0x6, 0xB, 0x3);
+            fn_80229E10(seWorkPart, 0x6, 0x3);
+            return;
+
+        case 0x464:
+            se_req_frame_set(seWorkMain, 0xE, 0x6, 0xB, 0x3);
+            fn_800DA428(seWorkFrame, 0x6, (part << 0x18), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            fn_80229E10(seWorkPart, 0x30, 0x3);
+            return;
+
+        case 0x465:
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x4, 0x2, 0x4, 0x2), 0xC, 0x3);
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0xA, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x52, (partHi | 0x1), 0x11, 0x2);
+            se_req_frame_set(seWorkMain, 0x12, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0x6, 0x3);
+            fn_80229E10(seWorkPart, 0x48, 0x3);
+            return;
+
+        case 0x46A:
+            se_req_frame_set(seWorkPart, 0x24, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x2, 0x1, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0x2, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1A, 0x3, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x24, 0x1, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkPart, 0x2A, 0x8, 0x14, 0x03000003);
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x10, (partHi | 0x3), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x28, (partHi | 0x4), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x12, 0x3);
+            fn_80229E10(seWorkPart, 0x2A, 0x3);
+            return;
+
+        case 0x47F:
+            se_req_frame_set(seWorkPart, 0x26, SE_Code_Make(0x16, 0x4, 0x16, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0xC, 0xE, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x4, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x22, 0xF5, 0x3, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x32, 0x7, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x4A, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x52, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x480:
+            se_req_frame_set(seWorkMain, 0x8, 0xC, 0x14, 0x3);
+            se_req_frame_set(seWorkPart, 0x8, 0xEE, 0x11, 0x03000002);
+            se_req_frame_set(seWorkPart, 0x18, 0xEE, 0x14, 0x03000002);
+            return;
+
+        case 0x481:
+            se_req_frame_set(seWorkPart, 0x4, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x36, 0xE, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x26, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x38, 0xED, 0x11, 0x03000003);
+            return;
+
+        case 0x483:
+            se_req_frame_set(seWorkPart, 0x12, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x16, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x18, 0x8, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x4E, 0xE, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x42, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x50, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x484:
+            se_req_frame_set(seWorkPart, 0x12, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x14, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x18, 0x8, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x4E, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x42, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x50, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x485:
+            se_req_frame_set(seWorkPart, 0x1E, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x2, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x18, 0x10, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0x9, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x58, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x7E, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x52, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x486:
+            se_req_frame_set(seWorkPart, 0x2, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x8, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x489:
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x15, 0x2, 0x16, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x4, 0x8, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x10, 0xEA, 0x3, 0x03000003);
+            return;
+
+        case 0x48A:
+            se_req_frame_set(seWorkPart, 0xC, SE_Code_Make(0x16, 0x4, 0x14, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0xE, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x14, 0x8, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x70, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x10, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x68, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x48E:
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x6, 0x8, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0xC, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x48F:
+            se_req_frame_set(seWorkPart, 0x4, 0xF5, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x1E, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x28, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x3C, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x490:
+            se_req_frame_set(seWorkPart, 0x8, SE_Code_Make(0x16, 0x4, 0x15, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0x14, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x3C, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x8, 0xB, 0x3);
+            se_req_frame_set(seWorkPart, 0x38, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x4A, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x492:
+            se_req_frame_set(seWorkMain, 0x4, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x10, 0xC, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x20, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x8, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x10, 0xEA, 0x3, 0x03000003);
+            return;
+
+        case 0x493:
+            se_req_frame_set(seWorkPart, 0x16, SE_Code_Make(0x16, 0x4, 0x16, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0xA, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x16, 0x4, 0x3, 0x3);
+            se_req_frame_set(seWorkMain, 0x6C, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x44, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x60, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x494:
+            se_req_frame_set(seWorkMain, 0xA, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkPart, 0xA, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x495:
+            se_req_frame_set(seWorkMain, 0xC, 0x10, 0x3, 0x4);
+            return;
+
+        case 0x496:
+            se_req_frame_set(seWorkMain, 0xC, 0x10, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x32, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x49C:
+            se_req_frame_set(seWorkPart, 0x24, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x2, 0xB, 0x6, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0xC, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1A, 0xD, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x24, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x22, 0x8, 0xB, 0x3);
+            se_req_frame_set(seWorkPart, 0x2A, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x4B1:
+            fn_80229E10(seWorkPart, 0x2, 0x3);
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x4, 0x2, 0x4, 0x2), 0xC, 0x3);
+            return;
+
+        case 0x4BB:
+            se_req_frame_set(seWorkMain, 0x4, 0x1, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            return;
+
+        case 0x4BC:
+            fn_80229EA8(seWorkPart, 0x16, 0x7, 0x3);
+            fn_80229E10(seWorkPart, 0x4E, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x1, 0x7, 0x3);
+            se_req_frame_set(seWorkPart, 0x2, 0x8, 0x11, 0x03000003);
+            fn_800DA428(seWorkFrame, 0x4C, ((part << 0x18) | 0x1), 0x11, 0x2);
+            return;
+
+        case 0x4C5:
+            se_req_frame_set(seWorkMain, 0x58, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0x1E, 0x3);
+            fn_80229E10(seWorkPart, 0x2E, 0x3);
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x1C, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x2C, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x5C, (partHi | 0x4), 0x11, 0x2);
+            return;
+
+        case 0x4C6:
+            se_req_frame_set(seWorkMain, 0x42, 0x4, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            fn_80229E10(seWorkPart, 0x2, 0x3);
+            fn_80229E10(seWorkPart, 0x26, 0x3);
+            fn_80229E10(seWorkPart, 0x56, 0x3);
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x12, (partHi | 0x4), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x2A, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x48, partHi, 0x14, 0x2);
+            return;
+
+        case 0x4E3:
+            se_req_frame_set(seWorkPart, 0x4, SE_Code_Make(0x18, 0x1, 0x19, 0x1), 0xC, 0x3);
+            return;
+
+        case 0x4ED:
+            se_req_frame_set(seWorkPart, 0x4, 0xEA, 0x3, 0x03000003);
+            return;
+
+        case 0x4EE:
+            se_req_frame_set(seWorkPart, 0x4, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x3E, 0xED, 0x11, 0x03000003);
+            return;
+
+        case 0x4F7:
+            se_req_frame_set(seWorkPart, 0x8, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x58, 0xE, 0x7, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x48, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x4F8:
+            se_req_frame_set(seWorkPart, 0x56, SE_Code_Make(0x16, 0x4, 0x15, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x50, 0x8, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x52, 0xB, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x3A, 0xB, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x4, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x52, 0xF5, 0x3, 0x03000003);
+        /* fallthrough */
+    default:
+        return;
+    }
+}
+
+/* Arms the frame-timed sound requests for the player's motions 0x3EA-0x4F7, the sibling bank of
+ * the one above. */
+
+extern "C" void fn_802399C8(_PLW* work, u8 part) {
+    /* The part byte is shifted into its own byte lane by most arms, so it is a local. */
+    u32 partHi;
+    /* The three per-part `_se_w` work objects.  The declaration order and the assignment
+     * order differ deliberately (the `Pl/fn_8023C2D0.cpp` shape) - it is what reproduces
+     * retail's colouring of the three pointers. */
+    _se_w* seWorkPart;
+    _se_w* seWorkMain;
+    _se_w* seWorkFrame;
+    seWorkPart = work->field_0xAF4;
+    seWorkFrame = work->field_0xAF8;
+    seWorkMain = work->field_0xAFC;
+
+    switch (Get_motion_no(work)) {
+        case 0x3EA:
+            se_req_frame_set(seWorkMain, 0x14, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x14, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x26, 0x3, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x10, partHi, 0x14, 0x2);
+            partHi = (partHi | 0x1);
+            fn_800DA428(seWorkFrame, 0x34, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x40, partHi, 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x42, 0x3);
+            fn_80229E10(seWorkPart, 0x10, 0x3);
+            return;
+
+        case 0x3EB:
+            se_req_frame_set(seWorkMain, 0xC, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x26, 0x6, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x2C, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x3E, (partHi | 0x1), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x40, 0x3);
+            fn_80229E10(seWorkPart, 0x10, 0x3);
+            return;
+
+        case 0x3EC:
+            se_req_frame_set(seWorkPart, 0x6, SE_Code_Make(0x7, 0x1, 0x8, 0x1), 0xC, 0x3);
+            partHi = ((part << 0x18) | 0x2);
+            fn_800DA428(seWorkFrame, 0x14, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x2E, partHi, 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x16, 0x3);
+            fn_80229E10(seWorkPart, 0x4, 0x3);
+            return;
+
+        case 0x3F1:
+            se_req_frame_set(seWorkMain, 0x8, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x26, 0x6, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x20, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x3C, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x4C, (partHi | 0x1), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x22, 0x3);
+            fn_80229E10(seWorkPart, 0x3E, 0x3);
+            return;
+
+        case 0x3F4:
+            se_req_frame_set(seWorkPart, 0x6, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkPart, 0x6, 0x28, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x14, 0xB, 0xE, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x3C, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x28, (partHi | 0x3), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x42, partHi, 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x2A, 0x3);
+            fn_80229E10(seWorkPart, 0x44, 0x3);
+            return;
+
+        case 0x3F5:
+            se_req_frame_set(seWorkPart, 0x6, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkPart, 0x6, 0x28, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x14, 0xB, 0xE, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x3C, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x28, (partHi | 0x3), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x42, partHi, 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x2A, 0x3);
+            fn_80229E10(seWorkPart, 0x44, 0x3);
+            return;
+
+        case 0x41B:
+            se_req_frame_set(seWorkMain, 0x10, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x14, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x26, 0xD, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkPart, 0x2C, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x41C:
+            se_req_frame_set(seWorkMain, 0xC, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x26, 0x10, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x12, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x41D:
+            se_req_frame_set(seWorkPart, 0x12, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x2A, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x421:
+            se_req_frame_set(seWorkMain, 0x18, 0x10, 0x3, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x18, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x2C, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x424:
+            se_req_frame_set(seWorkPart, 0x8, 0xF5, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x36, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x46, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x425:
+            se_req_frame_set(seWorkPart, 0x8, 0xF5, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x36, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x46, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x426:
+            se_req_frame_set(seWorkPart, 0x8, 0xF5, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x54, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x428:
+            se_req_frame_set(seWorkPart, 0x4, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x18, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x34, 0xED, 0x14, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x4C, 0xED, 0x11, 0x03000003);
+            return;
+
+        case 0x429:
+            se_req_frame_set(seWorkPart, 0x8, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x42A:
+            se_req_frame_set(seWorkPart, 0x8, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x36, 0xED, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x5C, 0xED, 0x14, 0x03000003);
+            return;
+
+        case 0x42B:
+            se_req_frame_set(seWorkPart, 0x8, 0xEA, 0x3, 0x03000003);
+            return;
+
+        case 0x42C:
+            se_req_frame_set(seWorkMain, 0x2A, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x6, 0xF5, 0x3, 0x03000003);
+            return;
+
+        case 0x42D:
+            se_req_frame_set(seWorkPart, 0x6, 0xF5, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x3C, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x44D:
+            se_req_frame_set(seWorkPart, 0x32, SE_Code_Make(0x0, 0x3, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0xC, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x22, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x42, 0x1, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x84, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x18, (partHi | 0x2), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x8E, (partHi | 0x1), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x1A, 0x3);
+            fn_80229E10(seWorkPart, 0x92, 0x3);
+            return;
+
+        case 0x44E:
+            se_req_frame_set(seWorkPart, 0x32, SE_Code_Make(0x0, 0x2, 0x0, 0x1), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0xC, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x2A, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x90, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x3C, 0x1, 0x3, 0x4);
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x1C, (partHi | 0x2), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x90, (partHi | 0x1), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x1E, 0x3);
+            fn_80229E10(seWorkPart, 0x92, 0x3);
+            return;
+
+        case 0x44F:
+            se_req_frame_set(seWorkPart, 0x1A, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x12, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x12, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x40, (partHi | 0x2), 0x11, 0x2);
+            se_req_frame_set(seWorkPart, 0x4C, 0x8, 0x11, 0x03000002);
+            fn_800DA428(seWorkFrame, 0x4C, partHi, 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x4E, 0x3);
+            return;
+
+        case 0x450:
+            se_req_frame_set(seWorkPart, 0x2E, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0xA, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x28, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x80, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x34, (partHi | 0x4), 0x14, 0x2);
+            partHi = (partHi | 0x1);
+            fn_800DA428(seWorkFrame, 0x70, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x84, partHi, 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x36, 0x3);
+            fn_80229E10(seWorkPart, 0x82, 0x3);
+            return;
+
+        case 0x451:
+            se_req_frame_set(seWorkPart, 0x14, SE_Code_Make(0x3, 0x4, 0x3, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x2, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x10, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x20, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x7A, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x18, (partHi | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x74, (partHi | 0x1), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x11, 0x3);
+            fn_80229E10(seWorkPart, 0x76, 0x3);
+            fn_80229EA8(seWorkPart, 0x2A, 0x7, 0x3);
+            return;
+
+        case 0x452:
+            se_req_frame_set(seWorkPart, 0x1C, SE_Code_Make(0x0, 0x2, 0x1, 0x1), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x70, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x28, (partHi | 0x2), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x32, (partHi | 0x1), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x34, 0x3);
+            return;
+
+        case 0x453:
+            se_req_frame_set(seWorkPart, 0x14, SE_Code_Make(0x0, 0x1, 0x1, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x14, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x50, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x76, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x1A, (partHi | 0x2), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x5E, (partHi | 0x1), 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x78, partHi, 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x1C, 0x3);
+            fn_80229E10(seWorkPart, 0x7A, 0x3);
+            fn_80229EA8(seWorkPart, 0x20, 0x7, 0x3);
+            return;
+
+        case 0x454:
+            se_req_frame_set(seWorkPart, 0x12, SE_Code_Make(0x0, 0x4, 0x0, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkPart, 0x28, SE_Code_Make(0x0, 0x1, 0x0, 0x1), 0xC, 0x3);
+            se_req_frame_set(seWorkPart, 0x5A, SE_Code_Make(0x1, 0x4, 0x1, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x22, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x2C, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x38, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x46, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x60, 0x1, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0xC4, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x14, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x5A, (partHi | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0xC0, (partHi | 0x1), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0x20, 0x3);
+            fn_80229E10(seWorkPart, 0x5C, 0x3);
+            return;
+
+        case 0x456:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x12, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x45A:
+            se_req_frame_set(seWorkMain, 0x6, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x22, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x4, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x16, partHi, 0x11, 0x2);
+            return;
+
+        case 0x45B:
+            se_req_frame_set(seWorkMain, 0x10, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x26, 0x3, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x18, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            partHi = ((part << 0x18) | 0x4);
+            fn_800DA428(seWorkFrame, 0xC, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x20, partHi, 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0x22, 0x3);
+            return;
+
+        case 0x45C:
+            se_req_frame_set(seWorkPart, 0x14, SE_Code_Make(0x0, 0x4, 0x1, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x14, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            fn_800DA428(seWorkFrame, 0xC, ((part << 0x18) | 0x4), 0x11, 0x2);
+            return;
+
+        case 0x45D:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x10, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x45E:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x10, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x45F:
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x460:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x461:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x462:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x463:
+            se_req_frame_set(seWorkMain, 0x2, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0xC, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x464:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x465:
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0xA, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x466:
+            se_req_frame_set(seWorkMain, 0x4, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x10, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x26, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            fn_800DA428(seWorkFrame, 0xA, (part << 0x18), 0x11, 0x2);
+            fn_80229E10(seWorkPart, 0xC, 0x3);
+            return;
+
+        case 0x467:
+            se_req_frame_set(seWorkPart, 0x18, SE_Code_Make(0x2, 0x4, 0x2, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x20, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkPart, 0xA, 0x8, 0x11, 0x03000002);
+            se_req_frame_set(seWorkMain, 0xE, 0x7, 0x3, 0x3);
+            se_req_frame_set(seWorkMain, 0x12, 0x8, 0x3, 0x3);
+            se_req_frame_set(seWorkMain, 0x3C, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x54, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x7E, 0x6, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            partHi = ((part << 0x18) | 0x3);
+            fn_800DA428(seWorkFrame, 0xA, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x20, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x4E, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x84, partHi, 0x11, 0x2);
+            return;
+
+        case 0x468:
+            se_req_frame_set(seWorkPart, 0x1A, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x12, partHi, 0x14, 0x2);
+            partHi = (partHi | 0x2);
+            fn_800DA428(seWorkFrame, 0x40, partHi, 0x11, 0x2);
+            fn_800DA428(seWorkFrame, 0x48, partHi, 0x14, 0x2);
+            se_req_frame_set(seWorkPart, 0x46, 0x8, 0x14, 0x03000002);
+            fn_80229E10(seWorkPart, 0x4C, 0x3);
+            return;
+
+        case 0x469:
+            se_req_frame_set(seWorkPart, 0x1A, SE_Code_Make(0x0, 0x2, 0x1, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x4, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x7, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            partHi = (part << 0x18);
+            fn_800DA428(seWorkFrame, 0x12, partHi, 0x11, 0x2);
+            partHi = (partHi | 0x2);
+            fn_800DA428(seWorkFrame, 0x40, partHi, 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x48, partHi, 0x11, 0x2);
+            se_req_frame_set(seWorkPart, 0x46, 0x8, 0x11, 0x03000002);
+            fn_80229E10(seWorkPart, 0x4C, 0x3);
+            return;
+
+        case 0x47E:
+            se_req_frame_set(seWorkPart, 0x32, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x6, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x28, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x2C, 0x5, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x70, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x6C, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x480:
+            se_req_frame_set(seWorkPart, 0x1A, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x12, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x14, 0x5, 0x3, 0x4);
+            return;
+
+        case 0x481:
+            se_req_frame_set(seWorkPart, 0x2E, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0xA, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x28, 0xB, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x2C, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x80, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x76, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x482:
+            se_req_frame_set(seWorkPart, 0x14, SE_Code_Make(0x17, 0x4, 0x17, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x2, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x12, 0xB, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x14, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x28, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x52, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x483:
+            se_req_frame_set(seWorkPart, 0x1C, SE_Code_Make(0x17, 0x4, 0x17, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x70, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x18, 0x5, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x62, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x72, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x484:
+            se_req_frame_set(seWorkPart, 0x14, SE_Code_Make(0x14, 0x1, 0x15, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x14, 0xB, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x16, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x52, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x76, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x3E, 0xEE, 0x14, 0x03000003);
+            return;
+
+        case 0x485:
+            se_req_frame_set(seWorkPart, 0x12, SE_Code_Make(0x14, 0x4, 0x14, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkPart, 0x28, SE_Code_Make(0x14, 0x1, 0x14, 0x1), 0xC, 0x3);
+            se_req_frame_set(seWorkPart, 0x5A, SE_Code_Make(0x15, 0x4, 0x15, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x8, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0xC, 0x5, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x22, 0xB, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x24, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x2C, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x38, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x58, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x5A, 0x5, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0xC4, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x9E, 0xEE, 0x11, 0x03000003);
+            return;
+
+        case 0x486:
+            se_req_frame_set(seWorkMain, 0xA, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x489:
+            se_req_frame_set(seWorkMain, 0x18, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0x5, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0x6, 0xD, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x48A:
+            se_req_frame_set(seWorkMain, 0x4, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x48B:
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x48C:
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x48D:
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0x4, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x16, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1A, 0x5, 0x3, 0x4);
+            return;
+
+        case 0x48E:
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkPart, 0xC, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x26, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x2A, 0x5, 0x3, 0x4);
+            return;
+
+        case 0x48F:
+            se_req_frame_set(seWorkPart, 0x6, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x490:
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x491:
+            se_req_frame_set(seWorkMain, 0x2, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x492:
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x8, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x493:
+            se_req_frame_set(seWorkMain, 0x8, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0xE, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x494:
+            se_req_frame_set(seWorkMain, 0x4, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0xA, 0xD, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            return;
+
+        case 0x495:
+            se_req_frame_set(seWorkPart, 0x18, SE_Code_Make(0x2, 0x4, 0x2, 0x4), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0x11, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1C, 0xB, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x1E, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkMain, 0xE, 0x7, 0x3, 0x3);
+            se_req_frame_set(seWorkMain, 0x12, 0x8, 0x3, 0x3);
+            se_req_frame_set(seWorkMain, 0x38, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x50, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x7C, 0x10, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            return;
+
+        case 0x496:
+            se_req_frame_set(seWorkPart, 0x1A, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x12, 0xC, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x14, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x24, 0xF5, 0x3, 0x03000003);
+            return;
+
+        case 0x497:
+            se_req_frame_set(seWorkPart, 0x1A, SE_Code_Make(0x14, 0x2, 0x15, 0x2), 0xC, 0x3);
+            se_req_frame_set(seWorkMain, 0x4, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x12, 0xC, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
+            se_req_frame_set(seWorkMain, 0x14, 0x4, 0x3, 0x4);
+            se_req_frame_set(seWorkPart, 0x24, 0xF5, 0x3, 0x03000003);
+            return;
+
+        case 0x4B1:
+            se_req_frame_set(seWorkPart, 0x8, SE_Code_Make(0x4, 0x1, 0x5, 0x1), 0xC, 0x3);
+            return;
+
+        case 0x4C5:
+            /* The one arm where the shift must be spelled in each argument instead of through
+             * `partHi`: with the local MWCC colours the shifted value and the OR'd temporary the
+             * other way round (99.98858). */
+            fn_800DA428(seWorkFrame, 0x1A, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x2A, ((part << 0x18) | 0x4), 0x14, 0x2);
+            fn_800DA428(seWorkFrame, 0x38, (part << 0x18), 0x14, 0x2);
+            fn_80229E10(seWorkPart, 0xC, 0x3);
+            fn_80229E10(seWorkPart, 0x44, 0x3);
+            fn_80229E10(seWorkPart, 0x1C, 0x3);
+            fn_80229E10(seWorkPart, 0x3A, 0x3);
+            return;
+
+        case 0x4E3:
+            se_req_frame_set(seWorkPart, 0x8, SE_Code_Make(0x18, 0x1, 0x19, 0x1), 0xC, 0x3);
+            return;
+
+        case 0x4F7:
+            se_req_frame_set(seWorkPart, 0xE, 0xEA, 0x3, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x2E, 0xEE, 0x11, 0x03000003);
+            se_req_frame_set(seWorkPart, 0x3E, 0xEE, 0x14, 0x03000003);
+            se_req_frame_set(seWorkMain, 0x18, 0xF, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+            se_req_frame_set(seWorkMain, 0x32, 0xE, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
+        /* fallthrough */
+    default:
+        return;
+    }
+}

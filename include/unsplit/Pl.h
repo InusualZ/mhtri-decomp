@@ -26,29 +26,33 @@ typedef struct PlSeVecPair {
 extern "C" {
 #endif
 
-s8 fn_802748C8(void* a);
+s32 fn_802748C8(void* a);
 
 /* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
  * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x80258FCC-0x80262940 and
  * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home.  (`fn_80257E70`
- * and `fn_8025FA00` moved to `Pl/fn_8024F200.h` when that unit claimed 0x8024F200-0x80258FCC.) */
-u16 fn_80260A18(struct _PLW* self);
-s32 fn_80261770(struct _PLW* self, u8* a, u16* b, u16* c, s32* d, u16* e, u16* f);
-u32 fn_802621B0(struct _PLW* self, void* b);
-s32 fn_80262688(struct _PLW* self);
-u32 fn_802745DC(struct _PLW* self, u32 v);
-s32 fn_80274AB8(s32 a);
+ * moved to `Pl/fn_8024F200.h` when that unit claimed 0x8024F200-0x80258FCC.  The
+ * `fn_8025FA00`/`fn_80260A18`/`fn_80261770`/`fn_802621B0`/`fn_80262688` declarations that stood here
+ * are owned by `Pl/fn_8025F088.cpp` (proposal 8025F088, `.text` 0x8025F088-0x80262940) and live in
+ * `Pl/fn_8025F088.h` - that unit's range, not `Pl/fn_8024F200.h`, covers their addresses.) */
+/* `fn_802745DC`'s return is the owner's `u32` (`Pl/fn_80273B14.cpp`), not the pre-merge `u16`: the
+ * callee's own body is byte-identical either way (every path ends in an `lhzx`/`li`), while the
+ * landed caller `Pl/fn_8027D684.cpp`'s measured row needs the `u32` - retail materialises the
+ * result with `mr r0,r3` before the caller's `(u16)` cast, which only a `u32` return produces.  The
+ * `s16` parameter is the owner's too (retail's callee narrows it with `extsh`). */
+u32 fn_802745DC(struct _PLW* self, s16 kind);
+s32 fn_80274AB8(struct _PLW* self);  /* the owner's own definition (fn_80273B14.cpp) */
 s32 fn_80276254(struct _PLW* self, s32 v);
-u32 fn_802764B0(struct _PLW* self, s32 v);
-u32 fn_80276514(struct _PLW* self, s32 v);
+s32 fn_802764B0(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
+s32 fn_80276514(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 void fn_80275AC4(struct _PLW* self, s32 a, u16 b, u16 c);
 s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
 u32 fn_8027E220(struct _PLW* self, s32 v);
-/* 0x80260198 - the shared chase/state update `Pl/fn_802430E8.cpp`'s act steps end with; it sits in the
- * band's unclaimed run 0x8025F088-0x80262940, so this header is its rule-2 home.  The target's two
- * call sites pass only the actor (`mr r3, r30`) and drop r3, so the return is not observable. */
-void fn_80260198(struct _PLW* self);
+/* 0x80260198 is NOT declared here: it sits inside the registered unit `Pl/fn_8025F088.cpp`
+ * (0x8025F088-0x80262940), so that unit's header `include/Pl/fn_8025F088.h` is its owner's
+ * declaration (`s32 (_PLW*)`) and a second, differently-typed copy here is the `illegal
+ * function overloading` class (rule 2).  Consumers include the owner's header. */
 
 
 
@@ -221,10 +225,40 @@ void fn_80245DA0(struct _PLW* self, u8 a);
 void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c);
 u32 fn_8027D8A0(struct _PLW* self, s32 a);
 
-/* The 0x80273B14-0x80276B58 run's act/motion request entry point `Pl/fn_8027D684.cpp`'s
- * `fn_8027D6DC` calls; unregistered, so this band header is its rule-2 home.  The four argument
- * registers are the callee's own prologue's (`Pl/fn_802756F0` saves r3..r6). */
-void fn_802756F0(struct _PLW* self, u8 a, u16 b, u32 c);
+/* Pl-band callees and tables with no registered owner, added with `Pl/fn_80273B14.cpp`
+ * (`.text` 0x80273B14-0x80276B58), which is their only consumer so far.  The addresses all sit in
+ * the band's unclaimed runs, so this header is their rule-2 home.  The 0x8026A224 / 0x8026A2DC /
+ * 0x8026A2F8 trio the same unit drives is NOT here: `Pl/fn_802693C4.cpp` owns
+ * 0x802693C4-0x8026BA1C and declares them in `Pl/fn_802693C4.h`, which the consumer includes
+ * (rule 2 - the owner's header wins, and a second spelling of the same name is the
+ * `illegal function overloading` class).  The `fn_8027Exxx` equipment helpers this branch used to
+ * declare here moved the same way: `Pl/fn_8027D684.cpp` now owns 0x8027D684-0x80288CEC, so its
+ * signatures live in the consumer's own header (`include/Pl/fn_80273B14.h`, which is the only
+ * consumer) - the band must not declare a symbol a registered unit owns. */
+
+/* The `.data` tables the same unit reads. */
+extern const u16 lbl_805C6030[];  /* the act-id row table `fn_802745DC`/`fn_80274624` walk */
+extern const u16 lbl_805C604C[];  /* its sibling for the ranged family */
+extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `fn_80274B20` looks ids up */
+extern u8 lbl_805C60A8[];         /* the 11-row act/motion pick table `Pl_decide_mot_get` walks */
+extern u8 lbl_805C5F30[];         /* the melee act-name table rows `fn_80274918` picks */
+extern u8 lbl_805C5F50[];
+extern u8 lbl_805C5F70[];
+
+/* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined).  `lbl_8079A000`
+ * is the same word the run above names, so it is declared once, there. */
+extern const f32 lbl_8079A044;
+extern const f32 lbl_8079A080;
+extern const f32 lbl_8079A084;
+
+/* The 0x80273B14-0x80276B58 run's act/motion request entry point, declared for
+ * `Pl/fn_8027D684.cpp`'s `fn_8027D6DC`.  The symbol is owned by `Pl/fn_80273B14.cpp`, so the
+ * signature here is that owner's (`include/Pl/fn_80273B14.h`) and not a second, differently-typed
+ * spelling of it: two C-linkage declarations of one name with different parameter types are the
+ * `illegal function overloading` class (rule 2).  The owner's `u16` third parameter is what
+ * retail's own callers narrow to (`fn_80275AC4`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
+ * reproduces the callee's own `clrlwi` on the mask. */
+void fn_802756F0(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
 /* The per-slot gate table at 0x806BB7A0 (`.bss`, 0x18 B = three 8-byte entries, the map's size).
  * size: 0x8 */
@@ -257,8 +291,113 @@ extern const f32 lbl_80799F00;
 extern const f32 lbl_80799F04;
 extern const f32 lbl_80799F08;
 
+/* The shell band `Pl/fn_802840DC.cpp` (`.text` 0x802840DC-0x80288CEC) reads these tables and
+ * constants out of the band's unclaimed data runs, so this header is their rule-2 home.  Every name
+ * below is the map's own.  The band's own call targets - its 16 per-act handlers, which sit inside
+ * `Pl/fn_8027D684.cpp`'s registered range 0x8027D684-0x802840DC - are declared in the consumer's
+ * header `Pl/fn_802840DC.h` instead: a declaration here of a symbol a registered unit owns is the
+ * `illegal function overloading` class, and this band must not declare one. */
+
+/* The band's own tables, all unclaimed: `lbl_805C9608` is the 0x1A-byte-row attack table
+ * `Pl/pl_act.cpp`'s `fn_80277974` walks (its `base` argument), and the `ShellAtkRow` arrays below are
+ * the per-shell-kind attack rows `fn_802842D4` is handed (`&row[kind]`, 0x12 bytes per row).  The
+ * second run of labels are the `u32` tables `fn_802842D4` passes on to `fn_802770E8`.  Declared,
+ * never defined (invariant 8.4). */
+extern u8 lbl_805C9608[];
+extern s32 lbl_80792188[2]; /* 0x80792188 - the 8-byte id list (two zero-initialised ids) the attack
+                              * rows' +0xF byte indexes; a *sized* declaration is what makes MWCC
+                              * address it through r13 (`@sda21`, the target's form) instead of
+                              * `lis`/`addi` (playbook: the absolute form comes from an unsized one) */
+extern s32 lbl_80792190[1]; /* 0x80792190 - the single-id sibling list `fn_8028738C` passes */
+extern s32 lbl_807921A8[2]; /* 0x807921A8 - the sibling list `fn_80288B98` passes */
+
+/* One 18-byte per-shell-kind attack row: `mode` selects which half of the motion/parameter fields
+ * applies. size: 0x12 */
+typedef struct ShellAtkRow {
+    /* +0x00 */ u16 mode;       /* the motion when `mode == 0xFFFF` picks the second field set, the
+                                 * row's alternate-selector when the caller asks for kind 1 */
+    /* +0x02 */ s16 value_0x02; /* second set: the motion's first argument */
+    /* +0x04 */ s16 value_0x04; /* second set: the motion's second argument */
+    /* +0x06 */ u16 add_0x06;   /* second set: frames added to the actor's own frame counters */
+    /* +0x08 */ s16 gate_0x08;  /* > 0 arms the motion gate (`fn_80277C50`) with this value */
+    /* +0x0A */ u16 motion_0x0A;  /* first set: the motion `fn_8026A224` sets */
+    /* +0x0C */ s16 param_0x0C;   /* first set: the motion's first argument */
+    /* +0x0E */ s16 param_0x0E;   /* first set: the motion's second argument */
+    /* +0x10 */ s16 attack_0x10;  /* first set: the attack value `fn_80284204` is run with */
+} ShellAtkRow;
+
+/* The per-shell-kind attack-row tables (`mulli ...,<kind>,18` at every call site). */
+extern ShellAtkRow lbl_805C9A78[];
+extern ShellAtkRow lbl_805C9AC0[];
+extern ShellAtkRow lbl_805C9AF8[];
+extern ShellAtkRow lbl_805C9B78[];
+extern ShellAtkRow lbl_805C9BC0[];
+extern ShellAtkRow lbl_805C9BF8[];
+extern ShellAtkRow lbl_805C9C1C[];
+extern ShellAtkRow lbl_805C9CAC[];
+extern ShellAtkRow lbl_805C9CD0[];
+
+/* The attack-row tables' companion records: `fn_802842D4` hands these to `fn_802770E8` as a `u32` and
+ * reads the `s16` at +0x8 of one as the row's motion gate. */
+extern u8 lbl_805C9DC8[];
+extern u8 lbl_805C9E4C[];
+extern u8 lbl_805C9EBC[];
+extern u8 lbl_805CA938[];
+extern u8 lbl_805CACC4[];
+/* The further attack tables of the band's single-shot entries (`fn_8028738C`, `fn_80288B98`). */
+extern u8 lbl_805CB0B0[];
+extern u8 lbl_805CBC80[];
+
+/* The band's private `.sdata2` pool, 0x8079A1D8-0x8079A268 - declared as loads, never defined
+ * (playbook 29).  The 30.0f/1.25f/0.83f trio is the charge-rate chain `fn_802843F0` applies. */
+extern const f32 lbl_8079A1D8; /* 30.0f  - the base charge rate */
+extern const f32 lbl_8079A1DC; /* 1.25f  - the skill-191 rate divisor */
+extern const f32 lbl_8079A1E0; /* 0.83f  - the skill-192 rate divisor */
+extern const f32 lbl_8079A1E4; /* 0.0f */
+extern const f32 lbl_8079A1E8; /* -1.0f */
+extern const f32 lbl_8079A1EC; /* 56.0f */
+extern const f32 lbl_8079A1F0; /* 52.0f */
+extern const f32 lbl_8079A1F4; /* 40.0f */
+extern const f32 lbl_8079A1F8; /* 27.0f */
+extern const f32 lbl_8079A1FC; /* 2*pi */
+extern const f32 lbl_8079A200; /* 90.0f */
+extern const f32 lbl_8079A204; /* 24.0f */
+extern const f32 lbl_8079A208; /* 360.0f */
+extern const f32 lbl_8079A20C; /* 18.0f */
+extern const f32 lbl_8079A210; /* 74.0f */
+extern const f32 lbl_8079A214; /* 80.0f */
+extern const f32 lbl_8079A218; /* 26.0f */
+extern const f32 lbl_8079A21C; /* 44.0f */
+extern const f32 lbl_8079A220; /* 38.0f */
+extern const f32 lbl_8079A228; /* 1.25f */
+extern const f32 lbl_8079A22C; /* 1.0f */
+extern const f32 lbl_8079A230; /* 0.75f */
+extern const f32 lbl_8079A234; /* 4.0f */
+extern const f32 lbl_8079A238; /* 0.0f */
+extern const f32 lbl_8079A23C; /* 0.01f */
+extern const f32 lbl_8079A240; /* 28.0f */
+extern const f32 lbl_8079A244; /* 8.0f */
+extern const f32 lbl_8079A248; /* 110.0f */
+extern const f32 lbl_8079A24C; /* -10.0f */
+extern const f32 lbl_8079A250; /* 2*pi */
+extern const f32 lbl_8079A254; /* 90.0f */
+extern const f32 lbl_8079A258; /* 102.0f */
+extern const f32 lbl_8079A25C; /* 360.0f */
+extern const f32 lbl_8079A260; /* 26.0f */
+extern const f32 lbl_8079A264; /* 34.0f */
+extern const f32 lbl_8079A268; /* 176.0f */
+
 #ifdef __cplusplus
 }
+
+/* 0x8027E1C8 - the attack-flag predicate the shell band's `fn_80284204` gates a hit entry on.  The
+ * symbol is owned by `Pl/fn_8027D684.cpp` (0x8027D684-0x80288CEC) since that unit landed, so the
+ * signature here is the owner's own definition's (`s32 (_PLW*, u8)`) and not a second,
+ * differently-typed spelling of it: two C-linkage declarations of one name with different types
+ * are the `illegal function overloading` class (rule 2).  The map name is its mangling and the
+ * owner grows no header yet, so the callable spelling of the map name still lives here
+ * (docs/plan.md 6.5 rule 9). */
+s32 Pl_atk_act_flag_ck(struct _PLW* self, u8 mask);
 
 /* 0x803C4814 - `event_demo_ck__Fv`, a C++ free function the Pl/ef band reads.  Unregistered, and the
  * files that spell it `int` locally would clash with a `u32` in `unsplit/unknown.h`, so it lives
@@ -267,10 +406,11 @@ u32 event_demo_ck(void);
 
 /* 0x8029F6DC - the item-record lookup, spelled `GetItemData__FUs` in the map: a C++ free function
  * taking the 16-bit item id and returning the record, so it is declared at C++ scope and the
- * front-end reproduces the map spelling (docs/plan.md 6.5 rule 9).  Unregistered, so this band
- * header is its rule-2 home; the callers read the record as bytes (`Pl/fn_802430E8.cpp:fn_802466C4`
- * tests bit 3 of +0x2 and byte +0x0). */
-u8* GetItemData(u16 id);
+ * front-end reproduces the map spelling (docs/plan.md 6.5 rule 9).  The range is unregistered, but
+ * the declaration now lives in `include/Pl/fn_8025F088.h` (the unit that first needed it), so it is
+ * NOT repeated here - a second copy is the rule-2 duplicate this header exists to avoid.  The
+ * callers read the record as bytes (`Pl/fn_802430E8.cpp:fn_802466C4` tests bit 3 of +0x2 and byte
+ * +0x0). */
 
 struct _PLW;
 

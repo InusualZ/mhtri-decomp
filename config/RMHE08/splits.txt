@@ -866,6 +866,12 @@ Pl/fn_80230FBC.cpp:
 	.text       start:0x80230FBC end:0x802373AC
 	.data       start:0x805C1F94 end:0x805C2C60
 
+Pl/fn_802373AC.cpp:
+	extab       start:0x80011CA4 end:0x80011CB4
+	extabindex  start:0x8002E9E0 end:0x8002E9F8
+	.text       start:0x802373AC end:0x8023C2D0
+	.data       start:0x805C2C60 end:0x805C34D4
+
 Pl/fn_8023C2D0.cpp:
 	extab       start:0x80011CB4 end:0x80011CC4
 	extabindex  start:0x8002E9F8 end:0x8002EA10
@@ -899,6 +905,11 @@ Pl/fn_80258FCC.cpp:
 	extabindex  start:0x8002F154 end:0x8002F454
 	.text       start:0x80258FCC end:0x8025F088
 
+Pl/fn_8025F088.cpp:
+	extab       start:0x8001239C end:0x8001241C
+	extabindex  start:0x8002F454 end:0x8002F514
+	.text       start:0x8025F088 end:0x80262940
+
 Pl/fn_80262940.cpp:
 	extab       start:0x8001241C end:0x80012554
 	extabindex  start:0x8002F514 end:0x8002F6E8
@@ -926,6 +937,11 @@ Pl/pl_skill.cpp:
 	extabindex  start:0x8002F8BC end:0x8002FA90
 	.text       start:0x80270018 end:0x80273B14
 
+Pl/fn_80273B14.cpp:
+	extab       start:0x8001280C end:0x8001294C
+	extabindex  start:0x8002FA90 end:0x8002FC70
+	.text       start:0x80273B14 end:0x80276B58
+
 Pl/pl_act.cpp:
 	extab       start:0x8001294C end:0x80012B54
 	extabindex  start:0x8002FC70 end:0x8002FF7C
@@ -936,11 +952,27 @@ Pl/fn_8027D684.cpp:
 	extabindex  start:0x8002FF7C end:0x80030438
 	.text       start:0x8027D684 end:0x802840DC
 
+Pl/fn_802840DC.cpp:
+	extab       start:0x80012E7C end:0x80012FFC
+	extabindex  start:0x80030438 end:0x80030678
+	.text       start:0x802840DC end:0x80288CEC
+
 Pl/fn_80288CEC.cpp:
 	extab       start:0x80012FFC end:0x8001323C
 	extabindex  start:0x80030678 end:0x800309D8
 	.text       start:0x80288CEC end:0x8028F66C
 	.ctors      start:0x8056F36C end:0x8056F370
+
+Pl/fn_8028F66C.cpp:
+	extab       start:0x8001323C end:0x800133CC
+	extabindex  start:0x800309D8 end:0x80030C30
+	.text       start:0x8028F66C end:0x80295EF4
+
+Pl/fn_80295EF4.cpp:
+	extab       start:0x800133CC end:0x8001360C
+	extabindex  start:0x80030C30 end:0x80030F90
+	.text       start:0x80295EF4 end:0x8029F3C8
+	.ctors      start:0x8056F370 end:0x8056F374
 
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C

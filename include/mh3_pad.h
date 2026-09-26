@@ -11,6 +11,7 @@
 #define MHTRI_MH3_PAD_H
 
 #include "types.h"
+#include "mh3_pad/control.h"   /* get_ControlType / fn_80044B14 (rule 2) */
 
 #ifdef __cplusplus
 extern "C" {
