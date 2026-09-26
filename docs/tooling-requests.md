@@ -8,14 +8,14 @@ anything but the **Status.** line (that line is carried across regenerations).
 
 Status is `open` (not built), `done` (built), or `parked` (decided against). Set it with `python tools/units/tooling.py --set-status <key> <status>` or edit the **Status.** line directly; the key is the `tooling-key` comment above it.
 
-_546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
+_548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 
 | # | request | votes | cost | status |
 | --- | --- | --- | --- | --- |
 | 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 61 | ~29 min | done |
 | 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
 | 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 30 | - | open |
-| 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 8 | - | open |
+| 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 9 | - | done |
 | 5 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
 | 6 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 5 | ~29 min | open |
 | 7 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 5 | - | done |
@@ -182,9 +182,9 @@ _546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 ## 4. Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable.
 
 <!-- tooling-key: m2c-paired-single -->
-**Votes.** 8  |  **Cost.** -
+**Votes.** 9  |  **Cost.** -
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
@@ -195,6 +195,7 @@ _546 sources (239 outboxes, 307 notes), 9 requests, 156 votes._
 * `800cb948-fn-800cb948-bc4f` - `m2c` gives a usable first shape for both functions (`python tools/units/m2cinput.py <obj> -f <sym>`, then `tools/m2c/m2c.py -t ppc-mwcc-c`), but it renders the Wii paired-single save/restore as `xxsel`/`vmrghb` garbage - those are MWCC's `psq_st`/`psq_lx` and are compiler-generated, never written by hand.
 * `80178378-fn-80178378-59b3` - The five M2C_ERROR drafts (`fn_801784D0`, `fn_80179070`, `fn_8017A0BC`, `fn_8017BDC4`, `fn_8017DF9C`) are the ones with paired-single (`vmrghb`/`ps_*`) in their tail — check them against the docs/matching.md paired-single stopping rule before spending a session on them. ## Merge of main (202
 * `802e4978-fn-802e4978-506b` - / `fn_802E5764` / 688 / 0 / VMX/paired-single body (`m2c` flags `xscmpgedp`/`xsmsubasp`/`xxsel`) / / `fn_802E5E90` / 1500 / 0 / VMX body (`xxsel`), 8-arm icon grid /
+* `m2c-paired-single` - The optional submodule alternative (if the submodule were ever forked) would be two lines in `m2c/arch_ppc.py`: add `"psq_lx"`/`"psq_stx"` to `instrs_load`/`instrs_store` (they already appear in `INSTRS_R0_AS_ZERO` and the `psq_imms` arg logic, so the parse expects them but the maps lack them). It is not needed for ...
 * `worker-800ff8d4-fn-800ff8d4-a0bf` - fn_80100088 (632 B) - paired-single/VMX body (m2c returns M2C_ERROR on xsmsubasp/xxsel/xscmpgtdp).
 
 ## 5. Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction.
