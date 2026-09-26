@@ -905,6 +905,11 @@ Pl/pl_master.cpp:
 	.text       start:0x8026BA1C end:0x8026FFBC
 	.data       start:0x805C5FA0 end:0x805C5FC4
 
+Pl/fn_8026FFBC.cpp:
+	extab       start:0x800126CC end:0x800126D4
+	extabindex  start:0x8002F8B0 end:0x8002F8BC
+	.text       start:0x8026FFBC end:0x80270018
+
 Pl/pl_skill.cpp:
 	extab       start:0x800126D4 end:0x8001280C
 	extabindex  start:0x8002F8BC end:0x8002FA90

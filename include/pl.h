@@ -329,8 +329,19 @@ struct _PLW {
     /* +0x36B */ u8 unk36B;
     /* +0x36C */ s16 unk36C;
     /* +0x36E */ u8 unk36E[0x370 - 0x36E];
-    /* +0x370 */ s16 field_0x370;
-    /* +0x372 */ s16 unk372;
+    /* +0x370 */ union { /* the health pair: current and cap, both signed 16-bit (`fn_8027628C`
+                         * adds a signed delta to the current, `fn_80276690` moves the cap and clamps
+                         * the current to it, and the reset sets current = cap) */
+        /* +0x370 */ s16 health;      /* current health; clamped to [0, cap], and to >= 1 by the act
+                                       * path that takes `-0xA` damage through `fn_8027628C` */
+        /* +0x370 */ s16 field_0x370; /* the pre-merge spelling `Pl/fn_80262940.cpp` reads */
+    };
+    /* +0x372 */ union {
+        /* +0x372 */ s16 health_max; /* the cap: `fn_80276690` clamps it to [1, 150] and clamps
+                                      * `health`/`unk376` down to it */
+        /* +0x372 */ s16 unk372;     /* the pre-merge spelling (only `Pl/pl_skill.cpp`'s own copy of
+                                      * the record still uses it) */
+    };
     /* +0x374 */ u8 pad_0x374[0x2];
     /* +0x376 */ s16 unk376;
     /* +0x378 */ union {   /* one s16, two spellings */
