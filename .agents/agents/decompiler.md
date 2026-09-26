@@ -59,6 +59,16 @@ not a guess at which tree was meant.
 
 1. **Ack** your claim: `python tools/units/claims.py ack <claim> --agent <your-slug>`, and call it again with
    `--progress` after each meaningful step. It is the heartbeat the orchestrator reads.
+**Recon fast path - do not sweep the object directory.** `build/RMHE08/obj/` holds 6000+ objects and each
+`nm` spawn costs ~100ms on this host, so a shell loop over it runs for many minutes and looks wedged. The
+answer is already written down: `grep -n "<start addr>" config/RMHE08/splits.txt` gives the claimed ranges -
+the gap between the neighbouring blocks **is** your band's extent - and `build/RMHE08/report.json` maps every
+unit name, including the `auto_*_text` ones, to its range. Read those instead of probing for coverage.
+
+A row that reads **unmeasurable** because no auto object covers its address is expected *before* your
+registration lands: the band is unclaimed while the neighbouring units' blocks bracket it, and the row pairs
+once your split is registered. It is not a coverage bug - do not hunt one.
+
 2. **Recon and register before writing bodies.** Registration is a real deliverable, not paperwork: a unit with
    no source file is a bug. Decide the module and file name from evidence (see *Naming*), then land, in the
    **same commit**: `src/<module>/<file>.c|cpp`, one `Object(NonMatching, "...")` line in `configure.py`
