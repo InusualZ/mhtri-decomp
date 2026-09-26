@@ -1262,6 +1262,17 @@ config.libs = [
             # seam is unproven (one maximal unclaimed run); see the unit's file header.
             Object(NonMatching, "ef/eft050.cpp"),
             Object(Matching, "ef/fn_803066F0.c"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8030681C_fn_8030681C.cpp: one maximal unclaimed run
+            # (`.text` 0x8030681C..0x8030D338, 58 functions / 27420 B) that holds at least two
+            # original TUs - the eft041/042 effect machine (`eft042_set2` is defined at 0x80306B60,
+            # and fn_803066F0's `_EFT` record is what the first body drives) and the head of the
+            # status/equip screen band (`Put_status_equip_status_block`, `Put_equip_dtl_*`; the run
+            # continues past 0x8030D338 into proposal/8030D338).  Class 4 therefore decided the name
+            # (the map's own fn_8030681C stem) and class 2 the module (`ef`, the left bracket).
+            # C++; every plain `fn_` definition is `extern "C"`.  Sections: extab
+            # 0x80015AB4..0x80015C24 (46 records), extabindex 0x80034674..0x8003489C (46 x 12 B).
+            Object(NonMatching, "ef/fn_8030681C.cpp"),
         ],
     },
 
