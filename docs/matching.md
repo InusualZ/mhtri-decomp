@@ -584,6 +584,20 @@ collapses. There the fix was a plain re-split - dtk names an unclaimed reloc tar
 target object had been split before the symbol was renamed. Claim data that the object *emits*; re-split when
 it only *references* something.
 
+**Refinement (2026-09-27, `hud/layout.cpp`): a *partial* `.sdata2` claim is not linkable.** The lane claimed
+`.data` 0x805D5798..0x805D5B48, `.sdata` 0x807927B0..0x807927C0 and `.sdata2` 0x8079A8C4..0x8079A8E0 beside its
+`.text`/extab/extabindex claims. With the `.sdata2` claim, `ninja build/RMHE08/ok` dies inside `mwldeppc.exe`
+with the generic `internal linker error: File: 'ELF_gen.c' Line 2802`; dropping only that claim makes it green,
+and `.data`/`.sdata` claims are harmless (all four combinations measured). The target's pool run is 28 B and our
+object emits its own 16 B - the pool words are *declared*, never defined (playbook 29) - so the claim was a
+promise about a section our object still contributes to. **Rule:** claim `.sdata2` only when our object emits no
+pool of its own (or exactly the run); for a partially-written unit leave the pool to its auto unit. `.data` and
+`.sdata` claims are safe. This is the playbook-23 class (dtk dropping the target pool's `R_PPC_NONE` relocs).
+It is also *the* reason to force a re-split when testing a claim - `rm build/RMHE08/config.json` - because a
+claim edit that never re-runs the split links the old object and reports a false green (that cost two bisect
+rounds here: `ninja`'s "no work to do" was not proof the claim had been applied).
+
+
 ## 24. Merging a probe into the unit is its own step
 
 **Problem.** Probes are measured standalone, in their own translation unit, so their numbers are not the
