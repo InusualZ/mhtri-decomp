@@ -118,6 +118,12 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
   already emits the profile in its paste-ready spawn (`agent: "decompiler"` for a proposal lane) and takes
   `--profile` for the rest; the roster is `docs/plan.md` 5.4.1. A lane launched with the wrong profile is not
   a cosmetic mistake: it is missing the rules its job is held to.
+* **Land the orchestrator-side batch first: `land.py land --already-applied` stages what it finds in MAIN.**
+  Measured 2026-09-26: an uncommitted `AGENTS.md` + `docs/plan.md` pair rode the `OS/FindContainHeap_.c` unit
+  commit (`4fad00522`), because the gate's commit-sweep guard protects a path only when the base's
+  `dirty_at_base` snapshot recorded it *and* the batch does not name it - it is a guard, not a guarantee, and
+  it does not stop a tracked file that is dirty at `record-base` time. Same class as the `docs/plan.md` edit
+  that rode unit commit `85ddd7b6`. Land the tools/docs batch first, then the lanes.
 
 **KNOWN BUG, measured 2026-09-24 (booked a slot):** `queue.py next` offered `proposal/80063888_fn_80063888` a second
 and third time while that proposal was already claimed and its worker was running, refusing each time with
