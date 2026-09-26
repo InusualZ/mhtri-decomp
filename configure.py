@@ -1147,6 +1147,20 @@ config.libs = [
             # deferral.  It uses `cflags_pl` (this lib).
             Object(Matching, "Pl/fn_80241558.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802430E8_fn_802430E8` - the second half of the player motion -> SE frame dispatcher
+            # family (0x802430E8-0x802489D4, 30 functions, 0x58EC B) with extab
+            # 0x80011CCC-0x80011DB4 and extabindex 0x8002EA1C-0x8002EB78 (29 framed functions, one
+            # 8-byte extab and one 12-byte extabindex record each - the left edge is the byte after
+            # `Pl/fn_80241558.cpp`'s own extabindex record and the right edge is `Pl/fn_802489D4.cpp`'s
+            # extab, so both runs are exactly this unit's).  Home is `Pl` and the stem is the map's
+            # `fn_802430E8` with a rule-7 deferral: the unit's first function dispatches on
+            # `Get_motion_no__FP4_PLW` and arms `se_req_frame_set__FP5_se_wllll` on the
+            # `_PLW`+0xAF4/+0xAF8/+0xAFC `_se_w` works, i.e. the same shape as the matching sibling
+            # `Pl/fn_80241558.cpp` (52 of its 59 switch arms are instruction-identical), no `__FILE__`
+            # string covers the range, and `dumpmap.py` answers only `zz_<addr>_` for all 30 symbols.
+            # It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802430E8.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `80258FCC_fn_80258FCC.cpp` - the player act state-machine band (0x80258FCC-0x8025F088,
             # 74 functions, 0x60BC B) with extab 0x8001219C-0x8001239C and extabindex
             # 0x8002F154-0x8002F454 (the run is exactly this unit's 64 framed functions).  Home is

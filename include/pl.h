@@ -208,7 +208,12 @@ struct _PLW {
     /* +0x058 */ u32 field_0x058;
     /* +0x05C */ u32 unk5C;
     /* +0x060 */ f32 ground_y_0x060;  /* the player's base/target y the effect sits on */
-    /* +0x064 */ f32 unk064;
+    /* +0x064 */ union {   /* one f32, two spellings (rule 5): `Pl/pl_act.cpp`'s `unk064` and the
+                            * ground/target height the chase step in `Pl/fn_802430E8.cpp` compares the
+                            * motion position against */
+        /* +0x064 */ f32 unk064;
+        /* +0x064 */ f32 field_0x064;
+    };
     /* +0x068 */ u8 pad_0x68[0x4];
     /* +0x06C */ f32 unk6C;
     /* +0x070 */ f32 unk70;
@@ -313,8 +318,10 @@ struct _PLW {
     /* +0x275 */ u8 unk275;
     /* +0x276 */ u8 unk276;
     /* +0x277 */ u8 unk277[0x278 - 0x277];
-    /* +0x278 */ _SLOTENT slot_id[24];
-    /* +0x2D8 */ u8 unk2D8[0x2E0 - 0x2D8];
+    /* +0x278 */ _SLOTENT slot_id[26];  /* the item scan `Pl/fn_802430E8.cpp:fn_802466C4` runs walks
+                                       * 0x1A four-byte entries from +0x278 to +0x2E0, which is what
+                                       * pins the count (the two the 24-entry view left as the
+                                       * +0x2D8 padding run are entries 24 and 25) */
     /* +0x2E0 */ _SLOTENT spare_slot_id[8];
     /* +0x300 */ u8 unk300[0x304 - 0x300];
     /* +0x304 */ u16 field_0x304;
@@ -597,7 +604,10 @@ struct _PLW {
     /* +0x584 */ union {   /* the pre-merge 0x14-byte run; the fn_8024F200 unit split it at +0x596 */
         /* +0x584 */ u8 pad_0x584[0x14];
         struct {
-            /* +0x584 */ u8 unk584[0x596 - 0x584];
+            /* +0x584 */ u8 unk584[0x585 - 0x584];
+            /* +0x585 */ u8 field_0x585;  /* the chase step's re-arm latch `Pl/fn_802430E8.cpp`'s
+                                           * `fn_80247EF0` clears when it enters the chase */
+            /* +0x586 */ u8 pad_0x586[0x596 - 0x586];
             /* +0x596 */ u8 field_0x596;   /* the act's "no pitfall" latch `Pl/fn_8024F8A8.cpp` arms */
             /* +0x597 */ u8 field_0x597;
         };
@@ -654,7 +664,10 @@ struct _PLW {
     /* +0x638 */ u32 unk638;
     /* +0x63C */ u32 unk63C;
     /* +0x640 */ u32 unk640;
-    /* +0x644 */ u8 pad_0x644[0xB];
+    /* +0x644 */ u8 pad_0x644[0x1];
+    /* +0x645 */ u8 field_0x645;  /* the input-hold latch `Pl/fn_802430E8.cpp:fn_80245E20` reports
+                                    * (the pad layer's answer is dropped while it is set) */
+    /* +0x646 */ u8 pad_0x646[0x9];
     /* +0x64F */ s8 unk64F;
     /* +0x650 */ u16 field_0x650;   /* the id `fn_802731B4`/`fn_80272E30` are handed */
     /* +0x652 */ s16 field_0x652;   /* the amount `fn_8027D76C` compares against and negates */

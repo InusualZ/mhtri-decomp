@@ -878,6 +878,12 @@ Pl/fn_80241558.cpp:
 	.text       start:0x80241558 end:0x802430E8
 	.data       start:0x805C3D20 end:0x805C4134
 
+Pl/fn_802430E8.cpp:
+	extab       start:0x80011CCC end:0x80011DB4
+	extabindex  start:0x8002EA1C end:0x8002EB78
+	.text       start:0x802430E8 end:0x802489D4
+	.data       start:0x805C4134 end:0x805C4548
+
 Pl/fn_802489D4.cpp:
 	extab       start:0x80011DB4 end:0x80011EFC
 	extabindex  start:0x8002EB78 end:0x8002ED64

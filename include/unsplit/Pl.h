@@ -45,6 +45,10 @@ void fn_80275AC4(struct _PLW* self, s32 a, u16 b, u16 c);
 s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
 u32 fn_8027E220(struct _PLW* self, s32 v);
+/* 0x80260198 - the shared chase/state update `Pl/fn_802430E8.cpp`'s act steps end with; it sits in the
+ * band's unclaimed run 0x8025F088-0x80262940, so this header is its rule-2 home.  The target's two
+ * call sites pass only the actor (`mr r3, r30`) and drop r3, so the return is not observable. */
+void fn_80260198(struct _PLW* self);
 
 
 
@@ -100,6 +104,12 @@ extern const f32 lbl_80799EC0;
 extern const f32 lbl_80799EC4;
 extern const f32 lbl_80799E4C;
 extern const f32 lbl_80799E54;
+/* 0x805C4898 - the per-chunk rotation-offset pair table `Pl/fn_802430E8.cpp:fn_80246158` reads
+ * (`chunk_ofs * 2` and `chunk_ofs * 2 + 1`); the `.data` run is unclaimed, so this band header is its
+ * rule-2 home. */
+extern f32 lbl_805C4898[];
+extern const f32 lbl_80799E20; /* 0x80799E20 - the +1.0 angle `fn_80247CC4` rotates its motion vector by */
+extern const f32 lbl_80799E24; /* 0x80799E24 - the frame gate `fn_80247EF0` hands `Pl_frame_check` */
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
  * The 0x8026A3xx trio (`fn_8026A328`/`fn_8026A34C`/`fn_8026A3A0`) sits inside the range
@@ -200,7 +210,10 @@ void fn_802430E8(struct _PLW* self, u8 part);
  * 0x80258FCC-0x8025F088).  `fn_80245DA0` sits in the unclaimed run 0x802430E8-0x80258FCC, so the band
  * header is its rule-2 home; `fn_8026A3A8` sits inside `Pl/fn_802693C4.cpp`'s range and is declared
  * in `Pl/fn_802693C4.h`. */
-u32 fn_80245DA0(struct _PLW* self, u32 a);
+/* The return was `u32`; the owner's own body ends without ever setting r3 (the value callers would
+ * read is `Pl_master_ck`'s), and `Pl/fn_80258FCC.cpp` drops it at all three call sites, so the
+ * declaration is `void` (docs/plan.md 6.5 rule 2: the owner owns the spelling). */
+void fn_80245DA0(struct _PLW* self, u8 a);
 
 /* The act band's remaining Pl helpers, added with the rest of `Pl/fn_80258FCC.cpp`.  Each signature
  * is the callee's own body (its prologue's argument saves and the width it narrows them to), not a
@@ -251,6 +264,13 @@ extern const f32 lbl_80799F08;
  * files that spell it `int` locally would clash with a `u32` in `unsplit/unknown.h`, so it lives
  * here. */
 u32 event_demo_ck(void);
+
+/* 0x8029F6DC - the item-record lookup, spelled `GetItemData__FUs` in the map: a C++ free function
+ * taking the 16-bit item id and returning the record, so it is declared at C++ scope and the
+ * front-end reproduces the map spelling (docs/plan.md 6.5 rule 9).  Unregistered, so this band
+ * header is its rule-2 home; the callers read the record as bytes (`Pl/fn_802430E8.cpp:fn_802466C4`
+ * tests bit 3 of +0x2 and byte +0x0). */
+u8* GetItemData(u16 id);
 
 struct _PLW;
 
