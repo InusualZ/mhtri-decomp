@@ -554,6 +554,14 @@ config.libs = [
         "progress_category": "game",
         "objects": [
             Object(NonMatching, "menu/menu_item.cpp"),
+            # The continuation of the menu band: proposal `802A6624_fn_802A6624.cpp` (`.text`
+            # 0x802A6624..0x802AD9C0, 139 functions / 29596 B; extab 0x800137D4..0x80013B0C and
+            # extabindex 0x8003123C..0x80031710).  Module `menu` from the left neighbour and from the
+            # range's own entry points (`put_message`, `put_frame_dialog`, `GetMenuFontColor`); no
+            # `__FILE__` string covers the range and the dump answers `zz_` for most of it, so the file
+            # keeps the map's stem (see its header).  Same `cflags_menu` as `menu_item.cpp`: the band
+            # carries 0 record-form instructions and keeps its tiny same-file `bl`s.
+            Object(NonMatching, "menu/fn_802A6624.cpp"),
         ],
     },
 
