@@ -908,10 +908,24 @@ struct _PLW {
         struct {
             /* +0x45E */ u8 pad_0x45E_start[0x460 - 0x45E];
             /* +0x460 */ s16 field_0x460;  /* > 0 is the whole of `fn_8027DFD0` */
-            /* +0x462 */ u8 pad_0x462[0x466 - 0x462];
+            /* +0x462 */ u8 pad_0x462[0x464 - 0x462];
+            /* +0x464 */ s16 field_0x464;  /* the cockpit-quest bar's recompute gate:
+                                            * `fn_802E7408` (`hud/cockpit_quest.cpp`) reads it
+                                            * as `lha` and leaves the bar's blend parameter alone
+                                            * while it is non-zero (playbook 56 splice: 2 B out of
+                                            * the filler, no member moved) */
         };
     };
-    /* +0x466 */ s16 unk466;
+    /* +0x466 */ union { /* MAIN's arm first; the second arm is `hud/cockpit_quest.cpp`'s view of
+                          * the same 2 bytes (rule 5: one member per offset). */
+        struct {   /* MAIN's view verbatim - `Pl/pl_act.cpp` keeps the name it reads */
+            /* +0x466 */ s16 unk466;
+        };
+        struct {   /* this band's name: `fn_802E7548` reads it as `lha` and stops recomputing the
+                    * second quest bar while it is non-zero */
+            /* +0x466 */ s16 field_0x466;
+        };
+    };
     /* +0x468 */ s16 unk468;
     /* +0x46A */ s16 unk46A;
     /* +0x46C */ union { /* MAIN's arm first; the second arm is this branch's view of

@@ -1056,6 +1056,11 @@ hud/layout.cpp:
 	extabindex  start:0x800332E8 end:0x80033660
 	.text       start:0x802E0740 end:0x802E4978
 
+hud/cockpit_quest.cpp:
+	extab       start:0x800150C4 end:0x8001529C
+	extabindex  start:0x8003378C end:0x80033A50
+	.text       start:0x802E7408 end:0x802EBED8
+
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674
