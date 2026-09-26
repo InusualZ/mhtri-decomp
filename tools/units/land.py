@@ -387,10 +387,21 @@ def command_detail(p: subprocess.CompletedProcess, limit: int = 300) -> str:
     2026-09-25 row `FAIL style lint (§6.5) adds no violation - (temporary grandfather: legacy scaffolding with
     bodies ...)`, read on its own, looked like a pass - and the batch was then committed by hand while the
     gates looked green (`.pi/land.log`). Two lines (the header and the first finding) are the reason; the
-    legend adds nothing and hides it. `gate()` keeps its tail: ninja's reason is its last line, a linter's is
-    its first.
+    legend adds nothing and hides it. A linter's reason is its *first* line.
+
+    Neither end is right for `ninja`, which is why a failing `ninja` reported only `ninja: build stopped:
+    subcommand failed.` for a whole session of gate runs. Its head is progress noise (`[N/M] ...`), its tail
+    is that summary line, and the reason - `FAILED: <target>` plus the compiler's own error - sits in the
+    middle. So when the output names failed outputs, those ARE the reason: report them and stop, rather than
+    showing either a progress line or a summary. That is the difference between "the batch is bad" being
+    actionable and being a hunt (2026-09-26: `ef/fn_8030681C` refused 4 times with the reason invisible).
     """
-    lines = [l.strip() for l in ((p.stdout or "") + (p.stderr or "")).splitlines() if l.strip()]
+    text = (p.stdout or "") + (p.stderr or "")
+    failed = failed_compile_outputs(text)
+    if failed:
+        extra = " (+%d more)" % (len(failed) - 3) if len(failed) > 3 else ""
+        return "exit %d: FAILED: %s%s" % (p.returncode, ", ".join(failed[:3]), extra)
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
     if not lines:
         return "no output (exit %d)" % p.returncode
     return "exit %d: %s" % (p.returncode, "; ".join(lines[:2])[:limit])
@@ -2893,6 +2904,20 @@ def selftest() -> int:
           command_detail(subprocess.CompletedProcess([], 0, stdout="ok\n", stderr="")), "exit 0: ok")
     check("an empty output is not a crash",
           command_detail(subprocess.CompletedProcess([], 3, stdout="", stderr="")), "no output (exit 3)")
+
+    # A failing `ninja` reported only `ninja: build stopped: subcommand failed.` for a whole session of gate
+    # runs (2026-09-26, `ef/fn_8030681C` refused four times). Its head is `[N/M]` progress and its tail is
+    # that summary, so neither end names the reason - the `FAILED: <target>` line in the middle does. The
+    # detail must therefore prefer the failed outputs over either end of the output.
+    ninja_out = ("[91/240] cxx src/ef/fn_8030681C.cpp\n"
+                 "FAILED: build/RMHE08/src/ef/fn_8030681C.o\n"
+                 "src/ef/fn_8030681C.cpp(12): error: identifier \"EftWork\" is undefined\n"
+                 "ninja: build stopped: subcommand failed.\n")
+    ninja_detail = command_detail(subprocess.CompletedProcess([], 1, stdout=ninja_out, stderr=""))
+    check("a failed ninja row names the FAILED target",
+          "FAILED: build/RMHE08/src/ef/fn_8030681C.o" in ninja_detail, True)
+    check("... not the progress line", "[91/240]" in ninja_detail, False)
+    check("... and not just 'build stopped'", ninja_detail.rstrip().endswith("subcommand failed."), False)
 
     # the snapshot the guard reads: `record_base` must capture what was dirty when it ran, so a path the
     # batch edits afterwards is batch material and one that was dirty before it is foreign. AGENTS.md is
