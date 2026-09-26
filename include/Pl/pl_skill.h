@@ -38,6 +38,9 @@ void fn_8027350C(struct _PLW* self, s32 part);
  * `Pl/pl_act.cpp` and `Pl/fn_8024F200.cpp` call; the owner defines it `extern "C" s16`
  * (`Pl/pl_skill.cpp:1233`), so the declaration keeps that return. */
 s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
+/* 0x802739F0 - the equipment-slot record resolver `Pl/fn_80273B14.cpp`'s act-kind switch calls;
+ * the owner defines it `extern "C" s32` at `Pl/pl_skill.cpp:1682`. */
+s32 fn_802739F0(struct _PLW* plw, s16 value, s32 mode, s8* out);
 /* 0x802731B4 - the item/skill timer lookup the same unit's consumers and `Pl/fn_8027D684.cpp`'s
  * `fn_8027D76C` call; the owner defines it `int` (`Pl/pl_skill.cpp:1265`), so the declaration keeps
  * that return (docs/plan.md 6.5 rule 2: this is the owner's header). */

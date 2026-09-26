@@ -35,7 +35,11 @@ void fn_8027A17C(struct _PLW* self);
 void fn_8027A190(struct _PLW* self, s32 a);
 u32 fn_802790E4(struct _PLW* self, u32 mask);
 u32 fn_8027BCE0(struct _PLW* self);
-u32 fn_8027D40C(struct _PLW* self, s32 arg);
+/* 0x8027D40C - the number of set bits in the actor's action-lock word.  The owner defines
+ * `extern "C" s32 fn_8027D40C(_PLW* self)` (one parameter); the `s32 arg` this declaration used to
+ * carry was never read, and `Pl/fn_8025F088.cpp` measured the extra `li r4,2` it cost (rule 2: the
+ * owner's signature wins). */
+s32 fn_8027D40C(struct _PLW* self);
 
 /* The rest of this unit's `.text` that `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) calls; the
  * signatures are the owners' own definitions in `src/Pl/pl_act.cpp` (rule 2: this header is the
@@ -67,6 +71,16 @@ void fn_80277C48(struct _PLW* self, s32 arg);
 void fn_80277C58(struct _PLW* self);
 void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 
+/* Added with `Pl/fn_80273B14.cpp`, whose act entry and frame step call them (rule 2):
+ * 0x8027AC2C is the act's status-block store, 0x80278BE4 the act tail the frame step falls into. */
+void fn_8027AC2C(struct _PLW* self, u32 a, u32 b);
+void fn_80278BE4(struct _PLW* self);
+
+/* 0x80277974 - the shared attack set-up the shell band's `fn_80284204` fills its attack entry with
+ * (`hit` is this unit's `_HIT_W`, spelled `void*` here so the consumer needs no type of its own);
+ * the owner defines it `extern "C"` in `Pl/pl_act.cpp`, so the declaration lives here. */
+void fn_80277974(struct _PLW* self, void* hit, u8* base, u16 idx, s32* ids, u16 flags);
+
 #ifdef __cplusplus
 }
 
@@ -77,6 +91,12 @@ u32 Pl_dm_condition_ck(struct _PLW* work, u32 condition); /* -> Pl_dm_condition_
  * C++ scope in `src/Pl/pl_act.cpp`, so this is the callable spelling of the map name
  * `Pl_suimen_ck__FP4_PLW` (docs/plan.md 6.5 rule 9). */
 u32 Pl_suimen_ck(struct _PLW* work);
+
+/* 0x8027CC44 / 0x8027CDF0 - the gunner's aim position and origin the shell band reads; this unit
+ * (`Pl/pl_act.cpp`) defines both at C++ scope, so these are the callable spellings of the map names
+ * `Pl_get_gunner_pos__FP4_PLWPQ34nw4r4math4VEC3l` and `Pl_get_gunner_vec__FP4_PLWP10_CP_VECTOR`. */
+void Pl_get_gunner_pos(struct _PLW* self, nw4r::math::VEC3* out, s32 arg2);
+void Pl_get_gunner_vec(struct _PLW* self, struct _CP_VECTOR* out);
 #else
 u32 Pl_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);
 u32 Pl_dm_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);

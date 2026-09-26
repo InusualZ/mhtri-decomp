@@ -58,6 +58,17 @@
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
 #include "ef/fn_800CDB2C.h"
+/* `include/Pl/fn_8025F088.h` is the owner of `fn_80260198` (0x80260198 sits inside that unit's
+ * range 0x8025F088-0x80262940) and carries the unregistered `GetItemData` declaration, so this unit
+ * takes both from it rather than keeping copies (rule 2).  The header also declares
+ * `fn_80041E40(void*, const void*)`, whose owner is `mh3_pad.cpp` (`include/mh3_pad.h`), while
+ * `sound/se.h` below declares the same name over `VEC3*`; this unit calls neither, so the header's
+ * copy is renamed out of the way for the include - the same workaround the se.h copy already uses. */
+#define fn_80041E40 mhtri_fn8025f088_h_fn_80041E40
+#define fn_80335CE8 mhtri_fn8025f088_h_fn_80335CE8
+#include "Pl/fn_8025F088.h"
+#undef fn_80041E40
+#undef fn_80335CE8
 #include "Pl/fn_802693C4.h"
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"

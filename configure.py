@@ -1108,6 +1108,18 @@ config.libs = [
             # only), so the stem is the map's `fn_80230FBC` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_80230FBC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802373AC_fn_802373AC` - the third and fourth of the player work's per-motion SE banks
+            # (`.text` 0x802373AC-0x8023C2D0, TWO functions, 20260 B) with extab
+            # 0x80011CA4-0x80011CB4, extabindex 0x8002E9E0-0x8002E9F8 and their two
+            # compiler-emitted jump tables in `.data` 0x805C2C60-0x805C34D4 (271 + 270 entries).
+            # Home is `Pl`: both functions pass their first argument straight to
+            # `Get_motion_no(_PLW*)`, the three `_se_w` fields they load are `_PLW`+0xAF4/+0xAF8/
+            # +0xAFC (the same pair of banks as the sibling `Pl/fn_80230FBC.cpp` next door) and
+            # their callees are the Pl SE helpers.  No `__FILE__` string covers the range (its own
+            # .data pool is the two jump tables and nothing else), so the stem is the map's
+            # `fn_802373AC` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802373AC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80224AC4_fn_80224AC4.cpp` - the player actor's per-model SE/motion rig update
@@ -1161,6 +1173,17 @@ config.libs = [
             # It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_802430E8.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8025F088_fn_8025F088` - the player per-frame control cluster
+            # (0x8025F088-0x80262940, 17 functions, 0x38B8 B) with its own exception tables
+            # (extab 0x8001239C-0x8001241C, extabindex 0x8002F454-0x8002F514 - the runs start and end
+            # exactly at this range, so both seams are real TU boundaries).  Home is `Pl`: every actor
+            # parameter is a `_PLW` (`Pl_master_ck`, `Pl_act_ck`, `Pl_Skill_ck`, `Pl_cat_skill_ck`,
+            # `Get_motion_no`), it reads the move work `get_move_work_adrs`/`get_move_work_max` and
+            # the `lbl_806AB848` chunk table, and its siblings are `Pl/fn_80241558.cpp` (before) and
+            # `Pl/fn_80262940.cpp` (after).  No `__FILE__` string covers the range and `dumpmap.py`
+            # answers only `zz_` placeholders, so the stem is the map's `fn_8025F088` with a rule-7
+            # deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8025F088.cpp"),
             # `80258FCC_fn_80258FCC.cpp` - the player act state-machine band (0x80258FCC-0x8025F088,
             # 74 functions, 0x60BC B) with extab 0x8001219C-0x8001239C and extabindex
             # 0x8002F154-0x8002F454 (the run is exactly this unit's 64 framed functions).  Home is
@@ -1213,6 +1236,18 @@ config.libs = [
             Object(NonMatching, "Pl/fn_802693C4.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80273B14_fn_80273B14.cpp` - the player act-entry/parameter unit
+            # (0x80273B14-0x80276B58, 68 functions, 0x3044 B), the gap between pl_skill and pl_act.
+            # It owns extab 0x8001280C-0x8001294C and extabindex 0x8002FA90-0x8002FC70: each run is
+            # exactly 40 records and every extabindex record's function address (0x80273B14..
+            # 0x80276A3C) is one of this unit's, read out of the DOL.  Home is `Pl`: every function
+            # takes the player work (`_PLW*`) or an equipment slot out of it, and the gates are the
+            # Pl siblings (`Pl_Skill_ck`, `Pl_master_ck`, `Pl_act_ck`, `Pl_cat_skill_ck`,
+            # `Pl_condition_ck`, `Pl_dm_condition_ck`, `Pl_suimen_ck`, `Pl_chr_setX`).  No `__FILE__`
+            # string covers the range and `dumpmap.py` answers only `zz_0273b14_`, so the stem is the
+            # map's `fn_80273B14` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80273B14.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
             # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.
             Object(Matching, "Pl/pl_master.cpp"),
@@ -1225,6 +1260,17 @@ config.libs = [
             # answers `zz_026ffbc_`, so the stem is the map's `fn_8026FFBC` with a rule-7 deferral.
             # It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_8026FFBC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `802840DC_fn_802840DC`.
+            # 54 functions, 0x802840DC-0x80288CEC (0x4C10 B).  Home is `Pl`: the band's callees are
+            # all Pl API (`Get_motion_no__FP4_PLW`, `Pl_get_gunner_pos`/`Pl_get_gunner_vec`,
+            # `Pl_atk_act_flag_ck`, `Pl_Skill_ck`, `Pl_frame_check`, `Pl_master_ck`) and its two
+            # registered neighbours (`Pl/pl_act.cpp` below 0x8027D684, `Pl/fn_80288CEC.cpp` at
+            # 0x80288CEC) are Pl units.  No `__FILE__` string covers the range (its own `.data` pool
+            # is jump tables only) and the runtime dump answers `zz_XXXXXXXX_` placeholders
+            # (`tools/symbols/dumpmap.py`), so the stem is the map's `fn_802840DC` with a rule-7
+            # deferral - the sibling class-4 pattern of `Pl/fn_8026FFBC.cpp` / `Pl/fn_80288CEC.cpp`.
+            # It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802840DC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `8027D684_fn_8027D684` -
             # the player act/equipment cluster (0x8027D684-0x802840DC, 138 functions, 0x6A58 B) with
             # extab 0x80012B54-0x80012E7C and extabindex 0x8002FF7C-0x80030438 (101 framed functions,
@@ -1247,6 +1293,34 @@ config.libs = [
             # stem is the map's `fn_80288CEC` with a rule-7 deferral (the sibling class-4 pattern of
             # `Pl/fn_80229ECC.cpp` / `Pl/fn_80241558.cpp`).  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_80288CEC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `8028F66C_fn_8028F66C` -
+            # the ground/hit collision cluster of the Pl band (0x8028F66C-0x80295EF4, 53 functions,
+            # 0x6888 B) with extab 0x8001323C-0x800133CC and extabindex 0x800309D8-0x80030C30 (50
+            # framed functions, one 8-byte extab and one 12-byte extabindex record each).  Home is
+            # `Pl`: the right edge of the preceding Pl unit's `.text` is this range's left edge and
+            # this unit's `.sdata2` pool starts exactly where that unit's ends (0x8079A314), the unit
+            # reads the Pl-band global `lbl_80794B58`, and its exported entry points are the ones the
+            # Pl/ef/enemy units call (`GetGroundHit2` from `Pl/pl_act.cpp`, `GetGroundHit` from
+            # `ef/eft001.cpp`, `findInterSection*` from `enemy/*`).  The proposal's right edge is a
+            # `--max-bytes` cap rather than a TU boundary (no `__FILE__` string covers the band and
+            # the dump answers `zz_<addr>_` for 47 of the 53 addresses), so the stem is the map's
+            # `fn_8028F66C` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8028F66C.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80295EF4_fn_80295EF4` -
+            # the hit/land query band (0x80295EF4-0x8029F3C8, 99 functions, 0x94D4 B).  Home is `Pl`:
+            # the band hits the Pl family (`get_move_work_adrs`, `_PLW` fields, `Pl_frame_check`) and
+            # its record vocabulary (`_HIT_W`, `LandData`, `get_hit_id`) is the one the map already
+            # names inside the Pl band, whose registered `Pl/fn_80288CEC.cpp` ends at 0x8028F66C
+            # straight before it.  The seam at 0x80295EF4 is a `--max-bytes` cut, not a TU boundary:
+            # the band's `.sdata2` run 0x8079A330-0x8079A3C8 has no break across it, and the static
+            # initializer inside this range (0x80297C30) constructs arrays out of the *previous*
+            # proposal's `fn_80295544`.  No `__FILE__` string covers the band and `dumpmap.py` answers
+            # only `zz_XXXXXXXX_` placeholders, so the stem is the map's `fn_80295EF4` with a rule-7
+            # deferral (the sibling class-4 pattern of `Pl/fn_80229ECC.cpp` / `Pl/fn_80288CEC.cpp`).
+            # `.text` only: the band owns no emitted data, and its `.ctors` word is not claimed
+            # because this source states the static initializer as an explicit function (invariant
+            # 8.4).  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80295EF4.cpp"),
         ],
     },
     {

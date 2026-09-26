@@ -25,6 +25,9 @@ f32 fn_800B5A48(void);
 int fn_800B59E4(void* self);
 void* fn_800B4B04(void* self, s16 flag);
 void fn_800B7DB0(void* em, MTX34* out);
+/* 0x800B0B90 - `self -= b` in place, returning `self` (the owner's own definition).  Added with
+ * `Pl/fn_8028F66C.cpp`, the third consumer (rule 2). */
+Vec* fn_800B0B90(Vec* self, Vec* b);
 
 /* The particle record the list walkers yield.  +0x38/+0x3C are the two list heads. size: 0xB3 */
 typedef struct EfParticleState {
