@@ -53,12 +53,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
 7. **Never paste `config/RMHE08/symbols.txt` into a prompt/tool output.** It is ~65,700 lines / 4.5 MB.
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
-
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
-
-**Next:** land the fixer's `802e4978` and the EF lane's unit, delete those two branches, then `queue.py list`
-must say "none unlanded" - that is the owner's condition for resuming production.
-
 
    content: pull it out before `git add AGENTS.md`, restore it afterwards, and commit every *other* AGENTS.md
    edit normally. Use the tool, not `sed`: `python tools/agents/localonly.py pull` before staging and
