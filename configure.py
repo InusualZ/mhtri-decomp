@@ -299,6 +299,14 @@ cflags_os = [*cflags_base, "-func_align", "4"]
 cflags_lobby = [
     *[f for f in cflags_base if f != "-O4,p"],
     "-O3",
+    # Evidence (lib-wide before/after, 2026-09-25): `-inline noauto` over the whole lobby lib. Of the 13
+    # registered units, 5 improve (fn_801E7530 27.64778 -> 31.76088, fn_801F9CD4 20.33288 -> 22.07398,
+    # fn_8021E1EC 9.21654 -> 9.66140, lb_npc 13.36667 -> 13.74540, fn_80219260 11.00314 -> 11.08171), 8 are
+    # unchanged (including every unit already at its ceiling), and NONE regresses - verified at per-function
+    # granularity, not just per unit, and the already-Matching lobby_scene.c stays byte-identical at 100.0.
+    # The same knob is what closed four main.cpp functions (cflags_main derives from this list); cflags_lobby
+    # keeps `-O3` for the same reason main does.
+    "-inline noauto",
 ]
 
 # main flags (src/main.cpp). Evidence in the lib entry below: -O3, and the inline knob has to move off `auto`,
@@ -337,7 +345,7 @@ cflags_pl_skill = [
     "-opt nopeephole,level=4",
 ]
 cflags_main = [
-    *[f for f in cflags_lobby if f != "-inline auto"],
+    *[f for f in cflags_lobby if f != "-inline noauto"],
     "-inline noauto",
     # Evidence: the retail main.o carries extab 0x90 + extabindex 0xD8 (18 unwind-only records, one per
     # function with a frame) and our object emitted none, while every function's .text is unaffected by the
