@@ -87,6 +87,7 @@
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
 #include "Pl/fn_802693C4.h"
+#include "Pl/fn_80288CEC.h" /* `PlBox`, shared with `Pl/fn_8028F66C.cpp` (rule 1) */
 #include "ef/fn_800CDB2C.h"
 
 /* ------------------------------------------------------------------------------------------------ *
@@ -151,15 +152,6 @@ struct PlHandleSet {
     /* +0x138 */ void* handle_0x138;
     /* +0x13C */ void* handle_0x13C;
     /* +0x140 */ void* handle_0x140;
-};
-
-/* The 0x24-byte record the box builders fill: three 0xC-byte vectors.  `fn_80041E40` copies one
- * 0xC-byte record and `fn_80050CA0` writes the cross product, so +0x00/+0x0C/+0x18 are the three
- * vectors `fn_8028F44C` fills.  size: 0x24 */
-struct PlBox {
-    /* +0x00 */ nw4r::math::VEC3 vec_0x00;
-    /* +0x0C */ nw4r::math::VEC3 vec_0x0C;
-    /* +0x18 */ nw4r::math::VEC3 vec_0x18;
 };
 
 /* ------------------------------------------------------------------------------------------------ *

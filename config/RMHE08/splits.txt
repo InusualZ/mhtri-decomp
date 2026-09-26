@@ -941,6 +941,11 @@ Pl/fn_80288CEC.cpp:
 	.text       start:0x80288CEC end:0x8028F66C
 	.ctors      start:0x8056F36C end:0x8056F370
 
+Pl/fn_8028F66C.cpp:
+	extab       start:0x8001323C end:0x800133CC
+	extabindex  start:0x800309D8 end:0x80030C30
+	.text       start:0x8028F66C end:0x80295EF4
+
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C
 	extabindex  start:0x80031710 end:0x80031A40

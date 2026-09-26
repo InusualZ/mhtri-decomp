@@ -1245,6 +1245,19 @@ config.libs = [
             # stem is the map's `fn_80288CEC` with a rule-7 deferral (the sibling class-4 pattern of
             # `Pl/fn_80229ECC.cpp` / `Pl/fn_80241558.cpp`).  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_80288CEC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `8028F66C_fn_8028F66C` -
+            # the ground/hit collision cluster of the Pl band (0x8028F66C-0x80295EF4, 53 functions,
+            # 0x6888 B) with extab 0x8001323C-0x800133CC and extabindex 0x800309D8-0x80030C30 (50
+            # framed functions, one 8-byte extab and one 12-byte extabindex record each).  Home is
+            # `Pl`: the right edge of the preceding Pl unit's `.text` is this range's left edge and
+            # this unit's `.sdata2` pool starts exactly where that unit's ends (0x8079A314), the unit
+            # reads the Pl-band global `lbl_80794B58`, and its exported entry points are the ones the
+            # Pl/ef/enemy units call (`GetGroundHit2` from `Pl/pl_act.cpp`, `GetGroundHit` from
+            # `ef/eft001.cpp`, `findInterSection*` from `enemy/*`).  The proposal's right edge is a
+            # `--max-bytes` cap rather than a TU boundary (no `__FILE__` string covers the band and
+            # the dump answers `zz_<addr>_` for 47 of the 53 addresses), so the stem is the map's
+            # `fn_8028F66C` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8028F66C.cpp"),
         ],
     },
     {
