@@ -1966,6 +1966,21 @@ config.libs = [
             # `tiHKBManager.cpp` is in `main`, so the unit takes the `main` lib and cflags_main; the
             # file is `homebutton/gui.cpp` (the namespace is `gui`).  Claims .text only.
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8055C894_fn_8055C894.cpp` - the lower slice of the home-button software-keyboard band
+            # (`.text` 0x8055C894-0x805632BC, 133 functions / 27176 B).  Evidence class 3: the range's
+            # `.data` vocabulary is the same home-button software-keyboard layout pool the registered
+            # `homebutton/keyboard.cpp` (immediately above at 0x805632BC) references (fs_VK_*.brlyt
+            # layouts, T_title_text, T_2l_TextBox, B_abc/T_sign/B_sign, the cellPhone/predictInput/
+            # signWindow/toolbar panes), and the module comes from the two link neighbours
+            # `homebutton/keyboard.cpp` and `homebutton/gui.cpp`.  No `__FILE__` string covers the range
+            # and the runtime dump answers only `zz_` placeholders, so the file name is descriptive
+            # (class 3) and the symbols keep the map's `fn_8055C894` stem with a rule-7 deferral in the
+            # file header.  The left edge is a `--max-bytes` cap (the brief warns; `tudiscover.py at
+            # 0x8055C894` stands behind no cut), the right edge is the registered homebutton/keyboard.cpp.
+            # Link neighbour keyboard.cpp is in `main`, so the unit takes the `main` lib and
+            # cflags_main; the file is `homebutton/keyboard_ui.cpp`.  Claims .text only.
+            Object(NonMatching, "homebutton/keyboard_ui.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `805632BC_fn_805632BC.cpp` - the software-keyboard band of the home-button GUI
             # (`.text` 0x805632BC-0x80569DAC, 142 functions / 27376 B).  Evidence class 3: the range's
             # own `.data` pool is the keyboard layout vocabulary of the home-button menu (fs_VK_*.brlyt
