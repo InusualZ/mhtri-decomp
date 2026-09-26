@@ -75,6 +75,7 @@ extern "C" {
 #include "unsplit/enemy.h"
 }
 #include "enemy/fn_801251D0.h"
+#include "enemy/fn_8015D860.h" /* the band below: fn_8015DDB8/... (rule 2, moved out of unsplit/enemy.h) */
 #include "enemy/fn_8012BDF4.h"
 #include "fn_8004CAD8.h"
 

@@ -599,6 +599,12 @@ config.libs = [
             # 104 functions).  C++ (the range defines three em003_* manglings).  The boundary is
             # provisional - see the unit header.
             Object(NonMatching, "enemy/fn_801550FC.cpp"),
+            # proposal/8015D860_fn_8015D860.cpp: the em008 per-action state-step band
+            # (0x8015D860..0x8015E854, 28 functions), the run between the two units above and
+            # below.  C++ (the range's callees are manglings and it allocates with `operator
+            # new`); registered once, at its final home - the file keeps the map's `fn_XXXXXXXX`
+            # stem because no `__FILE__` string names it (rule 7 deferred, see the unit header).
+            Object(NonMatching, "enemy/fn_8015D860.cpp"),
             # proposal/8015E854_fn_8015E854.cpp: the enemy action/state unit that follows the em003
             # block (0x8015E854..0x80165FC8, 55 functions).  C++ (every callee is a mangling reached
             # through its real signature).  Not a continuation of fn_801550FC.cpp (that unit ends at

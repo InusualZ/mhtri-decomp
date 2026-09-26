@@ -277,6 +277,15 @@ struct _ENEMY_WORK {
         } init_0x328;
         /* the action block `enemy/fn_801D428C.cpp` clears (`fn_801D71C4`). */
         struct EmActionBlock action_0x328;
+        /* the signed-short countdown view the action band `enemy/fn_8015D860.cpp` uses: the same
+         * 0x32A bytes as one halfword, where the first view above reads a `u8` flag there
+         * (`fn_8015DB68` stores 0x384 into it and `fn_8015DD6C` `lha`s it down while positive).
+         * Two views of the same bytes, so a union member and not a re-typing. */
+        struct {
+            /* +0x328 */ u8 unused_0x328d[0x2];
+            /* +0x32A */ s16 timer_0x32A;  /* armed to 0x384 at action 1's sub-state 6 */
+            /* +0x32C */ u8 unused_0x32Cc[0x338 - 0x32C];
+        };
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
@@ -346,7 +355,10 @@ struct _ENEMY_WORK {
     /* +0x483 */ u8 unused_0x483[0x48E - 0x483];
     /* +0x48E */ u8 field_0x48E;        /* the part-kind byte `enemy/fn_801DB8E0.cpp`'s `fn_801DF2F8`
                                         * compares against 4 and 6 */
-    /* +0x48F */ u8 unused_0x48F[0x761 - 0x48F];
+    /* +0x48F */ u8 unused_0x48F[0x491 - 0x48F];
+    /* +0x491 */ u8 field_0x491;      /* `enemy/fn_8015D860.cpp`'s `fn_8015DB68` sets it at action
+                                      * 0xA's sub-state 0xC8 */
+    /* +0x492 */ u8 unused_0x492[0x761 - 0x492];
     /* +0x761 */ u8 field_0x761;       /* one byte, two bands: `enemy/fn_801993E0.cpp`'s slot bit
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
                                         * 8 bits for free slot indices) and `enemy/fn_801D428C.cpp`'s
