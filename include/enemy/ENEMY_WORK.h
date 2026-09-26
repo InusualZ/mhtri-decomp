@@ -259,6 +259,15 @@ struct _ENEMY_WORK {
             /* +0x353 */ u8 field_0x353;      /* the kind-1 flag `fn_801A9384` tests; `fn_8019ECD4`
                                                * clears it */
         };
+        /* the signed-short TEV view `enemy/fn_8018B3B8.cpp`'s `fn_80191038` steps: the same
+         * +0x350/+0x352 bytes as the flat view above, read as `lha`/`sth` s16 colour words (the
+         * +0x350 halfword is stepped by 2 and clamped, the +0x352 one set from it).  Added by that
+         * unit; a union member because the byte view above already owns those bytes. */
+        struct {
+            /* +0x328 */ u8 unused_0x328e[0x350 - 0x328];
+            /* +0x350 */ s16 tev_0x350;
+            /* +0x352 */ s16 tev_0x352;
+        };
         /* the float/rotation view `enemy/fn_801502C8.cpp`'s `fn_80154988` steps (the same bytes
          * as the flat s32 view above, read as the animation angles the effect rotates by). */
         struct {
@@ -303,15 +312,36 @@ struct _ENEMY_WORK {
          * (`fn_8019E960`) and tests (`fn_8019E9AC`): `slot = id / 8` clamped to 3,
          * `mask_0x354[slot] |= 1 << (id % 8)`. */
         u8 mask_0x354[4];
+        /* the s16 TEV pair view `enemy/fn_8018B3B8.cpp`'s `fn_80191038` steps (`lha`/`sth` at
+         * +0x354/+0x356, the same bytes as `field_0x354`/`field_0x356` above).  Added by that unit. */
+        struct {
+            /* +0x0 */ s16 tev_0x354;
+            /* +0x2 */ s16 tev_0x356;
+        };
     };
-    /* +0x358 */ u8 field_0x358;       /* the action's "run" flag `fn_80147F48` arms/clears */
-    /* +0x359 */ u8 field_0x359;       /* `enemy/fn_801993E0.cpp`'s `fn_801994F4` sets it with
-                                        * +0x35B at the two state-0/1 action starts. */
-    /* +0x35A */ u8 unused_0x35A;
-    /* +0x35B */ u8 field_0x35B;       /* the same action-start pair as +0x359. */
-    /* +0x35C */ u8 field_0x35C;       /* the two action-completion flags `fn_8019E398` sets/clears
-                                        * (bit 0) and bit 1, and `fn_8019D8B8` cases 1/2 test. */
-    /* +0x35D */ u8 unused_0x35D[0x360 - 0x35D];
+    /* +0x358 */ union {
+        struct {
+            /* +0x358 */ u8 field_0x358;       /* the action's "run" flag `fn_80147F48` arms/clears */
+            /* +0x359 */ u8 field_0x359;       /* `enemy/fn_801993E0.cpp`'s `fn_801994F4` sets it with
+                                                * +0x35B at the two state-0/1 action starts. */
+            /* +0x35A */ u8 unused_0x35A;
+            /* +0x35B */ u8 field_0x35B;       /* the same action-start pair as +0x359. */
+            /* +0x35C */ u8 field_0x35C;       /* the two action-completion flags `fn_8019E398`
+                                                * sets/clears (bit 0) and bit 1, and `fn_8019D8B8`
+                                                * cases 1/2 test. */
+            /* +0x35D */ u8 unused_0x35D[0x360 - 0x35D];
+        };
+        /* the signed-short TEV view `enemy/fn_8018B3B8.cpp`'s `fn_80191038`/`fn_801913FC` step
+         * (`lha`/`sth` at +0x358/+0x35A/+0x35C, the same bytes as the byte view above; +0x35E
+         * is the shadow flag the same unit arms).  Added by that unit. */
+        struct {
+            /* +0x358 */ s16 tev_0x358;
+            /* +0x35A */ s16 tev_0x35A;
+            /* +0x35C */ s16 tev_0x35C;
+            /* +0x35E */ u8 tev_0x35E;
+            /* +0x35F */ u8 unused_0x35F;
+        };
+    };
     /* +0x360 */ s16 field_0x360;      /* fn_8013FD98's "already in this mode" countdown */
     /* +0x362 */ s16 field_0x362;      /* `enemy/fn_801993E0.cpp`'s `fn_8019D8B8` case 7: `<= 0`
                                         * answers 1 (`lha` + `cmpwi 0` + `bgt`). */
