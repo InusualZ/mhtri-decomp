@@ -82,4 +82,9 @@ void shell_se_req(_se_w* work, nw4r::math::VEC3* pos, u8 id, u32 arg);
 /* 0x800DB2DC - the no-argument SE mix update `Pl/fn_80262940.cpp` drives after the action settles; the
  * owner defines it `extern "C" void fn_800DB2DC(void)` (fn_800D7F54.cpp:1328). */
 void fn_800DB2DC(void);
+
+/* 0x800DBB78 - the non-positional SE request (`sysSE_req__Fl`); the owner defines it at C++ scope
+ * (fn_800D7F54.cpp:144), so it is declared here at C++ scope, outside the `extern "C"` block
+ * above.  Added with `menu/menu_item.cpp` (rule 2: this TU owns the address). */
+void sysSE_req(s32 id);
 #endif /* MHTRI_SOUND_FN_800D7F54_H */
