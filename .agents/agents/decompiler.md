@@ -210,6 +210,28 @@ the sibling units' naming scheme, 4. the map's stem (`fn_XXXXXXXX.cpp`). `python
 lookup <addr>` answers class 2. A discovery `seam_note` about "one source file" is often an `owner_merge`
 artefact - verify it.
 
+## C++ units: reconstruct the class, not a struct with a `self` parameter
+
+The target's own evidence decides the language, and it decides the *shape* too. When the range is a class's
+methods - a `__FILE__` string naming `Class::method`, a mangled definition, the canonical virtual dispatch
+`lwz r12,0(r3)` + `lwz r12,<slot>(r12)`, an adjustor thunk (`subi r3,r3,0x14`), a ctor/dtor pair, a string pool
+spelling `Class::` - then write it as a **real C++ class with member functions**, not as a C struct plus free
+functions taking `self`. Leaving `self` in place is a reconstruction of a different source shape, and the
+codegen says so:
+
+* MWCC emits the canonical `lwz r12,0(r3)`/`lwz r12,<slot>(r12)` dispatch only for a genuine `virtual`; a
+  struct of function pointers stages the table through a temporary and costs the function its score.
+* A member function's `this` arrives in `r3` and its name mangles (`Class::method`), which is what the map's
+  names and objdiff pairing expect - a free function with an explicit `self` gets neither.
+* Adjustor thunks, the vtable, and the ctor/dtor set are *definitions the target emits*; a class view is how
+  they come out right (and a class that is only declared/used emits no table of its own).
+
+The default is the class, because that is what the evidence shows. If the class form measures **worse** for a
+particular function, keep the better-scoring one and record both numbers in the unit's header - never leave the
+struct form in place because it was written first. The same rule covers the header: the type is the class (its
+layout is still annotated field by field, sizes and offsets), and member declarations replace the
+`fn_XXXXXXXX(Type* self, ...)` prototypes.
+
 ## Codegen levers (the ones that pay, in order)
 
 The full list is `docs/matching.md`, indexed in `AGENTS.md`. The recurring wins:
