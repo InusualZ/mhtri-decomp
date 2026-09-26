@@ -117,7 +117,9 @@ struct _PLW {
     /* +0x000 */ u8 slot_active;   /* the slot is in use (`fn_800EFAC0`/`fn_800EFDD8`) */
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 field_0x002;
-    /* +0x003 */ u8 unk003[0x008 - 0x003];
+    /* +0x003 */ u8 unk003[0x005 - 0x003];
+    /* +0x005 */ u8 act_step_0x05;   /* the per-act state step the lobby act handlers advance */
+    /* +0x006 */ u8 unk006[0x008 - 0x006];
     /* +0x008 */ u8 chunk_ofs;     /* plus 0x14 is the chunk index its files go to */
     /* +0x009 */ u8 kind_0x09;   /* compared against 3; `ef/eft019.cpp` names this same `_PLW` byte
                                   * `kind_0x09` and `enemy.h` names the analogous byte `state_0x009` */
@@ -125,9 +127,9 @@ struct _PLW {
     /* +0x00B */ u8 unk00B;
     /* +0x00C */ u16 act_no;      /* the action number `Pl_act_ck` compares as its `u16` argument
                                   * (`Pl_bari_ck` matches the rage actions 169..174 against it) */
-    /* +0x00E */ u8 unk00E[0x14 - 0x0E];
+    /* +0x00E */ u8 act_state_0x00E[0x14 - 0x0E];
     /* +0x014 */ u8 se_name_set;   /* picks the SE/BGM name table (`fn_800EFAC0`) */
-    /* +0x015 */ u8 unk015;
+    /* +0x015 */ u8 kind_0x015;   /* the NPC/actor kind `pl_act.cpp` reads as its `kind` */
     /* +0x016 */ u8 area_0x16;
     /* +0x017 */ u8 unk017[0x18 - 0x17];
     /* +0x018 */ u8 unk18;
@@ -215,7 +217,7 @@ struct _PLW {
     /* +0x308 */ u8 unk308[0x30C - 0x308];
     /* +0x30C */ u8 unk30C;
     /* +0x30D */ u8 unk30D;
-    /* +0x30E */ u8 unk30E;
+    /* +0x30E */ u8 flag_0x30E;   /* the lobby act family's own flag */
     /* +0x30F */ u8 unk30F[0x313 - 0x30F];
     /* +0x313 */ s8 unk313;
     /* +0x314 */ u8 unk314;
@@ -398,7 +400,15 @@ struct _PLW {
     /* +0xAF4 */ _se_w* field_0xAF4;
     /* +0xAF8 */ _se_w* field_0xAF8;
     /* +0xAFC */ _se_w* field_0xAFC;
-    /* +0xB00 */ u8 pad_0xB00[0x20];
+    /* +0xB00 */ u8 field_0xB00;   /* the lobby act latch (`fn_80208A3C`/`fn_80208A48` write it) */
+    /* +0xB01 */ u8 field_0xB01;
+    /* +0xB02 */ u8 field_0xB02;
+    /* +0xB03 */ u8 field_0xB03;
+    /* +0xB04 */ u8 field_0xB04;
+    /* +0xB05 */ u8 name_0xB05[10];  /* the hunter name the lobby compares with the move work */
+    /* +0xB0F */ u8 pad_0xB0F[0xB];
+    /* +0xB1A */ u8 field_0xB1A;
+    /* +0xB1B */ u8 pad_0xB1B[0x5];
 };
 
 #ifdef __cplusplus

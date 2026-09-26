@@ -1444,6 +1444,15 @@ config.libs = [
             # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
             Object(NonMatching, "lobby/lb_npc.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802076D4_fn_802076D4.cpp` (`.text` 0x802076D4..0x8020C588, 82 functions / 20148 B) -
+            # the lobby NPC/character action layer.  Module `lobby` from the code (`LbStr`,
+            # `lb_npc_Get_motion_no`, `fn_801FE0AC`/`fn_801FDE3C` out of `lb_npc.cpp`) and from the
+            # band (both bracketing registered units are `lobby`); no `__FILE__` string covers the
+            # range and the dump answers only `zz_` placeholders, so the file keeps the map stem
+            # (brief section 2, class 4).  C++ from the range's mangled callees.  Sections: extab
+            # 0x80010F7C..0x80011184 and extabindex 0x8002D624..0x8002D930 (65 records, both runs
+            # abutting the bracketing units), .text 0x802076D4..0x8020C588.
+            Object(NonMatching, "lobby/fn_802076D4.cpp"),
             # `802029B4_fn_802029B4.cpp` (`.text` 0x802029B4..0x802076D4, 68 functions / 19744 B) -
             # the lobby NPC work band above `lobby/lb_npc.cpp`'s range: the same `_LB_NPC` state
             # machines and motion-table helpers.  Module `lobby` from the link band (both bracketing
