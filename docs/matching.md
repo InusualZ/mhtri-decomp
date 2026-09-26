@@ -1551,3 +1551,32 @@ addresses no registered unit owns, so all correct; of the 6 code-pointer runs in
 the single genuine look-alike is `Pl/pl_master.cpp`'s `jumptable_805C5FA0` (9 words, the weapon-class switch
 table) in a `Matching` unit whose hash is green - compiler-emitted. Zero hand-built tables, zero
 owned-but-unemitted vtables.
+
+## 53. A sparse switch's jump table is readable once its `.data` range is claimed
+
+**Problem.** A unit whose switch has a compiler-emitted jump table measures just short of 100 % and its arms are
+unreachable from the `.text` alone: the table lives in `.data`, which the unit's `splits.txt` does not claim, so
+the splitter hands back zeros. Read as "the case-to-body mapping is unrecoverable" that looks like a hard
+ceiling, and the function gets written by hand or parked - one unit parked four functions on exactly that
+reading, and the ceiling was recorded in this project's own notes before a lane disproved it the same day.
+
+**Why try it.** The table is *data the compiler emitted for this TU*. Claiming its `.data` range puts it in the
+unit's own object, at which point the bytes and the relocations are both there - and the relocations are what
+pair retail's `lis`/`addi`. Unclaimed, the same function measures **99.999**: close enough to look like a
+codegen residual and send you hunting flags that are not the problem.
+
+**Result.** Add the table's `.data` range to the unit's `splits.txt` block; the neighbouring units' records
+bracket it exactly, the same way they bracket `.text`/`extab`. Then read the table from **`main.elf`**: each slot
+is an absolute arm address, so grouping slots by target gives each arm's `case` set and the `default` epilogue.
+Never hand-map DOL virtual addresses to file offsets - a first mapping that was silently wrong produced a
+plausible-looking table whose arm addresses pointed into the *previous* function. Generate the arms mechanically
+and **calibrate the generator against an already-landed sibling** before trusting it on your own range.
+
+**Example.** (2026-09-26) `Pl/fn_802430E8`: claiming `.data 0x805C4134-0x805C4548` (261 entries) took its owner
+from 99.999 to **100.0**, and diffing that table against the landed `Pl/fn_80241558`'s showed **52 of 59 arms
+instruction-identical** - the two functions are siblings, so a 7,584 B body was recovered rather than guessed.
+`Pl/fn_802373AC` then generated **145 arms** mechanically, having first required the same translator to
+reproduce `src/Pl/fn_8023C2D0.cpp` line for line from the landed `0x805C34D4` table, and landed a **99.986 %**
+unit whose `fn_802399C8` is byte-identical at 10,504 B. The same read may be the unlock for
+`Pl/fn_8023C2D0`/`fn_80230FBC`, which are byte-identical and blocked only by a jump table misplaced inside
+`.data`.

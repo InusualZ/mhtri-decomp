@@ -19,6 +19,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `src/auto/` units are moved to their final homes under the register-once rule (`docs/plan.md` §12), and a
   region still unclaimed in `symbols.txt` is a proposal backlog, not a defect.
 
+
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
@@ -144,6 +145,17 @@ The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matchi
 and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
 `variants`, `diff`, `slots`, `sections`, `dwarf`). The table below stays the source of truth for state.
 
+All project **subagent profiles** live in one tracked folder too, `.agents/agents/` (`/.gitignore` excepts it
+next to `.agents/skills/`). The harness discovers them as *project* agents - no install step: write the file,
+`subagent({ action: "list" })` shows it, and `{ agent: "decompiler" }` runs it. `.agents/agents/decompiler.md`
+is the role for unit work: it inherits the project context (`inheritProjectContext: true`, so this file is in
+the child's prompt), loads the matching/verify/registration skills (`skills:`), and carries the operational
+rules that used to be hand-typed into every launch - isolation (write only in your worktree, read the brief in
+MAIN), convergence (best-scoring variant, never a regression, residual in the unit header), the per-symbol
+measurement traps, the section 6.5 style rules and the standard report. The generic `worker` role stays for
+non-unit tasks. When a launch prompt and the profile disagree, the profile wins - so **keep the rules in the
+profile, not in the prompt** (QA: `subagent({ action: "list" })` must show `decompiler (project)`).
+
 All project skills live in one tracked folder, `.agents/skills/`, so every harness sees the same set:
 `mwcc-unit-matching/` (this playbook), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
 range and rename symbols without ever loading `symbols.txt` into context), `agents-md-local-only/`
@@ -204,6 +216,7 @@ measured unit).
 | 46 | A flipped unit's `.ctors$10` fragment is reordered by the linker | The object is byte-identical and `flipcheck.py` says READY, and the flip still loses the unit's `.ctors$10`/`.dtors$15` words; re-split first, then suspect the linker's fixed ctor/dtor name order. | done |
 | 50 | An already-mangled map name must not be declared as a C++ identifier | The map carries a *real* mangling (`Panic__Q24nw4r2dbFPCciPCce`) and the C++ source declares that spelling as an identifier, so the front-end mangles it AGAIN (`...__FPCciPCce`) and the link cannot resolve it - invisible while the unit is `NonMatching`, because its object is never linked. The map's name IS the real declaration's mangling: write `namespace nw4r { namespace db { void Panic(const char*, int, const char*, ...); } }` and the front-end reproduces it exactly (confirm with `tools/units/mangle.py`). This is row 48's complement: a `fn_XXXXXXXX` stem is a placeholder (write C++ and rename the map), an already-mangled name is real (write the real declaration). Five `ef` units had it, all flipped `.c`->`.cpp` by the promotion. | done |
 | 47 | Automate the shape search: generate, compile, score and rank source variants | The residual is codegen, so finding the source shape was a hand-run search of hundreds of variants per function; `tools/flags/shapesearch.py` does it mechanically (declaration order/types, `for`-decl hoisting, temps, casts, statement order, compound assignment, field form, dead copies, switch/cond/ternary/loop shape) and ranks by the official report metric. On `Pl/pl_act`'s worst 20: 12/20 improved, two byte-identical to 100 % (`fn_8027D40C` via `loop_decl_top`, `Pl_get_gunner_vec` via `deadcopy_plain_x`), combined unit mean 98.888 -> 99.086. | done |
+| 53 | A sparse switch's compiler-emitted jump table is readable once its `.data` range is claimed | The table reads as zeros while the range is unclaimed, so the arms look unreachable and the function gets parked as a ceiling; claiming the range puts the bytes and the `lis`/`addi` relocations into the unit. `Pl/fn_802430E8` went 99.999 -> 100.0 on the claim and then found 52 of 59 arms instruction-identical to its landed sibling; `Pl/fn_802373AC` generated 145 arms mechanically (calibrated against a landed sibling first) for a 99.986 % unit. Read tables from `main.elf`, never by hand-mapping DOL VAs. | done |
 | 52 | A vtable we own must be compiler-emitted; a hand-modelled table is not evidence of inheritance | A `NonMatching` unit whose source only *views* its own vtable still scores 100 % (the DOL keeps the bytes), so the class can be missing from the reconstruction and nothing fails until the flip - and a table the worker wrote cannot prove the layout it was written from. Owner's concern, audited repo-wide 2026-09-26: 23 `vtable = lbl_*` assignments, **all 23** aimed outside our ranges (correct), and of 6 code-pointer runs inside registered ranges only one is vtable-like (`Pl/pl_master.cpp`'s `jumptable_805C5FA0`, a compiler-emitted switch table in a `Matching` unit) - zero hand-built tables, zero owned-but-unemitted vtables. | done |
 | 48 | Never append `, ...` to a definition to dodge an argument-count mismatch | The variadic spelling compiles and links and looks cosmetic, but MWCC emits a full varargs prologue for EVERY function declared that way: a 12-byte thunk became 108 bytes and the unit scored 27 %. A fixed unused parameter of the caller width (`void* unused`) changes nothing in the prologue. | done |
 | 48 | A C++ unit's unmangled map name is not a reason for `extern "C"` | The unit is C++ but the map spells its symbols `fn_XXXXXXXX`, so a C++ definition mangles, pairs nothing and reports 0 % - and a member function cannot be `extern "C"` at all. The map is a build input, not the original's symbol table: `tools/units/mangle.py` compiles a probe with a real unit's command line and prints the mangled spelling, so the fix is a map+source rename (validated by exact reproduction: `void Pl_Skill_ck(_PLW*, u16)` -> `Pl_Skill_ck__FP4_PLWUs`). | done |
