@@ -102,6 +102,11 @@ exactly your unit's own files.
 * **Your unit's own source is yours**: keep it as it is, except where a `main` prototype changed under you
   (then follow `main`'s signature and re-measure - the score must be identical).
 
+* **M9 - never `git add -A`, and never `--amend`.** A probe or a scratch file at the repo root gets swept by
+  `add -A` and lands in the merge commit. The repair is `git restore --staged <file>` before committing, or a
+  follow-up commit - **never** `commit --amend`: rule 6 forbids rewriting history without exception, and
+  "it is my own branch and seconds old" is not one. Stage the paths you mean, one by one.
+
 ### Prove it: zero rows moved
 
 This is the point of the lane, not a formality. Re-measure the **landed** units that include the shared header
