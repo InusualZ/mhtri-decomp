@@ -416,12 +416,26 @@ struct _PLW {
             };
             /* +0x315 */ u8 unk315[0x318 - 0x315];
         };
-        struct {   /* the act entry's own view (fn_80273B14) */
+        struct {   /* the act entry's own view (fn_80273B14); the merged halfword and byte each carry
+                    * both sides' spelling as a union member (M3/M5), one member per offset */
             /* +0x30E */ u8 pad_0x30E_pair[0x2];
-            /* +0x310 */ u16 field_0x310;  /* the halfword this branch's act entry clears
-                                           * (`fn_80275C34`); main's `fn_80280678` clears the same
-                                           * halfword on entry */
-            /* +0x312 */ u8 field_0x312;   /* the byte `fn_80280678` clears on entry */
+            /* +0x310 */ union {   /* one halfword, two spellings (rule 5) */
+                /* +0x310 */ u16 field_0x310;         /* the halfword this branch's act entry clears
+                                                       * (`fn_80275C34`); main's `fn_80280678` clears
+                                                       * the same halfword on entry */
+                /* +0x310 */ s16 charge_gauge_0x310;  /* the accumulating charge gauge
+                                                       * `Pl/fn_802840DC.cpp` advances a frame at a
+                                                       * time and saturates at 999 (`fn_802843CC`);
+                                                       * `fn_80284474` divides it by the charge rate
+                                                       * to get the level, so the byte below stays
+                                                       * put */
+            };
+            /* +0x312 */ union {   /* one byte, two spellings (rule 5) */
+                /* +0x312 */ u8 field_0x312;          /* the byte `fn_80280678` clears on entry */
+                /* +0x312 */ u8 charge_level_0x312;   /* the level the gauge buys: `fn_80284474`
+                                                       * writes gauge/rate here and its callers
+                                                       * clamp it to 2 */
+            };
             /* +0x313 */ u8 pad_0x313_run[0x5];
         };
     };
@@ -730,15 +744,32 @@ struct _PLW {
     /* +0x470 */ s16 unk470;
     /* +0x472 */ u8 unk472[0x47B - 0x472];
     /* +0x47B */ u8 field_0x47B;         /* per-player type index `fn_80267C84` reads */
-    /* +0x47C */ u8 pad_0x47C[0x489 - 0x47C];
-    /* +0x489 */ u8 unk489;
-    /* +0x48A */ u8 unk48A[0x492 - 0x48A];
-    /* +0x492 */ u8 unk492;
-    /* +0x493 */ u8 pad_0x493[0x11];
-    /* +0x4A4 */ u32 field_0x4A4;
-    /* +0x4A8 */ u8 pad_0x4A8[0x34];
-    /* +0x4DC */ u8 unk4DC;
-    /* +0x4DD */ u8 unk4DD[0x4E5 - 0x4DD];
+    /* +0x47C */ u8 pad_0x47C[0x480 - 0x47C];
+    /* +0x480 */ union {   /* the 0x480..0x4DF run: the pre-merge field spellings kept whole, with the
+                            * shell band's view of the actor's own attack entry inside it.  The union is
+                            * anchored at the word-aligned +0x480 and its run is 0x60 long, because a
+                            * member carrying the `u32` at +0x4A4 gives it align 4 - an odd-length run
+                            * would round up and grow `_PLW` */
+        /* +0x480 */ u8 pad_0x480_run[0x4E0 - 0x480];
+        struct {
+            /* +0x480 */ u8 pad_0x480[0x489 - 0x480];
+            /* +0x489 */ u8 unk489;
+            /* +0x48A */ u8 unk48A[0x492 - 0x48A];
+            /* +0x492 */ u8 unk492;
+            /* +0x493 */ u8 pad_0x493[0x11];
+            /* +0x4A4 */ u32 field_0x4A4;
+            /* +0x4A8 */ u8 pad_0x4A8[0x34];
+            /* +0x4DC */ u8 unk4DC;
+            /* +0x4DD */ u8 unk4DD[0x4E0 - 0x4DD];
+        };
+        struct {   /* the shell band's view: the actor's own attack entry, the record
+                    * `Pl/pl_act.cpp` spells `_HIT_W` and `fn_80277974` fills in.  Only its address is
+                    * named - the entry runs on into the fields of the view above */
+            /* +0x480 */ u8 pad_0x480_head[0x484 - 0x480];
+            /* +0x484 */ u8 hit_0x484[0x5C];
+        };
+    };
+    /* +0x4E0 */ u8 unk4E0[0x4E5 - 0x4E0];
     /* +0x4E5 */ u8 unk4E5;
     /* +0x4E6 */ u8 unk4E6[0x4EE - 0x4E6];
     /* +0x4EE */ u8 unk4EE;

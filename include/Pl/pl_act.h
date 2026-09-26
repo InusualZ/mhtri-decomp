@@ -72,6 +72,11 @@ void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 void fn_8027AC2C(struct _PLW* self, u32 a, u32 b);
 void fn_80278BE4(struct _PLW* self);
 
+/* 0x80277974 - the shared attack set-up the shell band's `fn_80284204` fills its attack entry with
+ * (`hit` is this unit's `_HIT_W`, spelled `void*` here so the consumer needs no type of its own);
+ * the owner defines it `extern "C"` in `Pl/pl_act.cpp`, so the declaration lives here. */
+void fn_80277974(struct _PLW* self, void* hit, u8* base, u16 idx, s32* ids, u16 flags);
+
 #ifdef __cplusplus
 }
 
@@ -82,6 +87,12 @@ u32 Pl_dm_condition_ck(struct _PLW* work, u32 condition); /* -> Pl_dm_condition_
  * C++ scope in `src/Pl/pl_act.cpp`, so this is the callable spelling of the map name
  * `Pl_suimen_ck__FP4_PLW` (docs/plan.md 6.5 rule 9). */
 u32 Pl_suimen_ck(struct _PLW* work);
+
+/* 0x8027CC44 / 0x8027CDF0 - the gunner's aim position and origin the shell band reads; this unit
+ * (`Pl/pl_act.cpp`) defines both at C++ scope, so these are the callable spellings of the map names
+ * `Pl_get_gunner_pos__FP4_PLWPQ34nw4r4math4VEC3l` and `Pl_get_gunner_vec__FP4_PLWP10_CP_VECTOR`. */
+void Pl_get_gunner_pos(struct _PLW* self, nw4r::math::VEC3* out, s32 arg2);
+void Pl_get_gunner_vec(struct _PLW* self, struct _CP_VECTOR* out);
 #else
 u32 Pl_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);
 u32 Pl_dm_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);

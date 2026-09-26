@@ -941,6 +941,11 @@ Pl/fn_8027D684.cpp:
 	extabindex  start:0x8002FF7C end:0x80030438
 	.text       start:0x8027D684 end:0x802840DC
 
+Pl/fn_802840DC.cpp:
+	extab       start:0x80012E7C end:0x80012FFC
+	extabindex  start:0x80030438 end:0x80030678
+	.text       start:0x802840DC end:0x80288CEC
+
 Pl/fn_80288CEC.cpp:
 	extab       start:0x80012FFC end:0x8001323C
 	extabindex  start:0x80030678 end:0x800309D8

@@ -279,8 +279,113 @@ extern const f32 lbl_80799F00;
 extern const f32 lbl_80799F04;
 extern const f32 lbl_80799F08;
 
+/* The shell band `Pl/fn_802840DC.cpp` (`.text` 0x802840DC-0x80288CEC) reads these tables and
+ * constants out of the band's unclaimed data runs, so this header is their rule-2 home.  Every name
+ * below is the map's own.  The band's own call targets - its 16 per-act handlers, which sit inside
+ * `Pl/fn_8027D684.cpp`'s registered range 0x8027D684-0x802840DC - are declared in the consumer's
+ * header `Pl/fn_802840DC.h` instead: a declaration here of a symbol a registered unit owns is the
+ * `illegal function overloading` class, and this band must not declare one. */
+
+/* The band's own tables, all unclaimed: `lbl_805C9608` is the 0x1A-byte-row attack table
+ * `Pl/pl_act.cpp`'s `fn_80277974` walks (its `base` argument), and the `ShellAtkRow` arrays below are
+ * the per-shell-kind attack rows `fn_802842D4` is handed (`&row[kind]`, 0x12 bytes per row).  The
+ * second run of labels are the `u32` tables `fn_802842D4` passes on to `fn_802770E8`.  Declared,
+ * never defined (invariant 8.4). */
+extern u8 lbl_805C9608[];
+extern s32 lbl_80792188[2]; /* 0x80792188 - the 8-byte id list (two zero-initialised ids) the attack
+                              * rows' +0xF byte indexes; a *sized* declaration is what makes MWCC
+                              * address it through r13 (`@sda21`, the target's form) instead of
+                              * `lis`/`addi` (playbook: the absolute form comes from an unsized one) */
+extern s32 lbl_80792190[1]; /* 0x80792190 - the single-id sibling list `fn_8028738C` passes */
+extern s32 lbl_807921A8[2]; /* 0x807921A8 - the sibling list `fn_80288B98` passes */
+
+/* One 18-byte per-shell-kind attack row: `mode` selects which half of the motion/parameter fields
+ * applies. size: 0x12 */
+typedef struct ShellAtkRow {
+    /* +0x00 */ u16 mode;       /* the motion when `mode == 0xFFFF` picks the second field set, the
+                                 * row's alternate-selector when the caller asks for kind 1 */
+    /* +0x02 */ s16 value_0x02; /* second set: the motion's first argument */
+    /* +0x04 */ s16 value_0x04; /* second set: the motion's second argument */
+    /* +0x06 */ u16 add_0x06;   /* second set: frames added to the actor's own frame counters */
+    /* +0x08 */ s16 gate_0x08;  /* > 0 arms the motion gate (`fn_80277C50`) with this value */
+    /* +0x0A */ u16 motion_0x0A;  /* first set: the motion `fn_8026A224` sets */
+    /* +0x0C */ s16 param_0x0C;   /* first set: the motion's first argument */
+    /* +0x0E */ s16 param_0x0E;   /* first set: the motion's second argument */
+    /* +0x10 */ s16 attack_0x10;  /* first set: the attack value `fn_80284204` is run with */
+} ShellAtkRow;
+
+/* The per-shell-kind attack-row tables (`mulli ...,<kind>,18` at every call site). */
+extern ShellAtkRow lbl_805C9A78[];
+extern ShellAtkRow lbl_805C9AC0[];
+extern ShellAtkRow lbl_805C9AF8[];
+extern ShellAtkRow lbl_805C9B78[];
+extern ShellAtkRow lbl_805C9BC0[];
+extern ShellAtkRow lbl_805C9BF8[];
+extern ShellAtkRow lbl_805C9C1C[];
+extern ShellAtkRow lbl_805C9CAC[];
+extern ShellAtkRow lbl_805C9CD0[];
+
+/* The attack-row tables' companion records: `fn_802842D4` hands these to `fn_802770E8` as a `u32` and
+ * reads the `s16` at +0x8 of one as the row's motion gate. */
+extern u8 lbl_805C9DC8[];
+extern u8 lbl_805C9E4C[];
+extern u8 lbl_805C9EBC[];
+extern u8 lbl_805CA938[];
+extern u8 lbl_805CACC4[];
+/* The further attack tables of the band's single-shot entries (`fn_8028738C`, `fn_80288B98`). */
+extern u8 lbl_805CB0B0[];
+extern u8 lbl_805CBC80[];
+
+/* The band's private `.sdata2` pool, 0x8079A1D8-0x8079A268 - declared as loads, never defined
+ * (playbook 29).  The 30.0f/1.25f/0.83f trio is the charge-rate chain `fn_802843F0` applies. */
+extern const f32 lbl_8079A1D8; /* 30.0f  - the base charge rate */
+extern const f32 lbl_8079A1DC; /* 1.25f  - the skill-191 rate divisor */
+extern const f32 lbl_8079A1E0; /* 0.83f  - the skill-192 rate divisor */
+extern const f32 lbl_8079A1E4; /* 0.0f */
+extern const f32 lbl_8079A1E8; /* -1.0f */
+extern const f32 lbl_8079A1EC; /* 56.0f */
+extern const f32 lbl_8079A1F0; /* 52.0f */
+extern const f32 lbl_8079A1F4; /* 40.0f */
+extern const f32 lbl_8079A1F8; /* 27.0f */
+extern const f32 lbl_8079A1FC; /* 2*pi */
+extern const f32 lbl_8079A200; /* 90.0f */
+extern const f32 lbl_8079A204; /* 24.0f */
+extern const f32 lbl_8079A208; /* 360.0f */
+extern const f32 lbl_8079A20C; /* 18.0f */
+extern const f32 lbl_8079A210; /* 74.0f */
+extern const f32 lbl_8079A214; /* 80.0f */
+extern const f32 lbl_8079A218; /* 26.0f */
+extern const f32 lbl_8079A21C; /* 44.0f */
+extern const f32 lbl_8079A220; /* 38.0f */
+extern const f32 lbl_8079A228; /* 1.25f */
+extern const f32 lbl_8079A22C; /* 1.0f */
+extern const f32 lbl_8079A230; /* 0.75f */
+extern const f32 lbl_8079A234; /* 4.0f */
+extern const f32 lbl_8079A238; /* 0.0f */
+extern const f32 lbl_8079A23C; /* 0.01f */
+extern const f32 lbl_8079A240; /* 28.0f */
+extern const f32 lbl_8079A244; /* 8.0f */
+extern const f32 lbl_8079A248; /* 110.0f */
+extern const f32 lbl_8079A24C; /* -10.0f */
+extern const f32 lbl_8079A250; /* 2*pi */
+extern const f32 lbl_8079A254; /* 90.0f */
+extern const f32 lbl_8079A258; /* 102.0f */
+extern const f32 lbl_8079A25C; /* 360.0f */
+extern const f32 lbl_8079A260; /* 26.0f */
+extern const f32 lbl_8079A264; /* 34.0f */
+extern const f32 lbl_8079A268; /* 176.0f */
+
 #ifdef __cplusplus
 }
+
+/* 0x8027E1C8 - the attack-flag predicate the shell band's `fn_80284204` gates a hit entry on.  The
+ * symbol is owned by `Pl/fn_8027D684.cpp` (0x8027D684-0x80288CEC) since that unit landed, so the
+ * signature here is the owner's own definition's (`s32 (_PLW*, u8)`) and not a second,
+ * differently-typed spelling of it: two C-linkage declarations of one name with different types
+ * are the `illegal function overloading` class (rule 2).  The map name is its mangling and the
+ * owner grows no header yet, so the callable spelling of the map name still lives here
+ * (docs/plan.md 6.5 rule 9). */
+s32 Pl_atk_act_flag_ck(struct _PLW* self, u8 mask);
 
 /* 0x803C4814 - `event_demo_ck__Fv`, a C++ free function the Pl/ef band reads.  Unregistered, and the
  * files that spell it `int` locally would clash with a `u32` in `unsplit/unknown.h`, so it lives
