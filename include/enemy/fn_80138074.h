@@ -16,6 +16,10 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
+/* 0x8013A9F4 - r3 (`self`); the joint-effect release `enemy/fn_801A9540.cpp`'s fn_801A9540 calls
+ * before it walks the slots.  Added with that unit's registration (rule 2: this range owns the
+ * address). */
+void fn_8013A9F4(struct _ENEMY_WORK* self);
 u32 fn_8013A884(struct _ENEMY_WORK* self, s32 value);
 u32 fn_8013A8B4(struct _ENEMY_WORK* enemy, s32 a, s32 b);
 u8 fn_8013A900(struct _ENEMY_WORK* enemy);

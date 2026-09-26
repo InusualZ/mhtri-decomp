@@ -13,6 +13,10 @@
 extern "C" {
 #endif
 
+/* 0x800CF384 - r3 unused; the ef unit's live-effect count, read as a byte by
+ * `enemy/fn_801A9540.cpp`'s entry point.  Added with that unit's registration (rule 2: this
+ * range owns the address). */
+u32 fn_800CF384(void);
 u8  fn_800CF208(void);
 u32 fn_800CF280(void);
 

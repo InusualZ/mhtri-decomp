@@ -23,6 +23,10 @@
 extern "C" {
 #endif
 
+/* 0x8005D1AC - r3 the output object, r4 a scalar; the clear/sub-init leaf
+ * `enemy/fn_801A9540.cpp`'s `fn_801A9C6C` runs.  Added with that unit's registration (rule 2:
+ * this range owns the address). */
+void fn_8005D1AC(void* out, s32 a);
 void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `out`, returns `out` */
 void **fn_8005DCD0(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
 void dtor_8005D384(void *self, s32 flag);  /* 0x8005D384 - the teardown destructor */

@@ -87,6 +87,11 @@ void fn_8014610C(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
  * is the out record `fn_80125F54` prepared; returns a word the enemy program functions compare with 1.
  * Added with `enemy/fn_801B7020.cpp` (rule 2: this unit owns the address). */
 u32 fn_801421E4(u32 id, void* out);
+/* 0x80146008 - r3 the frame count in f1?  It reads the record's motion timer and returns 1 once
+ * the elapsed frame count has passed the value in r3 (the call sites pass 0x96/0x12C/...).
+ * Declared here with the rest of this unit's record helpers (rule 2). */
+u32 fn_80146008(u32 frames);
+void fn_8014619C(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

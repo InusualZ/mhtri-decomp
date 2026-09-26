@@ -45,6 +45,31 @@ void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 void fn_8013072C(struct _ENEMY_WORK* self, u32 mode, u32 value);
 /* 0x80131FA0 - r3 (`self`) and r4 (the scalar the motion modes pass: 80). */
 void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
+/* The effect-slot step band this unit owns, declared here for `enemy/fn_801A9540.cpp` (rule 2):
+ * that range's per-action state machines drive the motion through them, and the addresses sit in
+ * this unit's own `.text` range, so its header is their home.  Signatures are the call sites' -
+ * each is a leaf this unit never re-enters. */
+/* `fn_8012F8C8` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
+ * consumer (`enemy/fn_8014A1BC.c`) calls it with `self` only and relies on the old-style
+ * declaration, so `include/unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
+ * fn_8012F8C8();` split form - the shape `fn_80130008`, `fn_801303FC`, `fn_80133F4C` and
+ * `fn_80135600` keep there too, and the form the C++ consumers that do not include this header
+ * (`enemy/fn_801550FC.cpp`, `enemy/fn_8015E854.cpp`) reach it through.  A prototype here is an
+ * MWCC 10563 redeclaration against that declaration as soon as a C consumer includes both
+ * headers, which is what `enemy/fn_8014A1BC.c` does. */
+void fn_80134004(struct _ENEMY_WORK* self, u32 a, f32 b);
+/* r3 the work record, r4/r5 two scalars; returns 1 while the running motion has not finished. */
+u32 fn_80134114(struct _ENEMY_WORK* self, s32 a, s32 b);
+/* r3 the work record, r4 the effect table, r5/r6/r7 the three scalars the spawn helper takes. */
+void fn_80134964(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
+/* r3 the work record, r4 the effect table; returns 1 once the effect has finished. */
+u32 fn_80134B0C(struct _ENEMY_WORK* self, void* tbl);
+/* r3 the work record; the normalized motion-frame ratio. */
+f32 fn_8012F8EC(struct _ENEMY_WORK* self);
+/* r3 the work record; the per-frame motion tick the escaping actions run at their head. */
+void fn_80131D84(struct _ENEMY_WORK* self);
+/* r3 the work record; plays the armed motion's end reaction. */
+void fn_80132160(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }
