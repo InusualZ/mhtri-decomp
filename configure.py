@@ -742,6 +742,16 @@ config.libs = [
             # (see the unit's header).
             Object(NonMatching, "enemy/fn_801B4458.cpp"),
             Object(NonMatching, "enemy/fn_801B7020.cpp"),
+            # Registered from proposal/801BD6C0_fn_801BD6C0.cpp: the enemy motion/act-instruction
+            # band's continuation, 128 functions / 0xC944 bytes (0x801BD6C0..0x801CA004) plus the
+            # extab run 0x8000FACC..0x8000FDFC (102 records) and the extabindex run
+            # 0x8002B71C..0x8002BBE4 (102 x 12 B) its framed functions carry.  Module `enemy` from
+            # the link band (the unit below ends exactly at this range's start; the unit above starts
+            # later at 0x801D428C after the still-unclaimed 0x801CA004..0x801D428C run) and from the
+            # code (every callee is the enemy work API).  C++ because the range reaches mangled
+            # callees.  No `__FILE__` string survives and the dump answers only `zz_` placeholders,
+            # so the file keeps the map's own stem (see the unit header).
+            Object(NonMatching, "enemy/fn_801BD6C0.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/801CA004_fn_801CA004.cpp: the enemy action/state band, 47 functions /
             # 0x2BC0 bytes (0x801CA004..0x801CCBC4), plus the extab run 0x8000FDFC..0x8000FF4C and
