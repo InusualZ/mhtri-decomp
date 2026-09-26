@@ -13,6 +13,8 @@
 ###
 
 import argparse
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -2238,7 +2240,38 @@ config.progress_report_args = [
     # "--config functionRelocDiffs=data_value",
 ]
 
+
+def warn_if_original_missing() -> None:
+    """Warn loudly when this tree has no original DOL, so `build.ninja` will be a stub (#9).
+
+    `generate_build` emits the per-unit compile edges, the link edges and the real default target only
+    when `build/<version>/config.json` exists. That file is produced by `dtk dol split`, which reads the
+    `object:` DOL named in `config.yml`. A fresh git worktree has no `orig/` (it is gitignored), so
+    `configure.py` there silently writes a `build.ninja` whose default target is the split edge and which
+    has no way to compile a unit - measured 2026-09-2x, several workers read that stub as a configure bug
+    and hand-copied the DOL. Name the problem and the fix instead of writing a build file that cannot build.
+    """
+    try:
+        text = open(config.config_path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return
+    m = re.search(r"^\s*object:\s*(\S+)\s*$", text, re.M)
+    if m is None or os.path.exists(m.group(1)):
+        return
+    print(
+        "WARNING: %s is missing, so this tree cannot split: build.ninja will carry no per-unit\n"
+        "  rules (no `build ...: mwcc` edges, only the split edge), so `ninja` cannot build a unit\n"
+        "  object and the score is never measured.\n"
+        "  A fresh worktree has no `orig/` because it is gitignored; seed it from MAIN before\n"
+        "  configuring - copy `orig/RMHE08/**` in, or run the claim seeder - then re-run\n"
+        "  `python configure.py`. See `tools/units/claims.py seed_worktree_build`." % m.group(1),
+        file=sys.stderr,
+    )
+
+
 if args.mode == "configure":
+    # #9: a worktree without orig/ would get a stub build.ninja - warn loudly rather than write it silently
+    warn_if_original_missing()
     # Write build.ninja and objdiff.json
     generate_build(config)
 elif args.mode == "progress":
