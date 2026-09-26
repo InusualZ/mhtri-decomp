@@ -153,13 +153,14 @@ struct _PLW {
     /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `Pl/fn_80224AC4.cpp` */
     /* +0x01F */ u8 pad_0x01F[0x1];
     /* +0x020 */ u32 unk020;
-    /* +0x024 */ u8 pad_0x24[0x8];
+    /* +0x024 */ u8 pad_0x24[0x4];
+    /* +0x028 */ s32 field_0x28;  /* non-zero suppresses the `a2 == 1` act tail (`fn_80258FCC`) */
     /* +0x02C */ _SHELL_W* equip_0x2C;
     /* +0x030 */ s8 flag_0x30;
     /* +0x031 */ u8 pad_0x31[0xB];
-    /* +0x03C */ f32 unk03C;
-    /* +0x040 */ f32 unk40;
-    /* +0x044 */ f32 unk44;
+    /* +0x03C */ f32 field_0x03C;
+    /* +0x040 */ f32 field_0x040;
+    /* +0x044 */ f32 field_0x044;
     /* +0x048 */ u8 unk048[0x54 - 0x48];
     /* +0x054 */ u32 param_0x54;
     /* +0x058 */ u32 field_0x058;
@@ -189,7 +190,7 @@ struct _PLW {
     /* +0x0D0 */ u8 pad_0xD0[0x40];
     /* +0x110 */ f32 unk110;
     /* +0x114 */ u8 pad_0x114[0x14];
-    /* +0x128 */ u8 unk128;
+    /* +0x128 */ u8 field_0x128;
     /* +0x129 */ u8 pad_0x129[0xB];
     /* +0x134 */ u8 unk134;
     /* +0x135 */ u8 pad_0x135[0x7];
@@ -212,7 +213,8 @@ struct _PLW {
     /* +0x258 */ u8 field_0x258[0x4];  /* passed to `fn_80223830` by `Pl/fn_80224AC4.cpp` */
     /* +0x25C */ u8 field_0x25C[0x8];  /* passed to `fn_80223708` by `Pl/fn_80224AC4.cpp` */
     /* +0x264 */ s16 unk264;
-    /* +0x266 */ u8 unk266[0x269 - 0x266];
+    /* +0x266 */ s8 field_0x266;  /* non-zero holds off the act switch (`fn_80258FCC`) */
+    /* +0x267 */ u8 unk267[0x269 - 0x267];
     /* +0x269 */ u8 unk269;
     /* +0x26A */ u8 unk26A;
     /* +0x26B */ u8 unk26B;
@@ -230,22 +232,34 @@ struct _PLW {
     /* +0x2E0 */ _SLOTENT spare_slot_id[8];
     /* +0x300 */ u8 unk300[0x304 - 0x300];
     /* +0x304 */ u16 unk304;
-    /* +0x306 */ u16 field_0x306;   /* the effect/motion id `fn_80272E30` is fed and indexed on */
-    /* +0x308 */ u8 unk308[0x30C - 0x308];
+    /* +0x306 */ union { /* the effect/motion id `fn_80272E30` is fed and indexed on; one member per
+                          * offset, both spellings kept (rule 5) */
+        /* +0x306 */ u16 field_0x306;   /* `Pl/fn_8024F200.cpp` reads it as the effect/motion id */
+        /* +0x306 */ u16 unk306;        /* the pre-merge spelling, kept so no other consumer breaks */
+    };
+    /* +0x308 */ union { /* 0x308-0x30B: the pre-merge 4-byte spelling kept whole as a union member,
+                          * with this unit's byte split inside it (rule 4/5: same byte total) */
+        /* +0x308 */ u8 unk308[0x30C - 0x308];
+        struct {
+            /* +0x308 */ u8 field_0x308;  /* the act's hold/charge latch (`fn_8025E32C`) */
+            /* +0x309 */ u8 field_0x309;  /* the act's status byte (`fn_8025A7FC` sets 0x40) */
+            /* +0x30A */ u8 unk30A[0x30C - 0x30A];
+        };
+    };
     /* +0x30C */ u8 unk30C;
     /* +0x30D */ u8 unk30D;
     /* +0x30E */ u8 flag_0x30E;   /* the lobby act family's own flag */
     /* +0x30F */ u8 unk30F[0x313 - 0x30F];
-    /* +0x313 */ s8 unk313;
-    /* +0x314 */ u8 unk314;
+    /* +0x313 */ s8 field_0x313;  /* > 0 suppresses the scan (`fn_8025E298`) */
+    /* +0x314 */ u8 field_0x314;  /* > 0 suppresses the scan (`fn_8025E298`) */
     /* +0x315 */ u8 unk315[0x318 - 0x315];
-    /* +0x318 */ u32 unk318;
+    /* +0x318 */ u32 field_0x318;  /* the scan table `fn_8025E298` walks */
     /* +0x31C */ s16 unk31C;
     /* +0x31E */ s16 unk31E;
     /* +0x320 */ s16 unk320;
     /* +0x322 */ u8 unk322[16];
     /* +0x332 */ u8 unk332[0x354 - 0x332];
-    /* +0x354 */ f32 unk354;
+    /* +0x354 */ f32 field_0x354;
     /* +0x358 */ f32 unk358;
     /* +0x35C */ u8 pad_0x35C[0x4];
     /* +0x360 */ u32 unk360;
@@ -260,7 +274,7 @@ struct _PLW {
     /* +0x372 */ s16 unk372;
     /* +0x374 */ u8 pad_0x374[0x2];
     /* +0x376 */ s16 unk376;
-    /* +0x378 */ s16 unk378;
+    /* +0x378 */ s16 field_0x378;  /* the 150-frame gate the act tail tests (`fn_80258FCC`) */
     /* +0x37A */ s16 unk37A;
     /* +0x37C */ s16 unk37C;
     /* +0x37E */ u8 pad_0x37E[0x2];
@@ -285,7 +299,11 @@ struct _PLW {
     /* +0x3A1 */ u8 field_0x3A1;
     /* +0x3A2 */ s8 unk3A2;
     /* +0x3A3 */ s8 unk3A3;
-    /* +0x3A4 */ u8 unk3A4[0x3AC - 0x3A4];
+    /* +0x3A4 */ u8 field_0x3A4;
+    /* +0x3A5 */ u8 field_0x3A5;
+    /* +0x3A6 */ u8 field_0x3A6;
+    /* +0x3A7 */ u8 field_0x3A7;
+    /* +0x3A8 */ s16 field_0x3A8;  /* the act's 300-frame cooldown (`fn_8025A7D4` re-arms it) */
     /* +0x3AC */ u32 unk3AC;
     /* +0x3B0 */ u8 unk3B0[0x3B4 - 0x3B0];
     /* +0x3B4 */ u8 unk3B4;
@@ -300,15 +318,22 @@ struct _PLW {
     /* +0x3CC */ f32 unk3CC;
     /* +0x3D0 */ f32 unk3D0;
     /* +0x3D4 */ f32 unk3D4;
-    /* +0x3D8 */ u32 unk3D8;
+    /* +0x3D8 */ u32 field_0x3D8;  /* act bitfield; `fn_80258FCC` clears the 0x300 pair */
     /* +0x3DC */ u32 unk3DC;
     /* +0x3E0 */ u32 unk3E0;
-    /* +0x3E4 */ u8 unk3E4[0x3EA - 0x3E4];
+    /* +0x3E4 */ u8 field_0x3E4;
+    /* +0x3E5 */ u8 field_0x3E5;
+    /* +0x3E6 */ u8 field_0x3E6;
+    /* +0x3E7 */ u8 field_0x3E7;
+    /* +0x3E8 */ u8 field_0x3E8;
+    /* +0x3E9 */ u8 field_0x3E9;
     /* +0x3EA */ s16 field_0x3EA;         /* hit-stop / stagger timer `fn_80264274` feeds */
     /* +0x3EC */ s16 unk3EC;
-    /* +0x3EE */ u8 unk3EE[0x3F2 - 0x3EE];
+    /* +0x3EE */ u8 pad_0x3EE[0x2];
+    /* +0x3F0 */ s16 field_0x3F0;  /* the act's first timer (`fn_80259310`) */
     /* +0x3F2 */ s16 unk3F2;
-    /* +0x3F4 */ u8 unk3F4[0x3F8 - 0x3F4];
+    /* +0x3F4 */ u8 pad_0x3F4[0x2];
+    /* +0x3F6 */ s16 field_0x3F6;  /* the act's second timer (`fn_80259310`) */
     /* +0x3F8 */ s16 unk3F8;
     /* +0x3FA */ u8 unk3FA[0x3FC - 0x3FA];
     /* +0x3FC */ s16 field_0x3FC;         /* stamina/guard timer (`fn_80264EA4`, `fn_80265374`) */
@@ -332,8 +357,10 @@ struct _PLW {
     /* +0x428 */ s16 unk428;
     /* +0x42A */ s16 unk42A;
     /* +0x42C */ s16 unk42C;
-    /* +0x42E */ u8 pad_0x42E[0x18];
-    /* +0x446 */ u8 unk446;
+    /* +0x42E */ u8 pad_0x42E[0x16];
+    /* +0x444 */ s8 field_0x444;  /* the shell timer's re-arm countdown (`fn_80258FCC`) */
+    /* +0x445 */ u8 pad_0x445[0x1];
+    /* +0x446 */ u8 field_0x446;  /* the strike counter `fn_8025B0D4` saturates at 10 */
     /* +0x447 */ u8 unk447;
     /* +0x448 */ s8 unk448;
     /* +0x449 */ s8 unk449;
@@ -391,7 +418,7 @@ struct _PLW {
     /* +0x5C4 */ u8 unk5C4;
     /* +0x5C5 */ u8 unk5C5[0x5E5 - 0x5C5];
     /* +0x5E5 */ u8 unk5E5;
-    /* +0x5E6 */ u8 unk5E6;
+    /* +0x5E6 */ u8 field_0x5E6;  /* the act's boolean latch (`fn_8025ECF0` toggles it) */
     /* +0x5E7 */ u8 unk5E7;
     /* +0x5E8 */ s16 unk5E8;
     /* +0x5EA */ u8 pad_0x5EA[0x8];

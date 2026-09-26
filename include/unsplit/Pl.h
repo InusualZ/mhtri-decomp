@@ -58,9 +58,9 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
- * The 0x8026A3xx trio sits in the unclaimed run 0x802693C4-0x8026BA1C; 0x8025EFF4 and the two
- * 0x8027Exxx helpers in the runs the header above already documents. */
-u32 fn_8025EFF4(struct _PLW* self);
+ * The 0x8026A3xx trio sits in the unclaimed run 0x802693C4-0x8026BA1C; 0x8025EFF4 is owned by
+ * `Pl/fn_80258FCC.cpp` and is declared in `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the
+ * runs the header above already documents. */
 u32 fn_8026A328(struct _PLW* self, u32 n, f32 a, f32 b);
 f32 fn_8026A34C(struct _PLW* self);
 u8 fn_8026A3A0(struct _PLW* self);
@@ -134,15 +134,39 @@ void fn_8023C2D0(struct _PLW* self, u8 part);
 void fn_8023FC20(struct _PLW* self, u8 part);
 void fn_802430E8(struct _PLW* self, u8 part);
 
-/* 0x8026A224 / 0x8026A33C / 0x80275B04 / 0x802761B8 - the unmangled helpers the player-act cluster
- * `Pl/fn_8024F200.cpp` drives.  They sit in the band's unclaimed runs 0x802693C4-0x8026BA1C and
- * 0x80273B14-0x80276B58, so no registered unit owns them and this band header is their rule-2 home.
- * Their signatures are the call sites' (the definitions live where the runs land). */
+/* 0x8026A224 / 0x8026A33C / 0x8026A644 / 0x80275B04 / 0x802761B8 - the unmangled helpers the player-act
+ * clusters drive: `Pl/fn_8024F200.cpp` (main) and `Pl/fn_80258FCC.cpp` (this branch).  They sit in the
+ * band's unclaimed runs 0x802693C4-0x8026BA1C and 0x80273B14-0x80276B58, so no registered unit owns
+ * them and this band header is their rule-2 home.  Their signatures are the call sites'; where the two
+ * lanes spelled one argument differently (`fn_8026A644`, `fn_80275B04`) MAIN's spelling is kept - both
+ * call sites pass literals, so the width/signedness is codegen-identical. */
 void fn_8026A224(struct _PLW* self, u32 motion, s32 a, s32 b);
 u32 fn_8026A33C(struct _PLW* self);
 u32 fn_8026A644(struct _PLW* self, s32 id);
 void fn_80275B04(struct _PLW* self, s32 motion, s32 a, s32 b);
 void fn_802761B8(struct _PLW* self, u8 kind, s32 a, s32 b);
+
+/* The act tail's predicates and setters, called by `Pl/fn_80258FCC.cpp` (`.text`
+ * 0x80258FCC-0x8025F088).  They sit in the unclaimed runs 0x802430E8-0x80258FCC and
+ * 0x802693C4-0x8026BA1C, so this band header is their rule-2 home. */
+u32 fn_80245DA0(struct _PLW* self, u32 a);
+void fn_8026A3A8(struct _PLW* self);
+
+/* The act band's remaining Pl helpers, added with the rest of `Pl/fn_80258FCC.cpp`.  Each signature
+ * is the callee's own body (its prologue's argument saves and the width it narrows them to), not a
+ * guess from the call site. */
+void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c);
+u32 fn_8027D8A0(struct _PLW* self, s32 a);
+
+/* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined - the run is
+ * unclaimed, so this band header is their rule-2 home). */
+extern u8 lbl_805C4F5C[];  /* the per-act `.data` record `fn_802770E8` installs */
+extern const f32 lbl_80799E00;
+extern const f32 lbl_80799E2C;
+extern const f32 lbl_80799EB0;
+extern const f32 lbl_80799F00;
+extern const f32 lbl_80799F04;
+extern const f32 lbl_80799F08;
 
 #ifdef __cplusplus
 }

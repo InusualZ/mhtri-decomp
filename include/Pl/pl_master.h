@@ -50,7 +50,13 @@ u32 Pl_master_ck(struct _PLW* plw);
 u32 fn_8026FD0C(struct _PLW* self);
 u32 Pl_act_ck(struct _PLW* self, u8 group, u16 action);
 
-
+/* Declarations added with `Pl/fn_80258FCC.cpp` (the act state-machine band): added at this header's
+ * C++ scope, i.e. the same linkage as the symbols above.  `fn_8026FEC0` is declared (once, with
+ * `extern "C"`) in the status-bit setter block near the top - MAIN's copy is the authority for it. */
+void fn_8026FEF0(struct _PLW* self, s32 v);
+u32 fn_8026FE44(struct _PLW* self);
+u8 fn_8026F908(struct _PLW* self, u32 a);
+u32 fn_8026F888(struct _PLW* self);
 #endif
 
 #endif /* MHTRI_PL_PL_MASTER_H */
