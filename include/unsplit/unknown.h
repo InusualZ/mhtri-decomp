@@ -232,6 +232,20 @@ s32 fn_80331104(void);
  * registered the range 0x8029F3C8..0x802A6624, which owns that address. */
 void fn_80335CE8(struct _PLW* self, s32 kind);
 
+/* 0x8033A920 and 0x80463EE0 - called by `enemy/fn_802F5138.cpp`'s action band (an idle-mode
+ * retire request and a release request).  Neither address has a registered unit in either
+ * direction, and their nearest registered neighbours name different modules
+ * (`hud/fn_80324F7C.c` below 0x8033A920, `enemy/fn_8035E034.cpp` above it;
+ * `Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` below 0x80463EE0, `AX/AXFXReverbHi.c` above it), so
+ * the module is undecided and the declaration belongs in this band, not in a guessed one.  The
+ * 0x802FA9A0 / 0x802FAB98 / 0x802FAFB4 / 0x802FAFC4 group left this block when main landed
+ * `lobby/fn_802FA9A0.cpp` (0x802FA9A0..0x8030121C, which owns all four) - they are declared in
+ * `include/lobby/fn_802FA9A0.h` now (rule 2). */
+void fn_8033A920(u32 arg);
+/* 0x80463EE0 - a float-returning two-argument function: `ef/fn_80114E34.cpp` carries the
+ * signature its own call sites set (`f32 fn_80463EE0(s16, f32)`), which is the one declared
+ * here; the action band tail-calls it with its own parameters. */
+f32 fn_80463EE0(s16 a, f32 b);
 /* The `.sdata2` / `.data` pool entries the 0x805482CC-0x8054E894 game-UI band loads.  The band's
  * target object carries no data section at all, so every constant it uses is another translation
  * unit's pool entry and is declared here `extern` and used as a load operand - never defined
