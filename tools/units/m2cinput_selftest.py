@@ -165,6 +165,66 @@ SWITCH_EXPECTED = "\n".join(
 )
 
 
+# `-M gekko` makes objdump print the Gekko paired-single forms correctly: the frame saves are `psq_st`
+# (a *displacement* form, already handled) and the restores are an indexed form when MWCC's peephole is
+# off (the retail shape of docs/matching.md row 39). MWCC addresses the slot with a register it just
+# computed - `addi rX,r1,N` + `psq_stx fX,r0,rX` in the prologue, `li r0,N` + `psq_lx fX,r1,r0` in the
+# epilogue. m2c has no load/store entry for either, so the converter folds both pairs to the displacement
+# form it handles; without the fold the frame save/restore comes out as `M2C_ERROR(unknown instruction:
+# psq_stx/psq_lx ...)` woven into every path.
+PSQ_OBJECT = "\n".join(
+    [
+        "Disassembly of section .text:",
+        "",
+        "00000000 <fn_psq>:",
+        "   0:\tstwu    r1,-48(r1)",
+        "   4:\tstfd    f31,8(r1)",
+        "   8:\tpsq_st  f31,16(r1),0,0",
+        "   c:\taddi    r3,r1,24",
+        "  10:\tpsq_stx f31,r0,r3,0,0",
+        "  14:\tli      r0,16",
+        "  18:\tpsq_lx  f31,r1,r0,0,0",
+        "  1c:\tpsq_lx  f30,r3,r4,0,0",
+        "  20:\tlfd     f31,8(r1)",
+        "  24:\taddi   r1,r1,48",
+        "  28:\tblr",
+        "",
+    ]
+)
+PSQ_EXPECTED = "\n".join(
+    [
+        ".text",
+        "glabel fn_psq",
+        "stwu    r1,-48(r1)",
+        "stfd    f31,8(r1)",
+        "psq_st  f31,16(r1),0,0",
+        "addi    r3,r1,24",
+        "psq_st f31,24(r1),0,0",
+        "li      r0,16",
+        "psq_l f31,16(r1),0,0",
+        "psq_lx  f30,r3,r4,0,0",
+        "lfd     f31,8(r1)",
+        "addi   r1,r1,48",
+        "blr",
+        "",
+    ]
+)
+
+# A `psq_*x` indexed by a live register (no `li` setting the index) is *not* folded: m2c must report it
+# rather than be handed a guessed displacement. The row also pins the `li`->register match.
+PSQ_LIVE_INDEX_OBJECT = "\n".join(
+    [
+        "Disassembly of section .text:",
+        "",
+        "00000000 <fn_psq_live>:",
+        "   0:\tli      r0,16",
+        "   4:\tpsq_stx f31,r1,r4,0,0",
+        "   8:\tblr",
+        "",
+    ]
+)
+
+
 class FakeImage:
     """A `Dol` stand-in: a table's worth of 32-bit entries at one address."""
 
@@ -249,6 +309,17 @@ def rows():
     _, functions = m2c.parse(SWITCH_OBJECT, (".text",))
     yield "base from symbols", m2c.derive_base(functions, {"fn_80006000": {"address": 0x80006000}}, 0), 0x80006000
 
+    # The paired-single path: `-M gekko` decodes the Wii forms, and the indexed restore is folded to the
+    # displacement form m2c's own load/store table has (m2c/arch_ppc.py: `psq_l`/`psq_st`).
+    asm, _ = m2c.convert(PSQ_OBJECT, (".text",))
+    yield "psq indexed restore folded", asm, PSQ_EXPECTED
+    asm, _ = m2c.convert(PSQ_LIVE_INDEX_OBJECT, (".text",))
+    yield "psq live index left alone", "psq_stx f31,r1,r4,0,0" in asm, True
+
+    # objdump has to be told the Gekko core, or the pinned binutils renders `psq_lx` as `vmrghb` and the
+    # `psq_l`/`psq_st` displacement forms as VSX (`xxsel`, `xscmpgedp`, ...). The CPU flag is the fix.
+    yield "objdump gets the Gekko CPU", disasm_command()[1:3], ["-M", m2c.DISASM_CPU]
+
     for label, text in (("unknown relocation", UNKNOWN_OBJECT),):
         try:
             m2c.convert(text, (".text",))
@@ -256,6 +327,24 @@ def rows():
             yield label, "R_PPC_EMB_SDA2REL" in str(exc), True
         else:
             yield label, "no error raised", "SystemExit"
+
+
+def disasm_command() -> list[str]:
+    """The argv `disassemble` hands objdump, captured without running the real one."""
+    calls: list[list[str]] = []
+
+    class Done:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    original = m2c.subprocess.run
+    m2c.subprocess.run = lambda cmd, **kw: (calls.append(cmd), Done())[1]
+    try:
+        m2c.disassemble("objdump", "x.o")
+    finally:
+        m2c.subprocess.run = original
+    return calls[0]
 
 
 def main() -> int:

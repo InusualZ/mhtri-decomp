@@ -13,6 +13,8 @@
 ###
 
 import argparse
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -612,6 +614,23 @@ config.libs = [
             # naming scheme of the band's neighbours (`layout.cpp`, `cockpit_quest.cpp`).
             # Same `cflags_hud` as the two siblings.
             Object(NonMatching, "hud/fn_802EBED8.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80334568_fn_80334568.cpp` - the character-state network sync (`.text`
+            # 0x80334568..0x80338808, 77 functions / 17056 B; extab 0x8001677C..0x80016994 and
+            # extabindex 0x800359A0..0x80035CC4, one 8- and one 12-byte record per framed function).
+            # Its builders pack `_PLW`/`_ENEMY_WORK` state into small local messages and send them
+            # with `fn_8042C9C8` (the `NetworkSessionManagerPat` slot 0x128 send, guarded by
+            # `fn_8042CB9C()`); its receivers unpack them back.  No `__FILE__` string covers the range
+            # (its only data refs are `lbl_805E1ED0`, the three switch tables and one `.sdata2`
+            # constant) and the runtime dump answers `zz_` for all 77 addresses, so the file keeps the
+            # map stem (brief section 2, class 4).  Module `hud` is the flag-evidence choice:
+            # `cflags_hud` is the group whose `-opt nopeephole` (8 of the range's 75 target objects
+            # keep a redundant `clrlwi` before a narrowing store) and `-Cpp_exceptions on` (67 framed
+            # functions, 67 extab records) reproduce the target, and `hud` is also the nearest
+            # preceding registered unit (`hud/fn_80324F7C.c`).  The *content* reads as network rather
+            # than HUD, which the unit header records as this unit's first promotion candidate.
+            # Claims .text + extab + extabindex only.  The seam is unproven (brief section 8.3).
+            Object(NonMatching, "hud/fn_80334568.cpp"),
         ],
     },
 
@@ -659,6 +678,17 @@ config.libs = [
             # `cflags_menu` as its menu siblings.  This pass registers the range and measures it;
             # the unit header names the bodies still to write.
             Object(NonMatching, "menu/fn_8031A6C0.cpp"),
+            # Registered from proposal/8031EA8C_fn_8031EA8C.cpp: the continuation of the
+            # item/equipment selection-screen band above `menu/fn_8031A6C0.cpp` (`.text`
+            # 0x8031EA8C..0x80324F7C, 67 functions / 25840 B; extab 0x80016074..0x8001621C and
+            # extabindex 0x80034F14..0x80035190, both runs contiguous with the predecessor's and the
+            # successor's).  Module `menu` from the left neighbour and the range's own callees (the
+            # menu/HUD 2D library); no `__FILE__` string covers the range (every `.data` reference is
+            # a mask/sprite table, a jumptable or a pool float) and the dump answers `zz_`, so the
+            # file keeps the map's stem (brief section 2, class 4).  Same `cflags_menu` as the band
+            # below: `infer.py` reads the peephole off on its objects (`fn_80324CC4`, 0 record forms
+            # with 2 fold-shaped pairs) and `-use_lmw_stmw off`.
+            Object(NonMatching, "menu/fn_8031EA8C.cpp"),
         ],
     },
 
@@ -2247,7 +2277,38 @@ config.progress_report_args = [
     # "--config functionRelocDiffs=data_value",
 ]
 
+
+def warn_if_original_missing() -> None:
+    """Warn loudly when this tree has no original DOL, so `build.ninja` will be a stub (#9).
+
+    `generate_build` emits the per-unit compile edges, the link edges and the real default target only
+    when `build/<version>/config.json` exists. That file is produced by `dtk dol split`, which reads the
+    `object:` DOL named in `config.yml`. A fresh git worktree has no `orig/` (it is gitignored), so
+    `configure.py` there silently writes a `build.ninja` whose default target is the split edge and which
+    has no way to compile a unit - measured 2026-09-2x, several workers read that stub as a configure bug
+    and hand-copied the DOL. Name the problem and the fix instead of writing a build file that cannot build.
+    """
+    try:
+        text = open(config.config_path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return
+    m = re.search(r"^\s*object:\s*(\S+)\s*$", text, re.M)
+    if m is None or os.path.exists(m.group(1)):
+        return
+    print(
+        "WARNING: %s is missing, so this tree cannot split: build.ninja will carry no per-unit\n"
+        "  rules (no `build ...: mwcc` edges, only the split edge), so `ninja` cannot build a unit\n"
+        "  object and the score is never measured.\n"
+        "  A fresh worktree has no `orig/` because it is gitignored; seed it from MAIN before\n"
+        "  configuring - copy `orig/RMHE08/**` in, or run the claim seeder - then re-run\n"
+        "  `python configure.py`. See `tools/units/claims.py seed_worktree_build`." % m.group(1),
+        file=sys.stderr,
+    )
+
+
 if args.mode == "configure":
+    # #9: a worktree without orig/ would get a stub build.ninja - warn loudly rather than write it silently
+    warn_if_original_missing()
     # Write build.ninja and objdiff.json
     generate_build(config)
 elif args.mode == "progress":

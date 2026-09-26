@@ -48,6 +48,14 @@ What it rewrites, and why each one has to happen:
   with a warning instead of guessed at, and then m2c reports it itself. The table's address comes from
   `config/RMHE08/symbols.txt` (through its own parser), which is also what tells this script where a unit
   object is linked (`--base` overrides both).
+* The Gekko/Broadway paired-single save/restore is put into the shape m2c has a table entry for. The
+  pinned binutils defaults to a later PowerPC core and decodes those opcodes as the VSX/VMX instructions
+  that reused them - `psq_lx`/`psq_stx` as `vmrghb`/`vpku*`, `psq_l`/`psq_st` as `xscmpgedp`/`xxsel`/
+  `xsmsubasp` - so objdump is asked for the `gekko` core (`DISASM_CPU`) and the indexed frame save/restore
+  MWCC emits with its peephole off is folded to the displacement form m2c handles: `li rX,N` + `psq_lx
+  fD,base,rX,W,I` (or `addi rX,base,N` + `psq_stx fD,r0,rX,W,I`) becomes `psq_l/psq_st fD,N(base),W,I`.
+  Without both, the frame and float saves come out as `M2C_ERROR(unknown instruction: ...)` woven into
+  every return path - the part that decides a match.
 
 Not every instruction survives the trip: m2c has no `mfcr` or `cmpwi cr1, ...` and prints `M2C_ERROR(...)`
 inline where it meets one, which is visible in its output. The file written is throwaway - `build/tmp/` is
@@ -79,6 +87,15 @@ EXE = ".exe" if os.name == "nt" else ""
 DEFAULT_OBJDUMP = os.path.join(ROOT, "build", "binutils", f"powerpc-eabi-objdump{EXE}")
 ALL_SECTIONS = (".text", ".init", ".rodata", ".data", ".bss", ".sdata", ".sdata2", ".ctors", ".dtors")
 
+# The pinned binutils defaults to a later PowerPC core, which decodes the Gekko/Broadway paired-single
+# instructions as the VSX/VMX instructions that reused the same primary opcodes: `psq_lx`/`psq_stx`
+# (opcode 4, XO 6) come out as `vmrghb`, and the `psq_l`/`psq_st` displacement forms (opcode 60) as
+# `xscmpgedp`/`xxsel`/`xsmsubasp`/... m2c then prints `M2C_ERROR(unknown instruction: ...)` exactly
+# where the frames and float saves are - the part that decides a match. `-M gekko` selects the right
+# decoder (the pinned binutils 2.42 knows it; `broadway` and `750cl` decode identically). An objdump
+# that predates it warns and ignores the option, so the run still succeeds.
+DISASM_CPU = "gekko"
+
 # objdump's relocation type -> the macro m2c names it. m2c accepts exactly h/ha/l/sda2/sda21.
 RELOC_SUFFIX = {
     "R_PPC_ADDR16_HI": "h",
@@ -103,6 +120,22 @@ UNSPELLABLE_RE = re.compile(r"[@]")
 NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_])(?:-?[0-9]+|0x[0-9a-fA-F]+)")
 ADDRESS_MODE_RE = re.compile(r"\((?P<base>[^()]*)\)\s*$")
 DATA_RE = re.compile(r"^(?:\.\w+|\.\.\.)$")
+
+# The Gekko/Broadway paired-single indexed forms. With `-M gekko` objdump prints them correctly, but m2c
+# has no load/store entry for `psq_lx`/`psq_stx`, so it prints `M2C_ERROR(unknown instruction)` on the
+# frame restores. MWCC only emits the indexed form with its peephole off (docs/matching.md row 39) and
+# always addresses the slot with one register just computed from the frame pointer - `li r0,N` +
+# `psq_lx fX,r1,r0,W,I`, or `addi rX,r1,N` + `psq_stx fX,r0,rX,W,I`. Folding that pair to the displacement
+# form `psq_l/psq_st fX,N(rbase),W,I` is the exact rewrite the peephole would have made, and the shape
+# m2c handles natively. The `li`/`addi` stays (m2c drops it as dead once the index is gone).
+LI_RE = re.compile(r"^li\s+(?P<reg>r\d+)\s*,\s*(?P<val>-?\d+)$")
+ADDI_RE = re.compile(
+    r"^addi\s+(?P<reg>r\d+)\s*,\s*(?P<base>r\d+)\s*,\s*(?P<val>-?\d+)$"
+)
+PSQ_INDEXED_RE = re.compile(
+    r"^(?P<mn>psq_(?:l|st))x\s+(?P<fd>f\d+)\s*,\s*(?P<a>r\d+)\s*,\s*(?P<b>r\d+)\s*,"
+    r"\s*(?P<w>\d+)\s*,\s*(?P<i>\d+)$"
+)
 
 # The jump tables live in another section than the code that dispatches through them, so their bytes come
 # from the original DOL (read-only, and always present). m2c only recognizes a table by the *name* it is
@@ -168,11 +201,66 @@ def find_objdump(explicit: str | None) -> str:
 
 def disassemble(objdump: str, obj: str) -> str:
     out = subprocess.run(
-        [objdump, "-dr", "--no-show-raw-insn", obj], capture_output=True, text=True, errors="replace"
+        [objdump, "-M", DISASM_CPU, "-dr", "--no-show-raw-insn", obj],
+        capture_output=True,
+        text=True,
+        errors="replace",
     )
     if out.returncode != 0:
-        sys.exit(f"{objdump} failed on {obj}:\n{out.stderr.strip()[:500]}")
+        # A system objdump too old for `-M gekko` rejects the option outright; fall back to its default
+        # decode rather than fail the run (paired-single is then wrong, which the note in the header says).
+        out = subprocess.run(
+            [objdump, "-dr", "--no-show-raw-insn", obj],
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+        if out.returncode != 0:
+            sys.exit(f"{objdump} failed on {obj}:\n{out.stderr.strip()[:500]}")
+        print(
+            f"warning: {objdump} does not support `-M {DISASM_CPU}`; paired-single instructions may be "
+            "mis-decoded as VMX/VSX. Use the pinned binutils (build/binutils).",
+            file=sys.stderr,
+        )
     return out.stdout
+
+
+def fold_psq_indexed(instrs: list[Instr]) -> None:
+    """Rewrite `li/addi ...; psq_lx/psq_stx fX,RA,RB,W,I` to the displacement form m2c understands.
+
+    Only the immediate-index spelling MWCC emits for frame saves is folded: the slot register has to be the
+    one the immediately preceding `li`/`addi` just computed, and the other operand has to be the frame
+    pointer (`li` + base) or `r0` (`addi` into a base). A `psq_*x` indexed by a live register, or an
+    updating `psq_*ux`, is left for m2c to report rather than handed a guessed displacement.
+    """
+    pending: tuple[str, int, str | None] | None = None
+    for instr in instrs:
+        match = LI_RE.match(instr.text.strip())
+        if match:
+            pending = (match.group("reg"), int(match.group("val")), None)
+            continue
+        match = ADDI_RE.match(instr.text.strip())
+        if match:
+            pending = (match.group("reg"), int(match.group("val")), match.group("base"))
+            continue
+        match = PSQ_INDEXED_RE.match(instr.text.strip())
+        if match and pending is not None:
+            reg, val, base = pending
+            ra, rb = match.group("a"), match.group("b")
+            if reg in (ra, rb):
+                other = rb if ra == reg else ra
+                if base is None and other != "r0":  # `li rI,N` + `psq fD,base,rI`
+                    base = other
+                elif base is not None and other == "r0":  # `addi rI,base,N` + `psq fD,r0,rI`
+                    pass
+                else:
+                    base = None
+                if base is not None:
+                    instr.text = (
+                        f"{match.group('mn')} {match.group('fd')},{val}({base}),"
+                        f"{match.group('w')},{match.group('i')}"
+                    )
+        pending = None
 
 
 def spell(name: str) -> str:
@@ -505,6 +593,7 @@ def convert(
                 continue
             end = group[index + 1].addr if index + 1 < len(group) else function.end
             code = [instr for instr in function.instrs if not instr.is_data()]
+            fold_psq_indexed(code)
             if any(instr.mnemonic == "bctr" for instr in code):
                 tables = find_tables(function, base, end, lookup, image)
                 if not tables:
