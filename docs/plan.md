@@ -867,6 +867,28 @@ The corollary is a working rule: when a tool or a brief can carry one of these, 
 this session showed six workers independently rediscovering the same peephole lever, which is the same waste in a
 different place.
 
+### Which agent to spawn (2026-09-23)
+
+The project defines three agents for this campaign, and the orchestrator must spawn the *matching* one - the difference is
+the prompt, the skills the harness loads, and the acceptance role, not just a label:
+
+* **`decompiler`** (aliases `decomp`, `unit-matcher`) - reconstructs one translation unit so its object matches, measuring
+  each function with objdiff, honouring the section 6.5 rules, and committing. **This is the agent for every unit
+  round**, and it is what `queue.py` emits: `subagent(agent="decompiler", ...)`, asserted in its selftest.
+* **`fixer`** (aliases `gate-fixer`, `fix-lane`) - takes a branch the landing gate **REFUSED** and clears exactly the
+  items it listed (stylelint findings, a compile clash, a measured regression) without moving any score down, then
+  re-verifies and commits.
+* **`merger`** (aliases `merge-lane`) - merges main into a held branch whose unit cannot land because main moved through
+  a shared header it also touched, resolving by class and proving the shared header moved zero rows.
+
+A `worker` is the *general-purpose* agent and is right for tooling, probes and investigations - it is **not** the right
+agent for a unit round, and using it there loses the decompiler's prompt and its skill set.
+
+**Process note, learned the hard way**: when `queue.py next` prints its spawn line, paste it **whole**. Its output has
+`agent:`, `name:`, `cwd:` and `task:` lines; grepping only for the `cwd` (which is what the orchestrator did once,
+spawning six general-purpose `worker`s instead of `decompiler`s) silently drops the agent and loses exactly what the
+queue exists to provide.
+
 ### The two tools that changed how a round is worked (2026-09-23)
 
 Both were built as experiments on `experiment/*` branches, tested by the owner, and integrated after approval.
