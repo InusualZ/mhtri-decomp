@@ -16,6 +16,10 @@
 #include "types.h"
 #include "nw4r/math.h"
 
+/* The sound-work record (`include/sound/se.h`) whose handle the `enemy` band's action steps hand
+ * `se_req_pos_ps`/`shell_se_req`; forward-declared so this header stays light (rule 4's 0xB14). */
+struct _se_w;
+
 /* One 0x03-byte entry of the enemy program table `_ENEMY_WORK::prog_0xA00` points at (`fn_8013F764`
  * indexes it with a stride of 3: `entries[count - 1 - index]`, or `entries[index]` when the
  * `field_0x9FD` bit is clear).
@@ -565,7 +569,9 @@ struct _ENEMY_WORK {
     /* +0x0A69 */ u8 field_0xA69;       /* fn_80177D54's second gate */
     /* +0x0A6A */ u8 unused_0xA6A[0xAEE - 0xA6A];
     /* +0xAEE */ u8 field_0xAEE;        /* `fn_8013791C`'s one-shot action-setup request */
-    /* +0xAEF */ u8 unused_0xAEF[0xB18 - 0xAEF];
+    /* +0xAEF */ u8 unused_0xAEF[0xB14 - 0xAEF];
+    /* +0xB14 */ struct _se_w* se_0xB14;  /* the sound-work handle `enemy/fn_801BD6C0.cpp`'s
+                                           * `se_req_pos_ps`/`shell_se_req` calls take */
 };
 
 #endif /* MHTRI_ENEMY_ENEMY_WORK_H */

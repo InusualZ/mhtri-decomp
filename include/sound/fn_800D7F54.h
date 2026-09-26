@@ -72,6 +72,10 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e);
  * for `Pl/fn_80241558.cpp`, whose whole body is 139 `se_req_frame_set` arming calls. */
 void se_req_frame_set(struct _se_w* work, s32 a, s32 param, s32 d, s32 e);
 s32 SE_Code_Make(s32 low_code, s16 low, s32 mid_code, s16 span);
+/* 0x800DB208 - the position-seated shell-SE request (`shell_se_req__FP5_se_wPQ34nw4r4math4VEC3UcUl`),
+ * defined without `extern "C"` in `src/sound/fn_800D7F54.cpp`.  Added for
+ * `enemy/fn_801BD6C0.cpp` (rule 2). */
+void shell_se_req(_se_w* work, nw4r::math::VEC3* pos, u8 id, u32 arg);
 #endif
 
 

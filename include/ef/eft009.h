@@ -35,6 +35,10 @@ void fn_80103D28(void* self);
 void fn_801041BC(void* self);
 void fn_801048A0(void* self);
 void fn_801048B0(void* self);
+/* 0x801048B4 - the single-effect spawner (id/type/joint-delta/scale), defined `extern "C"` in
+ * `src/ef/eft009.cpp`.  Added for `enemy/fn_801BD6C0.cpp` (rule 2: three consumer units used to
+ * spell it locally). */
+void fn_801048B4(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, f32 scale);
 #ifdef __cplusplus
 }
 #endif
