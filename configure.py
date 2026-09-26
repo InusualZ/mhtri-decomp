@@ -692,6 +692,16 @@ config.libs = [
             # keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_801993E0.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8019ED34_fn_8019ED34.cpp (the 0x8019ED34 gap between this unit and
+            # `enemy/fn_801A4504.cpp`): the enemy motion/action band 0x8019ED34..0x801A4504, 65
+            # functions / 0x57D0 bytes, plus the extab run 0x8000F14C..0x8000F304 (55 records) and
+            # the extabindex run 0x8002A8DC..0x8002AB70 (55 records).  Module `enemy` from the link
+            # band (both bracketing units are `enemy`) and the code (every callee out of the range
+            # is enemy-band, every state machine switches on `_ENEMY_WORK::state`); the name keeps
+            # the map's `fn_` stem (no `__FILE__` string, the dump answers only `zz_`/`FUN_`).  C++,
+            # every plain `fn_XXXXXXXX` definition `extern "C"` (see the unit's header).
+            Object(NonMatching, "enemy/fn_8019ED34.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
             # proposal/801B7020_fn_801B7020.cpp (a 0x801B7020 run discovery proposed): the enemy
             # motion/act-instruction group, 123 functions / 0x669C bytes plus its extab/extabindex
             # run and one `.ctors` word.  Module `enemy` from the link band (both bracketing
