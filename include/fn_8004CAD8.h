@@ -122,6 +122,12 @@ void fn_800513CC(VEC3* out, VEC3* a, VEC3* b);
 void fn_80050028(VEC3* out, const VEC3* src);
 void fn_80051EE0(VEC3* out, VEC3* in, f32 scale);
 void fn_800513F0(VEC3* v, f32 scale);
+/* 0x80053960 / 0x80054178 - the two draw-shape helpers the cockpit band (`menu/fn_802E4978.cpp`,
+ * 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses; the signatures are that
+ * consumer's call sites, neither body being written yet).  0x80053960 sets a four-word colour run on
+ * the draw-shape state, 0x80054178 takes the 2D vertex pair it rewrites. */
+void fn_80053960(u32, s32, s32, u32);
+void fn_80054178(s16* pos);
 #ifdef __cplusplus
 }
 #endif
