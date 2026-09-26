@@ -120,7 +120,7 @@ from units import recompile as rc  # noqa: E402
 # growing a second copy of the map parser and a second declaration scanner.
 from units import stylelint as sl  # noqa: E402
 
-ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/skills/")
+ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
                  "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt")
 BASE_FILE = os.path.join(".pi", "land-base.json")
