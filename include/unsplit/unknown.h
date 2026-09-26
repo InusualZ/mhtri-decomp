@@ -231,7 +231,6 @@ s32 fn_80331104(void);
  * home is this file.  0x8029F73C moved to `include/menu/menu_item.h` (rule 2): `menu/menu_item.cpp`
  * registered the range 0x8029F3C8..0x802A6624, which owns that address. */
 void fn_80335CE8(struct _PLW* self, s32 kind);
-void fn_802EA138(s8 value);
 
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
