@@ -34,8 +34,9 @@ u32 Pl_cat_skill_ck__FP4_PLWUs(struct _PLW* work, u16 skill);
 extern "C" {
 #endif
 void fn_8027350C(struct _PLW* self, s32 part);
-/* 0x80272E30 - the item/motion lookup `Pl/pl_act.cpp` and `Pl/fn_8024F200.cpp` call; the owner
- * defines it `extern "C" s16` (`Pl/pl_skill.cpp:1233`), so the declaration keeps that return. */
+/* 0x80272E30 - the item/skill value setter `Pl/fn_802489D4.cpp` calls and the item/motion lookup
+ * `Pl/pl_act.cpp` and `Pl/fn_8024F200.cpp` call; the owner defines it `extern "C" s16`
+ * (`Pl/pl_skill.cpp:1233`), so the declaration keeps that return. */
 s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
 #ifdef __cplusplus
 }

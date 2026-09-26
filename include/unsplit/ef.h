@@ -59,6 +59,7 @@ struct _EFT;
  * (rule 2: an owned symbol is declared in the owner's header, not here). */
 
 
+
 #ifdef __cplusplus
 }
 #endif

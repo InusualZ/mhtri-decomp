@@ -24,7 +24,7 @@ u32 fn_8027BC48(s32 arg);
 /* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
  * which calls them; all four are in this unit's `.text` range (0x80276B58-0x8027D684). */
 void fn_80276B58(struct _PLW* self, s32 value);
-void fn_802770E8(struct _PLW* self, u32 table, s32 arg2);
+void fn_802770E8(struct _PLW* self, u32 table, s32 arg2);   /* the owner's own `void` definition */
 void fn_8027AC00(struct _PLW* self);
 void fn_8027AC0C(struct _PLW* self);
 void fn_8027D4F0(struct _PLW* self);
@@ -36,6 +36,19 @@ void fn_8027A190(struct _PLW* self, s32 a);
 u32 fn_802790E4(struct _PLW* self, u32 mask);
 u32 fn_8027BCE0(struct _PLW* self);
 u32 fn_8027D40C(struct _PLW* self, s32 arg);
+
+/* The rest of this unit's `.text` that `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) calls; the
+ * signatures are the owners' own definitions in `src/Pl/pl_act.cpp` (rule 2: this header is the
+ * owner's).  `fn_80277C58`, which both this unit and `Pl/fn_8024F200.cpp` drive, is declared in the
+ * block below. */
+void fn_802771A0(struct _PLW* self, s32 value);
+s32 fn_8027A340(struct _PLW* self);
+void fn_8027A57C(struct _PLW* self, u16 a, u8 b);
+void fn_8027BE2C(struct _PLW* self);
+void fn_80277BC4(struct _PLW* self, u8 flag);
+void fn_80277C50(struct _PLW* self, s16 value);
+void fn_80278564(struct _PLW* self, u32 value);
+void fn_80276CE8(struct _PLW* self, s16 value);
 
 /* 0x8027D310 - the three-argument target-check helper `ai/fn_802CC794.cpp` and the enemy units
  * call; C linkage (unmangled `fn_80278310`), added with its first consumer (rule 2). */
@@ -59,6 +72,11 @@ void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 
 u32 Pl_condition_ck(struct _PLW* work, u32 condition);    /* -> Pl_condition_ck__FP4_PLWUl */
 u32 Pl_dm_condition_ck(struct _PLW* work, u32 condition); /* -> Pl_dm_condition_ck__FP4_PLWUl */
+
+/* 0x80278814 - the gunner predicate `Pl/fn_802489D4.cpp` gates a motion on; the owner defines it at
+ * C++ scope in `src/Pl/pl_act.cpp`, so this is the callable spelling of the map name
+ * `Pl_suimen_ck__FP4_PLW` (docs/plan.md 6.5 rule 9). */
+u32 Pl_suimen_ck(struct _PLW* work);
 #else
 u32 Pl_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);
 u32 Pl_dm_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);

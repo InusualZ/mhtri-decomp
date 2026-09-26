@@ -211,6 +211,17 @@ void* fn_803438E4(u8 a, u8 b);
 u8 fn_803439D4(u8 a, u8 b);
 void fn_803B993C(s32 handle, Vec3* v, u8 area);
 
+/* 0x802B8DF8 / 0x802D884C / 0x802DE578 / 0x8042CB9C - helpers `Pl/fn_802489D4.cpp`
+ * (0x802489D4-0x8024F200) calls whose address bands have no registered range at all, so no
+ * `<module>.h` is sound for them (this file's own note, above).  Their map names are bare
+ * `fn_XXXXXXXX`, so they keep C linkage like everything else in this block. */
+void fn_802B8DF8(struct _PLW* self);
+void fn_802D884C(u16* a, s16* b);
+void fn_802DE578(struct _PLW* self, void* work);
+u32 fn_8042CB9C(void);
+s32 fn_80331104(void);
+void fn_802EA138(s8 value);
+
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
