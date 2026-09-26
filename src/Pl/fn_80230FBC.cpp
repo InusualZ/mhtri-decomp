@@ -50,7 +50,14 @@
  * the shared epilogue.
  *
  * `tools/units/flipcheck.py Pl/fn_80230FBC` says READY (4 sections match the claim); the unit is still
- * registered `NonMatching`, and `ninja build/RMHE08/ok` was green with it in that state.
+ * registered `NonMatching`, and `ninja build/RMHE08/ok` was green with it in that state.  The flip is
+ * red for the link's `.data` padding, not the object: MWCC gives this file's `.data` section header an
+ * `sh_addralign` of 8 while the claim starts at the 4-mod-8 0x805C1F94, so mwld pads 4 bytes, the four
+ * tables land at 0x805C1F98/…+8 and `main.dol` hashes 8D7E9DFC...; setting that *one* field to 4 in a
+ * scratch copy of the object (the `.comment` entry left at 8 - the linker does not use it) links to
+ * sha1 BF485073... with 0 differing bytes.  Details in `src/Pl/fn_8023C2D0.cpp`'s header.
+ * Resolved the same way - `tools/elf/objalign.py` (e242dfecf) plus the flip (6d0cf5705), green; see
+ * that header and docs/matching.md section 55.
  */
 
 #include "types.h"
