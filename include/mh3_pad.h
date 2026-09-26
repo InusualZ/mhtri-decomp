@@ -25,6 +25,13 @@ void fn_80043EA8(void *sub);
 void fn_80041E40(void *dst, const void *src); /* 0x80041E40 - copies a 0xC-byte record */
 void fn_80041E8C(f32 *out, f32 x, f32 y, f32 z);     /* 0x80041E8C - builds a record from three floats */
 
+/* Added when `camera/fn_802B5C58.cpp` registered (rule 2): the camera accessors all start by copying a
+ * 4-byte camera handle through this unit's helper (`fn_8004726C` does the word copy). */
+void fn_8004723C(void *out, void **src); /* 0x8004723C - copies the word `*src` into `out` */
+/* 0x80047058 - `Screen_w`'s +0x1A byte as a 0/1 flag; added with the `light/light.cpp` registration
+ * (rule 2: this range owns the address), whose `fn_802BECD0` gates the second light work on it. */
+s32 fn_80047058(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -23,6 +23,9 @@ extern "C" {
 
 /* The cluster's owns with plain `fn_XXXXXXXX` map names, so C linkage. */
 s32 fn_80064820(void *out);                 /* 0x80064820 - the caller keeps its own argument in r3 */
+/* 0x80064C14 - releases the object the second argument points at; added with `light/light.cpp`
+ * (rule 2: this range owns the address), whose `fn_802C1AD8` tail-calls it. */
+void fn_80064C14(void *self, const f32 *v);
 u32 fn_800651BC(void *self);                /* 0x800651BC - reads the word at +0x0 of `self` */
 void *fn_80067E54(void *out, void *in);     /* 0x80067E54 - copies 0x10 B, returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */

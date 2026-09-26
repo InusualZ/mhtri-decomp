@@ -33,6 +33,10 @@ void fn_80075440(void* pOut, const void* pIn);
 void fn_800754EC(void* pOut, const void* pIn);
 void fn_80075620(void* pOut, const void* pIn);
 
+/* Added when `camera/fn_802B5C58.cpp` registered (rule 2): its `get_camera_pos` reads the camera's
+ * position through this one. */
+void fn_800749C8(const void* src, void* dst); /* 0x800749C8 - copies the camera's +0x74 vector out */
+
 #ifdef __cplusplus
 }
 #endif
