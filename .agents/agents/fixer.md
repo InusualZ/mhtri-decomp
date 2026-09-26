@@ -19,12 +19,43 @@ has fired: its refusal is the task list, and it is not a formality to be worked 
 
 ## Isolation (non-negotiable)
 
-Work **only** in the worktree you were launched with. Every file, build and `git` command stays inside it; the
-brief, the notes and the outbox live in MAIN, read them there and never write there. Never modify
-`orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history. If your cwd is the repo root
-`mhtri-dtk` itself, you were launched in MAIN - do no work and report it.
+Work **only** in the worktree you were launched with. Every file, build and `git` command stays inside it.
+
+**MAIN's tracked files are read-only to you** - source, headers, `configure.py`, `splits.txt`, config, anything
+under version control. The brief, the notes and the outbox live there; read them, never write them - **except**
+the campaign's evidence files, `MAIN/.pi/outbox/<slug>.json` and `MAIN/.pi/notes/<slug>.md` (the slug is your
+branch minus `worker/`). Update those with what you changed and measured: they are the record a later session
+reads, and `.pi/` is gitignored, so they cannot corrupt the repo.
+
+Never modify `orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history. If your cwd is the repo
+root `mhtri-dtk` itself, you were launched in MAIN - do no work and report it.
+
+**If you believe the refusal is wrong, do not work around the gate.** Report it with the evidence (the finding,
+the measurement, why you think the rule does not apply) and keep the claim. The gate has been right every time it
+has fired, and a batch that lands a rule violation breaks the DOL for everyone.
 
 ## First: read the refusal exactly
+
+### The rules you must satisfy (section 6.5, the canonical table is `docs/plan.md`; the lint reports `file:line`)
+
+You are subject to **all ten**, not only the ones you fix most often:
+
+1. a shared type is defined **once** and included (never copied into a second `src/` file);
+2. an extern lives with the TU that owns it (a symbol nothing owns goes in `include/unsplit/<module>.h`, which
+   must not declare a symbol a registered unit owns);
+3. a reconstructed `struct`/`class` states its size;
+4. every field carries its offset (`/* +0x1C */`, ascending);
+5. every field has a context name (`pad_0xNN`/`unused_0xNN` for padding);
+6. no pointer arithmetic reaches a field;
+7. no `fn_XXXXXXXX` and no `unkNN` survive in `src/`;
+8. **`goto` is forbidden** (and a label used as control flow). The conformant shapes are a **helper function**, a
+   **`switch` whose cases share a `break`**, or a **`for (;;)` with `break`/`continue`**; if none reproduces the
+   target's codegen, that is a residual to record **with both measurements** - the conformant score and the
+   `goto` one - not a licence to keep the `goto`. (Four units carry a `goto` backlog from before the rule: see
+   `docs/plan.md`.)
+9. a mangled symbol (`Name__FP...`, `Name__Q34nw4r...`) is called/declared through its owner - declare the class
+   or namespace - while an `fn_XXXXXXXX` stem is the map's placeholder and stays legal;
+10. a vtable we own is compiler output (a class with `virtual` methods), never written entry by entry.
 
 1. `python tools/units/stylelint.py --diff main` - every finding, `file:line` (**section 6.5's table is
    `docs/plan.md`; the rule numbers there are the authority**).
@@ -48,6 +79,14 @@ named items only, and the diff should be as small as the refusal.
 * **rule 6** (pointer arithmetic): declare the record and write `->member`. The lint's own exception is a raw
   offset that names no field (`memset`, a byte-wise copy) - `(u32)((*(u8 *)p) - 252)` is a value subtraction,
   not a field reach, and the explicit dereference clears the false positive with byte-identical codegen.
+* **rule 8** (`goto`): rewrite as a helper function, a `switch` sharing a `break`, or a `for (;;)` with
+  `break`/`continue`. Measure the conformant shape against the target: if it does not reproduce the codegen,
+  record the residual **with both measurements** in the unit header and keep the conformant shape.
+* **rule 1** (a shared type twice): one definition, included where needed - delete the copy, do not merge the two.
+* **rule 9** (a mangled spelling used as a call): declare the owner (class or namespace) and call it properly;
+  an `fn_XXXXXXXX` stem is legal and stays.
+* **rule 10** (a hand-written table we own): let MWCC emit it from a class declaring its `virtual` methods plus
+  the constructor that stores it.
 * **rule 7** (no `fn_XXXX`/`unkNN` may survive): name from context or the real map/dump name. Where the context
   genuinely does not support a name, write a truthful `rule 7 deferred: <reason>` in the file header - never
   invent a name, and never defer to silence a finding you could fix.
@@ -71,14 +110,14 @@ match**, as long as nothing regresses. So:
 * Do not chase a single row for long: after a few measured variants, keep the best shape, write the residual in
   the header, and move on.
 
-## Then verify and commit
+## Then the profile's verification: full `ninja` with `build/RMHE08/ok` deleted (zero FAILED - the FAILED count is
+the primary signal, `ok` prints OK off a stale DOL), `ninja build/RMHE08/ok` = `main.dol: OK`,
+`python tools/units/stylelint.py --diff main` clean, and commit on the branch. If your worktree has no
+`orig/RMHE08/sys/main.dol`, **copy** the ~5 MB file in from MAIN.
 
-    rm -f build/RMHE08/ok && ninja -k 0            # zero FAILED targets
-    rm -f build/RMHE08/ok && ninja build/RMHE08/ok # build/RMHE08/main.dol: OK (SHA-1 BF485073...)
-    python tools/units/stylelint.py --diff main    # the finding you were sent to fix must be gone
-
-Check `FAILED` first: `ninja build/RMHE08/ok` prints OK even when a compile failed. If your worktree has no
-`orig/RMHE08/sys/main.dol`, **copy** the ~5 MB file in from MAIN. Commit on the branch.
+Commit message: an area-prefixed imperative subject, the same convention the units use - e.g.
+`enemy: clear the fn_8014A1BC declaration clash` or `Pl: name the _PLW fields the lint flagged` - and say *why*
+in the body when the fix is not obvious. One commit for the fix, on the branch.
 
 ## Report (your final message is the result the orchestrator receives)
 

@@ -26,11 +26,18 @@ residual written down is a landed win; a row you keep re-spelling is not.
 ## Isolation (non-negotiable)
 
 Your work belongs **only** inside your worktree - the `cwd` you were launched with. Every file you edit, every
-build, every `git` command, and every absolute path you construct stays inside it. The brief and the docs live
-in MAIN; read them there, **never write there**. An uncommitted edit in MAIN can be swept into another unit's
-commit and it makes the orchestrator's verification meaningless. If a build needs the original DOL and your
-worktree lacks `orig/RMHE08/sys/main.dol`, **copy** that ~5 MB file in from MAIN (do not junction the toolchain,
-do not skip the build).
+build, every `git` command, and every absolute path you construct stays inside it.
+
+**MAIN's tracked files are read-only to you** - its `src/`, `include/`, `configure.py`, `splits.txt`, config and
+anything else under version control. The brief and the docs live there; read them, never write them. There is
+**one** exception, and it is not tracked: the campaign's evidence files, `MAIN/.pi/outbox/<slug>.json` and
+`MAIN/.pi/notes/<slug>.md` (the slug is your branch minus `worker/`). Those are the record a later session reads,
+so update them - they cannot corrupt the repo, because `.pi/` is gitignored.
+
+An uncommitted edit to MAIN's tracked files can be swept into another unit's commit and it makes the
+orchestrator's verification meaningless. If a build needs the original DOL and your worktree lacks
+`orig/RMHE08/sys/main.dol`, **copy** that ~5 MB file in from MAIN (do not junction the toolchain, do not skip the
+build).
 
 Never modify `orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history.
 

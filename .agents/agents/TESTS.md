@@ -38,10 +38,44 @@ live one and there is no install or sync step.
 
 ### T2 - recall (2026-09-25)
 
-* `decompiler` - **FAIL, then fixed.** An earlier draft was probed and answered "rules 5 and 8 are not in my
-  context", which on inspection was a symptom of a mis-numbered table. The table now matches `docs/plan.md` 6.5
-  exactly and the profile carries the "are you sure you are in your worktree?" tell. Re-probed below.
-* `merger`, `fixer` - first probe below.
+* `decompiler` - **FAIL, then PASS.** An earlier draft answered "rules 5 and 8 are not in my context", which on
+  inspection was a symptom of a mis-numbered table (rule 1 described as the vtable rule, which is rule 10; rule 4
+  as "no duplicated records"; the field-offset rule folded into rule 3). The table now matches `docs/plan.md` 6.5
+  exactly. Re-probe: all ten rules correct, the policy, the residual's home, three paying codegen levers, and that
+  a rule-7 deferral covers the `fn_` half only. **PASS.**
+* `merger` - first probe: honest and mostly right, but it reported that its merge rules "are NOT numbered". The
+  rules are now M1-M8 (headers hand-union, re-pad, one member per offset, owner's declaration wins, and M8 "the
+  claim release is the parent's, never `claims.py release`"). Re-probe: **PASS**, M1-M8 all held, plus the
+  zero-rows proof, the struct-shrink hazard, and the FAILED-count primacy.
+* `fixer` - first probe: it held rules 3-7 but reported "not given: the text of stylelint rules 1, 8+". A real
+  gap - a fixer sent to clear a `goto` finding (and four units carry a pre-rule `goto` backlog) would not have
+  known rule 8's conformant shapes. Rules 1, 8, 9, 10 are now in the profile. Re-probe: **PASS**, all ten rules
+  with rule 8's three shapes and rule 9's placeholder nuance.
+
+The probes also exposed a **contradiction in all three profiles**: each said "never write MAIN", while the
+campaign requires the outbox/notes evidence *in* MAIN (`.pi/outbox/<slug>.json`, `.pi/notes/<slug>.md`). The rule
+is now precise - MAIN's **tracked** files are read-only; those two gitignored evidence files are the job's
+deliverable, and a later session reads them. `fixer` also gained the commit-message convention and "if you
+believe the refusal is wrong, report it with evidence - never work around the gate".
+
+### A defect the tests found before any lane used the profiles
+
+T3's first launch failed outright: `Unknown agent: fixer`. The error's directory list *is* the finding:
+
+    - user:    ~/.pi/agent/agents            (consulted for every cwd)
+    - user:    ~/.agents                     (present but empty)
+    - project: <worktree>/.agents            (present but empty)
+    - project: <worktree>/.pi/agents         (absent)
+
+The harness discovers project agents under **`<cwd>/.agents`**, and **every campaign lane runs in a `git
+worktree`** cut from the `main` of its claim time - so a worktree created before the profile commit sees none of
+them, and the launch fails. Running `subagent list` from MAIN hides this completely: the profiles are there and
+they work.
+
+Fix: **`tools/agents/install.sh`** copies `.agents/agents/*.md` into `~/.pi/agent/agents/` (user scope, consulted
+for every cwd). `.agents/agents/` stays the reviewed source of truth. **Run it after every profile edit**, then
+re-probe. Without this test, every profile-based lane would have failed to launch - i.e. the whole point of the
+profiles.
 
 ### T3 - behaviour
 
