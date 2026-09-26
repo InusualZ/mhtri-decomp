@@ -1974,6 +1974,18 @@ config.libs = [
             # the `.data` run this range partly references leaks outside it, so no data range is
             # claimed yet.
             Object(NonMatching, "lobby/fn_8021E1EC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/802FA9A0_fn_802FA9A0.cpp: the lobby event/status band
+            # (`.text` 0x802FA9A0..0x8030121C, 120 symbols / 26748 B, plus its extab run
+            # 0x800156B4..0x80015964 and extabindex run 0x80034074..0x8003447C - 86 records each, both
+            # exactly the gap between the bracketing registered units' runs).  It links between the
+            # `ef` bands (`ef/eft035.cpp` below it, `ef/fn_803066F0.c` above it), but the module is
+            # `lobby` (class 3): the range's own predicates read the lobby work block `lobby_w`
+            # (.bss 0x806AAB44) at +0x003/+0x15F/+0x161 and its `.sbss` run is the lobby pointer block
+            # `lbl_80794880`; no `__FILE__` string covers the range, so the file keeps the map's stem
+            # (class 4).  Same `cflags_lobby` as the band below, with the per-file
+            # `#pragma exceptions on` the other lobby units use to emit the unwind records.
+            Object(NonMatching, "lobby/fn_802FA9A0.cpp"),
         ],
     },
     {

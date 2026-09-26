@@ -1078,6 +1078,12 @@ ef/eft035.cpp:
 	.text       start:0x802F140C end:0x802F5138
 	.ctors      start:0x8056F38C end:0x8056F390
 
+lobby/fn_802FA9A0.cpp:
+	extab       start:0x800156B4 end:0x80015964
+	extabindex  start:0x80034074 end:0x8003447C
+	.text       start:0x802FA9A0 end:0x8030121C
+	.ctors      start:0x8056F394 end:0x8056F398
+
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674

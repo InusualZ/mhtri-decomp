@@ -35,6 +35,11 @@ void rotVecY(nw4r::math::VEC3* v, u32 angle);
  * artefact. */
 #ifdef __cplusplus
 extern "C" {
+u32 fn_8004D27C(s32 id);
+/* 0x8004D70C - the event-flag test that shares the same table `fn_8004D27C` reads; added with
+ * `src/lobby/fn_802FA9A0.cpp` as the second consumer (it was declared locally by four
+ * `src/lobby/*.cpp` files, which is the rule-2 backlog this declaration closes). */
+s32 fn_8004D70C(s32 id);
 #endif
 u32 fn_80051570(u32);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
