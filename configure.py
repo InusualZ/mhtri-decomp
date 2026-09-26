@@ -1108,6 +1108,18 @@ config.libs = [
             # only), so the stem is the map's `fn_80230FBC` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_80230FBC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802373AC_fn_802373AC` - the third and fourth of the player work's per-motion SE banks
+            # (`.text` 0x802373AC-0x8023C2D0, TWO functions, 20260 B) with extab
+            # 0x80011CA4-0x80011CB4, extabindex 0x8002E9E0-0x8002E9F8 and their two
+            # compiler-emitted jump tables in `.data` 0x805C2C60-0x805C34D4 (271 + 270 entries).
+            # Home is `Pl`: both functions pass their first argument straight to
+            # `Get_motion_no(_PLW*)`, the three `_se_w` fields they load are `_PLW`+0xAF4/+0xAF8/
+            # +0xAFC (the same pair of banks as the sibling `Pl/fn_80230FBC.cpp` next door) and
+            # their callees are the Pl SE helpers.  No `__FILE__` string covers the range (its own
+            # .data pool is the two jump tables and nothing else), so the stem is the map's
+            # `fn_802373AC` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802373AC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80224AC4_fn_80224AC4.cpp` - the player actor's per-model SE/motion rig update
