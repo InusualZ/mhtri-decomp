@@ -65,7 +65,8 @@ struct _se_w {
 /* The actor/motion object the SE work hangs off (`+0xAFC`) - the union of the views the band reads.
  * size: 0xB00 (at least) */
 struct _PLW {
-    /* +0x000 */ u8 pad_0x000[3];
+    /* +0x000 */ u8 pad_0x000[2];
+    /* +0x002 */ u8 field_0x002;   /* the motion-kind byte the kind dispatch switches on */
     /* +0x003 */ u8 field_0x003;
     /* +0x004 */ u8 pad_0x004[4];
     /* +0x008 */ u8 field_0x008;
@@ -77,7 +78,9 @@ struct _PLW {
     /* +0x1C8 */ u32 field_0x1C8;
     /* +0x1CC */ u8 pad_0x1CC[0x2D8];
     /* +0x4A4 */ u32 field_0x4A4;
-    /* +0x4A8 */ u8 pad_0x4A8[0x64C];
+    /* +0x4A8 */ u8 pad_0x4A8[0xFF];
+    /* +0x5A7 */ u8 field_0x5A7;   /* the SE part/voice index handed to the motion banks */
+    /* +0x5A8 */ u8 pad_0x5A8[0x54C];
     /* +0xAF4 */ _se_w* field_0xAF4;
     /* +0xAF8 */ _se_w* field_0xAF8;
     /* +0xAFC */ _se_w* field_0xAFC;

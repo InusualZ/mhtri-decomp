@@ -45,6 +45,15 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 /* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
+/* The four sibling motion banks `Pl/fn_80230FBC.cpp`'s kind byte dispatches to (kinds 3 and 7), and
+the motion bank that unit's range stops at.  All are unregistered, so this band header is their
+rule-2 home.  Each takes the player work and the SE part index the dispatcher read. */
+void fn_802373AC(struct _PLW* self, u8 part);
+void fn_802399C8(struct _PLW* self, u8 part);
+void fn_8023C2D0(struct _PLW* self, u8 part);
+void fn_8023FC20(struct _PLW* self, u8 part);
+void fn_802430E8(struct _PLW* self, u8 part);
+
 #ifdef __cplusplus
 }
 

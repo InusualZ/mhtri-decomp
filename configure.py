@@ -1089,6 +1089,17 @@ config.libs = [
         "progress_category": "game",
         "host": False,
         "objects": [
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80230FBC_fn_80230FBC` - the player work's motion-kind dispatch plus four of its nine
+            # per-kind motion banks (`.text` 0x80230FBC-0x802373AC, 4 functions, 25584 B) with
+            # extab 0x80011C84-0x80011CA4, extabindex 0x8002E9B0-0x8002E9E0 and the four
+            # compiler-emitted jump tables in `.data` 0x805C1F94-0x805C2C60.  Home is `Pl`: the
+            # first argument goes straight to `Get_motion_no(_PLW*)`, the third/fourth fields are
+            # the player's `_se_w` works (+0xAF4/+0xAF8/+0xAFC) and the banks' callees are the Pl
+            # SE helpers.  No `__FILE__` string covers the range (its own .data pool is jump tables
+            # only), so the stem is the map's `fn_80230FBC` with a rule-7 deferral.  It uses
+            # `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80230FBC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
