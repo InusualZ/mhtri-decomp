@@ -37,7 +37,14 @@ so update them - they cannot corrupt the repo, because `.pi/` is gitignored.
 An uncommitted edit to MAIN's tracked files can be swept into another unit's commit and it makes the
 orchestrator's verification meaningless. If a build needs the original DOL and your worktree lacks
 `orig/RMHE08/sys/main.dol`, **copy** that ~5 MB file in from MAIN (do not junction the toolchain, do not skip the
-build).
+build). Two setup traps cost sibling lanes a build each - follow them exactly:
+
+* **A junction to the read-only game data must use the absolute Windows target.** git-bash's `/c/...` spelling
+  produces a junction that does not resolve, and `dol split` then dies with
+  `orig/RMHE08/files/mh3.sel not found`. Use the `C:\...\mhtri-dtk\orig\RMHE08\files` form.
+* **Run one `ninja` before trusting `recompile.py --main .`.** `configure.py` alone writes only the base
+  `build.ninja`; the per-object rules live in `build/RMHE08/config.json`, which the split writes. Until that
+  split has run, `recompile.py` cannot resolve your unit's command line.
 
 Never modify `orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history.
 
