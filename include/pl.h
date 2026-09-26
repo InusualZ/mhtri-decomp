@@ -128,7 +128,17 @@ struct _PLW {
     /* +0x000 */ u8 slot_active;   /* the slot is in use (`fn_800EFAC0`/`fn_800EFDD8`) */
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 field_0x002;
-    /* +0x003 */ u8 unk003[0x005 - 0x003];
+    /* +0x003 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 2 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x003 */ u8 unk003[0x005 - 0x003];
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+        /* +0x003 */ u8 pad_merge_0x003[0x1];
+                                /* +0x004 */ u8 field_0x004;
+        };
+    };
     /* +0x005 */ u8 act_step_0x05;   /* the per-act state step the lobby act handlers advance */
     /* +0x006 */ u8 field_0x006;      /* the act's follow-up stage: reset when the step advances and
                                       * bumped once the step's frame check passes (`Pl/fn_8024F200.cpp`);
@@ -157,7 +167,16 @@ struct _PLW {
     /* +0x014 */ u8 se_name_set;   /* picks the SE/BGM name table (`fn_800EFAC0`) */
     /* +0x015 */ u8 kind_0x015;   /* the NPC/actor kind `pl_act.cpp` reads as its `kind` */
     /* +0x016 */ u8 area_0x16;
-    /* +0x017 */ u8 unk017[0x18 - 0x17];
+    /* +0x017 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x017 */ u8 unk017[0x18 - 0x17];
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x017 */ u8 field_0x017;
+        };
+    };
     /* +0x018 */ union { /* the actor mode byte; three spellings of one byte, one member per offset */
         /* +0x018 */ u8 field_0x18;   /* `Pl/fn_80224AC4.cpp` (main) reads the actor mode here, and
                                        * `Pl/pl_master.cpp`'s own view of the record calls it `unk18` */
@@ -172,7 +191,17 @@ struct _PLW {
         /* +0x019 */ u8 pad_0x19[0x1]; /* the pre-merge padding spelling of the same byte; no consumer
                                        * reads it, kept so the merge drops no pre-existing name */
     };
-    /* +0x01A */ u16 field_0x01A;
+    /* +0x01A */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 2 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x01A */ u16 field_0x01A;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+        /* +0x01A */ u8 pad_merge_0x01A[0x1];
+                                /* +0x01B */ u8 field_0x01B;   /* the "no surface contact" byte `Pl/fn_8025F088.cpp` clears */
+        };
+    };
     /* +0x01C */ u8 pad_0x1C[0x1];
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
     /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `Pl/fn_80224AC4.cpp` */
@@ -219,31 +248,58 @@ struct _PLW {
             /* +0x038 */ u8 pad_0x38[0x4];
         };
     };
-    /* +0x03C */ union {   /* one f32, three spellings: main's `unk03C`/`field_0x03C` and this branch's
-                            * `motion_pos_0x3C` - the three floats the 0x8026A4E4-family integrators
-                            * move are the position at +0x3C, the velocity at +0x78 and the
-                            * acceleration at +0x84 (fn_8026A4E4 adds the velocity into the position,
-                            * fn_8026A518 the acceleration into the velocity) */
-        /* +0x03C */ f32 unk03C;
-        /* +0x03C */ f32 field_0x03C;
-        /* +0x03C */ f32 motion_pos_0x3C;
+    /* +0x03C */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 12 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x03C */ union {   /* one f32, three spellings: main's `unk03C`/`field_0x03C` and this branch's
+                                    * `motion_pos_0x3C` - the three floats the 0x8026A4E4-family integrators
+                                    * move are the position at +0x3C, the velocity at +0x78 and the
+                                    * acceleration at +0x84 (fn_8026A4E4 adds the velocity into the position,
+                                    * fn_8026A518 the acceleration into the velocity) */
+                /* +0x03C */ f32 unk03C;
+                /* +0x03C */ f32 field_0x03C;
+                /* +0x03C */ f32 motion_pos_0x3C;
+            };
+            /* +0x040 */ union {   /* one f32, three spellings */
+                /* +0x040 */ f32 unk40;
+                /* +0x040 */ f32 field_0x040;
+                /* +0x040 */ f32 motion_pos_0x40;
+            };
+            /* +0x044 */ union {   /* one f32, three spellings */
+                /* +0x044 */ f32 unk44;
+                /* +0x044 */ f32 field_0x044;
+                /* +0x044 */ f32 motion_pos_0x44;
+            };
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x03C */ VEC3 vec_0x03C;   /* the actor's aim/facing vector the motion layer reads */
+        };
     };
-    /* +0x040 */ union {   /* one f32, three spellings */
-        /* +0x040 */ f32 unk40;
-        /* +0x040 */ f32 field_0x040;
-        /* +0x040 */ f32 motion_pos_0x40;
+    /* +0x048 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 12 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x048 */ u8 unk048[0x54 - 0x48];
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x048 */ VEC3 vec_0x048;
+        };
     };
-    /* +0x044 */ union {   /* one f32, three spellings */
-        /* +0x044 */ f32 unk44;
-        /* +0x044 */ f32 field_0x044;
-        /* +0x044 */ f32 motion_pos_0x44;
-    };
-    /* +0x048 */ u8 unk048[0x54 - 0x48];
     /* +0x054 */ u32 param_0x54;
     /* +0x058 */ u32 field_0x058;
     /* +0x05C */ u32 unk5C;
     /* +0x060 */ f32 ground_y_0x060;  /* the player's base/target y the effect sits on */
-    /* +0x064 */ f32 unk064;
+    /* +0x064 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 4 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x064 */ f32 unk064;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x064 */ f32 field_0x064;
+        };
+    };
     /* +0x068 */ union {   /* one word, two spellings (rule 5) */
         /* +0x068 */ u8 pad_0x68[0x4];  /* the pre-merge padding spelling */
         /* +0x068 */ f32 field_0x068;   /* the first of the three floats the act entry resets */
@@ -256,22 +312,34 @@ struct _PLW {
         /* +0x070 */ f32 unk70;
         /* +0x070 */ f32 field_0x070;  /* the act's cached vector z */
     };
-    /* +0x074 */ union {   /* two views of the 0x074-0x08F run, both 0x1C bytes (M4: the byte total is
-                            * the invariant; a union starting at +0x075 would round 0x1B up to 0x1C
-                            * and grow `_PLW` by 4, so the union is anchored at the aligned +0x074) */
-        struct {   /* the pre-merge view: the +0x074 byte and the `unk075` filler run */
-            /* +0x074 */ u8 unk074;
-            /* +0x075 */ u8 unk075[0x90 - 0x75];
+    /* +0x074 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 28 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x074 */ union {   /* two views of the 0x074-0x08F run, both 0x1C bytes (M4: the byte total is
+                                    * the invariant; a union starting at +0x075 would round 0x1B up to 0x1C
+                                    * and grow `_PLW` by 4, so the union is anchored at the aligned +0x074) */
+                struct {   /* the pre-merge view: the +0x074 byte and the `unk075` filler run */
+                    /* +0x074 */ u8 unk074;
+                    /* +0x075 */ u8 unk075[0x90 - 0x75];
+                };
+                struct {   /* main's split of the same bytes (the unit that owns 0x802693C4-0x8026BA1C) */
+                    /* +0x074 */ u8 pad_0x74[0x1];
+                    /* +0x075 */ u8 pad_0x75[0x3];
+                    /* +0x078 */ f32 motion_vel_0x78;
+                    /* +0x07C */ f32 motion_vel_0x7C;
+                    /* +0x080 */ f32 motion_vel_0x80;
+                    /* +0x084 */ f32 motion_acc_0x84;
+                    /* +0x088 */ f32 motion_acc_0x88;
+                    /* +0x08C */ f32 motion_acc_0x8C;
+                };
+            };
         };
-        struct {   /* main's split of the same bytes (the unit that owns 0x802693C4-0x8026BA1C) */
-            /* +0x074 */ u8 pad_0x74[0x1];
-            /* +0x075 */ u8 pad_0x75[0x3];
-            /* +0x078 */ f32 motion_vel_0x78;
-            /* +0x07C */ f32 motion_vel_0x7C;
-            /* +0x080 */ f32 motion_vel_0x80;
-            /* +0x084 */ f32 motion_acc_0x84;
-            /* +0x088 */ f32 motion_acc_0x88;
-            /* +0x08C */ f32 motion_acc_0x8C;
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x074 */ u8 field_0x074;
+                                /* +0x075 */ u8 field_0x075;
+                                /* +0x076 */ u8 field_0x076;
+        /* +0x077 */ u8 pad_merge_0x077[0x19];
         };
     };
     /* +0x090 */ f32 unk090[3];
@@ -279,11 +347,21 @@ struct _PLW {
     /* +0x0A0 */ f32 unk0A0;
     /* +0x0A4 */ f32 unk0A4;
     /* +0x0A8 */ u32 field_0x0A8;          /* the second counter `fn_80264940` feeds (Pl/fn_80262940.cpp) */
-    /* +0x0AC */ union {   /* the pre-merge run is `[0xB4 - 0xAC]`; this branch names its first word */
-        /* +0x0AC */ u8 unk0AC[0xB4 - 0xAC];
-        struct {
-            /* +0x0AC */ u32 field_0x0AC;  /* mirrors the damage/param word at +0x054 (`fn_802498E0`) */
-            /* +0x0B0 */ u8 pad_0x0B0[0x4];
+    /* +0x0AC */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 8 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x0AC */ union {   /* the pre-merge run is `[0xB4 - 0xAC]`; this branch names its first word */
+                /* +0x0AC */ u8 unk0AC[0xB4 - 0xAC];
+                struct {
+                    /* +0x0AC */ u32 field_0x0AC;  /* mirrors the damage/param word at +0x054 (`fn_802498E0`) */
+                    /* +0x0B0 */ u8 pad_0x0B0[0x4];
+                };
+            };
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+        /* +0x0AC */ u8 pad_merge_0x0AC[0x6];
+                                /* +0x0B2 */ u16 field_0x0B2;
         };
     };
     /* +0x0B4 */ s16 unk0B4;
@@ -361,7 +439,16 @@ struct _PLW {
     /* +0x272 */ s16 unk272;
     /* +0x274 */ u8 unk274;
     /* +0x275 */ u8 unk275;
-    /* +0x276 */ u8 unk276;
+    /* +0x276 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x276 */ u8 unk276;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x276 */ u8 field_0x276;
+        };
+    };
     /* +0x277 */ u8 unk277[0x278 - 0x277];
     /* +0x278 */ _SLOTENT slot_id[24];
     /* +0x2D8 */ u8 unk2D8[0x2E0 - 0x2D8];
@@ -489,9 +576,27 @@ struct _PLW {
         /* +0x360 */ u32 unk360;
         /* +0x360 */ u32 field_0x360;  /* cleared by the act entry */
     };
-    /* +0x364 */ u32 unk364;
+    /* +0x364 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 4 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x364 */ u32 unk364;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x364 */ u32 field_0x364;
+        };
+    };
     /* +0x368 */ u8 unk368;
-    /* +0x369 */ u8 unk369;
+    /* +0x369 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x369 */ u8 unk369;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x369 */ u8 field_0x369;
+        };
+    };
     /* +0x36A */ union {   /* one u8, two spellings (rule 5) */
         /* +0x36A */ u8 unk36A;
         /* +0x36A */ u8 field_0x36A;  /* cleared by the act entry */
@@ -593,10 +698,46 @@ struct _PLW {
             /* +0x3A8 */ s16 field_0x3A8;  /* the act's 300-frame cooldown (`fn_8025A7D4` re-arms it) */
         };
     };
-    /* +0x3AC */ u32 unk3AC;
-    /* +0x3B0 */ u8 unk3B0[0x3B4 - 0x3B0];
-    /* +0x3B4 */ u8 unk3B4;
-    /* +0x3B5 */ u8 unk3B5;
+    /* +0x3AC */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 4 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x3AC */ u32 unk3AC;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x3AC */ u32 field_0x3AC;
+        };
+    };
+    /* +0x3B0 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 4 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x3B0 */ u8 unk3B0[0x3B4 - 0x3B0];
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x3B0 */ u32 field_0x3B0;
+        };
+    };
+    /* +0x3B4 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x3B4 */ u8 unk3B4;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x3B4 */ u8 field_0x3B4;
+        };
+    };
+    /* +0x3B5 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x3B5 */ u8 unk3B5;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x3B5 */ u8 field_0x3B5;
+        };
+    };
     /* +0x3B6 */ u8 pad_0x3B6[0x2];
     /* +0x3B8 */ u16 unk3B8;
     /* +0x3BA */ u16 unk3BA;
@@ -661,7 +802,16 @@ struct _PLW {
             /* +0x402 */ u16 field_0x402;
         };
     };
-    /* +0x404 */ s16 unk404;
+    /* +0x404 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 2 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x404 */ s16 unk404;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x404 */ s16 field_0x404;
+        };
+    };
     /* +0x406 */ u8 unk406[0x40E - 0x406];
     /* +0x40E */ s16 unk40E;
     /* +0x410 */ union {   /* the 4-byte run 0x410-0x413, with the act's re-arm word inside */
@@ -737,39 +887,87 @@ struct _PLW {
     /* +0x466 */ s16 unk466;
     /* +0x468 */ s16 unk468;
     /* +0x46A */ s16 unk46A;
-    /* +0x46C */ u8 unk46C;
-    /* +0x46D */ u8 unk46D;
-    /* +0x46E */ u8 unk46E;
+    /* +0x46C */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x46C */ u8 unk46C;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x46C */ u8 field_0x46C;
+        };
+    };
+    /* +0x46D */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x46D */ u8 unk46D;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x46D */ u8 field_0x46D;
+        };
+    };
+    /* +0x46E */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 1 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x46E */ u8 unk46E;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x46E */ u8 field_0x46E;
+        };
+    };
     /* +0x46F */ u8 field_0x46F;
     /* +0x470 */ s16 unk470;
     /* +0x472 */ u8 unk472[0x47B - 0x472];
     /* +0x47B */ u8 field_0x47B;         /* per-player type index `fn_80267C84` reads */
     /* +0x47C */ u8 pad_0x47C[0x480 - 0x47C];
-    /* +0x480 */ union {   /* the 0x480..0x4DF run: the pre-merge field spellings kept whole, with the
-                            * shell band's view of the actor's own attack entry inside it.  The union is
-                            * anchored at the word-aligned +0x480 and its run is 0x60 long, because a
-                            * member carrying the `u32` at +0x4A4 gives it align 4 - an odd-length run
-                            * would round up and grow `_PLW` */
-        /* +0x480 */ u8 pad_0x480_run[0x4E0 - 0x480];
-        struct {
-            /* +0x480 */ u8 pad_0x480[0x489 - 0x480];
-            /* +0x489 */ u8 unk489;
-            /* +0x48A */ u8 unk48A[0x492 - 0x48A];
-            /* +0x492 */ u8 unk492;
-            /* +0x493 */ u8 pad_0x493[0x11];
-            /* +0x4A4 */ u32 field_0x4A4;
-            /* +0x4A8 */ u8 pad_0x4A8[0x34];
-            /* +0x4DC */ u8 unk4DC;
-            /* +0x4DD */ u8 unk4DD[0x4E0 - 0x4DD];
+    /* +0x480 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 96 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x480 */ union {   /* the 0x480..0x4DF run: the pre-merge field spellings kept whole, with the
+                                    * shell band's view of the actor's own attack entry inside it.  The union is
+                                    * anchored at the word-aligned +0x480 and its run is 0x60 long, because a
+                                    * member carrying the `u32` at +0x4A4 gives it align 4 - an odd-length run
+                                    * would round up and grow `_PLW` */
+                /* +0x480 */ u8 pad_0x480_run[0x4E0 - 0x480];
+                struct {
+                    /* +0x480 */ u8 pad_0x480[0x489 - 0x480];
+                    /* +0x489 */ u8 unk489;
+                    /* +0x48A */ u8 unk48A[0x492 - 0x48A];
+                    /* +0x492 */ u8 unk492;
+                    /* +0x493 */ u8 pad_0x493[0x11];
+                    /* +0x4A4 */ u32 field_0x4A4;
+                    /* +0x4A8 */ u8 pad_0x4A8[0x34];
+                    /* +0x4DC */ u8 unk4DC;
+                    /* +0x4DD */ u8 unk4DD[0x4E0 - 0x4DD];
+                };
+                struct {   /* the shell band's view: the actor's own attack entry, the record
+                            * `Pl/pl_act.cpp` spells `_HIT_W` and `fn_80277974` fills in.  Only its address is
+                            * named - the entry runs on into the fields of the view above */
+                    /* +0x480 */ u8 pad_0x480_head[0x484 - 0x480];
+                    /* +0x484 */ u8 hit_0x484[0x5C];
+                };
+            };
         };
-        struct {   /* the shell band's view: the actor's own attack entry, the record
-                    * `Pl/pl_act.cpp` spells `_HIT_W` and `fn_80277974` fills in.  Only its address is
-                    * named - the entry runs on into the fields of the view above */
-            /* +0x480 */ u8 pad_0x480_head[0x484 - 0x480];
-            /* +0x484 */ u8 hit_0x484[0x5C];
+        struct {   /* this branch's names, padded to the same byte total */
+        /* +0x480 */ u8 pad_merge_0x480[0x4];
+                                /* +0x484 */ u8 field_0x484;   /* the per-frame work block `fn_8029EFDC` resets */
+        /* +0x485 */ u8 pad_merge_0x485[0x5B];
         };
     };
-    /* +0x4E0 */ u8 unk4E0[0x4E5 - 0x4E0];
+    /* +0x4E0 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 5 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x4E0 */ u8 unk4E0[0x4E5 - 0x4E0];
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x4E0 */ u8 field_0x4E0;   /* the second per-frame work block `fn_8029EFDC` resets */
+        /* +0x4E1 */ u8 pad_merge_0x4E1[0x4];
+        };
+    };
     /* +0x4E5 */ u8 unk4E5;
     /* +0x4E6 */ u8 unk4E6[0x4EE - 0x4E6];
     /* +0x4EE */ u8 unk4EE;
@@ -845,39 +1043,61 @@ struct _PLW {
     /* +0x5A4 */ u16 field_0x5A4;
     /* +0x5A6 */ u8 unk5A6;
     /* +0x5A7 */ u8 field_0x5A7;
-    /* +0x5A8 */ u8 pad_0x5A8[0x10];
+    /* +0x5A8 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 16 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x5A8 */ u8 pad_0x5A8[0x10];
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+        /* +0x5A8 */ u8 pad_merge_0x5A8[0x4];
+                                /* +0x5AC */ u8 field_0x5AC;
+        /* +0x5AD */ u8 pad_merge_0x5AD[0xB];
+        };
+    };
     /* +0x5B8 */ s16 field_0x5B8;  /* the guard timer `fn_80274918` gates the table row on (>= 0xA0) */
     /* +0x5BA */ u8 field_0x5BA;
     /* +0x5BB */ u8 unk5BB;
     /* +0x5BC */ u8 unk5BC[0x5C4 - 0x5BC];
-    /* +0x5C4 */ union {
-        /* +0x5C4 */ u8 unk5C4;
-        /* +0x5C4 */ u8 field_0x5C4;  /* cleared by the act entry (`fn_80275C34`) */
-    };
-    /* +0x5C5 */ union {   /* the 0x20-byte run 0x5C5-0x5E4, with the armed-slot bytes inside */
-        /* +0x5C5 */ u8 unk5C5[0x5E5 - 0x5C5];
-        struct {
-            /* +0x5C5 */ union {   /* the run's 3-byte head, two spellings (rule 5) */
-                /* +0x5C5 */ u8 pad_0x5C5[0x3];
-                /* +0x5C5 */ u8 unk5C5_start[0x5C8 - 0x5C5];
+    /* +0x5C4 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 36 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x5C4 */ union {
+                /* +0x5C4 */ u8 unk5C4;
+                /* +0x5C4 */ u8 field_0x5C4;  /* cleared by the act entry (`fn_80275C34`) */
             };
-            /* +0x5C8 */ u8 field_0x5C8;   /* the armed weapon class `fn_802745DC` reads; non-zero
-                                            * also lets main's `fn_8027D6DC` send its motion
-                                            * request */
-            /* +0x5C9 */ u8 field_0x5C9;   /* set once the armed value table has been read; the latch
-                                            * main's `fn_8027D6DC` sets on every call */
-            /* +0x5CA */ union {   /* the 0x1B-byte tail, two spellings (rule 5) */
-                /* +0x5CA */ u8 pad_0x5CA[0x1B];
-                /* +0x5CA */ u8 unk5CA[0x5E5 - 0x5CA];
+            /* +0x5C5 */ union {   /* the 0x20-byte run 0x5C5-0x5E4, with the armed-slot bytes inside */
+                /* +0x5C5 */ u8 unk5C5[0x5E5 - 0x5C5];
+                struct {
+                    /* +0x5C5 */ union {   /* the run's 3-byte head, two spellings (rule 5) */
+                        /* +0x5C5 */ u8 pad_0x5C5[0x3];
+                        /* +0x5C5 */ u8 unk5C5_start[0x5C8 - 0x5C5];
+                    };
+                    /* +0x5C8 */ u8 field_0x5C8;   /* the armed weapon class `fn_802745DC` reads; non-zero
+                                                    * also lets main's `fn_8027D6DC` send its motion
+                                                    * request */
+                    /* +0x5C9 */ u8 field_0x5C9;   /* set once the armed value table has been read; the latch
+                                                    * main's `fn_8027D6DC` sets on every call */
+                    /* +0x5CA */ union {   /* the 0x1B-byte tail, two spellings (rule 5) */
+                        /* +0x5CA */ u8 pad_0x5CA[0x1B];
+                        /* +0x5CA */ u8 unk5CA[0x5E5 - 0x5CA];
+                    };
+                };
             };
+            /* +0x5E5 */ u8 unk5E5;
+            /* +0x5E6 */ union {   /* one u8, two spellings (rule 5) */
+                /* +0x5E6 */ u8 unk5E6;
+                /* +0x5E6 */ u8 field_0x5E6;  /* the act's boolean latch (`fn_8025ECF0` toggles it) */
+            };
+            /* +0x5E7 */ u8 unk5E7;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+        /* +0x5C4 */ u8 pad_merge_0x5C4[0x3];
+                                /* +0x5C7 */ u8 field_0x5C7;
+        /* +0x5C8 */ u8 pad_merge_0x5C8[0x20];
         };
     };
-    /* +0x5E5 */ u8 unk5E5;
-    /* +0x5E6 */ union {   /* one u8, two spellings (rule 5) */
-        /* +0x5E6 */ u8 unk5E6;
-        /* +0x5E6 */ u8 field_0x5E6;  /* the act's boolean latch (`fn_8025ECF0` toggles it) */
-    };
-    /* +0x5E7 */ u8 unk5E7;
     /* +0x5E8 */ s16 unk5E8;
     /* +0x5EA */ u8 pad_0x5EA[0x8];
     /* +0x5F2 */ u16 unk5F2[8];
@@ -915,28 +1135,45 @@ struct _PLW {
     };
     /* +0x650 */ u16 field_0x650;   /* the id `fn_802731B4`/`fn_80272E30` are handed */
     /* +0x652 */ s16 field_0x652;   /* the amount `fn_8027D76C` compares against and negates */
-    /* +0x654 */ u8 pad_0x654[0x1]; /* the pre-merge spelling of 0x650-0x655 was one 5-byte padding
-                                    * run; nothing read it, so it is split in place (the parent's
-                                    * layout, and the run's byte total, are unchanged) */
-    /* +0x655 */ u8 field_0x655;
-    /* +0x656 */ union {   /* the pre-merge padding run; the act-end flags this branch named */
-        /* +0x656 */ u8 pad_0x656[0x8];
-        struct {
-            /* +0x656 */ u8 act_end_request;      /* nonzero asks the running act handler to end; `1`
-                                                  * selects the alternate end path */
-            /* +0x657 */ u8 act_handler_entered;  /* every act handler sets it on entry */
-            /* +0x658 */ u8 pad_0x658[0x6];
+    /* +0x654 */ union { /* MAIN's arm first; the second arm is this branch's view of
+                          * the same 16 bytes, so `Pl/fn_8025F088.cpp` keeps the names
+                          * it reads (rule 5: one member per offset) */
+        struct {   /* MAIN's view verbatim - every member keeps its own offset */
+            /* +0x654 */ u8 pad_0x654[0x1]; /* the pre-merge spelling of 0x650-0x655 was one 5-byte padding
+                                            * run; nothing read it, so it is split in place (the parent's
+                                            * layout, and the run's byte total, are unchanged) */
+            /* +0x655 */ u8 field_0x655;
+            /* +0x656 */ union {   /* the pre-merge padding run; the act-end flags this branch named */
+                /* +0x656 */ u8 pad_0x656[0x8];
+                struct {
+                    /* +0x656 */ u8 act_end_request;      /* nonzero asks the running act handler to end; `1`
+                                                          * selects the alternate end path */
+                    /* +0x657 */ u8 act_handler_entered;  /* every act handler sets it on entry */
+                    /* +0x658 */ u8 pad_0x658[0x6];
+                };
+            };
+            /* +0x65E */ u8 field_0x65E;
+            /* +0x65F */ union {   /* the pre-merge 3-byte run; the fn_802489D4 unit split it at +0x660 */
+                /* +0x65F */ u8 unk65F[0x662 - 0x65F];
+                struct {
+                    /* +0x65F */ u8 field_0x65F;
+                    /* +0x660 */ u8 pad_0x660[0x2];
+                };
+            };
+            /* +0x662 */ s16 field_0x662;
+        };
+        struct {   /* this branch's names, padded to the same byte total */
+                                /* +0x654 */ u8 field_0x654;
+        /* +0x655 */ u8 pad_merge_0x655[0x1];
+                                /* +0x656 */ u8 field_0x656;
+                                /* +0x657 */ u8 field_0x657;
+                                /* +0x658 */ u8 field_0x658;   /* the 90-frame lockout `Pl/fn_80262688` sets */
+        /* +0x659 */ u8 pad_merge_0x659[0x3];
+                                /* +0x65C */ u8 field_0x65C;
+                                /* +0x65D */ u8 field_0x65D;
+        /* +0x65E */ u8 pad_merge_0x65E[0x6];
         };
     };
-    /* +0x65E */ u8 field_0x65E;
-    /* +0x65F */ union {   /* the pre-merge 3-byte run; the fn_802489D4 unit split it at +0x660 */
-        /* +0x65F */ u8 unk65F[0x662 - 0x65F];
-        struct {
-            /* +0x65F */ u8 field_0x65F;
-            /* +0x660 */ u8 pad_0x660[0x2];
-        };
-    };
-    /* +0x662 */ s16 field_0x662;
     /* +0x664 */ u16 field_0x664;
     /* +0x666 */ u16 field_0x666;
     /* +0x668 */ u8 pad_0x668[0x48C];
