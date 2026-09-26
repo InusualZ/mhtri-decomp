@@ -1531,3 +1531,31 @@ function the range owns - naming evidence class 1 without reading a single asser
 evidence made it visible. The same pattern settled a boundary question the other way: `_8029e4e0switchdataD_805cdea8`
 (owner 0x8029E4E0, which lies inside the *previous* run) sitting in a file's own `.data` run proves that TU starts
 at or before 0x8029E4E0 - a bound, not a measured edge, which is why the left edge stayed where it was.
+
+## 55. An odd-start section claim cannot be linked with MWCC's alignment
+
+**Problem.** A unit whose object is byte-identical to its target still refuses to flip: `flipcheck.py` says
+READY, the bytes match, and `ninja build/RMHE08/ok` still fails with a DOL in which the tables are four bytes
+late. It reads as link order or a misplaced `.data` boundary, and neither a source rewrite nor a flag spelling
+moves it.
+
+**Why try it.** MWCC writes one alignment per section regardless of where the linker script puts it
+(`sh_addralign = 8` for `.data`), but `splits.txt` may claim that section at a 4-mod-8 address - retail really
+has such units. mwld cannot honour the claim then: it rounds the section up to the next 8-byte boundary and
+everything after it shifts, while the *object* stays byte-identical, so every "is the unit complete?" check
+says yes.
+
+**Result.** Compare the section's alignment in our object against dtk's **target** object
+(`build/RMHE08/obj/<unit>.o`). `dol split` already normalises the target to what the address can honour, so if
+the target says 4 and ours says 8, the object is complete and the fix is a post-compile step, not source:
+lower the emitted section's `sh_addralign` to `lowbit(claimed start)` - never raise it. This is implemented in
+`tools/elf/objalign.py`, chained into every MWCC rule by `tools/project.py` after `dtk extab clean` (the two
+rules without a chain of their own need `CHAIN`, i.e. `cmd /c`, or MWCC is handed `&&` as a file argument). It
+is a strict lowering, so it is a no-op for every unit whose starts are aligned already, and a full rebuild with
+no flips is its regression proof.
+
+**Example.** `Pl/fn_8023C2D0`: ours `.data` size 0x84C align 8, target size 0x84C align **4** (the claim starts
+at 0x805C34D4). Setting that one field to 4 in a scratch copy relinked `main.dol` byte for byte. With the step
+in place the flip links green, and `Pl/fn_80230FBC` with it. `Pl/fn_802373AC`, `Pl/fn_802430E8` and
+`enemy/fn_80165FC8` have the same odd start but real `.text` residuals, so their alignment is already right and
+their code is not - one measurement tells the two apart, and `flipcheck.py` still refuses them for the code.
