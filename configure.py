@@ -1393,6 +1393,11 @@ config.libs = [
             # the runtime dump answers only `FUN_`/`zz_` placeholders (class 3/4 in the brief; see the
             # file header).
             Object(NonMatching, "fn_80056F24.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `8056BBF0` - the
+            # tiHKBManager.cpp listener/observer manager (its own `__FILE__` string at .data:0x80658408).
+            # Evidence class 1; un-moduled game file at the repository root in the `main` (game) lib,
+            # cflags_main.  Claims .text 0x8056BBF0-0x8056F2B4 + the .ctors word 0x8056F428-0x8056F42C.
+            Object(NonMatching, "tiHKBManager.cpp"),
         ],
     },
 ]
