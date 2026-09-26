@@ -494,6 +494,10 @@ config.libs = [
                         # Sections: .text 0x802D0F34..0x802D44F4, extab 0x80014844..0x8001496C,
                         # extabindex 0x80032ACC..0x80032C88, .data 0x805D4E80..0x805D5000.
                         Object(NonMatching, "ai/fn_802D0F34.cpp"),
+                        # Registered from proposal/802D44F4_fn_802D44F4.cpp (`.text`
+                        # 0x802D44F4..0x802DDC04, 165 functions / 38672 B).  See the unit header for
+                        # the seam, module and language evidence.
+                        Object(NonMatching, "ai/fn_802D44F4.cpp"),
         ],
     },
 
