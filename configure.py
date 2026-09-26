@@ -1475,6 +1475,22 @@ config.libs = [
             # partly references, so no data range is claimed yet.
             Object(NonMatching, "lobby/fn_80212810.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80219260_fn_80219260.cpp` (`.text` 0x80219260..0x8021E1EC, 76 functions / 20364 B) -
+            # the equipment-page group between the two item/equipment page units.  Module `lobby`
+            # from the band (both bracketing registered units are `lobby`) and from the code: it
+            # hands the player actor `_PLW` (`self->plw_0x34`) to the `Put_equip_dtl_*` /
+            # `Put_status_equip_*` page and calls the `_EQUIP` accessors (`Gunner_opt_ok_ck`,
+            # `Get_equip_rare`).  C++ from the range's mangled callees.  No `__FILE__` string covers
+            # the range - the band's only source-name string (`enemy_control.cpp`, 0x805A1BB8) is
+            # never addressed by the range's code - and the dump answers only `zz_` placeholders, so
+            # the file keeps the map stem (brief section 2, class 4).
+            # Sections: extab 0x80011724..0x800118CC (53 records), extabindex
+            # 0x8002E1A0..0x8002E41C (53 x 12 B), .text 0x80219260..0x8021E1EC - each run is exactly
+            # the gap between the two bracketing registered claims.  `.text` + the two unwind runs
+            # only: the `.data` (0x805C0xxx) and `.bss` runs this range reads are shared and leak
+            # outside it, so no data range is claimed yet.
+            Object(NonMatching, "lobby/fn_80219260.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `8021E1EC_fn_8021E1EC.cpp` (`.text` 0x8021E1EC..0x80224AC4, 108 functions / 26840 B) -
             # the lobby item/equipment page family.  Module `lobby` from the code (`LbStr`,
             # `draw_sprite_ary`, `draw_font_idx`, `get_lsp_data`, `ItemName`, `put_menu_cursor`) and
