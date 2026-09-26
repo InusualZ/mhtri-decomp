@@ -388,7 +388,8 @@ struct _ENEMY_WORK {
         struct {
             /* +0x328 */ u8 slots_0x328[0x10];
             /* +0x338 */ s16 field_0x338;
-            /* +0x33A */ u8 unused_0x33Ad[0x02];
+            /* +0x33A */ s16 field_0x33A;  /* the second timer `enemy/fn_80382310.cpp`'s
+                                           * `fn_8038729C` runs down (renamed from the pad) */
             /* +0x33C */ s16 field_0x33C;
         } init_0x328;
         /* the action block `enemy/fn_801D428C.cpp` clears (`fn_801D71C4`). */

@@ -989,6 +989,20 @@ config.libs = [
             # signatures (rule 9).  No `__FILE__` string is reachable from the range and the runtime dump
             # answers only `zz_` placeholders, so the file keeps the map's own `fn_80387844` stem.
             Object(NonMatching, "enemy/fn_80387844.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from proposal/80382310_fn_80382310.cpp:
+            # the enemy em009/em019 program band's shared support block (`.text` 0x80382310..0x80387844,
+            # 118 functions / 0x5534 bytes) plus its extab run 0x80017E2C..0x80018094 (77 records) and
+            # extabindex run 0x80037BA8..0x80037F44 (77 x 12 B).  Both runs are contiguous with the
+            # following `enemy/fn_80387844.cpp` (extab 0x80018094.., extabindex 0x80037F44..), which is
+            # what fixes the extent.  Module `enemy` from the code (every body drives the shared
+            # `_ENEMY_WORK` record through `em_frame_check__FP11_ENEMY_WORKUsff`, `em_act_ck`, `em_magma_check`,
+            # `get_joint_wpos_em`, `get_em_chg_scale`) and from the `.data` `em019_prog_tbl`/`em009_prog_tbl`
+            # program tables that bracket the range; the next registered unit is `enemy/fn_80387844.cpp`.
+            # C++ because the range defines `qn_get_motion_no__FP7_QNPC_W` and reaches genuinely mangled
+            # callees through their real signatures (rule 9).  No `__FILE__` string is referenced by the
+            # range and the runtime dump answers only `zz_` placeholders, so the file keeps the map's own
+            # `fn_80382310` stem.
+            Object(NonMatching, "enemy/fn_80382310.cpp"),
         ],
     },
 
