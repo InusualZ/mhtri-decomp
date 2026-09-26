@@ -93,5 +93,23 @@ profiles.
   the ack and the setup, and nothing else, because the profile is supposed to carry the rules.
 * **`merger`** - pending: the next refused apply (the parked `worker/801b0010-...` branch is the natural case).
 
+### Field comparison: `worker` vs `decompiler` on the same kind of task
+
+The profiles are not only tested in isolation - the campaign kept running `worker` lanes beside `decompiler` ones,
+which gives a direct comparison on real units.
+
+* **`enemy/fn_801D80EC` (`worker`, 2026-09-25)** - all 49 rows, 18 byte-identical, unit 94.97 %, landed clean. Its
+  own report names the difference: *"the enemy owner headers don't carry the call-site signatures this band needs,
+  so the file declares them itself exactly as `enemy/fn_801D428C.cpp` does; four `shared-file` requests are in the
+  outbox."* That is the rule-2 pattern the campaign has paid for all session: it passes the lint only because
+  those symbols have no registered owner *yet*, and it becomes a clash the moment one lands - which is exactly how
+  `801A9540` (clash in `fn_8014A1BC.o`) and `801BD6C0` (clash in `fn_80105314.cpp`) were both refused. The
+  `decompiler` profile says instead: a declaration belongs in its owner's header, and an unowned symbol goes in
+  `include/unsplit/<module>.h`.
+* **What to watch in the `decompiler` lanes** (`801E0ADC`, `801EC9F8`, `801F3294`, `801F9CD4`, `802029B4`): whether
+  they place declarations that way unprompted, and whether they land without a gate refusal. That outcome decides
+  whether the rule-2 refusals we have been absorbing go away - and it is the honest measure of whether the
+  profiles were worth building.
+
 The `worker`-based baseline this is measured against: five branches refused on rule 3/6/7 items, four hand-built
 merge lanes, one worker editing MAIN, and one lane spending 130 turns / 1.36 Mt on a single unit.
