@@ -519,12 +519,15 @@ config.libs = [
 
     {
         # New module, registered from proposal/8029F3C8_body_set__FP7_BODY_WP10_BODY_DATAUcUlUc: the
-        # item menu's data layer (`.text` 0x8029F3C8..0x802A5444, 91 functions, 0x607C B; extab
-        # 0x8001360C..0x800137A4 and extabindex 0x80030F90..0x800311F4 for the 51 framed functions in
-        # that range).  Module `menu` and file name `menu_item.cpp` come from the range's own
-        # `__FILE__` string (`.data` 0x805CDFC8, 0xE B = "menu_item.cpp"; the dump's local symbol for it
-        # is `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. it is emitted by 0x802A22A4, a function of this
-        # range).  cflags_main: the range keeps `bl`s to its tiny same-file helpers
+        # item menu (`.text` 0x8029F3C8..0x802A6624, 99 functions, 0x725C B; extab
+        # 0x8001360C..0x800137D4 and extabindex 0x80030F90..0x8003123C for the 57 framed functions in
+        # that range - both runs are exactly the gap between the bracketing auto objects).  Module
+        # `menu` and file name `menu_item.cpp` come from the range's own `__FILE__` string
+        # (`.data` 0x805CDFC8, 0xE B = "menu_item.cpp"; the dump's local symbol for it is
+        # `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. it is emitted by 0x802A22A4, a function of this
+        # range, and every `nw4r::db::Panic` assert of the range passes it - including the
+        # 0x802A5444..0x802A6624 half the 2026-09-26 fold brought in).  cflags_main: the range keeps
+        # `bl`s to its tiny same-file helpers
         # (`GetItemData` from `fn_8029F704`/`fn_8029F73C`, `hit_flag_set` from `fn_8029F4C4`), which is
         # cflags_main's `-inline noauto`, and it carries 0 record-form instructions like the stage and
         # Pl bands (the peephole is not proven off here - `infer.py` reads absence as no evidence).
