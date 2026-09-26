@@ -570,6 +570,18 @@ config.libs = [
             # range keeps `bl`s to its own tiny helpers (`fn_802E0DA8` -> `fn_802E0CE4`) and carries the
             # 74 extab records `-Cpp_exceptions on` emits.
             Object(NonMatching, "hud/layout.cpp"),
+            # Registered from proposal/802E7408_fn_802E7408.cpp (`.text` 0x802E7408..0x802EBED8, 64
+            # functions / 19152 B; extab 0x800150C4..0x8001529C and extabindex 0x8003378C..0x80033A50,
+            # 59 records each - both runs start exactly where `hud/layout.cpp`'s band's runs end).
+            # The name is class-1 evidence: `.data` 0x805D5D08 is the bare source name
+            # "cockpit_quest.cpp" (0x12 B, the dump's `_802e4e00s_cockpit_quest.cpp_805d5d08`) and it
+            # is referenced from inside this range (`fn_802E7408`/`fn_802E7548`'s `nw4r::db::Panic`
+            # asserts) and by nothing else.  Module `hud` from the naming scheme of the band's
+            # neighbours: `cockpit.cpp` (0x802D9EB4..0x802E0740) and `layout.cpp`
+            # (0x802E0740..0x802E4978) are both registered in this lib, and this range drives the
+            # same two `lbl_806BDCC8` work records and calls the same `hud` 2D element library.
+            # Same `cflags_main` as `hud/layout.cpp`.
+            Object(NonMatching, "hud/cockpit_quest.cpp"),
         ],
     },
 
