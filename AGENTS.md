@@ -54,45 +54,8 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
 
-**UPDATE 2026-09-26 (branch cleanup closed out).** `main` = `cf06c7d8f`; **exactly one non-main branch left**,
-`worker/802e4978-fn-802e4978-506b`, whose 54-rule-2 fix a `fixer` lane (`7521a53c-92db-46d5-88ec-dc58dbdafcde`)
-is finishing - land it, delete the branch, and `queue.py list` must then read "none unlanded", which is the
-owner's condition to resume production. Landed in this round: `ef/eft035.cpp` (0x802F140C-0x802F5138, 17/39 fn,
-11 byte-identical, 15.045 % - `cf06c7d8f`), `homebutton/fn_80555374.cpp` (868096c2b), `AX/AXFXReverbHi.c`
-(34f1c03a6), `Network/fn_803D3CE8.cpp` (205383f5b), `ef/fn_80101DF4` flips to Matching (1f2b59e28),
-`enemy/fn_80382310.cpp` (4414228c7), `tools/units/queue.py` guard (e4341d71c). Ledger: covered 11747 / closed
-6057 / partial 365 / matched 4258 / bytes 517860. **Incident mechanism (now understood):** worktrees hold
-`orig/RMHE08/files` as a **junction with an absolute target** (per the lane briefs); MAIN's
-`orig/RMHE08/{sys/main.dol,files/*.sel}` was emptied at ~08:04 while a lane repointed/deleted such a junction,
-and `build/RMHE08/{obj,asm}` was emptied with it. The originals are gitignored, so only a filesystem copy brings
-them back: `../orig-backup/RMHE08/` (sha1 `bf4850739478caaedfe675949eb7c28595a7fde9`). Do not let a lane point a
-junction at MAIN's `orig/`, and do not tear down a worktree until MAIN's copy is verified - AGENTS.md
-non-negotiable 1 carries the rule.
-
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
 
-**Owner round 2026-09-26 (late): branch cleanup + the unlanded-branch guard.** Production is HALTED by the
-owner until every non-main branch is resolved. Done so far: (1) **the guard** - `queue.py` refuses to claim
-while any branch holds content `main` lacks (`strictly_newer`; narrow, so the stale pads and comment wording a
-landed branch leaves behind do not block) - committed `e4341d71c` with AGENTS.md (operational mode) and
-`docs/plan.md` 7.23, 117 selftest checks; (2) **the audit and the sweep** - 23 local branches down to 2
-unlanded. Deleted after the line-superset test: landed content (`8026ffbc`, `802ebed8`, `80382310`, `803d3ce8`,
-`80423e74`, `80474cb0`, `804c1760`, `805113b0`, `80555374`, `802e7408`-class), stale (`8029f3c8`, `802a6624`,
-`802c474c`, `802c5d10`, `802d0f34`, `802d44f4`, `802ddc04`, `802e7408`, `80387844`, `80429b94`,
-`tools/linkage-repair`, `tools/queue-spread-claims`). Notable: `802e7408`'s per-file pragma is superseded by
-`cflags_hud`'s `-opt nopeephole`; `80429b94`'s `.data` line and `linkage-repair`'s `extern "C"` lines are in
-main already; `8029f3c8`/`802a6624`/`802c*/`802d*` differ only in older pad names and older header prose.
-`backup/pre-upstream-merge` is a **tag**, not a branch (kept). (3) **`menu/fn_802E4978.cpp` was a whole unlanded
-unit** (511 source + 186 unit header + 115 unsplit-header lines): my own apply was refused for 54 rule-2
-violations in `include/unsplit/menu.h`, so a `fixer` lane (`7521a53c-92db-46d5-88ec-dc58dbdafcde`, worktree
-`.ws-802e4978-...`) is moving each declaration to its owner's header. (4) `homebutton/fn_80555374.cpp`
-(0x80555374-0x8055C894, 86 of 213 bodies, 55 byte-identical) landed as `868096c2b`. (5) the EF lane
-`worker/802f140c-...` committed `src/ef/eft035.cpp` and is still running; it lands next.
-**INCIDENT + RECOVERY:** `orig/RMHE08/sys/main.dol` and `orig/RMHE08/files/*.sel` were **gone from MAIN**
-(gitignored, so git cannot restore them) and the build died with `orig/RMHE08/sys/main.dol not found`; the
-SHA-1 is back to `bf4850739478caaedfe675949eb7c28595a7fde9`, restored from `../orig-backup/RMHE08/`. AGENTS.md
-non-negotiable 1 now carries the rule (never run a repo-wide clean here, never let a subagent either).
-`build/RMHE08` was wiped and rebuilt green.**
 **Next:** land the fixer's `802e4978` and the EF lane's unit, delete those two branches, then `queue.py list`
 must say "none unlanded" - that is the owner's condition for resuming production.
 
