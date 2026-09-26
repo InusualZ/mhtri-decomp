@@ -669,6 +669,17 @@ config.libs = [
             # `cockpit.cpp` and `cockpit_quest.cpp`, this band's own entry points are the menu
             # library's - `get_menu_lsp_tbl`/`put_menu_cursor`/`GetMenuFontColor`/`ItemName`).
             Object(NonMatching, "menu/fn_802E4978.cpp"),
+            # Registered from proposal/8031EA8C_fn_8031EA8C.cpp: the continuation of the
+            # item/equipment selection-screen band above `menu/fn_8031A6C0.cpp` (`.text`
+            # 0x8031EA8C..0x80324F7C, 67 functions / 25840 B; extab 0x80016074..0x8001621C and
+            # extabindex 0x80034F14..0x80035190, both runs contiguous with the predecessor's and the
+            # successor's).  Module `menu` from the left neighbour and the range's own callees (the
+            # menu/HUD 2D library); no `__FILE__` string covers the range (every `.data` reference is
+            # a mask/sprite table, a jumptable or a pool float) and the dump answers `zz_`, so the
+            # file keeps the map's stem (brief section 2, class 4).  Same `cflags_menu` as the band
+            # below: `infer.py` reads the peephole off on its objects (`fn_80324CC4`, 0 record forms
+            # with 2 fold-shaped pairs) and `-use_lmw_stmw off`.
+            Object(NonMatching, "menu/fn_8031EA8C.cpp"),
         ],
     },
 
