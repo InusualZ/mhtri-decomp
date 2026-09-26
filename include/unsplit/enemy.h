@@ -302,6 +302,14 @@ void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
  * both name `enemy`, so this band header is their home. */
 void fn_801A9748(struct _ENEMY_WORK* self);
 void fn_801A98F8(struct _ENEMY_WORK* self);
+/* The enemy action-table head above `enemy/fn_80387844.cpp`'s range (0x803874C8..0x80387844): the
+ * first four `state_sub` handlers `fn_80388144` dispatches to.  Unowned (the bracketing registered
+ * units are `enemy` on both sides), so the band header is their rule-2 home.  Each drives the shared
+ * `_ENEMY_WORK`; `fn_803874C8` takes the work record, the other three take none (they forward r3). */
+void fn_803874C8(struct _ENEMY_WORK* self);
+void fn_80387528(void);
+void fn_803875A4(void);
+void fn_80387620(void);
 #ifdef __cplusplus
 }
 #endif

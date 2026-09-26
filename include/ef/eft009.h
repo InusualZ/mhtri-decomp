@@ -11,6 +11,7 @@
 #include "nw4r/math.h"
 
 struct _ENEMY_WORK;
+struct _CP_VECTOR;
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +40,13 @@ void fn_801048B0(void* self);
  * `src/ef/eft009.cpp`.  Added for `enemy/fn_801BD6C0.cpp` (rule 2: three consumer units used to
  * spell it locally). */
 void fn_801048B4(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, f32 scale);
+#ifdef __cplusplus
+/* 0x8010494C - the owner's own C++-mangled definition `eft009_set_pos__FUcPQ34nw4r4math4VEC3P10_CP_VECTORfUl`
+ * (`void eft009_set_pos(u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u32 id)` in
+ * `src/ef/eft009.cpp`), declared at C++ scope so a caller never spells the mangling (rule 9).  Added
+ * with `enemy/fn_80387844.cpp`, whose effect branches spawn through it. */
+void eft009_set_pos(u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u32 id);
+#endif
 #ifdef __cplusplus
 }
 #endif
