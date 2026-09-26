@@ -210,6 +210,10 @@ extern const f32 lbl_80799C78;       /* .sdata2 0x80799C78 - the per-row step sc
 extern const f32 lbl_80799C7C;       /* .sdata2 0x80799C7C - the "scrolled to the end" mark */
 extern u32 lbl_80794868;             /* .sbss 0x80794868 - the page's tick counter */
 s32 CalculateEvents();
+/* 0x80223E54 - the `.text` helper in this unit's range (0x8021E1EC-0x80224AC4) that
+ * `Pl/fn_80262940.cpp` calls on the actor model; an unmangled `fn_` stem, so C linkage.  Owned here by
+ * range (rule 2), so the consumer includes this header rather than declaring it in the unsplit band. */
+s32 fn_80223E54(s32 model);
 extern const f32 lbl_80799CDC;       /* .sdata2 0x80799CDC */
 }
 

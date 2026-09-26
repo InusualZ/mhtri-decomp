@@ -747,6 +747,12 @@ Pl/fn_80241558.cpp:
 	.text       start:0x80241558 end:0x802430E8
 	.data       start:0x805C3D20 end:0x805C4134
 
+Pl/fn_80262940.cpp:
+	extab       start:0x8001241C end:0x80012554
+	extabindex  start:0x8002F514 end:0x8002F6E8
+	.text       start:0x80262940 end:0x802693C4
+	.ctors      start:0x8056F368 end:0x8056F36C
+
 Pl/pl_master.cpp:
 	extab       start:0x8001265C end:0x800126CC
 	extabindex  start:0x8002F808 end:0x8002F8B0

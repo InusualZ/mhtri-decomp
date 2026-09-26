@@ -146,7 +146,7 @@ struct _PLW {
     /* +0x044 */ f32 unk44;
     /* +0x048 */ u8 unk048[0x54 - 0x48];
     /* +0x054 */ u32 param_0x54;
-    /* +0x058 */ u32 unk58;
+    /* +0x058 */ u32 field_0x058;
     /* +0x05C */ u32 unk5C;
     /* +0x060 */ f32 ground_y_0x060;  /* the player's base/target y the effect sits on */
     /* +0x064 */ f32 unk064;
@@ -159,7 +159,8 @@ struct _PLW {
     /* +0x09C */ f32 unk09C;
     /* +0x0A0 */ f32 unk0A0;
     /* +0x0A4 */ f32 unk0A4;
-    /* +0x0A8 */ u8 unk0A8[0xB4 - 0xA8];
+    /* +0x0A8 */ u32 field_0x0A8;          /* the second counter `fn_80264940` feeds (Pl/fn_80262940.cpp) */
+    /* +0x0AC */ u8 unk0AC[0xB4 - 0xAC];
     /* +0x0B4 */ s16 unk0B4;
     /* +0x0B6 */ u8 pad_0xB6[0x4];
     /* +0x0BA */ u16 unkBA;
@@ -236,7 +237,7 @@ struct _PLW {
     /* +0x36B */ u8 unk36B;
     /* +0x36C */ s16 unk36C;
     /* +0x36E */ u8 unk36E[0x370 - 0x36E];
-    /* +0x370 */ s16 unk370;
+    /* +0x370 */ s16 field_0x370;
     /* +0x372 */ s16 unk372;
     /* +0x374 */ u8 pad_0x374[0x2];
     /* +0x376 */ s16 unk376;
@@ -257,9 +258,12 @@ struct _PLW {
     /* +0x392 */ s16 unk392;
     /* +0x394 */ s16 unk394;
     /* +0x396 */ s16 unk396;
-    /* +0x398 */ u8 unk398[0x39E - 0x398];
+    /* +0x398 */ u16 field_0x398;        /* running damage dealt, `fn_80264940` accumulates into it */
+    /* +0x39A */ u8 unk39A[0x39C - 0x39A];
+    /* +0x39C */ u16 field_0x39C;         /* shell/element charge gauge (`fn_80265748`) */
     /* +0x39E */ u8 unk39E;
-    /* +0x39F */ u8 unk39F[0x3A2 - 0x39F];
+    /* +0x39F */ u8 unk39F[0x3A1 - 0x39F];
+    /* +0x3A1 */ u8 field_0x3A1;
     /* +0x3A2 */ s8 unk3A2;
     /* +0x3A3 */ s8 unk3A3;
     /* +0x3A4 */ u8 unk3A4[0x3AC - 0x3A4];
@@ -280,13 +284,15 @@ struct _PLW {
     /* +0x3D8 */ u32 unk3D8;
     /* +0x3DC */ u32 unk3DC;
     /* +0x3E0 */ u32 unk3E0;
-    /* +0x3E4 */ u8 unk3E4[0x3EC - 0x3E4];
+    /* +0x3E4 */ u8 unk3E4[0x3EA - 0x3E4];
+    /* +0x3EA */ s16 field_0x3EA;         /* hit-stop / stagger timer `fn_80264274` feeds */
     /* +0x3EC */ s16 unk3EC;
     /* +0x3EE */ u8 unk3EE[0x3F2 - 0x3EE];
     /* +0x3F2 */ s16 unk3F2;
     /* +0x3F4 */ u8 unk3F4[0x3F8 - 0x3F4];
     /* +0x3F8 */ s16 unk3F8;
-    /* +0x3FA */ u8 unk3FA[0x3FE - 0x3FA];
+    /* +0x3FA */ u8 unk3FA[0x3FC - 0x3FA];
+    /* +0x3FC */ s16 field_0x3FC;         /* stamina/guard timer (`fn_80264EA4`, `fn_80265374`) */
     /* +0x3FE */ s16 unk3FE;
     /* +0x400 */ u8 unk400[0x404 - 0x400];
     /* +0x404 */ s16 unk404;
@@ -294,11 +300,11 @@ struct _PLW {
     /* +0x40E */ s16 unk40E;
     /* +0x410 */ u8 unk410[0x414 - 0x410];
     /* +0x414 */ s16 unk414;
-    /* +0x416 */ s16 unk416;
-    /* +0x418 */ u8 unk418[0x41A - 0x418];
+    /* +0x416 */ s16 field_0x416;
+    /* +0x418 */ s16 field_0x418;         /* first shell timer, cleared by `fn_802656EC` */
     /* +0x41A */ s16 unk41A;
-    /* +0x41C */ s16 unk41C;
-    /* +0x41E */ u8 unk41E[0x420 - 0x41E];
+    /* +0x41C */ s16 field_0x41C;
+    /* +0x41E */ s16 field_0x41E;         /* second shell timer, cleared by `fn_802656EC` */
     /* +0x420 */ s16 unk420;
     /* +0x422 */ s16 unk422;
     /* +0x424 */ s16 unk424;
@@ -315,8 +321,9 @@ struct _PLW {
     /* +0x44C */ s8 unk44C;
     /* +0x44D */ s8 unk44D;
     /* +0x44E */ u8 unk44E[0x45A - 0x44E];
-    /* +0x45A */ s16 unk45A;
-    /* +0x45C */ u8 unk45C[0x466 - 0x45C];
+    /* +0x45A */ s16 field_0x45A;
+    /* +0x45C */ s16 field_0x45C;         /* the second hold/knock-down counter (`fn_8026505C`) */
+    /* +0x45E */ u8 pad_0x45E[0x466 - 0x45E];
     /* +0x466 */ s16 unk466;
     /* +0x468 */ s16 unk468;
     /* +0x46A */ s16 unk46A;
@@ -325,7 +332,9 @@ struct _PLW {
     /* +0x46E */ u8 unk46E;
     /* +0x46F */ u8 unk46F;
     /* +0x470 */ s16 unk470;
-    /* +0x472 */ u8 unk472[0x489 - 0x472];
+    /* +0x472 */ u8 unk472[0x47B - 0x472];
+    /* +0x47B */ u8 field_0x47B;         /* per-player type index `fn_80267C84` reads */
+    /* +0x47C */ u8 pad_0x47C[0x489 - 0x47C];
     /* +0x489 */ u8 unk489;
     /* +0x48A */ u8 unk48A[0x492 - 0x48A];
     /* +0x492 */ u8 unk492;

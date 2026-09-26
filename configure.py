@@ -961,6 +961,15 @@ config.libs = [
             # the jump table carries none), so the stem is the map's `fn_80241558` with a rule-7
             # deferral.  It uses `cflags_pl` (this lib).
             Object(Matching, "Pl/fn_80241558.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80262940_fn_80262940` - the player main/control cluster (0x80262940-0x802693C4, 59
+            # functions, 0x6A84 B) with its own exception tables (extab 0x8001241C-0x80012554,
+            # extabindex 0x8002F514-0x8002F6E8).  Home is `Pl`: the actors are `_PLW` and every gate
+            # is a Pl sibling (`Pl_master_ck`, `Pl_Skill_ck`, `Pl_act_ck`, `Pl_cat_skill_ck`,
+            # `Pl_condition_ck`), and the runtime dump names 8 of the 59
+            # (`player_control_move`/`init_player_work`/`player_move_start`/...).  No `__FILE__`
+            # string covers the band, so the stem is the map's `fn_80262940` with a rule-7 deferral.
+            Object(NonMatching, "Pl/fn_80262940.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump

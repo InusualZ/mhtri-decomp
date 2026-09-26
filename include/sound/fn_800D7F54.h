@@ -74,4 +74,8 @@ void se_req_frame_set(struct _se_w* work, s32 a, s32 param, s32 d, s32 e);
 s32 SE_Code_Make(s32 low_code, s16 low, s32 mid_code, s16 span);
 #endif
 
+
+/* 0x800DB2DC - the no-argument SE mix update `Pl/fn_80262940.cpp` drives after the action settles; the
+ * owner defines it `extern "C" void fn_800DB2DC(void)` (fn_800D7F54.cpp:1328). */
+void fn_800DB2DC(void);
 #endif /* MHTRI_SOUND_FN_800D7F54_H */

@@ -32,6 +32,12 @@ namespace nw4r { namespace ef { struct Effect; } }
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* Declarations whose module band is ambiguous (the registered units bracketing the address name
+ * different modules).  Added with `Pl/fn_80262940.cpp` (proposal 80262940).  `fn_80223E54` was
+ * originally here too; MAIN later registered the lobby range `lobby/fn_8021E1EC.cpp`
+ * (0x8021E1EC-0x80224AC4) over it, so its declaration moved to that owner's header (rule 2). */
+s32 fn_8035B700(s32 a, s32 b, u16 c); /* 0x8035B700 - bracket: hud below, Network above */
+
 
 /*
  * The game/system state block (`system_w`, 0xA5C B in retail).  Union of the three private copies:

@@ -21,6 +21,14 @@ extern "C" {
 s32 fn_8027AC18(void* arg);
 u32 fn_8027BC48(s32 arg);
 
+/* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
+ * which calls them; all four are in this unit's `.text` range (0x80276B58-0x8027D684). */
+void fn_80276B58(struct _PLW* self, s32 value);
+u32 fn_802770E8(struct _PLW* self);
+u32 fn_802790E4(struct _PLW* self, u32 mask);
+u32 fn_8027BCE0(struct _PLW* self);
+u32 fn_8027D40C(struct _PLW* self, s32 arg);
+
 /* 0x8027D310 - the three-argument target-check helper `ai/fn_802CC794.cpp` and the enemy units
  * call; C linkage (unmangled `fn_80278310`), added with its first consumer (rule 2). */
 u32 fn_80278310(u8 a, nw4r::math::VEC3* v, u8 b);

@@ -41,6 +41,11 @@ u32 fn_8026FD94(struct _PLW* self);
  * `Pl_master_ck__FP4_PLW`, so it is declared with C++ linkage (relocaudit). */
 #ifdef __cplusplus
 u32 Pl_master_ck(struct _PLW* plw);
+
+/* Declarations added with `Pl/fn_80262940.cpp` (the 0x80262940 player main/control cluster): the two
+ * action-state helpers that unit calls, both owned by this unit (0x8026FD0C / 0x8026FE68). */
+u32 fn_8026FD0C(struct _PLW* self);
+u32 Pl_act_ck(struct _PLW* self, u8 group, u16 action);
 #endif
 
 #endif /* MHTRI_PL_PL_MASTER_H */
