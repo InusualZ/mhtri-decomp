@@ -867,6 +867,22 @@ The corollary is a working rule: when a tool or a brief can carry one of these, 
 this session showed six workers independently rediscovering the same peephole lever, which is the same waste in a
 different place.
 
+### Paste the queue's spawn line verbatim (2026-09-23)
+
+Two mistakes this session had one cause: **the orchestrator retyped what `queue.py next` had already produced.**
+
+* it grepped the spawn line for the `cwd` to get the worktree path, dropped the `agent:` line, and spawned six
+  general-purpose `worker`s where the queue said `decompiler` - losing the decompiler's prompt, its loaded skills and
+  its acceptance role;
+* it wrote the task text by hand, and added *"end your turn by calling `subagent_done`"* - an instruction **no agent can
+  follow**, because none of them declares that tool. `brief.py` and `queue.py` do not say it (both have selftests
+  asserting the phrase is absent: *the handoff is the final message*), and delivery happens through the extension's
+  grace path regardless.
+
+So: **`queue.py next` prints `agent:`, `name:`, `cwd:` and `task:` - paste all four.** Hand-typing them re-introduces
+exactly the drift the queue exists to prevent, and both of the above were silent: the work still ran, it just ran with the
+wrong agent and an impossible closing instruction. Adding hints to a pasted task is fine; rewriting it is not.
+
 ### Which agent to spawn (2026-09-23)
 
 The project defines three agents for this campaign, and the orchestrator must spawn the *matching* one - the difference is
