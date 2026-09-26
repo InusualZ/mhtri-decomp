@@ -1024,6 +1024,11 @@ ai/fn_802C474C.cpp:
 	extabindex  start:0x800324A8 end:0x8003252C
 	.text       start:0x802C474C end:0x802C5D10
 
+ai/fn_802C5D10.cpp:
+	extab       start:0x80014484 end:0x8001467C
+	extabindex  start:0x8003252C end:0x80032820
+	.text       start:0x802C5D10 end:0x802CC794
+
 ai/fn_802CC794.cpp:
 	extab       start:0x8001467C end:0x80014844
 	extabindex  start:0x80032820 end:0x80032ACC

@@ -474,6 +474,19 @@ config.libs = [
                         Object(Matching, "ai/fn_802D0DCC.c"),
                         Object(NonMatching, "ai/fn_802CC794.cpp"),
                         Object(NonMatching, "ai/fn_802C474C.cpp"),
+                # Registered once, at its final home (docs/plan.md 12): proposal
+                # `802C5D10_fn_802C5D10.cpp` (`.text` 0x802C5D10..0x802CC794, 76 functions / 27268 B).
+                # Module `ai` from the code - every function takes an `_AINPC_W` in r3, calls
+                # `ai_skill_ck__FP8_AINPC_WUc` and drives the same `+0x170`/`+0x442`/`+0x444` offsets the
+                # band above writes - and from the bracketing units (both `ai`).  No `__FILE__` string and
+                # no runtime-dump name covers the range, so the file keeps the map's stem (brief section 2,
+                # class 4; see the unit header).  Sections: .text 0x802C5D10..0x802CC794, extab
+                # 0x80014484..0x8001467C (63 records), extabindex 0x8003252C..0x80032820 - both runs are
+                # exactly the gap between the bracketing objects' runs, and the extabindex entries for
+                # 0x802C5D10..0x802CC57C all point into the extab run.  No .data: the range's switch tables
+                # (0x805D4964..0x805D4D38) sit between the two neighbours' runs and a data claim has to be
+                # measured before and after (playbook 55).
+                        Object(NonMatching, "ai/fn_802C5D10.cpp"),
         ],
     },
 
