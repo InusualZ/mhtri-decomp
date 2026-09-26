@@ -2050,6 +2050,18 @@ config.libs = [
             # (class 4).  Same `cflags_lobby` as the band below, with the per-file
             # `#pragma exceptions on` the other lobby units use to emit the unwind records.
             Object(NonMatching, "lobby/fn_802FA9A0.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8030121C_fn_8030121C.cpp: the lobby UI band
+            # (`.text` 0x8030121C..0x803066F0, 52 symbols / 21716 B, plus its extab run
+            # 0x80015964..0x80015AAC and extabindex run 0x8003447C..0x80034668 - both exactly the gap
+            # between the bracketing registered units' runs).  Module `lobby` (class 3): the range's
+            # callees are the lobby/menu UI API (`LbStr`, `get_lsp_data`, `draw_sprite_ary`,
+            # `draw_font_idx`, `put_menu_cursor`, `GetMenuFontColor`, `ItemName`) and its `.sbss`
+            # reference is the lobby pointer block `lbl_80794880`; no `__FILE__` string covers the
+            # range and the dump answers only `zz_` placeholders, so the file keeps the map's stem
+            # (class 4).  Same `cflags_lobby` as the band below, with the per-file
+            # `#pragma exceptions on` the other lobby units use to emit the unwind records.
+            Object(NonMatching, "lobby/fn_8030121C.cpp"),
         ],
     },
     {
