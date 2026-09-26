@@ -109,6 +109,19 @@ void fn_80051378(VEC3* out, VEC3* a, VEC3* b);
 f32 getKeyData(f32* keys, f32 frame);
 void getKeyData3(f32* keys, f32 frame, f32* out0, f32* out1, f32* out2);
 f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
+/* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
+ * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `fn_800513CC(out, a, b)`
+ * is the paired-single add `out = a + b`, `fn_80050028(out, src)` the field-by-field three-float copy,
+ * `fn_80051EE0(out, in, s)` the scale (`fn_80043EA8` then `fn_80051424`), and `fn_800513F0` the
+ * in-place scale.  Added with `Pl/fn_8028F66C.cpp`, the first consumer to need them here.  The
+ * parameter spellings are the ones the consumers that already include this header declare
+ * (`ef/fn_801173AC.cpp`, `enemy/fn_801B7020.cpp`, `enemy/fn_8035E034.cpp`): `fn_800513F0`'s return
+ * value is ignored at every call site in the tree, so it is declared `void` - a `VEC3*` return here
+ * would be a second overload and `(10505) illegal overloading`. */
+void fn_800513CC(VEC3* out, VEC3* a, VEC3* b);
+void fn_80050028(VEC3* out, const VEC3* src);
+void fn_80051EE0(VEC3* out, VEC3* in, f32 scale);
+void fn_800513F0(VEC3* v, f32 scale);
 #ifdef __cplusplus
 }
 #endif
