@@ -14,6 +14,7 @@
 #define MHTRI_UNSPLIT_LOBBY_H
 
 #include "types.h"
+#include "lobby/lb_npc.h"
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
@@ -82,13 +83,54 @@ typedef struct LbLobbyWork {
     /* +0x007 */ u8 unused_0x007[0x05];
     /* +0x00C */ u32 slots_0x00C[2];
     /* +0x014 */ u8 field_0x014;
-    /* +0x015 */ u8 unused_0x015[0x68];
+    /* Merge of two views of the same 0x68 bytes: the option/menu layer names nothing in there, the
+     * NPC band (`lobby/fn_802029B4.cpp`) names its two state bytes.  Both keep their offsets. */
+    union {
+        /* +0x015 */ u8 unused_0x015[0x68];
+        struct {
+            /* +0x015 */ u8 unused_0x015b[0x61];
+            /* +0x076 */ u8 field_0x076;
+            /* +0x077 */ u8 field_0x077;
+            /* +0x078 */ u8 unused_0x078[0x5];
+        };
+    };
     /* +0x07D */ u8 slots_0x07D[0x2F];
     /* +0x0AC */ LbMenuWork* menu_0xAC;
     /* +0x0B0 */ u8 unused_0x0B0[0x7D];
     /* +0x12D */ u8 param_0x12D;
     /* +0x12E */ u8 unused_0x12E[0x4E];
 } LbLobbyWork; /* size: 0x17C */
+
+/* The lobby's NPC move table block (`lb_npc_move_data`, .bss): +0x0C is the `LbNpcMotionEntry` array
+ * `_LB_NPC::field_0x204` is pointed at.  Only the pointer is read here. size: 0x10 */
+typedef struct LbNpcMoveData {
+    /* +0x00 */ u8 unused_0x00[0x0C];
+    /* +0x0C */ LbNpcMotionEntry* table_0x0C;
+    /* +0x10 */ LbNpcMotionEntry* table_0x10;
+    /* +0x14 */ LbNpcMotionEntry* table_0x14;
+    /* +0x18 */ LbNpcMotionEntry** list_0x18;
+    /* +0x1C */ LbNpcMotionEntry** list_0x1C;
+    /* +0x20 */ LbNpcMotionEntry** list_0x20;
+    /* +0x24 */ LbNpcMotionEntry** list_0x24;
+    /* +0x28 */ LbNpcMotionEntry** list_0x28;
+    /* +0x2C */ LbNpcMotionEntry** list_0x2C;
+} LbNpcMoveData; /* size: 0x30+ */
+
+/* One entry of the map's NPC spot tables (`lbl_805B8EF0`, `lbl_805B8F28`, ...): an x and a z the
+ * `_LB_NPC`'s position is tested against; each table ends with the 10000.0f / 0.0f terminator the
+ * scan's limit names. size: 0x8 */
+typedef struct LbNpcMoveSpot {
+    /* +0x0 */ f32 x;
+    /* +0x4 */ f32 z;
+} LbNpcMoveSpot;
+
+/* One 0xB20-byte record of the enemy move work `get_move_work_adrs(2)` returns; the NPC band copies
+ * its vector at +0x3C into an NPC's target. size: 0xB20 */
+typedef struct LbNpcMoveWorkEntry {
+    /* +0x00 */ u8 pad_0x00[0x3C];
+    /* +0x3C */ VEC3 vec_0x3C;
+    /* +0x48 */ u8 pad_0x48[0xAD8];
+} LbNpcMoveWorkEntry;
 
 /* The per-item rate record `fn_801E6F10`/`fn_801E6F48` return: a pair of 16-bit rates. */
 typedef struct LbItemData {
@@ -335,6 +377,73 @@ extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
 extern u8 lbl_80794880[];
 extern LbLobbyWork lobby_w;
+
+/* The lobby NPC band's own `.sdata2` pool (`src/lobby/fn_802029B4.cpp`'s state machines hand these to
+ * `fn_801FE1CC` as its motion speed/base pair).  The run is unclaimed, so the band header is their
+ * home; the names are the map's own. */
+extern f32 lbl_8079999C;
+extern f32 lbl_807999A0;
+extern f32 lbl_807999B0;
+extern f32 lbl_807999C4;
+extern f32 lbl_807999C8;
+extern f32 lbl_807999CC;
+extern f32 lbl_807999D0;
+extern f32 lbl_807999D4;
+extern f32 lbl_807999D8;
+extern f32 lbl_807999DC;
+extern f32 lbl_807999E4;
+extern f32 lbl_807999E8;
+extern f32 lbl_807999EC;
+extern f32 lbl_807999F0;
+extern f32 lbl_807999F4;
+extern f32 lbl_807999E0;
+extern f32 lbl_807999F8;
+extern f32 lbl_807999FC;
+extern f32 lbl_80799A00;
+extern f32 lbl_80799A14;
+extern f32 lbl_80799A18;
+extern f32 lbl_80799A10;
+extern f32 lbl_80799A1C;
+extern f32 lbl_80799A20;
+extern f32 lbl_80799A24;
+extern f32 lbl_80799A28;
+extern f32 lbl_80799A2C;
+extern f32 lbl_80799A30;
+extern f32 lbl_80799A34;
+extern f32 lbl_80799A38;
+extern f32 lbl_80799A3C;
+extern f32 lbl_80799A40;
+extern f32 lbl_80799A74;
+extern f32 lbl_80799A78;
+extern f32 lbl_80799A7C;
+extern f32 lbl_80799A80;
+extern f32 lbl_80799A84;
+extern f32 lbl_80799A5C;
+extern f32 lbl_80799A88;
+extern f32 lbl_80799A8C;
+extern f32 lbl_80799AA4;
+extern f32 lbl_80799AA8;
+extern f32 lbl_80799AAC;
+extern f32 lbl_80799AB0;
+extern f32 lbl_80799AB4;
+extern f32 lbl_80799AB8;
+extern f32 lbl_80799ABC;
+extern f32 lbl_80799AC0;
+extern f32 lbl_80799AC4;
+extern f32 lbl_80799AC8;
+extern f32 lbl_80799ACC;
+extern f32 lbl_80799AD0;
+extern f32 lbl_80799AD4;
+extern f32 lbl_80799AD8;
+extern f32 lbl_80799ADC;
+extern LbNpcMoveData lb_npc_move_data;
+extern LbNpcMotionEntry lbl_805B8EC8;
+extern LbNpcMoveSpot lbl_805B8EF0[7];
+extern LbNpcMoveSpot lbl_805B8F28[2];
+extern LbNpcMoveSpot lbl_805B8F38[3];
+extern LbNpcMoveSpot lbl_805B8F50[2];
+extern LbNpcMoveSpot lbl_805B8F60[2];
+extern LbNpcMoveSpot lbl_805B8F70[3];
 
 /* The unsplit plain-C callees. */
 void* fn_801E6F10(u16 id);

@@ -52,6 +52,7 @@ typedef nw4r::math::MTX34 Mtx34;
  * mangled identifier).  Additive: a second lane extending this list stays additive. */
 void setVector3(VEC3* v, f32 x, f32 y, f32 z);
 void rotVecX(VEC3* v, u32 angle);
+void rotVecY(VEC3* v, u32 angle);
 void rotVecZ(VEC3* v, u32 angle);
 void mulVecMat(VEC3* v, MTX34* m);
 void copyMat33(MTX34* dst, MTX34* src);
