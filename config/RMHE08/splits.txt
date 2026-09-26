@@ -1038,6 +1038,12 @@ ai/fn_802CC794.cpp:
 ai/fn_802D0DCC.c:
 	.text       start:0x802D0DCC end:0x802D0F34
 
+ai/fn_802D0F34.cpp:
+	extab       start:0x80014844 end:0x8001496C
+	extabindex  start:0x80032ACC end:0x80032C88
+	.text       start:0x802D0F34 end:0x802D44F4
+	.data       start:0x805D4E80 end:0x805D5000
+
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674

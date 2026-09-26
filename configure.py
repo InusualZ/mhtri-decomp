@@ -487,6 +487,13 @@ config.libs = [
                 # (0x805D4964..0x805D4D38) sit between the two neighbours' runs and a data claim has to be
                 # measured before and after (playbook 55).
                         Object(NonMatching, "ai/fn_802C5D10.cpp"),
+                        # Registered from proposal/802D0F34_fn_802D0F34.cpp: the AI-NPC motion band
+                        # (90 functions / 13760 B) directly above `ai/fn_802D0DCC.c`.  Module `ai`
+                        # and the map's stem as file name (class 4 - the range's own manglings are
+                        # `*_AINPC_W`, so the module is certain but no source name is evidenced).
+                        # Sections: .text 0x802D0F34..0x802D44F4, extab 0x80014844..0x8001496C,
+                        # extabindex 0x80032ACC..0x80032C88, .data 0x805D4E80..0x805D5000.
+                        Object(NonMatching, "ai/fn_802D0F34.cpp"),
         ],
     },
 
