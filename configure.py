@@ -1146,7 +1146,7 @@ config.libs = [
             # SE helpers.  No `__FILE__` string covers the range (its own .data pool is jump tables
             # only), so the stem is the map's `fn_80230FBC` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_80230FBC.cpp"),
+            Object(Matching, "Pl/fn_80230FBC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802373AC_fn_802373AC` - the third and fourth of the player work's per-motion SE banks
             # (`.text` 0x802373AC-0x8023C2D0, TWO functions, 20260 B) with extab
