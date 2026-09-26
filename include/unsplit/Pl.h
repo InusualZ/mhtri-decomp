@@ -17,6 +17,25 @@ extern "C" {
 
 s8 fn_802748C8(void* a);
 
+/* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
+ * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x8024????-0x80262940 and
+ * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home. */
+u32 fn_80257E70(struct _PLW* self);
+u32 fn_8025FA00(void* a, void* b);
+u16 fn_80260A18(struct _PLW* self);
+s32 fn_80261770(struct _PLW* self, u8* a, u16* b, u16* c, s32* d, u16* e, u16* f);
+u32 fn_802621B0(struct _PLW* self, void* b);
+s32 fn_80262688(struct _PLW* self);
+u32 fn_802745DC(struct _PLW* self, u32 v);
+s32 fn_80274AB8(s32 a);
+s32 fn_80276254(struct _PLW* self, s32 v);
+u32 fn_802764B0(struct _PLW* self, s32 v);
+u32 fn_80276514(struct _PLW* self, s32 v);
+void fn_80275AC4(struct _PLW* self, s32 a, u16 b, u16 c);
+s32 fn_8027D7EC(struct _PLW* self, u8 flag);
+s32 fn_8027E1E4(struct _PLW* self);
+u32 fn_8027E220(struct _PLW* self, s32 v);
+
 /* The 0x80229xxx motion/SE helper family `Pl/fn_80229ECC.cpp` dispatches into (all unregistered and
  * unmangled; the actor itself is the `_PLW` at their r3). */
 void fn_80229CB4(struct _PLW* self);
