@@ -610,6 +610,16 @@ config.libs = [
             # through its real signature).  Not a continuation of fn_801550FC.cpp (that unit ends at
             # 0x8015D860); the boundary is provisional - see the unit header.
             Object(NonMatching, "enemy/fn_8015E854.cpp"),
+            # Registered from proposal/80165FC8_fn_80165FC8.cpp: the enemy per-area seat/action unit
+            # (0x80165FC8..0x801679B0, 21 functions / 0x19E8 bytes), the exact unclaimed gap between
+            # the two registered units above and below (each ends where this range begins/ends), plus
+            # the extab/extabindex runs its 18 framed functions carry and the one .ctors word for its
+            # static initializer `fn_80166330`.  Module `enemy` from the link band (both bracketing
+            # units are `enemy`) and from the code (`_ENEMY_WORK`, `fn_802B0668`, `em_frame_check`);
+            # C++ because the range reaches mangled callees through their real signatures (rule 9).
+            # No `__FILE__` string survives in the range and the dump answers only `zz_` placeholders,
+            # so the file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_80165FC8.cpp"),
             Object(NonMatching, "enemy/fn_801679B0.cpp"),
             Object(NonMatching, "enemy/fn_80171194.cpp"),
             Object(NonMatching, "enemy/fn_80178128.cpp"),

@@ -138,7 +138,8 @@ struct _ENEMY_WORK {
     /* +0x00A */ u8 field_0x00A;        /* the area `fn_8012E968` matches the work records'
                                         * `area_no` (+0x1E1) and the area table's entries against */
     /* +0x00B */ u8 field_0x00B;        /* the byte `fn_8012F504` hands the effect queue as its flag */
-    /* +0x00C */ u8 unused_0x00C;
+    /* +0x00C */ u8 field_0x00C;        /* the mode `fn_80166DF8` gates its case-0/case-3 blocks on
+                                        * (3 = the "entry seated" state) */
     /* +0x00D */ u8 field_0x00D;        /* the byte `fn_80137604`/`fn_8013760C` latch */
     /* +0x00E */ u8 field_0x00E;        /* `fn_80137C94` hands it to `fn_8012555C` */
     /* +0x00F */ u8 unused_0x00F[0x010 - 0x00F];
@@ -224,7 +225,10 @@ struct _ENEMY_WORK {
     /* +0x314 */ f32 field_0x314;      /* the effect scale `fn_80148BD0` writes (added by
                                         * `enemy/fn_80147CE0.cpp`) */
     /* +0x318 */ f32 field_0x318;      /* the effect radius `fn_801493A8` writes from `fn_80135644` */
-    /* +0x31C */ u8 unused_0x31C[0x324 - 0x31C];
+    /* +0x31C */ u8 unused_0x31C[0x320 - 0x31C];
+    /* +0x320 */ f32 field_0x320;      /* the third effect scale `fn_80167770` seeds (added by
+                                        * `enemy/fn_80165FC8.cpp`; the byte range is the +0x31C
+                                        * VEC3 clash that unit's header records) */
     /* +0x324 */ f32 field_0x324;      /* the effect scale `fn_801493A8` clamps */
     /* +0x328 */ union {
         /* the countdown/flag view `fn_80170600`/`fn_80170804` use. */
@@ -358,7 +362,12 @@ struct _ENEMY_WORK {
     /* +0x48F */ u8 unused_0x48F[0x491 - 0x48F];
     /* +0x491 */ u8 field_0x491;      /* `enemy/fn_8015D860.cpp`'s `fn_8015DB68` sets it at action
                                       * 0xA's sub-state 0xC8 */
-    /* +0x492 */ u8 unused_0x492[0x761 - 0x492];
+    /* +0x492 */ u8 unused_0x492[0x608 - 0x492];
+    /* +0x608 */ u32 field_0x608;      /* the X rotation word `fn_801661FC` hands `rotMatrixX`
+                                        * (added by `enemy/fn_80165FC8.cpp`) */
+    /* +0x60C */ u8 unused_0x60C[0x610 - 0x60C];
+    /* +0x610 */ u32 field_0x610;      /* the Z rotation word the same function hands `rotMatrixZ` */
+    /* +0x614 */ u8 unused_0x614[0x761 - 0x614];
     /* +0x761 */ u8 field_0x761;       /* one byte, two bands: `enemy/fn_801993E0.cpp`'s slot bit
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
                                         * 8 bits for free slot indices) and `enemy/fn_801D428C.cpp`'s
@@ -395,7 +404,10 @@ struct _ENEMY_WORK {
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
     /* +0x816 */ u8 unused_0x816[0x818 - 0x816];
     /* +0x818 */ s16 field_0x818;       /* the motion timer `fn_8012F110` arms before its mode switch */
-    /* +0x81A */ u8 unused_0x81A[0x836 - 0x81A];
+    /* +0x81A */ u8 unused_0x81A[0x834 - 0x81A];
+    /* +0x834 */ u8 field_0x834;      /* the "already seated" byte `fn_801671AC` tests against 1
+                                        * (added by `enemy/fn_80165FC8.cpp`) */
+    /* +0x835 */ u8 field_0x835;      /* the seat flag `fn_80166DF8` sets */
     /* +0x836 */ u16 flags_0x836;       /* bit 0x8000 is the "aim target found" flag `fn_801D75D0`
                                          * mirrors `self->action_0x328.field_0x345` into (added by
                                          * `enemy/fn_801D428C.cpp`) */
