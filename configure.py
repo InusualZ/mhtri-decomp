@@ -1748,6 +1748,25 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "Network/NetworkWiiMediator.c"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `803D3CE8_fn_803D3CE8.cpp` (`.text` 0x803D3CE8..0x803D70B8, 101 functions / 13264 B) -
+            # the Network session band: `NetworkSessionStable`'s op-code packet writers, the
+            # `NetworkSessionManager` request pool/state machine and the first `NetworkSessionManagerPat`
+            # virtual slots.  Module `Network` from the class names and the registered neighbour
+            # `Network/NetworkWiiMediator.c`; no `__FILE__` string and only `zz_` dump names cover the
+            # range, and the tile spans more than one original TU, so the file keeps the map stem
+            # (brief section 2, class 3 module + class 4 name).  C++ (mangled `__nw__FUl`/`__dl__FPv`),
+            # exceptions off, so `.text` only.  The seam is unproven (discovery byte cap).
+            # Per-unit flag deviation (brief section 8.2), instruction-level evidence: every framed
+            # function in the range is -O3 scheduling - fn_803D53B0's prologue is `stw r31,28; stw r30,24;
+            # mr r30,r3; mr r31,r4` and its global-descriptor copy is the plain `lwz/stw` block, both of
+            # which `-O4,p` destroys (it interleaves the saves and folds the copy into `lwzu`).  Measured:
+            # the same source scores fn_803D53B0 59.79 % at `-O4,p` and 95.15 % at `-O3`, fn_803D4904
+            # 70.42 % -> 93.24 %, fn_803D3CE8 81.63 % -> 92.23 %.  `-func_align 4` is kept (the 4-byte
+            # functions `fn_803D4B5C`/`fn_803D5D64` prove it).  This is the object's cflags, not the lib's:
+            # the sibling `NetworkWiiMediator.c` is byte-identical at `-O4,p`.
+            Object(NonMatching, "Network/fn_803D3CE8.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
         ],
     },
     {
