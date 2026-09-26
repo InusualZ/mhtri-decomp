@@ -35,7 +35,11 @@ void fn_8027A17C(struct _PLW* self);
 void fn_8027A190(struct _PLW* self, s32 a);
 u32 fn_802790E4(struct _PLW* self, u32 mask);
 u32 fn_8027BCE0(struct _PLW* self);
-u32 fn_8027D40C(struct _PLW* self, s32 arg);
+/* 0x8027D40C - the number of set bits in the actor's action-lock word.  The owner defines
+ * `extern "C" s32 fn_8027D40C(_PLW* self)` (one parameter); the `s32 arg` this declaration used to
+ * carry was never read, and `Pl/fn_8025F088.cpp` measured the extra `li r4,2` it cost (rule 2: the
+ * owner's signature wins). */
+s32 fn_8027D40C(struct _PLW* self);
 
 /* The rest of this unit's `.text` that `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) calls; the
  * signatures are the owners' own definitions in `src/Pl/pl_act.cpp` (rule 2: this header is the

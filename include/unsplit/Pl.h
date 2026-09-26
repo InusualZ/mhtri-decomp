@@ -31,11 +31,10 @@ s32 fn_802748C8(void* a);
 /* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
  * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x80258FCC-0x80262940 and
  * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home.  (`fn_80257E70`
- * and `fn_8025FA00` moved to `Pl/fn_8024F200.h` when that unit claimed 0x8024F200-0x80258FCC.) */
-u16 fn_80260A18(struct _PLW* self);
-s32 fn_80261770(struct _PLW* self, u8* a, u16* b, u16* c, s32* d, u16* e, u16* f);
-u32 fn_802621B0(struct _PLW* self, void* b);
-s32 fn_80262688(struct _PLW* self);
+ * moved to `Pl/fn_8024F200.h` when that unit claimed 0x8024F200-0x80258FCC.  The
+ * `fn_8025FA00`/`fn_80260A18`/`fn_80261770`/`fn_802621B0`/`fn_80262688` declarations that stood here
+ * are owned by `Pl/fn_8025F088.cpp` (proposal 8025F088, `.text` 0x8025F088-0x80262940) and live in
+ * `Pl/fn_8025F088.h` - that unit's range, not `Pl/fn_8024F200.h`, covers their addresses.) */
 /* `fn_802745DC`'s return is the owner's `u32` (`Pl/fn_80273B14.cpp`), not the pre-merge `u16`: the
  * callee's own body is byte-identical either way (every path ends in an `lhzx`/`li`), while the
  * landed caller `Pl/fn_8027D684.cpp`'s measured row needs the `u32` - retail materialises the

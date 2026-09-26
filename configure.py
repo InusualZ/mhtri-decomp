@@ -1159,6 +1159,17 @@ config.libs = [
             # deferral.  It uses `cflags_pl` (this lib).
             Object(Matching, "Pl/fn_80241558.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8025F088_fn_8025F088` - the player per-frame control cluster
+            # (0x8025F088-0x80262940, 17 functions, 0x38B8 B) with its own exception tables
+            # (extab 0x8001239C-0x8001241C, extabindex 0x8002F454-0x8002F514 - the runs start and end
+            # exactly at this range, so both seams are real TU boundaries).  Home is `Pl`: every actor
+            # parameter is a `_PLW` (`Pl_master_ck`, `Pl_act_ck`, `Pl_Skill_ck`, `Pl_cat_skill_ck`,
+            # `Get_motion_no`), it reads the move work `get_move_work_adrs`/`get_move_work_max` and
+            # the `lbl_806AB848` chunk table, and its siblings are `Pl/fn_80241558.cpp` (before) and
+            # `Pl/fn_80262940.cpp` (after).  No `__FILE__` string covers the range and `dumpmap.py`
+            # answers only `zz_` placeholders, so the stem is the map's `fn_8025F088` with a rule-7
+            # deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8025F088.cpp"),
             # `80258FCC_fn_80258FCC.cpp` - the player act state-machine band (0x80258FCC-0x8025F088,
             # 74 functions, 0x60BC B) with extab 0x8001219C-0x8001239C and extabindex
             # 0x8002F154-0x8002F454 (the run is exactly this unit's 64 framed functions).  Home is
