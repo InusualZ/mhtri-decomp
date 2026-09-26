@@ -1756,3 +1756,15 @@ both of them invisible to the tiling assert:
   declaration has the better claim: here the array won, the scalar's neighbouring `unused_0x3F9` filler (which
   the array now covers) was dropped, and the whole-tree build plus an empty `ninja changes` proved both
   consumers and the newcomer.
+
+**The tool.** `tools/units/recordmerge.py` implements the three rules above:
+
+    python tools/units/recordmerge.py --base include/ai/ainpc.h         --other worker/<slug>:include/ai/ainpc.h --out include/ai/ainpc.h
+
+It refuses to write while anything is unresolved - a named member in the way, no room in the covering
+filler, a same-offset rename, a member whose size is the struct total - and prints the per-group delta so
+the decision is visible. Top-level lines only the other view has are carried verbatim after the last group
+when they are declarations (reported), and reported but not carried when they are not. Run against the
+merge that produced this section (`089491a7b`'s header and the `802d44f4` view) it reproduces the 36
+splices, the 33 filler splits and the `0x3F8` decision exactly, and keeps one trailing comment the hand
+pass typed away. It is still only the edit: **the proof remains the whole-tree build plus `ninja changes`.**
