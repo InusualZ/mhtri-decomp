@@ -61,7 +61,14 @@
  *   - fn_802B4E58 43.65 % (1284 B): the colour-cycle blend; ours is 1324 B.  The final
  *     `fn_80057DE0(0, 6, colour, lbl_8079A4C4)` call and the `psq_lx` prologue/epilogue pair are right,
  *     so the residual is the inline per-channel blend shape.
- *   - fn_802B2F60 77.56 % (752 B, ours 812 B), fn_802B4ABC 74.41 % (416 B): all source shape.
+ *   - fn_802B2F60 77.56 % (752 B, ours 812 B): source shape.
+ *   - fn_802B4ABC 78.64 % (416 B, ours 412 B): the condition order still differs.  Retail tests
+ *     `now - base`'s `& 0x40` first and puts both `field_0x2FDC = 0` tails at the *end* of the function
+ *     (0x2188 / 0x2194), while ours emits one of them inline; and retail compares the map number with
+ *     `cmpwi` where MWCC emits `cmplwi` for the same `mapno != 5 && mapno != 0x10 && mapno != 0xA`
+ *     (both the `s32`/`int`/`s8` spelling and a `switch` give `cmplwi`).  Its *semantics* are now
+ *     right: `entry` is `p->offsets` (a sub-table of 8-byte records), which the earlier reconstruction
+ *     read as `entry = p` - the outer table and the sub-table share the record layout.
  *   - The claimed jump table's two relocations still pair by *value*, not by name: retail's split names
  *     the table `jumptable_805CF728` where MWCC emits an anonymous `@NNNN` in our object.  The bytes
  *     and the section size are equal (100.0), so this is cosmetic - but it is why the object is not
@@ -1213,11 +1220,10 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
     nw4r::math::VEC3 pos;
     StageDemoEntry* entry;
     StageDemoEntry* p;
-    u8 mapno;
+    int mapno;
     u16 secs;
     s32 now;
     s32 base;
-    s16 countdown;
 
     fn_80043EA8(&pos);
     entry = NULL;
@@ -1229,9 +1235,7 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
     base = fn_803A87E0();
     secs = (u16)((now - base) / 300);
     secs += fn_803A8F60(0);
-    countdown = st->field_0x2FDC - 1;
-    st->field_0x2FDC = countdown;
-    if (countdown > 0) {
+    if (--st->field_0x2FDC > 0) {
         return;
     }
     if (((now - base) & 0x40) == 0x40) {
@@ -1247,7 +1251,7 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
     }
     for (p = lbl_805CFA38; p->mapno != 0xFF; p++) {
         if (p->mapno == get_now_mapno()) {
-            entry = p;
+            entry = (StageDemoEntry*)p->offsets;
             break;
         }
     }
