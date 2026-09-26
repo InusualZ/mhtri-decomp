@@ -503,6 +503,12 @@ config.libs = [
             # Sections: .text 0x802B2AA0..0x802B5C58, extab 0x80013D34..0x80013E3C (33 8-byte
             # records), extabindex 0x80031A4C..0x80031BD8.
             Object(NonMatching, "stage/fn_802B2AA0.cpp"),
+            # Camera band 0x802B5C58-0x802BEAAC (132 functions, 36436 B), registered from
+            # proposal/802B5C58_fn_802B5C58.cpp.  The lib and cflags are the neighbours' ("stage"
+            # and "ai" both build with cflags_main / Wii/1.3) and the module is `camera`: the range's
+            # own named exports are get_camera_pos / get_camera_direction / get_current_view_mtx /
+            # set_quake_sub, and the seam at 0x802B5C58 is a .sdata2 pool jump.
+            Object(NonMatching, "camera/fn_802B5C58.cpp"),
         ],
     },
 

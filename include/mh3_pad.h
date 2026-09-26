@@ -25,6 +25,10 @@ void fn_80043EA8(void *sub);
 void fn_80041E40(void *dst, const void *src); /* 0x80041E40 - copies a 0xC-byte record */
 void fn_80041E8C(f32 *out, f32 x, f32 y, f32 z);     /* 0x80041E8C - builds a record from three floats */
 
+/* Added when `camera/fn_802B5C58.cpp` registered (rule 2): the camera accessors all start by copying a
+ * 4-byte camera handle through this unit's helper (`fn_8004726C` does the word copy). */
+void fn_8004723C(void *out, void **src); /* 0x8004723C - copies the word `*src` into `out` */
+
 #ifdef __cplusplus
 }
 #endif
