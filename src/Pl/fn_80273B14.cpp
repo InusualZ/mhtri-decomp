@@ -43,6 +43,7 @@
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"
 #include "Pl/fn_80273B14.h"
+#include "menu/menu_item.h"   /* `fn_8029F73C` (owner: `menu/menu_item.cpp`, rule 2) */
 #include "ef/eft001.h"
 #include "stage/stg_w.h"
 #include "Runtime.PPCEABI.H/memset.h"
