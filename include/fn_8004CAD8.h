@@ -57,6 +57,11 @@ f32 fn_80052214(const f32* a, const f32* b);
  * ef_cylinder 0x800CBD20/0x800CBD3C).  The `(f32, f32)` spelling this symbol used to carry in
  * `include/ef.h` was the wrong view and made every TU including both headers fail to compile. */
 f32 fn_80050BC0(f32 x);
+/* 0x8005024C - the `SinFIdx` wrapper `enemy/fn_80181E24.cpp`'s alpha computation calls: it narrows
+ * its argument to u16 (`clrlwi r3,r3,16`), scales the `fn_800501E4` result and returns
+ * `nw4r::math::SinFIdx`, so the signature is `(u16) -> f32` (settled from the callee's own body,
+ * docs/plan.md 6.5 rule 6).  Added with proposal/80181C88. */
+f32 fn_8005024C(u16 idx);
 /* 0x80050CF4 - the SDK vector subtract (`ps_sub` on two paired loads): `dst = a - b`. */
 void PSVECSubtract(f32* dst, const f32* a, const f32* b);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved

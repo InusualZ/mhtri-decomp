@@ -6,7 +6,8 @@
  *
  * Added with `enemy/fn_801A9540.cpp`'s registration: that range's `fn_801A960C`/`fn_801A9670` read
  * the per-part damage level through this function, and `src/ef/eft009.cpp` carried a private copy of
- * the declaration.
+ * the declaration.  `enemy/fn_80181C88.cpp`'s `fn_80182080`/`fn_801825A4`/`fn_80182918` are a
+ * second consumer (they declared it locally too), so this header is the one home for it.
  */
 #ifndef MHTRI_ENEMY_FN_8011D448_H
 #define MHTRI_ENEMY_FN_8011D448_H

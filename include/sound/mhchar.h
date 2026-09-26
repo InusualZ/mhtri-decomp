@@ -85,6 +85,12 @@ public:
     void setAmbColor(u32 idx, _GXChannelID channel, _GXColor color, bool keep);
     void getTevKColor(u32 idx, _GXTevKColorID id, _GXColor* out);
     void setTevKColor(u32 idx, _GXTevKColorID id, _GXColor color);
+    /* The pointer-taking overload the enemy action band's target objects carry: their call sites build
+     * the colour in a local and pass its address (`addi r6,r1,8`), and the map name is the pointer
+     * mangling `setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor` (settled from the call sites and
+     * the disassembly, docs/plan.md 6.5 rule 6).  Added with proposal/80181C88; the by-value spelling
+     * above keeps the `enemy/fn_801D428C.cpp`/`enemy/fn_801DB8E0.cpp` call sites unchanged. */
+    void setTevKColor(u32 idx, _GXTevKColorID id, _GXColor* color);
     void setMatAlphaBlendMode(u32 idx, _GXBlendMode mode, _GXBlendFactor src, _GXBlendFactor dst,
                               _GXLogicOp op);
     void setVisibility(u32 idx, bool visible);
