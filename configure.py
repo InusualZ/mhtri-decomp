@@ -1937,6 +1937,23 @@ config.libs = [
             # config/RMHE08/hbm_data/symbols.txt carries the same class hierarchy.  Link neighbour
             # `tiHKBManager.cpp` is in `main`, so the unit takes the `main` lib and cflags_main; the
             # file is `homebutton/gui.cpp` (the namespace is `gui`).  Claims .text only.
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `805632BC_fn_805632BC.cpp` - the software-keyboard band of the home-button GUI
+            # (`.text` 0x805632BC-0x80569DAC, 142 functions / 27376 B).  Evidence class 3: the range's
+            # own `.data` pool is the keyboard layout vocabulary of the home-button menu (fs_VK_*.brlyt
+            # layouts, T_hiragana/B_hiragana/T_katakana/P_dakuten/B_Gkey_handaku/T_hankaku/T_zenkaku/
+            # T_Mode_roma_hira, N_Header/N_Footer/T_Nigaoe/B_Nigaoe/T_Letter/T_TouchLetter,
+            # P_txtScrll_UP/DOWN/N_txt_scrl/N_TopBtn_00/N_MemoRoot/G_ArwRoop), and the module comes
+            # from the two link neighbours: `homebutton/gui.cpp` immediately above and
+            # `tiHKBManager.cpp` immediately below (its "HKB" is this keyboard's manager).  No
+            # `__FILE__` string covers the range and the runtime dump answers only `zz_`/`FUN_`
+            # placeholders, so the file name is descriptive (class 3) and the symbols keep the map's
+            # `fn_805632BC` stem with a rule-7 deferral in the file header.  The left edge is a
+            # `--max-bytes` cap (the brief warns; the code before it references the same data pool),
+            # the right edge is the registered homebutton/gui.cpp.  Link neighbour tiHKBManager.cpp is
+            # in `main`, so the unit takes the `main` lib and cflags_main; the file is
+            # `homebutton/keyboard.cpp`.  Claims .text only.
+            Object(NonMatching, "homebutton/keyboard.cpp"),
             Object(NonMatching, "homebutton/gui.cpp"),
         ],
     },
