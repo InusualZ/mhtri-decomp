@@ -368,6 +368,81 @@ def branch_error(main: str) -> str | None:
     return None
 
 
+def strictly_newer(main_lines, branch_lines):
+    """How many lines the branch has that main's copy lacks, or None when the two have diverged.
+
+    Pure, so the selftest can exercise the rule without a repository. A branch is *strictly newer* only when
+    main's line set is a subset of the branch's: the branch lost nothing and gained something, so the file
+    carries work that was never landed. A diverged file (both sides have lines the other lacks) returns
+    None - that is the stale-or-superseded class the 2026-09-26 audit found on every branch left over from
+    an already-landed unit (older pad names, older comment wording), and refusing a spawn on it would stop
+    production for nothing.
+    """
+    m, b = set(main_lines), set(branch_lines)
+    if m - b:
+        return None
+    return len(b - m) or None
+
+
+def _file_lines(main: str, ref: str, path: str) -> list[str]:
+    """One file's lines at `ref`, or [] when that ref has no such file (a branch's new file)."""
+    p = subprocess.run(["git", "show", "%s:%s" % (ref, path)], cwd=main,
+                       capture_output=True, text=True, errors="replace")
+    return p.stdout.splitlines() if p.returncode == 0 else []
+
+
+def unlanded_branches(main: str, ignore: set[str] | None = None) -> list[tuple[str, list[tuple[str, int]]]]:
+    """Local branches whose content is strictly newer than main's, with the files and line counts.
+
+    This is the guard the owner asked for on 2026-09-26: finished work must not sit on a branch while a new
+    unit is started. It is content-based, not commit-based - the landing recipe cherry-picks *content*, so
+    every worker branch stays ahead of main by commits after its unit lands, and a commit-count test would
+    refuse every spawn forever. `[]` when git cannot be asked (the selftests run outside a repository).
+    """
+    ignore = set(ignore or ())
+    p = subprocess.run(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads"], cwd=main,
+                       capture_output=True, text=True, errors="replace")
+    if p.returncode != 0:
+        return []
+    out = []
+    for branch in sorted(b.strip() for b in p.stdout.splitlines()):
+        if not branch or branch == "main" or branch in ignore:
+            continue
+        d = subprocess.run(["git", "diff", "--name-only", "main...%s" % branch], cwd=main,
+                           capture_output=True, text=True, errors="replace")
+        if d.returncode != 0:
+            continue
+        hits = []
+        for path in [ln for ln in d.stdout.splitlines() if ln.strip()]:
+            n = strictly_newer(_file_lines(main, "main", path), _file_lines(main, branch, path))
+            if n:
+                hits.append((path, n))
+        if hits:
+            out.append((branch, hits))
+    return out
+
+
+def unlanded_error(main: str, allow: set[str] | None = None) -> str | None:
+    """The refusal a spawn raises while any branch still holds work main does not have. None when clear.
+
+    Deliberately narrow: only a *strictly newer* file counts (see `strictly_newer`), so this blocks on real
+    unlanded work - as `worker/802e4978-...` was, a whole registered unit that no landing had ever taken -
+    and not on the stale wording every landed branch leaves behind.
+    """
+    hits = unlanded_branches(main, allow)
+    if not hits:
+        return None
+    lines = ["%d branch(es) hold work main does not have - land them (or delete them once the audit "
+             "proves them stale) before claiming another unit:" % len(hits)]
+    for branch, files in hits:
+        shown = ", ".join("%s +%d lines" % (f, n) for f, n in files[:4])
+        more = "" if len(files) <= 4 else " (+%d more file(s))" % (len(files) - 4)
+        lines.append("  %s: %s%s" % (branch, shown, more))
+    lines.append("  remedy: land it (docs/plan.md 12's recipe), or `git worktree remove <wt> && git branch -D "
+                 "<branch>` once its delta is proven stale; `--allow-unlanded <branch>` parks one on purpose")
+    return "\n".join(lines)
+
+
 def no_ready(main: str) -> str:
     """The refusal both entry points raise when the queue has nothing to hand out."""
     return ("no ready brief in %s\n"
@@ -400,11 +475,13 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
 
 
 def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
-               profile: str = "decompiler") -> dict:
+               profile: str = "decompiler", allow_unlanded=None) -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
     Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
-    branch are cut from that HEAD. The claim itself is `claim_entry`, shared with the `--count` wave path.
+    branch are cut from that HEAD, and `unlanded_error` refuses while any branch still holds work main does
+    not have (the owner's 2026-09-26 guard: do not start a unit while a finished one sits unlanded). The
+    claim itself is `claim_entry`, shared with the `--count` wave path.
     """
     claim_fn = claim_fn or claims.claim
     if not dry_run:
@@ -412,6 +489,9 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
         bad_branch = branch_error(main)
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
+        blocked = unlanded_error(main, set(allow_unlanded or ()))
+        if blocked:
+            raise SystemExit("REFUSED queue next | %s" % blocked)
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(no_ready(main))
@@ -419,11 +499,12 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
 
 
 def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
-                profile: str = "decompiler") -> dict:
+                profile: str = "decompiler", allow_unlanded=None) -> dict:
     """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
 
     Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
-    the single pick uses. `claimed` below `requested` means the queue could not fill the wave: fewer than
+    the single pick uses. The same two guards as `next_brief` run first: HEAD must be `main`, and no branch
+    may hold unlanded work. `claimed` below `requested` means the queue could not fill the wave: fewer than
     `count` were ready, or the rest were adjacent to a claim already in it. The wave claims what there is
     instead of failing, and the caller reports the shortfall.
     """
@@ -432,6 +513,9 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
         bad_branch = branch_error(main)
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
+        blocked = unlanded_error(main, set(allow_unlanded or ()))
+        if blocked:
+            raise SystemExit("REFUSED queue next | %s" % blocked)
     chosen = wave(main, count)
     if not chosen:
         raise SystemExit(no_ready(main))
@@ -466,6 +550,16 @@ def selftest() -> int:
             fails.append("%s: got %r want %r" % (name, got, want))
 
     import tempfile
+    # the unlanded-branch guard's rule, tested without a repository: only a strict superset blocks
+    check("strictly_newer: identical", strictly_newer(["a", "b"], ["a", "b"]), None)
+    check("strictly_newer: branch gained two", strictly_newer(["a"], ["a", "b", "c"]), 2)
+    check("strictly_newer: new file", strictly_newer([], ["x", "y"]), 2)
+    check("strictly_newer: diverged (stale pads)", strictly_newer(["a", "new"], ["a", "old"]), None)
+    check("strictly_newer: main is newer", strictly_newer(["a", "b"], ["a"]), None)
+    check("strictly_newer: empty branch", strictly_newer(["a"], []), None)
+    with tempfile.TemporaryDirectory() as tmp:
+        check("unlanded_branches outside a repo", unlanded_branches(tmp), [])
+        check("unlanded_error outside a repo", unlanded_error(tmp), None)
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "src", "auto"))
         # two stubs at different .text addresses, and one that already has a body
@@ -903,6 +997,9 @@ def main() -> int:
                    help="the agent profile the lane is launched with (default: decompiler - a proposal "
                         "lane registers and reconstructs a unit, which is unit work)")
     n.add_argument("--dry-run", action="store_true")
+    n.add_argument("--allow-unlanded", action="append", default=[], metavar="BRANCH",
+                   help="name a branch that is parked on purpose, so the unlanded-branch guard lets it "
+                        "through (repeatable; default is to refuse while any branch holds work main lacks)")
     n.add_argument("--json", action="store_true")
     l = sub.add_parser("list", help="the pool's state and the next ready candidates")
     l.add_argument("--json", action="store_true")
@@ -928,6 +1025,14 @@ def main() -> int:
         print("  claimed        : %d  (in flight)" % c.get("claimed", 0))
         print("  written        : %d  (unit has a body - prune with `brief.py --pool`)" % c.get("written", 0))
         print("  stale          : %d  (no longer registered - prune with `brief.py --pool`)" % c.get("stale", 0))
+        un = unlanded_branches(main_wt)
+        if un:
+            print("  unlanded       : %d branch(es) hold work main does not have - `next` refuses until they "
+                  "are landed or deleted" % len(un))
+            for branch, files in un[:6]:
+                print("      %s (%s)" % (branch, ", ".join("%s +%d" % (f, n) for f, n in files[:3])))
+        else:
+            print("  unlanded       : none - every branch's content is contained in main")
         print("  covered        : %d  (range already registered under another name)" % c.get("covered", 0))
         print("  unreadable     : %d" % c.get("unreadable", 0))
         if st["ready"]:
@@ -941,7 +1046,8 @@ def main() -> int:
 
     if args.cmd == "next":
         if args.count != 1:
-            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile)
+            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile,
+                              allow_unlanded=args.allow_unlanded)
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0
@@ -969,7 +1075,8 @@ def main() -> int:
                       " next to a claim already in this wave; `python tools/units/brief.py --pool`"
                       " replenishes it" % (out["claimed"], out["requested"]))
             return 0
-        out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile)
+        out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile,
+                         allow_unlanded=args.allow_unlanded)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0

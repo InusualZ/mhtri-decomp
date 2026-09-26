@@ -23,7 +23,13 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
-   Read-only, always.
+   Read-only, always. It is **gitignored**, so nothing in git can restore it: never run a repository-wide
+   clean (`git clean -xdf`, `rm -rf orig`, a "reset the tree" recipe) in this repo, and never let a subagent
+   do it either. On 2026-09-26 `orig/RMHE08/sys/main.dol` and `orig/RMHE08/files/*.sel` were gone from MAIN
+   and the build could not regenerate `build.ninja` (`orig/RMHE08/sys/main.dol not found`); they were restored
+   from the safety copy at `../orig-backup/RMHE08/` and checked against the documented SHA-1
+   `bf4850739478caaedfe675949eb7c28595a7fde9`. When the build reports the DOL missing, restore from that copy
+   first - `sha1sum orig/RMHE08/sys/main.dol` must print that hash.
 2. **Never commit build output or original files.** `build/`, `orig/RMHE08/**` (except `.gitkeep`),
    `*.dol`, `*.rel`, `*.elf`, `*.o`, `*.map`, `objdiff.json` and `compile_commands.json` are gitignored —
    keep it that way.
@@ -87,6 +93,14 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
 
 * **Six worker subagents at most, and that budget covers everything** - unit workers and tool fixes share it.
   Five units plus one fix is fine; six units plus a fix is not.
+* **A slot is not filled while finished work sits unlanded** (owner, 2026-09-26). `queue.py next` refuses to
+  claim a unit when any local branch holds content `main` lacks, and `queue.py list` reports the same state.
+  The test is narrow - a file counts only when main's copy is a *strict subset* of the branch's - so the
+  older pad names and comment wording every landed branch leaves behind do not block, and it is
+  content-based, not commit-based, because the landing recipe cherry-picks content and so leaves every
+  worker branch ahead of main by commits after its unit has landed. Remedy: land it (docs/plan.md §12's
+  recipe), or - once the audit shows the delta is stale - `git worktree remove <wt> && git branch -D
+  <branch>`. `--allow-unlanded <branch>` parks one on purpose.
 * **A slot goes to a problem before it goes to a new unit.** When something breaks - a gate refusal, a blocked
   or waiting worker, a tool that cannot express what the work needs, MAIN's HEAD on the wrong branch, a hole
   in the queue - the next free slot fixes that. Only when nothing is outstanding does a freed slot take a new
