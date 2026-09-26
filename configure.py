@@ -1235,6 +1235,17 @@ config.libs = [
             # answers `zz_026ffbc_`, so the stem is the map's `fn_8026FFBC` with a rule-7 deferral.
             # It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_8026FFBC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `802840DC_fn_802840DC`.
+            # 54 functions, 0x802840DC-0x80288CEC (0x4C10 B).  Home is `Pl`: the band's callees are
+            # all Pl API (`Get_motion_no__FP4_PLW`, `Pl_get_gunner_pos`/`Pl_get_gunner_vec`,
+            # `Pl_atk_act_flag_ck`, `Pl_Skill_ck`, `Pl_frame_check`, `Pl_master_ck`) and its two
+            # registered neighbours (`Pl/pl_act.cpp` below 0x8027D684, `Pl/fn_80288CEC.cpp` at
+            # 0x80288CEC) are Pl units.  No `__FILE__` string covers the range (its own `.data` pool
+            # is jump tables only) and the runtime dump answers `zz_XXXXXXXX_` placeholders
+            # (`tools/symbols/dumpmap.py`), so the stem is the map's `fn_802840DC` with a rule-7
+            # deferral - the sibling class-4 pattern of `Pl/fn_8026FFBC.cpp` / `Pl/fn_80288CEC.cpp`.
+            # It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802840DC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `8027D684_fn_8027D684` -
             # the player act/equipment cluster (0x8027D684-0x802840DC, 138 functions, 0x6A58 B) with
             # extab 0x80012B54-0x80012E7C and extabindex 0x8002FF7C-0x80030438 (101 framed functions,
