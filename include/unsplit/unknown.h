@@ -99,7 +99,8 @@ typedef struct SystemWork {
     /* +0x027 */ u8 field_0x27;
     /* +0x028 */ u8 field_0x28;
     /* +0x029 */ u8 field_0x29;
-    /* +0x02A */ u8 pad_0x2a[0x2];
+    /* +0x02A */ u8 field_0x2a;     /* non-zero is the system-wide "hold the player" gate `fn_8027E1E4` tests */
+    /* +0x02B */ u8 pad_0x2b[0x1];
     /* +0x02C */ u8 field_0x2c;      /* fn_800D2108: 1 or 2, the hbm state */
     /* +0x02D */ u8 field_0x2d;
     /* +0x02E */ u8 pad_0x2e[0x2];

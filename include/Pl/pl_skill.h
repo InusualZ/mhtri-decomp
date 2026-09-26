@@ -38,6 +38,13 @@ void fn_8027350C(struct _PLW* self, s32 part);
  * `Pl/pl_act.cpp` and `Pl/fn_8024F200.cpp` call; the owner defines it `extern "C" s16`
  * (`Pl/pl_skill.cpp:1233`), so the declaration keeps that return. */
 s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
+/* 0x802731B4 - the item/skill timer lookup the same unit's consumers and `Pl/fn_8027D684.cpp`'s
+ * `fn_8027D76C` call; the owner defines it `int` (`Pl/pl_skill.cpp:1265`), so the declaration keeps
+ * that return (docs/plan.md 6.5 rule 2: this is the owner's header). */
+int fn_802731B4(struct _PLW* plw, u16 item);
+/* 0x80273044 - the item-id -> slot lookup `Pl/fn_8027D684.cpp`'s `fn_8027DE88` walks its id tables
+ * with; the owner declares it `u16` (`Pl/pl_skill.cpp:279`). */
+u16 fn_80273044(struct _PLW* plw, u16 item);
 #ifdef __cplusplus
 }
 #endif

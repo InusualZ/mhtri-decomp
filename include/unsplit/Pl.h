@@ -208,6 +208,32 @@ u32 fn_80245DA0(struct _PLW* self, u32 a);
 void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c);
 u32 fn_8027D8A0(struct _PLW* self, s32 a);
 
+/* The 0x80273B14-0x80276B58 run's act/motion request entry point `Pl/fn_8027D684.cpp`'s
+ * `fn_8027D6DC` calls; unregistered, so this band header is its rule-2 home.  The four argument
+ * registers are the callee's own prologue's (`Pl/fn_802756F0` saves r3..r6). */
+void fn_802756F0(struct _PLW* self, u8 a, u16 b, u32 c);
+
+/* The per-slot gate table at 0x806BB7A0 (`.bss`, 0x18 B = three 8-byte entries, the map's size).
+ * size: 0x8 */
+typedef struct PlSlotGate {
+    /* +0x00 */ u8 flag_0x00;   /* non-zero means the slot is occupied (`fn_8027DC64`/`78`/`90`) */
+    /* +0x01 */ u8 pad_0x01[0x7];
+} PlSlotGate;
+
+extern PlSlotGate lbl_806BB7A0[3];
+
+/* 0x806AB810 (.bss, 0x20 B = eight 4-byte table pointers, the map's size): the two per-kind row
+ * tables `fn_8027E2A8`/`fn_8027E354` index after `fn_8027EFB4` validates the kind. */
+extern u8** lbl_806AB810[8];
+extern u32 lbl_805706C0[];  /* the per-kind row counts the two lookups clamp against */
+extern u32 lbl_805706D8[];  /* the sibling counts `fn_8027E918` reads for kinds 7-15 */
+
+/* The three per-kind item-id tables `fn_8027DE88`/`fn_8027DF38` walk until the 0xFFFF sentinel
+ * (`.sdata` 0x80792030/0x80792038 at 0x8 B each, `.data` 0x805BFFE0 at 0x18 B - the map's sizes). */
+extern u16 lbl_80792030[];
+extern u16 lbl_80792038[];
+extern u16 lbl_805BFFE0[];
+
 /* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined - the run is
  * unclaimed, so this band header is their rule-2 home). */
 extern u8 lbl_805C4F5C[];  /* the per-act `.data` record `fn_802770E8` installs */
