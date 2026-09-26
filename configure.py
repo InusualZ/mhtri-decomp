@@ -1967,6 +1967,16 @@ config.libs = [
             # cflags_main.  Claims .text 0x8056BBF0-0x8056F2B4 + the .ctors word 0x8056F428-0x8056F42C.
             Object(NonMatching, "tiHKBManager.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80423E74_fn_80423E74` - the 0x80423E74-0x80429B94 network work-record band (77
+            # functions, 23840 B) with extab 0x8001D1B4-0x8001D368 and extabindex
+            # 0x8003DC44-0x8003DE54.  Its own `.data` pool is the two dispatch jump tables at
+            # 0x80603750 / 0x806037F4 and the so/dwc alloc-failure strings at 0x80603888; no
+            # `__FILE__` string and no runtime-dump source name cover the range (class 3/4 in the
+            # brief), so the stem is the map's `fn_80423E74` with a rule-7 deferral.  Same game-root
+            # `main` lib and cflags_main as the link neighbour `fn_80429B94.cpp` below it (both
+            # dereference `net_ctrl_wk` and call `getPatsObject`/`getNetworkLayerPat`).
+            Object(NonMatching, "fn_80423E74.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `80429B94_fn_80429B94` - the 0x80429B94-0x8043065C network/server-control band (114
             # functions, 27336 B) with extab 0x8001D368-0x8001D558 and extabindex 0x8003DE54-0x8003E0DC.
             # Game code that drives getPatsObject/getNetworkSessionManagerPat and reads the lobby
