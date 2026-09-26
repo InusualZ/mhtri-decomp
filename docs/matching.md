@@ -1577,6 +1577,47 @@ from 99.999 to **100.0**, and diffing that table against the landed `Pl/fn_80241
 instruction-identical** - the two functions are siblings, so a 7,584 B body was recovered rather than guessed.
 `Pl/fn_802373AC` then generated **145 arms** mechanically, having first required the same translator to
 reproduce `src/Pl/fn_8023C2D0.cpp` line for line from the landed `0x805C34D4` table, and landed a **99.986 %**
-unit whose `fn_802399C8` is byte-identical at 10,504 B. The same read may be the unlock for
-`Pl/fn_8023C2D0`/`fn_80230FBC`, which are byte-identical and blocked only by a jump table misplaced inside
-`.data`.
+unit whose `fn_802399C8` is byte-identical at 10,504 B.
+
+**Correction (2026-09-26).** This section's earlier claim that `Pl/fn_8023C2D0`/`fn_80230FBC` were "blocked only
+by a jump table misplaced inside `.data`" was **wrong**, and the way it was wrong is worth keeping. Both units
+were byte-identical already, and their `.data` claims were in `splits.txt`; the misdiagnosis sent a lane hunting a
+data-placement bug that did not exist. `flipcheck.py` judges the **object**, and the objects and their table claims
+are both fine - the blocker is the **link**. What makes that reading trustworthy is the control set it ships with:
+run against two units already flipped to `Matching` it returns READY, and run against `Pl/fn_802373AC` it returns
+NOT READY at `.text +0x1671` (ours `1c`, target `1b`), which is exactly that unit's documented 12-instruction
+register residual. A tool that returned READY for everything would have been the trap instead. So: when an object
+is byte-identical and a flip is refused, suspect the **link** (`.ctors` ordering, link padding, the `active_flags`
+export bit) before you suspect the data.
+
+## 54. Dolphin's `.map` names a jump table's OWNER and a `__FILE__` emitter
+
+**Problem.** Section 53 says to claim a jump table's `.data` range, but not *whose* range it is - so the claim is a
+guess at the boundaries, and two lanes can claim one table or split one TU's data across two units. Separately,
+the campaign's strongest naming evidence (class 1, the `__FILE__` static a TU emits) requires knowing which
+*function* emits the string, and the symbol map only gives you the string's address.
+
+**Why try it.** The Dolphin runtime dump carries the **original build's local symbols**, and the compiler's own
+synthesized names encode exactly what you want:
+
+* `_<fnaddr>switchdataD_<addr>` - the **owner** of the jump table at `<addr>`. This is section 53's missing half:
+  53 tells you to claim the range, this tells you whose it is, which turns the claim into evidence.
+* `_<fnaddr>s_<file>_<addr>` - the function at `<fnaddr>` that **emits a `__FILE__` static** for `<file>`. The
+  campaign's naming-evidence class 1, resolved in one query instead of by reading assert call sites.
+
+**Result.** Ask the dump's map for a symbol by address (`dumpmap`) and read the pattern: the `_<fnaddr>` prefix is
+the function, the trailing `<addr>` is the data it owns. One query answers "whose table is this" and "which
+function does this file-name string belong to".
+
+**Trap that came with it.** `objdump -d build/RMHE08/main.elf --start-address=...` annotates every call, but a
+regex for `addr: op args` **silently drops `blr` and `nop`**, so a function can look one instruction short and a
+length comparison will "confirm" a difference that is not there.
+
+**Example.** `menu/menu_item.cpp` (2026-09-26). Its own `.data` holds `lbl_805CDFC8` = `"menu_item.cpp"`; the dump's
+local symbol for that address is `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. the emitter is **0x802A22A4**, a
+function the range owns - naming evidence class 1 without reading a single assert. Two lanes then derived the
+**same** file name independently from that one string, which is how a real defect was caught: `attribute.py`'s
+`--max-bytes` cap had split one translation unit into two registered proposals, and only the agreeing `__FILE__`
+evidence made it visible. The same pattern settled a boundary question the other way: `_8029e4e0switchdataD_805cdea8`
+(owner 0x8029E4E0, which lies inside the *previous* run) sitting in a file's own `.data` run proves that TU starts
+at or before 0x8029E4E0 - a bound, not a measured edge, which is why the left edge stayed where it was.
