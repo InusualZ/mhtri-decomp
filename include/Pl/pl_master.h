@@ -33,8 +33,15 @@ extern "C" {
 #endif
 struct _PLW;
 u32 fn_8026FD94(struct _PLW* self);
-/* 0x8026FEC0 - the status-bit setter the player act cluster drives; the owner defines it unmangled
- * (`Pl/pl_master.cpp`), so the declaration is `extern "C"`. */
+/* 0x8026FE44 - the second master predicate `Pl/fn_802489D4.cpp` gates a motion on.  The map name is
+ * the bare `fn_8026FE44`, so the owner defines it `extern "C"` and so is the declaration. */
+u32 fn_8026FE44(struct _PLW* self);
+/* 0x8026F908 - this unit's own helper `Pl/fn_802489D4.cpp` calls; the map name is a bare `fn_` stem,
+ * so `extern "C"`. */
+u8 fn_8026F908(struct _PLW* self, u32 idx);
+/* 0x8026FEC0 - the status-bit setter the player act cluster (`Pl/fn_802489D4.cpp`) and the player
+ * act dispatcher (`Pl/fn_8024F200.cpp`) drive; the owner defines it unmangled (`Pl/pl_master.cpp`),
+ * so the declaration is `extern "C"`.  One declaration: `mask`/`bits` are the same `u32`. */
 void fn_8026FEC0(struct _PLW* self, u32 bits);
 #ifdef __cplusplus
 }

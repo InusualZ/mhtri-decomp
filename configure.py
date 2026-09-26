@@ -1164,6 +1164,17 @@ config.libs = [
             # `Pl_condition_ck`), and the runtime dump names 8 of the 59
             # (`player_control_move`/`init_player_work`/`player_move_start`/...).  No `__FILE__`
             # string covers the band, so the stem is the map's `fn_80262940` with a rule-7 deferral.
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802489D4_fn_802489D4` - the player action/handler cluster (0x802489D4-0x8024F200,
+            # 42 functions, 0x6D2C B) with its own exception tables (extab
+            # 0x80011DB4-0x80011EFC, extabindex 0x8002EB78-0x8002ED64), both runs bracketed
+            # exactly by the neighbouring functions' records.  Home is `Pl`: the actor is
+            # `_PLW`, every sibling unit is `Pl/*.cpp`, and the outbound calls are the Pl gates
+            # (`Pl_master_ck`/`Pl_Skill_ck`/`Pl_act_ck`/`Pl_cat_skill_ck`/`Pl_frame_check`/
+            # `Pl_chr_setX`/`PlayMode_ck`).  No `__FILE__` string covers the band and no
+            # runtime-dump name exists for any of the 42 symbols, so the stem is the map's
+            # `fn_802489D4` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802489D4.cpp"),
             Object(NonMatching, "Pl/fn_80262940.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8024F200_fn_8024F200` - the player's per-act state machine cluster

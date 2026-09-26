@@ -57,6 +57,50 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 /* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
+/* The Pl helpers `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) and `Pl/fn_8024F200.cpp`
+ * (0x8024F200-0x80258FCC) call that sit in the band's unclaimed runs (0x802430E8-0x80258FCC,
+ * 0x802693C4-0x8026BA1C, 0x80273B14-0x80276B58).  This band header is their rule-2 home, and the C
+ * linkage here is the map's (every name is a bare `fn_XXXXXXXX`).  Each signature is the owner's own
+ * body where one exists, the call site's register width otherwise - one declaration serves both
+ * consumers, so the widths are the ones the two units' call sites agree on. */
+void fn_8026A224(struct _PLW* self, u32 motion, s32 a, s32 b);
+u32 fn_8026A33C(struct _PLW* self);
+u32 fn_8026A644(struct _PLW* self, s32 v);
+/* The second argument is `u16`: retail keeps the `clrlwi r4,r4,16` that narrows the `lis`/`subi`
+ * constant at the `0x8001`/`0x8003` call sites, which MWCC only emits for a narrower parameter.
+ * `Pl/fn_8024F200.cpp`'s calls pass 0/3, so the width is immaterial there. */
+void fn_80275B04(struct _PLW* self, u16 a, u32 b, u32 c);
+void fn_802761B8(struct _PLW* self, u32 a, u32 b, u32 c);
+void fn_80276868(struct _PLW* self, s16 value);
+u32 fn_80276800(struct _PLW* self, s32 v);
+
+/* The unclaimed `.data` tables this unit's act handlers index (no registered `.data` range covers
+ * them, so - like the band's code - this header is their rule-2 home). */
+extern u32 lbl_805BE824[]; /* 0x805BE824 - the per-act SE/motion table `fn_802770E8` is handed */
+extern u32 lbl_805BE5B8[]; /* 0x805BE5B8 - the sibling table `fn_8024A640` is handed */
+extern u16 lbl_805C4A54[]; /* 0x805C4A54 - 3 rows of {u16 motion, u16 param} `fn_8024A8EC` reads */
+extern u16 lbl_805C4A60[]; /* 0x805C4A60 - the sibling motion row table `fn_8024B35C` indexes */
+extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024B46C` indexes */
+extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `fn_802770E8` is handed */
+extern u32 lbl_805CAD74[]; /* 0x805CAD74 - the sibling table for the other actor kind */
+extern u32 lbl_805E2048[]; /* 0x805E2048 - the sibling table for the third actor kind */
+/* The `.sdata2` floats this band gates its frame checks on. */
+extern const f32 lbl_80799E00; /* 0x80799E00 - the zero/identity angle the Pl frame checks compare
+                                * against; `const` because `Pl/fn_8024F200.cpp` declares the same
+                                * pool word `const f32` in its own file (a bare `f32` redeclaration is
+                                * `(10563)`), and the pool is never written */
+extern const f32 lbl_80799E38;
+extern const f32 lbl_80799E48;
+extern const f32 lbl_80799E2C;
+extern const f32 lbl_80799E84;
+extern const f32 lbl_80799EAC;
+extern const f32 lbl_80799EB0;
+extern const f32 lbl_80799EB4;
+extern const f32 lbl_80799EC0;
+extern const f32 lbl_80799EC4;
+extern const f32 lbl_80799E4C;
+extern const f32 lbl_80799E54;
+
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
  * The 0x8026A3xx trio sits in the unclaimed run 0x802693C4-0x8026BA1C; 0x8025EFF4 is owned by
  * `Pl/fn_80258FCC.cpp` and is declared in `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the
@@ -134,17 +178,11 @@ void fn_8023C2D0(struct _PLW* self, u8 part);
 void fn_8023FC20(struct _PLW* self, u8 part);
 void fn_802430E8(struct _PLW* self, u8 part);
 
-/* 0x8026A224 / 0x8026A33C / 0x8026A644 / 0x80275B04 / 0x802761B8 - the unmangled helpers the player-act
- * clusters drive: `Pl/fn_8024F200.cpp` (main) and `Pl/fn_80258FCC.cpp` (this branch).  They sit in the
- * band's unclaimed runs 0x802693C4-0x8026BA1C and 0x80273B14-0x80276B58, so no registered unit owns
- * them and this band header is their rule-2 home.  Their signatures are the call sites'; where the two
- * lanes spelled one argument differently (`fn_8026A644`, `fn_80275B04`) MAIN's spelling is kept - both
- * call sites pass literals, so the width/signedness is codegen-identical. */
-void fn_8026A224(struct _PLW* self, u32 motion, s32 a, s32 b);
-u32 fn_8026A33C(struct _PLW* self);
-u32 fn_8026A644(struct _PLW* self, s32 id);
-void fn_80275B04(struct _PLW* self, s32 motion, s32 a, s32 b);
-void fn_802761B8(struct _PLW* self, u8 kind, s32 a, s32 b);
+/* The 0x8026A224 / 0x8026A33C / 0x8026A644 / 0x80275B04 / 0x802761B8 group above is the same five
+ * symbols the three player-act consumers drive (`Pl/fn_802489D4.cpp`, `Pl/fn_8024F200.cpp`,
+ * `Pl/fn_80258FCC.cpp`); the band header declares them once so all three compile.  Where the two
+ * lanes spelled one argument differently the MAIN spelling is kept (M7): both call sites pass
+ * literals, and re-measuring this branch's units against it moved no row. */
 
 /* The act tail's predicates and setters, called by `Pl/fn_80258FCC.cpp` (`.text`
  * 0x80258FCC-0x8025F088).  They sit in the unclaimed runs 0x802430E8-0x80258FCC and

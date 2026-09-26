@@ -26,6 +26,10 @@ void fn_800FF8D4(struct _EFT* self);
 void fn_800FFC98(struct _EFT* self);
 void fn_800FFCA8(struct _EFT* self);
 void fn_80100088(void* effect, s32 flag);
+/* 0x80101594 - the player actor's effect-anchor refresh `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200)
+ * calls after it arms a motion.  This unit defines it (`src/ef/eft004.cpp`), so the declaration lives
+ * here (rule 2) and takes the caller's `_PLW*` view as an opaque pointer. */
+void fn_80101594(void* self);
 #ifdef __cplusplus
 }
 #endif
