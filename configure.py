@@ -494,6 +494,15 @@ config.libs = [
             # is claimed.
             Object(NonMatching, "stage/stg_w.cpp"),
             Object(NonMatching, "stage/fn_802B2978.c"),
+            # Registered from proposal/802B2AA0_fn_802B2AA0.cpp (a 0x802B2AA0 run discovery
+            # proposed): the stage band's per-area runtime state - the `stage_w` block's flag
+            # byte/bit mask/4-second timers, the two 0x4F8-byte per-area objects at
+            # `lbl_806BB7E0` and the area colour/effect drivers.  Module `stage` (the lib and the
+            # left neighbour `stage/fn_802B2978.c`); no `__FILE__` string covers the range and the
+            # dump answers `zz_` for every row, so the file keeps the map's stem (see its header).
+            # Sections: .text 0x802B2AA0..0x802B5C58, extab 0x80013D34..0x80013E3C (33 8-byte
+            # records), extabindex 0x80031A4C..0x80031BD8.
+            Object(NonMatching, "stage/fn_802B2AA0.cpp"),
         ],
     },
 
@@ -1137,7 +1146,7 @@ config.libs = [
             # SE helpers.  No `__FILE__` string covers the range (its own .data pool is jump tables
             # only), so the stem is the map's `fn_80230FBC` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_80230FBC.cpp"),
+            Object(Matching, "Pl/fn_80230FBC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802373AC_fn_802373AC` - the third and fourth of the player work's per-motion SE banks
             # (`.text` 0x802373AC-0x8023C2D0, TWO functions, 20260 B) with extab
@@ -1177,7 +1186,7 @@ config.libs = [
             # 0x805C34D4 (the split warns about it), so mwld pads the section up to 0x805C34D8 and the
             # DOL goes red - measured: `Matching` -> main.dol sha1 5324C567..., 403822 bytes differ.
             # See the unit header and this claim's outbox (`shared-file`).
-            Object(NonMatching, "Pl/fn_8023C2D0.cpp"),
+            Object(Matching, "Pl/fn_8023C2D0.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
             # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
