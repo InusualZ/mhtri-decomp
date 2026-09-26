@@ -1706,3 +1706,31 @@ members (90 base + 9 spliced), 48 fillers, last field `+0x498`, total unchanged.
 reproduced its own report exactly (`fn_802C5D10` 99.0541, `fn_802C6690` 100.0000, unit 20.159) and the landed
 band's rows did not move at all - which is what made the landing acceptable with one `_AINPC_W` definition
 instead of two.
+
+## 57. A call-site mask means the callee's parameter is declared wider than the value
+
+**Problem.** A wrapper (or any caller) sits at 50-90 % and the first divergence is one instruction at the `bl`:
+retail masks or sign-extends the argument (`clrlwi r4,r4,16`, `extsh r5,r5`, a `slwi`/`srawi` pair) and ours
+passes it straight through. It reads as a scheduling or inlining residual, nothing in the caller's own source
+hints at a mask, and the search goes to flags and to the caller's statement order - where the mask cannot exist.
+
+**Why try it.** The mask is the *caller's* cost of the *callee's* prototype: MWCC converts an argument to the
+callee's declared parameter width, so a parameter declared `s32`/`u32` forces a mask on a value whose own type
+is narrower (`s16`, `u8`, a bitfield), while a parameter declared with the narrow type does not. The mask is
+therefore evidence about a declaration that is not in the function you are looking at.
+
+**Result.** When retail's call site carries a mask ours does not, widen the **callee's parameter** to
+`s32`/`u32` and narrow explicitly at the use inside the callee (which keeps the callee's own codegen) - or, for
+a local, widen the local's declared type and mask at the use. Measured across one `ai` band without any flag
+change: `fn_802D2ABC` 56.7 -> 90, `fn_802D287C` 85.9 -> 93.8, `fn_802D2264` 77.9 -> 81.7, and ten thin wrappers
+went to **100 %**. The mirror case is the same lever: `fn_802D3984` (76.14 %) has our mask *too* wide, i.e. a
+parameter declared wider than retail's, so the presence *or absence* of the mask is a statement about the
+callee's declared width rather than about the caller.
+
+**Example (the layout calculator that found the band's other class).** These records are written as explicit pad
+arrays (`u8 pad_0xNNN[0xMMM - 0xNNN];`), which makes the layout mechanically checkable: a 30-line checker
+asserts that the offsets tile (every filler's declared end equals the next member's offset, no duplicate
+offsets). It caught `field_0x216` declared `s32` where the code does a `lbz` - the field is **1** byte, so every
+later field sat 2 or 8 bytes out and ~20 functions each lost ~20 points. Take a field's size from the **access
+width in the code** (`lbz` = 1, `lhz` = 2, `lwz` = 4, `stb`/`sth` likewise), never from the type you guessed,
+and assert the tiling before you measure.
