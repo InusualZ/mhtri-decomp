@@ -22,6 +22,15 @@
  *   * `fn_80273B14` and `fn_80274B5C` both switch through a compiler-emitted `.data` jump table
  *     (0x805C5FEC, 17 entries, and 0x805C6068, 15 entries).  The case bodies are written in the
  *     order the table's addresses put them in, not in case-value order.
+ *   * rule 2 residual, `fn_80335CE8`: the address is owned by `src/hud/fn_80334568.cpp`, whose
+ *     prototype is three-parameter and right (that unit's definition is 100 % byte-identical), while
+ *     retail's Pl call sites must keep the two-parameter view they were built with - so the
+ *     declaration is local, with both measurements in the comment on it below.  The prototype family
+ *     is cross-TU in retail's own build (two arguments here, three at the owner), so the structural
+ *     fix is the owner's header family, not this unit's edit: recorded as a tooling-register request.
+ *   * This file stopped compiling because a rule-2 warning was obeyed without checking the call
+ *     sites: moving the declaration to the owner's header changed its arity under three call sites
+ *     here.  Check the callers first, then move the declaration.
  *
  * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x80273B14 0x80276B58` - 66 of the 68 stems are `fn_`,
@@ -52,6 +61,19 @@
  * brackets two different modules (`Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` below, `OS/OSAlarm.c`
  * above), so no band header owns it; `nw_resource.cpp` declares the same shape locally. */
 char* strcpy(char* dst, const char* src);
+
+/* 0x80335CE8 - the client-side act-message sender `fn_802756F0`'s tail calls (owner:
+ * `src/hud/fn_80334568.cpp`, rule 2).  Retail's own build carried this one address under two
+ * prototypes: the owner's definition takes a third `u16 param` and passes it on to the message
+ * builders (its reconstruction is 100 % byte-identical against the target), while this band's call
+ * sites pass two arguments - retail's `bl fn_80335CE8` is preceded by only `mr r3, r30` and
+ * `li r4, X`, with no third register materialised (read off the target's instruction stream).  MWCC
+ * rejects the two-argument call against the owner's three-parameter prototype ((10248) `function
+ * call ... does not match`, measured on a probe), and supplying the third argument would emit the
+ * missing `li r5, X` at all three call sites, so the faithful two-parameter view is the only shape
+ * that reproduces retail's bytes.  `extern "C"` keeps the emitted name the map's, as the owner's
+ * header does. */
+extern "C" void fn_80335CE8(struct _PLW* plw, s32 kind);
 
 /* The three equipment-slot records `fn_8027ECAC`/`fn_8027ED18`/`fn_8027E344` hand back.  Only this
  * unit reads them, so they live here (rule 1); each offset/width is the one its readers narrow to.
