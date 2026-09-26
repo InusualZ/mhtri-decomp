@@ -306,8 +306,13 @@ def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]
     return [ordered[i] for i in picked]
 
 
-def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dict:
+def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
+               profile: str = "decompiler") -> dict:
     """The paste-ready spawn: agent, cwd and task text for the orchestrator.
+
+    `profile` is the agent profile the lane is launched with. A registration-and-reconstruction lane is
+    unit work, which is the project's `decompiler` profile (`.agents/agents/decompiler.md`); `worker` stays
+    the generic fallback and `fixer`/`merger` are for a refused gate and a refused apply.
 
     The task names the brief by its absolute MAIN path: the brief is written into MAIN *after* the worktree
     was created, so the worktree's own checkout does not contain it. The call is the default `subagent`
@@ -315,13 +320,13 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str) -> dic
     it blocks and returns the worker's final message to the orchestrator when the child process exits.
     """
     task = ("Read %s (in MAIN) and do exactly what it says. "
-            "Ack first: python tools/units/claims.py ack %s --agent worker-%s. "
+            "Ack first: python tools/units/claims.py ack %s --agent %s-%s. "
             "You may fan out subagents. End your turn with your report: "
             "your final message is the result the orchestrator receives."
-            % (brief_path.replace("\\", "/"), unit, slug))
-    return {"agent": "worker", "name": "worker-%s" % slug, "cwd": wt, "task": task,
-            "call": "subagent(agent=\"worker\", cwd=\"%s\", task=%s, timeoutMs=%d)"
-                    % (wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
+            % (brief_path.replace("\\", "/"), unit, profile, slug))
+    return {"agent": profile, "name": "%s-%s" % (profile, slug), "cwd": wt, "task": task,
+            "call": "subagent(agent=\"%s\", cwd=\"%s\", task=%s, timeoutMs=%d)"
+                    % (profile, wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
 
 
 def promote(main: str, unit: str, claim_slug: str) -> str:
@@ -370,7 +375,8 @@ def no_ready(main: str) -> str:
             "  see: python tools/units/queue.py list" % pool_dir(main))
 
 
-def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn) -> dict:
+def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn,
+                profile: str = "decompiler") -> dict:
     """Claim one *selected* entry, promote its brief, and return its spawn.
 
     `next` and a wave differ only in selection, so this is the one claim path both take: the unit is
@@ -390,10 +396,11 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
         brief_path = promote(main, unit, claim_slug)
     return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
             "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
-            "spawn": spawn_line(main, unit, claim_slug, wt, brief_path)}
+            "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, profile)}
 
 
-def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> dict:
+def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
+               profile: str = "decompiler") -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
     Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
@@ -408,10 +415,11 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None) -> d
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(no_ready(main))
-    return claim_entry(main, entry, worker, dry_run, claim_fn)
+    return claim_entry(main, entry, worker, dry_run, claim_fn, profile)
 
 
-def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None) -> dict:
+def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
+                profile: str = "decompiler") -> dict:
     """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
 
     Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
@@ -427,7 +435,7 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
     chosen = wave(main, count)
     if not chosen:
         raise SystemExit(no_ready(main))
-    out = [claim_entry(main, entry, worker, dry_run, claim_fn) for entry in chosen]
+    out = [claim_entry(main, entry, worker, dry_run, claim_fn, profile) for entry in chosen]
     return {"requested": count, "claimed": len(out), "shortfall": count - len(out), "dry_run": dry_run,
             "claims": out}
 
@@ -507,11 +515,18 @@ def selftest() -> int:
         check("dry-run claims nothing", claims.load_registry(tmp), {})
         check("dry-run leaves the pool brief in place", os.path.exists(by_unit["auto/stubB"]["path"]), True)
         check("dry-run picks the lowest address", dry["unit"], "auto/stubB")
-        check("dry-run's spawn names the worker", dry["spawn"]["name"], "worker-" + claims.slug("auto/stubB"))
+        check("dry-run's spawn names the profile and the slug",
+              dry["spawn"]["name"], "decompiler-" + claims.slug("auto/stubB"))
         check("dry-run's spawn has the worktree as cwd", dry["spawn"]["cwd"], claims.worktree_for("auto/stubB", tmp))
         check("dry-run's spawn task names the brief", dry["brief"].replace("\\", "/") in dry["spawn"]["task"], True)
         check("dry-run's spawn task names the unit", "auto/stubB" in dry["spawn"]["task"], True)
-        check("dry-run's spawn is a subagent call", dry["spawn"]["call"].startswith("subagent(agent=\"worker\""), True)
+        check("dry-run's spawn is a subagent call",
+              dry["spawn"]["call"].startswith("subagent(agent=\"decompiler\""), True)
+        check("... and a proposal lane defaults to the decompiler profile",
+              dry["spawn"]["agent"] == "decompiler", True)
+        check("... which the orchestrator can override (a refused gate is a fixer lane)",
+              spawn_line(tmp, "auto/x", "s", "/w", "/b", "fixer")["call"]
+              .startswith("subagent(agent=\"fixer\""), True)
         check("the spawn omits the `name` the default tool has no parameter for",
               "name=" not in dry["spawn"]["call"], True)
         check("the spawn asks for a final-message handoff, not a tool",
@@ -705,7 +720,8 @@ def selftest() -> int:
         check("... every claim carries its own spawn",
               [c["unit"] for c in out["claims"]], [units[0], units[2]])
         check("... and every spawn is a subagent call",
-              all(c["spawn"]["call"].startswith("subagent(agent=\"worker\"") for c in out["claims"]), True)
+              all(c["spawn"]["call"].startswith("subagent(agent=\"decompiler\"")
+                  for c in out["claims"]), True)
         check("... claimed through the same path as a single pick",
               units[2] in claims.load_registry(tmp), True)
 
@@ -882,6 +898,10 @@ def main() -> int:
                    help="claim a wave of N proposals spread with a stride of N through the address order"
                         " (default 1 - the single next proposal)")
     n.add_argument("--worker", default=None)
+    n.add_argument("--profile", default="decompiler",
+                   choices=["decompiler", "worker", "fixer", "merger"],
+                   help="the agent profile the lane is launched with (default: decompiler - a proposal "
+                        "lane registers and reconstructs a unit, which is unit work)")
     n.add_argument("--dry-run", action="store_true")
     n.add_argument("--json", action="store_true")
     l = sub.add_parser("list", help="the pool's state and the next ready candidates")
@@ -921,7 +941,7 @@ def main() -> int:
 
     if args.cmd == "next":
         if args.count != 1:
-            out = next_briefs(main_wt, args.worker, args.dry_run, args.count)
+            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile)
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0
@@ -949,7 +969,7 @@ def main() -> int:
                       " next to a claim already in this wave; `python tools/units/brief.py --pool`"
                       " replenishes it" % (out["claimed"], out["requested"]))
             return 0
-        out = next_brief(main_wt, args.worker, args.dry_run)
+        out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
