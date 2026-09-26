@@ -58,14 +58,14 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
 /* The Pl helpers `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) and `Pl/fn_8024F200.cpp`
- * (0x8024F200-0x80258FCC) call that sit in the band's unclaimed runs (0x802430E8-0x80258FCC,
- * 0x802693C4-0x8026BA1C, 0x80273B14-0x80276B58).  This band header is their rule-2 home, and the C
+ * (0x8024F200-0x80258FCC) call that sit in the band's unclaimed runs (0x802430E8-0x80258FCC and
+ * 0x80273B14-0x80276B58; the third run main listed here, 0x802693C4-0x8026BA1C, is owned by
+ * `Pl/fn_802693C4.cpp`).  This band header is their rule-2 home, and the C
  * linkage here is the map's (every name is a bare `fn_XXXXXXXX`).  Each signature is the owner's own
  * body where one exists, the call site's register width otherwise - one declaration serves both
- * consumers, so the widths are the ones the two units' call sites agree on. */
-void fn_8026A224(struct _PLW* self, u32 motion, s32 a, s32 b);
-u32 fn_8026A33C(struct _PLW* self);
-u32 fn_8026A644(struct _PLW* self, s32 v);
+ * consumers, so the widths are the ones the two units' call sites agree on.  The
+ * `fn_8026A224`/`fn_8026A33C`/`fn_8026A644` trio moved into `Pl/fn_802693C4.h` with the unit that now
+ * owns 0x802693C4-0x8026BA1C. */
 /* The second argument is `u16`: retail keeps the `clrlwi r4,r4,16` that narrows the `lis`/`subi`
  * constant at the `0x8001`/`0x8003` call sites, which MWCC only emits for a narrower parameter.
  * `Pl/fn_8024F200.cpp`'s calls pass 0/3, so the width is immaterial there. */
@@ -102,12 +102,11 @@ extern const f32 lbl_80799E4C;
 extern const f32 lbl_80799E54;
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
- * The 0x8026A3xx trio sits in the unclaimed run 0x802693C4-0x8026BA1C; 0x8025EFF4 is owned by
- * `Pl/fn_80258FCC.cpp` and is declared in `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the
- * runs the header above already documents. */
-u32 fn_8026A328(struct _PLW* self, u32 n, f32 a, f32 b);
-f32 fn_8026A34C(struct _PLW* self);
-u8 fn_8026A3A0(struct _PLW* self);
+ * The 0x8026A3xx trio (`fn_8026A328`/`fn_8026A34C`/`fn_8026A3A0`) sits inside the range
+ * `Pl/fn_802693C4.cpp` now owns (`.text` 0x802693C4-0x8026BA1C), so it is declared in
+ * `Pl/fn_802693C4.h`; 0x8025EFF4 is owned by `Pl/fn_80258FCC.cpp` and is declared in
+ * `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the runs the header above already
+ * documents. */
 s32 fn_8027EE24(void);
 s32 fn_8027EBA8(struct _PLW* self, void* equip);
 
@@ -166,6 +165,19 @@ extern u8* lbl_807913D0[];
 extern u8* lbl_807913D8[];
 extern const f32 lbl_80792010[2];
 extern u8 lbl_805BAAD4[];
+/* The 0x8079A000 `.sdata2` run the Pl band's part/motion accessors load (0.0f and 1.0f; the eight
+ * bytes at +0x08 are the 2^52 double MWCC's u32->f32 conversion uses, which overlaps the -0.0f at
+ * +0x0C).  No registered unit claims the run, so this band header is its rule-2 home - declared, never
+ * defined (defining it would rebuild the pool). */
+extern const f32 lbl_8079A000; /* 0.0f */
+extern const f32 lbl_8079A004; /* 1.0f */
+
+/* The `.data` lookup tables the motion-number helpers at 0x8026A00C/0x8026A068 index: ten row
+ * pointers (one per hundred of the 0-999 range) and, for the 1000+ range, a two-level table keyed by
+ * the actor's `_PLW`+0x002 byte.  Both are unclaimed. */
+extern s16* lbl_805C0C98[];
+extern s16** lbl_805C1584[];
+
 extern PlSeVecPair lbl_805BB028[];
 extern PlSeVecPair lbl_805BB130[];
 
@@ -178,17 +190,17 @@ void fn_8023C2D0(struct _PLW* self, u8 part);
 void fn_8023FC20(struct _PLW* self, u8 part);
 void fn_802430E8(struct _PLW* self, u8 part);
 
-/* The 0x8026A224 / 0x8026A33C / 0x8026A644 / 0x80275B04 / 0x802761B8 group above is the same five
- * symbols the three player-act consumers drive (`Pl/fn_802489D4.cpp`, `Pl/fn_8024F200.cpp`,
- * `Pl/fn_80258FCC.cpp`); the band header declares them once so all three compile.  Where the two
- * lanes spelled one argument differently the MAIN spelling is kept (M7): both call sites pass
- * literals, and re-measuring this branch's units against it moved no row. */
+/* The 0x8026A224 / 0x8026A33C / 0x8026A644 group above is owned by `Pl/fn_802693C4.cpp` and declared
+ * in `Pl/fn_802693C4.h`, which the three player-act consumers (`Pl/fn_802489D4.cpp`,
+ * `Pl/fn_8024F200.cpp`, `Pl/fn_80258FCC.cpp`) include.  The 0x80275B04 / 0x802761B8 pair sits in the
+ * band's unclaimed run 0x80273B14-0x80276B58, so the band header is its rule-2 home; where the two
+ * lanes spelled one argument differently the MAIN spelling is kept (M7). */
 
 /* The act tail's predicates and setters, called by `Pl/fn_80258FCC.cpp` (`.text`
- * 0x80258FCC-0x8025F088).  They sit in the unclaimed runs 0x802430E8-0x80258FCC and
- * 0x802693C4-0x8026BA1C, so this band header is their rule-2 home. */
+ * 0x80258FCC-0x8025F088).  `fn_80245DA0` sits in the unclaimed run 0x802430E8-0x80258FCC, so the band
+ * header is its rule-2 home; `fn_8026A3A8` sits inside `Pl/fn_802693C4.cpp`'s range and is declared
+ * in `Pl/fn_802693C4.h`. */
 u32 fn_80245DA0(struct _PLW* self, u32 a);
-void fn_8026A3A8(struct _PLW* self);
 
 /* The act band's remaining Pl helpers, added with the rest of `Pl/fn_80258FCC.cpp`.  Each signature
  * is the callee's own body (its prologue's argument saves and the width it narrows them to), not a
@@ -216,16 +228,6 @@ u32 event_demo_ck(void);
 
 struct _PLW;
 
-/* `Get_motion_no` is defined at 0x8026A308; the map spells it `Get_motion_no__FP4_PLW`, so the real
- * C++ declaration is the callable spelling and the front-end mangles it back (rule 9). */
-u16 Get_motion_no(struct _PLW* plw);
-
-/* 0x8026A248 / 0x8026A314 - the two character setters `src/lobby/fn_802076D4.cpp` drives.  The map
- * spells them `Pl_chr_setX__FP4_PLWUsll` and `Pl_frame_check__FP4_PLWUlff`, so the real declarations are
- * the callable spellings and the front-end mangles them back (rule 9).  Their addresses sit in the Pl
- * band's unclaimed gap (0x802693C4..0x8026BA1C), so this band header is their rule-2 home. */
-void Pl_chr_setX(struct _PLW* plw, u16 motion, s32 a, s32 b);
-u32 Pl_frame_check(struct _PLW* plw, u32 mask, f32 a, f32 b);
 #endif
 
 #endif /* MHTRI_UNSPLIT_PL_H */

@@ -1186,6 +1186,17 @@ config.libs = [
             # whole band), so the stem is the map's `fn_8024F200` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_8024F200.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802693C4_fn_802693C4` - the player part/motion cluster (0x802693C4-0x8026BA1C, 63
+            # functions, 9816 B) with its own exception tables (extab 0x80012554-0x8001265C,
+            # extabindex 0x8002F6E8-0x8002F808 - the two runs the link order puts between
+            # `Pl/fn_80262940.cpp` and `Pl/pl_master.cpp`).  Home is `Pl`: every actor parameter is
+            # the `_PLW` the siblings take, the table it walks is `lbl_80794B28` (`_PLGLOBAL`) and
+            # its callees are `Pl_chr_set_attr`/`Pl_chr_setX`/`Pl_frame_check`/`Get_motion_no`.
+            # No `__FILE__` string covers the band and the runtime dump answers only `zz_`
+            # placeholders for 58 of the 63 addresses, so the stem is the map's `fn_802693C4` with
+            # a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_802693C4.cpp"),
             Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump

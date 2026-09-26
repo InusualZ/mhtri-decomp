@@ -62,6 +62,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "Pl/fn_8024F200.h"
+#include "Pl/fn_802693C4.h"
 #include "unsplit/Pl.h"
 
 /* 0x802DE578 / 0x802F39DC - the two helpers this unit calls whose address band interleaves modules

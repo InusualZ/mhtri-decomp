@@ -78,34 +78,8 @@
 #include "unsplit/g3d.h"
 #include "unsplit/unknown.h"
 #include "sys_mem.h"
-
-/* The per-model record the rig's three arrays hold: an `MHchar` plus 0x24 B the model layer uses.
- * size: 0x164 */
-typedef struct PlSeModel {
-    /* +0x000 */ MHchar model;
-    /* +0x140 */ u8 field_0x140[0x24];
-} PlSeModel; /* size: 0x164 */
-
-/* The third array's element: 0x110 B of per-attachment state; only the +0x10 id byte is read here.
- * size: 0x110 (lower bound) */
-typedef struct PlSeAttach {
-    /* +0x000 */ u8 pad_0x000[0x10];
-    /* +0x010 */ u8 field_0x10;
-    /* +0x011 */ u8 pad_0x011[0xFF];
-} PlSeAttach; /* size: 0x110 */
-
-/* The actor's SE/motion rig: the `_PLW*` at +0, seven model records, the per-model gate bytes, three
- * sub-model records and three attachment records - the offsets `fn_80224AC4` walks.
- * size: 0x1560 */
-typedef struct PlSeRig {
-    /* +0x000 */ _PLW* plw;
-    /* +0x004 */ PlSeModel models_0x004[7];
-    /* +0x9C0 */ u8 field_0x9C0[7];   /* one gate per entry of `models_0x004` */
-    /* +0x9C7 */ u8 field_0x9C7[3];   /* one gate per entry of `sub_0x0A14` */
-    /* +0x9CA */ u8 pad_0x9CA[0x4A];
-    /* +0xA14 */ PlSeModel sub_0x0A14[3];
-    /* +0x1230 */ PlSeAttach attachments_0x1230[3];
-} PlSeRig; /* size: 0x1560 */
+#include "Pl/fn_80224AC4.h"
+#include "Pl/fn_802693C4.h"
 
 /* One 4-byte row of the table `fn_80229868` scans. size: 0x4 */
 typedef struct PlSeRow {

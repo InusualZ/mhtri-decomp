@@ -56,6 +56,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_act.h"
+#include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the fn_8026A224/33C/644 group */
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
