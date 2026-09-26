@@ -21,18 +21,17 @@
  * The name stays the map's `fn_80324F7C`: the shared runtime dump's name list has no entry at 0x80324F7C
  * (only its `zz_0324f7c_` placeholder), so there is nothing better to rename it to.
  *
- * The one codegen deviation is the `#pragma peephole off` below, and it has a proven flag behind it:
- * with `-opt nopeephole` on the real command line (and no pragma) this object is byte-identical to the
- * target, so the original TU was built peephole-off.  The visible effect is the target's `get_option_cfg`
- * test - `clrlwi r0,r3,24` + `cmpwi r0,0`, the non-record form - which MWCC fuses into `clrlwi.` + `bne`
- * with the peephole on, leaving the function 4 bytes short (98.64 %).  The pragma carries the deviation
- * in the unit's own source until the cflags group in `config_requests` lands (playbook 33: the flag is
- * the preferred home; it is not a lib-wide default - only three of the DOL's split objects carry the
- * fused form at all).  ~25 source shapes were measured against the target object first and none
- * produces the non-fused pair: `== 0` / `!= 0` / `> 0` / `< 1` / `>= 1` / `>= 1U` / `& 0xFF`, a
- * `u8`/`u32` local, `(u8)`/`(u32)` casts, a `switch`, a `do { … } while (0)` and both branch orders;
- * `-O2`, `-O4,p` and `-O1` do not help either (`-O4,p` costs 20 points).  Only this unit's file is
- * affected (one function).
+ * The one codegen deviation is `-opt nopeephole`, which the `hud` lib now carries as `cflags_hud`
+ * (2026-09-27; this file said `the pragma` before that): with `-opt nopeephole` on the real command line
+ * this object is byte-identical to the target, so the original TU was built peephole-off.  The visible
+ * effect is the target's `get_option_cfg` test - `clrlwi r0,r3,24` + `cmpwi r0,0`, the non-record form -
+ * which MWCC fuses into `clrlwi.` + `bne` with the peephole on, leaving the function 4 bytes short
+ * (98.64 %).  It is not a project-wide default: only three of the DOL's split objects carry the fused
+ * form at all, and the three `hud` ones agree (playbook 33: the flag is the preferred home).  ~25 source
+ * shapes were measured against the target object first and none produces the non-fused pair: `== 0` /
+ * `!= 0` / `> 0` / `< 1` / `>= 1` / `>= 1U` / `& 0xFF`, a `u8`/`u32` local, `(u8)`/`(u32)` casts, a
+ * `switch`, a `do { … } while (0)` and both branch orders; `-O2`, `-O4,p` and `-O1` do not help either
+ * (`-O4,p` costs 20 points).  Only this unit's file is affected (one function).
  */
 
 #include "types.h"
@@ -74,8 +73,6 @@ extern const u16 lbl_80792D00;
 /* This unit's single codegen deviation: the original object carries the non-fused `clrlwi` + `cmpwi`
  * for the `get_option_cfg` test (see the file header).  The pragma is file-wide because the file is one
  * function, and its only observable effect is that fusion - the rest of the function is unaffected. */
-#pragma peephole off
-
 /* Draws one player's move indicator: the base sprite at the HUD anchor plus the extra sprite and the
  * shifted anchors the expanded layout needs. */
 void fn_80324F7C(_mh_move_work_* self)

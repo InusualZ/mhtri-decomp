@@ -354,6 +354,20 @@ cflags_main = [
     "-Cpp_exceptions on",
 ]
 
+# hud flags (src/hud/*). cflags_main plus `-opt nopeephole`: the whole lib needs the unfused forms, each
+# file saying so with a file-wide `#pragma peephole off` before this group existed (2026-09-27):
+#   * hud/fn_80324F7C.c - `draw_shape` keeps `clrlwi`+`cmpwi` separate where the fold fuses them (the
+#     object is `Matching`, so this group must reproduce that pragma byte for byte: it does, see the
+#     identical object hash in the commit that added this);
+#   * hud/layout.cpp - the band's `draw_*` wrappers keep unfused `slwi`+`or`/`clrlslwi` pairs;
+#   * hud/cockpit_quest.cpp - fn_802E7408 93.63 -> 100.0 and four siblings with it (measured per file).
+# Three of three registered hud objects agree, so it is the lib's flag, not a per-unit deviation; the
+# per-file pragmas were removed with this group and every object stayed byte-identical.
+cflags_hud = [
+    *cflags_main,
+    "-opt nopeephole",
+]
+
 # menu flags (src/menu/menu_item.cpp). cflags_main plus `-opt nopeephole`: the retail `ItemName`
 # (0x8029F628, 44 B / 13 ins) keeps `clrlwi r0,r3,16` + `slwi r0,r0,2` separate where the peephole pass
 # folds them into one `clrlslwi r0,r3,16,2` (measured: 34.090908 -> 100.0 with the flag off, 36 B ->
@@ -552,7 +566,9 @@ config.libs = [
         # Promoted from auto/80324F7C_fn_80324F7C.c (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "hud",
         "mw_version": "Wii/1.3",
-        "cflags": cflags_main,
+        # cflags_hud = cflags_main + `-opt nopeephole`: every object in this lib needs the unfused forms
+        # (see the group's evidence above); the three per-file `#pragma peephole off` are gone with it.
+        "cflags": cflags_hud,
         "progress_category": "game",
         "objects": [
                         Object(Matching, "hud/fn_80324F7C.c"),

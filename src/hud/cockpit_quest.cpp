@@ -39,15 +39,14 @@
  * runs end (`fn_802E7408`'s own `.note.split` says extab 0x800150C4 / extabindex 0x8003378C /
  * .text 0x802E7408; the band below's last record is 0x800150C4-8).
  *
- * Flags.  `cflags_hud`/`cflags_main` (Wii/1.3, `-O3`, `-inline noauto`, `-Cpp_exceptions on`) **plus
- * `#pragma peephole off`**: this band keeps the unfused `clrlwi` + `cmpwi`/`cmplwi` pairs retail
- * has.  It is the whole story on four of the ten bodies below - `fn_802E7408` 93.63 -> 100.00,
+ * Flags.  `cflags_hud` (Wii/1.3, `-O3`, `-inline noauto`, `-Cpp_exceptions on`, `-opt nopeephole`): this
+ * band keeps the unfused `clrlwi` + `cmpwi`/`cmplwi` pairs retail has, and the peephole pass is off for
+ * the whole `hud` lib as of 2026-09-27 (three independently measured `hud` units agree on the flag, so the
+ * per-file pragma this unit was landed with is gone).  It is the whole story on four of the ten bodies
+ * below - `fn_802E7408` 93.63 -> 100.00,
  * `fn_802E7690` 95.65 -> 100.00, `fn_802E884C` 96.25 -> 100.00, `fn_802E8BA4` 74.52 -> 91.00 (and
- * `fn_802E7548` 95.12 -> 99.21) - measured with `recompile.py --measure` before and after the
- * pragma, everything else unchanged.  `hud/layout.cpp` and `menu/fn_802E4978.cpp` carry the same
- * pragma for the same finding, so the lib flag `cflags_hud = cflags_main + -opt nopeephole`
- * (already filed by the layout lane) is now backed by three independently measured `hud` units;
- * this unit's own evidence is filed again as a `flag` config request in the outbox.
+ * `fn_802E7548` 95.12 -> 99.21) - measured with `recompile.py --measure` around the pragma, everything
+ * else unchanged.
  *
  * Playbook 29: the `.sdata2`/`.data` pool words, the `u16` table and the `HudBlend` tables this
  * range reads are **declared** and never defined, which is what keeps the .text/extab claims
@@ -102,9 +101,7 @@
 #include "fn_80429B94.h"
 
 /* Retail keeps the unfused `clrlwi` + `cmpwi` pairs this band is full of
- * (`fn_802E8BA4` 0x802E8BA4+0x5C), so the peephole pass is off here - the same finding
- * `hud/layout.cpp` and `menu/fn_802E4978.cpp` recorded for their bands. */
-#pragma peephole off
+ * (`fn_802E8BA4` 0x802E8BA4+0x5C) - `-opt nopeephole`, which the `hud` lib carries as `cflags_hud`. */
 
 /* nw4r's debug panic - the map's mangling is `Panic__Q24nw4r2dbFPCciPCce` (rule 9: the owner is
  * `nw4r::db`, so the declaration is the real one and the front-end reproduces the map name). */
