@@ -22,6 +22,13 @@
  * Result: `fn_8012BA00` 100 %, `.text` (0x3F4), `extab` (0x8) and `extabindex` (0xC) byte-identical
  * to the target object.
  *
+ * Pool: the object also emits the compiler's 8-byte int->float magic `.sdata2` (`4330000080000000`),
+ * which the DOL holds at `0x80796C68`.  That range stays **unclaimed**: three other registered units
+ * (`enemy/fn_801251D0.cpp`, `enemy/fn_8012BDF4.cpp`, `enemy/fn_8012EC74.cpp`) load the same address, so
+ * the entry belongs to the one original TU those four fragments come from, and a claim would leave the
+ * unit's flip unlinkable (`undefined: 'lbl_80796C68'` - the same class measured on `Pl/fn_8026FFBC`).
+ * Retail's relocation name `lbl_80796C68` vs our `@NN` is a row the report metric counts equal.
+ *
  * Source pragmas, evidenced (the lib's `cflags_main` has the peephole pass on and `-fp_contract on`):
  *   * `#pragma peephole off` - retail keeps the unfused `clrlwi`+`cmpwi` and `clrlwi`+`slwi` pairs
  *     the pass folds into `clrlwi.` and `clrlslwi` (playbook 39).
