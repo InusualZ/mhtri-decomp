@@ -297,7 +297,8 @@ struct _PLW {
         /* +0x266 */ u8 unk266[0x269 - 0x266];
         struct {
             /* +0x266 */ s8 field_0x266;  /* non-zero holds off the act switch (`fn_80258FCC`) */
-            /* +0x267 */ u8 unk267[0x269 - 0x267];
+            /* +0x267 */ u8 unk267[0x268 - 0x267];
+            /* +0x268 */ u8 field_0x268;  /* the byte `fn_8027D738` reports as a boolean */
         };
     };
     /* +0x269 */ u8 unk269;
@@ -316,7 +317,7 @@ struct _PLW {
     /* +0x2D8 */ u8 unk2D8[0x2E0 - 0x2D8];
     /* +0x2E0 */ _SLOTENT spare_slot_id[8];
     /* +0x300 */ u8 unk300[0x304 - 0x300];
-    /* +0x304 */ u16 unk304;
+    /* +0x304 */ u16 field_0x304;
     /* +0x306 */ union { /* the effect/motion id `fn_80272E30` is fed and indexed on; one member per
                           * offset, both spellings kept (rule 5); `Pl/fn_8024F200.cpp` and
                           * `Pl/fn_802489D4.cpp` read it */
@@ -335,7 +336,9 @@ struct _PLW {
     /* +0x30C */ u8 unk30C;
     /* +0x30D */ u8 unk30D;
     /* +0x30E */ u8 flag_0x30E;   /* the lobby act family's own flag */
-    /* +0x30F */ u8 unk30F[0x313 - 0x30F];
+    /* +0x30F */ u8 unk30F_start;   /* the pre-merge 4-byte run's first byte */
+    /* +0x310 */ u16 field_0x310;   /* the halfword `fn_80280678` clears on entry */
+    /* +0x312 */ u8 field_0x312;    /* the byte `fn_80280678` clears on entry */
     /* +0x313 */ union {   /* one s8, two spellings (rule 5) */
         /* +0x313 */ s8 unk313;
         /* +0x313 */ s8 field_0x313;  /* > 0 suppresses the scan (`fn_8025E298`) */
@@ -353,7 +356,15 @@ struct _PLW {
     /* +0x31E */ s16 unk31E;
     /* +0x320 */ s16 unk320;
     /* +0x322 */ u8 unk322[16];
-    /* +0x332 */ u8 unk332[0x354 - 0x332];
+    /* +0x332 */ union {   /* the pre-merge run, with this branch's named split inside it (M4: the
+                          * parent run 0x332-0x353 is kept whole as `unk332`, so the byte total is
+                          * unchanged) */
+        /* +0x332 */ u8 unk332[0x354 - 0x332];
+        struct {
+            /* +0x332 */ u8 unk332_start[0x352 - 0x332];
+            /* +0x352 */ s16 field_0x352;  /* > 0 is `fn_8027E1E4`'s first arm */
+        };
+    };
     /* +0x354 */ union {   /* one f32, two spellings: main renamed the pre-merge `unk354`, this branch
                             * reads the scale `fn_8026A2BC` hands the model layer */
         /* +0x354 */ f32 unk354;
@@ -370,7 +381,7 @@ struct _PLW {
     /* +0x369 */ u8 unk369;
     /* +0x36A */ u8 unk36A;
     /* +0x36B */ u8 unk36B;
-    /* +0x36C */ s16 unk36C;
+    /* +0x36C */ s16 field_0x36C;
     /* +0x36E */ u8 unk36E[0x370 - 0x36E];
     /* +0x370 */ union { /* the health pair: current and cap, both signed 16-bit (`fn_8027628C`
                          * adds a signed delta to the current, `fn_80276690` moves the cap and clamps
@@ -410,7 +421,7 @@ struct _PLW {
     /* +0x390 */ s16 unk390;
     /* +0x392 */ s16 unk392;
     /* +0x394 */ s16 unk394;
-    /* +0x396 */ s16 unk396;
+    /* +0x396 */ s16 field_0x396;
     /* +0x398 */ u16 field_0x398;        /* running damage dealt, `fn_80264940` accumulates into it */
     /* +0x39A */ u8 unk39A[0x39C - 0x39A];
     /* +0x39C */ u16 field_0x39C;         /* shell/element charge gauge (`fn_80265748`) */
@@ -516,7 +527,7 @@ struct _PLW {
     /* +0x42C */ s16 unk42C;
     /* +0x42E */ u8 pad_0x42E[0x16];
     /* +0x444 */ s8 field_0x444;  /* the shell timer's re-arm countdown (`fn_80258FCC`) */
-    /* +0x445 */ u8 pad_0x445[0x1];
+    /* +0x445 */ u8 field_0x445;  /* the 0-100 counter `fn_8027E048` advances and clamps */
     /* +0x446 */ union {   /* one u8, two spellings (rule 5) */
         /* +0x446 */ u8 unk446;
         /* +0x446 */ u8 field_0x446;  /* the strike counter `fn_8025B0D4` saturates at 10 */
@@ -527,17 +538,36 @@ struct _PLW {
     /* +0x44A */ u8 unk44A[0x44C - 0x44A];
     /* +0x44C */ s8 unk44C;
     /* +0x44D */ s8 unk44D;
-    /* +0x44E */ u8 unk44E[0x45A - 0x44E];
+    /* +0x44E */ union {   /* the pre-merge 12-byte run, recut by this branch (same byte total) */
+        /* +0x44E */ u8 unk44E[0x45A - 0x44E];
+        struct {
+            /* +0x44E */ u8 unk44E_start[0x450 - 0x44E];
+            /* +0x450 */ u8 field_0x450;   /* set by `fn_8027D6A4`, with the s16 at +0x454 */
+            /* +0x451 */ u8 field_0x451;   /* set by `fn_8027D6C0`, with the s16 at +0x456 */
+            /* +0x452 */ u8 field_0x452;   /* set by `fn_8027D698`, with the s16 at +0x458 */
+            /* +0x453 */ u8 pad_0x453[0x1];
+            /* +0x454 */ s16 field_0x454;  /* raised to the argument, never lowered (`fn_8027D6A4`) */
+            /* +0x456 */ s16 field_0x456;  /* raised to the argument, never lowered (`fn_8027D6C0`) */
+            /* +0x458 */ s16 field_0x458;  /* stored raw by `fn_8027D698` */
+        };
+    };
     /* +0x45A */ s16 field_0x45A;
     /* +0x45C */ s16 field_0x45C;         /* the second hold/knock-down counter (`fn_8026505C`) */
-    /* +0x45E */ u8 pad_0x45E[0x466 - 0x45E];
+    /* +0x45E */ union {   /* the pre-merge 8-byte run, with this branch's named split inside it */
+        /* +0x45E */ u8 pad_0x45E[0x466 - 0x45E];
+        struct {
+            /* +0x45E */ u8 pad_0x45E_start[0x460 - 0x45E];
+            /* +0x460 */ s16 field_0x460;  /* > 0 is the whole of `fn_8027DFD0` */
+            /* +0x462 */ u8 pad_0x462[0x466 - 0x462];
+        };
+    };
     /* +0x466 */ s16 unk466;
     /* +0x468 */ s16 unk468;
     /* +0x46A */ s16 unk46A;
     /* +0x46C */ u8 unk46C;
     /* +0x46D */ u8 unk46D;
     /* +0x46E */ u8 unk46E;
-    /* +0x46F */ u8 unk46F;
+    /* +0x46F */ u8 field_0x46F;
     /* +0x470 */ s16 unk470;
     /* +0x472 */ u8 unk472[0x47B - 0x472];
     /* +0x47B */ u8 field_0x47B;         /* per-player type index `fn_80267C84` reads */
@@ -558,7 +588,9 @@ struct _PLW {
     /* +0x539 */ u8 unk539[0x565 - 0x539];
     /* +0x565 */ u8 field_0x565;  /* the primary-act latch `Pl/fn_80288CEC.cpp` sets */
     /* +0x566 */ u8 field_0x566;  /* the arming byte `Pl/fn_80288CEC.cpp` sets once */
-    /* +0x567 */ u8 unk567[0x580 - 0x567];
+    /* +0x567 */ u8 atk_act_flag;   /* the act-flag byte `fn_8027E1B8` ORs into and
+                                    * `Pl_atk_act_flag_ck` masks */
+    /* +0x568 */ u8 unk568[0x580 - 0x568];
     /* +0x580 */ s16 unk580;
     /* +0x582 */ u8 unk582;
     /* +0x583 */ s8 unk583;
@@ -594,7 +626,15 @@ struct _PLW {
     /* +0x5BB */ u8 unk5BB;
     /* +0x5BC */ u8 unk5BC[0x5C4 - 0x5BC];
     /* +0x5C4 */ u8 unk5C4;
-    /* +0x5C5 */ u8 unk5C5[0x5E5 - 0x5C5];
+    /* +0x5C5 */ union {   /* the pre-merge run, with this branch's named split inside it */
+        /* +0x5C5 */ u8 unk5C5[0x5E5 - 0x5C5];
+        struct {
+            /* +0x5C5 */ u8 unk5C5_start[0x5C8 - 0x5C5];
+            /* +0x5C8 */ u8 field_0x5C8;  /* non-zero lets `fn_8027D6DC` send its motion request */
+            /* +0x5C9 */ u8 field_0x5C9;  /* the latch `fn_8027D6DC` sets on every call */
+            /* +0x5CA */ u8 unk5CA[0x5E5 - 0x5CA];
+        };
+    };
     /* +0x5E5 */ u8 unk5E5;
     /* +0x5E6 */ union {   /* one u8, two spellings (rule 5) */
         /* +0x5E6 */ u8 unk5E6;
@@ -616,7 +656,11 @@ struct _PLW {
     /* +0x640 */ u32 unk640;
     /* +0x644 */ u8 pad_0x644[0xB];
     /* +0x64F */ s8 unk64F;
-    /* +0x650 */ u8 pad_0x650[0x5];
+    /* +0x650 */ u16 field_0x650;   /* the id `fn_802731B4`/`fn_80272E30` are handed */
+    /* +0x652 */ s16 field_0x652;   /* the amount `fn_8027D76C` compares against and negates */
+    /* +0x654 */ u8 pad_0x654[0x1]; /* the pre-merge spelling of 0x650-0x655 was one 5-byte padding
+                                    * run; nothing read it, so it is split in place (the parent's
+                                    * layout, and the run's byte total, are unchanged) */
     /* +0x655 */ u8 field_0x655;
     /* +0x656 */ union {   /* the pre-merge padding run; the act-end flags this branch named */
         /* +0x656 */ u8 pad_0x656[0x8];

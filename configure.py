@@ -1211,6 +1211,18 @@ config.libs = [
             # answers `zz_026ffbc_`, so the stem is the map's `fn_8026FFBC` with a rule-7 deferral.
             # It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_8026FFBC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `8027D684_fn_8027D684` -
+            # the player act/equipment cluster (0x8027D684-0x802840DC, 138 functions, 0x6A58 B) with
+            # extab 0x80012B54-0x80012E7C and extabindex 0x8002FF7C-0x80030438 (101 framed functions,
+            # one 8-byte extab and one 12-byte extabindex record each - the record count is exactly the
+            # framed functions in the range, which is what pins both ranges).  Home is `Pl`: every
+            # function's first argument is the player work `_PLW`, the gates are the Pl siblings
+            # (`Pl_master_ck`/`Pl_frame_check`/`Pl_Skill_ck`), the equipment helpers take the `_EQUIP`
+            # record `include/pl.h` owns, and both bracketing registered units are Pl.  The proposal's
+            # edge is a `--max-bytes` cap rather than a TU boundary (no `__FILE__` evidence anywhere in
+            # the band) and the dump answers `zz_<addr>_` for it, so the stem is the map's
+            # `fn_8027D684` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8027D684.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80288CEC_fn_80288CEC`.
             # 78 functions, 0x80288CEC-0x8028F66C (0x697C B), with extab 0x80012FFC-0x8001323C and
             # extabindex 0x80030678-0x800309D8.  Home is `Pl`: the whole unit operates on the player
