@@ -7,6 +7,13 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
 
 * deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) **before** the run and requires
   them to be recreated;
+* **compiles the batch's own units** (`ninja -k 0`, scoped to `build/RMHE08/src/<unit>.o` for each `--units`
+  entry) before the DOL check proves anything: a `NonMatching` unit's object is never linked, so `ok` stayed
+  green **twice in one session** (2026-09-26) with a unit in the tree that did not compile - once a partial
+  file from a malformed cherry-pick, once a declaration moved out from under three call sites. `ok` answers
+  "is the DOL still the DOL"; this answers "does our source still compile". A **foreign** dirty object that
+  fails is named and tolerated - it is not this batch's defect, and the scoping is by object target, so the
+  check cannot make a passing gate fail for another stream's work;
 * checks every command's exit code, `configure.py`'s included - a failed `configure.py` leaves a stale
   `build.ninja` and every later number is a fiction;
 * refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
@@ -642,7 +649,18 @@ def tolerate_scratch(main: str, paths: list[str], act: bool = True) -> str:
 # builds cleanly, and the range can own data or functions the band legitimately spelled the same way - so
 # a refusal would not be provably safe (it could block a batch that builds). An extra signal that names the
 # symbol, the owner and the stale header is the whole point; the build remains the arbiter.
+#
+# Every rule-2 warning that says "move the declaration into the owner's header" carries this caveat, because
+# that instruction is not always true and following it blindly broke `main` on 2026-09-26: commit `756023c4e`
+# moved `fn_80335CE8` into its owner's header (hud/fn_80334568), whose prototype is THREE parameters, while
+# the three call sites in `Pl/fn_80273B14.cpp` pass TWO - so they lost their declaration ((10140) undefined
+# identifier) and the unit stopped compiling, with `ok` green because it is `NonMatching`. There was no
+# malformed input, only an instruction that is not always true.
 # --------------------------------------------------------------------------------------------------
+
+RULE2_CALLSITE_CAVEAT = ("after checking every call site: moving a declaration changes its arity if the "
+                         "owner's prototype differs")
+
 
 def _split_rows(text: str) -> list[tuple[str, str, int, int]]:
     """`(unit, section, start, end)` rows of a `splits.txt` text.
@@ -844,16 +862,18 @@ def band_ownership_warnings(main: str, base: str | None) -> list[str]:
                 owner = newly.get(name)
                 if owner is not None:
                     warnings.append(
-                        "WARNING: %s:%d declares `%s`, which this batch's registration now makes owned "
-                        "by `src/%s` - move the declaration into that unit's header and #include it "
-                        "(docs/plan.md 6.5 rule 2); a mismatched signature is the `(10505) illegal "
-                        "overloading` that only a full build would show" % (rel, line, name, owner))
+                        ("WARNING: %s:%d declares `%s`, which this batch's registration now makes owned "
+                         "by `src/%s` - move the declaration into that unit's header and #include it, "
+                         + RULE2_CALLSITE_CAVEAT +
+                         " (docs/plan.md 6.5 rule 2); a mismatched signature is the `(10505) illegal "
+                         "overloading` that only a full build would show") % (rel, line, name, owner))
                     continue
                 for full in sorted(newly_bases.get(name, [])):
                     warnings.append(
-                        "WARNING: %s:%d declares `%s`, the C++ spelling of `%s`, which this batch's "
-                        "registration now makes owned by `src/%s` - declare it in the owner's header "
-                        "and #include it (docs/plan.md 6.5 rule 2)"
+                        ("WARNING: %s:%d declares `%s`, the C++ spelling of `%s`, which this batch's "
+                         "registration now makes owned by `src/%s` - declare it in the owner's header "
+                         "and #include it, " + RULE2_CALLSITE_CAVEAT +
+                         " (docs/plan.md 6.5 rule 2)")
                         % (rel, line, name, full, newly[full]))
 
     # 2. a declaration this batch ADDS to a band header, of a symbol a unit already owned before the batch.
@@ -875,9 +895,9 @@ def band_ownership_warnings(main: str, base: str | None) -> list[str]:
             if res is None or res.get("kind") != "owned":
                 continue
             warnings.append(
-                "WARNING: %s:%d newly declares `%s`, already owned by `src/%s` - the band is a "
-                "fallback, not the owner: declare it in the owner's header and #include it "
-                "(docs/plan.md 6.5 rule 2)" % (rel, line, name, res["unit"]))
+                ("WARNING: %s:%d newly declares `%s`, already owned by `src/%s` - the band is a "
+                 "fallback, not the owner: declare it in the owner's header and #include it, "
+                 + RULE2_CALLSITE_CAVEAT + " (docs/plan.md 6.5 rule 2)") % (rel, line, name, res["unit"]))
 
     return sorted(dict.fromkeys(warnings))
 
@@ -1156,6 +1176,101 @@ def branch_problems(main: str, units: list[str]) -> list[str]:
     return problems
 
 
+# --------------------------------------------------------------------------------------------------
+# the compile gate: `ninja build/RMHE08/ok` is structurally blind to a unit that does not compile. A
+# `NonMatching` unit's object is never linked, so the DOL hash stays green with any number of uncompilable
+# units in the tree - measured twice in one session (2026-09-26): a partial file left by a malformed
+# cherry-pick, and a declaration moved out from under three call sites, both reached `main` with `ok` green
+# and were found much later, by a full build failing elsewhere. The failing unit compiles in about a second,
+# and `ninja -k 0` is seconds rather than minutes because only changed objects rebuild.
+#
+# The scoping is the point. Other dirty work in MAIN can be uncompilable for reasons that are not this
+# batch's, so the check must not fail for it. `ninja -k 0` builds every dirty object once; only a `FAILED:`
+# output that IS one of the batch's own object targets (`build/RMHE08/src/<unit>.o` for a `--units` entry) is
+# counted. A foreign object's failure is named and tolerated. The unit object is what "our source still
+# compiles" means, and the object is exactly what `ok` never links.
+# --------------------------------------------------------------------------------------------------
+
+_OBJECT_TARGET = "build/RMHE08/src/%s.o"
+_FAILED_LINE = re.compile(r"^FAILED:\s+(\S+)", re.M)
+
+
+def compile_targets(units: list[str]) -> list[str]:
+    """The ninja object targets of the batch's own units (`--units`), normalised and de-duplicated."""
+    out: list[str] = []
+    for unit in units:
+        norm = claims.norm_unit(unit.strip("/"))
+        if norm:
+            out.append(_OBJECT_TARGET % norm)
+    return list(dict.fromkeys(out))
+
+
+def failed_compile_outputs(output: str) -> list[str]:
+    """Every output path a ninja run reported as `FAILED: <path>`, de-duplicated, in order."""
+    seen: list[str] = []
+    for m in _FAILED_LINE.finditer((output or "").replace("\\", "/")):
+        if m.group(1) not in seen:
+            seen.append(m.group(1))
+    return seen
+
+
+def batch_compile_failures(units: list[str], output: str) -> tuple[list[str], list[str]]:
+    """-> (the batch's units whose object FAILED, foreign FAILED outputs).
+
+    Scoping: only a failed output that is one of the batch's own `build/RMHE08/src/<unit>.o` targets is a
+    failure of *this* batch. Every other failed output is another stream's dirty work in MAIN, which the
+    batch did not touch and must not answer for - named, never counted, so a compile gate cannot make a
+    passing batch fail for a reason that is not its own.
+    """
+    want: dict[str, str] = {}
+    for unit in units:
+        norm = claims.norm_unit(unit.strip("/"))
+        if norm:
+            want[_OBJECT_TARGET % norm] = norm
+    bad: list[str] = []
+    foreign: list[str] = []
+    for path in failed_compile_outputs(output):
+        unit = want.get(path)
+        if unit is None:
+            foreign.append(path)
+        elif unit not in bad:
+            bad.append(unit)
+    return bad, foreign
+
+
+def compile_check(main: str, units: list[str], runner=None) -> tuple[bool, str]:
+    """Do the batch's own units still compile? -> (ok, detail) after one `ninja -k 0`.
+
+    `ninja build/RMHE08/ok` is deliberately not asked (that is the DOL check); this runs the compile itself,
+    once: `-k 0` keeps going past the first error, so every failure is visible in one run and a foreign
+    failure cannot hide a batch unit's. The "did it compile" verdict is scoped by object target through
+    `batch_compile_failures`, so another stream's broken dirty unit is reported, not counted.
+
+    `runner` is a `run([...])`-shaped callable and exists for the selftest: it lets the scoping be exercised
+    in both directions without a real build tree.
+    """
+    if not units:
+        return True, "no batch unit named"
+    if not os.path.exists(os.path.join(main, "build.ninja")):
+        return True, "no build.ninja - the configure.py gate owns that"
+    run_fn = runner or (lambda args: run(args, main))
+    p = run_fn(["ninja", "-k", "0"])
+    output = (p.stdout or "") + (p.stderr or "")
+    bad, foreign = batch_compile_failures(units, output)
+    if bad:
+        return False, "FAILED to compile: %s" % ", ".join(bad)
+    if p.returncode != 0 and not foreign:
+        # ninja failed without naming an output: not a compile failure of a unit we can scope, so it is not
+        # silently read as a pass - the anomaly is the detail.
+        tail = [l.strip() for l in output.splitlines() if l.strip()]
+        return False, "ninja -k 0 exited %d without a FAILED target: %s" % (p.returncode, tail[-1] if tail else "")
+    detail = "all %d batch unit object(s) compiled" % len(compile_targets(units))
+    if foreign:
+        detail += (" (tolerated: %d FAILED foreign dirty target(s), not this batch's: %s)"
+                   % (len(foreign), ", ".join(foreign[:3])))
+    return True, detail
+
+
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, check_outbox: bool = True,
            release_claims: bool = True, problems: list[str] | None = None) -> int:
@@ -1272,8 +1387,9 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
             name, good, detail, info = row[:4]
             note = (detail if not good else "") or info
             print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
-        print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> ninja -> report.json -> "
-              "regression scan -> ok -> ledger -> baseline" % (" and main.elf (this batch flips an object)" if flip else ""))
+        print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> compile gate (ninja -k 0, scoped to "
+              "the batch's own objects) -> ninja -> report.json -> regression scan -> ok -> ledger -> baseline"
+              % (" and main.elf (this batch flips an object)" if flip else ""))
         if problems is not None:
             problems.extend(failing_checks(checks))
         return 0 if all(row[1] for row in checks) else 1
@@ -1303,6 +1419,15 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
             os.remove(stale)
     started = time.time_ns()
     built = gate("configure.py", [sys.executable, "configure.py"])
+    # the compile gate, before the link proves anything: `ok` cannot see a `NonMatching` unit's object (it is
+    # never linked), so this is the only check that answers "does our source still compile". Scoped to the
+    # batch's own `build/RMHE08/src/<unit>.o` targets - a foreign dirty object that fails is named and
+    # tolerated (`compile_check`). One `ninja -k 0`; the full `ninja` below then only links.
+    if built:
+        ok_compile, compile_detail = compile_check(main, units)
+        check("every batch unit compiles (compile gate)", ok_compile, compile_detail,
+              remedy="make the batch unit's source compile (`ninja -k 0` names the error above); "
+                     "`ninja build/RMHE08/ok` cannot see this because a `NonMatching` unit is never linked")
     built = gate("ninja", ["ninja"]) and built
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
     # the regression scan reads build/RMHE08/report_changes.json, which only `ninja changes` writes: without
@@ -1671,6 +1796,75 @@ def selftest() -> int:
           ["src/Pl/pl_act.cpp"])
     check("scratch: a staged scratch path is not stageable either",
           "d910.json" in land_stageable(["Pl/pl_act"], [("A ", "d910.json")]), False)
+
+    # the compile gate (2026-09-26): `ninja build/RMHE08/ok` is structurally blind to a `NonMatching` unit's
+    # object (it is never linked), so a unit that does not compile reached `main` twice in one session with
+    # `ok` green. The check is scoped by object target: only a `FAILED:` output that is one of the batch's own
+    # `build/RMHE08/src/<unit>.o` targets refuses. A foreign dirty object failing passes and is named.
+    check("compile: a unit's object target is build/RMHE08/src/<unit>.o",
+          compile_targets(["Pl/fn_80273B14"]), ["build/RMHE08/src/Pl/fn_80273B14.o"])
+    check("compile: a unit spelled with its extension still yields one target",
+          compile_targets(["Pl/fn_80273B14.cpp"]), ["build/RMHE08/src/Pl/fn_80273B14.o"])
+    check("compile: duplicates collapse", compile_targets(["Pl/pl_act", "Pl/pl_act.cpp"]),
+          ["build/RMHE08/src/Pl/pl_act.o"])
+    check("compile: no units yields no targets", compile_targets([]), [])
+    check("compile: FAILED outputs are read from ninja's stderr", failed_compile_outputs(
+        "FAILED: build/RMHE08/src/Pl/pl_act.o\nrun 1\nFAILED: build/RMHE08/src/RSO/runtime.o\nrun 2"),
+        ["build/RMHE08/src/Pl/pl_act.o", "build/RMHE08/src/RSO/runtime.o"])
+    check("compile: a target failed twice is named once", failed_compile_outputs(
+        "FAILED: build/RMHE08/src/Pl/pl_act.o\nFAILED: build/RMHE08/src/Pl/pl_act.o"),
+        ["build/RMHE08/src/Pl/pl_act.o"])
+    check("compile: a Windows path separator is normalised", failed_compile_outputs(
+        "FAILED: build\\RMHE08\\src\\Pl\\pl_act.o"), ["build/RMHE08/src/Pl/pl_act.o"])
+    check("compile: a batch unit's own failure is the batch's", batch_compile_failures(
+        ["Pl/pl_act"], "FAILED: build/RMHE08/src/Pl/pl_act.o"), (["Pl/pl_act"], []))
+    check("compile: a foreign dirty object's failure is NOT the batch's", batch_compile_failures(
+        ["Pl/pl_act"], "FAILED: build/RMHE08/src/RSO/runtime.o"),
+        ([], ["build/RMHE08/src/RSO/runtime.o"]))
+    check("compile: a mixed run names both, refuses on the batch's unit", batch_compile_failures(
+        ["Pl/pl_act"], "FAILED: build/RMHE08/src/RSO/runtime.o\nFAILED: build/RMHE08/src/Pl/pl_act.o"),
+        (["Pl/pl_act"], ["build/RMHE08/src/RSO/runtime.o"]))
+    check("compile: a target that only shares a prefix is foreign", batch_compile_failures(
+        ["Pl/pl_act"], "FAILED: build/RMHE08/src/Pl/pl_act2.o"),
+        ([], ["build/RMHE08/src/Pl/pl_act2.o"]))
+
+    class FakeProc:
+        """A `subprocess.CompletedProcess`-shaped stand-in for the selftest's fake ninja."""
+
+        def __init__(self, code, out="", err=""):
+            self.returncode, self.stdout, self.stderr = code, out, err
+
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, "build.ninja"), "w").close()
+        calls = []
+
+        def fake_runner(args):
+            calls.append(args)
+            return FakeProc(1, "", "FAILED: build/RMHE08/src/Pl/pl_act.o\n(10248) does not match")
+
+        ok, detail = compile_check(tmp, ["Pl/pl_act"], runner=fake_runner)
+        check("compile gate: a batch unit that does not compile is REFUSED", ok, False)
+        check("... and the batch unit is named", "Pl/pl_act" in detail, True)
+        check("... and it ran one `ninja -k 0`", calls, [["ninja", "-k", "0"]])
+
+        ok, detail = compile_check(
+            tmp, ["Pl/pl_act"],
+            runner=lambda args: FakeProc(1, "FAILED: build/RMHE08/src/RSO/runtime.o\n"))
+        check("compile gate: it PASSES when only FOREIGN dirty work is broken", ok, True)
+        check("... and the foreign failure is named, not counted", "foreign" in detail, True)
+        check("... and it never reads as the batch's", "Pl/pl_act" in detail, False)
+
+        ok, detail = compile_check(tmp, ["Pl/pl_act"], runner=lambda args: FakeProc(0))
+        check("compile gate: a clean compile passes", ok, True)
+
+        ok, detail = compile_check(
+            tmp, ["Pl/pl_act"], runner=lambda args: FakeProc(2, "ninja: error: unknown target\n"))
+        check("compile gate: an unattributable ninja failure is not read as a pass", ok, False)
+        check("... and the reason is in the detail", "unknown target" in detail, True)
+
+    with tempfile.TemporaryDirectory() as no_build:
+        ok, detail = compile_check(no_build, ["Pl/pl_act"], runner=lambda args: FakeProc(1, "x"))
+        check("compile gate: without build.ninja the configure.py gate owns it", ok, True)
 
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, ".git"), exist_ok=True)
@@ -2473,6 +2667,16 @@ def selftest() -> int:
               any("em_act_ck" in w and "cxx.h" in w
                   and "em_act_ck__FP11_ENEMY_WORKUcUc" in w for w in warns), True)
         check("band: exactly the four findings fire", len(warns), 4)
+        # the 2026-09-26 main breakage: the rule-2 instruction to move the declaration broke `main` when it
+        # was followed blindly (`756023c4e` moved `fn_80335CE8` into an owner header of a different arity and
+        # three call sites lost their declaration). Every rule-2 warning now carries the call-site caveat.
+        check("band: the newly-registered warning tells the reader to check the call sites first",
+              any("fn_8019E9AC" in w and "after checking every call site" in w
+                  and "changes its arity if the owner's prototype differs" in w for w in warns), True)
+        check("band: ... and so does the added-declaration warning",
+              any("fn_ALREADY" in w and "after checking every call site" in w for w in warns), True)
+        check("band: ... and the C++ spelling warning",
+              any("em_act_ck" in w and "after checking every call site" in w for w in warns), True)
         # a pre-existing band declaration of an already-owned symbol is NOT this batch's defect: a clean
         # batch must not be spammed with the band's whole backlog.
         check("band: a pre-existing owned declaration does not warn",
