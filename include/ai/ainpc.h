@@ -40,14 +40,17 @@ struct AINPCFormation {
 };
 
 struct _AINPC_W {
-    /* +0x000 */ u8 unused_0x000[0x003 - 0x000];
+    /* +0x000 */ u8 unused_0x000[0x002 - 0x000];
+    /* +0x002 */ u8 field_0x002;
     /* +0x003 */ u8 team;              /* read by `get_enemy_data` as its first argument */
     /* +0x004 */ u8 state;             /* the division's own sub-state every dispatcher switches on */
     /* +0x005 */ u8 sub_step;          /* the sub-state's own counter: the tables' entry index when
                                         * it is 0/1, the remaining holds otherwise */
     /* +0x006 */ u8 unused_0x006[0x00A - 0x006];
     /* +0x00A */ u8 area;              /* read by `get_enemy_data` as its second argument */
-    /* +0x00B */ u8 unused_0x00B[0x054 - 0x00B];
+    /* +0x00B */ u8 unused_0x00B[0x024 - 0x00B];
+    /* +0x024 */ nw4r::math::VEC3 vec_0x024;
+    /* +0x030 */ u8 unused_0x030[0x054 - 0x030];
     /* +0x054 */ u32 field_0x054;
     /* +0x058 */ u32 field_0x058;
     /* +0x05C */ u8 unused_0x05C[0x16C - 0x05C];
@@ -63,9 +66,10 @@ struct _AINPC_W {
     /* +0x19C */ f32 field_0x19C;       /* the aim's travelled distance */
     /* +0x1A0 */ u8 unused_0x1A0[0x1A4 - 0x1A0];
     /* +0x1A4 */ u8 field_0x1A4;
-    /* +0x1A5 */ u8 unused_0x1A5[0x1B0 - 0x1A5];
+    /* +0x1A5 */ u8 unused_0x1A5[0x1AC - 0x1A5];
+    /* +0x1AC */ s32 field_0x1AC;
     /* +0x1B0 */ nw4r::math::VEC3 vec_0x1B0;
-    /* +0x1BC */ u8 unused_0x1BC[0x1C0 - 0x1BC];
+    /* +0x1BC */ f32 field_0x1BC;
     /* +0x1C0 */ f32 field_0x1C0;
     /* +0x1C4 */ u8 enemy_index;        /* scaled by 0xB18 into the `_ENEMY_WORK` array */
     /* +0x1C5 */ u8 unused_0x1C5[0x1C8 - 0x1C5];
@@ -75,7 +79,9 @@ struct _AINPC_W {
     /* +0x1CE */ u8 pad_0x1CE;
     /* +0x1CF */ u8 field_0x1CF;
     /* +0x1D0 */ u8 step;               /* the per-motion step every dispatcher switches on */
-    /* +0x1D1 */ u8 unused_0x1D1[0x1DC - 0x1D1];
+    /* +0x1D1 */ u8 unused_0x1D1[0x1D4 - 0x1D1];
+    /* +0x1D4 */ f32 field_0x1D4;
+    /* +0x1D8 */ u8 unused_0x1D8[0x1DC - 0x1D8];
     /* +0x1DC */ f32 field_0x1DC;       /* the effect's hold timer `fn_802D2904` arms */
     /* +0x1E0 */ u8 unused_0x1E0[0x1E1 - 0x1E0];
     /* +0x1E1 */ u8 field_0x1E1;
@@ -154,7 +160,9 @@ struct _AINPC_W {
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ s16 field_0x43E;
     /* +0x440 */ u8 field_0x440;
-    /* +0x441 */ u8 unused_0x441[0x445 - 0x441];
+    /* +0x441 */ u8 unused_0x441[0x442 - 0x441];
+    /* +0x442 */ s16 field_0x442;
+    /* +0x444 */ u8 field_0x444;
     /* +0x445 */ u8 field_0x445;
     /* +0x446 */ u8 field_0x446;
     /* +0x447 */ u8 field_0x447;
@@ -172,9 +180,11 @@ struct _AINPC_W {
     /* +0x46A */ s16 field_0x46A;
     /* +0x46C */ u8 unused_0x46C[0x482 - 0x46C];
     /* +0x482 */ u8 field_0x482;        /* read sign-extended at every `fn_802D9D30` call site */
-    /* +0x483 */ u8 unused_0x483[0x485 - 0x483];
+    /* +0x483 */ u8 unused_0x483[0x484 - 0x483];
+    /* +0x484 */ u8 field_0x484;
     /* +0x485 */ u8 field_0x485;
-    /* +0x486 */ u8 unused_0x486[0x492 - 0x486];
+    /* +0x486 */ s16 field_0x486;
+    /* +0x488 */ u8 unused_0x488[0x492 - 0x488];
     /* +0x492 */ u8 field_0x492;
     /* +0x493 */ u8 unused_0x493[0x498 - 0x493];
     /* +0x498 */ struct _se_w* sound_0x498;  /* the SE work `fn_800DCC24` is handed */
