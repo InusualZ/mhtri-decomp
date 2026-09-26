@@ -390,7 +390,9 @@ struct _ENEMY_WORK {
     /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `fn_80050F80` measures against
                                         * `pos` (`fn_8013F764`'s distance test) */
     /* +0x378 */ f32 value_0x378;       /* fn_80177F30/fn_8017801C clamp this against a pool float */
-    /* +0x37C */ u8 unused_0x37C[0x380 - 0x37C];
+    /* +0x37C */ u32 field_0x37C;       /* the rotation word `fn_801CEF44` latches from
+                                        * `field_0x1C0` and hands `fn_801354F4` (added by
+                                        * `enemy/fn_801CCBC4.cpp`) */
     /* +0x380 */ u8 field_0x380;        /* the "special part armed" selector `fn_801D6758` matches
                                          * against 1 (added by `enemy/fn_801D428C.cpp`) */
     /* +0x381 */ u8 state_0x381;        /* its record index, handed to `fn_801377D0` */
@@ -492,7 +494,9 @@ struct _ENEMY_WORK {
                                         * tests it against -1 (added by that unit) */
     /* +0x88C */ u8 unused_0x88C[0x89F - 0x88C];
     /* +0x89F */ u8 field_0x89F;        /* the mode `fn_80137720` latches */
-    /* +0x8A0 */ u8 unused_0x8A0[0x8A4 - 0x8A0];
+    /* +0x8A0 */ u8 unused_0x8A0[0x8A2 - 0x8A0];
+    /* +0x8A2 */ u16 field_0x8A2;       /* the counter `fn_801CD400` gates its target search on
+                                        * (`lhz` + `cmplwi 0xFA`); added by `enemy/fn_801CCBC4.cpp` */
     /* +0x8A4 */ s16 field_0x8A4;       /* the timer `fn_80137720` arms from `fn_80126494` */
     /* +0x8A6 */ s16 field_0x8A6;       /* the timer `fn_801409C8` compares against the enemy data's */
     /* +0x8A8 */ u8 unused_0x8A8[0x8AA - 0x8A8];
