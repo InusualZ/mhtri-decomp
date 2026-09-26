@@ -86,6 +86,7 @@
 #include "pl.h"
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
+#include "Pl/fn_802693C4.h"
 #include "ef/fn_800CDB2C.h"
 
 /* ------------------------------------------------------------------------------------------------ *
@@ -190,7 +191,6 @@ void fn_800553B4(u8 idx);
 void fn_800D8E44(void* handle);
 void fn_800F6710(void);
 void fn_802673B8(void);
-void fn_802699AC(void);
 void fn_80275AC4(void* self, u32 a, u32 b, u32 c);
 u32 fn_8027CB1C(void* self);
 u32 fn_802B0668(u8 idx);

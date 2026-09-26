@@ -73,11 +73,22 @@ typedef struct MHchar {
     /* +0x035 */ u8 ready;
     /* +0x036 */ u8 pad_0x36[0xA];
     /* +0x040 */ s32 field_0x40;
-    /* +0x044 */ u8 pad_0x44[0x10];
+    /* +0x044 */ u8 pad_0x44[0xC];
+    /* +0x050 */ u16 motion_no_0x50;   /* the motion number `Get_motion_no` returns (0x8026A308) */
+    /* +0x052 */ u8 pad_0x52[0x2];
     /* +0x054 */ _CP_VECTOR rot_0x54;
     /* +0x060 */ u8 pad_0x60[0x4];
     /* +0x064 */ f32 field_0x64;
-    /* +0x068 */ u8 pad_0x68[0xAC];
+    /* +0x068 */ u8 pad_0x68[0xC];
+    /* +0x074 */ f32 field_0x74;   /* read by `fn_8026A34C` (0x8026A34C) */
+    /* +0x078 */ u8 pad_0x78[0x2C];
+    /* +0x0A4 */ f32 field_0xA4;   /* read by `fn_8026A358` (0x8026A358) */
+    /* +0x0A8 */ u8 pad_0xA8[0x14];
+    /* +0x0BC */ f32 field_0xBC;   /* the value `fn_8026A364` tests against 0 */
+    /* +0x0C0 */ u8 pad_0xC0[0x31];
+    /* +0x0F1 */ u8 field_0xF1;     /* the model visibility flag `fn_8026A2D0`/`fn_8026A2DC` set */
+    /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `fn_8026A2EC`/`fn_8026A2F8` */
+    /* +0x0F3 */ u8 pad_0xF3[0x21];
     /* +0x114 */ s32 field_0x114;
     /* +0x118 */ s32 field_0x118;
     /* +0x11C */ u8 pad_0x11C[0x20];
@@ -162,8 +173,8 @@ struct _PLW {
                                   * suppresses the `a2 == 1` act tail (`fn_80258FCC`) */
     /* +0x02C */ _SHELL_W* equip_0x2C;
     /* +0x030 */ s8 flag_0x30;
-    /* +0x031 */ union {   /* 0x031-0x03B: the pre-merge 11-byte run kept whole, with this branch's
-                            * split of the same bytes inside it (M4: same byte total) */
+    /* +0x031 */ union {   /* 0x031-0x03B: the pre-merge 11-byte run kept whole, with main's split of
+                            * the same bytes inside it (M4: same byte total) */
         /* +0x031 */ u8 pad_0x31[0xB];
         struct {
             /* +0x031 */ u8 pad_0x31_start[0x3];
@@ -173,17 +184,24 @@ struct _PLW {
             /* +0x037 */ u8 pad_0x37[0x5];
         };
     };
-    /* +0x03C */ union {   /* one f32; the fn_802489D4 unit renamed the pre-merge `unk03C` */
+    /* +0x03C */ union {   /* one f32, three spellings: main's `unk03C`/`field_0x03C` and this branch's
+                            * `motion_pos_0x3C` - the three floats the 0x8026A4E4-family integrators
+                            * move are the position at +0x3C, the velocity at +0x78 and the
+                            * acceleration at +0x84 (fn_8026A4E4 adds the velocity into the position,
+                            * fn_8026A518 the acceleration into the velocity) */
         /* +0x03C */ f32 unk03C;
         /* +0x03C */ f32 field_0x03C;
+        /* +0x03C */ f32 motion_pos_0x3C;
     };
-    /* +0x040 */ union {   /* one f32, two spellings */
+    /* +0x040 */ union {   /* one f32, three spellings */
         /* +0x040 */ f32 unk40;
         /* +0x040 */ f32 field_0x040;
+        /* +0x040 */ f32 motion_pos_0x40;
     };
-    /* +0x044 */ union {   /* one f32, two spellings */
+    /* +0x044 */ union {   /* one f32, three spellings */
         /* +0x044 */ f32 unk44;
         /* +0x044 */ f32 field_0x044;
+        /* +0x044 */ f32 motion_pos_0x44;
     };
     /* +0x048 */ u8 unk048[0x54 - 0x48];
     /* +0x054 */ u32 param_0x54;
@@ -194,8 +212,24 @@ struct _PLW {
     /* +0x068 */ u8 pad_0x68[0x4];
     /* +0x06C */ f32 unk6C;
     /* +0x070 */ f32 unk70;
-    /* +0x074 */ u8 unk074;
-    /* +0x075 */ u8 unk075[0x90 - 0x75];
+    /* +0x074 */ union {   /* two views of the 0x074-0x08F run, both 0x1C bytes (M4: the byte total is
+                            * the invariant; a union starting at +0x075 would round 0x1B up to 0x1C
+                            * and grow `_PLW` by 4, so the union is anchored at the aligned +0x074) */
+        struct {   /* the pre-merge view: the +0x074 byte and the `unk075` filler run */
+            /* +0x074 */ u8 unk074;
+            /* +0x075 */ u8 unk075[0x90 - 0x75];
+        };
+        struct {   /* this branch's split of the same bytes */
+            /* +0x074 */ u8 pad_0x74[0x1];
+            /* +0x075 */ u8 pad_0x75[0x3];
+            /* +0x078 */ f32 motion_vel_0x78;
+            /* +0x07C */ f32 motion_vel_0x7C;
+            /* +0x080 */ f32 motion_vel_0x80;
+            /* +0x084 */ f32 motion_acc_0x84;
+            /* +0x088 */ f32 motion_acc_0x88;
+            /* +0x08C */ f32 motion_acc_0x8C;
+        };
+    };
     /* +0x090 */ f32 unk090[3];
     /* +0x09C */ f32 unk09C;
     /* +0x0A0 */ f32 unk0A0;
@@ -222,7 +256,12 @@ struct _PLW {
     /* +0x0C0 */ u8 pad_0xC0[0xC];
     /* +0x0CC */ u16 unkCC;
     /* +0x0CE */ u16 unkCE;
-    /* +0x0D0 */ u8 pad_0xD0[0x40];
+    /* +0x0D0 */ u8 pad_0xD0[0xC];
+    /* +0x0DC */ u32 id_flags_0xDC;  /* the id bit set/tested/cleared by fn_8026A6D8 / fn_8026A6F4 /
+                                      * fn_8026A718 (bit `id & 31`) */
+    /* +0x0E0 */ u32 id_flags_0xE0[4];  /* 128 ids, set/tested by fn_8026A618 / fn_8026A644 */
+    /* +0x0F0 */ u32 id_flags_0xF0[4];  /* 128 ids, set/tested by fn_8026A678 / fn_8026A6A4 */
+    /* +0x100 */ u8 pad_0x100[0x10];
     /* +0x110 */ f32 unk110;
     /* +0x114 */ u8 pad_0x114[0x14];
     /* +0x128 */ union {   /* one u8, two spellings (rule 5) */
@@ -230,7 +269,10 @@ struct _PLW {
         /* +0x128 */ u8 field_0x128;
     };
     /* +0x129 */ u8 pad_0x129[0xB];
-    /* +0x134 */ u8 unk134;
+    /* +0x134 */ union {   /* one u8, two spellings: the pre-merge `unk134` and this branch's name */
+        /* +0x134 */ u8 unk134;
+        /* +0x134 */ u8 field_0x134;   /* bit 1 is the flag `fn_8026BA04` returns */
+    };
     /* +0x135 */ u8 pad_0x135[0x7];
     /* +0x13C */ _PLW_PHYSICS* physics_0x13C;
     /* +0x140 */ _EQUIP equipA[6];
@@ -312,7 +354,8 @@ struct _PLW {
     /* +0x320 */ s16 unk320;
     /* +0x322 */ u8 unk322[16];
     /* +0x332 */ u8 unk332[0x354 - 0x332];
-    /* +0x354 */ union {   /* one f32; the fn_802489D4 unit renamed the pre-merge `unk354` */
+    /* +0x354 */ union {   /* one f32, two spellings: main renamed the pre-merge `unk354`, this branch
+                            * reads the scale `fn_8026A2BC` hands the model layer */
         /* +0x354 */ f32 unk354;
         /* +0x354 */ f32 field_0x354;
     };

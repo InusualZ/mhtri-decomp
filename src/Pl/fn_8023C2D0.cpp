@@ -58,6 +58,7 @@
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"
 #include "Pl/pl_master.h"
+#include "Pl/fn_802693C4.h"
 
 /* Arms the frame-timed sound requests for every motion the player can be in above 0x3EA, with the
  * two motion groups whose extra frames depend on the active action gated on `Pl_act_ck`. */

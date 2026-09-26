@@ -55,6 +55,7 @@
 #include "pl.h"
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
+#include "Pl/fn_802693C4.h"
 #include "ef/fn_800CDB2C.h"
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"

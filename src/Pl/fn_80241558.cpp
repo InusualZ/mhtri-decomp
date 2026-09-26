@@ -37,6 +37,7 @@
 #include "sound/se.h"
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"
+#include "Pl/fn_802693C4.h"
 
 extern "C" void fn_80241558(_PLW* work, u8 part) {
     u32 partHi;

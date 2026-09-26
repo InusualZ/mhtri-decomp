@@ -47,6 +47,7 @@
 #include "unsplit/Pl.h"          /* Get_motion_no, Pl_chr_setX, Pl_frame_check */
 #include "unsplit/lobby.h"       /* LbStr, fn_8042E9A4, lbl_806AA6F0, lbl_80799Bxx */
 #include "Pl/pl_master.h"        /* Pl_master_ck, Pl_act_ck, fn_8026FD0C */
+#include "Pl/fn_802693C4.h"
 #include "ef/eft004.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
@@ -79,7 +80,6 @@ void fn_80207284(_LB_NPC* self);
 void fn_80207698(_LB_NPC* self);
 
 /* The Pl-band helpers, and this group's own neighbours. */
-void fn_8026A224(_PLW* self, u32 motion, s32 a, s32 b);
 u32 fn_8026A33C(_PLW* self);
 void fn_80043EA8(VEC3* out);
 u32 fn_800D0708(void);

@@ -48,7 +48,15 @@ s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
  * size: 0x14C */
 struct _PLOBJ {
     /* +0x000 */ u8 state[11];
-    /* +0x00B */ u8 unk00B[0xD];
+    /* +0x00B */ union {   /* the pre-merge `unk00B` run (0x00B-0x017) kept whole, with this branch's
+                            * split of the same bytes inside it (M4: same byte total) */
+        /* +0x00B */ u8 unk00B[0xD];
+        struct {
+            /* +0x00B */ u8 part_flag_0x0B[11];  /* the per-part armed/consumed flag `fn_802693C4`
+                                                  * clears and `fn_80269474` sets */
+            /* +0x016 */ u8 pad_0x16[0x2];
+        };
+    };
     /* +0x018 */ s32 group[7][11];
 };
 
@@ -79,11 +87,19 @@ struct _PLGLOBAL {
     /* +0x010 */ struct _PLOBJ* table;    /* one record per player, `fn_80269394`/`pl_skill` walk it */
     /* +0x014 */ u8 unk014[0x8];
     /* +0x01C */ s32 res_0x1C[0x79];      /* the per-player resource word table */
-    /* +0x200 */ s32 loaded[7];           /* per-player "load requested" flags */
-    /* +0x21C */ s32 gate21C;
-    /* +0x220 */ s32 gate220;
-    /* +0x224 */ s32 gate224;
-    /* +0x228 */ s32 gate228;
+    /* +0x200 */ union {   /* the pre-merge view is `loaded[7]` plus the four gate words; this branch
+                            * named the whole 0x2C-byte run as one 11-word array (M4) */
+        struct {
+            /* +0x200 */ s32 loaded[7];   /* per-player "load requested" flags */
+            /* +0x21C */ s32 gate21C;
+            /* +0x220 */ s32 gate220;
+            /* +0x224 */ s32 gate224;
+            /* +0x228 */ s32 gate228;
+        };
+        /* +0x200 */ s32 loaded_0x200[11];   /* the per-part "load requested" words `fn_802699C8`
+                                             * clears for parts 0..10 (the model parts then the
+                                             * control parts) */
+    };
     /* +0x22C */ s8 count22C;
     /* +0x22D */ u8 unk22D[0x3];
     /* +0x230 */ u8 slot_state[0x21C];    /* indexed by the player index (a `_PLW` +0x008) */
@@ -92,7 +108,11 @@ struct _PLGLOBAL {
     /* +0x478 */ s8 limit478;
     /* +0x479 */ s8 limit479;
     /* +0x47A */ s8 limit47A;
-    /* +0x47B */ u8 unk47B;
+    /* +0x47B */ union {   /* one u8, two spellings: the pre-merge `unk47B` and this branch's name */
+        /* +0x47B */ u8 unk47B;
+        /* +0x47B */ u8 com_motion_type;   /* the common motion type `set_com_motion_type` stores and
+                                            * `fn_802699AC` returns */
+    };
 };
 extern struct _PLGLOBAL* lbl_80794B28;
 
