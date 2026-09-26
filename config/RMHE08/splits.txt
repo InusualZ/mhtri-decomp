@@ -1095,6 +1095,12 @@ Camellia/camellia.c:
 	.text       start:0x8041DF10 end:0x80423E74
 	.rodata     start:0x80570E98 end:0x80571E98
 
+fn_80423E74.cpp:
+	extab       start:0x8001D1B4 end:0x8001D368
+	extabindex  start:0x8003DC44 end:0x8003DE54
+	.text       start:0x80423E74 end:0x80429B94
+	.data       start:0x80603750 end:0x806038E8
+
 fn_80429B94.cpp:
 	extab       start:0x8001D368 end:0x8001D558
 	extabindex  start:0x8003DE54 end:0x8003E0DC

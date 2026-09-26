@@ -29,6 +29,29 @@ typedef struct NetCtrlEntry {
     /* +0x50 */ char text_0x50[0xC];
 } NetCtrlEntry; /* size: 0x5C */
 
+/* One slot of the 100-record `slots_0x3ED4` table (map `lbl_80794CF8` band).  The first byte is the
+ * slot's state (0 = free), +0x04 is the owner pointer the state machine hands out, +0x3C/+0x40 the two
+ * float members and +0x54 the slot's mode word. */
+typedef struct NetSlot {
+    /* +0x00 */ u8 state_0x00;
+    /* +0x01 */ u8 pad_0x01[0x3];
+    /* +0x04 */ void* owner_0x04;
+    /* +0x08 */ u8 pad_0x08[0x34];
+    /* +0x3C */ f32 valueA_0x3C;
+    /* +0x40 */ f32 valueB_0x40;
+    /* +0x44 */ u8 pad_0x44[0x10];
+    /* +0x54 */ u32 mode_0x54;
+} NetSlot; /* size: 0x58 */
+
+/* One record of the 128-entry `pool_0x6320` array (stride 0x20).  `in_use_0x08` marks a handed-out
+ * record; the first record also carries a live count at +0x04. */
+typedef struct NetPoolEntry {
+    /* +0x00 */ u8 pad_0x00[0x4];
+    /* +0x04 */ u32 count_0x04;
+    /* +0x08 */ u32 in_use_0x08;
+    /* +0x0C */ u8 pad_0x0C[0x14];
+} NetPoolEntry; /* size: 0x20 */
+
 /* The network-control work record reached through `net_ctrl_wk`.  `entries_0x7CD8` is 16 records
  * of 0x5C; the tail offsets (+0x82C4, +0xBF2C, +0xC3F2, ...) are separate flags/counters. */
 typedef struct NetCtrlWk {
@@ -44,7 +67,24 @@ typedef struct NetCtrlWk {
     /* +0x06A */ u8 selected_server_0x06A;
     /* +0x06B */ u8 pad_0x06B[0x9];
     /* +0x074 */ s8 server_index_0x074[4];
-    /* +0x078 */ u8 pad_0x078[0x7C60];
+    /* +0x078 */ u8 pad_0x078[0x3E58];
+    /* +0x3ED0 */ NetSlot* slot_list_0x3ED0;
+    /* +0x3ED4 */ NetSlot slots_0x3ED4[100];
+    /* +0x6134 */ u8 pad_0x6134[0x1EC];
+    /* +0x6320 */ NetPoolEntry pool_0x6320[128];
+    /* +0x7320 */ u8 pad_0x7320[0x48];
+    /* +0x7368 */ char name_0x7368[0xA];
+    /* +0x7372 */ char name2_0x7372[0xA];
+    /* +0x737C */ u8 pad_0x737C[0x10C];
+    /* +0x7488 */ u8 msgTable_0x7488[0x4A0];
+    /* +0x7928 */ u8 pad_0x7928[0x60];
+    /* +0x7988 */ u8 used_0x7988[4];
+    /* +0x798C */ u8 pad_0x798C[0xA];
+    /* +0x7996 */ u32 slots_0x7996[0x40];
+    /* +0x7A96 */ u8 pad_0x7A96[0x2];
+    /* +0x7A98 */ u32* arrA_0x7A98[0x40];
+    /* +0x7B98 */ u32 arrB_0x7B98[0x40];
+    /* +0x7C98 */ u8 arrC_0x7C98[0x40];
     /* +0x7CD8 */ NetCtrlEntry entries_0x7CD8[16];
     /* +0x8298 */ u8 pad_0x8298[0x2C];
     /* +0x82C4 */ u8 flag_0x82C4;
@@ -53,7 +93,9 @@ typedef struct NetCtrlWk {
     /* +0x82C7 */ u8 flag_0x82C7;
     /* +0x82C8 */ u8 pad_0x82C8[0x3C64];
     /* +0xBF2C */ u8 flag_0xBF2C;
-    /* +0xBF2D */ u8 pad_0xBF2D[0x433];
+    /* +0xBF2D */ u8 pad_0xBF2D[0x3D3];
+    /* +0xC300 */ s32 msg_state_0xC300;
+    /* +0xC304 */ u8 pad_0xC304[0x5C];
     /* +0xC360 */ u16 counter_0xC360;
     /* +0xC362 */ u16 counter_0xC362;
     /* +0xC364 */ u32 counter_0xC364;
