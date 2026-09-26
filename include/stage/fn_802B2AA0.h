@@ -285,9 +285,15 @@ extern f32 lbl_8079A4E0; /* -1.0f    */
 extern f32 lbl_8079A4E4; /* 100.0f   */
 extern f32 lbl_8079A4E8; /* 55.0f    */
 
-/* .data - the band's own tables (0x805CF60C-0x805CFBE8, unclaimed; see the file header) */
+/* .data - the band's own tables (0x805CF60C-0x805CFBE8; only the jump table is claimed, see the
+ * file header) */
 extern StageJointLists* lbl_805CF60C[];
 extern StageJointLists* lbl_805CF644[];
+extern StageJointLists* lbl_805CF6A0[]; /* the mapno 1/12 per-area list pair */
+extern u8 lbl_805CF6D4[];
+extern u8 lbl_805CF6E8[];
+extern u8 lbl_805CF6F4[];
+extern u8 lbl_805CF700[];
 extern f32 lbl_805CF784[];
 extern u8 lbl_805CF7C0[]; /* the 0xC-byte Vec records the strips seat on */
 extern f32 lbl_805CF7F0[];
@@ -304,6 +310,18 @@ extern StageBlendEntry lbl_805CFB68[];
 extern StageJointLists* lbl_80792310;
 extern StageJointLists* lbl_80792330;
 extern StageJointLists* lbl_807923C8[];
+extern StageJointLists lbl_80792410;
+extern StageJointLists lbl_80792440;
+extern StageJointLists lbl_80792450;
+extern StageJointLists lbl_80792470;
+extern u8 lbl_80792418[0x4];
+extern u8 lbl_8079241C[0x4];
+extern u8 lbl_80792420[0x8];
+extern u8 lbl_80792428[0x8];
+extern u8 lbl_80792430[0x8];
+extern u8 lbl_80792458[0x8];
+extern u8 lbl_80792460[0x4];
+extern u8 lbl_80792464[0x4];
 extern u8 lbl_80792498[];
 extern u8 lbl_8079249C[];
 extern u8 lbl_807924A0[];
@@ -346,7 +364,14 @@ extern "C" void fn_802B0B7C(StageRuntime* st, u8 index);
 extern "C" void fn_802B2E2C(void);
 extern "C" void fn_802B2F3C(StageColourRec* dst, const StageColourRec* src);
 extern "C" void fn_802B2F60(StageRuntime* st, u8 kind);
-extern "C" void fn_802B3270(StageRuntime* st);
+extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode);
+extern "C" u8 fn_802FB8C4(void);
+extern "C" u8 fn_802FB8EC(s32 index);
+extern "C" u8 fn_802FB900(void);
+extern "C" u8 fn_802FB97C(void);
+extern "C" u32 fn_802FB9F8(void);
+extern "C" u8 fn_803AAF88(void);
+extern "C" u8 fn_803AAFE0(void);
 extern "C" s32 fn_802B2978(u32 from, u32 to, f32 t);
 extern "C" s32 fn_802B46DC(u8 index);
 extern "C" s32 fn_802BDF5C(void);
@@ -391,6 +416,7 @@ extern "C" u8 fn_803A8F60(s32 value);
 extern "C" u8 fn_803BECA0(u8 kind, s32 mode);
 
 /* C++ free functions whose map names are manglings (rule 9). */
+u32 LbCheckKujiraEvent(void);
 nw4r::math::VEC3 get_camera_pos(void);
 void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 area, long param);
 

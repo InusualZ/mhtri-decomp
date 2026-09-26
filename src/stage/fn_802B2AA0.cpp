@@ -28,11 +28,16 @@
  * Sections: .text 0x802B2AA0-0x802B5C58; extab 0x80013D34-0x80013E3C (33 8-byte records - the
  * extabindex table has one entry per function that contains a `bl`); extabindex
  * 0x80031A4C-0x80031BD8 (33 x 12 B).  The six functions with no record (fn_802B2F3C, fn_802B3250,
- * fn_802B3260, fn_802B45BC, fn_802B45D4, fn_802B46DC) are exactly the ones with no call at all.  No
- * `.data`/`.sdata2` range is claimed: the band's constants and its one jump table sit in the
- * still-unclaimed `.data` run 0x805CF60C-0x805CFBE8 that the data queue attributes to
- * `auto/802B2AA0_fn_802B2AA0`, so every pooled constant is `extern`-declared and never defined
- * (playbook 29); the claim is a `range` config_request in this unit's outbox.
+ * fn_802B3260, fn_802B45BC, fn_802B45D4, fn_802B46DC) are exactly the ones with no call at all.
+ *
+ * Data.  `.data` 0x805CF728-0x805CF784 (92 B) is claimed and 100 %: it is the 23-entry switch table
+ * MWCC emits for fn_802B3270's `switch (st->mapno)` (arms read out of `main.elf`; the table is our
+ * object's whole `.data`, so the claim is exactly what the object emits, plan 8.4).  The rest of the
+ * run the data queue attributes to `auto/802B2AA0_fn_802B2AA0` - the hand-written tables
+ * 0x805CF60C-0x805CFBE8 minus that table, 19 labels - stays **unclaimed**: our object does not emit
+ * them, so claiming them would only add target bytes nothing reproduces (playbook 23 / 8.4); the
+ * `range` config_request in this unit's outbox carries the evidence.  Every pooled constant is
+ * therefore still `extern`-declared and never defined (playbook 29).
  *
  * Flags.  The whole band is peephole-OFF, measured rather than inferred: with the lib's `-O3` peephole
  * on, MWCC restores a saved `f32` with `psq_l f31,N(r1)` where retail has the unfused `li r0,N` +
@@ -42,28 +47,37 @@
  * reason.  A lib-level flag is the durable home; until that lands the pragma pair carries the
  * deviation here.
  *
+ * Shapes.  fn_802B3270's list writes are `field[i] = v; i++;` through the *struct field*, not
+ * `buf[i++] = v` through the array: retail re-loads `local.show`/`local.hide` off the stack before
+ * every store, which only the field spelling produces.  Its dispatches come in both lowerings - the
+ * three on `fn_802FB8EC`'s result are `switch`es (one contiguous compare chain, cases merged into a
+ * `cmplwi/ble` range test where two share a body) while the `LbCheckKujiraEvent`/`fn_802FB9F8` tests
+ * are `if`/`else if` (chain interleaved with the bodies); a rewrite to the other lowering costs
+ * ~7 points.  `fn_802FB9F8` returns `u32`, not `u8` (retail compares `r3` raw, with no `clrlwi`).
+ *
  * Residuals (measured 2026-09-26, real command line):
- *   - fn_802B3270 (0xE68 B, 3688 B) is NOT reconstructed - the one row at 0 %.  Its body is a 22-case
- *     dispatch over `stage_w->mapno` with nested loops sharing 29 tails; turning m2c's output into the
- *     rule 8 shapes (a helper, a `switch` whose cases share a `break`, `for(;;)` with `break`) is a
- *     session of its own, and a wrong guess would be worse than the recorded gap.  Its jump table
- *     `jumptable_805CF728` (0x805CF728, 23 entries, read out of `main.elf`) is in the unclaimed `.data`
- *     run above.
  *   - fn_802B414C 36.50 % (320 B): the two effect-strip loops; ours is 332 B, so the loop shape (the
  *     `for(;;)` pair the target's `beq`-to-epilogue implies) still differs.
  *   - fn_802B4E58 43.65 % (1284 B): the colour-cycle blend; ours is 1324 B.  The final
  *     `fn_80057DE0(0, 6, colour, lbl_8079A4C4)` call and the `psq_lx` prologue/epilogue pair are right,
  *     so the residual is the inline per-channel blend shape.
- *   - fn_802B2F60 74.89 % (752 B, ours 812 B), fn_802B4ABC 74.99 % (416 B), fn_802B4824 76.04 %
+ *   - fn_802B2F60 77.56 % (752 B, ours 812 B), fn_802B4ABC 74.41 % (416 B), fn_802B4824 76.04 %
  *     (280 B, ours 284 B), fn_802B45D4 78.75 % (32 B): all source shape.
  *     fn_802B45D4 is the cheapest to explain - retail has the `neg`/`or`/`srwi` "is zero" idiom where
  *     MWCC's `-O3` peephole gives the shorter `cntlzw`/`srwi` for the same `!(x & 1)`; the peephole is
  *     off in this band already, so the idiom is not flag-reachable from source.
+ *   - The claimed jump table's two relocations still pair by *value*, not by name: retail's split names
+ *     the table `jumptable_805CF728` where MWCC emits an anonymous `@NNNN` in our object.  The bytes
+ *     and the section size are equal (100.0), so this is cosmetic - but it is why the object is not
+ *     byte-identical to the target yet.
  *   - Every int->float conversion gets MWCC's own anonymous `.sdata2` slot where the split names
  *     `lbl_8079A470` (2^52) / `lbl_8079A460` (2^52 + 2^31); that constant cannot be named from source
  *     (playbook 29) and it is the same residual `fn_802B2978` carries.
  *   - The unit's `.ctors` word (0x8056F37C, dtk appended the range in the re-split) is not emitted by
  *     our object; no static object with a constructor exists in the reconstruction yet.
+ *
+ * `fn_802B45D4`, `fn_802B2F60` etc. keep their pre-existing source shapes; fn_802B3270 is new here and
+ * its call site (`fn_802B4C5C`, which must pass all three arguments) moved that row 95.69 -> 96.38.
  *
  * Inventory and evidence: `python tools/units/ledger.py unit stage/fn_802B2AA0.cpp`.
  */
@@ -317,6 +331,535 @@ extern "C" void fn_802B3250(void)
 extern "C" void fn_802B3260(void)
 {
     fn_802B2F60((StageRuntime*)stage_w, 1);
+}
+
+/* Builds the current area's joint visibility set for the map's animation mode and applies it to the
+ * area's character: one list of joint ids is shown, the other hidden. */
+extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
+{
+    StageJointLists local;
+    u8 hide_buf[0x24];
+    u8 show_buf[0x24];
+    StageJointLists* lists = NULL;
+    s32 flag = 0;
+    u8 hide_i = 0;
+    u8 show_i = 0;
+
+    switch (st->mapno) {
+    case 1:
+    case 12: {
+        u8 area = st->areano;
+
+        lists = lbl_805CF6A0[area];
+        switch (area) {
+        case 0:
+            if (mode == 1) {
+                return;
+            }
+            if (fn_803AAF88() == 1) {
+                flag = 1;
+            }
+            break;
+        case 1:
+            if (fn_803AAFE0() == 1) {
+                flag = 1;
+            }
+            break;
+        case 6:
+            if (mode == 0) {
+                return;
+            }
+            if (mode == 1) {
+                flag = 1;
+            }
+            break;
+        }
+        break;
+    }
+    case 8:
+    case 19:
+        if (st->areano == 0) {
+            lists = &lbl_80792410;
+            flag = 0;
+        }
+        break;
+    case 11:
+    case 20:
+        if (st->areano == 0) {
+            lists = &lbl_80792410;
+            flag = 1;
+        }
+        break;
+    case 22: {
+        u8 area = st->areano;
+
+        if (area == 0) {
+            const u8* src;
+
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            if (fn_802FB97C() == 1) {
+                src = lbl_80792460;
+            } else {
+                src = lbl_80792464;
+            }
+            while (*src != 0xFF) {
+                local.show[show_i] = *src;
+                src++;
+                show_i++;
+            }
+            if (fn_8021F238() == 0) {
+                local.show[show_i] = 1;
+                show_i++;
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+        } else if (area == 1) {
+            lists = &lbl_80792470;
+            if (fn_8021F238() == 1) {
+                flag = 1;
+            }
+        } else if (area == 2) {
+            const u8* src;
+
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            switch (fn_802FB8EC(0)) {
+            case 0:
+            case 1:
+                local.show[0] = 3;
+                local.show[1] = 4;
+                show_i = 2;
+                break;
+            case 2:
+                local.show[0] = 1;
+                local.show[1] = 4;
+                show_i = 2;
+                break;
+            case 3:
+                local.show[0] = 1;
+                local.show[1] = 2;
+                show_i = 2;
+                break;
+            }
+            switch (fn_802FB8EC(2)) {
+            case 0:
+                local.show[show_i] = 8;
+                show_i++;
+                local.show[show_i] = 9;
+                show_i++;
+                local.show[show_i] = 10;
+                show_i++;
+                break;
+            case 1:
+                local.show[show_i] = 9;
+                show_i++;
+                local.show[show_i] = 10;
+                show_i++;
+                break;
+            case 2:
+                local.show[show_i] = 10;
+                show_i++;
+                break;
+            }
+            switch (fn_802FB8EC(3)) {
+            case 0:
+                local.show[show_i] = 11;
+                show_i++;
+                local.show[show_i] = 12;
+                show_i++;
+                local.show[show_i] = 13;
+                show_i++;
+                break;
+            case 1:
+                local.show[show_i] = 12;
+                show_i++;
+                local.show[show_i] = 13;
+                show_i++;
+                break;
+            case 2:
+                local.show[show_i] = 13;
+                show_i++;
+                break;
+            }
+            switch (fn_802FB8EC(1)) {
+            case 0:
+            case 1:
+                local.show[show_i] = 14;
+                show_i++;
+                local.show[show_i] = 15;
+                show_i++;
+                break;
+            case 2:
+                local.show[show_i] = 15;
+                show_i++;
+                break;
+            }
+            if (fn_802FB8C4() == 0) {
+                local.show[show_i] = 6;
+                show_i++;
+            } else {
+                local.show[show_i] = 5;
+                show_i++;
+            }
+            if (fn_802FB900() == 1) {
+                local.show[show_i] = 0x10;
+                show_i++;
+            }
+            if (fn_8021F238() == 0) {
+                local.show[show_i] = 7;
+                show_i++;
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+        }
+        break;
+    }
+    case 21: {
+        u8 area = st->areano;
+
+        switch (area) {
+        case 0:
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            if (fn_8021F238() == 1) {
+                const u8* src;
+
+                src = lbl_805CF6D4;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_80792418;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 0x12;
+                    show_i++;
+                    local.show[show_i] = 0x13;
+                    show_i++;
+                }
+            } else {
+                const u8* src;
+
+                src = lbl_80792418;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_805CF6D4;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 0x10;
+                    show_i++;
+                    local.show[show_i] = 0x11;
+                    show_i++;
+                }
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+            break;
+        case 1:
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            if (fn_8021F238() == 1) {
+                const u8* src;
+
+                src = lbl_805CF6E8;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_8079241C;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 0x11;
+                    show_i++;
+                    local.show[show_i] = 0x12;
+                    show_i++;
+                }
+            } else {
+                const u8* src;
+
+                src = lbl_8079241C;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_805CF6E8;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 0x0F;
+                    show_i++;
+                    local.show[show_i] = 0x10;
+                    show_i++;
+                }
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+            break;
+        case 2:
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            if (fn_8021F238() == 1) {
+                const u8* src;
+
+                src = lbl_805CF6F4;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_80792420;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 4;
+                    show_i++;
+                    local.show[show_i] = 0x0C;
+                    show_i++;
+                    local.show[show_i] = 0x0D;
+                    show_i++;
+                } else if (fn_802FB9F8() == 1) {
+                    local.show[show_i] = 4;
+                    show_i++;
+                }
+            } else {
+                const u8* src;
+
+                src = lbl_80792420;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_805CF6F4;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 2;
+                    show_i++;
+                    local.show[show_i] = 0x0A;
+                    show_i++;
+                    local.show[show_i] = 0x0B;
+                    show_i++;
+                } else if (fn_802FB9F8() == 1) {
+                    local.show[show_i] = 2;
+                    show_i++;
+                }
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+            break;
+        case 3:
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            if (fn_8021F238() == 1) {
+                const u8* src;
+
+                src = lbl_80792428;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_80792430;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 7;
+                    show_i++;
+                    local.show[show_i] = 8;
+                    show_i++;
+                } else {
+                    local.show[show_i] = 4;
+                    show_i++;
+                }
+            } else {
+                const u8* src;
+
+                src = lbl_80792430;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_80792428;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 5;
+                    show_i++;
+                    local.show[show_i] = 6;
+                    show_i++;
+                } else {
+                    local.show[show_i] = 3;
+                    show_i++;
+                }
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+            break;
+        case 5:
+            lists = &lbl_80792440;
+            if (fn_8021F238() == 1) {
+                flag = 1;
+            }
+            break;
+        case 6:
+            lists = &lbl_80792450;
+            if (fn_8021F238() == 1) {
+                flag = 1;
+            }
+            break;
+        case 7:
+            lists = &local;
+            local.hide = hide_buf;
+            local.show = show_buf;
+            if (fn_8021F238() == 1) {
+                const u8* src;
+
+                src = lbl_805CF700;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_80792458;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 0x19;
+                    show_i++;
+                    local.show[show_i] = 0x1D;
+                    show_i++;
+                    local.show[show_i] = 0x1E;
+                    show_i++;
+                    local.show[show_i] = 0x23;
+                    show_i++;
+                } else {
+                    if (fn_802FB9F8() == 1) {
+                        local.show[show_i] = 0x19;
+                        show_i++;
+                    }
+                    local.show[show_i] = 0x17;
+                    show_i++;
+                    local.show[show_i] = 0x18;
+                    show_i++;
+                    local.show[show_i] = 0x1F;
+                    show_i++;
+                }
+            } else {
+                const u8* src;
+
+                src = lbl_80792458;
+                while (*src != 0xFF) {
+                    local.show[show_i] = *src;
+                    src++;
+                    show_i++;
+                }
+                src = lbl_805CF700;
+                while (*src != 0xFF) {
+                    local.hide[hide_i] = *src;
+                    src++;
+                    hide_i++;
+                }
+                if (LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                    local.show[show_i] = 5;
+                    show_i++;
+                    local.show[show_i] = 0x1B;
+                    show_i++;
+                    local.show[show_i] = 0x1C;
+                    show_i++;
+                    local.show[show_i] = 0x22;
+                    show_i++;
+                } else {
+                    if (fn_802FB9F8() == 1) {
+                        local.show[show_i] = 5;
+                        show_i++;
+                    }
+                    local.show[show_i] = 4;
+                    show_i++;
+                    local.show[show_i] = 0x16;
+                    show_i++;
+                    local.show[show_i] = 0x1A;
+                    show_i++;
+                }
+            }
+            flag = 1;
+            local.hide[hide_i] = 0xFF;
+            local.show[show_i] = 0xFF;
+            break;
+        }
+        break;
+    }
+    }
+    if (lists != NULL) {
+        const u8* shown;
+        const u8* hidden;
+
+        if (flag != 0) {
+            shown = lists->hide;
+            hidden = lists->show;
+        } else {
+            shown = lists->show;
+            hidden = lists->hide;
+        }
+        while (*shown != 0xFF) {
+            chr->setVisibility(*shown, true);
+            shown++;
+        }
+        while (*hidden != 0xFF) {
+            chr->setVisibility(*hidden, false);
+            hidden++;
+        }
+    }
 }
 
 /* Hides every joint the current area's kind list names. */
@@ -730,7 +1273,7 @@ extern "C" void fn_802B4C5C(void)
     index = 0;
     do {
         if (st->area_char[index] != NULL) {
-            fn_802B3270(st);
+            fn_802B3270(st, st->area_char[index], index);
         }
         index++;
     } while (index < 4U);
