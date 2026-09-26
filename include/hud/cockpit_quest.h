@@ -143,6 +143,7 @@ f32 fn_802E90C0(CockpitWork* work, const f32* pos);
 s32 fn_802E90FC(CockpitWork* work, const f32* pos);
 u8 fn_802E9130(CockpitWork* work, u8 value, f32 dist);
 void fn_802E9E9C(CockpitWork* work, s32 arg1);
+void fn_802EA138(s8 value);                     /* 0x802EA138 size 0x7C (rule 2: this band owns it) */
 
 /* ---- unsplit callees whose map name is bare (C linkage) ---- */
 u8 fn_802715A0(_PLW* plw, u32 slot);            /* 0x802715A0 Pl/pl_skill.cpp defines it */
