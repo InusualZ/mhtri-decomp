@@ -1292,6 +1292,21 @@ config.libs = [
             # the dump answers `zz_<addr>_` for 47 of the 53 addresses), so the stem is the map's
             # `fn_8028F66C` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_8028F66C.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal `80295EF4_fn_80295EF4` -
+            # the hit/land query band (0x80295EF4-0x8029F3C8, 99 functions, 0x94D4 B).  Home is `Pl`:
+            # the band hits the Pl family (`get_move_work_adrs`, `_PLW` fields, `Pl_frame_check`) and
+            # its record vocabulary (`_HIT_W`, `LandData`, `get_hit_id`) is the one the map already
+            # names inside the Pl band, whose registered `Pl/fn_80288CEC.cpp` ends at 0x8028F66C
+            # straight before it.  The seam at 0x80295EF4 is a `--max-bytes` cut, not a TU boundary:
+            # the band's `.sdata2` run 0x8079A330-0x8079A3C8 has no break across it, and the static
+            # initializer inside this range (0x80297C30) constructs arrays out of the *previous*
+            # proposal's `fn_80295544`.  No `__FILE__` string covers the band and `dumpmap.py` answers
+            # only `zz_XXXXXXXX_` placeholders, so the stem is the map's `fn_80295EF4` with a rule-7
+            # deferral (the sibling class-4 pattern of `Pl/fn_80229ECC.cpp` / `Pl/fn_80288CEC.cpp`).
+            # `.text` only: the band owns no emitted data, and its `.ctors` word is not claimed
+            # because this source states the static initializer as an explicit function (invariant
+            # 8.4).  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80295EF4.cpp"),
         ],
     },
     {
