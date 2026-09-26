@@ -58,6 +58,13 @@ struct _PLW;
 /* `Get_motion_no` is defined at 0x8026A308; the map spells it `Get_motion_no__FP4_PLW`, so the real
  * C++ declaration is the callable spelling and the front-end mangles it back (rule 9). */
 u16 Get_motion_no(struct _PLW* plw);
+
+/* 0x8026A248 / 0x8026A314 - the two character setters `src/lobby/fn_802076D4.cpp` drives.  The map
+ * spells them `Pl_chr_setX__FP4_PLWUsll` and `Pl_frame_check__FP4_PLWUlff`, so the real declarations are
+ * the callable spellings and the front-end mangles them back (rule 9).  Their addresses sit in the Pl
+ * band's unclaimed gap (0x802693C4..0x8026BA1C), so this band header is their rule-2 home. */
+void Pl_chr_setX(struct _PLW* plw, u16 motion, s32 a, s32 b);
+u32 Pl_frame_check(struct _PLW* plw, u32 mask, f32 a, f32 b);
 #endif
 
 #endif /* MHTRI_UNSPLIT_PL_H */

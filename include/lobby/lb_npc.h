@@ -119,7 +119,9 @@ typedef struct _LB_NPC {
     /* +0x164 */ void* field_0x164;
     /* +0x168 */ u8 pad_0x168[8];
     /* +0x170 */ s32 field_0x170;
-    /* +0x174 */ u8 pad_0x174[0x58];
+    /* +0x174 */ u8 pad_0x174[0x0E];
+    /* +0x182 */ u16 field_0x182;
+    /* +0x184 */ u8 pad_0x184[0x48];
     /* +0x1CC */ u16 field_0x1CC;
     /* +0x1CE */ u8 field_0x1CE;
     /* +0x1CF */ u8 pad_0x1CF;
@@ -173,6 +175,11 @@ typedef struct _LB_NPC {
     /* +0x265 */ u8 pad_0x265[3];
 } _LB_NPC; /* size: 0x268 */
 
+/* ---------------------------------------------------------------------------------------------------
+ * This unit's own callable surface, for the lobby consumers that call it
+ * (`src/lobby/fn_802076D4.cpp`).  docs/plan.md 6.5 rule 2: an extern lives with the TU that owns the
+ * symbol.  The names are unmangled in the map, so the declarations are `extern "C"` (rule 9).
+ */
 /* The `.bss` lobby work block (`lobby_w`, 0x17C B).  Its view here is this unit's own (see the note
  * above): `include/unsplit/lobby.h` carries the menu-layer unit's partial view, whose `lbl_80794880`
  * is declared as an array rather than the pointer the target loads, so the two views cannot be one. */
@@ -192,7 +199,9 @@ typedef struct LbNpcLobbyWork {
     /* +0x081 */ u8 pad_0x081[0x3F];
     /* +0x0C0 */ u8 talk_0x0C0[0x6C];
     /* +0x12C */ u8 field_0x12C;
-    /* +0x12D */ u8 pad_0x12D[0x36];
+    /* +0x12D */ u8 pad_0x12D[0x2];
+    /* +0x12F */ u8 field_0x12F;
+    /* +0x130 */ u8 pad_0x130[0x33];
     /* +0x163 */ u8 field_0x163;
     /* +0x164 */ u8 pad_0x164[0x0B];
     /* +0x16F */ s8 field_0x16F;

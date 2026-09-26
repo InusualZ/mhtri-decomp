@@ -77,7 +77,12 @@ typedef struct LbMenuWork {
 typedef struct LbLobbyWork {
     /* +0x000 */ u8 state_0x000;
     /* +0x001 */ u8 field_0x001;
-    /* +0x002 */ u8 field_0x002;
+    /* +0x002 */ union {
+        u8 field_0x002;   /* the menu-layer state `src/lobby/fn_801F9CD4.cpp` sets (0/2) and passes to
+                           * `fn_801FB2A8`/`fn_802AEEF8` */
+        u8 area_0x002;    /* the scene's area id, compared against `_PLW::area_0x16`
+                           * (`src/lobby/fn_802076D4.cpp`) - the same byte, two consumers */
+    };
     /* +0x003 */ u8 unused_0x003[3];
     /* +0x006 */ u8 field_0x006;
     /* +0x007 */ u8 unused_0x007[0x05];
@@ -96,9 +101,12 @@ typedef struct LbLobbyWork {
     };
     /* +0x07D */ u8 slots_0x07D[0x2F];
     /* +0x0AC */ LbMenuWork* menu_0xAC;
-    /* +0x0B0 */ u8 unused_0x0B0[0x7D];
+    /* +0x0B0 */ u8 unused_0x0B0[0x7C];
+    /* +0x12C */ u8 field_0x12C;   /* 1 puts the lobby act layer on hold */
     /* +0x12D */ u8 param_0x12D;
-    /* +0x12E */ u8 unused_0x12E[0x4E];
+    /* +0x12E */ u8 unused_0x12E[0x1];
+    /* +0x12F */ u8 param_0x12F;
+    /* +0x130 */ u8 unused_0x130[0x4C];
 } LbLobbyWork; /* size: 0x17C */
 
 /* The lobby's NPC move table block (`lb_npc_move_data`, .bss): +0x0C is the `LbNpcMotionEntry` array
@@ -513,6 +521,14 @@ s32 fn_8035A034(void);
 s32 fn_8035A7D8(s32, void*, void*, s32, s32);
 u32 fn_803768F8(void);
 s32 fn_80377664(void *);
+
+/* The lobby band's unclaimed `.bss` / `.sdata2` objects this unit and its neighbours read.  An
+ * `extern` for an unsplit symbol belongs in this band header (docs/plan.md 6.5 rule 2). */
+extern u8 lbl_806AA6F0[0x20];   /* .bss 0x806AA6F0 - the lobby sub-scene latch block */
+extern f32 lbl_80799B18;
+extern f32 lbl_80799B1C;
+extern f32 lbl_80799B20;
+void fn_8042E9A4(u32 id, u8* table);
 
 #ifdef __cplusplus
 }
