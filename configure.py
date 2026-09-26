@@ -1378,6 +1378,20 @@ config.libs = [
         "objects": [
             Object(Matching, "lobby/lobby_scene.c"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `801E0ADC_fn_801E0ADC.cpp` (`.text` 0x801E0ADC..0x801E7530, 77 functions / 27220 B) -
+            # the effect/flag bookkeeping group that precedes the lobby menu layer.  Module `lobby`:
+            # 23 call sites go into the registered `lobby/fn_80212810.cpp`, the rest of the foreign
+            # calls are the lobby/HUD API (`LbStr`, `GetMenuFontColor`, `get_lsp_data`,
+            # `draw_sprite_*`), and the range's data is the lobby `.sbss`/`.data` run
+            # (`lbl_80794880`); both link neighbours are the enemy/lobby units.  No `__FILE__` string
+            # covers the range and the dump answers only `zz_` placeholders, so the file keeps the map
+            # stem (brief section 2, class 3+4).  C++ from the range's mangled callees.
+            # Sections: extab 0x800103D4..0x800105B4 (60 records), extabindex
+            # 0x8002C4A8..0x8002C778 (60 x 12 B), .text 0x801E0ADC..0x801E7530 - each is exactly the
+            # gap between the bracketing enemy/lobby claims.  The seam is unproven (`--max-bytes`
+            # cap) and the run holds several original TUs (see the file header).
+            Object(NonMatching, "lobby/fn_801E0ADC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `801E7530_fn_801E7530.cpp` (`.text` 0x801E7530..0x801EC9E0, 77 functions / 21680 B) -
             # the lobby menu-layer group.  Module `lobby` from the code (`lobby_w`, `lb_param_w`,
             # `LbStr`, `GetMenuFontColor`, `draw_font_idx`) and from the neighbour above; no `__FILE__`
