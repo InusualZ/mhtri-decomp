@@ -67,6 +67,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/fn_801B0010.h"
 #include "enemy/fn_801B4458.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
@@ -114,10 +115,6 @@ u32 fn_8012F93C(struct _ENEMY_WORK* self);
 void fn_80127F48(struct _ENEMY_WORK* self);
 void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
 u32 fn_80132184(void);
-
-/* the em030 unit (0x801B0010..0x801B4458) - the two lookups this band reuses. */
-u32 fn_801B4398(struct _ENEMY_WORK* self, u32 kind, u32* out);
-void fn_801B4348(struct _ENEMY_WORK* self);
 
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
 void fn_80043EA8(nw4r::math::VEC3* out);
@@ -218,18 +215,8 @@ extern u8 lbl_805B1F18[];
 extern u8 lbl_805B1FF0[];
 extern u8 lbl_805B20E8[];
 
-/* The 0x20-byte ground/entry record `fn_80125F54` prepares and `fn_801421E4` fills (only the two
- * vectors this band reads are named).  size: 0x20 */
-struct EmGroundRec {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 unused_0x01[2];
-    /* +0x03 */ u8 field_0x03;   /* the seat flags `fn_801B4C54` tests (bit 1) */
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ nw4r::math::VEC3 pos_0x08;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u32 field_0x1C;
-};
+/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills lives in
+ * `include/enemy/ENEMY_WORK.h` now (rule 1: one definition for both units that own one). */
 
 /* -------------------------------------------------------------------------------------------------
  * the range's functions, in address order
