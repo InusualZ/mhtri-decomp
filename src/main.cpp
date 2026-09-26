@@ -432,7 +432,7 @@ int main(void)
         if (system_w.unk2161 != 0) {
             continue;
         }
-        if (system_w.unk2149 != 0) {
+        if (system_w.field_0x865 != 0) {
             continue;
         }
         if (system_w.unk2353 != 0) {

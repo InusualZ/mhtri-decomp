@@ -1423,6 +1423,16 @@ config.libs = [
             # continues the band).  Sections: extab 0x8001094C..0x80010A7C (38 records), extabindex
             # 0x8002CCDC..0x8002CEA4 (38 x 12 B), .text 0x801F3294..0x801F9CD4.
             Object(NonMatching, "lobby/fn_801F3294.cpp"),
+            # `801F9CD4_fn_801F9CD4.cpp` (`.text` 0x801F9CD4..0x801FBF78, 14 functions / 8868 B) -
+            # the lobby character-edit (hair/inner colour) screen group.  Module `lobby` from the code
+            # (`lobby_w`/`lb_param_w`/`Screen_w`/`system_w`, `get_lsp_data`, `draw_sprite_ary`,
+            # `GetMenuFontColor`, `LbStr`) and from both bracketing registered units; no `__FILE__`
+            # string covers the range (the only `.cpp` string in the region's data, `enemy_control.cpp`,
+            # is referenced from 0x801411DC, a different band) and the dump answers only `zz_`
+            # placeholders, so the file keeps the map stem (brief section 2, class 3+4).  Sections:
+            # extab 0x80010A7C..0x80010ADC (12 records), extabindex 0x8002CEA4..0x8002CF34 (12 x 12 B),
+            # .text 0x801F9CD4..0x801FBF78.
+            Object(NonMatching, "lobby/fn_801F9CD4.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `801FBF78_fn_801FBF78.cpp` (`.text` 0x801FBF78..0x802029B4, 127 functions / 27196 B) -
             # the lobby NPC / world-update group.  Module `lobby` from the code (the range owns
