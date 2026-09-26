@@ -643,6 +643,13 @@ config.libs = [
             # keeps the map's stem (see its header).  Same `cflags_menu` as `menu_item.cpp`: the band
             # carries 0 record-form instructions and keeps its tiny same-file `bl`s.
             Object(NonMatching, "menu/fn_802A6624.cpp"),
+            # Registered from proposal/802E4978_fn_802E4978.cpp: the UI band directly above
+            # `menu/fn_802A6624.cpp`'s band's neighbours (`.text` 0x802E4978..0x802E7408, 29
+            # functions / 10896 B).  Module `menu` and the map's stem as file name (brief section 2,
+            # class 4: no `__FILE__` string covers the range; the flanking TUs' strings are
+            # `cockpit.cpp` and `cockpit_quest.cpp`, this band's own entry points are the menu
+            # library's - `get_menu_lsp_tbl`/`put_menu_cursor`/`GetMenuFontColor`/`ItemName`).
+            Object(NonMatching, "menu/fn_802E4978.cpp"),
         ],
     },
 

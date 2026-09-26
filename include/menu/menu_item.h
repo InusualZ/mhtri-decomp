@@ -359,6 +359,14 @@ u32 fn_802DE670(u8 idx);
 void fn_80384380(void);
 void fn_804273EC(s32 a, s32 b, s32 c);
 
+/* 0x802A2620 / 0x802A26F4 - the two menu-band entries the cockpit band above this range
+ * (`menu/fn_802E4978.cpp`, 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses).
+ * `fn_802A2620(0)` redraws the menu frame; `fn_802A26F4` is registered with `subTransSetPrio` by
+ * address, so it is declared as the function it is.  Both signatures are that consumer's call sites
+ * (neither body is written yet). */
+void fn_802A2620(s32 a);
+void fn_802A26F4(void);
+
 #ifdef __cplusplus
 }
 #endif

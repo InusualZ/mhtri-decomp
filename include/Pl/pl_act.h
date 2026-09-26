@@ -81,6 +81,14 @@ void fn_80278BE4(struct _PLW* self);
  * the owner defines it `extern "C"` in `Pl/pl_act.cpp`, so the declaration lives here. */
 void fn_80277974(struct _PLW* self, void* hit, u8* base, u16 idx, s32* ids, u16 flags);
 
+/* 0x8027B0BC / 0x8027B358 / 0x8027B918 - the three per-frame act entries the cockpit band
+ * (`menu/fn_802E4978.cpp`, 0x802E4978-0x802E7408) drives; the owner defines all three
+ * `extern "C" void (_PLW* self)` in `src/Pl/pl_act.cpp` (rule 2: this header is the owner's, so the
+ * parameter is the owner's `_PLW*`, not the consumer's own record). */
+void fn_8027B0BC(struct _PLW* self);
+void fn_8027B358(struct _PLW* self);
+void fn_8027B918(struct _PLW* self);
+
 #ifdef __cplusplus
 }
 
