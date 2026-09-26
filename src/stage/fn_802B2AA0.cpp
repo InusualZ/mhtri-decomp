@@ -61,11 +61,7 @@
  *   - fn_802B4E58 43.65 % (1284 B): the colour-cycle blend; ours is 1324 B.  The final
  *     `fn_80057DE0(0, 6, colour, lbl_8079A4C4)` call and the `psq_lx` prologue/epilogue pair are right,
  *     so the residual is the inline per-channel blend shape.
- *   - fn_802B2F60 77.56 % (752 B, ours 812 B), fn_802B4ABC 74.41 % (416 B), fn_802B4824 76.04 %
- *     (280 B, ours 284 B), fn_802B45D4 78.75 % (32 B): all source shape.
- *     fn_802B45D4 is the cheapest to explain - retail has the `neg`/`or`/`srwi` "is zero" idiom where
- *     MWCC's `-O3` peephole gives the shorter `cntlzw`/`srwi` for the same `!(x & 1)`; the peephole is
- *     off in this band already, so the idiom is not flag-reachable from source.
+ *   - fn_802B2F60 77.56 % (752 B, ours 812 B), fn_802B4ABC 74.41 % (416 B): all source shape.
  *   - The claimed jump table's two relocations still pair by *value*, not by name: retail's split names
  *     the table `jumptable_805CF728` where MWCC emits an anonymous `@NNNN` in our object.  The bytes
  *     and the section size are equal (100.0), so this is cosmetic - but it is why the object is not
@@ -76,8 +72,19 @@
  *   - The unit's `.ctors` word (0x8056F37C, dtk appended the range in the re-split) is not emitted by
  *     our object; no static object with a constructor exists in the reconstruction yet.
  *
- * `fn_802B45D4`, `fn_802B2F60` etc. keep their pre-existing source shapes; fn_802B3270 is new here and
- * its call site (`fn_802B4C5C`, which must pass all three arguments) moved that row 95.69 -> 96.38.
+ * `fn_802B2F60` and `fn_802B4ABC` keep their pre-existing source shapes.  Three rows that sat below the
+ * bar are 100 % on shape alone, and each one's shape is load-bearing:
+ *   - fn_802B3270: new here; its call site (`fn_802B4C5C`, which must pass all three arguments) moved
+ *     that row 95.69 -> 96.38.
+ *   - fn_802B4824: the outer loop must be a `for` with `index` initialised outside it (`for (; index <
+ *     4U; index++)`), not a `do`/`while` - only a for-counter gets the range analysis that drops the
+ *     `clrlwi` off `index < 4U`; and the per-area body re-reads `st->area_char[index]` (retail loads
+ *     the element address once per iteration and reloads the pointer after `frame_init`).  The
+ *     declarations are ordered `scale, amount, index, joint, st` because the allocator colours them by
+ *     declaration order (98.50 % in the natural order) - a deliberate deviation from the file's style.
+ *   - fn_802B45D4: `(x & 1) != 0`, not `!(x & 1)` - the `!` spelling makes MWCC emit the `cntlzw`/`srwi`
+ *     pair where retail has `neg`/`or`/`srwi`, and the peephole is off in this band already, so the
+ *     asymmetry is source, not flag.
  *
  * Inventory and evidence: `python tools/units/ledger.py unit stage/fn_802B2AA0.cpp`.
  */
@@ -1023,7 +1030,7 @@ extern "C" void fn_802B45BC(void)
 /* Returns whether the stage block's one-shot flag byte has bit 0 clear. */
 extern "C" s32 fn_802B45D4(void)
 {
-    return !(((StageRuntime*)stage_w)->field_0x2F91 & 1);
+    return (((StageRuntime*)stage_w)->field_0x2F91 & 1) != 0;
 }
 
 /* Arms area `index`'s timer on first use and keeps its 4-second window. */
@@ -1106,37 +1113,34 @@ extern "C" s32 fn_802B47B0(void)
 /* Re-drives every live area actor's per-joint frame init for the palette the kind selects. */
 extern "C" void fn_802B4824(u8 kind)
 {
-    StageRuntime* st = (StageRuntime*)stage_w;
-    MHchar* chr;
-    f32 amount;
     f32 scale;
+    f32 amount;
     u8 index;
-    u32 joint;
+    u8 joint;
+    StageRuntime* st = (StageRuntime*)stage_w;
 
     switch (kind) {
     case 18:
         amount = lbl_8079A4B8;
         break;
-    case 47:
-        amount = lbl_8079A4BC;
-        break;
     case 33:
         fn_802B4680(NULL, 0);
         return;
+    case 47:
+        amount = lbl_8079A4BC;
+        break;
     default:
         return;
     }
     index = 0;
     scale = lbl_8079A484;
-    do {
-        chr = st->area_char[index];
-        if (chr != NULL) {
-            for (joint = 0; joint < ((StageActorJoints*)chr)->joint_count; joint++) {
-                chr->frame_init(joint, (u16)joint, 0.0f, (u32)(amount * scale), lbl_8079A468);
+    for (; index < 4U; index++) {
+        if (st->area_char[index] != NULL) {
+            for (joint = 0; joint < ((StageActorJoints*)st->area_char[index])->joint_count; joint++) {
+                st->area_char[index]->frame_init(joint, (u16)joint, amount * scale, 0, lbl_8079A468);
             }
         }
-        index++;
-    } while (index < 4U);
+    }
 }
 
 /* Arms the map's joint sound effects for the current area. */
