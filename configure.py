@@ -1147,6 +1147,16 @@ config.libs = [
             # deferral.  It uses `cflags_pl` (this lib).
             Object(Matching, "Pl/fn_80241558.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80258FCC_fn_80258FCC.cpp` - the player act state-machine band (0x80258FCC-0x8025F088,
+            # 74 functions, 0x60BC B) with extab 0x8001219C-0x8001239C and extabindex
+            # 0x8002F154-0x8002F454 (the run is exactly this unit's 64 framed functions).  Home is
+            # `Pl`: every function's first argument is the player work `_PLW*` and the gates are the
+            # Pl siblings (`Pl_master_ck`, `Pl_act_ck`, `Pl_Skill_ck`, `Pl_frame_check`); both
+            # bracketing registered units are Pl.  No `__FILE__` string is reachable from the range
+            # and the dump answers only `zz_0258fcc_`, so the stem is the map's `fn_80258FCC` with a
+            # rule-7 deferral.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_80258FCC.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `80262940_fn_80262940` - the player main/control cluster (0x80262940-0x802693C4, 59
             # functions, 0x6A84 B) with its own exception tables (extab 0x8001241C-0x80012554,
             # extabindex 0x8002F514-0x8002F6E8).  Home is `Pl`: the actors are `_PLW` and every gate

@@ -73,6 +73,7 @@
 #include "sound/fn_800D7F54.h"
 #include "sound/se_w.h"
 #include "unsplit/Pl.h"
+#include "Pl/fn_80258FCC.h"
 #include "lobby/fn_8021E1EC.h"
 #include "unsplit/g3d.h"
 #include "unsplit/unknown.h"

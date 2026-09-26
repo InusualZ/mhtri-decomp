@@ -24,7 +24,15 @@ u32 fn_8027BC48(s32 arg);
 /* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
  * which calls them; all four are in this unit's `.text` range (0x80276B58-0x8027D684). */
 void fn_80276B58(struct _PLW* self, s32 value);
-u32 fn_802770E8(struct _PLW* self);
+void fn_802770E8(struct _PLW* self, u32 table, s32 arg2);
+void fn_8027AC00(struct _PLW* self);
+void fn_8027AC0C(struct _PLW* self);
+void fn_8027D4F0(struct _PLW* self);
+void fn_8027D510(struct _PLW* self);
+s32 fn_80277DAC(struct _PLW* self, s32 a, f32 b, f32 c);
+u32 fn_8027A198(struct _PLW* self);
+void fn_8027A17C(struct _PLW* self);
+void fn_8027A190(struct _PLW* self, s32 a);
 u32 fn_802790E4(struct _PLW* self, u32 mask);
 u32 fn_8027BCE0(struct _PLW* self);
 u32 fn_8027D40C(struct _PLW* self, s32 arg);
