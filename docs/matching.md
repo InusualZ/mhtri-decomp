@@ -1611,6 +1611,18 @@ and declaring `hide_buf` **before** `show_buf` (the declaration order decides wh
 reversed, it swaps them). A wrong prototype at a call site is its own measurable defect: `fn_802B4C5C` was
 declared with **1** parameter where retail passes **3**, and fixing the arity moved it 95.69 -> 96.38.
 
+**Refinement (2026-09-27, `fn_80429B94`): a unit that claims several runs of one section must own the bytes
+between them.** Claiming a band's jump tables but not the unnamed blobs between them splits the range against
+dtk's own `auto_<n>_<addr>_data` unit, that unit lands *inside* the claiming unit's address range, and
+`dtk dol split` stops with `Cyclic dependency encountered while resolving link order: <unit> ->
+auto_<n>_<addr>_data`. Either claim every run of that section, or drop a run entirely; the first is right when
+the blobs are the band's own data. `fn_80429B94`'s `lbl_80603C98` (a colour table) and `lbl_80603CB8` are
+referenced from `fn_80429B94` and sat between its sixth and seventh jump tables, so merging the claims
+`0x80603C6C-0x80603C98` and `0x80603CE4-0x80603D10` into one `0x80603C6C-0x80603CE4` took the split from that
+cycle to green with the DOL hash unchanged. A *leading* or *trailing* unclaimed run is harmless - a unit may
+reference an auto unit's data, one direction, no cycle - only a run **between** two of the unit's own does this.
+
+
 ## 54. Dolphin's `.map` names a jump table's OWNER and a `__FILE__` emitter
 
 **Problem.** Section 53 says to claim a jump table's `.data` range, but not *whose* range it is - so the claim is a
