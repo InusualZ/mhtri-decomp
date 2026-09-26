@@ -81,4 +81,23 @@ extern const f32 lbl_8079A778; /* 4000000.0 */
 }
 #endif
 
+extern const f32 lbl_8079A870; /* 5000.0 - the AI NPC's own attack reach */
+
+/* The hold-item tuning tables `src/ai/fn_802D44F4.cpp` reads (0x805D5354-0x805D5390): none of them is
+ * covered by a registered unit's range, so they are the band's fallback declarations too. */
+extern s16 lbl_805D5354[6];        /* the release countdown, x 0x1E frames */
+extern s16 lbl_805D5378[12];       /* the +0x422/+0x424 timer pair, x 0x1E frames */
+extern s16 lbl_805D5390[12];       /* the second +0x422/+0x424 timer pair */
+
+/* The per-record tuning table at 0x805D5360: 6 records of 4 bytes (size 0x18); +0x0 and +0x1 are the
+ * two thresholds `fn_802D66B8` rolls against and +0x3 the frame count `fn_802D6690` scales.
+ * size: 0x4 */
+struct AINPCTuning {
+    /* +0x0 */ u8 field_0x0;
+    /* +0x1 */ u8 field_0x1;
+    /* +0x2 */ u8 unused_0x2;
+    /* +0x3 */ u8 field_0x3;        /* the per-record frame count (x 0x708) */
+};
+extern struct AINPCTuning lbl_805D5360[6];
+
 #endif /* MHTRI_UNSPLIT_AI_H */

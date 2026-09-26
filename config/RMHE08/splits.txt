@@ -1044,6 +1044,13 @@ ai/fn_802D0F34.cpp:
 	.text       start:0x802D0F34 end:0x802D44F4
 	.data       start:0x805D4E80 end:0x805D5000
 
+ai/fn_802D44F4.cpp:
+	extab       start:0x8001496C end:0x80014C64
+	extabindex  start:0x80032C88 end:0x800330FC
+	.text       start:0x802D44F4 end:0x802DDC04
+	.ctors      start:0x8056F388 end:0x8056F38C
+	.data       start:0x805D5428 end:0x805D5460
+
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674
