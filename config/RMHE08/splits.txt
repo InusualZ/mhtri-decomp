@@ -995,6 +995,11 @@ stage/fn_802B2AA0.cpp:
 	.text       start:0x802B2AA0 end:0x802B5C58
 	.ctors      start:0x8056F37C end:0x8056F380
 
+camera/fn_802B5C58.cpp:
+	extab       start:0x80013E3C end:0x80014194
+	extabindex  start:0x80031BD8 end:0x800320DC
+	.text       start:0x802B5C58 end:0x802BEAAC
+
 ai/fn_802CC794.cpp:
 	extab       start:0x8001467C end:0x80014844
 	extabindex  start:0x80032820 end:0x80032ACC

@@ -35,6 +35,10 @@ void subTransSet(u32 a, s32 b, u32* c);
 extern "C" {
 #endif
 s32 fn_800497AC(void* pSelf);
+
+/* Added when `camera/fn_802B5C58.cpp` registered (rule 2).  0x80047398 returns the current
+ * `nw4r::g3d::Camera` (through `ScnRoot`); every camera accessor starts from it. */
+void* fn_80047398(void);
 #ifdef __cplusplus
 }
 #endif
