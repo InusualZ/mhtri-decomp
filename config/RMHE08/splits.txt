@@ -816,6 +816,11 @@ hud/fn_80324F7C.c:
 	extabindex  start:0x80035190 end:0x8003519C
 	.text       start:0x80324F7C end:0x803250B0
 
+enemy/fn_8035E034.cpp:
+	extab       start:0x80017574 end:0x800175DC
+	extabindex  start:0x80036E94 end:0x80036F30
+	.text       start:0x8035E034 end:0x8035F2B4
+
 Network/NetworkWiiMediator.c:
 	.text       start:0x80413F3C end:0x80413F50
 
