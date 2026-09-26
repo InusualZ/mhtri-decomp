@@ -73,10 +73,27 @@ typedef struct MHchar {
     /* +0x035 */ u8 ready;
     /* +0x036 */ u8 pad_0x36[0xA];
     /* +0x040 */ s32 field_0x40;
-    /* +0x044 */ u8 pad_0x44[0xC];
+    /* +0x044 */ union {   /* the 0x0C-byte run stays whole, with the two fields `ai/fn_802D0F34.cpp`
+                           * reads named inside it (same byte total; nothing moves) */
+        /* +0x044 */ u8 pad_0x44[0xC];
+        struct {
+            /* +0x044 */ f32 field_0x44;   /* the AI band's aim/blend frame factor (`+0x04C` of the
+                                           * NPC work record, = this + 8) */
+            /* +0x048 */ u8 pad_0x48[0x4];
+            /* +0x04C */ u32 field_0x4C;   /* its flag word (bit 0 latches the clamp above) */
+        };
+    };
     /* +0x050 */ u16 motion_no_0x50;   /* the motion number `Get_motion_no` returns (0x8026A308) */
     /* +0x052 */ u8 pad_0x52[0x2];
-    /* +0x054 */ _CP_VECTOR rot_0x54;
+    /* +0x054 */ union {   /* the rotation is one 0x0C-byte run; the AI band reads its z word as an
+                           * f32 (`+0x064` of the NPC work record) */
+        /* +0x054 */ _CP_VECTOR rot_0x54;
+        struct {
+            /* +0x054 */ u32 rot_x_0x54;
+            /* +0x058 */ u32 rot_y_0x58;
+            /* +0x05C */ f32 field_0x5C;
+        };
+    };
     /* +0x060 */ u8 pad_0x60[0x4];
     /* +0x064 */ f32 field_0x64;
     /* +0x068 */ u8 pad_0x68[0xC];
