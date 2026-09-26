@@ -598,6 +598,16 @@ config.libs = [
             # same two `lbl_806BDCC8` work records and calls the same `hud` 2D element library.
             # Same `cflags_main` as `hud/layout.cpp`.
             Object(NonMatching, "hud/cockpit_quest.cpp"),
+            # Registered once, at its final home (docs/plan.md 12).  The continuation of the cockpit
+            # HUD band above `hud/cockpit_quest.cpp`: `.text` 0x802EBED8..0x802F140C (54 functions,
+            # 21812 B), extab 0x8001529C..0x80015424 and extabindex 0x80033A50..0x80033C9C (49
+            # records each; both runs start exactly where `cockpit_quest.cpp`'s runs end - the five
+            # unframed functions carry no record).  No `__FILE__` string of the range names a source
+            # file (the range's `.data` references are all mask tables) and the dump answers `zz_`,
+            # so the file keeps the map's stem (brief section 2, class 4).  Module `hud` from the
+            # naming scheme of the band's neighbours (`layout.cpp`, `cockpit_quest.cpp`).
+            # Same `cflags_hud` as the two siblings.
+            Object(NonMatching, "hud/fn_802EBED8.cpp"),
         ],
     },
 
