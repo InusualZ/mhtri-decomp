@@ -78,6 +78,9 @@ typedef struct LbKujiraEventWork {
     /* +0x32D */ u8 unused_0x32D[0x1];
 } LbKujiraEventWork; /* size: 0x32E */
 
+/* The caller's record, only ever handled by address here (`struct _ENEMY_WORK*` parameters). */
+struct _ENEMY_WORK;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -106,6 +109,17 @@ void fn_802FDDCC(LbKujiraEventWork* work);
  * called by `fn_802FF248` above them. */
 void fn_802FF29C(u32 raw);
 void fn_802FF478(LbKujiraWork* work);
+
+/* The four per-action step machines the `enemy` band below this range (`enemy/fn_802F5138.cpp`, whose
+ * `fn_802FA964` dispatches into them) tail-calls: 0x802FA9A0, 0x802FAB98, 0x802FAFB4, 0x802FAFC4 -
+ * all inside this range, so they are this unit's own symbols and belong here rather than in the
+ * caller's include/unsplit band (rule 2).  They are still unwritten; the parameter is the caller's
+ * record (`_ENEMY_WORK`), the only type the call sites set.  Added by the merge lane that re-homed
+ * them out of `include/unsplit/unknown.h`. */
+void fn_802FA9A0(struct _ENEMY_WORK* work);
+void fn_802FAB98(struct _ENEMY_WORK* work);
+void fn_802FAFB4(struct _ENEMY_WORK* work);
+void fn_802FAFC4(struct _ENEMY_WORK* work);
 
 #ifdef __cplusplus
 }

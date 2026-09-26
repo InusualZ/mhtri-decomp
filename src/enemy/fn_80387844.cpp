@@ -1282,34 +1282,34 @@ extern "C" void fn_8038B914(_ENEMY_WORK* self, u8 a)
 extern "C" void fn_8038BD28(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
-    case 0x17: fn_801251D0((u32)lbl_805EFF68, 0, 0x17); return;
-    case 0x18: fn_801251D0((u32)lbl_805EFF90, 0, 0x18); return;
-    case 0x19: fn_801251D0((u32)lbl_805EFFB8, 0, 0x19); return;
-    case 0x1A: fn_801251D0((u32)lbl_805EFF90, 0, 0x1A); return;
-    case 0x1B: fn_801251D0((u32)lbl_805F0018, 0, 0x1B); return;
-    case 0x1C: fn_801251D0((u32)lbl_805F0088, 0, 0x1C); return;
-    case 0x1D: fn_801251D0((u32)lbl_805F00C8, 0, 0x1D); return;
-    case 0x7A: fn_801251D0((u32)lbl_805F00F0, 0, 0x7A); return;
-    case 0x7B: fn_801251D0((u32)lbl_805F0118, 0, 0x7B); return;
-    case 0x9F: fn_801251D0((u32)lbl_805F0140, 0, 0x9F); return;
-    case 0xA0: fn_801251D0((u32)lbl_805F0140, 0, 0xA0); return;
-    case 0x7C: fn_801251D0((u32)lbl_805F0168, 0, 0x7C); return;
-    case 0x8D: fn_801251D0((u32)lbl_805F0190, 0, 0x8D); return;
-    case 0x78: fn_801251D0((u32)lbl_805F01B8, 0, 0x78); return;
-    case 0xA8: fn_801251D0((u32)lbl_805F02D8, 0, 0xA8); return;
-    case 0x7E: fn_801251D0((u32)lbl_805F0210, 0, 0x7E); return;
-    case 0x7F: fn_801251D0((u32)lbl_805F0278, 0, 0x7F); return;
-    case 0x8E: fn_801251D0((u32)lbl_805F02B0, 0, 0x8E); return;
-    case 0xB6: fn_801251D0((u32)lbl_805F0300, 0, 0xB6); return;
-    case 0xB7: fn_801251D0((u32)lbl_805F0328, 0, 0xB7); return;
-    case 0xB8: fn_801251D0((u32)lbl_805F0350, 0, 0xB8); return;
-    case 0xB9: fn_801251D0((u32)lbl_805F0378, 0, 0xB9); return;
-    case 0xBA: fn_801251D0((u32)lbl_805F03A0, 0, 0xBA); return;
-    case 0xBB: fn_801251D0((u32)lbl_805F03C8, 0, 0xBB); return;
-    case 0xBC: fn_801251D0((u32)lbl_805F03C8, 0, 0xBC); return;
-    case 0xBF: fn_801251D0((u32)lbl_805F0408, 0, 0xBF); return;
-    case 0xC1: fn_801251D0((u32)lbl_805F0190, 0, 0xC1); return;
-    case 0xC9: fn_801251D0((u32)lbl_805F0478, 0, 0xC9); return;
+    case 0x17: fn_801251D0(self, lbl_805EFF68, 0, 0x17); return;
+    case 0x18: fn_801251D0(self, lbl_805EFF90, 0, 0x18); return;
+    case 0x19: fn_801251D0(self, lbl_805EFFB8, 0, 0x19); return;
+    case 0x1A: fn_801251D0(self, lbl_805EFF90, 0, 0x1A); return;
+    case 0x1B: fn_801251D0(self, lbl_805F0018, 0, 0x1B); return;
+    case 0x1C: fn_801251D0(self, lbl_805F0088, 0, 0x1C); return;
+    case 0x1D: fn_801251D0(self, lbl_805F00C8, 0, 0x1D); return;
+    case 0x7A: fn_801251D0(self, lbl_805F00F0, 0, 0x7A); return;
+    case 0x7B: fn_801251D0(self, lbl_805F0118, 0, 0x7B); return;
+    case 0x9F: fn_801251D0(self, lbl_805F0140, 0, 0x9F); return;
+    case 0xA0: fn_801251D0(self, lbl_805F0140, 0, 0xA0); return;
+    case 0x7C: fn_801251D0(self, lbl_805F0168, 0, 0x7C); return;
+    case 0x8D: fn_801251D0(self, lbl_805F0190, 0, 0x8D); return;
+    case 0x78: fn_801251D0(self, lbl_805F01B8, 0, 0x78); return;
+    case 0xA8: fn_801251D0(self, lbl_805F02D8, 0, 0xA8); return;
+    case 0x7E: fn_801251D0(self, lbl_805F0210, 0, 0x7E); return;
+    case 0x7F: fn_801251D0(self, lbl_805F0278, 0, 0x7F); return;
+    case 0x8E: fn_801251D0(self, lbl_805F02B0, 0, 0x8E); return;
+    case 0xB6: fn_801251D0(self, lbl_805F0300, 0, 0xB6); return;
+    case 0xB7: fn_801251D0(self, lbl_805F0328, 0, 0xB7); return;
+    case 0xB8: fn_801251D0(self, lbl_805F0350, 0, 0xB8); return;
+    case 0xB9: fn_801251D0(self, lbl_805F0378, 0, 0xB9); return;
+    case 0xBA: fn_801251D0(self, lbl_805F03A0, 0, 0xBA); return;
+    case 0xBB: fn_801251D0(self, lbl_805F03C8, 0, 0xBB); return;
+    case 0xBC: fn_801251D0(self, lbl_805F03C8, 0, 0xBC); return;
+    case 0xBF: fn_801251D0(self, lbl_805F0408, 0, 0xBF); return;
+    case 0xC1: fn_801251D0(self, lbl_805F0190, 0, 0xC1); return;
+    case 0xC9: fn_801251D0(self, lbl_805F0478, 0, 0xC9); return;
     default: fn_80127F48(self); return;
     }
 }

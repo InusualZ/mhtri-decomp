@@ -438,6 +438,17 @@ struct _ENEMY_WORK {
             /* +0x334 */ u8 field_0x334;   /* the em030 "in range" latch */
             /* +0x335 */ u8 unused_0x335[0x354 - 0x335];
         };
+        /* the UV-model slot view `enemy/fn_802F5138.cpp` keeps (added by that unit): the slot index
+         * `fn_802F51C8` clears, the "armed" flag cleared beside it, and the "model created" flag
+         * `fn_802F5464` arms for the two idle modes and `fn_802F8B28` reads back by index.  A union
+         * member because the views above already own these bytes. */
+        struct {
+            /* +0x328 */ u8 slot_0x328;
+            /* +0x329 */ u8 armed_0x329;
+            /* +0x32A */ u8 unused_0x32A[0x33E - 0x32A];
+            /* +0x33E */ u8 created_0x33E;  /* the model has been placed for this slot */
+            /* +0x33F */ u8 unused_0x33F[0x354 - 0x33F];
+        } uv_model_0x328;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four

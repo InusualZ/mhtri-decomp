@@ -66,7 +66,15 @@ void fn_8012A414(struct _ENEMY_WORK* work);
 void fn_8012A658(struct _ENEMY_WORK* work, s32 arg1);
 void fn_8012B64C(struct _ENEMY_WORK* work);
 
+/* 0x801251D0 - the same two views as `fn_801251D8` below: the C consumers pass the table in r3
+ * (`enemy/fn_8014A1BC.c`), while the C++ ones (`enemy/fn_802F5138.cpp`, whose call sites set
+ * r3 = the work record, r4 = the table, r5 = the selector and r6 = the id) get the four-argument
+ * form.  The body forwards r3/r4/r5 to 0x80124C5C either way, so both views are the same code. */
+#ifdef __cplusplus
+void fn_801251D0(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
+#else
 void fn_801251D0(u32 a, u32 b, u32 c);
+#endif
 u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
 u8 fn_80129DB8(struct _ENEMY_WORK* self);
 u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);

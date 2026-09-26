@@ -1010,6 +1010,22 @@ config.libs = [
             # range and the runtime dump answers only `zz_` placeholders, so the file keeps the map's own
             # `fn_80382310` stem.
             Object(NonMatching, "enemy/fn_80382310.cpp"),
+            # Registered from proposal/802F5138_fn_802F5138.cpp (`.text` 0x802F5138..0x802FA9A0, 72
+            # functions / 22632 B).  Module `enemy` from the code (of the range's 194 distinct
+            # callees the largest block is the enemy module - `em_die_ck`, `em_work_die_ck`,
+            # `em_frame_check`, `fn_8012EC74.cpp`'s motion band - and every body drives the shared
+            # `_ENEMY_WORK` record) and from the `.data` `em0XX_prog_tbl` program tables that
+            # bracket the band; no `__FILE__` string reaches the range and the runtime dump answers
+            # only `zz_` placeholders, so the file keeps the map's own `fn_802F5138` stem (brief
+            # section 2, class 3+4; see the unit header).  Language C++ (the range reaches genuinely
+            # mangled callees through their real signatures, rule 9); every plain `fn_` definition is
+            # `extern "C"`.  Sections: `.text` 0x802F5138..0x802FA9A0, `extab`
+            # 0x80015514..0x800156B4 (52 records), `extabindex` 0x80033E04..0x80034074 (52 x 12 B) and
+            # the `.ctors` word 0x8056F390..0x8056F394 (`fn_802F9898`) - each run is exactly the gap
+            # the bracketing objects leave (`ef/eft035.cpp` ends extab at 0x80015514 / extabindex
+            # 0x80033E04 / .ctors 0x8056F38C, and `fn_802FA9A0`'s object starts extab at 0x800156B4 /
+            # extabindex 0x80034074).
+            Object(NonMatching, "enemy/fn_802F5138.cpp"),
         ],
     },
 
