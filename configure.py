@@ -688,6 +688,15 @@ config.libs = [
             # Module `enemy` from `em_get_mot_no(_ENEMY_WORK*)` and every callee; the name keeps the
             # map's `fn_` stem (no `__FILE__` string, the dump answers only `zz_`/`FUN_`).  C++.
             Object(NonMatching, "enemy/fn_801A4504.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from proposal/8035E034_fn_8035E034.cpp:
+            # the em033/em035 enemy-program handlers (`.text` 0x8035E034..0x8035F2B4, 16 functions /
+            # 0x1280 bytes) plus their extab/extabindex group.  Module `enemy` from the `.data` program
+            # tables `em033_prog_tbl`/`em035_prog_tbl` that list the range's entry points and from the
+            # shared `_ENEMY_WORK` record every body drives; the name keeps the map's `fn_` stem (no
+            # `__FILE__` string is reachable and the dump answers only `zz_` placeholders).  Sections:
+            # extab 0x80017574..0x800175DC (13 records), extabindex 0x80036E94..0x80036F30 (13 x 12 B),
+            # `.text` 0x8035E034..0x8035F2B4.  C++; every plain `fn_` definition is `extern "C"`.
+            Object(NonMatching, "enemy/fn_8035E034.cpp"),
         ],
     },
 

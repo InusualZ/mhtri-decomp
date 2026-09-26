@@ -66,7 +66,13 @@ struct _ENEMY_WORK {
     /* +0x014 */ u8 field_0x014;
     /* +0x015 */ u8 pad_0x15[0x3];
     /* +0x018 */ s16 timer_0x18;
-    /* +0x01A */ u8 pad_0x1A[0x6];
+    /* +0x01A */ union {
+        u8 pad_0x1A[0x6];
+        struct {
+            /* +0x01A */ u16 field_0x01A;   /* passed to `fn_80141B88` (`enemy/fn_8035E034.cpp`) */
+            /* +0x01C */ u8 unused_0x1C[0x4];
+        };
+    };
     /* +0x020 */ u32 field_0x20;
     /* +0x024 */ u8 pad_0x24[0x3C];
     /* +0x060 */ u8* field_0x60;
@@ -82,7 +88,13 @@ struct _ENEMY_WORK {
     /* +0x1B0 */ VEC3 aim;
     /* +0x1BC */ _CP_VECTOR pos_0x1BC;
     /* +0x1C8 */ u32 field_0x1C8;
-    /* +0x1CC */ u8 pad_0x1CC[0x14];
+    /* +0x1CC */ union {
+        u8 pad_0x1CC[0x14];
+        struct {
+            /* +0x1CC */ f32 field_0x1CC;   /* `enemy/fn_8035E034.cpp` seeds the run speed */
+            /* +0x1D0 */ u8 unused_0x1D0[0x10];
+        };
+    };
     /* +0x1E0 */ u8 field_0x1E0;
     /* +0x1E1 */ u8 act_id;
     /* +0x1E2 */ u8 state_0x1E2;
@@ -122,8 +134,21 @@ struct _ENEMY_WORK {
     /* +0x22A */ u8 pad_0x22A[0xE6];
     /* +0x310 */ VEC3 v_0x310;
     /* +0x31C */ u8 pad_0x31C[0x4];
-    /* +0x320 */ VEC3 v_0x320;
-    /* +0x32C */ u16 field_0x32c;
+    /* +0x320 */ union {
+        VEC3 v_0x320;
+        struct {
+            /* +0x320 */ u8 unused_0x320[0x8];
+            /* +0x328 */ u16 field_0x328;   /* `enemy/fn_8035E034.cpp`'s em035 init (0x708) */
+            /* +0x32A */ u16 field_0x32A;   /* ... and 0xB4 */
+        } init_0x320;
+    };
+    /* +0x32C */ union {
+        u16 field_0x32c;
+        struct {
+            /* +0x32C */ u8 field_0x32C;
+            /* +0x32D */ u8 field_0x32D;
+        } bytes_0x32C;
+    };
     /* +0x32E */ u8 pad_0x32E[0x1];
     /* +0x32F */ u8 field_0x32F;
     /* +0x330 */ u8 field_0x330;
@@ -142,9 +167,22 @@ struct _ENEMY_WORK {
     /* +0x336 */ u8 field_0x336;
     /* +0x337 */ u8 pad_0x337[0x1];
     /* +0x338 */ s16 timer_0x338;   /* `fn_80155664` counts this down while it is positive */
-    /* +0x33A */ u8 pad_0x33A[0x2];
+    /* +0x33A */ union {
+        u8 pad_0x33A[0x2];
+        struct {
+            /* +0x33A */ u8 unused_0x33A;
+            /* +0x33B */ u8 field_0x33B;   /* the monster record id `enemy/fn_8035E034.cpp` caches */
+        };
+    };
     /* +0x33C */ u16 counter_0x33C; /* `fn_80155664` cycles it 0..0x31 */
-    /* +0x33E */ u8 pad_0x33E[0x2E];
+    /* +0x33E */ union {
+        u8 pad_0x33E[0x2E];
+        struct {
+            /* +0x33E */ u8 field_0x33E;   /* `enemy/fn_8035E034.cpp` returns this */
+            /* +0x33F */ u8 field_0x33F;   /* the em033 approach phase */
+            /* +0x340 */ u8 unused_0x340[0x2C];
+        };
+    };
     /* +0x36C */ VEC3 target;
     /* +0x378 */ f32 field_0x378;
     /* +0x37C */ u32 field_0x37c;
@@ -274,7 +312,16 @@ struct _ENEMY_WORK {
     /* +0xA7E */ u16 field_0xa7e;
     /* +0xA80 */ u8 pad_0xA80[0x70];
     /* +0xAF0 */ s16 field_0xaf0;
-    /* +0xAF2 */ u8 pad_0xaf2[0x22];
+    /* +0xAF2 */ u8 pad_0xaf2[0x12];   /* 0xAF2..0xB04 */
+    /* +0xB04 */ union {
+        u8 run_0xB04[0x10];
+        struct {
+            /* +0xB04 */ u8 unused_0xB04[0xC];
+            /* +0xB10 */ u16 run_angle_0xB10;   /* the em035 run angle block */
+            /* +0xB12 */ u8 run_flags_0xB12;
+            /* +0xB13 */ u8 unused_0xB13;
+        };
+    };
     /* +0xB14 */ _se_w* se_handle_0xB14;
     /* +0xB18 */ u8 pad_0xB18[0x4];
 };
