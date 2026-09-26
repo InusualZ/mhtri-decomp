@@ -128,8 +128,10 @@ extern "C" void fn_8027D6DC(_PLW* self, s16 value) {
     }
 }
 
-/* Reports the byte at +0x268 as a boolean. */
-extern "C" s32 fn_8027D738(_PLW* self) {
+/* Reports the byte at +0x268 as a boolean.  `u32`, not `s32`: the item menu's caller compares the
+ * result unsigned (`bl fn_8027D738; cmplwi r3,0x1` at 0x802A008C), which is what its declaration in
+ * this unit's header `include/Pl/fn_8027D684.h` carries too. */
+extern "C" u32 fn_8027D738(_PLW* self) {
     return self->field_0x268 != 0;
 }
 

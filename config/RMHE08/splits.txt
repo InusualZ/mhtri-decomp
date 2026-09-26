@@ -975,9 +975,9 @@ Pl/fn_80295EF4.cpp:
 	.ctors      start:0x8056F370 end:0x8056F374
 
 menu/menu_item.cpp:
-	extab       start:0x8001360C end:0x800137A4
-	extabindex  start:0x80030F90 end:0x800311F4
-	.text       start:0x8029F3C8 end:0x802A5444
+	extab       start:0x8001360C end:0x800137D4
+	extabindex  start:0x80030F90 end:0x8003123C
+	.text       start:0x8029F3C8 end:0x802A6624
 
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C
