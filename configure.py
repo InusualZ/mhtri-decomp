@@ -556,6 +556,20 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(Matching, "hud/fn_80324F7C.c"),
+            # Registered once, at its final home (docs/plan.md 12).  The `proposal/802DDC04_fn_802DDC04`
+            # range (0x802DDC04..0x802E4978, 149 functions) is a union of translation units, and this is
+            # the one that lies wholly inside it: `.text` 0x802E0740..0x802E4978 (88 functions, 0x4238 B),
+            # extab 0x80014DAC..0x80014FFC (74 8-byte records), extabindex 0x800332E8..0x80033660
+            # (74 12-byte records), .data 0x805D5798..0x805D5B48, .sdata 0x807927B0..0x807927BA and
+            # .sdata2 0x8079A8C4..0x8079A8E0.  The name `layout.cpp` is class-1 evidence: `.data`
+            # 0x805D5800, 0xB = "layout.cpp", is referenced by `fn_802E2440`/`fn_802E2524` of this range
+            # and by nothing else (the dump's local symbol for it is `s_layout.cpp_805d5800`).  Module
+            # `hud`: the registered `hud/fn_80324F7C.c` calls this range's `get_lsp_data`/`draw_sprite_ary`
+            # and carries the same `_mh_ivec2_`, and the lobby screens call the `draw_*` family directly -
+            # the `ai` module below is a link-order neighbour, not this file's system.  cflags_main: the
+            # range keeps `bl`s to its own tiny helpers (`fn_802E0DA8` -> `fn_802E0CE4`) and carries the
+            # 74 extab records `-Cpp_exceptions on` emits.
+            Object(NonMatching, "hud/layout.cpp"),
         ],
     },
 

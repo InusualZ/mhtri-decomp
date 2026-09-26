@@ -91,7 +91,12 @@ struct ItemDataRecord {
         };
     };
     /* +0x002 */ u8 field_0x002;      /* the mask `fn_8029F73C` ANDs its second argument with */
-    /* +0x003 */ u8 unused_0x003[0x005 - 0x003];
+    /* +0x003 */ u8 unused_0x003;
+    /* +0x004 */ u8 tex_idx_0x004;    /* the texture index `draw_itemicon_item_id`/`fn_802E1190`
+                                       * (both in `hud/layout.cpp`) hand to `fn_80055C5C`, and the
+                                       * byte `fn_802E1024`'s callers read next to `kind`.  Spliced
+                                       * out of the `unused_0x003[2]` filler this record carried, one
+                                       * byte at +0x004, so no member's offset moved (playbook 56). */
     /* +0x005 */ u8 kind;             /* indexes the .data colour table `lbl_805CDE78` */
     /* +0x006 */ u8 unused_0x006[0x00A - 0x006];
     /* +0x00A */ u16 species;         /* indexes the .data record table `lbl_805DBFB8` */
