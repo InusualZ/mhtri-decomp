@@ -1113,6 +1113,21 @@ config.libs = [
             # so the stem is the map's `fn_80224AC4` with a rule-7 deferral.  It uses `cflags_pl`
             # (this lib).
             Object(NonMatching, "Pl/fn_80224AC4.cpp"),
+            # `8023C2D0_fn_8023C2D0` - the other half of the player motion -> SE frame dispatcher
+            # family (0x8023C2D0-0x80241558, 0x50B8 B, TWO functions).  Home is `Pl` and the stem is
+            # the map's `fn_8023C2D0` with a rule-7 deferral: both functions dispatch on
+            # `Get_motion_no__FP4_PLW` and `fn_8023C2D0` gates two arms on `Pl_act_ck__FP4_PLWUcUs`,
+            # no `__FILE__` string covers the range and `dumpmap.py` has only `zz_` placeholders.
+            # The unit owns its two `.data` jump tables (270 entries at 0x805C34D4, 261 entries at
+            # 0x805C390C = 0x805C34D4-0x805C3D20) and its extab/extabindex pair.  It uses
+            # `cflags_pl` (this lib), and the object is byte-identical to the target (.text 0x5288,
+            # .data 0x84C, extab 0x10, extabindex 0x18; both functions 100.0 %).  It stays
+            # `NonMatching` for a LINK reason, not a code one: MWCC emits the two jump tables as an
+            # 8-byte-aligned `.data` section while retail's first table sits at the 4-mod-8 address
+            # 0x805C34D4 (the split warns about it), so mwld pads the section up to 0x805C34D8 and the
+            # DOL goes red - measured: `Matching` -> main.dol sha1 5324C567..., 403822 bytes differ.
+            # See the unit header and this claim's outbox (`shared-file`).
+            Object(NonMatching, "Pl/fn_8023C2D0.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
             # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
