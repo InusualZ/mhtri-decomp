@@ -1155,6 +1155,9 @@ Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 AX/AXFXReverbHi.c:
 	.text       start:0x80474CB0 end:0x80475E24
 
+EXI/ProbeBarnacle.c:
+	.text       start:0x804B17D0 end:0x804B8020
+
 OS/FindContainHeap_.c:
 	.text       start:0x804C1760 end:0x804C6D68
 
