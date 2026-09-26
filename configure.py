@@ -1190,9 +1190,16 @@ config.libs = [
             Object(NonMatching, "Pl/pl_act.cpp"),
             # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
             # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.
-            # `fn_8026FFBC` (0x8026FFBC..0x80270018) sits on the ambiguous side of that seam and is
-            # deliberately left unclaimed rather than guessed in.
             Object(Matching, "Pl/pl_master.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `8026FFBC_fn_8026FFBC` - the player work's health-ratio gate, ONE function
+            # (0x8026FFBC-0x80270018, 92 B) with extab 0x800126CC-0x800126D4 and extabindex
+            # 0x8002F8B0-0x8002F8BC.  Home is `Pl`: the argument is the `_PLW*` both callers (in
+            # `Pl/pl_skill.cpp`) hand `Pl_Skill_ck(_PLW*, u16)`.  No `__FILE__` string covers the
+            # range (its only data operands are the two `.sdata2` pool words) and `dumpmap.py`
+            # answers `zz_026ffbc_`, so the stem is the map's `fn_8026FFBC` with a rule-7 deferral.
+            # It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/fn_8026FFBC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80288CEC_fn_80288CEC`.
             # 78 functions, 0x80288CEC-0x8028F66C (0x697C B), with extab 0x80012FFC-0x8001323C and
             # extabindex 0x80030678-0x800309D8.  Home is `Pl`: the whole unit operates on the player
