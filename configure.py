@@ -1388,6 +1388,16 @@ config.libs = [
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `801EC9F8_fn_801EC9F8.cpp` (`.text` 0x801EC9F8..0x801F3294, 67 functions / 26780 B).
             Object(NonMatching, "lobby/fn_801EC9F8.cpp"),
+            # `801F3294_fn_801F3294.cpp` (`.text` 0x801F3294..0x801F9CD4, 48 functions / 27200 B) -
+            # the lobby page/panel group between the menu layer below and the NPC group above.  Module
+            # `lobby` from the code (`LbStr`, `get_lsp_data`, `chk_pointer`, `PutPageArrow`,
+            # `LbPutAnaPageArrow`, `draw_sprite*`, `sysSE_req`) and from both bracketing registered
+            # units; no `__FILE__` string covers the range and the dump answers only `zz_`
+            # placeholders, so the file keeps the map stem (brief section 2, class 3+4).  Both edges
+            # are unproven (the right one is the discovery byte cap; the next proposal 0x801F9CD4
+            # continues the band).  Sections: extab 0x8001094C..0x80010A7C (38 records), extabindex
+            # 0x8002CCDC..0x8002CEA4 (38 x 12 B), .text 0x801F3294..0x801F9CD4.
+            Object(NonMatching, "lobby/fn_801F3294.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `801FBF78_fn_801FBF78.cpp` (`.text` 0x801FBF78..0x802029B4, 127 functions / 27196 B) -
             # the lobby NPC / world-update group.  Module `lobby` from the code (the range owns
