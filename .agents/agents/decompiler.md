@@ -271,3 +271,23 @@ checklist is otherwise done. Report what you measured, not what you hoped.
 
     ## Unfinished / residual
     Unwritten functions with sizes, recorded residuals, blockers, and anything you decided *not* to do.
+
+    ## Tooling and environment
+    One to three entries (or `none`): what you tried, what blocked you, what it cost, and the
+    capability you would have wanted. See the section at the end of this profile.
+
+## Tooling and environment (say what would have saved you time)
+
+End every report with this section. It is the channel for **tool or environment improvements**: the tools you wished
+existed, the steps that cost the most wall-clock time, the thing the harness made awkward. The orchestrator aggregates
+these across every worker and ranks them by **how often the same request comes up** - a wall several workers hit is worth
+more than any single round.
+
+Rules for it:
+
+* **one to three entries, not ten** - the ones that would have saved the most time if they had existed;
+* each names **what you tried, what blocked you, and what it cost** - a number if you have one (minutes, turns, a failed
+  build, a manual repair);
+* phrase it as a **capability, not a complaint**: "the worktree's `build/` is seeded with `build/tools` but not
+  `orig/RMHE08/**`, so nothing splits until the DOL is copied in by hand" is actionable; "the worktree is broken" is not;
+* if nothing blocked you, write `none` - that is a useful data point too.
