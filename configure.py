@@ -1386,6 +1386,9 @@ config.libs = [
             # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
             Object(NonMatching, "lobby/fn_801E7530.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `801EC9F8_fn_801EC9F8.cpp` (`.text` 0x801EC9F8..0x801F3294, 67 functions / 26780 B).
+            Object(NonMatching, "lobby/fn_801EC9F8.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `801FBF78_fn_801FBF78.cpp` (`.text` 0x801FBF78..0x802029B4, 127 functions / 27196 B) -
             # the lobby NPC / world-update group.  Module `lobby` from the code (the range owns
             # `lb_npc`, `npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`
