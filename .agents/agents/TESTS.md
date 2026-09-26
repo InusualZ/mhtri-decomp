@@ -93,6 +93,21 @@ profiles.
   the ack and the setup, and nothing else, because the profile is supposed to carry the rules.
 * **`merger`** - pending: the next refused apply (the parked `worker/801b0010-...` branch is the natural case).
 
+* **`merger` - PASS** (2026-09-25, as a rescue). The lane inherited an in-progress merge abandoned by a
+  90-minute timeout (`MERGE_HEAD` set, `include/enemy/ENEMY_WORK.h` left `UU`, 17 paths staged, base 15 commits
+  stale). It did exactly what the profile licenses: **aborted and redid** the merge instead of patching a
+  half-understood partial resolution, then re-merged twice more as `main` advanced mid-task. The header's three
+  hunks were hand-unioned - both sides splitting the same fillers, so each region was rewritten by hand in
+  ascending offset order and **re-padded to the base byte total** - and the M1 completeness check confirmed all
+  17 units `main` had registered since the base present exactly once in both `configure.py` and `splits.txt`
+  (181 registrations vs 182 splits blocks, no duplicates, no registration without a block). For the proof it
+  built a **full report of the merged tree against a full report of `main`'s tree in the same worktree** (not a
+  proxy), **reproduced the two regressions the timed-out lane had found**, bisected them to a *variadic*
+  `fn_8012EC60` spelling in the band header that changed the call convention of two landed units, and fixed them
+  (`fn_8019DB9C` 93.75 -> 100.0000, `fn_801CA004` 86.67 -> 87.76923 - both restored to their main values).
+  Final: **33 landed units, 1,729 rows compared, 0 lower, 0 higher.** It also investigated rather than inherited
+  the stale `.ctors` line (dtk rewrites that fragment itself, so it is now committed). The gate landed it.
+
 ### The `decompiler` T3 "self-verification defect" was TOOLING, not the profile
 
 Two `decompiler` lanes reported *"no new section 6.5 violation"* and were then refused by the gate for real
