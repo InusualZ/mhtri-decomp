@@ -78,7 +78,14 @@ named items only, and the diff should be as small as the refusal.
   from its context - what is stored, compared against, passed on. Padding is `pad_0xNN`/`unused_0xNN`.
 * **rule 6** (pointer arithmetic): declare the record and write `->member`. The lint's own exception is a raw
   offset that names no field (`memset`, a byte-wise copy) - `(u32)((*(u8 *)p) - 252)` is a value subtraction,
-  not a field reach, and the explicit dereference clears the false positive with byte-identical codegen.
+  not a field reach, and the explicit dereference clears the false positive with byte-identical codegen. The
+  lint has a second false-positive shape: a cast on an **array subscript** - `(char*)ids[index + 1].b_0x04` is
+  read as a cast-plus-literal-offset, although `+ 1` there is a subscript and the field is already reached by
+  name. Clear it by separating the field reach from any reinterpretation of its *value* (load the field into a
+  `u32`, then cast that value). **Never take a spelling that only defeats the regex**: two were measured on that
+  finding which moved the row (94.23 and 97.70 against 99.89) and were rejected, and a third that was
+  byte-identical but changed nothing real was rejected too. A rewrite is right when it is both clearer and
+  codegen-neutral.
 * **rule 8** (`goto`): rewrite as a helper function, a `switch` sharing a `break`, or a `for (;;)` with
   `break`/`continue`. Measure the conformant shape against the target: if it does not reproduce the codegen,
   record the residual **with both measurements** in the unit header and keep the conformant shape.
