@@ -332,6 +332,73 @@ def _cp(argv, stdout="", returncode=0):
     return subprocess.CompletedProcess(argv, returncode, stdout, "")
 
 
+def _err(argv, text):
+    return subprocess.CompletedProcess(argv, 1, "", text)
+
+
+def chained_objalign_rows() -> int:
+    """The chained `objalign.py <object>` argument must be absolute and name the worktree's object.
+
+    The failure this pins: ninja's `.o` rule ends `... && python tools\\elf\\objalign.py
+    build\\RMHE08\\src\\<unit>.o`, and `rewrite` rewrote `-o`/`-c`/the includes but left that **chained**
+    argument relative while `compile_unit` runs the whole line with `cwd=MAIN`.  For a unit MAIN has not
+    registered, MAIN has no such object, objalign raised `FileNotFoundError`, and the tool reported
+    `FAILED` even though MWCC had compiled the worktree object fine - `--dry-run` showed the good command
+    and hid the mismatch.  The runner below emulates the shell chain: a relative objalign argument is a
+    hard error, the fixed absolute one is not.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = os.path.join(tmp, "main")
+        wt = os.path.join(tmp, "wt")
+        for d in (os.path.join(main, "include"), os.path.join(main, "build", "RMHE08", "include"),
+                  os.path.join(wt, "include"), os.path.join(wt, "src", "probe")):
+            os.makedirs(d, exist_ok=True)
+        open(os.path.join(wt, "src", "probe", "probe.cpp"), "w", encoding="utf-8").write(
+            "int f() { return 1; }\n")
+        tokens = ["cmd", "/c", "sjiswrap.exe", "mwcceppc.exe", "-i", "include", "-O3", "-MMD",
+                  "-c", "src/probe/probe.cpp", "-o", "build/RMHE08/src/probe", "&&",
+                  "C:\\Python\\python.exe", "tools\\elf\\objalign.py",
+                  "build\\RMHE08\\src\\probe\\probe.o"]
+        cmd, obj = rc.rewrite(tokens, "probe/probe", main, wt)
+        idx = next(k for k, t in enumerate(cmd) if t.replace("\\", "/").endswith("objalign.py"))
+        arg = cmd[idx + 1]
+        failures = _ok("the chained objalign argument is absolute", os.path.isabs(arg), True, failures)
+        failures = _ok("... and names the worktree's object",
+                       os.path.normcase(os.path.abspath(arg)),
+                       os.path.normcase(os.path.abspath(obj)), failures)
+        failures = _ok("... and the worktree object is the one -o names",
+                       os.path.dirname(os.path.abspath(arg)),
+                       os.path.dirname(os.path.abspath(obj)), failures)
+
+        def runner(argv, **kwargs):
+            """Emulate the `&&` chain: objalign needs an absolute object; MWCC writes into -o."""
+            for k, t in enumerate(argv):
+                if t.replace("\\", "/").endswith("objalign.py") and k + 1 < len(argv):
+                    if not os.path.isabs(argv[k + 1]):
+                        return _err(argv, "FileNotFoundError: " + argv[k + 1])
+            outdir = argv[argv.index("-o") + 1]
+            stem = os.path.splitext(os.path.basename(argv[argv.index("-c") + 1]))[0]
+            os.makedirs(outdir, exist_ok=True)
+            open(os.path.join(outdir, stem + ".o"), "wb").write(b"\x7fELF")
+            return _cp(argv)
+
+        good = rc.compile_unit("probe/probe", main, wt, tokens=tokens, runner=runner)
+        failures = _ok("compile_unit succeeds with the fixed command", good.get("compiled"), True, failures)
+        failures = _ok("... and the object is reported fresh", good.get("fresh"), True, failures)
+
+        # The pre-fix shape, run through the same runner: the relative argument is the failure.  (Passing
+        # it through `compile_unit` would re-fix it, so the chain is exercised directly - that is exactly
+        # the difference between `--dry-run` and the run.)
+        legacy = list(cmd)
+        legacy[idx + 1] = "build\\RMHE08\\src\\probe\\probe.o"
+        failures = _ok("the pre-fix relative argument makes the chain fail",
+                       runner(legacy, cwd=main).returncode != 0, True, failures)
+        failures = _ok("... naming the object it could not find",
+                       "FileNotFoundError" in runner(legacy, cwd=main).stderr, True, failures)
+    return failures
+
+
 def _fake_main(tmp):
     """A MAIN-shaped tree with the three things the fallback reads: the map, dtk's config, obj files."""
     main = os.path.join(tmp, "main")
@@ -491,6 +558,7 @@ def _raises(fn) -> bool:
 def main() -> int:
     failures = wire_rows()
     failures += include_order_rows()
+    failures += chained_objalign_rows()
     failures += proposal_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")
