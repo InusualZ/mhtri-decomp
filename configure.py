@@ -1102,6 +1102,18 @@ config.libs = [
             Object(NonMatching, "Pl/fn_80230FBC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80224AC4_fn_80224AC4.cpp` - the player actor's per-model SE/motion rig update
+            # (0x80224AC4-0x80229ECC, 44 functions, 0x8408 B) with its own exception tables
+            # (extab 0x80011B34-0x80011C7C, extabindex 0x8002E7B8-0x8002E9A4, 41 records).  Home is
+            # `Pl`: every actor parameter is a `_PLW*` (`Get_motion_no__FP4_PLW`,
+            # `Pl_master_ck__FP4_PLW`, `Pl_act_ck__FP4_PLWUcUs`), the tail helpers
+            # (`fn_80229CB4`/`fn_80229E10`/`fn_80229EA8`) are already homed in `unsplit/Pl.h`, and the
+            # target object's extab/extabindex rules out the `lobby` lib next door
+            # (`-Cpp_exceptions off`).  No `__FILE__` string and no runtime-dump name cover the range,
+            # so the stem is the map's `fn_80224AC4` with a rule-7 deferral.  It uses `cflags_pl`
+            # (this lib).
+            Object(NonMatching, "Pl/fn_80224AC4.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
             # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
             # compiled to a 261-entry `.data` jump table (`jumptable_805C3D20`, 0x805C3D20-0x805C4134).

@@ -11,6 +11,17 @@ struct _se_w;
 struct _PLW;
 struct _se_w;
 
+/* One 24-byte vector pair of the motion layer's placement tables; `Pl/fn_80224AC4.cpp` hands these to
+ * the model layer. size: 0x18 */
+typedef struct PlSeVecPair {
+    /* +0x00 */ f32 x_0x00;
+    /* +0x04 */ f32 y_0x04;
+    /* +0x08 */ f32 z_0x08;
+    /* +0x0C */ f32 x_0x0C;
+    /* +0x10 */ f32 y_0x10;
+    /* +0x14 */ f32 z_0x14;
+} PlSeVecPair; /* size: 0x18 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +47,8 @@ s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
 u32 fn_8027E220(struct _PLW* self, s32 v);
 
+
+
 /* The 0x80229xxx motion/SE helper family `Pl/fn_80229ECC.cpp` dispatches into (all unregistered and
  * unmangled; the actor itself is the `_PLW` at their r3). */
 void fn_80229CB4(struct _PLW* self);
@@ -44,6 +57,74 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 
 /* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
+
+/* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
+ * The 0x8026A3xx trio sits in the unclaimed run 0x802693C4-0x8026BA1C; 0x8025EFF4 and the two
+ * 0x8027Exxx helpers in the runs the header above already documents. */
+u32 fn_8025EFF4(struct _PLW* self);
+u32 fn_8026A328(struct _PLW* self, u32 n, f32 a, f32 b);
+f32 fn_8026A34C(struct _PLW* self);
+u8 fn_8026A3A0(struct _PLW* self);
+s32 fn_8027EE24(void);
+s32 fn_8027EBA8(struct _PLW* self, void* equip);
+
+/* The range's private pooled constants (playbook 29: declared, never defined).  `.sdata2`
+ * 0x80799CD8-0x80799Dxx is the run `Pl/fn_80224AC4.cpp` and the lobby unit next door share; `.sdata`
+ * 0x807913C0-0x807913D8 is the per-`se_name_set` decoration table pair; `.sdata` 0x80792010 is the
+ * per-bank SE gain table. */
+extern const f32 lbl_80799CD8;
+extern const f32 lbl_80799CDC;
+extern const f32 lbl_80799CE0;
+extern const f32 lbl_80799CE4;
+extern const f32 lbl_80799CF8;
+extern const f32 lbl_80799CFC;
+extern const f32 lbl_80799D00;
+extern const f32 lbl_80799D04;
+extern const f32 lbl_80799D08;
+extern const f32 lbl_80799D0C;
+extern const f32 lbl_80799D10;
+extern const f32 lbl_80799D14;
+extern const f32 lbl_80799D18;
+extern const f32 lbl_80799D1C;
+extern const f32 lbl_80799D20;
+extern const f32 lbl_80799D24;
+extern const f32 lbl_80799D28;
+extern const f32 lbl_80799D2C;
+extern const f32 lbl_80799D30;
+extern const f32 lbl_80799D34;
+extern const f32 lbl_80799D38;
+extern const f32 lbl_80799D3C;
+extern const f32 lbl_80799D40;
+extern const f32 lbl_80799D44;
+extern const f32 lbl_80799D48;
+extern const f32 lbl_80799D4C;
+extern const f32 lbl_80799D50;
+extern const f32 lbl_80799D54;
+extern const f32 lbl_80799D58;
+extern const f32 lbl_80799D5C;
+extern const f32 lbl_80799D60;
+extern const f32 lbl_80799D64;
+extern const f32 lbl_80799D68;
+extern const f32 lbl_80799D6C;
+extern const f32 lbl_80799D70;
+extern const f32 lbl_80799D74;
+extern const f32 lbl_80799D78;
+extern const f32 lbl_80799D7C;
+extern const f32 lbl_80799D80;
+extern const f32 lbl_80799D84;
+extern const f32 lbl_80799D88;
+extern const f32 lbl_80799D8C;
+extern const f32 lbl_80799D90;
+extern const f32 lbl_80799D94;
+extern const f32 lbl_80799D98;
+extern u8* lbl_807913C0[];
+extern u8* lbl_807913C8[];
+extern u8* lbl_807913D0[];
+extern u8* lbl_807913D8[];
+extern const f32 lbl_80792010[2];
+extern u8 lbl_805BAAD4[];
+extern PlSeVecPair lbl_805BB028[];
+extern PlSeVecPair lbl_805BB130[];
 
 /* The four sibling motion banks `Pl/fn_80230FBC.cpp`'s kind byte dispatches to (kinds 3 and 7), and
 the motion bank that unit's range stops at.  All are unregistered, so this band header is their

@@ -39,6 +39,7 @@ extern "C" {
 s32 fn_8035B700(s32 a, s32 b, u16 c); /* 0x8035B700 - bracket: hud below, Network above */
 
 
+
 /*
  * The game/system state block (`system_w`, 0xA5C B in retail).  Union of the three private copies:
  *   - `main.cpp`: the largest view, naming the bytes it polls at +0x01, +0x08 and +0x863..+0x931;

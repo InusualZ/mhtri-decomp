@@ -25,6 +25,8 @@ struct EmUserData {
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* 0x801394C0 - the track-selection helper `Pl/fn_80224AC4.cpp` tail-calls (rule 2). */
+void fn_801394C0(void* arg, u32 index);
 
 /* 0x8013A9F4 - r3 (`self`); the joint-effect release `enemy/fn_801A9540.cpp`'s fn_801A9540 calls
  * before it walks the slots.  Added with that unit's registration (rule 2: this range owns the

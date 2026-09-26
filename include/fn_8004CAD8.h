@@ -103,6 +103,12 @@ f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
  * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
  * registered as the first consumer (rule 2) - the owner header did not declare it yet. */
 void fn_80051378(VEC3* out, VEC3* a, VEC3* b);
+/* 0x80052300 / 0x80052408 / 0x80052370 - the animation key-frame readers this unit owns (the
+ * manglings `getKeyData__FPff` / `getKeyData3__FPffPfPfPf` say the real C++ signatures, which is how
+ * the consumers call them; rule 9).  Added with `Pl/fn_80224AC4.cpp`. */
+f32 getKeyData(f32* keys, f32 frame);
+void getKeyData3(f32* keys, f32 frame, f32* out0, f32* out1, f32* out2);
+f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
 #ifdef __cplusplus
 }
 #endif
