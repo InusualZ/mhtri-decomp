@@ -291,6 +291,10 @@ cflags_g3d = [
 # already identical, so the alignment was the entire difference - the same finding as cflags_ppceabi above.
 cflags_network = [*cflags_base, "-func_align", "4"]
 cflags_os = [*cflags_base, "-func_align", "4"]
+# DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
+# and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
+# functions back to back with 4-byte gaps, so `-func_align 4`.  Evidence: DWCi/fn_805113B0.c.
+cflags_dwc = [*cflags_base, "-func_align", "4"]
 
 # lobby flags (src/lobby/lobby_scene.c). Evidence: the retail fn_801EC9E0 (0x18 B / 6 instructions) reads the
 # small-data scene pointer, then the +0x10 table base, before the argument's byte, and keeps the table base
@@ -1730,6 +1734,24 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "Network/NetworkWiiMediator.c"),
+        ],
+    },
+    {
+        # The Nintendo Wi-Fi Connection (DWCi) SDK block of the retail link order: the only named
+        # symbol of the block is `DWCi_Np_CPUCopyFast` (0x80507C40) and the next block up is the
+        # NHTTP library (`NHTTPi_alloc`, 0x805145E8).  Registered once, at its final home (docs/plan.md 12):
+        # proposal `805113B0_fn_805113B0.c` (`.text` 0x805113B0..0x805124F4, 21 functions / 4420 B).
+        # Module `DWCi` from the library block the range's every callee lives in (0x8050A..0x8050E);
+        # no `__FILE__` string covers the range and the dump answers only `zz_` placeholders, so the
+        # file keeps the map's stem (brief section 2, class 3+4; see the unit header).  Sections: .text
+        # only - the `.data`/`.bss` objects the range loads (lbl_8060EDB0, lbl_80795820, lbl_807625C0)
+        # are not claimed here.
+        "lib": "DWCi",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_dwc,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "DWCi/fn_805113B0.c"),
         ],
     },
     {
