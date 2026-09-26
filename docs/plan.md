@@ -867,6 +867,44 @@ The corollary is a working rule: when a tool or a brief can carry one of these, 
 this session showed six workers independently rediscovering the same peephole lever, which is the same waste in a
 different place.
 
+### Paste the queue's spawn line verbatim (2026-09-23)
+
+Two mistakes this session had one cause: **the orchestrator retyped what `queue.py next` had already produced.**
+
+* it grepped the spawn line for the `cwd` to get the worktree path, dropped the `agent:` line, and spawned six
+  general-purpose `worker`s where the queue said `decompiler` - losing the decompiler's prompt, its loaded skills and
+  its acceptance role;
+* it wrote the task text by hand, and added *"end your turn by calling `subagent_done`"* - an instruction **no agent can
+  follow**, because none of them declares that tool. `brief.py` and `queue.py` do not say it (both have selftests
+  asserting the phrase is absent: *the handoff is the final message*), and delivery happens through the extension's
+  grace path regardless.
+
+So: **`queue.py next` prints `agent:`, `name:`, `cwd:` and `task:` - paste all four.** Hand-typing them re-introduces
+exactly the drift the queue exists to prevent, and both of the above were silent: the work still ran, it just ran with the
+wrong agent and an impossible closing instruction. Adding hints to a pasted task is fine; rewriting it is not.
+
+### Which agent to spawn (2026-09-23)
+
+The project defines three agents for this campaign, and the orchestrator must spawn the *matching* one - the difference is
+the prompt, the skills the harness loads, and the acceptance role, not just a label:
+
+* **`decompiler`** (aliases `decomp`, `unit-matcher`) - reconstructs one translation unit so its object matches, measuring
+  each function with objdiff, honouring the section 6.5 rules, and committing. **This is the agent for every unit
+  round**, and it is what `queue.py` emits: `subagent(agent="decompiler", ...)`, asserted in its selftest.
+* **`fixer`** (aliases `gate-fixer`, `fix-lane`) - takes a branch the landing gate **REFUSED** and clears exactly the
+  items it listed (stylelint findings, a compile clash, a measured regression) without moving any score down, then
+  re-verifies and commits.
+* **`merger`** (aliases `merge-lane`) - merges main into a held branch whose unit cannot land because main moved through
+  a shared header it also touched, resolving by class and proving the shared header moved zero rows.
+
+A `worker` is the *general-purpose* agent and is right for tooling, probes and investigations - it is **not** the right
+agent for a unit round, and using it there loses the decompiler's prompt and its skill set.
+
+**Process note, learned the hard way**: when `queue.py next` prints its spawn line, paste it **whole**. Its output has
+`agent:`, `name:`, `cwd:` and `task:` lines; grepping only for the `cwd` (which is what the orchestrator did once,
+spawning six general-purpose `worker`s instead of `decompiler`s) silently drops the agent and loses exactly what the
+queue exists to provide.
+
 ### The two tools that changed how a round is worked (2026-09-23)
 
 Both were built as experiments on `experiment/*` branches, tested by the owner, and integrated after approval.

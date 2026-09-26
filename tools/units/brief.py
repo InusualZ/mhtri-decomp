@@ -1118,7 +1118,10 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("changed goes into the outbox's `config_requests`.")
     lines.extend(config_schema_lines())
     lines.append("")
-    lines.append("**You may fan out subagents** for parallel work, in *your* worktree, on *your* branch. They never")
+    lines.append("**You may fan out subagents** - use the **`decompiler`** agent for them (the project agents "
+                 "`fixer` and `merger` exist for the two repair cases: a branch the landing gate refused, and a "
+                 "held branch that main moved past). "
+                 "**You may fan out subagents** for parallel work, in *your* worktree, on *your* branch. They never")
     lines.append("commit; you assign them disjoint functions; you re-measure every claim they make. Hand each of them")
     lines.append("this whole part verbatim.")
     lines.append("")

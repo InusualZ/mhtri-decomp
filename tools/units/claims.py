@@ -272,25 +272,118 @@ def norm_unit(unit: str) -> str:
     return unit
 
 
-def seed_worktree_build(main: str, wt: str) -> str:
-    """Give a fresh worktree its own `build/tools` (the toolchain is ~15 MB of read-only binaries).
+# What a fresh worktree is seeded with, and the *shape* of each - chosen by the write hazard (#5).
+#
+# * **`build/` inputs - COPY.**  `build/tools/*`, `build/compilers` and `build/binutils` are all ninja
+#   `download_tool` *outputs*.  A Windows directory junction is a reparse point that reads *and writes*
+#   through to its target, so `ninja` re-running `download_tool` unpacks the release archive straight into
+#   MAIN's tree.  Measured 2026-09-2x: a worker's `ninja` re-downloaded `build/compilers` through a junction
+#   into MAIN.  A copy is a different inode at a different path, so no write in the worktree can reach
+#   MAIN's file - the only shape that cannot.
+# * **`orig/RMHE08/**` - JUNCTION the directories, copy the small files.**  It is a read-only input (no
+#   ninja edge has an output anywhere under `orig/`) and it is large (`orig/RMHE08/files/` is gigabytes on
+#   a full checkout), so copying it per claim is the expensive half for no safety.  The one hazard a
+#   junction brings - a teardown recursing through it and deleting MAIN's orig - is exactly what
+#   `wtsafe.unlink_reparse_points()` in `safe_worktree_remove()` already retires (2026-09-24).
+SEED_COPY_DIRS = (
+    os.path.join("build", "tools"),
+    os.path.join("build", "compilers"),
+    os.path.join("build", "binutils"),
+)
+ORIG_REL = os.path.join("orig", "RMHE08")
 
-    A worktree must be self-sufficient: the worker compiles and measures in *its* `build/RMHE08`, and MAIN's
-    `build/` belongs to the orchestrator (docs/plan.md 5.1 - several workers share the machine, and one build
-    tree cannot take two builds). Seeding this at claim time is why no worker has to junction into MAIN's.
+
+def _is_reparse_point(path: str) -> bool:
+    """A junction or symlink - never recurse a removal through it (see `wtsafe`)."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    return os.path.islink(path) or bool(getattr(st, "st_reparse_tag", 0))
+
+
+def _make_junction(link: str, target: str) -> bool:
+    """Point `link` at `target` as a Windows directory junction (a dir symlink elsewhere).
+
+    A junction is the documented shape here - no admin rights on Windows, and `wtsafe` already knows how to
+    unlink it.  The target is absolutised because `mklink /J` resolves a relative target against the
+    caller's cwd, not against the link's parent.
     """
-    src = os.path.join(main, "build", "tools")
-    dst = os.path.join(wt, "build", "tools")
-    if not os.path.isdir(src):
-        return "skipped (MAIN has no build/tools yet - run `ninja tools`)"
-    os.makedirs(dst, exist_ok=True)
+    link, target = os.path.abspath(link), os.path.abspath(target)
+    if os.name == "nt":
+        r = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
+                           capture_output=True, text=True, errors="replace")
+        return r.returncode == 0 and os.path.exists(link)
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return True
+    except OSError:
+        return False
+
+
+def _copy_missing_files(src: str, dst: str) -> int:
+    """Copy every regular file under `src` into `dst`, skipping what is already there. -> files copied.
+
+    The write-safe shape for a `build/` input (#5): the worktree gets its own bytes on its own path, so no
+    ninja rule can write through to MAIN.  Existing files are left alone, so a re-seed is cheap and a
+    worker's own replacement survives it.
+    """
     copied = 0
-    for name in sorted(os.listdir(src)):
-        s, d = os.path.join(src, name), os.path.join(dst, name)
-        if os.path.isfile(s) and not os.path.exists(d):
+    for dirpath, _dirnames, filenames in os.walk(src):
+        rel = os.path.relpath(dirpath, src)
+        target_dir = dst if rel == "." else os.path.join(dst, rel)
+        os.makedirs(target_dir, exist_ok=True)
+        for name in sorted(filenames):
+            s, d = os.path.join(dirpath, name), os.path.join(target_dir, name)
+            if os.path.exists(d):
+                continue
             shutil.copy2(s, d)
             copied += 1
-    return "seeded %d file(s)" % copied
+    return copied
+
+
+def seed_worktree_build(main: str, wt: str) -> str:
+    """Seed a fresh worktree from MAIN: the build inputs (copy) and the original payload (junction).
+
+    A worktree must be self-sufficient: the worker compiles and measures in *its* `build/RMHE08`, and a
+    split needs the original DOL and selfile under `orig/`.  None of that is tracked, so it is seeded from
+    MAIN at claim time - and no MAIN path is ever written: every `build/` input is a copy and `orig/` is
+    only read.  See `SEED_COPY_DIRS` / `ORIG_REL` above for why the two shapes differ (#2/#5).
+
+    Returns a one-line description of what was seeded (or why nothing was).
+    """
+    parts: list[str] = []
+    seeded = False
+    for rel in SEED_COPY_DIRS:
+        src, dst = os.path.join(main, rel), os.path.join(wt, rel)
+        if not os.path.isdir(src):
+            continue
+        n = _copy_missing_files(src, dst)
+        seeded = True
+        parts.append("%s: %d file(s)" % (rel.replace(os.sep, "/"), n))
+    orig_src, orig_dst = os.path.join(main, ORIG_REL), os.path.join(wt, ORIG_REL)
+    if os.path.isdir(orig_src):
+        os.makedirs(orig_dst, exist_ok=True)
+        linked: list[str] = []
+        copied = 0
+        for name in sorted(os.listdir(orig_src)):
+            s, d = os.path.join(orig_src, name), os.path.join(orig_dst, name)
+            if os.path.exists(d):
+                continue
+            if os.path.isdir(s):
+                if _make_junction(d, s):
+                    linked.append(name)
+            elif os.path.isfile(s):
+                shutil.copy2(s, d)
+                copied += 1
+        seeded = True
+        if linked:
+            parts.append("orig/RMHE08: junction %s" % ", ".join(linked))
+        if copied:
+            parts.append("orig/RMHE08: %d file(s)" % copied)
+    if not seeded:
+        return "skipped (MAIN has no build/tools yet - run `ninja tools`)"
+    return "seeded " + "; ".join(parts)
 
 
 def load_registry(main: str) -> dict:
@@ -798,7 +891,7 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
                       or os.environ.get("USER") or "unknown", "base": base,
                       "claimed_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
     save_registry(main, registry)
-    return {"unit": unit, "branch": branch, "worktree": path, "base": base}
+    return {"unit": unit, "branch": branch, "worktree": path, "base": base, "seeded": seed_note}
 
 
 def registry_key(registry: dict, unit: str) -> str | None:
@@ -1250,18 +1343,58 @@ def selftest() -> int:
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"}, interval=0,
                        lister=lambda: panes, reader=lambda _pane: "same", sleeper=lambda _s: None)
         check("a static pane is not active", p["active"], False)
-        # a fresh worktree is seeded with the toolchain, so it never reaches into MAIN's build/ for one
+        # a fresh worktree is seeded with the toolchain and the original payload, so it never reaches into
+        # MAIN's build/ or orig/ for one (#2).  build/ inputs are COPIES (#5); orig/ is a junction.
         _seed_main = os.path.join(tmp, "seed-main")
         os.makedirs(os.path.join(_seed_main, "build", "tools"), exist_ok=True)
         open(os.path.join(_seed_main, "build", "tools", "dtk.exe"), "w").close()
+        os.makedirs(os.path.join(_seed_main, "build", "compilers", "Wii", "1.3"))
+        open(os.path.join(_seed_main, "build", "compilers", "Wii", "1.3", "mwcceppc.exe"),
+             "wb").write(b"MAIN-COMPILER\n")
+        os.makedirs(os.path.join(_seed_main, "build", "binutils"))
+        open(os.path.join(_seed_main, "build", "binutils", "powerpc-eabi-as.exe"), "wb").write(b"MAIN-AS\n")
+        os.makedirs(os.path.join(_seed_main, "orig", "RMHE08", "sys"))
+        open(os.path.join(_seed_main, "orig", "RMHE08", "sys", "main.dol"), "wb").write(b"MAIN-DOL\n")
+        os.makedirs(os.path.join(_seed_main, "orig", "RMHE08", "files"))
+        open(os.path.join(_seed_main, "orig", "RMHE08", "files", "mh3.sel"), "wb").write(b"MAIN-SEL\n")
+        open(os.path.join(_seed_main, "orig", "RMHE08", "cert.bin"), "wb").write(b"MAIN-BIN\n")
         _seed_wt = os.path.join(tmp, "ws-seeded")
-        seed_worktree_build(_seed_main, _seed_wt)
+        os.makedirs(os.path.join(_seed_wt, "orig", "RMHE08"), exist_ok=True)
+        open(os.path.join(_seed_wt, "orig", "RMHE08", ".gitkeep"), "w").close()
+        note = seed_worktree_build(_seed_main, _seed_wt)
         check("a claim seeds the worktree's toolchain",
               os.path.exists(os.path.join(_seed_wt, "build", "tools", "dtk.exe")), True)
+        check("a claim seeds build/compilers (#2)",
+              os.path.exists(os.path.join(_seed_wt, "build", "compilers", "Wii", "1.3", "mwcceppc.exe")), True)
+        check("a claim seeds build/binutils",
+              os.path.exists(os.path.join(_seed_wt, "build", "binutils", "powerpc-eabi-as.exe")), True)
+        # #5: build inputs must be real copies, never a junction ninja can write through into MAIN
+        check("build/compilers is a copy, not a junction (#5)",
+              _is_reparse_point(os.path.join(_seed_wt, "build", "compilers")), False)
+        check("build/binutils is a copy, not a junction (#5)",
+              _is_reparse_point(os.path.join(_seed_wt, "build", "binutils")), False)
+        # a worker writing its own toolchain (or ninja re-downloading over it) must not reach MAIN
+        with open(os.path.join(_seed_wt, "build", "compilers", "Wii", "1.3", "mwcceppc.exe"), "wb") as fh:
+            fh.write(b"WORKTREE-REWRITE\n")
+        check("writing the worktree's compiler does not touch MAIN (#5)",
+              open(os.path.join(_seed_main, "build", "compilers", "Wii", "1.3", "mwcceppc.exe"),
+                   "rb").read(), b"MAIN-COMPILER\n")
+        # #2: the read-only original payload is reachable and is a junction into MAIN (worth not copying)
+        _sys = os.path.join(_seed_wt, "orig", "RMHE08", "sys")
+        check("orig/RMHE08/sys is a junction (#2)", _is_reparse_point(_sys), True)
+        check("... and its DOL reads through to MAIN",
+              open(os.path.join(_sys, "main.dol"), "rb").read(), b"MAIN-DOL\n")
+        check("orig/RMHE08/files is a junction (#2)",
+              _is_reparse_point(os.path.join(_seed_wt, "orig", "RMHE08", "files")), True)
+        check("the small orig files are copied, not junctioned",
+              open(os.path.join(_seed_wt, "orig", "RMHE08", "cert.bin"), "rb").read(), b"MAIN-BIN\n")
+        check("the worktree's tracked orig .gitkeep is left alone",
+              os.path.exists(os.path.join(_seed_wt, "orig", "RMHE08", ".gitkeep")), True)
         check("the claim key ignores the source extension",
               norm_unit("auto/802B2978_fn_802B2978.c") == norm_unit("auto/802B2978_fn_802B2978"), True)
         check("the claim key ignores a .cpp too", norm_unit("Pl/pl_act.cpp") == norm_unit("Pl/pl_act"), True)
-        check("seeding reports what it did", seed_worktree_build(_seed_main, _seed_wt).startswith("seeded"), True)
+        check("seeding reports what it did", note.startswith("seeded"), True)
+        check("the seed note names the junctioned original", "junction" in note, True)
         check("seeding skips cleanly when MAIN has no toolchain",
               seed_worktree_build(os.path.join(tmp, "nowhere"), os.path.join(tmp, "ws-x")).startswith("skipped"), True)
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"},
@@ -1413,6 +1546,33 @@ def selftest() -> int:
         registry[unit_name] = {"branch": branch, "worktree": wt}
         save_registry(main, registry)
         return branch, wt
+
+    # claim() end to end in a throwaway repo: the worktree it cuts is seeded before the worker sees it
+    # (#2/#5).  The seeding above is asserted at the function level; this is the integration assertion,
+    # and it ends in `release` so the test cannot leave a stray claim behind.
+    with tempfile.TemporaryDirectory() as tmp:
+        seed_main = new_repo(tmp)
+        os.makedirs(os.path.join(seed_main, "build", "tools"))
+        open(os.path.join(seed_main, "build", "tools", "dtk.exe"), "wb").write(b"dtk")
+        os.makedirs(os.path.join(seed_main, "build", "compilers", "Wii", "1.3"))
+        open(os.path.join(seed_main, "build", "compilers", "Wii", "1.3", "mwcceppc.exe"), "wb").write(b"cc")
+        os.makedirs(os.path.join(seed_main, "orig", "RMHE08", "sys"))
+        open(os.path.join(seed_main, "orig", "RMHE08", "sys", "main.dol"), "wb").write(b"dol")
+        out = claim("Pl/seeded", seed_main, "w", False, cwd=seed_main)
+        seed_wt = out["worktree"]
+        check("claim seeds the toolchain into a fresh worktree",
+              os.path.exists(os.path.join(seed_wt, "build", "tools", "dtk.exe")), True)
+        check("claim seeds build/compilers as a copy, not a junction (#5)",
+              _is_reparse_point(os.path.join(seed_wt, "build", "compilers")), False)
+        check("claim junctions orig/RMHE08/sys (#2)",
+              _is_reparse_point(os.path.join(seed_wt, "orig", "RMHE08", "sys")), True)
+        check("claim reports the seed in its result", out.get("seeded", "").startswith("seeded"), True)
+        check("the claim cut a worktree on its own branch",
+              repo_git(seed_wt, "rev-parse", "--abbrev-ref", "HEAD"), out["branch"])
+        rel = release("Pl/seeded", seed_main, force=True, dry_run=False, probe=no_pane)
+        check("the seeded claim releases cleanly (no stray claim)", rel.get("complete"), True)
+        check("MAIN's original survives the teardown through the junction",
+              open(os.path.join(seed_main, "orig", "RMHE08", "sys", "main.dol"), "rb").read(), b"dol")
 
     with tempfile.TemporaryDirectory() as tmp:
         main = new_repo(tmp)
@@ -1681,8 +1841,9 @@ def main() -> int:
         if out.get("dry_run"):
             print("would run: %s" % out["command"])
         else:
-            print("claimed %s\n  branch   %s\n  worktree %s\n  base     %s"
-                  % (out["unit"], out["branch"], out["worktree"], out["base"]))
+            print("claimed %s\n  branch   %s\n  worktree %s\n  base     %s\n  seeded   %s"
+                  % (out["unit"], out["branch"], out["worktree"], out["base"],
+                     out.get("seeded", "")))
             # the brief is named after the branch the claim just made, not re-derived from the unit path
             print("\nnext: python tools/units/brief.py %s          # write the brief\n"
                   "      read tools/units/briefs/%s.md in %s, do it, write your report"

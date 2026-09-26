@@ -1101,10 +1101,21 @@ menu/fn_8031A6C0.cpp:
 	.text       start:0x8031A6C0 end:0x8031EA8C
 	.ctors      start:0x8056F398 end:0x8056F39C
 
+menu/fn_8031EA8C.cpp:
+	extab       start:0x80016074 end:0x8001621C
+	extabindex  start:0x80034F14 end:0x80035190
+	.text       start:0x8031EA8C end:0x80324F7C
+
 hud/fn_80324F7C.c:
 	extab       start:0x8001621C end:0x80016224
 	extabindex  start:0x80035190 end:0x8003519C
 	.text       start:0x80324F7C end:0x803250B0
+
+hud/fn_80334568.cpp:
+	extab       start:0x8001677C end:0x80016994
+	extabindex  start:0x800359A0 end:0x80035CC4
+	.text       start:0x80334568 end:0x80338808
+	.data       start:0x805E2788 end:0x805E27B0
 
 enemy/fn_8035E034.cpp:
 	extab       start:0x80017574 end:0x800175DC

@@ -60,6 +60,10 @@ def stb(rs_, ra_, d=0):
     return (38 << 26) | (rs_ << 21) | (ra_ << 16) | (d & 0xFFFF)
 
 
+def lwz(rt_, ra_, d=0):
+    return (32 << 26) | (rt_ << 21) | (ra_ << 16) | (d & 0xFFFF)
+
+
 def stmw(rs_, ra_, d=0):
     return (47 << 26) | (rs_ << 21) | (ra_ << 16) | (d & 0xFFFF)
 
@@ -226,6 +230,10 @@ def test_ground_truth_parser():
 
     exp = infer.expected_flags(["-opt nopeephole", "-fp_contract on"], {"peephole": ["off"]}, True)
     check(exp["peephole"] == "off" and exp["fp_contract"] == "on", "documented cflags + pragma")
+    exp = infer.expected_flags(["-func_align 4"], {"function_align": ["16"]}, True)
+    check(exp["func_align"] == "16", "a source function_align pragma beats -func_align 4")
+    exp = infer.expected_flags(["-func_align 4"], {}, True)
+    check(exp["func_align"] == "4", "no pragma -> the cflags group")
     exp = infer.expected_flags(["-O3"], {"peephole": ["off", "reset", "on"]}, False)
     check(exp["peephole"] == "off", "a scoped off pragma is a record even with a later reset")
     check("fp_contract" not in exp, "an auto unit with no pragma records no fp_contract")
@@ -270,6 +278,44 @@ def test_synthetic_fingerprints():
         got = {f["flag"]: (f["value"], f["confidence"]) for f in fp.findings}
         check(got["fp_contract"][0] == "off" and got["fp_contract"][1] == "low",
               "unfused chain -> low hint")
+
+        # peephole mixed: a record form plus a kept `lwz`+`addi` load-update pair (the pass folds
+        # it into `lwzu`) - a scoped `#pragma peephole off`.  Must be a hint, not a confident `on`.
+        text = b"".join(struct.pack(">I", w) for w in
+                        [clrlwi(3, 4, 24, rc=1), lwz(12, 3, 0x10), addi(3, 3, 0x10)])
+        p = write("mixed_peep.o", build_obj(text, [("f", 0, len(text))]))
+        fp = infer.Fingerprint(p)
+        got = {f["flag"]: (f["value"], f["confidence"]) for f in fp.findings}
+        check(got["peephole"] == ("mixed", "low"),
+              "record form + kept load-update -> mixed hint: %r" % (got["peephole"],))
+
+        # fp_contract mixed: a fused FMA in one function, an unfused chain in another - a scoped
+        # `#pragma fp_contract off`.  Hint only.
+        text = b"".join(struct.pack(">I", w) for w in
+                        [fmadds(1, 2, 3, 4), fmuls(0, 0, 1), fadds(2, 0, 3)])
+        p = write("mixed_fpc.o", build_obj(text, [("f", 0, len(text))]))
+        fp = infer.Fingerprint(p)
+        got = {f["flag"]: (f["value"], f["confidence"]) for f in fp.findings}
+        check(got["fp_contract"] == ("mixed", "low"),
+              "FMA + unfused chain -> mixed hint: %r" % (got["fp_contract"],))
+
+        # func_align 16 with gap padding is only a hint: a -func_align 4 unit can look the same.
+        text = b"".join(struct.pack(">I", w) for w in [0] * 5)
+        p = write("align16.o", build_obj(text, [("a", 0, 4), ("gap_x", 4, 12), ("b", 16, 4)]))
+        fp = infer.Fingerprint(p)
+        got = {f["flag"]: (f["value"], f["confidence"]) for f in fp.findings}
+        check(got["func_align"] == ("16", "low"),
+              "16-aligned starts + padding -> low hint: %r" % (got["func_align"],))
+
+        # inline noauto is a hint: a kept bl to a tiny same-object function is not proof (auto is a
+        # heuristic, and a cross-TU callee in a multi-TU split object is never inlined either way).
+        text = b"".join(struct.pack(">I", w) for w in [bl(4), 0])
+        p = write("tinycall.o", build_obj(text, [("caller", 0, 4), ("tiny", 4, 4)],
+                                          relocs=[(0, "tiny", 10)]))
+        fp = infer.Fingerprint(p)
+        got = {f["flag"]: (f["value"], f["confidence"]) for f in fp.findings}
+        check(got["inline"] == ("noauto", "low"),
+              "kept tiny same-object call -> low hint: %r" % (got["inline"],))
 
         # lmw_stmw off: an EABI save helper call
         text = b"".join(struct.pack(">I", w) for w in [bl(4)])

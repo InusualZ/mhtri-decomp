@@ -312,6 +312,19 @@ def include_order_rows() -> int:
                        _search_path(cmd3),
                        [os.path.join(main, "include"),
                         os.path.join(main, "build", "RMHE08", "include")], failures)
+
+        # MAIN's line can carry *absolute* `-i` paths too (a borrowed sibling command); the worktree's own
+        # header must still be searched first, or the same silent shadowing comes back through the other
+        # spelling. An absolute MAIN entry cannot be re-pointed under the worktree by `os.path.join`, so the
+        # ordering (step 1) is what protects it.
+        abs_tokens = ["sjiswrap.exe", "mwcceppc.exe", "-i", os.path.join(main, "include"), "-i",
+                      os.path.join(main, "build", "RMHE08", "include"), "-c", "src/probe/probe.cpp",
+                      "-o", "build/RMHE08/src/probe"]
+        cmd5, _obj5 = rc.rewrite(abs_tokens, "probe/probe", main, wt)
+        failures = _ok("an absolute MAIN include does not outrank the worktree's",
+                       _search_path(cmd5)[0], wt_inc, failures)
+        failures = _ok("an absolute MAIN include still resolves the worktree's shared header",
+                       _which(cmd5, main, "shared.h"), os.path.join(wt_inc, "shared.h"), failures)
     return failures
 
 
