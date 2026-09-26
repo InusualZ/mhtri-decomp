@@ -13,16 +13,27 @@
  * (its only data operands are the two `.sdata2` pool words below) and the surrounding pools carry no
  * `__FILE__` name for it.  The behaviour is a ratio test, not a named API of its neighbours' scheme.
  *
- * The `.sdata2` operands are the pooled constants the target object references: `lbl_8079A008` is the
- * signed int->float magic MWCC synthesises for the two `(f32)(s16)` casts (it stays implicit, so the
- * object carries its own copy and the relocation is unnamed - see the residual below), `lbl_8079A02C`
- * is the 0.4f threshold and is declared here as the load operand so the relocation pairs by name.
+ * The `.sdata2` operands are the pooled constants the target object references.  `lbl_8079A02C` is the
+ * 0.4f threshold, declared here as an external load operand so the relocation pairs by name: it is the
+ * unit's own (private) constant and no other registered unit reads that address.
  *
- * Residual: none in the code.  The two relocation *names* that no source spelling can produce - the
- * compiler-synthesised `.sdata2` magic (`@117` here, `lbl_8079A008` in the map) and the compiler-emitted
- * extab record (`@119` vs `@etb_800126CC`) - differ from the map's names, and the official report metric
- * counts those rows equal (`functionRelocDiffs: none`), so `fn_8026FFBC` measures 100.0 % against the
- * target object with the unit's `cflags_pl`.
+ * `lbl_8079A008` (0x4330000080000000, the signed int->float magic MWCC synthesises for the two
+ * `(f32)(s16)` casts) is a **shared** pool entry and stays unclaimed:
+ *   * the address is loaded by 28 `lfd`s in 9 functions of four registered units (`Pl/fn_802693C4.cpp`,
+ *     this unit, `Pl/pl_skill.cpp`, `Pl/fn_80273B14.cpp`), and a pool entry is local to its TU - so those
+ *     four are fragments of **one** original TU whose pool 0x8079A008 is part of.
+ *   * claiming `.sdata2 0x8079A008-0x8079A010` here keeps `main.dol` green while the unit is
+ *     `NonMatching`, but the flip cannot link: `undefined: 'lbl_8079A008'`, referenced from
+ *     `fn_802751B4` in `fn_80273B14.o` - the linked objects keep the map's global name, our pool entry is
+ *     the local `@519`.
+ *   * naming the symbol from source is not reachable either: the constant is compiler-synthesised, and
+ *     `-pool off`, `-sdata2 0` and `-str reuse` all leave the local 8-byte entry in the object
+ *     (measured on this unit's command line).
+ *
+ * Residual: none in the code - `fn_8026FFBC` is 100.0 % over all 23 rows with the unit's `cflags_pl`.  The
+ * unit cannot be flipped until the original TU is one registered unit again (the four fragments above) or
+ * the build post-processes the pool entry into the map's global name; the compiler-emitted extab record's
+ * name (`@etb_800126CC` in the map) is a relocation-name difference the report metric counts equal.
  */
 
 #include "types.h"

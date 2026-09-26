@@ -473,6 +473,7 @@ ef/fn_80101DF4.cpp:
 	extab       start:0x8000BEF4 end:0x8000BEFC
 	extabindex  start:0x80025D58 end:0x80025D64
 	.text       start:0x80101DF4 end:0x80101FA4
+	.sdata2     start:0x807966E8 end:0x807966F0
 
 ef/eft007.cpp:
 	extab       start:0x8000BEFC end:0x8000BF7C

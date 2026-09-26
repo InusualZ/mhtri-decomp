@@ -20,7 +20,9 @@
  * Residual: 73 of 74 rows match.  The one that does not is `lfd f2, <magic>@sda21` - retail loads
  * `lbl_8079A460`, ours loads the pool entry MWCC names `@NN`.  That constant is the implicit int->float
  * magic, which cannot be named from source (playbook 29), so it is the residual and the unit's `.sdata2`
- * range stays unclaimed.
+ * range stays unclaimed.  Measured (data-claim lane): `lbl_8079A460` is loaded by `stage/fn_802B2AA0.cpp`
+ * and `stage/stg_w.cpp` as well, so the entry belongs to the one original TU those three fragments come
+ * from and a claim would leave the unit's flip unlinkable (`undefined: 'lbl_8079A460'`).
  *
  * Name: still generated.  The runtime dump has only `zz_02b2978_` for it and the neighbours carry no
  * naming scheme, so no evidenced name exists; the two-edit rename rides a rename batch when one does.

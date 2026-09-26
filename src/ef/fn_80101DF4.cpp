@@ -25,10 +25,11 @@
  *     0.56 points (playbook 19/20).
  *
  * Pool: the two scale constants are literals, so this object emits the unit's 8-byte `.sdata2`
- * (`42840000 40e66666`, i.e. 66.0f then 7.2f) that the DOL holds at 0x807966E8-0x807966F0 - the range
- * `splits.txt` already proposes for this unit, claimed by the measured data pass (playbook 29).  Until
- * then the target object references the map labels `lbl_807966E8`/`lbl_807966EC` where ours references
- * its own `@46`/`@47`: a relocation-name difference only, which the report metric ignores.
+ * (`42840000 40e66666`, i.e. 66.0f then 7.2f), and the DOL holds exactly those bytes at
+ * 0x807966E8-0x807966F0.  That range is claimed: it is the unit's **own** pool entry, so no other
+ * registered unit's object references it, the claim pairs the target object's `.sdata2` with ours and
+ * the unit is linked (`Object(Matching, ...)`).  A claim on a *shared* pool entry does not work this
+ * way - `Pl/fn_8026FFBC.cpp` is the measured counter-example.
  *
  * The types below are shared with the sibling state handlers of this library (`fn_80101DB8`,
  * `fn_80101C74`, `fn_80101D70` are the evidence for `EftState`); they move to a shared `ef` header the
