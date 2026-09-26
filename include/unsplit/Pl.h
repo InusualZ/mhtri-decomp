@@ -26,7 +26,7 @@ typedef struct PlSeVecPair {
 extern "C" {
 #endif
 
-s8 fn_802748C8(void* a);
+s32 fn_802748C8(void* a);
 
 /* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
  * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x80258FCC-0x80262940 and
@@ -36,11 +36,16 @@ u16 fn_80260A18(struct _PLW* self);
 s32 fn_80261770(struct _PLW* self, u8* a, u16* b, u16* c, s32* d, u16* e, u16* f);
 u32 fn_802621B0(struct _PLW* self, void* b);
 s32 fn_80262688(struct _PLW* self);
-u32 fn_802745DC(struct _PLW* self, u32 v);
-s32 fn_80274AB8(s32 a);
+/* `fn_802745DC`'s return is the owner's `u32` (`Pl/fn_80273B14.cpp`), not the pre-merge `u16`: the
+ * callee's own body is byte-identical either way (every path ends in an `lhzx`/`li`), while the
+ * landed caller `Pl/fn_8027D684.cpp`'s measured row needs the `u32` - retail materialises the
+ * result with `mr r0,r3` before the caller's `(u16)` cast, which only a `u32` return produces.  The
+ * `s16` parameter is the owner's too (retail's callee narrows it with `extsh`). */
+u32 fn_802745DC(struct _PLW* self, s16 kind);
+s32 fn_80274AB8(struct _PLW* self);  /* the owner's own definition (fn_80273B14.cpp) */
 s32 fn_80276254(struct _PLW* self, s32 v);
-u32 fn_802764B0(struct _PLW* self, s32 v);
-u32 fn_80276514(struct _PLW* self, s32 v);
+s32 fn_802764B0(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
+s32 fn_80276514(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 void fn_80275AC4(struct _PLW* self, s32 a, u16 b, u16 c);
 s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
@@ -208,10 +213,40 @@ u32 fn_80245DA0(struct _PLW* self, u32 a);
 void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c);
 u32 fn_8027D8A0(struct _PLW* self, s32 a);
 
-/* The 0x80273B14-0x80276B58 run's act/motion request entry point `Pl/fn_8027D684.cpp`'s
- * `fn_8027D6DC` calls; unregistered, so this band header is its rule-2 home.  The four argument
- * registers are the callee's own prologue's (`Pl/fn_802756F0` saves r3..r6). */
-void fn_802756F0(struct _PLW* self, u8 a, u16 b, u32 c);
+/* Pl-band callees and tables with no registered owner, added with `Pl/fn_80273B14.cpp`
+ * (`.text` 0x80273B14-0x80276B58), which is their only consumer so far.  The addresses all sit in
+ * the band's unclaimed runs, so this header is their rule-2 home.  The 0x8026A224 / 0x8026A2DC /
+ * 0x8026A2F8 trio the same unit drives is NOT here: `Pl/fn_802693C4.cpp` owns
+ * 0x802693C4-0x8026BA1C and declares them in `Pl/fn_802693C4.h`, which the consumer includes
+ * (rule 2 - the owner's header wins, and a second spelling of the same name is the
+ * `illegal function overloading` class).  The `fn_8027Exxx` equipment helpers this branch used to
+ * declare here moved the same way: `Pl/fn_8027D684.cpp` now owns 0x8027D684-0x80288CEC, so its
+ * signatures live in the consumer's own header (`include/Pl/fn_80273B14.h`, which is the only
+ * consumer) - the band must not declare a symbol a registered unit owns. */
+
+/* The `.data` tables the same unit reads. */
+extern const u16 lbl_805C6030[];  /* the act-id row table `fn_802745DC`/`fn_80274624` walk */
+extern const u16 lbl_805C604C[];  /* its sibling for the ranged family */
+extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `fn_80274B20` looks ids up */
+extern u8 lbl_805C60A8[];         /* the 11-row act/motion pick table `Pl_decide_mot_get` walks */
+extern u8 lbl_805C5F30[];         /* the melee act-name table rows `fn_80274918` picks */
+extern u8 lbl_805C5F50[];
+extern u8 lbl_805C5F70[];
+
+/* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined).  `lbl_8079A000`
+ * is the same word the run above names, so it is declared once, there. */
+extern const f32 lbl_8079A044;
+extern const f32 lbl_8079A080;
+extern const f32 lbl_8079A084;
+
+/* The 0x80273B14-0x80276B58 run's act/motion request entry point, declared for
+ * `Pl/fn_8027D684.cpp`'s `fn_8027D6DC`.  The symbol is owned by `Pl/fn_80273B14.cpp`, so the
+ * signature here is that owner's (`include/Pl/fn_80273B14.h`) and not a second, differently-typed
+ * spelling of it: two C-linkage declarations of one name with different parameter types are the
+ * `illegal function overloading` class (rule 2).  The owner's `u16` third parameter is what
+ * retail's own callers narrow to (`fn_80275AC4`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
+ * reproduces the callee's own `clrlwi` on the mask. */
+void fn_802756F0(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
 /* The per-slot gate table at 0x806BB7A0 (`.bss`, 0x18 B = three 8-byte entries, the map's size).
  * size: 0x8 */

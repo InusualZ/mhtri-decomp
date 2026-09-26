@@ -221,6 +221,10 @@ void fn_802D884C(u16* a, s16* b);
 void fn_802DE578(struct _PLW* self, void* work);
 u32 fn_8042CB9C(void);
 s32 fn_80331104(void);
+/* Added with `Pl/fn_80273B14.cpp`: 0x8029F73C (bracket: Pl below, stage above) and
+ * 0x80335CE8 (hud below, enemy above) name different modules, so their home is this file. */
+s32 fn_8029F73C(u16 id, s32 index);
+void fn_80335CE8(struct _PLW* self, s32 kind);
 void fn_802EA138(s8 value);
 
 
