@@ -1120,6 +1120,10 @@ RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40
 	.data       start:0x80629C08 end:0x80629C40
 
+homebutton/keyboard.cpp:
+	.text       start:0x805632BC end:0x80569DAC
+	.ctors      start:0x8056F424 end:0x8056F428
+
 homebutton/gui.cpp:
 	.text       start:0x80569DAC end:0x8056BBF0
 
