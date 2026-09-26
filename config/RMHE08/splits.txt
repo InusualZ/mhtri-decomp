@@ -785,6 +785,11 @@ lobby/fn_801E7530.cpp:
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8
 
+lobby/fn_801EC9F8.cpp:
+	extab       start:0x8001079C end:0x8001094C
+	extabindex  start:0x8002CA54 end:0x8002CCDC
+	.text       start:0x801EC9F8 end:0x801F3294
+
 lobby/lb_npc.cpp:
 	extab       start:0x80010ADC end:0x80010DBC
 	extabindex  start:0x8002CF34 end:0x8002D384
