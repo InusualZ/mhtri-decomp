@@ -66,6 +66,17 @@ typedef struct LbResRec {
     /* +0x08 */ u32 c_0x08;
 } LbResRec;
 
+/* One 0x14-byte entry of the NPC's motion table - the array `_LB_NPC::field_0x204` points at and
+ * `field_0x208` indexes (the band 0x802029B4..0x802076D4's state machines read an entry's id and hand
+ * it to `fn_801FE13C`, which restarts that motion).  Only the id is read here; size from the two
+ * `mulli ..., 20` sites. size: 0x14 */
+typedef struct LbNpcMotionEntry {
+    /* +0x00 */ u8 pad_0x00[0x0C];
+    /* +0x0C */ u16 motion_0x0C;
+    /* +0x0E */ u8 pad_0x0E[2];
+    /* +0x10 */ struct LbNpcMotionEntry* field_0x10;
+} LbNpcMotionEntry;
+
 /* The motion record an NPC points at through `field_0x214`; only its trailing VEC3 is used here. */
 typedef struct LbNpcMotion {
     /* +0x00 */ u8 pad_0x00[0x3C];
@@ -125,7 +136,7 @@ typedef struct _LB_NPC {
     /* +0x1E8 */ s32 field_0x1E8;
     /* +0x1EC */ VEC3 target_0x1EC;
     /* +0x1F8 */ VEC3 vel_0x1F8;
-    /* +0x204 */ s32 field_0x204;
+    /* +0x204 */ LbNpcMotionEntry* field_0x204;
     /* +0x208 */ s16 field_0x208;
     /* +0x20A */ s16 field_0x20A;
     /* +0x20C */ f32 field_0x20C;

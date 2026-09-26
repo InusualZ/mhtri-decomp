@@ -1443,6 +1443,19 @@ config.libs = [
             # class 3).  Sections: extab 0x80010ADC..0x80010DBC, extabindex 0x8002CF34..0x8002D384
             # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
             Object(NonMatching, "lobby/lb_npc.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `802029B4_fn_802029B4.cpp` (`.text` 0x802029B4..0x802076D4, 68 functions / 19744 B) -
+            # the lobby NPC work band above `lobby/lb_npc.cpp`'s range: the same `_LB_NPC` state
+            # machines and motion-table helpers.  Module `lobby` from the link band (both bracketing
+            # registered units are `lobby`) and from the code (it takes `_LB_NPC`, calls
+            # `lb_npc_Get_motion_no` and reads `lb_npc_move_data`/`lobby_w`); no `__FILE__` string is
+            # reachable from the range and the dump answers only `zz_` placeholders, so the file keeps
+            # the map stem (brief section 2, class 3+4).  Sections: extab 0x80010DBC..0x80010F7C,
+            # extabindex 0x8002D384..0x8002D624 (56 x 8 / 56 x 12 B: the range has 56 framed
+            # functions, and the per-function split objects' extabindex relocations hand
+            # `@etb_80010F7C` to the next proposal's first framed function), .text
+            # 0x802029B4..0x802076D4.
+            Object(NonMatching, "lobby/fn_802029B4.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/8020C588_fn_8020C588.cpp: the lobby player-character control band
             # (`.text` 0x8020C588..0x80212810, 112 functions / 25224 B, plus its extab run
