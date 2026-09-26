@@ -17,6 +17,9 @@
 
 #ifdef __cplusplus
 
+struct _ENEMY_WORK;
+struct _PLW;
+
 /* 0x802BDCE0 - the current camera's world position. */
 nw4r::math::VEC3 get_camera_pos(void);
 
@@ -41,6 +44,27 @@ bool fn_802BE3EC(void);
 /* 0x802BE7E8 - updates one of a light work's channels.  The parameters are typed `void*` because
  * the light work's own types are private to its unit. */
 void fn_802BE7E8(void* self, void* channel, u8 index);
+
+/* The small camera-band setters and predicates 0x802B8DF8/0x802BBA64/0x802BBAC0/0x802BBAC4/
+ * 0x802BE638 - the rest of the `.text` range this unit owns (0x802B5C58-0x802BEAAC).  Their
+ * consumers read them out of `include/unsplit/lobby.h` and `include/unsplit/unknown.h` while the
+ * addresses were unclaimed; both of those headers include this one now (docs/plan.md 6.5 rule 2).
+ * `fn_802BE638`/`fn_802B8DF8` keep the call sites' spellings - neither body is written yet. */
+
+/* 0x802BBA64 - stores the argument in the camera work's +0x47E byte (1 while the sub-scene is up). */
+void fn_802BBA64(u8 value);
+
+/* 0x802BBAC0 - the four-byte stub at 0x802BBAC0. */
+void fn_802BBAC0(void);
+
+/* 0x802BBAC4 - like `fn_802BBA64`, for the +0x47F byte. */
+void fn_802BBAC4(u8 value);
+
+/* 0x802B8DF8 - r3 the player work; `Pl/fn_802489D4.cpp`'s leaves call it. */
+void fn_802B8DF8(struct _PLW* self);
+
+/* 0x802BE638 - r3 the enemy work, r4 a kind, r5 an output `Vec3`; `enemy/fn_801A4504.cpp` calls it. */
+void fn_802BE638(struct _ENEMY_WORK* self, s32 a, Vec3* v);
 }
 
 #endif /* __cplusplus */

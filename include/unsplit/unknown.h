@@ -18,6 +18,10 @@
 #include "nw4r/math.h"
 #include "gx.h"
 
+/* Owner headers (rule 2): `camera/fn_802B5C58.cpp` owns 0x802B5C58-0x802BEAAC, which covers the
+ * 0x802B8DF8/0x802BE638 sites declared here until that range registered. */
+#include "camera/camera.h"
+
 struct MHchar;
 struct _CP_VECTOR;
 struct _PLW;
@@ -196,7 +200,8 @@ extern SystemWork system_w;
  * signatures are the call sites' (r3 the work record; `fn_80304510`'s fifth argument is the s32
  * `0`/0xF4A0/0xB61 the target materialises; `fn_803B50A8` returns the r3 word compared against 1). */
 u8 fn_802B0668(u8 kind);
-void fn_802BE638(struct _ENEMY_WORK* self, s32 a, Vec3* v);
+/* `fn_802BE638` (0x802BE638) is in `camera/fn_802B5C58.cpp`'s range 0x802B5C58-0x802BEAAC, so the
+ * owner's header declares it and this one includes it (rule 2). */
 void fn_80304510(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, s32 d, f32 s);
 void fn_80306A98(struct _ENEMY_WORK* self, u32 a);
 u32 fn_803B50A8(void);
@@ -212,11 +217,12 @@ void* fn_803438E4(u8 a, u8 b);
 u8 fn_803439D4(u8 a, u8 b);
 void fn_803B993C(s32 handle, Vec3* v, u8 area);
 
-/* 0x802B8DF8 / 0x802D884C / 0x802DE578 / 0x8042CB9C - helpers `Pl/fn_802489D4.cpp`
+/* 0x802D884C / 0x802DE578 / 0x8042CB9C - helpers `Pl/fn_802489D4.cpp`
  * (0x802489D4-0x8024F200) calls whose address bands have no registered range at all, so no
  * `<module>.h` is sound for them (this file's own note, above).  Their map names are bare
- * `fn_XXXXXXXX`, so they keep C linkage like everything else in this block. */
-void fn_802B8DF8(struct _PLW* self);
+ * `fn_XXXXXXXX`, so they keep C linkage like everything else in this block.  `fn_802B8DF8`
+ * (0x802B8DF8) left this group when `camera/fn_802B5C58.cpp` registered that range - its owner's
+ * header carries it now (rule 2). */
 void fn_802D884C(u16* a, s16* b);
 void fn_802DE578(struct _PLW* self, void* work);
 u32 fn_8042CB9C(void);
