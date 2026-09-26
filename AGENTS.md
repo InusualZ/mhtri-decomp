@@ -53,6 +53,22 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
 7. **Never paste `config/RMHE08/symbols.txt` into a prompt/tool output.** It is ~65,700 lines / 4.5 MB.
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
+
+**UPDATE 2026-09-26 (branch cleanup closed out).** `main` = `cf06c7d8f`; **exactly one non-main branch left**,
+`worker/802e4978-fn-802e4978-506b`, whose 54-rule-2 fix a `fixer` lane (`7521a53c-92db-46d5-88ec-dc58dbdafcde`)
+is finishing - land it, delete the branch, and `queue.py list` must then read "none unlanded", which is the
+owner's condition to resume production. Landed in this round: `ef/eft035.cpp` (0x802F140C-0x802F5138, 17/39 fn,
+11 byte-identical, 15.045 % - `cf06c7d8f`), `homebutton/fn_80555374.cpp` (868096c2b), `AX/AXFXReverbHi.c`
+(34f1c03a6), `Network/fn_803D3CE8.cpp` (205383f5b), `ef/fn_80101DF4` flips to Matching (1f2b59e28),
+`enemy/fn_80382310.cpp` (4414228c7), `tools/units/queue.py` guard (e4341d71c). Ledger: covered 11747 / closed
+6057 / partial 365 / matched 4258 / bytes 517860. **Incident mechanism (now understood):** worktrees hold
+`orig/RMHE08/files` as a **junction with an absolute target** (per the lane briefs); MAIN's
+`orig/RMHE08/{sys/main.dol,files/*.sel}` was emptied at ~08:04 while a lane repointed/deleted such a junction,
+and `build/RMHE08/{obj,asm}` was emptied with it. The originals are gitignored, so only a filesystem copy brings
+them back: `../orig-backup/RMHE08/` (sha1 `bf4850739478caaedfe675949eb7c28595a7fde9`). Do not let a lane point a
+junction at MAIN's `orig/`, and do not tear down a worktree until MAIN's copy is verified - AGENTS.md
+non-negotiable 1 carries the rule.
+
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
 
 **Owner round 2026-09-26 (late): branch cleanup + the unlanded-branch guard.** Production is HALTED by the
