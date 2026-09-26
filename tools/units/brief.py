@@ -508,6 +508,39 @@ def build(main: str, wt: str, unit: str, task: str | None, assume_claim: bool = 
     }
 
 
+def _data_step(lines: list[str]) -> None:
+    """Append section 5d (the data step) - shared by both brief renderers.
+
+    Owner instruction, 2026-09-26: a decompiler lane matches **data** as well as code. objdiff's unit score
+    does not count a wrong data section, so a lane could hand over a unit whose code matched and whose
+    `.data`/`.sdata2` was ours-extra - which is where the 20-unit flip-blocker list came from. Both the
+    registered-unit renderer and the proposal renderer call this, because a proposal lane registers its unit
+    and is exactly the lane that needs the step.
+    """
+    lines.append("")
+    lines.append("### 5d · Data (measure it, then claim what your object emits)")
+    lines.append("")
+    lines.append("objdiff's unit score does not count a wrong data section, so measure it: "
+                 "`python tools/units/datagap.py --unit <unit>` prints the per-section gap between the target "
+                 "object and yours (`build/RMHE08/obj/...o` vs `build/RMHE08/src/...o`). Record it before and "
+                 "after your work.")
+    lines.append("")
+    lines.append("* `ours-extra` - your source defines a table or constant the original TU did not own - is the "
+                 "usual defect. A pooled constant is fixed by declaring the map's symbol `extern` and using it "
+                 "as a load operand, **never** by defining it (playbook 29/58: a definition makes MWCC emit "
+                 "both the named constant and its pool copy, so `.sdata2` grows instead of clearing).")
+    lines.append("* Claim the data your object **emits**: exact `start:`/`end:` in `splits.txt`, then "
+                 "`rm -f build/RMHE08/config.json` and rebuild - a claim edit that never re-splits links the "
+                 "old object and reports a false green. `.data`, `.sdata`, `.ctors` and `.dtors` claims are "
+                 "safe; **a partial `.sdata2` claim breaks the link** (playbook 23).")
+    lines.append("* A pool entry is claimable **only while your unit is its sole referencer** (playbook 58). A "
+                 "private entry is exactly what the claim is for - claim it, flip the unit to "
+                 "`Object(Matching)` and say so; a shared entry can be neither claimed nor named in source, so "
+                 "write the measured blocker in the unit header and report it.")
+    lines.append("* Finish with the numbers: the unit's sections and bytes before/after, and whether "
+                 "`python tools/units/datagap.py --flip-blockers` lists this unit.")
+
+
 def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     rng = b["sections"]
     txt = rng.get(".text")
@@ -676,28 +709,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
                                                         e.get("verdict", "unmeasured")) for e in b["data_queue"])
                      + " - claim what your object *emits* (and only while this unit is its sole referencer); "
                        "propose the rest.")
-    lines.append("")
-    lines.append("### 5d · Data (measure it, then claim what your object emits)")
-    lines.append("")
-    lines.append("objdiff's unit score does not count a wrong data section, so measure it: "
-                 "`python tools/units/datagap.py --unit <unit>` prints the per-section gap between the target "
-                 "object and yours (`build/RMHE08/obj/...o` vs `build/RMHE08/src/...o`). Record it before and "
-                 "after your work.")
-    lines.append("")
-    lines.append("* `ours-extra` - your source defines a table or constant the original TU did not own - is the "
-                 "usual defect. A pooled constant is fixed by declaring the map's symbol `extern` and using it "
-                 "as a load operand, **never** by defining it (playbook 29/58: a definition makes MWCC emit "
-                 "both the named constant and its pool copy, so `.sdata2` grows instead of clearing).")
-    lines.append("* Claim the data your object **emits**: exact `start:`/`end:` in `splits.txt`, then "
-                 "`rm -f build/RMHE08/config.json` and rebuild - a claim edit that never re-splits links the "
-                 "old object and reports a false green. `.data`, `.sdata`, `.ctors` and `.dtors` claims are "
-                 "safe; **a partial `.sdata2` claim breaks the link** (playbook 23).")
-    lines.append("* A pool entry is claimable **only while your unit is its sole referencer** (playbook 58). A "
-                 "private entry is exactly what the claim is for - claim it, flip the unit to "
-                 "`Object(Matching)` and say so; a shared entry can be neither claimed nor named in source, so "
-                 "write the measured blocker in the unit header and report it.")
-    lines.append("* Finish with the numbers: the unit's sections and bytes before/after, and whether "
-                 "`python tools/units/datagap.py --flip-blockers` lists this unit.")
+    _data_step(lines)
     lines.append("")
     lines.append("## 6 · The rules")
     lines.append("")
@@ -1058,6 +1070,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
         lines.append("--measure <symbol>`. A function that resists is a residual to record, not a reason to stop -")
         lines.append("**apply the best-scoring variant even if it is not a full match** and write what still differs")
         lines.append("into the unit's file header.")
+    _data_step(lines)
     lines.append("")
     lines.append("## 6 · The rules")
     lines.append("")
