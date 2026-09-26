@@ -1092,6 +1092,11 @@ enemy/fn_80387844.cpp:
 	extabindex  start:0x80037F44 end:0x800380D0
 	.text       start:0x80387844 end:0x8038E8E8
 
+Network/fn_803D3CE8.cpp:
+	extab       start:0x80019E5C end:0x8001A348
+	extabindex  start:0x8003A524 end:0x8003A8B4
+	.text       start:0x803D3CE8 end:0x803D70B8
+
 Network/NetworkWiiMediator.c:
 	.text       start:0x80413F3C end:0x80413F50
 
