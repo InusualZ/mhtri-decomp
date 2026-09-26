@@ -1090,6 +1090,11 @@ lobby/fn_802FA9A0.cpp:
 	.text       start:0x802FA9A0 end:0x8030121C
 	.ctors      start:0x8056F394 end:0x8056F398
 
+lobby/fn_8030121C.cpp:
+	extab       start:0x80015964 end:0x80015AAC
+	extabindex  start:0x8003447C end:0x80034668
+	.text       start:0x8030121C end:0x803066F0
+
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674
