@@ -2092,6 +2092,18 @@ config.libs = [
             # takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
             # -Cpp_exceptions on - the target object carries extab/extabindex).
             Object(NonMatching, "fn_80429B94.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `805482CC_fn_805482CC` - the 0x805482CC-0x8054E894 game-UI band (71 functions /
+            # 26056 B) between the registered `DWCi/fn_805113B0.c` and `homebutton/fn_80555374.cpp`.
+            # No `__FILE__` string covers the range (its data refs are the `.data` UI part-name
+            # vocabulary - "P_txtScrll_UP", "T_As_TextBox_00", "W_TextBox_02" - two `.sdata`
+            # descriptors, the `.sdata2` float pool and the `.bss`/`.sbss` state blocks) and the
+            # runtime-dump map answers only `zz_`/`FUN_` plus a set of clearly misattributed SDK
+            # names at dozens of addresses in this band, so the stem is the map's `fn_805482CC`
+            # with a rule-7 deferral (evidence classes 3/4 in the brief; see the file header).
+            # C++ from the range's own structure (vptr dispatch, adjustor thunks, `__dl__FPv`),
+            # which puts it in the game-root `main` lib with cflags_main like its link neighbours.
+            Object(NonMatching, "fn_805482CC.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80569DAC` - the
             # homebutton::gui component/manager band (`.text` 0x80569DAC-0x8056BBF0, 52 functions /
             # 7748 B).  Evidence class 2: the shared runtime dump names six functions with the real

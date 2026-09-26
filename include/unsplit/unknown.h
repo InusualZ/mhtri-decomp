@@ -232,6 +232,31 @@ s32 fn_80331104(void);
  * registered the range 0x8029F3C8..0x802A6624, which owns that address. */
 void fn_80335CE8(struct _PLW* self, s32 kind);
 
+/* The `.sdata2` / `.data` pool entries the 0x805482CC-0x8054E894 game-UI band loads.  The band's
+ * target object carries no data section at all, so every constant it uses is another translation
+ * unit's pool entry and is declared here `extern` and used as a load operand - never defined
+ * (playbook 29/58; a definition would make the object emit its own copy and drift the DOL).  The
+ * address band names no module (the nearest registered ranges are `DWCi/fn_805113B0.c` below and
+ * `homebutton/fn_80555374.cpp` above), so this file is their home (rule 2's named gap).
+ * Added with the `fn_805482CC.cpp` registration. */
+extern f32 lbl_8079D628; /* 640.0f - the row bound fn_80548394 writes into a text record */
+extern f64 lbl_8079D630; /* the u32->double magic 4503599627370496.0 */
+extern f32 lbl_8079D638; /* 1.0f */
+extern f32 lbl_8079D63C; /* 0.5f */
+extern f32 lbl_8079D698; /* 15.0f */
+
+/* The helpers the 0x805482CC-0x8054E894 band tail-calls into its unregistered neighbours (the bands
+ * below at 0x8054F788 / 0x805526xx and above at 0x80553xxx / 0x8055Bxxx, none of which is registered
+ * yet, so rule 2's owner has no header to name).  Signatures are the call sites': r3 is the address
+ * the caller hands over, and `fn_8055A3E0` takes the sub-object plus the mode word the caller
+ * materialises. */
+void fn_8054F788(void* record);
+void fn_80553670(void* record);
+void fn_80526D00(void* record);
+/* 0x8055A3E0 / 0x8055BEF0 / 0x8055C1D4 / 0x8055C2CC are inside the registered band
+ * `homebutton/fn_80555374.cpp`, so `include/homebutton/fn_80555374.h` declares them (rule 2). */
+
+
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
