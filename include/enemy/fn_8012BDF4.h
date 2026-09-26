@@ -25,6 +25,10 @@ s32 em_act_ck(struct _ENEMY_WORK* self, u8 a, u8 b);
 u32 em_area_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 u32 em_die_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void fn_8012BDF4(struct _ENEMY_WORK* work);
+/* 0x8012CEB4 - r3 the work record, r4 the timer, r5 the slot index; the area-table timer arm
+ * `enemy/fn_801A9540.cpp`'s counters use.  Added with that unit's registration (rule 2: this
+ * range owns the address). */
+void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
 void fn_8012C600(struct _ENEMY_WORK* work);
 void fn_8012C9AC(struct _ENEMY_WORK* work);
 s32 fn_8012D0B4(struct _ENEMY_WORK* enemy, void* move);

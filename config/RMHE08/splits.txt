@@ -727,6 +727,11 @@ enemy/fn_801A4504.cpp:
 	extabindex  start:0x8002AB70 end:0x8002ABA0
 	.text       start:0x801A4504 end:0x801A9540
 
+enemy/fn_801A9540.cpp:
+	extab       start:0x8000F324 end:0x8000F54C
+	extabindex  start:0x8002ABA0 end:0x8002AEDC
+	.text       start:0x801A9540 end:0x801B0010
+
 enemy/fn_801B4458.cpp:
 	extab       start:0x8000F6B4 end:0x8000F7EC
 	extabindex  start:0x8002B0F8 end:0x8002B2CC

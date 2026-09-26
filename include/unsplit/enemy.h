@@ -288,6 +288,12 @@ void fn_801A4218(struct _ENEMY_WORK* self);
 void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
 /* r3 the work record, r4/r5/r6/r7 four scalars and f1 (the target's call sites set all five). */
 void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
+/* Added with `enemy/fn_801A9540.cpp`'s registration (rule 2): the enemy-band callees that
+ * range's state machines call and no registered unit owns.  Their bracketing registered units
+ * both name `enemy`, so this band header is their home. */
+/* 0x801B0010 - r3 the area byte; the enemy's own area predicate, owned by the still-unregistered
+ * proposal/801B0010 range, so the band header carries it (rule 2). */
+u32 fn_801B0010(u8 area);
 void fn_801A9748(struct _ENEMY_WORK* self);
 void fn_801A98F8(struct _ENEMY_WORK* self);
 #ifdef __cplusplus

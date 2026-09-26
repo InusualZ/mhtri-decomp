@@ -758,6 +758,19 @@ config.libs = [
             # Module `enemy` from `em_get_mot_no(_ENEMY_WORK*)` and every callee; the name keeps the
             # map's `fn_` stem (no `__FILE__` string, the dump answers only `zz_`/`FUN_`).  C++.
             Object(NonMatching, "enemy/fn_801A4504.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/801A9540_fn_801A9540.cpp: the enemy per-action state-machine band
+            # (`.text` 0x801A9540..0x801B0010, 82 functions / 0x6AD0 bytes) plus its
+            # extab run 0x8000F324..0x8000F54C (69 records) and extabindex run
+            # 0x8002ABA0..0x8002AEDC (69 x 12 B).  Module `enemy` from the link band (both
+            # bracketing registered units are `enemy/*`) and from the code (every callee is the
+            # `_ENEMY_WORK` API and every body drives that record); C++ because the range
+            # reaches genuinely mangled callees (`em_frame_check__FP11_ENEMY_WORKUsff`,
+            # `setVector3__FPQ34nw4r4math4VEC3fff`, `ran_suu__Fl`) through their real
+            # signatures (rule 9).  No `__FILE__` string is referenced by the range (checked
+            # with `nm -u` over its 82 split objects) and the runtime dump answers only `zz_`
+            # placeholders, so the file keeps the map's own stem (see the unit's header).
+            Object(NonMatching, "enemy/fn_801A9540.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from proposal/8035E034_fn_8035E034.cpp:
             # the em033/em035 enemy-program handlers (`.text` 0x8035E034..0x8035F2B4, 16 functions /
             # 0x1280 bytes) plus their extab/extabindex group.  Module `enemy` from the `.data` program

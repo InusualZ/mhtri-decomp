@@ -91,6 +91,15 @@ void fn_801280F4(struct _ENEMY_WORK* self);
  * existing consumers (`enemy/fn_80176C58.cpp`, `enemy/fn_80178128.cpp`) spell it the same way. */
 void fn_80128030(struct _ENEMY_WORK* self);
 void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
+/* 0x80128AEC - r3 the work record, r4/r5 two scalars (its body reads both and tail-calls the
+ * 0x80128A3C slot helper).  Added with `enemy/fn_801A9540.cpp`'s registration: that unit's
+ * `fn_801A9724` asks the area table for action 13's slot through it. */
+void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
+/* 0x80128A14 - r3 the work record and the two scalars its own body narrows; the neighbour state
+ * machines call it after `fn_8012F93C` reports the motion done (declaration moved here from
+ * include/unsplit/enemy.h by `enemy/fn_801A9540.cpp`'s registration: this range owns the
+ * address). */
+void fn_80128A14(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in
  * 0x10-byte steps; the caller (`enemy/fn_8015E854.cpp`'s `fn_8015EFAC`) reads the f32 at +0x4. */
 f32* fn_80126454(struct _ENEMY_WORK* self);
