@@ -1095,6 +1095,12 @@ ef/fn_803066F0.c:
 	extabindex  start:0x80034668 end:0x80034674
 	.text       start:0x803066F0 end:0x8030681C
 
+menu/fn_8031A6C0.cpp:
+	extab       start:0x80015F3C end:0x80016074
+	extabindex  start:0x80034D40 end:0x80034F14
+	.text       start:0x8031A6C0 end:0x8031EA8C
+	.ctors      start:0x8056F398 end:0x8056F39C
+
 hud/fn_80324F7C.c:
 	extab       start:0x8001621C end:0x80016224
 	extabindex  start:0x80035190 end:0x8003519C
