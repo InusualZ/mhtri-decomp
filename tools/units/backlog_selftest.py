@@ -228,6 +228,30 @@ def selftest() -> int:
                      tooling_register=os.path.join(tmp, "x"))
     check("recording a claim preserves the statuses", bl.load_statuses(tmp, seeded), {key: "done"})
     check("... and appends to the ledger", len(bl.load_ledger(tmp, seeded)["claims"]), 1)
+    # A claim is free while the register is CLEAN (owner, 2026-09-27): the ledger rations against known
+    # backlog work, so with nothing to fix there is nothing to ration - charging would let a clean stretch
+    # accrue negative credit and then demand catch-up resolutions the day items reappeared.
+    clean = tempfile.mkdtemp(prefix="backlog-clean-")
+    os.makedirs(os.path.join(clean, "outbox"))
+    clean_reg = os.path.join(clean, ".pi", "clean.json")
+    check("a clean register has no open items", bl.open_items(clean), [])
+    fsum = bl.record_claims(clean, [{"unit": "uF"}], ratio=1, register=clean_reg)
+    check("... a claim while it is clean is free", fsum["balance"], 1)
+    check("... and spends nothing", bl.load_ledger(clean, clean_reg)["claims"], [])
+    check("... but is still counted, so nothing is hidden", bl.load_ledger(clean, clean_reg)["free"], 1)
+    check("... and the balance line says so",
+          "free while the register was clean" in bl.ledger_line(fsum), True)
+    check("... and the payload carries it",
+          bl.payload([], "", {}, bl.load_ledger(clean, clean_reg))["ledger"]["free"], 1)
+    check("... a second free claim accumulates",
+          bl.record_claims(clean, [{"unit": "uG"}], ratio=1, register=clean_reg)["free"], 2)
+    check("... and the balance is untouched by either",
+          bl.record_claims(clean, [], ratio=1, register=clean_reg)["balance"], 1)
+    check("a claim against an open backlog still spends",
+          bl.record_claims(tmp, [{"unit": "u10"}], ratio=1,
+                           register=os.path.join(tmp, ".pi", "spend.json"),
+                           outbox=obx, notes=notes,
+                           tooling_register=os.path.join(tmp, "x"))["balance"], 0)
 
     # --- refusal: the balance, not a hard gate -------------------------------------------------------
     no_reg = os.path.join(tmp, "no-register.json")
