@@ -42,28 +42,40 @@
  * same literals), so per playbook 58 it can be neither claimed nor named here.  Our object keeps the
  * empty `ours-extra` set: the view classes are never constructed, so no vtable is emitted.
  *
- * FLAGS.  The object deviates from the lib on two points, both in `configure.py` with the evidence:
- * `-O3` + `-inline noauto` in place of `-O4,p` + `-inline auto` (retail calls the file-static helpers
- * - the peer's `isQueued` is 72 B against our 64 B when the inliner folds them in), and the
- * exceptions pragma above.
+ * FLAGS.  The object deviates from the lib on three points, all in `configure.py` or in this file
+ * with the evidence: `-O3` + `-inline noauto` in place of `-O4,p` + `-inline auto` (retail calls the
+ * file-static helpers - the peer's `isQueued` is 72 B against our 64 B when the inliner folds them
+ * in), the `#pragma exceptions on` above, and a file-wide `#pragma peephole off` (retail keeps the
+ * *unfused* folds across the band - `clrlwi`+`slwi` in place of `clrlslwi`, `extsh`+`cmpwi` in place
+ * of a folded compare, `extsb`+`cmpwi` in place of `extsb.`), with the five functions whose retail
+ * bodies DO carry the folded forms bracketed back on.
  *
- * RESIDUALS.  Unit 92.15 % fuzzy, 26/71 functions byte-identical, `.text` 13716 B against 13972 B.
- * fn_8041B720 70.94 / replyRequest 66.42 / registerReceiver 64.20 - retail drives the receiver-table
- * loops with `mtctr`+`bdnz` and a pointer advanced by 4 where ours emits a `clrlwi`/`cmplw`+`blt`
- * rotation from the same source shape; receive 78.05 and isQueued 83.89 (536/72 B retail against our
- * 476/64).  Two dispatch sites are not virtual calls: the network singleton's `postError` at vtable
- * +0x288 would need 161 declared virtuals, so it keeps the documented table view in
- * `include/unsplit/Network.h` (`lwz r12, 0x0(r3)` + `lwz r12, 0x288(r12)` in retail, ours through a
- * scratch register).  `runThread` and the thread body it calls are emitted in the reverse of the
- * target's address order (the map has `runThread` at 0x8041D31C and the body at 0x8041D344): a source
- * order defect that costs no row but keeps our `.text` layout from matching.  Data: `extabindex`
- * 540/540 exact, `extab` 360 against 380 - the target's last entry is the 20-byte cleanup record
- * whose `.relaextab` reloc points at `dtor_803CA338`, a local object with a destructor the range's own
- * code does not show.
+ * RESIDUALS.  Unit 95.46 % fuzzy, 42/71 functions byte-identical, `.text` 13716 B against 13972 B.
+ * fn_8041B720 74.25 / applyEvent 83.90 / isQueued 83.89 / unregisterReceiver 85.93 - the tail of the
+ * error record is staged through two 3-word halves the compiler keeps in registers (writing
+ * `info[0] = info[3] = v` recovers part of it; the rest is block layout), and the receiver-table
+ * loops are driven by `mtctr`+`bdnz` in retail against our `clrlwi`/`cmplw`+`blt` rotation from the
+ * same source shape.  isQueued differs only in that the sign-extended state stays in r3 for the
+ * branchless clamp in retail while ours moves it to r4.  Two dispatch sites are not virtual calls:
+ * the network singleton's `postError` at vtable +0x288 would need 161 declared virtuals, so it keeps
+ * the documented table view in `include/unsplit/Network.h` (`lwz r12, 0x0(r3)` +
+ * `lwz r12, 0x288(r12)` in retail, ours through a scratch register).  `runThread` and the thread body
+ * it calls are emitted in the reverse of the target's address order (the map has `runThread` at
+ * 0x8041D31C and the body at 0x8041D344): a source order defect that costs no row but keeps our
+ * `.text` layout from matching.  Data: `extabindex` 540/540 exact, `extab` 360 against 380 and
+ * `.rela.text` 5688 against 5616 (ours carries relocations the target's does not - a body-pass
+ * residual); the target's last extab entry is the 20-byte cleanup record whose `.relaextab` reloc
+ * points at `dtor_803CA338`, a local object with a destructor the range's own code does not show.
  */
 
 #include "types.h"
 #include "Network/fn_8041A87C.h"
+
+/* retail keeps the *unfused* peephole forms across this band: `clrlwi`+`slwi` in place of
+ * `clrlslwi`, `extsh`+`cmpwi` in place of a folded compare, `extsb`+`cmpwi` in place of
+ * `extsb.`.  The five functions below re-enable the pass - their retail bodies DO carry the
+ * folded forms - and each is bracketed rather than left open (playbook 32). */
+#pragma peephole off
 
 /* The target object carries `extab`/`extabindex` (380/540 B) while the `Network` lib is built with
  * exceptions off, so the front-end is told per file (the pragma pair of playbook 30). */
@@ -110,6 +122,7 @@ s32 fn_8041DD28(NetworkPeerCallback* self);
 /* ------------------------------------------------------------------------------------------------ */
 
 /* Runs the connect-attempt callback sub-machine, one step per frame. */
+#pragma peephole on
 void NetworkGameSpyInterface::updateCallbackStep()
 {
     u8 step;
@@ -177,6 +190,7 @@ void NetworkGameSpyInterface::updateCallbackStep()
         break;
     }
 }
+#pragma peephole off
 
 /* Dispatches to the search sub-machine (task 1) or the connect sub-machine (task 2). */
 s32 NetworkGameSpyInterface::dispatchTask()
@@ -301,6 +315,7 @@ s32 NetworkGameSpyInterface::runConnect()
 }
 
 /* Applies a DWC event to the interface, then folds the event bits into the state machine's flags. */
+#pragma peephole on
 void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpyEventMsg* msg)
 {
     u32 limit;
@@ -391,6 +406,7 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         break;
     }
 }
+#pragma peephole off
 
 /* Drops every socket of the three-slot table, one request record at a time. */
 extern "C" void fn_8041B194(void)
@@ -435,6 +451,7 @@ extern "C" s32 fn_8041B270(NetworkInstance* self, u32 peer, u16 value, const voi
 }
 
 /* Maps a GameSpy connect result onto the interface's request state and error record. */
+#pragma peephole on
 extern "C" void fn_8041B334(s32 result, s32 unused, const GameSpyAddress* src, GameSpyResultInfo* info)
 {
     s32 error = 0;
@@ -476,6 +493,7 @@ extern "C" void fn_8041B334(s32 result, s32 unused, const GameSpyAddress* src, G
         ((GameSpyInterfaceThread*)fn_803D6A98())->setError(0x80000007, 0x5F, -error);
     }
 }
+#pragma peephole off
 
 /* Copies the 8-byte GameSpy header out of a received frame. */
 extern "C" void fn_8041B514(GameSpyAddress* out, const GameSpyAddress* in)
@@ -515,9 +533,9 @@ extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s
             }
         }
         if (i >= 3 && getInstance_() != NULL) {
-            info[0] = 0x80000007;
-            info[1] = 0x5F;
-            info[2] = 0x2D6A;
+            info[0] = info[3] = 0x80000007;
+            info[1] = info[4] = 0x5F;
+            info[2] = info[5] = 0x2D6A;
             getInstance_()->vtable->postError_288(getInstance_(), (NetworkErrorInfo*)info);
         }
     } else {
@@ -550,9 +568,9 @@ extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
         }
     }
     if (i >= 3 && getInstance_() != NULL) {
-        info[0] = 0x80000007;
-        info[1] = 0x5F;
-        info[2] = 0x2D6A;
+        info[0] = info[3] = 0x80000007;
+        info[1] = info[4] = 0x5F;
+        info[2] = info[5] = 0x2D6A;
         getInstance_()->vtable->postError_288(getInstance_(), (NetworkErrorInfo*)info);
     }
 }
@@ -988,8 +1006,8 @@ s32 GameSpyInterfaceThread::canClose()
 /* Replies to a pending request by filling the first free return handle. */
 s32 GameSpyInterfaceThread::replyRequest(s32 handle)
 {
-    u8 count;
-    u8 i;
+    s32 count;
+    s32 i;
 
     if (field_68 < 0) {
         return -1;
@@ -1252,7 +1270,7 @@ void GameSpyInterfaceThread::step()
                         if (peerMatch_4478 == 1) {
                             if (fn_8050DFA0(lbl_80794CE0, info,
                                             DWCi_formatAddress(lbl_806D3660.session_0C,
-                                                        lbl_806D3660.encoded_0A, NULL),
+                                                        DWCi_htons(lbl_806D3660.encoded_0A), NULL),
                                             profile_4485, 0x14, 0x2710, lbl_806031A0, 0) == 0) {
                                 negotiationStep_4480 = 3;
                                 break;
@@ -1513,6 +1531,7 @@ void GameSpyInterfaceThread::setBufferSize(s16 size)
 }
 
 /* Starts a NAT negotiation between the two peer ids. */
+#pragma peephole on
 void GameSpyInterfaceThread::startNegotiation(const GameSpyPeerId* a, const GameSpyPeerId* b)
 {
     s32 i;
@@ -1542,6 +1561,7 @@ void GameSpyInterfaceThread::startNegotiation(const GameSpyPeerId* a, const Game
     negotiationStep_4480 = 0;
     negotiation_446C = 1;
 }
+#pragma peephole off
 
 /* Reports whether a negotiation is running. */
 u8 GameSpyInterfaceThread::isNegotiating()
@@ -1604,7 +1624,8 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
     s8 slot;
 
     flagByte = flag;
-    if (interface_6634->getSlotState(peer_6638) < 0) {
+    slot = interface_6634->getSlotState(peer_6638);
+    if (slot < 0) {
         fn_803CCF14(this, lbl_806036A0, 0, -1);
         return -1;
     }
@@ -1678,7 +1699,8 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
     *aLen = 0;
     *bLen = 0;
     *flag = 0;
-    if (interface_6634->getSlotState(peer_6638) < 0) {
+    slot = interface_6634->getSlotState(peer_6638);
+    if (slot < 0) {
         fn_803CCF14(this, lbl_806036A0, 0, 0);
         return -1;
     }
@@ -1748,16 +1770,18 @@ s32 NetworkPeerGameSpy::put(const void* data, u32 size)
 }
 
 /* Reports whether the peer has a message queued. */
+#pragma peephole on
 s32 NetworkPeerGameSpy::isQueued()
 {
     s8 state;
 
-    state = interface_6634->getSlotState(peer_6638);
+    state = (s8)interface_6634->getSlotState(peer_6638);
     if (state > 0) {
         return 1;
     }
     return state & (state >> 31);
 }
+#pragma peephole off
 
 /* Empty body: the peer's vtable placeholder. */
 extern "C" void fn_8041DD24(void)

@@ -84,12 +84,13 @@ typedef struct NetworkErrorInfo {
 /* The worker thread object (the pool's own logs spell its methods `NetworkGameSpyInterface::<method>`;
  * the name here is the one this band's other lane chose for the object - see the unit header).
  *
- * NOTE, pre-existing and left to its own pass: `thread_130` is declared 0x1E50 B here while the
- * annotations from `threadParam_4448` on start at +0x4448, so everything past the array is compiled
- * 0x24C8 low against the target (retail reads `sessionOpen` at +0x4484, our object at +0x1FBC).
- * Sizing it 0x4318 (OSThread 0x318 + the 0x4000 stack the ctor hands `OSCreateThread`) makes the
- * declaration agree with its own annotations: unit 92.168 against 92.146 and 30/71 byte-identical,
- * no row down.  Not applied - it is a field-size defect, not this lane's class-form finding. */
+ * `thread_130` is sized 0x4318 (dolphin's 0x318-byte `OSThread` plus the 0x4000-byte stack the
+ * constructor hands `OSCreateThread`), which is what puts the annotations from `threadParam_4448`
+ * on at `+0x4448` in the object as well as in this comment.  Sized 0x1E50 (the pre-fix value) the
+ * whole tail of the object compiled 0x24C8 low - retail reads `sessionOpen` at +0x4484 where ours
+ * read +0x1FBC - and the four tail accessors (`getPeerId`, `isNegotiating`,
+ * `getNegotiationResult`, `setBufferSize`) each lost the displacement while 19 more rows moved up
+ * with the fix. */
 class GameSpyInterfaceThread {
 public:
     /* +0x0000 */ void* vtable_00;
@@ -137,7 +138,7 @@ public:
     /* +0x0127 */ u8  pad_127;
     /* +0x0128 */ u32 busy_128;
     /* +0x012C */ u8  pad_12C[0x04];
-    /* +0x0130 */ u8  thread_130[0x1E50];
+    /* +0x0130 */ u8  thread_130[0x4318];
     /* +0x4448 */ u32 threadParam_4448;
     /* +0x444C */ u8  mutexReady_444C;
     /* +0x444D */ u8  pad_444D[0x03];
@@ -231,7 +232,8 @@ public:
     u8    registerReceiver(void* receiver, u32 id);
     /* releases the receiver slot at `index` and clears its id */
     void  unregisterReceiver(s32 index);
-    /* returns the state of the slot `id` maps to, or the pending negotiation result */
+    /* returns the state of the slot `id` maps to, or the pending negotiation result; the callers
+       narrow it to `s8`, so a negative value means the peer's interface slot is gone */
     u8    getSlotState(u32 id);
     /* returns the slot index `id` maps to, or -1 */
     s8    findSlot(u32 id);
