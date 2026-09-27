@@ -598,6 +598,11 @@ regression if the hash goes red.
 * [ ] `symbols.txt` / `splits.txt` edits are byte-clean for the lines you didn't mean to touch
       (`git diff --stat` sanity check — these files are huge; a symbol rename goes through
       `python tools/symbols/symedit.py rename`, so its diff is exactly one line per symbol).
+* [ ] For a tool change: the suite is green - `python tools/selftest.py --changed` locally, and the land
+      gate runs all of it as the row **"all tool selftests pass (except the parked list)"** (~30 s, before
+      the build, so a failure refuses early). A failure is fixed or **parked** in
+      `tools/selftests-known-failures.json` with a reason and a date - never ignored, and never silently
+      skipped: a park whose test now *passes* is itself an error, so parked debt cannot rot.
 * [ ] No new compiler flags / tool version changes smuggled in.
 * [ ] Nothing was committed or pushed unless the user asked for it (see Non-negotiables rule 6); staged vs.
       unstaged state reported clearly.
