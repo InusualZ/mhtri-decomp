@@ -1217,6 +1217,11 @@ ef/eft053.cpp:
 	.data       start:0x805EDF40 end:0x805EDFB8
 	.sdata2     start:0x8079B740 end:0x8079B820
 
+enemy/em020_prog.cpp:
+	extab       start:0x800178E4 end:0x80017A5C
+	extabindex  start:0x800373BC end:0x800375F0
+	.text       start:0x8036CF64 end:0x80375084
+
 enemy/fn_80382310.cpp:
 	extab       start:0x80017E2C end:0x80018094
 	extabindex  start:0x80037BA8 end:0x80037F44

@@ -1116,6 +1116,25 @@ config.libs = [
             # neighbours plus a file-wide `#pragma peephole off` (the target keeps the unfused
             # `addi`+`cmpwi` timer compares).
             Object(NonMatching, "enemy/em035_prog.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8036CF64_fn_8036CF64.cpp: the em020 enemy program
+            # (`.text` 0x8036CF64..0x80375084, 57 functions / 0x8120 B, plus its extab run
+            # 0x800178E4..0x80017A5C - 47 records - and extabindex run 0x800373BC..0x800375F0 -
+            # 47 x 12 B; each is exactly the gap the bracketing split objects leave).  Module
+            # `enemy` and the file name `em020_prog` (brief class 3): the map's own global
+            # `em020_prog_tbl` (`.data` 0x805EE098, 0x70 B) lists seven of this range's handlers by
+            # address (0x8036E2BC/E320/E6B8/72D58/E570/E574/733BC) exactly as `em035_prog_tbl`
+            # lists `enemy/em035_prog.cpp`'s, and the range's callee profile is the enemy band's
+            # (`em_frame_check`, `em_get_mot_no`, `em_act_ck`, `get_joint_wmat_em`, `fn_8013*`).
+            # No `__FILE__` string covers the range and the dump answers only `zz_` placeholders.
+            # C++; every plain `fn_` definition is `extern "C"`.  Same `cflags_main` as its enemy
+            # neighbours.  SEAM UNPROVEN (the `.sdata2` run 0x8079B820..0x8079BC64 is an ordered
+            # disjoint partition between the two neighbours' pools, which is the reliable class -
+            # but an ordered partition cannot separate one object from two adjacent ones); the range
+            # also holds a head group (0x8036CF64..0x8036E26C) that owns no pool and no `.data`, and
+            # `em020_prog_tbl`'s first entry (0x8036E2BC) is the apparent cut - a re-cut is requested
+            # in this batch's `config_requests`.  See the unit header for the full evidence.
+            Object(NonMatching, "enemy/em020_prog.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803253BC_fn_803253BC` (the map stem it was claimed under) - the 0x803253BC-0x8032C920
             # band (85 functions / 30052 B) between the registered `hud/fn_80324F7C.c` above and the
