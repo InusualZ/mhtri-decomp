@@ -57,6 +57,11 @@ void fn_800E0A14(void* chr, u32 joint, Mtx34* out);
 /* 0x800DD514 - the fixed SE request the effect step makes when its joint window is hit (the body
  * loads 46/13 and tail-calls the SE request path).  Added with `ef/fn_8030681C.cpp`. */
 void fn_800DD514(nw4r::math::VEC3* pos);
+/* 0x800DDCB8 - request the map's SE `id` at `pos`.  Its map name is the global C++ mangling
+ * `map_se_req__FUcPQ34nw4r4math4VEC3`, so the declaration has to sit at global scope with exactly
+ * these parameter types to reproduce it.  Added with `ef/eft053.cpp`; `ef/eft004.cpp` carries an
+ * older local copy of the same declaration. */
+void map_se_req(u8 id, nw4r::math::VEC3* pos);
 
 #ifdef __cplusplus
 }

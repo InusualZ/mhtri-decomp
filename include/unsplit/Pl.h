@@ -264,7 +264,9 @@ void fn_802756F0(struct _PLW* self, u8 kind, u16 no, u16 mask);
  * size: 0x8 */
 typedef struct PlSlotGate {
     /* +0x00 */ u8 flag_0x00;   /* non-zero means the slot is occupied (`fn_8027DC64`/`78`/`90`) */
-    /* +0x01 */ u8 pad_0x01[0x7];
+    /* +0x01 */ u8 pad_0x01[0x3];
+    /* +0x04 */ s32 length_0x04; /* the effect family's loop length in frames; `ef/eft053.cpp`'
+                                  * state machine reloads entry 1's copy after its last state */
 } PlSlotGate;
 
 extern PlSlotGate lbl_806BB7A0[3];
