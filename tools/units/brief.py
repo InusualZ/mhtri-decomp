@@ -1294,6 +1294,16 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
                      % (p.get("count", 0), BAR))
         lines.append("biggest first where two are equal.")
         lines.append("")
+        lines.append("**Name what you need - that is part of the work, not a blocker.** A call to another unit's "
+                     "`fn_XXXXXXXX` is a rule 7 finding, and rule 7's unblock is to NAME the callee: rename it in "
+                     "the map (`python tools/symbols/symedit.py rename-batch`), sweep every reference site in "
+                     "`src/` and `include/` in the same change, declare it where section 6.5 puts it, and "
+                     "re-measure that owner and its consumers - playbook row 60, a shared header's declaration set "
+                     "is a codegen input. Rule 7 asks for the name and never for the body, so naming unblocks you "
+                     "without touching who owns the code; a missed reference site is not cosmetic either, since "
+                     "objdiff pairs by name and reports that function as 0 %% wherever it is used. This is also "
+                     "the thing that makes the rest of your range reachable, so do not leave it for someone else.")
+        lines.append("")
         lines.append("Work them one at a time and re-measure each with `python tools/units/measure.py <unit>`")
         lines.append("(the loop is in §6). A function that resists is a residual to")
         lines.append("record, not a reason to stop -")
