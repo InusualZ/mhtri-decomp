@@ -8,7 +8,7 @@
  * (0x802701E8, 0x8027060C), pass the same record they hand `Pl_Skill_ck(_PLW*, u16)` and gate the
  * result on `Pl_cat_skill_ck`/`Pl_Skill_ck`.
  *
- * rule 7 deferred: the symbol map has only `fn_8026FFBC` for this range and no evidence names it -
+ * Naming note: the symbol map has only `fn_8026FFBC` for this range and no evidence names it -
  * `dumpmap.py lookup 0x8026FFBC` answers the placeholder `zz_026ffbc_`, the function reads no string
  * (its only data operands are the two `.sdata2` pool words below) and the surrounding pools carry no
  * `__FILE__` name for it.  The behaviour is a ratio test, not a named API of its neighbours' scheme.

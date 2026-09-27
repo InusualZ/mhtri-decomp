@@ -1,5 +1,5 @@
 /* auto/800FD718_fn_800FD718.c - the state-1/2/3 handlers of the `eft002` effect machine,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x800FD718..0x800FD864 (3 functions: fn_800FD718, fn_800FD850, fn_800FD860).
  *
  * What it is.  `fn_800FD4E4` is the four-state update hook the `eft002` setters install on the 0x48-byte

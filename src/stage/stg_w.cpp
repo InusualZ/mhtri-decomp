@@ -17,7 +17,7 @@
  * class 3 of brief section 2: what the code does plus the neighbours' scheme - the block the range
  * is built around is the stage (`stg`) work record.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for 92 of this range's 98 symbols (checked
+ * Naming note: the symbol map has only fn_XXXXXXXX for 92 of this range's 98 symbols (checked
  * with `python tools/symbols/symedit.py range 0x802AD9C0 0x802B2978` and
  * `python tools/symbols/dumpmap.py lookup` over the inventory: every unnamed entry is a bare
  * `fn_XXXXXXXX` in config/RMHE08/symbols.txt and the runtime dump answers `zz_XXXXXXXX_`); the six

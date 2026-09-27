@@ -2,7 +2,7 @@
  * ef/ef_emitter.cpp - the nw4r::ef emitter / particle-manager object layer, `.text`
  * 0x800A6350..0x800A99B4.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` for every one of the proposal's 49 symbols - each
  * resolves to `map=fn_XXXXXXXX`, and the shared dump names none of those addresses either).
  *

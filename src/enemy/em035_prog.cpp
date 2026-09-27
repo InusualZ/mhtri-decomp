@@ -1,6 +1,6 @@
 /* enemy/em035_prog.cpp - the em035 enemy program's tail, `.text` 0x8035F2B4..0x8035FC18 (20
  * functions / 0x964 B), extab 0x800175DC..0x80017634 and extabindex 0x80036F30..0x80036FB4.
- * rule 7 deferred: the names this file *references* in other units are still the map's generated
+ * Naming note: the names this file *references* in other units are still the map's generated
  * `fn_XXXXXXXX` stems (the `fn_8012*`/`fn_8014*` callee band and the lobby `fn_8021*`/`fn_8035FC*`
  * note below) - those are other lanes' to rename.  Every symbol this file DEFINES is named from its
  * own body; the derivation and its evidence are under "NAMING" below.

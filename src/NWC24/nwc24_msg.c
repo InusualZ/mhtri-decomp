@@ -17,7 +17,7 @@
  * so `.text` is the only code section claimed (no extab/extabindex for the band).
  *
  * NAMING.  Every generated name this unit owns was renamed through
- * `python tools/symbols/symedit.py rename` (18 rows, `.pi/notes/net-nwc24.md`); no `rule 7 deferred`
+ * `python tools/symbols/symedit.py rename` (18 rows, `.pi/notes/net-nwc24.md`); no naming
  * escape is needed, because the unit now defines and references only real names.  The three data
  * labels inside the unit's own `.sbss`/`.sdata` claims were renamed the same way, each a GUESS (the
  * image carries no spelling for them): 0x807958A0 `0x807958A0` -> `sMsgLibOpenState` (the four

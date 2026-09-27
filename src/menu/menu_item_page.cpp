@@ -23,7 +23,7 @@
  * table are named there (one definition, rule 1 - the extension was proven inert:
  * `build/RMHE08/src/menu/menu_item.o` is byte-identical before and after it).
  *
- * rule 7 deferred: the `fn_XXXXXXXX` names this file carries are all *references* to other units'
+ * Naming note: the `fn_XXXXXXXX` names this file carries are all *references* to other units'
  * symbols (`fn_802E0AD4`, `fn_8004EA24`, `fn_8033ADD0`, `get_menu_lsp_tbl`'s band, ...) which the map
  * still spells as stems and which are not this batch's to rename; every one of this file's own 22
  * symbols is named above.  The shape is the one `hud/fn_80334568.cpp` and `menu/fn_8031EA8C.cpp`

@@ -8,7 +8,7 @@
  * `g3d_resanmscn_ac.h` header string (lbl_8058FF08); `fn_8008A204` carries no data reference (the
  * report's alternative cut is 0x8008A204) - unpinned, measure to settle.
  *
- * rule 7 deferred: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
+ * Naming note: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
  * symbol needs the map and the source in one edit (playbook 31).
  *
  * Language: langcheck says the retail TU is C++, but the source is C-idiom (`fn_80089F94` passes a

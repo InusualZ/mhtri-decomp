@@ -1,7 +1,7 @@
 /* sound/fn_800E8E60.cpp - the quest/challenge sound work system, `.text` 0x800E8E60..0x800EF7D8
  * (0x6978 B, 149 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for 144 of this range's 149 symbols (checked by
+ * Naming note: the symbol map has only fn_XXXXXXXX for 144 of this range's 149 symbols (checked by
  * reading config/RMHE08/symbols.txt: `fn_800E8E60` .. `fn_800EF690` are the map's bare `.text` entries);
  * the five named symbols carry the map's own C++ mangling and are defined under their real identifiers.
  *

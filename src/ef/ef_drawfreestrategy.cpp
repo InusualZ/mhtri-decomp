@@ -1,7 +1,7 @@
 /*
  * ef/ef_drawfreestrategy.cpp - nw4r::ef `DrawFreeStrategy`, 0x800BE154..0x800BEF98 (11 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name
  * this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * The unit's `.data` pool names the original source file: the assert at 0x805941F8 is the bare string

@@ -22,7 +22,7 @@
  * (`title_snd_init__Fv`, `set_BGM_volume__FUc`, ...) and the request records the range builds are
  * passed as C++ aggregates, so the C++ front-end is the one that produced the object.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for 54 of this range's 62 symbols (checked
+ * Naming note: the symbol map has only fn_XXXXXXXX for 54 of this range's 62 symbols (checked
  * with `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump answers `zz_XXXXXXXX_`,
  * which is not a name), so the map's stems are kept as the definitions' names.
  *

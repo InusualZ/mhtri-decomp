@@ -20,7 +20,7 @@
  * 0x80022158-0x8002232C.  The boundaries are the functions before (fn_800938EC, `CleanUpTracks`) and
  * after (fn_800947A4, the first body of the next TU, which cites "g3d_resmat.cpp").
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x80093990`, which answers a `zz_` placeholder, and with
  * config/RMHE08/symbols.txt, whose every `.text` entry in 0x80093990..0x800947A4 is a bare
  * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.

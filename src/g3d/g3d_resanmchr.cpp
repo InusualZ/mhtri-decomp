@@ -21,7 +21,7 @@
  * `extabindex` 0x80021A74-0x80021D5C (62 entries).  The boundaries are the functions before
  * (fn_8008A644) and after (fn_8008F6E8).
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8008A664`, which answers the `zz_008a664_` placeholder,
  * and with config/RMHE08/symbols.txt, whose every `.text` entry in 0x8008A664..0x8008F6E8 is a bare
  * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.

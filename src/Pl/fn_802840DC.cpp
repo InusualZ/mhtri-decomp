@@ -6,7 +6,7 @@
  * attack-row tables and pool constants are still emitted by the neighbouring `auto_*` objects, so
  * they are declared and never defined (invariant 8.4 / playbook 29).
  *
- * rule 7 deferred: the symbol map spells every one of this range's 54 functions as a bare
+ * Naming note: the symbol map spells every one of this range's 54 functions as a bare
  * `fn_XXXXXXXX` (checked with `tools/symbols/dumpmap.py` - every address of the range answers the
  * `zz_XXXXXXXX_` placeholder, never a real runtime name - and the range's `config/RMHE08/symbols.txt`
  * entries carry no signature).

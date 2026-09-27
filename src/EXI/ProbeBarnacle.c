@@ -54,7 +54,7 @@
  * object (`lo`/`hi`) as ours-extra; nothing of the target's data is claimed because none of it is in the
  * band's own ranges.
  *
- * rule 7 deferred: the symbol map carries only `fn_XXXXXXXX` for part of this range (checked with
+ * Naming note: the symbol map carries only `fn_XXXXXXXX` for part of this range (checked with
  * `dumpmap.py lookup` over the inventory: `fn_804B1F50`, `fn_804B2050`, `fn_804B21B0`, `fn_804B2AB0`,
  * `fn_804B2CE0`, `fn_804B32D0`, `fn_804B33F0`, `fn_804B4460`, ... - the dump answers a real name for a few
  * of them, but the same dump answers `ISFS_CreateFileAsync` for two different addresses, so its names are

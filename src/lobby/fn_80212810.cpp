@@ -18,7 +18,7 @@
  * whole inventory: every name but `LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` is a bare `.text`
  * entry and the runtime dump answers `zz_XXXXXXXX_`), so the file keeps the map's stem.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
  * lookup over the range's inventory: all names are bare `.text` entries in
  * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
  *

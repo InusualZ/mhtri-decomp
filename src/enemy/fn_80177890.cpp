@@ -1,5 +1,5 @@
 /* enemy/fn_80177890.cpp - the enemy motion-state update set, `.text` 0x80177890..0x80178128.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py grep '80177890'` - every symbol in the range is a bare
  * `fn_XXXXXXXX = .text:0x...` entry with no real name).
  *

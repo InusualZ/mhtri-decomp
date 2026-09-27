@@ -1,5 +1,5 @@
 /* auto/800FCED4_fn_800FCED4.cpp - the `eft002` effect cluster, 0x800FCED4..0x800FD520 (8 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * Two effect families share the range. `eft002_set` / `eft002_set_shell` (0x800FD2FC, 0x800FD3D8) build
  * the 72-byte effect object `fn_800F886C` destroys and install the two handlers that travel with it

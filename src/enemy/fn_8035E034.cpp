@@ -1,5 +1,5 @@
 /* enemy/fn_8035E034.cpp - the em033/em035 enemy-program band, `.text` 0x8035E034..0x8035F2B4
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address here resolves to a `zz_XXXXXXXX_` dump
  * name and a bare `.text` entry in config/RMHE08/symbols.txt, so no real function name survives).
  *

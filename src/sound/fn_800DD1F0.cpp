@@ -1,7 +1,7 @@
 /* sound/fn_800DD1F0.cpp - the SE (`se_w`) request cluster's tail and the `MHchar` model class,
  * .text 0x800DD1F0..0x800E3CBC (125 symbols, 0x6ACC bytes).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: the
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: the
  * unsplit functions of the range are bare `.text` entries in config/RMHE08/symbols.txt; the map's real
  * names - the `* _se_req` helpers and the `MHchar::` methods - are used verbatim below)
  *

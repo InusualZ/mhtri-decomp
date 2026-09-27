@@ -1,7 +1,7 @@
 /* enemy/fn_80382310.cpp - the enemy `em009`/`em019` program band's shared support block, `.text`
  * 0x80382310..0x80387844 (118 functions / 0x5534 bytes, one maximal unclaimed run, docs/plan.md 12).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x80382310` -> `zz_0382310_`; the map's own rows for the
  * range in config/RMHE08/symbols.txt carry no real name either), and no `__FILE__` string is
  * referenced by any body - every `lis`/`addi` and every `@sda21` relocation in the range resolves to

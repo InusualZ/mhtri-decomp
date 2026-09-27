@@ -12,7 +12,7 @@
 // (adjustor thunks `addi r3, r3, -0x04/-0x10/-0x14/-0x17F4/-0x189C/-0x1A04`, the deleting
 // destructors' `__dl__FPv`, the `.ctors` words).
 //
-// rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+// Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
 // `python tools/symbols/dumpmap.py lookup 0x8054E894` -> `zz_054e894_` and a `__FILE__` scan of the
 // range's `.data` pool 0x8064E760-0x8064F600, which holds only layout/pane names).
 //

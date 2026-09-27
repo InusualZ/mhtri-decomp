@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map spells 75 of this range's 78 functions as bare `fn_XXXXXXXX`
+ * Naming note: the symbol map spells 75 of this range's 78 functions as bare `fn_XXXXXXXX`
  * (checked with tools/symbols/dumpmap.py - every address of the range answers `zz_XXXXXXXX_` or
  * `FUN_XXXXXXXX`, never a real runtime name - and the range's `config/RMHE08/symbols.txt` entries
  * carry no signature).  The three the map does name keep the map's spelling

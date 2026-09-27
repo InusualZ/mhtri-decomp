@@ -9,7 +9,7 @@
  * runtime dump answers `zz_` for every in-range address, so the file keeps the map's stem - brief
  * section 2, class 4.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with `python
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `python
  * tools/symbols/symedit.py range 0x8030121C 0x803066F0`), so every definition below keeps the map's
  * own name.
  *

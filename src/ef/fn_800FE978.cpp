@@ -1,6 +1,6 @@
 /* ef/fn_800FE978.cpp - the effect-family spawn/init handler at `.text` 0x800FE978-0x800FF8D4
  * (3 functions, 0xF5C bytes).  Registered once, at its final home (docs/plan.md 12).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; dumpmap returns only
  * the placeholder `zz_00fe978_`, and the object carries no `__FILE__` string).
  *

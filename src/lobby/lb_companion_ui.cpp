@@ -10,7 +10,7 @@
  * are two 0x24-byte refresh wrappers with no argument, so the dump's answer contradicts them and is
  * recorded for a later pass with the caller graph.
  *
- * rule 7 deferred: the file's own 79 symbols are named above.  What the escape still covers is
+ * Naming note: the file's own 79 symbols are named above.  What the escape still covers is
  * precisely the names this file *references* in other units - the 40-odd unsplit lobby/runtime
  * callees (`fn_80334A34`, `fn_8042C9C8`, `fn_800CF384`, ...) and the two neighbouring handlers
  * `fn_80337E78`..`fn_80338600` - which are not this lane's to rename; the dump answers `zz_` for

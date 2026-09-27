@@ -1,5 +1,5 @@
 /* enemy/fn_801550FC.cpp - the em003 enemy's action/state unit, 0x801550FC..0x8015D860 (104 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with `dumpmap.py
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `dumpmap.py
  * lookup`: every function of the range reports `zz_<addr>_` in the shared runtime dump and no
  * `__FILE__`/class string names it, and `config/RMHE08/symbols.txt` carries only the bare
  * `fn_XXXXXXXX` entries for the range - the three exceptions are the C++ mangled definitions listed

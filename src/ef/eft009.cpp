@@ -1,5 +1,5 @@
 /* auto/80103D28_fn_80103D28.cpp - the `eft009` enemy-effect cluster, 0x80103D28..0x80104BD0 (10 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * The unit is the enemy-side effect family: `fn_80104A68` is the allocator every setter funnels through
  * (it pools a 72-byte effect object, installs `fn_80104B94` as the `state_0x05` dispatcher and

@@ -19,7 +19,7 @@
  * fn_8009F848, fn_800A1290, fn_800A14A4) get no record, which is why the extab run is 21 entries
  * and not 26.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` over all 26 addresses - every one answers the
  * map's own `fn_` stem and the runtime dump only `zz_XXXXXXXX_`; config/RMHE08/symbols.txt agrees).
  *

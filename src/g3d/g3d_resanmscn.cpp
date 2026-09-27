@@ -43,7 +43,7 @@
  * `-inline noauto` is what makes the `*_ac.h` inline constructors call out-of-line copies
  * (fn_800900A4/... and fn_80062D58/...), so those are declared and called by their map stems.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x800908FC` -> `zz_00908fc_`, and with
  * config/RMHE08/symbols.txt, whose every `.text` entry in 0x800908FC..0x800916FC is a bare
  * `fn_XXXXXXXX`), so the map's stems stand and are the identifiers.  The `*_ac.h` file strings prove the

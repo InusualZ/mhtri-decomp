@@ -16,7 +16,7 @@
  * (`proposal/8004CAD8_fn_8004CAD8.cpp`); 0x80054C64 is a proposal cap, not a TU boundary.  The
  * registration below claims exactly the proposal's range and says so here.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked
  * `grep -E '^fn_8005(4C|4F|50|53|55|56)' config/RMHE08/symbols.txt`, which is the whole inventory minus
  * the five named entries itemicon_tex_load/gpframe_tex_load/menu_tex_load/village_tex_load/
  * set_arena_idx_switch).

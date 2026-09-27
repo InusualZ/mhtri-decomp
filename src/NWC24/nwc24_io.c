@@ -23,7 +23,7 @@
  * clears it and `NWC24iIsAsyncIoctlBusy` reads it - the image carries no spelling for it).
  * Every generated name this unit owns was renamed through
  * `python tools/symbols/symedit.py rename` (18 rows for the two units, `.pi/notes/net-nwc24.md`); no
- * `rule 7 deferred` escape is needed, because the unit now defines and references only real names:
+ * naming escape is needed, because the unit now defines and references only real names:
  *   0x8051E384 -> NWC24iSetRtcCounter        passes its own name string "NWC24iSetRtcCounter"
  *            (`.data` 0x806311D4) to its error path.
  *   0x8051E560 -> NWC24iOpenFd               IOS_Open with the NWC24 error map (-3 no out

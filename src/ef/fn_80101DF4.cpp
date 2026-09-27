@@ -1,5 +1,5 @@
 /* auto/80101DF4_fn_80101DF4.cpp - the effect-state machine's state-0 handler: `fn_80101DF4`,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80101DF4-0x80101FA4.
  *
  * One C++ TU of the `ef` (effect) library, `auto` / `Wii/1.3` / `cflags_main` (`-O3 -inline noauto`).

@@ -57,7 +57,7 @@
  *     `eft052_hold_entry_set` (hand the caller's entry to the block and re-seed it) and
  *     `eft052_hold_entry_copy` (copy one entry field by field).
  *
- * rule 7 deferred: every remaining `fn_XXXXXXXX` in this file is a REFERENCE to a symbol ANOTHER unit
+ * Naming note: every remaining `fn_XXXXXXXX` in this file is a REFERENCE to a symbol ANOTHER unit
  * owns (the rule's tolerated half, checked with `python tools/symbols/symedit.py refs` on each of the
  * file's names): the effect pool/manager (`fn_800F8788`, `fn_800F8914`, `fn_800F886C`, `fn_800F9DF4`,
  * `fn_800F8A44`), the enemy band (`fn_80126278`, `em_parts_damage_level_get`) and the lobby item API

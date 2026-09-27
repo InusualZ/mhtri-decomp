@@ -1,5 +1,5 @@
 /* enemy/em024_ai.cpp - the em024 monster-AI band `.text` 0x8034C1D0..0x80358624
- * rule 7 deferred: only the eight `fn_` names this file *references* in OTHER units
+ * Naming note: only the eight `fn_` names this file *references* in OTHER units
  * (`fn_8004D27C`, `fn_8004D70C`, `fn_8004EA24`, `fn_8004EA58`, `fn_8004EAF4`, `fn_8029F818`,
  * `fn_802DA2D4`, `fn_80349914`); every symbol this file *defines* is named below (NAMING).
  *

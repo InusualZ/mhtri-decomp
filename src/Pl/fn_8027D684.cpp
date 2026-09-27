@@ -10,7 +10,7 @@
  * record `include/pl.h` owns, and both bracketing registered units are Pl.  The target object carries
  * extab/extabindex, so the flags are the lib's `cflags_pl` (`-Cpp_exceptions on`).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x8027D684 0x802840DC`; the runtime dump answers `zz_<addr>_`
  * for every one of them - `python tools/symbols/dumpmap.py lookup`).
  *

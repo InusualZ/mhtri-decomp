@@ -30,7 +30,7 @@
  * 0x80378F9C..0x8037F940; the brief's 0x8037EA64 cut is filed as a `range` config_request and the
  * tail (0x8037EA64..0x8037F940, 12 functions) is left to its own lane.
  *
- * rule 7 deferred: the names this file *references* in other units are still the map's generated
+ * Naming note: the names this file *references* in other units are still the map's generated
  * `fn_XXXXXXXX` stems (the enemy core band 0x8012xxxx/0x8013xxxx, the lobby 0x802xxxxx band and the
  * game-root 0x8042xxxx band, checked with `tools/symbols/symedit.py range`), and so are the
  * addresses of its own range that are not reconstructed yet - they are *declared*, never defined, so

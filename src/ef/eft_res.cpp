@@ -1,6 +1,6 @@
 /* ef/eft_res.cpp - the game's effect-resource manager, `.text` 0x800F6520..0x800F95A4 (43 functions).
  *
- * rule 7 deferred: the symbol map spells 36 of this range's 43 functions as bare `fn_XXXXXXXX`
+ * Naming note: the symbol map spells 36 of this range's 43 functions as bare `fn_XXXXXXXX`
  * (checked with `tools/symbols/dumpmap.py lookup`: each answers `dump=zz_...` and is a bare `.text`
  * entry in config/RMHE08/symbols.txt), so those definitions keep the map's own spelling; the other
  * seven arrive mangled (`res_eft_create__FUsUsUl`, `res_eft_model_create__FP6MHcharUsUl`,

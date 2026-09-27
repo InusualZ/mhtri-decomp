@@ -21,7 +21,7 @@
  *    `tudiscover` offers for the state closure (0x80088AD0, 0x80089330) are *weak* only, so the run
  *    is registered whole and the seam is left to settle as the functions match (brief 8.3).
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `tools/symbols/dumpmap.py` over the range and the proposal's 202-entry inventory - every name is a
  * `fn_`/`dtor_` stem, no mangling, so no better name can be derived).
  *

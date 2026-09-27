@@ -29,7 +29,7 @@
  * Sections: .text 0x80063888-0x800680A8, extab 0x800076C4-0x80007B14,
  * extabindex 0x8001FB00-0x8001FF5C.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: every unnamed entry is a bare `zz_XXXXXXXX_`
  * placeholder in the runtime dump too), so there is no real name to recover for those functions and
  * stylelint's rule 7 refuses the landing without this line.  The two name-map exceptions

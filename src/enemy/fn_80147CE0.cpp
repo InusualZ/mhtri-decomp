@@ -1,5 +1,5 @@
 /* enemy/fn_80147CE0.cpp - the enemy action-handler band, `.text` 0x80147CE0..0x80149D6C (36 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address resolves to a `zz_XXXXXXXX_` dump name and a
  * bare `.text` entry in config/RMHE08/symbols.txt, so no real name exists to use).
  *

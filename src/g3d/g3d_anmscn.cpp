@@ -36,7 +36,7 @@
  * Residual: none now. Under cflags_base's -O4,p the unit was 97.56 % with the same nine instructions in the
  * other order (`lwz r0, 0x14(r1)` before `lwz r3, 0xc(r3)`); -O3 restores the retail order.
  *
- * rule 7 deferred: the map carries only the `fn_XXXXXXXX` stems for this range, and its renamed
+ * Naming note: the map carries only the `fn_XXXXXXXX` stems for this range, and its renamed
  * `fn_800680A8__FPv`/`fn_80066C8C__FPv` are still those stems plus the front-end's argument list (playbook 48).
  * The source must keep the bare stem as its identifier - writing the suffix as the identifier would mangle it
  * a second time, the link failure of playbook 50.

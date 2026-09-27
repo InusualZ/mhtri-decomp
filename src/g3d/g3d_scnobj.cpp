@@ -26,7 +26,7 @@
  * `extabindex` 0x80021150-0x800212C4.  The `.data` fragment 0x8058F3D8-0x8058F530 is not claimed
  * (docs/plan.md 8.4); it is recorded for the data pass.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX`/`dtor_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX`/`dtor_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` and by reading every `.text` entry in
  * 0x800813B8..0x800827E4 out of config/RMHE08/symbols.txt).  `dtor_` stems are the map's own
  * placeholders for the two deleting destructors.

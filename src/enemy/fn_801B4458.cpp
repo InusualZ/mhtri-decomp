@@ -18,7 +18,7 @@
  *     (`src/enemy/` is 27 such files plus `enemy_control.cpp`), and no evidence names the original
  *     source file, so the file keeps the map's own stem.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup` on every address of the 48-function inventory: every one
  * answers `zz_<addr>_`, and `config/RMHE08/symbols.txt` carries nothing but the bare `fn_XXXXXXXX`
  * entries).

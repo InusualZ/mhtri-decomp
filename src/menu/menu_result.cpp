@@ -43,7 +43,7 @@
  * (`.data` 0x805F1698..0x805F16BC, the target's `jumptable_805F1698`, 36 B, referenced by this
  * unit only) - without it `datagap.py` reports an `ours-extra .data 36B` row.
  *
- * rule 7 deferred: references only to other units' unrenamed fn_XXXXXXXX symbols (each checked
+ * Naming note: references only to other units' unrenamed fn_XXXXXXXX symbols (each checked
  * against the map's owner: `fn_800F886C` -> `ef/eft_res.cpp`, `fn_800DBDD4` ->
  * `sound/fn_800D7F54.cpp`, `fn_8004A1F8` -> `fn_80047398.cpp`, and `fn_803B5030`, `fn_802DF6E4`,
  * `fn_803B4C64`/`fn_803B4CE8` -> unregistered bands).  No `fn_` name

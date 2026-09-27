@@ -1,5 +1,5 @@
 /* enemy/fn_80176C58.cpp - the enemy death/state sub-action unit, 11 functions, 0x80176C58..0x80177608.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every symbol this file defines is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every symbol this file defines is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * This is the small enemy-side state block discovery proposed between the enemy action unit
  * (`enemy/fn_8012BDF4.cpp`) and the enemy motion unit that follows it.  It is reached with a

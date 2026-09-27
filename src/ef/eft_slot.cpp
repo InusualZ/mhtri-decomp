@@ -59,7 +59,7 @@
  * this file's `EftSlot` view (its fields are the ones these bodies read) - folding it onto
  * `_ENEMY_DATA` is a shared-file change, recorded in this unit's outbox rather than smuggled in here.
  *
- * rule 7 deferred: the 34 symbols this file defines are named above, so the escape covers only the
+ * Naming note: the 34 symbols this file defines are named above, so the escape covers only the
  * names it REFERENCES - this range's own still-unwritten entries (`fn_803432B4`, `fn_80345A2C`) and
  * eight callees other units own (`fn_800F886C`, `fn_80125FF0`, `fn_8012A9E8`, `fn_8012D1A8`,
  * `fn_80143BF8`, `fn_803386C4`, `fn_8042CB9C`, `fn_8042CC20`).

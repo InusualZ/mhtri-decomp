@@ -1,7 +1,7 @@
 /*
  * ai/fn_802CC794.cpp - the 0x802CC794-0x802D0DCC AI-NPC work band (63 functions, 17976 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py lookup + `grep -n "fn_802CC" config/RMHE08/symbols.txt`: every defined
  * name lands as a bare `.text` entry, and no `__FILE__` string or runtime-dump name covers it).
  *

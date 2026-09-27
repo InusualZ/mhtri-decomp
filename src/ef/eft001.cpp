@@ -1,5 +1,5 @@
 /* ef/eft001.cpp - the `eft001` effect cluster, 0x800FAE08..0x800FCED4 (23 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; the one non-fn_ name,
  * eft001_set_pos__FPQ34nw4r4math4VEC3UlP10_CP_VECTORUcf, is the unit's own runtime-dump name).
  *

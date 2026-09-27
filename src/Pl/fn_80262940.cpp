@@ -14,7 +14,7 @@
  *     `Pl/*.cpp`;
  *   - 51 of the 59 map entries carry only the `fn_XXXXXXXX` stem, so the file keeps the stem.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x80262940 0x802693C4`; 8 of 59 entries are named by the
  * runtime dump, the rest are the map's placeholders).
  *

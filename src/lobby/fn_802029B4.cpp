@@ -24,7 +24,7 @@
  *      the `_LB_NPC` record `include/lobby/lb_npc.h` owns, calls its helpers, and reads the band's own
  *      `.bss` (`lb_npc_move_data`, `lobby_w`).  The file keeps the map's own stem, like its neighbours.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x802029B4 0x802076D4`: all 68 rows are bare
  * `fn_XXXXXXXX = .text:0x...` entries, and `python tools/symbols/dumpmap.py lookup` answers
  * `zz_XXXXXXXX_` for them in the shared runtime dump).

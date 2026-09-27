@@ -17,7 +17,7 @@
  * `Pl_chr_set_attr`/`Pl_chr_setX`/`Pl_frame_check`/`Get_motion_no`/`pl_get_joint_wpos`; 4. the stem
  * is the map's `fn_802693C4`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x802693C4 0x8026BA1C`; 58 of the 63 entries are bare `fn_`
  * placeholders, the other 5 are the manglings this unit defines).
  *

@@ -42,7 +42,7 @@
  * `build/RMHE08/obj/`: the only other citations are the jump table below and a call from the
  * unregistered `fn_80363A5C`, which has no source yet).
  *
- * rule 7 deferred: the `fn_XXXXXXXX` names this file still carries are OTHER units' symbols - the
+ * Naming note: the `fn_XXXXXXXX` names this file still carries are OTHER units' symbols - the
  * lobby/hud/Pl callees in the linkage block below and the six 0x8036xxxx siblings - whose map rows
  * this lane does not own.  The two symbols this unit defines are named.
  *

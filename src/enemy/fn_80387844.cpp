@@ -1,5 +1,5 @@
 /* enemy/fn_80387844.cpp - the enemy monster-AI action band, `.text` 0x80387844..0x8038E8E8.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address here resolves to a `zz_XXXXXXXX_` dump
  * name and a bare `.text` entry in config/RMHE08/symbols.txt, so no real function name survives).
  *

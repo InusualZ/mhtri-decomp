@@ -1,6 +1,6 @@
 /* ef/eft029.cpp - the `eft029` effect family, `.text` 0x80119DEC..0x8011D448 (37 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the two family
  * setters `eft029_set_scale` (0x8011AD84) and `eft029_set_kaihou` (0x8011AFBC); every other address in
  * the range is the dump's placeholder `FUN_`/`zz_XXXXXXXX_`).

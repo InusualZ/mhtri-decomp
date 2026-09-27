@@ -96,7 +96,7 @@
  *     in `build/tmp/draft_*.c`; each still needs its loop/goto shape rewritten to the conformant
  *     form, and no body was invented for them.
  *
- * rule 7 deferred: every remaining `fn_XXXXXXXX` here is a REFERENCE, never a definition - either a
+ * Naming note: every remaining `fn_XXXXXXXX` here is a REFERENCE, never a definition - either a
  * declaration of one of this range's five still-unwritten bodies (0x80367124, 0x80367760, 0x80368374,
  * 0x8036928C, 0x80369D50; `python tools/symbols/dumpmap.py lookup <addr>` answers the dump's
  * `zz_XXXXXXXX_` placeholder for each, so no name is derivable yet) or a call to a callee ANOTHER unit

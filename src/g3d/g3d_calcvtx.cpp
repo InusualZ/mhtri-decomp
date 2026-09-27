@@ -28,7 +28,7 @@
  * seam to the whole-function start, but the flag-helper group carries no data reference of its own
  * (`.pi/notes/tuboundary-defects-2026-09-23.md` - measure to settle).
  *
- * rule 7 deferred: the map carries only `fn_XXXXXXXX` names in this range (docs/plan.md 6.5 rule 7);
+ * Naming note: the map carries only `fn_XXXXXXXX` names in this range (docs/plan.md 6.5 rule 7);
  * renaming a symbol needs the map and the source in one edit (playbook 31).
  *
  * `#pragma fp_contract off` is file-scoped: the retail object contains no `fmadds`/`fmsubs` while

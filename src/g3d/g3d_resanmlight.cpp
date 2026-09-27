@@ -28,7 +28,7 @@
  * 0x80021D68-0x80021E4C.  Both are claimed in splits.txt.  No `.ctors`/`.dtors` word points into the
  * range.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8008F8E4` / `0x8008FD04` / `0x800900A4`: all bare
  * `zz_XXXXXXXX_` placeholders in the runtime dump too), so there is no real name to recover and
  * stylelint's rule 7 refuses the landing without this line.

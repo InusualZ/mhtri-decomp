@@ -48,7 +48,7 @@
  *   - the unit's `.data` tables are declared, not claimed: the split range is `.text` + extab +
  *     extabindex only, and claiming data moves relocation handling (playbook row 23).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
  * on all 14 names in config/RMHE08/symbols.txt: 12 are bare `fn_` entries and the dump answers only
  * `zz_XXXXXXXX_` placeholders for them)
  */

@@ -15,7 +15,7 @@
  * and the two source files below it in the band are `cockpit.cpp` (0x802D9EB4..0x802E0740) and
  * `layout.cpp` (0x802E0740..0x802E4978), both registered in the `hud` lib.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/symedit.py --section .text range 0x802E7408 0x802EBED8`: 63 of the 64 rows are
  * bare `fn_` stems and the dump answers `zz_02exxxxx_` for all of them; the single real name,
  * `PitTrapSet__FPCQ34nw4r4math4VEC3Uc` at 0x802EBB58, is written as the real function

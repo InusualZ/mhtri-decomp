@@ -20,7 +20,7 @@
  * and the three SE works are the `_se_w` pointers at `_PLW`+0xAF4/+0xAF8/+0xAFC the sibling unit
  * uses.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `grep -n "^fn_8024" config/RMHE08/symbols.txt` - every entry in the range is a bare `fn_<addr>`
  * stem, and `dumpmap.py lookup <addr>` answers only `zz_<addr>_` for all 30).
  *

@@ -1,5 +1,5 @@
 /* auto/800FF8D4_fn_800FF8D4.cpp - the `eft004` effect cluster, 0x800FF8D4..0x80101DF4 (37 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * The game's `eft004` effect module: the per-frame handlers (`fn_800FF8D4`, `fn_800FFCAC`,
  * `fn_80100088`, ...), the effect-record state-machine dispatchers (`fn_80100A6C`, `fn_80101774`,

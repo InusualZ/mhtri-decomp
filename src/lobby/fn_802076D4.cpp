@@ -18,7 +18,7 @@
  * `dumpmap.py lookup` answers only `zz_` placeholders, so the file keeps the map stem (brief section 2,
  * class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with tools/symbols/symedit.py at 0x802076D4 for the inventory and python tools/symbols/dumpmap.py lookup on all 82 rows - all of them answer zz_0207xxx_)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with tools/symbols/symedit.py at 0x802076D4 for the inventory and python tools/symbols/dumpmap.py lookup on all 82 rows - all of them answer zz_0207xxx_)
  *
  * Seam.  Unproven: the range edges are `dtk` pool-run cuts and the interior ones were joined by
  * `owner_merge` on the artefact above, so this may be more than one file.  `fn_80207698`

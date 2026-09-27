@@ -5,7 +5,7 @@
  * extabindex 0x80022E30..0x80022EE4, .text 0x800A56B0..0x800A6350, and the `.ctors` word at 0x8056F2D8,
  * which points at the file's static initializer fn_800A60C8.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` over every one of the 23 addresses - each answers
  * `dump=zz_00a5xxx_` - and against config/RMHE08/symbols.txt, where every one is a bare `.text` fn_
  * entry; only `RetireEffect__Q34nw4r2ef12EffectSystemFPQ34nw4r2ef6Effect` carries a real name), so the

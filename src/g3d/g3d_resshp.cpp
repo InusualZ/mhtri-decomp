@@ -31,7 +31,7 @@
  * carry none) and the extabindex entries 0x80022920-0x80022AAC; both runs abut the head's and
  * `g3d_cpu.cpp`'s with no gap.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with `grep` over
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with `grep` over
  * config/RMHE08/symbols.txt: every 0x80099400..0x8009A748 row is a bare `fn_XXXXXXXX`, and
  * `python tools/symbols/dumpmap.py lookup 0x800997E0` answers the `zz_00997e0_` placeholder).
  *

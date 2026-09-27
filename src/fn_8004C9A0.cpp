@@ -26,7 +26,7 @@
  *   byte is 0x0E and the configured Wii/1.3 `mwcceppc` writes 0x0F (the same 0x0E/0x0F gap
  *   `src/fn_80040598.cpp` records).  Every other instruction is byte-identical.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/dumpmap.py lookup 0x8004C9A0` -> zz_004c9a0_, and the range's .data run is only the
  * switch jump table, so there is no `__FILE__` string to name the original TU either).
  */

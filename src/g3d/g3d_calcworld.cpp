@@ -10,7 +10,7 @@
  * 0x800746DC puts them here (alternative 0x80074620), so the group is unpinned and a measurement is
  * what settles it.
  *
- * rule 7 deferred: the map carries only `fn_XXXXXXXX` names in this range (docs/plan.md 6.5 rule 7);
+ * Naming note: the map carries only `fn_XXXXXXXX` names in this range (docs/plan.md 6.5 rule 7);
  * renaming a symbol needs the map and the source in one edit (playbook 31).
  *
  * Shared declarations: `ResHandle` comes from `nw4r/g3d/res_common.h`, `nw4r::math::VEC3` from

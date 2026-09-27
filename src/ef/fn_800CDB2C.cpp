@@ -1,6 +1,6 @@
 /*
  * ef/fn_800CDB2C.cpp - the `.text` 0x800CDB2C..0x800D45AC run, 165 functions / 0x6A80 bytes.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * `fn_` name this file uses is a bare `.text` entry in config/RMHE08/symbols.txt; only the 24 named
  * symbols - file_loading_ck, load_file_req, load_file, ran_suu, system_w_clr, all_reset, PlayMode_ck,
  * GameMode_set, PlayMode_set, work_mem_alloc, work_mem_free, get_move_work_adrs, get_move_work_max,

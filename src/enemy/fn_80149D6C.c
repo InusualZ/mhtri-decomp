@@ -1,5 +1,5 @@
 /* auto/80149D6C_fn_80149D6C.c - one enemy action step, `.text` 0x80149D6C..0x8014A1BC.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * What it is.  The unit is one `_ENEMY_WORK` action.  A two-state machine on `state_0x05` (state 0
  * initialises through `fn_80134F70`/`fn_80134004`/`fn_80130248`/`fn_80135584`, state 1 runs the action)

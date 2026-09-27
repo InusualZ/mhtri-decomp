@@ -37,7 +37,7 @@
  * references functions at 0x8036E2BC..0x80375290, so the original em020 file starts well before the
  * brief's range; the head is left to its own lane and filed as a `config_requests` `range` entry.
  *
- * rule 7 deferred: the names this file *references* in other units are still the map's generated
+ * Naming note: the names this file *references* in other units are still the map's generated
  * `fn_XXXXXXXX` stems (the enemy core band 0x8012xxxx/0x8013xxxx and the game-root 0x8042xxxx band,
  * checked with `tools/symbols/symedit.py range`); every symbol this file DEFINES is named from its
  * own body and renamed in the map with `symedit.py rename`.

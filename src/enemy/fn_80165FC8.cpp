@@ -1,6 +1,6 @@
 /* enemy/fn_80165FC8.cpp - the enemy per-area seat/action unit, 0x80165FC8..0x801679B0 (21 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/dumpmap.py lookup` on every one of the 21 addresses: the shared runtime dump answers
  * only `zz_<addr>_`, and `config/RMHE08/symbols.txt` carries nothing but the bare `fn_XXXXXXXX`
  * entries - no `__FILE__`/class string names a file here).

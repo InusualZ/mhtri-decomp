@@ -1,5 +1,5 @@
 /* auto/800E46E8_fn_800E46E8.cpp - the sound/stream runtime: `fn_800E46E8`, `.text` 0x800E46E8-0x800E8E60.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 196 functions in one C++ TU.  Two globals carry the state:
  *   * the stream manager `lbl_8069A810` (0xD8 B, `.bss`): a flag word at +0x04, the current slot index at

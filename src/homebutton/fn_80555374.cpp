@@ -3,7 +3,7 @@
  * home-button (Wii HOME menu overlay) software-keyboard block, plus its 3 `.ctors` words at
  * 0x8056F404-0x8056F410.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py lookup for every row of the range - all `zz_`/`FUN_` placeholders - and
  * with a scan of the whole DOL's string pool: no bare source-file name is referenced by any
  * function of the range; the pools it does reference hold the software-keyboard layout vocabulary

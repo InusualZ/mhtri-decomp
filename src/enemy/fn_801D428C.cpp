@@ -1,6 +1,6 @@
 /* enemy/fn_801D428C.cpp - the `em0xx` enemy's action band, `.text` 0x801D428C..0x801D80EC (42
  * functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address of the range answers `zz_XXXXXXXX_` in the
  * shared runtime dump and carries a bare `fn_XXXXXXXX = .text:0x...` entry in
  * config/RMHE08/symbols.txt; no `__FILE__` string is reachable from the range - the only `enemy`

@@ -57,7 +57,7 @@
  *   * `fn_801B7BDC` 99.84 - one `fmuls` operand order (`f1 * f0` in retail, `f0 * f1` here) after the
  *     `-5.0f` local is narrowed.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
  * lookup on the range's inventory: all 123 names are bare `.text` entries in
  * config/RMHE08/symbols.txt, the whole range's data references are pool floats/integers and `.bss`
  * blocks, and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)

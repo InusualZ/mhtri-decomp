@@ -2,7 +2,7 @@
  * (26 functions, 10136 B), extab 0x80015AB4..0x80015B54 (20 records) and extabindex
  * 0x80034674..0x80034764 (20 x 12 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump names only `eft042_set2`, and
  * every other address in the range is the dump's placeholder `zz_XXXXXXXX_`; a real name would need
  * the map and the source in one edit).

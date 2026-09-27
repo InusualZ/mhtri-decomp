@@ -27,7 +27,7 @@
  * signatures (rule 9).  Every plain `fn_XXXXXXXX` definition here is `extern "C"` so its map name is
  * emitted.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup` - every address answers the `zz_XXXXXXXX_`/`FUN_XXXXXXXX`
  * placeholder, and no `__FILE__` string is referenced anywhere in the range).
  *

@@ -1,5 +1,5 @@
 /* ef/ef_drawstripestrategy.cpp - nw4r::ef draw-strategy family, 0x800B99E8..0x800BE154.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 37 functions / 0x4770 bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  The

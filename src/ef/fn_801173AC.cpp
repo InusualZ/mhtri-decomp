@@ -1,7 +1,7 @@
 /* ef/fn_801173AC.cpp - the `.text` 0x801173AC..0x80119C44 run (30 functions), the tail of the eft024
  * job machine plus the whole eft025 player family, the whole eft026 enemy family and the head of eft028.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_
  * name this file uses is a bare .text entry in config/RMHE08/symbols.txt); the runtime dump resolves only
  * the two family setters `eft026_set` (0x80117DA8) and `eft028_set_koware` (0x80119A40).
  *

@@ -1,5 +1,5 @@
 /* auto/80138074_fn_80138074.c - the enemy "user data" driver and its accessors,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80138074..0x8013ACC4.
  *
  * What it is.  Two clusters that share one translation unit:

@@ -61,7 +61,7 @@
  * (fn_8006EC3C 93.60 % -> 100 %); and the file/format strings are `extern` map labels, not literals,
  * because `-str reuse` would pool the twice-used `lbl_8058D6C0` and share one base register.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8006EAC0`, which answers the `zz_006eac0_` placeholder, and
  * with `python tools/units/stylelint.py`'s own map index; every `.text` entry in 0x8006EAC0..0x8006EE78
  * in config/RMHE08/symbols.txt is a bare `fn_XXXXXXXX`).  The dump's three real names are for a

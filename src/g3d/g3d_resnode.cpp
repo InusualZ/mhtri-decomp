@@ -29,7 +29,7 @@
  * 0x80022854-0x8002289C (6 records) - contiguous with `g3d/g3d_resmat.cpp`'s end (0x80009850) and with
  * `g3d_resshp.cpp`'s start (0x80009880 / 0x8002289C).
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with `grep` over
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with `grep` over
  * config/RMHE08/symbols.txt: every 0x80098D5C..0x80099400 row is a bare `fn_XXXXXXXX`).
  *
  * What the bodies are: fn_80098F6C fills an `AnmResult` from the node's own animation state and

@@ -1,5 +1,5 @@
 /* auto/80104BD0_fn_80104BD0.c - one function, .text 0x80104BD0..0x80105314.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * Per-frame handler of the enemy hit-effect controller.  It reads the enemy work object and the
  * effect work block off the effect object, spawns the two `nw4r::ef` effects the type selects, keeps

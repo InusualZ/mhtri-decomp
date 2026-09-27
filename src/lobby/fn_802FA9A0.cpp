@@ -9,7 +9,7 @@
  * file keeps the map's stem - brief section 2, class 4.  `LbCheckKujiraEvent` (0x802FB9DC) is the one
  * real name in the band.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with `python
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `python
  * tools/symbols/symedit.py range 0x802FA9A0 0x8030121C` - the single non-`fn_` row is
  * `LbCheckKujiraEvent__Fv`), so every definition below keeps the map's own name.
  *

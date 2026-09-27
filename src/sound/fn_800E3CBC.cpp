@@ -2,7 +2,7 @@
  * sound/fn_800E3CBC.cpp - the 0x800E3CBC..0x800E46E8 band: the primitive-record pools and their GX state
  * helpers.  Registered from `proposal/800E3CBC_fn_800E3CBC.cpp` (12 functions, 2604 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: nine of the twelve addresses carry a `zz_` placeholder,
  * only prim_init_all__Fv, set_blendmode__FUcUcUc and set_zmode__FbUcb have a real dump name, and none of
  * the three is the translation unit's name).

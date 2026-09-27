@@ -12,7 +12,7 @@
  * `python tools/symbols/dumpmap.py lookup 0x8009B140` and `0x8009B2CC` answer the `zz_009b140_` /
  * `zz_009b2cc_` placeholders, not a name.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8009B140`/`0x8009B2CC`, which answer `zz_` placeholders,
  * and with config/RMHE08/symbols.txt, whose every `.text` entry in 0x8009B140..0x8009B374 is a bare
  * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.

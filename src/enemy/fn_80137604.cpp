@@ -1,5 +1,5 @@
 /* enemy/fn_80137604.cpp - an enemy's per-motion action/rotation update set, `.text` 0x80137604..0x80138074.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x80137604 0x80138074`: all 20 symbols are bare
  * `fn_XXXXXXXX = .text:0x...` rows with no real name).
  *

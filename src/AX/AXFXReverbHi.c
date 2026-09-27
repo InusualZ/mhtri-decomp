@@ -18,7 +18,7 @@
  * of them plus the game's second-effect API wrappers, i.e. the discovery seam between the two TUs was
  * not taken (recorded, not split - see the unit notes).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX / lbl_XXXXXXXX for the internal helpers and the
+ * Naming note: the symbol map has only fn_XXXXXXXX / lbl_XXXXXXXX for the internal helpers and the
  * data pool of this range (checked `grep -n 80474/80475 config/RMHE08/symbols.txt`: only AXFXReverbHi*,
  * DVDCancel and the fn_ stems are present), so those stems are kept verbatim - renaming them would
  * unpair every function in objdiff (which matches by symbol name) and the names are the map's.

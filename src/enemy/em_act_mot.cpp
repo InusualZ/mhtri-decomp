@@ -28,7 +28,7 @@
  * extab runs tile - this unit takes 0x80017E14..0x80017E2C and the next registered unit
  * (`enemy/fn_80382310.cpp`) starts its own record run at 0x80017E2C.
  *
- * rule 7 deferred: references only to other units' unrenamed `fn_XXXXXXXX` symbols; every symbol this
+ * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols; every symbol this
  * file *defines* is named (the three definitions below).  `em_act_mot_step`'s own row is **not yet
  * defined** - the 216 arm bodies are a unit of their own - so its map name stays a target-only name
  * and its row measures 0 % (see RESIDUALS).  Every definition is `extern "C"` so objdiff pairs it by

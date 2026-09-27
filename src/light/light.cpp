@@ -17,7 +17,7 @@
  * Language C++: four defined manglings (`light_init__Fv`...), `cflags_main` (`Wii/1.3`, `-O3
  * -inline noauto -Cpp_exceptions on`), the same group as the neighbour `stage/stg_w.cpp`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for 99 of this range's 103 symbols (checked
+ * Naming note: the symbol map has only fn_XXXXXXXX for 99 of this range's 103 symbols (checked
  * with `python tools/symbols/symedit.py range 0x802BEAAC 0x802C474C` and
  * `python tools/symbols/dumpmap.py lookup` over the inventory: every unnamed entry is a bare
  * `fn_XXXXXXXX` in config/RMHE08/symbols.txt, and the runtime dump answers either `zz_XXXXXXXX_` or

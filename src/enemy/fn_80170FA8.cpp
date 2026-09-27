@@ -1,5 +1,5 @@
 /* enemy/fn_80170FA8.cpp - four `_ENEMY_WORK` action handlers, `.text` 0x80170FA8..0x80171194 (492 B).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_
  * name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * What it is.  Four steps of one enemy action.  `fn_80170FA8`, `fn_80171038` and `fn_801710B4` are the

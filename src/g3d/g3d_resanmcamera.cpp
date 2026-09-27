@@ -13,7 +13,7 @@
  * C++ `nw4r::db::Panic`, so this is a C++ translation unit - the `.c` spelling of the earlier cut is
  * why it carried the mangled `Panic__Q24nw4r2dbFPCciPCce` declaration (docs/plan.md 6.5 rule 9).
  *
- * rule 7 deferred: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
+ * Naming note: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
  * symbol needs the map and the source in one edit (playbook 31).
  *
  * `#pragma peephole off` / `#pragma fp_contract off` are file-scoped.  Registered `Object(NonMatching,

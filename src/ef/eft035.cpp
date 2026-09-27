@@ -1,6 +1,6 @@
 /* ef/eft035.cpp - the `eft035` effect family, `.text` 0x802F140C..0x802F5138 (39 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the two
  * `eft035_*` names - `eft035_set` at 0x802F2238 and `eft035_set2` at 0x802F2394 - and every other
  * address in the range is the dump's placeholder `zz_XXXXXXXX_`).

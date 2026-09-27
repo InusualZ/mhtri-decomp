@@ -1,7 +1,7 @@
 /* enemy/fn_8011D448.cpp - the enemy effect-spawner band, `.text` 0x8011D448..0x801251D0 (101
  * functions, 32136 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` over the whole range: the dump resolves only
  * `em_parts_damage_level_get(_ENEMY_WORK, u8)` at 0x8011E9DC - which the map already spells
  * `em_parts_damage_level_get__FP11_ENEMY_WORKUc` - and the unrelated `JASSeqCtrl::setIntrMask`

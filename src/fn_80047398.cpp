@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` - every function in 0x80047398..0x8004C9A0 is a bare
  * `.text` entry; the shared runtime dump has only `zz_<addr>_` placeholders, so there is no better name
  * to take).  The four mangled names the range does carry (`drawSpr2TF__FUcP9fltSpr2TFUc`,

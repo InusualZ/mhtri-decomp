@@ -16,7 +16,7 @@
  * `zz_01fbf78_`.  The file name is taken from what the code is (brief section 2, class 3): the
  * subsystem's own global is `lb_npc` and its two named functions are `lb_npc_*`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
  * on the range inventory: 124 of the 127 .text entries are bare fn_XXXXXXXX/LbCheckKujiraEvent-style
  * map placeholders and the runtime dump answers only zz_XXXXXXXX_ for them)
  *

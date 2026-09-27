@@ -18,7 +18,7 @@
  * pass their first argument straight to `Get_motion_no` (`Get_motion_no__FP4_PLW`) and their other
  * callees are the Pl SE helpers.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py show fn_802373AC` / `... fn_802399C8` - the range's sole entries
  * are the two `type:function` lines, and `dumpmap.py lookup` gives only the `zz_` placeholders).
  *

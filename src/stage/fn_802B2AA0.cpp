@@ -12,7 +12,7 @@
  * referenced only by the band *below* 0x802B2AA0) and the runtime dump answers only `zz_XXXXXXXX_`, so
  * the file keeps the map's own stem (class 4, brief section 2).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x802B2AA0 0x802B5C58`: every entry is a bare
  * `fn_XXXXXXXX = .text:0x802BXXXX;` line, and `python tools/symbols/dumpmap.py lookup <addr>` answers
  * the `zz_XXXXXXXX_` placeholder for each).

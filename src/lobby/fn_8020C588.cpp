@@ -20,7 +20,7 @@
  * (86 records, `fn_8020C588` first, `fn_8021261C` last, and the run ends where
  * `lobby/fn_80212810.cpp`'s extab begins at 0x80011434).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `dumpmap.py lookup` over the range's inventory: every name but `LbStr__FUcUs` and
  * `glplatTextureGetHeight` is a bare `.text` entry in config/RMHE08/symbols.txt and the runtime dump
  * has only `zz_XXXXXXXX_` placeholders for them)
@@ -39,7 +39,7 @@
  *    (the header says so) but it renames fields `src/Pl/pl_master.cpp` and
  *    `src/sound/fn_800EF7D8.cpp` already read, so it is a config_request, not this batch's edit.  The
  *    enforce-lint would otherwise flag every `unk` member access in this file (rule 7's unk half is
- *    not covered by the `rule 7 deferred` line above).
+ *    not covered by the `Naming note` line above).
  *  - `fn_80212370` (352 B) reads the `Psw` pad record's 0x2C0..0x2DF bytes; the only `PlayerPad`
  *    definition lives in `src/mh3_pad.cpp` (rule 1: a shared type in one header), so naming them here
  *    would copy it.  Config_request: move `PlayerPad` into `include/mh3_pad.h`.

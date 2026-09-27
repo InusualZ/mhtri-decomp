@@ -1,5 +1,5 @@
 /* auto/800FD520_fn_800FD520.c - the state-0 handler of the eft002 effect machine,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x800FD520..0x800FD718 (one function, `fn_800FD520`).
  *
  * What it is.  `fn_800FD4E4` (the last function of the previous unit, 0x800FCED4..0x800FD520) is the

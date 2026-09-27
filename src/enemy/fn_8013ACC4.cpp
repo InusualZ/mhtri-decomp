@@ -1,5 +1,5 @@
 /* enemy/fn_8013ACC4.cpp - the enemy user-data command interpreter and its 0x100-entry dispatch table.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup:
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup:
  * every `fn_` name this file uses is a bare .text entry in config/RMHE08/symbols.txt, and the dump
  * answers only `zz_` placeholders for all three of this range's symbols)
  * `.text` 0x8013ACC4..0x8013BE60 (3 functions), extab 0x8000D414..0x8000D424,

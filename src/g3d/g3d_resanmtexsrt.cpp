@@ -31,7 +31,7 @@
  * records).  The boundaries are the functions before (fn_80091628, the resanmscn tail) and after
  * (fn_80093990 = `ResFile::CheckRevision`).  No `.ctors`/`.dtors` word points into the range.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x800916FC`, which answers the `zz_00916fc_` placeholder,
  * and with config/RMHE08/symbols.txt, whose every `.text` entry in 0x800916FC..0x80093990 is a bare
  * `fn_XXXXXXXX` except the two `ResFile::GetRes*` accessors), so there is no real name to recover

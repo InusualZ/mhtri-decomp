@@ -24,7 +24,7 @@
  *   - Class 4 (file stem): the map's `fn_802489D4`, the sibling class-4 pattern of
  *     `Pl/fn_80229ECC.cpp` / `Pl/fn_80241558.cpp` / `Pl/fn_80262940.cpp` / `Pl/fn_80288CEC.cpp`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x802489D4 0x8024F200` - all 42 entries are the map's
  * `fn_XXXXXXXX` placeholders, and `python tools/symbols/dumpmap.py lookup` resolves every one of
  * them to a `zz_XXXXXXXX_` dump placeholder).

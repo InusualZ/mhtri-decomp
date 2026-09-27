@@ -39,7 +39,7 @@
  * one in address order, so this registration is a *fragment* of that file - the `range` config_request
  * in the outbox asks for the two to be folded once the em019 file's bodies are written.
  *
- * rule 7 deferred: references only to other units' unrenamed `fn_XXXXXXXX` symbols - this file names
+ * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols - this file names
  * every symbol it *defines* (the 12 definitions below); what remains are callees whose owning band is
  * still a `fn_` row in the map (`fn_80130478`, `fn_8012F5B8`, `fn_80127F48` and ~40 more, plus the
  * em019 band's `fn_8037E0E8`..`fn_803797F4`), which the pass that writes those bands owns

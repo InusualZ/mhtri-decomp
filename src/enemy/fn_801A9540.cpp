@@ -30,7 +30,7 @@
  * signatures (rule 9); every plain `fn_XXXXXXXX` definition here is `extern "C"` so its map name is
  * emitted.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked over
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked over
  * config/RMHE08/symbols.txt - every symbol this unit defines is a bare `.text` entry with no owner
  * name - and `python tools/symbols/dumpmap.py lookup 0x801A9540` answers the `zz_01a9540_`
  * placeholder form, which is not evidence).  The owner names this range *does* reach

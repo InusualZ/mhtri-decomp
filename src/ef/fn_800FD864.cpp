@@ -1,5 +1,5 @@
 /* ef/fn_800FD864.cpp - the map/area spawn table of the `eft004` effect family and its two hooks,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x800FD864..0x800FE978 (3 functions: fn_800FD864, fn_800FE8E8, fn_800FE93C).
  *
  * What it is.  `fn_800FD864` is the effect spawner the map/area code calls once per map area: it takes

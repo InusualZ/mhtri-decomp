@@ -24,7 +24,7 @@
  * answers only `zz_XXXXXXXX_` for every address in the range (`dumpmap.py lookup`), so the file keeps
  * the map's stem (brief section 2, class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
  * lookup over the range's inventory - every address answers `zz_XXXXXXXX_` - and the map's own rows
  * are bare `.text` entries)
  *

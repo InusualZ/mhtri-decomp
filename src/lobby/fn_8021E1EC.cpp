@@ -66,7 +66,7 @@
  *  - fn_80223A18/fn_80223A44 85.45 % (44 B each): the two table accessors - the row-stride `add` comes
  *    out right, the leading `clrlwi`/`slwi` pair is scheduled differently.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
  * lookup over the range's inventory: all 108 definitions are bare `.text` entries in
  * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
  */

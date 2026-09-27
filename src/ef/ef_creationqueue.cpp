@@ -36,7 +36,7 @@
  *   - fn_800A3800 99.56 %: the disposal call loads the vtable into r4 (`lwz r4, 0x1C(r31)`) instead of
  *     through the `this` register (`lwz r12, 0x1C(r3)`); every instruction and the section size match.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py lookup over all seven addresses, and config/RMHE08/symbols.txt).
  */
 

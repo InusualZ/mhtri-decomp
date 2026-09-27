@@ -1,5 +1,5 @@
 /* auto/80114E34_fn_80114E34.cpp - the eft020/021/022 effect cluster and the eft023/024 job machine,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80114E34..0x8011722C (45 functions, in address order).
  *
  * What it is.  `fn_800F8788(size)` allocates the 0x48-byte `_EFT` record with a `size`-byte work block

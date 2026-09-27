@@ -16,7 +16,7 @@
  * same data pool as this range ... the retail translation unit continues to the left").  The range is
  * therefore worked as one unit; its extent settles as its bodies match.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup` over the range's addresses and with
  * `grep -n "fn_8055C\|fn_8055D\|fn_8055E\|fn_80560\|fn_80561\|fn_80562" config/RMHE08/symbols.txt`:
  * every defined name of the range is a bare `.text` entry, and the runtime dump answers a bare
