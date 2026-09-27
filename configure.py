@@ -669,6 +669,14 @@ config.libs = [
             # `cockpit.cpp` and `cockpit_quest.cpp`, this band's own entry points are the menu
             # library's - `get_menu_lsp_tbl`/`put_menu_cursor`/`GetMenuFontColor`/`ItemName`).
             Object(NonMatching, "menu/fn_802E4978.cpp"),
+            # Registered from proposal/8030D338_Put_equip_dtl_basis_sword_colorX__FP4_PLWP12_EQU.cpp
+            # (`--max-bytes`-capped run `.text` 0x8030D338..0x80313E24, 67 functions / 27372 B).
+            # Module `menu` and file name `menu_infomation.cpp` are class-1 evidence: `.data`
+            # 0x805DCCDC is the bare `__FILE__` string referenced by this range's `fn_80312F84`
+            # Panic.  The seam is provisional (the same string is referenced out to 0x8031A244); see
+            # the unit header.  Sections: .text 0x8030D338..0x80313E24, extab
+            # 0x80015C24..0x80015DEC (57 records), extabindex 0x8003489C..0x80034B48 (57 records).
+            Object(NonMatching, "menu/menu_infomation.cpp"),
             # Registered from proposal/8031A6C0_fn_8031A6C0.cpp (the `.text` 0x8031A6C0..0x8031EA8C
             # run, 59 functions / 17356 B): the item/equipment selection screen.  Module `menu`,
             # map stem as file name (brief section 2, class 4 - the band's own `.data` run carries

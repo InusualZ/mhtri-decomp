@@ -144,6 +144,8 @@ u32 fn_802E326C(u32* out, const _SPR_ANIM_* anim, u16 frame);
 /* The mangled map names are the compiler's spelling of these declarations (rule 9): the front-end
  * reproduces each map name exactly, and the call site writes the plain function. */
 void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);
+void draw_font(const _SPR_DATA_& spr, s8* str, u32 flags, const _mh_ivec2_* pos);
+void draw_font_idx(u16 id, s8* str, u32 flags, const _mh_ivec2_* pos);
 void draw_sprite_idx(u16 id, const _mh_ivec2_* pos);
 void draw_sprite_ary(const u16* ids, const _mh_ivec2_* pos);
 void draw_sprite_anim_idx(u16 id, u16 anim, const _mh_ivec2_* pos);
