@@ -1258,6 +1258,11 @@ enemy/fn_80387844.cpp:
 	extabindex  start:0x80037F44 end:0x800380D0
 	.text       start:0x80387844 end:0x8038E8E8
 
+lobby/lb_quest_ui.cpp:
+	extab       start:0x8001819C end:0x8001833C
+	extabindex  start:0x800380D0 end:0x80038340
+	.text       start:0x8038E8E8 end:0x80394038
+
 lobby/lb_quest_board.cpp:
 	extab       start:0x8001833C end:0x8001843C
 	extabindex  start:0x80038340 end:0x800384C0

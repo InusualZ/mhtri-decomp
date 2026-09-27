@@ -394,6 +394,20 @@ extern u8 lbl_80791C40[2];
 extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
 extern u8 lbl_80794880[];
+/* The `.data` pair/lookup tables the lobby list band reads: `lbl_805F0EC8[kind]` is a pointer to a
+ * table of 6-byte-stride records whose first u16 is the key, terminated by an entry whose u16 is
+ * 0xFFFF (`lb_ui_pair_lookup`, `lb_ui_pair_offset`).  The `.data` range 0x805F0EC8 is unclaimed, so
+ * the band header is its home (docs/plan.md 6.5 rule 2). */
+extern u16* lbl_805F0EC8[];
+/* The 12-entry signed table the option-parameter copy indexes by a byte flag (`lb_ui_param_apply`).
+ * `.data` 0x805F0CDC, unclaimed, so the band header is its home. */
+extern const s16 lbl_805F0CDC[12];
+
+/* The two handlers of the band above this unit (`0x80394144`, `0x80394154`) that its per-detail step
+ * tails into.  Both addresses are still unclaimed and their band's bracketing registered units name
+ * `lobby` on the left, so the band header declares them (rule 2's unsplit case). */
+void fn_80394144(void* self);
+void fn_80394154(void* self);
 extern LbLobbyWork lobby_w;
 
 /* The lobby NPC band's own `.sdata2` pool (`src/lobby/fn_802029B4.cpp`'s state machines hand these to
