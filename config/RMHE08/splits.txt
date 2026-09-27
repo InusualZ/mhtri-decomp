@@ -1274,6 +1274,11 @@ menu/menu_result.cpp:
 	.text       start:0x803967F0 end:0x8039D278
 	.data       start:0x805F1698 end:0x805F16BC
 
+menu/multi_result.cpp:
+	extab       start:0x8001863C end:0x8001882C
+	extabindex  start:0x800387C0 end:0x80038AA8
+	.text       start:0x8039D278 end:0x803A3A50
+
 Network/fn_803D3CE8.cpp:
 	extab       start:0x80019E5C end:0x8001A348
 	extabindex  start:0x8003A524 end:0x8003A8B4

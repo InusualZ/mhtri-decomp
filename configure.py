@@ -768,6 +768,22 @@ config.libs = [
             # unit's `.data`/`.sdata`/`.sdata2` runs are not claimed until the bodies that emit
             # them land (see the unit header's residual list).
             Object(NonMatching, "menu/menu_result.cpp"),
+            # Registered once, at its final home, from proposal/8039D278_fn_8039D278.cpp: the
+            # multiplayer-result screen's box cursor band plus the enemy action/substate dispatchers
+            # that share its address range (`.text` 0x8039D278..0x803A3A50, 80 functions / 0x67D8 B).
+            # Module `menu` (evidence class 3): the range's head is the multi-result screen, its
+            # neighbours are `menu_result.cpp` below and the `menu/*` band above, and its two
+            # original manglings are the box helpers on `_multi_result_work`.  C++ because those
+            # manglings are defined by the range (`...__FP18_multi_result_work`).  The seam is
+            # UNPROVEN - it is the discovery `--max-bytes` cap, no `__FILE__` string reaches the
+            # range, and the range is really a *sequence* of objects: `tudiscover at 0x8039FD4C`
+            # gives a 40-function `.sdata2`-sharing enemy cluster in the middle, and the runtime dump
+            # names SDK objects interleaved with the game ones (`DBClose` 0x8039E714,
+            # `gdev_cc_shutdown` 0x803A1108, `GoalOverlay::SceneCreated` 0x803A1680,
+            # `homebutton::MotorCallback` 0x803A26A8).  The unit header carries the full evidence and
+            # the residual list; a seam re-draw is the follow-up.  Same `cflags_menu` as its menu
+            # siblings.
+            Object(NonMatching, "menu/multi_result.cpp"),
         ],
     },
 
