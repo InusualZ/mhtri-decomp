@@ -219,6 +219,25 @@ def test_decoder():
     check(infer.Insn(0, lis(3)).is_lis(), "lis predicate")
 
 
+def test_repo_root():
+    """`repo_root` must be the caller's worktree, not the script's location (7.28).
+
+    The failure: an infer run from inside a worktree read MAIN's `configure.py`, so a proposal unit
+    registered only in the worktree was reported as unregistered. Patches the one resolver it delegates
+    to, so the check is deterministic on any host.
+    """
+    tools = os.path.join(ROOT, "tools")
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
+    import unitutil
+    real = unitutil.caller_worktree
+    unitutil.caller_worktree = lambda *a, **k: ROOT
+    try:
+        check(infer.repo_root() == ROOT, "repo_root is the caller's worktree")
+    finally:
+        unitutil.caller_worktree = real
+
+
 def test_ground_truth_parser():
     cf = infer.parse_cflags(["-O4,p", "-inline auto", "-str reuse", "-str reuse,pool,readonly",
                              "-fp_contract on"])
@@ -372,7 +391,7 @@ def test_no_confident_miss():
 
 
 def main():
-    tests = [test_decoder, test_ground_truth_parser, test_synthetic_fingerprints,
+    tests = [test_repo_root, test_decoder, test_ground_truth_parser, test_synthetic_fingerprints,
              test_known_objects, test_no_confident_miss]
     for t in tests:
         t()

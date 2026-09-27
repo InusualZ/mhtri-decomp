@@ -25,6 +25,12 @@ What it does, in order, and the only place it differs from `recompile.py`:
   official measures (``fuzzy_match_percent``, ``matched_functions``) beside a per-symbol table;
 * remembers the previous run's scores in `build/tmp/measure/<unit>.scores.json` and prints the **delta**
   per symbol, which is what tells a worker "did this shape work" without babysitting a spreadsheet;
+* `--baseline <report.json>` (or `--against-main`) makes that delta compare against a **saved** project
+  report or **MAIN's** `build/RMHE08/report.json` instead of the tool's own last run - the shape the
+  hand-written scorers all converged on (`build/probe/score.py` diffed a probe's rows against the committed
+  report). One call then answers "every symbol of this unit, and what each one is worth against the build
+  that landed", which is the per-iteration question. `--save` writes this run in that shape for the next
+  one. A baseline that moved a row **down** is a regression, and the summary says so;
 * `--diff` (or a symbol focus) adds a compact instruction-level mismatch list for the symbol, read from
   `recompile.diff_rows`' diagnostic JSON - never quoted as the score.
 
@@ -227,6 +233,62 @@ def cache_path(wt: str, unit: str) -> str:
     return os.path.join(wt, STATE_DIR, _san(unit) + ".scores.json")
 
 
+def numeric(rows: dict) -> dict:
+    """The `{symbol: score}` subset of a mapping whose values are not numbers."""
+    return {name: value for name, value in (rows or {}).items()
+            if isinstance(value, (int, float))}
+
+
+def load_baseline(path: str, unit_name: str):
+    """({symbol: score}, note) from a saved report - a project `report.json` or a `--save` file.
+
+    The two shapes a worker already has on disk: the campaign's `build/RMHE08/report.json` (units carry
+    `functions[].fuzzy_match_percent`) and a previous `measure.py --save`. A unit the file does not carry
+    is an error, never an empty baseline that would read every row as "new".
+    """
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, "cannot read baseline %s: %s" % (path, exc)
+    rows = numeric(data.get("scores"))
+    if rows:
+        return rows, path
+    for u in data.get("units") or []:
+        name = u.get("name") or ""
+        if name == unit_name or name.endswith("/" + unit_name):
+            rows = numeric({f.get("name"): f.get("fuzzy_match_percent")
+                            for f in u.get("functions") or []})
+            return rows, path
+    return None, ("baseline %s has no unit %s (it carries %d unit(s))"
+                  % (path, unit_name, len(data.get("units") or [])))
+
+
+def moved_summary(functions: dict, baseline: dict) -> dict:
+    """How many rows moved against a baseline, and in which direction (`down` is a regression)."""
+    moved = up = down = 0
+    for name, row in (functions or {}).items():
+        now, before = row.get("score"), (baseline or {}).get(name)
+        if not (isinstance(now, (int, float)) and isinstance(before, (int, float))):
+            continue
+        if abs(now - before) > 1e-9:
+            moved += 1
+            if now > before:
+                up += 1
+            else:
+                down += 1
+    return {"moved": moved, "up": up, "down": down}
+
+
+def save_run(path: str, result: dict) -> None:
+    """Write this run's scores in the `--baseline` shape, so the next iteration can diff against it."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    rows = {name: row.get("score") for name, row in (result.get("functions") or {}).items()
+            if isinstance(row.get("score"), (int, float))}
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"unit": result.get("unit"), "target": result.get("target"),
+                   "measures": result.get("measures") or {}, "scores": rows}, fh, indent=1)
+
+
 def _load_scores(path: str, target: str):
     try:
         data = json.load(open(path, encoding="utf-8"))
@@ -246,15 +308,31 @@ def _save_scores(path: str, target: str, entries: dict) -> None:
 
 
 def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess.run,
-            use_cache: bool = True) -> dict:
-    """Compile once, score every symbol with one report, return the whole result (no printing)."""
+            use_cache: bool = True, baseline_path: str = None) -> dict:
+    """Compile once, score every symbol with one report, return the whole result (no printing).
+
+    `baseline_path` (a project `report.json` or a `--save` file) replaces the tool's own cache as the
+    delta's "before": every symbol then carries its delta against that saved build. A baseline that names
+    a unit the file does not carry is refused loudly (see `load_baseline`).
+    """
     unit = normalize_unit(unit, wt)
+    unit_name = "main/" + os.path.splitext(unit)[0]
+    baseline = None
+    if baseline_path:
+        baseline, note = load_baseline(baseline_path, unit_name)
+        if baseline is None:
+            return {"unit": unit, "worktree": wt, "main": main, "compiled": False,
+                    "error": note}
     tokens, command_source = rc.unit_tokens(main, wt, unit, runner=runner)
     compiled = rc.compile_unit(unit, main, wt, tokens=tokens, runner=runner)
     if not compiled.get("compiled"):
         return {"unit": unit, "worktree": wt, "main": main, "compiled": False,
                 "error": compiled.get("error", "compile failed")}
     obj = compiled["object"]
+    # the measurement boundary's own stale guard: a compile that wrote nothing must never be scored
+    ok, why = rc.object_is_fresh(obj, rc.source_path(wt, unit))
+    if not ok:
+        return {"unit": unit, "worktree": wt, "main": main, "compiled": False, "error": why}
     candidates = candidate_functions(obj)
     names = [name for name, _size in candidates]
 
@@ -271,7 +349,6 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
     if kind == "missing":
         return result
 
-    unit_name = "main/" + os.path.splitext(unit)[0]
     tmpdir = os.path.join(wt, STATE_DIR, _san(unit) + ".report")
     entries, measures, err = score_report(target, obj, unit_name, tmpdir,
                                           objdiff_path(wt, main), runner=runner)
@@ -294,7 +371,14 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
     result["extra_functions"] = [name for name in names if name not in entries]
 
     path = cache_path(wt, unit)
-    if use_cache:
+    if baseline is not None:
+        for name, row in functions.items():
+            now, before = row["score"], baseline.get(name)
+            if isinstance(now, (int, float)) and isinstance(before, (int, float)):
+                row["delta"] = now - before
+        result["baseline"] = baseline_path
+        result["moved"] = moved_summary(functions, baseline)
+    elif use_cache:
         previous = _load_scores(path, target)
         if previous is not None:
             for name, row in functions.items():
@@ -346,6 +430,8 @@ def format_report(r: dict, sort: str = "score", limit: int = None, quiet: bool =
         out.append("command   %s" % r["command_source"])
     out.append("target    %s%s" % (r["target"],
                                   "  [%s]" % r["target_kind"] if r.get("target_kind") else ""))
+    if r.get("baseline"):
+        out.append("baseline  %s  (before = this saved report)" % r["baseline"])
     if r.get("target_note"):
         out.append("          %s" % r["target_note"])
     out.append("compiled  %s  (%s bytes, fresh=%s)" % (r["object"], r.get("bytes"),
@@ -374,6 +460,11 @@ def format_report(r: dict, sort: str = "score", limit: int = None, quiet: bool =
     obytes = sum(v for v in (row.get("ours_size") for row in r["functions"].values())
                  if isinstance(v, int))
     out.append("text      %d B target   %d B ours" % (tbytes, obytes))
+    moved = r.get("moved")
+    if moved:
+        out.append("moved     %d row(s) moved vs baseline: %d up, %d down%s"
+                   % (moved["moved"], moved["up"], moved["down"],
+                      "   <- a DOWN row is a regression" if moved["down"] else ""))
 
     symbol = r.get("symbol")
     if symbol:
@@ -436,6 +527,9 @@ def emit(r: dict, sort: str = "score", limit: int = None, quiet: bool = False,
     if r.get("compiled") and not r.get("fresh"):
         print("WARNING: the object's mtime did not move - treat the scores as stale", file=sys.stderr)
         return 1
+    # a baseline that moved a row down is a regression: say so in the exit code so a sweep can gate on it
+    if (r.get("moved") or {}).get("down"):
+        return 1
     return 0
 
 
@@ -452,15 +546,26 @@ def main(argv=None) -> int:
     ap.add_argument("-q", "--quiet", action="store_true",
                     help="summary and focused symbol only - the search-loop form")
     ap.add_argument("--no-cache", action="store_true", help="do not read or write the score cache")
+    ap.add_argument("--baseline", default=None,
+                    help="a saved report to diff against: a project report.json or a --save file")
+    ap.add_argument("--against-main", action="store_true",
+                    help="diff against MAIN's build/RMHE08/report.json (the last landed build)")
+    ap.add_argument("--save", default=None, help="write this run's scores here, for a later --baseline")
     args = ap.parse_args(argv)
 
     wt = rc.worktree_root()
     main_wt = args.main or rc.main_root(wt)
+    baseline = args.baseline
+    if args.against_main:
+        baseline = os.path.join(main_wt, "build", "RMHE08", "report.json")
     try:
-        result = collect(args.unit, wt, main_wt, symbol=args.symbol, use_cache=not args.no_cache)
+        result = collect(args.unit, wt, main_wt, symbol=args.symbol, use_cache=not args.no_cache,
+                         baseline_path=baseline)
     except SystemExit as exc:
         print("measure: %s" % exc, file=sys.stderr)
         return 2
+    if args.save and result.get("compiled"):
+        save_run(args.save, result)
     if args.json:
         print(json.dumps(result, indent=2))
         return 0 if result.get("compiled") else 1

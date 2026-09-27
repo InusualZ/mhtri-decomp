@@ -359,6 +359,8 @@ def chained_objalign_rows() -> int:
         tokens = ["cmd", "/c", "sjiswrap.exe", "mwcceppc.exe", "-i", "include", "-O3", "-MMD",
                   "-c", "src/probe/probe.cpp", "-o", "build/RMHE08/src/probe", "&&",
                   "C:\\Python\\python.exe", "tools\\elf\\objalign.py",
+                  "build\\RMHE08\\src\\probe\\probe.o", "&&",
+                  "C:\\Python\\python.exe", "tools\\elf\\objextab.py",
                   "build\\RMHE08\\src\\probe\\probe.o"]
         cmd, obj = rc.rewrite(tokens, "probe/probe", main, wt)
         idx = next(k for k, t in enumerate(cmd) if t.replace("\\", "/").endswith("objalign.py"))
@@ -370,6 +372,17 @@ def chained_objalign_rows() -> int:
         failures = _ok("... and the worktree object is the one -o names",
                        os.path.dirname(os.path.abspath(arg)),
                        os.path.dirname(os.path.abspath(obj)), failures)
+
+        # objextab is chained after objalign and takes the same positional object; it was the same latent
+        # bug, and the broader fix covers both by helper name.
+        eidx = next(k for k, t in enumerate(cmd) if t.replace("\\", "/").endswith("objextab.py"))
+        failures = _ok("the chained objextab argument is absolute",
+                       os.path.isabs(cmd[eidx + 1]), True, failures)
+        failures = _ok("... and names the worktree's object too",
+                       os.path.normcase(os.path.abspath(cmd[eidx + 1])),
+                       os.path.normcase(os.path.abspath(obj)), failures)
+        failures = _ok("both helpers are retargeted by name", sorted(rc.OBJECT_HELPERS),
+                       ["objalign.py", "objextab.py"], failures)
 
         def runner(argv, **kwargs):
             """Emulate the `&&` chain: objalign needs an absolute object; MWCC writes into -o."""
@@ -555,11 +568,151 @@ def _raises(fn) -> bool:
         return True
 
 
+def switch_rows() -> int:
+    """`absolutize` must never treat a switch as a MAIN-relative path - the `cmd /c` -> `C:\\c` bug.
+
+    `os.path.join(main, "/c")` is `C:/c` on Windows (a leading separator resets to the drive root), and
+    on a host where `C:\\c` exists the token was rewritten to it: the child became an *interactive* `cmd`,
+    printed its banner, wrote no object, and `recompile.py`/`measure.py` were unusable. Every measurement
+    read the previous build's number. The classification below is asserted directly, so it holds whether
+    or not this host carries the `C:\\c` artifact that surfaced the bug.
+    """
+    failures = 0
+    failures = _ok("/c is a switch", rc.is_switch("/c"), True, failures)
+    failures = _ok("/C is a switch", rc.is_switch("/C"), True, failures)
+    failures = _ok("-o is a switch", rc.is_switch("-o"), True, failures)
+    failures = _ok("a relative executable is not a switch", rc.is_switch("build\\tools\\sjiswrap.exe"),
+                   False, failures)
+    failures = _ok("an absolute path is not a switch", rc.is_switch("C:\\x\\y.exe"), False, failures)
+    with tempfile.TemporaryDirectory() as tmp:
+        main = os.path.join(tmp, "main")
+        os.makedirs(os.path.join(main, "build", "tools"))
+        open(os.path.join(main, "build", "tools", "sjiswrap.exe"), "wb").write(b"")
+        tokens = ["cmd", "/c", "build\\tools\\sjiswrap.exe", "mwcceppc.exe", "-i", "include",
+                  "-O3", "-c", "src/x.c", "-o", "build\\RMHE08\\src", "&&", "C:\\Py\\python.exe"]
+        out = rc.absolutize(tokens, main)
+        failures = _ok("a switch is returned byte-for-byte", out[1], "/c", failures)
+        failures = _ok("cmd is left for PATH to resolve", out[0], "cmd", failures)
+        failures = _ok("the MAIN-relative driver is absolutised",
+                       os.path.isabs(out[2]) and out[2].endswith("sjiswrap.exe"), True, failures)
+        failures = _ok("`&&` is left alone", out[tokens.index("&&")], "&&", failures)
+        failures = _ok("an already-absolute path is not joined to MAIN", out[-1], "C:\\Py\\python.exe",
+                       failures)
+    return failures
+
+
+def staleness_rows() -> int:
+    """The stale-object guard: an object older than its source is refused, never scored.
+
+    A compile that fails (or silently writes nothing) leaves the previous object in place; a scorer that
+    reads it reports the *old* score as this run's, which is worse than no scorer because the number looks
+    like progress. `compile_unit` deletes the object first and requires it to reappear; `object_is_fresh`
+    is the second line of defence, for any caller handed an object path directly.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        wt = os.path.join(tmp, "wt")
+        src_dir = os.path.join(wt, "src", "prop")
+        os.makedirs(src_dir)
+        src = os.path.join(src_dir, "unit.cpp")
+        obj = os.path.join(wt, "build", "RMHE08", "src", "prop", "unit.o")
+        os.makedirs(os.path.dirname(obj))
+        open(src, "w", encoding="utf-8").write("int f() { return 1; }\n")
+        open(obj, "wb").write(b"\x7fELF" * 1024)
+        future = os.stat(src).st_mtime_ns + 5_000_000_000
+        os.utime(obj, ns=(future, future))  # object newer than its source
+        ok, why = rc.object_is_fresh(obj, src)
+        failures = _ok("an object newer than its source is fresh", ok, True, failures)
+        failures = _ok("... with no reason", why, "", failures)
+
+        past = os.stat(src).st_mtime_ns - 5_000_000_000
+        os.utime(obj, ns=(past, past))       # exactly the failed-compile shape
+        ok, why = rc.object_is_fresh(obj, src)
+        failures = _ok("an object older than its source is refused", ok, False, failures)
+        failures = _ok("... and the refusal says STALE and names it",
+                       "STALE OBJECT" in why and os.path.basename(obj) in why, True, failures)
+
+        os.remove(obj)
+        ok, why = rc.object_is_fresh(obj, src)
+        failures = _ok("a missing object is refused, never a number", ok, False, failures)
+        failures = _ok("... and the refusal says nothing was written", "no object" in why, True, failures)
+
+        failures = _ok("source_path resolves the unit's source", rc.source_path(wt, "prop/unit"), src,
+                       failures)
+        failures = _ok("source_path infers .cpp too", rc.source_path(wt, "prop/unit.cpp"), src, failures)
+
+        # compile_unit itself must refuse the object a runner leaves behind older than the still-broken
+        # source: the runner writes *an* object and returns 0, which is exactly the silent-stale case.
+        def stale_runner(argv, **kwargs):
+            if argv[0] == "ninja":
+                return _cp(argv, "sjiswrap.exe mwcceppc.exe -c src\\prop\\unit.cpp -o build\\RMHE08\\src\\prop\n")
+            outdir = argv[argv.index("-o") + 1] if "-o" in argv else os.path.dirname(obj)
+            os.makedirs(outdir, exist_ok=True)
+            written = os.path.join(outdir, "unit.o")
+            open(written, "wb").write(b"\x7fELF" * 1024)
+            os.utime(written, ns=(past, past))
+            return _cp(argv)
+
+        broken = rc.compile_unit("prop/unit.cpp", wt, wt, runner=stale_runner)
+        failures = _ok("compile_unit refuses an object older than its source", broken.get("compiled"),
+                       False, failures)
+        failures = _ok("... naming the stale object", "STALE OBJECT" in (broken.get("error") or ""),
+                       True, failures)
+    return failures
+
+
+def main_root_rows() -> int:
+    """MAIN must be resolved by the git **common dir**, not whichever worktree happens to list first.
+
+    A worktree's `.git` file points at `<MAIN>/.git`, so `--git-common-dir`'s parent IS MAIN by
+    construction; `git worktree list` order is registration order and a tool that pinned MAIN by it could
+    hand a lane another slot's tree. The fake git below lists a *slot first* on purpose, so a first-entry
+    implementation fails this test.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = os.path.join(tmp, "mhtri-dtk")
+        slot = os.path.join(tmp, "mhtri-dtk.slot1")
+        os.makedirs(os.path.join(main, ".git"))
+        os.makedirs(slot)
+        open(os.path.join(main, "configure.py"), "w", encoding="utf-8").write("# main\n")
+        real = rc.git
+
+        def hostile_git(args, cwd, check=True):
+            if args[:1] == ["rev-parse"]:
+                return os.path.join(main, ".git")
+            return ("worktree %s\nHEAD abc\nbranch refs/heads/main\n\n"
+                    "worktree %s\nHEAD def\ndetached\n" % (slot, main))
+
+        rc.git = hostile_git
+        try:
+            failures = _ok("MAIN is the common dir's parent, not the first worktree entry",
+                           os.path.normcase(rc.main_root(slot)), os.path.normcase(main), failures)
+        finally:
+            rc.git = real
+
+        def old_git(args, cwd, check=True):
+            if args[:1] == ["rev-parse"]:
+                return ""
+            return "worktree %s\nHEAD abc\n\nworktree %s\nHEAD def\n" % (main, slot)
+
+        rc.git = old_git
+        try:
+            failures = _ok("a git that cannot report a common dir falls back to the first entry",
+                           os.path.normcase(rc.main_root(slot)), os.path.normcase(main), failures)
+        finally:
+            rc.git = real
+    return failures
+
+
 def main() -> int:
     failures = wire_rows()
     failures += include_order_rows()
     failures += chained_objalign_rows()
+    failures += switch_rows()
+    failures += staleness_rows()
     failures += proposal_rows()
+    failures += main_root_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")
     return 1 if failures else 0

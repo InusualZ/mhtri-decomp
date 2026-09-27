@@ -37,8 +37,32 @@ VALUED = {
 SOURCE_EXT = (".c", ".cc", ".cp", ".cpp", ".cxx", ".c++")
 
 
+def caller_worktree(start=None):
+    """The git worktree the *caller* is in, or None when git cannot say."""
+    try:
+        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=start or os.getcwd(),
+                           capture_output=True, text=True, errors="replace")
+    except OSError:
+        return None
+    return (p.stdout or "").strip() or None if p.returncode == 0 else None
+
+
 def repo_root(start=None):
-    """Walk up from `start` (default: this file) until the directory that holds configure.py."""
+    """The tree the tools should read: the **caller's** git worktree, else the tree this file lives in.
+
+    This used to be only the file's location, which silently read MAIN from inside a lane's worktree: a
+    tool invoked as `python <MAIN>/tools/objdiff/symdiff.py -u <unit>` with cwd in a worktree scored
+    MAIN's objects and printed MAIN's numbers - 0.91743 for a symbol the worktree's own build had at
+    100.0, which read as "the merge destroyed 67 functions". The invocation's tree is what the caller
+    means (`git rev-parse --show-toplevel`), and it is the same tree `recompile.py`/`measure.py` already
+    take their source, `-o` and `-i` order from. When there is no git worktree (a temp dir, a packaged
+    copy) the walk up to `configure.py` is unchanged, and an explicit `start` still roots the walk (the
+    lane/teardown helpers pass one) so a caller can name a tree unambiguously.
+    """
+    if start is None:
+        top = caller_worktree()
+        if top and os.path.exists(os.path.join(top, "configure.py")):
+            return top
     d = os.path.abspath(start or os.path.dirname(os.path.abspath(__file__)))
     while True:
         if os.path.exists(os.path.join(d, "configure.py")):
@@ -52,31 +76,19 @@ def repo_root(start=None):
 ROOT = repo_root()
 
 
-def caller_worktree(start=None):
-    """The git worktree the *caller* is in, or None when git cannot say."""
-    try:
-        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=start or os.getcwd(),
-                           capture_output=True, text=True, errors="replace")
-    except OSError:
-        return None
-    return (p.stdout or "").strip() or None if p.returncode == 0 else None
-
-
 def warn_if_foreign_worktree() -> None:
     """Say so when the caller sits in a worktree other than ROOT - a silent wrong-source measurement.
 
-    Everything here resolves the unit, its source and its object from ROOT (the tree this file lives in)
-    and runs the compiler with `cwd=ROOT`, and the command line's `-i include -i build/RMHE08/include` are
-    *relative to ROOT*. That is right for the MAIN-side flag tools, whose subject is MAIN's source. A
-    worker is not: its subject is its own worktree, so a worker that reaches these helpers through
-    `MAIN/tools/...` (rather than its own tree, which has no `build.ninja`) would compile and measure
-    MAIN's source and read the number as a matching problem. It cannot be detected from the numbers, so it
-    is said out loud. `tools/units/recompile.py` is the worktree-aware path - it rewrites the source, the
-    `-o` directory and the `-i` order to the caller's tree.
+    With `repo_root` now resolving the caller's worktree this is mostly a safety net: it fires only when
+    ROOT was pinned to a tree other than the caller's (an explicit import, or a `repo_root(start)`), which
+    is the case where compiling here would measure a tree the caller cannot see. Everything here resolves
+    the unit, its source and its object from ROOT and runs the compiler with `cwd=ROOT`; if that is not
+    the caller's tree the number is not the caller's. `tools/units/recompile.py` is the worktree-aware
+    path - it rewrites the source, the `-o` directory and the `-i` order to the caller's tree.
     """
     top = caller_worktree()
     if top and os.path.normcase(os.path.abspath(top)) != os.path.normcase(os.path.abspath(ROOT)):
-        print("note: this tool compiles MAIN's source (%s) - you are in %s, whose edits it cannot see. "
+        print("note: this tool compiles %s - you are in %s, whose edits it cannot see. "
               "Use tools/units/recompile.py to measure your own tree." % (ROOT, top), file=sys.stderr)
 
 

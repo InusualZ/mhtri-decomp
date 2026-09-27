@@ -89,7 +89,24 @@ def worktree_root(start: str | None = None) -> str:
 
 
 def main_root(current: str) -> str:
-    """The first worktree git lists - the main one. `git worktree list --porcelain` prints it first."""
+    """MAIN's worktree path - the tree that owns the toolchain, the ninja graph and the split objects.
+
+    Callers that genuinely need MAIN: `recompile.py`/`measure.py` take the compile **command line**, the
+    toolchain and the *target* split object from MAIN (a worktree has no `build.ninja` of its own), while
+    the source, `-o` directory and `-i` order are the caller's tree. The gate (`land.py`) runs from MAIN
+    and does not call this.
+
+    Resolution is by `git rev-parse --git-common-dir`, whose parent is MAIN by construction, **not** the
+    first `git worktree list` entry - that order is registration order, and a tool that pinned MAIN by it
+    could hand a lane a slot's tree (or, worse, read a tree it was not editing). Falls back to the first
+    worktree entry only when git cannot answer, so a non-git copy still works.
+    """
+    common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], current, check=False)
+    common = (common or "").strip()
+    if common and os.path.basename(common.replace("\\", "/")) == ".git":
+        main = os.path.dirname(os.path.abspath(common))
+        if os.path.exists(os.path.join(main, "configure.py")):
+            return main
     out = git(["worktree", "list", "--porcelain"], current)
     paths = [line.split(" ", 1)[1] for line in out.splitlines() if line.startswith("worktree ")]
     return paths[0] if paths else current
@@ -248,24 +265,37 @@ def unit_tokens(main: str, wt: str, unit: str, runner=subprocess.run):
     return retarget(tokens, unit), "sibling %s (same lib)" % sibling
 
 
-def retarget_objalign(tokens: list[str], obj_path: str) -> list[str]:
-    """Point the ninja rule's **chained** `objalign.py <object>` argument at the worktree's object.
+# The post-compile helpers project.py chains after MWCC; each takes the just-written object as its
+# positional argument. Kept as data so a new helper is one entry, not another special case.
+OBJECT_HELPERS = ("objalign.py", "objextab.py")
 
-    Every `.o` rule ends `... && python tools\\elf\\objalign.py build\\RMHE08\\src\\<unit>.o`, and that
-    argument is neither `-o` nor `-c`, so `rewrite` used to leave it **relative** while `compile_unit`
-    runs the whole line with `cwd=MAIN`.  `objalign` then resolved MAIN's copy of the object - absent for
-    a unit MAIN has not registered - raised `FileNotFoundError`, and the tool reported `FAILED` even
-    though MWCC had compiled the worktree object fine (the exact measurement `docs/plan.md`'s landing
-    recipe names; its `--dry-run` showed the good command and hid the mismatch).  A borrowed sibling's
-    line is worse still: its `objalign.py` carries the *sibling's* object name, so the fix replaces the
-    token after `objalign.py` rather than matching on the object's name.
+
+def retarget_object_helpers(tokens: list[str], obj_path: str) -> list[str]:
+    """Point every chained `<helper>.py <object>` argument at the worktree's object.
+
+    Every `.o` rule ends `... && python tools\\elf\\objalign.py build\\RMHE08\\src\\<unit>.o && python
+    tools\\elf\\objextab.py build\\RMHE08\\src\\<unit>.o`, and those arguments are neither `-o` nor `-c`,
+    so `rewrite` used to leave them **relative** while `compile_unit` runs the whole line with `cwd=MAIN`.
+    The helper then resolved MAIN's copy of the object - absent for a unit MAIN has not registered -
+    raised `FileNotFoundError`, and the tool reported `FAILED` even though MWCC had compiled the worktree
+    object fine (the exact measurement `docs/plan.md`'s landing recipe names; its `--dry-run` showed the
+    good command and hid the mismatch). `objextab` was the same latent failure `objalign` already had:
+    with a worktree object and an unregistered unit it silently rewrote MAIN's object instead of this
+    tree's. A borrowed sibling's line is worse still: its helper carries the *sibling's* object name, so
+    the fix replaces the token after the helper rather than matching on the object's name.
     """
-    for i, tok in enumerate(tokens):
-        if tok.replace("\\", "/").endswith("objalign.py") and i + 1 < len(tokens):
-            out = list(tokens)
+    out = list(tokens)
+    changed = False
+    for i, tok in enumerate(out):
+        if any(tok.replace("\\", "/").endswith(helper) for helper in OBJECT_HELPERS) \
+                and i + 1 < len(out):
             out[i + 1] = os.path.abspath(obj_path)
-            return out
-    return tokens
+            changed = True
+    return out if changed else tokens
+
+
+# kept for callers outside this module (the name the fix first shipped under)
+retarget_objalign = retarget_object_helpers
 
 
 def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str], str]:
@@ -300,9 +330,10 @@ def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str]
         raise SystemExit("no -o in the command line - refusing to guess where the object goes")
     out = order_includes(out, main, wt)
     obj_path = os.path.join(obj_dir, os.path.splitext(os.path.basename(wt_src))[0] + ".o")
-    # the chained objalign argument is not a `-o`/`-c` value, so it was left relative to MAIN; absolutise
-    # it here, after the object path is known, so objalign aligns the object MWCC just wrote.
-    out = retarget_objalign(out, obj_path)
+    # the chained objalign/objextab arguments are not `-o`/`-c` values, so they were left relative to
+    # MAIN; absolutise them here, after the object path is known, so each helper touches the object MWCC
+    # just wrote rather than MAIN's.
+    out = retarget_object_helpers(out, obj_path)
     return out, obj_path
 
 
@@ -378,6 +409,38 @@ def order_includes(tokens: list[str], main: str, wt: str) -> list[str]:
     kept = [t for k, t in enumerate(tokens) if k not in skip]
     pos = at - sum(1 for k in skip if k < at)
     return kept[:pos] + block + kept[pos:]
+
+
+def source_path(wt: str, unit: str) -> str:
+    """The source a unit's object must be newer than, resolved the way `rewrite` resolves it."""
+    return os.path.join(wt, "src", *unit_source(unit).split("/"))
+
+
+def object_is_fresh(object_path: str, source: str) -> tuple[bool, str]:
+    """(fresh, reason) - the stale-object guard every measurement path must pass before reading an object.
+
+    The failure this refuses: a compile fails (or is a no-op) and leaves the **previous** object on disk,
+    and the scorer reads it and reports the old score as this run's number. That is worse than no scorer,
+    because the number looks like progress. Two layers protect against it - `compile_unit` deletes the
+    object before it compiles and requires it to reappear, and this last check refuses any object whose
+    mtime predates the source it claims to be built from, so a scorer handed an object path directly
+    cannot be fooled either.
+
+    An object with no source to compare against is not rejected *here* (`compile_unit` already failed the
+    compile if the source is missing); this is about the ordering, not existence.
+    """
+    if not os.path.exists(object_path):
+        return False, ("STALE OBJECT: no object at %s - the compile wrote nothing, so there is no score to "
+                       "read" % object_path)
+    if not os.path.exists(source):
+        return True, ""
+    obj_m, src_m = os.stat(object_path).st_mtime_ns, os.stat(source).st_mtime_ns
+    if obj_m < src_m:
+        return False, (
+            "STALE OBJECT: %s is older than its source %s (%d ns) - the compile did not rewrite it; "
+            "refusing to measure, because a score read from here would be last build's number dressed as "
+            "this one's" % (object_path, source, src_m - obj_m))
+    return True, ""
 
 
 def section_sizes(obj: str) -> dict:
@@ -509,17 +572,43 @@ def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
     return result
 
 
+# Tokens that are switches, not paths. `cmd /c` is the one that bit: `os.path.join(main, "/c")` is
+# `C:/c` - a leading separator resets to the drive root - and on a host where `C:\c` exists (this one
+# does) the switch was rewritten to that path, so the child became an *interactive* `cmd`, printed its
+# banner, and never wrote an object. A `-` or `/` prefix is always a switch in these command lines
+# (`-o`, `-i`, `-c`, `-lang=`, `cmd /c`), never a MAIN-relative file.
+SWITCH_PREFIXES = ("-", "/")
+
+
+def is_switch(tok: str) -> bool:
+    """Whether a command token is a flag/switch, never a MAIN-relative path.
+
+    The one predicate that decides `absolutize`'s classification; kept separate so the `cmd /c` contract
+    can be asserted without depending on whether this host happens to have a `C:/c` artifact.
+    """
+    return tok.startswith(SWITCH_PREFIXES)
+
+
 def absolutize(tokens: list[str], main: str) -> list[str]:
-    """Resolve any token that names a file *in MAIN* to an absolute path.
+    """Resolve any token that names a file *in MAIN* to an absolute path, without touching switches.
 
     Windows resolves a relative executable path against the parent process's directory, not against the
     `cwd=` handed to the child, so `build/tools/sjiswrap.exe` fails with WinError 2 even when the child's cwd
     is MAIN. Absolutizing the driver (and the compiler sjiswrap is told to run) is what makes the command
     work from any worktree.
+
+    The guard that matters is the switch prefix: a token beginning with `-` or `/` is a flag, and
+    `os.path.join` would resolve a rooted one (`/c`) against the *drive root* rather than MAIN. With
+    `C:/c` present that turned `cmd /c ...` into `cmd C:\\c ...` - an interactive shell, no compile, no
+    object. A rooted token that is a real path (`C:\\...`) is still absolutised by `os.path.join`
+    discarding `main`, so absolute paths keep working.
     """
     out = []
     for tok in tokens:
-        if not tok.startswith("-") and ("\\" in tok or "/" in tok):
+        if is_switch(tok):
+            out.append(tok)
+            continue
+        if "\\" in tok or "/" in tok:
             candidate = os.path.join(main, tok.replace("\\", os.sep))
             if os.path.exists(candidate):
                 out.append(os.path.abspath(candidate))
@@ -668,6 +757,10 @@ def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=su
                          "digest:\n" + log}
     after = os.stat(obj).st_mtime_ns
     fresh = after >= started and after != before
+    ok, why = object_is_fresh(obj, source_path(wt, unit))
+    if not ok:
+        # the compile returned 0 and wrote *an* object, but it is not this source's - refuse it
+        return {"object": obj, "compiled": False, "error": why}
     return {"object": obj, "compiled": True, "fresh": fresh, "bytes": os.path.getsize(obj),
             "sections": section_sizes(obj), "log": log}
 
