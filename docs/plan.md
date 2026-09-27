@@ -545,12 +545,13 @@ report and left alone. Rule 7 has one exemption: a registered unit with **no bod
 A batch that touches a unit closes its rows in that table for that unit. The lint's backlog number is the
 campaign's second burn-down (§7.11 is the first, bytes).
 
-### 6.6 The backlog register — backlog first (owner, 2026-09-27)
+### 6.6 The backlog register — a credit ratio, and an evidence-based triage (owner, 2026-09-27)
 
-**While the backlog has open items, work those before handing out a new proposal claim.** The backlog was
-always filed - every lane's outbox `config_requests` records what it found but was not allowed to change -
-but nothing tracked whether any of it was ever done. `tools/units/backlog.py` is that register and
-`queue.py next` reads it.
+**One resolved backlog item per new proposal claim.** The backlog was always filed - every lane's outbox
+`config_requests` records what it found but was not allowed to change - but nothing tracked whether any of it
+was ever done. `tools/units/backlog.py` is that register and `queue.py next` reads it. The first rule ("work
+the backlog before any new proposal claim") was a hard gate: with 229 open items it held decompilation shut.
+The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (option 2).
 
 * **What is backlog.** A `range` (a data run to claim), a `seam` (a code span whose boundary is in the wrong
   place, so the unit split needs re-drawing - its own kind, because "the cut belongs elsewhere" is a
@@ -579,10 +580,28 @@ but nothing tracked whether any of it was ever done. `tools/units/backlog.py` is
   (gitignored, like `claims.json`, so it survives a regeneration); set it with
   `python tools/units/backlog.py --set-status KEY done`, and `--check` exits 1 when the register is missing or
   stale.
-* **The queue refuses.** `python tools/units/queue.py next` exits 1 while the register is open, printing the
-  top item(s) with a ready-to-paste lane task; `--ignore-backlog` hands out a proposal anyway, the way
-  `--allow-unlanded` parks a branch on purpose. The guard order is branch (`HEAD` must be `main`), backlog,
-  then unlanded.
+* **The queue spends credits, it does not refuse outright (option 3 - a ratio, not a gate).** The register
+  keeps a **credit ledger**. A resolved item (`done`) earns **1 credit**, a claim spends **`--ratio K`**
+  credits (default 1 = one backlog item per claim), and the register starts with **1 credit** so the campaign
+  can begin. `python tools/units/queue.py next` hands out the claim while the balance covers it and **records
+  the claim in the ledger**; when it does not, it refuses and prints the balance with its derivation and the
+  top item(s) with a ready-to-paste lane, exactly as the old refusal did. `--ignore-backlog` is the
+  deliberate override and spends nothing; a wave (`--count N`) costs `N x ratio`. **`parked` earns no
+  credit** - parking removes a ghost, it does not buy a claim; only `done` does, and both `--print` and the
+  refusal say so. Earnings are **derived from the item statuses** (the count of resolved `done`) rather than
+  stored as a counter, so the rule can never drift and enforcement never depends on the register file
+  surviving a clean checkout; the claims handed out are the one part persisted. The guard order is branch
+  (`HEAD` must be `main`), the credit balance, then unlanded.
+* **Triage the stale first, and never guess (option 2).** `python tools/units/backlog.py triage [--apply]`
+  classifies every open item as `resolved` / `stale` / `open`, printing the check that proved each, and
+  `--apply` writes `resolved` -> `done` and `stale` -> `parked`. `--apply` is idempotent and never flips a
+  status a human already set. The evidence rule is per kind: a `range`/`seam` is `resolved` when its span is
+  now **fully covered by a registered unit's range in `splits.txt`**; a `flag` is `resolved` when the lib's
+  cflags group in `configure.py` already carries the requested flag; a `shared-file` is `stale` when its file
+  no longer exists, and `resolved` when the file is present and the stated defect is **gone** (the named
+  `#pragma` is no longer present, or the declaration's symbol is no longer named); a `tooling` request is
+  auto-decided only when it has a checkable artifact. **Anything that cannot be proved from the repository
+  stays `open (no check)`** - a triage that guesses is worse than the pile it is triaging.
 
 ## 7. The tooling roadmap — build order, why, and the acceptance test
 

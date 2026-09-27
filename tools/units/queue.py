@@ -44,6 +44,7 @@ candidates in address order.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
 import os
 import re
@@ -475,16 +476,24 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
             "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, profile)}
 
 
+def _claim_record(out: dict, worker: str | None, ratio: int) -> dict:
+    """One ledger entry for a handed-out claim, so the spent side is auditable."""
+    return {"unit": out.get("unit"), "worker": worker or "",
+            "branch": (out.get("claim") or {}).get("branch"),
+            "worktree": out.get("worktree"), "ratio": ratio,
+            "when": _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()}
+
+
 def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
-               profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False) -> dict:
+               profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False,
+               ratio: int = backlog.RATIO_DEFAULT) -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
     Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
-    branch are cut from that HEAD; `backlog.refusal` refuses while the campaign backlog has open items (the
-    owner's 2026-09-27 rule: work the backlog before a new proposal claim), unless `--ignore-backlog` parks
-    the whole register on purpose; and `unlanded_error` refuses while any branch still holds work main does
-    not have (the owner's 2026-09-26 guard). The claim itself is `claim_entry`, shared with the `--count`
-    wave path.
+    branch are cut from that HEAD; the backlog **credit gate** refuses when the balance does not cover a
+    claim (the owner's 2026-09-27 ratio: a `done` earns 1 credit, a claim spends `ratio`), unless
+    `--ignore-backlog` hands out work without spending on purpose; and `unlanded_error` refuses while any
+    branch still holds work main does not have. A real (non-dry) claim is recorded in the ledger.
     """
     claim_fn = claim_fn or claims.claim
     if not dry_run:
@@ -493,7 +502,7 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
     if not ignore_backlog:
-        backlog_msg = backlog.refusal(main)
+        backlog_msg = backlog.refusal(main, ratio=ratio)
         if backlog_msg:
             raise SystemExit("REFUSED queue next | %s" % backlog_msg)
     if not dry_run:
@@ -503,18 +512,22 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(no_ready(main))
-    return claim_entry(main, entry, worker, dry_run, claim_fn, profile)
+    out = claim_entry(main, entry, worker, dry_run, claim_fn, profile)
+    if not dry_run and not ignore_backlog:
+        backlog.record_claims(main, [_claim_record(out, worker, ratio)], ratio=ratio)
+    return out
 
 
 def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
-                profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False) -> dict:
+                profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False,
+                ratio: int = backlog.RATIO_DEFAULT) -> dict:
     """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
 
     Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
-    the single pick uses. The same guards as `next_brief` run first: HEAD must be `main`, the backlog must be
-    closed (or `--ignore-backlog`), and no branch may hold unlanded work. `claimed` below `requested` means
-    the queue could not fill the wave: fewer than `count` were ready, or the rest were adjacent to a claim
-    already in it. The wave claims what there is instead of failing, and the caller reports the shortfall.
+    the single pick uses. The same guards as `next_brief` run first, and the credit gate is then re-checked
+    for the whole wave: a wave of N costs N x ratio credits, so a balance that covers one claim may not
+    cover three. A real wave is recorded in the ledger; `--ignore-backlog` hands out the wave without
+    spending. `claimed` below `requested` means the queue could not fill the wave.
     """
     claim_fn = claim_fn or claims.claim
     if not dry_run:
@@ -522,7 +535,7 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
     if not ignore_backlog:
-        backlog_msg = backlog.refusal(main)
+        backlog_msg = backlog.refusal(main, ratio=ratio)
         if backlog_msg:
             raise SystemExit("REFUSED queue next | %s" % backlog_msg)
     if not dry_run:
@@ -532,7 +545,13 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
     chosen = wave(main, count)
     if not chosen:
         raise SystemExit(no_ready(main))
+    if not ignore_backlog:
+        backlog_msg = backlog.refusal(main, ratio=ratio, wants=len(chosen))
+        if backlog_msg:
+            raise SystemExit("REFUSED queue next | %s" % backlog_msg)
     out = [claim_entry(main, entry, worker, dry_run, claim_fn, profile) for entry in chosen]
+    if not dry_run and not ignore_backlog:
+        backlog.record_claims(main, [_claim_record(c, worker, ratio) for c in out], ratio=ratio)
     return {"requested": count, "claimed": len(out), "shortfall": count - len(out), "dry_run": dry_run,
             "claims": out}
 
@@ -987,9 +1006,10 @@ def selftest() -> int:
         check("a released claim is ready again", state(repo, by_unit[claimed_unit]), "ready")
         check("... and next_entry offers it first again", next_entry(repo)["unit"], claimed_unit)
 
-    # the owner's backlog rule (2026-09-27): while the register has open items, `next` refuses to hand out
-    # a new proposal and prints the top item with a paste-ready lane; `--ignore-backlog` parks the whole
-    # register on purpose, the way `--allow-unlanded` parks a branch.
+    # The owner's revised rule (2026-09-27): a credit ledger, not a hard refusal. A `done` earns 1 credit,
+    # a claim spends `ratio` (default 1), the register starts with 1. The first claim is handed out and
+    # recorded; the next is refused until a backlog item is resolved. `--ignore-backlog` is the deliberate
+    # override and spends nothing. `parked` earns nothing - parking removes a ghost, it does not buy a claim.
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
@@ -1001,35 +1021,78 @@ def selftest() -> int:
                                                    "count": 2, "bytes": 256, "cxx": False}]}, fh)
         open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"),
              "w", encoding="utf-8").write("# Proposal brief: %s\n" % label)
-        # no outbox yet: the register is empty, so `next` hands out a normal claim
+        # no outbox yet: the register is empty, so there is nothing to ration against and a claim flows
         check("an empty backlog hands out a normal claim", next_brief(tmp, None, dry_run=True)["unit"],
               claims.norm_unit(label))
-        # one open backlog item (a shared-file defect) blocks the claim and names the item
+        # one open backlog item (a shared-file defect)
         os.makedirs(os.path.join(tmp, ".pi", "outbox"))
         with open(os.path.join(tmp, ".pi", "outbox", "lane.json"), "w", encoding="utf-8") as fh:
             json.dump({"unit": "auto/x", "worker": "w1", "finished_at": "2026-09-01T00:00:00",
                        "config_requests": [{"kind": "shared-file", "file": "include/unsplit/lobby.h",
                                             "why": "the header's `s32 fn_80215C98(...)` has the wrong "
                                                    "arity - every call site passes five arguments."}]}, fh)
+
+        def fake_claim(unit, main, worker, dry_run):
+            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
+                                               "worktree": claims.worktree_for(unit, main)}})
+            return {"unit": unit, "branch": claims.branch_for(unit),
+                    "worktree": claims.worktree_for(unit, main)}
+
+        items_before, _ = backlog.build(tmp)
+        check("the ledger starts at 1 credit", backlog.ledger_summary(items_before, [])["balance"], 1)
+        check("no claims are recorded yet", backlog.load_ledger(tmp)["claims"], [])
+        # PATH 1: balance >= 1 -> the claim is handed out AND recorded
+        over = next_brief(tmp, "w-led", dry_run=False, claim_fn=fake_claim)
+        check("balance >= 1 hands out the claim", over["unit"], claims.norm_unit(label))
+        check("... and records exactly one claim in the ledger", len(backlog.load_ledger(tmp)["claims"]), 1)
+        check("... the recorded claim names the unit", backlog.load_ledger(tmp)["claims"][0]["unit"],
+              claims.norm_unit(label))
+        items_after, _ = backlog.build(tmp)
+        check("... and the balance is spent to 0",
+              backlog.ledger_summary(items_after, backlog.load_ledger(tmp)["claims"])["balance"], 0)
+        # PATH 2: balance 0 -> refused, naming the top item and printing the rule
         try:
             next_brief(tmp, None, dry_run=True)
-            check("an open backlog refuses a new proposal", "no error", "SystemExit")
+            check("balance 0 refuses the next claim", "no error", "SystemExit")
         except SystemExit as exc:
-            check("an open backlog refuses a new proposal", "REFUSED queue next" in str(exc), True)
-            check("... names the top backlog item", "include/unsplit/lobby.h" in str(exc), True)
-            check("... and carries a paste-ready lane", "subagent(" in str(exc), True)
-            check("... and quotes the backlog key for --set-status", "--set-status" in str(exc), True)
-        over = next_brief(tmp, None, dry_run=True, ignore_backlog=True)
-        check("--ignore-backlog hands out a normal claim", over["unit"], claims.norm_unit(label))
-        check("... and a dry run claims nothing", claims.load_registry(tmp), {})
-        # the wave (`next --count N`) path is guarded the same way
+            msg = str(exc)
+            check("balance 0 refuses the next claim", "REFUSED queue next" in msg, True)
+            check("... shows the balance and its derivation",
+                  "balance is 0" in msg and "earns 1 credit" in msg, True)
+            check("... names the top backlog item", "include/unsplit/lobby.h" in msg, True)
+            check("... carries a paste-ready lane", "subagent(" in msg, True)
+            check("... and says parked earns no credit", "`parked` earns no credit" in msg, True)
+        # PATH 3: --ignore-backlog -> handed out WITHOUT spending (release the unit PATH 1 claimed)
+        claims.save_registry(tmp, {})
+        over2 = next_brief(tmp, "w-ignore", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
+        check("--ignore-backlog hands out the claim", over2["unit"], claims.norm_unit(label))
+        check("... and spends nothing (the ledger is unchanged)",
+              len(backlog.load_ledger(tmp)["claims"]), 1)
+        # a `parked` item earns no credit; a resolved `done` does
+        item_key = [i.key for i in items_after if i.kind == "shared-file"][0]
+        parked_statuses = {item_key: "parked"}
+        parked_items = backlog.build_items(backlog.outbox_dir(tmp), backlog.notes_dir(tmp),
+                                           backlog.tooling_register_path(tmp), parked_statuses)
+        check("a parked item earns no credit", backlog.ledger_earned(parked_items), 0)
+        done_statuses = {item_key: "done"}
+        done_items = backlog.build_items(backlog.outbox_dir(tmp), backlog.notes_dir(tmp),
+                                         backlog.tooling_register_path(tmp), done_statuses)
+        check("a resolved `done` earns 1 credit", backlog.ledger_earned(done_items), 1)
+        # --ratio 2: one claim costs two credits, so the base 1 alone is not enough
+        os.remove(backlog.register_path(tmp))
         try:
-            next_briefs(tmp, None, dry_run=True, count=2)
-            check("an open backlog refuses a wave too", "no error", "SystemExit")
+            next_brief(tmp, None, dry_run=True, ratio=2)
+            check("--ratio 2 refuses when the balance is 1", "no error", "SystemExit")
         except SystemExit as exc:
-            check("an open backlog refuses a wave too", "backlog" in str(exc).lower(), True)
-        check("a wave with --ignore-backlog hands out normally",
-              next_briefs(tmp, None, dry_run=True, count=2, ignore_backlog=True)["claimed"], 1)
+            check("--ratio 2 refuses when the balance is 1", "needs 2 credit(s)" in str(exc), True)
+        check("... one resolution buys one credit (balance 2, so ratio 2 now covers)",
+              backlog.ledger_summary(done_items, [])["balance"], 2)
+        # the wave path is guarded the same way and `--ignore-backlog` still spends nothing
+        claims.save_registry(tmp, {})
+        wave_out = next_briefs(tmp, None, dry_run=False, count=1, ignore_backlog=True,
+                               claim_fn=fake_claim)
+        check("a wave with --ignore-backlog hands out without spending", wave_out["claimed"], 1)
+        check("... and leaves the ledger untouched", backlog.load_ledger(tmp)["claims"], [])
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -1058,8 +1121,11 @@ def main() -> int:
                    help="name a branch that is parked on purpose, so the unlanded-branch guard lets it "
                         "through (repeatable; default is to refuse while any branch holds work main lacks)")
     n.add_argument("--ignore-backlog", action="store_true",
-                   help="hand out a proposal even while the backlog register has open items - parking the "
-                        "whole backlog on purpose, the way --allow-unlanded parks a branch")
+                   help="hand out a proposal even when the backlog credit balance does not cover it, without "
+                        "spending a credit - the deliberate override (a ratio of `done : claim` is the default)")
+    n.add_argument("--ratio", type=int, default=backlog.RATIO_DEFAULT,
+                   help="credits one claim spends - K backlog items per claim (default 1: one resolved "
+                        "`done` buys one claim)")
     n.add_argument("--json", action="store_true")
     l = sub.add_parser("list", help="the pool's state and the next ready candidates")
     l.add_argument("--json", action="store_true")
@@ -1107,7 +1173,8 @@ def main() -> int:
     if args.cmd == "next":
         if args.count != 1:
             out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile,
-                              allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog)
+                              allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
+                              ratio=args.ratio)
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0
@@ -1136,7 +1203,8 @@ def main() -> int:
                       " replenishes it" % (out["claimed"], out["requested"]))
             return 0
         out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile,
-                         allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog)
+                         allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
+                         ratio=args.ratio)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
