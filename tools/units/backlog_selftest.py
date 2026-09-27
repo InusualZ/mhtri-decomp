@@ -189,15 +189,174 @@ def selftest() -> int:
     check("json statuses only lists overrides",
           set(bl.payload(parked, "", {}).get("statuses", {})), {key})
 
-    # --- refusal -----------------------------------------------------------------------------------
-    msg = bl.refusal(tmp, outbox=obx, notes=notes, register=os.path.join(tmp, "no-register.json"))
-    check_true("a refusal is raised while the register is open", msg and msg.startswith("backlog:"))
+    # --- the credit ledger: a `done` earns 1, a claim spends `ratio`, the base is 1 ---------------------
+    check("a default-done record earns no credit", bl.ledger_earned(items), 0)
+    check("the ledger starts at 1 credit", bl.ledger_summary(items, [])["balance"], 1)
+    check("a claim spends 1 credit", bl.ledger_summary(items, [{"unit": "u1"}])["balance"], 0)
+    check("... two claims overdraw it", bl.ledger_summary(items, [{"unit": "u1"}, {"unit": "u2"}])["balance"], -1)
+    resolved = bl.build_items(obx, notes, os.path.join(tmp, "x"), {key: "done"})
+    check("a resolved `done` earns 1 credit", bl.ledger_earned(resolved), 1)
+    check("... so a claim is affordable again", bl.ledger_summary(resolved, [{"unit": "u1"}])["balance"], 1)
+    check("... but `parked` earns nothing", bl.ledger_earned(
+        bl.build_items(obx, notes, os.path.join(tmp, "x"), {key: "parked"})), 0)
+    check("ratio 2 makes one claim cost two credits",
+          bl.ledger_summary(resolved, [{"unit": "u1"}], 2)["balance"], 0)
+    check("a default-done item does not count even as an override",
+          bl.ledger_earned(bl.build_items(obx, notes, os.path.join(tmp, "x"),
+                                          {done[0].key: "done"})), 0)
+    # record_claims persists the spent side and leaves the earned side derivable from the statuses
+    ledger_reg = os.path.join(tmp, ".pi", "ledger.json")
+    summ = bl.record_claims(tmp, [{"unit": "u1"}], ratio=1, register=ledger_reg,
+                            outbox=obx, notes=notes, tooling_register=os.path.join(tmp, "x"))
+    check("record_claims persists the claim", bl.load_ledger(tmp, ledger_reg)["claims"], [{"unit": "u1"}])
+    check("... and reports the spent balance", summ["balance"], 0)
+    check("... and the claim can be read back", bl.load_ledger(tmp, ledger_reg)["ratio"], 1)
+    p = bl.payload(items, "", {}, {"claims": [{"unit": "u1"}], "ratio": 1})
+    check("the payload carries the ledger balance", p["ledger"]["balance"], 0)
+    check("... and its derivation", (p["ledger"]["base"], p["ledger"]["earned"], p["ledger"]["spent"]),
+          (1, 0, 1))
+    # enforcement reads only the claims from the file; `earned` is always derived, so a hand-edited balance
+    # cannot buy a claim, and recording a claim preserves the statuses it shares the file with.
+    bogus = os.path.join(tmp, "bogus.json")
+    bl.write_atomic(bogus, json.dumps({"statuses": {}, "ledger": {"claims": [], "ratio": 1,
+                                                                    "balance": 9999}}))
+    check("a hand-edited ledger balance is ignored (earned is derived)",
+          bl.refusal(tmp, outbox=obx, notes=notes, register=bogus, wants=2) is not None, True)
+    seeded = os.path.join(tmp, "seeded.json")
+    bl.write_atomic(seeded, json.dumps({"statuses": {key: "done"}, "ledger": {"claims": [], "ratio": 1}}))
+    bl.record_claims(tmp, [{"unit": "u9"}], ratio=1, register=seeded, outbox=obx, notes=notes,
+                     tooling_register=os.path.join(tmp, "x"))
+    check("recording a claim preserves the statuses", bl.load_statuses(tmp, seeded), {key: "done"})
+    check("... and appends to the ledger", len(bl.load_ledger(tmp, seeded)["claims"]), 1)
+
+    # --- refusal: the balance, not a hard gate -------------------------------------------------------
+    no_reg = os.path.join(tmp, "no-register.json")
+    check("the starting balance covers a single claim",
+          bl.refusal(tmp, outbox=obx, notes=notes, register=no_reg), None)
+    msg = bl.refusal(tmp, outbox=obx, notes=notes, register=no_reg, wants=2)
+    check_true("a claim the balance cannot cover is refused", msg and msg.startswith("backlog:"))
+    check_true("... and shows the balance", "balance is 1" in (msg or ""))
     check_true("... names the top item's target", "include/enemy/fn_801251d0.h" in (msg or ""))
     check_true("... and carries a paste-ready lane", 'subagent(agent="fixer"' in (msg or ""))
+    check_true("... and says parked earns no credit", "`parked` earns no credit" in (msg or ""))
     empty = tempfile.mkdtemp(prefix="backlog-empty-")
     os.makedirs(os.path.join(empty, "outbox"))
     check("an empty register does not refuse", bl.refusal(empty), None)
+    check("... even when the balance is spent (nothing to work)",
+          bl.refusal(empty, wants=99), None)
     check("an empty register has no open items", bl.open_items(empty), [])
+
+    # --- triage: evidence-based classification, and never a guess ------------------------------------
+    tdir = tempfile.mkdtemp(prefix="backlog-triage-")
+    tobx = os.path.join(tdir, "outbox")
+    tnotes = os.path.join(tdir, "notes")
+    os.makedirs(tobx)
+    os.makedirs(os.path.join(tdir, "config", "RMHE08"))
+    os.makedirs(os.path.join(tdir, "include"))
+    open(os.path.join(tdir, "configure.py"), "w", encoding="utf-8").write(
+        'cflags_base = ["-O4,p", "-inline auto"]\n'
+        'cflags_test = [*cflags_base, "-opt nopeephole"]\n'
+        'config.libs = [\n'
+        '    {"lib": "test", "cflags": cflags_test, "objects": []},\n'
+        '    {"lib": "plain", "cflags": cflags_base, "objects": []},\n'
+        ']\n')
+    open(os.path.join(tdir, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8").write(
+        "g3d/covered.cpp:\n\t.text       start:0x80100000 end:0x80100100\n")
+    open(os.path.join(tdir, "include", "pragma_off.h"), "w").write(
+        "#pragma peephole off\nvoid fn_80001111(void);\n")
+    open(os.path.join(tdir, "include", "pragma_gone.h"), "w").write("void fn_80002222(void);\n")
+    open(os.path.join(tdir, "include", "decl_present.h"), "w").write("void fn_80003333(void);\n")
+    open(os.path.join(tdir, "include", "decl_gone.h"), "w").write("void other(void);\n")
+    treqs = [
+        {"kind": "range", "section": ".text", "start": "0x80100000", "end": "0x80100100",
+         "evidence": "Requested, not claimed: the run."},
+        {"kind": "range", "section": ".data", "start": "0x80500000", "end": "0x80500100",
+         "evidence": "Requested, not claimed: the table."},
+        {"kind": "range", "section": ".data", "start": "0x805C02xx", "end": "0x805C53xx",
+         "evidence": "Requested, not claimed: the pool."},
+        {"kind": "flag", "lib": "test", "change": "-opt nopeephole", "evidence": "measured"},
+        {"kind": "flag", "lib": "plain", "change": "-opt nopeephole", "evidence": "measured"},
+        {"kind": "flag", "lib": "plain", "change": ["-inline", "noauto"], "evidence": "measured"},
+        {"kind": "flag", "lib": "test", "change": "a per-region cflags group with `-opt level=4` (x)",
+         "evidence": "x"},
+        {"kind": "shared-file", "file": "include/pragma_off.h",
+         "why": "line 23 opens a file-wide `#pragma peephole off` that leaks into every TU including it"},
+        {"kind": "shared-file", "file": "include/pragma_gone.h",
+         "why": "line 23 opens a file-wide `#pragma peephole off` that leaks into every TU including it"},
+        {"kind": "shared-file", "file": "include/decl_present.h",
+         "why": "the header still declares `void fn_80003333(void)` while the owner's body returns void."},
+        {"kind": "shared-file", "file": "include/decl_gone.h",
+         "why": "the header still declares `void fn_80004444(void)` while the owner's body returns void."},
+        {"kind": "shared-file", "file": "include/gone.h",
+         "why": "the header should take one argument: all call sites pass one."},
+        {"kind": "shared-file", "file": "include/ (a new shared header, e.g. include/nw4r.h)",
+         "why": "the whole-file `#pragma peephole off` must move to the owner band header."},
+        {"kind": "tooling", "what": "teach objdiff to pair symbols by size", "why": "a request in prose"},
+    ]
+    with open(os.path.join(tobx, "t.json"), "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(outbox("auto/t", "wt", "2026-09-27T00:00:00", treqs), fh)
+    treg = os.path.join(tdir, ".pi", "backlog.json")
+    decisions, _ = bl.triage(tdir, outbox=tobx, notes=tnotes,
+                             tooling_register=os.path.join(tdir, "none.md"), register=treg)
+
+    def dec(kind, target, needle=""):
+        for it, d, ev in decisions:
+            if it.kind == kind and it.target == target and needle in (it.defect or it.ask or ""):
+                return d, ev
+        return None, None
+
+    check("triage: a covered span is resolved", dec("range", ".text 0x80100000-0x80100100")[0], "resolved")
+    check_true("... and says which unit claims it", "g3d/covered.cpp" in (dec("range", ".text 0x80100000-0x80100100")[1] or ""))
+    check("triage: an uncovered span stays open", dec("range", ".data 0x80500000-0x80500100")[0], "open")
+    check("triage: an unparseable span stays open (no check)",
+          dec("range", ".data 0x805C02xx-0x805C53xx")[0], "open")
+    check_true("... and says why", "parseable" in (dec("range", ".data 0x805C02xx-0x805C53xx")[1] or ""))
+    check("triage: a flag the lib already carries is resolved",
+          dec("flag", "test", "nopeephole")[0], "resolved")
+    check("triage: a flag the lib lacks stays open", dec("flag", "plain", "nopeephole")[0], "open")
+    check("triage: a JSON flag spec is checked, not guessed",
+          dec("flag", "plain", "noauto")[0], "open")
+    check("triage: a prose flag request is unprovable and stays open",
+          dec("flag", "test", "per-region")[0], "open")
+    check("triage: a pragma still present stays open", dec("shared-file", "include/pragma_off.h")[0], "open")
+    check("triage: a pragma now gone is resolved", dec("shared-file", "include/pragma_gone.h")[0], "resolved")
+    check("triage: a still-declared owned symbol stays open",
+          dec("shared-file", "include/decl_present.h")[0], "open")
+    check("triage: a no-longer-named symbol is resolved",
+          dec("shared-file", "include/decl_gone.h")[0], "resolved")
+    check("triage: a missing file is stale", dec("shared-file", "include/gone.h")[0], "stale")
+    check("triage: a prose target is unprovable and stays open",
+          dec("shared-file", "include/")[0], "open")
+    check("triage: a tooling request has no artifact and stays open",
+          dec("tooling", "teach objdiff to pair symbols by size")[0], "open")
+    rep = bl.triage_report(decisions)
+    check("triage reports resolved/stale/open by kind",
+          (rep["counts"]["resolved"], rep["counts"]["stale"], rep["counts"]["open"]), (4, 1, 9))
+    check("... with a per-kind breakdown", rep["by_kind"]["range"]["resolved"], 1)
+
+    # --apply: resolved -> done, stale -> parked; idempotent; a human's status is never flipped
+    out1 = bl.apply_triage(tdir, decisions, register=treg, outbox=tobx, notes=tnotes,
+                           tooling_register=os.path.join(tdir, "none.md"))
+    check("triage --apply marks resolved done and stale parked",
+          (out1["changed"]["done"], out1["changed"]["parked"]), (4, 1))
+    check("... and leaves the rest open", out1["changed"]["open"], 9)
+    check("... the register now reads 9 open / 4 done / 1 parked",
+          (out1["counts"]["open"], out1["counts"]["done"], out1["counts"]["parked"]), (9, 4, 1))
+    check("... and the four resolutions earn 4 credits", out1["summary"]["earned"], 4)
+    decisions2, _ = bl.triage(tdir, outbox=tobx, notes=tnotes,
+                              tooling_register=os.path.join(tdir, "none.md"), register=treg)
+    out2 = bl.apply_triage(tdir, decisions2, register=treg, outbox=tobx, notes=tnotes,
+                           tooling_register=os.path.join(tdir, "none.md"))
+    check("triage --apply is idempotent (a second run changes nothing)",
+          (out2["changed"]["done"], out2["changed"]["parked"]), (0, 0))
+    check("... and reclassifies only the survivors", len(decisions2), 9)
+    # a human's non-default status is respected: seed one resolved item as `parked` by hand
+    hkey = [it.key for it, d, _ in decisions if d == "resolved"][0]
+    bl.write_atomic(treg, json.dumps({"version": 1, "statuses": {hkey: "parked"},
+                                      "ledger": {"claims": [], "ratio": 1}}))
+    items_h, _ = bl.build(tdir, outbox=tobx, notes=tnotes,
+                          tooling_register=os.path.join(tdir, "none.md"), register=treg)
+    check("a hand-set status wins over the default", [i for i in items_h if i.key == hkey][0].status, "parked")
 
     # --- --check semantics -------------------------------------------------------------------------
     import contextlib

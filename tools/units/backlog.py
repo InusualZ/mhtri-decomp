@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 """One ranked register of everything the campaign filed but has not done - the *backlog*.
 
-The owner's rule (2026-09-27): **backlog first.** While the backlog has open items, work those before
-handing out a new proposal claim. That rule was unenforceable because the backlog was invisible: every lane
-ends with an outbox `.pi/outbox/*.json` whose `config_requests` list records what it found but was not
-allowed to change, and nothing tracked whether any of it was ever done (266 outboxes / 703 requests on
-2026-09-27). This tool makes it one register with a lifecycle, and `queue.py next` reads it.
+The owner's rule (2026-09-27, revised): **one resolved backlog item per new proposal claim.** While the
+backlog has open items, `queue.py next` does not hand out an unbounded stream of new proposal claims: it
+keeps a **credit ledger**. A `done` earns 1 credit; a claim spends 1 credit (`--ratio K` makes a claim cost
+K, i.e. K backlog items per claim); the register starts with 1 credit so the campaign can begin. The rule
+was unenforceable because the backlog was invisible: every lane ends with an outbox `.pi/outbox/*.json`
+whose `config_requests` list records what it found but was not allowed to change, and nothing tracked
+whether any of it was ever done (266 outboxes / 703 requests on 2026-09-27). This tool makes it one register
+with a lifecycle and a ledger, and `queue.py next` reads it.
+
+**The ledger can never drift.** Earnings are *derived from the item statuses* - the count of items a lane
+resolved (`done` that is not the source's default) - not from a stored counter, so enforcement never depends
+on the file surviving a clean checkout. `parked` earns **no** credit: parking removes a ghost, it does not
+buy a claim; only `done` does. The spent side (the claims handed out) is the one thing that cannot be
+derived from the statuses, so it is persisted alongside them in `.pi/backlog.json`; losing that file is
+fail-open by design (the statuses are lost with it, so the register restarts at 1 credit).
+
+**`triage` is evidence-based and never guesses.** Many "open" items were filed weeks ago against code that
+has since moved, so `python tools/units/backlog.py triage` classifies every open item as `resolved`,
+`stale` or `open` and prints the check that proved each. `--apply` writes the verdicts (`resolved` -> `done`,
+`stale` -> `parked`) and is idempotent, respecting any status a human already set. Anything that cannot be
+proved from the repository stays `open (no check)` - a triage that guesses is worse than the pile it is
+triaging.
 
 Two sources, one register:
 
@@ -29,8 +46,9 @@ while ... declares Y, so any TU that includes both fails with MWCC"; "should tak
 A small classifier splits them; every item keeps the raw filing text, so a wrong classification is visible
 rather than hidden.
 
-Statuses live in `MAIN/.pi/backlog.json` (gitignored, the way `claims.json` is), so they survive a
-regeneration and can be set with `--set-status KEY STATUS`. The register is regenerated after each change.
+Statuses and the credit ledger live in `MAIN/.pi/backlog.json` (gitignored, the way `claims.json` is), so
+they survive a regeneration and can be set with `--set-status KEY STATUS`. The register is regenerated after
+each change.
 
     python tools/units/backlog.py                       # regenerate MAIN/.pi/backlog.json + summary
     python tools/units/backlog.py --print [--top N]     # human summary, write nothing
@@ -437,7 +455,8 @@ def tooling_register_path(main: str) -> str:
     return os.path.join(main, "docs", "tooling-requests.md")
 
 
-def load_statuses(main: str, register: str | None = None) -> dict[str, str]:
+def load_register(main: str, register: str | None = None) -> dict:
+    """The persisted `.pi/backlog.json` as a dict, or `{}` when missing/unreadable."""
     path = register or register_path(main)
     if not os.path.exists(path):
         return {}
@@ -445,15 +464,71 @@ def load_statuses(main: str, register: str | None = None) -> dict[str, str]:
         d = json.loads(read(path))
     except json.JSONDecodeError:
         return {}
-    st = d.get("statuses")
+    return d if isinstance(d, dict) else {}
+
+
+def load_statuses(main: str, register: str | None = None) -> dict[str, str]:
+    st = load_register(main, register).get("statuses")
     return dict(st) if isinstance(st, dict) else {}
 
 
-def payload(items: list[Item], as_of: str, counts: dict) -> dict:
+# -----------------------------------------------------------------------------------------------------------
+# The credit ledger: one resolved backlog item per new proposal claim.
+#
+# Earnings are DERIVED from the item statuses - never a stored counter - so the rule cannot silently drift
+# and never depends on the register file surviving a clean checkout. `parked` earns nothing: parking removes
+# a ghost, it does not buy a claim. Only the claims handed out cannot be derived from the statuses, so they
+# are the one thing persisted.
+# -----------------------------------------------------------------------------------------------------------
+BASE_CREDITS = 1
+RATIO_DEFAULT = 1
+
+
+def load_ledger(main: str, register: str | None = None) -> dict:
+    """The persisted ledger: `{"claims": [...], "ratio": K}` (empty claims when absent)."""
+    raw = load_register(main, register).get("ledger")
+    if not isinstance(raw, dict):
+        return {"claims": [], "ratio": RATIO_DEFAULT}
+    claims = raw.get("claims")
+    return {"claims": list(claims) if isinstance(claims, list) else [],
+            "ratio": raw.get("ratio", RATIO_DEFAULT)}
+
+
+def ledger_earned(items: list[Item]) -> int:
+    """Resolutions: items a lane closed. A source-default `done` (a record, an admission, a no-request flag)
+    is done by definition, not a resolution, so it earns nothing and cannot inflate the campaign's credit."""
+    return sum(1 for it in items if it.status == "done" and it.default_status != "done")
+
+
+def ledger_summary(items: list[Item], claims, ratio: int = RATIO_DEFAULT) -> dict:
+    """The balance, with its derivation, so every refusal and every summary can show the rule rather than
+    leave it to be inferred: `balance = base + earned - ratio * spent`."""
+    earned = ledger_earned(items)
+    spent = len(claims or [])
+    return {"base": BASE_CREDITS, "earned": earned, "spent": spent, "ratio": ratio,
+            "cost": ratio, "balance": BASE_CREDITS + earned - ratio * spent,
+            "claims": list(claims or [])}
+
+
+def ledger_line(summary: dict, prefix: str = "credits") -> str:
+    """One human line for the balance, used by `--print` and the `queue.py next` refusal."""
+    return ("%s: balance %d  (base %d + %d resolved - %d x %d claim(s) handed out)"
+            % (prefix, summary["balance"], summary["base"], summary["earned"],
+               summary["ratio"], summary["spent"]))
+
+
+def payload(items: list[Item], as_of: str, counts: dict, ledger=None) -> dict:
+    ledger = ledger if isinstance(ledger, dict) else {}
+    claims = ledger.get("claims") or []
+    ratio = ledger.get("ratio", RATIO_DEFAULT)
+    summary = ledger_summary(items, claims, ratio)
     return {
         "version": 1,
         "as_of": as_of,
         "counts": counts,
+        "ledger": {"claims": list(claims), "ratio": ratio, "base": summary["base"],
+                   "earned": summary["earned"], "spent": summary["spent"],
+                   "balance": summary["balance"]},
         "items": [
             {
                 "key": it.key,
@@ -504,13 +579,15 @@ def build(main: str, outbox: str | None = None, notes: str | None = None,
     notes = notes or notes_dir(main)
     tooling_register = tooling_register or tooling_register_path(main)
     statuses = load_statuses(main, register)
+    ledger = load_ledger(main, register)
     items = build_items(outbox, notes, tooling_register, statuses)
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
               "parked": sum(1 for i in items if i.status == "parked"),
               "total": len(items)}
-    return items, {"as_of": as_of, "counts": counts}
+    return items, {"as_of": as_of, "counts": counts, "ledger": ledger,
+                   "summary": ledger_summary(items, ledger["claims"], ledger["ratio"])}
 
 
 def open_items(main: str, **kw) -> list[Item]:
@@ -518,15 +595,38 @@ def open_items(main: str, **kw) -> list[Item]:
     return [i for i in items if i.status == "open"]
 
 
+def write_register(main: str, items: list[Item], as_of: str, counts: dict, ledger: dict,
+                   register: str | None = None) -> None:
+    path = register or register_path(main)
+    write_atomic(path, json.dumps(payload(items, as_of, counts, ledger), indent=1,
+                                  ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def record_claims(main: str, claims: list[dict], ratio: int = RATIO_DEFAULT,
+                  register: str | None = None, **kw) -> dict:
+    """Append handed-out claims to the persisted ledger and rewrite the register. Returns the new summary.
+
+    Only a *real* claim is recorded (`queue.py next` calls this for a non-dry run); a `--dry-run` and the
+    deliberate `--ignore-backlog` override hand out work without spending, so they never call it.
+    """
+    items, meta = build(main, register=register, **kw)
+    ledger = meta["ledger"]
+    ledger["claims"].extend(claims)
+    ledger["ratio"] = ratio
+    write_register(main, items, meta["as_of"], meta["counts"], ledger, register)
+    return ledger_summary(items, ledger["claims"], ratio)
+
+
 def lane_task(main: str, item: Item) -> dict:
     """A ready-to-paste lane for a backlog item - mirroring how `queue.py next` prints its spawn line."""
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
                "tooling": "worker"}.get(item.kind, "worker")
     task = ("Work the campaign backlog item `%s` (%s %s): %s. "
-            "This is on the backlog, so `queue.py next` refuses a new proposal claim until it is resolved or "
-            "parked. Do the work, then mark it: `python tools/units/backlog.py --set-status %s done` "
-            "(or `parked` with a reason). The filing lanes' raw evidence is in %s. Commit on your own branch; "
-            "end your turn with your report - your final message is the result the orchestrator receives."
+            "This is on the backlog, so `queue.py next` spends a credit on a new proposal claim until it is "
+            "resolved or parked. Do the work, then mark it: `python tools/units/backlog.py --set-status %s done` "
+            "(or `parked` with a reason - but `parked` earns no credit). The filing lanes' raw evidence is in %s. "
+            "Commit on your own branch; end your turn with your report - your final message is the result the "
+            "orchestrator receives."
             % (item.key, item.kind, item.target, item.ask, item.key,
                register_path(main).replace("\\", "/")))
     return {"agent": profile, "name": "%s-backlog-%s" % (profile, item.key[:32]),
@@ -535,17 +635,28 @@ def lane_task(main: str, item: Item) -> dict:
                     % (profile, main.replace("\\", "/"), json.dumps(task))}
 
 
-def refusal(main: str, top: int = 3, **kw) -> str | None:
-    """The `queue.py next` refusal while the register is open, with the top item(s) and a lane for #1.
+def refusal(main: str, top: int = 3, ratio: int = RATIO_DEFAULT, wants: int = 1, **kw) -> str | None:
+    """The `queue.py next` refusal when the credit balance does not cover `wants` claim(s).
 
-    `None` when nothing is open, so the caller hands out work normally.
+    Returns `None` - hand out work normally - when there is **no open backlog** (there is nothing to ration
+    against, so the campaign must not halt) or when the balance covers the claim(s). When it does not, the
+    message prints the balance with its derivation and the top item(s) with a ready-to-paste lane.
     """
     items, meta = build(main, **kw)
+    summary = ledger_summary(items, meta["ledger"]["claims"], ratio)
     open_ = [i for i in items if i.status == "open"]
     if not open_:
         return None
-    lines = ["backlog: %d open item(s) - work the backlog before a new proposal claim (top %d shown; "
-             "`--ignore-backlog` parks the whole register on purpose)" % (len(open_), min(top, len(open_)))]
+    cost = ratio * max(1, wants)
+    if summary["balance"] >= cost:
+        return None
+    need = "%d credit(s)" % cost if cost != 1 else "1 credit"
+    lines = ["backlog: a claim needs %s, balance is %d - resolve a backlog item (a `done` earns 1 credit) "
+             "before handing out another" % (need, summary["balance"]),
+             "  %s" % ledger_line(summary),
+             "  `parked` earns no credit: parking removes a ghost, it does not buy a claim; only `done` does.",
+             "  %d open item(s) - top %d shown; `--ignore-backlog` hands out work without spending on purpose"
+             % (len(open_), min(top, len(open_)))]
     for n, it in enumerate(open_[:top], 1):
         age = "" if it.age_days is None else "  %.0fd open" % it.age_days
         lines.append("  %d. %d filer(s)%s  %s" % (n, it.filer_count, age, it.kind))
@@ -567,12 +678,415 @@ def refusal(main: str, top: int = 3, **kw) -> str | None:
 
 
 # -----------------------------------------------------------------------------------------------------------
+# Triage: classify every OPEN item as `resolved` / `stale` / `open`, with the check that proved it.
+#
+# The rule is evidence, never a guess: an item is `resolved` only when the repository shows the defect is gone
+# (its span is registered, its flag is present, its file no longer names the symbol, its `#pragma` is gone),
+# `stale` only when the artifact it was filed against no longer exists, and otherwise `open`. An item whose
+# evidence is prose - a tooling request, a defect with no extractable predicate - stays `open (no check)`.
+# -----------------------------------------------------------------------------------------------------------
+TRIAGE_DECISIONS = ("resolved", "stale", "open")
+
+
+def _norm_section(s: str) -> str:
+    return re.sub(r"^[.\s]+", "", (s or "").strip()).lower()
+
+
+def _bracket_rhs(text: str, name: str) -> str | None:
+    """The text inside `name = [ ... ]`, honouring nesting, or None when the assignment is absent."""
+    m = re.search(r"^%s\s*=\s*\[" % re.escape(name), text, re.M)
+    if not m:
+        return None
+    i = text.index("[", m.start())
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == "[":
+            depth += 1
+        elif text[j] == "]":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1:j]
+    return None
+
+
+def _cflags_groups(main: str) -> tuple[str, dict]:
+    """`configure.py`'s text and every `cflags_* = [...]` RHS, for the flag checks."""
+    text = read(os.path.join(main, "configure.py"))
+    raw = {}
+    for m in re.finditer(r"^(cflags_\w+)\s*=\s*\[", text, re.M):
+        rhs = _bracket_rhs(text, m.group(1))
+        if rhs is not None:
+            raw[m.group(1)] = rhs
+    return text, raw
+
+
+def _resolve_group(text: str, raw: dict, name: str, seen=None) -> list[str]:
+    """A cflags group as an ordered token list, resolving `*cflags_*` spreads and the `[f for f in ...]`
+    filters the file uses. The tokens are the quoted list elements, so a flag written as `"-opt nopeephole"`
+    is one token while `"-func_align", "4"` is two - membership is tested on the joined string."""
+    seen = set(seen or ())
+    if name in seen:
+        return []
+    seen.add(name)
+    rhs = raw.get(name)
+    if rhs is None:
+        return []
+    rhs = re.sub(r"#.*", "", rhs)
+    out: list[str] = []
+    pat = re.compile(r"\*?\[f for f in (cflags_\w+) if f (?:not in \(([^)]*)\)|!=\s*(\"[^\"]*\"))\]"
+                     r"|\*(cflags_\w+)|\"([^\"]*)\"")
+    for m in pat.finditer(rhs):
+        if m.group(1):
+            base = _resolve_group(text, raw, m.group(1), seen)
+            if m.group(2) is not None:
+                excl = set(re.findall(r'"([^"]*)"', m.group(2)))
+                out.extend(t for t in base if t not in excl)
+            else:
+                out.extend(t for t in base if t != m.group(3))
+        elif m.group(4):
+            out.extend(_resolve_group(text, raw, m.group(4), seen))
+        elif m.group(5) is not None:
+            out.append(m.group(5))
+    return out
+
+
+def _lib_groups(text: str) -> dict:
+    """lib name -> its cflags group name, from both the dict entries and the `DolphinLib`/`Rel` helpers."""
+    libs: dict = {}
+    for m in re.finditer(r'"lib"\s*:\s*"([^"]+)"', text):
+        seg = text[m.end():m.end() + 4000]
+        cg = re.search(r'"cflags"\s*:\s*(cflags_\w+)', seg)
+        libs[m.group(1)] = cg.group(1) if cg else None
+    for helper, grp in (("DolphinLib", "cflags_base"), ("Rel", "cflags_rel")):
+        for m in re.finditer(re.escape(helper) + r'\("([^"]+)"', text):
+            libs[m.group(1)] = grp
+    return libs
+
+
+_FLAG_PART_RE = re.compile(r"-[A-Za-z_]\w*(?:\s+[A-Za-z0-9,_=\.]+)?$")
+_ARROW_RE = re.compile(r"->\s*(\S.*)$")
+_REPLACE_RE = re.compile(r"replace\s+(\S.*?)\s+with\s+(\S.*)$", re.I)
+
+
+def flag_specs(defect: str) -> list[str] | None:
+    """The flag(s) a defect requests, or `None` when it is prose and cannot be checked. A trailing
+    parenthetical explanation is dropped; `X -> Y` and `replace X with Y` keep `Y`; `A and B` is two specs.
+    Anything that is not purely flag tokens returns `None` - the point is to never guess."""
+    s = (defect or "").strip()
+    if not s:
+        return None
+    if s.startswith("["):
+        try:
+            v = json.loads(s)
+        except (ValueError, TypeError):
+            return None
+        if isinstance(v, list) and v and all(isinstance(x, str) for x in v):
+            return [" ".join(v)]
+        return None
+    s = re.sub(r"\([^()]*\)", " ", s).replace("`", "")
+    s = re.sub(r"^\s*--\s*", "", s)
+    m = _ARROW_RE.search(s)
+    if m:
+        s = m.group(1)
+    m = _REPLACE_RE.search(s)
+    if m:
+        s = m.group(2)
+    specs = []
+    for part in re.split(r"\s+and\s+", s):
+        part = part.strip().strip(",").strip()
+        if not _FLAG_PART_RE.match(part):
+            return None
+        specs.append(part)
+    return specs or None
+
+
+def _flag_present(tokens: list[str], spec: str) -> bool:
+    hay = " ".join(re.sub(r"\s+", " ", t).strip() for t in tokens)
+    return re.search(r"(?<![\w-])" + re.escape(spec) + r"(?![\w-])", hay) is not None
+
+
+def _splits_ranges(main: str) -> dict:
+    """`section -> [(start, end, unit)]` from `config/RMHE08/splits.txt` - the registration test."""
+    path = os.path.join(main, "config", "RMHE08", "splits.txt")
+    out: dict = {}
+    if not os.path.exists(path):
+        return out
+    unit = ""
+    for line in read(path).replace("\r\n", "\n").split("\n"):
+        if not line.strip():
+            continue
+        if not line[0].isspace():
+            unit = line.rstrip().rstrip(":") if line.rstrip().endswith(":") else unit
+            continue
+        m = re.match(r"\s+(\S+)\s+start:0x([0-9A-Fa-f]+)\s+end:0x([0-9A-Fa-f]+)", line)
+        if m and unit:
+            out.setdefault(_norm_section(m.group(1)), []).append(
+                (int(m.group(2), 16), int(m.group(3), 16), unit))
+    return out
+
+
+def _parse_span(target: str):
+    """`(section, start, end)` or None. `0x` hex and bare decimal parse; a `xx` placeholder does not - an
+    unparseable span is unprovable, not resolved."""
+    m = re.match(r"^\s*(\S+)\s+(\S+)\s*-\s*(\S+)\s*$", target or "")
+    if not m:
+        return None
+
+    def _addr(v):
+        v = v.strip()
+        if re.fullmatch(r"0[xX][0-9A-Fa-f]+", v):
+            return int(v, 16)
+        if re.fullmatch(r"\d+", v):
+            return int(v)
+        return None
+
+    s, e = _addr(m.group(2)), _addr(m.group(3))
+    if s is None or e is None:
+        return None
+    return _norm_section(m.group(1)), s, e
+
+
+def _coverage(ivals: list, start: int, end: int) -> tuple[bool, list[str]]:
+    """Whether `[start,end)` is fully covered by the `(s,e,unit)` intervals, and which units touch it."""
+    hits = sorted({u for s, e, u in ivals if s < end and e > start})
+    spans = sorted((max(s, start), min(e, end)) for s, e, u in ivals if s < end and e > start)
+    cur, total = start, 0
+    for s, e in spans:
+        if s > cur:
+            break
+        if e > cur:
+            total += e - cur
+            cur = e
+        if cur >= end:
+            break
+    return (cur >= end and total >= end - start), hits
+
+
+def _span_decision(splits: dict, target: str):
+    span = _parse_span(target)
+    if not span:
+        return ("open", "no check: %r is not a parseable <section> <start>-<end> span" % one_line(target, 60))
+    sec, s, e = span
+    if s >= e:
+        return ("open", "no check: empty or inverted span 0x%X-0x%X" % (s, e))
+    covered, hits = _coverage(splits.get(sec, []), s, e)
+    if covered:
+        shown = ", ".join(hits[:3]) + ("" if len(hits) <= 3 else ", ...")
+        return ("resolved", "span 0x%X-0x%X is now claimed by %s in splits.txt" % (s, e, shown))
+    return ("open", "span 0x%X-0x%X is still unclaimed in %s (splits.txt)" % (s, e, sec))
+
+
+def _resolve_repo_path(main: str, rel: str) -> str | None:
+    """The on-disk path for a (possibly lowercased) repo-relative path, or None when it does not exist.
+
+    The register lowercases targets (`norm_file`), so `config/rmhe08/splits.txt` has to resolve against the
+    real `config/RMHE08/splits.txt` - matched case-insensitively, component by component."""
+    rel = (rel or "").strip().strip("`").strip("/")
+    if not rel:
+        return None
+    direct = os.path.join(main, *rel.split("/"))
+    if os.path.exists(direct):
+        return direct
+    cur = main
+    for part in rel.split("/"):
+        if not os.path.isdir(cur):
+            return None
+        match = [e for e in os.listdir(cur) if e.lower() == part.lower()]
+        if not match:
+            return None
+        cur = os.path.join(cur, match[0])
+    return cur if os.path.exists(cur) else None
+
+
+_PATH_LIKE = re.compile(r"^(?:[^/\s]+/)*[^/\s]+\.[A-Za-z0-9]+$")
+
+
+def _shared_targets(item: Item) -> list[str]:
+    """The repo paths a shared-file item names, split on the filers' connectors (`,`, ` + `, ` and `)."""
+    parts = re.split(r"\s*(?:,|\+| and )\s*", item.target or "")
+    return [t.strip().strip("`") for t in parts if t.strip()] if item.target else []
+
+
+def _path_like(t: str) -> bool:
+    return bool(_PATH_LIKE.match((t or "").strip()))
+
+
+def _filing_text(item: Item) -> str:
+    return (item.ask or "") + " " + " ".join(f.detail or "" for f in item.filings)
+
+
+def _pragma_specs(item: Item) -> list[str]:
+    """`peephole off` etc. named by a `#pragma` defect, normalised and de-duplicated."""
+    out, seen = [], set()
+    for m in re.finditer(r"#?\s*pragma\s+([A-Za-z_]+)(?:\s+(off|on))?", _filing_text(item), re.I):
+        spec = " ".join(x.lower() for x in m.groups() if x)
+        if spec not in seen:
+            seen.add(spec)
+            out.append(spec)
+    return out
+
+
+def _has_pragma(path: str, spec: str) -> bool:
+    words = [re.escape(w) for w in spec.split()]
+    return re.search(r"#\s*pragma\s+" + r"\s+".join(words), read(path), re.I) is not None
+
+
+def _mentions(path: str, sym: str) -> bool:
+    return re.search(r"(?<![\w])" + re.escape(sym) + r"(?![\w])", read(path)) is not None
+
+
+def _decl_symbols(item: Item) -> list[str]:
+    """The `fn_*`/`lbl_*` symbols a defect's own backticked declaration text names, excluding paths."""
+    syms = set()
+    for span in re.findall(r"`([^`]+)`", _filing_text(item)):
+        if "/" in span or re.search(r"\.(?:cpp|h|c|txt|md)\b", span):
+            continue
+        syms.update(re.findall(r"\b(fn_[0-9A-Fa-f]{6,8}|lbl_[0-9A-Za-z_]+)\b", span))
+    return sorted(syms)
+
+
+def _check_shared(main: str, item: Item, ctx: dict):
+    paths = [t for t in _shared_targets(item) if _path_like(t)]
+    if not paths:
+        return ("open", "no check: target %r is not a clean repo path" % one_line(item.target, 50))
+    found = [(t, p) for t in paths if (p := _resolve_repo_path(main, t))]
+    if not found:
+        return ("stale", "none of the %d path(s) still exist: %s"
+                % (len(paths), ", ".join(paths[:4]) + (" ..." if len(paths) > 4 else "")))
+    cls = (item.defect or "").split(":")[0]
+    if cls == "pragma":
+        specs = _pragma_specs(item)
+        if not specs:
+            return ("open", "no check: a pragma defect with no extractable `#pragma` in its filing text")
+        for spec in specs:
+            for t, p in found:
+                if _has_pragma(p, spec):
+                    return ("open", "%s still carries `#pragma %s`" % (t, spec))
+        return ("resolved", "the `#pragma %s` is gone from %s" % (", ".join(specs), found[0][0]))
+    code = [(t, p) for t, p in found if re.search(r"\.(?:h|c|cpp|hpp|cc|hxx|cxx)$", t, re.I)]
+    syms = _decl_symbols(item) if code else []
+    if syms:
+        present = [s for s in syms if any(_mentions(p, s) for _, p in code)]
+        if cls == "missing-decl":
+            if present:
+                return ("resolved", "%s now declares %s" % (code[0][0], ", ".join(present)))
+            return ("open", "%s still has no declaration of %s" % (code[0][0], ", ".join(syms)))
+        if present:
+            return ("open", "%s still names %s" % (code[0][0], ", ".join(present)))
+        return ("resolved", "%s no longer names the owned symbol(s) %s" % (code[0][0], ", ".join(syms)))
+    return ("open", "no check: shared-file defect %r has no repo-provable predicate"
+            % one_line(item.defect or "?", 40))
+
+
+def _check_flag(main: str, item: Item, ctx: dict):
+    specs = flag_specs(item.defect)
+    if specs is None:
+        return ("open", "no check: flag request %r is not a single measurable flag change"
+                % one_line(item.defect, 60))
+    lib = (item.target or "").strip()
+    group = ctx["libs"].get(lib) or (lib if lib in ctx["groups"] else None)
+    if not group:
+        return ("open", "no check: no cflags group resolves for lib %r in configure.py" % lib)
+    if group not in ctx["resolved"]:
+        ctx["resolved"][group] = _resolve_group(ctx["text"], ctx["raw"], group)
+    toks = ctx["resolved"][group]
+    missing = [s for s in specs if not _flag_present(toks, s)]
+    if missing:
+        return ("open", "%s still lacks %s in configure.py (%s)"
+                % (lib, " and ".join("`%s`" % m for m in missing), group))
+    return ("resolved", "%s already carries %s in configure.py (%s)"
+            % (lib, " and ".join("`%s`" % s for s in specs), group))
+
+
+def _check_tooling(main: str, item: Item, ctx: dict):
+    """A tooling request is not given a write artifact by this tool, so there is nothing to prove from the
+    repository: it stays open and says why rather than guessing from the request's prose."""
+    return ("open", "no check: a tooling request has no repo-provable completion artifact "
+                    "(tracked in docs/tooling-requests.md)")
+
+
+def triage_item(main: str, item: Item, ctx: dict):
+    if item.kind == "range":
+        return _span_decision(ctx["splits"], item.target)
+    if item.kind == "seam":
+        return _span_decision(ctx["splits"], item.target)
+    if item.kind == "flag":
+        return _check_flag(main, item, ctx)
+    if item.kind == "shared-file":
+        return _check_shared(main, item, ctx)
+    return _check_tooling(main, item, ctx)
+
+
+def triage(main: str, **kw) -> tuple[list, dict]:
+    """Classify every OPEN item; returns `([(item, decision, evidence)], meta)`."""
+    items, meta = build(main, **kw)
+    text, raw = _cflags_groups(main)
+    ctx = {"text": text, "raw": raw, "groups": set(raw), "resolved": {},
+           "libs": _lib_groups(text), "splits": _splits_ranges(main)}
+    out = []
+    for it in items:
+        if it.status != "open":
+            continue
+        try:
+            decision, evidence = triage_item(main, it, ctx)
+        except Exception as exc:  # a malformed fixture must stay open, never crash the whole run
+            decision, evidence = "open", "no check: %s" % exc
+        out.append((it, decision, evidence))
+    return out, meta
+
+
+def apply_triage(main: str, decisions: list, register: str | None = None, **kw) -> dict:
+    """Write the verdicts: `resolved` -> `done`, `stale` -> `parked`. Idempotent, and an item a human (or a
+    previous triage) already set is never flipped. Returns the change counts and the new credit summary."""
+    register = register or register_path(main)
+    statuses = load_statuses(main, register)
+    ledger = load_ledger(main, register)
+    changed = {"done": 0, "parked": 0, "open": 0, "skipped": 0}
+    for it, decision, _ in decisions:
+        if it.key in statuses:                     # an existing non-default status is a human's decision
+            changed["skipped"] += 1
+            continue
+        if decision == "resolved":
+            statuses[it.key] = "done"
+            changed["done"] += 1
+        elif decision == "stale":
+            statuses[it.key] = "parked"
+            changed["parked"] += 1
+        else:
+            changed["open"] += 1
+    outbox = kw.get("outbox") or outbox_dir(main)
+    notes = kw.get("notes") or notes_dir(main)
+    tooling_register = kw.get("tooling_register") or tooling_register_path(main)
+    items = build_items(outbox, notes, tooling_register, statuses)
+    counts = {"open": sum(1 for i in items if i.status == "open"),
+              "done": sum(1 for i in items if i.status == "done"),
+              "parked": sum(1 for i in items if i.status == "parked"),
+              "total": len(items)}
+    write_register(main, items, _as_of(items), counts, ledger, register)
+    return {"changed": changed, "counts": counts,
+            "summary": ledger_summary(items, ledger["claims"], ledger["ratio"])}
+
+
+def triage_report(decisions: list) -> dict:
+    """`{decision: n}` overall and `{kind: {decision: n}}` - the before/after arithmetic."""
+    counts = {d: 0 for d in TRIAGE_DECISIONS}
+    by_kind: dict = {}
+    for it, decision, _ in decisions:
+        counts[decision] = counts.get(decision, 0) + 1
+        by_kind.setdefault(it.kind, {d: 0 for d in TRIAGE_DECISIONS})[decision] += 1
+    return {"total": len(decisions), "counts": counts, "by_kind": by_kind}
+
+
+# -----------------------------------------------------------------------------------------------------------
 # Rendering
 # -----------------------------------------------------------------------------------------------------------
 def print_report(items: list[Item], meta: dict, top: int) -> None:
     c = meta["counts"]
     print("backlog: %d open / %d done / %d parked  (as of %s)"
           % (c["open"], c["done"], c["parked"], meta["as_of"] or "?"))
+    if meta.get("summary"):
+        print("  %s" % ledger_line(meta["summary"]))
+        print("    (`parked` earns no credit - parking removes a ghost; only a resolved `done` buys a claim)")
     print("  rank  filers  age  kind         item")
     for i, it in enumerate(items[:top], 1):
         age = "-" if it.age_days is None else "%.0fd" % it.age_days
@@ -582,17 +1096,46 @@ def print_report(items: list[Item], meta: dict, top: int) -> None:
         print("  ... %d more (use --json for all)" % (len(items) - top))
 
 
+def print_triage(decisions: list, top: int, balance: dict) -> None:
+    rep = triage_report(decisions)
+    c = rep["counts"]
+    print("triage: %d open item(s) -> %d resolved / %d stale / %d open (no check)"
+          % (rep["total"], c["resolved"], c["stale"], c["open"]))
+    print("  %s" % ledger_line(balance))
+    print("  by kind:")
+    for kind in sorted(rep["by_kind"]):
+        kc = rep["by_kind"][kind]
+        print("    %-12s resolved %3d  stale %3d  open %3d"
+              % (kind, kc["resolved"], kc["stale"], kc["open"]))
+    print("  each decision and the check that proved it:")
+    for it, decision, evidence in decisions:
+        print("    %-8s %-11s %s" % (decision, it.kind,
+                                        one_line("%s: %s" % (it.target, it.ask), 84)))
+        print("             %s" % one_line(evidence, 150))
+    survivors = [(it, ev) for it, d, ev in decisions if d == "open"]
+    survivors.sort(key=lambda t: (-t[0].filer_count, t[0].kind, t[0].target))
+    print("  top %d still open:" % min(top, len(survivors)))
+    for i, (it, ev) in enumerate(survivors[:top], 1):
+        print("    %2d. %-11s %s" % (i, it.kind, one_line("%s: %s" % (it.target, it.ask), 92)))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("cmd", nargs="?", choices=["triage"],
+                    help="subcommand: `triage` classifies every open item (resolved/stale/open)")
     ap.add_argument("--main", default=None, help="MAIN worktree (default: the first `git worktree list`)")
     ap.add_argument("--outbox", default=None)
     ap.add_argument("--notes", default=None)
     ap.add_argument("--tooling-register", default=None)
     ap.add_argument("--register", default=None)
+    ap.add_argument("--ratio", type=int, default=RATIO_DEFAULT,
+                    help="credits a proposal claim costs - K backlog items per claim (default 1)")
     ap.add_argument("--json", action="store_true", help="emit the register as JSON on stdout (no write)")
     ap.add_argument("--check", action="store_true", help="exit 1 when the register is missing or stale")
     ap.add_argument("--print", dest="print_only", action="store_true", help="summary only, write nothing")
     ap.add_argument("--top", type=int, default=20)
+    ap.add_argument("--apply", action="store_true",
+                    help="with `triage`: write the verdicts (resolved -> done, stale -> parked)")
     ap.add_argument("--set-status", nargs=2, metavar=("KEY", "STATUS"),
                     help="set an item's status (open/done/parked) and regenerate")
     ap.add_argument("--selftest", action="store_true")
@@ -614,6 +1157,7 @@ def main() -> int:
     tooling_register = args.tooling_register or tooling_register_path(main_wt)
 
     statuses = load_statuses(main_wt, register)
+    ledger = load_ledger(main_wt, register)
     if args.set_status:
         key, status = args.set_status
         status = status.lower()
@@ -626,13 +1170,41 @@ def main() -> int:
             return 2
         statuses[key] = status
 
+    if args.cmd == "triage":
+        decisions, _ = triage(main_wt, outbox=outbox, notes=notes,
+                              tooling_register=tooling_register, register=register)
+        rep = triage_report(decisions)
+        all_items = build_items(outbox, notes, tooling_register, statuses)
+        balance = ledger_summary(all_items, ledger["claims"], args.ratio)
+        if args.json:
+            print(json.dumps({"triage": rep, "credits": balance,
+                              "decisions": [{"key": it.key, "kind": it.kind, "target": it.target,
+                                             "decision": d, "evidence": e} for it, d, e in decisions]},
+                             indent=2, ensure_ascii=False))
+            return 0
+        print_triage(decisions, args.top, balance)
+        if args.apply:
+            out = apply_triage(main_wt, decisions, register=register, outbox=outbox, notes=notes,
+                               tooling_register=tooling_register)
+            ch, co = out["changed"], out["counts"]
+            print("applied: %d -> done, %d -> parked, %d left open, %d skipped (status already set)"
+                  % (ch["done"], ch["parked"], ch["open"], ch["skipped"]))
+            print("  register now: %d open / %d done / %d parked"
+                  % (co["open"], co["done"], co["parked"]))
+            print("  %s" % ledger_line(out["summary"]))
+            print("  `parked` earns no credit - only `done` buys a claim; register written to %s" % register)
+        else:
+            print("dry run: nothing written (pass --apply to mark resolved/stale)")
+        return 0
+
     items = build_items(outbox, notes, tooling_register, statuses)
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
               "parked": sum(1 for i in items if i.status == "parked"),
               "total": len(items)}
-    meta = {"as_of": as_of, "counts": counts}
+    meta = {"as_of": as_of, "counts": counts, "ledger": ledger,
+            "summary": ledger_summary(items, ledger["claims"], args.ratio)}
 
     if args.check:
         if not os.path.exists(register):
@@ -642,7 +1214,7 @@ def main() -> int:
             stored = json.loads(read(register))
         except json.JSONDecodeError:
             stored = None
-        fresh = payload(items, as_of, counts)
+        fresh = payload(items, as_of, counts, ledger)
         if stored is None or canonical(stored) != canonical(fresh):
             print("check: %s is stale; run `python tools/units/backlog.py`" % register, file=sys.stderr)
             return 1
@@ -650,13 +1222,12 @@ def main() -> int:
         return 0
 
     if args.json:
-        print(json.dumps(payload(items, as_of, counts), indent=2, ensure_ascii=False))
+        print(json.dumps(payload(items, as_of, counts, ledger), indent=2, ensure_ascii=False))
         return 0
 
     print_report(items, meta, args.top)
     if not args.print_only:
-        write_atomic(register, json.dumps(payload(items, as_of, counts), indent=1,
-                                          ensure_ascii=False, sort_keys=True) + "\n")
+        write_register(main_wt, items, as_of, counts, ledger, register)
         print("wrote %s (%d open / %d items)" % (register, counts["open"], counts["total"]),
               file=sys.stderr)
     return 0
