@@ -1,7 +1,7 @@
 /* The enemy state/action unit `enemy/fn_80165FC8.cpp` (0x80165FC8..0x801679B0, 21 functions).
  *
  * This header holds what the unit needs from outside its own range: the two records its bodies read
- * (the `fn_803438E4` entry and the `ResUserDataAc` accessor the range's three non-state methods
+ * (the `enemy_data_find` entry and the `ResUserDataAc` accessor the range's three non-state methods
  * belong to), and the declarations of the flat `fn_XXXXXXXX` symbols the range calls.  The flat names
  * are C-linkage and never spelled as a mangling (docs/plan.md 6.5 rule 9); the genuinely mangled
  * callees are declared at C++ scope with their real signatures.
@@ -25,7 +25,7 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
-/* The record `fn_803438E4` returns lives in `include/enemy/ENEMY_DATA.h` (rule 1: one home
+/* The record `enemy_data_find` returns lives in `include/enemy/ENEMY_DATA.h` (rule 1: one home
  * for the type, now that a second unit reads it). */
 #include "enemy/ENEMY_DATA.h"
 
@@ -114,8 +114,8 @@ void fn_80051574(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void* fn_80097EB0(void* sub, s32 a);
 u8 fn_802B0668(u8 kind);
 u32 fn_802B0998(u32 kind);
-void* fn_803438E4(u8 a, u8 b);
-u8 fn_803439D4(u8 a, u8 b);
+/* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4): declared in their owner's header,
+ * `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them (rule 2). */
 void rotMatrixX(u32 angle, nw4r::math::MTX34* m);
 void rotMatrixZ(u32 angle, nw4r::math::MTX34* m);
 

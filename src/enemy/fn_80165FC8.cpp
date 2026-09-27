@@ -38,7 +38,7 @@
  *
  * Object: `_ENEMY_WORK`, included from `include/enemy/ENEMY_WORK.h` (the one shared home; the fields
  * this range names were added there - +0x00C, +0x320, +0x608/+0x610, +0x834/+0x835).  The
- * `fn_803438E4` entry and the `ResUserDataAc` accessor are in this unit's own header.
+ * `enemy_data_find` entry and the `ResUserDataAc` accessor are in this unit's own header.
  *
  * Flags: no deviation - the `enemy` lib's `cflags_main` measured every body below.  No `#pragma`.
  *
@@ -51,6 +51,7 @@
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_80165FC8.h"
+#include "ef/eft_slot.h"    /* enemy_data_find / enemy_data_grp (rule 2: their owner's header) */
 
 /* -------------------------------------------------------------------------------------------------
  * the range's functions, in address order
@@ -499,7 +500,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
     case 0:
         if (self->field_0x00C == 3) {
             _ENEMY_DATA* data =
-                (_ENEMY_DATA*)fn_803438E4(fn_803439D4(self->team, self->field_0x00A), self->field_0x46C);
+                (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
             if (data != 0) {
                 if (self->area_no == data->field_0x14) {
                     fn_80127308(self, &data->vec_0x24, &self->pos, 0);
@@ -524,7 +525,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
         running = 0;
         if (self->field_0x00C == 3) {
             _ENEMY_DATA* data =
-                (_ENEMY_DATA*)fn_803438E4(fn_803439D4(self->team, self->field_0x00A), self->field_0x46C);
+                (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
             if (data != 0 && fn_80176AA8(data->work_0x18) == 1) {
                 switch (map) {
                 case 1:
@@ -593,7 +594,7 @@ void fn_801671AC(_ENEMY_WORK* self) {
         }
         {
             _ENEMY_DATA* data =
-                (_ENEMY_DATA*)fn_803438E4(fn_803439D4(self->team, self->field_0x00A), self->field_0x46C);
+                (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
             if (data != 0) {
                 if (self->field_0x46C == data->field_0x17) {
                     fn_80041E40(&self->aim, &data->vec_0x24);

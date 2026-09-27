@@ -1,4 +1,4 @@
-/* The enemy per-entry data table record `fn_803438E4` returns (map 0x803438E4, its owner in the
+/* The enemy per-entry data table record `enemy_data_find` returns (map 0x803438E4, its owner in the
  * unregistered 0x8032C920 band).  One home for the type (docs/plan.md 6.5 rule 1): the offsets are
  * the union of every reader's view, each named with what it is read for, and bytes no reader touches
  * stay `pad_0xNN` so the offsets stay exact.  It lived in `enemy/fn_80165FC8.h` until

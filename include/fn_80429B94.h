@@ -118,6 +118,9 @@ typedef struct NetSessionManagerVtbl {
 extern NetCtrlWk* net_ctrl_wk;
 
 /* The network facade the band drives; both are unsplit addresses. */
+/* 0x8042CC20 - no arguments; the sibling predicate of `fn_8042CB9C`, reached by
+ * `ef/eft_slot.cpp`.  Added here because this unit owns the address (rule 2). */
+BOOL fn_8042CC20(void);
 void* getPatsObject(void);
 void* getNetworkSessionManagerPat(void* pats, int index);
 BOOL fn_803DF1A8(void* session_manager);
