@@ -545,6 +545,43 @@ report and left alone. Rule 7 has one exemption: a registered unit with **no bod
 A batch that touches a unit closes its rows in that table for that unit. The lint's backlog number is the
 campaign's second burn-down (§7.11 is the first, bytes).
 
+### 6.6 The backlog register — backlog first (owner, 2026-09-27)
+
+**While the backlog has open items, work those before handing out a new proposal claim.** The backlog was
+always filed - every lane's outbox `config_requests` records what it found but was not allowed to change -
+but nothing tracked whether any of it was ever done. `tools/units/backlog.py` is that register and
+`queue.py next` reads it.
+
+* **What is backlog.** A `range` (a seam re-draw, or a data run to claim), a `shared-file` (a defect in a
+  header a worker may not touch: a conflicting declaration, a `#pragma` that leaks, a wrong signature) and a
+  `flag` (a compiler flag for a lib) - each open until a proposal pass re-draws it, it is fixed, or it is
+  measured and adopted/rejected. The tooling/environment register `tooling.py` owns is read into the same
+  list, never duplicated. **A `rename` is not backlog**: the landing applies it, so it is done when its batch
+  lands, and carrying it would drown the signal.
+* **A record is not a request.** Most `shared-file` entries are past-tense records of a change the branch
+  already made ("Added one union member to the +0x328 union ..."); those default to `done`. Only an entry
+  that states a live defect ("line 67 declares X while ... declares Y, so any TU that includes both fails
+  with MWCC") defaults to `open`, and every item keeps the raw filing text so a wrong classification is
+  visible. A `range` "SEAM UNPROVEN - registered whole as the brief proposed" is an admission, not a request,
+  so it too is `done`.
+* **Dedupe is the priority signal.** Items are keyed on `(kind, target, normalised-defect)`; the same defect
+  filed by several lanes over weeks collapses into one item that records **how many lanes filed it and
+  which**. The 703 requests in today's 266 outboxes are, after dedup and the record/request split, a few
+  hundred distinct items - on 2026-09-27, 64 open `shared-file`, 130 open `range`, 26 open `flag` and 4 open
+  tooling - with **22 open items filed by two or more independent lanes**: a signal that was thrown away
+  before this register existed.
+* **Ranking is filers, then recency, then `tooling.py`'s votes**, and each item shows its age. An item filed
+  in an early phase may be stale because the code moved on - the register surfaces it, never drops it; a
+  human or a lane parks it with `--set-status`.
+* **Status is persistent and per item.** `open` / `done` / `parked` lives in `MAIN/.pi/backlog.json`
+  (gitignored, like `claims.json`, so it survives a regeneration); set it with
+  `python tools/units/backlog.py --set-status KEY done`, and `--check` exits 1 when the register is missing or
+  stale.
+* **The queue refuses.** `python tools/units/queue.py next` exits 1 while the register is open, printing the
+  top item(s) with a ready-to-paste lane task; `--ignore-backlog` hands out a proposal anyway, the way
+  `--allow-unlanded` parks a branch on purpose. The guard order is branch (`HEAD` must be `main`), backlog,
+  then unlanded.
+
 ## 7. The tooling roadmap — build order, why, and the acceptance test
 
 The review's accepted items, in the order that makes each one safe. Everything is `NonMatching`-safe by

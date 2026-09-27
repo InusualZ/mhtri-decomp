@@ -4,7 +4,7 @@
 2026-09-23: "prepare briefs in advance and queue new work right away"), so the orchestrator can start a
 worker the instant a slot frees without deriving anything. This is the other half:
 
-    python tools/units/queue.py next [--count N] [--worker NAME] [--dry-run] [--json]
+    python tools/units/queue.py next [--count N] [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
     python tools/units/queue.py list [--json]
     python tools/units/queue.py --selftest
 
@@ -62,6 +62,7 @@ from units import brief  # noqa: E402
 TIMEOUT_MS = 5400000
 from units import claims  # noqa: E402
 from units import recompile as rc  # noqa: E402
+from units import backlog  # noqa: E402
 
 POOL_DEPTH = 5  # how many ready candidates `list` prints
 
@@ -475,13 +476,15 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
 
 
 def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
-               profile: str = "decompiler", allow_unlanded=None) -> dict:
+               profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False) -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
     Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
-    branch are cut from that HEAD, and `unlanded_error` refuses while any branch still holds work main does
-    not have (the owner's 2026-09-26 guard: do not start a unit while a finished one sits unlanded). The
-    claim itself is `claim_entry`, shared with the `--count` wave path.
+    branch are cut from that HEAD; `backlog.refusal` refuses while the campaign backlog has open items (the
+    owner's 2026-09-27 rule: work the backlog before a new proposal claim), unless `--ignore-backlog` parks
+    the whole register on purpose; and `unlanded_error` refuses while any branch still holds work main does
+    not have (the owner's 2026-09-26 guard). The claim itself is `claim_entry`, shared with the `--count`
+    wave path.
     """
     claim_fn = claim_fn or claims.claim
     if not dry_run:
@@ -489,6 +492,11 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
         bad_branch = branch_error(main)
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
+    if not ignore_backlog:
+        backlog_msg = backlog.refusal(main)
+        if backlog_msg:
+            raise SystemExit("REFUSED queue next | %s" % backlog_msg)
+    if not dry_run:
         blocked = unlanded_error(main, set(allow_unlanded or ()))
         if blocked:
             raise SystemExit("REFUSED queue next | %s" % blocked)
@@ -499,20 +507,25 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
 
 
 def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
-                profile: str = "decompiler", allow_unlanded=None) -> dict:
+                profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False) -> dict:
     """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
 
     Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
-    the single pick uses. The same two guards as `next_brief` run first: HEAD must be `main`, and no branch
-    may hold unlanded work. `claimed` below `requested` means the queue could not fill the wave: fewer than
-    `count` were ready, or the rest were adjacent to a claim already in it. The wave claims what there is
-    instead of failing, and the caller reports the shortfall.
+    the single pick uses. The same guards as `next_brief` run first: HEAD must be `main`, the backlog must be
+    closed (or `--ignore-backlog`), and no branch may hold unlanded work. `claimed` below `requested` means
+    the queue could not fill the wave: fewer than `count` were ready, or the rest were adjacent to a claim
+    already in it. The wave claims what there is instead of failing, and the caller reports the shortfall.
     """
     claim_fn = claim_fn or claims.claim
     if not dry_run:
         bad_branch = branch_error(main)
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
+    if not ignore_backlog:
+        backlog_msg = backlog.refusal(main)
+        if backlog_msg:
+            raise SystemExit("REFUSED queue next | %s" % backlog_msg)
+    if not dry_run:
         blocked = unlanded_error(main, set(allow_unlanded or ()))
         if blocked:
             raise SystemExit("REFUSED queue next | %s" % blocked)
@@ -974,6 +987,50 @@ def selftest() -> int:
         check("a released claim is ready again", state(repo, by_unit[claimed_unit]), "ready")
         check("... and next_entry offers it first again", next_entry(repo)["unit"], claimed_unit)
 
+    # the owner's backlog rule (2026-09-27): while the register has open items, `next` refuses to hand out
+    # a new proposal and prints the top item with a paste-ready lane; `--ignore-backlog` parks the whole
+    # register on purpose, the way `--allow-unlanded` parks a branch.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src"))
+        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
+        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
+        claims.save_registry(tmp, {})
+        label = "proposal/80100000_fn_80100000.cpp"
+        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "units": [{"label": label, "text": [0x80100000, 0x80100100],
+                                                   "count": 2, "bytes": 256, "cxx": False}]}, fh)
+        open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"),
+             "w", encoding="utf-8").write("# Proposal brief: %s\n" % label)
+        # no outbox yet: the register is empty, so `next` hands out a normal claim
+        check("an empty backlog hands out a normal claim", next_brief(tmp, None, dry_run=True)["unit"],
+              claims.norm_unit(label))
+        # one open backlog item (a shared-file defect) blocks the claim and names the item
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"))
+        with open(os.path.join(tmp, ".pi", "outbox", "lane.json"), "w", encoding="utf-8") as fh:
+            json.dump({"unit": "auto/x", "worker": "w1", "finished_at": "2026-09-01T00:00:00",
+                       "config_requests": [{"kind": "shared-file", "file": "include/unsplit/lobby.h",
+                                            "why": "the header's `s32 fn_80215C98(...)` has the wrong "
+                                                   "arity - every call site passes five arguments."}]}, fh)
+        try:
+            next_brief(tmp, None, dry_run=True)
+            check("an open backlog refuses a new proposal", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("an open backlog refuses a new proposal", "REFUSED queue next" in str(exc), True)
+            check("... names the top backlog item", "include/unsplit/lobby.h" in str(exc), True)
+            check("... and carries a paste-ready lane", "subagent(" in str(exc), True)
+            check("... and quotes the backlog key for --set-status", "--set-status" in str(exc), True)
+        over = next_brief(tmp, None, dry_run=True, ignore_backlog=True)
+        check("--ignore-backlog hands out a normal claim", over["unit"], claims.norm_unit(label))
+        check("... and a dry run claims nothing", claims.load_registry(tmp), {})
+        # the wave (`next --count N`) path is guarded the same way
+        try:
+            next_briefs(tmp, None, dry_run=True, count=2)
+            check("an open backlog refuses a wave too", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("an open backlog refuses a wave too", "backlog" in str(exc).lower(), True)
+        check("a wave with --ignore-backlog hands out normally",
+              next_briefs(tmp, None, dry_run=True, count=2, ignore_backlog=True)["claimed"], 1)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1000,6 +1057,9 @@ def main() -> int:
     n.add_argument("--allow-unlanded", action="append", default=[], metavar="BRANCH",
                    help="name a branch that is parked on purpose, so the unlanded-branch guard lets it "
                         "through (repeatable; default is to refuse while any branch holds work main lacks)")
+    n.add_argument("--ignore-backlog", action="store_true",
+                   help="hand out a proposal even while the backlog register has open items - parking the "
+                        "whole backlog on purpose, the way --allow-unlanded parks a branch")
     n.add_argument("--json", action="store_true")
     l = sub.add_parser("list", help="the pool's state and the next ready candidates")
     l.add_argument("--json", action="store_true")
@@ -1047,7 +1107,7 @@ def main() -> int:
     if args.cmd == "next":
         if args.count != 1:
             out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile,
-                              allow_unlanded=args.allow_unlanded)
+                              allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog)
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0
@@ -1076,7 +1136,7 @@ def main() -> int:
                       " replenishes it" % (out["claimed"], out["requested"]))
             return 0
         out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile,
-                         allow_unlanded=args.allow_unlanded)
+                         allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
