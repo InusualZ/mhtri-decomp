@@ -568,6 +568,73 @@ def _data_step(lines: list[str]) -> None:
                  "`python tools/units/datagap.py --flip-blockers` lists this unit.")
 
 
+def _precommit_lines(lines: list[str]) -> None:
+    """Append the §4 pre-commit gate check and staging hygiene - shared by both renderers.
+
+    The land gate's naming rule is importable, so a worker can run it from its own worktree instead of
+    paying a refusal round; two lanes were refused after a full unit of work because they did not run it
+    first. And `git add` aborts the *whole* add, silently, when any path it is given no longer exists -
+    a rename commit staged only the `git mv` because it also passed the renamed-away path.
+    """
+    lines.append("")
+    lines.append("**Check the gate from your own worktree before you commit** - it is importable, so run its")
+    lines.append("naming rule yourself instead of paying a refusal round. Both commands must print `[]`:")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python -c \"import sys;sys.path[:0]=['tools','tools/units'];from units import land;"
+                 "print(land.rule7_defer_growth(r'.','main'))\"        # run with your worktree as cwd")
+    lines.append("python -c \"import sys;sys.path[:0]=['tools','tools/units'];from units import land;"
+                 "print(land.band_ownership_warnings(r'.','main'))\"   # likewise")
+    lines.append("```")
+    lines.append("")
+    lines.append("**Stage the whole change, then read the commit back.** `git add <path>` aborts the *whole* add")
+    lines.append("- silently - when any `<path>` no longer exists: a rename commit staged only the `git mv` because")
+    lines.append("it also passed the renamed-away path. Use `git add -A` with no path arguments, then")
+    lines.append("`git show --stat` and check the commit holds every file you touched.")
+    lines.append("")
+
+
+def _teardown_lines(lines: list[str]) -> None:
+    """Append the §6 `claims.py release` ban - shared by both renderers.
+
+    Run from inside a worktree it WIPED the directory and deregistered it while reporting "teardown is
+    INCOMPLETE, the claim is kept". That lane's work survived only because it had committed first;
+    uncommitted work would have been lost. Teardown is the orchestrator's job.
+    """
+    lines.append("")
+    lines.append("**NEVER run `claims.py release`.** From inside a worktree it WIPED the directory and")
+    lines.append("deregistered it while reporting \"teardown is INCOMPLETE, the claim is kept\" - that lane")
+    lines.append("lost its tree, and it survived only because it had committed first; uncommitted work would")
+    lines.append("not have. Teardown is the orchestrator's job. Leave your worktree where it is.")
+
+
+def _measure_lines(lines: list[str], unit: str) -> None:
+    """Append the working measurement loop (§6) - shared by both renderers.
+
+    `recompile.py --measure` and `measure.py` are unusable on this host: from git-bash the compile path
+    emits `cmd /c`, MSYS rewrites it to `C:\\c`, and no object is written (a worktree run says "the
+    compiler returned 0 but wrote no object"). `ninja build/RMHE08/report.json` plus `symdiff.py` is the
+    loop that works - and `report.json` is an order-only target of `all_source`, so it must be removed
+    first or ninja reports "no work to do" and the worker reads the previous build's scores.
+    """
+    lines.append("")
+    lines.append("**Measure with `ninja build/RMHE08/report.json` + `tools/objdiff/symdiff.py`, never")
+    lines.append("`recompile.py --measure` or `measure.py`.** Both are unusable here: from git-bash the compile")
+    lines.append("path emits `cmd /c`, MSYS rewrites it to `C:\\c`, and no object is written (a worktree run")
+    lines.append("reports \"the compiler returned 0 but wrote no object\").")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("rm -f build/RMHE08/report.json   # order-only target: see below")
+    lines.append("ninja build/RMHE08/report.json")
+    lines.append("python tools/objdiff/symdiff.py -u %s <symbol>   # the official report metric" % unit)
+    lines.append("```")
+    lines.append("")
+    lines.append("**`build/RMHE08/report.json` is an order-only target of `all_source`**: after a source edit ninja")
+    lines.append("says \"no work to do\" and you read the PREVIOUS build's scores. `rm -f build/RMHE08/report.json`")
+    lines.append("first - that trap cost one lane three iterations that looked like \"all new functions score 0 %\".")
+    lines.append("")
+
+
 def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     rng = b["sections"]
     txt = rng.get(".text")
@@ -695,6 +762,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("never in your source; `include/unsplit/<band>.h` is the home when no unit owns it) and")
     lines.append("**rule 9** (never spell a mangled name - call the owner's member or function through its real")
     lines.append("signature; `tools/units/mangle.py` proves the signature).")
+    _precommit_lines(lines)
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch "
                      "(`%s` minus `worker/`), so write it exactly here; do not invent a name."
@@ -766,11 +834,9 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("```")
     lines.append("")
     lines.append("`infer.py` reads the target bytes and names the flags (it is 100 % correct on 36 confident claims and abstains rather than guess); `shapesearch.py` writes variants of your source, compiles each with the real command line into a scratch copy and ranks them by the official metric - it took two functions to 100 % on `Pl/pl_act` in 30 seconds. A shapesearch *miss* is informative: zero differing rows with a 99.9 % score means relocation naming, so the data claim is the fix, not a shape.")
-    lines.append("")
-    lines.append("python tools/units/recompile.py %s --measure <symbol>   # compiles YOUR source in YOUR worktree" % b["unit"])
-    lines.append("```")
-    lines.append("")
+    _measure_lines(lines, b["unit"])
     lines.append("A worker **registers its own unit** (`splits.txt` + `configure.py`, part 2) and builds freely **in its own worktree** - including the full `ninja` - but never runs the **split**, the **link**, `land.py` or `claims.py release`, never edits `symbols.txt` or `AGENTS.md`, and never commits on `main`. Everything else you need changed goes into the outbox's `config_requests`.")
+    _teardown_lines(lines)
     lines.extend(config_schema_lines())
     lines.append("")
     lines.append("**You may fan out subagents** for parallel work. They run in *your* worktree, on *your* branch; "
@@ -1100,6 +1166,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("never in your source; `include/unsplit/<band>.h` is the home when no unit owns it) and")
     lines.append("**rule 9** (never spell a mangled name - call the owner's member or function through its real")
     lines.append("signature; `tools/units/mangle.py` proves the signature).")
+    _precommit_lines(lines)
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch, so"
                      % b["handoff"]["outbox"])
@@ -1121,8 +1188,9 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
                      % (p.get("count", 0), BAR))
         lines.append("biggest first where two are equal.")
         lines.append("")
-        lines.append("Work them one at a time and re-measure each: `python tools/units/recompile.py <unit>")
-        lines.append("--measure <symbol>`. A function that resists is a residual to record, not a reason to stop -")
+        lines.append("Work them one at a time and re-measure each with `ninja build/RMHE08/report.json` +")
+        lines.append("`tools/objdiff/symdiff.py` (the loop is in §6). A function that resists is a residual to")
+        lines.append("record, not a reason to stop -")
         lines.append("**apply the best-scoring variant even if it is not a full match** and write what still differs")
         lines.append("into the unit's file header.")
     _cpp_step(lines)
@@ -1138,11 +1206,12 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("python tools/flags/infer.py <unit>                    # which flags the TARGET object implies")
     lines.append("python tools/flags/shapesearch.py -u <unit> --scan 20 # generate/compile/score/rank variants")
     lines.append("```")
-    lines.append("")
+    _measure_lines(lines, label)
     lines.append("A worker never runs the **split**, the **link** or `land.py`, and never commits on `main` - but it DOES")
     lines.append("build in its own worktree, full `ninja` with `build/RMHE08/ok` deleted first (that is the only way to prove")
     lines.append("the worktree and see a real `main.dol: OK`). Apart from the registration part 2 requires, everything you need")
     lines.append("changed goes into the outbox's `config_requests`.")
+    _teardown_lines(lines)
     lines.extend(config_schema_lines())
     lines.append("")
     lines.append("**You may fan out subagents** - use the **`decompiler`** agent for them (the project agents "
@@ -1522,6 +1591,18 @@ def selftest() -> int:
               "final message" in brief_text and "subagent_done" not in brief_text, True)
         check("the brief names the rule-7 deferral declaration",
               "rule 7 deferred:" in brief_text, True)
+        check("the brief tells the worker to run the gate's naming rule locally",
+              "land.rule7_defer_growth" in brief_text and "land.band_ownership_warnings" in brief_text, True)
+        check("the brief bans claims.py release with its consequence",
+              "NEVER run `claims.py release`" in brief_text and "WIPED the directory" in brief_text, True)
+        check("the brief warns off recompile.py --measure / measure.py",
+              "`recompile.py --measure` or `measure.py`" in brief_text
+              and "tools/objdiff/symdiff.py" in brief_text, True)
+        check("the brief carries the order-only report.json trap",
+              "order-only target of `all_source`" in brief_text
+              and "rm -f build/RMHE08/report.json" in brief_text, True)
+        check("the brief carries the git add hygiene",
+              "`git add -A` with no path arguments" in brief_text and "`git show --stat`" in brief_text, True)
         check("pool is idempotent", pool(tmp)["skipped"], ["auto/stub"])
         open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("int f(void) { return 1; }\n")
         check("pool prunes a unit that gained a body",
@@ -1568,6 +1649,16 @@ def selftest() -> int:
         check("the proposal brief keeps the section 6.5 rules",
               "## 6 · The rules" in text and "rule 7 deferred:" in text, True)
         check("the proposal brief carries the outbox path", str(b["handoff"]["outbox"]) in text, True)
+        check("the proposal brief tells the worker to run the gate's naming rule locally",
+              "land.rule7_defer_growth" in text and "land.band_ownership_warnings" in text, True)
+        check("the proposal brief bans claims.py release with its consequence",
+              "NEVER run `claims.py release`" in text and "WIPED the directory" in text, True)
+        check("the proposal brief warns off recompile.py --measure / measure.py",
+              "`recompile.py --measure` or `measure.py`" in text and "tools/objdiff/symdiff.py" in text, True)
+        check("the proposal brief carries the order-only report.json trap",
+              "order-only target of `all_source`" in text and "rm -f build/RMHE08/report.json" in text, True)
+        check("the proposal brief carries the git add hygiene",
+              "`git add -A` with no path arguments" in text and "`git show --stat`" in text, True)
         check("a proposal brief still says where the report goes",
               "final message" in text and "subagent_done" not in text, True)
 
