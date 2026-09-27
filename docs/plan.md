@@ -294,7 +294,7 @@ write your report.*
 | # | artefact | consumed by |
 | --- | --- | --- |
 | 1 | the source it owns, compiled and measured, committed on its branch (one commit) | the build, the merge |
-| 2 | `MAIN/.pi/outbox/<slug>.json` (branch minus `worker/`) — per-symbol %, unit %, residual, **config requests** (range/rename/flag with evidence), **flag probes** (numbers + verdict), blockers, and the command it measured with | me and `land.py`, which can refuse a batch from it alone |
+| 2 | `MAIN/.pi/outbox/<slug>.json` (branch minus `worker/`) - per-symbol %, unit %, residual, **config requests** (range/seam/rename/flag/shared-file with evidence), **flag probes** (numbers + verdict), blockers, and the command it measured with | me and `land.py`, which can refuse a batch from it alone |
 | 3 | `MAIN/.pi/notes/<slug>.md` — the full evidence trail | a later session, or a re-brief of the same unit |
 | 4 | a ≤ 15-line digest in the reply | human review |
 | 5 | the claim released (worktree removed, branch deleted after the merge) | other workers |
@@ -552,12 +552,14 @@ always filed - every lane's outbox `config_requests` records what it found but w
 but nothing tracked whether any of it was ever done. `tools/units/backlog.py` is that register and
 `queue.py next` reads it.
 
-* **What is backlog.** A `range` (a seam re-draw, or a data run to claim), a `shared-file` (a defect in a
-  header a worker may not touch: a conflicting declaration, a `#pragma` that leaks, a wrong signature) and a
-  `flag` (a compiler flag for a lib) - each open until a proposal pass re-draws it, it is fixed, or it is
-  measured and adopted/rejected. The tooling/environment register `tooling.py` owns is read into the same
-  list, never duplicated. **A `rename` is not backlog**: the landing applies it, so it is done when its batch
-  lands, and carrying it would drown the signal.
+* **What is backlog.** A `range` (a data run to claim), a `seam` (a code span whose boundary is in the wrong
+  place, so the unit split needs re-drawing - its own kind, because "the cut belongs elsewhere" is a
+  different ask from "claim this data"), a `shared-file` (a defect in a header a worker may not touch: a
+  conflicting declaration, a `#pragma` that leaks, a wrong signature) and a `flag` (a compiler flag for a
+  lib) - each open until a proposal pass re-draws it, it is fixed, or it is measured and adopted/rejected.
+  The tooling/environment register `tooling.py` owns is read into the same list, never duplicated. **A
+  `rename` is not backlog**: the landing applies it, so it is done when its batch lands, and carrying it
+  would drown the signal.
 * **A record is not a request.** Most `shared-file` entries are past-tense records of a change the branch
   already made ("Added one union member to the +0x328 union ..."); those default to `done`. Only an entry
   that states a live defect ("line 67 declares X while ... declares Y, so any TU that includes both fails
