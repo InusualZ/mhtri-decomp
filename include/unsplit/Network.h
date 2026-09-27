@@ -75,7 +75,7 @@ s32 isCallback(NetworkInstance* self, s32 index);
 void resetCallback(NetworkInstance* self, s32 index);
 
 /* DWC/GameSpy session layer */
-void fn_804189C8(void);   /* 0x804189C8, the sNetworkLibrary constructor body the opener calls */
+void constructNetworkLibrary(void);   /* 0x804189C8, the sNetworkLibrary constructor body the opener calls */
 void decrement60d4(NetworkInstance* self);
 u32 getSomething5(NetworkInstance* self);
 s32 fn_803FD658(NetworkInstance* self);
@@ -115,8 +115,9 @@ void fn_80507470(void);
  * it keeps the callers below compiling without redeclaring an owned symbol (rule 2). */
 #include "DWCi/DWCi_NatNeg.h"
 
-/* OS / runtime helpers */
-u16 SOHtoNs(u16 value);
+/* OS / runtime helpers.  `SOHtoNs` is an SO-library symbol whose one home is the SO band header,
+ * which is C-linkage-safe and so reachable from the DWCi `.c` units as well. */
+#include "unsplit/SO.h"
 void fn_804167B4(void* out);
 void fn_80403F60(NetworkInstance* self, u32 handle);
 void fn_80403FE4(NetworkInstance* self, u32 handle, u32 offset, u32 size);
@@ -182,6 +183,10 @@ extern const char lbl_80603638[];
 extern const char lbl_80603660[];
 extern const char lbl_80603680[];
 extern const char lbl_806036B0[];
+
+/* The Network band's constants live in the data-only sibling header (see its comment for why a
+ * unit that also includes `Network/fn_803D3CE8.h` cannot take them from here). */
+#include "unsplit/NetworkData.h"
 
 }
 

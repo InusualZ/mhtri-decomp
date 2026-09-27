@@ -18,29 +18,32 @@
  * The code is C (`IOS_*`/`OS*`/`SC*` callees only, nothing mangled) with `-Cpp_exceptions off`, so
  * `.text` is the only code section claimed (no extab/extabindex for the band).
  *
- * NAMING.  Every generated name this unit owns was renamed through
+ * NAMING.  0x807958C0 `0x807958C0`, the two-word `.sbss` in-flight slot inside the unit's own
+ * `.sbss` claim, is `sAsyncIoctlSlot` (a GUESS: the async wrapper sets it, the completion callback
+ * clears it and `NWC24iIsAsyncIoctlBusy` reads it - the image carries no spelling for it).
+ * Every generated name this unit owns was renamed through
  * `python tools/symbols/symedit.py rename` (18 rows for the two units, `.pi/notes/net-nwc24.md`); no
  * `rule 7 deferred` escape is needed, because the unit now defines and references only real names:
- *   0x8051E384 fn_8051E384 -> NWC24iSetRtcCounter        passes its own name string "NWC24iSetRtcCounter"
+ *   0x8051E384 -> NWC24iSetRtcCounter        passes its own name string "NWC24iSetRtcCounter"
  *            (`.data` 0x806311D4) to its error path.
- *   0x8051E560 fn_8051E560 -> NWC24iOpenFd               IOS_Open with the NWC24 error map (-3 no out
+ *   0x8051E560 -> NWC24iOpenFd               IOS_Open with the NWC24 error map (-3 no out
  *            slot, -0x1D on -6, -0x1A on -8, -0x2A otherwise); its callers pass "/dev/net/kd/request"
  *            (0x80631178, 0x80631200) or "/dev/net/kd/time" (0x806311C0).
- *   0x8051E5D8 fn_8051E5D8 -> NWC24iCloseFd              IOS_Close, -0x2A on failure.
- *   0x8051E60C fn_8051E60C -> NWC24iIoctl                IOS_Ioctl, -0x2A on failure.
- *   0x8051E654 fn_8051E654 -> NWC24iIoctlAsync           IOS_IoctlAsync with NWC24iAsyncIoctlCallback as
+ *   0x8051E5D8 -> NWC24iCloseFd              IOS_Close, -0x2A on failure.
+ *   0x8051E60C -> NWC24iIoctl                IOS_Ioctl, -0x2A on failure.
+ *   0x8051E654 -> NWC24iIoctlAsync           IOS_IoctlAsync with NWC24iAsyncIoctlCallback as
  *            the callback; on success it sets the `.sbss` 0x807958C0 in-flight slot.
- *   0x8051E6B0 fn_8051E6B0 -> NWC24iIsAsyncIoctlBusy     returns that slot; its only caller is
+ *   0x8051E6B0 -> NWC24iIsAsyncIoctlBusy     returns that slot; its only caller is
  *            NWC24iRequestShutdown, which polls it for the async completion.
- *   0x8051E6B8 fn_8051E6B8 -> NWC24iAsyncIoctlCallback   the IOS_IoctlAsync callback: stores the result
+ *   0x8051E6B8 -> NWC24iAsyncIoctlCallback   the IOS_IoctlAsync callback: stores the result
  *            word to *out and clears the in-flight slot (marked guess: the slot's only writers are this
  *            callback and the async wrapper, so the name follows the pair).
- *   0x8051E794 fn_8051E794 -> NWC24iRequestShutdown      passes its own name string "NWC24iRequestShutdown"
+ *   0x8051E794 -> NWC24iRequestShutdown      passes its own name string "NWC24iRequestShutdown"
  *            (`.data` 0x80631214) to its error path.
  *
  * SEAM.  `tools/splits/tudiscover.py at 0x8051D710` reports the seam between the two halves as its only
  * weak-cut cluster (0x8051E068 codegen, 0x8051E100, 0x8051E384), and the `.sdata` must-link anchor
- * `lbl_80794440` (span 400 B) binds NWC24iPrepareShutdown to NWC24iRequestShutdown at the band's top;
+ * `0x80794440` (span 400 B) binds NWC24iPrepareShutdown to NWC24iRequestShutdown at the band's top;
  * the split position and its window are documented in the sibling's header.
  *
  * Bodies written and measured: `NWC24iOpenFd`, `NWC24iCloseFd`, `NWC24iIoctl`, `NWC24iIoctlAsync`,
@@ -52,16 +55,13 @@
  */
 
 #include "types.h"
+#include "unsplit/IOS.h"   /* IOS_Open / IOS_Close / IOS_Ioctl / IOS_IoctlAsync (rule 2 band) */
 
-/* The in-flight async command slot (`.sbss` 0x807958C0).  The map sizes the object at 8 B with no
-   label at +0x4, so it is declared as a two-word slot; the band's code only ever touches word 0. */
-static u32 lbl_807958C0[2];
-
-extern s32 IOS_Open(const char* path, u32 mode);
-extern s32 IOS_Close(s32 fd);
-extern s32 IOS_Ioctl(s32 fd, u32 command, void* in, u32 inLen, void* out, u32 outLen);
-extern s32 IOS_IoctlAsync(s32 fd, u32 command, void* in, u32 inLen, void* out, u32 outLen,
-                          void (*callback)(u32, u32*), void* userData);
+/* The in-flight async command slot (`.sbss` 0x807958C0, inside the unit's own `.sbss` range).  The
+   map sizes the object at 8 B with no label at +0x4, so it is a two-word slot; the band's code only
+   ever touches word 0.  NAME (a GUESS, see the header): the async wrapper sets it, the completion
+   callback clears it, and `NWC24iIsAsyncIoctlBusy` reads it. */
+static u32 sAsyncIoctlSlot[2];
 
 /* owned by this unit; declared here until their bodies land */
 int NWC24iSetRtcCounter(u32 value, u32 flag);
@@ -119,13 +119,13 @@ int NWC24iIoctlAsync(u32 unused, s32 fd, u32 command, void* in, u32 inLen, void*
     if (error < 0) {
         return -0x2A;
     }
-    lbl_807958C0[0] = 1;
+    sAsyncIoctlSlot[0] = 1;
     return 0;
 }
 
 u32 NWC24iIsAsyncIoctlBusy(void)
 {
-    return lbl_807958C0[0];
+    return sAsyncIoctlSlot[0];
 }
 
 int NWC24iAsyncIoctlCallback(u32 value, u32* out)
@@ -135,6 +135,6 @@ int NWC24iAsyncIoctlCallback(u32 value, u32* out)
     if (out != 0) {
         *out = value;
     }
-    lbl_807958C0[0] = 0;
+    sAsyncIoctlSlot[0] = 0;
     return result;
 }

@@ -6,13 +6,13 @@
  * closure as the function alone, the nearest left cut 0x803DD750 and right cut 0x803DEDE0 are both
  * single-signal (codegen fingerprint change, share 0.093 / 0.113).  The closure edge is taken on both
  * sides, so **both seams are unproven** - the original TU may extend up to 0x803DEDE0 (its next
- * function, `fn_803DEB38`, and the six following it are just as plausibly the same file).
+ * function, `0x803DEB38`, and the six following it are just as plausibly the same file).
  * Sections: `.text` 0x803DEA30..0x803DEB38, `extab` 0x8001A630..0x8001A648,
  * `extabindex` 0x8003AB9C..0x8003ABA8 (the object's one unwind record).
  *
  * WHAT IT IS.  The NetworkSessionStable opener: it rejects a second init (+0xC already set returns
  * -1), allocates the 0x16D08-byte session object, constructs it, seeds three of its sliders from the
- * float pool (0x8079C764 / 0x80793930 / 0x80793934), installs the reflect callback `fn_803D6870`
+ * float pool (0x8079C764 / 0x80793930 / 0x80793934), installs the reflect callback `networkSessionReflectCallback`
  * through vtable slot +0xC, flips the +0x3C8 ready flag and returns the object's own "start" result.
  * Module `Network` (the class names and the registered neighbour).
  *
@@ -22,9 +22,10 @@
  * (`extern "C"`) so the unmangled `initNetworkSessionStable` symbol is unchanged.  That also satisfies
  * rule 2/9: the allocator is declared once in `include/sys_mem.h` and called as `operator new`.
  *
- * rule 7 deferred: this is a reconnaissance registration; the range's one owned symbol already has its
- * real name (`initNetworkSessionStable`) and the `fn_` spellings below are *callees* the runtime dump
- * answers only `zz_` for.
+ * The range's one owned symbol already has its real name (`initNetworkSessionStable`); the two
+ * callees it makes were named from their use here (`constructNetworkSessionObject`,
+ * `networkSessionReflectCallback`) and the four constants it loads from the band data header, so no
+ * generated spelling survives in this file.
  *
  * BODY.  Reconstructed from the disassembly; the allocation/construct sequence and the vtable
  * dispatch are modelled as a class with the target's slots (no vtable is emitted - no virtual is
@@ -34,14 +35,12 @@
 #include "types.h"
 #include "sys_mem.h"
 #include "Network/fn_803D3CE8.h"
+#include "unsplit/NetworkData.h"   /* the band's unowned constants (rule 2) */
 
 extern "C" {
 
 s32 initNetworkSessionStable(void* self);
-void fn_803CF7FC(void);   /* the session object's constructor, 0x803CF7FC (unclaimed band) */
-extern f32 lbl_80793930;
-extern f32 lbl_80793934;
-extern f32 lbl_8079C764;
+void constructNetworkSessionObject(void);   /* the session object's constructor, 0x803CF7FC (unclaimed band) */
 
 }
 
@@ -99,16 +98,16 @@ s32 initNetworkSessionStable(void* selfv)
     }
     session = (NetworkSessionObject*)operator new(0x16D08);
     if (session != NULL) {
-        fn_803CF7FC();
+        constructNetworkSessionObject();
     }
     self->session_0C = session;
     if (session == NULL) {
         return -2;
     }
-    session->v03(1, (void*)fn_803D6870, self, self->work_3CC, 0);
-    session->v22(lbl_8079C764);
-    session->v24(lbl_80793930);
-    session->v21(lbl_80793934);
+    session->v03(1, (void*)networkSessionReflectCallback, self, self->work_3CC, 0);
+    session->v22(networkSessionPeriodSeconds);
+    session->v24(networkSessionTimeoutSeconds);
+    session->v21(networkSessionIntervalSeconds);
     self->ready_3C8 = 1;
     return session->v27();
 }

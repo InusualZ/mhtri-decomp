@@ -30,6 +30,7 @@
 
 #include "types.h"
 #include "Network/fn_803D3CE8.h"
+#include "unsplit/NetworkData.h"
 
 /* ---- this unit's own forward declarations ---- */
 extern "C" {
@@ -108,11 +109,11 @@ struct DebugManager {
 };   /* size: 0x04 */
 
 /* ---- extra neighbouring globals ---- */
+/* The four addresses themselves are declared in the band's data header (rule 2).  They cannot come
+   from `include/unsplit/Network.h`: that header declares `dtor_803CA338(void*, s32)` where this
+   file's own header declares `dtor_803CA338(void*)`, and including both fails to compile - the
+   reason `include/unsplit/NetworkData.h` exists. */
 extern "C" {
-extern u32 lbl_80572428[4];
-extern u32 lbl_80794CA0;
-extern const char lbl_805FA8C8[0x3A];
-extern const char lbl_805FAAD0[0x33];
 struct DebugManager;
 DebugManager* fn_803C9974(void);
 }
@@ -340,9 +341,9 @@ extern "C" void fn_803D4A50(NetworkRequest* self)
     self->unused_24 = 0;
     self->cancelled_74 = 0;
     self->owner_94 = 0;
-    self->desc_98 = lbl_80572428[0];
-    self->desc_9C = lbl_80572428[1];
-    self->desc_A0 = lbl_80572428[2];
+    self->desc_98 = NetworkRequest_defaultDescriptor[0];
+    self->desc_9C = NetworkRequest_defaultDescriptor[1];
+    self->desc_A0 = NetworkRequest_defaultDescriptor[2];
     self->count_28 = 0;
     self->record_54 = 0;
     self->record_58 = 0;
@@ -470,8 +471,8 @@ extern "C" void fn_803D5150(NetworkRequest* req, NetworkSessionManager* owner,
 
     fn_803D4A50(req);
     req->timeout_50 = 0.0f;
-    req->requestId_70 = lbl_80794CA0;
-    lbl_80794CA0 = req->requestId_70 + 1;
+    req->requestId_70 = NetworkRequest_idCounter;
+    NetworkRequest_idCounter = req->requestId_70 + 1;
     req->owner_94 = owner;
     req->desc_98 = desc.id_0;
     req->desc_9C = desc.value_4;
@@ -904,7 +905,7 @@ extern "C" void fn_803D64A4(NetworkSessionManager* self, NetworkRequest** slot)
     if (*slot != 0) {
         if (fn_803D5070(*slot) != 0) {
             DebugManager* log = fn_803C9974();
-            log->vtable->log_14(log, lbl_805FA8C8);
+            log->vtable->log_14(log, NetworkSessionManager_deleteRequestMessage);
         }
         fn_803D4B5C(*slot);
     }
@@ -944,7 +945,7 @@ extern "C" s32 fn_803D65F4(NetworkRequest* self, u32 idx)
     count = self->count_28;
     if (count <= idx) {
         log = fn_803C9974();
-        log->vtable->warn_10(log, lbl_805FAAD0, count, idx);
+        log->vtable->warn_10(log, NetworkRequest_getArgumentMessage, count, idx);
         return 0;
     }
     return (s32)self->args_2C[idx];

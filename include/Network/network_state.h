@@ -8,7 +8,7 @@
  * declares a newly-owned symbol, so they moved here.
  *
  * `sendReqShut` (0x803FFDCC, opcode 0x04) and `resetNetworkState3` (0x803FE924) are the two the
- * GameSpy band (`Network/fn_8041A87C.cpp`) calls; every other symbol the range owns is declared and
+ * GameSpy band (`Network/0x8041A87C.cpp`) calls; every other symbol the range owns is declared and
  * defined in `src/Network/network_state.cpp` itself.  The `NetworkInstance` layout lives in
  * `include/unsplit/Network.h` (a shared type, not an owned symbol).
  */

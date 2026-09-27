@@ -3,9 +3,11 @@
  * 0x80515774..0x8051B7FC) and the NHTTP system-info block it owns.
  *
  * Rule 2: this unit owns `NHTTPi_GetSystemInfoP` and the info-block layout, so the consumers
- * (`NHTTP_bgnend.c`, `NHTTP_os_RVL.c`) include this header instead of declaring them.
+ * (`NHTTP_bgnend.c`, `NHTTP_os_RVL.c`) include this header instead of declaring them.  The two data
+ * objects have no registered owner, so they are declared in the band header
+ * `include/unsplit/NHTTP.h`, which this file includes.
  *
- * The block is `lbl_80762C60` (`.bss`); `NHTTPi_GetSystemInfoP` lazily points `lbl_80795884` at it.
+ * The block is `NHTTPi_systemInfo` (`.bss`); `NHTTPi_GetSystemInfoP` lazily points `NHTTPi_systemInfoP` at it.
  * Only the fields the reconstructed accessors touch are modelled, with `pad_0xNN` filling the gaps;
  * the sub-records sit at the offsets `NHTTPi_Get*InfoP` return (0x800/0x808/0x80C/0x840).
  */
@@ -72,8 +74,7 @@ typedef struct NHTTPInfo {
 } NHTTPInfo;
 
 /* `NHTTPi_GetSystemInfoP`'s singleton slot and the block it points at. */
-extern NHTTPInfo* lbl_80795884;
-extern NHTTPInfo lbl_80762C60;
+#include "unsplit/NHTTP.h"
 
 NHTTPInfo* NHTTPi_GetSystemInfoP(void);
 void* NHTTPi_GetBgnEndInfoP(NHTTPInfo* info);
