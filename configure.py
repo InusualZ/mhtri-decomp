@@ -1182,6 +1182,24 @@ config.libs = [
             # 0x8001622C-0x80016464, extabindex 0x800351A8-0x800354FC and the one `.ctors` word
             # 0x8056F39C -> fn_8032C65C.
             Object(NonMatching, "enemy/em_action.cpp"),
+            # Registered from proposal/80375084_fn_80375084.cpp, at its final home (docs/plan.md 12):
+            # three handler entries of the em020 enemy program, `.text` 0x80375084..0x80375424 (3
+            # functions / 0x3A0 B) plus their extab run 0x80017A5C..0x80017A74 (three 8-byte records)
+            # and extabindex run 0x800375F0..0x80037614 (three 12-byte records) - both runs are exactly
+            # the gap the bracketing objects leave.  Module `enemy` from the code (every body drives the
+            # shared `_ENEMY_WORK` record through `em_act_ck`/`MHchar` and `include/enemy/ENEMY_WORK.h`
+            # is the record's home) and from the `.data` program table `em020_prog_tbl` (0x805EE098),
+            # which lists all three entry points (+0x20/+0x24/+0x34) beside the em020 band's other
+            # handlers; the file and its three symbols are GUESSES from the table and from each body
+            # (no `__FILE__` string reaches the range, the dump answers only `zz_`), on the module's
+            # `em020_*` scheme - see the unit header.  C++; every plain `fn_` definition is
+            # `extern "C"`.  Seam unproven (the table lists entry points on both sides of the range:
+            # 0x803733BC above, 0x80375424 below), so a re-draw is a candidate for the round that
+            # registers the neighbouring proposals.  `Matching`: the object's `.text` (0x3A0),
+            # `extab` (0x18) and `extabindex` (0x24) are byte-identical to the target's and all three
+            # functions measure 100.0, so `flipcheck.py`/`verifyunit.py` say READY and the linker
+            # substitutes the object rather than leaving the range's original bytes (playbook 5d).
+            Object(Matching, "enemy/em020_handlers.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from proposal/80387844_fn_80387844.cpp:
             # the enemy monster-AI action band (`.text` 0x80387844..0x8038E8E8, 43 functions / 0x7084
             # bytes).  Module `enemy` from the code (every body drives the shared `_ENEMY_WORK` record

@@ -17,11 +17,13 @@ extern "C" {
 #endif
 
 s32 em_act_ck__FP11_ENEMY_WORKUcUc(struct _ENEMY_WORK* work, u8 a, u8 b);
-/* The C++ spelling of the same symbol, for the consumers that must not write the mangling
- * (docs/plan.md 6.5 rule 9): `enemy/fn_801993E0.cpp`'s `fn_8019E398` calls it. */
-#ifdef __cplusplus
-s32 em_act_ck(struct _ENEMY_WORK* self, u8 a, u8 b);
-#endif
+/* NOTE (2026-09-27): the `s32 em_act_ck(...)` declaration that used to sit *here*, inside this
+ * `extern "C"` block, made every consumer that includes this header emit the unmangled `em_act_ck`
+ * while the map (and the retail objects) reference the mangling `em_act_ck__FP11_ENEMY_WORKUcUc`: the
+ * first declaration of a name fixes its language linkage, so the C-linkage block above was winning
+ * over the C++-scope declaration at the bottom of this file.  Removed - the C++ declaration below is
+ * now the first, and callers emit the map's spelling (`em020_handlers.cpp` measured 98.76 -> 98.85 on
+ * it, and it is what keeps the object linkable). */
 u32 em_area_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 u32 em_die_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void fn_8012BDF4(struct _ENEMY_WORK* work);

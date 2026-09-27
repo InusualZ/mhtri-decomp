@@ -22,6 +22,13 @@ u8 fn_802B0598(u8 id);
  * `extern "C" u32 fn_802B0688(void* self)` at `stage/stg_w.cpp:275`. */
 u32 fn_802B0688(void* self);
 
+/* 0x802B0A98 - the stage table selector `enemy/em020_handlers.cpp`'s `em020_area_model_set` calls
+ * for the two em020 area models: `idx` indexes the two-byte records at 0x805DEF38, whose bytes are
+ * handed to `fn_802B0A3C`, and `value` is stored into the stage work block's +0x2EAC byte
+ * (`0x806BB7AC`) once per call.  Added with that registration (rule 2: this range owns the address;
+ * the signature is the callee's own body - `clrlwi r3,24` for the index, a `stb` for the value). */
+void fn_802B0A98(u8 idx, u8 value);
+
 /* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `fn_802C2314` calls; added with that
  * registration (rule 2: this range owns the address).  The owner's body does not exist yet, so the
  * signature is the call site's view: no arguments, no result. */
