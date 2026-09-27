@@ -1237,6 +1237,16 @@ enemy/em019_ai.cpp:
 	extabindex  start:0x800378CC end:0x80037B00
 	.text       start:0x80378F9C end:0x8037EA64
 
+enemy/em019_prog.cpp:
+	extab       start:0x80017DBC end:0x80017E14
+	extabindex  start:0x80037B00 end:0x80037B84
+	.text       start:0x8037EA64 end:0x8037F940
+
+enemy/em_act_mot.cpp:
+	extab       start:0x80017E14 end:0x80017E2C
+	extabindex  start:0x80037B84 end:0x80037BA8
+	.text       start:0x8037F940 end:0x80382310
+
 enemy/fn_80382310.cpp:
 	extab       start:0x80017E2C end:0x80018094
 	extabindex  start:0x80037BA8 end:0x80037F44

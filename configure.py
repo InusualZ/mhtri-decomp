@@ -1270,6 +1270,38 @@ config.libs = [
             # `fn_8033041C` stem for now: bodyless, so rule 7 does not apply yet - the pass that
             # writes the bodies names it from them (31 of its 48 functions call `Pl_frame_check`).
             Object(NonMatching, "enemy/em_pl_frame.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8037EA64_fn_8037EA64.cpp, which the brief's `--max-bytes` run had cut over
+            # TWO translation units: this is the em019 program band (`.text`
+            # 0x8037EA64..0x8037F940, 12 functions / 3804 B), the tail of the same file whose head
+            # `enemy/em019_ai.cpp` above already registered (0x80378F9C..0x8037EA64).  Module `enemy`
+            # (brief section 2 class 3): every body drives the shared `_ENEMY_WORK` record through
+            # `em_frame_check__FP11_ENEMY_WORKUsff` (8 sites), `em_parts_damage_level_get`,
+            # `get_em_chg_scale`, and the sibling `em_*` bands are the naming scheme; the file name
+            # follows the `.data` program table `em019_prog_tbl` (0x805EE518), whose +0x0C entry is
+            # this band's own `em_act_run`.  No `__FILE__` string is reachable and the runtime dump
+            # answers only `zz_<addr>_`, so the file name and all 12 symbols are **derived names
+            # (GUESS)** from their bodies - the file header lists each derivation.  C++; every plain
+            # `fn_` definition is `extern "C"`.  The seam at 0x8037F940 is the one `tudiscover.py at
+            # 0x8037E0E8` reports as strong (`.data` jumptable_805EF4F4 -> jumptable_805EF52C and
+            # `.sdata2` lbl_8079BE88 -> lbl_8079BE8C, each side referenced only by its own
+            # functions), the same extent `enemy/em019_ai.cpp` records; the extab/extabindex runs tile
+            # (this unit 0x80017DBC..0x80017E14 / 0x80037B00..0x80037B84, the other half from
+            # 0x80017E14 / 0x80037B84, both ending exactly where `enemy/fn_80382310.cpp` starts).
+            # Claims `.text` 0x8037EA64..0x8037F940, extab 0x80017DBC..0x80017E14 (11 x 8 B),
+            # extabindex 0x80037B00..0x80037B84 (11 x 12 B).  See the unit's file header.
+            Object(NonMatching, "enemy/em019_prog.cpp"),
+            # The other half of the same proposal: the enemy per-motion stepper band (`.text`
+            # 0x8037F940..0x80382310, 4 functions / 10704 B) - the 216-case per-motion stepper
+            # `em_act_mot_step` (0x8037F940, 10076 B) plus the three part-material steppers
+            # `enemy/fn_80382310.cpp` calls.  Its left edge is the same strong seam, its right edge is
+            # where that registered neighbour starts (extab 0x80017E2C / extabindex 0x80037BA8).
+            # Module `enemy` and the file name `em_act_mot` from the bodies (class 3; no `__FILE__`
+            # string, the dump answers `zz_`), so all four names are GUESSES.  `em_act_mot_step` is
+            # registered but NOT written - a 216-arm switch is a lane of its own - and is this unit's
+            # one 0 % row.  Claims `.text` 0x8037F940..0x80382310, extab 0x80017E14..0x80017E2C
+            # (3 x 8 B), extabindex 0x80037B84..0x80037BA8 (3 x 12 B).
+            Object(NonMatching, "enemy/em_act_mot.cpp"),
         ],
     },
 
