@@ -63,10 +63,10 @@ void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
  * that range's per-action state machines drive the motion through them, and the addresses sit in
  * this unit's own `.text` range, so its header is their home.  Signatures are the call sites' -
  * each is a leaf this unit never re-enters. */
-/* `fn_8012F8C8` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
+/* `em_mot_speed_set` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
  * consumer (`enemy/fn_8014A1BC.c`) calls it with `self` only and relies on the old-style
  * declaration, so `include/unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
- * fn_8012F8C8();` split form - the shape `fn_80130008`, `fn_801303FC`, `fn_80133F4C` and
+ * em_mot_speed_set();` split form - the shape `fn_80130008`, `fn_801303FC`, `fn_80133F4C` and
  * `fn_80135600` keep there too, and the form the C++ consumers that do not include this header
  * (`enemy/fn_801550FC.cpp`, `enemy/fn_8015E854.cpp`) reach it through.  A prototype here is an
  * MWCC 10563 redeclaration against that declaration as soon as a C consumer includes both

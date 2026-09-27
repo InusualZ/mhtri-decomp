@@ -90,7 +90,7 @@
  *   * `ResUserDataAc` (this range's `EmUserData` view) belongs in `include/enemy/fn_80138074.h`, its
  *     owner's header - `include/enemy/fn_80138074.h` declares `fn_8013A654` with `_ENEMY_WORK*` where
  *     the callee's own body reads +0x04/+0x08 (settled from the callee, rule 6 of the playbook).
- *   * the plain prototypes at the top of this file (`fn_80130478`, `fn_80126324`, `fn_80129xxx`,
+ *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `fn_80139A64`, `fn_80139A7C`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
  *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `fn_80101428`, `fn_8010140C`, `MTX34_ctor`,
  *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `fn_802B0668`,
@@ -307,7 +307,7 @@ extern "C" {
  * width the target's registers show); they belong in their owner's header or in
  * `include/unsplit/enemy.h`, and the outbox carries that list - the same interim spelling
  * `enemy/fn_8013ACC4.cpp` uses for its neighbours. */
-void fn_80130478(EmActWork* self, u32 mode);
+void em_move_mode_set(EmActWork* self, u32 mode);
 void fn_80126324(EmActWork* self, u8 a, u8 b, f32 value);
 void fn_80182D5C(void);
 u8 fn_802B0668(u8 key);
@@ -319,7 +319,7 @@ u8 fn_80129DB8(EmActWork* self);
 u32 fn_80129A70(EmActWork* self, u16 value);
 u32 fn_8012A014(EmActWork* self, u32 a, u32 b, u16 c, u32 d, u8* table);
 s32 fn_8012A204(EmActWork* self);
-void fn_8012F5B8(EmActWork* self, s32 a, s32 b, s32 c);
+void em_mot_set(EmActWork* self, s32 a, s32 b, s32 c);
 void fn_803B9BA0(EmActWork* self, VEC3* pos, s32 value);
 void fn_8013918C(void* p, s16 flag);
 void fn_8012933C(EmActWork* self, u8 a, u32 b, u32 c);
@@ -372,20 +372,20 @@ void fn_80192630(EmActWork* self);
 void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
     switch (self->team) {
     case 16:
-        fn_80130478(self, 0);
+        em_move_mode_set(self, 0);
         *out_class = 12;
         *out_state = 2;
         switch (fn_802B0668(self->field_0x1E0)) {
         case 1:
             switch (self->act_id) {
             case 6:
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 *out_class = 12;
                 *out_state = 8;
                 fn_80126324(self, 14, 15, lbl_80797E88);
                 break;
             case 7:
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_class = 12;
                 *out_state = 9;
                 fn_80126324(self, 13, 14, lbl_80797E88);
@@ -395,13 +395,13 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
         case 3:
             switch (self->act_id) {
             case 2:
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_class = 12;
                 *out_state = 9;
                 fn_80126324(self, 6, 4, lbl_80797E88);
                 break;
             case 3:
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_class = 12;
                 *out_state = 9;
                 fn_80126324(self, 15, 16, lbl_80797E88);
@@ -411,7 +411,7 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
         case 9:
         case 11:
             if (self->act_id == 1) {
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_class = 12;
                 *out_state = 9;
                 fn_80126324(self, 0, 1, lbl_80797E88);
@@ -427,23 +427,23 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
             case 5:
             case 6:
             case 8:
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 *out_class = 12;
                 *out_state = 5;
                 break;
             case 7:
             case 12:
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_class = 12;
                 *out_state = 0;
                 break;
             default:
                 *out_class = 12;
                 if (self->field_0x00A == 1) {
-                    fn_80130478(self, 2);
+                    em_move_mode_set(self, 2);
                     *out_state = 3;
                 } else {
-                    fn_80130478(self, 0);
+                    em_move_mode_set(self, 0);
                     *out_state = 2;
                 }
                 break;
@@ -453,12 +453,12 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
             switch (self->act_id) {
             case 1:
             case 5:
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 *out_class = 12;
                 *out_state = 5;
                 break;
             case 7:
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 *out_class = 12;
                 *out_state = 6;
                 break;
@@ -467,22 +467,22 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
             case 4:
             case 6:
             case 8:
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_class = 12;
                 *out_state = 0;
                 break;
             case 10:
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 *out_class = 12;
                 *out_state = 7;
                 break;
             default:
                 *out_class = 12;
                 if (self->field_0x00A == 1) {
-                    fn_80130478(self, 2);
+                    em_move_mode_set(self, 2);
                     *out_state = 3;
                 } else {
-                    fn_80130478(self, 0);
+                    em_move_mode_set(self, 0);
                     *out_state = 2;
                 }
                 break;
@@ -491,17 +491,17 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
         default:
             *out_class = 12;
             if (self->field_0x00A == 1) {
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 *out_state = 3;
             } else {
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 *out_state = 2;
             }
             break;
         }
         break;
     case 21:
-        fn_80130478(self, 4);
+        em_move_mode_set(self, 4);
         *out_class = 12;
         *out_state = 1;
         break;
@@ -532,11 +532,11 @@ void fn_80191990(EmActWork* self) {
         break;
     }
     if (state == 1) {
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 1, 0, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 1, 0, 0);
     } else if (state == 2) {
-        fn_80130478(self, 2);
-        fn_8012F5B8(self, 0x28, 0, 0);
+        em_move_mode_set(self, 2);
+        em_mot_set(self, 0x28, 0, 0);
     }
 }
 

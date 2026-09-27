@@ -7,7 +7,7 @@
  * "sub state" `_ENEMY_WORK::state_sub` (+0x1E6): `fn_801775C0` is the dispatcher that calls one of
  * `fn_80177314`/`fn_801773B0`/`fn_80177430`/`fn_801774B0`/`fn_80177540` for sub states 0/1/2/4/5, and
  * each of those is the same three-step shape - bump `state_0x05`, hand the enemy a motion
- * (`fn_80130478` + `fn_8012F5C4`), then wait for it (`fn_8012F93C`) and finish (`fn_80127F48` /
+ * (`em_move_mode_set` + `fn_8012F5C4`), then wait for it (`em_mot_end_ck`) and finish (`em_action_finish` /
  * `fn_80128030`).
  *
  * The rest is the enemy's damage/death bookkeeping:
@@ -89,7 +89,7 @@ extern "C" u8 lbl_805AA900[];
 /* --------------------------------------------------------------------------------------------- */
 
 /* Declared in a shared header: `VEC3_ctor`, `setVector3` (`nw4r/math.h`); `fn_8012ECF0`,
- * `fn_8012F93C`, `fn_80130478` (`unsplit/enemy.h`).  The C++ free functions are declared by their
+ * `em_mot_end_ck`, `em_move_mode_set` (`unsplit/enemy.h`).  The C++ free functions are declared by their
  * real signatures so the front-end mangles them to the map spellings. */
 extern "C" u8 fn_802B0668(u8 id);
 extern "C" void fn_80182978(_ENEMY_WORK* self);
@@ -99,7 +99,7 @@ extern "C" void fn_8012A354(_ENEMY_WORK* self);
 extern "C" void fn_8012999C(_ENEMY_WORK* self);
 extern "C" void fn_801823A0(_ENEMY_WORK* self, u32 a);
 extern "C" void fn_80128BF8(_ENEMY_WORK* self, u32 a);
-extern "C" void fn_80127F48(_ENEMY_WORK* self);
+extern "C" void em_action_finish(_ENEMY_WORK* self);
 extern "C" void fn_80128030(_ENEMY_WORK* self);
 
 /* This unit's own forward declaration (fn_80176C58 calls it before its definition). */
@@ -141,28 +141,28 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
         switch (kind) {
           case 1:
             if (self->act_id == 5) {
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 fn_80128A8C(self, 0, 0);
             } else {
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 fn_80128A8C(self, 0, 4);
             }
             break;
           case 8:
-            fn_80130478(self, 0);
+            em_move_mode_set(self, 0);
             fn_80128A8C(self, 0, 0);
             break;
           case 9:
             if (self->act_id == 0) {
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 fn_80128A8C(self, 0, 0);
             } else {
-                fn_80130478(self, 2);
+                em_move_mode_set(self, 2);
                 fn_80128A8C(self, 0, 4);
             }
             break;
           default:
-            fn_80130478(self, 2);
+            em_move_mode_set(self, 2);
             fn_80128A8C(self, 0, 4);
             break;
         }
@@ -385,13 +385,13 @@ extern "C" void fn_80177314(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
       case 0:
         self->state_0x05++;
-        fn_80130478(self, 0);
+        em_move_mode_set(self, 0);
         fn_8012F5C4(self, 1, 0x14, 0, 1);
         break;
       case 1:
         fn_80128BF8(self, 0);
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -401,12 +401,12 @@ extern "C" void fn_801773B0(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
       case 0:
         self->state_0x05++;
-        fn_80130478(self, 0);
+        em_move_mode_set(self, 0);
         fn_8012F5C4(self, 0x14, 0x14, 0, 1);
         break;
       case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -416,12 +416,12 @@ extern "C" void fn_80177430(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
       case 0:
         self->state_0x05++;
-        fn_80130478(self, 0);
+        em_move_mode_set(self, 0);
         fn_8012F5C4(self, 0x1D, 0x14, 0, 1);
         break;
       case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -432,11 +432,11 @@ extern "C" void fn_801774B0(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
       case 0:
         self->state_0x05++;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F5C4(self, 0x28, 0x28, 0, 3);
         break;
       case 1:
-        if (fn_8012F93C(self) == 1) {
+        if (em_mot_end_ck(self) == 1) {
             fn_80128030(self);
         }
         break;
@@ -447,11 +447,11 @@ extern "C" void fn_80177540(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
       case 0:
         self->state_0x05++;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F5C4(self, 0x36, 0x1E, 0, 3);
         break;
       case 1:
-        if (fn_8012F93C(self) == 1) {
+        if (em_mot_end_ck(self) == 1) {
             fn_80128030(self);
         }
         break;

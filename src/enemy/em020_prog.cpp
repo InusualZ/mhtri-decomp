@@ -9,7 +9,7 @@
  * 0x8036E570, 0x8036E574 and 0x803733BC - exactly the way `em035_prog_tbl` lists the registered
  * `enemy/em035_prog.cpp`'s, and every body drives the shared `_ENEMY_WORK` record through
  * `em_frame_check`/`em_after_frame_check`/`em_get_mot_no`/`em_act_ck`/`em_area_ck`, the motion
- * arming pair `fn_80130478`/`fn_8012F504`/`fn_8012F5C4` and the nw4r math helpers
+ * arming pair `em_move_mode_set`/`fn_8012F504`/`fn_8012F5C4` and the nw4r math helpers
  * (`setVector3`, `mulVecMat`, `rotVecY`, `calcVecAng2`/`calcVecAngX`), with the joint/effect
  * queries `get_joint_wmat_em`/`get_em_scale`/`get_em_chg_scale`.
  *
@@ -193,11 +193,11 @@ void em020_arm_mot1_wait20(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F5C4(self, 1, 0x14, 0, 1);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     default:
@@ -237,11 +237,11 @@ void em020_arm_mot3_wait50(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 0x32, 0x28, 0, 3);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     default:
@@ -258,7 +258,7 @@ void em020_arm_approach_mot1_wait55(_ENEMY_WORK* self, u8 mode)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 0x37, 0x14, 0, 1);
 
         switch (mode) {
@@ -282,7 +282,7 @@ void em020_arm_approach_mot1_wait55(_ENEMY_WORK* self, u8 mode)
         }
         break;
     case 2:
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     default:
@@ -296,11 +296,11 @@ void em020_arm_mot1_wait58(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 0x3a, 0xa, 0, 1);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     default:
@@ -316,7 +316,7 @@ void em020_arm_mot1_facing_wait77(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 0x4d, 0x14, 0, 1);
         fn_80129668(self, 0, 0xa);
         break;
@@ -324,7 +324,7 @@ void em020_arm_mot1_facing_wait77(_ENEMY_WORK* self)
         if (em_frame_check(self, 1, lbl_8079B874, lbl_8079B83C) == 0) {
             fn_80133C50(self, 0x40);
         }
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     default:
@@ -340,7 +340,7 @@ void em020_arm_mot1_turn_wait79(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 0x4f, 0xa, 0, 1);
         fn_80129668(self, 0, 1);
         break;
@@ -353,7 +353,7 @@ void em020_arm_mot1_turn_wait79(_ENEMY_WORK* self)
         f32 lo = lbl_8079B8EC;
         f32 hi = lbl_8079B8F0;
         fn_80133E3C(self, 0x10000, lo, hi);
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     }
@@ -369,8 +369,8 @@ void em020_arm_mot1_effects_wait78(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
-        fn_8012F5B8(self, 0x4e, 0xa, 0);
+        em_move_mode_set(self, 2);
+        em_mot_set(self, 0x4e, 0xa, 0);
         fn_8012933C(self, 0, 0xb, 8);
         fn_8012933C(self, 1, 0xc, 0x10);
         break;
@@ -379,7 +379,7 @@ void em020_arm_mot1_effects_wait78(_ENEMY_WORK* self)
             fn_80136D4C(self, lbl_8079B854);
             fn_80133C50(self, 0x40);
         }
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     default:
@@ -398,7 +398,7 @@ void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, (u16)(0x51 - (right == 0)), 0x14, 0, 1);
         fn_80129668(self, 0, 0x11);
         break;
@@ -406,7 +406,7 @@ void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
         f32 lo = lbl_8079B87C;
         f32 hi = lbl_8079B8C4;
         fn_80133E3C(self, right == 0 ? 0x4000 : -0x4000, lo, hi);
-        if (fn_8012F93C(self) == 1)
+        if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
     }

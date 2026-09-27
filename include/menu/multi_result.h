@@ -96,6 +96,11 @@ extern "C" {
 
 u16 multi_box_cursor_index(_multi_result_work* box);
 u32 multi_box_phase_step(QResultScreen* self, u8 mode);
+/* The box band's own frame step and phase latch (the `fn_8039D278`/`multi_box_phase_step` pair the
+ * screen's dispatcher runs). */
+void multi_box_phase_apply(QResultScreen* self);
+/* Credits the player's box contents into their VS user block and empties the grid. */
+void multi_box_grid_clear(_multi_result_work* box, struct _vs_user_data* user);
 
 /* The enemy action/substate dispatchers in the same range: `em_action_dispatch` runs the handler
  * for `_ENEMY_WORK::action`, each `em_actionN_dispatch` the one for `state_sub`. */
@@ -137,6 +142,9 @@ void em_action7_step(struct _ENEMY_WORK* self);
 /* `multi_box_phase_step` asks this one whether the screen is ready for the phase it names; the body
  * is the next pass's work (it needs `get_vsUser_work` declared by its owner, `fn_8004CAD8.cpp`). */
 u32 multi_box_phase_ck(QResultScreen* self, u8 mode);
+
+/* Whether the area already holds an active team-19 enemy, the action band's hand-over test. */
+u32 em_area_team_ck(u8 area);
 
 /* Two stub rows inside the range: an empty one and a `return 0` one.  The runtime dump's names for
  * them (`DBClose`, `gdev_cc_shutdown`) are its *junk* mappings - both spellings appear at 295 and 133

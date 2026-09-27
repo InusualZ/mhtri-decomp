@@ -46,7 +46,7 @@ u32 fn_8012E5A8(struct _ENEMY_WORK* self);
  * declares and defines it with this signature. */
 void fn_8012E664(struct _ENEMY_WORK* self);
 /* 0x8012E694 - one `self` argument, no return (the finish step `enemy/fn_80182D5C.cpp` runs once
- * `fn_8012F93C` reports done).  Added with its owner (rule 2). */
+ * `em_mot_end_ck` reports done).  Added with its owner (rule 2). */
 void fn_8012E694(struct _ENEMY_WORK* self);
 /* 0x8012D8D0 / 0x8012DB3C / 0x8012E21C - this unit's own definitions, moved here from the consumer
  * `enemy/fn_8012EC74.cpp` (rule 2): the owner is this unit, and the signatures are the ones that
@@ -71,7 +71,7 @@ s32 fn_8012E8F4(f32 seconds);
  * consumers spell it themselves with ABI-equivalent prototypes, and MWCC's C front-end rejects a
  * fixed prototype after one of those, so the declaration is C++-only. */
 #ifdef __cplusplus
-void fn_8012CF20(struct _ENEMY_WORK* self);
+void em_busy_set(struct _ENEMY_WORK* self);
 #endif
 /* 0x8012C220 / 0x8012C4E8 - this unit's own definitions, moved here from `include/unsplit/enemy.h`
  * (rule 2): the band header had them as if no unit owned the address.  Signatures are the owner's

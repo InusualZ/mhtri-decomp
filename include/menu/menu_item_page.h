@@ -101,7 +101,7 @@ u8 fn_800CF208(void);
 u16 fn_8004AE70(void* userdata);
 s32 fn_8004AF0C(u8 idx);
 void* fn_8004AF60(void* userdata, u8 idx);
-u32 fn_8004B064(u16 id, void* a, s32 b);
+u32 item_count_find(u16 id, void* a, s32 b);
 u32 fn_8004B0A4(u16 id, void* userdata);
 u32 fn_8004B70C(u16 id, void* a, u16 b);
 u8 fn_8004E634(u8 a, u16 b);

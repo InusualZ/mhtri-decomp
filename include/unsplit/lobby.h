@@ -518,7 +518,7 @@ s32 fn_8021D5BC(void);
 s32 fn_8021F238(void);
 s32 fn_80222848(s32, s16 *);
 s32 fn_80222BC4(void*, s32, u8);
-/* `fn_802A7C04`/`fn_802A8EC0`/`fn_802A8ED8`/`fn_802A8EFC`/`fn_802A8F50` (0x802A7C04-0x802A8F50) were
+/* `fn_802A7C04`/`fn_802A8EC0`/`fn_802A8ED8`/`menu_cursor_step`/`fn_802A8F50` (0x802A7C04-0x802A8F50) were
  * declared here while the menu band had no registered unit.  `menu/fn_802A6624.cpp` owns that range
  * now, so its header `include/menu/fn_802A6624.h` declares them and this header includes it (rule 2).
  * They stood here with `s16` returns and `void*`/`s32` tails while the owner defines `s32` - that

@@ -5,7 +5,7 @@
  * initialises through `fn_80134F70`/`fn_80134004`/`fn_80130248`/`fn_80135584`, state 1 runs the action)
  * plus a `phase_0x06`/`step_0x07` pair picks the body; the shared tail first asks `fn_80134114`
  * whether the enemy is in the released group and then either sets an act id
- * (`fn_80128A14`/`fn_80128A70`) or hands the parameter table `lbl_8056F9E0` to `fn_80135000`.  The
+ * (`em_state_set`/`fn_80128A70`) or hands the parameter table `lbl_8056F9E0` to `fn_80135000`.  The
  * `u8` argument is the action index the dispatcher in this region tail-calls the function with (0/1/2).
  *
  * Flags.  The unit needs a scoped `#pragma peephole off` (playbook 39): retail keeps the `clrlwi`
@@ -85,7 +85,7 @@ typedef struct _ENEMY_WORK {
 
 /* ---- callees ---- */
 
-extern void fn_8012CF20(_ENEMY_WORK* self);
+extern void em_busy_set(_ENEMY_WORK* self);
 extern void fn_80134004(_ENEMY_WORK* self, f32 scale, u16 id);
 extern u32 fn_8012EC3C(_ENEMY_WORK* self);
 extern u32 fn_80131BD4(_ENEMY_WORK* self);
@@ -104,7 +104,7 @@ extern f32 lbl_80796EE8; /* 16000000.0f */
 /* Runs one enemy action step: advances the two-state machine and dispatches the per-action body. */
 void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
 {
-    fn_8012CF20(self);
+    em_busy_set(self);
 
     switch (self->state_0x05) {
     case 0:
@@ -155,7 +155,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                     }
                     if (v != 0) {
                         fn_8012B380(self, 3, 2, v->slot_0x02);
-                        fn_80128A14(self, 13, 0);
+                        em_state_set(self, 13, 0);
                         fn_8013AAC4(self);
                         return;
                     }
@@ -165,7 +165,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                 case 2:
                     if (calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(
                             &self->field_0x188, &self->field_0x36C) <= lbl_80796EE8) {
-                        fn_80128A14(self, 3, 8);
+                        em_state_set(self, 3, 8);
                         fn_8013AAC4(self);
                         return;
                     }
@@ -183,9 +183,9 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
 
             case 1:
                 if (self->area_no == self->field_0x9F8 || self->field_0x9F8 == 255) {
-                    fn_80128A14(self, 3, 10);
+                    em_state_set(self, 3, 10);
                 } else {
-                    fn_80128A14(self, 3, 9);
+                    em_state_set(self, 3, 9);
                 }
                 break;
 
@@ -203,7 +203,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                         if (self->field_0x382 == 255) {
                             fn_8012B380(self, 5, 9, 0);
                         }
-                        fn_80128A14(self, 7, 28);
+                        em_state_set(self, 7, 28);
                         break;
 
                     case 4:
@@ -212,9 +212,9 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                             fn_8012B380(self, 5, 9, 0);
                         }
                         if (fn_8012EC3C(self) == 1) {
-                            fn_80128A14(self, 7, 57);
+                            em_state_set(self, 7, 57);
                         } else {
-                            fn_80128A14(self, 7, 29);
+                            em_state_set(self, 7, 29);
                         }
                         break;
                     }

@@ -7,14 +7,14 @@
  * module is `enemy/`.
  *
  * The three functions are the classic enemy action pattern:
- *   - `fn_80178128` - two-phase action: phase 0 arms the action (`fn_80130478`, `fn_80134964`,
+ *   - `fn_80178128` - two-phase action: phase 0 arms the action (`em_move_mode_set`, `fn_80134964`,
  *     `fn_801353F8`) and, for motion ids 0x1F/0x20, aims `v_0x310` at the target (`calcVecAng2` ->
  *     `rotVecY`, re-scaled by `fn_8012F8E4`/`get_em_chg_scale`); phase 1 runs the frame check
- *     (`em_frame_check` -> `CancelFade`) and `fn_80127F48` once `fn_80134B0C` reports done.
+ *     (`em_frame_check` -> `CancelFade`) and `em_action_finish` once `fn_80134B0C` reports done.
  *   - `fn_8017827C` - dispatcher on `state_sub` (0..0xB) tail-calling the previous range's handler
  *     functions with a sub-index argument (0..3).
  *   - `fn_801782F8` - two-phase action: phase 0 arms `fn_8012F504(self, 0x32, 0x28, 0, 3)`; phase 1
- *     runs `fn_8012F93C` and `fn_80128030` on completion.
+ *     runs `em_mot_end_ck` and `fn_80128030` on completion.
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * `fn_` name defined here is a bare `.text` entry in config/RMHE08/symbols.txt, and neither the map nor
@@ -58,14 +58,14 @@ u32 em_frame_check(_ENEMY_WORK* self, u16 a, f32 b, f32 c);
 
 extern "C" {
 /* Owner: the unsplit enemy band (`include/unsplit/enemy.h` already declares most of these). */
-void fn_80130478(_ENEMY_WORK* self, u32 a);
+void em_move_mode_set(_ENEMY_WORK* self, u32 a);
 void fn_80134964(_ENEMY_WORK* self, void* tbl, u32 a, u32 b, u32 c);
 void fn_801353F8(_ENEMY_WORK* self);
 u32 fn_80134B0C(_ENEMY_WORK* self, void* tbl);
 f32 fn_8012F8E4(_ENEMY_WORK* self);
-u32 fn_8012F93C(_ENEMY_WORK* self);
+u32 em_mot_end_ck(_ENEMY_WORK* self);
 void fn_8012F504(_ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
-void fn_80127F48(_ENEMY_WORK* self);
+void em_action_finish(_ENEMY_WORK* self);
 void fn_80128030(_ENEMY_WORK* self);
 void CancelFade(_ENEMY_WORK* self);
 
@@ -92,7 +92,7 @@ extern "C" void fn_80178128(_ENEMY_WORK* self) {
     case 0: {
         u8 state = self->state_0x05;
         self->state_0x05 = state + 1;
-        fn_80130478(self, 0);
+        em_move_mode_set(self, 0);
         fn_80134964(self, lbl_8056FE10, 0, 1, 0);
         fn_801353F8(self);
 
@@ -117,7 +117,7 @@ extern "C" void fn_80178128(_ENEMY_WORK* self) {
         }
 
         if (done == 1) {
-            fn_80127F48(self);
+            em_action_finish(self);
         }
         break;
     }
@@ -170,7 +170,7 @@ extern "C" void fn_8017827C(_ENEMY_WORK* self) {
 }
 
 /* ------------------------------------------------------------------------------------------------
- * fn_801782F8 - two-phase action: arm the timer action, then finish on `fn_8012F93C`
+ * fn_801782F8 - two-phase action: arm the timer action, then finish on `em_mot_end_ck`
  * ------------------------------------------------------------------------------------------------ */
 
 extern "C" void fn_801782F8(_ENEMY_WORK* self) {
@@ -178,12 +178,12 @@ extern "C" void fn_801782F8(_ENEMY_WORK* self) {
     case 0: {
         u8 state = self->state_0x05;
         self->state_0x05 = state + 1;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 0x32, 0x28, 0, 3);
         break;
     }
     case 1:
-        if (fn_8012F93C(self) == 1) {
+        if (em_mot_end_ck(self) == 1) {
             fn_80128030(self);
         }
         break;

@@ -31,7 +31,7 @@
  * Reconstructed: the menu list/cursor layer and the entry points around it - 19 of the 139 rows,
  * 3212 of 29596 bytes.  Twelve are byte-identical (`fn_802A6624`, `fn_802A66BC`, `fn_802A695C`,
  * `fn_802A6B6C`, `fn_802A6C1C`, `fn_802A6C28` is 80.03, `fn_802A6EF4`, `fn_802A7978`, `fn_802A7C04`,
- * `fn_802A8EC0`, `fn_802A8ED8`, `fn_802A8EEC`, `fn_802A8EFC`), 18 are at or over the 80 % bar.
+ * `fn_802A8EC0`, `fn_802A8ED8`, `fn_802A8EEC`, `menu_cursor_step`), 18 are at or over the 80 % bar.
  *
  * Residuals, biggest first - the 120 unwritten bodies, by block:
  *   * `fn_802A6F64`-`fn_802A7CC8` (0x408/0x1B8/0x314/0x140/0x40/0x1C8/0x84/0x40/0x84/0x358 B): the
@@ -51,7 +51,7 @@
  *     `fn_802A8F14` 76.67 (the ceiling-divide helper: same instruction sequence, the allocator swaps
  *     the two parameters' registers), `fn_802A6A64` 97.58, `fn_802A736C` 97.57, `fn_802A7B80` 90.91.
  *   * rule-2 note: `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h` declare
- *     `fn_802A8EFC` as a C++ five-argument function; this range owns 0x802A8EFC and the target
+ *     `menu_cursor_step` as a C++ five-argument function; this range owns 0x802A8EFC and the target
  *     object's relocations spell it bare, so both declarations want moving to this unit's header
  *     (they cannot be included here - `(10597) illegal function overloading`).
  *
@@ -77,7 +77,7 @@ extern "C" s32 fn_802A8DF4(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g);
 
 /* The 2D integer vector the HUD helpers exchange, complete in `include/unsplit/lobby.h`; only ever
  * pointed at here, so the forward declaration is enough (and including that header would clash with
- * its `fn_802A8EFC` declaration, which this range owns - see the unit header). */
+ * its `menu_cursor_step` declaration, which this range owns - see the unit header). */
 struct _mh_ivec2_;
 
 void sysSE_req(long id);
@@ -102,7 +102,7 @@ void font_flush(void);
 
 /* This unit's own bodies, in address order. */
 extern "C" void fn_802A7524(s32 select, u32* dst, void* entry, s32 flags, struct _mh_ivec2_* pos);
-extern "C" s32 fn_802A8EFC(s32 a, s32 b, u16 c, u16 d, u16 e);
+extern "C" s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
 extern "C" s16 fn_802A8F14(s16 a, s16 b);
 extern "C" void fn_802A7838(u16* item, struct _mh_ivec2_* pos);
 extern "C" void fn_802A79B8(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
@@ -283,7 +283,7 @@ extern "C" void fn_802A6A64(MenuListWork* self, s8 step)
             sysSE_req(3);
         }
     } else if ((input & 3) != 0) {
-        self->column_0x006 = fn_802A8EFC(self->column_0x006, step, input, 1, 2);
+        self->column_0x006 = menu_cursor_step(self->column_0x006, step, input, 1, 2);
     } else if (step < self->column_0x006) {
         self->column_0x006 = step - 1;
     }
@@ -525,7 +525,7 @@ extern "C" s32 fn_802A8EEC(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g)
 }
 
 /* Same step with the two fixed tail values 3 and 0 - the entry point the cursor call sites use. */
-extern "C" s32 fn_802A8EFC(s32 a, s32 b, u16 c, u16 d, u16 e)
+extern "C" s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e)
 {
     return fn_802A8DF4(a, b, c, d, e, 3, 0);
 }

@@ -41,9 +41,9 @@
  *    `em_act_ck` matches) and its jump table's cases 0..3 call these four, so each one is the step of
  *    that action state and each switches on `+0x1E6 state_sub` for its phase;
  *  - `em_act_arm_<motion>[...]` = one phase of such a step, which arms a motion through the record's
- *    own setters (`fn_8012F5B8(self, motion, mode, 0)`, `fn_8012F62C`, `fn_8012F504`) and then ends the
- *    step when the motion's frame check (`fn_8012F93C`, `fn_80133C50`, `fn_80134114`, `em_frame_check`)
- *    reports done; `_hit<a>_<b>` is the pair handed to the damage handler `fn_80128A14`, `_f<frames>`
+ *    own setters (`em_mot_set(self, motion, mode, 0)`, `em_mot_set_ck`, `fn_8012F504`) and then ends the
+ *    step when the motion's frame check (`em_mot_end_ck`, `fn_80133C50`, `fn_80134114`, `em_frame_check`)
+ *    reports done; `_hit<a>_<b>` is the pair handed to the damage handler `em_state_set`, `_f<frames>`
  *    the frame count the arm sets, `_mot_mode` an arm whose motion is the caller's mode argument;
  *  - the rest are named for the record's own state machine and helpers, not for a motion.
  *
@@ -63,17 +63,17 @@
  *   fn_8032CEE8 -> em_work_noop              the vtable's other empty virtual stub
  *   fn_8032CEEC -> em_act_die_step           while `em_die_ck` refuses it, steps `+0x1CC` up to its
  *                                            ceiling once `+0x338` is 1
- *   fn_8032CF68 -> em_act_arm_mot1           action 0 phases 0-2: `fn_8012F62C(self, 1, 6, 0)`, ends on
- *                                            `fn_8012F93C`
+ *   fn_8032CF68 -> em_act_arm_mot1           action 0 phases 0-2: `em_mot_set_ck(self, 1, 6, 0)`, ends on
+ *                                            `em_mot_end_ck`
  *   fn_8032CFE4 -> em_act_arm_mot201         action 0 phase 3: the two effect resets, then motion 201
  *   fn_8032D074 -> em_act_step_0             the step function of action id 0: `state_sub` 0/1/2 ->
  *                                            `em_act_arm_mot1`, 3 -> `em_act_arm_mot201`
- *   fn_8032D0B0 -> em_act_arm_mot2           action 1 phase 0: `fn_8012F5B8(self, 2, 6, 0)`
+ *   fn_8032D0B0 -> em_act_arm_mot2           action 1 phase 0: `em_mot_set(self, 2, 6, 0)`
  *   fn_8032D12C -> em_act_arm_mot_mode       action 1 phases 1-4: arms the motion the caller's mode
  *                                            selects (0->3, 1->4, 2->6, 3->9)
  *   fn_8032D210 -> em_act_arm_mot11          action 1 phase 5: the two motion counters, then motion 11
  *   fn_8032D2A0 -> em_act_arm_mot1_hit1_1    action 1 phase 6: motion 1, then the scan of the `+0x454`
- *                                            per-attacker values hands `fn_80128A14(self, 1, 1)`
+ *                                            per-attacker values hands `em_state_set(self, 1, 1)`
  *   fn_8032D3F4 -> em_act_arm_mot1_f20       action 1 phase 7: `fn_8012F504(self, 1, 20, 0, 1)` - motion 1
  *                                            with a 20-frame check
  *   fn_8032D480 -> em_act_step_1             the step function of action id 1: `state_sub` 0..7 (the
@@ -88,23 +88,23 @@
  *   fn_8032D8C0 -> em_act_step_2             the step function of action id 2: `state_sub` 0..5
  *   fn_8032D914 -> em_act_arm_mot202         action 3 phase 0: the +0xCA resets, then motion 202
  *   fn_8032D9A4 -> em_act_arm_mot201_hit7_2  action 3 phase 1: motion 201, the attacker scan every 16th
- *                                            step hands `fn_80128A14(self, 7, 2)`
+ *                                            step hands `em_state_set(self, 7, 2)`
  *   fn_8032DAE4 -> em_act_arm_mot203_204     action 3 phases 2/3: motion 203, or 204 when the mode is 1
  *   fn_8032DBAC -> em_act_arm_mot205         action 3 phase 4: motion 205, 120-frame countdown and a
  *                                            64-frame `fn_80134114` check
  *   fn_8032DC70 -> em_act_arm_mot207         action 3 phase 5: motion 207, waits 1024 frames
- *   fn_8032DF44 -> em_act_arm_mot210_hit3_10 action 3 phase 11: motion 210, then `fn_80128A14(self, 3,
+ *   fn_8032DF44 -> em_act_arm_mot210_hit3_10 action 3 phase 11: motion 210, then `em_state_set(self, 3,
  *                                            10)` and `em_eff_offset_set` at the end of every step
  *   fn_8032DFD4 -> em_act_arm_mot201_hit7_6  action 3 phase 18: motion 201, the same scan with
- *                                            `fn_80128A14(self, 7, 6)`
- *   fn_8032E108 -> em_act_arm_mot203_hit3_20 action 3 phase 19: motion 203 and `fn_80128A14(self, 3, 20)`
+ *                                            `em_state_set(self, 7, 6)`
+ *   fn_8032E108 -> em_act_arm_mot203_hit3_20 action 3 phase 19: motion 203 and `em_state_set(self, 3, 20)`
  *   fn_8032E190 -> em_act_step_3             the step function of action id 3: `state_sub` 0..5, 10, 11,
  *                                            18, 19 (the sparse table behind its `cmplwi 21`)
  *   fn_8032E1E8 -> em_seat_aim_ck            1 / -1 / 0 for "the seat has a player and
  *                                            `em_act_face_away` turned the record" / "refused" / "no seat"
  *
  * Naming note: the file names every symbol it *defines* (the table above); the escape that remains
- * covers precisely the names it *references* in other units - `fn_8012F5B8`, `fn_80130478`, `fn_80128A14`
+ * covers precisely the names it *references* in other units - `em_mot_set`, `em_move_mode_set`, `em_state_set`
  * and ~50 more callee stems whose owners have not been named yet, plus the rows of this range's own
  * unwritten tail (`fn_8032DD04`, `fn_8032E23C`, `fn_803303E0`, ...), which belong to the pass that
  * writes their bodies.  Renaming the callee stems is a cross-unit batch in ten owner units, not this
@@ -165,7 +165,7 @@
  * `lbl_8079B2A0`, which is the OTHER half's copy of 0.8 - a reference across the seam, impossible once
  * the range is two TUs - so both now use this unit's own `lbl_8079B178` (0.8).  Both measured identical
  * before and after (98.25 % / 98.18 %), so the score does not say which copy the body wants; the
- * target's `em_act_arm_mot201_hit7_2` loads `lbl_8079B150` (800.0) there and calls `fn_80128A14` at +0x1170, so the
+ * target's `em_act_arm_mot201_hit7_2` loads `lbl_8079B150` (800.0) there and calls `em_state_set` at +0x1170, so the
  * body's constant is a decompilation defect for the next pass - recorded, not guessed at.  The ten
  * written functions that are not byte-identical:
  *
@@ -485,12 +485,12 @@ extern "C" void em_act_arm_mot1(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F62C((_ENEMY_WORK*)self, 1, 6, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set_ck((_ENEMY_WORK*)self, 1, 6, 0);
         break;
     case 1:
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -504,12 +504,12 @@ extern "C" void em_act_arm_mot201(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F62C((_ENEMY_WORK*)self, 201, 6, 0);
+        em_mot_set_ck((_ENEMY_WORK*)self, 201, 6, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             fn_80127FE4((_ENEMY_WORK*)self);
         }
         break;
@@ -541,12 +541,12 @@ extern "C" void em_act_arm_mot2(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 2, 6, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 2, 6, 0);
         break;
     case 1:
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -562,7 +562,7 @@ extern "C" void em_act_arm_mot_mode(_EM_CHARA_WORK* self, u32 action)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
         switch ((u8)action) {
         case 0:
             action = 3;
@@ -577,11 +577,11 @@ extern "C" void em_act_arm_mot_mode(_EM_CHARA_WORK* self, u32 action)
             action = 9;
             break;
         }
-        fn_8012F5B8((_ENEMY_WORK*)self, action, 4, 0);
+        em_mot_set((_ENEMY_WORK*)self, action, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -595,11 +595,11 @@ extern "C" void em_act_arm_mot11(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 11, 4, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 11, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             fn_8012E694((_ENEMY_WORK*)self);
         }
         break;
@@ -616,8 +616,8 @@ extern "C" void em_act_arm_mot1_hit1_1(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 1, 0, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 1, 0, 0);
         fn_801303EC((_ENEMY_WORK*)self, lbl_8079B124);
         self->field_0x20 = 0;
         break;
@@ -651,7 +651,7 @@ extern "C" void em_act_arm_mot1_hit1_1(_EM_CHARA_WORK* self)
             if (value < lbl_8079B108) {
                 continue;
             }
-            fn_80128A14((_ENEMY_WORK*)self, 1, 1);
+            em_state_set((_ENEMY_WORK*)self, 1, 1);
             return;
         }
         self->field_0x20 += 1;
@@ -666,12 +666,12 @@ extern "C" void em_act_arm_mot1_f20(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
         fn_8012F504((_ENEMY_WORK*)self, 1, 20, 0, 1);
         break;
     case 1:
         if (em_frame_check((_ENEMY_WORK*)self, 0, lbl_8079B12C, lbl_8079B108) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -716,16 +716,16 @@ extern "C" void em_act_arm_mot5(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 5, 4, 0);
-        fn_8012F8C8((_ENEMY_WORK*)self,
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 5, 4, 0);
+        em_mot_speed_set((_ENEMY_WORK*)self,
                     lbl_8079B130 + lbl_8079B134 * (f32)(self->bits_0x1EC & 3));
         fn_80134004((_ENEMY_WORK*)self, 0, lbl_8079B138);
         self->field_0x20 = 150;
         break;
     case 1:
         if (fn_80134114((_ENEMY_WORK*)self, 0, 128) == 1 || --self->field_0x20 <= 0) {
-            fn_80127F48((_ENEMY_WORK*)self);
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -737,16 +737,16 @@ extern "C" void em_act_arm_mot7(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 7, 4, 0);
-        fn_8012F8C8((_ENEMY_WORK*)self,
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 7, 4, 0);
+        em_mot_speed_set((_ENEMY_WORK*)self,
                     lbl_8079B148 + lbl_8079B14C * (f32)(self->bits_0x1EC & 3));
         fn_80134004((_ENEMY_WORK*)self, 0, lbl_8079B138);
         self->field_0x20 = 120;
         break;
     case 1:
         if (fn_80134114((_ENEMY_WORK*)self, 0, 128) == 1 || --self->field_0x20 <= 0) {
-            fn_80127F48((_ENEMY_WORK*)self);
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -758,12 +758,12 @@ extern "C" void em_act_arm_mot12(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 12, 4, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 12, 4, 0);
         break;
     case 1:
         if (fn_80133C50((_ENEMY_WORK*)self, 512) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -775,12 +775,12 @@ extern "C" void em_act_arm_mot13(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 13, 4, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 13, 4, 0);
         break;
     case 1:
         if (fn_80133C50((_ENEMY_WORK*)self, 1024) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -792,13 +792,13 @@ extern "C" void em_act_arm_mot10(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 10, 4, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 10, 4, 0);
         break;
     case 1:
         fn_80133C50((_ENEMY_WORK*)self, 2048);
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
-            fn_80127F48((_ENEMY_WORK*)self);
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -810,13 +810,13 @@ extern "C" void em_act_arm_mot114(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130478((_ENEMY_WORK*)self, 0);
-        fn_8012F5B8((_ENEMY_WORK*)self, 114, 4, 0);
+        em_move_mode_set((_ENEMY_WORK*)self, 0);
+        em_mot_set((_ENEMY_WORK*)self, 114, 4, 0);
         self->field_0x20 = 120;
         break;
     case 1:
         if (--self->field_0x20 <= 0) {
-            fn_80127F48((_ENEMY_WORK*)self);
+            em_action_finish((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -855,12 +855,12 @@ extern "C" void em_act_arm_mot202(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 202, 6, 0);
+        em_mot_set((_ENEMY_WORK*)self, 202, 6, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             fn_80127FE4((_ENEMY_WORK*)self);
         }
         break;
@@ -876,7 +876,7 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 201, 0, 0);
+        em_mot_set((_ENEMY_WORK*)self, 201, 0, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         self->field_0x20 = 0;
         break;
@@ -899,7 +899,7 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
                 if (fn_80050F80((VEC3*)&work->vec_0x03C, &self->pos) > lbl_8079B178) {
                     continue;
                 }
-                fn_80128A14((_ENEMY_WORK*)self, 7, 2);
+                em_state_set((_ENEMY_WORK*)self, 7, 2);
                 return;
             }
         }
@@ -920,12 +920,12 @@ extern "C" void em_act_arm_mot203_204(_EM_CHARA_WORK* self, u32 action)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, (u16)(203 + ((action & 0xFF) == 1)), 0, 0);
+        em_mot_set((_ENEMY_WORK*)self, (u16)(203 + ((action & 0xFF) == 1)), 0, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             fn_80127FE4((_ENEMY_WORK*)self);
         }
         break;
@@ -940,7 +940,7 @@ extern "C" void em_act_arm_mot205(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 205, 4, 0);
+        em_mot_set((_ENEMY_WORK*)self, 205, 4, 0);
         fn_80134004((_ENEMY_WORK*)self, 0, lbl_8079B124);
         self->field_0x20 = 120;
         fn_80136DF4((_ENEMY_WORK*)self);
@@ -962,7 +962,7 @@ extern "C" void em_act_arm_mot207(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 207, 4, 0);
+        em_mot_set((_ENEMY_WORK*)self, 207, 4, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
@@ -983,11 +983,11 @@ extern "C" void em_act_arm_mot210_hit3_10(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 210, 0, 0);
+        em_mot_set((_ENEMY_WORK*)self, 210, 0, 0);
         break;
     case 1:
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
-            fn_80128A14((_ENEMY_WORK*)self, 3, 10);
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
+            em_state_set((_ENEMY_WORK*)self, 3, 10);
         }
         break;
     }
@@ -1003,7 +1003,7 @@ extern "C" void em_act_arm_mot201_hit7_6(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 201, 4, 0);
+        em_mot_set((_ENEMY_WORK*)self, 201, 4, 0);
         self->field_0x20 = 0;
         break;
     case 1: {
@@ -1024,7 +1024,7 @@ extern "C" void em_act_arm_mot201_hit7_6(_EM_CHARA_WORK* self)
                 if (fn_80050F80((VEC3*)&work->vec_0x03C, &self->pos) > lbl_8079B178) {
                     continue;
                 }
-                fn_80128A14((_ENEMY_WORK*)self, 7, 6);
+                em_state_set((_ENEMY_WORK*)self, 7, 6);
                 return;
             }
         }
@@ -1042,11 +1042,11 @@ extern "C" void em_act_arm_mot203_hit3_20(_EM_CHARA_WORK* self)
         self->state += 1;
         fn_80130248((_ENEMY_WORK*)self);
         fn_801305C4((_ENEMY_WORK*)self);
-        fn_8012F5B8((_ENEMY_WORK*)self, 203, 0, 0);
+        em_mot_set((_ENEMY_WORK*)self, 203, 0, 0);
         break;
     case 1:
-        if (fn_8012F93C((_ENEMY_WORK*)self) == 1) {
-            fn_80128A14((_ENEMY_WORK*)self, 3, 20);
+        if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
+            em_state_set((_ENEMY_WORK*)self, 3, 20);
         }
         break;
     }

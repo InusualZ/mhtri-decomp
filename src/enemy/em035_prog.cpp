@@ -11,7 +11,7 @@
  * `em035_timer_done_ck` and `em035_part_node_init` at its last word 0x805ED8A0), and every body drives the shared
  * `_ENEMY_WORK` record (`+0x005` sub-state, `+0x020` timer, `+0x188` position, `+0x1C4` angle,
  * `+0x1E5` action, `+0x1E6` first sub-state, `+0xB14` sound handle) through the same motion arming
- * pair (`fn_8012F5B8`/`fn_8012F62C`) the neighbour above uses.
+ * pair (`em_mot_set`/`em_mot_set_ck`) the neighbour above uses.
  *
  * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string covers the range: the
  * `.data`/`.sdata` its relocations reach are the unowned program tables (`lbl_805ED8C0`/`lbl_805ED8F8`/
@@ -28,13 +28,13 @@
  *     `+0x328`/`+0x32A` counters, tail-calls `fn_80131E00`);
  *   * `em035_arm_mot1s4_wait90` / `em035_arm_mot1s4_angle_wait90` / `em035_arm_mot1s0_wait90` /
  *     `em035_arm_mot1s0_angle_wait90` - the four arming steps, named for the motion the pair arms
- *     (`fn_8012F62C(self, 1, 4, 0)` / `(self, 1, 0, 0)`), whether they reset `+0x1C4` to 0x8000 first,
- *     and whether the wait is the 90-frame timer or `fn_8012F93C`-done (`em035_arm_mot2_exit`,
- *     `em035_arm_mot2_angle_exit` - `fn_8012F5B8(self, 2, 0, 0)`);
+ *     (`em_mot_set_ck(self, 1, 4, 0)` / `(self, 1, 0, 0)`), whether they reset `+0x1C4` to 0x8000 first,
+ *     and whether the wait is the 90-frame timer or `em_mot_end_ck`-done (`em035_arm_mot2_exit`,
+ *     `em035_arm_mot2_angle_exit` - `em_mot_set(self, 2, 0, 0)`);
  *   * `em035_handlers_mot1s4` / `em035_handlers_alt` / `em035_handlers_angle` /
  *     `em035_handlers_blend` - the four second-level sub-state dispatchers, each named for the handler
  *     set it selects;
- *   * `em035_motion_done_step` - picks `fn_80127FE4`/`fn_80127F48` from the `+0x1E2` mode byte;
+ *   * `em035_motion_done_step` - picks `fn_80127FE4`/`em_action_finish` from the `+0x1E2` mode byte;
  *   * `em035_substate_se_start` - starts the action's sound program (`fn_801251D8` with the
  *     `0x805ED8C0`/`0x805ED8F8`/`0x805ED930` tables) from the `+0x1E6` sub-state;
  *   * `em035_blend_seq` / `em035_blend_entry` - the three-stage motion-blend sequences
@@ -200,13 +200,13 @@ extern "C" void em035_arm_mot1s4_wait90(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130478(work, 0);
-        fn_8012F62C(work, 1, 4, 0);
+        em_move_mode_set(work, 0);
+        em_mot_set_ck(work, 1, 4, 0);
         work->timer_0x020 = 90;
         break;
     case 1:
         if (--work->timer_0x020 <= 0)
-            fn_80127F48(work);
+            em_action_finish(work);
         break;
     }
 }
@@ -222,7 +222,7 @@ extern "C" void em035_arm_mot1s4_angle_wait90(_ENEMY_WORK* work)
         work->state += 1;
         fn_80130248(work);
         fn_801305C4(work);
-        fn_8012F62C(work, 1, 4, 0);
+        em_mot_set_ck(work, 1, 4, 0);
         work->timer_0x020 = 90;
         fn_80136DF4(work);
         break;
@@ -263,12 +263,12 @@ extern "C" void em035_arm_mot2_exit(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130478(work, 0);
-        fn_8012F5B8(work, 2, 0, 0);
+        em_move_mode_set(work, 0);
+        em_mot_set(work, 2, 0, 0);
         break;
     case 1:
-        if (fn_8012F93C(work) == 1)
-            fn_80127F48(work);
+        if (em_mot_end_ck(work) == 1)
+            em_action_finish(work);
         break;
     }
 }
@@ -281,13 +281,13 @@ extern "C" void em035_arm_mot1s0_wait90(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130478(work, 0);
-        fn_8012F62C(work, 1, 0, 0);
+        em_move_mode_set(work, 0);
+        em_mot_set_ck(work, 1, 0, 0);
         work->timer_0x020 = 90;
         break;
     case 1:
         if (--work->timer_0x020 <= 0)
-            fn_80127F48(work);
+            em_action_finish(work);
         break;
     }
 }
@@ -318,12 +318,12 @@ extern "C" void em035_arm_mot2_angle_exit(_ENEMY_WORK* work)
         work->state += 1;
         fn_80130248(work);
         fn_801305C4(work);
-        fn_8012F5B8(work, 2, 0, 0);
+        em_mot_set(work, 2, 0, 0);
         fn_80136DF4(work);
         break;
     case 1:
         fn_80136DF4(work);
-        if (fn_8012F93C(work) == 1)
+        if (em_mot_end_ck(work) == 1)
             fn_80127FE4(work);
         break;
     }
@@ -340,7 +340,7 @@ extern "C" void em035_arm_mot1s0_angle_wait90(_ENEMY_WORK* work)
         work->state += 1;
         fn_80130248(work);
         fn_801305C4(work);
-        fn_8012F62C(work, 1, 0, 0);
+        em_mot_set_ck(work, 1, 0, 0);
         work->timer_0x020 = 90;
         fn_80136DF4(work);
         break;
@@ -375,7 +375,7 @@ extern "C" void em035_motion_done_step(_ENEMY_WORK* work)
     if (work->field_0x1E2 == 1)
         fn_80127FE4(work);
     else
-        fn_80127F48(work);
+        em_action_finish(work);
 }
 
 /* ---------------------------------------------------------------------------------------------- *
@@ -410,15 +410,15 @@ extern "C" void em035_blend_seq(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130478(work, 0);
-        fn_8012F5B8(work, 1, 0, 0);
+        em_move_mode_set(work, 0);
+        em_mot_set(work, 1, 0, 0);
         fn_8014616C(work, 0);
         break;
     case 1:
         if (fn_80146008(1166) == 1) {
             work->state += 1;
             fn_8014619C(work);
-            fn_8012F5B8(work, 2, 0, 0);
+            em_mot_set(work, 2, 0, 0);
             fn_80146058(work, lbl_8079B724, lbl_8079B728, lbl_8079B72C);
             fn_8014610C(work, lbl_8079B728, lbl_8079B730, lbl_8079B728);
         }
@@ -426,7 +426,7 @@ extern "C" void em035_blend_seq(_ENEMY_WORK* work)
     case 2:
         if (fn_80146008(1324) == 1) {
             work->state += 1;
-            fn_8012F5B8(work, 1, 0, 0);
+            em_mot_set(work, 1, 0, 0);
             fn_80146058(work, lbl_8079B734, lbl_8079B728, lbl_8079B738);
         }
         break;
@@ -441,14 +441,14 @@ extern "C" void em035_blend_entry(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130478(work, 0);
-        fn_8012F5B8(work, 1, 0, 0);
+        em_move_mode_set(work, 0);
+        em_mot_set(work, 1, 0, 0);
         fn_80146058(work, lbl_8079B734, lbl_8079B728, lbl_8079B738);
         fn_8014610C(work, lbl_8079B728, lbl_8079B730, lbl_8079B728);
         break;
     case 1:
-        if (fn_8012F93C(work) == 1)
-            fn_80127F48(work);
+        if (em_mot_end_ck(work) == 1)
+            em_action_finish(work);
         break;
     }
 }

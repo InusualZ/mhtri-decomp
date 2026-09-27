@@ -53,7 +53,7 @@ s32  fn_80274570(void* a);
 s32  fn_8033AAFC(u16 a);
 s32  fn_8033AC78(u16 a, u16 b, s32 c);
 s16  fn_8033B380(void* self, u16 a, u16 b, s32 kind, s16 c, s16 d);
-u16  fn_8004B064(u16 a, s32 b, s32 c);
+u16  item_count_find(u16 a, s32 b, s32 c);
 s32  fn_8004B3A0(u16 a, s32 b, s32 c);
 void fn_800DCFC0(void);
 void fn_80349184(void* a);
@@ -92,14 +92,14 @@ extern "C" s32 fn_8031AC80(MenuSel* self, u16 a, u16 b) {
 
 /* 0x8031AD30 - the item's base value plus the second slot's */
 extern "C" s32 fn_8031AD30(u16 id, s32 b, s32 c) {
-    s32 r = fn_8004B064(id, b, 0x18);
-    if (c != 0) r += fn_8004B064(id, c, 8);
+    s32 r = item_count_find(id, b, 0x18);
+    if (c != 0) r += item_count_find(id, c, 8);
     return r;
 }
 
 /* 0x8031AD9C - apply or clear the item's bonus */
 extern "C" void fn_8031AD9C(u16 id, s32 a, s32 b) {
-    if (fn_8004B064(id, a, 0x18) == 0 && b != 0 &&
+    if (item_count_find(id, a, 0x18) == 0 && b != 0 &&
         GetItemData(id)->kind_0x00 == 1 && fn_8004B3A0(id, b, 8) >= 0) {
         return;
     }
@@ -265,7 +265,7 @@ extern "C" s32 fn_8031C408(MenuSelCursor* cur, s32* flag, u16 a, u16 b, u16 c) {
         return 0;
     }
     if (cur->status_0x10 < 0 && (c & 3)) {
-        *flag = fn_802A8EFC(*flag, 2, c, 1, 2);
+        *flag = menu_cursor_step(*flag, 2, c, 1, 2);
     }
     return 0;
 }

@@ -130,7 +130,7 @@ typedef struct LbChgFileReq {
  * `fn_803C3F60`, ... - the `lobby/lb_npc.cpp` range) are filed as shared-file requests.
  * ------------------------------------------------------------------------------------------------- */
 extern "C" {
-s32 fn_8004D0E8(s32 delta, s32* value);
+s32 score_add_clamped(s32 delta, s32* value);
 void fn_80040DE8(u8 mode);
 s32 fn_80054FAC(void* dst, void* src);
 void* fn_80054FE8(void* out, u32 value);
@@ -392,7 +392,7 @@ void fn_801FBAE4(void)
     LbChgQResult* q = (LbChgQResult*)get_qResult_work();
 
     if (q->mode_0x1E2 == 3 && q->value_0x3F0 > 0) {
-        fn_8004D0E8(q->value_0x3F0, (s32*)(lb_chg::lbl_80794880 + 0x18));
+        score_add_clamped(q->value_0x3F0, (s32*)(lb_chg::lbl_80794880 + 0x18));
     }
     lb_param_w.field_0x00 = 0;
     lb_param_w.field_0x04 = 0;

@@ -5,8 +5,8 @@
  *
  * WHAT IT IS.  Monster-AI code of the em019 program, continued from `enemy/em020_ai.cpp`: every body
  * takes the shared `_ENEMY_WORK` record (`include/enemy/ENEMY_WORK.h`) and drives it through the
- * enemy core API (`em_frame_check`, `get_joint_wpos_em`, `get_em_chg_scale`, `fn_8012F5B8` /
- * `fn_8012F62C` / `fn_8012F93C`) and the game's work blocks (`system_w`, `lobby_w`,
+ * enemy core API (`em_frame_check`, `get_joint_wpos_em`, `get_em_chg_scale`, `em_mot_set` /
+ * `em_mot_set_ck` / `em_mot_end_ck`) and the game's work blocks (`system_w`, `lobby_w`,
  * `get_move_work_adrs`, `my_player_no`, `Psw`).
  *
  * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable from the

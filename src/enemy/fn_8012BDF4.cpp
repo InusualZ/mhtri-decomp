@@ -719,7 +719,7 @@ extern "C" u32 fn_8012CF04(_ENEMY_WORK* enemy, u32 flag)
 }
 
 /* Marks the enemy busy for this frame. */
-extern "C" void fn_8012CF20(_ENEMY_WORK* enemy)
+extern "C" void em_busy_set(_ENEMY_WORK* enemy)
 {
     enemy->field_0x79B = 1;
 }

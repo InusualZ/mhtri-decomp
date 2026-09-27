@@ -144,7 +144,7 @@
  *     owner's header does not declare them), so this unit references the plain name where the target
  *     reloc is the mangling `get_move_work_adrs__FUc` - a reloc-name-only difference (the sibling
  *     `Pl/fn_80273B14.cpp` carries the same one); `fn_802A5444` is 4 B too large (its
- *     `fn_802A8EFC(self->item_cursor, self->item_count, keys, 1, 2)` call narrows `item_count`, a
+ *     `menu_cursor_step(self->item_cursor, self->item_count, keys, 1, 2)` call narrows `item_count`, a
  *     `u8`, to the `s16` second parameter `include/unsplit/lobby.h` declares, while retail's call site
  *     has no `extsh` - a `u32`/`s32` second parameter satisfies both of the range's call sites, a
  *     shared-file request rather than an edit to a band header another unit measures against);
@@ -421,7 +421,7 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
         } else {
             if (fn_802A674C(self, -1) != 0) {
                 if (keys & 3) {
-                    self->item_cursor = (s8)fn_802A8EFC(self->item_cursor, self->item_count, keys, 1, 2);
+                    self->item_cursor = (s8)menu_cursor_step(self->item_cursor, self->item_count, keys, 1, 2);
                 }
             } else {
                 self->item_cursor = 0;
@@ -682,7 +682,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
             self->state = 0;
             sysSE_req(1);
         } else if (keys & 3) {
-            self->action_no = (s8)fn_802A8EFC(self->action_no, self->field_0x016, keys, 1, 2);
+            self->action_no = (s8)menu_cursor_step(self->action_no, self->field_0x016, keys, 1, 2);
         }
         fn_802A4EF8(self, self->action_no);
         break;

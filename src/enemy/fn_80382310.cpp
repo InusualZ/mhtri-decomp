@@ -279,10 +279,10 @@ void fn_8007F0CC(s32 root, u32 id);
 void fn_801280F4(_ENEMY_WORK* self);
 void fn_8013032C(_ENEMY_WORK* self);
 void fn_801303EC(_ENEMY_WORK* self);
-void fn_80127F48(_ENEMY_WORK* self);
-u32 fn_8012F93C(_ENEMY_WORK* self);
-void fn_8012F62C(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_80130478(_ENEMY_WORK* self, u32 a);
+void em_action_finish(_ENEMY_WORK* self);
+u32 em_mot_end_ck(_ENEMY_WORK* self);
+void em_mot_set_ck(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
+void em_move_mode_set(_ENEMY_WORK* self, u32 a);
 void fn_80385828(NoteWork* self);
 void fn_803858F8(NoteWork* self);
 void fn_8029208C(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 c, nw4r::math::VEC3* d, u32 e,
@@ -301,7 +301,7 @@ extern s32 pRoot;
 
 /* 0x80382BB0 */
 extern "C" void fn_80382BB0(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
-    fn_80130478(self, 4);
+    em_move_mode_set(self, 4);
     *out_a = 12;
     *out_b = 0;
 }
@@ -975,11 +975,11 @@ extern "C" void fn_803872C8(_ENEMY_WORK* self) {
     u8 v = self->state;
     if (v == 0) {
         self->state = v + 1;
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 1, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 1, 6, 0);
     } else if (v == 1) {
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
     }
 }
@@ -989,11 +989,11 @@ extern "C" void fn_80387344(_ENEMY_WORK* self) {
     u8 v = self->state;
     if (v == 0) {
         self->state = v + 1;
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 2, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 2, 6, 0);
     } else if (v == 1) {
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
     }
 }
@@ -1003,11 +1003,11 @@ extern "C" void fn_803873C0(_ENEMY_WORK* self) {
     u8 v = self->state;
     if (v == 0) {
         self->state = v + 1;
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 14, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 14, 6, 0);
     } else if (v == 1) {
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
     }
 }
@@ -1017,12 +1017,12 @@ extern "C" void fn_8038743C(_ENEMY_WORK* self) {
     u8 v = self->state;
     if (v == 0) {
         self->state = v + 1;
-        fn_80130478(self, 4);
-        fn_8012F62C(self, 1, 0, 0);
+        em_move_mode_set(self, 4);
+        em_mot_set_ck(self, 1, 0, 0);
         fn_8013032C(self);
         fn_801303EC(self);
     } else if (v == 1) {
-        if (fn_8012F93C(self) == 1) {
+        if (em_mot_end_ck(self) == 1) {
             fn_801280F4(self);
         }
     }

@@ -102,7 +102,7 @@
  *
  * Other load-bearing shapes, from the earlier pass:
  *   - A helper's narrow return type is *not* trusted sign-extended, so it decides where MWCC re-emits the
- *     conversion: `fn_8004BA3C` must return `s16` (the `(u32)(s16)v` tests then keep their own `extsh` and
+ *     conversion: `item_take` must return `s16` (the `(u32)(s16)v` tests then keep their own `extsh` and
  *     the two 8/24-slot call blocks stay separate) and fn_80272E30 must return `s16` for `return v` to stay
  *     a bare `mr`. fn_802724E8's `a` and 7th parameter are signed-byte typed (`s8*`, `s8 aval`) - as `u8`
  *     it masks the level the target passes raw - and fn_8027252C's third parameter follows it to `s8*`.
@@ -286,7 +286,7 @@ void* fn_8027E344(void);
 
 u32 fn_80274AEC(u8*, u32, u8);
 
-s16 fn_8004BA3C(u16, s16, void*, int, int, int);
+s16 item_take(u16, s16, void*, int, int, int);
 u16 fn_8025DF78(_PLW*, u16, int);
 u32 fn_80269394(void*);
 u32 fn_802693C4(u8, int, s32);
@@ -1238,13 +1238,13 @@ extern "C" s16 fn_80272E30(_PLW* plw, u16 item, s16 value) {
 
     for (;;) {
         if (data[0] == 1 && fn_8026FE44(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
-            v = fn_8004BA3C(item, value, plw->spare_slot_id, 8, 1, 0);
+            v = item_take(item, value, plw->spare_slot_id, 8, 1, 0);
             slot = fn_80273044(plw, item);
             if ((u32)v <= 4) {
                 break;
             }
         }
-        v = fn_8004BA3C(item, value, plw->slot_id, 24, 1, 0);
+        v = item_take(item, value, plw->slot_id, 24, 1, 0);
         slot = fn_80273044(plw, item);
         break;
     }
