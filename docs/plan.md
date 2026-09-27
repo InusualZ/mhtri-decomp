@@ -182,6 +182,8 @@ git commit -F .git/land_msg.txt                # only after verify passes; --abo
 
 # orchestrator: the teardown RETURNS the slot (it is never removed); the branch still goes
 python tools/units/claims.py release Pl/pl_act # slot back to main's tip, branch deleted, warm trees kept
+#   ... and the rescue ref it parked the un-merged commits at is audited on the spot: `redundant` is pruned,
+#   drift is reported, `unlanded`/`unknown` are named loudly and kept (see "A branch is never the only copy")
 ```
 
 **A free slot is the concurrency cap.** With the pool in use, `queue.py next` refuses while all six slots are
@@ -674,7 +676,7 @@ construction: a tool can waste time, it cannot break the link.
 | # | tool | why it exists (incident) | acceptance test | size |
 | --- | --- | --- | --- | --- |
 | 7.1 | `tools/units/recompile.py` (+ 7.15) | two workers measured objects the compiler never rewrote (1-second mtime granularity); a worker must not run `ninja` | delete the object, compile **without ninja**, assert the mtime moved, print section sizes and both object paths; resolve `MAIN` for the toolchain and the target object | ~60 |
-| 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock, and a silent worker must be reclaimable (see the ack/heartbeat/timeout layer, §5.6) | `claim` takes a reusable **slot** and cuts the worktree+branch or refuses (7.26; `--no-slots` keeps the old construction path); `ack`/`status`/`timeout` cover liveness and reclaim (a timed-out branch is rescued to `refs/rescue/<slug>` first); `list` shows owner/age; `release` returns the slot | ~140 |
+| 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock, and a silent worker must be reclaimable (see the ack/heartbeat/timeout layer, §5.6) | `claim` takes a reusable **slot** and cuts the worktree+branch or refuses (7.26; `--no-slots` keeps the old construction path); `ack`/`status`/`timeout` cover liveness and reclaim (a timed-out branch is rescued to `refs/rescue/<slug>` first); `list` shows owner/age; `release` returns the slot and classifies the rescue ref it parks (`redundant` pruned and printed, drift reported, `unlanded`/`unknown` surfaced and kept) | ~140 |
 | 7.3 | `tools/units/brief.py` | every fan-out cost a hand-written 40-line brief and each drifted | one file per unit with §5.2's six parts; idempotent | ~120 |
 | 7.4 | `tools/units/handoff.py` | worker replies were inconsistently shaped; detail was lost to truncation | prints the digest skeleton; validates an outbox entry against the schema | ~60 |
 | 7.5 | `tools/units/land.py` | the batch checklist was six manual commands and the regression scan was rewritten four times; a green `ok` can come from a stale link | `verify` **deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) before the run and requires both to be recreated**, then runs configure → split → report → regressions → `ok` → ledger delta → knowledge-delta check; refuses on a shared-file edit or an outbox violation; owns the baseline (7.16). The `.ninja_log` ordering idea does not work: a `NonMatching` batch never relinks, so `main.elf` never runs | ~240 |
@@ -699,7 +701,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.24 | **done** - a `decompiler` lane matches **data** as well as code: `.agents/agents/decompiler.md` gains a Data section and every brief gains 5d, and the old propose-do-not-claim line is inverted | objdiff's unit score does not count a wrong data section, so a lane could hand over a unit whose code matched and whose `.data`/`.sdata2` was ours-extra - the whole 20-unit flip-blocker list came from that blind spot, and no lane was ever asked about it | the lane measures with `datagap.py --unit`, claims what its object emits (private pool entries, unclaimed `.data`/`.ctors` ranges; never a shared entry - playbook 58), drops definitions it should only declare (playbook 29), and reports sections and bytes before/after; a code-complete unit with a claimable data gap is finished in the same lane and flipped | ~40 |
 | 7.25 | **done** - the C++ **class shape** rule: `.agents/agents/decompiler.md` and every brief (section 5c) say a range the evidence calls a class is written as a class with member functions and real virtuals, not as a C struct plus free functions taking `self` | the owner caught a landed unit reconstructing a class that way - 403 `self->` uses in `Network/fn_8041A87C.cpp` while its own header records the target's string pool spelling `NetworkGameSpyInterface::`/`NetworkPeerGameSpy::`; MWCC only emits retail's canonical `lwz r12,0(r3)`/`lwz r12,<slot>` dispatch for a genuine `virtual`, so the shape is part of the match | both renderers carry 5c; a `fixer` lane reconverts the landed unit and records any function where the struct form measured better; 153 + 117 selftest checks green | ~40 |
 | 7.26 | **done** - `tools/units/slots.py`: a fixed pool of reusable lane directories at stable paths, one lock each, a verified-and-fail-closed reset, wired into the claim path | per-claim construction costs per lane, its teardown cannot remove a worktree holding the `tools/m2c` submodule (the careless 2026-09-24 teardown destroyed a lane's branch), and the seeder rewrites `.ninja_deps`' absolute paths every time because each path is new; a reused slot also carries the previous round's build state, and a stale tree cost a full `rm -rf build/RMHE08` rebuild | `init`/`acquire`/`release`/`status`/`verify`; a slot holds a directory, never a branch (`acquire` cuts a fresh `checkout -B worker/<slug> <tip>`); a free slot is the concurrency cap (`queue.py next` refuses at six); the kept build tree is validated against MAIN's current map/DOL with the seeder's own guard plus a `report.json` comparison and re-seeded if it cannot be proven current; one lock per slot at `MAIN/.pi/slots/<n>.json`, stale locks reclaimed; 62 selftest checks | ~340 |
-| 7.27 | **done** - `tools/units/rescue.py audit`: the `refs/rescue/*` safety net gets an audit, and `land.py resolve`'s `land/resolve-*` helper branch gets a teardown | 193 rescue refs had accumulated and nothing had ever looked at them; `land.py resolve` also left its helper branch (and its scratch worktree) behind, so a `land/*` ref outlived the batch it was made for (two were found from 2026-09-26) | every ref reports its date/subject, the unit(s) it registers (**the registration diff against the merge-base with `main`** - a whole-file name match against `main` matches every unit in the file), whether each is registered on `main` today and how the touched paths differ; verdicts `redundant`/`landed-with-drift`/`unlanded`/`unknown`; `--prune` deletes only `redundant` (printing each), is strictly read-only without it, and never touches drift/unlanded/unknown; a landing deletes its own resolve helper, visibly, only when the tip is contained by the branch or `main`, and refuses loudly otherwise; 28 checks | ~180 |
+| 7.27 | **done** - `tools/units/rescue.py audit`: the `refs/rescue/*` safety net gets an audit, and `land.py resolve`'s `land/resolve-*` helper branch gets a teardown | 193 rescue refs had accumulated and nothing had ever looked at them; `land.py resolve` also left its helper branch (and its scratch worktree) behind, so a `land/*` ref outlived the batch it was made for (two were found from 2026-09-26) | every ref reports its date/subject, the unit(s) it registers (**the registration diff against the merge-base with `main`** - a whole-file name match against `main` matches every unit in the file), whether each is registered on `main` today and how the touched paths differ; verdicts `redundant`/`landed-with-drift`/`unlanded`/`unknown`; `--prune` deletes only `redundant` (printing each), is strictly read-only without it, and never touches drift/unlanded/unknown; a landing deletes its own resolve helper, visibly, only when the tip is contained by the branch or `main`, and refuses loudly otherwise; `claims.py release` runs the same classification on the ref it parks at teardown - `redundant` pruned and printed, `landed-with-drift` reported, `unlanded`/`unknown` surfaced with the ref, its unit(s) and its date and kept, never a gate; 28 checks in `rescue.py` + 36 in `claims.py` | ~180 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
@@ -1146,7 +1148,10 @@ ref after a `--force` release had taken its branch.
 
 The rules that follow:
 
-* a rescue ref is **never deleted**, by anything;
+* a rescue ref is **never deleted without proof it is redundant**: the only deletion is the audit's `redundant`
+  verdict - the unit is on `main` *and* every touched path matches - whether it runs at teardown or
+  `rescue.py audit --prune`; a ref the classifier cannot prove contained (drift, unlanded, unknown) is never
+  touched, because a by-name check cannot see a unit renamed or absorbed into another file;
 * `--force` on an unreported claim is defensible *only* because the ref exists - so the refusal message names the
   exact restore command, and the release says what it is about to remove before it removes it;
 * after any `--force` release the recovery list is `git for-each-ref refs/rescue`, and the restore is
@@ -1166,6 +1171,18 @@ read-only; `landed-with-drift`, `unlanded` and `unknown` are never touched. The 
 conservative about renames: an `auto/` unit that migrated to its final home still fails the by-name check and
 is surfaced as `unlanded` (and kept) rather than guessed about.
 
+**The audit also runs at teardown, where the answer is still actionable** (2026-09-27). `claims.py release`
+classifies the ref it parks - in the same step list, right after `git update-ref` - and acts on the verdict: a
+**`redundant`** ref (the unit is on `main` and every touched path matches) is **pruned and the deletion
+printed**; **`landed-with-drift`** is **reported and kept**, one line naming the ref and the drift size, because
+drift can hide an unlanded hunk; **`unlanded`/`unknown`** are **surfaced loudly** - the ref, its unit(s) and its
+date - and kept, because that is the case where the lane's work did not land and the ref may be the only copy.
+The verdict is a **report, never a gate**: a release always completes, no verdict can fail one, and nothing is
+pruned without proof of containment. The classification is `rescue.py`'s - `release` calls it, it does not
+re-implement "is this on main". A teardown that finds a `redundant` ref prunes it (that is the one deletion
+rule), and `--force`'s cost line says so instead of naming a ref that is gone. The lesson is *when* the check
+runs: at release time the loss is actionable, 193 refs later it is archaeology.
+
 `land.py resolve`'s helper branch has the same teardown rule. `scratch_resolve` parks the union on a
 `land/resolve-<slug>-<pid>` branch in its scratch worktree so the caller can fast-forward the worker branch;
 when that branch lands, `land --branch` deletes the helper **and prints the deletion**. The helper is deleted
@@ -1182,9 +1199,11 @@ stay, only the branch (the lock) and the lock file go. Landing a unit is not fin
 landed unit must not leave a claim, a merged branch or a registry entry behind, and the same is true of a worker
 whose round produced nothing.
 
-`claims.py release <unit>` is the one-shot: rescue ref -> pane close -> **return the slot** (detach at main's
-tip, clear the lock, refresh the warm tree) - or `git worktree remove --force` for a throwaway worktree - ->
-`branch -D` -> `prune`, then the registry entry. It must be **idempotent and total** - every step says what it
+`claims.py release <unit>` is the one-shot: rescue ref -> **audit that ref** (`redundant` pruned and the
+deletion printed, drift reported and kept, `unlanded`/`unknown` surfaced loudly with the ref, its unit(s) and
+its date and kept - a verdict is reported, never enforced) -> pane close -> **return the slot** (detach at
+main's tip, clear the lock, refresh the warm tree) - or `git worktree remove --force` for a throwaway worktree -
+-> `branch -D` -> `prune`, then the registry entry. It must be **idempotent and total** - every step says what it
 did or why it was skipped (already gone, never existed, pane still active) - because aborting on an
 already-removed target is how the 2026-09-23 Camellia tangle happened: its claim could not be released, a
 merged branch then blocked the re-claim, and a leftover directory blocked the new worktree, all three cleared

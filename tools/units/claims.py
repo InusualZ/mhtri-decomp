@@ -27,6 +27,12 @@ because Windows will not delete a directory a process is sitting in (5.1); it is
 status says whether the teardown is complete. `release --all-merged` sweeps every claim whose branch is already
 merged into main, releasing what it can and naming what it skipped.
 
+The rescue ref is also **classified at the moment it is created** (`rescue_verdict`, reusing `rescue.py`'s audit -
+never a second implementation of "is this on main"): the verdict is reported in the teardown's own step list, a
+`redundant` ref (the unit is on `main` and every touched path matches) is pruned, `landed-with-drift` is reported
+and kept, and `unlanded`/`unknown` are surfaced loudly with the ref, its unit(s) and its date and kept.  It is
+**never a gate**: a verdict cannot fail a teardown, and nothing is pruned without proof of containment.
+
 A claim is only ever declared `stalled` from the ack *and* the worker's own pane: `herdr pane list`
 is matched to the claim by its worktree name, and `herdr pane read` is sampled twice - a pane whose
 content moves is a worker that is alive, whatever its ack file says. A live pane is therefore never
@@ -52,6 +58,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
 from units import recompile as rc  # noqa: E402
+from units import rescue as rescue_audit  # noqa: E402
 from units import wtsafe  # noqa: E402
 
 
@@ -890,6 +897,56 @@ def rescue_exists(main: str, unit: str) -> str | None:
     return ref if out.returncode == 0 else None
 
 
+def rescue_verdict(main: str, ref: str, prune: bool = True) -> dict:
+    """What a rescue ref is, read at the teardown that created it - `release`'s one classification point.
+
+    At release time the answer is still actionable; 193 refs later it is archaeology (2026-09-27).  The
+    classification is `rescue.py`'s, not a copy of it: the same registration diff against the merge-base with
+    `main`, the same touched-path diff, the same four verdicts.  `release` calls this the moment the ref exists
+    and reports the result in its own step list.
+
+    -> {"ref", "verdict", "units", "date", "reason", "drift", "pruned", "line"}.  `prune` deletes the ref
+    **only** on `redundant` - the unit is registered on `main` *and* every touched path matches, which is proof
+    the work is in - and reports the deletion.  `landed-with-drift` is reported and kept (drift can hide an
+    unlanded hunk); `unlanded` and `unknown` are kept and surfaced loudly, because the classifier is
+    deliberately conservative and a by-name check cannot see a unit renamed or absorbed into another file.
+
+    This never raises and never returns a verdict that can stop a teardown: an audit that cannot run (git
+    unavailable, a ref that vanished) is itself an `unknown` with the ref untouched.  A verdict is a report,
+    never a gate - and nothing is ever deleted without proof of containment.
+    """
+    rows: list[dict] = []
+    deleted: list[str] = []
+    error: str | None = None
+    try:
+        report = rescue_audit.audit(main, main_ref="main", refs=[ref], prune=prune)
+        rows, deleted = report["refs"], report.get("deleted") or []
+    except (SystemExit, Exception) as exc:  # noqa: BLE001 - the verdict must not be able to block a teardown
+        error = (str(exc).strip().splitlines() or [exc.__class__.__name__])[0]
+    if not rows:
+        why = error or "the ref was not there to audit"
+        return {"ref": ref, "verdict": rescue_audit.VERDICT_UNKNOWN, "units": [], "date": "?",
+                "reason": why, "drift": 0, "pruned": False,
+                "line": "UNKNOWN %s: %s - the teardown kept it" % (ref, why)}
+    row = rows[0]
+    out = {"ref": ref, "verdict": row["verdict"], "units": row["units"], "date": row["date"] or "?",
+           "reason": row["reason"], "drift": len(row["drift_paths"]), "pruned": ref in deleted}
+    units = ", ".join(out["units"]) or "(none)"
+    if out["verdict"] == rescue_audit.VERDICT_REDUNDANT:
+        out["line"] = "pruned %s - redundant: %s" % (ref, out["reason"])
+    elif out["verdict"] == rescue_audit.VERDICT_DRIFT:
+        out["line"] = ("kept %s - landed-with-drift: %s; drift can hide an unlanded hunk, so it stays"
+                       % (ref, out["reason"]))
+    elif out["verdict"] == rescue_audit.VERDICT_UNLANDED:
+        out["line"] = ("UNLANDED WORK at %s (%s): unit(s) %s hold no landing on main - this ref may be the "
+                       "only copy and the teardown kept it (inspect: python tools/units/rescue.py audit "
+                       "--ref %s)" % (ref, out["date"], units, ref))
+    else:
+        out["line"] = ("UNKNOWN %s (%s): nothing parseable to prove containment (%s) - the teardown kept it"
+                       % (ref, out["date"], out["reason"]))
+    return out
+
+
 def claim_slug(main: str, unit: str) -> str | None:
     """The handoff slug of the unit's active claim, or `None` when the unit is unclaimed.
 
@@ -1428,6 +1485,13 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
     the teardown finished, and the registry entry and the ack file survive an incomplete one so the next
     attempt has the claim to work from.
 
+    The rescue ref is **classified as soon as it is created** (`rescue_verdict`, over `rescue.py`'s audit) and
+    the verdict rides in the teardown's own step list: `redundant` is pruned and the deletion printed,
+    `landed-with-drift` is reported and kept, `unlanded`/`unknown` are surfaced loudly with the ref, its unit(s)
+    and its date and kept. A verdict is never a gate - no verdict can stop a teardown - and nothing is pruned
+    without proof of containment. `result["rescue_verdict"]` is the structured form of the same row, or `None`
+    when no ref was parked at all.
+
     Every pane the claim owns is closed, not just the worker's own: a subagent's pane has no other owner and
     outlives its parent (`panes_for_claim`). `probe`, `close` and `lister` exist for the selftests; all three
     default to the real herdr layer.
@@ -1472,8 +1536,9 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
     branch_present = branch_exists(main, branch)
     merged = merged_into_main(main, branch) if branch_present else True
     result = {"unit": unit, "branch": branch, "worktree": path, "merged": merged, "outbox": outbox,
-              "registry": key is not None, "pane": None, "release_ref": None, "steps": [],
-              "complete": False, "dry_run": dry_run, "refused": None, "child_panes": [], "cost": None}
+              "registry": key is not None, "pane": None, "release_ref": None, "rescue_verdict": None,
+              "steps": [], "complete": False, "dry_run": dry_run, "refused": None, "child_panes": [],
+              "cost": None}
 
     forced = force and not (merged or outbox)
     if not force and not (merged or outbox):
@@ -1510,11 +1575,22 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
             result["release_ref"] = rescue
             steps.append(_done_step("git update-ref %s %s" % (rescue, branch),
                                     lambda b=branch, r=rescue: git(["update-ref", r, b], main) and None))
+            # The ref's verdict, read HERE - the one place the ref is created, and the last moment the answer is
+            # anything but archaeology (193 refs by 2026-09-27). It is a report, never a gate: `rescue_verdict`
+            # never raises, so no verdict can stop the teardown, and it prunes only what it can prove is already
+            # on main (`redundant`) - drift, unlanded and unknown refs are kept and said out loud.
+            def _audit_rescue(r=rescue):
+                result["rescue_verdict"] = verdict = rescue_verdict(main, r)
+                return verdict["line"]
+            steps.append(_done_step("rescue ref audit %s" % rescue, _audit_rescue))
         else:
             steps.append(_skip_step("rescue ref %s" % rescue, "branch has no commits of its own"))
+            steps.append(_skip_step("rescue ref audit",
+                                    "no rescue ref: the branch had no commits of its own"))
     else:
         steps.append(_skip_step("rescue ref",
                                 "branch already merged into main" if branch_present else "branch already gone"))
+        steps.append(_skip_step("rescue ref audit", "no rescue ref: nothing was parked"))
     if pane and info.get("alive") is not False:
         steps.append(_done_step("herdr pane close %s" % pane, _close_step(pane, close or herdr_close)))
     elif pane:
@@ -1569,6 +1645,13 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
         return result
 
     result["complete"] = complete = _run_teardown(steps)
+    # a `redundant` verdict pruned the ref the `--force` cost above sends a reader to: say what actually
+    # happened instead of naming a ref that is gone (the unit is on main and every touched path matches, so
+    # there is nothing to restore and nothing was lost).
+    if result["cost"] and (result["rescue_verdict"] or {}).get("pruned"):
+        result["cost"] = ("--force deleted the branch %s; its rescue ref %s was pruned by the audit (the unit "
+                          "is on main and every touched path matches), so nothing was lost"
+                          % (branch, result["release_ref"]))
     # the record and the heartbeat are only cleared by a *complete* teardown: an incomplete one has to stay
     # visible to `list`/`status` (and re-runnable) or the claim becomes the stale entry this tool cleans up
     if complete:
@@ -2241,6 +2324,145 @@ def selftest() -> int:
               "git branch %s refs/rescue/%s" % (branch, slug(unit)) in (forced["cost"] or ""), True)
         check("... and rescue_exists finds it", rescue_exists(main, unit),
               "refs/rescue/%s" % slug(unit))
+
+    # The rescue ref's verdict, read at the one place `release` creates it (2026-09-27: 193 refs had piled up
+    # and nothing had ever looked at them - the loss is only actionable at teardown). Real temp repos with a
+    # real registration, because the audit reads configure.py, splits.txt and the src/ paths; the fixtures come
+    # from `rescue.py`'s own selftest (`rescue_audit._apply_unit` and friends), the same way `slots.verify`
+    # reuses `claims._build_is_current` - one fixture vocabulary, one classifier.
+    def commit_in(path, msg):
+        repo_git(path, "add", "-A")
+        repo_git(path, "commit", "-q", "-m", msg)
+
+    def registered_main(tmp):
+        """A temp repo whose `main` carries the registration files the audit reads, and nothing registered."""
+        main = new_repo(tmp)
+        rescue_audit._write(main, "configure.py", rescue_audit._registration([]))
+        rescue_audit._write(main, "config/RMHE08/splits.txt", rescue_audit._splits([]))
+        commit_in(main, "the registration files")
+        return main
+
+    def claim_shell(main, unit_name):
+        """A claim without its commit: branch, worktree, outbox, heartbeat, registry (as `claimed`)."""
+        branch = branch_for(unit_name)
+        wt = worktree_for(unit_name, main)
+        repo_git(main, "worktree", "add", "-b", branch, wt)
+        entry = outbox_path(main, unit_name)
+        os.makedirs(os.path.dirname(entry), exist_ok=True)
+        json.dump({"unit": unit_name}, open(entry, "w"))
+        heartbeat = ack_path(main, unit_name)
+        os.makedirs(os.path.dirname(heartbeat), exist_ok=True)
+        json.dump({"unit": unit_name}, open(heartbeat, "w"))
+        registry = load_registry(main)
+        registry[unit_name] = {"branch": branch, "worktree": wt}
+        save_registry(main, registry)
+        return branch, wt
+
+    # (a) redundant: the unit is on main and the touched path matches, so the ref is pruned and says so
+    with tempfile.TemporaryDirectory() as tmp:
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "red/red")
+        rescue_audit._write(wt, "src/red/red.cpp", "int f(void) { return 1; }\n")
+        commit_in(wt, "the worker's work")
+        # main takes the same source in its own commit (and registers the unit), so the branch is not merged
+        # and the merge-base stays put - the shape a cherry-picked arm leaves behind
+        rescue_audit._apply_unit(main, "red/red", "int f(void) { return 1; }\n")
+        commit_in(main, "land red/red")
+        ref = rescue_ref_name("red/red")
+        out = release("red/red", main, force=False, dry_run=False, probe=no_pane)
+        check("a redundant ref: the release completes", out["complete"], True)
+        check("a redundant ref: it was parked first", out["release_ref"], ref)
+        check("a redundant ref: verdict", out["rescue_verdict"]["verdict"], "redundant")
+        check("a redundant ref: pruned", out["rescue_verdict"]["pruned"], True)
+        check("a redundant ref: the step prints the deletion",
+              "pruned %s" % ref in step_of(out, "rescue ref audit")["why"], True)
+        check("a redundant ref: it is gone", rescue_exists(main, "red/red"), None)
+
+    # (c) landed-with-drift: the unit is on main but the paths differ - reported, kept, never pruned
+    with tempfile.TemporaryDirectory() as tmp:
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "drift/drift")
+        rescue_audit._apply_unit(wt, "drift/drift", "int f(void) { return 1; }\n")
+        commit_in(wt, "drift v1")
+        rescue_audit._apply_unit(main, "drift/drift", "int f(void) { return 2; }\n")
+        commit_in(main, "land drift v2")
+        ref = rescue_ref_name("drift/drift")
+        out = release("drift/drift", main, force=False, dry_run=False, probe=no_pane)
+        why = step_of(out, "rescue ref audit")["why"]
+        check("a drifted ref: verdict", out["rescue_verdict"]["verdict"], "landed-with-drift")
+        check("a drifted ref: the drift size is reported", out["rescue_verdict"]["drift"], 1)
+        check("a drifted ref: NOT pruned", out["rescue_verdict"]["pruned"], False)
+        check("a drifted ref: the one line names the ref", ref in why, True)
+        check("a drifted ref: ... and the drift", "landed-with-drift" in why, True)
+        check("a drifted ref: it survives the teardown", rescue_exists(main, "drift/drift"), ref)
+        check("a drifted ref: the release completes", out["complete"], True)
+
+    # (b) unlanded: the unit never reached main - surfaced loudly, and the ref is the only copy, so kept
+    with tempfile.TemporaryDirectory() as tmp:
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "unl/unl")
+        rescue_audit._apply_unit(wt, "unl/unl")
+        commit_in(wt, "the worker's work")
+        ref = rescue_ref_name("unl/unl")
+        out = release("unl/unl", main, force=False, dry_run=False, probe=no_pane)
+        verdict, why = out["rescue_verdict"], step_of(out, "rescue ref audit")["why"]
+        check("an unlanded ref: verdict", verdict["verdict"], "unlanded")
+        check("an unlanded ref: NOT pruned", verdict["pruned"], False)
+        check("an unlanded ref: it outlives the teardown", rescue_exists(main, "unl/unl"), ref)
+        check("an unlanded ref: the line names the ref", ref in verdict["line"], True)
+        check("an unlanded ref: ... its unit", "unl/unl" in verdict["line"], True)
+        check("an unlanded ref: ... and its date", verdict["date"] not in ("", "?"), True)
+        check("an unlanded ref: it is surfaced in the teardown's own report",
+              "UNLANDED WORK" in why, True)
+        check("an unlanded ref: the release still completes", out["complete"], True)
+
+    # (e) unknown: nothing parseable to prove containment with - reported, kept, never guessed at
+    with tempfile.TemporaryDirectory() as tmp:
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "tools/scratch")
+        rescue_audit._write(wt, "tools/scratch.txt", "a tool change, no unit\n")
+        commit_in(wt, "tools only")
+        ref = rescue_ref_name("tools/scratch")
+        out = release("tools/scratch", main, force=False, dry_run=False, probe=no_pane)
+        check("a ref nothing can be proven about: verdict", out["rescue_verdict"]["verdict"], "unknown")
+        check("a ref nothing can be proven about: NOT pruned", out["rescue_verdict"]["pruned"], False)
+        check("a ref nothing can be proven about: it stays", rescue_exists(main, "tools/scratch"), ref)
+        check("a ref nothing can be proven about: the line says why",
+              "UNKNOWN" in out["rescue_verdict"]["line"], True)
+        check("a ref nothing can be proven about: the release completes", out["complete"], True)
+
+    # (d) a clean landing parks no ref at all: the audit step is a named skip, and the release is unchanged
+    with tempfile.TemporaryDirectory() as tmp:
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "clean/clean")
+        rescue_audit._apply_unit(wt, "clean/clean")
+        commit_in(wt, "the worker's work")
+        repo_git(main, "cherry-pick", branch)      # the landing: the branch is merged, nothing needs rescuing
+        out = release("clean/clean", main, force=False, dry_run=False, probe=no_pane)
+        audit_step = step_of(out, "rescue ref audit")
+        check("a clean landing: no ref is parked", out["release_ref"], None)
+        check("a clean landing: no verdict is invented", out["rescue_verdict"], None)
+        check("a clean landing: the audit step is a skip", audit_step["status"], "skipped")
+        check("a clean landing: ... with its reason", audit_step["why"], "no rescue ref: nothing was parked")
+        check("a clean landing: the release completes", out["complete"], True)
+
+    # --force prune coherence: the cost line must not send a reader to a ref the audit just pruned
+    with tempfile.TemporaryDirectory() as tmp:
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "red/red")
+        rescue_audit._write(wt, "src/red/red.cpp", "int f(void) { return 1; }\n")
+        commit_in(wt, "the worker's work")
+        rescue_audit._apply_unit(main, "red/red", "int f(void) { return 1; }\n")
+        commit_in(main, "land red/red")
+        os.remove(outbox_path(main, "red/red"))    # an unreported claim: the refusal, then --force
+        refused = release("red/red", main, force=False, dry_run=False, probe=no_pane)
+        check("an unreported claim is refused before anything is parked", refused["release_ref"], None)
+        check("... and no verdict is invented", refused["rescue_verdict"], None)
+        forced = release("red/red", main, force=True, dry_run=False, probe=no_pane)
+        check("--force on redundant work: the ref is pruned", forced["rescue_verdict"]["pruned"], True)
+        check("--force on redundant work: the cost stops naming the pruned ref",
+              "pruned by the audit" in (forced["cost"] or ""), True)
+        check("--force on redundant work: the release completes", forced["complete"], True)
 
     with tempfile.TemporaryDirectory() as tmp:
         main = new_repo(tmp)
