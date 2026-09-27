@@ -35,8 +35,18 @@ stale build tree is the most expensive failure this campaign has hit (a refused 
 left in a tree made the next gate report "no unit's split target object moved" for an untouched unit,
 costing a full `rm -rf build/RMHE08` rebuild):
 
-* **one lock per slot** at `MAIN/.pi/slots/<n>.json`, naming the claim and the time.  Never two writers in
-  one slot; a stale lock (its claim already landed) is detected and reclaimed instead of wedging forever.
+* **one `.used` marker per slot** in the worktree root, created by `acquire` (atomically, `O_EXCL`) and
+  removed by `release`; `status` reports `used`/`free` from it.  The marker is the primary occupancy signal -
+  it only works because the launch pattern is now structural (acquire first, launch with the slot as `cwd`),
+  so a lane always enters its slot.  A JSON lock record at `MAIN/.pi/slots/<n>.json` still names the claim,
+  worker and time, and a stale one is reclaimed instead of wedging forever.
+* **`status` reads the worktree too, and keeps the two readings distinct.**  A slot whose worktree still has
+  a branch checked out is **in use**, whatever the marker or the JSON record say - the lock is a convenience,
+  the worktree is the truth.  The two disagreed in the wild (slot 2 was reported `free` while it held
+  `worker/rule10-fix-14f8`), and that disagreement *was* the bug, so both readings are kept.
+* **`acquire` falls through.**  An occupied slot is skipped, not failed on: the search takes the next
+  genuinely free slot and marks it atomically, so two racing acquires cannot both take one.  An explicitly
+  targeted `--slot N` still refuses when it holds an unlanded branch (never reuse a branch).
 * **reset** = `checkout -f --detach <main-tip>`, a selective `git clean` that keeps `build/`, `orig/`, the
   toolchain and `tools/m2c` but discards scratch, stale source edits and stray files, then
   `checkout -B worker/<slug> <main-tip>`.
@@ -68,7 +78,53 @@ LOCK_SUBDIR = ("slots",)
 # What a reset keeps.  Everything else untracked/ignored is scratch and goes; tracked edits are discarded
 # by the forced `checkout`.  `tools/m2c` is a tracked submodule and must survive (see `clean_slot`).
 SLOT_KEEP = (".ninja_deps", ".ninja_log", "build.ninja", "objdiff.json", "compile_commands.json",
-             "build", "orig", os.path.join("tools", "m2c"))
+             "build", "orig", os.path.join("tools", "m2c"), ".used")
+
+# A slot's **sentinel**: `.used` in the worktree root.  `acquire` creates it (atomically, `O_EXCL`) and
+# `release` removes it; `status` reads it and reports `used` / `free`.  It is gitignored, and `clean_slot`
+# preserves it across a reset *because* the marker the acquire just created must survive the reset - a
+# stale marker from a crash is reclaimed by the worktree reading (see `slot_state`), not by the clean.
+SLOT_MARKER = ".used"
+
+
+def marker_path(slot: str) -> str:
+    return os.path.join(slot, SLOT_MARKER)
+
+
+def marker_present(slot: str) -> bool:
+    return os.path.exists(marker_path(slot))
+
+
+def mark_used(slot: str, unit: str = "", branch: str = "") -> bool:
+    """Claim the slot by creating its `.used` marker **atomically**.  -> False when one already exists.
+
+    `O_CREAT | O_EXCL` is the atomicity: two racing `acquire`s cannot both create the file, so the loser
+    falls through to the next free slot (`_pick_free`).  That is the whole mechanism - no lock daemon, no
+    platform shim, and a crashed acquire leaves a marker the worktree reading reclaims.
+    """
+    path = marker_path(slot)
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        return False
+    except OSError:
+        return False
+    try:
+        os.write(fd, ("%d %s %s\n" % (os.getpid(), unit, branch)).encode("utf-8", "replace"))
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+    return True
+
+
+def clear_marker(slot: str) -> bool:
+    """Remove the slot's `.used` marker.  -> whether one was removed."""
+    try:
+        os.remove(marker_path(slot))
+        return True
+    except OSError:
+        return False
 
 
 def _claims():
@@ -189,25 +245,45 @@ def lock_stale(main: str, n: int, lock: dict | None = None) -> bool:
 
 
 def slot_state(main: str, n: int) -> dict:
-    """One slot's row: whether it exists, what it has checked out, its lock and whether it is free."""
+    """One slot's row: whether it exists, what it has checked out, its `.used` marker and whether it is free.
+
+    **`free`/`used` is read from two sources of the same fact, and both must agree that the slot is empty.**
+    The primary is the `.used` sentinel `acquire` creates and `release` removes; the second is the worktree
+    state - a slot whose worktree still has a branch checked out is **in use**, whatever any file says.  The
+    lock record is a convenience; the worktree is the truth.  Today the two disagreed (slot 2 was reported
+    `free` while its worktree held `worker/rule10-fix-14f8`), and that disagreement *was* the bug, so both
+    readings are kept.
+
+    A `.used` marker on a *detached* worktree with no live lock record is a crash remnant, not a live claim -
+    it is named reclaimable and the slot is free, so a crashed acquire can never wedge a slot.
+    """
     d = slot_dir(main, n)
     exists = os.path.isdir(d) and os.path.exists(os.path.join(d, ".git"))
     lock = read_lock(main, n)
     stale = lock_stale(main, n, lock) if lock else False
+    live_lock = bool(lock and not stale)
     attached = slot_attached_branch(d) if exists else None
-    free = exists and not (lock and not stale)
+    marked = marker_present(d) if exists else False
+    marker_stale = marked and not attached and not live_lock
+    used = bool(attached) or (marked and not marker_stale)
+    free = exists and not used
     if not exists:
         why = "no such slot directory"
-    elif lock and not stale:
+    elif live_lock:
         why = "in use by %s (%s)" % (lock.get("unit") or "?", lock.get("worker") or "?")
     elif attached:
-        why = "holds branch %s with no live lock - release it first" % attached
+        why = "in use - holds branch %s (its `.used` marker is %s); release it first" % (
+            attached, "present" if marked else "MISSING")
+    elif marked and not marker_stale:
+        why = "used (`.used` marker present, worktree detached)"
+    elif marker_stale:
+        why = "stale `.used` marker on a detached worktree with no live lock - reclaimable"
     elif lock and stale:
         why = "stale lock (%s) - reclaimable" % (lock.get("unit") or "?")
     else:
         why = "free"
     return {"slot": n, "dir": d, "exists": exists, "attached": attached, "lock": lock, "stale": stale,
-            "free": free, "why": why}
+            "marked": marked, "marker_stale": marker_stale, "used": used, "free": free, "why": why}
 
 
 def all_slots(main: str) -> list[dict]:
@@ -350,7 +426,16 @@ def init(main: str, count: int = DEFAULT_COUNT, force: bool = False, seed: bool 
 
 # --- acquire -------------------------------------------------------------------------------------
 
-def _pick_free(main: str, slot: int | None) -> dict:
+def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
+    """Pick a free slot, falling through to the next genuinely free one.
+
+    `free` is the worktree truth (`slot_state`), so an occupied slot is **skipped**, never failed on.  With
+    `claim`, each candidate is *atomically* marked (`.used`, `O_EXCL`) before it is returned - so two racing
+    acquires cannot both take the same slot, and a slot a racing acquire just marked is skipped too.
+
+    A slot explicitly targeted with `slot=N` is a search *by name*, not a search: it refuses when occupied -
+    the "a slot holds a directory, never a branch" rule - or when the mark cannot be taken.
+    """
     rows = all_slots(main)
     if not rows:
         raise SystemExit("REFUSED: the slot pool is not initialised - run `python tools/units/slots.py init`")
@@ -359,12 +444,22 @@ def _pick_free(main: str, slot: int | None) -> dict:
         if row is None:
             raise SystemExit("REFUSED: no slot %d (the pool is slots 1..%d)" % (slot, len(rows)))
         if not row["free"]:
+            if row["attached"]:
+                raise SystemExit("REFUSED slot %d: it still has branch %r checked out - a slot holds a "
+                                 "directory, never a branch.\n  release it first: python tools/units/slots.py "
+                                 "release --slot %d" % (slot, row["attached"], slot))
             raise SystemExit("REFUSED slot %d: %s" % (slot, row["why"]))
+        if claim is not None and not claim(row):
+            raise SystemExit("REFUSED slot %d: another acquire claimed it first (its `.used` marker exists); "
+                             "retry, or drop `--slot` to let the search fall through to the next free slot"
+                             % slot)
         return row
-    free = [s for s in rows if s["free"]]
-    if not free:
-        raise SystemExit("REFUSED: %s" % capacity_error(main))
-    return free[0]
+    for row in rows:
+        if not row["free"]:
+            continue
+        if claim is None or claim(row):
+            return row
+    raise SystemExit("REFUSED: %s" % capacity_error(main))
 
 
 def preview(main: str, unit: str, branch: str | None = None, slot: int | None = None) -> dict:
@@ -379,13 +474,15 @@ def preview(main: str, unit: str, branch: str | None = None, slot: int | None = 
 
 def acquire(main: str, unit: str, branch: str | None = None, worker: str | None = None,
             slot: int | None = None) -> dict:
-    """Take a slot for `unit`: reset it, cut a **fresh** branch off main's tip, verify, lock.
+    """Take a slot for `unit`: mark it `.used`, reset it, cut a **fresh** branch off main's tip, verify, lock.
 
-    Refuses, before touching anything, when the unit's branch already exists (the claim is taken), when the
-    chosen slot is locked, and when the slot still has a branch checked out - a slot whose previous branch
-    has not landed is surfaced loudly, never silently reused.  The kept build tree is verified against
-    MAIN's current map/DOL; if it cannot be proven current it is re-seeded, and if it still cannot, the
-    acquire fails closed rather than handing the lane a stale tree.
+    Refuses, before touching anything, when the unit's branch already exists (the claim is taken) and when an
+    explicitly named slot is occupied - a slot whose previous branch has not landed is surfaced loudly, never
+    silently reused.  The slot is **marked `.used` atomically before the reset**, so a racing acquire falls
+    through to the next free slot instead of colliding; a failure after the mark removes it, and a crash
+    leaves a marker the worktree reading reclaims.  The kept build tree is verified against MAIN's current
+    map/DOL; if it cannot be proven current it is re-seeded, and if it still cannot, the acquire fails closed
+    rather than handing the lane a stale tree.
     """
     claims = _claims()
     unit = claims.norm_unit(unit.strip("/"))
@@ -393,47 +490,61 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
     if claims.branch_exists(main, branch):
         raise SystemExit("REFUSED: branch %s already exists - the unit is claimed (or was never released).\n"
                          "  see: python tools/units/claims.py list" % branch)
-    row = _pick_free(main, slot)
+
+    def claim(row: dict) -> bool:
+        # reclaim a crash remnant (a marker on a detached worktree) before marking, or it would never free
+        if row.get("marker_stale"):
+            clear_marker(row["dir"])
+        return mark_used(row["dir"], unit, branch)
+
+    row = _pick_free(main, slot, claim=claim)
     n, d = row["slot"], row["dir"]
-    # A SLOT HOLDS A DIRECTORY, NEVER A BRANCH: the reset below detaches, and every release detaches, so a
-    # branch still checked out here is a bug (a crashed/forced teardown) and must be named, not absorbed.
-    attached = slot_attached_branch(d)
-    if attached:
-        raise SystemExit("REFUSED slot %d: it still has branch %r checked out - a slot holds a directory, "
-                         "never a branch.\n  release it first: python tools/units/slots.py release --slot %d"
-                         % (n, attached, n))
-    reclaimed = None
-    lock = read_lock(main, n)
-    if lock and lock_stale(main, n, lock):
-        # Reclaimable - unless its branch still exists, which is the unlanded branch acquire must surface.
-        if lock.get("branch") and claims.branch_exists(main, lock["branch"]):
-            raise SystemExit("REFUSED slot %d: it holds the unlanded branch %s from a previous round "
-                             "(lock by %s at %s).\n  land it or release it before reusing the slot."
-                             % (n, lock["branch"], lock.get("worker") or "?", lock.get("acquired_at") or "?"))
-        reclaimed = lock
-        clear_lock(main, n)
-    tip = reset_slot(main, n)
-    git(["checkout", "-q", "-B", branch, tip], d)
-    # Fill anything missing (toolchain/orig/m2c) cheaply, then *prove* the build tree current.
-    seed_note = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=False)
-    v = verify(main, n)
-    refreshed = None
-    if not v["ok"]:
-        if not claims._main_build_is_current(main):
-            raise SystemExit("REFUSED slot %d: MAIN's own build tree is not current (%s);\n"
-                             "  run `ninja` in MAIN so the slot can be re-seeded - never hand a lane a doubt"
-                             % (n, "; ".join(v["reasons"])))
-        refreshed = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
+    try:
+        # A SLOT HOLDS A DIRECTORY, NEVER A BRANCH: the reset below detaches, and every release detaches, so a
+        # branch still checked out here is a bug (a crashed/forced teardown) and must be named, not absorbed.
+        attached = slot_attached_branch(d)
+        if attached:
+            raise SystemExit("REFUSED slot %d: it still has branch %r checked out - a slot holds a directory, "
+                             "never a branch.\n  release it first: python tools/units/slots.py release "
+                             "--slot %d" % (n, attached, n))
+        reclaimed = None
+        lock = read_lock(main, n)
+        if lock and lock_stale(main, n, lock):
+            # Reclaimable - unless its branch still exists, which is the unlanded branch acquire must surface.
+            if lock.get("branch") and claims.branch_exists(main, lock["branch"]):
+                raise SystemExit("REFUSED slot %d: it holds the unlanded branch %s from a previous round "
+                                 "(lock by %s at %s).\n  land it or release it before reusing the slot."
+                                 % (n, lock["branch"], lock.get("worker") or "?",
+                                    lock.get("acquired_at") or "?"))
+            reclaimed = lock
+            clear_lock(main, n)
+        tip = reset_slot(main, n)
+        git(["checkout", "-q", "-B", branch, tip], d)
+        # Fill anything missing (toolchain/orig/m2c) cheaply, then *prove* the build tree current.
+        seed_note = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=False)
         v = verify(main, n)
+        refreshed = None
         if not v["ok"]:
-            raise SystemExit("REFUSED slot %d: the kept build tree could not be proven current even after a "
-                             "re-seed: %s" % (n, "; ".join(v["reasons"])))
-    write_lock(main, n, {"slot": n, "dir": d, "unit": unit, "branch": branch,
-                         "worker": worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
-                         "base": tip, "acquired_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                         "verified": v["ok"], "report_matches": v["report_matches"]})
-    return {"slot": n, "dir": d, "worktree": d, "branch": branch, "base": tip, "unit": unit,
-            "seeded": seed_note, "refreshed": refreshed, "verify": v, "reclaimed": reclaimed}
+            if not claims._main_build_is_current(main):
+                raise SystemExit("REFUSED slot %d: MAIN's own build tree is not current (%s);\n"
+                                 "  run `ninja` in MAIN so the slot can be re-seeded - never hand a lane a doubt"
+                                 % (n, "; ".join(v["reasons"])))
+            refreshed = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
+            v = verify(main, n)
+            if not v["ok"]:
+                raise SystemExit("REFUSED slot %d: the kept build tree could not be proven current even after "
+                                 "a re-seed: %s" % (n, "; ".join(v["reasons"])))
+        write_lock(main, n, {"slot": n, "dir": d, "unit": unit, "branch": branch,
+                             "worker": worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
+                             "base": tip, "acquired_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                             "verified": v["ok"], "report_matches": v["report_matches"]})
+        return {"slot": n, "dir": d, "worktree": d, "branch": branch, "base": tip, "unit": unit,
+                "seeded": seed_note, "refreshed": refreshed, "verify": v, "reclaimed": reclaimed}
+    except BaseException:
+        # a failed acquire must not leave the slot marked: the marker is the occupancy signal the next search
+        # reads, so clearing it here is what keeps a refused acquire from wedging the slot.
+        clear_marker(d)
+        raise
 
 
 # --- release -------------------------------------------------------------------------------------
@@ -476,7 +587,7 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
     unit = unit or lock.get("unit") or (claims.slug_of_branch(branch) if branch else None)
     result = {"slot": n, "dir": d, "branch": branch, "unit": unit, "detached": False, "cleaned": [],
               "branch_deleted": False, "rescue_ref": None, "refreshed": None, "lock_cleared": False,
-              "dry_run": dry_run}
+              "marker_cleared": False, "dry_run": dry_run}
     if not os.path.exists(os.path.join(d, ".git")):
         raise SystemExit("REFUSED release slot %d: %s is not a worktree" % (n, d))
     tip = git(["rev-parse", "HEAD"], main)
@@ -484,6 +595,7 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
         result["detached"] = True
         result["branch_deleted"] = bool(branch and claims.branch_exists(main, branch))
         result["lock_cleared"] = bool(lock)
+        result["marker_cleared"] = marker_present(d)
         return result
     git(["checkout", "-f", "-q", "--detach", tip], d)
     result["detached"] = True
@@ -498,6 +610,9 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
         result["branch_deleted"] = True
     if refresh and claims._main_build_is_current(main):
         result["refreshed"] = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
+    # the marker is the occupancy signal the next `acquire`/`status` reads: remove it only after the branch is
+    # gone and the warm tree is refreshed, so a crash before this line leaves `status` naming the slot in use
+    result["marker_cleared"] = clear_marker(d)
     clear_lock(main, n)
     result["lock_cleared"] = True
     return result
@@ -555,7 +670,7 @@ def selftest() -> int:
         os.makedirs(os.path.join(repo, "build", "tools"))
         open(os.path.join(repo, "configure.py"), "w").write("config.libs = []\n")
         open(os.path.join(repo, ".gitignore"), "w").write(
-            "build/\norig/\n.ninja_*\nbuild.ninja\nobjdiff.json\ncompile_commands.json\n__pycache__/\n")
+            "build/\norig/\n.ninja_*\nbuild.ninja\nobjdiff.json\ncompile_commands.json\n__pycache__/\n.used\n")
         open(os.path.join(repo, "src", "auto", "stub.c"), "w").write("/* header only */\n")
         open(os.path.join(repo, "tools", "m2c", "m2c.py"), "w").write("# m2c\n")
         open(os.path.join(repo, "config", "RMHE08", "splits.txt"), "w").write(
@@ -625,6 +740,9 @@ def selftest() -> int:
         check("the slot's report matches MAIN exactly", report_matches(repo, d1), True)
         check("no src diff against main", g(d1, "diff", "--name-only", "main", "--", "src"), "")
         check("git status in the slot is clean", g(d1, "status", "--porcelain"), "")
+        check("acquire creates the `.used` marker", marker_present(d1), True)
+        check("... and the marker is gitignored (the tree stays clean)",
+              g(d1, "status", "--porcelain", "-uall"), "")
 
         # (2) THE HOSTILE CASE: poison the build tree, then release and re-acquire - it must repair, not lie
         open(os.path.join(d1, "build", "RMHE08", "report.json"), "w").write('{"units": {}}\n')
@@ -639,6 +757,7 @@ def selftest() -> int:
         check("release detaches the slot", slot_attached_branch(d1), None)
         check("release deletes the branch", claims.branch_exists(repo, claims.branch_for("auto/stub")), False)
         check("release clears the lock", read_lock(repo, 1), {})
+        check("release removes the `.used` marker", marker_present(d1), False)
         check("release refreshes the warm tree", report_matches(repo, d1), True)
         # poison again, this time while the slot is free, so acquire itself must repair it
         open(os.path.join(d1, "build", "RMHE08", "report.json"), "w").write('{"units": {"stale": true}}\n')
@@ -652,6 +771,13 @@ def selftest() -> int:
         check("... and the poisoned config.json is gone",
               open(os.path.join(d1, "build", "RMHE08", "config.json")).read(), '{"libs": []}\n')
         release(repo, slot=1, unit="auto/stub-2", rescue=False)
+
+        # the marker is atomic: two racing acquires cannot both claim one slot
+        check("the marker is created atomically", mark_used(d1, "u", "b"), True)
+        check("... a second, racing mark on the same slot is refused", mark_used(d1, "u2", "b2"), False)
+        clear_marker(d1)
+        check("... and once cleared the slot can be marked again", mark_used(d1, "u3", "b3"), True)
+        clear_marker(d1)
 
         # (3) THE BRANCH INVARIANT: fresh branch off main's tip each time; a held branch is refused
         first = acquire(repo, "auto/stub-a")
@@ -673,6 +799,17 @@ def selftest() -> int:
               claims.branch_exists(repo, claims.branch_for("auto/stub-a")), False)
         # a slot holding an unlanded branch (lock lost, branch left attached) is surfaced loudly
         clear_lock(repo, first["slot"])          # simulate a crash between detach and unlock
+        clear_marker(d)                          # ... and losing the marker too: the HOSTILE case
+        check("HOSTILE: a checked-out branch with NO marker and NO lock still reports in use",
+              slot_state(repo, first["slot"])["free"], False)
+        check("... the worktree branch, not any file, is what decides",
+              slot_state(repo, first["slot"])["attached"], claims.branch_for("auto/stub-b"))
+        check("... `status` agrees it is not free", status(repo)[0]["free"], False)
+        check("... and it is excluded from the free count", free_count(repo), 1)
+        # the search must SKIP it and fall through to the next genuinely free slot
+        skipped = acquire(repo, "auto/stub-skip")
+        check("acquire skips the occupied slot and falls through to the next free one", skipped["slot"], 2)
+        release(repo, slot=2, unit="auto/stub-skip", rescue=False)
         try:
             acquire(repo, "auto/stub-c", slot=first["slot"])
             check("a slot holding an unlanded branch is refused", "no error", "SystemExit")
@@ -688,6 +825,15 @@ def selftest() -> int:
         check("... and the slot is now locked by the new claim", read_lock(repo, first["slot"])["unit"],
               "auto/stub-c")
         release(repo, slot=first["slot"], unit="auto/stub-c", rescue=False)
+        # a crash leaves a marker on a DETACHED worktree: reclaimable, never a permanent wedge
+        mark_used(d, "ghost", "ghost-gone")
+        check("a `.used` marker on a detached worktree is stale",
+              slot_state(repo, first["slot"])["marker_stale"], True)
+        check("... and the slot reads free", slot_state(repo, first["slot"])["free"], True)
+        reclaimed2 = acquire(repo, "auto/reclaim", slot=first["slot"])
+        check("... acquire reclaims it and hands it out",
+              (marker_present(d), reclaimed2["slot"]), (True, first["slot"]))
+        release(repo, slot=first["slot"], unit="auto/reclaim", rescue=False)
 
         # (4) THE CAP: fill every slot and the free count is zero
         acquire(repo, "auto/cap-1", slot=1)
@@ -723,6 +869,7 @@ def selftest() -> int:
               os.path.exists(os.path.join(dd, "tools", "m2c", "m2c.py")), True)
         check("the slot is detached and free after release",
               (slot_attached_branch(dd), read_lock(repo, 1)), (None, {}))
+        check("... and its `.used` marker is gone", marker_present(dd), False)
 
         # integration: the *claim path* takes a slot and its release returns it (claims.py's own selftest
         # covers the classic path; this is the seam between the two tools)
@@ -748,6 +895,8 @@ def selftest() -> int:
         rows = status(repo)
         check("status lists every slot", [r["slot"] for r in rows], [1, 2])
         check("status reports the build tree current on a clean pool", all(r["build_ok"] for r in rows), True)
+        check("status keeps `used` and the worktree branch as separate readings",
+              all("used" in r and "attached" in r and "marked" in r for r in rows), True)
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -848,13 +997,19 @@ def main() -> int:
         if not rows:
             print("no slot pool - run `python tools/units/slots.py init`")
             return 0
-        print("%-5s %-10s %-26s %-12s %s" % ("slot", "state", "unit", "branch", "build tree"))
+        print("%-5s %-10s %-24s %-20s %-7s %s" % ("slot", "state", "unit", "branch", ".used", "build tree"))
         for row in rows:
             lock = row.get("lock") or {}
-            state = "free" if row["free"] else ("stale-lock" if row["stale"] else "in use")
-            print("%-5d %-10s %-26s %-12s %s" % (
-                row["slot"], state, (lock.get("unit") or "-")[:26],
-                (lock.get("branch") or row["attached"] or "detached")[:12],
+            if row["free"]:
+                state = "free"
+            elif row["attached"]:
+                state = "in use"
+            else:
+                state = "used"
+            marker = "stale" if row.get("marker_stale") else ("yes" if row["marked"] else "-")
+            print("%-5d %-10s %-24s %-20s %-7s %s" % (
+                row["slot"], state, (lock.get("unit") or "-")[:24],
+                (row["attached"] or "detached")[:20], marker,
                 "current" if row["build_ok"] else "; ".join(row["build_reasons"])))
         return 0
     if args.cmd == "verify":

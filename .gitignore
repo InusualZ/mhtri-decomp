@@ -54,3 +54,7 @@ d[0-9]*.json
 t[0-9]*.json
 # a lane worktree created inside the repo root must never be staged
 .ws-*/
+
+# a slot's occupancy sentinel: tools/units/slots.py creates `.used` in the slot worktree root on acquire and
+# removes it on release. It is intentionally invisible to git so an occupied slot's tree stays clean.
+.used

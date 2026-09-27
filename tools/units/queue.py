@@ -308,6 +308,10 @@ def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]
     return [ordered[i] for i in picked]
 
 
+def _same_path(a: str, b: str) -> bool:
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
                profile: str = "decompiler") -> dict:
     """The paste-ready spawn: agent, cwd and task text for the orchestrator.
@@ -320,7 +324,16 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
     was created, so the worktree's own checkout does not contain it. The call is the default `subagent`
     tool's single mode (`agent`/`task`/`cwd`); it has no `name` parameter, so the slug is a label only, and
     it blocks and returns the worker's final message to the orchestrator when the child process exits.
+
+    **`cwd` is the claim's own worktree, and MAIN is refused outright.**  A lane launched with its cwd set to
+    MAIN cloned its upstream *inside the repository root* (`.tmp-mwcc/`), and the next landing was refused
+    over the foreign path - collateral damage to a different lane's batch.  So the wrong thing is impossible
+    rather than discouraged: a spawn line whose cwd resolves to MAIN is a refusal, not a line to paste.
     """
+    if _same_path(wt, main):
+        raise SystemExit("REFUSED spawn %s: cwd resolves to MAIN (%s) - a lane runs in its own worktree, "
+                         "never the orchestrator's tree; take the claim first so the slot is the cwd."
+                         % (unit, wt))
     task = ("Read %s (in MAIN) and do exactly what it says. "
             "Ack first: python tools/units/claims.py ack %s --agent %s-%s. "
             "You may fan out subagents. End your turn with your report: "
@@ -331,7 +344,7 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
                     % (profile, wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
 
 
-def promote(main: str, unit: str, claim_slug: str) -> str:
+def promote(main: str, unit: str, claim_slug: str, wt: str | None = None) -> str:
     """Render the brief for `unit` at the claim's slug path, **from the current entry**.
 
     The pool is a scheduling device, not the source of truth: `brief.py --pool` used to skip a brief that
@@ -344,7 +357,10 @@ def promote(main: str, unit: str, claim_slug: str) -> str:
     """
     dest = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    b, text = brief.brief_for(main, claims.worktree_for(unit, main), unit, None)
+    # the worktree the brief names is the claim's OWN (`wt`) when the caller has it - a slot claim's worktree
+    # is the slot dir, not `claims.worktree_for`'s `.ws-*` sibling, and the brief's "your tree" block and §1
+    # worktree row must be the cwd the spawn line hands out.
+    b, text = brief.brief_for(main, wt or claims.worktree_for(unit, main), unit, None)
     with open(dest, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
     return dest
@@ -481,7 +497,15 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
         info = claim_fn(unit, main, worker, False)
         wt = info.get("worktree") or claims.worktree_for(unit, main)
         claim_slug = claims.claim_slug(main, unit) or slug
-        brief_path = promote(main, unit, claim_slug)
+        # "the wrong thing is impossible": a slot claim MUST hand out the slot's cwd.  If the claim names a
+        # slot, the worktree it returned has to be that slot's directory - never MAIN, never a `.ws-*` sibling.
+        if use_slots and info.get("slot") is not None:
+            expected = sm.slot_dir(main, info["slot"])
+            if not _same_path(wt, expected):
+                raise SystemExit("REFUSED spawn %s: claim slot %s has worktree %s, not the slot dir %s - a "
+                                 "slot claim must hand out the slot's cwd"
+                                 % (unit, info["slot"], wt, expected))
+        brief_path = promote(main, unit, claim_slug, wt)
     return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
             "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
             "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, profile)}
@@ -736,6 +760,15 @@ def selftest() -> int:
               state(tmp, {"unit": None, "path": "x"}), "unreadable")
 
         check("spawn_line's call is one line", "\n" not in spawn_line(tmp, "auto/x", "s", "/w", "/b")["call"], True)
+        # the wrong thing is impossible: a spawn line whose cwd is MAIN is a refusal, not a line to paste
+        try:
+            spawn_line(tmp, "auto/x", "s", tmp, "/b")
+            check("spawn_line refuses a cwd that is MAIN", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("spawn_line refuses a cwd that is MAIN", "resolves to MAIN" in str(exc), True)
+        check("spawn_line carries the worktree's own path as cwd",
+              spawn_line(tmp, "auto/x", "s", os.path.join(tmp, "ws"), "/b")["cwd"],
+              os.path.join(tmp, "ws"))
 
     # option A: a proposal is ready while it is in the queue, and stale once the queue drops it (which is
     # what happens when its range is registered and `attribute.py queue` is re-run)

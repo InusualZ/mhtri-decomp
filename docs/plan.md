@@ -192,9 +192,27 @@ taken (naming each holder) instead of constructing a seventh environment; `slots
 the kept `build/RMHE08` against MAIN's current map/DOL with the same staleness guard the seeder already uses
 (`config.json` vs `symbols.txt`/`splits.txt`/`main.dol`, plus a byte comparison of `report.json`) and
 **re-seeds if it cannot be proven current** - a stale build tree is the most expensive failure this campaign
-has hit. One lock per slot lives at `MAIN/.pi/slots/<n>.json` (the claim and the time); a stale lock - its
-claim already landed - is detected and reclaimed rather than wedging forever, and there are never two writers
-in one slot.
+has hit.
+
+**A slot is occupied by one sentinel file, `.used`, read from two sources that must agree.** `acquire`
+creates `.used` in the slot's worktree root **atomically** (`O_CREAT | O_EXCL`), so two racing acquires cannot
+both take one slot; `release` removes it; `status` reports `used`/`free` from it. The second source is the
+worktree itself: a slot whose worktree still has a branch checked out is **in use**, whatever any file says -
+the lock record is a convenience, the worktree is the truth. On 2026-09-27 the two disagreed - `status` called
+slot 2 `free` while its worktree held `worker/rule10-fix-14f8` - and that disagreement *was* the bug, so both
+readings are kept. A `.used` marker on a *detached* worktree with no live claim is a crash remnant, named
+reclaimable rather than a permanent wedge. The JSON record at `MAIN/.pi/slots/<n>.json` (the claim, worker and
+time) is still written and a stale one is reclaimed.
+
+**The marker only works because the launch pattern is structural: acquire first, then launch with the slot as
+`cwd`.** A file-based signal cannot catch a lane that never entered a slot at all (the lane that worked in
+MAIN and left `.tmp-mwcc/` behind wrote no slot file - nothing could have), so `queue.py next` and
+`claims.py claim` print the paste-ready spawn line with **the claim's own worktree as `cwd`**, and a spawn line
+whose `cwd` resolves to MAIN is refused outright rather than discouraged. `acquire` also **falls through**: an
+occupied slot is skipped for the next genuinely free one, while an explicitly named `--slot N` still refuses
+when it holds an unlanded branch. Every brief opens with a **"your tree"** block naming the cwd and the
+one-line self-check (`git rev-parse --show-toplevel` must equal the tree; if it does not, stop and report), so
+a mis-launched lane detects it in its first turn.
 
 * **A slot keeps its build tree warm; the branch is what is fresh.** The pool directory holds the toolchain,
   `orig/`, `tools/m2c` and `build/RMHE08/` across rounds, so a lane starts without a per-claim copy - only the
@@ -341,7 +359,16 @@ through `recompile.py` (direct compiler invocation, mtime asserted, section size
 `claims.py claim`), which takes a free slot from the pool, resets it, cuts a fresh branch off main's current
 tip and verifies the kept build tree; the worker starts in the directory it is handed. A free slot is the
 concurrency cap: with all six taken, `queue.py next` refuses and names the holders rather than constructing a
-seventh worktree.
+seventh worktree. The printed spawn line carries **the claim's worktree as `cwd`** (the slot, never MAIN) -
+the orchestrator pastes it, it does not assemble the cwd by hand - and every brief's "your tree" block makes
+the lane itself verify that cwd before it works.
+
+**The land gate pre-flights MAIN before it builds.** `land` reports foreign/untracked paths already in the
+tree **before** the expensive gate runs, naming a likely cause when they look like lane scratch (`.tmp-*`,
+`.ws-*`, a leftover `upstream/` clone) - the same information the post-build refusal prints, delivered before
+a 5-minute build instead of after it. The refusal is unchanged (a path that appears *during* the build is
+still refused); only the delivery is earlier, because a refusal that arrives after the build is the same
+information, late.
 
 | failure | detected by | handling |
 | --- | --- | --- |
@@ -705,6 +732,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.28 | **done** - the per-lane measurement loop is fixed: `recompile.py`/`measure.py` run from git-bash, and no score can come from a stale object or the wrong tree | `absolutize()` rewrote cmd's `/c` to `C:\c` (`os.path.join(main, "/c")` is `C:/c`, and that drive-root artifact exists on this host), so the child was an *interactive* `cmd`, no object was written, and 31 lanes filed "make this work" in the register. Two siblings of the same failure: a hand-built scorer measured a STALE object twice when a compile failed and two invented "improvements" were reported as real, and the measuring tools rooted at their own file location / the first `git worktree list` entry, so a score run from a slot could print MAIN's number (`NetworkWiiMediator/dispatchReflectEvent` 0.91743 vs 100.0) | `absolutize()` never rewrites a `-`/`/` switch; every measurement path deletes the object before compiling and `object_is_fresh()` refuses an object older than its source; both chained post-processors (`objalign.py`, `objextab.py`) are retargeted to this tree's object; `unitutil.repo_root()` resolves the caller's `git rev-parse --show-toplevel` and `recompile.main_root()` the git common dir (the gate still runs from MAIN, unchanged); the hostile selftests break a source and assert `FAILED` with no score, and score a throwaway worktree and assert its number (100.00000, not MAIN's 99.80576) | ~80 |
 | 7.29 | **done** - `measure.py --baseline`/`--against-main`/`--save`: every symbol of a unit with its before/after delta in **one call** | `symdiff.py -u <unit>` lists per-symbol scores but needs a re-invocation per symbol to see a diff, so a body lane spent minutes per iteration; the lanes' scratch scorers (`build/probe/score.py`) each re-derived "diff the probe's rows against the committed report" | one compile and one `report generate` score all N symbols (~0.3 s on `Camellia/camellia`); `--against-main` diffs each row against MAIN's `build/RMHE08/report.json`, `--baseline <file>` against a saved report or a `--save` file, `--save` writes this run for the next; a moved-down row is reported and the exit code is non-zero; the baseline selftest pins both shapes, the refusal of a unit the file lacks, and the delta direction | ~60 |
 | 7.30 | **done 2026-09-27** - `tools/selftest.py`: one runner for every tool selftest, and the gate's `all tool selftests pass` row (measured ~29 s) | `measure_selftest.py` was red for weeks while 31 lanes filed "`recompile.py` is broken" - the tool's own test said so and nothing ran it. A selftest nobody runs is decoration, and the land gate ran only `land.py --selftest`, never the suite | discovers both shapes (`tools/**/*_selftest.py` and every tool exposing `--selftest`), **dedupes** a wrapper pair to one entry per tested tool (a genuine complementary pair, e.g. `ledger.py`/`ledger_selftest.py`, keeps both); runs in parallel with a per-test timeout that kills the whole process tree; one pass/fail/checks/duration table; **`git status --porcelain` identical before and after** (a selftest that writes into the repo is named); a **park list** (`tools/selftests-known-failures.json`, reason + date) so `green except N parked` never lets one old red hide a new one (a park that now passes is `STALE` and fails); `--json`, `--changed [REF]`, `--list`, `--no-dedupe`, and a `--selftest` that the suite itself runs; 51 entries / 3,345 checks / 29 s | ~260 |
+| 7.31 | **done** - slot hygiene: `status` reads the worktree (not the lock file), `acquire` falls through, the spawn line carries the slot's `cwd`, every brief opens with a "your tree" self-check, and `land` pre-flights MAIN for foreign paths | a lane was launched with its cwd set to **MAIN**, so it cloned its upstream into `.tmp-mwcc/` inside the repository root and the next landing was refused with "paths outside the batch appeared during the build" - collateral damage to a *different* lane's batch, and only after the fact. `slots.py status` called that same slot `free` while its worktree held `worker/rule10-fix-14f8` (it believed the lock file), so a cap reasoning that trusted it was wrong; `acquire` refused instead of trying the next slot; nothing handed the lane a cwd | `status` derives **in use** from the worktree branch *and* the atomic `.used` sentinel (`acquire` marks it `O_EXCL`, `release` clears it, a crash remnant on a detached tree is reclaimable) - the two readings disagreed and both are kept; `acquire` skips an occupied slot and takes the next genuinely free one (an explicit `--slot N` still refuses an unlanded branch); `queue.py next`/`claims.py claim` print the paste-ready line with **the slot's path as `cwd`** and refuse a `cwd` that resolves to MAIN; every brief (unit and proposal) gains a "your tree" block with the `git rev-parse --show-toplevel` must-equal self-check and "STOP and report" if it does not; `land` reports foreign paths **before** the build, naming lane scratch (`.tmp-*`, `.ws-*`, `upstream/`) as the likely cause; selftests 62->78 (slots), 137->139 (queue), 169->172 (brief), 352->362 (land), 221 (claims, unchanged); the hostile case - a checked-out branch with no lock file and no marker - is reported in use | ~150 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a

@@ -2619,9 +2619,24 @@ def main() -> int:
                      " (slot %s)" % out["slot"] if out.get("slot") else "",
                      out["base"], out.get("seeded", "")))
             # the brief is named after the branch the claim just made, not re-derived from the unit path
-            print("\nnext: python tools/units/brief.py %s          # write the brief\n"
-                  "      read tools/units/briefs/%s.md in %s, do it, write your report"
-                  % (out["unit"], slug_of_branch(out["branch"]) or slug(out["unit"]), out["worktree"]))
+            print("\nnext: python tools/units/brief.py %s          # write the brief" % out["unit"])
+        # The paste-ready line names the claim's OWN worktree as `cwd` - the slot, never MAIN.  A lane
+        # launched with cwd=MAIN cloned its upstream inside the repository root (`.tmp-mwcc/`) and the next
+        # landing was refused over it, so the cwd is printed here rather than left to the orchestrator.
+        claim_slug = slug_of_branch(out.get("branch") or "") or slug(out["unit"])
+        brief_path = os.path.join(main_wt, "tools", "units", "briefs", claim_slug + ".md")
+        try:
+            from units import queue as queue_mod
+            sp = queue_mod.spawn_line(main_wt, out["unit"], claim_slug, out["worktree"], brief_path)
+        except SystemExit as exc:
+            print("\nspawn line REFUSED: %s" % exc)
+            return 0
+        print("\nspawn this worker (the cwd is the claim's worktree, never MAIN):")
+        print("  agent: %s" % sp["agent"])
+        print("  label: %s  (the tool takes no name)" % sp["name"])
+        print("  cwd:   %s" % sp["cwd"])
+        print("  task:  %s" % sp["task"])
+        print("\n%s" % sp["call"])
         return 0
     if args.cmd == "list":
         rows = claims_view(main_wt)
