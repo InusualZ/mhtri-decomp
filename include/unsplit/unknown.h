@@ -205,9 +205,6 @@ u8 fn_802B0668(u8 kind);
 void fn_80304510(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, s32 d, f32 s);
 void fn_80306A98(struct _ENEMY_WORK* self, u32 a);
 u32 fn_803B50A8(void);
-/* Added with `enemy/fn_801A9540.cpp`'s registration: the 0x800C/0x803 leaves that range calls and
- * whose bracketing registered units name different modules (rule 2's named gap). */
-void fn_80339E04(u8 a, s32 b);
 /* r3 the work record, r4 the slot index (a u16 in the caller's view), r5 the slot pointer, r6/r7
  * two scalars: the per-slot effect/joint binding the range's entry points walk. */
 void fn_803B9588(struct _ENEMY_WORK* self, u16 index, s32* slot, s32 a, s32 b);

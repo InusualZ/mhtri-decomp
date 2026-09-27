@@ -409,7 +409,7 @@ extern "C" void fn_802BE4FC(s32 kind);
 extern "C" void fn_802BEAAC(StageAreaObj* area, u8 kind);
 extern "C" void fn_802C20A4(nw4r::math::VEC3* vec);
 extern "C" void fn_802FBA94(void);
-extern "C" void fn_803394F0(u8 index);
+extern "C" void lb_sub12_send(u8 index);
 extern "C" s32 fn_803A87E0(void);
 extern "C" s32 fn_803A8858(void);
 extern "C" u8 fn_803A8F60(s32 value);

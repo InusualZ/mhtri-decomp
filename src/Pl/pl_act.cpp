@@ -537,7 +537,15 @@ void rotVecY(nw4r::math::VEC3*, u32);
 
 extern "C" s32 fn_802E5CFC(s32);
 extern "C" u32 fn_8042CB9C(s32);
-extern "C" void fn_80338E04(s32, u8, u8);
+/* 0x80338E04 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The owner's header cannot be
+ * included from this unit - it declares `Pl_cat_skill_ck` returning `void` against this file's `u32`
+ * (measured: `(10505) illegal overloading 'Pl_cat_skill_ck(_PLW *, unsigned short)'`), and
+ * `include/unsplit/*.h` may not carry a symbol a registered unit owns (rule 2) - so the declaration is
+ * this unit's own view in a linkage block, the shape `enemy/fn_80137604.cpp` uses for the same case.
+ * The three-argument signature is this unit's call site; the callee reads r3/r4/r5. */
+extern "C" {
+void lb_entry_handover_send(s32, u8, u8);
+}
 extern "C" void fn_80272E30(_PLW*, u16, s16);
 extern "C" void fn_802E5D68(u16);
 
@@ -1898,7 +1906,7 @@ extern "C" void fn_8027AF88(_PLW* self)
     if (fn_8042CB9C(fn_802E5CFC(*(s8*)(q + 1505))) == 1) {
         *(s16*)((u8*)self + 1626) = 900;
         *((u8*)self + 1625) = 1;
-        fn_80338E04(1, (u8)my_player_no(), *(u8*)(q + 1505));
+        lb_entry_handover_send(1, (u8)my_player_no(), *(u8*)(q + 1505));
         return;
     }
     *(s16*)((u8*)self + 1626) = 0;

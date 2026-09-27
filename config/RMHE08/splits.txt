@@ -1155,6 +1155,12 @@ hud/fn_80334568.cpp:
 	.text       start:0x80334568 end:0x80338808
 	.data       start:0x805E2788 end:0x805E27B0
 
+lobby/lb_companion_ui.cpp:
+	extab       start:0x80016994 end:0x80016CA4
+	extabindex  start:0x80035CC4 end:0x8003615C
+	.text       start:0x80338808 end:0x8033F270
+	.data       start:0x805E27D4 end:0x805E27F8
+
 ef/eft050.cpp:
 	extab       start:0x80016CA4 end:0x80016DB4
 	extabindex  start:0x8003615C end:0x800362F4

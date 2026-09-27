@@ -253,6 +253,12 @@ void fn_802EF230(void);                 /* 0x802EF230 hud/fn_802EBED8.cpp */
 void fn_802EF424(void);                 /* 0x802EF424 hud/fn_802EBED8.cpp */
 void fn_802EF6B0(void);                 /* 0x802EF6B0 hud/fn_802EBED8.cpp */
 void fn_802EF730(void);                 /* 0x802EF730 hud/fn_802EBED8.cpp */
+/* 0x8033A850 `lobby/lb_companion_ui.cpp` (the companion/status UI band, formerly the band entry
+ * `fn_8033A850` in `include/unsplit/menu.h` - the band may not carry a symbol a registered unit
+ * owns).  The owner's header cannot be included here: it redefines `_mh_ivec2_` against
+ * `include/unsplit/lobby.h`, which this unit needs (measured - `(10296) class '_mh_ivec2_'
+ * redefined`).  The zero-argument signature is this unit's call site. */
+s32 lb_quest_work_active_ck(void);
 
 #ifdef __cplusplus
 }
