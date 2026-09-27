@@ -526,8 +526,10 @@ s32 fn_80359B00(s32);
 s32 fn_80359D98(void *, void *);
 s32 fn_8035A034(void);
 s32 fn_8035A7D8(s32, void*, void*, s32, s32);
-u32 fn_803768F8(void);
-s32 fn_80377664(void *);
+/* `fn_803768F8` (0x803768F8) and `fn_80377664` (0x80377664) are owned by
+ * `enemy/em020_ai.cpp` now that its range is registered - rule 2: their declarations moved to the
+owner's header and are included here. */
+#include "enemy/em020_ai.h"
 
 /* The lobby band's unclaimed `.bss` / `.sdata2` objects this unit and its neighbours read.  An
  * `extern` for an unsplit symbol belongs in this band header (docs/plan.md 6.5 rule 2). */
