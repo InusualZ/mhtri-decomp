@@ -1844,6 +1844,17 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # `splits.txt` change that re-ranged a neighbour (the merger's strongest form, .pi/notes/8031a6c0).
     before_targets = vu.target_object_snapshot(main)
     built = gate("configure.py", [sys.executable, "configure.py"])
+    # the split, before the registration check (2026-09-26, .pi/notes/8030681c-gate-finding.md): the
+    # per-unit rules are generated from build/RMHE08/config.json, and build.ninja itself depends on it
+    # (`build build.ninja objdiff.json: configure | build\RMHE08\config.json`), so a configure.py run
+    # that precedes the split regenerates the graph from the *previous* analyzed config. A batch whose
+    # splits.txt block is new is then absent from build.ninja and the registration check below fails on
+    # the first attempt and passes on the retry, because the `ninja` row further down is what ran the
+    # split. Run the split (a no-op when it is current), then configure.py again so the graph the check
+    # reads carries the batch's own units.
+    if built and os.path.exists(os.path.join(main, "build.ninja")):
+        gate("split (config.json)", ["ninja", "build/RMHE08/config.json"])
+        built = gate("configure.py (after the split)", [sys.executable, "configure.py"]) and built
     # the registration gate (2026-09-26): a unit can be committed as a *source file* with its
     # `configure.py` `Object(...)` line and its `splits.txt` block left behind, and then it is
     # registered in name only and absent from the build - `ok` stays green (`NonMatching` is never
