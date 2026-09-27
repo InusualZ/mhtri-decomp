@@ -24,6 +24,7 @@ Rules checked (each finding is `file:line`):
 | 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's); **exempt per file** - see below |
 | 8 | `goto` is forbidden | the `goto` keyword |
 | 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
+| 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
 
 Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt`
 (each registered unit's ranges): an `extern` a file declares for a symbol another registered unit owns is a
@@ -91,6 +92,11 @@ SRC = "src"
 # declared here collides with the owner's typed definition (MWCC `(10197) illegal function overloading`)
 # in every translation unit that includes the band.
 UNSPLIT = "include/unsplit"
+# Every shared header lives under `include/` (the unsplit band is `include/unsplit/`).  Rule 10 scans this
+# whole tree: a codegen pragma is lexically scoped to the rest of every TU that includes the header, so
+# one in the tree silently changes code that does not belong to the header's author.
+HEADERS = "include"
+HEADER_SUFFIXES = (".h", ".hpp", ".hh")
 SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
 
 # Rule 7's path-keyed exemption table. This is now only a **temporary grandfather** for the legacy
@@ -116,7 +122,23 @@ RULE_NAMES = {
     7: "no fn_XXXXXXXX / bare unkNN identifier",
     8: "goto is forbidden",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
+    10: "a codegen pragma lives in the TU that needs it, not in a shared header",
 }
+
+# The codegen-affecting pragma names for rule 10.  A `#pragma` is lexically scoped to the rest of the
+# translation unit that reaches it, so one in a shared header leaks the pass onto every including TU -
+# measured 2026-09-27 in both directions: a lane matched a file only because of a leaked
+# `#pragma peephole off`, and another lost rows until it was restated where it was wanted.  The pragma
+# belongs in the `.c`/`.cpp` that measured the dependency.  The list is section 6.5's codegen subset;
+# extend it when a new codegen pragma is used.  Deliberately absent: `once` (include guard), `pack`
+# (layout/ABI, judged elsewhere), `legacy_messages`/`warn*` (diagnostics only).
+CODEGEN_PRAGMAS = (
+    "peephole", "optimization_level", "fp_contract", "optimize_for_size", "inline",
+    "pool", "scheduling", "scheduling_priority", "unroll", "vectorize", "ipa", "profile",
+    "opt_propagation", "opt_common_subs", "opt_lifetimes",
+)
+CODEGEN_PRAGMA_RE = re.compile(
+    r"^[ \t]*#[ \t]*pragma[ \t]+(" + "|".join(CODEGEN_PRAGMAS) + r")\b", re.M)
 # No rule is unchecked any more. Rule 2's remaining gap is dynamic (an unsplit address whose bracketing
 # registered units name different modules), so it is reported from `Ownership.gaps`, not from here.
 UNCHECKED: list[tuple[int, str]] = []
@@ -862,6 +884,55 @@ def all_sources(root: str) -> list["Source"]:
     return [Source(path, rel_of(root, path), read_text(path)) for path in source_files(root)]
 
 
+def codegen_pragma_findings(src: "Source") -> list[dict]:
+    """Rule 10 for one file: a codegen pragma in a **shared header**.  The path gate is here, not in the
+    caller, so a `.c`/`.cpp` can never be reported however this is invoked.  `src.code` blanks
+    comments/literals, so a pragma *named* in a comment is not a finding - only a real directive is."""
+    if not src.rel.replace("\\", "/").startswith(HEADERS + "/"):
+        return []
+    out = []
+    for m in CODEGEN_PRAGMA_RE.finditer(src.code):
+        out.append(_finding(src, 10, src.line_of(m.start()),
+                            "codegen pragma `#pragma %s` in a shared header - state it in the "
+                            "`.c`/`.cpp` that needs it, never in the header" % m.group(1)))
+    return out
+
+
+def header_files(root: str) -> list[str]:
+    """Every shared header under `include/`, in path order (the unsplit band included - it is a header)."""
+    out = []
+    for dirpath, dirnames, filenames in os.walk(os.path.join(root, HEADERS)):
+        dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+        for name in sorted(filenames):
+            if name.endswith(HEADER_SUFFIXES):
+                out.append(os.path.join(dirpath, name))
+    return out
+
+
+def header_pragma_findings(root: str) -> list[dict]:
+    """Rule 10 over the whole shared-header tree (`include/`).  Not part of `lint_source`, which runs
+    rules 3-9 on `src/` files and rule 2 on the band; a header is judged by this rule only."""
+    out = []
+    for path in header_files(root):
+        out.extend(codegen_pragma_findings(Source(path, rel_of(root, path), read_text(path))))
+    return out
+
+
+def header_pragma_counts_at_ref(root: str, ref: str) -> dict:
+    """Rule-10 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+    out: dict = {}
+    for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
+        if not path.endswith(HEADER_SUFFIXES):
+            continue
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        for f in codegen_pragma_findings(Source(path, path, text)):
+            out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
+    return out
+
+
 def lint_tree(root: str, paths: list[str] | None = None,
               ownership: "Ownership | None" = None) -> list[dict]:
     """Per-file findings (rules 2-9) for `paths`, or for the whole tree when `paths` is None.
@@ -890,6 +961,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
     for src in sources:
         out.extend(lint_source(src, ownership))
     out.extend(rule1_findings(sources))
+    out.extend(header_pragma_findings(root))
     out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out
 
@@ -1535,8 +1607,39 @@ def selftest() -> int:
     check("diff: a fixed rule still fails for a different one",
           [(x["rule"]) for x in diff_deltas({(5, "x"): 1, (8, "x"): 0}, {(5, "x"): 1, (8, "x"): 1})], [8])
 
+    # --- rule 10: a codegen pragma belongs to a TU, not to a shared header ------------------------
+    hdr = "include/stage/fn_802B2AA0.h"
+
+    def pragmas_of(text: str, rel: str = hdr) -> list[int]:
+        return [f["line"] for f in codegen_pragma_findings(Source("x", rel, text))]
+
+    check("rule10: peephole in a shared header is a finding", pragmas_of("#pragma peephole off\n"), [1])
+    check("rule10: optimization_level in a shared header is a finding",
+          pragmas_of("#pragma optimization_level 2\n"), [1])
+    check("rule10: fp_contract in a shared header is a finding",
+          pragmas_of("#pragma fp_contract on\n"), [1])
+    check("rule10: an indented pragma is still found", pragmas_of("    #pragma peephole off\n"), [1])
+    check("rule10: a pragma in a .cpp is not reported",
+          codegen_pragma_findings(Source("x", "src/enemy/em019_prog.cpp", "#pragma peephole off\n")), [])
+    check("rule10: a pragma in a .c is not reported",
+          codegen_pragma_findings(Source("x", "src/foo.c", "#pragma peephole off\n")), [])
+    check("rule10: a commented pragma is clean", pragmas_of("/* #pragma peephole off */\n"), [])
+    check("rule10: a pragma named in a line comment is clean",
+          pragmas_of("// #pragma peephole off\n"), [])
+    check("rule10: `#pragma once` is not a codegen pragma", pragmas_of("#pragma once\n"), [])
+    check("rule10: `#pragma pack` is not a codegen pragma", pragmas_of("#pragma pack(4)\n"), [])
+    check("rule10: the finding names the pragma and the fix",
+          [f["detail"] for f in codegen_pragma_findings(Source("x", hdr, "#pragma peephole off\n"))],
+          ["codegen pragma `#pragma peephole` in a shared header - state it in the `.c`/`.cpp` that "
+           "needs it, never in the header"])
+    check("rule10: the report is a rule-10 finding",
+          [f["rule"] for f in codegen_pragma_findings(Source("x", hdr, "#pragma peephole off\n"))], [10])
+    if os.path.exists(hdr):
+        check("rule10: the motivating header is clean after the fix",
+              codegen_pragma_findings(Source(hdr, hdr, read_text(hdr))), [])
+
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     check("e2e: no rule is declared unchecked", UNCHECKED, [])
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
@@ -1591,13 +1694,15 @@ def main(argv: list[str] | None = None) -> int:
             pairs = changed_src_files(root, args.diff)
             rels = [after for _before, after in pairs]
             before = merge_counts(findings_at_ref(root, args.diff, pairs, ownership),
-                                  rule1_counts_at_ref(root, args.diff, pairs))
+                                  rule1_counts_at_ref(root, args.diff, pairs),
+                                  header_pragma_counts_at_ref(root, args.diff))
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
             return 2
         after = merge_counts(
             rule_counts(lint_tree(root, [os.path.join(root, a) for _b, a in pairs], ownership)),
-            rule_counts(rule1_findings(all_sources(root))))
+            rule_counts(rule1_findings(all_sources(root))),
+            rule_counts(header_pragma_findings(root)))
         added = diff_deltas(before, after)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
