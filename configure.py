@@ -297,6 +297,15 @@ cflags_os = [*cflags_base, "-func_align", "4"]
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
 # functions back to back with 4-byte gaps, so `-func_align 4`.  Evidence: DWCi/fn_805113B0.c.
 cflags_dwc = [*cflags_base, "-func_align", "4"]
+# NWC24 (the WiiConnect24 library: `NWC24IsMsgLibOpened` .. `NWC24iPrepareShutdown`,
+# src/NWC24/fn_8051D710.c + src/NWC24/fn_8051E068.c).  Same shape as the sibling SDK groups above -
+# cflags_base + `-func_align 4`, copied, not changed: the band's retail .text packs its functions on
+# 4-byte boundaries (e.g. NWC24IsMsgLibOpened 0x8051D8B0 -> ...ByTool 0x8051D8C4 -> fn_8051D8D8
+# 0x8051D8D8 -> NWC24BlockOpenMsgLib 0x8051D8EC, and the 0x10-byte command thunks at 0x8051DEA8,
+# 0x8051DEB8, 0x8051DEC8 are not 16-byte aligned), while cflags_base's `-O4,p` implies -func_align 16.
+# The level itself is unprobed for this band - no unit here is flipped - so a body pass should sweep
+# -O3/-O4,p per unit (playbook 33) before the flags are called settled.
+cflags_nwc24 = [*cflags_base, "-func_align", "4"]
 
 # lobby flags (src/lobby/lobby_scene.c). Evidence: the retail fn_801EC9E0 (0x18 B / 6 instructions) reads the
 # small-data scene pointer, then the +0x10 table base, before the argument's byte, and keeps the table base
@@ -2184,6 +2193,38 @@ config.libs = [
         "host": False,
         "objects": [
             Object(NonMatching, "DWCi/fn_805113B0.c"),
+        ],
+    },
+    {
+        # The WiiConnect24 (NWC24) SDK library of the retail link order: the strongest cut in the
+        # band is `NWC24IsMsgLibOpened` (0x8051D8B0) on its right edge, 0x8051E864 (a `.sdata` pool
+        # run jump, the NWC24 -> SO library seam), and the band really starts at 0x8051D710, not at
+        # the weak left cut 0x8051CDD0 (that one is inside the NCD/REX band: `.sbss` 0x80795894 is
+        # referenced only by 0x8051C554-0x8051CCE0, and NETMemCpy/NETMemSet have no data refs at all).
+        # The band is registered as the TWO original translation units its own data proves - the
+        # `.data` literal "/dev/net/kd/request" is emitted twice with disjoint referrer sets
+        # (0x80631178 <- 0x8051DB4C/0x8051DCEC/0x8051DF08, 0x80631200 <- 0x8051E6D4) and `-str reuse`
+        # merges identical literals inside one TU.  See both unit headers for the full cut evidence.
+        # Module `NWC24` from the library's own version string in the span (`.data` 0x80631128,
+        # "<< RVL_SDK - NWC24 release build: Jun  9 2009 11:59:51 (0x4199_60831) >>", registered by
+        # fn_8051D878 at 0x8051D878) and from the named NWC24* API; no `__FILE__` string covers the
+        # range, so the files keep the map's stems under a rule-7 deferral.
+        "lib": "NWC24",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_nwc24,
+        "host": False,
+        "objects": [
+            # The WiiConnect24 (NWC24) SDK library's two translation units, as the band's own data
+            # proves: the message-library half (the MsgLib state API, the scheduler pair, the
+            # script-mode/user-id requests, the version registration and the /dev/net/kd/request command
+            # engine) and the device/utility half (the /dev/net/kd/* fd+ioctl wrappers with the async
+            # command slot, the user-id CRC/unscramble pair, the RTC pair and the shutdown pair).  Both
+            # file names are descriptive guesses marked as such in the unit headers - the image carries no
+            # `__FILE__` string for the range and the runtime dump answers only zz_/fn_ placeholders.
+            # The seam between them, the cut evidence and the 18 fn_XXXXXXXX symbols renamed to real
+            # names are documented in the two headers and in .pi/notes/net-nwc24.md.
+            Object(NonMatching, "NWC24/nwc24_msg.c"),  # 0x8051D710-0x8051E068
+            Object(NonMatching, "NWC24/nwc24_io.c"),   # 0x8051E068-0x8051E864
         ],
     },
     {
