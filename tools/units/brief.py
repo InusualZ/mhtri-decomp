@@ -783,10 +783,17 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
     lines.append("")
     lines.append("**Rule 7 at your final path.** The lint stops enforcing rule 7 while a unit has no bodies "
-                 "yet, and once it has bodies it defers rule 7 for a unit whose file header carries one "
-                 "line:\n\n    rule 7 deferred: <the evidence, e.g. the map has only fn_XXXXXXXX for this "
-                 "range>\n\nUse it only when the map really offers no name. It defers the `fn_XXXXXXXX` "
-                 "half only - a bare `unk*` local still fails - and the complete set of deferrals is "
+                 "yet. Once it carries bodies, every symbol the unit **defines** needs a name: use the map's "
+                 "real name when the evidence has one, otherwise derive one from the symbol's own body and "
+                 "the neighbours' scheme, and when the context supports only a guess, guess and mark it as a "
+                 "GUESS in the unit header with the evidence behind it. `fn_XXXXXXXX` is never the resting "
+                 "place, and a rename is the map **and** the source in one edit - request the map half of "
+                 "your own unit's renames in the outbox (`config_requests`, `kind: rename`, "
+                 "old/new/evidence), since you may not edit `symbols.txt` here. A `rule 7 deferred` line is "
+                 "only for references to OTHER units' unrenamed symbols - the land gate refuses a batch that "
+                 "grows an escape for a name the batch owns:\n\n    rule 7 deferred: <the evidence, e.g. "
+                 "references only to other units' fn_XXXXXXXX symbols>\n\nIt defers the `fn_XXXXXXXX` half "
+                 "only - a bare `unk*` local still fails - and the complete set of deferrals is "
                  "`grep -rn \"rule 7 deferred\" src/`.")
     lines.append("")
     lines.append(plan_section(main, "## 8. Invariants"))
@@ -1008,18 +1015,28 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("3. **What the code does, plus the naming scheme of its neighbours.** A descriptive name that fits")
     lines.append("   the siblings' scheme. If several proposals are plainly one subsystem, say so - they belong in")
     lines.append("   one module directory.")
-    lines.append("4. **Nothing supports a name.** Keep the map's `fn_XXXXXXXX` stem as the file name and say so.")
-    lines.append("   Inventing a name to fill the gap is forbidden, and this is a legitimate outcome. Do not invent")
-    lines.append("   a module either - if the module is genuinely unknown, ask the orchestrator.")
+    lines.append("4. **The evidence gives no name - derive the best guess and mark it.** With no `__FILE__`")
+    lines.append("   string, no real runtime-dump name and no neighbour scheme reaching the range, derive the most")
+    lines.append("   descriptive module and name the context supports (what the range actually does), write it in the")
+    lines.append("   unit header as an explicit **GUESS** with the evidence behind it, and register at")
+    lines.append("   `src/<module>/<name>.<ext>`. **Keeping the map's `fn_XXXXXXXX` stem as the file name is not an")
+    lines.append("   option**: the land gate refuses a batch whose own unit is registered at a generated file name")
+    lines.append("   (`src/enemy/fn_8033041C.cpp`). Do not invent a module either - if the module is genuinely unknown,")
+    lines.append("   ask the orchestrator.")
     lines.append("")
-    lines.append("Then make the registration, **in your worktree**, as three edits in one commit:")
+    lines.append("Then make the registration, **in your worktree**, in one commit - the source, the map row and the")
+    lines.append("two build files, because a rename is always **two** edits (the map **and** the source; playbook")
+    lines.append("31/48):")
     lines.append("")
     lines.append("```sh")
     lines.append("# 1. the source, at its final path")
     lines.append("mkdir -p src/<module> && $EDITOR src/<module>/<name>.<ext>")
-    lines.append("# 2. its object line, in configure.py's config.libs, in the lib its neighbours use")
+    lines.append("# 2. the map row for each symbol THIS unit defines that the map still spells fn_XXXXXXXX -")
+    lines.append("#    never by hand, and never another unit's symbol")
+    lines.append("python tools/symbols/symedit.py rename fn_XXXXXXXX <name>")
+    lines.append("# 3. its object line, in configure.py's config.libs, in the lib its neighbours use")
     lines.append("#    Object(NonMatching, \"<module>/<name>.<ext>\"),")
-    lines.append("# 3. its splits.txt block: one line per section, exact start:/end: addresses")
+    lines.append("# 4. its splits.txt block: one line per section, exact start:/end: addresses")
     lines.append("#    <module>/<name>.<ext>:")
     lines.append("#    \t.text       start:0x%08X end:0x%08X" % (t0, t1))
     lines.append("python configure.py && ninja build/RMHE08/src/<module>/<name>.o   # registers it in YOUR worktree")
@@ -1035,13 +1052,23 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("If the unit needs sections beyond `.text` (a `.ctors`/`.dtors` word, `extab`/`extabindex`), claim")
     lines.append("them in the same `splits.txt` block and say so in your report.")
     lines.append("")
-    lines.append("**Naming, and the one line the gate needs.** If the symbol map has only `fn_XXXXXXXX` for this")
-    lines.append("range then your source must use those names - the project's naming rule forbids inventing a")
-    lines.append("better one - and stylelint's rule 7 would refuse the landing. Put this line in the unit's file")
-    lines.append("header, with a reason that names the evidence:")
+    lines.append("**Naming your own symbols, and the one line the gate needs.** This unit is yours, so every")
+    lines.append("symbol it **defines** is yours to name: use the map's real name when the evidence has one, otherwise")
+    lines.append("derive a descriptive name from the symbol's own body - what it does, what it returns, who calls it,")
+    lines.append("what it writes - plus the neighbours' naming scheme. When the context supports only a guess, guess")
+    lines.append("and write it in the unit header as an explicit **GUESS** with the evidence behind it: there is no")
+    lines.append("\"no evidence for a name\" case, only a name to derive. Register at that named path (never")
+    lines.append("`fn_XXXXXXXX.cpp`) and finish the rename's map half with")
+    lines.append("`python tools/symbols/symedit.py rename fn_XXXXXXXX <name>` - the map **and** the source, one edit.")
+    lines.append("")
+    lines.append("The gate line is for the symbols you only *reference*: the land gate REFUSES a batch that grows a")
+    lines.append("`rule 7 deferred` escape for a name the batch owns (its own file registered at a generated file")
+    lines.append("name, or its own `fn_XXXXXXXX` name left **defined** in the source). References to OTHER units'")
+    lines.append("unrenamed `fn_XXXXXXXX` symbols are tolerated - they are not this batch's to fix - and a `rule 7")
+    lines.append("deferred` line is still the durable way to say so, with a reason that names the evidence:")
     lines.append("")
     lines.append("```c")
-    lines.append(" * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked <how>)")
+    lines.append(" * rule 7 deferred: references only to other units' unrenamed fn_XXXXXXXX symbols (checked <how>)")
     lines.append("```")
     lines.append("")
     lines.append("It is a per-unit, greppable deferral - `grep -rn \"rule 7 deferred\" src/` is the complete list,")
@@ -1530,8 +1557,14 @@ def selftest() -> int:
         check("the proposal brief states the shared-file exception",
               "one exception to the shared-file rule" in text, True)
         check("the proposal brief carries the rule-7 deferral spelling", "rule 7 deferred:" in text, True)
-        check("the proposal brief keeps the ban on inventing a name",
-              "Inventing a name to fill the gap is forbidden" in text, True)
+        check("the proposal brief tells the worker to guess and mark a name, not keep the map's stem",
+              "explicit **GUESS**" in text
+              and "Keeping the map's `fn_XXXXXXXX` stem as the file name is not an" in text
+              and "Keep the map's `fn_XXXXXXXX` stem as the file name and say so" not in text, True)
+        check("the proposal brief carries the map-side rename of the unit's own symbol",
+              "symedit.py rename fn_XXXXXXXX <name>" in text, True)
+        check("the proposal brief keeps the tolerance for other units' unrenamed symbols",
+              "references only to other units' unrenamed fn_XXXXXXXX symbols" in text, True)
         check("the proposal brief keeps the section 6.5 rules",
               "## 6 · The rules" in text and "rule 7 deferred:" in text, True)
         check("the proposal brief carries the outbox path", str(b["handoff"]["outbox"]) in text, True)
