@@ -699,6 +699,16 @@ config.libs = [
             # below: `infer.py` reads the peephole off on its objects (`fn_80324CC4`, 0 record forms
             # with 2 fold-shaped pairs) and `-use_lmw_stmw off`.
             Object(NonMatching, "menu/fn_8031EA8C.cpp"),
+            # Registered from proposal/8034C0C4_fn_8034C0C4.cpp (`.text` 0x8034C0C4..0x8034C1D0, one
+            # function / 268 B): the note-list entry table.  Module `menu` and file name
+            # `menu_note.cpp` are class-1 evidence - the range's `__FILE__` string `.data` 0x805E91F8
+            # reads "menu_note.cpp", it has exactly ONE copy in the DOL, and it is referenced by
+            # exactly this range's object, so no neighbour shares the TU.  Sections: `.text` plus
+            # `.data` 0x805E9220..0x805E9248 (the unit's own 10-entry switch jump table); the two
+            # `.data` literals the body loads stay unowned (declared, never defined).  Same
+            # `cflags_menu` as its file family (`menu_item.cpp` and `menu_infomation.cpp` carry the
+            # same `menu_*` name pattern); the body keeps no fold-shaped pair.
+            Object(Matching, "menu/menu_note.cpp"),
         ],
     },
 
