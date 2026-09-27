@@ -1280,7 +1280,12 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
             continue
         defs = generated_fn_definitions(new_text)
         if defs:
-            offenders.append("%s: defines %s" % (rel, ", ".join(defs[:3])))
+            # The list must be COMPLETE: a worker who renames only the names it was shown is refused again
+            # on the next run, and that loop cost two lanes a full unit of work each (the 803432b4 unit
+            # defines 33 generated names, the eft053 batch 8 - both messages showed only three). The count
+            # goes first so the scale of the job is visible in one line.
+            offenders.append("%s: defines %d generated name(s): %s"
+                             % (rel, len(defs), ", ".join(defs)))
     return sorted(offenders)
 
 
