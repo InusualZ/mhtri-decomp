@@ -162,6 +162,24 @@ SYMBOLS = """fn_80004000 = .text:0x80004000; // type:function size:0x10
 fn_80004010 = .text:0x80004010; // type:function size:0x10
 tbl_80050000 = .data:0x80050000; // type:object size:0x10 scope:local
 lbl_80050200 = .data:0x80050200; // type:object size:0x8 scope:local
+UnitVTable = .data:0x80050000; // type:object size:0x10 scope:global
+FarVTable = .data:0x80600000; // type:object size:0x8 scope:global
+"""
+
+# The definition index's input: a struct whose member at +0x00 is a pointer to a table of function pointers.
+# The member is deliberately spelled `pVtbl` - not `vtable`/`vtbl` - so the selftest proves the scan finds
+# an assignment through the DEFINITION and not through a hard-coded name.
+UNIT_HEADER = """typedef struct Vtbl {
+    void* rtti_00;
+    void* rtti_04;
+    void (*slot_08)(void* self);
+    void (*slot_0C)(void* self);
+} Vtbl;
+
+typedef struct Unit {
+    Vtbl* pVtbl;                 /* +0x00 */
+    unsigned int field;          /* +0x04 */
+} Unit;
 """
 
 CONFIGURE = """config.libs = [
@@ -173,10 +191,13 @@ CONFIGURE = """config.libs = [
 """
 
 # The source fixtures: one legal rule-10 Case 2 reference (outside every registered range), one reference
-# to another unit's range, and one to the file's own range - plus two lines that must NOT match.
+# to another unit's range, and one to the file's own range - the last two named with the `_VTable`
+# spelling that the old `lbl_XXXXXXXX`-only scan could not see, which is the blind spot this selftest
+# exists for. Two lines must NOT match.
 UNIT_SRC = """void f(void) {
-    self->vtable = lbl_80600000;          /* no registered range owns this - rule 10 Case 2 */
+    self->pVtbl = &FarVTable;             /* no registered range owns this - rule 10 Case 2 */
     self->vtable = lbl_80050200;          /* t/ref.cpp's range - that unit's table */
+    self->pVtbl = &UnitVTable;            /* this file's OWN .data - the forbidden shape */
     vtable_size = 4;                      /* not a reference */
 }
 """
@@ -195,6 +216,21 @@ def dol_header() -> bytes:
     return bytes(hdr)
 
 
+def table_dol() -> bytes:
+    """A DOL with a `.text` at 0x80004000 and a `.data` at 0x80050000 holding two of its code pointers.
+
+    The structural ownership test reads these bytes, so it needs a DOL that really carries both sections.
+    """
+    hdr = bytearray(0x100)
+    struct.pack_into(">I", hdr, 0x00, 0x100)          # text[0] file offset
+    struct.pack_into(">I", hdr, 0x1C, 0x200)          # data[0] file offset
+    struct.pack_into(">I", hdr, 0x48, 0x80004000)     # text[0] address
+    struct.pack_into(">I", hdr, 0x64, 0x80050000)     # data[0] address
+    struct.pack_into(">I", hdr, 0x90, 0x100)          # text[0] size
+    struct.pack_into(">I", hdr, 0xAC, 8)              # data[0] size
+    return bytes(hdr) + b"\x00" * 0x100 + struct.pack(">II", 0x80004000, 0x80004010)
+
+
 def make_tree(root: str) -> dict:
     """Write the whole fixture tree and return its expected object paths."""
     paths = {
@@ -203,9 +239,10 @@ def make_tree(root: str) -> dict:
         "dol": os.path.join(root, "orig", "RMHE08", "sys", "main.dol"),
         "configure": os.path.join(root, "configure.py"),
         "unit_src": os.path.join(root, "src", "t", "unit.cpp"),
+        "unit_hdr": os.path.join(root, "src", "t", "unit.h"),
         "ref_src": os.path.join(root, "src", "t", "ref.cpp"),
     }
-    for key in ("splits", "symbols", "dol", "configure", "unit_src", "ref_src"):
+    for key in ("splits", "symbols", "dol", "configure", "unit_src", "unit_hdr", "ref_src"):
         os.makedirs(os.path.dirname(paths[key]), exist_ok=True)
     with open(paths["splits"], "w", encoding="utf-8") as fh:
         fh.write(SPLITS)
@@ -217,6 +254,8 @@ def make_tree(root: str) -> dict:
         fh.write(dol_header())
     with open(paths["unit_src"], "w", encoding="utf-8") as fh:
         fh.write(UNIT_SRC)
+    with open(paths["unit_hdr"], "w", encoding="utf-8") as fh:
+        fh.write(UNIT_HEADER)
     with open(paths["ref_src"], "w", encoding="utf-8") as fh:
         fh.write(REF_SRC)
 
@@ -297,9 +336,9 @@ def selftest() -> int:
     check("splits: a renamed section keeps both spellings",
           [(r["section"], r["object"]) for r in renamed["u.c"]], [(".ctors", ".ctors$10")])
     symbols = va.parse_symbols(SYMBOLS)
-    check("symbols: name -> (section, address)",
-          symbols["lbl_80050200"], (DATA, 0x80050200))
-    check("symbols: comments do not create rows", len(symbols), 4)
+    check("symbols: name -> (section, address, size)",
+          symbols["lbl_80050200"], (DATA, 0x80050200, 8))
+    check("symbols: comments do not create rows", len(symbols), 6)
     check("dol: text ranges from the header", va.dol_text_ranges(dol_header()),
           [(0x80004000, 0x80004100)])
     check("dol: a runt is not a DOL", va.dol_text_ranges(b"\x7fELF" + b"\x00" * 8), [])
@@ -397,11 +436,58 @@ def selftest() -> int:
           va.symbol_at(symbols, DATA, 0x80050004), "tbl_80050000+0x4")
     check("symbol_at: nothing in that section",
           va.symbol_at(symbols, RODATA, 0x80060000), None)
-    check("the vtable-assignment pattern takes a plain and a cast spelling",
-          [m.group("sym") for m in va.VTABLE_ASSIGN_RE.finditer(
+    check("the scan takes a plain, a cast and an `&` spelling, and filters by the member's DEFINITION",
+          [(h["field"], h["symbol"]) for h in va.scan_text_assignments(
               "  a->vtable = lbl_80050000;\n  b->vtable = (const Vtbl*)lbl_80050200;\n"
-              "  c->vtable_slot = lbl_80050200;\n  vtable_size = 4;\n")],
-          ["lbl_80050000", "lbl_80050200"])
+              "  c->pVtbl = &SomeVTable;\n  d->vtable_slot = lbl_80050200;\n  vtable_size = 4;\n",
+              {"pVtbl": {"pointee": "Vtbl"}})],
+          [("vtable", "lbl_80050000"), ("vtable", "lbl_80050200"), ("pVtbl", "SomeVTable")])
+    check("the scan does not read `==` as an assignment",
+          va.scan_text_assignments("  a->vtable == 0;\n  b->vtable != 0;\n", {}), [])
+    check("the scan does not read an assignment QUOTED IN A COMMENT as one",
+          va.scan_text_assignments("/* `self->vtable = &OwnVTable;` was the defect */\n"
+                                   "// self->vtable = &OwnVTable;\n", {}), [])
+    check("... and it does not read one inside a string literal either",
+          va.scan_text_assignments('  log("s->vtable = &OwnVTable;");\n', {}), [])
+
+    # -- the definition index (a +0x00 fn-table pointer is a class with inheritance) ---------------
+    defs = va.type_definitions({"t/unit.h": UNIT_HEADER})
+    check("the definition index reads a function-pointer member",
+          [x[1] for x in defs["Vtbl"]], ["rtti_00", "rtti_04", "slot_08", "slot_0C"])
+    check("a +0x00 pointer to a function-pointer table is found, whatever the member is called",
+          {k: v["pointee"] for k, v in va.fn_table_fields(defs).items()}, {"pVtbl": "Vtbl"})
+    check("a linked-list `next` to a struct that merely holds a callback is NOT a vtable field",
+          va.fn_table_fields(va.type_definitions({"c.c": "typedef struct Chain { struct Chain* next;\n"
+                                                  "  void (*dtor)(void*);\n  void* object; } Chain;\n"
+                                                  "typedef struct Top { Chain* next; } Top;\n"})),
+          {})
+    check("a `pad`/`rtti`-only filler does not disqualify a vtable",
+          va.fn_table_fields(va.type_definitions({"h.h": "typedef struct V { void* rtti_00;\n"
+                                                  "  void* rtti_04; u8 pad08[0x20];\n"
+                                                  "  void (*a)(void); void (*b)(void); } V;\n"
+                                                  "typedef struct T { V* p; } T;\n"})),
+          {"p": {"pointee": "V", "file": "h.h", "type": "T"}})
+
+    # -- the structural ownership test ------------------------------------------------------------
+    check("a table whose entries are this unit's code is structurally the unit's own vtable",
+          va.table_belongs_to_unit(table_dol(), (DATA, 0x80050000, 8), [(0x80004000, 0x80004100)]),
+          True)
+    check("... and a table pointing elsewhere is not",
+          va.table_belongs_to_unit(table_dol(), (DATA, 0x80050000, 8), [(0x80006000, 0x80006100)]),
+          False)
+    check("an address the DOL does not cover is not an owned table",
+          va.table_belongs_to_unit(table_dol(), (DATA, 0x80070000, 8), [(0x80004000, 0x80004100)]),
+          False)
+
+    # -- violation_keys: the `--diff` comparison's unit -------------------------------------------------
+    check("violation_keys names a run and an own-range assignment distinctly",
+          va.violation_keys({"violations": [{"unit": "u.cpp", "section": ".data",
+                                              "address": 0x80050000}],
+                             "references": [{"file": "src/u.cpp", "line": 3,
+                                             "symbol": "X", "kind": "own"},
+                                            {"file": "src/u.cpp", "line": 4,
+                                             "symbol": "Y", "kind": "external"}]}),
+          ["ref:src/u.cpp:3:X", "run:u.cpp:.data:80050000"])
 
     # -- end to end, over the fixture tree ------------------------------------------------------
     with tempfile.TemporaryDirectory() as tmp:
@@ -468,18 +554,27 @@ def selftest() -> int:
         check("sweep: the section kinds are counted", s["section_kinds"]["missing"], 1)
 
         # (b) the source references, classified, with the legal case NOT reported
-        check("sweep: three vtable assignments found", len(s["references"]), 3)
-        check("sweep: one legal Case 2, one foreign, one own-range",
-              s["reference_kinds"], {"external": 1, "foreign": 1, "own": 1})
+        check("sweep: four assignments found, any symbol spelling or member name",
+              len(s["references"]), 4)
+        check("sweep: one legal Case 2, one foreign, two own-range",
+              s["reference_kinds"], {"external": 1, "foreign": 1, "own": 2, "unresolved": 0})
         by_kind = {r["kind"]: r for r in s["references"]}
         check("sweep: the external one names its file and line",
               (by_kind["external"]["file"], by_kind["external"]["line"]),
               ("src/t/unit.cpp", 2))
         check("sweep: the own-range one is the file's own .data",
               (by_kind["own"]["symbol"], by_kind["own"]["address"]),
-              ("lbl_80050200", 0x80050200))
+              ("UnitVTable", 0x80050000))
+        check("sweep: a `_VTable`-named table is found by ownership, not by spelling",
+              sorted(r["symbol"] for r in s["references"] if r["symbol"].endswith("VTable")),
+              ["FarVTable", "UnitVTable"])
+        check("sweep: the `pVtbl` member was matched through the definition index",
+              [r["field"] for r in s["references"] if r["symbol"] in ("UnitVTable", "FarVTable")],
+              ["pVtbl", "pVtbl"])
         check("sweep: `vtable_size = 4;` is not a reference",
-              [r for r in s["references"] if r["line"] == 4], [])
+              [r for r in s["references"] if r["line"] == 5], [])
+        check("sweep: the +0x00 fn-table pointer fields are reported",
+              {k: v["pointee"] for k, v in s["fn_table_fields"].items()}, {"pVtbl": "Vtbl"})
 
         # the tool only reads: every fixture file is byte-identical afterwards
         check("sweep: nothing in the tree was written", tree_digest(tmp), before)

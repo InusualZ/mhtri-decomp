@@ -32,11 +32,22 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md` is the standard), rather than assuming the re-range harmless;
 * checks every command's exit code, `configure.py`'s included - a failed `configure.py` leaves a stale
   `build.ninja` and every later number is a fiction;
+<<<<<<< HEAD
+* refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
+  outside the batch's expected set, or whose outbox entry does not validate;
+* **checks rule 10 like every other rule** (`vtableaudit.py`): a table of code pointers inside a unit's own
+  ranges must be compiler output, so the row is add-only - exactly like the lint's `--diff`, because the
+  tree already carries violations - and it PRINTS the violation set for the batch's units even when it
+  passes. The rule used to be a "landing-review rule" (a habit), and
+  `Network/fn_803D3CE8.cpp`'s two `self->vtable = &NetworkSessionManagerVTable;` writes survived a landing
+  through it (2026-09-27); a silent pass is what that classification bought, so a silent pass is gone;
+=======
 * **refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
   outside the batch's expected set, or whose outbox entry does not validate**; a foreign path **already in the
   tree** is reported - with a likely cause when it looks like lane scratch (`.tmp-*`, `.ws-*`, an `upstream/`
   clone) - **before** the expensive gate runs (`preflight_foreign`), not only as the refusal afterwards, so a
   mis-launched lane's leftovers cost a second, not a 5-minute build;
+>>>>>>> main
 * runs the style lint when it exists (7.21), reports the ledger delta, and warns when a unit improved with no
   document or header change to show for it (7.10); the lint row carries the **head** of stylelint's output -
   where the findings are - and never its trailing "not enforced: ..." legend, which on 2026-09-25 made a FAIL
@@ -189,6 +200,12 @@ from units import unionresolve as ur  # noqa: E402
 # drift. `land` calls it directly so the gate performs the checks the SKILL documents rather than the
 # landing flow trusting `build/RMHE08/report.json` (which the batch was measured against).
 from units import verifyunit as vu  # noqa: E402
+# `vtableaudit` owns the rule-10 check: a table of code pointers inside a unit's own ranges must be
+# **compiler output** (a `virtual` class), and a hand assignment to it is the violation. Rule 10 used to
+# be a "landing-review rule" - enforced by a habit nobody performed - and `Network/fn_803D3CE8.cpp`'s two
+# `self->vtable = &NetworkSessionManagerVTable;` writes survived a landing through it (2026-09-27). The
+# gate row below is that habit, as a check.
+from units import vtableaudit as vta  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
@@ -1481,6 +1498,50 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
     return sorted(offenders)
 
 
+def rule10_violations(main: str, text_ref: str | None = None) -> dict | None:
+    """`{key: {"unit", "where", "kind"}}` for every rule-10 violation in the tree as it stands.
+
+    Two shapes, and the key is stable so the gate can diff two snapshots: `run:<unit>:<section>:<addr>`
+    for a code-pointer run inside the unit's own registered ranges that our object neither emits nor
+    references, and `ref:<file>:<line>:<symbol>` for a source assignment to a `+0x00` function-pointer-table
+    member whose table the unit itself owns. `text_ref` judges the text half as of that revision - the gate
+    passes the batch base for its BEFORE snapshot. `None` when the audit cannot read the tree at all (a
+    missing DOL, a broken `configure.py`) - the row then says so instead of refusing every batch.
+    """
+    try:
+        sweep = vta.sweep(main, text_ref=text_ref)
+    except Exception as exc:                                   # noqa: BLE001 - the row must never crash
+        print("rule 10: vtableaudit could not read this tree (%s)" % exc, file=sys.stderr)
+        return None
+    rows = {}
+    for run in sweep["violations"]:
+        key = "run:%s:%s:%08X" % (run["unit"], run["section"], run["address"])
+        rows[key] = {"unit": claims.norm_unit(run["unit"]), "kind": "run",
+                     "where": "%s %s 0x%08X (%d words)" % (run["unit"], run["section"],
+                                                           run["address"], run["words"])}
+    for ref in sweep["references"]:
+        if ref["kind"] != "own":
+            continue
+        key = "ref:%s:%d:%s" % (ref["file"], ref["line"], ref["symbol"])
+        rows[key] = {"unit": claims.norm_unit(ref["unit"]), "kind": "ref",
+                     "where": "%s:%d assigns %s" % (ref["file"], ref["line"], ref["symbol"])}
+    return rows
+
+
+def rule10_growth(before: dict, after: dict, units: list[str]) -> tuple[list[str], list[str]]:
+    """`(added_keys, rows_for_the_batch_units)` - the rule-10 row's decision, as a pure function.
+
+    ADD-only, like the lint's `--diff`: a key present before the batch is grandfathered, a key the batch
+    introduced is a refusal. The second element is the report the row prints even when it passes - the
+    violation set for the units the batch touches, so a silent pass (rule 10's old "landing review"
+    classification) cannot happen again.
+    """
+    grew = sorted(set(after) - set(before))
+    mine = {claims.norm_unit(u) for u in units}
+    touched = [after[k]["where"] for k in sorted(after) if after[k]["unit"] in mine]
+    return grew, touched
+
+
 def band_ownership_warnings(main: str, base: str | None) -> list[str]:
     """Rule-2 warnings a batch introduces at the registration boundary. Never a refusal.
 
@@ -2178,6 +2239,10 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # batch's ranges: compared after the build, a unit the batch does not name whose object moved is a
     # `splits.txt` change that re-ranged a neighbour (the merger's strongest form, .pi/notes/8031a6c0).
     before_targets = vu.target_object_snapshot(main)
+    # rule 10 (vtable ownership), the pre-build half: the batch's working tree already carries the head
+    # text, and `configure.py` below re-splits and overwrites the objects, so the BEFORE snapshot has to be
+    # taken here - text from the batch base (`want_base`) and objects as the base built them.
+    rule10_before = rule10_violations(main, text_ref=want_base)
     built = gate("configure.py", [sys.executable, "configure.py"])
     # the split, before the registration check (2026-09-26, .pi/notes/8030681c-gate-finding.md): the
     # per-unit rules are generated from build/RMHE08/config.json, and build.ninja itself depends on it
@@ -2213,6 +2278,27 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                      "`ninja build/RMHE08/ok` cannot see this because a `NonMatching` unit is never linked")
     built = gate("ninja", ["ninja"]) and built
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
+    # rule 10 (vtable ownership), the row: a table of code pointers inside a unit's own ranges must be
+    # compiler output (a `virtual` class emits it and the store), so a batch that ADDS a violation is
+    # refused. The comparison is add-only, exactly like the lint's `--diff`: the tree already carries
+    # violations (`fn_80429B94.cpp`'s seven, `fn_80423E74.cpp`, `ai/fn_802CC794.cpp`, and the units that
+    # hand-assign their own unclaimed vtable, `Network/fn_803D3CE8.cpp` among them before this batch), and
+    # refusing those would refuse every batch forever. The set for the batch's own units is printed even
+    # when the row passes - a silent pass is what rule 10's old "landing review" classification bought.
+    rule10_after = rule10_violations(main)
+    if rule10_before is None or rule10_after is None:
+        check("rule 10 (vtable ownership) adds no violation", True,
+              info="vtableaudit could not read this tree - the row is skipped (see the note above)")
+    else:
+        grew, touched_rows = rule10_growth(rule10_before, rule10_after, unit_units)
+        check("rule 10 (vtable ownership) adds no violation", not grew,
+              detail="%d added: %s" % (len(grew), "; ".join(grew[:4])),
+              info=("rule 10 report for this batch: %s" % "; ".join(touched_rows)) if touched_rows
+                   else "no owned-but-unemitted code-pointer run or own-range vtable write in the batch's "
+                        "units",
+              remedy="declare the class with its `virtual` methods and let MWCC emit the table and the "
+                     "store (rule 10 / playbook 52), or claim the `.data` range and emit it; run "
+                     "`python tools/units/vtableaudit.py --unit <unit>` for the detail")
     # the split target objects after the re-split: a unit the batch does not name must be byte-identical.
     after_targets = vu.target_object_snapshot(main)
     drift = vu.target_drift_problems(before_targets, after_targets, unit_units)
@@ -2990,6 +3076,26 @@ def selftest() -> int:
           module.rule7_defer_growth(d5, sha5), [])
     for d in (d1, d2, d3, d4, d5):
         shutil.rmtree(d, ignore_errors=True)
+
+    # --- rule 10: the row is ADD-only, like the lint's `--diff` ------------------------------------
+    existing = {"run:ai/fn_802CC794.cpp:.data:805D4D38": {"unit": "ai/fn_802CC794",
+                                                            "where": "ai/fn_802CC794.cpp .data"},
+                "ref:src/old/unit.cpp:9:OldVTable": {"unit": "old/unit",
+                                                      "where": "src/old/unit.cpp:9 assigns OldVTable"}}
+    same = dict(existing, **{"ref:src/new/unit.cpp:3:NewVTable":
+                             {"unit": "new/unit", "where": "src/new/unit.cpp:3 assigns NewVTable"}})
+    check("rule10: an unchanged set (existing violations grandfathered) adds nothing",
+          module.rule10_growth(existing, existing, ["new/unit"]), ([], []))
+    added, touched = module.rule10_growth(existing, same, ["new/unit"])
+    check("rule10: a batch that ADDS a violation is refused",
+          added, ["ref:src/new/unit.cpp:3:NewVTable"])
+    check("... and the row prints the batch units' violations even when it passes",
+          touched, ["src/new/unit.cpp:3 assigns NewVTable"])
+    check("rule10: a violation that disappears is not an addition",
+          module.rule10_growth(same, existing, ["new/unit"]), ([], []))
+    check("rule10: a batch touching a file that already has one passes",
+          module.rule10_growth(existing, existing, ["ai/fn_802CC794"]),
+          ([], ["ai/fn_802CC794.cpp .data"]))
 
 
     def fake_verify_with(write, gate_code=0, gate_problems=()):
