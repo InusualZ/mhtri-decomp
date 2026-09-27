@@ -43,6 +43,9 @@ EXTRA = {
 7. For this role specifically: what is the matching policy when a row cannot reach 100 %, and where does a
    residual belong? Name three codegen levers that usually pay, and what a `rule 7 deferred` comment does and
    does not defer.
+8. Also for this role: what must you check about a registered range BEFORE you write bodies into it, and what do
+   you do when that check fails? Which single piece of data settles it, and what does a `_<fnaddr>s_<file>_` name
+   in the dump's map tell you - and what does it NOT tell you?
 """,
     "merger": """
 7. For this role specifically: which two files may be unioned automatically and which must NEVER be handled
@@ -69,8 +72,8 @@ def main(argv):
         "const lanes = ["] + lanes + [
         "];",
         "const ran = await runs.all(lanes);",
-        "emit(ran.map(function (r) { return { key: r.key, status: r.status, out: String(r.output || '') }; }));",
-        "return ran.map(function (r) { return { key: r.key, status: r.status }; });",
+        "emit(ran.map(function (r) { return { key: r.key, out: String(r.output || '') }; }));",
+        "return ran.map(function (r) { return { key: r.key }; });",
     ])
     out = os.path.join(main_dir, ".pi", "workflows", "probe-%s.js" % "-".join(agents))
     io.open(out, "w", encoding="utf-8", newline="\n").write(js + "\n")
@@ -96,6 +99,10 @@ def main(argv):
             print("      - best-scoring variant policy; residual in the UNIT header")
             print("      - three paying codegen levers (peephole off / fp_contract / typed params / pool off)")
             print("      - rule 7 deferral defers the fn_ half only")
+            print("      - the seam check BEFORE writing bodies: a registered range is not necessarily a TU; a")
+            print("        one-copy __FILE__ string is decisive (cited on both sides of an edge => that edge is")
+            print("        FALSE), .data pins are candidates only, and a fragment is REPORTED - never patched")
+            print("        with a local literal or a re-declared symbol")
         if a == "merger":
             print("      - union only configure.py + splits.txt; a HEADER gets a hand union")
             print("      - the zero-rows-moved proof")
