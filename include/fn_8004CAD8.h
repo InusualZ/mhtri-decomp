@@ -138,6 +138,13 @@ void fn_80054178(s16* pos);
 s32 fn_80050C40(void* a, void* b);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void fn_800516F0(void* out);
+/* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)
+ * as four separate word moves.  Added with `enemy/em024_ai.cpp`, its consumer (rule 2). */
+void fn_8004EAF4(void* dst, const void* src);
+/* 0x8004EA58 - the 8-row item table's insert: it fills the first empty row with the caller's 16-byte
+ * record, and when every row is full shifts the table down one row and writes the record into the
+ * last.  Added with `enemy/em024_ai.cpp`, its consumer (rule 2). */
+void fn_8004EA58(const void* entry);
 
 #ifdef __cplusplus
 }

@@ -128,7 +128,7 @@ extern "C" void item_page_fill_rows(MenuSlot* slot)
         row->selected = (i == slot->scroll.row);
         row->field_0x06 = (s16)first;
         row->field_0x0C = 0;
-        if (fn_8034C784(kind, (u8)first) > 0) {
+        if (item_page_option_item_id(kind, (u8)first) > 0) {
             row->field_0x02 = 1;
             switch (kind) {
             case 0:

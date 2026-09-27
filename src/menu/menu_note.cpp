@@ -28,9 +28,9 @@
  * both, and the switch's ten constants are otherwise unexplained.
  *
  * The two out parameters are inferred, and marked as such: both callers hand the pair to
- * `fn_8034C614`, which switches on the FIRST one (0..3) to pick one of four item tables via
+ * `note_slot_cursor_bounds`, which switches on the FIRST one (0..3) to pick one of four item tables via
  * `fn_8029F818` and then indexes it with the SECOND, so they are the table slot and the entry index
- * rather than a pair of undifferentiated bytes.  They are `fn_8034C1D0` and `fn_8034C2B8` - the
+ * rather than a pair of undifferentiated bytes.  They are `note_slot_cursor_step` and `note_slot_draw_row` - the
  * list row's select/update and draw handlers, called from `fn_8033A160` (0x8033A4D4) and
  * `fn_8033A7DC` (0x8033A808); a scan of every `bl` in the DOL finds no other caller.
  *

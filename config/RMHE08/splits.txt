@@ -1184,6 +1184,11 @@ menu/menu_note.cpp:
 	.text       start:0x8034C0C4 end:0x8034C1D0
 	.data       start:0x805E9220 end:0x805E9248
 
+enemy/em024_ai.cpp:
+	extab       start:0x80017094 end:0x8001736C
+	extabindex  start:0x80036744 end:0x80036B88
+	.text       start:0x8034C1D0 end:0x80358624
+
 enemy/fn_8035E034.cpp:
 	extab       start:0x80017574 end:0x800175DC
 	extabindex  start:0x80036E94 end:0x80036F30
