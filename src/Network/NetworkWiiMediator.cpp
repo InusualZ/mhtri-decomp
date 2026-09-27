@@ -53,31 +53,8 @@
  * called - those are semantic (the field and value each tests), not address-keyed.
  * `pat_*` / `line_table_*` / `buffer_*` field names come from the functions that use them.
  *
- * BODIES.  67 of 79 functions are at 100 %, and the unit's `.data` (the three jump tables) is
- * byte-complete.  The 12 residuals, largest first:
- *   - `initializeNetworkMediator` (0xD4) is a stub, and its only blocker is NAMING: the second half is
- *     `if (fn_803D6A98() == 0) { thread = new GameSpyInterfaceThread; if (thread) thread->create(); }`,
- *     and `fn_803D6A98` is *also* declared and called from `src/Network/fn_8041A87C.cpp` (12 call sites)
- *     and `include/Network/fn_8041A87C.h`, so renaming it off its generated stem - which rule 7 requires
- *     before this file may call it - would have to edit another lane's unit.  The rest of the body (the
- *     two allocations, `setTermVersion`, `setPatBuffer`, the two `setPatRange` slots, the `+0x24` store)
- *     is decoded.  Filed in this lane's outbox as a rename request.
- *   - `parseReflectPacket` 91.27 - MWCC folds the two identical `out[0] = 'S'` / `'C'` / `'I'` case
- *     bodies into one arm each, retail keeps nine separate arms, and it re-reads `in[1]`/sign-extends
- *     `in[0]` where we keep them live; the switch and the if-chain spelling of the same nine cases emit
- *     the same object.
- *   - `parseReflectLines` 96.31 - one instruction (retail keeps `mr r0,r28` before the `*table = text`
- *     store; MWCC stores the pointer directly).
- *   - `buildReflectPacket` 95.93 - one instruction (the second `c == '*'` test is re-evaluated where
- *     retail jumps straight to the shared `count++`; the nested spelling that avoids it duplicates the
- *     `count++` block instead).
- *   - `updateServerTime` 98.46 - the 64-bit `return 0` emits `li r3,0` where retail emits `mr r3,r4`.
- *   - `reflectInit` 88.34 - retail keeps the allocation in a callee-saved register (r31); ours allocates
- *     it to r3, so the frame is 0x10 instead of 0x20 and r29 is not saved.
- *   - `isNameSymbolChar` 91.67, `setMediatorState68A` 91.25 and `getReflectPage` 96.25 - one
- *     instruction each: the `clrlwi` a `u8` argument gets in retail (see `isShiftJisLeadByte`), the
- *     `li r4,0` our 4-parameter `setMediatorTimestamp` declaration forces at a call site retail leaves
- *     unset, and `mr r4,r31` where retail masks the `u8` page before the call.
+ * BODIES.  70 of 79 functions are at 100 %, and the unit's `.data` (the three jump tables) is
+ * byte-complete.  The 9 residuals, largest first:
  *   - `isShiftJisLeadByte` 71.69 - retail evaluates the two byte ranges as four separate unsigned
  *     compares; MWCC folds each range into one `addi`/`clrlwi`/`cmplwi` and the `>= 224` test into
  *     branchless code, the same on -O4,p and for every spelling tried (`||`, nested `if`, a result
@@ -86,6 +63,48 @@
  *     the `li r5,0x106` of the same `memcpy` call; MWCC emits them the other way round for the store
  *     direction only (the load direction, `getMediatorBuffer*`, is byte-identical).  Tried as a typed
  *     array, `&self->buffer[0]` and an explicit `(u8*)self + 0x7C`.
+ *   - `parseReflectPacket` 91.27 - the lead-byte guard lands in `cr1` where retail uses `cr0` (retail's
+ *     `&&` chain reuses one condition register, ours needs a second because the `>= 0xA0` test is
+ *     consumed by a later `bne`), and retail re-reads `in[1]` with a `lbz`+`extsb` before the
+ *     `out[1] = in[1] - 32` store where ours keeps the byte live.  The switch and the if-chain spelling
+ *     of the nine symbol-map cases emit the same object.
+ *   - `parseReflectLines` 96.31 - one instruction (retail keeps `mr r0,r28` before the `*table = text`
+ *     store; MWCC stores the pointer directly).  A named temporary and a `#pragma peephole off`
+ *     around the function both leave it at 96.31.
+ *   - `buildReflectPacket` 99.94 - byte-identical instructions, same 344 B; the last 0.06 is a
+ *     relocation/address artefact of the split (no `.rela.text` record in this function).
+ *   - `updateServerTime` 98.46 - the 64-bit tail `return 0` emits `li r3,0` where retail emits
+ *     `li r4,0` + `mr r3,r4`.
+ *   - `getReflectPage` 96.25 - `mr r4,r31` where retail masks the `u8` page (`clrlwi r4,r31,24`) before
+ *     the call; an explicit `(u32)` widening cast does not reproduce it.
+ *   - `isNameSymbolChar` 96.43 - the `u8` local's mask lands in `r3` where retail masks into `r0` and
+ *     keeps the raw parameter in `r4`; declaring the parameter `u8` fixes the mask but costs
+ *     `validateReflectName` 3.45 (the caller's `char` -> `u8` conversion), so the local spelling stays.
+ *
+ * SOLVED THIS PASS (measured before -> after).  `initializeNetworkMediator` 1.89 -> 100, `reflectInit`
+ * 88.34 -> 100, `setMediatorState68A` 91.25 -> 100, `isNameSymbolChar` 91.67 -> 96.43, `buildReflectPacket`
+ * 95.93 -> 99.94; unit 95.09 -> 98.89, 67 -> 70 functions at 100 %.
+ *
+ * THE SHAPE THAT CLOSED `initializeNetworkMediator` AND `reflectInit` (playbook-worthy).  Both tail
+ * residuals are the same one instruction - a `mr r31,r3` between `bl __nw__FUl` and the null check -
+ * and it is **not** reachable from `T* p = (T*)operator new(n); if (p != NULL) ctor(p);`: MWCC coalesces
+ * that copy away.  It appears when the allocation is a real **`new` expression whose constructor is
+ * called** - with `#pragma exceptions on` (this unit's setting) the new-expression's value must survive
+ * the constructor for the unwind path, so MWCC keeps it in a callee-saved register and emits the copy.
+ * The constructor may be inlined: `NetworkReflectService`'s inline ctor calls the free
+ * `constructReflectService(this)` (0x8041A1C4, dump-unnamed), which is exactly the `bl` retail makes.
+ * Both classes therefore carry a declared ctor plus a padding member that makes `sizeof` the size the
+ * allocation passes to `operator new` (0xD640 / 0x816C / 0x44A0), and the three allocation sites are
+ * `new PatInterface();` / `new NetworkReflectService();` / `new GameSpyInterfaceThread();`.
+ *
+ * CONSEQUENCE FOR THE MAP.  Those three constructors are still called through `fn_`/guessed map rows:
+ * `fn_803FCC34` (0x803FCC34, dump `constructor1`, unowned band) is `__ct__12PatInterfaceFv`;
+ * `constructReflectService` (0x8041A1C4, dump-unnamed, unowned band) is `__ct__21NetworkReflectServiceFv`;
+ * `create__22GameSpyInterfaceThreadFv` (0x8041C66C, dump `constructor1`) is
+ * `__ct__22GameSpyInterfaceThreadFv` but is **owned by `Network/fn_8041A87C.cpp`**, which defines
+ * `GameSpyInterfaceThread::create()` at that address - renaming it needs that unit's source too and is
+ * left to the orchestrator (outbox rename requests carry the evidence).  objdiff scores the three `bl`s
+ * 100 % regardless of the spelling, so nothing here depends on the rename.
  *
  * .data.  The three jump tables are `jumptable_806024B8` (0x2C4, 177 entries), `jumptable_8060277C`
  * (0x28, 10) and `jumptable_806027A4` (0x80, 32); they tile exactly 0x806024B8..0x80602824 in the same
@@ -149,8 +168,7 @@ typedef struct NetworkWiiMediatorFields {
     /* +0x1BA4 */ char* line_table_b[0x400];
     /* +0x2BA4 */ char* line_table_c[0x01];
     /* +0x2BA8 */ u8  pad_2BA8[0xE68];
-    /* +0x3A10 */ u32 stamp_3A10;
-    /* +0x3A14 */ u32 stamp_3A14;
+    /* +0x3A10 */ u64 stamp_3A10;
     /* +0x3A18 */ u8  pad_3A18[0x26B9];
     /* +0x60D1 */ u8  flag_60D1;
 } NetworkWiiMediatorFields;  /* size: 0x60D2 */
@@ -158,26 +176,43 @@ typedef struct NetworkWiiMediatorFields {
 /* The reflect sub-service the mediator starts, stops and agrees through.  This band only dispatches
  * into its `+0x08` slot (retail's `lwz r12, 0(r3)` / `lwz r12, 8(r12)`), so the class is declared with
  * the real virtual and never defined here - MWCC emits the table only for a class this TU defines,
- * and this one's vtable lives in the unit that owns the service. */
+ * and this one's vtable lives in the unit that owns the service.  Its constructor is the unit-level
+ * builder at 0x8041A1C4 (out of line, so `new NetworkReflectService` lowers to that call and keeps
+ * the allocation alive across it - the `mr r31,r3` of `reflectInit`); the 0x816C body is the size
+ * `reflectInit` allocates. */
 class NetworkReflectService {
 public:
-    /* +0x08 */ virtual void finalize(s32 flags);
+    NetworkReflectService();
+    /* +0x00 */ virtual void finalize(s32 flags);
+    /* +0x04 */ u8 pad_004[0x8168];
     /* only the vtable word and the one slot this band dispatches through are evidenced */
-};   /* size: 0x04 */
+};   /* size: 0x816C (the allocation `reflectInit` makes) */
 
 /* The network singleton's Pat accessor the two buffer loaders forward to.  Its five buffer setters are
  * the mangled member symbols this band calls (`setTermsBuffer__12PatInterfaceFPScUl`); the class is
  * only used here, never constructed, so no vtable and no table bytes enter our object. */
 class PatInterface {
 public:
-    /* +0x08 */ virtual void finalize(s32 flags);
+    PatInterface();
+    /* +0x00 */ virtual void finalize(s32 flags);
+    /* +0x04 */ u8 pad_004[0xD63C];
     void setTermsBuffer(s8* buffer, u32 size);
     void setMaintenanceBuffer(s8* buffer, u32 size);
     void setAnnounceBuffer(s8* buffer, u32 size);
     void setNoChargeBuffer(s8* buffer, u32 size);
     void setPatchMessageBuffer(s8* buffer, u32 size);
     /* only the vtable word is evidenced: the band reaches the record through `getInstance_` */
-};   /* size: 0x04 */
+};   /* size: 0xD640 (the allocation `initializeNetworkMediator` makes) */
+
+/* The GameSpy worker thread `initializeNetworkMediator` spawns.  Its full layout and the rest of its
+ * methods live in `include/Network/fn_8041A87C.h`, which this band does not include (that header also
+ * declares `updatePatInterface` with a different first parameter, and playbook 60: a declaration set
+ * is a codegen input), so only the entry point this band calls is named here. */
+class GameSpyInterfaceThread {
+public:
+    GameSpyInterfaceThread();
+    /* +0x0000 */ u8 pad_000[0x44A0];
+};   /* size: 0x44A0 (the allocation `initializeNetworkMediator` makes) */
 
 /* `operator new` is what the band's allocation lowers to (`__nw__FUl`). */
 void* operator new(unsigned long size);   /* untyped: allocation returns a raw byte range */
@@ -196,11 +231,18 @@ void getMediatorField288(NetworkWiiMediatorFields* self, u32* out);
 void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
 void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
 void resetMediatorState(NetworkWiiMediatorFields* self);
-void initializeNetworkMediator(void* self, u32 value);
+void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
+
+/* The two callees the opening's init reaches.  Neither answer a real name in the runtime dump
+ * (`getInstance` / `constructor1` are placeholders) and both map rows still carry a `fn_` stem, so
+ * this file may not spell them (rule 7): the map rows are renamed to these spellings in this lane's
+ * outbox, together with the source half in `src/Network/fn_8041A87C.cpp` and its header. */
+PatInterface* constructPatInterface(PatInterface* self);
+GameSpyInterfaceThread* getGameSpyInterfaceThread(void);
 u32   getMediatorField24(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
-void  setMediatorTimestamp(NetworkWiiMediatorFields* self, u32 unused, u32 a, u32 b);
+void  setMediatorTimestamp(NetworkWiiMediatorFields* self, u64 value);
 void  getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
 void  updatePatInterface180(NetworkWiiMediatorFields* self, u32 a, u32 b, u32 c);
 void  updateTermVersion(NetworkWiiMediatorFields* self, u32 value);
@@ -289,7 +331,6 @@ void  setPatField854(PatInterface* self, u32 value);
 void  setPatField860(PatInterface* self, u32 value);
 
 /* the reflect service's own entry points */
-void constructReflectService(NetworkReflectService* service);
 void initReflectService(NetworkReflectService* service, NetworkWiiMediatorReflectFn callback,
                         void* arg);   /* untyped: the callback's user payload, caller-owned */
 void finalizeReflectService(NetworkReflectService* service);
@@ -316,12 +357,8 @@ void getReflectPageBuffer(char *self, char **subobject, unsigned int *limit)
 
 void NetworkWiiMediator::reflectInit(NetworkWiiMediatorReflectFn callback, void* arg)
 {
-    NetworkReflectService* service = getReflectService();
-    if (service == NULL) {
-        service = (NetworkReflectService*)operator new(33132);
-        if (service != NULL) {
-            constructReflectService(service);
-        }
+    if (getReflectService() == NULL) {
+        new NetworkReflectService();
     }
     initReflectService(getReflectService(), callback, arg);
 }
@@ -435,7 +472,7 @@ char* NetworkWiiMediator::getAccountWaitQueue(char* out, u32 size)
 void NetworkWiiMediator::getReflectPage(u8 page)
 {
     if (getReflectService() != NULL) {
-        setReflectServicePage(getReflectService(), (u8)page);
+        setReflectServicePage(getReflectService(), (u32)page);
     }
 }
 void NetworkWiiMediator::agreeReflect()
@@ -628,7 +665,22 @@ void resetMediatorState(NetworkWiiMediatorFields* self)
 {
     initializeNetworkMediator(self, 0);
 }
-void initializeNetworkMediator(void* self, u32 value) { (void)self; (void)value; }
+/* Builds the Pat interface the opening reads through, spawns the GameSpy worker thread if it is not
+ * running, then points the two Pat buffer slots at this mediator's term/maintenance blocks. */
+void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value)
+{
+    if (getInstance_() == NULL) {
+        new PatInterface();
+    }
+    if (getGameSpyInterfaceThread() == NULL) {
+        new GameSpyInterfaceThread();
+    }
+    setTermVersion(getInstance_(), 0);
+    setPatBuffer(getInstance_(), 1, (char*)self->single_line_buffer, 1);
+    setPatRange(getInstance_(), 1, self->pat_terms_ptr, self->pat_terms_size);
+    setPatRange(getInstance_(), 2, self->pat_maintenance_ptr, self->pat_maintenance_size);
+    self->field_24 = value;
+}
 void resetMediatorFlags(NetworkWiiMediatorFields* self)
 {
     self->flag_1C = 1;
@@ -727,23 +779,21 @@ u64 setServerTimeResult(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-#pragma peephole on
 u64 getMediatorTimestamp(NetworkWiiMediatorFields* self)
 {
-    return *(u64*)&self->stamp_3A10;
+    return self->stamp_3A10;
 }
 void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value)
 {
-    if ((u8)value == 0 && getNetworkWiiMediator() != NULL) {
-        setMediatorTimestamp(getNetworkWiiMediator(), 0, 0, 0);
+    if ((u32)value == 0 && getNetworkWiiMediator() != NULL) {
+        setMediatorTimestamp(getNetworkWiiMediator(), 0);
     }
     self->flag_68A = value;
 }
-void setMediatorTimestamp(NetworkWiiMediatorFields* self, u32 unused, u32 a, u32 b)
+#pragma peephole on
+void setMediatorTimestamp(NetworkWiiMediatorFields* self, u64 value)
 {
-    (void)unused;
-    self->stamp_3A14 = b;
-    self->stamp_3A10 = a;
+    self->stamp_3A10 = value;
 }
 void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out)
 {
@@ -954,6 +1004,7 @@ s32 isShiftJisLeadByte(NetworkWiiMediatorFields* self, u8 value)
     }
     return 0;
 }
+#pragma peephole off
 s32 isNameSymbolChar(NetworkWiiMediatorFields* self, char value)
 {
     (void)self;
@@ -966,6 +1017,7 @@ s32 isNameSymbolChar(NetworkWiiMediatorFields* self, char value)
     }
     return 1;
 }
+#pragma peephole on
 void parseReflectLines(NetworkWiiMediatorFields* self, s32 source)
 {
     char** table;
@@ -1103,27 +1155,32 @@ s32 buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* sk
     s32 count = 0;
     *skipCount = 0;
     *flags = 0;
-    s32 i = 0;
-    while (text[i] != 0) {
+    for (s32 i = 0; text[i] != 0; i++) {
         char c = text[i];
-        if (c == '*' && i == 1 && text[i - 1] == '.') {
-            *flags |= 1;
-            *skipCount = *skipCount + 2;
-            count--;
-        } else if (c == '*' && i > 1 && text[i - 1] == '.' && text[i + 1] == 0) {
-            *flags |= 2;
-            count--;
-            break;
+        if (c == '*') {
+            if (i == 1) {
+                if (text[i - 1] == '.') {
+                    *flags |= 1;
+                    *skipCount = *skipCount + 2;
+                    count--;
+                    continue;
+                }
+            } else if (i > 1) {
+                if (text[i - 1] == '.' && text[i + 1] == 0) {
+                    *flags |= 2;
+                    count--;
+                    break;
+                }
+            }
         } else if (c == '^' && i == 0) {
             *flags |= 4;
             *skipCount = *skipCount + 1;
+            continue;
         } else if (c == '$' && text[i + 1] == 0) {
             *flags |= 8;
             break;
-        } else {
-            count++;
         }
-        i++;
+        count++;
     }
     switch (*flags) {
     case 9:
