@@ -54,7 +54,8 @@ You are subject to **all ten**, not only the ones you fix most often:
    `goto` one - not a licence to keep the `goto`. (Four units carry a `goto` backlog from before the rule: see
    `docs/plan.md`.)
 9. a mangled symbol (`Name__FP...`, `Name__Q34nw4r...`) is called/declared through its owner - declare the class
-   or namespace - while an `fn_XXXXXXXX` stem is the map's placeholder and stays legal;
+   or namespace - while an `fn_XXXXXXXX` stem is the map's placeholder, not a mangling, so rule 9 does not apply
+   to it (naming it is rule 7's job);
 10. a vtable we own is compiler output (a class with `virtual` methods), never written entry by entry.
 
 1. `python tools/units/stylelint.py --diff main` - every finding, `file:line` (**section 6.5's table is
@@ -91,12 +92,16 @@ named items only, and the diff should be as small as the refusal.
   record the residual **with both measurements** in the unit header and keep the conformant shape.
 * **rule 1** (a shared type twice): one definition, included where needed - delete the copy, do not merge the two.
 * **rule 9** (a mangled spelling used as a call): declare the owner (class or namespace) and call it properly;
-  an `fn_XXXXXXXX` stem is legal and stays.
+  an `fn_XXXXXXXX` stem is not a mangling (rule 9 does not apply to it), but it is never a resting place - name
+  it (rule 7).
 * **rule 10** (a hand-written table we own): let MWCC emit it from a class declaring its `virtual` methods plus
   the constructor that stores it.
-* **rule 7** (no `fn_XXXX`/`unkNN` may survive): name from context or the real map/dump name. Where the context
-  genuinely does not support a name, write a truthful `rule 7 deferred: <reason>` in the file header - never
-  invent a name, and never defer to silence a finding you could fix.
+* **rule 7** (no `fn_XXXX`/`unkNN` may survive): name from context or the real map/dump name. There is no "no
+  evidence for a name" case, only a name to derive - when the context supports only a guess, guess and write it
+  in the unit header as an explicit **GUESS** with the evidence behind it; never invent a name the evidence does
+  not reach. `rule 7 deferred: <reason>` is legal only for references to OTHER units' unrenamed `fn_` symbols, so
+  do not add one for a name the unit you are touching owns (the land gate refuses that growth) - derive the name
+  instead, and never defer to silence a finding you could fix.
 * **a compile clash**: rule 2. The symbol belongs in its owner's header; delete your copy and include the
   owner's. If an owner header in `main` already declares the whole family, that declaration is authoritative.
 * **a regression**: find the field or type that moved it. A field *type* change moves real scores; a rename or a

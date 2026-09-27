@@ -197,8 +197,10 @@ The rules apply to new work immediately; existing units are brought into conform
   `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise
   copy, a `sizeof`/offset computation) - and even there prefer `offsetof(Type, field)`.
 * **7 - symbols have proper names.** No `fn_XXXXXXXX` and no `unkNN` may survive in `src/`. A function gets a
-  name for what it does plus the naming scheme of its neighbours; a field a name for what it holds. Where the
-  context genuinely does not support a name, a file-wide `rule 7 deferred: <reason>` comment defers the `fn_`
+  name for what it does plus the naming scheme of its neighbours; a field a name for what it holds. There is no
+  "no evidence for a name" case, only a name to derive - when the context supports only a guess, guess and write
+  it in the unit header as an explicit **GUESS** with the evidence behind it. A file-wide `rule 7 deferred:
+  <reason>` comment is legal only for references to OTHER units' unrenamed `fn_` symbols, and defers the `fn_`
   half only (the `unk` half stays).
 * **8 - `goto` is forbidden** (and so is a label used as control flow). Where a shared tail or a dispatch
   layout looks like it needs one, the conformant shapes are a **helper function**, a **`switch` whose cases
@@ -207,8 +209,9 @@ The rules apply to new work immediately; existing units are brought into conform
 * **9 - a mangled symbol is called through its owner.** A map name carrying an argument list (`Name__FP...`) or
   a class/namespace qualifier (`Name__Q34nw4r...`) is a *mangling*: declare the class or namespace and call
   `obj->method(args)` / `ns::function(args)`. The same holds for a *declaration* of the mangled spelling (the
-  C++ front-end mangles it a second time). An `fn_XXXXXXXX` stem is the map's placeholder, not a mangling, and
-  stays legal under rule 7's deferral. (This is *not* about `extern "C"`: putting a genuinely mangled map name
+  C++ front-end mangles it a second time). An `fn_XXXXXXXX` stem is the map's placeholder, not a mangling: rule 9
+  does not route it through an owner, but it is never a resting place either - name it (see *Naming*). (This is
+  *not* about `extern "C"`: putting a genuinely mangled map name
   at C++ scope, or an `fn_*` inside `extern "C"`, is how objdiff pairs it by name - see `rehome_decls`.)
 * **10 - a vtable we own is compiler output.** A table of code pointers inside the unit's own registered ranges
   is **emitted by MWCC** from a class declaring its `virtual` methods plus the constructor that stores the
@@ -230,36 +233,56 @@ before the lint matches, so rules 3-4 live *in comments* while the others must n
 * Use the real name when it is known (the retail map, the shared runtime dump via `docs/memory-dump.md`, the
   SDK); otherwise **derive one from context** - what the function does and who calls it, what the data holds and
   who reads it, the field's offset and the value stored there - fitting the surrounding symbols' scheme. **A
-  generated name left in `src/` is a defect**: when the context supports only a guess, guess, and mark it in the
-  unit's header so a later pass can refine it. `fn_xxxxxxxx`/`lbl_xxxxxxxx`/`unkNN` are never the answer.
+  generated name left in `src/` is a defect**: when the context supports only a guess, guess and write it in the
+  unit's header as an explicit **GUESS** with the evidence behind it, so a later pass can refine it.
+  `fn_xxxxxxxx`/`lbl_xxxxxxxx`/`unkNN` are never the answer.
 * Never print `config/RMHE08/symbols.txt` (4.5 MB, 65k lines) into output. Grep it, or use
   `python tools/symbols/symedit.py`. A rename is always *two* edits - the map and the source - via the proxy.
 
 ## Naming and placement, from evidence
 
 Decide the module and file name from evidence, in this order, and write the class you used into the header:
-1. a `__FILE__`/assert string in the range's data, 2. the shared runtime dump's real name, 3. the behaviour plus
-the sibling units' naming scheme, 4. the map's stem (`fn_XXXXXXXX.cpp`). `python tools/units/dumpmap.py
-lookup <addr>` answers class 2. A discovery `seam_note` about "one source file" is often an `owner_merge`
-artefact - verify it.
+
+1. a `__FILE__`/assert string in the range's data;
+2. the shared runtime dump's real name;
+3. the behaviour plus the sibling units' naming scheme - a descriptive name that fits the siblings' scheme, and
+   if several proposals are plainly one subsystem, say so: they belong in one module directory;
+4. **the evidence gives no name - derive the best guess and mark it.** With no `__FILE__` string, no real
+   runtime-dump name and no neighbour scheme reaching the range, derive the most descriptive module and name the
+   context supports (what the range actually does), write it in the unit header as an explicit **GUESS** with the
+   evidence behind it, and register at `src/<module>/<name>.<ext>`. **Keeping the map's `fn_XXXXXXXX` stem as the
+   file name is not an option**: the land gate refuses a batch whose own unit is registered at a generated file
+   name (`src/enemy/fn_8033041C.cpp`). Do not invent a module either - if the module is genuinely unknown, ask
+   the orchestrator.
+
+`python tools/units/dumpmap.py lookup <addr>` answers class 2. A discovery `seam_note` about "one source file" is
+often an `owner_merge` artefact - verify it.
 
 **Naming is part of the unit's work, not a later pass - for every symbol the unit owns.**
 
 * **Functions**: use the real name whenever the evidence has one - the shared runtime dump first (`dumpmap.py
   lookup <addr>`), then the map. A rename is **two** edits (the map and the source) or objdiff pairs nothing
-  (playbook 31/48): `symedit.py rename <old> <new>`, never a hand edit. **Otherwise derive the name from
-  context** - what it does, what it returns, who calls it, what it writes - and when that supports only a guess,
-  guess and record it in the file header as a guess. `fn_XXXXXXXX` is never the resting place.
+  (playbook 31/48): `python tools/symbols/symedit.py rename fn_XXXXXXXX <name>`, never a hand edit. **Otherwise
+  derive the name from context** - what it does, what it returns, who calls it, what it writes - and when the
+  context supports only a guess, guess: write it in the unit header as an explicit **GUESS** with the evidence
+  behind it and finish the rename's map half with `python tools/symbols/symedit.py rename fn_XXXXXXXX <name>`
+  (the map **and** the source, one edit). There is no "no evidence for a name" case, only a name to derive, and
+  `fn_XXXXXXXX` is never the resting place.
 * **Fields**: every field carries its offset and a name from the context it is used in - what is stored, what it
   is compared against, which SDK type the offset belongs to, what the value is later passed to (rules 4/5).
   `unkNN` is the fallback, `pad_0xNN`/`unused_0xNN` the exception; a bare `unkNN` identifier is a rule 7 finding.
 * **Statics and globals**: name them from what they hold and how they are used (a table becomes
   `stage_random_placement_table`, not `lbl_805DC5E8`) - its contents (floats? pointers? a jump table?), its size,
-  and who reads it. `lbl_XXXXXXXX` is never the resting place: guess from that evidence and mark the guess in the
-  unit header.
-* `rule 7 deferred: <reason>` exists for the units registered before this rule; **a unit you write does not use
-  it** - there is no "no evidence for a name" case, only a name to derive. It covers the `fn_` half only (`unkNN`
-  and field names stay enforced), and `grep -rn "rule 7 deferred" src/` is the complete list of units that used it.
+  and who reads it. `lbl_XXXXXXXX` is never the resting place: when the context supports only a guess, guess,
+  write it in the unit header as an explicit **GUESS** with the evidence behind it, and finish the rename's map
+  half with `python tools/symbols/symedit.py rename lbl_XXXXXXXX <name>`.
+* `rule 7 deferred: <reason>` is legal **only for references to OTHER units' unrenamed symbols** - the
+  `fn_XXXXXXXX` names you call but do not own. They are not this batch's to fix, and the line is the durable way
+  to say so, with a reason that names the evidence. The land gate refuses a batch that grows an escape for a name
+  the batch owns (its own file registered at a generated file name, or its own `fn_` left **defined**), so a unit
+  you write does not use it for a name it owns - there is no "no evidence for a name" case, only a name to derive.
+  It covers the `fn_` half only (`unkNN` and field names stay enforced), and `grep -rn "rule 7 deferred" src/` is
+  the complete list of units that use it.
 
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 
