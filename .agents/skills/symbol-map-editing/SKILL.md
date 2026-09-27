@@ -23,7 +23,7 @@ name token you asked it to change.
 | what is called like X? | `python tools/symbols/symedit.py find "<regex>" [--section .text] [--type function] [--limit N]` |
 | what is around this address? | `python tools/symbols/symedit.py at 0x804DA598 [--count N] [--section .text]` |
 | what is inside this split range? | `python tools/symbols/symedit.py range 0x804D9B4C 0x804DAE40 [--section .text]` |
-| where is this name referenced? | `python tools/symbols/symedit.py refs <name> [--roots src include docs]` |
+| where is this name referenced? | `python tools/symbols/symedit.py refs <name> [--roots src include docs] [--code-only]` |
 | is the map sane? | `python tools/symbols/symedit.py check` |
 | rename one symbol | `python tools/symbols/symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]` |
 | rename many | `python tools/symbols/symedit.py rename-batch map.txt [--dry-run]` (lines of `old new`) |
@@ -39,8 +39,15 @@ flood the context.
 1. **A rename is two edits in one change**: the map (it names the *target* object) and the source that
    defines or references the symbol. Rename only the map and objdiff stops matching the symbol by name and
    reports it as 0 %.
-2. **Find the other half first**: `refs <name>` lists every in-repo mention (source, docs, tools).
-   `rename` runs the same scan and prints it after writing.
+2. **Find the other half first**: `refs <name>` lists every in-repo mention (source, docs, tools), **classified**
+   into `code` / `path` / `mention`. `rename` runs the same scan and prints it after writing. **Use
+   `--code-only` for any scripted rewrite.** The classification is load-bearing because a map name is also a
+   *file* name whenever a unit is registered under a generated path, and the scan matches with `\b`, so `/`
+   and `.` are word boundaries: `#include "DWCi/fn_805113B0.h"` is reported as a reference to `fn_805113B0`.
+   Rewriting it corrupts the include - the file on disk keeps its name, and renaming a unit's *file* is a
+   **registration move**, not a symbol rename - and only a build would notice. The degenerate case is real: a
+   name can have **zero** code references and several path mentions, where a naive "rewrite every reference"
+   changes nothing real and breaks three files.
 3. **Dry-run, then apply.** The tool refuses when the old name is not defined exactly once or the new name
    is already taken (`--force` overrides the latter), writes atomically, preserves the file's line endings,
    and prints just the one line it changed - that output *is* the diff to quote in the report.
