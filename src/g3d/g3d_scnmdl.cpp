@@ -40,7 +40,7 @@
  * be claimed once the object emits it (docs/plan.md 8.4) and this pass reconstructs bodies only.
  * They are recorded in the outbox for the data pass.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8007C540`, which answers the `zz_007c540_` placeholder,
  * and by reading every `.text` entry in 0x8007C540..0x8007F0E4 out of config/RMHE08/symbols.txt:
  * they are all bare `fn_XXXXXXXX`).  The one real name the range implies - `nw4r::g3d::ScnMdl` - is

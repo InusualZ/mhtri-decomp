@@ -9,7 +9,7 @@
  * `fn_80074620`..`fn_800746D4` (0x80074620-0x800746DC, zero data references) are assigned to
  * `g3d/g3d_calcworld.cpp` per the report's candidate cut - unpinned, measure to settle.
  *
- * rule 7 deferred: the free functions keep the map's `fn_XXXXXXXX` names (docs/plan.md 6.5 rule 7);
+ * Naming note: the free functions keep the map's `fn_XXXXXXXX` names (docs/plan.md 6.5 rule 7);
  * the three `Camera` members are named because the map already carries their mangling.
  *
  * Shared declarations: `nw4r::g3d::Camera`/`CameraData` and `nw4r::math::VEC3` are local/shared per

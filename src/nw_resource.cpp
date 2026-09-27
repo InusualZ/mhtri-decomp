@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with `nm build/RMHE08/main.elf`
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `nm build/RMHE08/main.elf`
  * and `python tools/symbols/dumpmap.py lookup`, which give a `zz_` placeholder for every fn_ address).
  *
  * The game's resource / "work" manager: the refcounted resource-memory cache (`RESmemAlloc`,

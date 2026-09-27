@@ -27,7 +27,7 @@
  * `fn_8028F66C`, matching the sibling class-4 registrations `Pl/fn_80229ECC.cpp`,
  * `Pl/fn_80241558.cpp` and `Pl/fn_80288CEC.cpp`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for 47 of this range's 53 functions (checked
+ * Naming note: the symbol map has only fn_XXXXXXXX for 47 of this range's 53 functions (checked
  * with `tools/symbols/dumpmap.py lookup <addr>` for every address of the inventory - 47 answer
  * `zz_<addr>_`, and the six real names the dump knows (`GetGroundHit`, `GetGroundHit2`,
  * `hit_ground_comon`, `findInterSection`, `findInterSection2`, `findInterSection3`) are already the

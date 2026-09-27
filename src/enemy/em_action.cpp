@@ -42,7 +42,7 @@
  * the 0xC-byte action record's constructor and its empty step.  Refine them when better evidence
  * turns up; only the bodies support them.
  *
- * rule 7 deferred: the file's own 14 symbols are named above; what the escape still covers is
+ * Naming note: the file's own 14 symbols are named above; what the escape still covers is
  * precisely the names this file *references* in other units - 25 callee symbols in **42**
  * occurrences (fn_80130478 x5, fn_80126324 x4, fn_8012F93C x3, fn_801303EC x2, fn_8012F5C4 x2,
  * fn_8013072C x2, fn_80133BC0 x2, enemy_data_find x2, enemy_data_grp x2, ...; 21 of the 25 answer `zz_` in

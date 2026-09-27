@@ -1,7 +1,7 @@
 /* ef/ef_drawstrategyimpl.cpp - the nw4r::ef DrawStrategyImpl translation unit,
  * .text 0x800C5DB8..0x800C9540 (69 functions / 0x3788 bytes).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/units/dossier.py proposal/800C5DB8_fn_800C5DB8: every .text row of the split object is a bare
  * fn_ name).
  *

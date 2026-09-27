@@ -1,5 +1,5 @@
 /* enemy/fn_802F5138.cpp - an enemy action-program band, `.text` 0x802F5138..0x802FA9A0.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: every address resolves to a `zz_XXXXXXXX_` dump
  * placeholder and a bare `.text` entry in config/RMHE08/symbols.txt, and no `__FILE__` source-name
  * literal is reachable from the range's `.data`/`.rodata` references).

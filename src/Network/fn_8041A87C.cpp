@@ -11,7 +11,7 @@
  * defined here, so a `virtual` spelling makes MWCC emit a second copy of the table in `.data`
  * (measured: a class whose virtuals are all defined in its TU gains a 20-byte `.data` vtable).
  *
- * rule 7 deferred: `dumpmap.py lookup` answers only `zz_XXXXXXXX_` for this range's code, so the
+ * Naming note: `dumpmap.py lookup` answers only `zz_XXXXXXXX_` for this range's code, so the
  * `fn_` stems of the unsplit callees this file still calls stay (they are the map's placeholders).
  * The band's own names come from the code and the pool: the map carries each member's mangled
  * spelling, and the seven the pool spells out are `NetworkGameSpyInterface::startMatch`,

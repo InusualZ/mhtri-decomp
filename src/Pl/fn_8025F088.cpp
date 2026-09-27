@@ -15,7 +15,7 @@
  *     are `Pl/fn_80241558.cpp` (before) and `Pl/fn_80262940.cpp` (after);
  *   - all 17 map entries carry only the `fn_XXXXXXXX` stem, so the file keeps the stem.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x8025F088 0x80262940`; all 17 entries are the map's
  * placeholders and `dumpmap.py lookup` answers `zz_` for each).
  *

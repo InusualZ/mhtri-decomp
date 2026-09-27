@@ -1,7 +1,7 @@
 /* hud/layout.cpp - the HUD's 2D element library (the 88-function `layout.cpp` translation unit,
  * `.text` 0x802E0740..0x802E4978 / 0x4238 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for most of this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for most of this range (checked with
  * tools/symbols/symedit.py --section .text range 0x802E0740 0x802E4978: 68 of the 88 rows are bare
  * `fn_` stems; the other 20 carry real names the runtime dump confirms, e.g. draw_sprite,
  * draw_font_idx, put_button_icon_tex, color_mult, and those are written as real functions here).

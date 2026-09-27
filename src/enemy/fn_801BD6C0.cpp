@@ -24,7 +24,7 @@
  * reference is a pool float, an integer table or a `.bss` block), so the file keeps the map's stem
  * (brief section 2, class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/dumpmap.py lookup` and a scan of the range's data references in the auto split)
  *
  * Language: C++ (re-derived from the range's own evidence: its callees carry argument-list manglings -

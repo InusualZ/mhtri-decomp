@@ -1,6 +1,6 @@
 /* effect.cpp - the game's effect manager, `.text` 0x800F95A4..0x800FAE08 (41 functions).
  *
- * rule 7 deferred: the symbol map spells 34 of this range's 41 functions as bare `fn_XXXXXXXX`
+ * Naming note: the symbol map spells 34 of this range's 41 functions as bare `fn_XXXXXXXX`
  * (checked with symedit: each is a bare .text entry in config/RMHE08/symbols.txt), so those
  * definitions have to keep the map's own spelling; the other seven arrive mangled and are written
  * through their owners.

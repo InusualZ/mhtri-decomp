@@ -1,5 +1,5 @@
 /* auto/8012BDF4_fn_8012BDF4.cpp - enemy action/status module, 71 function(s), 0x8012BDF4..0x8012E968.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * The unit is the enemy-side action bookkeeping: its public entry points (`ana_em_ck`, `shibire_em_ck`,
  * `em_act_ck`, `em_area_ck`, `em_die_ck`, `em_work_die_ck`) test an enemy's state, and the `fn_8012C*`

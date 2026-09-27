@@ -7,7 +7,7 @@
  * tools/symbols/dumpmap.py: no `_<fnaddr>s_<file>_<addr>` local symbol has a `<fnaddr>` inside the
  * range), so evidence class 1 does not apply here.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `grep -n "fn_80569\|fn_8056A\|fn_8056B" config/RMHE08/symbols.txt` - every defined name is a bare
  * `.text` entry, and tools/symbols/dumpmap.py lookup over the whole inventory answers only `FUN_`/
  * `zz_` placeholders or unrelated J3D/GX names for most of it).

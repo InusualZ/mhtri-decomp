@@ -17,7 +17,7 @@
  * both functions pass their first argument straight to `Get_motion_no` (`Get_motion_no__FP4_PLW`),
  * and `fn_8023C2D0` gates two of its cases on `Pl_act_ck__FP4_PLWUcUs`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py show fn_8023C2D0` / `... fn_8023FC20` - the range's sole entries
  * are the two `type:function` lines, and `dumpmap.py lookup` gives only the `zz_` placeholders).
  *

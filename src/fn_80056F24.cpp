@@ -34,7 +34,7 @@
  *     `fn_80058BD0`/`fn_8005920C` drive.  Only the bytes this range touches are named.
  *   * `lbl_8058B178` (.data, 0xA8 B) - the fade step table, 0x18 B per entry.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked
  * `python tools/symbols/dumpmap.py lookup <addr>` for every address in the range - `FUN_`/`zz_`
  * placeholders; and `grep -E '^fn_8005(6F|7|8|9)' config/RMHE08/symbols.txt` is the whole inventory
  * minus the six named entries GlareFilter_on/fade_set/fade_reset/get_fade_stat/filter_reset/

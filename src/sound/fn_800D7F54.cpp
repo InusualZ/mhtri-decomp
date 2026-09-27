@@ -1,5 +1,5 @@
 /* auto/800D7F54_fn_800D7F54.cpp - the SE (`se_w`) request cluster, .text 0x800D7F54..0x800DCFEC.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 141 functions. This is the game's sound-effect request layer: a request names a sound id plus a world
  * position, lands in a free slot of the `_se_w` work object, and the per-frame drivers (`fn_800D84E8` /

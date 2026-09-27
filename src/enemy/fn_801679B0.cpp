@@ -1,5 +1,5 @@
 /* enemy/fn_801679B0.cpp - the enemy state-machine unit, 0x801679B0..0x80170600 (117 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap lookup:
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap lookup:
  * every function of the range reports only `zz_<addr>_` in the shared runtime dump, and
  * `config/RMHE08/symbols.txt` carries only the bare `fn_XXXXXXXX` entries).
  *

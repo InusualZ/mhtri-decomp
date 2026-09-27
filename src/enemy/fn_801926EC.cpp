@@ -11,7 +11,7 @@
  * placeholders (`dumpmap.py lookup 0x801926EC` -> `zz_01926ec_`), so the map's own stem keeps the
  * file name (brief section 2, class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
  * lookup on the range's inventory: every name is a bare `.text` entry in
  * config/RMHE08/symbols.txt and the runtime dump answers only `zz_XXXXXXXX_` placeholders)
  *

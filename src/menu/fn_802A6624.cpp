@@ -22,7 +22,7 @@
  * proposal's extent because a worker may not re-cut a claim, and reuses the offsets rather than
  * inventing a type (`include/menu/fn_802A6624.h` says which).
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for 99 of this range's 139 symbols (checked
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for 99 of this range's 139 symbols (checked
  * with `python tools/symbols/dumpmap.py lookup` over the inventory and `grep` on the map: the 40
  * named rows are the `put_message`/`put_frame_dialog`/`GetMenuFontColor`/`shell_*`/`serial_*`/
  * `niku_*`/`yure_move` family the runtime dump carries, and every remaining row is a bare

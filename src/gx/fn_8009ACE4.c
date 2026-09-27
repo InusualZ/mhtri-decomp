@@ -8,7 +8,7 @@
  * stem for both symbols and the runtime dump resolves only `zz_`, so the stem is kept and no name is
  * invented.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8009ACE4` and 0x8009B0D8: both are bare `.text` entries in
  * config/RMHE08/symbols.txt, and the dump resolves only the `zz_` placeholder).
  *

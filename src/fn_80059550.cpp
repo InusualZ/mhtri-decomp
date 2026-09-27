@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x80059550`, which answers the runtime dump's `zz_0059550_`
  * placeholder for every function here; every `.text` entry in 0x80059550..0x8005AA28 in
  * config/RMHE08/symbols.txt is a bare `fn_XXXXXXXX`).  The mangled names the range does carry

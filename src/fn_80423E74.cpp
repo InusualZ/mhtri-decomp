@@ -15,7 +15,7 @@
  * game-root `main` lib and `cflags_main` (Wii/1.3, -O3, -inline noauto, -Cpp_exceptions on - the target
  * object carries extab/extabindex).  The stem is the map's `fn_80423E74` (classes 3/4 in the brief).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py: every address in the range answers `zz_<addr>_` or a global name, never a
  * `__FILE__` emitter; `PatCryptDecrypt` and `setErrorHappened` are the only real names in the map).
  *

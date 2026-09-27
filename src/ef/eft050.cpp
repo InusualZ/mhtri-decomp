@@ -20,7 +20,7 @@
  * names and never defined (playbook 29); the jump table at 0x805E918C is this range's
  * (`_8034239cswitchdataD_805e918c` in the dump, i.e. `fn_8034235C`'s switch).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x8033F270 0x803432B4`: 45 of the 46 rows are bare `fn_`
  * stems, and `python tools/symbols/dumpmap.py lookup <addr>` answers `zz_XXXXXXXX_` for every address
  * but 0x80342F34).

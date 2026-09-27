@@ -30,7 +30,7 @@
  *     codegen class docs/matching.md records as not reachable from this C frontend - recorded unwritten.
  *   - the vec cluster (PSVECNormalize .. PSVECSquareDistance), the hand-written vector library - unwritten.
  *
- * rule 7 deferred: the map/dump carry only fn_XXXXXXXX for part of this range (checked with
+ * Naming note: the map/dump carry only fn_XXXXXXXX for part of this range (checked with
  * `dumpmap.py lookup` over the inventory and `.pi/notes/dumpmap-join.json`): fn_804C1A60, fn_804C1BD0,
  * fn_804C1E00, fn_804C1EE0, fn_804C2200, fn_804C2380, fn_804C2460, fn_804C2470, fn_804C24C0, fn_804C24E0,
  * fn_804C2550, fn_804C25C0, fn_804C26A0, fn_804C26E0, fn_804C2800, fn_804C2820, fn_804C2830, fn_804C2840,

@@ -26,7 +26,7 @@
  * candidates are weak (`0x802BF278`/`0x802BF284`, codegen fingerprint + call closure), so the extent
  * may settle a few functions wider once those match.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x802B5C58 0x802BEAAC --limit 500`, which lists exactly the
  * four camera names above as non-`fn_` entries).
  *

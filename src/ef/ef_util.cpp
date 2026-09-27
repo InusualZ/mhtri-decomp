@@ -12,7 +12,7 @@
  * the lib choice cannot change the codegen.  Class 2 fails: `python tools/symbols/dumpmap.py lookup
  * 0x8009B374` (and every other address in the range) answers the `zz_009b374_` placeholders, not a name.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` over all 17 symbols, which answer `zz_` placeholders,
  * and with `python tools/symbols/symedit.py range 0x8009B374 0x8009CDBC`, whose every entry is a bare
  * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.

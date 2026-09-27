@@ -1,5 +1,5 @@
 /* auto/803066F0_fn_803066F0.c - the initialisation step of one effect's update machine, `.text`
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * 0x803066F0-0x8030681C (one function, `fn_803066F0`).
  *
  * What it is.  `fn_803066B4` (0x803066B4, the last function of the previous unit) is a four-state update

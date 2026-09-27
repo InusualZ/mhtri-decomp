@@ -39,7 +39,7 @@
  * 0x8079C2C8/0x8079C2E0 (each also referenced by 0x804BF530 / 0x8027D968), which defeat the
  * single-referrer pair test; the other words' owners rise monotonically, so no internal seam exists.
  *
- * rule 7 deferred: references only to OTHER units' unrenamed fn_XXXXXXXX symbols - every `fn_` this
+ * Naming note: references only to OTHER units' unrenamed fn_XXXXXXXX symbols - every `fn_` this
  * file names (`fn_80396070`, `fn_80396248`, `fn_8039631C`, `fn_803963F4`, `fn_80396654`,
  * `fn_803967F0`, `fn_80396934`, `fn_80396944`, `fn_80395DF4`, `fn_8004DF10`, `fn_800DBC84`,
  * `fn_80214EF0`, `fn_80215170`, `fn_803772A8`, `fn_803B1EAC`, `fn_803B7154`, `fn_804338E0`) is still

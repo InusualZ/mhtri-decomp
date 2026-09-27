@@ -1,7 +1,7 @@
 /*
  * ai/fn_802D0F34.cpp - the 0x802D0F34-0x802D44F4 AI-NPC motion band (90 functions, 13760 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/symedit.py: every name this file defines is a bare `.text` row in
  * config/RMHE08/symbols.txt, no `__FILE__` string covers the range - the nearest one,
  * `lbl_805CDFC8` ("menu_item.cpp"), is referenced only by 0x802A5444/0x802A579C/0x802A64B0, eight

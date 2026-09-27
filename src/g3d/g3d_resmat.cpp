@@ -22,7 +22,7 @@
  * ends exactly where `gx/fn_8009AA78.c`'s extab begins (0x800099F0); our 110 records sit in
  * its middle, in `.text` order.  No `.ctors`/`.dtors` word points into the range.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` on the range's addresses: only the two
  * `ResTexSrt` manglings resolve to a real name, every other entry is an `fn_` placeholder),
  * so there is no real name to recover and stylelint's rule 7 refuses the landing without

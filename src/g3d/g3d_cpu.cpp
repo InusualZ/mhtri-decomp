@@ -11,7 +11,7 @@
  * / `zz_009a910_` placeholders, not a name.  Class 3 agrees: every caller of the range is nw4r g3d
  * (fn_80075DCC, g3d_state.cpp, g3d_resfile.cpp and the g3d_resmat band), so the module is `g3d`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8009A748`, which answers a `zz_` placeholder, and with
  * config/RMHE08/symbols.txt, whose every `.text` entry in 0x8009A748..0x8009AA78 is a bare
  * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.

@@ -6,7 +6,7 @@
  * at 0x805482CC` reports only weak signals at both ends, no must-link anchor at all), so the run is
  * worked as one unit.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked: `tudiscover.py at
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked: `tudiscover.py at
  * 0x805482CC` gives no name evidence; `python tools/symbols/dumpmap.py lookup` answers `zz_<addr>_`
  * for most addresses and, for the rest, a repeated and clearly misattributed set of SDK names -
  * `DBClose`, `gdev_cc_shutdown`, `J3DAnonVisibilityFull::~...` - at dozens of addresses across the

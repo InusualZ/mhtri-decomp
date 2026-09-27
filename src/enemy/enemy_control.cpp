@@ -5,7 +5,7 @@
  * requested in this worker's outbox (`config_requests`), to be applied by the orchestrator at the
  * re-split; no source of the landed upper unit was touched.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address resolves to a `zz_XXXXXXXX_` dump name and
  * a bare `.text` entry in config/RMHE08/symbols.txt, so no real function name exists to use).  A few
  * symbols arrive already mangled (`senko_set__FPQ34nw4r4math4VEC3fUcs`, `em_get_unique_work__FUs...`)

@@ -32,7 +32,7 @@
  *     sites: moving the declaration to the owner's header changed its arity under three call sites
  *     here.  Check the callers first, then move the declaration.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x80273B14 0x80276B58` - 66 of the 68 stems are `fn_`,
  * and the remaining two, `Pl_critical_get__FP4_PLW` and `Pl_decide_mot_get__FPUsPUs`, are the
  * manglings of the two real C++ declarations this file defines).  `dumpmap.py lookup` answers only

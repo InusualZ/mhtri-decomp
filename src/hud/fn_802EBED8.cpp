@@ -1,7 +1,7 @@
 /* hud/fn_802EBED8.cpp - the cockpit HUD's quest-window band (`.text` 0x802EBED8..0x802F140C, 54
  * functions / 21812 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/symedit.py --section .text range 0x802EBED8 0x802F140C`: every row in the range is
  * a bare `fn_` stem, and `tools/symbols/dumpmap.py lookup 0x802EBED8` answers `zz_02ebed8_`), so
  * every body below keeps the map's stem.

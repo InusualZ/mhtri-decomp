@@ -15,7 +15,7 @@
  * (its only data references are the numeric tables `lbl_805B85D8`/`lbl_805B8618`/`lbl_805B8638` and the
  * switch table `jumptable_805B8B98`), so the file keeps the map's stem (brief section 2, class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit.py range
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit.py range
  * over the proposal inventory and dumpmap.py lookup on the range's addresses: all 67 names are bare
  * `.text` entries and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
  *

@@ -1,5 +1,5 @@
 /* g3d/g3d_calcmaterial.cpp - the `g3d_calcmaterial.cpp` TU's `.text` 0x8006EE78..0x8006F738.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with a symbol greps of
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with a symbol greps of
  * config/RMHE08/symbols.txt: every .text entry in 0x8006EE78..0x8007270C is a bare `fn_XXXXXXXX`).
  *
  * The file name is class-1 evidence: the `.data` string `lbl_8058D7E0` read out of

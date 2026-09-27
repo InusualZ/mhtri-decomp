@@ -1,6 +1,6 @@
 /* ef/eft019.cpp - the `eft019` effect family, `.text` 0x801121DC..0x80114E34 (24 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the nine `eft019_*`
  * names - `eft019_set`, `eft019_set_core`, `_vec`, `_brethend`, `_tyakudan`, `_mazule`, `_subtype`,
  * `_ring`, `_smoke` - and every other address in the range is the dump's placeholder `zz_XXXXXXXX_`).

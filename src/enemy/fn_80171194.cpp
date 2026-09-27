@@ -20,7 +20,7 @@
  * Name: the map has only `fn_XXXXXXXX` for this range and the runtime dump has only `zz_` placeholders
  * (`.pi/notes/dumpmap-join.json`), so the map stem is kept as the file name.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked symbols.txt via the
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked symbols.txt via the
  *   brief's section 3 inventory - all 46 symbols are fn_* - and the runtime dump's zz_ placeholders in
  *   .pi/notes/dumpmap-join.json; the .rodata/.data runs carry no source-file string)
  *

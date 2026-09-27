@@ -1,5 +1,5 @@
 /* auto/8014A1BC_fn_8014A1BC.c - the enemy-work state unit, 0x8014A1BC..0x801502C8 (60 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * Provisional attribution: the range came from the DOL's own layout (docs/plan.md 12 item 5).  Seams
  * (see the `tu-boundary-discovery` skill): .data run jump jumptable_805A30B0 -> jumptable_805A4020,

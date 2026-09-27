@@ -10,7 +10,7 @@
  * from the range and `dumpmap.py lookup 0x80258FCC` answers only `zz_0258fcc_`, so the file keeps
  * the map's `fn_XXXXXXXX` stem (class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x80258FCC 0x8025F088` - every row is `fn_` - and
  * `python tools/splits/tudiscover.py at 0x80258FCC`, which reports 0 must-link anchors, no
  * `__FILE__` anchor and no owned data).

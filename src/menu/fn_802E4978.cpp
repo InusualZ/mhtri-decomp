@@ -1,7 +1,7 @@
 /*
  * menu/fn_802E4978.cpp - the 0x802E4978-0x802E7408 cockpit/HUD band (29 functions, 10896 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/symedit.py find/at + the Dolphin dump map at D:/WiiExperiment/DumpSymbols.zip: every
  * defined name in the range is a bare `fn_`/`zz_` entry, and the only `__FILE__` strings in the
  * neighbourhood are `cockpit.cpp` (emitted at 0x802DBC48, below this range) and `cockpit_quest.cpp`

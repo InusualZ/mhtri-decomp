@@ -14,7 +14,7 @@
  * merely the latest accepted source name before the run, not an owner of it (the same note sits on
  * the neighbouring `proposal/801D428C`).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address resolves to a `zz_XXXXXXXX_` dump name
  * and a bare `.text` entry in config/RMHE08/symbols.txt, so no real function name exists to use).
  *

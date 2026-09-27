@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py - `zz_0224ac4_` at 0x80224AC4 - and config/RMHE08/symbols.txt, where every
  * name between 0x80224AC4 and 0x80229ECC is a bare `fn_` or `dtor_` placeholder with no signature)
  *

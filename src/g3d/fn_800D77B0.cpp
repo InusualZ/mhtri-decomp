@@ -1,5 +1,5 @@
 /* g3d/fn_800D77B0.cpp - the single-matrix node transform pair, .text 0x800D77B0..0x800D79B4.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: both fn_ names this file uses are bare .text entries in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: both fn_ names this file uses are bare .text entries in config/RMHE08/symbols.txt)
  *
  * Registration - which evidence class decided it.  Class 3 (what the code does, plus the naming scheme
  * of its neighbours): the range sits between the discovery proposals `800D45AC` (`g3d_xsi.cpp`) and

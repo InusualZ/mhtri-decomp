@@ -1,5 +1,5 @@
 /* auto/80101FA4_fn_80101FA4.cpp - the `ef` effect-setup batch: three controller families whose
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * per-frame hooks share one object, 22 function(s), 0x80101FA4..0x80103D28.
  *
  * The seam is pinned by the `.data` pool run jumptable_8059E160 -> jumptable_8059E268

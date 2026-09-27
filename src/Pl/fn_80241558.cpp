@@ -14,7 +14,7 @@
  * whose map spelling is `Get_motion_no__FP4_PLW`, and the sibling big switch `fn_8023C2D0` calls
  * `Pl_act_ck__FP4_PLWUcUs` the same way.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `grep -n "^fn_8024" config/RMHE08/symbols.txt` - the range's sole entry is
  * `fn_80241558 = .text:0x80241558; // type:function size:0x1B90`, and dumpmap.py lookup 0x80241558
  * gives only the `zz_0241558_` placeholder, no real runtime name).

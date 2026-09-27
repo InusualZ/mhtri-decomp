@@ -29,7 +29,7 @@
  * `em_frame_check__FP11_ENEMY_WORKUsff`, `setVector3__FPQ34nw4r4math4VEC3fff` - through their real
  * signatures (rule 9).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked over
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked over
  * config/RMHE08/symbols.txt - every symbol this unit defines is a bare `.text` entry with no owner
  * name - and `python tools/symbols/dumpmap.py lookup 0x801993E0` answers the `zz_` placeholder
  * form, which is not evidence).

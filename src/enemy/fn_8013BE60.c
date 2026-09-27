@@ -1,5 +1,5 @@
 /* auto/8013BE60_fn_8013BE60.c - the enemy parameter interpreter and its handler table,
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * .text 0x8013BE60..0x8013F764 (78 functions).
  *
  * What it is.  `fn_8013BE60` is the generic "apply one parameter record" interpreter: it takes the

@@ -23,7 +23,7 @@
  *      the map's own `fn_XXXXXXXX` stem.
  * The file therefore keeps the map stem (brief option 4); no name was invented.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address of the range answers `zz_XXXXXXXX_` and
  * carries a bare `fn_XXXXXXXX = .text:0x...` entry in config/RMHE08/symbols.txt; no `__FILE__` string
  * is reachable from the range).

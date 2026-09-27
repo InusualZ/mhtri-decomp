@@ -34,7 +34,7 @@
  * The pool constants this unit loads are declared `extern`, never defined (playbook 29): redefining
  * them would rebuild the pool instead of addressing the target's.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with `symedit` over
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `symedit` over
  * config/RMHE08/symbols.txt - every symbol defined here is a bare `.text` entry with no owner name -
  * and `python tools/symbols/dumpmap.py lookup 0x80182D5C` answers the `zz_` placeholder form, which
  * is not evidence).

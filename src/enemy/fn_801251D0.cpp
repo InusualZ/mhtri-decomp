@@ -1,5 +1,5 @@
 /* auto/801251D0_fn_801251D0.cpp - the enemy control unit, 43 function(s) so far, `.text`
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * 0x801251D0..0x8012BA00 (26672 bytes, 145 symbols).
  *
  * What it is.  The enemy-side work block's taken/seated-state bookkeeping: the small accessors that

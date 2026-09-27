@@ -16,7 +16,7 @@
  * so the module is `ai` and the file keeps the map's stem.  The `.cpp` extension is the band's: the same
  * run is C++ (mangled callees `rotVecY__FPQ34nw4r4math4VEC3Ul`).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked: `symedit.py range`
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked: `symedit.py range`
  * over 0x802C4700..0x802C5E00 lists eleven `fn_` stems and nothing else, and `dumpmap.py lookup` on all
  * eleven returns `zz_<address>_` placeholders, i.e. unnamed rather than absent).
  *

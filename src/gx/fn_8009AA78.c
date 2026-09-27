@@ -1,5 +1,5 @@
 /* auto/8009AA78_fn_8009AA78.c - the 8 functions at .text 0x8009AA78..0x8009ACE4.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * A write-gather-pipe command writer and the six entry points built on it. `fn_8009AB1C`/`28`/`38` are
  * the u32/u16/u8 stores to the pipe window at 0xCC008000; the other functions pack a command word and

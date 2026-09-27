@@ -1,5 +1,5 @@
 /* enemy/fn_8012EC74.cpp - the enemy per-motion frame-window/area set, `.text` 0x8012EC74..0x80137604.
- * rule 7 deferred: the symbol map spells 266 of this range's 281 functions as bare `fn_XXXXXXXX` rows
+ * Naming note: the symbol map spells 266 of this range's 281 functions as bare `fn_XXXXXXXX` rows
  * (checked `python tools/symbols/symedit.py range 0x8012EC74 0x80137604`); those keep the map's stem.
  * The 15 rows that carry real names (`em_sleep_ck`, `em_get_mot_no`, `em_frame_check`,
  * `em_after_frame_check`, `em_water_check`, `em_magma_check`, `UpdateValue`, `shuffle1`..`shuffle6`,

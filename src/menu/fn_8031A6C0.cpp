@@ -32,7 +32,7 @@
  * target's m2c skeletons in `.pi/notes` and are the follow-up round's work.  Every function's
  * `.text` is unaffected by the helpers, so the landed subset measures as its own functions.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
  * config/RMHE08/symbols.txt from 0x8031A6C0 to 0x8031EA8C - 59 functions, all `fn_` stems, and the
  * runtime dump answers `zz_031a6c0_`).
  */

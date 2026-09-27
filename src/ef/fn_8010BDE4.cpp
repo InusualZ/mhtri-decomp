@@ -1,5 +1,5 @@
 /* ef/fn_8010BDE4.cpp - the player/enemy action-effect frame handlers, `.text` 0x8010BDE4..0x8010D1A8.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: every address answers `zz_XXXXXXXX_`, which is not
  * a name; the file's own symbols are bare `.text` entries in config/RMHE08/symbols.txt).
  *

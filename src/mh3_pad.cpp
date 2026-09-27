@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for the unnamed functions in this range
+ * Naming note: the symbol map has only fn_XXXXXXXX for the unnamed functions in this range
  * (checked with `python tools/symbols/dumpmap.py lookup <addr>`: every unnamed entry in this range is a
  * bare `zz_<addr>_` placeholder in the runtime dump as well, so there is no real name to recover).  The
  * functions the map does name (`Tsk_Change`, `GameModeExec`, `cnvt_eur_fname`, `initKPAD`, ...) use

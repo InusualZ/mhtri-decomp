@@ -1,7 +1,7 @@
 /*
  * fn_80429B94.cpp - the 0x80429B94-0x8043065C network/server-control band (114 functions, 27336 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py: every address in the range answers `zz_<addr>_` or a global name, never a
  * `__FILE__` emitter; the whole unit's `.data` pool carries the strings "so_alloc_fail",
  * "dwc_alloc_fail", "mh3uswii" and "mh.capcom.co.jp" and no bare source-file name).  The real names

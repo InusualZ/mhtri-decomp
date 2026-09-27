@@ -1,5 +1,5 @@
 /* g3d/g3d_basic.cpp - the `g3d_basic.cpp` basic-matrix cluster, .text 0x800D79B4..0x800D7F54.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every name
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every name
  * this file uses is a bare `fn_XXXXXXXX` entry in config/RMHE08/symbols.txt).
  *
  * The file name is class-1 evidence: the `.data` string `lbl_80595840` is `"g3d_basic.cpp"`, the `pFile`

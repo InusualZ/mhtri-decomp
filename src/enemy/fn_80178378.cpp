@@ -28,7 +28,7 @@
  *   extabindex  start:0x80029A54 end:0x80029D0C
  *   .text       start:0x80178378 end:0x80181C88
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x80178378 0x801784D0 0x80178754`, which answers only
  * `zz_XXXXXXXX_` placeholders, and by reading the probe's data pool: no `__FILE__` string).
  *

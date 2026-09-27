@@ -103,7 +103,7 @@
  *   fn_8032E1E8 -> em_seat_aim_ck            1 / -1 / 0 for "the seat has a player and
  *                                            `em_act_face_away` turned the record" / "refused" / "no seat"
  *
- * rule 7 deferred: the file names every symbol it *defines* (the table above); the escape that remains
+ * Naming note: the file names every symbol it *defines* (the table above); the escape that remains
  * covers precisely the names it *references* in other units - `fn_8012F5B8`, `fn_80130478`, `fn_80128A14`
  * and ~50 more callee stems whose owners have not been named yet, plus the rows of this range's own
  * unwritten tail (`fn_8032DD04`, `fn_8032E23C`, `fn_803303E0`, ...), which belong to the pass that

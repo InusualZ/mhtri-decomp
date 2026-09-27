@@ -62,7 +62,7 @@
  *   * `include/Pl/fn_8027D684.h` - `fn_8027DC64` declared `u32` here, not the owner's `s32`: the
  *     target's caller compares it unsigned (`cmplwi r3,0x1`), which is what mode 2 needs.
  *
- * rule 7 deferred: references only to other units' unrenamed `fn_XXXXXXXX` symbols (`MTX34_ctor`,
+ * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols (`MTX34_ctor`,
  * `fn_8005024C`, `fn_800E2994`, `fn_8006F304`, `fn_8013A9F4`, `fn_802B0668`, `fn_802B0A98`,
  * `fn_802D94C4`, `fn_8027DC64`), each declared by its
  * owner's header below; checked with `grep -n "fn_" include/fn_8004CAD8.h include/unsplit/{g3d,sound,unknown}.h

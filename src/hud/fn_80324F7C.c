@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the callees this file still spells by their map stem (`fn_800526F8`, `fn_8021B890`)
+ * Naming note: the callees this file still spells by their map stem (`fn_800526F8`, `fn_8021B890`)
  * are bare .text entries in config/RMHE08/symbols.txt with `zz_` in the runtime dump, and neither of
  * those addresses is this unit's own row.
  * One player's move-indicator draw: `move_indicator_draw`, `.text` 0x80324F7C-0x803250B0 (0x134 B).

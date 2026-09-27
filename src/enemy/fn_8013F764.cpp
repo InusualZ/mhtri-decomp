@@ -1,6 +1,6 @@
 /* enemy/fn_8013F764.cpp - the enemy program interpreter's second half: the run driver, the stream
  * readers and the command-length/stream-walk helpers, `.text` 0x8013F764..0x801411B8 (45 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/symedit.py range 0x8013F764 0x801411B8`: every one of the 45 rows is a bare
  * `fn_XXXXXXXX = .text:0x...` entry with no real name).
  *

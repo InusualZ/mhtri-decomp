@@ -26,7 +26,7 @@
  *     `enemy_control.cpp`), and no evidence names the original source file, so the file keeps the
  *     map's own stem.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range except the two `em030_*`
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range except the two `em030_*`
  * runtime-dump names (checked with `python tools/symbols/dumpmap.py lookup` over the range's
  * inventory: 58 of the 60 rows answer `zz_XXXXXXXX_` placeholders, and the two that do not,
  * `em030_condition_ck__FP11_ENEMY_WORK` / `em030_homing_range_ck__FP11_ENEMY_WORK`, are written as

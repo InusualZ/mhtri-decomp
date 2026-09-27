@@ -1,7 +1,7 @@
 /* enemy/fn_8015E854.cpp - the enemy action/state unit that follows the em003 block,
  * 0x8015E854..0x80165FC8 (55 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/dumpmap.py lookup 0x8015E854`: the shared runtime dump answers only
  * `zz_015e854_`, and `config/RMHE08/symbols.txt` carries nothing but the bare `fn_XXXXXXXX`
  * entries for the range - no `__FILE__`/class string names a file here).

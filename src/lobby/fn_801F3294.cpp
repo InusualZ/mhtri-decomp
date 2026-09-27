@@ -58,7 +58,7 @@
  *     emits `clrlwi r0,r5,16` first.  A `u16` local instead drops the mask but turns the index load into
  *     `lhz` where the target has `lha`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
  * over the range's inventory: all 48 names are bare `.text` entries in config/RMHE08/symbols.txt and the
  * runtime dump answers only `zz_XXXXXXXX_` placeholders for them)
  */

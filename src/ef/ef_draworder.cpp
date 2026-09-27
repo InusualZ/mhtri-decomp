@@ -12,7 +12,7 @@
  * 0x80009B60..0x80009BA0 (8 unwind records, one per non-leaf body), extabindex
  * 0x80022CEC..0x80022D4C, .text 0x800A388C..0x800A40F4.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` over all nine addresses and with
  * config/RMHE08/symbols.txt - every one is a bare `.text` fn_ name; only the two vtables carry labels).
  *

@@ -1,7 +1,7 @@
 /*
  * ai/fn_802D44F4.cpp - the 0x802D44F4-0x802DDC04 band (165 functions, 38672 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py lookup + the Dolphin dump map at
  * D:/WiiExperiment/DumpSymbols.zip: every defined symbol in the range is a bare `fn_`/`zz_`
  * entry, and no `__FILE__` string covers it), so the file keeps the map's stem.

@@ -14,7 +14,7 @@
  * 0x80022D4C..0x80022E30).  Sections: extab 0x80009BA0..0x80009C38 (19 unwind records),
  * extabindex 0x80022D4C..0x80022E30, .text 0x800A40F4..0x800A56B0.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` over all 39 addresses and against
  * config/RMHE08/symbols.txt, where every one is a bare `.text` fn_ entry) - except the three methods the
  * map names (`RetireEmitterAll__Q34nw4r2ef6EffectFv`,

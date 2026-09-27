@@ -1,7 +1,7 @@
 /*
  * nw4r g3d: the `ResMat` accessor cluster at 0x8005AA28-0x8005ABD8 (8 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit over
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit over
  * config/RMHE08/symbols.txt: every 0x8005AA28..0x8005ABD8 row is a bare `fn_XXXXXXXX`).
  *
  * Module `g3d` is class-1 evidence, the file name is class 4.  The range's only `__FILE__` string is

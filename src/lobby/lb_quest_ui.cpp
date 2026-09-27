@@ -66,7 +66,7 @@
  * see its docstring), and the fix on the merged tree is to move the two declarations into
  * `include/lobby/lb_quest_board.h`.
  *
- * rule 7 deferred: references only to other units' unrenamed fn_XXXXXXXX symbols (checked with
+ * Naming note: references only to other units' unrenamed fn_XXXXXXXX symbols (checked with
  * `grep -rn "fn_80" src/lobby/lb_quest_ui.cpp` - the only `fn_` names this file names
  * (`fn_80394144`, `fn_80394154`) are the next band's, declared by the band header it includes).
  *

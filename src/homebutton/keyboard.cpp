@@ -15,7 +15,7 @@
  * cuts (0x80561074/0x80561528/0x8056229C, "codegen fingerprint change", share 0.22) and no must-link
  * anchors - no cut it will stand behind.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` for every fn_8056 address of the range: every one
  * answers a bare `zz_<addr>_`/`FUN_<addr>` placeholder or an unrelated J3D/JSU name - the dump's map
  * resolves by nearest symbol and names no function of this band).

@@ -16,7 +16,7 @@
  *   - `fn_801782F8` - two-phase action: phase 0 arms `fn_8012F504(self, 0x32, 0x28, 0, 3)`; phase 1
  *     runs `fn_8012F93C` and `fn_80128030` on completion.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * `fn_` name defined here is a bare `.text` entry in config/RMHE08/symbols.txt, and neither the map nor
  * the runtime dump offers a real name - `dumpmap.py lookup` returns `zz_0178128_`/`zz_017827c_`/
  * `zz_01782f8_`, which is not evidence).

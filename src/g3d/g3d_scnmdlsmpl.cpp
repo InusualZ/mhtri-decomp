@@ -32,7 +32,7 @@
  * `extabindex` 0x80020FB8-0x80021150.  The `.data` fragment 0x8058F0A0-0x8058F3D8 is not claimed
  * (docs/plan.md 8.4: a range is claimed when the object emits it); it is recorded for the data pass.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range except for the dump's
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range except for the dump's
  * `TheBeatMatchOutput` (checked with `python tools/symbols/dumpmap.py lookup <addr>` over the range
  * and by reading every `.text` entry in 0x8007F0E4..0x800813B8 out of config/RMHE08/symbols.txt).
  *

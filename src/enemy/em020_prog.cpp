@@ -70,7 +70,7 @@
  * map's name (playbook 42).  Lib `enemy` (`cflags_main`); the target objects carry 47 extab records
  * and 47 extabindex entries, and `cflags_main` is already the lib's exceptions setting.
  *
- * rule 7 deferred: references only to other units' unrenamed `fn_XXXXXXXX` symbols (checked with a
+ * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols (checked with a
  * relocation sweep over `build/RMHE08/obj/`: every `fn_` this file calls - the 0x8012xxxx/0x8013xxxx
  * enemy band, the 0x802Axxxx menu band and the 0x8036xxxx siblings - is defined outside this range).
  * The symbols this file defines are named.

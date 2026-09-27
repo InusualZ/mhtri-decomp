@@ -27,7 +27,7 @@
  * Seam: the left edge 0x8008F6E8 is the proposal cap (the preceding TU is unclaimed); the right
  * edge 0x8008F8E4 is `g3d_resanmlight.cpp`'s first body and a proven seam.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (checked with
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8008F6E8` / `0x8008F8C8`: both are bare
  * `zz_XXXXXXXX_` placeholders in the runtime dump too), so there is no real name to recover and
  * stylelint's rule 7 refuses the landing without this line.

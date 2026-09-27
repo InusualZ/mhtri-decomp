@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map spells 97 of this range's 99 functions as bare `fn_XXXXXXXX` and
+ * Naming note: the symbol map spells 97 of this range's 99 functions as bare `fn_XXXXXXXX` and
  * names the other two with a mangling (`get_hit_id__Fv`) or a plain name; the map is the only
  * evidence for a name here - no `__FILE__` string covers the band (the DOL's string pool jumps from
  * `enemy_control.cpp` at 0x805A1BB8 straight to `menu_item.cpp` at 0x805CDFC8) and

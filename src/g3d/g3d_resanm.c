@@ -8,7 +8,7 @@
  * The byte-lerp helpers `fn_80089E9C`..`fn_80089F90` carry no data reference of their own; the report's
  * candidate cut 0x80089F94 puts them here (alternative 0x80089E9C) - unpinned, measure to settle.
  *
- * rule 7 deferred: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
+ * Naming note: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
  * symbol needs the map and the source in one edit (playbook 31).
  *
  * Language: langcheck says the retail TU is C++ (`__FILE__` `g3d_resanm.cpp`), but the reconstructed

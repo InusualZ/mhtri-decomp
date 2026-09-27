@@ -23,7 +23,7 @@
  * and the mangled ones are called through their real signatures (rule 9).  `_EFT`/`MHchar` come from
  * the owner headers `include/ef.h`/`include/pl.h`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
  * config/RMHE08/symbols.txt from 0x8031EA8C to 0x80324F7C - 67 functions, all `fn_` stems but the one
  * mangled `eft045_set`, and the runtime dump answers `zz_031ea8c_`).
  *

@@ -21,7 +21,7 @@
  *   * class 4 keeps the name: nothing supports a file name, so the map's own `fn_801CCBC4` stem is the
  *     file name (the sibling units use the same scheme).  No name was invented.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x801CCBC4` - every address answers the runtime dump's
  * `zz_XXXXXXXX_` placeholder and a bare `fn_XXXXXXXX = .text:0x...` map entry, and no `__FILE__`
  * string is reachable from the range).

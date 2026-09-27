@@ -33,7 +33,7 @@
  * down (their assert materialisation needs it), `#pragma peephole off` again for fn_800AB3FC (retail
  * has no fused `clrlslwi` there), and file-scoped `#pragma fp_contract off`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` for all 21 symbols of the proposal - every one
  * resolves to `map=fn_XXXXXXXX`, and the shared dump has no name for the helpers either).
  */

@@ -18,7 +18,7 @@
  * 0x8058B3D0 - inside the same `.data` pool as the `g3d_anmchr.cpp` assert strings - so the font
  * accessors are this TU's own debug-print state, not a neighbour's.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for most of this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for most of this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` - every unnamed address in 0x8005ABD8..0x80063888 is a
  * bare `.text` entry and the shared runtime dump has only `zz_<addr>_` placeholders).  Those definitions
  * are `extern "C"` so the object emits the map's own stem.

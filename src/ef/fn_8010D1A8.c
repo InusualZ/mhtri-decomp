@@ -1,5 +1,5 @@
 /* auto/8010D1A8_fn_8010D1A8.c - the player action-effect state machine, `.text` 0x8010D1A8..0x801121DC.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * What it is.  The unit drives the nw4r effects a player action spawns: an `Eft` record carries a
  * `state_0x05` the per-variant handler advances and a `type_0x02` selecting the variant body, and its

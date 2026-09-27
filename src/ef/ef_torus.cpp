@@ -1,7 +1,7 @@
 /*
  * ef/ef_torus.cpp - the retail `ef_torus.cpp` shape, 0x800C9540..0x800C9DD0 (2 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap:
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap:
  * `fn_800C9540 = .text:0x800C9540` and `fn_800C9DCC = .text:0x800C9DCC` are bare name = address rows)
  *
  * The original source file is named by the unit's own `.data` pool: the three `nw4r::db::Panic`

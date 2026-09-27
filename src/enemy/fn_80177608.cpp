@@ -1,5 +1,5 @@
 /* enemy/fn_80177608.cpp - two enemy action handlers, 0x80177608..0x80177890 (2 functions, 648 bytes).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap: both
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap: both
  * addresses resolve to bare `.text` entries `fn_80177608`/`fn_80177774` in config/RMHE08/symbols.txt,
  * and `dumpmap lookup` gives only a `zz_XXXXXXXX_` dump name, which is not evidence).
  *

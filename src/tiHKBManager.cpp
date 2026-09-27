@@ -1,5 +1,5 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` for every fn_8056 address in the range, which answers
  * only a bare `zz_<addr>_` placeholder; the runtime dump carries no real name for any of the 51 symbols).
  *

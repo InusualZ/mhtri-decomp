@@ -1,7 +1,7 @@
 /* enemy/fn_8015D860.cpp - the em008 enemy's per-action state-step band,
  * `.text` 0x8015D860..0x8015E854 (28 functions).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `tools/symbols/dumpmap.py lookup 0x8015D860`: the shared runtime dump answers only
  * `zz_015d860_` - no `__FILE__`/class string names a source file - and
  * `config/RMHE08/symbols.txt` carries nothing but the bare `fn_XXXXXXXX` entries for the range;

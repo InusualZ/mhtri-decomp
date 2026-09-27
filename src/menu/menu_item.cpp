@@ -66,7 +66,7 @@
  *     (`put_menu_cursor`, `GetItemData`, `get_menu_lsp_tbl` call sites); every other row answers the
  *     `zz_<addr>_` placeholder.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `symedit.py range 0x8029F3C8 0x802A6624` - 81 of the landed half's 91 rows are `fn_XXXXXXXX` with
  * `dumpmap.py lookup` answering `zz_<addr>_` for all 81 and no dump name for the folded half's 8,
  * all of which are bare `fn_XXXXXXXX` stems too - and the 10 real rows are written as the C++

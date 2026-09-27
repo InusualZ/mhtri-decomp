@@ -1,6 +1,6 @@
 /* ef/fn_80105314.cpp - the enemy/player effect-setter batch, .text 0x80105314..0x8010BDE4 (93
  * functions, 27344 bytes).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; only `eft013_set`,
  * `eft013_set_dmeft_pl`, `eft014_set_daihouden` and `eft015_set` carry a real name).
  *

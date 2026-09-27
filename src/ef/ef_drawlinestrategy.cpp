@@ -1,5 +1,5 @@
 /* ef_drawlinestrategy.cpp - nw4r::ef DrawLineStrategy, .text 0x800BEF98..0x800BF818.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x800BEF98` - the map carries `fn_800BEF98` and the shared
  * runtime dump carries only `zz_00bef98_`, so no better name exists for the ten functions).
  *

@@ -25,7 +25,7 @@
  * 0x8006EAC0 is the start of the next proposal (`g3d_anmvis.cpp`).  Registered at the proposal's exact
  * extent so it can be measured; the re-cut rides the batch.
  *
- * rule 7 deferred: the symbol map has only `fn_XXXXXXXX` for this range (plus dtk's `dtor_XXXXXXXX`
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (plus dtk's `dtor_XXXXXXXX`
  * destructor stems) - checked with `python tools/symbols/dumpmap.py lookup <addr>`: every unnamed entry is
  * a bare `zz_XXXXXXXX_` placeholder in the runtime dump too - so there is no real name to recover and
  * stylelint's rule 7 refuses the landing without this line.  The owner's checked-getter/assert shape is reconstructed, but

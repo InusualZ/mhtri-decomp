@@ -1,5 +1,5 @@
 /* ef/ef_drawpointstrategy.cpp - nw4r::ef DrawPointStrategy family, 0x800BF818..0x800BFFD4.
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 9 functions / 0x7BC bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  The split

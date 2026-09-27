@@ -3,7 +3,7 @@
  * `fn_801A94C0` 0x4, `fn_801A94C4` 0x7C), plus the extab run 0x8000F304..0x8000F324 and the
  * extabindex run 0x8002AB70..0x8002ABA0.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup` - every address answers `zz_XXXXXXXX_`/`FUN_XXXXXXXX`,
  * i.e. the runtime dump has no name, and no `__FILE__` string is referenced anywhere in the range:
  * the only pooled data it reaches is `.sdata2` float constants).

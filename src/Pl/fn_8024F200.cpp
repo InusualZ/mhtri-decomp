@@ -17,7 +17,7 @@
  * callees are `Pl_Skill_ck`/`Pl_cat_skill_ck`/`Pl_frame_check`/`Get_motion_no`, so the module is
  * `Pl`; 4. the stem is the map's `fn_8024F200`.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x8024F200` -> `zz_024f200_`, and with
  * `grep -n "^fn_8024\|^fn_8025" config/RMHE08/symbols.txt` - every one of the 92 entries is a bare
  * `fn_` placeholder, and every non-mangled callee they share is one too).

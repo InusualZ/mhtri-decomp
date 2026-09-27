@@ -1,7 +1,7 @@
 /*
  * ef_particlemanager.cpp - the nw4r::ef ParticleManager implementation.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every name
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every name
  * this file uses is a bare .text entry in config/RMHE08/symbols.txt, and the only __FILE__ string the
  * range references is "ef_particlemanager.cpp").
  *

@@ -14,7 +14,7 @@
  * `python tools/symbols/dumpmap.py lookup 0x8018B3B8` answers the `zz_018b3b8_` placeholder form,
  * which is not evidence.  The file keeps the map's own stem (class 4).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with `symedit` over
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `symedit` over
  * config/RMHE08/symbols.txt - every symbol defined here is a bare `.text` entry with no owner name -
  * and `python tools/symbols/dumpmap.py lookup` answers the `zz_XXXXXXXX_` placeholder form for the
  * whole inventory, which is not evidence).

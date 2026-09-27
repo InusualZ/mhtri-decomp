@@ -17,7 +17,7 @@
  * `menu_note.cpp`, `menu_placeinfo.cpp`), extension `.cpp` (the range's mangled callees).
  * `fn_8027FF88`'s caller and the `Set_equip_column_arrangement` mangling are the two C++ signals.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for most of this range (`symedit.py range`
+ * Naming note: the symbol map has only fn_XXXXXXXX for most of this range (`symedit.py range`
  * 0x80308FB4 0x8031A6C0: of 149 rows five are named - the four `Put_*` putters and
  * `Set_equip_column_arrangement` - and `dumpmap.py lookup` answers `zz_<addr>_` for the rest).  The
  * named rows are written as the C++ free functions their manglings spell; every bare stem is

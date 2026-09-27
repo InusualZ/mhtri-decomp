@@ -1,5 +1,5 @@
 /* src/enemy/fn_80170600.cpp - one `_ENEMY_WORK` action family, `.text` 0x80170600..0x80170FA8 (18 functions).
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap: every
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap: every
  * `dump` name in the range is `zz_XXXXXXXX_`, and the one real dump hit, `l2cu_release_rcb`, is flagged
  * `ambiguous` in dumpmap-join.json - the same name is proposed for two addresses - so it is not evidence).
  *

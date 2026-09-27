@@ -25,7 +25,7 @@
  * (`fn_801E1A40`) and unfused narrow compares, where the pass folds them into `clrlslwi`/an
  * if-converted branch chain.  Per-function measurements are in the outbox.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `dumpmap.py lookup` on the range's inventory - every name is a bare `fn_XXXXXXXX`/`zz_XXXXXXXX_`
  * placeholder; the only real names in the run, `eft033_set`/`eft033_set_ofs`, are used as they are)
  */
