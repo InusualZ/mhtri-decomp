@@ -74,8 +74,7 @@ s32 isCallback(NetworkInstance* self, s32 index);
 void resetCallback(NetworkInstance* self, s32 index);
 
 /* DWC/GameSpy session layer */
-void sendReqShut(NetworkInstance* self, s32 mode);
-void resetNetworkState3(NetworkInstance* self);
+void fn_804189C8(void);   /* 0x804189C8, the sNetworkLibrary constructor body the opener calls */
 void decrement60d4(NetworkInstance* self);
 u32 getSomething5(NetworkInstance* self);
 s32 fn_803FD658(NetworkInstance* self);
