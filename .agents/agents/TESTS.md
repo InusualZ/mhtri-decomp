@@ -61,6 +61,25 @@ written against, the one-copy `__FILE__` string is the decisive datum and an edg
 false, and `_<fnaddr>s_<file>_` gives the file name only, never the emitter. The run also reported **completed**
 rather than failed, so the recall evidence is readable from the run itself - which is the point of the probe.
 
+### Profile edit - the data sections are part of the registration (2026-09-26)
+
+`decompiler` gained the rule that a unit's **data sections belong to the registration**, not to a later lane: the
+data its own functions reference and own (private pool entries, jump tables, `__FILE__` strings, tables) is claimed
+and emitted in the same change that writes the bodies, and an `extern` for data the unit owns is a defect. The old
+framing was "**Encouraged** ... if the unit's code is at 100 %", so a unit at 88 % simply left the data; it is now
+a requirement, and the **mandatory verification block** carries
+`python tools/units/datagap.py --unit <stem>` - no `ours-extra` row, and no `target-extra` row for a section the
+block claims.
+
+Why the rule was needed, measured over the tree: **242 registered units with a source, only 23 claim any data
+section, and 171 of the remaining 219 declare data `extern`s** - so most units are not their target object in
+data and `matched_data` cannot rise. `enemy/fn_8018B3B8` (194 externs, no data claim) reports `ours-extra .data
+1116 B (target 0 B), .rela.data 3348 B (target 0 B)`: our object invents a `.data` section the target object does
+not have. `dataclaim.py` decides a *proposed* run (it serves the attribution queue), so `datagap.py` is the check a
+worker runs.
+
+T2 re-probe: the checklist now asks for the data rule as well; verdict recorded when it returns.
+
 ### T1 - discovery (2026-09-25)
 
 **PASS.** `decompiler`, `merger`, `fixer` all listed as project agents with aliases; the harness surfaced their
