@@ -986,9 +986,13 @@ stub -> later promotion to a real name and location) touched every unit twice an
 
 * **The worker names the unit from the evidence it has.** In order: the `__FILE__` string in the pool (the
   original source name, hence the module and the language), then a real name from the shared dump
-  (`docs/memory-dump.md`), then what the code does plus the naming scheme of its neighbours. The map's
-  `fn_XXXXXXXX` stem is a **legitimate outcome** when nothing supports a better name; **inventing a module is
-  forbidden**.
+  (`docs/memory-dump.md`), then what the code does plus the naming scheme of its neighbours. **The map's
+  `fn_XXXXXXXX` stem is not an outcome** (owner, 2026-09-26): when the evidence is thin, derive a name from the
+  context and **mark the guess** in the unit header so a later pass can refine it - a generated `fn_`/`lbl_`/
+  `unk` name left in `src/` is a defect, and `rule 7 deferred` is not for a unit being written (the escape
+  covers the files registered before the rule, and the land gate refuses one a batch *grows* for a symbol its
+  own unit defines, or a unit registered at a generated file name). **Inventing a module is forbidden** - a
+  module comes from the `__FILE__` string, the dump or the subsystem, never from a guess.
 * **Registration before measurement is the constraint.** A worker cannot score a unit that is not in the build
   graph, so it makes the registration - `splits.txt` range, `configure.py` entry, source file - **inside its own
   worktree** and measures there. The orchestrator applies that registration on `main` (§5.1's cherry-pick), so
