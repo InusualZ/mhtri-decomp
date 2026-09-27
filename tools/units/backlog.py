@@ -479,19 +479,26 @@ def load_statuses(main: str, register: str | None = None) -> dict[str, str]:
 # and never depends on the register file surviving a clean checkout. `parked` earns nothing: parking removes
 # a ghost, it does not buy a claim. Only the claims handed out cannot be derived from the statuses, so they
 # are the one thing persisted.
+#
+# A claim is FREE while the register has no open items (owner's ruling, 2026-09-27): the ledger rations
+# against known backlog work, and with nothing to fix there is nothing to ration. Charging anyway would let a
+# clean stretch accrue negative credit and then demand catch-up resolutions the day items reappeared. Free
+# claims are still counted, so the ledger shows everything that was handed out - nothing is hidden.
 # -----------------------------------------------------------------------------------------------------------
 BASE_CREDITS = 1
 RATIO_DEFAULT = 1
 
 
 def load_ledger(main: str, register: str | None = None) -> dict:
-    """The persisted ledger: `{"claims": [...], "ratio": K}` (empty claims when absent)."""
+    """The persisted ledger: `{"claims": [...], "ratio": K, "free": N}` (empty when absent)."""
     raw = load_register(main, register).get("ledger")
     if not isinstance(raw, dict):
-        return {"claims": [], "ratio": RATIO_DEFAULT}
+        return {"claims": [], "ratio": RATIO_DEFAULT, "free": 0}
     claims = raw.get("claims")
+    free = raw.get("free")
     return {"claims": list(claims) if isinstance(claims, list) else [],
-            "ratio": raw.get("ratio", RATIO_DEFAULT)}
+            "ratio": raw.get("ratio", RATIO_DEFAULT),
+            "free": int(free) if isinstance(free, int) and free > 0 else 0}
 
 
 def ledger_earned(items: list[Item]) -> int:
@@ -500,35 +507,39 @@ def ledger_earned(items: list[Item]) -> int:
     return sum(1 for it in items if it.status == "done" and it.default_status != "done")
 
 
-def ledger_summary(items: list[Item], claims, ratio: int = RATIO_DEFAULT) -> dict:
+def ledger_summary(items: list[Item], claims, ratio: int = RATIO_DEFAULT, free: int = 0) -> dict:
     """The balance, with its derivation, so every refusal and every summary can show the rule rather than
-    leave it to be inferred: `balance = base + earned - ratio * spent`."""
+    leave it to be inferred: `balance = base + earned - ratio * spent`. `free` counts the claims handed out
+    while the register was clean - they cost nothing, but they are still reported."""
     earned = ledger_earned(items)
     spent = len(claims or [])
-    return {"base": BASE_CREDITS, "earned": earned, "spent": spent, "ratio": ratio,
+    return {"base": BASE_CREDITS, "earned": earned, "spent": spent, "ratio": ratio, "free": free,
             "cost": ratio, "balance": BASE_CREDITS + earned - ratio * spent,
             "claims": list(claims or [])}
 
 
 def ledger_line(summary: dict, prefix: str = "credits") -> str:
     """One human line for the balance, used by `--print` and the `queue.py next` refusal."""
-    return ("%s: balance %d  (base %d + %d resolved - %d x %d claim(s) handed out)"
+    line = ("%s: balance %d  (base %d + %d resolved - %d x %d claim(s) handed out)"
             % (prefix, summary["balance"], summary["base"], summary["earned"],
                summary["ratio"], summary["spent"]))
+    if summary.get("free"):
+        line += "; %d claim(s) free while the register was clean" % summary["free"]
+    return line
 
 
 def payload(items: list[Item], as_of: str, counts: dict, ledger=None) -> dict:
     ledger = ledger if isinstance(ledger, dict) else {}
     claims = ledger.get("claims") or []
     ratio = ledger.get("ratio", RATIO_DEFAULT)
-    summary = ledger_summary(items, claims, ratio)
+    summary = ledger_summary(items, claims, ratio, free=int(ledger.get("free") or 0))
     return {
         "version": 1,
         "as_of": as_of,
         "counts": counts,
         "ledger": {"claims": list(claims), "ratio": ratio, "base": summary["base"],
                    "earned": summary["earned"], "spent": summary["spent"],
-                   "balance": summary["balance"]},
+                   "free": summary["free"], "balance": summary["balance"]},
         "items": [
             {
                 "key": it.key,
@@ -608,13 +619,21 @@ def record_claims(main: str, claims: list[dict], ratio: int = RATIO_DEFAULT,
 
     Only a *real* claim is recorded (`queue.py next` calls this for a non-dry run); a `--dry-run` and the
     deliberate `--ignore-backlog` override hand out work without spending, so they never call it.
+
+    A claim is **free while the register has no open items** (owner, 2026-09-27): there is nothing to ration
+    against, so charging would let a clean stretch accrue negative credit and then demand catch-up
+    resolutions the day items reappeared. A free claim is counted in `ledger["free"]` instead, so the ledger
+    still accounts for every claim handed out.
     """
     items, meta = build(main, register=register, **kw)
     ledger = meta["ledger"]
-    ledger["claims"].extend(claims)
     ledger["ratio"] = ratio
+    if any(it.status == "open" for it in items):
+        ledger["claims"].extend(claims)
+    else:
+        ledger["free"] = int(ledger.get("free") or 0) + len(claims)
     write_register(main, items, meta["as_of"], meta["counts"], ledger, register)
-    return ledger_summary(items, ledger["claims"], ratio)
+    return ledger_summary(items, ledger["claims"], ratio, free=ledger.get("free", 0))
 
 
 def lane_task(main: str, item: Item) -> dict:
@@ -643,7 +662,8 @@ def refusal(main: str, top: int = 3, ratio: int = RATIO_DEFAULT, wants: int = 1,
     message prints the balance with its derivation and the top item(s) with a ready-to-paste lane.
     """
     items, meta = build(main, **kw)
-    summary = ledger_summary(items, meta["ledger"]["claims"], ratio)
+    summary = ledger_summary(items, meta["ledger"]["claims"], ratio,
+                             free=int(meta["ledger"].get("free") or 0))
     open_ = [i for i in items if i.status == "open"]
     if not open_:
         return None

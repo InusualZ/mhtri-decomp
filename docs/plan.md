@@ -591,7 +591,11 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   refusal say so. Earnings are **derived from the item statuses** (the count of resolved `done`) rather than
   stored as a counter, so the rule can never drift and enforcement never depends on the register file
   surviving a clean checkout; the claims handed out are the one part persisted. The guard order is branch
-  (`HEAD` must be `main`), the credit balance, then unlanded.
+  (`HEAD` must be `main`), the credit balance, then unlanded. **A claim is free while the register is
+  clean** (owner, 2026-09-27): the ledger rations against known backlog work, so with nothing to fix there is
+  nothing to ration - charging anyway would let a clean stretch accrue negative credit and then demand
+  catch-up resolutions the day items reappeared. A free claim is still counted in the ledger and shown on
+  the balance line, so every claim handed out stays accounted for.
 * **Triage the stale first, and never guess (option 2).** `python tools/units/backlog.py triage [--apply]`
   classifies every open item as `resolved` / `stale` / `open`, printing the check that proved each, and
   `--apply` writes `resolved` -> `done` and `stale` -> `parked`. `--apply` is idempotent and never flips a
