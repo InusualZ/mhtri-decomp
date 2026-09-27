@@ -2237,6 +2237,27 @@ config.libs = [
             # either edge, and the `.data`/`.sdata` runs continue across both with ascending owners
             # (candidate-only class); see the unit header for the counts and the bracket.
             Object(NonMatching, "lobby/lb_companion_ui.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/80365C84_fn_80365C84.cpp: the lobby menu page's frame step and its
+            # info/text selector (`.text` 0x80365C84..0x80366618, 2 functions / 2452 B, plus their
+            # extab run 0x800177C4..0x800177D4 and extabindex run 0x8003720C..0x80037224 - each run
+            # is exactly the gap the bracketing split objects leave).  Module `lobby` and the names
+            # from the code (class 3, GUESS marked in the unit header): the frame step reads
+            # `lobby_w` (.bss 0x806AAB44) at +0x0AC - the menu pointer `lobby/fn_801E7530.cpp` uses -
+            # and the selector reads the lobby page block `lbl_80794880`; every callee is a lobby/hud
+            # symbol (set_zmode/set_blendmode, the 0x1877/0x1878/0x1879 panel setters fn_80214EF0/
+            # fn_80214FB8/fn_802150DC/fn_80215170, fn_801E66A8/fn_801E677C/fn_801E68B4,
+            # fn_801EF73C/fn_801F0834, fn_8033C1AC) plus the Pl icon queries
+            # fn_8027EFB4/fn_8027F1B8/fn_8027F21C.  No `__FILE__` string covers the range and the
+            # dump answers only `zz_` placeholders, so the unit and its two symbols are named for
+            # what the bodies do - `lb_menu_page_step` (the frame step) and `lb_menu_info_update`
+            # (the text selector); both map rows were renamed with the source via `symedit.py`.
+            # C++; every plain `fn_` definition that remains is another unit's symbol.
+            # `.data` 0x805EDAB4..0x805EDAE0 is claimed: it is `lb_menu_page_step`'s own 11-entry
+            # jump table (`jumptable_805EDAB4`, `scope:local`), the only data either body emits.  Same
+            # `cflags_lobby` as the band above, with the per-file `#pragma exceptions on` and
+            # `#pragma peephole off` the other lobby units use (both measured, see the unit header).
+            Object(NonMatching, "lobby/lb_menu_page.cpp"),
         ],
     },
     {
