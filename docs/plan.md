@@ -499,12 +499,12 @@ rules 3 and 4 exist to record.
 | # | rule | what it means concretely |
 | --- | --- | --- |
 | 1 | **A shared type lives in one header** | a type more than one unit uses is defined **once** (under `include/`, or beside its owner and included) and *included* where needed — never copied. The existing convention applies: a declaration moves to `include/` the *second* time a unit needs it, never the first |
-| 2 | **An extern lives with the TU that owns the symbol** | a function or variable declared `extern` belongs in the source or header of the translation unit that **defines** it, and consumers include that. Re-declaring someone else's symbol in your own file "to save an include" is forbidden |
+| 2 | **An extern lives with the TU that owns the symbol** | a function or variable declared `extern` belongs in the source or header of the translation unit that **defines** it, and consumers include that. Re-declaring someone else's symbol in your own file "to save an include" is forbidden. A symbol **no registered unit owns** (the map resolves it to an unsplit address) belongs in a band header under `include/unsplit/`, never a local `extern` |
 | 3 | **A reconstructed class/struct states its size** | every reconstructed type carries `/* size: 0xNN */`, traced from the evidence (allocations, `memset`/`memcpy` lengths, the object's `.data`/`.rel` records, the runtime dump). An approximation is allowed **only** if it is marked as one |
 | 4 | **Every field carries its offset** | `/* +0x1C */` on the field, in ascending order, so the layout is readable at a glance and a reviewer can check it against the disassembly |
 | 5 | **Every field has a name from its context** | what is stored, compared against, passed on. The **only** exception is a padding or unused field — present in the original object but untouched by the functions we match — which gets `pad_0xNN` / `unused_0xNN` **and keeps its offset** |
 | 6 | **Pointer arithmetic to reach a field is forbidden** | `*(u32*)((u8*)self + 0x1C) = v;` is not acceptable; declare the type and write `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise copy, a `sizeof`/offset computation) — and even there prefer `offsetof(Type, field)` |
-| 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used. Neither `fn_XXXXXXXX` nor `unkNN` may survive in `src/` |
+| 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used. Neither `fn_XXXXXXXX` nor `unkNN` may survive in `src/`. A data label this unit **owns** (`lbl_XXXXXXXX` / `loc_XXXXXXXX`) is the same: name it from what it holds and where it is used, and rename the map row in the same change - a reference to **another** unit's label is that unit's, not this file's |
 | 8 | **`goto` is forbidden** | No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read |
 | 9 | **A mangled symbol is called through its owner** | a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and stays legal (row 7's deferral) |
 | 10 | **A vtable we own is compiler output** | a table of code pointers inside the unit's own registered ranges is **emitted by MWCC** from a class that declares its `virtual` methods (plus the constructor that stores the table) - never written out entry by entry, never declared `extern`, never declared through a `void**` member. A table *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC emit a table into our object - extra bytes). **A table we wrote is not evidence of inheritance** - inheritance comes from the object's structure: the slot addresses read out of the DOL, the constructor's store, and the constructor/destructor chain |
@@ -524,12 +524,18 @@ tried.
 enforced by remembering is not a rule. The rules apply to new work immediately; existing units are brought into
 conformance as they are touched. **Rules 1, 2 and 9 are checked, not deferred**: rule 1 compares every `src/`
 type definition, rule 9 rejects a mangled spelling used as a callable identifier, and rule 2 resolves every
-`extern` through `config/RMHE08/symbols.txt` + `splits.txt` to the unit that owns the symbol. Rule 2 has one
-**named** gap rather than a guess: an unsplit address whose bracketing registered units name different modules
-has no sound header to move to (a `sound` unit sits inside the `ef` band), so those sites are counted in the
-report and left alone. Rule 7 has one exemption: a registered unit with **no bodies yet** is not held to it
-(§12) - its names are still the map's until the worker writes the bodies from the evidence. The audit of
-2026-09-22 says how much there is to bring:
+`extern` through `config/RMHE08/symbols.txt` + `splits.txt` to the unit that owns the symbol - and when the map
+resolves the symbol but **no** registered unit owns it, the local `extern` is itself the finding: the
+declaration belongs in a band header under `include/unsplit/`. Where the registered bands bracketing an unsplit
+address name different modules (a `sound` unit sits inside the `ef` band) no `<module>.h` is sound, so the
+finding names the band directory rather than guess a header; a symbol the map does not contain at all, and a
+duplicate map row, stay counted gaps because the map cannot judge them. Rule 7 has one exemption and one
+ownership split: a registered unit with **no bodies yet** is not held to it (§12) - its names are still the
+map's until the worker writes the bodies from the evidence - and a `lbl_XXXXXXXX` / `loc_XXXXXXXX` data label
+whose address falls in one of the unit's **own** registered ranges is a finding, while a reference to another
+unit's (or an unowned) label is that unit's and is never this file's (reporting those would be ~11.7k lines of
+churn for data the file does not claim). A `rule 7 deferred: <reason>` comment defers the `fn_` and `lbl_`
+halves for a unit that cannot yet name its own. The audit of 2026-09-22 says how much there is to bring:
 
 | measure | count | rule |
 | --- | --- | --- |
