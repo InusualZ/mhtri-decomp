@@ -28,6 +28,11 @@ u32 fn_8027D738(struct _PLW* self);
  * (docs/plan.md 6.5 rule 2). */
 void fn_8027D76C(struct _PLW* self);
 
+/* 0x8027FF88 - classify one packed equipment word (`_EQUIP_INDEX` +0x00) and return the number of
+ * colour/variant forms it has (0 = none).  Read by the equipment-information screen
+ * (`menu/menu_infomation.cpp`), whose header is the first consumer. */
+u8 fn_8027FF88(u32 equip);
+
 #ifdef __cplusplus
 }
 #endif

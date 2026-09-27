@@ -1105,6 +1105,11 @@ ef/fn_8030681C.cpp:
 	extabindex  start:0x80034674 end:0x8003489C
 	.text       start:0x8030681C end:0x8030D338
 
+menu/menu_infomation.cpp:
+	extab       start:0x80015C24 end:0x80015DEC
+	extabindex  start:0x8003489C end:0x80034B48
+	.text       start:0x8030D338 end:0x80313E24
+
 menu/fn_8031A6C0.cpp:
 	extab       start:0x80015F3C end:0x80016074
 	extabindex  start:0x80034D40 end:0x80034F14
