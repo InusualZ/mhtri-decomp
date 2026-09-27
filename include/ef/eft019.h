@@ -16,6 +16,12 @@
  * declaration belongs there too (rule 9).  Added with `ef/eft035.cpp`. */
 void eft019_set_core(nw4r::math::VEC3* pos, u8 area, u8 param, f32 scale_a, f32 scale_b);
 
+/* 0x80111A34 - the family's short entry point (`eft019_set__FPQ34nw4r4math4VEC3UcUc`): the position,
+ * the area byte and the parameter id, no scales.  Declared at C++ scope like its sibling above
+ * (rule 9: the map name is this signature's mangling).  Added with `enemy/em035_prog.cpp`, the
+ * first consumer to need the three-argument form. */
+void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 param);
+
 #endif
 
 #endif /* MHTRI_EF_EFT019_H */

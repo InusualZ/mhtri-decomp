@@ -91,6 +91,12 @@ void fn_801354AC(struct _ENEMY_WORK* self);
 void fn_801354B4(struct _ENEMY_WORK* self);
 void fn_8013581C(VEC3* out, VEC3* a, VEC3* b, u32 c, u16 d, f32 e);
 
+/* 0x80136DF4 - r3 the work record; the per-frame refresh the em035 program's angle-reset steps tail
+ * with (`enemy/em035_prog.cpp`'s `fn_8035F39C`/`fn_8035F5A8`/`fn_8035F644` call it once at the
+ * sub-state entry and once per wait frame, and none of them reads a result).  Added with that unit's
+ * registration (rule 2: the address is in this unit's own range). */
+void fn_80136DF4(struct _ENEMY_WORK* self);
+
 #ifdef __cplusplus
 }
 #endif
