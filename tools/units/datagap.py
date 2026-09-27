@@ -197,12 +197,21 @@ def main(argv=None) -> int:
     for name, extra, missing in rows:
         bits = []
         if extra:
-            bits.append("ours-extra " + ", ".join(f"{s} {o}B (target {t}B)" for s, o, t in extra))
+            # `.text` is not a data gap: a NonMatching unit whose functions overrun reports it too, and that
+            # is a size residual (progress), not the actionable data defect the rest of this tool is about.
+            data_extra = [e for e in extra if e[0] != ".text"]
+            text_extra = [e for e in extra if e[0] == ".text"]
+            if data_extra:
+                bits.append("ours-extra " + ", ".join(f"{s} {o}B (target {t}B)" for s, o, t in data_extra))
+            if text_extra:
+                bits.append("size residual, not a data gap " +
+                            ", ".join(f"{s} {o}B (target {t}B)" for s, o, t in text_extra))
         if missing:
             bits.append("target-extra " + ", ".join(f"{s} {t}B (ours {o}B)" for s, t, o in missing))
         print(f"{name}: " + "; ".join(bits))
+    data_rows = sum(1 for _n, e, m in rows if m or any(s != ".text" for s, _o, _t in e))
     what = f"data-only gap at or above {args.min_fuzzy:g} % code" if args.flip_blockers else f"{args.mode} gap"
-    print(f"\n{len(rows)} unit(s) with a {what}, out of {len(pairs)} scanned")
+    print(f"\n{len(rows)} unit(s) listed, {data_rows} of them with a real {what}, out of {len(pairs)} scanned")
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
