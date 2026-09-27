@@ -235,13 +235,54 @@ def sha256_file(path: str) -> str:
     return h.hexdigest()
 
 
+# The two sections a symbol *rename* rewrites and a `splits.txt` re-range does not: the string tables a
+# rename touches by definition. Measured 2026-09-26 on `worker/803250b0-fn-803250b0-2a24`, whose 18
+# renames moved a neighbour's object hash without re-ranging anything: `extab`, `extabindex`, `.text`,
+# `.relaextabindex`, `.rela.text`, `.comment`, `.note.split` and `.shstrtab` were byte-identical and
+# only `.symtab`/`.strtab` differed - the renamed callees are *undefined* in that object, and dtk does
+# not reorder the symbol table on a rename (`.rela.text` was byte-identical too, so the relocation
+# symbol indices did not move either).
+_RENAME_FREE_SECTIONS = (".symtab", ".strtab")
+
+
+def target_object_fingerprint(path: str) -> str:
+    """A rename-insensitive content fingerprint of a split target object.
+
+    The drift check must catch a `splits.txt` change that re-ranged a unit the batch does not name,
+    and must not fire when the batch renamed symbols: a cross-unit rename legitimately rewrites the
+    symbol table of every unit that references the renamed name, and the map diff for it is already in
+    the batch. So the hash covers every section except the two string tables (name, size and content),
+    plus the defined symbols' geometry - `(value, size, type, section)` with the names dropped. A
+    re-range moves bytes or addresses; a rename moves neither, which is the whole point of the split.
+
+    A file that cannot be read as an ELF object falls back to its raw hash, so an unreadable object
+    that changed is still drift rather than a crash.
+    """
+    try:
+        secs, syms = unitutil.read_elf(path)
+    except Exception:                                            # not an ELF (or truncated): raw hash
+        return "raw:" + sha256_file(path)
+    h = hashlib.sha256()
+    for sec in secs:
+        if sec["sname"] in _RENAME_FREE_SECTIONS:
+            continue
+        h.update(("%s\0%08x\0" % (sec["sname"], sec["size"])).encode())
+        h.update(sec["data"])
+    for geom in sorted((v, size, typ, shndx) for _n, v, size, typ, shndx in syms):
+        h.update(("|%08x/%08x/%d/%d" % geom).encode())
+    return h.hexdigest()
+
+
 def target_object_snapshot(main: str) -> dict[str, str | None]:
-    """`{unit_stem: sha256 | None}` for every unit `splits.txt` defines, before or after a build.
+    """`{unit_stem: content fingerprint | None}` for every unit `splits.txt` defines, before or after a build.
 
     Scoped to the *registered units'* split objects, not every `.o` under `build/RMHE08/obj/`: the
     retired `auto_*_text` objects there are not units and dtk does not reproduce four of them
     byte-for-byte, so including them would report drift that no registration caused. `None` is a unit
     whose object does not exist yet (a batch's newly registered range, before the split runs).
+
+    The fingerprint is `target_object_fingerprint`, not the file's hash: a rename must not read as a
+    re-range (see that function).
     """
     try:
         splits_text = open(_join(main, "config/RMHE08/splits.txt"), encoding="utf-8",
@@ -251,7 +292,7 @@ def target_object_snapshot(main: str) -> dict[str, str | None]:
     out: dict[str, str | None] = {}
     for stem in sorted(splits_unit_names(splits_text)):
         path = _join(main, target_object_rel(stem))
-        out[stem] = sha256_file(path) if os.path.exists(path) else None
+        out[stem] = target_object_fingerprint(path) if os.path.exists(path) else None
     return out
 
 
@@ -260,10 +301,13 @@ def target_drift_problems(before: dict[str, str | None], after: dict[str, str | 
     """Target objects that moved under the batch, naming any unit the batch does not own.
 
     A unit the batch names may legitimately change (its own range may be widened or newly
-    registered); every *other* unit's split target object must be byte-identical, because target
+    registered); every *other* unit's split target object must be content-identical, because target
     objects come from the DOL split and only `splits.txt` re-ranges them. So a neighbour that moved is
     a `splits.txt` change that re-ranged a unit the batch does not own - refused, not assumed
     harmless. A newly registered unit (present-after, absent-before) is only ever a batch unit.
+
+    "Moved" is `target_object_fingerprint`'s reading, so a batch that only *renamed* symbols (the map
+    is shared, and a cross-unit rename rewrites every referencing unit's symbol table) is not drift.
     """
     batch = {unit_stem(u) for u in batch_stems}
     problems: list[str] = []
@@ -277,8 +321,9 @@ def target_drift_problems(before: dict[str, str | None], after: dict[str, str | 
             problems.append("%s: a split target object appeared for a unit the batch does not name "
                             "(the registration re-ranged a neighbour)" % stem)
         else:
-            problems.append("%s: its split target object changed under the batch (%s -> %s) - a "
-                            "`splits.txt` change re-ranged a neighbour rather than leaving it alone"
+            problems.append("%s: its split target object's content changed under the batch (%s -> %s) "
+                            "- a `splits.txt` change re-ranged a neighbour rather than leaving it "
+                            "alone (its bytes, addresses or sections moved, not just its names)"
                             % (stem, b[:8], a[:8]))
     return problems
 
