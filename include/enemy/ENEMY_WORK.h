@@ -490,6 +490,23 @@ struct _ENEMY_WORK {
             /* +0x330 */ s16 part_value_0x330;
             /* +0x332 */ s16 part_value_0x332;
         } part_values_0x32C;
+        /* the em020 program's own field view `enemy/em020_prog.cpp` reaches (added by that unit):
+         * the +0x334/+0x336 halfword pair its init clears, the +0x338 per-frame latch and the
+         * +0x33E countdown `em020_timers_tick` ticks, and the +0x339/+0x33A/+0x33B triple
+         * `fn_80372DAC` fills.  A union member because the views above already own these bytes. */
+        struct {
+            /* +0x328 */ u8 unused_0x328gt[0x334 - 0x328];
+            /* +0x334 */ s16 timer_0x334;   /* the per-frame countdown `em020_timers_tick` ticks */
+            /* +0x336 */ s16 value_0x336;   /* armed from the map lookup at init */
+            /* +0x338 */ u8 latch_0x338;    /* "map 7 and area 3" for this frame */
+            /* +0x339 */ u8 sel_0x339;      /* out of the `fn_80372DAC` lookup */
+            /* +0x33A */ u8 sel_0x33A;
+            /* +0x33B */ u8 sel_0x33B;
+            /* +0x33C */ u8 flag_0x33C;
+            /* +0x33D */ u8 pad_0x33D;
+            /* +0x33E */ s16 timer_0x33E;   /* the second countdown, gated on the byte stack */
+            /* +0x340 */ u8 unused_0x340gt[0x354 - 0x340];
+        } em020_0x328;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
