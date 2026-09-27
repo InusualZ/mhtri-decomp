@@ -886,7 +886,7 @@ s32 GameSpyInterfaceThread::updateClock()
 {
     s32 time[8];
 
-    fn_800E89D8();
+    getInstance();
     fn_804167B4(time);
     fn_8050C5F0((const void*)time[3]);
     frame_70 = frame_70 + 1;

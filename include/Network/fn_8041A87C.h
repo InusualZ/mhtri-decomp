@@ -414,7 +414,7 @@ u16 DWCi_htons(u16 port);
 char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 
 /* owner: src/sound/fn_800E46E8.cpp */
-void* fn_800E89D8(void);
+void* getInstance(void);
 
 }
 
