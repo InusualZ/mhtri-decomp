@@ -146,6 +146,7 @@ import contextlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1193,23 +1194,70 @@ def _defer_count(text: str) -> int:
     return len(sl.RULE7_DEFER_RE.findall(text))
 
 
+# a file name (or a symbol) that is a generated stem rather than a name: rule 7's defect class.
+_GENERATED_STEM_RE = re.compile(r"^(?:fn|lbl|unk)_[0-9A-Fa-f]{8}$")
+_GENERATED_FN_RE = re.compile(r"\bfn_[0-9A-Fa-f]{8}\s*\(")
+
+
+def generated_fn_definitions(text: str) -> list[str]:
+    """The generated `fn_XXXXXXXX` names `text` *defines* (a body, not a prototype) - the file's own.
+
+    Rule 7's escape defers the `fn_` half of a file, and the ruling is that it may only defer names the
+    file does not own: `void fn_802B2978(void);` is a *reference* to another unit's symbol and is
+    tolerated, while `void fn_802B2978(void) { ... }` is this file's own name left generated. The test
+    is syntactic, on stylelint's comment-and-literal-blanked `code` view: the `(` after a generated
+    name must close on a `{` rather than on a `;`.
+    """
+    code = sl.strip(text)[0]
+    out: list[str] = []
+    for m in _GENERATED_FN_RE.finditer(code):
+        depth, i = 0, m.end() - 1
+        while i < len(code):
+            if code[i] == "(":
+                depth += 1
+            elif code[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        j = i + 1
+        while j < len(code) and code[j] in " \t\r\n":
+            j += 1
+        if j < len(code) and code[j] == "{":
+            out.append(m.group(0).rstrip(" \t("))
+    return sorted(set(out))
+
+
 def rule7_defer_growth(main: str, base: str | None) -> list[str]:
-    """Files in the batch whose `rule 7 deferred` count went UP - the naming rule's refusal.
+    """The batch's OWN symbols left generated behind a `rule 7 deferred` escape - the naming refusal.
 
-    The owner's ruling (2026-09-26): a generated name is never a resting place - derive one from context, and
-    guess (marked in the unit header so a later pass can refine it) when the evidence is thin. The escape stays
-    available for the files registered before the rule, so this is a check on GROWTH, not on presence: rewriting
-    a header that already carries the comment is safe (1 -> 1 passes), adding one to a file that did not have it
-    is not (0 -> 1 fails). `grep -rn "rule 7 deferred" src/` remains the complete list of files that use it.
+    The owner's ruling (2026-09-26) is a hybrid, and this row enforces the batch's own half only: a
+    generated name is never a resting place for a unit being written, so a file that *grows* an escape
+    may not (1) be registered at a generated file name (`src/enemy/fn_8033041C.cpp`) or (2) leave a
+    generated `fn_` name **defined** by it.
 
-    Returns the offending paths, sorted. `[]` when `base` is unknown, no source file changed, or nothing grew.
+    References to *other* units' unrenamed symbols are tolerated - they are not this batch's to fix,
+    and in a wholly unnamed region they are most of rule 7's findings (the 803253bc lane: 42 of 68
+    findings were callee names owned by ~10 other units, with 0 rename candidates anywhere in the
+    band). The escape also stays available for the files registered before the rule, so this is a
+    check on GROWTH, not on presence: rewriting a header that already carries the comment is safe
+    (1 -> 1 passes); adding one to a file that did not have it is examined. `grep -rn "rule 7
+    deferred" src/` remains the complete list of files that use it.
+
+    A *bodyless* file is not examined even when its escape is new, because it is exempt from rule 7
+    anyway (key 2, `stylelint.rule7_state`) and its file name is provisional - `enemy/fn_8033041C.cpp`
+    is the seam re-draw's second half, whose band has no name evidence at all. When that unit is
+    written it grows bodies, its escape becomes load-bearing and this row then demands the name.
+
+    Returns one line per offender, sorted. `[]` when `base` is unknown, no source file changed, or the
+    growth is in files that name their own symbols.
     """
     if not base:
         return []
     touched = run(["git", "diff", "--name-only", base, "--", "src", "include"], main)
     if touched.returncode != 0 or not (touched.stdout or "").strip():
         return []
-    grew = []
+    offenders: list[str] = []
     for rel in touched.stdout.split():
         if not rel.endswith((".c", ".cpp", ".h", ".hpp", ".cc")):
             continue
@@ -1218,9 +1266,15 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
         if os.path.exists(path):
             new_text = open(path, encoding="utf-8", errors="replace", newline="").read()
         old = run(["git", "show", "%s:%s" % (base, rel)], main)
-        if _defer_count(new_text) > _defer_count(old.stdout if old.returncode == 0 else ""):
-            grew.append(rel)
-    return sorted(grew)
+        if _defer_count(new_text) <= _defer_count(old.stdout if old.returncode == 0 else ""):
+            continue
+        if _GENERATED_STEM_RE.match(os.path.splitext(os.path.basename(rel))[0]):
+            offenders.append("%s: registered at a generated file name" % rel)
+            continue
+        defs = generated_fn_definitions(new_text)
+        if defs:
+            offenders.append("%s: defines %s" % (rel, ", ".join(defs[:3])))
+    return sorted(offenders)
 
 
 def band_ownership_warnings(main: str, base: str | None) -> list[str]:
@@ -1832,16 +1886,20 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                 "lines above" % len(band_warnings)) if band_warnings
                else "no newly-owned symbol left declared in include/unsplit/*.h")
 
-    # No batch may add a `rule 7 deferred` escape (owner's ruling, 2026-09-26): a generated name is never a
-    # resting place - derive one from context, and guess (marked in the unit header) when the evidence is thin.
-    # The escape remains for the files registered before the rule, so the check is on growth per file, not on
-    # presence: a header that already carries the comment may be rewritten, a file that did not have it may not
-    # gain one. Without this the naming rule is advisory at the gate - stylelint accepts the comment by design.
+    # No batch may leave its OWN symbols generated behind a `rule 7 deferred` escape (owner's ruling,
+    # 2026-09-26, narrowed the same day): the escape may cover references to other units' unrenamed symbols -
+    # in a wholly unnamed region they are most of rule 7's findings and cannot be fixed from that lane - but
+    # not a name this batch's unit defines, and not a file registered at a generated stem. See
+    # `rule7_defer_growth` for the two conditions and why a bodyless file is exempt.
     defer_growth = rule7_defer_growth(main, want_base)
-    check("no batch adds a `rule 7 deferred` escape", not defer_growth,
-          detail="%d file(s) gained a `rule 7 deferred` comment: %s"
-                 % (len(defer_growth), ", ".join(defer_growth[:5])),
-          info="no file in the batch gained a `rule 7 deferred` comment")
+    check("no batch leaves its own symbols generated behind a `rule 7 deferred` escape",
+          not defer_growth,
+          detail="%d file(s) grew a `rule 7 deferred` escape for a name the batch owns: %s"
+                 % (len(defer_growth), "; ".join(defer_growth[:4])),
+          remedy="name the symbols the batch's own unit defines - derive a name from context and mark "
+                 "the guess in the unit header - and register the unit at a named path; references to "
+                 "OTHER units' unrenamed symbols are tolerated and are not this batch's to fix",
+          info="no file in the batch grew a `rule 7 deferred` escape")
 
     before = recorded.get("ledger") or ledger_numbers(main)
     flip = flips_objects(main)
@@ -2617,6 +2675,45 @@ def selftest() -> int:
     import io
     import unittest.mock as mock
     module = sys.modules[__name__]
+    # the rule-7 row, narrowed (2026-09-26): the escape may cover references to OTHER units' unrenamed
+    # symbols (most of rule 7's findings in a wholly unnamed band, unfixable from that lane) but not a name
+    # the batch's own unit defines, and not a file registered at a generated stem. The three cases are
+    # exactly the ones the 803253bc and 8032c920 lanes produced.
+    def defer_repo(rel, base_text, text):
+        tmp = tempfile.mkdtemp(prefix="land-defer-")
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        path = os.path.join(tmp, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(base_text)
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        base_sha = repo_git(tmp, "rev-parse", "HEAD")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        return tmp, base_sha
+
+    defer = "/* rule 7 deferred: the map has only fn_XXXXXXXX for this range */\n"
+    d1, sha1 = defer_repo("src/enemy/em_action.cpp", "void em_act_dispatch(void) {}\n",
+                          defer + "void fn_802B2978(void) {}\n")
+    check("rule7: a file that DEFINES its own generated name REFUSES",
+          module.rule7_defer_growth(d1, sha1) != [], True)
+    d2, sha2 = defer_repo("src/enemy/em_action.cpp", "void em_act_dispatch(void) {}\n",
+                          defer + "void fn_802B2978(void);\nvoid em_act_dispatch(void) {}\n")
+    check("rule7: a prototype of another unit's generated name is tolerated",
+          module.rule7_defer_growth(d2, sha2), [])
+    d3, sha3 = defer_repo("src/enemy/fn_8033041C.cpp", "",
+                          defer + "void em_act_dispatch(void) {}\n")
+    check("rule7: a unit registered at a generated file name REFUSES",
+          module.rule7_defer_growth(d3, sha3) != [], True)
+    d4, sha4 = defer_repo("src/enemy/em_action.cpp", defer + "void em_act_dispatch(void) {}\n",
+                          defer + "/* rewritten header */\nvoid em_act_dispatch(void) {}\n")
+    check("rule7: rewriting a file that already had the escape passes",
+          module.rule7_defer_growth(d4, sha4), [])
+    for d in (d1, d2, d3, d4):
+        shutil.rmtree(d, ignore_errors=True)
+
 
     def fake_verify_with(write, gate_code=0, gate_problems=()):
         """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
