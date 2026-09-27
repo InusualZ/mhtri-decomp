@@ -2165,8 +2165,20 @@ config.libs = [
             # is recorded as unproven in each file's header.  `Network/NetworkWiiMediator.cpp` folds in
             # the retired `Network/NetworkWiiMediator.c` (`fn_80413F3C` at 0x80413F3C) so the whole
             # class band has one owner; the fold-in is part of this batch, not a later one.
-            Object(NonMatching, "Network/initNetworkSessionStable.cpp"),
-            Object(NonMatching, "Network/network_state.cpp"),
+            # Per-unit flag deviation (brief section 8.2), instruction-level evidence: the two
+            # session-manager units are `-O3` scheduling, like the sibling `Network/fn_803D3CE8.cpp`
+            # below.  With the lib's `-O4,p` every framed function hoists its constant-argument
+            # setup into the prologue's `mflr`->`stw` latency slot (sendReqCommonKey: the target is
+            # `stw r0,20; stw r31,12; stw r30,8; mr r30,r3; li r4,18; li r5,0; bl` while ours puts
+            # the two `li` before the saves), and the FMP/request switch tails are laid out
+            # unsorted.  Measured over the same source: `Network/network_state.cpp` 69.42 % at
+            # `-O4,p` -> 81.93 % at `-O3` (five more functions at 100 %),
+            # `Network/initNetworkSessionStable.cpp` 63.26 % -> 92.88 %.  `-func_align 4` is kept
+            # from `cflags_network` (the range packs on 4-byte boundaries).
+            Object(NonMatching, "Network/initNetworkSessionStable.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            Object(NonMatching, "Network/network_state.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/NetworkWiiMediator.cpp"),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: retail's
             # `constructNetworkWiiMediator` is the plain source order - `li r3,0x1408` lands *after*

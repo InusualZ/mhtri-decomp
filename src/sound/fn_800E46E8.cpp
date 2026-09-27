@@ -591,7 +591,7 @@ LevelSetting* fn_800E8690(void);
 void fn_800E87E0(void* alloc, void* free);
 s32 fn_800E885C(void);
 s16 fn_800E8880(LevelSetting* setting);
-void* fn_800E89D8(void);
+void* getInstance(void);
 void fn_800E89E0(u32 v);
 void fn_800E8D40(void);
 void fn_800E8D74(void);
@@ -1887,7 +1887,7 @@ extern "C" s16 fn_800E8880(LevelSetting* setting)
 }
 
 /* The network library mediator. */
-extern "C" void* fn_800E89D8(void)
+extern "C" void* getInstance(void)
 {
     return mpMediator__15sNetworkLibrary;
 }
