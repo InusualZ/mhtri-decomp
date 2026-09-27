@@ -173,6 +173,11 @@ struct MenuScroll {
     /* +0x00B */ s8 dark_colour;     /* its dark colour */
 };
 
+struct _mh_ivec2_;
+/* The 0x24-byte placement record `MenuSlot::place_entries` points at: `enemy/em024_ai.cpp` is its
+ * only consumer, so its definition lives in that unit and this header only names the pointer's type. */
+struct MenuPlaceRec;
+
 /* One of the two 0x330-byte working records of the menu work area at `.bss:0x806AC8C8`; the area is
  * `MenuSlot slot[2]` (0x660 = the whole `.bss` run, and `fn_802A0188` walks it with an 816-byte
  * stride).  The three entry arrays and their counts are the ones the setters below walk; the other
@@ -236,7 +241,10 @@ struct MenuSlot {
     /* +0x2F6 */ u8 unused_0x2F6[0x31E - 0x2F6];
     /* +0x31E */ u8 field_0x31E;
     /* +0x31F */ u8 field_0x31F;
-    /* +0x320 */ u8 unused_0x320[0x32D - 0x320];
+    /* +0x320 */ u8 unused_0x320[0x4];
+    /* +0x324 */ MenuPlaceRec* place_entries; /* the 0x24-byte placement list `enemy/em024_ai.cpp` walks */
+    /* +0x328 */ s32 place_count;
+    /* +0x32C */ u8 unused_0x32C[0x1];
     /* +0x32D */ u8 field_0x32D;      /* the flag `fn_802A0188` clears after `fn_8004082C` */
     /* +0x32E */ u8 unused_0x32E[0x330 - 0x32E];
 };
@@ -322,6 +330,9 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  * includes this header for it now (rule 2).  Its third parameter is the lobby band's 2D vector, whose
  * tag is declared here rather than including a band header for it. */
 struct _mh_ivec2_;
+/* The 0x24-byte placement record `MenuSlot::place_entries` points at: `enemy/em024_ai.cpp` is its
+ * only consumer, so its definition lives in that unit and this header only names the pointer's type. */
+struct MenuPlaceRec;
 
 void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode);
 void hit_flag_set(_HIT_W* hit, u32 flags);

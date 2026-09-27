@@ -1073,6 +1073,28 @@ config.libs = [
             # extab 0x80017574..0x800175DC (13 records), extabindex 0x80036E94..0x80036F30 (13 x 12 B),
             # `.text` 0x8035E034..0x8035F2B4.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/fn_8035E034.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from proposal/8034C1D0_fn_8034C1D0.cpp:
+            # the em024 monster-AI band `.text` 0x8034C1D0..0x80358624 (120 functions / 50260 B) plus
+            # its extab 0x80017094..0x8001736C (91 records) and extabindex 0x80036744..0x80036B88
+            # (91 x 12 B).  Module `enemy` from the link band (the unit below starts at the range's
+            # end, every callee out of the range is enemy-band: `em_frame_check`,
+            # `em_after_frame_check`, `em_act_ck`, `em_get_mot_no`, `fn_8012xxxx`, `fn_80136xxx`) and
+            # from the code (the biggest body in the range is a 0x1A84-byte switch over
+            # `em_get_mot_no()`'s motions).  No `__FILE__` string is reachable from the range and the
+            # runtime dump answers only `zz_` placeholders, so the file name and the 14 symbols the
+            # file defines are **guesses from the range's dominant content**: `em024_prog_tbl`
+            # (`.data:0x805EBBE0`, the monster-id program table `em0XX_prog_tbl`) lists seven of the
+            # band's functions (0x8034F334, 0x8034F524, 0x803562B4, 0x8034F410, 0x8034F414,
+            # `fn_80356664`, `fn_803580E8`) and sits inside the band's own `.data` run, next to its
+            # switch jump tables (`jumptable_805EBD78`/`jumptable_805EC1C0`/`jumptable_805ECE88`) - so
+            # this is the em024 monster's AI band.  The range's head (0x8034C1D0..0x8034D124) is menu
+            # item-page note code, so `menu/menu_note.cpp` may be a fragment of a TU that continues
+            # here - a seam re-draw candidate in the unit's outbox; the 14 named symbols are all in
+            # that head and are named for what they are (note page / menu row table / placement
+            # list), the file for the band it registers.  The `rule 7 deferred` escape the file still
+            # carries covers only the callee names it references in other units.  C++; every plain
+            # `fn_` definition is `extern "C"`.  See the unit header for the residuals.
+            Object(NonMatching, "enemy/em024_ai.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803253BC_fn_803253BC` (the map stem it was claimed under) - the 0x803253BC-0x8032C920
             # band (85 functions / 30052 B) between the registered `hud/fn_80324F7C.c` above and the

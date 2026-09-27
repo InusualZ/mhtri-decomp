@@ -131,7 +131,7 @@ typedef struct LbItemDb {
 } LbItemDb;
 extern LbItemDb* lbl_80794880;
 
-s32 fn_8034C784(u8 kind, u8 row);
+s32 item_page_option_item_id(u8 kind, u8 row);
 u16 fn_803AA588(u8 a);
 u16 fn_803AA674(u8 a);
 
