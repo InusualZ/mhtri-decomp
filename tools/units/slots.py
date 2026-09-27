@@ -532,8 +532,26 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
             refreshed = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
             v = verify(main, n)
             if not v["ok"]:
-                raise SystemExit("REFUSED slot %d: the kept build tree could not be proven current even after "
-                                 "a re-seed: %s" % (n, "; ".join(v["reasons"])))
+                # Two of `verify`'s three checks are hard doubts and still refuse: MAIN's own tree being
+                # stale, and the slot's report differing from MAIN's by even a byte (a stale report is how a
+                # lane measures the wrong build).  The third is `build_current`, which compares the SLOT's
+                # `config.json` mtime against MAIN's map/DOL inputs - inputs that are newer whenever MAIN's
+                # own map/DOL moved after MAIN's last build.  That is a property of MAIN, not of a copy that
+                # was just made from it, and no re-seed can ever satisfy it, so it refused forever: a lane
+                # lost ~25 minutes here proving by hand what `report_matches` proves in a second.
+                # When MAIN is current AND the report is byte-identical, accept and SAY SO - never silently.
+                if not v["main_build_current"]:
+                    raise SystemExit("REFUSED slot %d: MAIN's own build tree is not current (%s);\n"
+                                     "  run `ninja` in MAIN so the slot can be re-seeded - never hand a lane a doubt"
+                                     % (n, "; ".join(v["reasons"])))
+                if not v["report_matches"]:
+                    raise SystemExit("REFUSED slot %d: slot build/RMHE08/report.json differs from MAIN's - "
+                                     "a stale report is how a lane measures the wrong build (%s)"
+                                     % (n, "; ".join(v["reasons"])))
+                print("slot %d: MAIN's tree is current and report.json is byte-identical to MAIN's, so the only "
+                      "remaining doubt is config.json's mtime (%s) - accepting; a stale build would have failed "
+                      "report_matches" % (n, "; ".join(v["reasons"])))
+                v = dict(v, ok=True, accepted_mtime_note=True)
         write_lock(main, n, {"slot": n, "dir": d, "unit": unit, "branch": branch,
                              "worker": worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
                              "base": tip, "acquired_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
