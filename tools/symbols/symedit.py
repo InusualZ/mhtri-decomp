@@ -1000,7 +1000,11 @@ def selftest() -> int:
     msg, _c = merge_plan(adj, [mrow], lambda names: {n: [] for n in names})
     check("merge: a clean reference scan passes", msg, "")
     check("refs: a known name is found", len(find_refs(["symedit"], ["tools"], 3)["symedit"]) > 0, True)
-    ghost = "fn_" + "9" * 8
+    # The name must be unique per RUN, not merely unusual. This check asserts a repo-wide ABSENCE, so a
+    # hardcoded made-up name is a static string another file may legitimately contain - a selftest fixture
+    # in tools/units/callees.py carried exactly fn_99999999, and the check then failed for a reason that
+    # had nothing to do with find_refs. Deriving it from the pid keeps it valid (fn_<8 hex>) and unique.
+    ghost = "fn_%08X" % (os.getpid() & 0xFFFFFFFF)
     check("refs: a made-up name is not", find_refs([ghost], ["tools"], 3)[ghost], [])
 
     # --- the merge-batch file parser -------------------------------------------------------------
