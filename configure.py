@@ -308,6 +308,12 @@ cflags_dwc = [*cflags_base, "-func_align", "4"]
 # -O3/-O4,p per unit (playbook 33) before the flags are called settled.
 cflags_nwc24 = [*cflags_base, "-func_align", "4"]
 
+# NHTTP (the Revolution SDK HTTP library the retail link places immediately after the DWCi band,
+# 0x805145B8..0x8051B7FC).  Same shape as the sibling SDK groups above: `Wii/1.3` and
+# `-func_align 4`, copied from `cflags_dwc`/`cflags_os`.  The change from 16-byte to 4-byte
+# function packing at 0x805145B8 is the DWCi/NHTTP boundary (see NHTTP/NHTTP_bgnend.c).
+cflags_nhttp = [*cflags_base, "-func_align", "4"]
+
 # lobby flags (src/lobby/lobby_scene.c). Evidence: the retail fn_801EC9E0 (0x18 B / 6 instructions) reads the
 # small-data scene pointer, then the +0x10 table base, before the argument's byte, and keeps the table base
 # in r4; -O4,p instead hoists the byte load, splits the base across r3 and reorders the two loads. -O3 is
@@ -2209,7 +2215,39 @@ config.libs = [
         "cflags": cflags_dwc,
         "host": False,
         "objects": [
+            # The DWCi SDK band head: the named `DWCi_Np_CPUCopyFast` (0x80507C40) and its 14
+            # neighbours (.text 0x80507C40..0x80509DB0, 15 functions / 8560 B).  Right edge is the
+            # strong `.sdata` run-jump cut at 0x80509DB0 (`tudiscover.py at 0x80507C40`); the left
+            # edge is the named symbol's own start.  Claims .text only.  See the file header.
+            Object(NonMatching, "DWCi/DWCi_Np_CPUCopyFast.c"),
             Object(NonMatching, "DWCi/fn_805113B0.c"),
+            # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
+            # edge is the seam the recon resolved: `tudiscover.py at 0x80512490` pins `strong x2`
+            # at 0x80512490, so the registered `DWCi/fn_805113B0.c` right edge was moved down from
+            # 0x805124F4.  The right edge 0x805145B8 is the 16->4 byte function-packing change - the
+            # DWCi/NHTTP library boundary.  `DWCi`, not NHTTP: the range calls only the DWCi
+            # transport helpers and carries the GameSpy NATNEG pool.  Claims .text only.
+            Object(NonMatching, "DWCi/DWCi_NatNeg.c"),
+        ],
+    },
+    {
+        # The Revolution SDK NHTTP (HTTP) library, `.text` 0x805145B8..0x8051B7FC (the SSL library
+        # begins at 0x8051B7FC).  Registered as its own SDK lib block because it is a separate
+        # prebuilt library with its own source files: the three units' own `__FILE__` pool strings
+        # are `NHTTP_bgnend.c` (0x80630A28), `NHTTP_os_RVL.c` (0x80630B18) and `d_nhttp.c`
+        # (0x80630F04).  Internal TU boundaries are only weakly pinned by `tudiscover` (the NHTTP
+        # cuts are weak pool signals), so the split follows the real file names + per-TU `.data`
+        # fragment order and is expected to be re-cut when the SDK object list is recovered.
+        # `Wii/1.3` + cflags_nhttp (4-byte packing is instruction-level evidence here; the flags
+        # are otherwise the sibling SDK group's).  Each unit claims .text only.
+        "lib": "NHTTP",
+        "mw_version": "Wii/1.3",
+        "cflags": cflags_nhttp,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "NHTTP/NHTTP_bgnend.c"),
+            Object(NonMatching, "NHTTP/NHTTP_os_RVL.c"),
+            Object(NonMatching, "NHTTP/d_nhttp.c"),
         ],
     },
     {

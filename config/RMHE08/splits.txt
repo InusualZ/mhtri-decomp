@@ -1365,8 +1365,23 @@ RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40
 	.data       start:0x80629C08 end:0x80629C40
 
+DWCi/DWCi_Np_CPUCopyFast.c:
+	.text       start:0x80507C40 end:0x80509DB0
+
 DWCi/fn_805113B0.c:
-	.text       start:0x805113B0 end:0x805124F4
+	.text       start:0x805113B0 end:0x80512490
+
+DWCi/DWCi_NatNeg.c:
+	.text       start:0x80512490 end:0x805145B8
+
+NHTTP/NHTTP_bgnend.c:
+	.text       start:0x805145B8 end:0x80515010
+
+NHTTP/NHTTP_os_RVL.c:
+	.text       start:0x80515010 end:0x80515774
+
+NHTTP/d_nhttp.c:
+	.text       start:0x80515774 end:0x8051B7FC
 
 NWC24/nwc24_msg.c:
 	.text       start:0x8051D710 end:0x8051E068
