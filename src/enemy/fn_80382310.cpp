@@ -74,6 +74,7 @@
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80147CE0.h"
 #include "sound/fn_800DD1F0.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* --- the declarations this band's bodies need (the owners are not registered yet; the address of
  * each sits inside 0x80380000.., the band this unit opens) ------------------------------- */
@@ -247,9 +248,7 @@ void fn_800D58B0(s32 handle);
 s32 fn_800D9804(u32 a, void* b, void* c);
 void fn_800E0560(MHchar* self);
 void fn_801FF984(void* self);
-void* fn_80043EA8(void* self);
 void fn_802DFC6C(void);
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 s32 fn_80383F0C(_ENEMY_WORK* self, s16 a);
 void __construct_array(void* array, void* ctor, u32 a, u32 size, u32 count);
 }
@@ -536,7 +535,7 @@ extern "C" void fn_80385A78(NoteWork* self) {
     self->model.field_0x2C = self->field_0x188;
     self->model.field_0x30 = self->field_0x18C;
     self->model.field_0x34 = self->field_0x190;
-    fn_80041E40(&self->model.pos_0x04, &self->vec_0x170);
+    copyVec3(&self->model.pos_0x04, &self->vec_0x170);
 }
 
 /* 0x80385AA0 */
@@ -626,8 +625,8 @@ extern "C" void fn_80385E7C(void) {
 /* 0x80385E9C */
 extern "C" NoteWork* fn_80385E9C(NoteWork* self) {
     fn_801FF984(&self->model);
-    fn_80043EA8(&self->vec_0x170);
-    fn_80043EA8(&self->vec_0x17C);
+    VEC3_ctor(&self->vec_0x170);
+    VEC3_ctor(&self->vec_0x17C);
     return self;
 }
 
@@ -919,12 +918,12 @@ extern "C" void fn_803861F8(NoteWork* self) {
         fn_80385AA0(self, 0);
         fn_80385BF4(self, 2, 0, 0);
         self->field_0x1B0 = lbl_8079BF90;
-        fn_80041E40(&self->vec_0x170, (nw4r::math::VEC3*)(work + 0x3C));
+        copyVec3(&self->vec_0x170, (nw4r::math::VEC3*)(work + 0x3C));
         fn_800FC0D4(&self->field_0x188, work + 0x54);
         fn_80385C98((_QNPC_W*)self, 90);
     } else if (v == 1) {
         if (Pl_act_ck((_PLW*)work, 9, 0) == 1) {
-            fn_80041E40(&self->vec_0x170, (nw4r::math::VEC3*)(work + 0x3C));
+            copyVec3(&self->vec_0x170, (nw4r::math::VEC3*)(work + 0x3C));
             fn_800FC0D4(&self->field_0x188, work + 0x54);
             fn_80385C98((_QNPC_W*)self, 90);
         } else {

@@ -46,7 +46,7 @@
  * signature their mangling encodes and called through it; every `fn_*` definition stays `extern "C"`.
  *
  * Types.  `_ENEMY_WORK` is the shared record `include/enemy/ENEMY_WORK.h` owns (rule 1).  This unit
- * added the bytes it measures to that header: +0x1B0 (the aim vector `fn_80041E40` copies into),
+ * added the bytes it measures to that header: +0x1B0 (the aim vector `copyVec3` copies into),
  * +0x20C, +0x380/+0x381, +0x452, +0x76C, +0x836, +0x9F6, and the +0x328 block - two vectors plus the
  * two flags `fn_801D71C4` clears, reached through the union member `action_0x328` because
  * `enemy/fn_80170600.cpp`'s `timers_0x328` view names the same 44 bytes.
@@ -71,6 +71,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "sound/mhchar.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
@@ -338,9 +339,6 @@ void fn_80106694(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void fn_8010D2B0(void* pos, u8 a, u8 b, s32 c, f32 d);
 void fn_800FA378(void* out);
 void fn_800FA3B8(void* out);
-void fn_80041E40(void* dst, const void* src);
-void* fn_80041E8C(void* out, f32 x, f32 y, f32 z);
-void fn_80043EA8(void* out);
 void fn_80051490(void* out, const void* in);
 void fn_80051378(void* out, const void* in, const void* v);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
@@ -448,7 +446,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
     u8 area;
     u8 flags;
 
-    fn_80043EA8(&spot);
+    VEC3_ctor(&spot);
     fn_801D4CE0(self);
     switch (em_get_mot_no(self)) {
     case 0x8:
@@ -843,7 +841,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
 void fn_801D428C(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 spot;
 
-    fn_80043EA8(&spot);
+    VEC3_ctor(&spot);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1107,7 +1105,7 @@ void fn_801D4CE0(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
     u16 ang;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (fn_8012EC60(self) != 0) {
         ang = calcVecAngX(&self->vec_0x76C);
         if ((u16)(ang + 0x8000) > 0x671B) {
@@ -1129,7 +1127,7 @@ void fn_801D4CE0(struct _ENEMY_WORK* self) {
 void fn_801D4DD8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 arg5) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     switch (arg1) {
     case 0:
         if ((u32)(arg2 - 0xC) > 0xD) {
@@ -1147,7 +1145,7 @@ void fn_801D4DD8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4,
         break;
     case 1:
         if (arg3 == 0xFF) {
-            fn_80041E40(&pos, &self->pos);
+            copyVec3(&pos, &self->pos);
         } else {
             get_joint_wpos_em(self, arg3, &pos);
         }
@@ -1157,7 +1155,7 @@ void fn_801D4DD8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4,
         break;
     case 2:
         if (arg3 == 0xFF) {
-            fn_80041E40(&pos, &self->pos);
+            copyVec3(&pos, &self->pos);
         } else {
             get_joint_wpos_em(self, arg3, &pos);
         }
@@ -1196,18 +1194,18 @@ s32 fn_801D6548(struct _ENEMY_WORK* self, u8 arg1) {
     f32 dist;
     f32 scale;
 
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     other = fn_80131034(self, 0x1C, 0);
     if (other != NULL && fn_8012E5A8(other) == 1) {
         if (arg1 == 0) {
             return 1;
         }
-        fn_80041E40(&b, fn_80041E8C(&d, lbl_80799220, lbl_80799220,
+        copyVec3(&b, setVec3(&d, lbl_80799220, lbl_80799220,
                                     lbl_80799264 * get_em_chg_scale(self)));
         rotVecY(&b, self->field_0x1C0);
         fn_80051378(&c, &self->pos, &b);
-        fn_80041E40(&a, &c);
+        copyVec3(&a, &c);
         dist = calcDistanceSqXZ(&a, &other->pos);
         scale = lbl_8079948C * get_em_chg_scale(self);
         if (dist < lbl_8079948C * get_em_chg_scale(self) * scale) {
@@ -1260,7 +1258,7 @@ u8 fn_801D67D8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, nw4r::math::VEC3* tar
     u8 id;
     s32 i;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     i = 0;
     id = arg1;
     best = arg2;
@@ -1286,7 +1284,7 @@ u32 fn_801D68A8(struct _ENEMY_WORK* self, u32 arg1) {
     u32 t;
     u8 sel;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     sel = (u8)arg1;
     switch (sel) {
     case 0:
@@ -1448,9 +1446,9 @@ s32 fn_801D6DA4(struct _ENEMY_WORK* self, u16 arg1) {
 void fn_801D6EDC(EmSpawnRec801D428C* rec, u8 a1, u16 a2, u16 a3) {
     nw4r::math::VEC3 pos;
 
-    fn_80041E8C(&pos, lbl_80799220, lbl_807992BC, lbl_80799380);
+    setVec3(&pos, lbl_80799220, lbl_807992BC, lbl_80799380);
     rec->id = 29;
-    fn_80041E40(&rec->pos, &pos);
+    copyVec3(&rec->pos, &pos);
     rec->field_0x10 = a1;
     rec->field_0x12 = a2;
     rec->field_0x14 = a3;
@@ -1482,27 +1480,27 @@ void fn_801D6FB8(void) {
     nw4r::math::VEC3 v12;
     nw4r::math::VEC3 v13;
 
-    fn_80051490(lbl_806A7B30, fn_80041E8C(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(lbl_806A7B30 + 0xC, fn_80041E8C(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(lbl_806A7B48, fn_80041E8C(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(lbl_806A7B48 + 0xC, fn_80041E8C(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(lbl_806A7B60, fn_80041E8C(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
-    fn_80051490(lbl_806A7B60 + 0xC, fn_80041E8C(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
-    fn_80051490(lbl_806A7B78, fn_80041E8C(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(lbl_806A7B78 + 0xC, fn_80041E8C(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(lbl_805B6950, fn_80041E8C(&v8, lbl_807994C0, lbl_80799220, lbl_807994C4));
-    fn_80051490(lbl_805B6950 + 0xC, fn_80041E8C(&v9, lbl_807994C8, lbl_807994CC, lbl_807994D0));
-    fn_80051490(lbl_805B6950 + 0x1C, fn_80041E8C(&v10, lbl_807994D4, lbl_80799220, lbl_807994D8));
-    fn_80051490(lbl_805B6950 + 0x28, fn_80041E8C(&v11, lbl_807994DC, lbl_80799220, lbl_807994E0));
-    fn_80051490(lbl_805B6950 + 0x38, fn_80041E8C(&v12, lbl_807994E4, lbl_80799220, lbl_807994E8));
-    fn_80051490(lbl_805B6950 + 0x44, fn_80041E8C(&v13, lbl_807994EC, lbl_80799220, lbl_807994F0));
+    fn_80051490(lbl_806A7B30, setVec3(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
+    fn_80051490(lbl_806A7B30 + 0xC, setVec3(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
+    fn_80051490(lbl_806A7B48, setVec3(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
+    fn_80051490(lbl_806A7B48 + 0xC, setVec3(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
+    fn_80051490(lbl_806A7B60, setVec3(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
+    fn_80051490(lbl_806A7B60 + 0xC, setVec3(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
+    fn_80051490(lbl_806A7B78, setVec3(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
+    fn_80051490(lbl_806A7B78 + 0xC, setVec3(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
+    fn_80051490(lbl_805B6950, setVec3(&v8, lbl_807994C0, lbl_80799220, lbl_807994C4));
+    fn_80051490(lbl_805B6950 + 0xC, setVec3(&v9, lbl_807994C8, lbl_807994CC, lbl_807994D0));
+    fn_80051490(lbl_805B6950 + 0x1C, setVec3(&v10, lbl_807994D4, lbl_80799220, lbl_807994D8));
+    fn_80051490(lbl_805B6950 + 0x28, setVec3(&v11, lbl_807994DC, lbl_80799220, lbl_807994E0));
+    fn_80051490(lbl_805B6950 + 0x38, setVec3(&v12, lbl_807994E4, lbl_80799220, lbl_807994E8));
+    fn_80051490(lbl_805B6950 + 0x44, setVec3(&v13, lbl_807994EC, lbl_80799220, lbl_807994F0));
 }
 
 void fn_801D71C4(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 pos;
     EmHelper801D428C* helper;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     setVector3(&self->action_0x328.vec_0x328, lbl_807994F8, lbl_807994F8, lbl_807994F8);
     setVector3(&self->action_0x328.vec_0x334, lbl_807994F8, lbl_807994F8, lbl_807994F8);
     self->action_0x328.field_0x340 = lbl_807994FC;
@@ -1632,7 +1630,7 @@ void fn_801D75D0(struct _ENEMY_WORK* self) {
             if (other->active != 0 && (other->field_0x1C8 & 1) != 0 && other != self &&
                 self->area_no == other->area_no &&
                 fn_8013023C(other) == fn_8013023C(self) && other->action == 0xB) {
-                fn_80041E40(&self->aim, &other->pos);
+                copyVec3(&self->aim, &other->pos);
                 self->action_0x328.field_0x345 = 1;
                 found = 1;
                 break;
@@ -1775,7 +1773,7 @@ void fn_801D79F8(struct _ENEMY_WORK* self) {
 void fn_801D7A74(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;

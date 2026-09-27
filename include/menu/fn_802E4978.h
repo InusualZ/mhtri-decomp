@@ -212,7 +212,7 @@ u32 get_move_work_max(u8 kind);
  *   * `include/ai/fn_802D0F34.h` (0x802D27E0): redefines `_HIT_W` against `include/menu/menu_item.h`
  *     and declares `get_move_work_adrs` as `u8*` against this header's `void*`.
  *   * `include/mh3_pad.h` (0x80046F0C): clashes with `include/pl.h` on its own pre-existing
- *     `fn_80041E8C` declaration.
+ *     `setVec3` declaration.
  *
  * Each is a `shared-file` request in the unit's outbox, `fn_80050BC0`'s included.  The signatures are
  * this unit's call sites, measured against the target object (a change here moves a row, so they must

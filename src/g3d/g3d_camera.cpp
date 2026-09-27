@@ -25,6 +25,8 @@
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 #include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -52,12 +54,8 @@ extern "C" void GXSetProjection(const f32* pMtx, s32 type);
 extern "C" void GXSetScissor(u32 left, u32 top, u32 width, u32 height);
 extern "C" void GXSetScissorBoxOffset(s32 x, s32 y);
 extern "C" void GXSetViewport(f32 x, f32 y, f32 width, f32 height, f32 near, f32 far);
-extern "C" void fn_80041E40(void* pDst, const void* pSrc);
-extern "C" void fn_80041E8C(void* pOut, f32 x, f32 y, f32 z);
-extern "C" void fn_80043EA8(void* pOut);
 extern "C" void fn_800504D4(void* pOut);
 extern "C" void* fn_80050508(void* pMtx);
-extern "C" void fn_8005050C(void* pOut);
 extern "C" void fn_80050850(void* pOut, const void* pIn);
 extern "C" s32 fn_800508A8(const void* pIn);
 extern "C" void fn_80051820(void* pOut, const void* pA, const void* pB);
@@ -315,7 +313,7 @@ void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
     }
     if (pOut != NULL && fn_80067EE8(pSelf)) {
         CameraData* pData = fn_80074A54(pSelf);
-        fn_80041E40(pOut, &pData->mPosX);
+        copyVec3(pOut, &pData->mPosX);
     }
 }
 
@@ -357,17 +355,17 @@ void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut)
     u32 flags = pData->mFlags;
     if ((flags & 1) != 0) {
         pOut->mType = 0;
-        fn_80041E40(&pOut->mPosX, &pData->mTargetX);
-        fn_80041E40(&pOut->mTargetX, &pData->mUpX);
+        copyVec3(&pOut->mPosX, &pData->mTargetX);
+        copyVec3(&pOut->mTargetX, &pData->mUpX);
         return;
     }
     if ((flags & 2) != 0) {
         pOut->mType = 1;
-        fn_80041E40(&pOut->mUpX, &pData->mUnk98);
+        copyVec3(&pOut->mUpX, &pData->mUnk98);
         return;
     }
     pOut->mType = 2;
-    fn_80041E40(&pOut->mTargetX, &pData->mUpX);
+    copyVec3(&pOut->mTargetX, &pData->mUpX);
     pOut->mUnk28 = pData->mUnkA4;
 }
 
@@ -451,7 +449,7 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
     f32 projMtx[16];
     ProjParams params;
     f32 frustum[6];
-    fn_8005050C(viewMtx);
+    MTX34_ctor(viewMtx);
     fn_80075390(projMtx);
     fn_80075394(pSelf, viewMtx);
     fn_80075440(pSelf, projMtx);
@@ -635,7 +633,7 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         fn_80050508(pData);
         fn_804C64E0(pos, target, up);
     } else if ((flags & 4) != 0) {
-        fn_80041E8C(&diff, pData->mPosX - pData->mUpX, pData->mPosY - pData->mUpY,
+        setVec3(&diff, pData->mPosX - pData->mUpX, pData->mPosY - pData->mUpY,
                     pData->mPosZ - pData->mUpZ);
         if (0.0f == diff.x && 0.0f == diff.z) {
             pData->mViewMtx[0][0] = 1.0f;
@@ -658,14 +656,14 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
                 pData->mViewMtx[2][3] = -pData->mPosY;
             }
         } else {
-            fn_80041E8C(&axisA, diff.z, 0.0f, -diff.x);
-            fn_80043EA8(&axisB);
+            setVec3(&axisA, diff.z, 0.0f, -diff.x);
+            VEC3_ctor(&axisB);
             fn_80050850(&diff, &diff);
             fn_80050850(&axisA, &axisA);
             fn_80051820(&axisB, &diff, &axisA);
             fn_80075DCC(&rotSin, &rotCos, pData->mUnkA4);
-            fn_80043EA8(&rowA);
-            fn_80043EA8(&rowB);
+            VEC3_ctor(&rowA);
+            VEC3_ctor(&rowB);
             rowA.x = rotSin * axisB.x + rotCos * axisA.x;
             rowA.y = rotSin * axisB.y;
             rowA.z = rotSin * axisB.z + rotCos * axisA.z;
@@ -692,9 +690,9 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         fn_80075DCC(&sinX, &cosX, pData->mUnk98);
         fn_80075DCC(&sinY, &cosY, pData->mUnk9C);
         fn_80075DCC(&sinZ, &cosZ, pData->mUnkA0);
-        fn_80043EA8(&row0);
-        fn_80043EA8(&row1);
-        fn_80043EA8(&row2);
+        VEC3_ctor(&row0);
+        VEC3_ctor(&row1);
+        VEC3_ctor(&row2);
         row0.x = sinZ * (sinX * sinY) + cosX * cosZ;
         row0.y = cosY * sinZ;
         row0.z = sinZ * (sinX * cosX) - sinY * cosZ;
@@ -730,7 +728,7 @@ void nw4r::g3d::Camera::SetPosition(const math::VEC3& rPos) {
     }
     if (fn_80067EE8(this)) {
         CameraData* pData = fn_800748E4(this);
-        fn_80041E40(&pData->mPosX, &rPos);
+        copyVec3(&pData->mPosX, &rPos);
         pData->mFlags &= ~8;
     }
 }
@@ -749,8 +747,8 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
             fn_80074D38(&rInfo.mTargetX, &pData->mUpX) != 0) {
             pData->mFlags &= ~7;
             pData->mFlags |= 1;
-            fn_80041E40(&pData->mTargetX, &rInfo.mPosX);
-            fn_80041E40(&pData->mUpX, &rInfo.mTargetX);
+            copyVec3(&pData->mTargetX, &rInfo.mPosX);
+            copyVec3(&pData->mUpX, &rInfo.mTargetX);
             pData->mFlags &= ~8;
         }
         break;
@@ -759,7 +757,7 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
         if ((pData->mFlags & 2) == 0 || fn_80074D38(&rInfo.mUpX, &pData->mUnk98) != 0) {
             pData->mFlags &= ~7;
             pData->mFlags |= 2;
-            fn_80041E40(&pData->mUnk98, &rInfo.mUpX);
+            copyVec3(&pData->mUnk98, &rInfo.mUpX);
             pData->mFlags &= ~8;
         }
         break;
@@ -769,7 +767,7 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
             rInfo.mUnk28 != pData->mUnkA4) {
             pData->mFlags &= ~7;
             pData->mFlags |= 4;
-            fn_80041E40(&pData->mUpX, &rInfo.mTargetX);
+            copyVec3(&pData->mUpX, &rInfo.mTargetX);
             pData->mUnkA4 = rInfo.mUnk28;
             pData->mFlags &= ~8;
         }

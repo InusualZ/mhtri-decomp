@@ -45,6 +45,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/eft007.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 #pragma peephole off
 
@@ -127,8 +128,7 @@ extern "C" void fn_800A8998(void** dst, void* value);
 extern "C" void* fn_800B2878(void);
 /* Bounds-checks `index` against `obj`'s +0x08 count, then forwards to `fn_80501C9C`. */
 extern "C" void fn_800B4A70(void* obj, u16 index);
-/* The `nw4r::math::VEC3` copy the map still spells `fn_80041E40`. */
-extern "C" void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
+/* The `nw4r::math::VEC3` copy the map still spells `copyVec3`. */
 /* The library's error path (`fn_800F886C`). */
 /* fn_801025F8 comes from its owner's header (rule 2). */
 /* Builds the current area's effect vector from the per-map table at 0x806C87C0. */
@@ -198,5 +198,5 @@ extern "C" void fn_80101DF4(EftState* self) {
 
     self->field_01 = 1;
     fn_802B00AC(&vec, self->area);
-    fn_80041E40(&set->vec, &vec);
+    copyVec3(&set->vec, &vec);
 }

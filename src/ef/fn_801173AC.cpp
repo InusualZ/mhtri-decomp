@@ -95,6 +95,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "nw4r/g3d/scnmdl.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The retail object keeps the raw record-form chains and the `subi rX,rY,1` / `cmpwi` pair the peephole
  * pass fuses into `subic.`; `gekko`/MWCC's default here is peephole ON (the ef band's cflags_main).  The
@@ -314,10 +315,9 @@ _EFT* fn_80119C44(u8 kind, u8 variant, u32 arg);
 void fn_80119D10(_EFT* self);
 void fn_80119D9C(_EFT* self);
 /* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`include/ef.h`
- * spells `fn_80043EA8`/`fn_80041E8C` differently from `include/mh3_pad.h`, MWCC (10197)), so this
+ * spells `VEC3_ctor`/`setVec3` differently from `include/mh3_pad.h`, MWCC (10197)), so this
  * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`fn_80051378` now
  * come from their owner's header, `include/fn_8004CAD8.h` (included above, rule 2). */
-void* fn_80041E40(void* dst, const void* src);
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_800532DC(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 /* fn_800F8914 comes from the owner's header `ef/eft_res.h` (rule 2): this unit's local
@@ -418,8 +418,8 @@ extern "C" void fn_801173AC(_EFT* self)
     nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 pos;
 
-    fn_8005050C(&mtx);
-    fn_80043EA8(&pos);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&pos);
 
     work->spin_x = (s16)((f32)work->spin_x * lbl_80796A88);
     work->spin_y = (s16)((f32)work->spin_y * lbl_80796A8C);
@@ -443,7 +443,7 @@ extern "C" void fn_801173AC(_EFT* self)
     work->pos.y *= lbl_80796A98;
     work->pos.z *= lbl_80796A9C;
 
-    fn_80041E40(&pos, &work->pos);
+    copyVec3(&pos, &work->pos);
     mulVecMat(&pos, &mtx);
     fn_80073F68(&work->chara[0]->pos_0x04, &pos);
     work->chara[0]->field_0x28 = work->rot_x;
@@ -551,8 +551,8 @@ extern "C" void fn_80117894(_EFT* self)
     nw4r::math::VEC3 vec;
     nw4r::math::MTX34 mtx;
 
-    fn_80043EA8(&vec);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&vec);
+    MTX34_ctor(&mtx);
     self->state_0x05++;
     work->models[0] = res_eft_create(lbl_80791938[self->type_0x02], 0x16, 0);
     if (work->models[0] == 0) {
@@ -604,10 +604,10 @@ extern "C" void fn_80117A1C(_EFT* self)
     nw4r::math::MTX34 mtxB;
     s32 i;
 
-    fn_80043EA8(&vec);
-    fn_80043EA8(&vel);
-    fn_8005050C(&mtxA);
-    fn_8005050C(&mtxB);
+    VEC3_ctor(&vec);
+    VEC3_ctor(&vel);
+    MTX34_ctor(&mtxA);
+    MTX34_ctor(&mtxB);
 
     if (fn_800F92F4(self, 0) == 0) {
         self->flag_0x01 = 0;
@@ -713,7 +713,7 @@ extern "C" void fn_80117E58(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u32 j
     rec->rot_0x24.z = 0;
     {
         _EFT26_WORK* work = (_EFT26_WORK*)rec->work_0x38;
-        fn_80041E40(&work->offset, vec);
+        copyVec3(&work->offset, vec);
         work->joint = joint;
         setVector3(&work->scale, scale, scale, scale);
     }
@@ -731,7 +731,7 @@ extern "C" void fn_80117EFC(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 
     }
     rec->source_0x30 = 0;
     rec->field_0x10 = 0;
-    fn_80041E40(&rec->pos_0x18, pos);
+    copyVec3(&rec->pos_0x18, pos);
     rec->rot_0x24.x = rot->x;
     rec->rot_0x24.y = rot->y + 0x8000;
     work = (_EFT26_WORK*)rec->work_0x38;
@@ -840,10 +840,10 @@ extern "C" void fn_80118214(_EFT* self)
     nw4r::math::VEC3 cam;
     s32 i;
 
-    fn_80043EA8(&vA);
-    fn_80043EA8(&vB);
-    fn_80043EA8(&vC);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&vA);
+    VEC3_ctor(&vB);
+    VEC3_ctor(&vC);
+    MTX34_ctor(&mtx);
     self->state_0x05++;
     for (i = 0; i < work->count; i++) {
         work->models[i] = res_eft_UV_model_create(work->chara[i], lbl_805A0488[self->type_0x02], 0x118, 0,
@@ -893,8 +893,8 @@ extern "C" void fn_80118214(_EFT* self)
             return;
         }
         get_joint_wpos_em((struct _ENEMY_WORK*)em, work->joint, &vA);
-        fn_80041E40(&self->pos_0x18, &vA);
-        fn_80041E40(&vB, &work->offset);
+        copyVec3(&self->pos_0x18, &vA);
+        copyVec3(&vB, &work->offset);
         fn_800504D4(&mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);
         rotLocalMatX(self->rot_0x24.x, &mtx);
@@ -907,9 +907,9 @@ extern "C" void fn_80118214(_EFT* self)
         if (self->type_0x02 == 1 || self->type_0x02 == 8) {
             nw4r::math::VEC3 camPos = get_camera_pos();
             fn_80119818(work->chara[0], 1);
-            fn_80041E40(&vC, &camPos);
+            copyVec3(&vC, &camPos);
             fn_80050CA0(&cam, &self->pos_0x18, &vC);
-            fn_80041E40(&vA, &cam);
+            copyVec3(&vA, &cam);
             {
                 f32 dist = fn_80050F24((const f32*)&vA);
                 if (dist < lbl_80796ADC) {
@@ -944,7 +944,7 @@ extern "C" void fn_80118214(_EFT* self)
         fn_8010140C(&mtx, &self->pos_0x18);
         work->chara[0]->getTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
         work->phase[0].color_a = 0;
-        fn_80041E40(&vB, &work->offset);
+        copyVec3(&vB, &work->offset);
         mulVecMat(&vB, &mtx);
         fn_80073F68(&self->pos_0x18, &vB);
         self->field_0x10 = 10;
@@ -993,9 +993,9 @@ extern "C" void fn_8011870C(_EFT* self)
     u32 done = 0;
     s32 i;
 
-    fn_80043EA8(&vA);
-    fn_80043EA8(&vB);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&vA);
+    VEC3_ctor(&vB);
+    MTX34_ctor(&mtx);
 
     if (work->phase[0].state == 2) done = 1;
     if (work->phase[1].state == 2) done++;
@@ -1068,13 +1068,13 @@ extern "C" void fn_8011870C(_EFT* self)
 
     self->area_0x44 = em->area_0x16;
     em->model_0x13C->chr_0x04.get_joint_wpos(3, &vA);
-    fn_80041E40(&self->pos_0x18, &vA);
+    copyVec3(&self->pos_0x18, &vA);
     fn_800504D4(&mtx);
     rotLocalMatY(self->rot_0x24.y, &mtx);
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatY(work->rot_c, &mtx);
     rotLocalMatZ(self->rot_0x24.z, &mtx);
-    fn_80041E40(&vA, &work->offset);
+    copyVec3(&vA, &work->offset);
     mulVecMat(&vA, &mtx);
     fn_80073F68(&self->pos_0x18, &vA);
     mtx.m[0][3] = self->pos_0x18.x;
@@ -1083,8 +1083,8 @@ extern "C" void fn_8011870C(_EFT* self)
     self->rot_0x24.z = (work->chara[0]->field_0x30 += 0x100);
 
     for (i = 0; i < work->count; i++) {
-        fn_80041E40(&work->chara[i]->pos_0x04, &self->pos_0x18);
-        fn_80041E40(&work->chara[i]->scale_0x1C, &work->scale);
+        copyVec3(&work->chara[i]->pos_0x04, &self->pos_0x18);
+        copyVec3(&work->chara[i]->scale_0x1C, &work->scale);
         work->chara[i]->move2(&mtx, 0);
         ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
         fn_800F93D8(self, (void**)&work->chara[i], 2, 1, 0);
@@ -1104,12 +1104,12 @@ extern "C" void fn_80118B2C(_EFT* self)
     nw4r::math::MTX34 mtx;
     s32 i;
 
-    fn_80043EA8(&v0);
-    fn_80043EA8(&v1);
-    fn_80043EA8(&v2);
-    fn_80043EA8(&v3);
-    fn_80043EA8(&v4);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v0);
+    VEC3_ctor(&v1);
+    VEC3_ctor(&v2);
+    VEC3_ctor(&v3);
+    VEC3_ctor(&v4);
+    MTX34_ctor(&mtx);
 
     if (em_work_die_ck((struct _ENEMY_WORK*)em) != 0) {
         self->flag_0x01 = 0;
@@ -1135,8 +1135,8 @@ extern "C" void fn_80118B2C(_EFT* self)
     case 1:
     case 8:
         fn_800FBB90(&mtx, &self->pos_0x18);
-        fn_80041E40(&v2, &self->pos_0x18);
-        fn_80041E40(&v4, &work->scale);
+        copyVec3(&v2, &self->pos_0x18);
+        copyVec3(&v4, &work->scale);
         break;
     case 2:
     case 9:
@@ -1145,7 +1145,7 @@ extern "C" void fn_80118B2C(_EFT* self)
         self->rot_0x24.z -= 0x444;
         self->pos_0x18.x = v0.x;
         self->pos_0x18.z = v0.z;
-        fn_80041E40(&v1, &work->offset);
+        copyVec3(&v1, &work->offset);
         mulVecMat(&v1, &mtx);
         self->pos_0x18.x += v1.x;
         self->pos_0x18.y += em->height_0x18C - work->field_0x74;
@@ -1154,12 +1154,12 @@ extern "C" void fn_80118B2C(_EFT* self)
         work->field_0x74 = em->height_0x18C;
         {
             nw4r::math::VEC3 camDir = get_camera_direction();
-            fn_80041E40(&v3, &camDir);
+            copyVec3(&v3, &camDir);
         }
         fn_80050850(&v3, &v3);
         fn_800513F0(&v3, lbl_80796B04);
         fn_80051378(&v0, &self->pos_0x18, &v3);
-        fn_80041E40(&v2, &v0);
+        copyVec3(&v2, &v0);
         self->field_0x10++;
         if (self->field_0x10 > 5) {
             fn_8011D7B0(6, &self->pos_0x18, &self->rot_0x24, lbl_80796AC8, self->area_0x44, em->team);
@@ -1199,7 +1199,7 @@ extern "C" void fn_80118B2C(_EFT* self)
     {
         f32 zero = lbl_80796AC0;
         for (i = 0; i < work->count; i++) {
-            fn_80041E40(&work->chara[i]->scale_0x1C, &v4);
+            copyVec3(&work->chara[i]->scale_0x1C, &v4);
             work->chara[i]->move2(&mtx, 0);
             ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
             if (get_camera_pos().y < zero) {
@@ -1222,12 +1222,12 @@ extern "C" void fn_80118FF0(_EFT* self)
     nw4r::math::MTX34 mtxB;
     s32 i;
 
-    fn_80043EA8(&v0);
-    fn_80043EA8(&v1);
-    fn_80043EA8(&v2);
-    fn_80043EA8(&v3);
-    fn_8005050C(&mtxA);
-    fn_8005050C(&mtxB);
+    VEC3_ctor(&v0);
+    VEC3_ctor(&v1);
+    VEC3_ctor(&v2);
+    VEC3_ctor(&v3);
+    MTX34_ctor(&mtxA);
+    MTX34_ctor(&mtxB);
 
     if (em_work_die_ck((struct _ENEMY_WORK*)em) != 0) {
         self->flag_0x01 = 0;
@@ -1270,7 +1270,7 @@ extern "C" void fn_80118FF0(_EFT* self)
     }
     self->area_0x44 = em->area_no_0x1E1;
     get_joint_wmat_em((struct _ENEMY_WORK*)em, work->joint, &mtxA);
-    fn_80041E40(&v1, &work->offset);
+    copyVec3(&v1, &work->offset);
     mulVecMat(&v1, &mtxA);
     fn_80101428(&mtxA, &v1);
     fn_8010140C(&mtxA, &self->pos_0x18);
@@ -1298,7 +1298,7 @@ extern "C" void fn_80118FF0(_EFT* self)
     for (i = 0; i < work->count; i++) {
         fn_800532DC(&mtxB, &mtxA);
         rotLocalMatZ(work->rot_a[i], &mtxB);
-        fn_80041E40(&work->chara[i]->scale_0x1C, &v3);
+        copyVec3(&work->chara[i]->scale_0x1C, &v3);
         work->chara[i]->move2(&mtxB, 0);
         ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
         work->chara[i]->setTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
@@ -1318,9 +1318,9 @@ extern "C" void fn_80119450(_EFT* self)
     nw4r::math::MTX34 mtx;
     s32 i;
 
-    fn_80043EA8(&v0);
-    fn_80043EA8(&v1);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v0);
+    VEC3_ctor(&v1);
+    MTX34_ctor(&mtx);
 
     for (i = 0; i < 5; i++) {
         _EFT26_PHASE* p = &work->phase[i];
@@ -1386,15 +1386,15 @@ extern "C" void fn_80119450(_EFT* self)
     rotLocalMatZ(self->rot_0x24.z, &mtx);
     mulVecMat(&v0, &mtx);
     fn_80051378(&v2, &self->pos_0x18, &v0);
-    fn_80041E40(&v1, &v2);
+    copyVec3(&v1, &v2);
     mtx.m[0][3] = v1.x;
     mtx.m[1][3] = v1.y;
     mtx.m[2][3] = v1.z;
     self->rot_0x24.z = (work->chara[0]->field_0x30 += 0x100);
 
     for (i = 0; i < work->count; i++) {
-        fn_80041E40(&work->chara[i]->pos_0x04, &v1);
-        fn_80041E40(&work->chara[i]->scale_0x1C, &work->scale);
+        copyVec3(&work->chara[i]->pos_0x04, &v1);
+        copyVec3(&work->chara[i]->scale_0x1C, &work->scale);
         work->chara[i]->move2(&mtx, 0);
         ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
         fn_800F93D8(self, (void**)&work->chara[i], 2, 1, 0);
@@ -1512,7 +1512,7 @@ void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 variant, long timer)
     if (rec == 0) {
         return;
     }
-    fn_80041E40(&rec->pos_0x18, pos);
+    copyVec3(&rec->pos_0x18, pos);
     rec->timer_0x0C = timer;
 }
 
@@ -1536,15 +1536,15 @@ extern "C" _EFT* fn_80119AA8(u8 area)
     fn_800F9DF4(rec, 0, 0);
     work = (_EFT28_WORK*)rec->work_0x38;
     work->mode = 1;
-    fn_80041E40(&param.a, &lbl_806A4548[0]);
-    fn_80041E40(&param.b, &lbl_806A4548[0xc]);
+    copyVec3(&param.a, &lbl_806A4548[0]);
+    copyVec3(&param.b, &lbl_806A4548[0xc]);
     param.c = lbl_80796B28;
     fn_8028F558(&param, &work->param_0x0C[0]);
     work->col_r = 0xff;
     work->col_g = 0xff;
     work->col_b = 0xff;
     work->col_a = 0;
-    fn_80041E40(&rec->pos_0x18, &param);
+    copyVec3(&rec->pos_0x18, &param);
     rec->timer_0x0C = 0;
     rec->release_0x40 = fn_80119D10;
     rec->dispatch_0x34 = fn_80119D9C;
@@ -1561,7 +1561,7 @@ extern "C" void fn_80119BB0(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32
     }
     work = (_EFT28_WORK*)rec->work_0x38;
     work->field_0x10 = scale;
-    fn_80041E40(&rec->pos_0x18, pos);
+    copyVec3(&rec->pos_0x18, pos);
     fn_800FC0D4(&rec->rot_0x24, rot);
     rec->timer_0x0C = timer;
 }

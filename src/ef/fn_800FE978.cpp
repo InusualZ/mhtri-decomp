@@ -52,6 +52,8 @@
 #include "ef/effect.h"
 #include "ef/eft004.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ------------------------------------------------------------------------------------------------ */
 /* pooled data (owned by the map, referenced by name - playbook 29)                                   */
@@ -82,9 +84,7 @@ extern f32 lbl_807966A4;
 /* externs                                                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* MTX34 identity (`fn_8005050C`), VEC3 clear (`fn_80043EA8`) - both stubs the map still spells. */
-extern "C" void fn_8005050C(nw4r::math::MTX34* mtx);
-extern "C" void fn_80043EA8(nw4r::math::VEC3* out);
+/* MTX34 identity (`MTX34_ctor`), VEC3 clear (`VEC3_ctor`) - both stubs the map still spells. */
 
 /* The nw4r::ef / engine helpers, reached through their real signatures (rule 9). */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
@@ -203,7 +203,7 @@ extern "C" void fn_800FE978(_EFT* self)
     s32 mapno;
     s32 i;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     fn_800FF840(&set);
 
     work = (EftSpawnWork*)self->work_0x38;
@@ -486,7 +486,7 @@ extern "C" EftSpawnSet* fn_800FF840(EftSpawnSet* self)
     EftSpawnSlot* end;
     EftSpawnSlot* slot;
 
-    fn_80043EA8(&self->vec_0x84);
+    VEC3_ctor(&self->vec_0x84);
     slot = self->slots_0x90;
     end = self->slots_0x90 + 30;
     do {
@@ -499,6 +499,6 @@ extern "C" EftSpawnSet* fn_800FF840(EftSpawnSet* self)
 /* Releases one spawn-set slot's embedded vector state and returns the slot. */
 extern "C" EftSpawnSlot* fn_800FF8A0(EftSpawnSlot* self)
 {
-    fn_80043EA8(&self->vec_0x14);
+    VEC3_ctor(&self->vec_0x14);
     return self;
 }

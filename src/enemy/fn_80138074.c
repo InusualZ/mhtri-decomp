@@ -57,6 +57,8 @@
 #include "unsplit/enemy.h"
 #include "unsplit/g3d.h"
 #include "unsplit/sound.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* shared pool symbols (another unit owns the bytes)                                              */
@@ -224,10 +226,7 @@ u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2);
 extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, s32 line, const char* msg, ...);
 extern s32 strcmp(const char* a, const char* b);
 
-extern void fn_80041E40(void* dst, const void* src);
-extern void fn_80043EA8(Vec3* out);
 extern void fn_800504D4(void* mtx);
-extern void fn_8005050C(Mtx34* mtx);
 extern void fn_80050CA0(Vec3* out, const Vec3* a, const Vec3* b);
 extern f32 fn_80050EF4(const Vec3* a, const Vec3* b);
 extern f32 fn_80050F80(const Vec3* a, const Vec3* b);
@@ -603,20 +602,20 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
     Vec3 saved;
     Vec3 offset;
 
-    fn_80043EA8(&saved);
-    fn_80043EA8(&offset);
+    VEC3_ctor(&saved);
+    VEC3_ctor(&offset);
     if (self->field_0x30C != 1) {
         if ((self->flags_0x1C8 & 0x400) != 0) {
             return;
         }
         if (self->field_0x1E2 == 1 && self->field_0x1E3 == 1) {
-            fn_80041E40(&saved, &self->field_0x188);
+            copyVec3(&saved, &self->field_0x188);
             setVector3__FPQ34nw4r4math4VEC3fff(&offset, lbl_80796D40, lbl_80796D40, lbl_80796D44);
             rotVecY__FPQ34nw4r4math4VEC3Ul(&offset, self->field_0x1C0);
             fn_80073F68(&self->field_0x188, &offset);
             fn_80295578(self, arg1, fn_80127E78(self));
             if (self->field_0x218 == 0) {
-                fn_80041E40(&self->field_0x188, &saved);
+                copyVec3(&self->field_0x188, &saved);
             }
         } else {
             fn_80295578(self, arg1, fn_80127E78(self));
@@ -670,15 +669,15 @@ void fn_8013823C(EnemyWork* self) {
     u8 i;
     u8 was_special;
 
-    fn_80043EA8(&vD4);
-    fn_80043EA8(&vC8);
-    fn_80043EA8(&vBC);
-    fn_80043EA8(&vB0);
-    fn_80043EA8(&vA4);
-    fn_80043EA8(&v98);
-    fn_80043EA8(&v8C);
-    fn_80043EA8(&v80);
-    fn_80043EA8(&v74);
+    VEC3_ctor(&vD4);
+    VEC3_ctor(&vC8);
+    VEC3_ctor(&vBC);
+    VEC3_ctor(&vB0);
+    VEC3_ctor(&vA4);
+    VEC3_ctor(&v98);
+    VEC3_ctor(&v8C);
+    VEC3_ctor(&v80);
+    VEC3_ctor(&v74);
     flag = 0;
     for (i = 0; i < 3; i++) {
         if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
@@ -720,26 +719,26 @@ void fn_8013823C(EnemyWork* self) {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D40, lbl_80796D40, lbl_80796D40);
             }
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v68, &v8C, self->field_0x1E1);
-            fn_80041E40(&vC8, &v68);
+            copyVec3(&vC8, &v68);
             if (fn_802B0668(self->field_0x1E0) == 5 && self->field_0x9F7 == 3) {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D48, lbl_80796D40, lbl_80796D4C);
             } else {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D40, lbl_80796D40, lbl_80796D40);
             }
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v5C, &v8C, self->field_0x9F7);
-            fn_80041E40(&vBC, &v5C);
+            copyVec3(&vBC, &v5C);
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v50, &self->field_0x188, self->field_0x1E1);
-            fn_80041E40(&vD4, &v50);
+            copyVec3(&vD4, &v50);
             fn_80051378(&v74, &vC8, &vBC);
             fn_80051EE0(&v80, &v74, lbl_80796D50);
-            fn_80041E40(&vB0, &v80);
+            copyVec3(&vB0, &v80);
             fn_80050CA0(&v2C, &vBC, &vB0);
-            fn_80041E40(&vA4, &v2C);
+            copyVec3(&vA4, &v2C);
             fn_80050CA0(&v20, &vD4, &vB0);
-            fn_80041E40(&v98, &v20);
+            copyVec3(&v98, &v20);
             if (fn_80052214(&vA4, &v98) >= lbl_80796D40) {
                 fn_802B01AC(&v14, &vD4, self->field_0x9F7);
-                fn_80041E40(&self->field_0x188, &v14);
+                copyVec3(&self->field_0x188, &v14);
                 self->field_0x188.y = fn_802B0430(self->field_0x9F7);
                 fn_8012A658(self, 0);
             }
@@ -767,11 +766,11 @@ void fn_8013823C(EnemyWork* self) {
     self->field_0x30D = 0;
     self->field_0x30E = 0;
     self->field_0x30F = 0;
-    fn_80041E40(&self->field_0x194, &self->field_0x188);
+    copyVec3(&self->field_0x194, &self->field_0x188);
     was_special = self->field_0x1E2;
     fn_80133C30(self);
     if (self->field_0x767 == 1) {
-        fn_80041E40(&self->field_0x778, &self->field_0x76C);
+        copyVec3(&self->field_0x778, &self->field_0x76C);
     }
     self->field_0x767 = 1;
     self->field_0x740 = 0;
@@ -885,7 +884,7 @@ void fn_8013823C(EnemyWork* self) {
             }
             move__6MHcharFUs(&self->char_0x024, move_arg);
         }
-        fn_80041E40(&self->field_0x188, &self->char_0x024.field_0x04);
+        copyVec3(&self->field_0x188, &self->char_0x024.field_0x04);
         switch (self->field_0x1E2) {
         case 0:
             if (was_special != 1) {
@@ -901,7 +900,7 @@ void fn_8013823C(EnemyWork* self) {
             break;
         }
         fn_80050CA0(&v8, &self->field_0x188, &self->field_0x194);
-        fn_80041E40(&self->field_0x470, &v8);
+        copyVec3(&self->field_0x470, &v8);
         fn_80138074(self, 0);
         fn_8012A3B4(self);
         fn_8012FF38(self);
@@ -943,7 +942,7 @@ void fn_80138B60(EnemyWork* self) {
         if (self->field_0x766 == 0) {
             if (self->field_0x767 == 1) {
                 self->field_0x766 = (u8)(self->field_0x766 + 1);
-                fn_80041E40(&self->field_0x778, &self->field_0x76C);
+                copyVec3(&self->field_0x778, &self->field_0x76C);
             }
             if (self->field_0x768 > 0) {
                 self->field_0x768 = (s16)(self->field_0x768 - 1);
@@ -1023,7 +1022,7 @@ void fn_80138E64(EnemyWork* self) {
     ch->field_0x28 = self->field_0x1BC;
     ch->field_0x2C = self->field_0x1C0;
     ch->field_0x30 = self->field_0x1C4;
-    fn_80041E40(&ch->field_0x04, &self->field_0x188);
+    copyVec3(&ch->field_0x04, &self->field_0x188);
 }
 
 /* Advances one of the two per-entity effect slots. */
@@ -1135,7 +1134,7 @@ void fn_801391FC(EnemyWork* self) {
     u16 i;
     UserDataItem* item;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     best = (u32)-1;
     total = 0;
     if (self->field_0x740 == 0) {
@@ -1154,7 +1153,7 @@ void fn_801391FC(EnemyWork* self) {
         if (best != (u32)-1) {
             get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(self, best, &pos);
         } else {
-            fn_80041E40(&pos, &self->field_0x188);
+            copyVec3(&pos, &self->field_0x188);
         }
         v = (f32)(s16)(calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(&pos, &self->field_0x36C) -
                        (u16)self->field_0x1C0);
@@ -1220,7 +1219,7 @@ void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3)
 
     if (index == self->work->field_0x110) {
         Vec3 pos;
-        fn_80043EA8(&pos);
+        VEC3_ctor(&pos);
         pos.x = lbl_80796D40;
         pos.y = lbl_80796D40;
         pos.z = lbl_80796D40;
@@ -1252,8 +1251,8 @@ void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4
     Mtx34 dst;
     KeyFrameSet* frames;
 
-    fn_80043EA8(&angles);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&angles);
+    MTX34_ctor(&mtx);
     fn_800516F0(&dst);
     switch (arg5->field_0x04) {
     case 0:
@@ -1336,7 +1335,7 @@ void fn_80139858(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3)
 void fn_80139954(ResUserDataAc* self, MtxHolder* arg1, s32 arg2, s32 arg3, s32 arg4, UserDataItem* arg5) {
     Mtx34 mtx;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     switch (arg5->field_0x04) {
     case 0:
     case 3: {
@@ -1399,9 +1398,9 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
     s32 idx;
 
     fn_8005D1AC(&key, 0);
-    fn_8005050C(&m1);
-    fn_8005050C(&m2);
-    fn_8005050C(&m3);
+    MTX34_ctor(&m1);
+    MTX34_ctor(&m2);
+    MTX34_ctor(&m3);
     fn_800532DC(&m1, &arg2[fn_8006FDCC(arg1)]);
     idx = fn_8005D124(arg1);
     fn_8005D0CC(&key, &idx);

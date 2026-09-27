@@ -52,6 +52,7 @@
 
 #include "ef.h"
 #include "gx.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled
@@ -242,16 +243,16 @@ void fn_800C1508(EfVec3x3* dst, EfVec3x3* src) {
 
 /* Zeroes a three-vector record and returns it. */
 EfVec3x3* fn_800C16F8(EfVec3x3* self) {
-    fn_80043EA8((VEC3*)&self->a);   /* the declaration takes the nw4r vector; same 3-float layout */
-    fn_80043EA8((VEC3*)&self->b);
-    fn_80043EA8((VEC3*)&self->c);
+    VEC3_ctor((VEC3*)&self->a);   /* the declaration takes the nw4r vector; same 3-float layout */
+    VEC3_ctor((VEC3*)&self->b);
+    VEC3_ctor((VEC3*)&self->c);
     return self;
 }
 
 /* Zeroes a two-vector record and returns it. */
 EfVec3x2* fn_800C1B7C(EfVec3x2* self) {
-    fn_80043EA8((VEC3*)&self->a);
-    fn_80043EA8((VEC3*)&self->b);
+    VEC3_ctor((VEC3*)&self->a);
+    VEC3_ctor((VEC3*)&self->b);
     return self;
 }
 
@@ -292,7 +293,6 @@ typedef struct EfAheadContext {
  * the four particle walkers this unit defines further down. */
 extern void GXSetTexCoordGen2(u32 dst_coord, u32 func, u32 src_param, u32 mtx, u32 normalize,
                               u32 pt_texmtx);
-extern void fn_8005050C(Mtx34* mtx);
 void fn_800C8A80(void);
 void fn_800C8B9C(void);
 void fn_800C8CB8(void);
@@ -300,11 +300,11 @@ void fn_800C8DE4(void);
 
 /* Initialises the ahead context and returns it. */
 EfAheadContext* fn_800C9434(EfAheadContext* self) {
-    fn_8005050C(&self->emitter_mtx);
-    fn_8005050C(&self->manager_mtx);
-    fn_8005050C(&self->manager_mtx_inv);
-    fn_80043EA8((VEC3*)&self->emitter_axis_y);
-    fn_80043EA8((VEC3*)&self->emitter_center);
+    MTX34_ctor(&self->emitter_mtx);
+    MTX34_ctor(&self->manager_mtx);
+    MTX34_ctor(&self->manager_mtx_inv);
+    VEC3_ctor((VEC3*)&self->emitter_axis_y);
+    VEC3_ctor((VEC3*)&self->emitter_center);
     return self;
 }
 

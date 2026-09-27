@@ -54,7 +54,7 @@
  * (21 at 100.0).  In address order, with the official `recompile.py --measure` score:
  *   0x8011D448 fn_8011D448 0x64 100.0   one-shot placer: spawn through fn_8011D558, set the work's
  *                                       target vector from the type table
- *   0x8011D4AC fn_8011D4AC 0x50 100.0   same, fills the target vector through fn_80041E40
+ *   0x8011D4AC fn_8011D4AC 0x50 100.0   same, fills the target vector through copyVec3
  *   0x8011D4FC fn_8011D4FC 0x5C 100.0   same, two id words + the table vector
  *   0x8011D558 fn_8011D558 0x138 100.0  the `0xA8`-pool creator (area guard, work fill, callbacks)
  *   0x8011D690 fn_8011D690 0x120 92.85  the `0x20`-pool creator owned by an `_ENEMY_WORK`
@@ -164,6 +164,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "unsplit/unknown.h"
 #include "unsplit/enemy.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* Retail keeps the unfused `clrlwi`+`slwi` and `clrlwi`+`stb`/`stw` pairs the `-O3` peephole pass
  * folds into `clrlslwi` - `fn_8011E530`'s part index and `fn_8011D558`'s type/timer narrowing both show
@@ -210,12 +211,10 @@ void get_camera_pos(nw4r::math::VEC3* out);
 
 
 /* `src/mh3_pad.cpp` owns both of these, but its header `include/mh3_pad.h` cannot be included here:
- * it spells `fn_80043EA8(void*)` while `include/ef.h` spells the same C-linkage symbol
- * `fn_80043EA8(VEC3*)`, and MWCC rejects the pair with "illegal function overloading" (a shared-file
+ * it spells `VEC3_ctor(void*)` while `include/ef.h` spells the same C-linkage symbol
+ * `VEC3_ctor(VEC3*)`, and MWCC rejects the pair with "illegal function overloading" (a shared-file
  * conflict recorded in the outbox's config_requests).  The VEC3 spelling below equals `ef.h`'s, so
  * there is one view of the symbol; the parameter type is the same register either way. */
-void fn_80043EA8(nw4r::math::VEC3* out);
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 }
 
 /* `get_em_scale` (0x80135940) is in the unsplit enemy band, so its home is `include/unsplit/enemy.h` -
@@ -287,7 +286,7 @@ extern "C" void fn_8011D4AC(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, cons
 
     if (effect != NULL) {
         work = (_EFT_FX_FULL*)effect->work_0x38;
-        fn_80041E40(&work->target_0x98, pos);
+        copyVec3(&work->target_0x98, pos);
     }
 }
 
@@ -408,7 +407,7 @@ extern "C" void fn_8011D7B0(u32 type, const nw4r::math::VEC3* pos, const _CP_VEC
     effect->source_0x30 = NULL;
     effect->area_0x44 = area;
     effect->rot_0x24 = *rot;
-    fn_80041E40(&effect->pos_0x18, pos);
+    copyVec3(&effect->pos_0x18, pos);
     effect->timer_0x0C = 0;
     fn_800F9DF4(effect, 0, 0);
     effect->demo_flag_0x08 = demo;
@@ -534,15 +533,15 @@ extern "C" void fn_8011E530(_EFT* self, nw4r::ef::Effect* effect, u8 part)
     _ENEMY_WORK* owner;
     _EFT_FX_FULL* work;
 
-    fn_80043EA8(&joint);
-    fn_80043EA8(&target);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&joint);
+    VEC3_ctor(&target);
+    MTX34_ctor(&mtx);
 
     owner = (_ENEMY_WORK*)self->source_0x30;
     work = (_EFT_FX_FULL*)self->work_0x38;
 
     cpSetRotMatrix(&self->rot_0x24, &mtx);
-    fn_80041E40(&target, &work->target_0x98);
+    copyVec3(&target, &work->target_0x98);
     mulVecMat(&target, &mtx);
     get_joint_wpos_em(owner, work->ids_0x90[part], &joint);
     fn_80073F68(&joint, &target);

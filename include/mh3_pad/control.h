@@ -1,10 +1,9 @@
 /* The pad/control entry points of `src/mh3_pad.cpp`.
  *
- * Bracket note (docs/plan.md 6.5 rule 2): `include/mh3_pad.h` is the same unit's header, but its
- * three `fn_80041E40`/`fn_80041E8C`/`fn_80043EA8` prototypes spell those helpers `void*` while
- * `include/ef.h` (pulled in by `include/pl.h`) spells them `VEC3*`; a unit that needs both headers
- * cannot take two parameter types for one function.  This file carries the two declarations that
- * have no such overlap, so a Pl unit can reach the pad query without dragging the whole header in.
+ * Bracket note (docs/plan.md 6.5 rule 2): this file exists so a Pl unit can reach the pad query
+ * without dragging the whole of `include/mh3_pad.h` in.  The clash it was filed for - `include/ef.h`
+ * spelling `copyVec3`/`setVec3`/`VEC3_ctor` `VEC3*`/`Vec*` while `mh3_pad.h` spells them `void*`,
+ * MWCC `(10197)` - is CLOSED: both headers now spell them identically.
  */
 #ifndef MHTRI_MH3_PAD_CONTROL_H
 #define MHTRI_MH3_PAD_CONTROL_H

@@ -101,6 +101,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h" /* nw4r::ef::Effect (rule 9's owner) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -283,10 +285,7 @@ void fn_800A95D8(void* node);
 u32 fn_800A98D4(void* pm, void (*cb)(void*, u32), u32 arg, bool flag, u32 zero);
 void fn_800AE500(void* pm, u32 flag);
 void fn_800AE5B0(void* pm);
-void fn_80041E40(VEC3* dst, const VEC3* src);
-void fn_80043EA8(VEC3* v);
 void fn_800504D4(void* mtx);
-void fn_8005050C(MTX34* mtx);
 void fn_8007100C(MTX34* dst, const MTX34* src);
 u16 fn_8009B374(void* list, void** buf, u16 size);
 void fn_80501A64(void* list, void* node);
@@ -625,7 +624,7 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
             if ((u32)(node->mState - 1) <= 1u && node->mField_0xB4 == 1u) {
                 node->mField_0xB4 = 0;
             }
-            fn_80041E40(&node->mField_0x114, &node->mField_0x108);
+            copyVec3(&node->mField_0x114, &node->mField_0x108);
             EfEffEmitter* child = NULL;
             while ((child = (EfEffEmitter*)fn_80501C60(&node->mChildren, child)) != NULL) {
                 fn_800AE500(child, 0);
@@ -732,7 +731,7 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
             fn_800AE5B0(child);
         }
         MTX34 mtx;
-        fn_8005050C(&mtx);
+        MTX34_ctor(&mtx);
         fn_800A94A4(node, &mtx);
         node->mField_0x108.x = mtx.m[0][3];
         node->mField_0x108.y = mtx.m[1][3];
@@ -874,8 +873,8 @@ extern "C" void* fn_800A5484(void** pp) {
 /* 0x800A559C - the EffectSystem constructor. */
 extern "C" EfEffSys* fn_800A559C(EfEffSys* self) {
     fn_800A2FA4(&self->field_0x10);
-    fn_80043EA8(&self->mRefPos);
-    fn_8005050C(&self->mRefMtx);
+    VEC3_ctor(&self->mRefPos);
+    MTX34_ctor(&self->mRefMtx);
     if (lbl_8079491C == 0) {
         lbl_8079491C = 1;
         OSRegisterVersion((const char*)lbl_807912E0);

@@ -53,6 +53,8 @@
 #include "g3d/g3d_calcworld.h"
 /* The `g3d` band's declarations for the still-unsplit matrix copy/concat helpers. */
 #include "unsplit/g3d.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The record layout this range reads.  `g3d_calcworld.cpp` carries the full `NodeMtxRec`; this is the
  * three-member view the transform needs, under its own name. size: 0x4C */
@@ -64,9 +66,6 @@ struct G3DNodeMtxRec {
 }; /* size: 0x4C */
 
 /* No registered owner (their address band interleaves modules): declared here for this unit only. */
-extern "C" void fn_80041E40(VEC3* dst, const VEC3* src);
-extern "C" void fn_80041E8C(VEC3* out, f32 x, f32 y, f32 z);
-extern "C" void fn_8005050C(MTX34* mtx);
 extern "C" void fn_80501390(MTX34* out, const MTX34* a, const VEC3* v);
 
 extern "C" s32 fn_800D79A0(u32 value);
@@ -80,11 +79,11 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
     } else if ((flags & 0x20) != 0) {
         if (fn_800D79A0(mtxId) != 0) {
             VEC3 v;
-            fn_80041E8C(&v, pRec->mMtx.m[0][3], pRec->mMtx.m[1][3], pRec->mMtx.m[2][3]);
+            setVec3(&v, pRec->mMtx.m[0][3], pRec->mMtx.m[1][3], pRec->mMtx.m[2][3]);
             fn_80501390(pDstMtx, pSrcMtx, &v);
         } else {
             VEC3 v;
-            fn_80041E8C(&v, pSrcScale->x * pRec->mMtx.m[0][3], pSrcScale->y * pRec->mMtx.m[1][3],
+            setVec3(&v, pSrcScale->x * pRec->mMtx.m[0][3], pSrcScale->y * pRec->mMtx.m[1][3],
                         pSrcScale->z * pRec->mMtx.m[2][3]);
             fn_80501390(pDstMtx, pSrcMtx, &v);
         }
@@ -92,7 +91,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
         fn_800710BC(pDstMtx, pSrcMtx, &pRec->mMtx);
     } else {
         MTX34 mtx;
-        fn_8005050C(&mtx);
+        MTX34_ctor(&mtx);
         fn_8007100C(&mtx, &pRec->mMtx);
         mtx.m[0][3] *= pSrcScale->x;
         mtx.m[1][3] *= pSrcScale->y;
@@ -103,7 +102,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
     u32 id;
     if ((flags & 8) != 0) {
         id = fn_800737C4(mtxId);
-        fn_80041E40(pDstScale, pSrcScale);
+        copyVec3(pDstScale, pSrcScale);
     } else {
         id = fn_800737B4(mtxId);
         pDstScale->x = pSrcScale->x * pRec->mScale.x;

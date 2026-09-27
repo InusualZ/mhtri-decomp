@@ -337,10 +337,10 @@ extern u8 lbl_807924A8[];
  * the callees (C linkage: the map spells every one of these plainly)
  * ------------------------------------------------------------------------------------------------ */
 
-extern "C" void fn_80041E40(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
-extern "C" void fn_80041E8C(f32* out, f32 x, f32 y, f32 z);
 extern "C" s32 fn_80047058(void);
-extern "C" void fn_8004723C(void* out, const s32* camera);
+/* 0x8004723C is `mh3_pad.cpp`'s; spelled as its owner's header does (this call site passes `s32*`,
+ * `camera/fn_802B5C58.cpp` a `void**`, hence the erased types). */
+extern "C" void* fn_8004723C(void* out, const void* src);
 extern "C" void fn_800473F4(u8 value);
 extern "C" void fn_80057DE0(s32 a, s32 count, u32* colours, f32 param);
 extern "C" void fn_80057EF4(s32 a, s32 count, u32* colours, f32 param);

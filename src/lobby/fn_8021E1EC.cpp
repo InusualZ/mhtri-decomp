@@ -77,6 +77,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 
 #include "lobby/fn_8021E1EC.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The retail object keeps the narrowing `clrlwi` the peephole pass folds away (flags/infer.py: "3 kept
  * `clrlwi` before a narrowing store"), so the unit is built with the pass off.  Two functions keep the
@@ -101,8 +102,6 @@ f32 fn_8021E300(f32 v);
 s32 fn_80208AC0(void);
 s32 game_ready_ck(void);
 u8 fn_8004DD74(void);
-void* fn_80041E40(void* dst, void* src);
-void fn_80043EA8(VEC3* out);
 s32 fn_80217934(void);
 u8* fn_80223A18(u8 table, s32 index);
 LbGlobalBlock* fn_80064080(void);
@@ -129,11 +128,11 @@ s32 fn_8021E1EC(LbMenuActor* self, LbMenuActor* rec, LbMenuFallback* work, u32 l
     f32 dist_sq;
     VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (rec != 0) {
-        fn_80041E40(&pos, &rec->pos_0x03C);
+        copyVec3(&pos, &rec->pos_0x03C);
     } else {
-        fn_80041E40(&pos, &work->pos_0x10);
+        copyVec3(&pos, &work->pos_0x10);
     }
     if (fn_8021E300(pos.y - self->pos_0x03C.y) < lbl_80799C60) {
         idx = fn_8021E1B4(self, &pos);
@@ -306,7 +305,7 @@ void* fn_8021EFC8(LbMenuScratch* work)
     VEC3* end = work->slots_0x160 + 8;
 
     do {
-        fn_80043EA8(p);
+        VEC3_ctor(p);
         p++;
     } while (p < end);
     return work;

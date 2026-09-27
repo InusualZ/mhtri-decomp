@@ -50,6 +50,7 @@
 #include "Pl/fn_802693C4.h"
 #include "ef/eft004.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 int memcmp(const void* a, const void* b, u32 n);
 
@@ -62,7 +63,6 @@ f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 int memcmp(const void* a, const void* b, u32 n);
 
 extern "C" {
-void fn_80041E40(VEC3* dst, VEC3* src);
 __declspec(noinline) u32 fn_80208AB8(void);
 __declspec(noinline) u32 fn_80208AC0(_PLW* self);
 __declspec(noinline) u32 fn_80208AE8(_PLW* self);
@@ -81,7 +81,6 @@ void fn_80207698(_LB_NPC* self);
 
 /* The Pl-band helpers, and this group's own neighbours. */
 u32 fn_8026A33C(_PLW* self);
-void fn_80043EA8(VEC3* out);
 u32 game_ready_ck(void);
 u32 fn_8021B8A8(u8 a, u8 b);
 u32 fn_8021B8F4(u8 a, u8 b);
@@ -114,7 +113,7 @@ void fn_802076D4(_LB_NPC* self)
     if (lobby_w.field_0x12C == 1) {
         return;
     }
-    fn_80041E40(&self->target_0x1EC, (VEC3*)(work + 0x3C));
+    copyVec3(&self->target_0x1EC, (VEC3*)(work + 0x3C));
     self->field_0x22D = 1;
 
     switch (self->field_0x006) {
@@ -174,7 +173,7 @@ __declspec(noinline) void fn_80207938(_LB_NPC* self)
 {
     VEC3 scratch;
 
-    fn_80043EA8(&scratch);
+    VEC3_ctor(&scratch);
     switch (self->field_0x006) {
     case 0:
         self->field_0x006 = 1;

@@ -46,6 +46,7 @@
 #include "enemy/fn_80147CE0.h"
 #include "unsplit/enemy.h"
 #include "enemy/fn_8012EC74.h" /* fn_80136D4C (its owner) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * nw4r math types
@@ -176,7 +177,6 @@ extern f32 lbl_80796F20;
 extern f32 lbl_80796F24;
 extern f32 lbl_80796F28;
 extern f32 lbl_80796F2C;
-extern void fn_80043EA8(void *p);
 extern void fn_80056A54(_ENEMY_WORK *self, u32 a, u32 b);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(VEC3 *v, f32 x, f32 y, f32 z);
 extern void fn_80304508(_ENEMY_WORK *self, u32 a, u32 b, VEC3 *v, f32 s);
@@ -276,7 +276,6 @@ extern f32 lbl_80796E98;
 extern f32 lbl_80796E9C;
 extern f32 lbl_80796F6C;
 extern f32 lbl_80796F70;
-extern void fn_80041E40();
 extern void fn_80050CA0();
 
 extern f32 lbl_8056F960[];
@@ -1031,7 +1030,7 @@ void fn_8014B378(_ENEMY_WORK *self) {
     VEC3 sp8;
     u8 temp_r3;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     fn_80154CA4(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
@@ -1073,7 +1072,7 @@ void fn_8014B4EC(_ENEMY_WORK *self, s32 arg1) {
     u8 temp_r0;
     u8 temp_r3;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     fn_80154CA4(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
@@ -2526,11 +2525,11 @@ void fn_8014F078(_ENEMY_WORK *self) {
     f32 spC;
     VEC3 sp8;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     if ((u32) (em_get_mot_no__FP11_ENEMY_WORK(self) - 0x70) <= 1U) {
         if (((s32) self->sub_state == 0) && (em_magma_check__FP11_ENEMY_WORK(self) == 1U) && (self->v_0x188.y < self->field_0x214)) {
             self->sub_state = (u8) (self->sub_state + 1);
-            fn_80041E40(&sp8, &self->v_0x188);
+            copyVec3(&sp8, &self->v_0x188);
             spC = lbl_80796F00 + self->field_0x214;
             eft009_set_pos__FUcPQ34nw4r4math4VEC3P10_CP_VECTORfUl(0x88, &sp8, &self->field_0x1bc, self->field_0x1e1, lbl_80796E20);
         }
@@ -2544,7 +2543,7 @@ void fn_8014FF10(_ENEMY_WORK *self) {
     VEC3 sp8;
     u8 temp_r3;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
     case 0:
@@ -2608,7 +2607,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     u8 temp_r0_5;
     u8 temp_r3;
 
-    fn_80043EA8(&sp1C);
+    VEC3_ctor(&sp1C);
     fn_8012CF20(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* switch 1; irregular */
@@ -2638,7 +2637,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             break;
         default:                                    /* switch 2 */
             fn_80050CA0(&sp10, &self->v_0x36c, &self->v_0x188);
-            fn_80041E40(&sp1C, &sp10);
+            copyVec3(&sp1C, &sp10);
             calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl(&sp1C, &spC, &sp8);
             if (spC > 0x3000U) {
                 spC = 0x3000;
@@ -2789,8 +2788,8 @@ u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
     s32 temp_r31;
     u8 *temp_r31_2;
 
-    fn_80043EA8(&sp2C);
-    fn_80043EA8(&sp20);
+    VEC3_ctor(&sp2C);
+    VEC3_ctor(&sp20);
     temp_r31 = get_move_work_adrs__FUc(2);
     if ((arg1 & 0xFF) < (s32) get_move_work_max__FUc(2)) {
         temp_r31_2 = (u8 *) (temp_r31 + (arg1 * 0xB20));
@@ -2799,7 +2798,7 @@ u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
             rotVecY__FPQ34nw4r4math4VEC3Ul(&sp2C, self->field_0x1c0);
             fn_80051EE0(&sp8, &sp2C, lbl_80796F64 * get_em_chg_scale__FP11_ENEMY_WORK(self));
             fn_80051378(&sp14, &self->v_0x188, &sp8);
-            fn_80041E40(&sp20, &sp14);
+            copyVec3(&sp20, &sp14);
             if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) <= lbl_80796F94) {
                 return 1U;
             }
@@ -2819,8 +2818,8 @@ void fn_8014FC24(_ENEMY_WORK *self) {
     f32 temp_f31;
     u8 temp_r3;
 
-    fn_80043EA8(&sp3C);
-    fn_80043EA8(&sp30);
+    VEC3_ctor(&sp3C);
+    VEC3_ctor(&sp30);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
     case 0:
@@ -2829,14 +2828,14 @@ void fn_8014FC24(_ENEMY_WORK *self) {
         fn_80130478(self, 0);
         fn_80154B04(self, &sp3C, &sp8, lbl_80796F64);
         fn_80050CA0(&sp24, &sp3C, &self->v_0x188);
-        fn_80041E40(&sp30, &sp24);
+        copyVec3(&sp30, &sp24);
         fn_80128BF8(self, &sp3C);
         fn_80134964(self, &lbl_8056F960, 2, 1, sp8);
         fn_801353E4(self);
         temp_f31 = fn_8012F8E4(self);
         fn_80051EE0(&spC, &sp30, lbl_80796F98);
         fn_80051EE0(&sp18, &spC, temp_f31);
-        fn_80041E40(&self->v_0x310, &sp18);
+        copyVec3(&self->v_0x310, &sp18);
         self->v_0x310.y = (f32) lbl_80796E1C;
         return;
     case 1:
@@ -3190,7 +3189,7 @@ void fn_8014DDEC(_ENEMY_WORK *self) {
         fn_80154C74(self);
         fn_8012F5B8(self, 0xDB, 6, 0);
         fn_80129668(self, 0, 0x1F);
-        fn_80041E40(&self->v_0x1b0, &self->v_0x188);
+        copyVec3(&self->v_0x1b0, &self->v_0x188);
         self->field_0x32c = (u16) self->field_0x1c0;
         fn_801353F8(self);
         self->field_0x20 = (s32) (s16) (lbl_80796EA8 / fn_8012F8E4(self));
@@ -3239,7 +3238,7 @@ void fn_8014DDEC(_ENEMY_WORK *self) {
         if (temp_r30 > 0) {
             fn_80050CA0(&sp8, &self->v_0x1b0, &self->v_0x188);
             fn_800AD9C0(&sp14, &sp8, (f32) temp_r30);
-            fn_80041E40(&self->v_0x310, &sp14);
+            copyVec3(&self->v_0x310, &sp14);
             fn_80135418(self);
         }
         self->field_0x20 = (s32) (self->field_0x20 - 1);
@@ -3266,9 +3265,9 @@ void fn_8014E774(_ENEMY_WORK *self) {
     s32 temp_r0;
     u8 temp_r3;
 
-    fn_80043EA8(&sp48);
-    fn_80043EA8(&sp3C);
-    fn_80043EA8(&sp30);
+    VEC3_ctor(&sp48);
+    VEC3_ctor(&sp3C);
+    VEC3_ctor(&sp30);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
     case 0:
@@ -3277,14 +3276,14 @@ void fn_8014E774(_ENEMY_WORK *self) {
         fn_80130478(self, 0);
         fn_80154B04(self, &sp48, &sp8, lbl_80796F64);
         fn_80050CA0(&sp24, &sp48, &self->v_0x188);
-        fn_80041E40(&sp3C, &sp24);
+        copyVec3(&sp3C, &sp24);
         fn_80128BF8(self, &sp48);
         fn_80134964(self, &lbl_8056F960, 2, 1, sp8);
         fn_801353E4(self);
         temp_f31 = fn_8012F8E4(self);
         fn_80051EE0(&spC, &sp3C, lbl_80796F98);
         fn_80051EE0(&sp18, &spC, temp_f31);
-        fn_80041E40(&self->v_0x310, &sp18);
+        copyVec3(&self->v_0x310, &sp18);
         self->v_0x310.y = (f32) lbl_80796E1C;
         return;
     case 1:
@@ -3349,7 +3348,7 @@ void fn_8014F71C(_ENEMY_WORK *self) {
     u8 temp_r0;
     u8 temp_r3;
 
-    fn_80043EA8(&sp1C);
+    VEC3_ctor(&sp1C);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* switch 1; irregular */
     case 0:                                         /* switch 1 */
@@ -3366,7 +3365,7 @@ void fn_8014F71C(_ENEMY_WORK *self) {
         fn_80130248(self);
         fn_80135600(self, &self->field_0x1bc);
         fn_80050CA0(&sp10, &self->v_0x36c, &self->v_0x188);
-        fn_80041E40(&sp1C, &sp10);
+        copyVec3(&sp1C, &sp10);
         calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl(&sp1C, &spC, &sp8);
         var_r0 = spC + 0x400;
         spC = var_r0;

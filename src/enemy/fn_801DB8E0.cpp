@@ -51,6 +51,8 @@
 #include "enemy/ENEMY_WORK.h"
 #include "sound/mhchar.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
@@ -168,10 +170,7 @@ void fn_80106694(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void fn_8010D2B0(void* pos, u8 a, u8 b, s32 c, f32 d);
 
 /* the base runtime helpers the range reaches. */
-void fn_80043EA8(void* out);
-void fn_80041E40(void* dst, const void* src);
 f32 fn_80050EF4(void* a, void* b);
-void fn_8005050C(void* out);
 void fn_80051378(void* out, void* a, void* b);
 void fn_8005D0CC(void* out, void* src);
 void fn_8005D1AC(void* out, u32 a);
@@ -188,7 +187,7 @@ void fn_800810DC(void* self, u32 a);
  * and `system_w`'s counter has run a multiple of 24 frames. */
 void fn_801DB8E0(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (fn_8012EC60(self) == 1) {
         if (system_w.field_0x0c % 0x18 == 0) {
             setVector3(&pos, lbl_807994FC, lbl_8079964C, lbl_80799650);
@@ -202,7 +201,7 @@ void fn_801DB8E0(struct _ENEMY_WORK* self) {
  * `fn_801048B4`/`fn_8010D2B0`/`fn_80106694`. */
 void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, f32 scale) {
     nw4r::math::VEC3 pos;
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (mode == 0) {
         if ((self->field_0x228 & 0x6) != 0) {
             switch (kind) {
@@ -315,7 +314,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
             }
         } else {
             if (joint == 0xff) {
-                fn_80041E40(&pos, &self->pos);
+                copyVec3(&pos, &self->pos);
             } else {
                 get_joint_wpos_em(self, joint, &pos);
             }
@@ -325,7 +324,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
         }
     } else if (mode == 2) {
         if (joint == 0xff) {
-            fn_80041E40(&pos, &self->pos);
+            copyVec3(&pos, &self->pos);
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -683,9 +682,9 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     nw4r::math::VEC3 res;
     u16 ang;
     u16 delta;
-    fn_80043EA8(&dir);
-    fn_80043EA8(&rot);
-    fn_80041E40(&dir, &self->vec_0x36C);
+    VEC3_ctor(&dir);
+    VEC3_ctor(&rot);
+    copyVec3(&dir, &self->vec_0x36C);
     ang = calcVecAng2(&self->pos, &dir);
     *angleOut = ang;
     delta = (u16)(ang - self->field_0x1C0);
@@ -695,14 +694,14 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
         setVector3(&rot, lbl_807994FC, lbl_807994FC, base - scale);
         rotVecY(&rot, *angleOut);
         fn_80051378(&tmp, &self->pos, &rot);
-        fn_80041E40(out, &tmp);
+        copyVec3(out, &tmp);
     } else {
         u16 a2 = (delta < 0x8000) ? 0x4000 : 0xc000;
         *angleOut = (u16)(a2 + self->field_0x1C0);
         setVector3(&rot, lbl_807994FC, lbl_807994FC, -scale);
         rotVecY(&rot, *angleOut);
         fn_80051378(&res, &dir, &rot);
-        fn_80041E40(out, &res);
+        copyVec3(out, &res);
     }
 }
 

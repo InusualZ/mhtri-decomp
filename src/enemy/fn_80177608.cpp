@@ -25,7 +25,7 @@
  * does not emit must not be claimed (docs/plan.md 8.4).  The `extab`/`extabindex` fragments travel
  * with the code unit and ARE claimed in `splits.txt`.
  *
- * Declarations: `fn_80130478`, `fn_8012F5B8`, `fn_8012F93C` and `fn_80043EA8` come from the shared
+ * Declarations: `fn_80130478`, `fn_8012F5B8`, `fn_8012F93C` and `VEC3_ctor` come from the shared
  * headers (`include/unsplit/enemy.h`, `include/ef.h`); their signatures are the shared ones.  The
  * symbols whose owning unit is not registered and whose band has no sound header
  * (`fn_80304508`, `fn_80056A54`, `fn_8012933C`, `fn_80127F48`) are declared here, as the landed
@@ -80,7 +80,7 @@ extern f32 lbl_80797B44;
 extern "C" void fn_80177608(_ENEMY_WORK* self) {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state_0x05) {
     case 0:
         self->state_0x05++;

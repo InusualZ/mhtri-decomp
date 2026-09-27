@@ -36,6 +36,8 @@
 #include "ef.h"
 #include "pl.h"
 #include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The retail object keeps the unfused forms (a `rlwinm` + `cmpwi` where the pass would emit a
  * record-form `rlwinm.`); the whole file is compiled with the peephole pass off (playbook 39). */
@@ -223,9 +225,6 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
 extern "C" {
 
 /* the engine vector/matrix helpers */
-void fn_8005050C(void* mtx);
-void fn_80043EA8(nw4r::math::VEC3* out);
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void fn_8004C4F0(void* dst, void* src);
 void fn_800532DC(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void fn_802BDE90(f32* out_a, f32* out_b);
@@ -341,9 +340,9 @@ extern "C" void fn_800F95A4(void* self) {
     f32 aspect;
     f32 fov;
 
-    fn_8005050C(&world);
-    fn_80043EA8(&pos);
-    fn_80041E40(&pos, &get_camera_pos());
+    MTX34_ctor(&world);
+    VEC3_ctor(&pos);
+    copyVec3(&pos, &get_camera_pos());
     fn_800532DC(&world, &get_current_view_mtx());
     fn_802BDE90(&fov, &aspect);
     fn_800A602C(self, &pos, &world, fov, aspect);
@@ -375,7 +374,7 @@ extern "C" void fn_800F96D4(u32* dst, const u32* src) {
 /* 0x800F96E0 - set the effect's root matrix translation from a world position. */
 void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     nw4r::math::MTX34 mtx;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     if (effect != NULL) {
         const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)fn_800A60C0(effect);
         fn_800532DC(&mtx, src);
@@ -389,7 +388,7 @@ void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
 /* 0x800F975C - add a world position to the effect's root matrix translation. */
 extern "C" void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     nw4r::math::MTX34 mtx;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     if (effect != NULL) {
         const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)fn_800A60C0(effect);
         fn_800532DC(&mtx, src);
@@ -462,7 +461,7 @@ extern "C" void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* co
     fn_8004C4F0(args.color_0x01, color);
     fn_8004C4F0(args.color2_0x05, color2);
     args.scale_0x0C = scale;
-    fn_80041E40(&args.pos_0x10, pos);
+    copyVec3(&args.pos_0x10, pos);
     ((nw4r::ef::Effect*)effect)->ForeachParticleManager((void (*)(void*, u32))fn_800F9A70, (u32)&args, flag != 0);
 }
 
@@ -474,14 +473,14 @@ extern "C" void fn_800F9A70(void* mgr, EftParticleArgs* data) {
 
 /* 0x800F9A8C - zero a vector at +0x10 and return the record. */
 extern "C" EftParticleArgs* fn_800F9A8C(EftParticleArgs* self) {
-    fn_80043EA8(&self->pos_0x10);
+    VEC3_ctor(&self->pos_0x10);
     return self;
 }
 
 /* 0x800F9AC0 - scale the effect's first emitter uniformly. */
 void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale) {
     nw4r::math::VEC3 v;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     fn_800834F0(&v);
     if (scale >= lbl_807965DC) {
         if (fn_800A51D0(effect) != 0) {
@@ -496,14 +495,14 @@ void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale) {
 
 /* 0x800F9B68 - install a scale vector on one handle. */
 extern "C" void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v) {
-    fn_80041E40(&handle->pos_0x9C, v);
+    copyVec3(&handle->pos_0x9C, v);
     fn_800A95D8(handle);
 }
 
 /* 0x800F9BA0 - scale the effect's first emitter by a vector. */
 void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* v) {
     nw4r::math::VEC3 tmp;
-    fn_80043EA8(&tmp);
+    VEC3_ctor(&tmp);
     if (fn_80050EDC(v) >= lbl_807965DC) {
         if (fn_800A51D0(effect) != 0) {
             void* handle = fn_800A51D8(effect, 0);
@@ -684,8 +683,8 @@ extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src) {
 /* 0x800FA378 - construct the box record and its two vectors. */
 extern "C" EftShape* fn_800FA378(EftShape* self) {
     fn_800FA3B8((EftVectors*)&self->box_0x00);
-    fn_80043EA8(&self->a_0x1C);
-    fn_80043EA8(&self->b_0x28);
+    VEC3_ctor(&self->a_0x1C);
+    VEC3_ctor(&self->b_0x28);
     return self;
 }
 
@@ -697,14 +696,14 @@ extern "C" EftVectors* fn_800FA3B8(EftVectors* self) {
 
 /* 0x800FA3E8 - zero the two vectors of a record. */
 extern "C" EftVectors* fn_800FA3E8(EftVectors* self) {
-    fn_80043EA8(&self->a_0x00);
-    fn_80043EA8(&self->b_0x0C);
+    VEC3_ctor(&self->a_0x00);
+    VEC3_ctor(&self->b_0x0C);
     return self;
 }
 
 /* 0x800FA420 - zero one vector. */
 extern "C" nw4r::math::VEC3* fn_800FA420(nw4r::math::VEC3* self) {
-    fn_80043EA8(self);
+    VEC3_ctor(self);
     return self;
 }
 
@@ -719,7 +718,7 @@ extern "C" void fn_800FA450(void* effect) {
     s32 alive = 0;
     fn_800FA420((nw4r::math::VEC3*)&sphere);
     fn_800FA3B8((EftVectors*)&box);
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     fn_800FA378(&box2);
     fn_800A8998(&mode, 0);
     u16 count = fn_800A51D0(effect);
@@ -776,7 +775,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
     fn_800FA420((nw4r::math::VEC3*)&sphere);
     fn_800FA420((nw4r::math::VEC3*)&sphere2);
     fn_800FA3B8((EftVectors*)&box);
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     fn_800FA378(&shape);
     s32 count = fn_800E28E4(chr);
     u8 flags = owner->flags_0x14;

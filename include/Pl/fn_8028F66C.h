@@ -1,20 +1,16 @@
 /*
  * `Pl/fn_8028F66C.cpp`'s outbound declarations (the ground/hit collision TU).
  *
- * Two of these are callees whose owner's header cannot supply a usable declaration:
+ * `copyVec3` (0x80041E40) is `src/mh3_pad.cpp`'s and comes from `include/mh3_pad.h`, which this unit
+ * includes - the `(10197)` clash this header used to record (`include/ef.h` spelling `VEC3_ctor` as
+ * `(VEC3*)` against `mh3_pad.h`'s `(void*)`, measured 2026-09-27) is closed: both headers spell the
+ * three helpers identically now.
  *
- * * `fn_80041E40` is owned by `mh3_pad.cpp`, whose `include/mh3_pad.h` spells it `(void*, const void*)`
- *   *and* spells `fn_80043EA8` as `(void*)`.  `fn_80043EA8` is declared `(VEC3*)` by `include/ef.h`,
- *   which this unit reaches through `pl.h` and through `ef/fn_800AEE48.h` (for `fn_800B0B90`), so
- *   including `mh3_pad.h` here is `(10197) illegal function overloading` on `fn_80043EA8` - measured,
- *   not guessed.  The shape below is the call sites' (a 0xC-byte record copy), matching the owner's
- *   body, and it is C linkage.
- * * `fn_8012A8F8` is owned by `enemy/fn_801251D0.cpp`; its header does not declare the symbol yet
- *   (`(u16*)writer`-style stub), so the shape here is this unit's call site: it zeroes a `PlBox`.
- *
- * Both follow the practice `include/enemy/fn_80165FC8.h` documents for the same situation ("their
+ * `fn_8012A8F8` is owned by `enemy/fn_801251D0.cpp`; its header does not declare the symbol yet
+ * (`(u16*)writer`-style stub), so the shape here is this unit's call site: it zeroes a `PlBox`.
+ * It follows the practice `include/enemy/fn_80165FC8.h` documents for the same situation ("their
  * owners' headers do not declare these, or declare a different signature; the shapes here are the
- * call sites'").  When those owners write their bodies the declarations move to their headers.
+ * call sites'").  When that owner writes its body the declaration moves to its header.
  */
 #ifndef MHTRI_PL_FN_8028F66C_H
 #define MHTRI_PL_FN_8028F66C_H
@@ -45,7 +41,6 @@ struct LandData {
 
 /* 0x80041E40 - copies one 0xC-byte float record and returns `dst` (the owner `src/mh3_pad.cpp`'s
  * body); normalised with the declaration fold-in of 2026-09-27. */
-void* fn_80041E40(void* dst, const void* src);
 
 /* 0x8012A624 - the `LandData` constructor: constructs the +0x08 vector. */
 void fn_8012A624(LandData* land);

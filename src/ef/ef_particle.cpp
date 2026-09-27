@@ -93,7 +93,7 @@ extern "C" EfParticle* fn_800AA18C(EfParticle* self)
     fn_800A4080(self);
     self->slots = (EfParticleSlots*)lbl_80592E30;
     fn_800AA1D8(&self->params);
-    fn_80043EA8(&self->field_0xCC);
+    VEC3_ctor(&self->field_0xCC);
     return self;
 }
 
@@ -106,7 +106,7 @@ extern "C" EfParticleParams* fn_800AA1D8(EfParticleParams* self)
 
     fn_800834F0(&self->scale_0x10);
     fn_800834F0(&self->scale_0x18);
-    fn_80043EA8(&self->field_0x20);
+    VEC3_ctor(&self->field_0x20);
 
     end = &self->field_0x2C[3];
     for (p = &self->field_0x2C[0]; p < end; p++) {
@@ -117,9 +117,9 @@ extern "C" EfParticleParams* fn_800AA1D8(EfParticleParams* self)
         fn_800834F0(p);
     }
 
-    fn_80043EA8(&self->field_0x80);
-    fn_80043EA8(&self->field_0x8C);
-    fn_80043EA8(&self->field_0x98);
+    VEC3_ctor(&self->field_0x80);
+    VEC3_ctor(&self->field_0x8C);
+    VEC3_ctor(&self->field_0x98);
     return self;
 }
 

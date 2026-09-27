@@ -76,7 +76,7 @@
  *
  * Residuals of what is written:
  *   * em_tut_cam_ck 81.0 - the by-value `get_camera_pos()` result is copied through a temporary where
- *     retail hands the temporary straight to `fn_80041E40`, i.e. the owner's declaration is a
+ *     retail hands the temporary straight to `copyVec3`, i.e. the owner's declaration is a
  *     `const VEC3&` (or the original took a temporary's address); the `const VEC3*` spelling this
  *     unit must use costs the 3-word copy.
  *   * em_act_hold 87.5, em_act_frame_ck 93.7, em_act_aim 93.9 - register colouring plus one duplicated
@@ -97,6 +97,7 @@
  * rows above gained from the repair.
  */
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/ENEMY_DATA.h"
@@ -135,13 +136,13 @@ void em_act_mot21(_ENEMY_WORK* self);
 s32 em_tut_cam_ck(void) {
     nw4r::math::VEC3 zeroed;
     nw4r::math::VEC3 cam;
-    fn_80043EA8(&zeroed);
+    VEC3_ctor(&zeroed);
     if (get_now_mapno() != 0x16) {
         return 1;
     }
     if (get_now_areano() == 2) {
         cam = get_camera_pos();
-        fn_80041E40(&zeroed, &cam);
+        copyVec3(&zeroed, &cam);
         if (zeroed.x >= lbl_8079AF4C) {
             return 0;
         }

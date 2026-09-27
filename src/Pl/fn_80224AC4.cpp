@@ -43,7 +43,7 @@
  *    `rig+4`).  Both are encodings of the same address, so no source shape reaches them from here.
  *  - fn_80226A4C 0x80226A4C (148 B) is written but **not landed**: its whole body is two
  *    `fn_80045330` copies, and that symbol is owned by `src/mh3_pad.cpp`, whose header re-declares
- *    `fn_80043EA8`/`fn_80041E8C` with different parameter types than `ef.h` - so including
+ *    `VEC3_ctor`/`setVec3` with different parameter types than `ef.h` - so including
  *    `include/mh3_pad.h` from a unit that also includes `pl.h` (which pulls `ef.h`) is an illegal
  *    overload.  The fix is a rule-2/rule-1 pass over `include/mh3_pad.h` (one declaration per symbol,
  *    in the owner's header); until then the function is left out rather than declared locally.

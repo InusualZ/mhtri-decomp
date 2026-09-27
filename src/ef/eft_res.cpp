@@ -899,7 +899,7 @@ extern "C" void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void
     VEC3 pos;
     u16 flags = 0;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (self->area_0x44 != get_now_areano() || self->flag_0x01 != 0) {
         if ((mode & 2) == 0) {
             return;

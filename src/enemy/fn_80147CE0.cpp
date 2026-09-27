@@ -303,7 +303,7 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
     VEC3 v;
     Helper_80147CE0* helper;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if ((arg & 0xFF) == 2) {
         self->pos.y += lbl_80796E18;
         fn_80130248(self);
@@ -613,7 +613,7 @@ extern "C" void fn_801484D4(_ENEMY_WORK* self) {
 extern "C" void fn_80148528(_ENEMY_WORK* self) {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
       case 0:
         self->state++;
@@ -699,7 +699,7 @@ extern "C" void fn_8014879C(_ENEMY_WORK* self) {
 extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if ((arg & 0xFF) == 0) {
         fn_8012CF20(self);
     }
@@ -767,7 +767,7 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
 extern "C" void fn_80148BD0(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
       case 0:
         self->state++;
@@ -977,7 +977,7 @@ extern "C" void fn_80149214(_ENEMY_WORK* self, u32 arg) {
 
 /* The spawn record's position reset: zero the VEC3 at +0x04 and hand the record back. */
 extern "C" EmSpawnRec* fn_80149788(EmSpawnRec* rec) {
-    fn_80043EA8(&rec->pos);
+    VEC3_ctor(&rec->pos);
     return rec;
 }
 

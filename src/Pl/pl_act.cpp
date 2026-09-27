@@ -253,6 +253,8 @@
 #include "types.h"
 #include "enemy/enemy_control.h"
 #include "ef/fn_800CDB2C.h"   /* my_player_no (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The actor the whole Pl_* family takes as its first argument. Only the offsets this unit touches are named;
  * everything in between is padding. */
@@ -523,7 +525,6 @@ void Pl_get_gunner_pos(_PLW*, nw4r::math::VEC3*, s32);
 void cpSetRotMatrixZXY(_CP_VECTOR*, nw4r::math::MTX34*);
 void rotVecXYZ(nw4r::math::VEC3*, _CP_VECTOR*);
 
-extern "C" void fn_80043EA8(nw4r::math::VEC3*);
 extern "C" void fn_800FC0D4(_CP_VECTOR*, void*);
 extern "C" f32 fn_80050EF4(void*, void*);
 extern "C" u32 fn_80114C20(_PLW*, s32);
@@ -1613,7 +1614,7 @@ extern "C" void fn_8027CD0C(_PLW* self, nw4r::math::MTX34* mtx)
 {
     _CP_VECTOR pos;
     nw4r::math::VEC3 v;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     fn_800FC0D4(&pos, (u8*)self + 84);
     f32 t = (f32)self->unk64F / lbl_8079A0D0;
     t = lbl_8079A110 * t * lbl_8079A0DC / lbl_8079A0E4 + lbl_8079A088;
@@ -1873,7 +1874,7 @@ extern "C" s32 fn_80277C94(_PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3
 {
     nw4r::math::VEC3 v;
     u8 hit;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     out->x = lbl_8079A084;
     v.x = lbl_8079A084;
     v.y = arg2 + arg3;
@@ -3272,11 +3273,9 @@ extern "C" u32 fn_80274DCC(_PLW*, u8);
 extern "C" s32 fn_8027D968(_PLW*, void*, void*, void*);
 extern "C" s32 fn_8027DC90(void);
 extern "C" u32 fn_802D7804(s32, f32);
-extern "C" void fn_8005050C(void*);
 extern "C" void fn_800504D4(void*);
 extern "C" void fn_8008C484(void*, f32, f32, f32);
 extern "C" void fn_80051574(void*, void*);
-extern "C" void fn_80041E40(nw4r::math::VEC3*, void*);
 extern "C" u8 fn_80224E28(_PLW*, u8);
 extern "C" void fn_8026A394(_PLW*, s32, void*);
 extern "C" void fn_8026A230(_PLW*, s32, u16, s32, s32);
@@ -3301,7 +3300,7 @@ extern "C" s32 fn_80277DAC(_PLW* self, s32 arg1, f32 arg2, f32 arg3)
 {
     nw4r::math::VEC3 v;
     u8 hit;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     v.x = lbl_8079A084;
     v.y = lbl_8079A084;
     v.z = arg2;
@@ -3882,9 +3881,9 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
     nw4r::math::MTX34 m;
     u8 m2[0x30];
     s32 part;
-    fn_8005050C(&m);
-    fn_8005050C(m2);
-    fn_80043EA8(&v);
+    MTX34_ctor(&m);
+    MTX34_ctor(m2);
+    VEC3_ctor(&v);
     u8 t = fn_80224E28(self, lbl_805BAA90[self->unk002]);
     out->x = lbl_8079A084;
     out->y = lbl_8079A084;
@@ -3896,7 +3895,7 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
         break;
     case 1:
         if (self->unk002 == 3) {
-            fn_80041E40(&v, fn_80143174(buf, lbl_805BAC98 + self->unk002 * 0x18 + 0xC,
+            copyVec3(&v, fn_80143174(buf, lbl_805BAC98 + self->unk002 * 0x18 + 0xC,
                                          self->unk002 * 0x18));
         }
         /* fall through */
@@ -3924,7 +3923,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
     s32 sp10;
     s32 spC;
     s16 sp8;
-    fn_80043EA8(&sp24);
+    VEC3_ctor(&sp24);
     if (self->unk00A == 7) {
         if (arg1 == 0x15B) {
             if ((u32)self->unk00C <= 1U) {

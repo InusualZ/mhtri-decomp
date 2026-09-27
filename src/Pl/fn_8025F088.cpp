@@ -34,6 +34,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "pl.h"
 #include "nw4r/math.h"
 #include "Pl/fn_8025F088.h"
@@ -690,7 +691,7 @@ void fn_8025F088(_PLW* self) {
     MHchar* chr = &((PlBodyWork*)self->physics_0x13C)->chr_0x04;
 
     get_move_work_adrs(0);
-    fn_80041E40(&self->vec_0x048, &self->vec_0x03C);
+    copyVec3(&self->vec_0x048, &self->vec_0x03C);
 
     self->field_0x65C = self->field_0x65D;
     if (self->field_0x017 != self->area_0x16) {
@@ -770,7 +771,7 @@ void fn_8025F088(_PLW* self) {
     fn_8026FD0C(self);
     fn_8025ED00(self);
     fn_80224AC4(self->physics_0x13C);
-    fn_80041E40(&self->vec_0x03C, &chr->pos_0x04);
+    copyVec3(&self->vec_0x03C, &chr->pos_0x04);
     switch (self->kind_0x09) {
     case 2:
         break;

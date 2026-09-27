@@ -97,7 +97,7 @@
 #include "enemy/fn_8015D860.h"
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
-#include "ef.h"              /* fn_80043EA8 */
+#include "ef.h"              /* VEC3_ctor */
 #include "ef/fn_80105314.h"  /* fn_801057A4 */
 #include "draw_shape.h"      /* fn_80056A54 */
 #include "enemy/fn_801251D0.h"
@@ -137,7 +137,7 @@ extern "C" u8 lbl_805A6D28[];
  * `fn_80132224`, `fn_80132264`, `fn_80141B88`, `fn_8012EC3C` (`unsplit/enemy.h`);
  * `fn_80128A8C`, `fn_80128AAC`, `fn_8012933C`, `fn_801280F4` (`enemy/fn_801251D0.h`);
  * `fn_8012D1A0` (`enemy/fn_8012BDF4.h`); `fn_801391E8`, `fn_801390FC` (`enemy/fn_80138074.h`);
- * `fn_80147E2C` (`enemy/fn_80147CE0.h`); `fn_80043EA8` (`ef.h`); `fn_801057A4`
+ * `fn_80147E2C` (`enemy/fn_80147CE0.h`); `VEC3_ctor` (`ef.h`); `fn_801057A4`
  * (`ef/fn_80105314.h`); `fn_80056A54` (`draw_shape.h`); `setVector3` (`nw4r/math.h`);
  * `system_w` (`unsplit/unknown.h`). */
 
@@ -267,7 +267,7 @@ extern "C" void fn_8015D9C8(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
     Helper_8015DAA8* helper;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch ((u8)arg) {
       case 2:
         fn_80130478(self, 4);
@@ -327,8 +327,8 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
     VEC3 v1;
     VEC3 v2;
 
-    fn_80043EA8(&v1);
-    fn_80043EA8(&v2);
+    VEC3_ctor(&v1);
+    VEC3_ctor(&v2);
     switch (arg) {
       case 1:
         switch (sub) {
@@ -506,7 +506,7 @@ extern "C" void fn_8015E05C(_ENEMY_WORK* self) {
 extern "C" void fn_8015E0BC(_ENEMY_WORK* self) {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
       case 0:
         self->state++;
@@ -543,7 +543,7 @@ extern "C" void fn_8015E148(_ENEMY_WORK* self) {
 extern "C" void fn_8015E1C4(_ENEMY_WORK* self) {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
       case 0:
         self->state++;

@@ -261,7 +261,7 @@ void fn_80132264(struct _ENEMY_WORK* self);
  * (included above) declares both: `fn_80154CA4` takes the record and `fn_801545B8` the 0x18-byte
  * spawn record; the spellings here were the call sites' `void*`/`u32` view (rule 2). */
 /* The tenth argument is a POINTER, settled from the callee's own body (`auto_fn_80141B88_text.s`):
- * it loads the outgoing stack word into r21 and hands it to `fn_80041E40` as the second argument
+ * it loads the outgoing stack word into r21 and hands it to `copyVec3` as the second argument
  * when it is non-null, and the two callers pass a `VEC3*` (`enemy/fn_8015D860.cpp`'s `fn_8015DB68`)
  * or null (`enemy/fn_80170600.cpp`'s `fn_801706B8`). */
 void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, void* j, s32 k);

@@ -81,6 +81,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "unsplit/ef.h"
 #include "ef/ef_particlemanager.h"
@@ -197,7 +198,7 @@ struct EfAnimSlotQueue {
     /* +0x04 */ EfAnimSlot mSlot[0x400];
 }; /* size: 0xC004 */
 
-/* fn_80043EA8 (zero a VEC3) and fn_800C9DCC (fabsf) are declared by the `ef` band header, where their
+/* VEC3_ctor (zero a VEC3) and fn_800C9DCC (fabsf) are declared by the `ef` band header, where their
  * owner-less declarations live (rule 2), so this unit includes it rather than re-declaring them. */
 extern "C" {
 
@@ -319,8 +320,8 @@ u32 fn_8009E854(u32 tick, u8 start, u8 end, u8 type) {
 
 /* 0x800A3008 - initialise a queue slot's two VEC3 tails. */
 EfAnimSlot* fn_800A3008(EfAnimSlot* slot) {
-    fn_80043EA8(&slot->mPos);
-    fn_80043EA8(&slot->mVel);
+    VEC3_ctor(&slot->mPos);
+    VEC3_ctor(&slot->mVel);
     return slot;
 }
 

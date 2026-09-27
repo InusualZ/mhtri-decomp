@@ -87,6 +87,8 @@
 #include "enemy/ENEMY_WORK.h"
 #include "pl.h"              /* MHchar / setTevKColor / _CP_VECTOR */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ------------------------------------------------------------------------------------------------ *
  * The mangled callees, outside `extern "C"` so the front-end mangles them the way the map spells
@@ -208,8 +210,6 @@ void fn_8011D4FC(_ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
 void fn_8011D690(_ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void fn_801E2D04(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, u32 c, f32 d);
 void fn_80304508(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 c);
-void* fn_80041E40(void* dst, const void* src);
-void fn_8005050C(void* out);
 void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 fn_8005024C(u16 a);
 void fn_80191EF8(_ENEMY_WORK* self);
@@ -472,7 +472,7 @@ void fn_8018B3C8(_ENEMY_WORK* self) {
 void fn_8018B418(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     fn_80131D84(self);
     switch (self->state) {
     case 0:
@@ -826,7 +826,7 @@ void fn_8018C2CC(_ENEMY_WORK* self) {
 void fn_8018C370(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state = (u8)(self->state + 1);
@@ -893,7 +893,7 @@ void fn_8018C5CC(_ENEMY_WORK* self) {
     VEC3 sp8;
     f32 spC;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state = (u8)(self->state + 1);
@@ -996,7 +996,7 @@ void fn_8018CA3C(_ENEMY_WORK* self) {
     VEC3 sp8;
     f32 spC;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state = (u8)(self->state + 1);
@@ -1104,7 +1104,7 @@ void fn_8018CE84(_ENEMY_WORK* self) {
     VEC3 sp8;
     f32 spC;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state = (u8)(self->state + 1);
@@ -1290,8 +1290,8 @@ void fn_8018D370(_ENEMY_WORK* self) {
     u16 ang;
     u16 mot;
 
-    fn_80043EA8(&sp8);
-    fn_8005050C(&sp18);
+    VEC3_ctor(&sp8);
+    MTX34_ctor(&sp18);
     if (fn_8012EC60(self) != 0) {
         ang = calcVecAngX(&self->vec_0x76C);
         if ((u16)(ang + 0x8000) > 0x671B) {
@@ -1333,7 +1333,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
     u8 var;
 
     var = arg2;
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     switch (arg1) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -1404,7 +1404,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
             return;
         }
         if (arg3 == 0xFF) {
-            fn_80041E40(&vec, &self->pos);
+            copyVec3(&vec, &self->pos);
         } else {
             get_joint_wpos_em(self, arg3, &vec);
         }
@@ -1413,7 +1413,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
         return;
     case 2:
         if (arg3 == 0xFF) {
-            fn_80041E40(&vec, &self->pos);
+            copyVec3(&vec, &self->pos);
         } else {
             get_joint_wpos_em(self, arg3, &vec);
         }
@@ -1623,9 +1623,9 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
     u16 temp_r3_3;
     u8 temp_r0;
 
-    fn_80043EA8(&sp2C);
-    fn_80043EA8(&sp20);
-    fn_80043EA8(&sp14);
+    VEC3_ctor(&sp2C);
+    VEC3_ctor(&sp20);
+    VEC3_ctor(&sp14);
     temp_r0 = self->team;
     switch ((s32) temp_r0) {                        /* switch 1; irregular */
     case 16:                                        /* switch 1 */
@@ -1819,7 +1819,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                     setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797F58 * get_em_chg_scale(self));
                     rotVecY(&sp14, self->field_0x1C0);
                     fn_80051378(&sp8, &self->pos, &sp14);
-                    fn_80041E40(&sp2C, fn_80041E40(&sp20, &sp8));
+                    copyVec3(&sp2C, copyVec3(&sp20, &sp8));
                     temp_f1 = lbl_807981CC * get_em_chg_scale(self);
                     sp2C.y -= temp_f1;
                     sp20.y += lbl_807981CC * get_em_chg_scale(self);

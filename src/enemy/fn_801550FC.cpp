@@ -76,15 +76,9 @@ extern void rotVecY(VEC3*, u32);
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80138074.h"
 #include "fn_8004CAD8.h"
-/* `mh3_pad.h` and `ef.h` (through `enemy.h`) both spell `fn_80043EA8` and `fn_80041E8C` with
- * different parameter types, which is a C-linkage overload error.  This unit wants only the owner's
- * `fn_80041E40`, so the two stale duplicates are renamed out of the way for this include - the same
- * workaround `ef/ef_creationqueue.cpp` uses for the band header's copy. */
-#define fn_80043EA8 mhtri_mh3pad_fn_80043EA8
-#define fn_80041E8C mhtri_mh3pad_fn_80041E8C
+/* The `VEC3_ctor`/`setVec3` macros that used to guard this include are gone: `ef.h` now spells both
+ * exactly as their owner `mh3_pad.h` does, so the two headers no longer clash. */
 #include "mh3_pad.h"
-#undef fn_80043EA8
-#undef fn_80041E8C
 
 /* flat map symbols are C-linkage in a C++ TU */
 extern "C" {
@@ -1927,7 +1921,7 @@ extern "C" void fn_8015AB08(_ENEMY_WORK* self) {
         fn_80130248(self);
         fn_801305C4(self);
         setVector3(&self->pos, lbl_80797260, lbl_80797264, lbl_80797268);
-        fn_80041E40(&self->prev_pos, &self->pos);
+        copyVec3(&self->prev_pos, &self->pos);
         self->pos_0x1BC.x = 0;
         self->pos_0x1BC.y = 0xC44;
         self->pos_0x1BC.z = 0;

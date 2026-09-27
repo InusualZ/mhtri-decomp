@@ -68,6 +68,7 @@
 #include "ef/ef_particlemanager.h"
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The real `nw4r::db::Panic`; the map already carries its C++ mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`) and the C++ front end reproduces it (tools/units/mangle.py agrees).
@@ -116,7 +117,7 @@ extern void GXLoadPosMtxImm(void* mtx, u32 id);
  * fn_800AB388/fn_800AB3AC/fn_800AB2DC -> `ef/ef_particle.h`, fn_800AE360 ->
  * `ef/ef_particlemanager.h`.  The still-unsplit ones live in `unsplit/ef.h` (fn_800C5F74,
  * fn_800C6064, fn_800C68E8) and `unsplit/g3d.h` (fn_800710BC). */
-extern void fn_8005050C(MTX34* mtx);                        /* MTX34::MTX34() (identity) */
+                        /* MTX34::MTX34() (identity) */
 extern MTX34* fn_80050508(MTX34* mtx);                      /* MTX34::Get() */
 extern void fn_800513F0(VEC3* v, f32 scale);                /* VEC3::Scale / rotate helper */
 extern void fn_800A7F00(void* particle, VEC3* out);         /* particle velocity/axis accessor */
@@ -216,9 +217,9 @@ void fn_800BEF98(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleMa
     MTX34 mtxEm;
     u32 screenSpace = (self->mTexCoordEnable != 0);
 
-    fn_8005050C(&mtxPm);
+    MTX34_ctor(&mtxPm);
     fn_800AE360(pm, &mtxPm);
-    fn_8005050C(&mtxEm);
+    MTX34_ctor(&mtxEm);
     fn_800B7DB0(em, &mtxEm);
     fn_800710BC(&mtxEm, &mtxEm, &mtxPm);
     GXLoadPosMtxImm(fn_80050508(&mtxEm), 0);
@@ -246,7 +247,7 @@ void fn_800BEF98(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleMa
             continue;
         }
         fn_80051490((Vec*)&pos, (Vec*)&particle->position);
-        fn_80043EA8(&dir);
+        VEC3_ctor(&dir);
         fn_800A7F00(particle, &dir);
         if (fn_800B59E4(&dir) == 0) {
             continue;

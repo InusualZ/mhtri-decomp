@@ -65,7 +65,7 @@
  *     block in;
  *   - `fn_8026BF98` opens with a 16-element `Vec3` loop written `do { ... } while (p < &vec[16])`: a
  *     `for`/`while` in the same place makes MWCC emit an extra loop guard, and the array is only ever
- *     initialised (`fn_80043EA8`), never read;
+ *     initialised (`VEC3_ctor`), never read;
  *   - `fn_8026BF98` reads `st->unk7D` through `switch (st->unk7D) { default: <hold-start>; case 1: <hold-tick>; }`
  *     - MWCC lowers a switch test to `cmpwi` where an `if` on the same `u8` emits `cmplwi`, and the default
  *     arm has to be written first for its body to be laid out as retail's fall-through;
@@ -77,6 +77,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 typedef struct Vec3 {
     f32 x;
@@ -183,8 +184,6 @@ u32 fn_8026B934(_PLW* self);
 u32 fn_8026BA04(_PLW* self);
 u32 fn_803BECC8(u8 value, u32 low, u32 high);
 void fn_8026AF08(_PLW* self, u32 value);
-void fn_80043EA8(void* vec);
-void* fn_80041E40(void* dst, void* src);
 void fn_800E09D0(void* dst, void* src);
 u8 fn_800CF208(void);
 s8 my_player_no(void);
@@ -329,7 +328,7 @@ extern "C" void fn_8026BF98(_PLW* self)
     Vec3* p = vec;
 
     do {
-        fn_80043EA8(p);
+        VEC3_ctor(p);
         p++;
     } while (p < &vec[16]);
 
@@ -1861,12 +1860,12 @@ extern "C" void fn_8026FD0C(_PLW* self)
     Vec3 vec;
     u32* p;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     p = (u32*)((u8*)self->unk13C + 4);
     p[10] = self->unk54;
     p[11] = self->unk58;
     p[12] = self->unk5C;
-    fn_80041E40(&p[1], (u8*)self + 60);
+    copyVec3(&p[1], (u8*)self + 60);
     vec.x = self->unk68;
     vec.y = self->unk6C;
     vec.z = self->unk70;

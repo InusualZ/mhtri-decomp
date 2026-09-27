@@ -92,6 +92,8 @@
  */
 
 #include "types.h"
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef.h"
@@ -101,8 +103,8 @@
 #include "ef/fn_800CDB2C.h"
 #include "enemy/ENEMY_WORK.h"
 #include "pl.h"
-#include "fn_8004CAD8.h"               /* fn_8005050C */
-#include "Pl/fn_8028F66C.h"            /* fn_80041E40 */
+#include "fn_8004CAD8.h"               /* MTX34_ctor */
+#include "Pl/fn_8028F66C.h"            /* copyVec3 */
 #include "g3d/g3d_calcworld.h"         /* fn_80073F68 */
 #include "sound/fn_800D7F54.h"         /* em015_denki_eft_se_req, se_req_pos_ps */
 #include "stage/stg_w.h"               /* get_now_areano */
@@ -311,9 +313,9 @@ extern "C" void fn_802F26B4(_EFT* self)
     nw4r::math::VEC3 vec_b;
     Eft035Work* work = (Eft035Work*)self->work_0x38;
 
-    fn_80043EA8(&vec_a);
-    fn_80043EA8(&vec_b);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&vec_a);
+    VEC3_ctor(&vec_b);
+    MTX34_ctor(&mtx);
 
     _ENEMY_WORK* source = (_ENEMY_WORK*)self->source_0x30;
 
@@ -341,7 +343,7 @@ extern "C" void fn_802F26B4(_EFT* self)
         break;
     }
 
-    fn_80041E40(&work->slots_0x08[0].model_0x0C->pos_0x04, &self->pos_0x18);
+    copyVec3(&work->slots_0x08[0].model_0x0C->pos_0x04, &self->pos_0x18);
     work->slots_0x08[0].model_0x0C->field_0x28 = (u16)(ran_suu(0) + self->rot_0x24.x);
     work->slots_0x08[0].model_0x0C->field_0x2C = (u16)(ran_suu(0) + self->rot_0x24.y);
     work->slots_0x08[0].model_0x0C->field_0x30 = (u16)(ran_suu(0) + self->rot_0x24.z);
@@ -363,9 +365,9 @@ extern "C" void fn_802F288C(_EFT* self)
     nw4r::math::VEC3 vec_b;
     Eft035Work* work = (Eft035Work*)self->work_0x38;
 
-    fn_80043EA8(&vec_a);
-    fn_80043EA8(&vec_b);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&vec_a);
+    VEC3_ctor(&vec_b);
+    MTX34_ctor(&mtx);
 
     _ENEMY_WORK* source = (_ENEMY_WORK*)self->source_0x30;
 
@@ -379,7 +381,7 @@ extern "C" void fn_802F288C(_EFT* self)
         se_req_pos_ps(source->se_0xB14, 31, 2, &self->pos_0x18);
     }
     self->timer_0x0C = 0;
-    fn_80041E40(&work->slots_0x08[0].model_0x0C->pos_0x04, &self->pos_0x18);
+    copyVec3(&work->slots_0x08[0].model_0x0C->pos_0x04, &self->pos_0x18);
     work->slots_0x08[0].model_0x0C->field_0x28 = self->rot_0x24.x;
     work->slots_0x08[0].model_0x0C->field_0x2C = self->rot_0x24.y;
     work->slots_0x08[0].model_0x0C->field_0x30 = self->rot_0x24.z;
@@ -515,7 +517,7 @@ void eft035_set(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* r
     eft->source_0x30 = self;
     eft->field_0x10 = 1;
     eft->timer_0x0C = 0;
-    fn_80041E40(&eft->pos_0x18, pos);
+    copyVec3(&eft->pos_0x18, pos);
     eft->rot_0x24.x = rot->x;
     eft->rot_0x24.y = rot->y;
     eft->area_0x44 = area;
@@ -553,7 +555,7 @@ void eft035_set2(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* 
     eft->source_0x30 = self;
     eft->field_0x10 = 1;
     eft->timer_0x0C = 0;
-    fn_80041E40(&eft->pos_0x18, pos);
+    copyVec3(&eft->pos_0x18, pos);
     eft->rot_0x24.x = rot->x;
     eft->rot_0x24.y = rot->y;
     eft->area_0x44 = area;

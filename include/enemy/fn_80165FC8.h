@@ -106,13 +106,10 @@ u32 fn_80176AA8(void* p);
 /* ---- library callees (their owners' headers do not declare these, or declare a different
  * signature; the shapes here are the call sites' - each is a leaf this unit never re-enters) ---- */
 void fn_8005D1AC(void* out, s32 a);
-void fn_8005050C(void* out);
 void fn_800504D4(void* out);
 void fn_800532DC(void* dst, const void* src);
 int fn_8006FDCC(const void* p);
 void fn_8005D0CC(void* obj, const void* sub);
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-nw4r::math::VEC3* fn_80041E8C(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 void fn_80051490(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void fn_80051574(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void* fn_80097EB0(void* sub, s32 a);

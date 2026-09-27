@@ -45,6 +45,7 @@
 #include "types.h"
 #include "unsplit/ef.h"
 #include "fn_8004CAD8.h"       /* fn_80050BC0 - that unit owns the address and publishes it (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* A 3-float vector. */
 typedef struct Vec {
@@ -101,10 +102,9 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* nw4r::math and effect-library helpers.  The target object references each by its plain
  * `fn_XXXXXXXX` map name, so they carry C linkage; a C++ spelling mangles the reloc
  * (fn_80043EA8__FPv) and it no longer pairs (relocaudit).  The one name `unsplit/ef.h` already
- * declares (fn_80043EA8) is left to that header; its call sites below cast their `Vec` to the
+ * declares (VEC3_ctor) is left to that header; its call sites below cast their `Vec` to the
  * header's `Vec3`). */
 extern "C" {
-extern void fn_80041E8C(Vec* out, f32 x, f32 y, f32 z);
 extern void fn_8009C484(Vec* out, Vec* in);
 extern void fn_80051490(Vec* out, Vec* in);
 extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);
@@ -155,8 +155,8 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         f32 cs, sn;
         f32 factor, rate, t;
 
-        fn_80043EA8((Vec3*)&v88); /* C-linkage decl in unsplit/ef.h takes nw4r::math::VEC3* */
-        fn_80043EA8((Vec3*)&v76);
+        VEC3_ctor((Vec3*)&v88); /* C-linkage decl in unsplit/ef.h takes nw4r::math::VEC3* */
+        VEC3_ctor((Vec3*)&v76);
         t = fn_800A8A08(&em->progress);
         rate = params->rate_pct / 100.0f;
         if (flags & 0x01000000) {
@@ -170,7 +170,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             angle = (params->range_end - params->range_begin) * fn_800A8A08(&em->progress);
         }
         fn_8009C760(&cs, &sn, phase + angle);
-        fn_80041E8C(&v64, cs, 0.0f, -sn);
+        setVec3(&v64, cs, 0.0f, -sn);
         v88.x = size_x * (v64.x * factor);
         if (flags & 0x00020000) {
             v88.y = offset_y;
@@ -178,7 +178,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             v88.y = size_y * ((2.0f * fn_800A8A08(&em->progress)) - 1.0f);
         }
         v88.z = size_z * (v64.z * factor);
-        fn_80041E8C(&v52, v88.x, 0.0f, v88.z);
+        setVec3(&v52, v88.x, 0.0f, v88.z);
         fn_8009C484(&v52, &v52);
         fn_80051490(&v40, &v88);
         fn_8009C484(&v40, &v40);

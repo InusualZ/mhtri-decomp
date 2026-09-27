@@ -123,6 +123,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h" /* nw4r::ef::EffectSystem / nw4r::ef::Effect (rule 9's owner) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -208,7 +210,7 @@ typedef struct EfSys {
     /* +0xC014 */ u32 mMaxGroupID;
     /* +0xC018 */ EfSysActivityList* mActivityList;
     /* +0xC01C */ u32 mRandom; /* the seed fn_800A5900 writes (ef/ef_emitter.cpp reads the same word) */
-    /* +0xC020 */ nw4r::math::VEC3 mRefPos; /* fn_80041E40 copies the caller's vector into it */
+    /* +0xC020 */ nw4r::math::VEC3 mRefPos; /* copyVec3 copies the caller's vector into it */
     /* +0xC02C */ nw4r::math::MTX34 mRefMtx;
     /* +0xC05C */ f32 mRangeB;
     /* +0xC060 */ f32 mRangeA;
@@ -372,8 +374,6 @@ u32 fn_800A4AF8(void* effect);
 const char* fn_800A485C(void* p);
 void* fn_800A4864(void* p);
 u16 fn_8009B374(void* list, void** buf, u16 size);
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-void* fn_8005050C(void* mtx);
 void* fn_800504D4(void* mtx);
 void* fn_80050508(void* mtx);
 void* fn_80051570(const void* src);
@@ -609,7 +609,7 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
 /* 0x800A602C - set the system's reference transform and its two range floats. */
 extern "C" void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src,
                             f32 a, f32 b) {
-    fn_80041E40(&self->mRefPos, pos);
+    copyVec3(&self->mRefPos, pos);
     nw4r::math::MTX34* dst = (nw4r::math::MTX34*)fn_80050508(&self->mRefMtx);
     PSMTXCopy(fn_80051570(src), dst);
     self->mRangeA = a;
@@ -647,9 +647,9 @@ __declspec(section ".ctors") void* const lbl_8056F2D8 = (void*)fn_800A60C8;
 
 /* 0x800A6134 - the constructor of the 0xA0-byte record the game allocates at 0x800D3D0C. */
 extern "C" void* fn_800A6134(EfSysDefaultRecord* self) {
-    fn_8005050C(&self->mtx_0x00);
-    fn_8005050C(&self->mtx_0x30);
-    fn_80043EA8(&self->vec_0x8C);
+    MTX34_ctor(&self->mtx_0x00);
+    MTX34_ctor(&self->mtx_0x30);
+    VEC3_ctor(&self->vec_0x8C);
     fn_800504D4(&self->mtx_0x00);
     fn_800504D4(&self->mtx_0x30);
     self->field_0x60 = 0;
@@ -713,18 +713,18 @@ extern "C" EfSysResourceObj* fn_800A6258(EfSysResourceObj* self) {
     self->vtable = lbl_80592BA8;
     fn_800A62C0(&self->sub_0x020);
     fn_800A3FFC(&self->particles, 0x14);
-    fn_80043EA8(&self->vec_0x108);
-    fn_80043EA8(&self->vec_0x114);
-    fn_8005050C(&self->mtx_0x124);
+    VEC3_ctor(&self->vec_0x108);
+    VEC3_ctor(&self->vec_0x114);
+    MTX34_ctor(&self->mtx_0x124);
     return self;
 }
 
 /* 0x800A62C0 - the resource object's +0x20 sub-object: clear its four transform vectors. */
 extern "C" EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self) {
-    fn_80043EA8(&self->vec_0x84);
-    fn_80043EA8(&self->vec_0x90);
-    fn_80043EA8(&self->vec_0x9C);
-    fn_80043EA8(&self->vec_0xA8);
+    VEC3_ctor(&self->vec_0x84);
+    VEC3_ctor(&self->vec_0x90);
+    VEC3_ctor(&self->vec_0x9C);
+    VEC3_ctor(&self->vec_0xA8);
     return self;
 }
 

@@ -50,6 +50,8 @@
 #include "gx.h"
 #include "nw4r/math.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * The two engine globals this range drives.
@@ -61,7 +63,7 @@
  * are padding for this view. size: 0x364 */
 typedef struct DrawShapeWork {
     /* +0x00 */ u8 pad_0x00[0x74];
-    /* +0x74 */ u8 matrix_0x74[0x30];  /* fn_8005050C's 3x4 float matrix */
+    /* +0x74 */ u8 matrix_0x74[0x30];  /* MTX34_ctor's 3x4 float matrix */
     /* +0xA4 */ u8 matrix_0xA4[0x30];
     /* +0xD4 */ u32 field_0xD4;        /* GXInitTexObj wrapS / tlut name */
     /* +0xD8 */ u32 field_0xD8;        /* GXInitTexObj wrapT / tlut name */
@@ -178,7 +180,6 @@ extern char lbl_80581944[];
 
 extern "C" {
 /* The `drawshape_*` 2D helpers this range calls (0x8004F..0x80053.., same band). */
-void  fn_8005050C(void* mtx);
 void  fn_800539B4(u16 idx);
 void  fn_800529A0(u32 a, u32 b);
 void  fn_80052844(void* tex, void* pltt, u16 idx, u32 arg);
@@ -194,7 +195,6 @@ void  fn_80053A90(void* a, void* b);
 void  fn_8009A490(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h);
 void  fn_8009A5C4(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h);
 void  fn_8004C4F0(void* dst, const void* src);
-void  fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void  fn_80057810(u32 a, u32 b, u32 c);
 
 /* SDK. */
@@ -313,8 +313,8 @@ extern "C" void fn_80055DC8(s16* a, s16* b, u32 raw) {
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" DrawShapeWork* fn_80055E64(DrawShapeWork* self) {
-    fn_8005050C(&self->matrix_0x74);
-    fn_8005050C(&self->matrix_0xA4);
+    MTX34_ctor(&self->matrix_0x74);
+    MTX34_ctor(&self->matrix_0xA4);
     fn_80052BC0(&self->field_0xE0, 0);
     fn_800534B0(&self->field_0xE4, 0);
     fn_80052BC0(&self->field_0x360, 0);
@@ -512,7 +512,7 @@ extern "C" void fn_80056A84(const nw4r::math::VEC3* pos, u32 handle, u8 flag) {
     s->field_0x54 = handle;
     s->field_0x60 = 0;
     s->field_0x62 = 1;
-    fn_80041E40(&s->vec_0x64, pos);
+    copyVec3(&s->vec_0x64, pos);
     s->field_0x63 = flag;
 }
 

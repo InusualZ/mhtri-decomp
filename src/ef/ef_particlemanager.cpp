@@ -38,6 +38,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
@@ -69,10 +71,7 @@ void fn_800A4A1C(void* list, void* node);
 void fn_800A49B8(void* node);
 void fn_800A6554(void* em, void* self);
 void fn_800834F0(void* self);
-void fn_80043EA8(void* v);
-void fn_80041E40(void* dst, const void* src);
 void fn_8004C4F0(void* dst, const void* src);
-void fn_8005050C(void* mtx);
 void fn_80051424(void* dst, const void* src, f32 f);
 void fn_800513F0(void* dst, f32 f);
 void fn_800514FC(void* dst, const void* a, const void* b);
@@ -235,20 +234,20 @@ extern "C" EfPmManager* fn_800AB664(EfPmManager* self) {
     self->vtable = lbl_805934E0;
     fn_800A3FFC(&self->list, 0x14);
     fn_800AB6BC(&self->stateA);
-    fn_8005050C(&self->pos);
+    MTX34_ctor(&self->pos);
     return self;
 }
 
 /* Construct the scalar/vec block at manager +0x58. */
 extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self) {
     fn_800834F0(self);
-    fn_80043EA8(&self->aa.vec);
+    VEC3_ctor(&self->aa.vec);
     fn_800AB6FC(&self->b);
     return self;
 }
 
 extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self) {
-    fn_80043EA8(&self->vec);
+    VEC3_ctor(&self->vec);
     return self;
 }
 
@@ -311,7 +310,7 @@ extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, void* d, 
     fn_8004C4F0(self->stateA.b.colorPri, b);
     fn_8004C4F0(self->stateA.b.colorSec, c);
     self->stateA.b.scale = f;
-    fn_80041E40(&self->stateA.b.vec, d);
+    copyVec3(&self->stateA.b.vec, d);
 }
 
 /* Delete-like helper: free only a live object. */
@@ -365,9 +364,9 @@ extern "C" nw4r::math::VEC3* fn_800AD0CC(EfPmManager* self, nw4r::math::VEC3* ad
 
 /* Zero the three-vec block used by the particle transform paths. */
 extern "C" EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self) {
-    fn_80043EA8(&self->a);
-    fn_80043EA8(&self->b);
-    fn_80043EA8(&self->c);
+    VEC3_ctor(&self->a);
+    VEC3_ctor(&self->b);
+    VEC3_ctor(&self->c);
     return self;
 }
 
@@ -390,7 +389,7 @@ extern "C" s32 fn_800ADA24(void* out, EfPmDirParam* p, void* v) {
 /* Set the manager's scale and copy a source position into the live block. */
 extern "C" void fn_800AE298(EfPmManager* self, f32 f, const void* src) {
     self->scale = f;
-    fn_80041E40(&self->pos, src);
+    copyVec3(&self->pos, src);
 }
 
 /* Walk the list, aging every particle. */
@@ -433,8 +432,8 @@ extern "C" void fn_800AEE0C(void* a, EfPmManager* m) {
 
 /* The .ctors entry: construct the file's two static matrices. */
 extern "C" void fn_800AEE14() {
-    fn_8005050C(&lbl_80694538);
-    fn_8005050C(&lbl_80694568);
+    MTX34_ctor(&lbl_80694538);
+    MTX34_ctor(&lbl_80694568);
 }
 
 __declspec(section ".ctors") void* const lbl_8056F2DC = (void*)fn_800AEE14;

@@ -56,6 +56,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 
 #include "nw4r/math.h"
 
@@ -75,8 +76,8 @@
  * `void se_req_pos_ps(...)` spelling (`(10505) illegal overloading`). */
 #include "sound/se.h"
 
-/* `fn_80043EA8` (the 3-float record writer) - via the ef band, because `sound/se.h` and the
- * owner's `mh3_pad.h` both declare `fn_80041E40`/`fn_80041E8C` with signatures that clash
+/* `VEC3_ctor` (the 3-float record writer) - via the ef band, because `sound/se.h` and the
+ * owner's `mh3_pad.h` both declare `copyVec3`/`setVec3` with signatures that clash
  * (`(10197) illegal function overloading`), the same conflict `ai/fn_802CC794.cpp` records.  The
  * ef band carries the identical `Vec3*` spelling (`Vec3` is `nw4r::math::VEC3`). */
 #include "unsplit/ef.h"
@@ -129,7 +130,7 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
 {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -176,7 +177,7 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     fn_80131E00(self);
     switch (self->state) {
     case 0:

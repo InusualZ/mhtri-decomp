@@ -100,7 +100,7 @@ s32 fn_80273228(struct _PLW* self, u16 item_id, s16 value);
 u32 fn_802B0598(struct _PLW* self);
 
 /* ---- library callees (the owners' headers do not declare these) ---- */
-void* fn_80041E40(void* dst, const void* src); /* 0x80041E40 - copies a 0xC-byte record and
+ /* 0x80041E40 - copies a 0xC-byte record and
     * returns `dst` (the owner's body); normalised with the declaration fold-in, 2026-09-27 */
 u32 fn_8004EB18(u16 item_id);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);

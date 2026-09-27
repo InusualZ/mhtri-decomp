@@ -126,7 +126,7 @@ struct EmSelRec {
     /* +0x00 */ u8 unused_0x00[0x03];
     /* +0x03 */ u8 mode;          /* 0 or 2: the random threshold `fn_801B7118` picks */
     /* +0x04 */ u8 unused_0x04[0x04];
-    /* +0x08 */ nw4r::math::VEC3 vec_0x08; /* zeroed by `fn_80125F54` through `fn_80043EA8` */
+    /* +0x08 */ nw4r::math::VEC3 vec_0x08; /* zeroed by `fn_80125F54` through `VEC3_ctor` */
     /* +0x14 */ u8 unused_0x14[0x04];
     /* +0x18 */ u32 value_0x18;   /* the id `fn_801B71F4` latches into the work's +0x32E */
 };
@@ -199,7 +199,7 @@ extern "C" void fn_801B78F8(EmProgWork* self);
 /* The two foreign callees this unit cannot reach through a header, each for a documented reason:
  *   * `fn_800B0B90` is `Vec* fn_800B0B90(Vec* self, Vec* b)` in the owner's own source
  *     (`src/ef/fn_800AEE48.cpp:330` - it subtracts `b` from `self` in place), but that owner's header
- *     includes `include/ef.h`, whose `fn_80043EA8`/`fn_80041E8C` spellings clash with
+ *     includes `include/ef.h`, whose `VEC3_ctor`/`setVec3` spellings clash with
  *     `include/mh3_pad.h`'s on the very same C-linkage symbols (MWCC `(10197) illegal function
  *     overloading`), so the header is not includable here.  The map symbol is the plain
  *     `fn_800B0B90`, hence C linkage.
@@ -211,7 +211,7 @@ void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 /* 0x80050850 has moved to its owner's header, `include/fn_8004CAD8.h` (included above): the two
  * in-file copies that made that fold unsafe (`src/ef/fn_801173AC.cpp`'s and this one) were settled
  * in the same batch, 2026-09-27.  0x80051EE0 (r3 `out`, r4 `in`, f1 the scale it saves in f31
- * before zeroing `out` through `fn_80043EA8`) is still declared here: its owner is the same unit,
+ * before zeroing `out` through `VEC3_ctor`) is still declared here: its owner is the same unit,
  * but the remaining spellings (`src/g3d/fn_80075DCC.cpp`'s four-argument form) have not been
  * settled, so the fold stays an outbox `shared-file` request. */
 void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
@@ -249,7 +249,7 @@ extern "C" void fn_801B70A4(EmProgWork* self) {
     nw4r::math::VEC3 rot;
     EmVecWords out;
 
-    fn_80043EA8(&rot);
+    VEC3_ctor(&rot);
     rot.x = 0.0f;
     rot.y = 0.0f;
     rot.z = 45.0f;
@@ -596,7 +596,7 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
     nw4r::math::VEC3 out;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -605,13 +605,13 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
         fn_8012F5B8((struct _ENEMY_WORK*)self, 2, 20, 0);
         fn_80134004((struct _ENEMY_WORK*)self, 8, (s32)(u8)mode == 1 ? -450.0f : -80.0f);
         fn_801353F8((struct _ENEMY_WORK*)self);
-        fn_80041E40(&vec, &self->target);
+        copyVec3(&vec, &self->target);
         vec.y += 60.0f;
         fn_800B0B90(&vec, &self->pos);
         if (fn_80050EDC((const f32*)&vec) > 0.001f) {
             fn_80050850(&vec, &vec);
             fn_80051EE0(&out, &vec, 8.0f);
-            fn_80041E40(&self->vec_0x310, &out);
+            copyVec3(&self->vec_0x310, &out);
         }
         self->timer_0x020 = 240;
         break;
@@ -708,7 +708,7 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
     nw4r::math::VEC3 out;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -716,13 +716,13 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
         fn_801305C4((struct _ENEMY_WORK*)self);
         fn_8012F5B8((struct _ENEMY_WORK*)self, 2, 20, 0);
         fn_801353F8((struct _ENEMY_WORK*)self);
-        fn_80041E40(&vec, &self->target);
+        copyVec3(&vec, &self->target);
         vec.y += 60.0f;
         fn_800B0B90(&vec, &self->pos);
         if (fn_80050EDC((const f32*)&vec) > 0.001f) {
             fn_80050850(&vec, &vec);
             fn_80051EE0(&out, &vec, 10.0f);
-            fn_80041E40(&self->vec_0x310, &out);
+            copyVec3(&self->vec_0x310, &out);
         }
         self->timer_0x020 = 150;
         break;

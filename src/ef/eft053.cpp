@@ -100,16 +100,18 @@
  * declaration of one of this range's five still-unwritten bodies (0x80367124, 0x80367760, 0x80368374,
  * 0x8036928C, 0x80369D50; `python tools/symbols/dumpmap.py lookup <addr>` answers the dump's
  * `zz_XXXXXXXX_` placeholder for each, so no name is derivable yet) or a call to a callee ANOTHER unit
- * owns (`fn_800F8788`, `fn_80043EA8`, ...).  Every symbol this file DEFINES is named above; the two
+ * owns (`fn_800F8788`, `VEC3_ctor`, ...).  Every symbol this file DEFINES is named above; the two
  * runtime-dump spellings (`eft053_get_shell_data`, `eft053_get_model_ang`) are the dump's own.
  */
 #include "types.h"
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "ef.h"
 #include "pl.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_8012BDF4.h" /* em_act_ck, em_work_die_ck */
-#include "fn_8004CAD8.h"       /* setVector3, mulVecMatAddTrans, rotVecY, fn_80043EA8, fn_8005050C */
+#include "fn_8004CAD8.h"       /* setVector3, mulVecMatAddTrans, rotVecY, VEC3_ctor, MTX34_ctor */
 #include "ef/eft053.h"         /* this unit's header (the helpers whose owner header cannot carry them) */
 #include "unsplit/unknown.h"   /* the band's unnamed callees */
 #include "ef/eft_res.h"        /* fn_800F8788/fn_800F8914/fn_800F8A44 (the effect pool) */
@@ -289,7 +291,7 @@ extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
     s32 a;
     s16 v;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     setVector3(out, lbl_8079B740, lbl_8079B740, lbl_8079B740);
     fn_800FC0D4(&rot, (_CP_VECTOR*)&plw->param_0x54); /* +0x54 is the actor's 3-word rotation */
     a = plw->shell_ang_0x583;
@@ -473,7 +475,7 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
 
     work = (Eft053Work*)self->work_0x38;
     timer = lbl_806BB7A0;
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     work->counters[index] += 1;
     switch (self->area_0x44) {
     case 1:
@@ -574,7 +576,7 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
     work = (Eft053Work*)self->work_0x38;
     ret = 0;
     step = (f32)work->field_0x6E[work->field_0x35[index]];
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (randomize != 0) {
         seed = ran_suu(1) % 5;
         start = ran_suu(1) % (s32)(lbl_8079B7F0 / step);
@@ -827,7 +829,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             fn_80073F68(b, &tmp_a);
             fn_80051EE0(&tmp_b, c, off_a);
             fn_80051378(&tmp_c, b, &tmp_b);
-            fn_80041E40(a, &tmp_c);
+            copyVec3(a, &tmp_c);
             fn_800513F0(c, e * lbl_8079B7AC);
             return 1;
         }

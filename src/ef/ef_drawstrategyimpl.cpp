@@ -37,6 +37,7 @@
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
 #include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* `nw4r::db::Panic` - the real declaration; the front end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled
@@ -94,7 +95,6 @@ extern f32 lbl_80796200; /* 4.5036e+15 (0x4330000080000000)                     
 /* The GX texture-coordinate generator (an SDK symbol) and the shared matrix initialiser. */
 extern void GXSetTexCoordGen2(u32 dst_coord, u32 func, u32 src_param, u32 mtx, u32 normalize,
                               u32 pt_texmtx);
-extern void fn_8005050C(Mtx34* mtx);
 
 /* --------------------------------------------------------------------------------------------- *
  * The three-layer texture set's constructor, 0x800C5F74..0x800C6054.
@@ -416,11 +416,11 @@ void fn_800C8DE4(void* pm, void* em) {
 
 /* Initialises the ahead context and returns it. */
 EfAheadContext* fn_800C9434(EfAheadContext* self) {
-    fn_8005050C(&self->emitter_mtx);
-    fn_8005050C(&self->manager_mtx);
-    fn_8005050C(&self->manager_mtx_inv);
-    fn_80043EA8((VEC3*)&self->emitter_axis_y);
-    fn_80043EA8((VEC3*)&self->emitter_center);
+    MTX34_ctor(&self->emitter_mtx);
+    MTX34_ctor(&self->manager_mtx);
+    MTX34_ctor(&self->manager_mtx_inv);
+    VEC3_ctor((VEC3*)&self->emitter_axis_y);
+    VEC3_ctor((VEC3*)&self->emitter_center);
     return self;
 }
 
@@ -658,10 +658,10 @@ void fn_800C9488(void) {
     f32 m22;
     f32 m23;
 
-    fn_80041E8C(&lbl_80694C08, lbl_807961E0, lbl_807961E4, lbl_807961E4);
-    fn_80041E8C(&lbl_80694C14, lbl_807961E4, lbl_807961E0, lbl_807961E4);
-    fn_80041E8C(&lbl_80694C20, lbl_807961E4, lbl_807961E4, lbl_807961E0);
-    fn_80041E8C(&lbl_80694C2C, lbl_807961E4, lbl_807961E4, lbl_807961E4);
+    setVec3(&lbl_80694C08, lbl_807961E0, lbl_807961E4, lbl_807961E4);
+    setVec3(&lbl_80694C14, lbl_807961E4, lbl_807961E0, lbl_807961E4);
+    setVec3(&lbl_80694C20, lbl_807961E4, lbl_807961E4, lbl_807961E0);
+    setVec3(&lbl_80694C2C, lbl_807961E4, lbl_807961E4, lbl_807961E4);
     m20 = lbl_807961E4;
     m21 = lbl_807961E4;
     m22 = lbl_807961E0;

@@ -36,6 +36,7 @@
 #include "types.h"
 #include "menu/fn_8031EA8C.h"
 #include "unsplit/lobby.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The band's unowned callees (no registered unit owns these addresses). */
 extern "C" {
@@ -45,7 +46,6 @@ void* fn_800F8914(void);
 void  fn_800F886C(_EFT* self);
 void  fn_800F8A44(MHchar** models, s32 count);
 void  fn_800F9DF4(_EFT* self, u32 a, u32 b);
-void  fn_80041E40(VEC3* dst, VEC3* src);
 f32   fn_800513F0(VEC3* v, f32 s);
 void  fn_800FC0D4(_CP_VECTOR* dst, _CP_VECTOR* src);
 u32   fn_8004D70C(u32 value);

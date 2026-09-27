@@ -54,10 +54,11 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "pl.h"                /* `_PLW` - the record's +0x650/+0x652 the motion switch reads */
 #include "Pl/fn_8027D684.h"    /* `fn_8027D76C` (rule 2: the owner's header) */
-#include "Pl/fn_8028F66C.h"    /* `fn_80041E40`, `fn_8012A624`, `fn_80291B08` */
+#include "Pl/fn_8028F66C.h"    /* `copyVec3`, `fn_8012A624`, `fn_80291B08` */
 #include "fn_8004CAD8.h"       /* `rotVecY`, `fn_80050CA0`, `fn_80051378` */
 #include "sound/fn_800D7F54.h" /* `fn_800DCC24` */
 #include "ai/ainpc.h"
@@ -381,7 +382,7 @@ extern "C" void fn_802C4CD4(struct _AINPC_W* self, u8 arg) {
  * yaw, and the per-frame pass integrates the effect vector and the stage timer. */
 extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
     nw4r::math::VEC3 shot;
-    fn_80043EA8(&shot);
+    VEC3_ctor(&shot);
     shot.x = lbl_8079A670;
     shot.y = lbl_8079A670;
     shot.z = lbl_8079A6A4;
@@ -404,7 +405,7 @@ extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
         }
         rotVecY(&shot, self->field_0x194);
         fn_80051378(&out, &self->vec_0x178, &shot);
-        fn_80041E40(&self->vec_0x3E0, &out);
+        copyVec3(&self->vec_0x3E0, &out);
         self->field_0x3EC = (u16)self->field_0x194;
         self->field_0x3EE = 0;
         fn_800DCC24(self->sound_0x498, 0, 0);
@@ -416,7 +417,7 @@ extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
         self->field_0x194 = self->field_0x3EC;
         rotVecY(&shot, self->field_0x194);
         fn_80050CA0(&out, &self->vec_0x3E0, &shot);
-        fn_80041E40(&self->vec_0x178, &out);
+        copyVec3(&self->vec_0x178, &out);
         if (arg >= 5) {
             self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x600);
         }
@@ -437,7 +438,7 @@ extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
         self->field_0x194 = self->field_0x3EC;
         rotVecY(&shot, self->field_0x194);
         fn_80050CA0(&out, &self->vec_0x3E0, &shot);
-        fn_80041E40(&self->vec_0x178, &out);
+        copyVec3(&self->vec_0x178, &out);
         if (fn_802D2984(self) == 1) {
             if (self->sub_step == 0) {
                 fn_802D2ABC(self, 1, lbl_805D4784[arg * ROW7_WORDS + ROW7_SE], self->field_0x1EC);
@@ -634,7 +635,7 @@ extern "C" void fn_802C58DC(struct _AINPC_W* self) {
     case 2:
         self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x1000);
         if (fn_802D2984(self) == 1) {
-            fn_80041E40(&self->vec_0x178, &self->vec_0x1B0);
+            copyVec3(&self->vec_0x178, &self->vec_0x1B0);
             if (fn_80291B08((struct _PLW*)self, &self->vec_0x178, &land, &ground, -5) == 1) {
                 /* One `lfs` and two stores in retail: the traveller's distance and the
                  * height it settles at are the same value. */

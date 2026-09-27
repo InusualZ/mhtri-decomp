@@ -32,6 +32,7 @@
  */
 #include "types.h"
 #include "nw4r/math.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -77,7 +78,7 @@ extern f32 lbl_80795CF4;          /* 100.0f                                     
  * them into the owners' headers.  These are `fn_XXXXXXXX`/SDK stems, not manglings, so rule 9 does not
  * reach them. */
 extern "C" {
-void fn_80041E8C(Vec3* pOut, f32 x, f32 y, f32 z); /* owner: src/mh3_pad.cpp            */
+ /* owner: src/mh3_pad.cpp            */
 void* fn_80050508(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
 void* fn_80051570(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
 /* `PSMTXTransApply(const Mtx src, Mtx dst, f32 x, f32 y, f32 z)` - the SDK math helper (the declaration
@@ -144,8 +145,8 @@ Mtx34* fn_8005AB08(Mtx34* pSrc, const Vec3* pPos, void* pNodeMtx) {
  *   Vec3 lbl_8066AE54(100.0f + lbl_8066AE48.x, lbl_8066AE48.y, lbl_8066AE48.z);
  * Written as the out-of-line function it compiles to, so the map's fn_8005AB78 stays its name. */
 void fn_8005AB78(void) {
-    fn_80041E8C(&lbl_8066AE48, lbl_80795CF0, lbl_80795CF0, lbl_80795CF0);
-    fn_80041E8C(&lbl_8066AE54, lbl_80795CF4 + lbl_8066AE48.x, lbl_8066AE48.y, lbl_8066AE48.z);
+    setVec3(&lbl_8066AE48, lbl_80795CF0, lbl_80795CF0, lbl_80795CF0);
+    setVec3(&lbl_8066AE54, lbl_80795CF4 + lbl_8066AE48.x, lbl_8066AE48.y, lbl_8066AE48.z);
 }
 
 }  // extern "C"

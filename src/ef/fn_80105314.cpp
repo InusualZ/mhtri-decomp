@@ -60,6 +60,8 @@
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the 72-byte effect object and its pool blocks (the `_EFT` shape of ef/eft002.cpp, named per-unit so
@@ -276,7 +278,6 @@ struct _EFT013_WORK_A {
  * externs - mangled callees are declared through their real signature (rule 9)
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_8005050C(nw4r::math::MTX34* mtx);
 extern "C" void fn_80050708(void* mtx, nw4r::math::VEC3* v);
 /* fn_8010140C comes from its owner's header (rule 2). */
 /* fn_800DC60C / fn_800DB964 come from their owner's header (rule 2). */
@@ -304,7 +305,6 @@ extern "C" f32 lbl_8059F028[];
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
 /* `se_req_pos_ps` comes from the owner's header `sound/fn_800D7F54.h` (rule 2); this unit's local
  * `void` copy collided with the owner's `SeSlot*` once the header declared it. */
-extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 u8 get_now_areano();
 u32 em_sleep_ck(_ENEMY_WORK* enemy, u8 kind);
 void get_joint_wmat_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::MTX34* mtx);
@@ -842,8 +842,8 @@ extern "C" void fn_8010A728(_EFT013* self, u32 mode) {
 extern "C" void fn_8010A8CC(_ENEMY_WORK* self, u32 a, f32 scale) {
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
-    fn_80043EA8(&v);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v);
+    MTX34_ctor(&mtx);
     if (self->act_id != get_now_areano()) {
         return;
     }
@@ -1058,7 +1058,7 @@ extern "C" void fn_80107518(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, f32
     if (e != NULL) {
         _EFT013_WORK_F* work = (_EFT013_WORK_F*)e->work_0x38;
         work->field_0x44 = 1;
-        fn_80041E40(&work->pos_0x30, pos);
+        copyVec3(&work->pos_0x30, pos);
         work->field_0x40 = a;
     }
 }
@@ -1073,7 +1073,7 @@ extern "C" void fn_801075AC(_EFT013_PL* self, nw4r::math::VEC3* pos, u32 a, f32 
     if (e != NULL) {
         _EFT013_WORK_F* work = (_EFT013_WORK_F*)e->work_0x38;
         work->field_0x44 = 2;
-        fn_80041E40(&work->pos_0x30, pos);
+        copyVec3(&work->pos_0x30, pos);
         work->field_0x40 = a;
     }
 }
@@ -1129,8 +1129,8 @@ extern "C" void fn_801078BC(_ENEMY_WORK* self, u32 id, u32 b) {
 extern "C" void fn_80106F5C(_EFT013* self) {
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
-    fn_80043EA8(&v);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v);
+    MTX34_ctor(&mtx);
     _EFT013_POOL2* work = (_EFT013_POOL2*)self->work_0x38;
     self->state_0x05++;
     work->effects[0] = res_eft_create(lbl_8059EAD0[(u8)self->type_0x02], lbl_8059EAE0[(u8)self->type_0x02], 0);
@@ -1214,7 +1214,7 @@ extern "C" void fn_8010710C(_EFT013* self) {
  * effect's own rotation/position, recolour it by type and hand off to the state-1 handler. */
 extern "C" void fn_8010695C(_EFT013* self) {
     nw4r::math::MTX34 mtx;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     self->state_0x05++;
     work->effects[0] = res_eft_create(lbl_8059EAB0[(u8)self->type_0x02], lbl_8059EAC0[(u8)self->type_0x02], 0);
@@ -1274,7 +1274,7 @@ extern "C" void fn_80106DC8(nw4r::math::VEC3* pos, u32* rot, _EFT013_SRC* src, f
     work->scale_0x04 = scale;
     e->field_0x03 = 12;
     e->type_0x02 = 3;
-    fn_80041E40(&e->pos_0x18, pos);
+    copyVec3(&e->pos_0x18, pos);
     e->rot_0x24.x = rot[0];
     e->rot_0x24.y = rot[1];
     e->rot_0x24.z = 0;
@@ -1287,7 +1287,7 @@ extern "C" void fn_80106DC8(nw4r::math::VEC3* pos, u32* rot, _EFT013_SRC* src, f
 /* 0x80106530 - state-2 handler: retire the emitter, tick the effect, then drive its colour/scale. */
 extern "C" void fn_80106530(_EFT013* self) {
     nw4r::math::MTX34 mtx;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     if (self->type_0x02 != 2) {
         self->state_0x05++;
@@ -1315,7 +1315,7 @@ extern "C" void fn_80106530(_EFT013* self) {
  * position into it, fold in the effect's own rotation and set the root matrix. */
 extern "C" void fn_801065FC(_EFT013* self, _ENEMY_WORK* enemy, nw4r::math::VEC3* v, u32 joint, u32 index) {
     nw4r::math::MTX34 mtx;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     get_joint_wmat_em(enemy, joint, &mtx);
     mulVecMat(v, &mtx);
@@ -1339,7 +1339,7 @@ extern "C" void fn_801067F4(u32 type, nw4r::math::VEC3* pos, f32 scale, u32 area
     e->flag_0x01 = 1;
     e->field_0x03 = 11;
     e->type_0x02 = (u8)type;
-    fn_80041E40(&e->pos_0x18, pos);
+    copyVec3(&e->pos_0x18, pos);
     e->source_0x30 = NULL;
     e->area_0x44 = (u8)areano;
     e->rot_0x24.x = 0;
@@ -1416,10 +1416,10 @@ extern "C" void fn_8010562C(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3
     case 29:
     case 30:
     case 31:
-        fn_80041E40(&e->pos_0x18, b);
+        copyVec3(&e->pos_0x18, b);
         break;
     default:
-        fn_80041E40(&work->pos_0x14, b);
+        copyVec3(&work->pos_0x14, b);
         break;
     }
     work->field_0x10 = a;
@@ -1476,7 +1476,7 @@ extern "C" _EFT013* fn_80105888(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::
     _EFT013_WORK_A* work = (_EFT013_WORK_A*)e->work_0x38;
     work->count = lbl_8059E688[(u8)type];
     work->field_0x10 = a;
-    fn_80041E40(&work->pos_0x14, b);
+    copyVec3(&work->pos_0x14, b);
     work->scale_0x20 = scale;
     e->field_0x03 = 10;
     e->type_0x02 = type;

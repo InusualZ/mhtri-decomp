@@ -53,6 +53,7 @@
 #include "ef/fn_80101DF4.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The retail object keeps the unfused forms of several peephole folds (a `rlwinm` + `cmpwi` where the
  * pass would emit a record-form `rlwinm.`, a function pointer through `r0`); the whole file is compiled
@@ -199,7 +200,6 @@ extern "C" Eft004* fn_801007BC(void* owner, u32 arg1, u32 arg2, u32 arg3, s32* a
                                f32 farg0, f32 farg1, f32 farg2);
 extern "C" u32 fn_80100330(u32* p);
 extern "C" void* fn_800A485C(u32 color);
-extern "C" void fn_80041E40(void* dst, const void* src);
 extern "C" void* fn_800A60C0(void* self);
 extern "C" void fn_800A4AF8(nw4r::ef::Effect* effect);
 extern "C" nw4r::ef::EffectSystem* fn_800A4420(nw4r::ef::EffectSystem* system);
@@ -416,7 +416,7 @@ extern "C" void fn_80100024(EftEmitter* self, nw4r::math::VEC3* out)
     if (out == NULL) {
         nw4r::db::Panic(lbl_8059C4D0, 391, lbl_8059C4AC);
     }
-    fn_80041E40(out, &self->pos_0x90);
+    copyVec3(out, &self->pos_0x90);
 }
 
 /* Retires one live effect: runs the nw4r teardown, releases it from the system and clears its slot. */
@@ -447,7 +447,7 @@ extern "C" void fn_801006A0(u8 type, nw4r::math::VEC3* pos, u32 param, u8 flag, 
     params[2] = 0;
     effect = fn_801007BC(NULL, type, flag, 255, params, scale, lbl_807966B8, lbl_807966B8);
     if (effect != NULL) {
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
         effect->byte_0x08 = key;
     }
 }
@@ -465,7 +465,7 @@ extern "C" void fn_8010072C(_PLW* owner, u8 type, nw4r::math::VEC3* pos, u32 par
                          lbl_807966B8, lbl_807966B8);
     if (effect != NULL) {
         effect->owner_0x30 = owner;
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
         effect->byte_0x08 = 2;
     }
 }
@@ -482,7 +482,7 @@ void eft004_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u32 param, u8 flag)
     params[2] = 0;
     effect = fn_801007BC(NULL, type, flag, 255, params, scale, lbl_807966B8, lbl_807966B8);
     if (effect != NULL) {
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
     }
 }
 
@@ -497,7 +497,7 @@ void eft004_set_pl(_PLW* self, u8 type, f32 a, f32 b, f32 c, u32 param)
     params[2] = self->param_0x5C;
     effect = fn_801007BC(self, type, self->area_0x16, 255, params, a, b, c);
     if (effect != NULL) {
-        fn_80041E40(&effect->pos_0x18, &self->pos_0x3C);
+        copyVec3(&effect->pos_0x18, &self->pos_0x3C);
         if (type == 17 && (self->field_0x5A4 & 0x6) != 0) {
             eft004_set_pl(self, 2, a, b, c, param);
         }
@@ -511,13 +511,13 @@ void eft004_set_pl2(_PLW* self, u8 type, u32 param, f32 a, f32 b, f32 c, u32 ext
     s32 params[3];
     Eft004* effect;
 
-    fn_80043EA8(&dir);
+    VEC3_ctor(&dir);
     params[0] = self->param_0x54;
     params[1] = self->param_0x58 + extra;
     params[2] = self->param_0x5C;
     effect = fn_801007BC(self, type, self->area_0x16, param, params, a, b, c);
     if (effect != NULL) {
-        fn_80041E40(&effect->pos_0x18, &self->pos_0x3C);
+        copyVec3(&effect->pos_0x18, &self->pos_0x3C);
         if (type == 17 && (self->field_0x5A4 & 0x6) != 0) {
             eft004_set_pl2(self, 2, param, a, b, c, extra);
         }
@@ -570,7 +570,7 @@ extern "C" void fn_80101670(nw4r::math::VEC3* pos, u8 area, f32 scale)
         effect->type_0x02 = 1;
         effect->owner_0x30 = NULL;
         effect->area_0x44 = area;
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
         effect->timer_0x0C = 0;
         effect->field_0x10 = 0;
         fn_800F9DF4(effect, 1, 0);

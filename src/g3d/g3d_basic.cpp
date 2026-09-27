@@ -34,6 +34,8 @@
 #include "nw4r/math.h"
 #include "unsplit/g3d.h" /* fn_8007100C / fn_800710BC (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The retail object keeps the un-folded `(x & mask) != 0` form in fn_800D7F40 (`rlwinm` + the
  * neg/or/srwi tests) and the un-fused compares elsewhere; the file-scope peephole pass folds both.
@@ -51,10 +53,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 extern "C" {
 /* The `g3d` node/resource helpers this unit calls; all still `fn_XXXXXXXX` in the map.  Declared here
  * because their addresses have no registered owner yet or are declared in the unsplit band. */
-void fn_80041E40(Vec3* pDst, const Vec3* pSrc);
-void fn_80041E8C(Vec3* pOut, f32 x, f32 y, f32 z);
 void* fn_80050508(void* pMtx);
-void fn_8005050C(void* pOut);
 void* fn_80051570(void* pMtx);
 u32 fn_800737AC(u32 handle);
 u32 fn_800737B4(u32 handle);
@@ -152,10 +151,10 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
         }
     } else if (flag & 0x20) {
         if (fn_800D7F40(handle)) {
-            fn_80041E8C(&tmpVec, pNode->mtx.m[0][3], pNode->mtx.m[1][3], pNode->mtx.m[2][3]);
+            setVec3(&tmpVec, pNode->mtx.m[0][3], pNode->mtx.m[1][3], pNode->mtx.m[2][3]);
             fn_80501390(pMtx, pSrcMtx, &tmpVec);
         } else {
-            fn_8005050C(&tmpMtx);
+            MTX34_ctor(&tmpMtx);
             fn_800D7ED0(&tmpMtx, pScale, &pNode->mtx);
             fn_800710BC(pMtx, pSrcMtx, &tmpMtx);
         }
@@ -175,7 +174,7 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
         pVecOut->x = lbl_807963D4;
     } else {
         handle = fn_800737B4(handle);
-        fn_80041E40(pVecOut, &pNode->pos);
+        copyVec3(pVecOut, &pNode->pos);
     }
 
     if (flag & 0x10) {
@@ -217,7 +216,7 @@ int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
         pMtx->m[2][2] = lbl_807963D4;
         pMtx->m[2][3] = lbl_807963D0;
     } else {
-        fn_8005050C(&mtx);
+        MTX34_ctor(&mtx);
         mtx.m[0][0] = pSrt->scaleX * cos_;
         mtx.m[0][1] = -pSrt->scaleY * sin_;
         mtx.m[0][2] = lbl_807963D0;

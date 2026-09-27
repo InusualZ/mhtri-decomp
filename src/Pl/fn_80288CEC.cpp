@@ -89,6 +89,7 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_80288CEC.h" /* `PlBox`, shared with `Pl/fn_8028F66C.cpp` (rule 1) */
 #include "ef/fn_800CDB2C.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ------------------------------------------------------------------------------------------------ *
  * The player-mode root work (`get_move_work_adrs(0)`).
@@ -173,7 +174,6 @@ u32 Pl_frame_check(_PLW* plw, u32 frame, f32 a, f32 b);
 void player_init_data_load(void);
 
 extern "C" {
-void fn_80041E40(void* dst, void* src);
 void fn_8004A240(void* table, void* key);
 f32 fn_80050CA0(void* dst, void* a, void* b);
 f32 fn_80050EF4(void* a, void* b);
@@ -197,7 +197,7 @@ void PSVECSubtract(void* dst, void* a, void* b);
 }
 
 /* The two small-data seeds `fn_8028F400` fills, and the 256-byte-stride table `fn_8028F1E8` indexes.
- * `fn_80041E8C` itself is declared by `include/ef.h` (pulled in by `pl.h`) as `(Vec*, f32, f32,
+ * `setVec3` itself is declared by `include/ef.h` (pulled in by `pl.h`) as `(Vec*, f32, f32,
  * f32)`; re-declaring it here with `void*` is an illegal overload, so the call site casts. */
 extern u8 lbl_806AB830[];
 extern u8 lbl_806AB83C[];
@@ -537,20 +537,20 @@ u32 fn_8028F368(void) {
     return 1;
 }
 
-/* 0x8028F400 - seed the two `fn_80041E8C` vectors from the small-data literals. */
+/* 0x8028F400 - seed the two `setVec3` vectors from the small-data literals. */
 void fn_8028F400(void) {
-    fn_80041E8C((Vec*)lbl_806AB830, 573.0f, -1265.0f, 3392.0f);
-    fn_80041E8C((Vec*)lbl_806AB83C, 1413.0f, -571.0f, 1740.0f);
+    setVec3((Vec*)lbl_806AB830, 573.0f, -1265.0f, 3392.0f);
+    setVec3((Vec*)lbl_806AB83C, 1413.0f, -571.0f, 1740.0f);
 }
 
 /* 0x8028F44C - build the first 0x24 bytes of a box from two vectors and their cross product. */
 void fn_8028F44C(PlBox* a, PlBox* b) {
     f32 cross[3];
 
-    fn_80041E40(b, a);
-    fn_80041E40(&b->vec_0x0C, &a->vec_0x0C);
+    copyVec3(b, a);
+    copyVec3(&b->vec_0x0C, &a->vec_0x0C);
     fn_80050CA0(cross, &a->vec_0x0C, a);
-    fn_80041E40(&b->vec_0x18, cross);
+    copyVec3(&b->vec_0x18, cross);
 }
 
 } /* extern "C" */

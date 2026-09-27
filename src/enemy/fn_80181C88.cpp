@@ -85,7 +85,7 @@
  *    target relocations encode (`...P8_GXColor`); the by-value spelling is kept for the existing
  *    `enemy/fn_801D428C.cpp`/`enemy/fn_801DB8E0.cpp` call sites.
  *
- * fn_80182B94 seals its four table entries with the `fn_80041E40` 0xC-byte copy (mh3_pad.h) rather
+ * fn_80182B94 seals its four table entries with the `copyVec3` 0xC-byte copy (mh3_pad.h) rather
  * than the target's `fn_80051490`: the target's reloc pairs identically in the report metric (both
  * measured 81.40 %) and declaring `fn_80051490` in its owner header collides with the
  * `Vec*`-spelling locals in `ef/ef_cylinder.cpp` (a pre-existing rule-2 conflict, not this unit's).
@@ -103,7 +103,7 @@
 #include "enemy/fn_80138074.h" /* fn_8013A654/fn_8013918C + the EmUserData record */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
-#include "mh3_pad.h"           /* fn_80043EA8/fn_80041E40/fn_80041E8C */
+#include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
 #include "sys_mem.h"           /* operator delete (the `__dl__FPv` global deleter) */
 
 /* One 0x16-byte action record `fn_80182AB8` builds (the +0x00 type word, a VEC3 and three scalars).
@@ -433,8 +433,8 @@ u32 fn_80182430(_ENEMY_WORK* self, u32 arg) {
     VEC3 b;
     VEC3 rel;
     VEC3 probe;
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     _ENEMY_WORK* target = fn_80131034(self, 23, 0);
     if (target == 0) {
         return 0;
@@ -445,11 +445,11 @@ u32 fn_80182430(_ENEMY_WORK* self, u32 arg) {
     if ((arg & 0xFF) == 0) {
         return 1;
     }
-    fn_80041E8C((f32*)&rel, lbl_80797B18, lbl_80797B18, lbl_80797D08 * get_em_chg_scale(self));
-    fn_80041E40(&b, &rel);
+    setVec3((f32*)&rel, lbl_80797B18, lbl_80797B18, lbl_80797D08 * get_em_chg_scale(self));
+    copyVec3(&b, &rel);
     rotVecY(&b, self->field_0x1C0);
     fn_80051378(&probe, &self->pos, &b);
-    fn_80041E40(&a, &probe);
+    copyVec3(&a, &probe);
     f32 dist = calcDistanceSqXZ(&a, &target->pos);
     f32 range = lbl_80797BE4 * get_em_chg_scale(self);
     if (dist >= range * (lbl_80797BE4 * get_em_chg_scale(self))) {
@@ -632,9 +632,9 @@ void fn_80182978(_ENEMY_WORK* self) {
  * ------------------------------------------------------------------------------------------------ */
 void fn_80182AB8(struct EmWorkItem* out, u32 a, s16 b, s16 c) {
     VEC3 vec;
-    fn_80041E8C((f32*)&vec, lbl_80797B18, lbl_80797E7C, lbl_80797B64);
+    setVec3((f32*)&vec, lbl_80797B18, lbl_80797E7C, lbl_80797B64);
     out->type_0x00 = 0x1A;
-    fn_80041E40(&out->vec_0x04, &vec);
+    copyVec3(&out->vec_0x04, &vec);
     out->field_0x10 = (u8)a;
     out->field_0x12 = b;
     out->field_0x14 = c;
@@ -662,14 +662,14 @@ void fn_80182B94(void) {
     VEC3 b;
     VEC3 c;
     VEC3 d;
-    fn_80041E8C((f32*)&a, lbl_80797B18, lbl_80797B18, lbl_80797E80);
-    fn_80041E40(&lbl_806A79D0[0], &a);
-    fn_80041E8C((f32*)&b, lbl_80797B18, lbl_80797B18, lbl_80797B18);
-    fn_80041E40(&lbl_806A79D0[3], &b);
-    fn_80041E8C((f32*)&c, lbl_80797C34, lbl_80797B18, lbl_80797B18);
-    fn_80041E40(&lbl_806A79D0[6], &c);
-    fn_80041E8C((f32*)&d, lbl_80797B18, lbl_80797B18, lbl_80797B18);
-    fn_80041E40(&lbl_806A79D0[9], &d);
+    setVec3((f32*)&a, lbl_80797B18, lbl_80797B18, lbl_80797E80);
+    copyVec3(&lbl_806A79D0[0], &a);
+    setVec3((f32*)&b, lbl_80797B18, lbl_80797B18, lbl_80797B18);
+    copyVec3(&lbl_806A79D0[3], &b);
+    setVec3((f32*)&c, lbl_80797C34, lbl_80797B18, lbl_80797B18);
+    copyVec3(&lbl_806A79D0[6], &c);
+    setVec3((f32*)&d, lbl_80797B18, lbl_80797B18, lbl_80797B18);
+    copyVec3(&lbl_806A79D0[9], &d);
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -679,7 +679,7 @@ void fn_80182B94(void) {
 void fn_80182C40(_ENEMY_WORK* self, u32 kind, void* out) {
     VEC3 v;
     VEC3 rel;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     v.x = lbl_80797E88;
     v.y = lbl_80797E88;
     v.z = lbl_80797E8C;
@@ -708,7 +708,7 @@ void fn_80182C40(_ENEMY_WORK* self, u32 kind, void* out) {
     }
     rotVecY(&v, (u16)(self->field_0x1C0 + offset));
     fn_80051378(&rel, &self->pos, &v);
-    fn_80041E40(out, &rel);
+    copyVec3(out, &rel);
 }
 
 /* ------------------------------------------------------------------------------------------------

@@ -32,7 +32,8 @@ f32 fn_800AB658(void* self, f32 v);
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 void fn_801173AC(void* self);
-void fn_80043EA8(Vec3* out);
+/* `VEC3_ctor` (0x80043EA8) is `src/mh3_pad.cpp`'s and is declared in `include/mh3_pad.h`, which the
+ * consumers of this band include (docs/plan.md 6.5 rule 2: a band header declares no owned symbol). */
 
 /* 0x800CFA90 / 0x800CFAD0 - the move-work record table and its record count.  No registered unit
  * owns the run (it sits between `ef/eft001.cpp` and `ef/eft002.cpp`), so this band header is their

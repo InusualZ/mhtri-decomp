@@ -241,7 +241,7 @@ extern "C" void fn_8025953C(_PLW* self, s32 a2)
 {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -277,7 +277,7 @@ extern "C" void fn_80259684(_PLW* self, s32 a2)
 {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;

@@ -77,7 +77,7 @@
 
 #include "types.h"
 #include "fn_8004CAD8.h"    /* the VEC3 helpers this range owns (rule 2) */
-#include "mh3_pad.h"        /* fn_80043EA8 - owner src/mh3_pad.cpp (rule 2) */
+#include "mh3_pad.h"        /* VEC3_ctor - owner src/mh3_pad.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h" /* fn_800610AC - owner src/g3d/g3d_anmchr.cpp (rule 2) */
 
 /* `Panic(const char* pFile, int line, const char* pFmt, ...)`; the map's name is the C++ mangling
@@ -274,9 +274,9 @@ extern "C" void fn_8009B650(const f32* src, f32* mtx) {
 
     NW4R_POINTER_ASSERT(mtx, 0x1F6, lbl_80591A24);
 
-    fn_80043EA8(v20);
-    fn_80043EA8(v14);
-    fn_80043EA8(v8);
+    VEC3_ctor(v20);
+    VEC3_ctor(v14);
+    VEC3_ctor(v8);
 
     fn_8009BA78(src, 0, v20);
     if (fn_8009C484(v20, v20) == 0)
@@ -457,10 +457,10 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
 
     NW4R_POINTER_ASSERT(scale, 0x266, lbl_80591AC8);
 
-    fn_80043EA8(v8);
-    fn_80043EA8(v14);
-    fn_80043EA8(v20);
-    fn_80043EA8(v2c);
+    VEC3_ctor(v8);
+    VEC3_ctor(v14);
+    VEC3_ctor(v20);
+    VEC3_ctor(v2c);
 
     fn_8009BA78(mtx, 0, v2c);
     len = fn_80050EDC(v2c);
@@ -628,7 +628,7 @@ extern "C" void fn_8009CC20(f32* dst, const f32* scale, const f32* mtx) {
 extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
     f32 inv[3];
 
-    fn_80043EA8(inv);
+    VEC3_ctor(inv);
     if (lbl_80795F7C != scale[0])
         inv[0] = fn_800610AC(scale[0]);
     else

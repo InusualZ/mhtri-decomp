@@ -97,6 +97,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "gx.h"
 #include "sound/mhchar.h"
@@ -132,10 +133,10 @@ extern "C" void fn_802B2AA0(StageBlendRec* rec, void* obj, u8 store)
     u16 delta;
     f32 t;
 
-    fn_80043EA8(&poly);
+    VEC3_ctor(&poly);
     base = fn_802BDF5C();
     fn_80050CA0(&world, &get_camera_pos(), obj);
-    fn_80041E40(&poly, &world);
+    copyVec3(&poly, &world);
     calcVecAngXY(&poly, &ang_x, &ang_y);
 
     delta = (u16)(ang_y - base);
@@ -245,7 +246,7 @@ extern "C" void fn_802B2F60(StageRuntime* st, u8 kind)
     changed = 0;
     found = 0;
     chr = (MHchar*)st->area_char[kind];
-    fn_80043EA8(&poly);
+    VEC3_ctor(&poly);
 
     if (kind == 1) {
         if (lbl_805CF644[st->mapno] != NULL) {
@@ -276,7 +277,7 @@ extern "C" void fn_802B2F60(StageRuntime* st, u8 kind)
         return;
     }
     if (group == 1U && kind == 0) {
-        fn_80041E40(&poly, &get_camera_pos());
+        copyVec3(&poly, &get_camera_pos());
         group = my_player_no();
         if (fn_802B0688(&poly) == 1U) {
             keep = list->show;
@@ -901,7 +902,7 @@ extern "C" void fn_802B414C(StageRuntime* st)
     f32 limit;
     s32 i;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (st->mapno != 0xA || st->areano != 1) {
         return;
     }
@@ -935,7 +936,7 @@ extern "C" void fn_802B428C(StageRuntime* st)
     u8 mapno;
     u8 areano;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     fn_802B414C(st);
     mapno = st->mapno;
     if (mapno != 5 && mapno != 0x10) {
@@ -975,7 +976,7 @@ extern "C" void fn_802B43A8(MHchar* chr, u8 kind, u16 flags)
     u8 index;
     u8 mapno;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     strip = NULL;
     mapno = get_now_mapno();
     if ((mapno == 4 || mapno == 0xF) && kind == 5) {
@@ -1160,7 +1161,7 @@ extern "C" void fn_802B493C(StageRuntime* st)
     s32 sound;
     s32 target;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     list = NULL;
     sound = 0;
     target = 0;
@@ -1225,7 +1226,7 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
     s32 now;
     s32 base;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     entry = NULL;
     mapno = get_now_mapno();
     if (mapno != 5 && mapno != 0x10 && mapno != 0xA) {
@@ -1437,9 +1438,9 @@ extern "C" void fn_802B4E58(void)
 extern "C" void fn_802B535C(void)
 {
     fn_802B53CC((u32)stage_w);
-    fn_80041E8C((f32*)lbl_806BB7B8, lbl_8079A448, lbl_8079A448, lbl_8079A448);
-    fn_80041E8C((f32*)lbl_806BB7C4, lbl_8079A4C8, lbl_8079A4CC, lbl_8079A4D0);
-    fn_80041E8C((f32*)lbl_806BB7D0, lbl_8079A448, lbl_8079A448, lbl_8079A448);
+    setVec3((f32*)lbl_806BB7B8, lbl_8079A448, lbl_8079A448, lbl_8079A448);
+    setVec3((f32*)lbl_806BB7C4, lbl_8079A4C8, lbl_8079A4CC, lbl_8079A4D0);
+    setVec3((f32*)lbl_806BB7D0, lbl_8079A448, lbl_8079A448, lbl_8079A448);
 }
 
 /* Runs the stage block's cleanup over every sub-block array it owns. */
@@ -1453,14 +1454,14 @@ extern "C" u32 fn_802B53CC(u32 base)
         p += 0x5D0;
     } while (p < base + 0xBC4);
     p = base + 0xC08;
-    fn_80043EA8((Vec3*)p);
+    VEC3_ctor((Vec3*)p);
     p = base + 0xC20;
     do {
         fn_802B5538(p);
         p += 0x1DC;
     } while (p < base + 0x2804);
     p = base + 0x2808;
-    fn_80043EA8((Vec3*)p);
+    VEC3_ctor((Vec3*)p);
     p = base + 0x2C2C;
     do {
         fn_802B54C4(p);
@@ -1493,12 +1494,12 @@ extern "C" u32 fn_802B54C4(u32 block)
 
     p = block + 4;
     do {
-        fn_80043EA8((Vec3*)p);
+        VEC3_ctor((Vec3*)p);
         p += 0xC;
     } while (p < block + 0x28);
     p = block + 0x4C;
     do {
-        fn_80043EA8((Vec3*)p);
+        VEC3_ctor((Vec3*)p);
         p += 0xC;
     } while (p < block + 0x70);
     return block;
@@ -1524,7 +1525,7 @@ extern "C" u32 fn_802B5590(u32 slot)
 
     p = slot + 0xC;
     do {
-        fn_80043EA8((Vec3*)p);
+        VEC3_ctor((Vec3*)p);
         p += 0xC;
     } while (p < slot + 0x30);
     return slot;
@@ -1589,7 +1590,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
     u32 move;
     u8 kind;
 
-    fn_80043EA8(&poly);
+    VEC3_ctor(&poly);
     move = (s32)get_move_work_adrs(2);
     area->field_0x494 = (u32)move + my_player_no() * 0xB20;
     fn_802B7034(area);
@@ -1621,7 +1622,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
     fn_802BE1EC(area);
     fn_802BDDB0(&pos);
     fn_80050CA0(&world, &get_camera_pos(), &pos);
-    fn_80041E40(&poly, &world);
+    copyVec3(&poly, &world);
     if (fn_80047058() != 0) {
         setVector3(&poly, lbl_8079A4D8, lbl_8079A4DC, lbl_8079A4E0);
     }
@@ -1660,8 +1661,8 @@ extern "C" void fn_802B5980(StageAreaObj* area)
     nw4r::math::VEC3 cam;
     nw4r::math::VEC3 out;
 
-    fn_80043EA8(&poly);
-    fn_80041E40(&poly, &get_camera_pos());
+    VEC3_ctor(&poly);
+    copyVec3(&poly, &get_camera_pos());
     if (fn_80291BBC(&poly, get_now_areano(), (s32)&area->field_0x4F4, &out, 0xFFFF) == 0) {
         area->field_0x4F4 = 0;
     }
@@ -1674,7 +1675,7 @@ extern "C" void fn_802B59F8(StageAreaObj* area)
     nw4r::math::VEC3 world;
     u8 mode;
 
-    fn_80043EA8(&poly);
+    VEC3_ctor(&poly);
     setVector3(&area->seat_pos, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4E4);
     setVector3(&area->seat_pos2, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
     area->span = lbl_8079A4E8;
@@ -1682,7 +1683,7 @@ extern "C" void fn_802B59F8(StageAreaObj* area)
     fn_802B592C(0, 2);
     fn_802BE0F4(0, area, &area->seat_pos2, area->span, area->pitch);
     fn_80050CA0(&world, &area->seat_pos, &area->seat_pos2);
-    fn_80041E40(&poly, &world);
+    copyVec3(&poly, &world);
     calcVecAngXY(&poly, &area->ang_x, &area->ang_y);
     area->field_0x06C = area->ang_x;
     area->field_0x070 = area->ang_y;

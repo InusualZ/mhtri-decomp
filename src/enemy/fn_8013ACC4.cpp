@@ -56,7 +56,7 @@
  *     what is applied;
  *   * the `switch (work->field_0x95C)` range probe: retail `subi r0,r3,3 / cmplwi r0,2 / ble`, ours the
  *     two-sided `cmpwi r0,3 / blt / cmpwi r0,5 / ble` chain (same cases 3,4,5);
- *   * the head's schedule: `bl fn_80043EA8` runs one slot earlier in retail than here.
+ *   * the head's schedule: `bl VEC3_ctor` runs one slot earlier in retail than here.
  *
  * Source shapes worth keeping (each measured):
  *   * a `switch` beats `if/else if` for the inner `case 10` sub-command (retail's compare chain is
@@ -76,6 +76,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/fn_8013ACC4.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* One scoped pragma, measured on this unit's own command line: with the -O3 peephole MWCC fuses the
  * interpreter's record index into `clrlslwi` (0x8013AE34's `clrlwi`+`slwi` pair) and folds the
@@ -131,7 +132,7 @@ struct EmRunRec {
  * size: 0xB18 */
 struct EmWork {
     /* +0x0000 */ u8 unused_0x0000[0x036C];
-    /* +0x036C */ nw4r::math::VEC3 vec_0x36C;  /* the position `fn_80041E40` snapshots with the state */
+    /* +0x036C */ nw4r::math::VEC3 vec_0x36C;  /* the position `copyVec3` snapshots with the state */
     /* +0x0378 */ u8 unused_0x0378[0x0380 - 0x0378];
     /* +0x0380 */ u8 field_0x380;  /* the state snapshot's first byte (`fn_8013A0xx` writes it) */
     /* +0x0381 */ u8 field_0x381;  /* the state snapshot's second byte */
@@ -339,8 +340,6 @@ u8 fn_80140768(u8* in);
 s16 fn_80140778(u8* in, u8 code, u8 mode);
 
 /* the shared layers */
-void fn_80041E40(void* dst, const void* src);
-void fn_80043EA8(void* out);
 u32 fn_802AB994(u8 a, u8 b);
 u32 fn_802ABBA8(u32 id, EmWork* self);
 
@@ -394,7 +393,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
     u8 len;
     u32 i = 0;
 
-    fn_80043EA8(&save);
+    VEC3_ctor(&save);
 
     if (self->stream_0x958 == NULL) {
         return 0;
@@ -418,7 +417,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
         save384 = self->field_0x384;
         save424 = self->field_0x424;
 
-        fn_80041E40(&save.vec_0x00, &self->vec_0x36C);
+        copyVec3(&save.vec_0x00, &self->vec_0x36C);
 
         switch (self->field_0x95C) {
         case 3:

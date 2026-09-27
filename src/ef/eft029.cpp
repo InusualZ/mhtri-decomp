@@ -59,6 +59,7 @@
 #include "ef.h"
 #include "ef/eft001.h"
 #include "unsplit/unknown.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The unit's own pooled tables (never emitted here). */
 extern "C" {
@@ -70,7 +71,6 @@ u16 lbl_805A0710[]; /* its parameter pair,      .data 0x805A0710 */
  * `fn_800DD1F0` / `fn_8021F238` (neither address has a registered owner that publishes a header, so
  * both stay declared here - rule 2's named gap). */
 extern "C" {
-void fn_8005050C(nw4r::math::MTX34* m);
 void fn_800DD1F0(u32 id, nw4r::math::VEC3* pos);
 u32 fn_8021F238();
 void fn_8011AD00(_EFT* self);
@@ -109,7 +109,7 @@ extern "C" void fn_80119DEC(_EFT* self)
     u16 param;
     s32 i;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     work = (_EFT029_WORK*)self->work_0x38;
     if (--self->timer_0x0C >= 0) {
         return;

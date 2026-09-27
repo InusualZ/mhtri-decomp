@@ -204,6 +204,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "ef.h"
 #include "fn_8004CAD8.h"
@@ -345,7 +346,7 @@ extern "C" void em_eff_offset_set(_EM_CHARA_WORK* self)
     nw4r::math::VEC3 offset;
     _CP_VECTOR out;
 
-    fn_80043EA8(&offset);
+    VEC3_ctor(&offset);
     offset.x = lbl_8079B108;
     offset.y = lbl_8079B108;
     offset.z = lbl_8079B110;
@@ -405,17 +406,17 @@ extern "C" u32 em_act_face_away(_EM_CHARA_WORK* self, _PLW* pl)
         return 0;
     }
 
-    fn_80043EA8(&dir);
-    fn_80041E8C((Vec*)&seed, lbl_8079B108, lbl_8079B108, lbl_8079B110);
-    fn_80041E40(offset, &seed);
+    VEC3_ctor(&dir);
+    setVec3((Vec*)&seed, lbl_8079B108, lbl_8079B108, lbl_8079B110);
+    copyVec3(offset, &seed);
 
     fn_80050CA0(&target, &self->pos, &pl->vec_0x03C);
-    fn_80041E40(&dir, &target);
+    copyVec3(&dir, &target);
     calcVecAngXY(&dir, &ang_a, &ang_b);
     rotVecY(offset, (u16)(ang_a - pl->field_0x058));
 
     fn_80050CA0(&target, &pl->vec_0x03C, &self->pos);
-    fn_80041E40(&dir, &target);
+    copyVec3(&dir, &target);
     calcVecAngXY(&dir, &ang_a, &ang_b);
     self->rot_y = ang_a - pl->field_0x058;
     self->handle_0x328.field_0x0C = 3;

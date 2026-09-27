@@ -84,6 +84,8 @@
 #include "enemy/fn_80147CE0.h" /* EmSpawnRec + fn_80147E2C (the owner's header) */
 #include "enemy/fn_801502C8.h" /* this unit's own declarations (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -155,10 +157,6 @@ void fn_80106694(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void fn_8010D2B0(void* pos, u8 a, u8 b, s32 c, f32 d);
 
 /* the runtime helpers the range reaches. */
-void fn_80041E40(void* dst, const void* src);
-void* fn_80041E8C(void* out, f32 a, f32 b, f32 c);
-void fn_80043EA8(void* out);
-void fn_8005050C(void* out);
 f32 fn_80050EF4(const void* a, const void* b);
 void fn_80051378(void* out, const void* a, const void* b);
 void fn_80051490(void* dst, s32 src);
@@ -411,7 +409,7 @@ void fn_80150728(struct _ENEMY_WORK* self) {
  * a motion end and arms the next effect/motion pair. */
 void fn_801507CC(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state = self->state + 1;
@@ -661,7 +659,7 @@ void fn_8015111C(struct _ENEMY_WORK* self) {
     u16 motion;
     u32 kind;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (fn_8012EC60(self) == 1) {
         angle = calcVecAngX(&self->vec_0x76C);
         if ((u16)(angle + 0x8000) > 0x671B) {
@@ -690,7 +688,7 @@ void fn_8015111C(struct _ENEMY_WORK* self) {
 void fn_80151274(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (self->field_0x354 == 0) {
         setVector3(&pos, lbl_80796E1C, lbl_80796E1C, lbl_80796F88);
         fn_801369A0(self, arg1, 1, &pos, lbl_80796E20);
@@ -703,8 +701,8 @@ void fn_801512E8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, s32 arg3, s32 arg4,
     char buf_0x18[0x18];
     nw4r::math::VEC3 pos;
 
-    fn_8005050C(buf_0x18);
-    fn_80043EA8(&pos);
+    MTX34_ctor(buf_0x18);
+    VEC3_ctor(&pos);
     switch (arg1) {
     case 0:
         fn_801048B4(self, arg3, arg2, arg4, farg0);
@@ -729,7 +727,7 @@ void fn_801512E8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, s32 arg3, s32 arg4,
 void fn_801513FC(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if ((system_w.field_0x0c & 3) == 0) {
         fn_801512E8(self, 2, 1, 0, 0, lbl_80796E20);
         if ((system_w.field_0x0c & 4) != 0) {
@@ -849,9 +847,9 @@ s32 fn_801542D0(struct _ENEMY_WORK* self, u16 arg1) {
 void fn_801545B8(EmSpawnRec* rec, u8 arg1, s16 arg2, s16 arg3) {
     nw4r::math::VEC3 pos;
 
-    fn_80041E8C(&pos, lbl_80796E1C, lbl_80797098, lbl_80796E3C);
+    setVec3(&pos, lbl_80796E1C, lbl_80797098, lbl_80796E3C);
     rec->id = 0x1A;
-    fn_80041E40(&rec->pos, &pos);
+    copyVec3(&rec->pos, &pos);
     rec->field_0x10 = arg1;
     rec->field_0x12 = arg2;
     rec->field_0x14 = arg3;
@@ -870,8 +868,8 @@ s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1) {
     f32 dist;
     f32 limit;
 
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     target = fn_80131034(self, 0x1B, 0);
     if (target == 0) {
         return 0;
@@ -882,10 +880,10 @@ s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1) {
     if (arg1 == 0) {
         return 1;
     }
-    fn_80041E40(&b, fn_80041E8C(&v, lbl_80796E1C, lbl_80796E1C, lbl_80797074 * get_em_chg_scale(self)));
+    copyVec3(&b, setVec3(&v, lbl_80796E1C, lbl_80796E1C, lbl_80797074 * get_em_chg_scale(self)));
     rotVecY(&b, self->field_0x1C0);
     fn_80051378(&w, &self->pos, &b);
-    fn_80041E40(&a, &w);
+    copyVec3(&a, &w);
     dist = calcDistanceSqXZ(&a, &target->pos);
     limit = lbl_8079709C * get_em_chg_scale(self);
     if (dist < (lbl_8079709C * get_em_chg_scale(self)) * limit) {
@@ -1039,9 +1037,9 @@ void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     f32 scale;
     u16 base;
 
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
-    fn_80041E40(&a, &self->vec_0x36C);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
+    copyVec3(&a, &self->vec_0x36C);
     angle = (u16)calcVecAng2(&self->pos, &a);
     *angleOut = angle;
     delta = (u16)(angle - self->field_0x1C0);
@@ -1050,7 +1048,7 @@ void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
         setVector3(&b, lbl_80796E1C, lbl_80796E1C, fn_80050EF4(&a, &self->pos) - scale);
         rotVecY(&b, *angleOut);
         fn_80051378(&v, &self->pos, &b);
-        fn_80041E40(out, &v);
+        copyVec3(out, &v);
         return;
     }
     base = 0xC000;
@@ -1061,7 +1059,7 @@ void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     setVector3(&b, lbl_80796E1C, lbl_80796E1C, -scale);
     rotVecY(&b, *angleOut);
     fn_80051378(&w, &a, &b);
-    fn_80041E40(out, &w);
+    copyVec3(out, &w);
 }
 
 /* 0x80154C74 (0x30) - the team/area sound selector. */
@@ -1105,12 +1103,12 @@ void fn_80154D44(void) {
     nw4r::math::VEC3 e;
     nw4r::math::VEC3 f;
 
-    fn_80051490(lbl_806A77D8, (s32)fn_80041E8C(&a, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
-    fn_80051490(lbl_806A77D8 + 0xC, (s32)fn_80041E8C(&b, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
-    fn_80051490(lbl_806A77F0, (s32)fn_80041E8C(&c, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
-    fn_80051490(lbl_806A77F0 + 0xC, (s32)fn_80041E8C(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
-    fn_80051490(lbl_806A7808, (s32)fn_80041E8C(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
-    fn_80051490(lbl_806A7808 + 0xC, (s32)fn_80041E8C(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
+    fn_80051490(lbl_806A77D8, (s32)setVec3(&a, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
+    fn_80051490(lbl_806A77D8 + 0xC, (s32)setVec3(&b, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
+    fn_80051490(lbl_806A77F0, (s32)setVec3(&c, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
+    fn_80051490(lbl_806A77F0 + 0xC, (s32)setVec3(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
+    fn_80051490(lbl_806A7808, (s32)setVec3(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
+    fn_80051490(lbl_806A7808 + 0xC, (s32)setVec3(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
 }
 
 /* 0x80154E40 (0x50) - reset the effect slot set. */
@@ -1132,7 +1130,7 @@ void fn_80154E90(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 pos;
     s32 helper;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (arg1 != 0) {
         fn_8012FCC4(self, 0, lbl_807970C0);
         fn_8012FCC4(self, 0xA, lbl_807970C4);

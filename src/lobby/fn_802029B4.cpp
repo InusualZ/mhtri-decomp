@@ -7,8 +7,8 @@
  * `lobby/lb_npc.cpp` helper set (`fn_801FDFE4` = set motion + build the MHchar, `fn_801FDEE4`/
  * `fn_801FDF70` = play the motion over the model's own frame, `fn_801FE13C` = restart the motion the
  * NPC's motion table entry names) and waiting on `fn_801FDFD0` (the lobby's field_0x000 flag).  The
- * band also carries the NPC's own steering/position code (the `nw4r` math and `fn_80043EA8`/
- * `fn_80041E40` vector work) and three 0x14-stride switch tables in `.data`.
+ * band also carries the NPC's own steering/position code (the `nw4r` math and `VEC3_ctor`/
+ * `copyVec3` vector work) and three 0x14-stride switch tables in `.data`.
  *
  * Module and name (brief section 2, in evidence order).
  *   1. No `__FILE__` string covers the range: the only bare source name in the image's `.data` is
@@ -87,6 +87,7 @@
 
 #include "lobby/lb_npc.h"
 #include "unsplit/lobby.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * Declarations.  The lobby band's helper set is defined in `lobby/lb_npc.cpp`; its header publishes the
@@ -95,8 +96,6 @@
  * mangling are C linkage; the mangled callees are declared at C++ scope (rule 9).
  */
 extern "C" {
-void fn_80041E40(VEC3* dst, const VEC3* src);
-void fn_80043EA8(VEC3* out);
 f32 fn_80050EF4(VEC3* a, VEC3* b);
 void fn_80051378(VEC3* out, const VEC3* a, const VEC3* b);
 void fn_801FDD9C(_LB_NPC* self, f32 duration);
@@ -166,7 +165,7 @@ extern "C" {
 __declspec(noinline) void fn_802029B4(_LB_NPC* self)
 {
     VEC3 unused;
-    fn_80043EA8(&unused);
+    VEC3_ctor(&unused);
 
     switch (self->field_0x006) {
     case 0:
@@ -264,7 +263,7 @@ __declspec(noinline) void fn_80202C24(_LB_NPC* self)
 __declspec(noinline) void fn_80202D24(_LB_NPC* self)
 {
     VEC3 unused;
-    fn_80043EA8(&unused);
+    VEC3_ctor(&unused);
 
     switch (self->field_0x006) {
     case 0:
@@ -304,7 +303,7 @@ __declspec(noinline) void fn_80202DD0(_LB_NPC* self)
 __declspec(noinline) void fn_80202E6C(_LB_NPC* self)
 {
     VEC3 unused;
-    fn_80043EA8(&unused);
+    VEC3_ctor(&unused);
 
     switch (self->field_0x006) {
     case 0:
@@ -327,7 +326,7 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
     VEC3 offset;
     VEC3 delta;
 
-    fn_80043EA8(&offset);
+    VEC3_ctor(&offset);
     self->field_0x22D = 1;
     self->field_0x22C = 1;
 
@@ -361,7 +360,7 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
             setVector3(&offset, lbl_807999A0, lbl_807999A0, lbl_807999CC);
             rotVecY(&offset, calcVecAng2(&self->field_0x214->vec_0x3C, &self->pos_0x10));
             fn_80051378(&delta, &self->field_0x214->vec_0x3C, &offset);
-            fn_80041E40(&self->target_0x1EC, &delta);
+            copyVec3(&self->target_0x1EC, &delta);
             fn_801FDD9C(self, lbl_807999D0);
             fn_801FE13C(self, 44);
         } else if (fn_801FDFD0(self) == 1) {
@@ -1234,7 +1233,7 @@ void fn_80205424(_LB_NPC* self)
 {
     VEC3 offset;
 
-    fn_80043EA8(&offset);
+    VEC3_ctor(&offset);
 
     switch (self->field_0x006) {
     case 0:
@@ -1938,7 +1937,7 @@ void fn_80205764(_LB_NPC* self)
     f32 dist;
 
     work = (LbNpcMoveWorkEntry*)get_move_work_adrs(2);
-    fn_80041E40(&self->target_0x1EC, &work[(s8)my_player_no()].vec_0x3C);
+    copyVec3(&self->target_0x1EC, &work[(s8)my_player_no()].vec_0x3C);
     self->field_0x22C = 1;
     self->field_0x22D = 1;
 

@@ -58,6 +58,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math type the mangled callees take
@@ -122,8 +123,7 @@ struct _EFT_WORK {
  * externs - the plain-named callees and the shared pool
  * ------------------------------------------------------------------------------------------------- */
 
-extern void fn_80043EA8(VEC3* v);      /* a `blr` stub in the DOL: the VEC3 ctor */
-extern void* fn_80041E40(VEC3* dst, const VEC3* src);
+      /* a `blr` stub in the DOL: the VEC3 ctor */
 extern void* fn_80073F68(VEC3* dst, const VEC3* src);
 extern void fn_800F93D8(void* self, void* effects, u32 mode, s32 count, u32 arg);
 extern void fn_800F886C(void* self);
@@ -159,7 +159,7 @@ void fn_800FD718(struct _EFT* self)
     VEC3 v;
 
     work = self->work_0x38;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
 
     if (self->type_0x02 == 1) {
         source = (struct _SHELL_W*)self->source_0x30;
@@ -173,7 +173,7 @@ void fn_800FD718(struct _EFT* self)
         if (self->area_0x44 != (u8)get_now_areano__Fv()) {
             return;
         }
-        fn_80041E40(&self->pos_0x18, &source->pos_0x18);
+        copyVec3(&self->pos_0x18, &source->pos_0x18);
         setVector3__FPQ34nw4r4math4VEC3fff(&v, lbl_80796688, lbl_8079668C, lbl_80796688);
         rotVecX__FPQ34nw4r4math4VEC3Ul(&v, source->rot_x_0x24);
         rotVecZ__FPQ34nw4r4math4VEC3Ul(&v, source->rot_z_0x2C);

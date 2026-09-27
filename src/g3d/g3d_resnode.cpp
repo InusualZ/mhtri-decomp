@@ -65,6 +65,7 @@
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_resnode.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */
@@ -97,8 +98,8 @@ extern const f32 lbl_80795F4C;          /* 0.0f                                 
  * lift them into the owners' headers.  These are `fn_XXXXXXXX` stems, not manglings, so rule 9 does
  * not reach them. */
 extern "C" {
-void fn_80041E40(VEC3* pDst, const VEC3* pSrc);              /* owner: src/mh3_pad.cpp */
-void fn_80041E8C(VEC3* pOut, f32 x, f32 y, f32 z);           /* owner: src/mh3_pad.cpp */
+              /* owner: src/mh3_pad.cpp */
+           /* owner: src/mh3_pad.cpp */
 void fn_800504D4(MTX34* pMtx);                               /* owner: src/fn_8004CAD8.cpp */
 s32 fn_8005AAEC(const ResHandle* pSelf);                     /* owner: src/g3d/fn_8005AA28.cpp */
 void* fn_8005AAE4(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
@@ -147,13 +148,13 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
                 if ((dataFlags & 0x10) != 0) {
                     newFlags = flags | 0x10;
                 }
-                fn_80041E40((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
+                copyVec3((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
                 flags = newFlags & ~0xA;
             }
         }
         if ((flags & 0x100) != 0) {
             VEC3 translate;
-            fn_80041E8C(&translate, pResult->mtx[3], pResult->mtx[7], pResult->mtx[11]);
+            setVec3(&translate, pResult->mtx[3], pResult->mtx[7], pResult->mtx[11]);
             if ((pData->mFlags & 0x4) != 0) {
                 fn_800504D4((MTX34*)pResult->mtx);
                 flags |= 0x20;
@@ -210,14 +211,14 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
             if ((dataFlags & 0x10) != 0) {
                 flags |= 0x10;
             }
-            fn_80041E40((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
+            copyVec3((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
         }
         if ((pData->mFlags & 0x4) != 0) {
             fn_800504D4((MTX34*)pResult->mtx);
             flags |= 0x20;
         } else {
             VEC3 rotate;
-            fn_80041E40((VEC3*)pResult->rotate, fn_80067E54(&rotate, (const VEC3*)pData->mRotate));
+            copyVec3((VEC3*)pResult->rotate, fn_80067E54(&rotate, (const VEC3*)pData->mRotate));
             fn_8008C484(pResult->mtx, pData->mRotate[0], pData->mRotate[1], pData->mRotate[2]);
         }
         if ((pData->mFlags & 0x2) != 0) {
