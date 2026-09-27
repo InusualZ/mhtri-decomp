@@ -59,7 +59,15 @@ worth naming in your report rather than dropping silently).
   total with an MWCC `sizeof` probe, and **prove the probe can fail** by feeding it a wrong size - a probe
   that always passes is not evidence.
 * **M5 - keep every pre-existing field name** as a `union` member so no other unit breaks; a rename is a
-  separate change, not something a merge smuggles in.
+  separate change, not something a merge smuggles in - **except while you are solving a conflict** (owner,
+  2026-09-26): when the merge brings the batch to symbols the map spells as generated stems, the merger may
+  rename, and must then finish the rename's other half (the map **and** every source/header that spells the
+  name) inside the merge commit. This is what lets a merge lane land a unit whose registration still rests on
+  the map's `fn_XXXXXXXX` names - the gate refuses a written unit behind a `rule 7 deferred` escape
+  (`land.py`'s `rule7_defer_growth`), and a merge lane is often the only one that can fix it. Derive each name
+  from the symbol's own body, mark a thin guess in the unit header, rename the file too when its stem is
+  generated, and leave references to **other** units' unrenamed symbols alone. Worked pattern and the three
+  branches this unblocked: `.pi/notes/naming-backlog.md`.
 * **M6 - a declaration clash is a rule-2 problem** (`(10505)` / `(10197) illegal function overloading`): the
   symbol belongs in its **owner's** header. `main` is the authority for every symbol another unit already owns -
   delete your copy and include the owner's header. The same for `include/unsplit/*.h`: it is a fallback band, and
