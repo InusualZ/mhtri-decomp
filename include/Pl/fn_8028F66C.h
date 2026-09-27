@@ -66,4 +66,9 @@ s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* o
 }
 #endif
 
+
+/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
+ * had not declared it yet). */
+u32 fn_802907BC(void* a, void* b);
+
 #endif /* MHTRI_PL_FN_8028F66C_H */

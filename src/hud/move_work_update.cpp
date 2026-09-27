@@ -118,7 +118,7 @@ u32 game_ready_ck(void);                          /* 0x800D0708 - `system_w +0x7
 u8 hud_key_lookup(const void* key);                /* 0x8033A0BC - memcmps 6 bytes over the 10x0x130 table, 0xFF = absent */
 s16 draw_lsp_element(void* work, u8 index, u8 kind, u16 id); /* 0x802E00A4 - draws the element's sprites/text, returns its -0x12 y offset */
 void move_work_draw(void* work, const void* pos, u32 draw); /* 0x80324304 - projects the position and draws the move-work element */
-u32 map22_camera_ck(void);                        /* 0x803253BC - 0 only in map 0x16/area 2 with the camera >= 1300.0f away */
+u32 em_tut_cam_ck(void);                        /* 0x803253BC - owned by enemy/em_action; 0 only in map 0x16/area 2 with the camera >= 1300.0f away */
 void lb_npc_move_work_draw(_LB_NPC* npc);         /* 0x80324544 - a character joint's world position, projected and drawn */
 void hud_key_table_draw(void);                    /* 0x803248D4 - draws the 10 entries of the keyed table, via move_work_draw */
 void draw_lsp_anim_ary(void);                     /* 0x80324CC4 - the animated sprite runs (draw_sprite_anim_ary/draw_sprite) */
@@ -176,7 +176,7 @@ extern "C" void move_work_update(void)
         }
     }
 
-    if (map22_camera_ck() == 1) {
+    if (em_tut_cam_ck() == 1) {
         state = 1;
     }
 

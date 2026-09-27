@@ -1061,6 +1061,25 @@ config.libs = [
             # extab 0x80017574..0x800175DC (13 records), extabindex 0x80036E94..0x80036F30 (13 x 12 B),
             # `.text` 0x8035E034..0x8035F2B4.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/fn_8035E034.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `803253BC_fn_803253BC` (the map stem it was claimed under) - the 0x803253BC-0x8032C920
+            # band (85 functions / 30052 B) between the registered `hud/fn_80324F7C.c` above and the
+            # unclaimed 0x8032C920 run below.  Module `enemy` (brief class 3) from the code: the range
+            # drives the `_ENEMY_WORK` record through `em_frame_check`/`em_get_mot_no`/`em_die_ck`/
+            # `em_after_frame_check` and calls into the registered enemy units
+            # `enemy/enemy_control.cpp`, `enemy/fn_801251D0.cpp` and `enemy/fn_8012EC74.cpp`
+            # (fn_8012F5B8 x75, fn_80130478 x62, fn_801251D0 x60, fn_801303EC x51, fn_8012F93C x44,
+            # fn_801280F4 x42).  No `__FILE__` string covers the range and the runtime dump answers
+            # only `zz_<addr>_` for every address probed (`dumpmap.py join` reports no rename candidate
+            # anywhere in it), so the file name and the 14 symbols the file defines are **guesses from
+            # their bodies** on the module's `em_*` scheme - `em_action.cpp` / `em_act_*`; the file
+            # header lists each one with its reason.  The `rule 7 deferred` escape the file still
+            # carries covers only the 25 callee names it references in other units (42 occurrences),
+            # which a cross-unit rename batch owns, not this unit.  cflags_main, the lib flag group
+            # its enemy neighbours use.  Claims .text 0x803253BC-0x8032C920, extab
+            # 0x8001622C-0x80016464, extabindex 0x800351A8-0x800354FC and the one `.ctors` word
+            # 0x8056F39C -> fn_8032C65C.
+            Object(NonMatching, "enemy/em_action.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from proposal/80387844_fn_80387844.cpp:
             # the enemy monster-AI action band (`.text` 0x80387844..0x8038E8E8, 43 functions / 0x7084
             # bytes).  Module `enemy` from the code (every body drives the shared `_ENEMY_WORK` record

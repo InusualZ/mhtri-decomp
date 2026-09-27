@@ -133,6 +133,12 @@ void fn_800513F0(VEC3* v, f32 scale);
  * the draw-shape state, 0x80054178 takes the 2D vertex pair it rewrites. */
 void fn_80053960(u32, s32, s32, u32);
 void fn_80054178(s16* pos);
+/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
+ * had not declared it yet). */
+s32 fn_80050C40(void* a, void* b);
+void fn_8004FFC8(void* a, void* b, void* c, f32 d);
+void fn_800516F0(void* out);
+
 #ifdef __cplusplus
 }
 #endif

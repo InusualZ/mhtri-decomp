@@ -228,7 +228,15 @@ struct _ENEMY_WORK {
     /* +0x13C */ u32 field_0x13C;       /* the scene-model id `fn_8007F0CC` is handed */
     /* +0x140 */ u8 unused_0x140[0x188 - 0x140];
     /* +0x188 */ nw4r::math::VEC3 pos;
-    /* +0x194 */ u8 unused_0x194[0x1AC - 0x194];
+    /* +0x194..0x1AC is one 0x18-byte run; the two views are a union so the run keeps its size
+     * (a split without the second view's trailing pad would shrink the struct by 0x0C and
+     * shift every member above it). */
+    union {
+        /* +0x194 */ u8 unused_0x194[0x1AC - 0x194];
+        /* +0x194 */ nw4r::math::VEC3 vec_0x194;  /* the second target position the 0x803253BC band
+                                        * measures its aim angle against (`em_act_aim` passes it
+                                        * with `pos` to `fn_80050C40`; added by that unit) */
+    };
     /* +0x1AC */ f32 field_0x1AC;       /* the height `fn_8012F39C` compares against 0.9 * the model scale */
     /* +0x1B0 */ nw4r::math::VEC3 aim;   /* one position, two readers: the second position
                                          * `enemy/fn_801B0010.cpp`'s `fn_801B0810` copies the matching
@@ -414,6 +422,19 @@ struct _ENEMY_WORK {
             /* +0x334 */ s16 field_0x334;
             /* +0x336 */ u8 unused_0x336j[0x354 - 0x336];
         } timer_0x328;
+        /* the four `s16` action slots `enemy/em_action.cpp`'s `em_act_slots_clr` clears and its state
+         * machine reads back (`em_act_frame_ck` arms +0x32A/+0x32C, `fn_803257C4` counts +0x334 down and
+         * clamps +0x336).  A union member because the countdown view above already owns +0x32A
+         * (added by that unit). */
+        struct {
+            /* +0x328 */ u8 unused_0x328fn[0x32A - 0x328];
+            /* +0x32A */ s16 arm_0x32A;   /* the action's own halfword timer */
+            /* +0x32C */ s16 arm_0x32C;   /* the second one, armed by `em_act_frame_ck`'s case 6 */
+            /* +0x32E */ u8 unused_0x32E[0x334 - 0x32E];
+            /* +0x334 */ s16 count_0x334;   /* counted down by `fn_803257C4`, clamped at 0x5A */
+            /* +0x336 */ s16 limit_0x336;   /* clamped to the count above */
+            /* +0x338 */ u8 unused_0x338fn[0x354 - 0x338];
+        } band_0x328;
         /* the effect-seat view `enemy/fn_801B4458.cpp` keeps: the selected seat record index at
          * +0x328 (0xFF = none) and its armed flag at +0x329 (added by that unit). */
         struct {
