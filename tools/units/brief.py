@@ -608,6 +608,21 @@ def _teardown_lines(lines: list[str]) -> None:
     lines.append("not have. Teardown is the orchestrator's job. Leave your worktree where it is.")
 
 
+def _dump_asm_hint(lines: list[str]) -> None:
+    """The recon prerequisite both renderers were missing: `tudiscover` reads `build/RMHE08/asm/`.
+
+    The build does not write that directory (`config.yml` sets `write_asm: false`), so a lane's first
+    `python tools/splits/tudiscover.py at 0x...` reports **0 functions** and reads as a tool bug -
+    measured 2026-09-27: it cost a lane its first turn. `python tools/splits/dump_asm.py` is one
+    command and ~8 s (not the 200-400 s the older build docs quote), so the fix is named here.
+    """
+    lines.append("**Recon prerequisite - the asm dump.** `build/RMHE08/asm/` is not built by default "
+                 "(`write_asm: false`): run `python tools/splits/dump_asm.py` (~8 s) before any "
+                 "`python tools/splits/tudiscover.py at 0x...`. Without it `tudiscover` reports "
+                 "**0 functions** - that is the missing dump, not a bug in the tool.")
+    lines.append("")
+
+
 def _measure_lines(lines: list[str], unit: str) -> None:
     """Append the working measurement loop (§6) - shared by both renderers.
 
@@ -743,6 +758,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     if b.get("dossier"):
         lines.append(dossier_mod.render(b["dossier"]).rstrip())
         lines.append("")
+    _dump_asm_hint(lines)
     lines.append("## 3 · What is already known (the unit's own header, verbatim)")
     lines.append("")
     lines.append("```c")
@@ -1067,6 +1083,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     if p.get("seam_note"):
         lines.append("**WARNING from discovery:** %s" % p["seam_note"])
         lines.append("")
+    _dump_asm_hint(lines)
     lines.append("## 2 · Register it at its final home (do this first)")
     lines.append("")
     lines.append("A unit that is not in the build graph cannot be measured, so registration comes before the")
@@ -1601,6 +1618,8 @@ def selftest() -> int:
         check("the brief carries the order-only report.json trap",
               "order-only target of `all_source`" in brief_text
               and "rm -f build/RMHE08/report.json" in brief_text, True)
+        check("the brief says tudiscover needs the on-demand asm dump",
+              "python tools/splits/dump_asm.py" in brief_text and "0 functions" in brief_text, True)
         check("the brief carries the git add hygiene",
               "`git add -A` with no path arguments" in brief_text and "`git show --stat`" in brief_text, True)
         check("pool is idempotent", pool(tmp)["skipped"], ["auto/stub"])
@@ -1657,6 +1676,8 @@ def selftest() -> int:
               "`recompile.py --measure` or `measure.py`" in text and "tools/objdiff/symdiff.py" in text, True)
         check("the proposal brief carries the order-only report.json trap",
               "order-only target of `all_source`" in text and "rm -f build/RMHE08/report.json" in text, True)
+        check("the proposal brief says tudiscover needs the on-demand asm dump",
+              "python tools/splits/dump_asm.py" in text and "0 functions" in text, True)
         check("the proposal brief carries the git add hygiene",
               "`git add -A` with no path arguments" in text and "`git show --stat`" in text, True)
         check("a proposal brief still says where the report goes",
