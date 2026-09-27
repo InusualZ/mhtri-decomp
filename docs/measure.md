@@ -9,6 +9,7 @@ votes** (`docs/tooling-requests.md`, key `scratch-measurer`), quoting `build/tmp
 is that driver, shipped.
 
     python tools/units/measure.py <unit> [symbol] [--json] [--diff] [-q]
+                                       [--baseline FILE | --against-main] [--save FILE]
 
 It compiles the unit once with the **real** command line - the construction is `recompile.py`'s
 (`recompile.unit_tokens` -> MAIN's ninja, the worktree's ninja, then a same-lib sibling - plus
@@ -31,6 +32,51 @@ single `objdiff report generate` over a one-unit project, the official `fuzzy_ma
 
 `recompile.py --measure` stays the single-symbol proof; `measure.py` is for the round. `--json` makes it
 scriptable from a sweep.
+
+## Every row's before/after delta in one call
+
+A search iteration's real question is "which of these N symbols moved, and did any move down". `measure.py`
+answers it in the same one compile + one report, diffed against a report you name:
+
+* **`--against-main`** diffs each row against MAIN's `build/RMHE08/report.json` - the last landed build. Run
+  it from your worktree and every row shows what your edit is worth against `main`.
+* **`--baseline <file>`** diffs against a saved report: either a project `report.json` or a file a previous
+  run wrote with `--save`.
+* **`--save <file>`** writes this run's per-symbol scores in that shape, so you can snapshot a "before" and
+  diff a later "after" without waiting for a landing.
+
+A row that moved **down** is a regression, not a rounding difference: the summary counts them and the exit
+code is non-zero, so a sweep can gate on it.
+
+    $ python tools/units/measure.py Camellia/camellia --against-main
+    unit      Camellia/camellia.c
+    ...
+    baseline  .../build/RMHE08/report.json  (before = this saved report)
+    score     99.96134 fuzzy   (unit, official report metric)
+    functions 10 functions   9 == 100% (report matched_functions)   10 >= 80%   mean 99.98% of 10 scored
+    text      24420 B target   24420 B ours
+    moved     0 row(s) moved vs baseline: 0 up, 0 down
+
+        score      delta   target    ours   symbol
+           99.81%    +0.00    4860    4860   camellia_setup256
+          100.00%    +0.00     496     496   Camellia_DecryptBlock
+          ...
+
+## What it refuses - a number is never invented
+
+Two failures in this loop produced numbers that looked real and were not, and both are now refusals:
+
+* **A stale object.** The object is deleted before the compile and must reappear; before it is scored,
+  `recompile.object_is_fresh` also refuses any object older than its source. A compile that fails is
+  `FAILED: <unit>` with the compiler's error and **no table of scores** - never last build's number dressed
+  as this one's. (A hand-built scorer measured a stale object twice and reported two invented improvements.)
+* **The wrong tree.** The tools root at the invocation's `git rev-parse --show-toplevel`, not at the tree the
+  script file happens to live in. Running `<MAIN>/tools/units/measure.py` from inside a worktree measures the
+  **worktree**, so the number belongs to the tree you edited.
+
+Both refusals are pinned by `measure_selftest.py`: it breaks a source and asserts the run fails with no
+`functions`, and it scores a throwaway git worktree whose objects are byte-identical (100.0) and asserts the
+tool prints that, not MAIN's number for the same symbol.
 
 ## Demonstration - `Camellia/camellia` (10 functions) in MAIN
 

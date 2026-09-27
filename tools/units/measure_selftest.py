@@ -25,9 +25,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -339,12 +341,187 @@ def integration_rows() -> int:
     return failures
 
 
+def baseline_rows() -> int:
+    """The before/after delta against a **saved report** or MAIN's - the bulk path's whole point.
+
+    `symdiff.py -u <unit>` lists per-symbol scores but needs a re-invocation per symbol to see a diff; the
+    lanes' scratch scorers all compared a probe's rows against the committed `report.json`. This pins
+    both accepted baseline shapes (a project report and a `--save` file), the refusal of a unit the file
+    does not carry, and that `collect` puts the delta on every row - against the baseline, not the cache.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        report = os.path.join(tmp, "report.json")
+        json.dump({"units": [{"name": "main/prop/unit", "functions": [
+            {"name": "a", "fuzzy_match_percent": 50.0},
+            {"name": "b", "fuzzy_match_percent": 100.0}]}]},
+            open(report, "w", encoding="utf-8"))
+        rows, note = ms.load_baseline(report, "main/prop/unit")
+        failures = _ok("a project report's unit is found by name", rows, {"a": 50.0, "b": 100.0},
+                       failures)
+        failures = _ok("... and the note names the file", note, report, failures)
+        rows, err = ms.load_baseline(report, "main/prop/other")
+        failures = _ok("a unit the report lacks is refused", rows, None, failures)
+        failures = _ok("... and the refusal names it", "prop/other" in err, True, failures)
+
+        saved = os.path.join(tmp, "run.json")
+        json.dump({"unit": "prop/unit.c", "scores": {"a": 40.0, "b": None, "c": 10.0}},
+                  open(saved, "w", encoding="utf-8"))
+        rows, _ = ms.load_baseline(saved, "main/prop/unit")
+        failures = _ok("a --save file's scores are read", rows, {"a": 40.0, "c": 10.0}, failures)
+
+        mv = ms.moved_summary({"a": {"score": 45.0}, "b": {"score": 100.0}, "c": {"score": 5.0}},
+                              {"a": 50.0, "b": 100.0, "c": 4.0})
+        failures = _ok("one up and one down are counted", mv, {"moved": 2, "up": 1, "down": 1},
+                       failures)
+
+        # collect with a baseline: deltas are against it; the cache is not consulted
+        main = _fake_main(tmp)
+        calls = []
+        functions = [
+            {"name": "f0", "size": "16", "fuzzy_match_percent": 90.0},
+            {"name": "f1", "size": "32", "fuzzy_match_percent": 100.0},
+            {"name": "f2", "size": "48", "fuzzy_match_percent": 40.0},
+        ]
+        report_runner = _report_runner(calls, functions)
+        compile_runner = _compile_runner(calls, main)
+        combined = lambda argv, **kw: report_runner(argv, **kw) if argv[0] != "ninja" \
+            and not any("mwcceppc" in a for a in argv) else compile_runner(argv, **kw)
+        base_file = os.path.join(tmp, "before.json")
+        json.dump({"unit": "prop/unit.c", "scores": {"f0": 89.0, "f1": 100.0, "f2": 42.0}},
+                  open(base_file, "w", encoding="utf-8"))
+        r = ms.collect("prop/unit", main, main, symbol=None, runner=combined,
+                       baseline_path=base_file)
+        failures = _ok("the baseline run still compiles and scores", r.get("compiled"), True, failures)
+        failures = _ok("f0's delta is against the baseline", round(r["functions"]["f0"]["delta"], 3),
+                       1.0, failures)
+        failures = _ok("f2's delta is negative against the baseline",
+                       round(r["functions"]["f2"]["delta"], 3), -2.0, failures)
+        failures = _ok("the moved summary counts up and down", r.get("moved"),
+                       {"moved": 2, "up": 1, "down": 1}, failures)
+        failures = _ok("the baseline is named in the result", r.get("baseline"), base_file, failures)
+
+        # a baseline that names a unit the file lacks must refuse, not silently report "all new"
+        missing = ms.collect("prop/other", main, main, symbol=None, runner=combined,
+                             baseline_path=report)
+        failures = _ok("an unusable baseline refuses the run", missing.get("compiled"), False,
+                       failures)
+    return failures
+
+
+def hostile_rows() -> int:
+    """The hostile case that matters: **break a source, run the measurement, assert it fails**.
+
+    A hand-built scorer measured a STALE object twice when a compile failed and the two invented
+    "improvements" were reported as real. This runs the real tool path (MAIN's real command line, the real
+    compiler) on a deliberately broken source, with a valid-but-stale object already in the output
+    directory, and asserts the measurement refuses: no compile, no `functions` table, a non-empty error,
+    and the stale object deleted rather than read. Skipped when the build tree is absent.
+    """
+    objdiff = os.path.join(ROOT, "build", "tools", "objdiff-cli.exe")
+    unit_src = os.path.join(ROOT, "src", "Camellia", "camellia.c")
+    if not (os.path.exists(objdiff) and os.path.exists(unit_src)):
+        print("skip  hostile compile test (no build tree)")
+        return 0
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        wt = os.path.join(tmp, "wt")
+        os.makedirs(os.path.join(wt, "src", "Camellia"))
+        broken = os.path.join(wt, "src", "Camellia", "camellia.c")
+        open(broken, "w", encoding="utf-8").write(
+            '#error measure-selftest: this source must never compile\n')
+        objdir = os.path.join(wt, "build", "RMHE08", "src", "Camellia")
+        os.makedirs(objdir)
+        stale = os.path.join(objdir, "camellia.o")
+        open(stale, "wb").write(b"\x7fELF" + b"\x00" * 4096)
+        old = time.time() - 3600
+        os.utime(stale, (old, old))
+
+        result = ms.collect("Camellia/camellia", wt, ROOT, use_cache=False)
+        failures = _ok("a broken source does not compile", result.get("compiled"), False, failures)
+        failures = _ok("... and no table of scores is produced", "functions" in result, False, failures)
+        failures = _ok("... and it fails with a non-empty error", bool(result.get("error")), True,
+                       failures)
+        failures = _ok("... and the stale object was deleted, never measured", os.path.exists(stale),
+                       False, failures)
+    return failures
+
+
+def invocation_root_rows() -> int:
+    """A score must come from the tree the command was **run in**, not from MAIN or a first-entry guess.
+
+    The failure that cost the orchestrator an hour: `python <MAIN>/tools/objdiff/symdiff.py -u <unit>` run
+    with cwd inside a worktree scored MAIN's objects and printed **MAIN's** number - 0.91743 for a symbol
+    the worktree's own report had at 100.0 - and it read as "the merge destroyed 67 functions". This builds
+    a throwaway git worktree whose two objects are byte-identical (so it scores 100.0) and runs the tool
+    with cwd there. MAIN's report has `camellia_setup256` at 99.80576, so the two values are distinct: a
+    tool that reads MAIN prints 99.80576, the fixed one prints 100.00000. Skipped without a build tree.
+    """
+    tools = os.path.join(ROOT, "tools")
+    objdiff = os.path.join(ROOT, "build", "tools", "objdiff-cli.exe")
+    target = os.path.join(ROOT, "build", "RMHE08", "obj", "Camellia", "camellia.o")
+    if not (os.path.exists(objdiff) and os.path.exists(target) and os.path.exists(tools)):
+        print("skip  invocation-root test (no build tree)")
+        return 0
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        wt = os.path.join(tmp, "wt")
+        os.makedirs(os.path.join(wt, "src", "Camellia"))
+        os.makedirs(os.path.join(wt, "build", "RMHE08", "obj", "Camellia"))
+        os.makedirs(os.path.join(wt, "build", "RMHE08", "src", "Camellia"))
+        os.makedirs(os.path.join(wt, "build", "tools"))
+        open(os.path.join(wt, "configure.py"), "w", encoding="utf-8").write("# probe worktree\n")
+        if subprocess.run(["git", "init", "-q", wt], capture_output=True).returncode != 0:
+            print("skip  invocation-root test (no git)")
+            return 0
+        open(os.path.join(wt, "src", "Camellia", "camellia.c"), "w", encoding="utf-8").write("\n")
+        data = open(target, "rb").read()
+        for rel in (("obj",), ("src",)):
+            open(os.path.join(wt, "build", "RMHE08", rel[0], "Camellia", "camellia.o"),
+                 "wb").write(data)          # target == ours -> every symbol scores 100.0
+        shutil.copyfile(objdiff, os.path.join(wt, "build", "tools", "objdiff-cli.exe"))
+        cmd = [sys.executable, os.path.join(tools, "objdiff", "symdiff.py"),
+               "-u", "Camellia/camellia"]
+        p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, errors="replace")
+        out = p.stdout
+        line = next((l for l in out.splitlines() if "camellia_setup256" in l), "")
+        failures = _ok("the worktree's own tree is scored, not MAIN's", "100.00000" in line, True,
+                       failures)
+        main_report = os.path.join(_main_root(), "build", "RMHE08", "report.json")
+        main_val = None
+        if os.path.exists(main_report):
+            for u in json.load(open(main_report, encoding="utf-8")).get("units") or []:
+                if u.get("name") == "main/Camellia/camellia":
+                    main_val = next((f.get("fuzzy_match_percent") for f in u.get("functions") or []
+                                     if f.get("name") == "camellia_setup256"), None)
+        if isinstance(main_val, (int, float)) and abs(main_val - 100.0) > 1e-6:
+            failures = _ok("and it is NOT MAIN's number (%s vs the worktree's 100.00000)" % main_val,
+                           "%.5f" % main_val in out, False, failures)
+    return failures
+
+
+def _main_root() -> str:
+    """MAIN resolved the same way `recompile.main_root` does, without importing recompile here."""
+    try:
+        p = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                           cwd=ROOT, capture_output=True, text=True, errors="replace")
+        common = (p.stdout or "").strip()
+        if common and os.path.basename(common.replace("\\", "/")) == ".git":
+            return os.path.dirname(os.path.abspath(common))
+    except OSError:
+        pass
+    return ROOT
+
+
 def main() -> int:
     failures = normalize_rows()
     failures += target_rows()
     failures += parse_rows()
     failures += collect_rows()
+    failures += baseline_rows()
     failures += format_rows()
+    failures += hostile_rows()
+    failures += invocation_root_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")
     return 1 if failures else 0

@@ -675,6 +675,23 @@ def render(fp: Fingerprint) -> str:
 # --- unit resolution + ground truth ------------------------------------------------------------
 
 def repo_root() -> str:
+    """The tree the **caller** is in, not the tree this script happens to live in.
+
+    Same failure class as `unitutil.repo_root` (7.28): the file-location answer silently reads MAIN when
+    this tool is invoked as `<MAIN>/tools/flags/infer.py` from inside a worktree, so a proposal unit's
+    flags are inferred from a `configure.py` that does not register it. The caller's git worktree is what
+    they mean; the walk up to `configure.py` is the fallback when there is no git.
+    """
+    try:
+        tools = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if tools not in sys.path:
+            sys.path.insert(0, tools)
+        import unitutil
+        top = unitutil.caller_worktree()
+    except Exception:
+        top = None
+    if top and os.path.exists(os.path.join(top, "configure.py")):
+        return top
     d = os.path.dirname(os.path.abspath(__file__))
     while True:
         if os.path.exists(os.path.join(d, "configure.py")):

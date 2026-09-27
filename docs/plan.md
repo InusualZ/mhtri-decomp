@@ -702,6 +702,8 @@ construction: a tool can waste time, it cannot break the link.
 | 7.25 | **done** - the C++ **class shape** rule: `.agents/agents/decompiler.md` and every brief (section 5c) say a range the evidence calls a class is written as a class with member functions and real virtuals, not as a C struct plus free functions taking `self` | the owner caught a landed unit reconstructing a class that way - 403 `self->` uses in `Network/fn_8041A87C.cpp` while its own header records the target's string pool spelling `NetworkGameSpyInterface::`/`NetworkPeerGameSpy::`; MWCC only emits retail's canonical `lwz r12,0(r3)`/`lwz r12,<slot>` dispatch for a genuine `virtual`, so the shape is part of the match | both renderers carry 5c; a `fixer` lane reconverts the landed unit and records any function where the struct form measured better; 153 + 117 selftest checks green | ~40 |
 | 7.26 | **done** - `tools/units/slots.py`: a fixed pool of reusable lane directories at stable paths, one lock each, a verified-and-fail-closed reset, wired into the claim path | per-claim construction costs per lane, its teardown cannot remove a worktree holding the `tools/m2c` submodule (the careless 2026-09-24 teardown destroyed a lane's branch), and the seeder rewrites `.ninja_deps`' absolute paths every time because each path is new; a reused slot also carries the previous round's build state, and a stale tree cost a full `rm -rf build/RMHE08` rebuild | `init`/`acquire`/`release`/`status`/`verify`; a slot holds a directory, never a branch (`acquire` cuts a fresh `checkout -B worker/<slug> <tip>`); a free slot is the concurrency cap (`queue.py next` refuses at six); the kept build tree is validated against MAIN's current map/DOL with the seeder's own guard plus a `report.json` comparison and re-seeded if it cannot be proven current; one lock per slot at `MAIN/.pi/slots/<n>.json`, stale locks reclaimed; 62 selftest checks | ~340 |
 | 7.27 | **done** - `tools/units/rescue.py audit`: the `refs/rescue/*` safety net gets an audit, and `land.py resolve`'s `land/resolve-*` helper branch gets a teardown | 193 rescue refs had accumulated and nothing had ever looked at them; `land.py resolve` also left its helper branch (and its scratch worktree) behind, so a `land/*` ref outlived the batch it was made for (two were found from 2026-09-26) | every ref reports its date/subject, the unit(s) it registers (**the registration diff against the merge-base with `main`** - a whole-file name match against `main` matches every unit in the file), whether each is registered on `main` today and how the touched paths differ; verdicts `redundant`/`landed-with-drift`/`unlanded`/`unknown`; `--prune` deletes only `redundant` (printing each), is strictly read-only without it, and never touches drift/unlanded/unknown; a landing deletes its own resolve helper, visibly, only when the tip is contained by the branch or `main`, and refuses loudly otherwise; `claims.py release` runs the same classification on the ref it parks at teardown - `redundant` pruned and printed, `landed-with-drift` reported, `unlanded`/`unknown` surfaced with the ref, its unit(s) and its date and kept, never a gate; 28 checks in `rescue.py` + 36 in `claims.py` | ~180 |
+| 7.28 | **done** - the per-lane measurement loop is fixed: `recompile.py`/`measure.py` run from git-bash, and no score can come from a stale object or the wrong tree | `absolutize()` rewrote cmd's `/c` to `C:\c` (`os.path.join(main, "/c")` is `C:/c`, and that drive-root artifact exists on this host), so the child was an *interactive* `cmd`, no object was written, and 31 lanes filed "make this work" in the register. Two siblings of the same failure: a hand-built scorer measured a STALE object twice when a compile failed and two invented "improvements" were reported as real, and the measuring tools rooted at their own file location / the first `git worktree list` entry, so a score run from a slot could print MAIN's number (`NetworkWiiMediator/dispatchReflectEvent` 0.91743 vs 100.0) | `absolutize()` never rewrites a `-`/`/` switch; every measurement path deletes the object before compiling and `object_is_fresh()` refuses an object older than its source; both chained post-processors (`objalign.py`, `objextab.py`) are retargeted to this tree's object; `unitutil.repo_root()` resolves the caller's `git rev-parse --show-toplevel` and `recompile.main_root()` the git common dir (the gate still runs from MAIN, unchanged); the hostile selftests break a source and assert `FAILED` with no score, and score a throwaway worktree and assert its number (100.00000, not MAIN's 99.80576) | ~80 |
+| 7.29 | **done** - `measure.py --baseline`/`--against-main`/`--save`: every symbol of a unit with its before/after delta in **one call** | `symdiff.py -u <unit>` lists per-symbol scores but needs a re-invocation per symbol to see a diff, so a body lane spent minutes per iteration; the lanes' scratch scorers (`build/probe/score.py`) each re-derived "diff the probe's rows against the committed report" | one compile and one `report generate` score all N symbols (~0.3 s on `Camellia/camellia`); `--against-main` diffs each row against MAIN's `build/RMHE08/report.json`, `--baseline <file>` against a saved report or a `--save` file, `--save` writes this run for the next; a moved-down row is reported and the exit code is non-zero; the baseline selftest pins both shapes, the refusal of a unit the file lacks, and the delta direction | ~60 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
@@ -840,7 +842,11 @@ functions match) and its header says so.
 never claim linker-generated data.
 
 **8.5 Measurement policy.** The object measured must come from the real command line; a stale `report.json` lies
-(regenerate, 1.5–3.5 s); frame size is not progress; a per-symbol score is the only score.
+(regenerate, 1.5–3.5 s); frame size is not progress; a per-symbol score is the only score. **And a score must
+come from an object this run wrote, in this tree**: `recompile.py`/`measure.py` delete the object before
+compiling and refuse one older than its source, and the measuring tools root at the invocation's
+`git rev-parse --show-toplevel` - a score printed from inside a worktree is that worktree's, never MAIN's
+(7.28). When in doubt, the whole-tree check is one command and it is in §11.
 
 **8.6 Blast radius.** Everything lands `NonMatching`, so a bad batch cannot break the link — but it can break the
 *next* session's ability to measure. A half-registered unit, a range with no `configure.py` entry, or a report
@@ -910,6 +916,19 @@ exit code, `configure.py`'s included — a failed `configure.py` otherwise leave
 later number is meaningless. The `.ninja_log` ordering idea is **not** a substitute: a `NonMatching` batch never
 relinks, so `main.elf` never runs and `ok` is the only edge that re-validates. Ordering still matters for
 freshness (`ninja -t query build/RMHE08/main.elf` shows the `order_only` dependency on `config.json`).
+
+**The whole-tree check is one command, and a lane can run it verbatim before it reports:**
+
+```sh
+ninja changes      # every unit whose score moved vs the baseline
+```
+
+**A non-empty diff is a row moving in a unit the batch did not touch.** A declaration change is part of codegen
+(playbook 60): changing which header declares a callee shifts the TU's anonymous-pool ordering and can move a
+row in a unit that has nothing to do with the symbol being renamed, and only a whole-tree diff shows it. A
+folded-declaration batch that followed the net-zero rule moved 0 of 2,797 units; the two regressions the
+type-fix lane caught were rows in unrelated units. **Investigate every line; never wave a non-empty diff
+through.**
 
 **And the style lint is part of the same gate** (`python tools/units/stylelint.py --diff <base>`): a batch may not
 *add* a violation of §6.5, and it must not leave a violation in a unit it touched.
@@ -1328,7 +1347,9 @@ python tools/units/ledger.py                 # totals, per-module, closed >= 80 
 python tools/units/ledger.py unit <unit>     # one unit's coverage and per-symbol score
 python tools/units/ledger.py --json          # machine-readable
 ninja build/RMHE08/report.json               # 1.5-3.5 s; the report is what the bar reads
-ninja changes                                # regression scan against the baseline
+ninja changes                                # whole-tree diff vs the baseline; a non-empty line
+                                             # is a neighbour that moved -> investigate, never waive
+python tools/units/measure.py <unit> --against-main   # the unit's rows with their delta vs MAIN's report
 ninja build/RMHE08/ok                        # the DOL hash - the only test that matters
 python - <<'EOF'                             # per-edge build costs, straight from .ninja_log
 for l in open(".ninja_log"):

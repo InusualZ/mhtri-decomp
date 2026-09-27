@@ -626,27 +626,53 @@ def _dump_asm_hint(lines: list[str]) -> None:
 def _measure_lines(lines: list[str], unit: str) -> None:
     """Append the working measurement loop (§6) - shared by both renderers.
 
-    `recompile.py --measure` and `measure.py` are unusable on this host: from git-bash the compile path
-    emits `cmd /c`, MSYS rewrites it to `C:\\c`, and no object is written (a worktree run says "the
-    compiler returned 0 but wrote no object"). `ninja build/RMHE08/report.json` plus `symdiff.py` is the
-    loop that works - and `report.json` is an order-only target of `all_source`, so it must be removed
-    first or ninja reports "no work to do" and the worker reads the previous build's scores.
+    The per-lane loop is the shipped tools, now that the git-bash compile path is fixed (`absolutize`
+    rewrote cmd's `/c` to `C:\\c`, so the child was an *interactive* `cmd`, printed its banner, and no
+    object was ever written). `measure.py` answers the whole unit in one compile + one `report generate`
+    with a per-symbol before/after delta; `recompile.py --measure` is the single-symbol proof. The ninja
+    path is still valid, and its one trap is that `report.json` is an order-only target of `all_source`.
+
+    The whole-tree `ninja changes` line is playbook 60's check (a declaration change is part of codegen,
+    so it can move a row in an unrelated TU); it is one command and it belongs in the checklist.
     """
     lines.append("")
-    lines.append("**Measure with `ninja build/RMHE08/report.json` + `tools/objdiff/symdiff.py`, never")
-    lines.append("`recompile.py --measure` or `measure.py`.** Both are unusable here: from git-bash the compile")
-    lines.append("path emits `cmd /c`, MSYS rewrites it to `C:\\c`, and no object is written (a worktree run")
-    lines.append("reports \"the compiler returned 0 but wrote no object\").")
+    lines.append("**Measure your own tree with the shipped loop.** `measure.py` compiles the unit once and")
+    lines.append("scores **every** symbol with one official `report generate` (the number `report.json` carries):")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python tools/units/measure.py <your-unit>                  # every symbol, one compile (~0.3 s)")
+    lines.append("python tools/units/measure.py <your-unit> --against-main   # each row's before/after delta vs MAIN")
+    lines.append("python tools/units/recompile.py <your-unit> --measure <symbol>   # one symbol, the proof step")
+    lines.append("```")
+    lines.append("")
+    lines.append("`<your-unit>` is the path from the repository root (`Pl/pl_act`, `Camellia/camellia`); the")
+    lines.append("extension may be omitted. **A score is only real if the object was rewritten:** both tools")
+    lines.append("delete the object before compiling and refuse to score one older than its source, and a compile")
+    lines.append("that fails prints `FAILED`, never a number. If you see a score, it came from this run.")
+    lines.append("")
+    lines.append("**The `ninja` path works too, and its one trap is freshness:** `build/RMHE08/report.json` is an")
+    lines.append("order-only target of `all_source`, so after a source edit ninja says \"no work to do\" and you")
+    lines.append("read the PREVIOUS build's scores.")
     lines.append("")
     lines.append("```sh")
     lines.append("rm -f build/RMHE08/report.json   # order-only target: see below")
     lines.append("ninja build/RMHE08/report.json")
-    lines.append("python tools/objdiff/symdiff.py -u %s <symbol>   # the official report metric" % unit)
+    lines.append("python tools/objdiff/symdiff.py -u %s   # the official report metric per symbol" % unit)
     lines.append("```")
     lines.append("")
     lines.append("**`build/RMHE08/report.json` is an order-only target of `all_source`**: after a source edit ninja")
     lines.append("says \"no work to do\" and you read the PREVIOUS build's scores. `rm -f build/RMHE08/report.json`")
     lines.append("first - that trap cost one lane three iterations that looked like \"all new functions score 0 %\".")
+    lines.append("")
+    lines.append("**Before you report, the whole-tree check - one command:**")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("ninja changes      # every unit whose score moved vs the baseline")
+    lines.append("```")
+    lines.append("")
+    lines.append("**A non-empty diff is a row moving in a unit you did not touch.** A declaration change is part of")
+    lines.append("codegen (playbook 60), so changing which header declares a callee can move a neighbouring TU; a")
+    lines.append("whole-tree diff is the only thing that shows it. Investigate what moved - never wave it through.")
     lines.append("")
 
 
@@ -1209,8 +1235,8 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
                      % (p.get("count", 0), BAR))
         lines.append("biggest first where two are equal.")
         lines.append("")
-        lines.append("Work them one at a time and re-measure each with `ninja build/RMHE08/report.json` +")
-        lines.append("`tools/objdiff/symdiff.py` (the loop is in §6). A function that resists is a residual to")
+        lines.append("Work them one at a time and re-measure each with `python tools/units/measure.py <unit>`")
+        lines.append("(the loop is in §6). A function that resists is a residual to")
         lines.append("record, not a reason to stop -")
         lines.append("**apply the best-scoring variant even if it is not a full match** and write what still differs")
         lines.append("into the unit's file header.")
@@ -1617,9 +1643,11 @@ def selftest() -> int:
               "land.rule7_defer_growth" in brief_text and "land.band_ownership_warnings" in brief_text, True)
         check("the brief bans claims.py release with its consequence",
               "NEVER run `claims.py release`" in brief_text and "WIPED the directory" in brief_text, True)
-        check("the brief warns off recompile.py --measure / measure.py",
-              "`recompile.py --measure` or `measure.py`" in brief_text
-              and "tools/objdiff/symdiff.py" in brief_text, True)
+        check("the brief ships the fixed per-lane measurer",
+              "tools/units/measure.py" in brief_text and "--against-main" in brief_text
+              and "refuse to score one older than its source" in brief_text, True)
+        check("the brief carries the whole-tree report diff",
+              "ninja changes" in brief_text and "never wave it through" in brief_text, True)
         check("the brief carries the order-only report.json trap",
               "order-only target of `all_source`" in brief_text
               and "rm -f build/RMHE08/report.json" in brief_text, True)
@@ -1679,8 +1707,11 @@ def selftest() -> int:
               "land.rule7_defer_growth" in text and "land.band_ownership_warnings" in text, True)
         check("the proposal brief bans claims.py release with its consequence",
               "NEVER run `claims.py release`" in text and "WIPED the directory" in text, True)
-        check("the proposal brief warns off recompile.py --measure / measure.py",
-              "`recompile.py --measure` or `measure.py`" in text and "tools/objdiff/symdiff.py" in text, True)
+        check("the proposal brief ships the fixed per-lane measurer",
+              "tools/units/measure.py" in text and "--against-main" in text
+              and "refuse to score one older than its source" in text, True)
+        check("the proposal brief carries the whole-tree report diff",
+              "ninja changes" in text and "never wave it through" in text, True)
         check("the proposal brief carries the order-only report.json trap",
               "order-only target of `all_source`" in text and "rm -f build/RMHE08/report.json" in text, True)
         check("the proposal brief says tudiscover needs the on-demand asm dump",

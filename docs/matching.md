@@ -1911,5 +1911,12 @@ too heavy to pull in at all - including `fn_8004CAD8.h` into 41 TUs failed with 
 force the include.
 
 **How to check.** Diff `report.json` over the **whole tree**, not the unit you touched: a fold moves a row in a
-TU that has nothing to do with the symbol being renamed, and only a whole-tree diff shows it. A batch that
+TU that has nothing to do with the symbol being renamed, and only a whole-tree diff shows it. It is one
+command a lane can run verbatim:
+
+```sh
+ninja changes      # every unit whose score moved vs the baseline
+```
+
+A **non-empty** line means a unit you did not touch moved - investigate it, never wave it through. A batch that
 folded 114 declarations across 65 files moved **0 of 2,797 units** once it followed the net-zero rule.
