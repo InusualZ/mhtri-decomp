@@ -145,22 +145,48 @@ struct ItemSpeciesRecord {
  * `memset(self + 36, 0, 72)` (three entries at +0x24) and the 24-byte stride of the loops. */
 struct MenuEntry {
     /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 selected;         /* 1 for the entry the caller's index names, else 0 */
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 unused_0x03[0x008 - 0x003];
+    /* +0x01 */ s8 selected;         /* 1 for the entry the caller's index names, else 0 */
+    /* +0x02 */ s8 field_0x02;       /* nonzero when the row may be picked */
+    /* +0x03 */ u8 unused_0x03[0x006 - 0x003];
+    /* +0x06 */ s16 field_0x06;      /* the inventory row the entry draws (the kind tables' index) */
     /* +0x08 */ u32 field_0x08;      /* the word `fn_8029FB00` copies in from the menu table */
-    /* +0x0C */ u8 unused_0x0C[0x018 - 0x00C];
+    /* +0x0C */ u32 field_0x0C;      /* cleared by the item page's row fill */
+    /* +0x10 */ u8 unused_0x10[0x018 - 0x010];
+};
+
+/* The 0x0C-byte list-scroll work record embedded in a `MenuSlot` at +0x1A4: the two cursors (`row`,
+ * `col`) the menu band's scroller (`fn_802A9368`) moves by a button word, clamped against the row
+ * and column counts, plus the `move_flags` word it sets for the frame and the two option-card
+ * colours.  `menu/menu_item_page.cpp` is the record's own reader (`item_page_fill_rows` reads the counts and
+ * the cursor pair); the fields it does not touch keep their offsets.
+ * size: 0x0C (its own byte run: `MenuSlot`'s +0x1A4 pad and this record's +0x0C end agree) */
+struct MenuScroll {
+    /* +0x000 */ u16 unused_0x000;
+    /* +0x002 */ u8 rows_per_page;    /* the row count `fn_802A9368` clamps `row` against */
+    /* +0x003 */ u8 row;             /* the row cursor */
+    /* +0x004 */ u8 col;             /* the column cursor */
+    /* +0x005 */ u8 row_limit;       /* the row count the cursor is bounded by */
+    /* +0x006 */ u8 col_count;       /* the column count `col` wraps at */
+    /* +0x007 */ u8 field_0x007;     /* `fn_802A9368` copies it into `row_limit` at the last column */
+    /* +0x008 */ u16 move_flags;     /* the move bits `fn_802A9368` ORs in (1/2/4/8) */
+    /* +0x00A */ s8 light_colour;    /* the option card's light colour */
+    /* +0x00B */ s8 dark_colour;     /* its dark colour */
 };
 
 /* One of the two 0x330-byte working records of the menu work area at `.bss:0x806AC8C8`; the area is
  * `MenuSlot slot[2]` (0x660 = the whole `.bss` run, and `fn_802A0188` walks it with an 816-byte
  * stride).  The three entry arrays and their counts are the ones the setters below walk; the other
- * fields are the ones this unit's bodies touch. */
+ * fields are the ones this unit's bodies touch.  The item page's draw layer
+ * (`menu/menu_item_page.cpp`) named the bytes it introduced: the page index at +0x01C, the per-kind
+ * selected-row offsets at +0x01D, the embedded `MenuScroll` at +0x1A4 and the per-kind row base at
+ * +0x2ED. */
 struct MenuSlot {
     /* +0x000 */ u8 field_0x000;      /* the slot's mode/state the predicates below compare */
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 field_0x002;
-    /* +0x003 */ u8 unused_0x003[0x00E - 0x003];
+    /* +0x003 */ u8 unused_0x003[0x008 - 0x003];
+    /* +0x008 */ u16 field_0x008;     /* the option card's arrow word (`item_page_draw_closed_column`'s `arg5`) */
+    /* +0x00A */ u8 unused_0x00A[0x00E - 0x00A];
     /* +0x00E */ u8 active;           /* the "slot in use" flag every predicate below tests */
     /* +0x00F */ u8 field_0x00F;      /* 1 selects the `fn_802A008C` arm that reads `worker` */
     /* +0x010 */ u8 field_0x010;
@@ -174,7 +200,11 @@ struct MenuSlot {
     /* +0x019 */ u8 field_0x019;
     /* +0x01A */ u8 field_0x01A;
     /* +0x01B */ u8 field_0x01B;
-    /* +0x01C */ u8 unused_0x01C[0x021 - 0x01C];
+    /* +0x01C */ s8 page_index;       /* 0..3: the page the detail draw switches on */
+    /* +0x01D */ u8 field_0x01D;      /* kind 1's selected row offset (the page-0 blend index) */
+    /* +0x01E */ u8 field_0x01E;      /* kind 2's */
+    /* +0x01F */ u8 field_0x01F;      /* kind 3's */
+    /* +0x020 */ u8 unused_0x020[0x021 - 0x020];
     /* +0x021 */ u8 field_0x021;      /* the byte `fn_802A053C`/`fn_802A054C` set */
     /* +0x022 */ u8 unused_0x022[0x024 - 0x022];
     /* +0x024 */ MenuEntry entries_a[3];
@@ -190,15 +220,20 @@ struct MenuSlot {
     /* +0x1A1 */ s8 field_0x1A1;      /* its row (`fn_802A8F14` resolves the height into it) */
     /* +0x1A2 */ u8 field_0x1A2;
     /* +0x1A3 */ u8 field_0x1A3;
-    /* +0x1A4 */ u8 unused_0x1A4[0x1B0 - 0x1A4];
+    /* +0x1A4 */ MenuScroll scroll;   /* the list-scroll cursors `fn_802A9368` moves */
     /* +0x1B0 */ u8 field_0x1B0;
     /* +0x1B1 */ u8 unused_0x1B1[0x1EC - 0x1B1];
     /* +0x1EC */ u8 field_0x1EC[0x1F0 - 0x1EC];  /* the embedded selection cursor */
     /* +0x1F0 */ u16 field_0x1F0;    /* the cursor's two item ids */
     /* +0x1F2 */ u16 field_0x1F2;
     /* +0x1F4 */ u8 unused_0x1F4[0x23A - 0x1F4];
-    /* +0x23A */ u8 field_0x23A;
-    /* +0x23B */ u8 unused_0x23B[0x31E - 0x23B];
+    /* +0x23A */ u8 field_0x23A;     /* the sprite id every draw of the item page takes */
+    /* +0x23B */ u8 field_0x23B;     /* 0 = the page draws no detail panel */
+    /* +0x23C */ u8 field_0x23C;     /* the blend colour the item page's rows are handed */
+    /* +0x23D */ u8 unused_0x23D[0x2ED - 0x23D];
+    /* +0x2ED */ u8 kind_row_base[8]; /* `kind_row_base[kind * 2]`: the first row the item kind shows */
+    /* +0x2F5 */ u8 field_0x2F5;     /* the item kind (0..3) the page is showing */
+    /* +0x2F6 */ u8 unused_0x2F6[0x31E - 0x2F6];
     /* +0x31E */ u8 field_0x31E;
     /* +0x31F */ u8 field_0x31F;
     /* +0x320 */ u8 unused_0x320[0x32D - 0x320];

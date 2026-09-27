@@ -715,6 +715,18 @@ config.libs = [
             # below: `infer.py` reads the peephole off on its objects (`fn_80324CC4`, 0 record forms
             # with 2 fold-shaped pairs) and `-use_lmw_stmw off`.
             Object(NonMatching, "menu/fn_8031EA8C.cpp"),
+            # Registered from proposal/80349DD8_fn_80349DD8.cpp (`.text` 0x80349DD8..0x8034C0C4, 22
+            # functions / 8940 B; extab 0x80016FE4..0x80017094, extabindex 0x8003663C..0x80036744,
+            # `.data` 0x805E91E8..0x805E91F8, `.sdata` 0x807932F0..0x80793308).  Module `menu` from the
+            # band its own `.data`/`.sdata` fragments sit in and from its entry points
+            # (`get_str_tbl`/`get_menu_lsp_tbl`/`ItemName`/`ItemExp`/`font_print_ex`); no `__FILE__`
+            # string covers the range (the flanking `menu_note.cpp` string at 0x805E91F8 belongs to the
+            # 0x8034C0C4 TU) and the dump answers `zz_` for all 22 addresses, so the file and its
+            # symbols are named for what they do - the menu's item page draw layer (naming pass
+            # 2026-09-27; every name is a guess recorded in the file header).  Same `cflags_menu` as
+            # its menu siblings.  `.data`/`.sdata` are claimed: both are this object's own and
+            # byte-identical to the target's (`datagap.py` reports no data gap).
+            Object(NonMatching, "menu/menu_item_page.cpp"),
             # Registered from proposal/8034C0C4_fn_8034C0C4.cpp (`.text` 0x8034C0C4..0x8034C1D0, one
             # function / 268 B): the note-list entry table.  Module `menu` and file name
             # `menu_note.cpp` are class-1 evidence - the range's `__FILE__` string `.data` 0x805E91F8

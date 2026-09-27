@@ -1173,6 +1173,13 @@ ef/eft_slot.cpp:
 	.ctors      start:0x8056F3A4 end:0x8056F3A8
 	.data       start:0x805E9168 end:0x805E91E8
 
+menu/menu_item_page.cpp:
+	extab       start:0x80016FE4 end:0x80017094
+	extabindex  start:0x8003663C end:0x80036744
+	.text       start:0x80349DD8 end:0x8034C0C4
+	.data       start:0x805E91E8 end:0x805E91F8
+	.sdata      start:0x807932F0 end:0x80793308
+
 menu/menu_note.cpp:
 	.text       start:0x8034C0C4 end:0x8034C1D0
 	.data       start:0x805E9220 end:0x805E9248
