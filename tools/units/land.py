@@ -65,7 +65,11 @@ inside MAIN is what left MAIN conflicted on 2026-09-26).  The union is gated in 
 `unionresolve` invariants (no duplicate unit key, no duplicate `Object()` line, no overlapping
 `.text`/`extab`/`extabindex` range, and no registration `main` already had is dropped); the union is
 computed in memory and the invariants asserted *before* anything is written.  Staging is explicit
-(`git add -- <the two paths>`), never the untracked `.pi/bin/applybranch.sh`'s `git add -A`.
+(`git add -- <the two paths>`), never the untracked `.pi/bin/applybranch.sh`'s `git add -A`.  The helper
+branch that parks the union (`land/resolve-<slug>-<pid>`, in the scratch worktree) is deleted by the landing
+that lands the branch - visibly, and only when the helper's tip is provably contained by the branch or by
+`main`; one carrying a hand fix the branch never took is refused loudly and left alone, because it may be the
+only copy (two helpers outlived their batches on 2026-09-26).
 
 `land --branch` is the one-command landing, so the orchestrator never assembles it by hand again.  It
 refuses a dirty tree (with the exact clean commands), records the base on the clean tree **before** the
@@ -812,6 +816,95 @@ def scratch_resolve(main_tree: str, branch: str, base: str | None = None, commit
 
 
 # --------------------------------------------------------------------------------------------------
+# The resolve helper's teardown: `scratch_resolve` parks a registration union on a
+# `land/resolve-<slug>-<pid>` helper branch (in its own scratch worktree) so the caller can fast-forward
+# the worker branch onto it.  Once the branch lands, the helper is debris - and a `land/*` ref left
+# behind is a false statement about the branch's state (two were left from 2026-09-26).  The landing
+# deletes the helpers it can *prove* redundant - the helper's tip is already contained by the branch it
+# resolved or by `main` - and refuses loudly on any other, because a hand fix made on the helper
+# (2026-09-26: the `u32 mode` repair lived only on `land/resolve-8030681c-...-31048`) would be the only
+# copy.  Nothing is deleted until the landing has succeeded.
+# --------------------------------------------------------------------------------------------------
+
+def resolve_helper_slug(branch: str) -> str:
+    """The slug `scratch_resolve` names a branch's helper with (`worker/x` -> `x`)."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", branch.split("/", 1)[-1])
+
+
+def resolve_helper_refs(main: str, branch: str) -> list[str]:
+    """Every `land/resolve-<slug>-<pid>[-<n>]` helper ref that `branch` owns, matched by exact slug.
+
+    The trailing `-<pid>[-<n>]` is what keeps `worker/foo` from claiming `worker/foo-bar`'s helper: a
+    bare prefix match would sweep a sibling's resolution.
+    """
+    pat = re.compile(r"^refs/heads/land/resolve-%s-[0-9]+(-[0-9]+)?$" % re.escape(resolve_helper_slug(branch)))
+    out = git(["for-each-ref", "--format=%(refname)", "refs/heads/land/"], main, check=False)
+    return [line.strip() for line in out.splitlines() if pat.match(line.strip())]
+
+
+def _is_ancestor(main: str, ancestor: str, descendant: str) -> bool:
+    """True when `ancestor` is reachable from `descendant` - the one containment proof the sweep uses."""
+    return run(["git", "merge-base", "--is-ancestor", ancestor, descendant], main).returncode == 0
+
+
+def resolve_helper_state(main: str, branch: str) -> tuple[list[str], list[str]]:
+    """Classify `branch`'s resolve helpers -> (provably redundant, refused).
+
+    Redundant: the helper's tip is contained by `branch` or by `main`, so deleting it cannot lose the
+    work.  Refused: anything else - the helper may hold a hand fix the branch never took.
+    """
+    redundant: list[str] = []
+    refused: list[str] = []
+    for ref in resolve_helper_refs(main, branch):
+        tip = git(["rev-parse", ref], main, check=False).strip()
+        if tip and (_is_ancestor(main, tip, branch) or _is_ancestor(main, tip, "main")):
+            redundant.append(ref)
+        else:
+            refused.append(ref)
+    return redundant, refused
+
+
+def _resolve_helper_worktree(main: str, ref: str) -> str | None:
+    """The worktree a helper ref is checked out in, or None."""
+    out = git(["worktree", "list", "--porcelain"], main, check=False)
+    wt = None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            wt = line[len("worktree "):].strip()
+        elif line.startswith("branch ") and wt and line[len("branch "):].strip() == ref:
+            return wt
+    return None
+
+
+def delete_resolve_helper(main: str, ref: str) -> str:
+    """Remove a redundant helper's scratch worktree and delete its branch; -> the branch name deleted."""
+    branch = ref[len("refs/heads/"):]
+    wt = _resolve_helper_worktree(main, ref)
+    if wt and os.path.isdir(wt):
+        try:
+            claims.safe_worktree_remove(wt, main)
+        except SystemExit:
+            git(["worktree", "remove", "--force", wt], main, check=False)
+    git(["worktree", "prune"], main, check=False)
+    git(["branch", "-D", branch], main)
+    return branch
+
+
+def _sweep_resolve_helpers(main: str, branch: str, redundant: list[str], refused: list[str]) -> None:
+    """Delete the provably-redundant helper(s) and name every refusal, in the landing output."""
+    for ref in redundant:
+        try:
+            delete_resolve_helper(main, ref)
+            print("    resolve helper %s deleted (its resolution landed with %s)" % (ref, branch))
+        except SystemExit as exc:
+            print("    REFUSING to delete resolve helper %s: %s" % (ref, exc), file=sys.stderr)
+    for ref in refused:
+        print("    REFUSING to delete resolve helper %s: its tip is not contained by %s or main - it may "
+              "hold the only copy; fast-forward %s to it and re-run" % (ref, branch, branch),
+              file=sys.stderr)
+
+
+# --------------------------------------------------------------------------------------------------
 # The one-command landing: `land.py land --branch worker/<slug>`.
 # --------------------------------------------------------------------------------------------------
 
@@ -951,6 +1044,9 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
         print("REFUSED %s | could not read the branch's registered unit(s) from its configure.py/"
               "splits.txt diff; pass --units explicitly" % branch)
         return 1
+    # Read the resolve-helper state now, while `branch` still exists: the landing below may release and
+    # delete it, and the containment proof is against `branch`'s pre-land tip.
+    helper_redundant, helper_refused = resolve_helper_state(main, branch)
     record_base(main)                      # on the clean tree, BEFORE the pick
     head_before = git(["rev-parse", "HEAD"], main).strip()
     ok, why, applied_base = apply_branch(main, branch, base=merge_base)
@@ -964,6 +1060,10 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
         # the gate refused before committing: undo the apply so a refused landing is not a half-landing
         ug.cleanup_applied(main, applied_base, branch)
         print("NOTE: the apply was undone - main is back at %s" % head_before[:8], file=sys.stderr)
+    if code == 0:
+        # the branch landed: its resolve helper (if any) is debris now. Delete only what is provably
+        # contained; refuse loudly on anything else rather than leaving a `land/*` ref and hoping.
+        _sweep_resolve_helpers(main, branch, helper_redundant, helper_refused)
     return code
 
 
@@ -3617,6 +3717,61 @@ def selftest() -> int:
         check("... both bands are in the committed file",
               "menu/branch.cpp" in text and "menu/main.cpp" in text, True)
         check("... and the tree is clean afterwards", require_clean_tree(tmp), None)
+        check("... and a conflict-free landing leaves no land/* ref",
+              repo_git(tmp, "for-each-ref", "refs/heads/land/"), "")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # A landing that goes through the conflict-resolution path: `scratch_resolve` parked the union on
+        # a `land/resolve-*` helper (and its scratch worktree), the caller fast-forwarded the branch onto
+        # it, and the landing deletes the now-redundant helper - visibly.
+        _resolve_fixture(
+            tmp,
+            branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+            main_splits="menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n",
+            branch_conf='            Object(NonMatching, "menu/branch.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/main.cpp"),\n')
+        resolved = scratch_resolve(tmp, "worker/x")
+        helper = resolved["scratch_branch"]
+        check("resolve helper: the union is parked on a land/resolve-* ref",
+              repo_git(tmp, "for-each-ref", "--format=%(refname)", "refs/heads/land/").endswith(helper),
+              True)
+        repo_git(tmp, "branch", "-f", "worker/x", helper)      # the caller's documented fast-forward
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", _land_verify_ok), contextlib.redirect_stdout(buf), \
+                contextlib.redirect_stderr(buf):
+            code = land_branch(tmp, "worker/x", no_build=True, check_outbox=False, release_claims=False,
+                               subject="selftest helper")
+        check("resolve helper: the branch lands", code, 0)
+        check("resolve helper: the landing leaves no land/* ref behind",
+              repo_git(tmp, "for-each-ref", "refs/heads/land/"), "")
+        check("resolve helper: the deletion is visible in the landing output",
+              "resolve helper refs/heads/%s deleted" % helper in buf.getvalue(), True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # The helper carries a hand fix the branch never took: deleting it would drop the only copy, so
+        # the landing must refuse loudly and leave it alone.
+        _resolve_fixture(
+            tmp,
+            branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+            main_splits="menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n",
+            branch_conf='            Object(NonMatching, "menu/branch.cpp"),\n',
+            main_conf='            Object(NonMatching, "menu/main.cpp"),\n')
+        resolved = scratch_resolve(tmp, "worker/x")
+        helper = resolved["scratch_branch"]
+        _write_tree(resolved["worktree"], {"src/hand_fix.cpp": "int hand_fix;\n"})
+        buf = io.StringIO()
+        with mock.patch.object(module, "verify", _land_verify_ok), contextlib.redirect_stdout(buf), \
+                contextlib.redirect_stderr(buf):
+            code = land_branch(tmp, "worker/x", no_build=True, check_outbox=False, release_claims=False,
+                               subject="selftest helper fix")
+        check("resolve helper fix: the branch still lands", code, 0)
+        check("resolve helper fix: the helper is NOT deleted",
+              repo_git(tmp, "for-each-ref", "--format=%(refname)", "refs/heads/land/").endswith(helper),
+              True)
+        check("resolve helper fix: the refusal is named",
+              "REFUSING to delete resolve helper" in buf.getvalue(), True)
+        repo_git(tmp, "worktree", "remove", "--force", resolved["worktree"])
+        repo_git(tmp, "branch", "-D", helper)
 
     with tempfile.TemporaryDirectory() as tmp:
         _resolve_fixture(
