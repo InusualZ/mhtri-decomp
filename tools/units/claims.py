@@ -402,6 +402,16 @@ def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None) -> st
         n = _copy_missing_files(src, dst)
         seeded = True
         parts.append("%s: %d file(s)" % (rel.replace(os.sep, "/"), n))
+    # `tools/m2c` is a git submodule and `git worktree add` does NOT populate submodules, so a fresh
+    # worktree's offline decompiler is an EMPTY directory - measured 2026-09-27: a lane decoded a 50 KB range
+    # by hand because of it ("the bulk of this lane's wall-clock").  Init it from MAIN's already-cloned
+    # .git/modules (no network needed).  Same class as `build/binutils` seeding as 0 files.
+    if os.path.isdir(os.path.join(wt, "tools")) and not os.path.exists(os.path.join(wt, "tools", "m2c", "m2c.py")):
+        subprocess.run(["git", "-C", wt, "submodule", "update", "--init", "tools/m2c"],
+                       capture_output=True, text=True)
+        if os.path.exists(os.path.join(wt, "tools", "m2c", "m2c.py")):
+            seeded = True
+            parts.append("tools/m2c: submodule initialised")
     orig_src, orig_dst = os.path.join(main, ORIG_REL), os.path.join(wt, ORIG_REL)
     if os.path.isdir(orig_src):
         os.makedirs(orig_dst, exist_ok=True)
