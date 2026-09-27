@@ -1278,6 +1278,7 @@ Network/fn_803D3CE8.cpp:
 	extab       start:0x80019E5C end:0x8001A348
 	extabindex  start:0x8003A524 end:0x8003A8B4
 	.text       start:0x803D3CE8 end:0x803D70B8
+	.data       start:0x805FA908 end:0x805FAAD0
 
 Network/initNetworkSessionStable.cpp:
 	extab       start:0x8001A630 end:0x8001A648

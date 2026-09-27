@@ -134,6 +134,7 @@ for the unit-level view) and compare against `main`.
     rm -f build/RMHE08/ok && ninja -k 0            # must end with zero FAILED targets
     rm -f build/RMHE08/ok && ninja build/RMHE08/ok # then: build/RMHE08/main.dol: OK (SHA-1 BF485073...)
     python tools/units/stylelint.py --diff main    # must add no new violation
+    python tools/units/vtableaudit.py --diff main  # rule 10: no added owned-but-unemitted table / vtable write
 
 Check the `FAILED` count **first**: `ninja build/RMHE08/ok` is order-only and prints `main.dol: OK` even when a
 compile failed, because the stale `main.dol` is still there to check. The `FAILED` count is the primary signal.

@@ -22,15 +22,38 @@
  * Manager in the middle, ManagerPat at the back), so no single evidenced file name covers it and
  * the file keeps the map's `fn_803D3CE8` stem (brief option 4): no name was invented.
  *
- * LANGUAGE AND SECTIONS.  C++ (`__nw__FUl` / `__dl__FPv` / `__ptmf_scall`), exceptions off, `.text`
- * only (the range carries no extab/extabindex).  Every plain `fn_` definition is `extern "C"`.
+ * CLASS AND RULE 10.  `NetworkSessionManager` is a class with inheritance, not a struct with a vtable
+ * member.  Its vtable (0x805FA908, 0x1C8 = 112 slots, 61 of them 0 in the DOL) is emitted by MWCC
+ * from the class's `virtual` declarations, and the constructor/destructor emit the vptr store - the
+ * `self->vtable = &NetworkSessionManagerVTable;` writes this unit used to carry were the rule-10
+ * defect, because the table IS this unit's: all 51 non-zero slots point into this range.  Claimed:
+ * `.data` 0x805FA908..0x805FAAD0 (456 B, byte-for-byte the DOL's table, 51 relocations).  The 13
+ * slots whose bodies are not written yet (`slot_18`, `slot_13C`, `slot_140`, `slot_144`,
+ * `slot_14C`..`slot_168`) are declared and left undefined, so their entries are the map's names; a
+ * body pass replaces them.  See `tools/units/vtableaudit.py` (rule 10 is a gate row).
  *
- * STATUS / RESIDUALS.  See the outbox `config_requests` and the batch note.
+ * LANGUAGE AND SECTIONS.  C++ (`__nw__FUl` / `__dl__FPv` / `__ptmf_scall`); `#pragma exceptions on`
+ * for the target's `extab`/`extabindex`.  Every plain `fn_` definition is `extern "C"`.
+ *
+ * STATUS / RESIDUALS.
+ *  - 52 map rows renamed to the members' mangled spellings (`symedit.py rename`); 48 of them did not
+ *    move, 4 improved (getInt/getFloat/broadcastPlayerSlots/flush: the class form emits the canonical
+ *    `lwz r12,0(r3)` dispatch where the struct form staged it).  Unit 53.406513 -> 53.418575.
+ *  - `.sdata2` 20 B extra (the target has none) - pre-existing, unclaimed, reported not fixed.
+ *  - `extab` 408 vs 1260 B, `extabindex` 612 vs 912 B: the pragma is on and the records are short
+ *    because the unit still has 37 bodies to write (the target's records cover all 101 functions).
+ *  - `slot_18`/`slot_13C`/... are slot-derived names - the bodies are not written, so GUESS.
+ *  - See the outbox `config_requests` and the batch note.
  */
 
 #include "types.h"
 #include "Network/fn_803D3CE8.h"
 #include "unsplit/NetworkData.h"
+
+/* EXCEPTIONS.  The lib builds with `-Cpp_exceptions off` while this range's target object carries
+   `extab` 1260 B and `extabindex` 912 B (the C++ unwind records of the class below); the pragma turns the
+   front-end's exceptions back on and moves no `.text` byte. */
+#pragma exceptions on
 
 /* ---- this unit's own forward declarations ---- */
 extern "C" {
@@ -44,52 +67,15 @@ void fn_803D41D0(NetworkSessionStable*, const void*, u32, s8);
 void fn_803D4290(NetworkSessionStable*, s8);
 s8 fn_803D4858(NetworkSessionStable*, s8);
 
-NetworkSessionManager* fn_803D4904(NetworkSessionManager*);
 void fn_803D4A50(NetworkRequest*);
 void* dtor_803D4AF8(NetworkRequest*, s16);
 void fn_803D4B5C(NetworkRequest*);
 NetworkRequest* fn_803D4B60(NetworkRequest*);
-void* dtor_803D4B9C(NetworkSessionManager*, s16);
-void fn_803D4C18(NetworkSessionManager*, u32, u32);
-void fn_803D4C24(NetworkSessionManager*);
-void fn_803D4D20(NetworkSessionManager*);
-void fn_803D4DE4(NetworkSessionManager*);
 s32 fn_803D5070(NetworkRequest*);
 void zz_03d5084_ptmf_scall(NetworkRequest*);
-void fn_803D50D8(NetworkSessionManager*);
 void fn_803D5150(NetworkRequest*, NetworkSessionManager*, NetworkRequestDesc, u32, ...);
-void fn_803D528C(NetworkSessionManager*);
-void fn_803D5318(NetworkSessionManager*, u32, u32);
-void fn_803D53B0(NetworkSessionManager*, u32);
-void fn_803D5438(NetworkSessionManager*, u32);
-void fn_803D54C0(NetworkSessionManager*, u32);
-void fn_803D5548(NetworkSessionManager*, u32);
-void fn_803D55D0(NetworkSessionManager*);
-void fn_803D5648(NetworkSessionManager*, u32);
-void fn_803D56D0(NetworkSessionManager*, s8);
-void fn_803D5758(NetworkSessionManager*);
-void fn_803D57D0(NetworkSessionManager*, u32);
-void fn_803D5858(NetworkSessionManager*);
-void fn_803D58D0(NetworkSessionManager*);
-void fn_803D5948(NetworkSessionManager*);
-void fn_803D59C0(NetworkSessionManager*);
-void fn_803D5A38(NetworkSessionManager*, u32, u32, s8);
-void fn_803D5AE0(NetworkSessionManager*);
-void fn_803D5B58(NetworkSessionManager*, u32, u32);
-void fn_803D5BF0(NetworkSessionManager*, u32, u32);
-void fn_803D5C88(NetworkSessionManager*, u32);
-void fn_803D5D10(NetworkSessionManager*);
 void fn_803D5D58(NetworkRequest*);
 s32 fn_803D5D64(NetworkRequest*);
-void fn_803D5D6C(NetworkSessionManager*);
-void fn_803D5DB4(NetworkSessionManager*, s8);
-void fn_803D5DC4(NetworkSessionManager*, s8);
-s32 fn_803D5DCC(NetworkSessionManager*, s8);
-f32 fn_803D5E38(NetworkSessionManager*, s8);
-void fn_803D5EA4(NetworkSessionManager*);
-void fn_803D5EF8(NetworkSessionManager*, u32, u32, u8);
-void fn_803D5F4C(NetworkSessionManager*, u32, u32);
-void fn_803D5F9C(NetworkSessionManager*, u32, u32, u8);
 NetworkRequest* fn_803D6430(NetworkSessionManager*);
 void fn_803D64A4(NetworkSessionManager*, NetworkRequest**);
 s32 fn_803D6514(NetworkRequest*, u32*);
@@ -311,25 +297,23 @@ extern "C" void fn_803D4290(NetworkSessionStable* self, s8 idx)
 /* NetworkSessionManager - construction / pool                                                */
 /* ----------------------------------------------------------------------------------------- */
 
-extern "C" NetworkSessionManager* fn_803D4904(NetworkSessionManager* self)
+NetworkSessionManager::NetworkSessionManager()
 {
     s32 i;
 
-    self->vtable = &NetworkSessionManagerVTable;
-    __construct_array(&self->pool_7C[0], (void*)fn_803D4B60, (void*)dtor_803D4AF8, 0xA4, 2);
-    self->unused_04 = 0;
-    self->unused_08 = 0;
-    self->buffer = 0;
+    __construct_array(&this->pool_7C[0], (void*)fn_803D4B60, (void*)dtor_803D4AF8, 0xA4, 2);
+    this->unused_04 = 0;
+    this->unused_08 = 0;
+    this->buffer = 0;
     for (i = 0; i < 21; i++) {
-        self->requests_10[i] = 0;
-        self->request_state_64[i] = 0;
+        this->requests_10[i] = 0;
+        this->request_state_64[i] = 0;
     }
-    self->unused_79 = 1;
-    self->unused_7A = 1;
+    this->unused_79 = 1;
+    this->unused_7A = 1;
     for (i = 0; i < 2; i++) {
-        fn_803D4A50(&self->pool_7C[i]);
+        fn_803D4A50(&this->pool_7C[i]);
     }
-    return self;
 }
 
 extern "C" void fn_803D4A50(NetworkRequest* self)
@@ -394,59 +378,53 @@ extern "C" NetworkRequest* fn_803D4B60(NetworkRequest* self)
     return self;
 }
 
-extern "C" void* dtor_803D4B9C(NetworkSessionManager* self, s16 flags)
+NetworkSessionManager::~NetworkSessionManager()
 {
-    if (self != 0) {
-        self->vtable = &NetworkSessionManagerVTable;
-        fn_803D4D20(self);
-        __destroy_arr(&self->pool_7C[0], (void*)dtor_803D4AF8, 0xA4, 2);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+    NetworkSessionManager::release();
+    __destroy_arr(&this->pool_7C[0], (void*)dtor_803D4AF8, 0xA4, 2);
 }
 
-extern "C" void fn_803D4C18(NetworkSessionManager* self, u32 a, u32 b)
+
+void NetworkSessionManager::init(u32 a, u32 b)
 {
-    self->unused_04 = a;
-    self->unused_08 = b;
-    fn_803D4C24(self);
+    this->unused_04 = a;
+    this->unused_08 = b;
+    NetworkSessionManager::clear();
 }
 
-extern "C" void fn_803D4C24(NetworkSessionManager* self)
+void NetworkSessionManager::clear()
 {
     s32 i;
 
-    self->buffer = 0;
+    this->buffer = 0;
     for (i = 0; i < 21; i++) {
-        self->requests_10[i] = 0;
-        self->request_state_64[i] = 0;
+        this->requests_10[i] = 0;
+        this->request_state_64[i] = 0;
     }
     for (i = 0; i < 2; i++) {
-        fn_803D4A50(&self->pool_7C[i]);
+        fn_803D4A50(&this->pool_7C[i]);
     }
 }
 
-extern "C" void fn_803D4D20(NetworkSessionManager* self)
+void NetworkSessionManager::release()
 {
     NetworkBuffer* buf;
     s32 i;
 
-    buf = self->buffer;
+    buf = this->buffer;
     if (buf != 0) {
         buf->vtable->end_14(buf);
-        buf = self->buffer;
+        buf = this->buffer;
         if (buf != 0) {
             buf->vtable->destroy_08(buf, 1);
-            self->buffer = 0;
+            this->buffer = 0;
         }
     }
     for (i = 0; i < 0x15; i++) {
-        fn_803D64A4(self, &self->requests_10[i]);
+        fn_803D64A4(this, &this->requests_10[i]);
     }
     for (i = 0; i < 2; i++) {
-        fn_803D4B5C(&self->pool_7C[i]);
+        fn_803D4B5C(&this->pool_7C[i]);
     }
 }
 
@@ -487,280 +465,280 @@ extern "C" void fn_803D5150(NetworkRequest* req, NetworkSessionManager* owner,
 /* NetworkSessionManager - the lazy request allocators                                        */
 /* ----------------------------------------------------------------------------------------- */
 
-extern "C" void fn_803D50D8(NetworkSessionManager* self)
+void NetworkSessionManager::request364()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[1] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[1] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[1] = req;
-            fn_803D5150(req, self, lbl_805FA7CC, 0);
+            this->requests_10[1] = req;
+            fn_803D5150(req, this, lbl_805FA7CC, 0);
         }
     }
 }
 
-extern "C" void fn_803D528C(NetworkSessionManager* self)
+void NetworkSessionManager::request368()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[2] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[2] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[2] = req;
-            fn_803D5150(req, self, lbl_805FA7D8, 0);
+            this->requests_10[2] = req;
+            fn_803D5150(req, this, lbl_805FA7D8, 0);
         }
     }
 }
 
-extern "C" s32 fn_803D5304(NetworkSessionManager* self)
+s32 NetworkSessionManager::hasBuffer()
 {
-    return self->buffer != 0;
+    return this->buffer != 0;
 }
 
-extern "C" void fn_803D5318(NetworkSessionManager* self, u32 a, u32 b)
+void NetworkSessionManager::request372(u32 a, u32 b)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[3] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[3] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[3] = req;
-            fn_803D5150(req, self, lbl_805FA7E4, 2, a, b);
+            this->requests_10[3] = req;
+            fn_803D5150(req, this, lbl_805FA7E4, 2, a, b);
         }
     }
 }
 
-extern "C" void fn_803D53B0(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request376(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[4] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[4] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[4] = req;
-            fn_803D5150(req, self, lbl_805FA7F0, 1, a);
+            this->requests_10[4] = req;
+            fn_803D5150(req, this, lbl_805FA7F0, 1, a);
         }
     }
 }
 
-extern "C" void fn_803D5438(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request380(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[5] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[5] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[5] = req;
-            fn_803D5150(req, self, lbl_805FA7FC, 1, a);
+            this->requests_10[5] = req;
+            fn_803D5150(req, this, lbl_805FA7FC, 1, a);
         }
     }
 }
 
-extern "C" void fn_803D54C0(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request384(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[6] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[6] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[6] = req;
-            fn_803D5150(req, self, lbl_805FA808, 1, a);
+            this->requests_10[6] = req;
+            fn_803D5150(req, this, lbl_805FA808, 1, a);
         }
     }
 }
 
-extern "C" void fn_803D5548(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request388(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[6] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[6] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[6] = req;
-            fn_803D5150(req, self, lbl_805FA814, 1, a);
+            this->requests_10[6] = req;
+            fn_803D5150(req, this, lbl_805FA814, 1, a);
         }
     }
 }
 
-extern "C" void fn_803D55D0(NetworkSessionManager* self)
+void NetworkSessionManager::request432()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[7] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[7] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[7] = req;
-            fn_803D5150(req, self, lbl_805FA820, 0);
+            this->requests_10[7] = req;
+            fn_803D5150(req, this, lbl_805FA820, 0);
         }
     }
 }
 
-extern "C" void fn_803D5648(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request416(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[16] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[16] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[16] = req;
-            fn_803D5150(req, self, lbl_805FA82C, 1, a);
+            this->requests_10[16] = req;
+            fn_803D5150(req, this, lbl_805FA82C, 1, a);
         }
     }
 }
 
-extern "C" void fn_803D56D0(NetworkSessionManager* self, s8 a)
+void NetworkSessionManager::request420(s8 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[17] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[17] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[17] = req;
-            fn_803D5150(req, self, lbl_805FA838, 1, (u32)a);
+            this->requests_10[17] = req;
+            fn_803D5150(req, this, lbl_805FA838, 1, (u32)a);
         }
     }
 }
 
-extern "C" void fn_803D5758(NetworkSessionManager* self)
+void NetworkSessionManager::request424()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[20] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[20] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[20] = req;
-            fn_803D5150(req, self, lbl_805FA844, 0);
+            this->requests_10[20] = req;
+            fn_803D5150(req, this, lbl_805FA844, 0);
         }
     }
 }
 
-extern "C" void fn_803D57D0(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request404(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[8] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[8] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[8] = req;
-            fn_803D5150(req, self, lbl_805FA850, 1, a);
+            this->requests_10[8] = req;
+            fn_803D5150(req, this, lbl_805FA850, 1, a);
         }
     }
 }
 
-extern "C" void fn_803D5858(NetworkSessionManager* self)
+void NetworkSessionManager::request436()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[9] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[9] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[9] = req;
-            fn_803D5150(req, self, lbl_805FA85C, 0);
+            this->requests_10[9] = req;
+            fn_803D5150(req, this, lbl_805FA85C, 0);
         }
     }
 }
 
-extern "C" void fn_803D58D0(NetworkSessionManager* self)
+void NetworkSessionManager::request440()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[19] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[19] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[19] = req;
-            fn_803D5150(req, self, lbl_805FA868, 0);
+            this->requests_10[19] = req;
+            fn_803D5150(req, this, lbl_805FA868, 0);
         }
     }
 }
 
-extern "C" void fn_803D5948(NetworkSessionManager* self)
+void NetworkSessionManager::request444()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[10] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[10] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[10] = req;
-            fn_803D5150(req, self, lbl_805FA874, 0);
+            this->requests_10[10] = req;
+            fn_803D5150(req, this, lbl_805FA874, 0);
         }
     }
 }
 
-extern "C" void fn_803D59C0(NetworkSessionManager* self)
+void NetworkSessionManager::request408()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[11] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[11] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[11] = req;
-            fn_803D5150(req, self, lbl_805FA880, 0);
+            this->requests_10[11] = req;
+            fn_803D5150(req, this, lbl_805FA880, 0);
         }
     }
 }
 
-extern "C" void fn_803D5A38(NetworkSessionManager* self, u32 a, u32 b, s8 c)
+void NetworkSessionManager::request412(u32 a, u32 b, s8 c)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[15] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[15] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[15] = req;
-            fn_803D5150(req, self, lbl_805FA88C, 3, a, b, (u32)c);
+            this->requests_10[15] = req;
+            fn_803D5150(req, this, lbl_805FA88C, 3, a, b, (u32)c);
         }
     }
 }
 
-extern "C" void fn_803D5AE0(NetworkSessionManager* self)
+void NetworkSessionManager::request392()
 {
     NetworkRequest* req;
 
-    if (self->requests_10[12] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[12] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[12] = req;
-            fn_803D5150(req, self, lbl_805FA898, 0);
+            this->requests_10[12] = req;
+            fn_803D5150(req, this, lbl_805FA898, 0);
         }
     }
 }
 
-extern "C" void fn_803D5B58(NetworkSessionManager* self, u32 a, u32 b)
+void NetworkSessionManager::request396(u32 a, u32 b)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[13] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[13] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[13] = req;
-            fn_803D5150(req, self, lbl_805FA8A4, 2, a, b);
+            this->requests_10[13] = req;
+            fn_803D5150(req, this, lbl_805FA8A4, 2, a, b);
         }
     }
 }
 
-extern "C" void fn_803D5BF0(NetworkSessionManager* self, u32 a, u32 b)
+void NetworkSessionManager::request400(u32 a, u32 b)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[14] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[14] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[14] = req;
-            fn_803D5150(req, self, lbl_805FA8B0, 2, a, b);
+            this->requests_10[14] = req;
+            fn_803D5150(req, this, lbl_805FA8B0, 2, a, b);
         }
     }
 }
 
-extern "C" void fn_803D5C88(NetworkSessionManager* self, u32 a)
+void NetworkSessionManager::request428(u32 a)
 {
     NetworkRequest* req;
 
-    if (self->requests_10[18] == 0) {
-        req = fn_803D6430(self);
+    if (this->requests_10[18] == 0) {
+        req = fn_803D6430(this);
         if (req != 0) {
-            self->requests_10[18] = req;
-            fn_803D5150(req, self, lbl_805FA8BC, 1, a);
+            this->requests_10[18] = req;
+            fn_803D5150(req, this, lbl_805FA8BC, 1, a);
         }
     }
 }
@@ -769,9 +747,9 @@ extern "C" void fn_803D5C88(NetworkSessionManager* self, u32 a)
 /* NetworkSessionManager - accessors / small virtuals                                         */
 /* ----------------------------------------------------------------------------------------- */
 
-extern "C" void fn_803D5D10(NetworkSessionManager* self)
+void NetworkSessionManager::abortRequest4()
 {
-    NetworkRequest* req = self->requests_10[4];
+    NetworkRequest* req = this->requests_10[4];
 
     if (req != 0 && fn_803D5D64(req) == 0) {
         fn_803D5D58(req);
@@ -790,47 +768,47 @@ extern "C" s32 fn_803D5D64(NetworkRequest* self)
 }
 #pragma dont_inline off
 
-extern "C" void fn_803D5D6C(NetworkSessionManager* self)
+void NetworkSessionManager::abortRequest14()
 {
-    NetworkRequest* req = self->requests_10[14];
+    NetworkRequest* req = this->requests_10[14];
 
     if (req != 0 && fn_803D5D64(req) == 0) {
         fn_803D5D58(req);
     }
 }
 
-extern "C" void fn_803D5DB4(NetworkSessionManager* self, s8 value)
+void NetworkSessionManager::setFlag79(s8 value)
 {
-    self->unused_79 = value;
+    this->unused_79 = value;
 }
 
-extern "C" void fn_803D5DBC(void* self, s32 value)
+void NetworkSessionManager::notify(s32 value)
 {
     fn_803CF66C(value);
 }
 
-extern "C" void fn_803D5DC4(NetworkSessionManager* self, s8 value)
+void NetworkSessionManager::setFlag7A(s8 value)
 {
-    self->unused_7A = value;
+    this->unused_7A = value;
 }
 
-extern "C" s32 fn_803D5DCC(NetworkSessionManager* self, s8 value)
+s32 NetworkSessionManager::getInt(s8 value)
 {
-    if (self->buffer == 0) {
+    if (this->buffer == 0) {
         return 0;
     }
-    return self->buffer->vtable->getInt_90(self->buffer, self->vtable->mapId_1C0(self, value));
+    return this->buffer->vtable->getInt_90(this->buffer, mapId_1C0(value));
 }
 
-extern "C" f32 fn_803D5E38(NetworkSessionManager* self, s8 value)
+f32 NetworkSessionManager::getFloat(s8 value)
 {
-    if (self->buffer == 0) {
+    if (this->buffer == 0) {
         return 0.0f;
     }
-    return self->buffer->vtable->getFloat_8C(self->buffer, self->vtable->mapId_1C0(self, value));
+    return this->buffer->vtable->getFloat_8C(this->buffer, mapId_1C0(value));
 }
 
-extern "C" void fn_803D5EA4(NetworkSessionManager* self)
+void NetworkSessionManager::broadcastPlayerSlots()
 {
     s8 data[4];
 
@@ -838,49 +816,49 @@ extern "C" void fn_803D5EA4(NetworkSessionManager* self)
     data[1] = 1;
     data[2] = 2;
     data[3] = 3;
-    self->vtable->sendBatch_138(self, 4, data);
+    sendBatch_138(4, data);
 }
 
-extern "C" void fn_803D5EF8(NetworkSessionManager* self, u32 a, u32 b, u8 c)
+void NetworkSessionManager::putTerminatorA(u32 a, u32 b, u8 c)
 {
     s8 data;
     NetworkBuffer* buf;
 
     data = -1;
-    buf = self->buffer;
+    buf = this->buffer;
     if (buf != 0) {
         buf->vtable->put_38(buf, a, b, 1, 1, &data, c);
     }
 }
 
-extern "C" void fn_803D5F4C(NetworkSessionManager* self, u32 a, u32 b)
+void NetworkSessionManager::putTerminatorB(u32 a, u32 b)
 {
     s8 data;
     NetworkBuffer* buf;
 
     data = -2;
-    buf = self->buffer;
+    buf = this->buffer;
     if (buf != 0) {
         buf->vtable->put_38(buf, a, b, 0, 1, &data, 0xFF);
     }
 }
 
-extern "C" void fn_803D5F9C(NetworkSessionManager* self, u32 a, u32 b, u8 c)
+void NetworkSessionManager::putTerminatorC(u32 a, u32 b, u8 c)
 {
     s8 data;
     NetworkBuffer* buf;
 
     data = -2;
-    buf = self->buffer;
+    buf = this->buffer;
     if (buf != 0) {
         buf->vtable->put_38(buf, a, b, 1, 1, &data, c);
     }
 }
 
-extern "C" void fn_803D62D0(NetworkSessionManager* self)
+void NetworkSessionManager::flush()
 {
-    if (self->buffer != 0 && self->vtable->canSend_28(self) != 0) {
-        self->buffer->vtable->flush_44(self->buffer);
+    if (this->buffer != 0 && canSend_28() != 0) {
+        this->buffer->vtable->flush_44(this->buffer);
     }
 }
 

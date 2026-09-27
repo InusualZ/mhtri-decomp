@@ -3,9 +3,12 @@
  *
  * The types are unit-local (nothing else includes it yet): `NetworkSessionStable`,
  * `NetworkSessionManager` and `NetworkRequest` are reconstructed here from the range's own
- * disassembly (every field offset is the one the target instructions address).  The bit-stream
- * writer and the neighbouring `fn_` helpers are declared `extern "C"` because their owners are
- * still unsplit; per brief section 6.5 rule 2 those sites are the named unsplit gap.
+ * disassembly (every field offset is the one the target instructions address).  `NetworkSessionManager`
+ * is a CLASS with inheritance (rule 10): the base declares the 112-slot vtable the DOL carries at
+ * 0x805FA908, so MWCC emits the table and the vptr store instead of the unit writing them by hand; the
+ * 61 slots the original leaves 0 are pure virtual (`NetworkSessionManagerPat`'s table fills them).  The
+ * bit-stream writer and the neighbouring `fn_` helpers are declared `extern "C"` because their owners
+ * are still unsplit; per brief section 6.5 rule 2 those sites are the named unsplit gap.
  */
 
 #ifndef FN_803D3CE8_H
@@ -103,18 +106,132 @@ typedef struct NetworkSessionManagerVtable {
     s8 (*mapId_1C0)(void* self, s32 value);                      /* +0x1C0 */
 } NetworkSessionManagerVtable;
 
-typedef struct NetworkSessionManager {
-    NetworkSessionManagerVtable* vtable;   /* +0x00 */
+class NetworkSessionManager {
+public:
+    NetworkSessionManager();
+    virtual ~NetworkSessionManager();                      /* +0x008 */
+    virtual void init(u32 a, u32 b);                       /* +0x00C */
+    virtual void clear();                                  /* +0x010 */
+    virtual void release();                                /* +0x014 */
+    virtual void slot_18();                                /* +0x018 */
+    virtual void request364();                             /* +0x01C */
+    virtual void request368();                             /* +0x020 */
+    virtual s32 hasBuffer();                               /* +0x024 */
+    virtual u32 canSend_28() = 0;                          /* +0x028 */
+    virtual void pure_02C() = 0;                           /* +0x02C */
+    virtual void pure_030() = 0;                           /* +0x030 */
+    virtual void pure_034() = 0;                           /* +0x034 */
+    virtual void pure_038() = 0;                           /* +0x038 */
+    virtual void setFlag79(s8 value);                      /* +0x03C */
+    virtual void notify(s32 value);                        /* +0x040 */
+    virtual void setFlag7A(s8 value);                      /* +0x044 */
+    virtual void request372(u32 a, u32 b);                 /* +0x048 */
+    virtual void request376(u32 a);                        /* +0x04C */
+    virtual void request380(u32 a);                        /* +0x050 */
+    virtual void request384(u32 a);                        /* +0x054 */
+    virtual void request388(u32 a);                        /* +0x058 */
+    virtual void request392();                             /* +0x05C */
+    virtual void request396(u32 a, u32 b);                 /* +0x060 */
+    virtual void request400(u32 a, u32 b);                 /* +0x064 */
+    virtual void pure_068() = 0;                           /* +0x068 */
+    virtual void pure_06C() = 0;                           /* +0x06C */
+    virtual void pure_070() = 0;                           /* +0x070 */
+    virtual void pure_074() = 0;                           /* +0x074 */
+    virtual void pure_078() = 0;                           /* +0x078 */
+    virtual void pure_07C() = 0;                           /* +0x07C */
+    virtual void pure_080() = 0;                           /* +0x080 */
+    virtual void pure_084() = 0;                           /* +0x084 */
+    virtual void pure_088() = 0;                           /* +0x088 */
+    virtual void pure_08C() = 0;                           /* +0x08C */
+    virtual void pure_090() = 0;                           /* +0x090 */
+    virtual void pure_094() = 0;                           /* +0x094 */
+    virtual void pure_098() = 0;                           /* +0x098 */
+    virtual void pure_09C() = 0;                           /* +0x09C */
+    virtual void abortRequest4();                          /* +0x0A0 */
+    virtual void abortRequest14();                         /* +0x0A4 */
+    virtual void request404(u32 a);                        /* +0x0A8 */
+    virtual void request408();                             /* +0x0AC */
+    virtual void request412(u32 a, u32 b, s8 c);           /* +0x0B0 */
+    virtual void request416(u32 a);                        /* +0x0B4 */
+    virtual void request420(s8 a);                         /* +0x0B8 */
+    virtual void request424();                             /* +0x0BC */
+    virtual void request428(u32 a);                        /* +0x0C0 */
+    virtual void request432();                             /* +0x0C4 */
+    virtual void request436();                             /* +0x0C8 */
+    virtual void request440();                             /* +0x0CC */
+    virtual void request444();                             /* +0x0D0 */
+    virtual void pure_0D4() = 0;                           /* +0x0D4 */
+    virtual void pure_0D8() = 0;                           /* +0x0D8 */
+    virtual void pure_0DC() = 0;                           /* +0x0DC */
+    virtual void pure_0E0() = 0;                           /* +0x0E0 */
+    virtual void pure_0E4() = 0;                           /* +0x0E4 */
+    virtual void pure_0E8() = 0;                           /* +0x0E8 */
+    virtual void pure_0EC() = 0;                           /* +0x0EC */
+    virtual void pure_0F0() = 0;                           /* +0x0F0 */
+    virtual void pure_0F4() = 0;                           /* +0x0F4 */
+    virtual void pure_0F8() = 0;                           /* +0x0F8 */
+    virtual void pure_0FC() = 0;                           /* +0x0FC */
+    virtual void pure_100() = 0;                           /* +0x100 */
+    virtual void pure_104() = 0;                           /* +0x104 */
+    virtual void pure_108() = 0;                           /* +0x108 */
+    virtual void pure_10C() = 0;                           /* +0x10C */
+    virtual void pure_110() = 0;                           /* +0x110 */
+    virtual void pure_114() = 0;                           /* +0x114 */
+    virtual void pure_118() = 0;                           /* +0x118 */
+    virtual void pure_11C() = 0;                           /* +0x11C */
+    virtual s32 getInt(s8 value);                          /* +0x120 */
+    virtual f32 getFloat(s8 value);                        /* +0x124 */
+    virtual void broadcastPlayerSlots();                   /* +0x128 */
+    virtual void putTerminatorA(u32 a, u32 b, u8 c);       /* +0x12C */
+    virtual void putTerminatorB(u32 a, u32 b);             /* +0x130 */
+    virtual void putTerminatorC(u32 a, u32 b, u8 c);       /* +0x134 */
+    virtual void sendBatch_138(u32 count, const s8* data); /* +0x138 */
+    virtual void slot_13C();                               /* +0x13C */
+    virtual void slot_140();                               /* +0x140 */
+    virtual void slot_144();                               /* +0x144 */
+    virtual void flush();                                  /* +0x148 */
+    virtual void slot_14C();                               /* +0x14C */
+    virtual void slot_150();                               /* +0x150 */
+    virtual void slot_154();                               /* +0x154 */
+    virtual void slot_158();                               /* +0x158 */
+    virtual void slot_15C();                               /* +0x15C */
+    virtual void slot_160();                               /* +0x160 */
+    virtual void slot_164();                               /* +0x164 */
+    virtual void slot_168();                               /* +0x168 */
+    virtual void pure_16C() = 0;                           /* +0x16C */
+    virtual void pure_170() = 0;                           /* +0x170 */
+    virtual void pure_174() = 0;                           /* +0x174 */
+    virtual void pure_178() = 0;                           /* +0x178 */
+    virtual void pure_17C() = 0;                           /* +0x17C */
+    virtual void pure_180() = 0;                           /* +0x180 */
+    virtual void pure_184() = 0;                           /* +0x184 */
+    virtual void pure_188() = 0;                           /* +0x188 */
+    virtual void pure_18C() = 0;                           /* +0x18C */
+    virtual void pure_190() = 0;                           /* +0x190 */
+    virtual void pure_194() = 0;                           /* +0x194 */
+    virtual void pure_198() = 0;                           /* +0x198 */
+    virtual void pure_19C() = 0;                           /* +0x19C */
+    virtual void pure_1A0() = 0;                           /* +0x1A0 */
+    virtual void pure_1A4() = 0;                           /* +0x1A4 */
+    virtual void pure_1A8() = 0;                           /* +0x1A8 */
+    virtual void pure_1AC() = 0;                           /* +0x1AC */
+    virtual void pure_1B0() = 0;                           /* +0x1B0 */
+    virtual void pure_1B4() = 0;                           /* +0x1B4 */
+    virtual void pure_1B8() = 0;                           /* +0x1B8 */
+    virtual void pure_1BC() = 0;                           /* +0x1BC */
+    virtual s8 mapId_1C0(s32 value) = 0;                   /* +0x1C0 */
+    virtual void pure_1C4() = 0;                           /* +0x1C4 */
+
     u32 unused_04;                             /* +0x04 */
     u32 unused_08;                             /* +0x08 */
-    NetworkBuffer* buffer;                 /* +0x0C */
-    NetworkRequest* requests_10[21];       /* +0x10..+0x63 */
-    u8 request_state_64[21];               /* +0x64..+0x78 */
+    NetworkBuffer* buffer;                     /* +0x0C */
+    NetworkRequest* requests_10[21];           /* +0x10..+0x63 */
+    u8 request_state_64[21];                   /* +0x64..+0x78 */
     u8 unused_79;                              /* +0x79 */
     u8 unused_7A;                              /* +0x7A */
-    u8 pad7B;
-    NetworkRequest pool_7C[2];             /* +0x7C..+0x1C3 */
-} NetworkSessionManager;
+    u8 pad7B;                                  /* +0x7B */
+    NetworkRequest pool_7C[2];                 /* +0x7C..+0x1C3 */
+};   /* size: 0x1C4 */
 
 /* ---------------- NetworkSessionStable ---------------------------------------------------- */
 
@@ -176,7 +293,6 @@ extern "C" {
 
 /* class vtables live in another TU's `.data` - reference, never rebuild (rule 10) */
 extern NetworkSessionStableVtable NetworkSessionStable_VTable;
-extern NetworkSessionManagerVtable NetworkSessionManagerVTable;
 
 extern NetworkRequestDesc lbl_805FA7CC;
 extern NetworkRequestDesc lbl_805FA7D8;

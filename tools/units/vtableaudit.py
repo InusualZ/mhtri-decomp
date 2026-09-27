@@ -25,9 +25,20 @@ fine. A run we own and **neither emit nor reference** is the violation - the tab
 entirely. The legal rule-10 Case 2 shape is the mirror image and is explicitly **not** flagged, only recorded:
 `self->vtbl = lbl_XXXXXXXX;` where the address is outside every registered range is another TU's table, and
 storing its address is the correct way to reproduce the call without dragging a class into this TU. The source
-scan for that shape (`vtable = lbl_*`) reports every hit with its classification: `external` (no registered
-range owns it - legal), `foreign` (another unit owns it - legal), `own` (this unit's range - the shape rule 10
-forbids, reported).
+scan for that shape reports every hit with its classification: `external` (no registered range owns it -
+legal), `foreign` (another unit owns it - legal), `own` (this unit's range - the shape rule 10 forbids,
+reported).
+
+**The scan keys on the assignment and on OWNERSHIP, never on the table symbol's spelling** (fixed
+2026-09-27). It used to match `vtable = lbl_XXXXXXXX` and nothing else, so
+`self->vtable = &NetworkSessionManagerVTable;` in `Network/fn_803D3CE8.cpp` - a table at 0x805FA908, inside
+that unit's own band - was invisible to it and survived a landing review; the owner found it by reading the
+file. A rule about *ownership* cannot be enforced by a scan keyed on a *name*. The symbol on the right is now
+resolved through `symbols.txt` (any spelling) and classified against the unit's own registered ranges, and
+the member it is assigned to is matched either by the legacy `vtable`/`vtbl` name or by **the definition
+index**: any struct/class member at `+0x00` whose type is a pointer to a struct whose members are function
+pointers (the owner's heuristic - a function-pointer-table pointer at `+0x00` IS a class with inheritance).
+That is `fn_table_fields`, and it is what makes the `_VTable`-named blind spot impossible to repeat.
 
 **(c) section completeness.** The same defect seen from the other side: a `NonMatching` unit hides a missing
 `.data`/`.rodata` section entirely, because the target's bytes are scored against nothing of ours. Every
@@ -48,12 +59,19 @@ Read-only by construction: no `ninja`, no compile, no link, no write anywhere. S
     python tools/units/vtableaudit.py                    # every registered unit, runs + refs + section diffs
     python tools/units/vtableaudit.py --runs             # only the owned code-pointer runs
     python tools/units/vtableaudit.py --sections         # only the section-size differences
+    python tools/units/vtableaudit.py --fields           # only the fn-table-pointer fields at +0x00
     python tools/units/vtableaudit.py --unit Pl/pl_master
+    python tools/units/vtableaudit.py --diff <ref>       # exit 0 = the batch adds no rule-10 violation
     python tools/units/vtableaudit.py --json
     python tools/units/vtableaudit.py --selftest
 
 `--main` points the sweep at a tree holding `configure.py` and `build/` (default: the tree this file lives in),
-which is how a worktree audits `MAIN`'s built objects without a build of its own.
+which is how a worktree audits `MAIN`'s built objects without a build of its own. `--diff <ref>` is the
+`land.py` gate row's core: the violation set is computed twice - once with the batched tree and once with
+`<ref>`'s text (`configure.py`, `symbols.txt`, `splits.txt` and the `src/**` that carries an assignment, read
+with `git show`) - and only a set that *grew* is a refusal. The run half is judged with the working tree's
+objects on both sides, so the ownership change a batch makes (a new `.data` claim) is what the diff sees;
+a batch that only *removed* an emission is not refused by that half - it is named in the report instead.
 """
 
 from __future__ import annotations
@@ -63,6 +81,7 @@ import json
 import os
 import re
 import struct
+import subprocess
 import sys
 import time
 
@@ -103,11 +122,29 @@ RUN_KIND = {
     "extab": "exception", "extabindex": "exception",
 }
 
-# `self->vtable = (const SoundVtbl*)lbl_80597DA8;` - the rule-10 Case 2 shape, and the exact query the
-# by-hand audit used (an assignment to a member spelled `vtable`, with a `lbl_XXXXXXXX` address on the right
-# after any number of casts). A member named `vtable_...` is a different spelling and is not matched.
+# `self->vtable = (const SoundVtbl*)lbl_80597DA8;` and `self->vtable = &NetworkSessionManagerVTable;` -
+# the rule-10 shape: an ASSIGNMENT to a struct/class member that holds a table of code pointers. The scan
+# keys on the assignment and on the member's POSITION (a table pointer at +0x00 of a class), never on the
+# SPELLING of the table symbol on the right: `lbl_XXXXXXXX` was the only spelling the old pattern matched,
+# which is exactly how `Network/fn_803D3CE8.cpp`'s two `&NetworkSessionManagerVTable` writes survived a
+# landing review (2026-09-27). The symbol is resolved through `symbols.txt` and classified by OWNERSHIP, so
+# any name works. A member named `vtable_...` is a different member and is not matched.
 VTABLE_ASSIGN_RE = re.compile(
-    r"\bvtable\s*=\s*(?:\([^()]*\)\s*)*(?P<sym>lbl_[0-9A-Fa-f]{8})\b")
+    r"(?:->|\.)\s*(?P<field>[A-Za-z_]\w*)\s*=\s*(?!=)(?:\([^()]*\)\s*)*(?P<amp>&\s*)?"
+    r"(?P<sym>[A-Za-z_]\w*)\b")
+
+# The member names that count with no definition to prove them: the two spellings the by-hand audit and the
+# campaign's units use. `fn_table_fields` ADDS every other name the tree gives a function-pointer table at
+# `+0x00`, so a member spelled `pVtbl` is caught too.
+LEGACY_VTABLE_FIELDS = ("vtable", "vtbl")
+
+# A member that holds a table of code pointers at `+0x00` of a class is the rule-10 heuristic (owner,
+# 2026-09-27): `struct X { X_VTable* vtable; /* +0x00 */ ... }` is a CLASS WITH INHERITANCE - the field means
+# the original was a class with `virtual` methods and MWCC emitted the table and the store itself. A
+# function-pointer member is `RET (*name)(args);`; a struct with at least one of them is the pointee of such
+# a field.
+FN_PTR_RE = re.compile(r"\(\s*[*&]*\s*(?P<name>[A-Za-z_]\w*)\s*\)\s*\(")
+CLASS_OPEN_RE = re.compile(r"\b(?:typedef\s+)?(class|struct)\b\s*([A-Za-z_]\w*)?\s*(?::[^{;]*)?\{")
 
 SOURCE_EXT = (".c", ".cc", ".cpp", ".cxx", ".cp", ".c++")
 
@@ -147,17 +184,48 @@ def parse_splits(text: str) -> dict:
 
 
 def parse_symbols(text: str) -> dict:
-    """`{name: (section, address)}` from `config/RMHE08/symbols.txt`.
+    """`{name: (section, address, size)}` from `config/RMHE08/symbols.txt`.
 
     Needed to resolve a relocation whose symbol is **undefined** in the object (the splitter names it with
-    the map's spelling but has no address for it) and to name the symbol a run sits at.
+    the map's spelling but has no address for it), to name the symbol a run sits at, and - for the rule-10
+    ownership test - to read the table's own extent out of the DOL.
     """
     out = {}
     for line in text.splitlines():
         m = SYMBOL_RE.match(line)
         if m:
-            out[m.group(1)] = (m.group(2), int(m.group(3), 16))
+            size = re.search(r"size:(0x[0-9A-Fa-f]+)", line)
+            out[m.group(1)] = (m.group(2), int(m.group(3), 16),
+                               int(size.group(1), 16) if size else 0)
     return out
+
+
+def dol_segments(blob: bytes) -> list:
+    """`[(start, size, file_offset)]` for every section the DOL header declares - the raw byte reader."""
+    if len(blob) < 0x100:
+        return []
+    text_off = struct.unpack_from(">7I", blob, 0x00)
+    data_off = struct.unpack_from(">11I", blob, 0x1C)
+    text_addr = struct.unpack_from(">7I", blob, 0x48)
+    data_addr = struct.unpack_from(">11I", blob, 0x64)
+    text_size = struct.unpack_from(">7I", blob, 0x90)
+    data_size = struct.unpack_from(">11I", blob, 0xAC)
+    out = []
+    for i in range(7):
+        if text_size[i]:
+            out.append((text_addr[i], text_size[i], text_off[i]))
+    for i in range(11):
+        if data_size[i]:
+            out.append((data_addr[i], data_size[i], data_off[i]))
+    return out
+
+
+def dol_read(blob: bytes, address: int, length: int) -> bytes:
+    """The DOL's own bytes at `address`, or None when the address is in no section."""
+    for start, size, offset in dol_segments(blob):
+        if start <= address < start + size:
+            return blob[offset + address - start:offset + address - start + length]
+    return None
 
 
 def dol_text_ranges(blob: bytes) -> list:
@@ -282,7 +350,7 @@ def section_diff(ours: dict, target: dict) -> list:
 
 
 def classify_reference(address: int, unit_ranges, all_ranges) -> str:
-    """`own` | `foreign` | `external` for a `vtable = lbl_*` address.
+    """`own` | `foreign` | `external` for a `vtable = <table>` address.
 
     `external` (no registered range owns it) is rule 10 Case 2 and legal; `foreign` (another unit owns it)
     is that unit's table, legal to reference; `own` is the shape the rule forbids - this unit's own table
@@ -295,15 +363,35 @@ def classify_reference(address: int, unit_ranges, all_ranges) -> str:
     return "external"
 
 
+def table_belongs_to_unit(blob, named, unit_text_ranges) -> bool:
+    """Whether a table at `named = (section, address, size)` is structurally the unit's own vtable.
+
+    The second half of the ownership test, and the one that catches the defect **before** the unit claims
+    the range: rule 10's inheritance evidence is the object's structure - the slot addresses read out of the
+    DOL - so a table whose code pointers land inside this unit's own `.text` is this unit's table, whether
+    the unit has claimed its `.data` yet or not. `NetworkSessionManagerVTable` (0x805FA908, 51 entries, all
+    51 in `Network/fn_803D3CE8.cpp`'s `.text`) is exactly that case, and it was `external` - and therefore
+    silent - for as long as the unit claimed no `.data`.
+    """
+    if blob is None or not named or not named[2]:
+        return False
+    data = dol_read(blob, named[1], named[2])
+    if not data:
+        return False
+    words = [struct.unpack_from(">I", data, i)[0] for i in range(0, len(data) - 3, 4)]
+    inside = [w for w in words if in_ranges(unit_text_ranges, w)]
+    return len(inside) >= MIN_RUN_WORDS
+
+
 def symbol_at(symbols_by_name: dict, section: str, address: int):
     """The name `symbols.txt` gives the address, or the nearest symbol at or below it in the same section."""
-    for name, (sec, addr) in symbols_by_name.items():
-        if sec == section and addr == address:
+    for name, row in symbols_by_name.items():
+        if row[0] == section and row[1] == address:
             return name
     best = None
-    for name, (sec, addr) in symbols_by_name.items():
-        if sec == section and addr <= address and (best is None or addr > best[1]):
-            best = (name, addr)
+    for name, row in symbols_by_name.items():
+        if row[0] == section and row[1] <= address and (best is None or row[1] > best[1]):
+            best = (name, row[1])
     if best is None:
         return None
     return "%s+0x%X" % (best[0], address - best[1]) if best[1] != address else best[0]
@@ -370,10 +458,21 @@ def read_object(path: str):
     return obj
 
 
-def load_tree(main: str) -> dict:
-    """Everything the sweep reads once: the splits, the symbol map and the DOL's `.text` ranges."""
-    splits = parse_splits(read_text(os.path.join(main, SPLITS_REL)) or "")
-    symbols = parse_symbols(read_text(os.path.join(main, SYMBOLS_REL)) or "")
+def load_tree(main: str, ref: str | None = None) -> dict:
+    """Everything the sweep reads once: the splits, the symbol map and the DOL's `.text` ranges.
+
+    With `ref`, `splits.txt`/`symbols.txt` (and, through `unit_list`, the registered set) come from that
+    revision via `git show` - the `--diff` back side is judged by the map it was written against. The DOL
+    itself is immutable and always read from the tree.
+    """
+    def text(rel):
+        if ref:
+            got = _git(main, "show", "%s:%s" % (ref, rel.replace(os.sep, "/")))
+            if got:
+                return got
+        return read_text(os.path.join(main, rel)) or ""
+    splits = parse_splits(text(SPLITS_REL))
+    symbols = parse_symbols(text(SYMBOLS_REL))
     blob = None
     dol = os.path.join(main, DOL_REL)
     try:
@@ -387,30 +486,270 @@ def load_tree(main: str) -> dict:
         text = merge_ranges([(r["start"], r["end"]) for u in splits.values() for r in u
                              if r["section"] in CODE_SECTIONS])
         source = "splits"
-    return {"main": main, "splits": splits, "symbols": symbols,
+    return {"main": main, "splits": splits, "symbols": symbols, "blob": blob,
             "text_ranges": merge_ranges(text), "text_source": source}
 
 
-def scan_source_references(main: str) -> list:
-    """Every `vtable = lbl_XXXXXXXX` assignment in `src/`, with the unit and the reference's classification."""
-    out = []
-    for dirpath, dirnames, filenames in os.walk(os.path.join(main, "src")):
-        dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
-        for fn in sorted(filenames):
-            if os.path.splitext(fn)[1] not in SOURCE_EXT:
-                continue
-            path = os.path.join(dirpath, fn)
-            rel = os.path.relpath(path, main).replace("\\", "/")
-            unit = rel[len("src/"):] if rel.startswith("src/") else rel
-            text = read_text(path)
-            if text is None:
-                continue
-            for lineno, line in enumerate(text.splitlines(), 1):
-                for m in VTABLE_ASSIGN_RE.finditer(line):
-                    symbol = m.group("sym")
-                    out.append({"file": rel, "line": lineno, "unit": unit, "symbol": symbol,
-                                "address": int(symbol.split("_", 1)[1], 16)})
+def unit_list(main: str, tree: dict, ref: str | None = None) -> list:
+    """`[{"path", "flag"}]` - `configure.py`'s registered units, or `ref`'s splits when there is a ref.
+
+    The `--diff` back side needs the unit set that revision registered, and `splits.txt` is the file that
+    says which ranges a unit owns - a unit with a splits block and no `configure.py` line has no runs to
+    audit anyway, and one with a line and no block has no ranges.
+    """
+    if ref:
+        return [{"path": p, "flag": ""} for p in sorted(tree["splits"])]
+    return langcheck.registered_units(main)
+
+
+# --------------------------------------------------------------------------------------------------
+# the definition index: a member at +0x00 that holds a function-pointer table
+# --------------------------------------------------------------------------------------------------
+_BLANKERS = (re.compile(r"/\*.*?\*/", re.S), re.compile(r"//[^\n]*"),
+             re.compile(r'"(?:\\.|[^"\\])*"'), re.compile(r"'(?:\\.|[^'\\])*'"))
+
+
+def blank_literals(text: str) -> str:
+    """Replace comments and string/char literals with same-length blanks, keeping newlines.
+
+    Brace matching and field splitting must not see a `{` inside a comment or a `;` inside a literal - a
+    declaration comment with an address in it is common here. Positions are preserved, so a reported line
+    is still the source's line.
+    """
+    def rep(m):
+        return "".join("\n" if c == "\n" else " " for c in m.group(0))
+    for rx in _BLANKERS:
+        text = rx.sub(rep, text)
+    return text
+
+
+def _match_brace(code: str, open_pos: int):
+    """Index of the `}` matching the `{` at `open_pos`, or None. Comment/literal-free input."""
+    depth = 0
+    for i in range(open_pos, len(code)):
+        if code[i] == "{":
+            depth += 1
+        elif code[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
+
+
+def _members(body: str):
+    """`[(type_text, name, is_fn_ptr)]` for the top-level `;`-terminated members of a class body.
+
+    Nested braces (an inline function body, an anonymous union) are skipped as one chunk, and a member whose
+    declarator ends in `= ...` (an initializer) keeps the name before the `=`. An access specifier is not a
+    member.
+    """
+    out, start, depth, i = [], 0, 0, 0
+    while i < len(body):
+        c = body[i]
+        if c in "{({":
+            depth += 1
+        elif c in "})":
+            depth = max(0, depth - 1)
+        elif c == ";" and depth == 0:
+            chunk = body[start:i].strip()
+            start = i + 1
+            if chunk:
+                head = chunk.split("=", 1)[0].strip()
+                fp = FN_PTR_RE.search(head)
+                if fp:                              # `RET (*name)(args);` - a function pointer member
+                    out.append((head[:fp.start()] + head[fp.end():], fp.group("name"), True))
+                else:
+                    m = re.search(r"([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?$", head)
+                    if m and not re.fullmatch(r"(public|private|protected|virtual)", m.group(1)):
+                        out.append((head[:m.start(1)] + head[m.end(1):], m.group(1), False))
+        i += 1
     return out
+
+
+def type_definitions(texts: dict) -> dict:
+    """`{type_name: [(member_type_text, member_name, source_file)]}` for every struct/class in `texts`.
+
+    `texts` is `{path: text}`; a typedef'd anonymous definition takes the name after the closing brace. A
+    heavier parser would be wrong here - the index feeds a heuristic, and the shape it needs ("is this
+    member a pointer to a struct of function pointers") is decidable from the declarators alone.
+    """
+    defs = {}
+    for path, text in texts.items():
+        code = blank_literals(text)
+        for m in CLASS_OPEN_RE.finditer(code):
+            close = _match_brace(code, m.end() - 1)
+            if close is None:
+                continue
+            name = m.group(2)
+            if not name:
+                tail = re.match(r"\s*([A-Za-z_]\w*)?\s*;", code[close + 1:close + 120])
+                name = (tail.group(1) if tail else None) if tail else None
+            if not name:
+                continue
+            defs.setdefault(name, []).extend(
+                (t.strip(), n, path, fn) for t, n, fn in _members(code[m.end():close]))
+    return defs
+
+
+def _is_fn_table(members) -> bool:
+    """Whether a type is a table of CODE pointers: >=2 function pointers and nothing else but RTTI/padding.
+
+    The tight half of the heuristic, and the reason it is not just "points at something callable": a linked
+    list's `next` (pointing at a struct that happens to hold a destructor) and a module record with function
+    pointers among its fields are both *data* structures, not vtables. A vtable is function pointers plus the
+    two RTTI words plus `pad` slots for the ones this file did not name.
+    """
+    if sum(1 for m in members if m[3]) < 2:
+        return False
+    for decl, name, _path, is_fn in members:
+        if is_fn:
+            continue
+        if decl.strip() in ("void*", "char*", "void *"):
+            continue
+        if re.fullmatch(r"(u8|u16|u32|u64|s8|s16|s32)( \[[^\]]*\])?", decl.strip()) \
+                and re.match(r"(rtti|pad|unused|unknown|reserved|_)", name):
+            continue
+        return False
+    return True
+
+
+def fn_table_fields(defs: dict) -> dict:
+    """`{member_name: {"pointee", "file", "type"}}` for every definition whose FIRST member is a
+    fn-table pointer.
+
+    The owner's heuristic, made mechanical: a struct/class whose member at `+0x00` (the first one, or one
+    carrying an explicit `+0x00` offset) is a pointer to a type whose members are function pointers is a
+    class with inheritance. The member's NAME is whatever the source called it - the point is that no scan
+    keys on a spelling any more.
+    """
+    fn_tables = {name for name, members in defs.items() if _is_fn_table(members)}
+    out = {}
+    for name, members in defs.items():
+        if not members:
+            continue
+        for index, (decl, field, _path, _fn) in enumerate(members):
+            if index and "+0x00" not in decl:
+                break
+            pointee = _pointee_type(decl)
+            if pointee is None:
+                break
+            if pointee in fn_tables:
+                out.setdefault(field, {"pointee": pointee, "file": _path, "type": name})
+            break
+    return out
+
+
+def _pointee_type(decl: str):
+    """The struct name a member declarator points at (`Foo* f[2]` -> `Foo`), or None."""
+    decl = decl.replace("const ", " ").strip()
+    m = re.match(r"(struct\s+|class\s+)?([A-Za-z_]\w*)\s*\*", decl)
+    return m.group(2) if m else None
+
+
+# --------------------------------------------------------------------------------------------------
+# the source scan
+# --------------------------------------------------------------------------------------------------
+def working_texts(main: str) -> dict:
+    """`{relpath: text}` for every source and header in the working tree - the definition index's input.
+
+    `include/` matters as much as `src/`: the class a member belongs to is usually declared in a header
+    (`include/Network/fn_803D3CE8.h` holds `NetworkSessionManager`), and reading only the `.cpp` would miss
+    the member entirely.
+    """
+    out = {}
+    for top in ("src", "include"):
+        root_dir = os.path.join(main, top)
+        for dirpath, dirnames, filenames in os.walk(root_dir):
+            dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+            for fn in sorted(filenames):
+                if os.path.splitext(fn)[1] not in SOURCE_EXT + (".h", ".hpp"):
+                    continue
+                path = os.path.join(dirpath, fn)
+                text = read_text(path)
+                if text is not None:
+                    out[os.path.relpath(path, main).replace("\\", "/")] = text
+    return out
+
+
+def scan_text_assignments(text: str, fields: dict) -> list:
+    """Every `->member = <symbol>;` in one source text whose member is a `+0x00` fn-table pointer.
+
+    Comments and string literals are blanked first (`blank_literals`), so a header comment that *quotes*
+    the defect - `self->vtable = &NetworkSessionManagerVTable;` - is not read as one. Positions are
+    preserved, so the reported line is the source's.
+    """
+    out = []
+    for lineno, line in enumerate(blank_literals(text).splitlines(), 1):
+        for m in VTABLE_ASSIGN_RE.finditer(line):
+            field = m.group("field")
+            if field not in fields and field not in LEGACY_VTABLE_FIELDS:
+                continue
+            out.append({"line": lineno, "field": field, "symbol": m.group("sym"),
+                        "cast": bool(m.group("amp"))})
+    return out
+
+
+def scan_source_references(main: str, fields: dict, symbols_by_name: dict,
+                          ref: str | None = None) -> list:
+    """Every fn-table-pointer assignment in `src/`, classified by the OWNERSHIP of its symbol.
+
+    The working tree is walked; with `ref` the file list comes from `git grep` at that revision and each
+    hit's text from `git show`, which is the `--diff` back side. The reference's address comes from
+    `symbols.txt` (any spelling), falling back to the `_XXXXXXXX` suffix a `lbl_`/`fn_` name carries.
+    """
+    out = []
+    if ref:
+        # `git grep -l` prefixes every hit with the revision (`HEAD:src/x.cpp`); the blob is then read with
+        # `git show`, so a file that HEAD does not have is simply not in the list.
+        paths = [line.split(":", 1)[-1]
+                 for line in _git(main, "grep", "-l", "-E", _GREP_PATTERN, ref, "--", "src").splitlines()]
+        paths = [p for p in paths if os.path.splitext(p)[1] in SOURCE_EXT]
+        if not paths:
+            return out
+        files = [(p, _git(main, "show", "%s:%s" % (ref, p))) for p in paths]
+    else:
+        files = []
+        for dirpath, dirnames, filenames in os.walk(os.path.join(main, "src")):
+            dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+            for fn in sorted(filenames):
+                if os.path.splitext(fn)[1] not in SOURCE_EXT:
+                    continue
+                path = os.path.join(dirpath, fn)
+                rel = os.path.relpath(path, main).replace("\\", "/")
+                text = read_text(path)
+                if text is not None:
+                    files.append((rel, text))
+    for rel, text in files:
+        rel = rel.replace("\\", "/")
+        unit = rel[len("src/"):] if rel.startswith("src/") else rel
+        for hit in scan_text_assignments(text, fields):
+            address, section = _symbol_address(hit["symbol"], symbols_by_name)
+            out.append(dict(hit, file=rel, unit=unit, symbol_section=section,
+                            address=address))
+    return out
+
+
+# the `git grep` prefilter for the `--diff` side: a member assignment, whatever the table is called
+_GREP_PATTERN = r"(->|\\.)[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*=[^=]"
+
+
+def _symbol_address(name: str, symbols_by_name: dict):
+    """`(address, section)` for a source symbol, from the map first and the `_XXXXXXXX` suffix second."""
+    named = symbols_by_name.get(name)
+    if named:
+        return named[1], named[0]
+    m = HEX_SUFFIX_RE.search(name)
+    return (int(m.group(1), 16), None) if m else (None, None)
+
+
+def _git(root: str, *args: str) -> str:
+    """`git <args>` stdout, or `""` - a missing ref or a file absent at it is a fact, not a crash."""
+    try:
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                           errors="replace")
+    except OSError:
+        return ""
+    return p.stdout if p.returncode == 0 else ""
 
 
 # --------------------------------------------------------------------------------------------------
@@ -512,12 +851,17 @@ def _verdict_run(run, section, first, words, address, our, our_bases, symbols_by
         run["verdict"] = "violation"
 
 
-def sweep(main: str, only: str | None = None) -> dict:
-    """Audit every registered unit. Returns the runs, the source references, the section diffs and counts."""
+def sweep(main: str, only: str | None = None, text_ref: str | None = None) -> dict:
+    """Audit every registered unit. Returns the runs, the source references, the section diffs and counts.
+
+    `text_ref` judges the text half (`configure.py`/`symbols.txt`/`splits.txt`/`src/**`) as of that git
+    revision - the `--diff` back side. The object half is the working tree's on both sides, so the diff sees
+    an ownership change (a new `.data` claim) exactly; see the module docstring for what that implies.
+    """
     main = os.path.abspath(main)
     t0 = time.time()
-    tree = load_tree(main)
-    units = langcheck.registered_units(main)
+    tree = load_tree(main, ref=text_ref)
+    units = unit_list(main, tree, ref=text_ref)
     if only:
         want = only.replace("\\", "/").strip("/")
         units = [u for u in units
@@ -525,11 +869,23 @@ def sweep(main: str, only: str | None = None) -> dict:
     records = [audit_unit(tree, u["path"], u.get("flag", "")) for u in units]
 
     all_ranges = merge_ranges([(r["start"], r["end"]) for u in tree["splits"].values() for r in u])
+    fields = fn_table_fields(type_definitions(working_texts(main)))
     refs = []
-    for ref in scan_source_references(main):
+    for ref in scan_source_references(main, fields, tree["symbols"], ref=text_ref):
         ranges = merge_ranges([(r["start"], r["end"]) for r in tree["splits"].get(ref["unit"], [])])
-        ref = dict(ref, kind=classify_reference(ref["address"], ranges, all_ranges))
-        refs.append(ref)
+        text_ranges = merge_ranges([(r["start"], r["end"]) for r in tree["splits"].get(ref["unit"], [])
+                                    if r["section"] in CODE_SECTIONS])
+        structural = False
+        if ref["address"] is None:
+            kind = "unresolved"
+        else:
+            kind = classify_reference(ref["address"], ranges, all_ranges)
+            if kind != "own" and table_belongs_to_unit(tree["blob"], tree["symbols"].get(ref["symbol"]),
+                                                       text_ranges):
+                # the table's OWN entries are this unit's code: it is this unit's vtable even though the
+                # range is unclaimed, which is the state the hand assignment shipped in
+                kind, structural = "own", True
+        refs.append(dict(ref, kind=kind, structural=structural))
     refs = [r for r in refs if not only or _same_unit(r["unit"], only)]
 
     runs = [r for rec in records for r in rec["runs"]]
@@ -538,6 +894,7 @@ def sweep(main: str, only: str | None = None) -> dict:
     return {
         "root": main,
         "text_source": tree["text_source"],
+        "text_ref": text_ref,
         "units_total": len(records),
         "units_built": sum(1 for r in records if r["status"] != "unbuilt"),
         "unbuilt": [r for r in records if r["status"] == "unbuilt"],
@@ -549,7 +906,8 @@ def sweep(main: str, only: str | None = None) -> dict:
         "violations": violations,
         "references": refs,
         "reference_kinds": {k: sum(1 for r in refs if r["kind"] == k)
-                            for k in ("external", "foreign", "own")},
+                            for k in ("external", "foreign", "own", "unresolved")},
+        "fn_table_fields": {k: v for k, v in sorted(fields.items())},
         "sections": sections,
         "section_kinds": {k: sum(1 for d in sections if d["kind"] == k)
                           for k in ("missing", "extra", "short", "long")},
@@ -564,6 +922,22 @@ def sweep(main: str, only: str | None = None) -> dict:
 def _same_unit(path: str, spec: str) -> bool:
     a, b = path.replace("\\", "/"), spec.replace("\\", "/").strip("/")
     return a == b or os.path.splitext(a)[0] == os.path.splitext(b)[0]
+
+
+def violation_keys(s: dict) -> list:
+    """Stable identifiers for every rule-10 violation in a sweep result - the `--diff` comparison's unit.
+
+    A key is `run:<unit>:<section>:<address>` for an owned code-pointer run our object neither emits nor
+    references, and `ref:<file>:<line>:<symbol>` for an assignment whose table the unit itself owns. The
+    `land.py` gate row refuses a batch whose set *grew* - an existing violation is grandfathered exactly the
+    way the lint's `--diff` grandfathers a finding - so the existing ones (`fn_80429B94.cpp`'s seven,
+    `fn_80423E74.cpp`, `ai/fn_802CC794.cpp`, `enemy/em_act_step.cpp`'s own-range assignment) do not refuse
+    every batch forever.
+    """
+    keys = ["run:%s:%s:%08X" % (r["unit"], r["section"], r["address"]) for r in s["violations"]]
+    keys += ["ref:%s:%d:%s" % (r["file"], r["line"], r["symbol"])
+             for r in s["references"] if r["kind"] == "own"]
+    return sorted(keys)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -608,14 +982,27 @@ def render(s: dict, out=sys.stdout, show_runs=True, show_refs=True, show_section
               % (run["unit"], run["section"], run["address"], run["words"]), file=out)
 
     refs = s["references"]
-    print("  vtable assignments in src/ (`...->vtable = lbl_XXXXXXXX;`): %d"
-          % len(refs), file=out)
-    print("    external %d (rule 10 Case 2 - another TU's table, legal), foreign %d, own-range %d (reported)"
-          % (s["reference_kinds"]["external"], s["reference_kinds"]["foreign"],
-             s["reference_kinds"]["own"]), file=out)
+    kinds = s["reference_kinds"]
+    print("  fn-table-pointer fields at +0x00 (a class with inheritance): %d"
+          % len(s["fn_table_fields"]), file=out)
+    for field, info in s["fn_table_fields"].items():
+        print("    %-14s -> %-28s %s" % (field, info["pointee"], info["file"]), file=out)
+    print("  assignments to such a member anywhere in src/ (any symbol spelling): %d" % len(refs),
+          file=out)
+    print("    external %d (rule 10 Case 2 - another TU's table, legal), foreign %d, own-range %d "
+          "(reported), unresolved %d"
+          % (kinds["external"], kinds["foreign"], kinds["own"], kinds["unresolved"]), file=out)
     for ref in refs:
-        if ref["kind"] == "own" or show_refs:
-            print("    %-7s %s:%d  %s" % (ref["kind"], ref["file"], ref["line"], ref["symbol"]), file=out)
+        if ref["kind"] in ("own", "unresolved") or show_refs:
+            print("    %-10s %s:%d  %s%s"
+                  % (ref["kind"], ref["file"], ref["line"], ref["symbol"],
+                     "  (the table's own entries are this unit's code)" if ref.get("structural") else ""),
+                  file=out)
+    for ref in refs:
+        if ref["kind"] == "own":
+            print("  VIOLATION %s:%d assigns %s (0x%08X), which THIS unit owns - model the class and let "
+                  "MWCC emit the table"
+                  % (ref["file"], ref["line"], ref["symbol"], ref["address"]), file=out)
 
     diffs = s["sections"]
     print("  section completeness (ours vs the target object, every non-.text section): %d differences "
@@ -641,18 +1028,35 @@ def main(argv=None) -> int:
     ap.add_argument("--unit", default=None, help="one registered unit (path, with or without extension)")
     ap.add_argument("--runs", action="store_true", help="report only the owned code-pointer runs")
     ap.add_argument("--sections", action="store_true", help="report only the section-size differences")
+    ap.add_argument("--fields", action="store_true", help="report only the +0x00 fn-table-pointer fields")
+    ap.add_argument("--diff", metavar="REF", default=None,
+                    help="compare the working tree with REF; exit 1 when the rule-10 set grows")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
         import vtableaudit_selftest
         return vtableaudit_selftest.selftest()
-    s = sweep(args.main or ROOT, only=args.unit)
+    main_tree = args.main or ROOT
+    s = sweep(main_tree, only=args.unit)
+    if args.diff is not None:
+        back = sweep(main_tree, only=args.unit, text_ref=args.diff)
+        added = sorted(set(violation_keys(s)) - set(violation_keys(back)))
+        if args.json:
+            print(json.dumps({"ref": args.diff, "added": added,
+                              "before": violation_keys(back), "after": violation_keys(s)}, indent=2))
+            return 1 if added else 0
+        print("vtableaudit --diff %s: %d rule-10 violation(s) before, %d after, %d added"
+              % (args.diff, len(set(violation_keys(back))), len(set(violation_keys(s))), len(added)))
+        for key in added:
+            print("  ADDED %s" % key)
+        return 1 if added else 0
     if args.json:
         print(json.dumps(s, indent=2))
     else:
-        render(s, show_runs=not args.sections, show_refs=not (args.runs or args.sections),
-               show_sections=not args.runs)
+        render(s, show_runs=not (args.sections or args.fields),
+               show_refs=not (args.runs or args.sections or args.fields),
+               show_sections=not (args.runs or args.fields))
     return 0
 
 
