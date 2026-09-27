@@ -48,19 +48,17 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* Types                                                                                          */
 /* --------------------------------------------------------------------------------------------- */
 
-/* The three-float vector the ef emitter calls pass around (this unit's own copy: `Vec3` in
- * Pl/pl_master.cpp is a different unit's). */
-typedef struct EfVec3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} EfVec3; /* size: 0x0C */
+/* The three-float vector the ef emitter calls pass around: the shared record the three vector
+ * helpers take, reached here as the local spelling `EfVec3` (the name the ef band's own code
+ * uses). */
+typedef nw4r::math::VEC3 EfVec3; /* size: 0x0C */
 
 /* The emitter sub-object at `em + 0xEC` whose normalised progress `fn_800A8A08` returns. Only its
  * address is used here; `fn_800A8A08` reads the u32 at +0x00. */
@@ -126,11 +124,11 @@ extern const f32 lbl_80796318; /* 0.01f */
 extern "C" {
 extern f32 fn_800A8A08(struct EfRate *rate);
 extern u16 fn_800A9FB0(void *self, u16 id, struct EfEmitter *em, f32 f);
-extern void fn_800A99B4(void *self, struct EfVec3 *out, struct EfEmitter *em, struct EfVec3 *a,
-                        struct EfVec3 *b, struct EfVec3 *c, struct EfVec3 *d);
+extern void fn_800A99B4(void *self, nw4r::math::VEC3 *out, struct EfEmitter *em, nw4r::math::VEC3 *a,
+                        nw4r::math::VEC3 *b, nw4r::math::VEC3 *c, nw4r::math::VEC3 *d);
 extern f32 fn_80050BC0(f32 x);
 extern void fn_8009C760(f32 *a, f32 *b, f32 angle);
-extern void fn_8009C484(struct EfVec3 *a, struct EfVec3 *b);
+extern void fn_8009C484(nw4r::math::VEC3 *a, nw4r::math::VEC3 *b);
 }
 
 /* --------------------------------------------------------------------------------------------- */

@@ -2,8 +2,8 @@
  *
  * Bracket note (docs/plan.md 6.5 rule 2): this file exists so a Pl unit can reach the pad query
  * without dragging the whole of `include/mh3_pad.h` in.  The clash it was filed for - `include/ef.h`
- * spelling `copyVec3`/`setVec3`/`VEC3_ctor` `VEC3*`/`Vec*` while `mh3_pad.h` spells them `void*`,
- * MWCC `(10197)` - is CLOSED: both headers now spell them identically.
+ * spelling `copyVec3`/`setVec3`/`VEC3_ctor` with a different record type than the owner's header,
+ * MWCC `(10197)` - is CLOSED: every header now spells them `nw4r::math::VEC3*` (rule 11).
  */
 #ifndef MHTRI_MH3_PAD_CONTROL_H
 #define MHTRI_MH3_PAD_CONTROL_H

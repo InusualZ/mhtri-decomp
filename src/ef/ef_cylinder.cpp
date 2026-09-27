@@ -43,16 +43,14 @@
 #pragma fp_contract off
 
 #include "types.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "unsplit/ef.h"
 #include "fn_8004CAD8.h"       /* fn_80050BC0 - that unit owns the address and publishes it (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
-/* A 3-float vector. */
-typedef struct Vec {
-    f32 x;                /* +0x00 */
-    f32 y;                /* +0x04 */
-    f32 z;                /* +0x08 */
-} Vec;                    /* size: 0x0C */
+/* The 3-float vector `include/nw4r/math.h` owns, spelled `VEC3` here: this unit's whole vector
+ * API (`fn_8009C484`, `fn_80051490`, the spawn slot) works on it. */
+typedef nw4r::math::VEC3 VEC3; /* size: 0x0C */
 
 /* The six-float parameter block `params`. */
 typedef struct EfParams {
@@ -83,7 +81,7 @@ typedef struct EfParticle EfParticle;
 
 typedef struct EfParticleSlots {
     u8  pad_0x00[0x14];   /* +0x00 */
-    void (*spawn)(EfParticle* self, u16 id, Vec* pos, Vec* dir, s32 param, u8* extra, /* +0x14 */
+    void (*spawn)(EfParticle* self, u16 id, VEC3* pos, VEC3* dir, s32 param, u8* extra, /* +0x14 */
                   u32 work_param, u16 work_id, f32 scale);
 } EfParticleSlots;        /* size: 0x18 */
 
@@ -102,13 +100,13 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* nw4r::math and effect-library helpers.  The target object references each by its plain
  * `fn_XXXXXXXX` map name, so they carry C linkage; a C++ spelling mangles the reloc
  * (fn_80043EA8__FPv) and it no longer pairs (relocaudit).  The one name `unsplit/ef.h` already
- * declares (VEC3_ctor) is left to that header; its call sites below cast their `Vec` to the
- * header's `Vec3`). */
+ * declares (VEC3_ctor) is left to that header; this file's own spelling of the record is the
+ * same type under the name `VEC3`). */
 extern "C" {
-extern void fn_8009C484(Vec* out, Vec* in);
-extern void fn_80051490(Vec* out, Vec* in);
+extern void fn_8009C484(VEC3* out, VEC3* in);
+extern void fn_80051490(VEC3* out, VEC3* in);
 extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);
-extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
+extern void fn_800A99B4(s32 ctx, VEC3* out, EfWork* em, VEC3* pos, VEC3* a, VEC3* b, VEC3* c);
 extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
 extern f32  fn_800A8A08(void* progress);
 extern f32  fn_80463F10(f32 a, f32 b);
@@ -151,12 +149,12 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     CHECK_PTR(lbl_80594D98, params);
 
     for (i = 0; i < count; i++) {
-        Vec v88, v76, v64, v52, v40, v28, v16;
+        VEC3 v88, v76, v64, v52, v40, v28, v16;
         f32 cs, sn;
         f32 factor, rate, t;
 
-        VEC3_ctor((Vec3*)&v88); /* C-linkage decl in unsplit/ef.h takes nw4r::math::VEC3* */
-        VEC3_ctor((Vec3*)&v76);
+        VEC3_ctor(&v88); /* C-linkage decl in unsplit/ef.h takes nw4r::math::VEC3* */
+        VEC3_ctor(&v76);
         t = fn_800A8A08(&em->progress);
         rate = params->rate_pct / 100.0f;
         if (flags & 0x01000000) {

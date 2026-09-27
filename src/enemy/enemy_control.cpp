@@ -546,7 +546,7 @@ void fn_80144240(void* self) {
 void senko_set(nw4r::math::VEC3* pos, f32 value, u8 arg2, s16 arg3) {
     SenkoRec* rec = fn_801416EC();
     if (rec != 0) {
-        copyVec3((f32*)rec, (f32*)pos);
+        copyVec3(&rec->pos_0x00, pos);
         rec->value_0x0C = value;
         rec->value_0x12 = arg2;
         rec->countdown = arg3;
@@ -558,7 +558,7 @@ void senko_set(nw4r::math::VEC3* pos, f32 value, u8 arg2, s16 arg3) {
 void kemuri_set(nw4r::math::VEC3* pos, f32 value, u8 arg2) {
     SenkoRec* rec = fn_8014192C();
     if (rec != 0) {
-        copyVec3((f32*)rec, (f32*)pos);
+        copyVec3(&rec->pos_0x00, pos);
         rec->value_0x0C = value;
         rec->value_0x12 = arg2;
         rec->countdown = 570;

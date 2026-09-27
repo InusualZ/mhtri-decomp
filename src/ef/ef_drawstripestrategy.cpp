@@ -123,7 +123,7 @@ typedef struct EfDrawStrategyObj {
 typedef struct EfAheadArgs {
     void* particle;    /* +0x00 */
     u8 pad_0x04[0x94]; /* +0x04 */
-    Vec prev_pos;      /* +0x98  the previous resolved position */
+    VEC3 prev_pos;     /* +0x98  the previous resolved position */
     Vec pos;           /* +0xA4  the fallback position */
 } EfAheadArgs; /* size: 0xB0 (lower bound, the record continues past what this unit reads) */
 
@@ -446,7 +446,7 @@ void fn_800BBCF8(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
         PSVECSubtract(out, &em->world_pos, &args->pos);
     }
     if (fn_800B59E4(out) == 0) {
-        copyVec3(out, &args->prev_pos);
+        copyVec3((nw4r::math::VEC3*)out, &args->prev_pos);
     }
 }
 
@@ -459,25 +459,25 @@ void fn_800BBBBC(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
     EfWalkerObj* first = fn_800B5ACC(args->particle, em);
     EfWalkerObj* second = fn_800B8D48(args->particle, em);
 
-    setVec3(&a, lbl_80796154, lbl_80796154, lbl_80796154);
+    setVec3((nw4r::math::VEC3*)&a, lbl_80796154, lbl_80796154, lbl_80796154);
     if (first != 0) {
         PSVECSubtract(&a, &first->world_pos, &em->world_pos);
         if (fn_800B59E4(&a) == 0) {
-            setVec3(&c, lbl_80796154, lbl_80796154, lbl_80796154);
-            copyVec3(&a, &c);
+            setVec3((nw4r::math::VEC3*)&c, lbl_80796154, lbl_80796154, lbl_80796154);
+            copyVec3((nw4r::math::VEC3*)&a, (const nw4r::math::VEC3*)&c);
         }
     }
-    setVec3(&b, lbl_80796154, lbl_80796154, lbl_80796154);
+    setVec3((nw4r::math::VEC3*)&b, lbl_80796154, lbl_80796154, lbl_80796154);
     if (second != 0) {
         PSVECSubtract(&b, &second->world_pos, &em->world_pos);
         if (fn_800B59E4(&b) == 0) {
-            setVec3(&d, lbl_80796154, lbl_80796154, lbl_80796154);
-            copyVec3(&b, &d);
+            setVec3((nw4r::math::VEC3*)&d, lbl_80796154, lbl_80796154, lbl_80796154);
+            copyVec3((nw4r::math::VEC3*)&b, (const nw4r::math::VEC3*)&d);
         }
     }
     PSVECSubtract(out, &a, &b);
     if (fn_800B59E4(out) == 0) {
-        copyVec3(out, &args->prev_pos);
+        copyVec3((nw4r::math::VEC3*)out, &args->prev_pos);
     }
 }
 

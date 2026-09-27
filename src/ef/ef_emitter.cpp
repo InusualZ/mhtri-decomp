@@ -185,11 +185,7 @@ void fn_800532DC(void* dst, void* mtx);
  * ------------------------------------------------------------------------------------------------- */
 
 /* The engine vector (the same layout as nw4r's, but the engine's own library type). */
-typedef struct EfVec {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} EfVec; /* size: 0x0C */
+typedef nw4r::math::VEC3 EfVec; /* size: 0x0C */
 
 /* The `nw4r::ut::List` head: the walkers start at `head` and follow the runtime link offset. */
 typedef struct EfList {

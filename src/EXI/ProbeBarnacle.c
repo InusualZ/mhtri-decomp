@@ -247,7 +247,7 @@ BOOL EXIWriteReg(EXIChannel chan, u32 dev, u32 cmd, const void* buf, s32 len)
  *
  * The library keeps one IPC heap and one `/dev/fs` fd, hands every ioctl a 0x140-byte command block out
  * of that heap and completes the async ones through `_isfsFuncCb`.  The map's `fn_804B...` names are kept
- * for the five entry points the map does not name (rule 7 deferral above); the comment on each one names
+ * for the five entry points the map does not name (Naming note above); the comment on each one names
  * the SDK function the disassembly proves it is (the ioctl number and argument shape).
  * =================================================================================================== */
 

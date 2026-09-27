@@ -701,7 +701,9 @@ void fn_801512E8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, s32 arg3, s32 arg4,
     char buf_0x18[0x18];
     nw4r::math::VEC3 pos;
 
-    MTX34_ctor(buf_0x18);
+    /* `buf_0x18` is the unit's own 0x18-byte scratch buffer, whose first 0xC bytes are the record
+     * the helper constructs; the buffer's size is part of the matched frame (see the unit header). */
+    MTX34_ctor((MTX34*)buf_0x18);
     VEC3_ctor(&pos);
     switch (arg1) {
     case 0:

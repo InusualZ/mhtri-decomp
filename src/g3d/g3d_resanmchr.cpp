@@ -1199,18 +1199,18 @@ u32* fn_8008A664(f32* out, u32* self, f32* keys, f32 frame)
 
 void fn_8008D1C4(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
 {
-    f32 rec[3];
+    nw4r::math::VEC3 rec;
 
     (void)unused;
-    VEC3_ctor(rec);
+    VEC3_ctor(&rec);
     self->scale[0] = lbl_80795EE8;
     self->scale[1] = lbl_80795EE8;
     self->scale[2] = lbl_80795EE8;
     fn_800504D4(self->mat);
-    fn_8008CF2C(rec, key, key + 2, frame);
-    self->mat[3] = rec[0];
-    self->mat[7] = rec[1];
-    self->mat[11] = rec[2];
+    fn_8008CF2C(&rec, key, key + 2, frame);
+    self->mat[3] = rec.x;
+    self->mat[7] = rec.y;
+    self->mat[11] = rec.z;
 }
 
 void fn_8008D25C(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
@@ -1227,19 +1227,19 @@ void fn_8008D25C(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 
 void fn_8008D30C(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 {
-    f32 rec[3];
+    nw4r::math::VEC3 rec;
     void* row;
 
-    VEC3_ctor(rec);
+    VEC3_ctor(&rec);
     self->scale[0] = lbl_80795EE8;
     self->scale[1] = lbl_80795EE8;
     self->scale[2] = lbl_80795EE8;
     row = fn_8008C038(self->mat, self->pos, arg1, (u32)key, key + 2, frame);
     self->flags |= 0x80000000;
-    fn_8008CF2C(rec, key, row, frame);
-    self->mat[3] = rec[0];
-    self->mat[7] = rec[1];
-    self->mat[11] = rec[2];
+    fn_8008CF2C(&rec, key, row, frame);
+    self->mat[3] = rec.x;
+    self->mat[7] = rec.y;
+    self->mat[11] = rec.z;
 }
 
 void fn_8008D3DC(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
@@ -1256,33 +1256,33 @@ void fn_8008D3DC(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 
 void fn_8008D47C(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
 {
-    f32 rec[3];
+    nw4r::math::VEC3 rec;
     void* row;
 
     (void)unused;
-    VEC3_ctor(rec);
+    VEC3_ctor(&rec);
     row = (void*)fn_8008A664(self->scale, (u32*)key, (f32*)&key[2], frame);
     fn_800504D4(self->mat);
-    fn_8008CF2C(rec, key, row, frame);
-    self->mat[3] = rec[0];
-    self->mat[7] = rec[1];
-    self->mat[11] = rec[2];
+    fn_8008CF2C(&rec, key, row, frame);
+    self->mat[3] = rec.x;
+    self->mat[7] = rec.y;
+    self->mat[11] = rec.z;
 }
 
 void fn_8008D528(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 {
-    f32 rec[3];
+    nw4r::math::VEC3 rec;
     void* row;
     void* out;
 
-    VEC3_ctor(rec);
+    VEC3_ctor(&rec);
     row = (void*)fn_8008A664(self->scale, (u32*)key, (f32*)&key[2], frame);
     out = fn_8008C038(self->mat, self->pos, arg1, (u32)key, row, frame);
-    fn_8008CF2C(rec, key, out, frame);
+    fn_8008CF2C(&rec, key, out, frame);
     self->flags |= 0x80000000;
-    self->mat[3] = rec[0];
-    self->mat[7] = rec[1];
-    self->mat[11] = rec[2];
+    self->mat[3] = rec.x;
+    self->mat[7] = rec.y;
+    self->mat[11] = rec.z;
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1314,7 +1314,7 @@ void fn_8008DA10(ResAnmChrObj* self, f32* out)
         out[1] = lbl_80795EE8;
         out[2] = lbl_80795EE8;
     } else {
-        copyVec3(out, self->scale);
+        copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->scale);
     }
 }
 
@@ -1467,7 +1467,7 @@ void fn_8008E8D0(ResAnmChrObj* self, const f32* out)
             self->flags = t | 0x10;
         }
     }
-    copyVec3(self->scale, out);
+    copyVec3((nw4r::math::VEC3*)self->scale, (const nw4r::math::VEC3*)out);
 }
 
 void fn_8008EB68(ResAnmChrObj* self, const f32* out)
@@ -1504,14 +1504,14 @@ void fn_8008EB68(ResAnmChrObj* self, const f32* out)
         self->mat[9] = lbl_80795ED0;
         self->mat[10] = lbl_80795EE8;
     } else {
-        f32 rec[3];
+        nw4r::math::VEC3 rec;
 
-        setVec3(rec, self->mat[3], self->mat[7], self->mat[11]);
+        setVec3(&rec, self->mat[3], self->mat[7], self->mat[11]);
         fn_8008C484(self->mat, out[0], out[1], out[2]);
-        self->mat[3] = rec[0];
-        self->mat[7] = rec[1];
-        self->mat[11] = rec[2];
-        copyVec3(self->pos, out);
+        self->mat[3] = rec.x;
+        self->mat[7] = rec.y;
+        self->mat[11] = rec.z;
+        copyVec3((nw4r::math::VEC3*)self->pos, (const nw4r::math::VEC3*)out);
         self->flags &= ~0x26;
     }
     self->flags |= 0x80000000;
@@ -1553,7 +1553,7 @@ void fn_8008EE68(ResAnmChrObj* self, const f32* out)
 void fn_8008F3DC(ResAnmChrObj* self, const void* src)
 {
     u32 valid;
-    f32 rec[3];
+    nw4r::math::VEC3 rec;
     f32 norm[3];
 
     valid = IS_VALID_PTR(self);
@@ -1564,12 +1564,12 @@ void fn_8008F3DC(ResAnmChrObj* self, const void* src)
     if (!valid) {
         nw4r::db::Panic(lbl_80590010, 0x672, lbl_805903BC, src);
     }
-    setVec3(rec, fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
-    fn_8008E8D0(self, rec);
+    setVec3(&rec, fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
+    fn_8008E8D0(self, (const f32*)&rec);
     if (self->flags & 8) {
         fn_8007100C(self->mat, src);
     } else {
-        setVec3(norm, fn_800610AC(rec[0]), fn_800610AC(rec[1]), fn_800610AC(rec[2]));
+        setVec3((nw4r::math::VEC3*)norm, fn_800610AC(rec.x), fn_800610AC(rec.y), fn_800610AC(rec.z));
         fn_8050133C(self->mat, src, norm);
     }
     self->flags &= 0x7FFFFFFF;
@@ -1595,7 +1595,7 @@ s32 fn_8008DC4C(ResAnmChrObj* self, f32* out)
         return 1;
     }
     if (self->flags & 0x80000000) {
-        copyVec3(out, self->pos);
+        copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->pos);
         return 1;
     }
     r = fn_80050BC0(lbl_80795EE8 - self->mat[8] * self->mat[8]);

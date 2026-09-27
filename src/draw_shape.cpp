@@ -63,8 +63,8 @@
  * are padding for this view. size: 0x364 */
 typedef struct DrawShapeWork {
     /* +0x00 */ u8 pad_0x00[0x74];
-    /* +0x74 */ u8 matrix_0x74[0x30];  /* MTX34_ctor's 3x4 float matrix */
-    /* +0xA4 */ u8 matrix_0xA4[0x30];
+    /* +0x74 */ MTX34 matrix_0x74;  /* MTX34_ctor's 3x4 float matrix */
+    /* +0xA4 */ MTX34 matrix_0xA4;
     /* +0xD4 */ u32 field_0xD4;        /* GXInitTexObj wrapS / tlut name */
     /* +0xD8 */ u32 field_0xD8;        /* GXInitTexObj wrapT / tlut name */
     /* +0xDC */ u8 pad_0xDC[0x04];

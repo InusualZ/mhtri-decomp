@@ -227,7 +227,7 @@ u16 fn_801CA8DC(_ENEMY_WORK* self, u8 a) {
 /* 0x801CA7F0 - fill a spawn record: kind 0x1C, the fixed vector and the three scalar fields. */
 void fn_801CA7F0(EmSpawnRec* rec, u8 a, u16 b, u16 c) {
     VEC3 v;
-    setVec3((f32*)&v, lbl_80798FF8, lbl_80798FF8, lbl_80799014);
+    setVec3(&v, lbl_80798FF8, lbl_80798FF8, lbl_80799014);
     rec->id = 0x1C;
     copyVec3(&rec->pos, &v);
     rec->field_0x10 = a;

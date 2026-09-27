@@ -64,11 +64,7 @@ extern "C" void fn_8005D3E0(void *self);
 
 /* A three-float vector record (the cluster's `.text` copies it field by field, so the struct is the
  * explicit-float-copy shape, not a word copy). */
-typedef struct {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} Vec3f; /* size: 0xC */
+typedef nw4r::math::VEC3 Vec3f; /* size: 0xC */
 
 /* The cluster's `.rodata` animation type-name records (0x8056F500-0x8056F678): a length word followed by
  * the NUL-terminated name.  Referenced by address only. */

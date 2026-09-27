@@ -950,8 +950,12 @@ void fn_80192630(EmActWork* self) {
     VEC3 v1;
     VEC3 v2;
 
-    copyVec3(&rec->angle_0x00, setVec3(&v1, lbl_8079824C, lbl_8079824C, lbl_8079824C));
-    copyVec3(&rec->rot_0x10, setVec3(&v2, lbl_8079824C, lbl_8079824C, lbl_8079824C));
+    /* The aim record's +0x00 is a scalar the rest of the unit reads as one, but the retail call
+     * copies a whole 3-float record over it (see the unit header). */
+    copyVec3((nw4r::math::VEC3*)&rec->angle_0x00,
+             setVec3(&v1, lbl_8079824C, lbl_8079824C, lbl_8079824C));
+    copyVec3((nw4r::math::VEC3*)&rec->rot_0x10,
+             setVec3(&v2, lbl_8079824C, lbl_8079824C, lbl_8079824C));
     rec->vec_0x1C.x = lbl_80798238;
     rec->vec_0x1C.y = lbl_80798250;
     rec->vec_0x1C.z = lbl_80798254;

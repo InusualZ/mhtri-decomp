@@ -292,7 +292,8 @@ typedef struct EfResParams {
     u8 pad_0x00[0x4C]; /* +0x00 */
     f32 field_0x4C;    /* +0x4C */
     u8 pad_0x50[0x04]; /* +0x50 */
-    u8 field_0x54[0x40]; /* +0x54 */
+    VEC3 field_0x54;   /* +0x54 */
+    u8 pad_0x60[0x34]; /* +0x60 */
 } EfResParams; /* size: 0x94 */
 
 extern EfResParams* fn_800B2598(void* self);
@@ -314,7 +315,7 @@ void fn_800B2810(void* self, f32 value) {
 }
 
 /* Copies a source block over the resolved parameter's second block. */
-void fn_800B2840(void* self, void* src) {
+void fn_800B2840(void* self, const nw4r::math::VEC3* src) {
     copyVec3(&fn_800B26F8(self)->field_0x54, src);
 }
 
@@ -337,13 +338,14 @@ Vec* fn_800B0B90(Vec* self, Vec* b) {
 
 /* Copies the particle's +0x98 block into `dst`. */
 void fn_800B87C8(void* dst, EfParticleState* particle) {
-    copyVec3(dst, &particle->field_0x98);
+    copyVec3((nw4r::math::VEC3*)dst, (const nw4r::math::VEC3*)&particle->field_0x98);
 }
 
 /* Builds the particle's +0xB0 transform into a local and copies it into `dst`. */
 void fn_800B8788(void* dst, EfParticleState* particle) {
     u8 tmp[0x10];
-    copyVec3(dst, fn_80067E54(tmp, &particle->field_0xB0));
+    copyVec3((nw4r::math::VEC3*)dst,
+             (const nw4r::math::VEC3*)fn_80067E54(tmp, &particle->field_0xB0));
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -600,7 +602,7 @@ void* fn_800B3DBC(void* self, u32 index, EfResFile* arg) {
 void fn_800B87D0(Vec* a, EfParticleState* particle, EfAheadItem* item) {
     PSVECSubtract(a, &item->field_0xAC, &particle->field_0xA4);
     if (fn_800B59E4(a) == 0) {
-        copyVec3(a, &particle->field_0x98);
+        copyVec3((nw4r::math::VEC3*)a, (const nw4r::math::VEC3*)&particle->field_0x98);
     }
 }
 
@@ -608,7 +610,7 @@ void fn_800B87D0(Vec* a, EfParticleState* particle, EfAheadItem* item) {
 void fn_800B882C(Vec* a, EfParticleState* particle, void* arg) {
     fn_800A7F00(arg, a);
     if (fn_800B59E4(a) == 0) {
-        copyVec3(a, &particle->field_0x98);
+        copyVec3((nw4r::math::VEC3*)a, (const nw4r::math::VEC3*)&particle->field_0x98);
     }
 }
 

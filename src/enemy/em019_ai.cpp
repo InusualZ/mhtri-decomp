@@ -53,7 +53,7 @@
 extern "C" {
 #endif
 
-/* The addresses of this unit's range that are not reconstructed yet (rule 7 deferral above).  They
+/* The addresses of this unit's range that are not reconstructed yet (Naming note above).  They
  * are declared, never defined: the map row still names the target object's symbol. */
 void fn_8037983C(struct _ENEMY_WORK* self);
 void fn_803799A8(struct _ENEMY_WORK* self);

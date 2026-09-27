@@ -89,7 +89,7 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot, Vec* rot2)
 {
     Mtx34 mtx_a;
-    Vec axis_a;
+    VEC3 axis_a;
     Mtx34 mtx_b;
     Vec axis_b;
     VEC3 tmp;
@@ -163,7 +163,8 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
             MTX34_ctor(&mtx_b);
             ang = lbl_80796034 * (lbl_80796038 * fn_800A8A08(&em->progress));
             fn_8009CA30(&mtx_b, em->axis_angle_y * fn_800A8A08(&em->progress), ang, lbl_80796030);
-            MTX34_ctor(&axis_b);
+            /* `axis_b` is the matrix record; its declaration is short (see the unit header). */
+            MTX34_ctor((MTX34*)&axis_b);
             fn_8009CA30(&axis_b, em->euler_x, em->euler_y, em->euler_z);
             fn_800710BC(&mtx_b, (const Mtx34*)&axis_b, &mtx_b);
             out->x += em->axis_angle_scale * mtx_b.m[0][1];

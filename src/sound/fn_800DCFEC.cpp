@@ -36,15 +36,12 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
-/* A 3-float engine vector.  `Pl/pl_act.cpp` carries the same type as `nw4r::math::VEC3`; the two belong
- * in one header (rules 1-2 are not linted, see tools/units/stylelint.py).  size: 0xC */
-typedef struct VEC3 {
-    /* 0x0 */ f32 x;
-    /* 0x4 */ f32 y;
-    /* 0x8 */ f32 z;
-} VEC3;
+/* The 3-float engine vector: the shared `nw4r::math::VEC3` layout, reached through the header that
+ * owns it (rule 1).  It was a second local definition until the type-fix pass. */
+typedef nw4r::math::VEC3 VEC3; /* size: 0xC */
 
 /* The two getters are C++-mangled in the target (`get_now_mapno__Fv`/`get_now_areano__Fv`); they are
  * still unsplit, so the declarations live here as ordinary C++ functions.  The `fn_*` callees are

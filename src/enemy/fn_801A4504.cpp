@@ -1402,7 +1402,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                 if (idx != 0xFF) {
                     EmDataEntry* e = &data->table_0x2C[idx];
                     get_joint_wmat_em(self, e->joint, &mtx);
-                    copyVec3(&v2C, fn_80143174(&rec8, &e->vec, 0));
+                    copyVec3(&v2C, (const nw4r::math::VEC3*)fn_80143174(&rec8, &e->vec, 0));
                     mulVecMatAddTrans(&v2C, &mtx);
                     fn_803B993C(self->handles_0x328[i], &v2C, self->area_no);
                 }

@@ -216,7 +216,9 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
         v2.z = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
     fn_8009C484(&v2, &v2);
-    VEC3_ctor(&v3);
+    /* This unit's own record type (`Vec3`, the map's `P4Vec3`) is a different type from the
+     * helper's `nw4r::math::VEC3`; both are the same 0xC-byte layout (see the header). */
+    VEC3_ctor((nw4r::math::VEC3*)&v3);
     fn_800A99B4(a, &v3, em, b, c, &v1, &v2);
     v3_copy = v3;
     b_copy = *b;

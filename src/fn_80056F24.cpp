@@ -494,7 +494,8 @@ extern "C" void fn_8005913C(GameDrawState* s) {
  * `VEC3_ctor` target.  Only the node's base is used. size: 0x3C */
 typedef struct CtorBlock {
     /* +0x00 */ u8 pad_0x00[0x28];
-    /* +0x28 */ u8 node_0x28[0x14];
+    /* +0x28 */ nw4r::math::VEC3 node_0x28;
+    /* +0x34 */ u8 pad_0x34[0x08];
 } CtorBlock; /* size: 0x3C */
 
 /* `fn_800584F8`: initialise the whole draw/filter state block `lbl_8066ACF8` - the capture-buffer pair,
@@ -607,7 +608,7 @@ extern "C" void fn_800594C8(void) {
 /* The constructor chain `fn_800594DC` runs over the global state: the +0x3C sub-object's own +0x28
  * node is handed to `VEC3_ctor`.  Typed so no raw offset reaches a field (rule 6). */
 extern "C" void* fn_8005951C(CtorBlock* self) {
-    VEC3_ctor(self->node_0x28);
+    VEC3_ctor(&self->node_0x28);
     return self;
 }
 

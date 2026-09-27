@@ -1438,9 +1438,11 @@ extern "C" void fn_802B4E58(void)
 extern "C" void fn_802B535C(void)
 {
     fn_802B53CC((u32)stage_w);
-    setVec3((f32*)lbl_806BB7B8, lbl_8079A448, lbl_8079A448, lbl_8079A448);
-    setVec3((f32*)lbl_806BB7C4, lbl_8079A4C8, lbl_8079A4CC, lbl_8079A4D0);
-    setVec3((f32*)lbl_806BB7D0, lbl_8079A448, lbl_8079A448, lbl_8079A448);
+    /* Each seat is its own `lbl_` symbol (0xC apart); a `VEC3[]` view would fold them into one
+     * relocation (measured 100 -> 80.86 on fn_802B535C). */
+    setVec3((nw4r::math::VEC3*)lbl_806BB7B8, lbl_8079A448, lbl_8079A448, lbl_8079A448);
+    setVec3((nw4r::math::VEC3*)lbl_806BB7C4, lbl_8079A4C8, lbl_8079A4CC, lbl_8079A4D0);
+    setVec3((nw4r::math::VEC3*)lbl_806BB7D0, lbl_8079A448, lbl_8079A448, lbl_8079A448);
 }
 
 /* Runs the stage block's cleanup over every sub-block array it owns. */

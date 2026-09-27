@@ -14,7 +14,7 @@
  * The map owns two mangled symbols in this range - `ResTexSrt::SetEffectMtx` and its const
  * `GetEffectMtx` twin (`Q34nw4r3g3d9ResTexSrt`) - and 138 bare `fn_XXXXXXXX` stems.  The
  * mangled pair is written through its owner class (`include/nw4r/g3d/g3d_resmat.h`, rule 9);
- * the rest keep the map's stems (rule 7 deferral below).
+ * the rest keep the map's stems (Naming note below).
  *
  * Sections: `.text` 0x800947A4-0x80098D5C, `extab` 0x800094E0-0x80009850 (110 8-byte
  * unwind-only records) and `extabindex` 0x8002232C-0x80022854 (110 12-byte records).  The

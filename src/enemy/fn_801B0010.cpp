@@ -1622,9 +1622,9 @@ extern "C" void fn_801B42C8(_ENEMY_WORK* work, u8* state, u8* flag) {
 extern "C" void fn_801B42DC(void) {
     VEC3 rec;
 
-    setVec3((Vec*)&rec, lbl_80798B48, lbl_80798B94, lbl_80798C58);
+    setVec3(&rec, lbl_80798B48, lbl_80798B94, lbl_80798C58);
     fn_80051490((Vec*)lbl_806A7A88, (Vec*)&rec);
-    setVec3((Vec*)&rec, lbl_80798B48, lbl_80798C5C, lbl_80798C60);
+    setVec3(&rec, lbl_80798B48, lbl_80798C5C, lbl_80798C60);
     fn_80051490((Vec*)(lbl_806A7A88 + 0x0C), (Vec*)&rec);
 }
 

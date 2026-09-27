@@ -141,8 +141,8 @@ u16 fn_802D30F8(u16 a, u16 b, u16 c);
 void fn_802D31FC(struct _AINPC_W* self);
 void fn_802D3210(struct _AINPC_W* self, u32* out);
 
-/* `pl.h` pulls `ef.h` in, whose `setVec3`/`VEC3_ctor` spell the 3-float record `Vec` - the same
- * layout this file's locals use, so only the `setVec3` calls need the spelling. */
+/* `pl.h` pulls `ef.h` in, which declares `setVec3`/`VEC3_ctor` with their owner's type
+ * (`nw4r::math::VEC3*`), the same record this file's locals use. */
 
 /* Callees whose owner is a registered unit but whose header does not declare them yet (the same gap
  * `camera/fn_802B5C58.cpp` recorded): each spelling is that owner's own declaration. */
@@ -239,7 +239,7 @@ extern "C" void fn_802C5ECC(struct _AINPC_W* self)
         self->state += 1;
         fn_802D2B98(self, 2);
         self->field_0x002 = 0;
-        setVec3((Vec*)&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
+        setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
         copyVec3(&vec, &offset);
         rotVecY(&vec, self->field_0x194);
         fn_80073F68(&vec, &self->vec_0x178);
@@ -321,7 +321,7 @@ extern "C" void fn_802C6110(struct _AINPC_W* self)
             }
             self->field_0x002 = 0;
         } else if (frames == 2) {
-            setVec3((Vec*)&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
+            setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
             copyVec3(&vec, &offset);
             rotVecY(&vec, self->field_0x194);
             fn_80073F68(&vec, &self->vec_0x178);
@@ -363,11 +363,11 @@ extern "C" void fn_802C6318(struct _AINPC_W* self, u8 flag)
         self->vec_0x024.y = lbl_8079A674;
         self->vec_0x024.z = lbl_8079A674;
         if ((flag & 0xFF) == 0) {
-            setVec3((Vec*)&front, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
+            setVec3(&front, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
             copyVec3(&vec, &front);
         } else {
             self->vec_0x178.y = self->field_0x19C;
-            setVec3((Vec*)&back, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
+            setVec3(&back, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
             copyVec3(&vec, &back);
         }
         if (fn_802D2B78(self, 2) != 0) {

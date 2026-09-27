@@ -274,9 +274,9 @@ extern "C" void fn_8009B650(const f32* src, f32* mtx) {
 
     NW4R_POINTER_ASSERT(mtx, 0x1F6, lbl_80591A24);
 
-    VEC3_ctor(v20);
-    VEC3_ctor(v14);
-    VEC3_ctor(v8);
+    VEC3_ctor((nw4r::math::VEC3*)v20);
+    VEC3_ctor((nw4r::math::VEC3*)v14);
+    VEC3_ctor((nw4r::math::VEC3*)v8);
 
     fn_8009BA78(src, 0, v20);
     if (fn_8009C484(v20, v20) == 0)
@@ -457,10 +457,10 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
 
     NW4R_POINTER_ASSERT(scale, 0x266, lbl_80591AC8);
 
-    VEC3_ctor(v8);
-    VEC3_ctor(v14);
-    VEC3_ctor(v20);
-    VEC3_ctor(v2c);
+    VEC3_ctor((nw4r::math::VEC3*)v8);
+    VEC3_ctor((nw4r::math::VEC3*)v14);
+    VEC3_ctor((nw4r::math::VEC3*)v20);
+    VEC3_ctor((nw4r::math::VEC3*)v2c);
 
     fn_8009BA78(mtx, 0, v2c);
     len = fn_80050EDC(v2c);
@@ -628,7 +628,7 @@ extern "C" void fn_8009CC20(f32* dst, const f32* scale, const f32* mtx) {
 extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
     f32 inv[3];
 
-    VEC3_ctor(inv);
+    VEC3_ctor((nw4r::math::VEC3*)inv);
     if (lbl_80795F7C != scale[0])
         inv[0] = fn_800610AC(scale[0]);
     else

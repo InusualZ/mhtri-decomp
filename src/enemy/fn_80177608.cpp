@@ -19,7 +19,7 @@
  * Registration: moved to its final home `enemy/fn_80177608.cpp` from the discovery proposal
  * `proposal/80177608_fn_80177608.cpp`; the module is the band's (`enemy` - the bracketing registered
  * units are `enemy/fn_8014A1BC.c` below and `lobby/lobby_scene.c` above, and the region's callees are
- * the `em_*` enemy helpers), the name is the map's own `fn_XXXXXXXX` stem (rule 7 deferral above).
+ * the `em_*` enemy helpers), the name is the map's own `fn_XXXXXXXX` stem (Naming note above).
  *
  * Data runs in this range are NOT claimed: a stub object emits no `.sdata2`, and a range our object
  * does not emit must not be claimed (docs/plan.md 8.4).  The `extab`/`extabindex` fragments travel

@@ -540,26 +540,29 @@ void TestModeExec(void)
  * 0x80041E40 - 0x80041E9C  (vector helpers)
  * ------------------------------------------------------------------ */
 
-extern "C" void fn_80041E70(void* dst, void* src)
+/* The record these three work on is `nw4r::math::VEC3` (0xC, x/y/z at +0/+4/+8) - see
+ * `include/mh3_pad/vec3.h` for the evidence (`setVec3`'s body is byte-identical to the map's
+ * `setVector3__FPQ34nw4r4math4VEC3fff`).  The parameters were `void*` until the type-fix pass. */
+extern "C" void fn_80041E70(VEC3* dst, const VEC3* src)
 {
-    ((f32*)dst)[0] = ((f32*)src)[0];
-    ((f32*)dst)[1] = ((f32*)src)[1];
-    ((f32*)dst)[2] = ((f32*)src)[2];
+    dst->x = src->x;
+    dst->y = src->y;
+    dst->z = src->z;
 }
 
-extern "C" void* copyVec3(void* dst, const void* src)
+extern "C" VEC3* copyVec3(VEC3* dst, const VEC3* src)
 {
-    fn_80041E70(dst, (void*)src);
+    fn_80041E70(dst, src);
     return dst;
 }
 
 /* The return is the first argument, as the callers use it (`mr r4,r3` after the `bl`); the body
  * leaves r3 alone, so `return out;` costs no instruction. */
-extern "C" void* setVec3(void* out, f32 x, f32 y, f32 z)
+extern "C" VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z)
 {
-    ((f32*)out)[0] = x;
-    ((f32*)out)[1] = y;
-    ((f32*)out)[2] = z;
+    out->x = x;
+    out->y = y;
+    out->z = z;
     return out;
 }
 
@@ -635,7 +638,7 @@ extern "C" void fn_800438B8(s32 arg0)
 }
 
 /* The retail body is a bare `blr`; the parameter is the record the call sites pass. */
-extern "C" void VEC3_ctor(void* out)
+extern "C" void VEC3_ctor(VEC3* out)
 {
     (void)out;
 }
