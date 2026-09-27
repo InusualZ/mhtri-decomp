@@ -19,7 +19,6 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `src/auto/` units are moved to their final homes under the register-once rule (`docs/plan.md` §12), and a
   region still unclaimed in `symbols.txt` is a proposal backlog, not a defect.
 
-
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
