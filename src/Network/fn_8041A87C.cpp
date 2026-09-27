@@ -50,22 +50,31 @@
  * of a folded compare, `extsb`+`cmpwi` in place of `extsb.`), with the five functions whose retail
  * bodies DO carry the folded forms bracketed back on.
  *
- * RESIDUALS.  Unit 95.46 % fuzzy, 42/71 functions byte-identical, `.text` 13716 B against 13972 B.
- * fn_8041B720 74.25 / applyEvent 83.90 / isQueued 83.89 / unregisterReceiver 85.93 - the tail of the
- * error record is staged through two 3-word halves the compiler keeps in registers (writing
- * `info[0] = info[3] = v` recovers part of it; the rest is block layout), and the receiver-table
- * loops are driven by `mtctr`+`bdnz` in retail against our `clrlwi`/`cmplw`+`blt` rotation from the
- * same source shape.  isQueued differs only in that the sign-extended state stays in r3 for the
- * branchless clamp in retail while ours moves it to r4.  Two dispatch sites are not virtual calls:
- * the network singleton's `postError` at vtable +0x288 would need 161 declared virtuals, so it keeps
- * the documented table view in `include/unsplit/Network.h` (`lwz r12, 0x0(r3)` +
- * `lwz r12, 0x288(r12)` in retail, ours through a scratch register).  `runThread` and the thread body
- * it calls are emitted in the reverse of the target's address order (the map has `runThread` at
- * 0x8041D31C and the body at 0x8041D344): a source order defect that costs no row but keeps our
- * `.text` layout from matching.  Data: `extabindex` 540/540 exact, `extab` 360 against 380 and
- * `.rela.text` 5688 against 5616 (ours carries relocations the target's does not - a body-pass
- * residual); the target's last extab entry is the 20-byte cleanup record whose `.relaextab` reloc
- * points at `dtor_803CA338`, a local object with a destructor the range's own code does not show.
+ * RESIDUALS.  Unit 96.84 % fuzzy, 42/71 functions byte-identical, `.text` 13976 B against 13972 B,
+ * every function >= 80 %.  The error record a caller builds is three constants that stay live across
+ * six stores - retail groups them `[3],[4],[5],[0],[1],[2]` from three named temporaries - and the
+ * record is *dispatched*, not returned: with `NetworkInstanceVtableData` the call passes the instance
+ * in r3 the way retail's virtual-call expansion does (`fn_8041B720` 74.25 -> 99.89, `fn_8041B538`
+ * 93.77 -> 98.61, `applyEvent`'s two sites each -4 instructions).  `tGameSpyInterface` 87.45 -> 93.82:
+ * the request flags are read as `s8` (`lbz`+`extsb`) and the sleep length is a `u64` local, which is
+ * what makes MWCC keep the `hi * 17` term of the 64-bit multiply (`mullw r28, r24=0, r27=17`) the way
+ * retail does.  What is left: fn_8041B720 keeps its vtable pointer in r5 where retail's expansion
+ * uses r12 (two rows, the only difference left in that function); `tGameSpyInterface` also passes its
+ * `arg` to `ConnectToAnybody()` (`mr r4, r30`) although the map's row - a name this band invented -
+ * mangles `Fv`, so the real signature is probably `...Fl` and the re-anchor is an outbox rename;
+ * `applyEvent` 88.71 stages a *second* 3-word record and a 0x28-byte channel through locals this
+ * reconstruction does not declare (retail's frame is 0x60 against our 0x30); `publishRequest` 90.18,
+ * `receive` 92.30 and `runNasLogin` 94.34 are register colourings of the same statements.
+ * isQueued 83.89: retail keeps `extsb`+`cmpwi` (the unfused pair) and jumps to the clamp, ours emits
+ * the peephole's `extsb.` form and inverts the branch - the shapesearch "winner" for it negates the
+ * guard, which is a *different* function (the same trap `startNegotiation`'s 94.92 candidate is),
+ * so both are rejected and the 83.89 / 93.39 shapes below 100 % stay.  `runThread` and the thread
+ * body it calls are emitted in the reverse of the target's address order (the map has `runThread` at
+ * 0x8041D31C and the body at 0x8041D344): a source order defect that costs no row.  Data:
+ * `extabindex` 540/540 exact, `extab` 360 against 380 and `.rela.text` 5640 against 5616 (ours
+ * carries two relocations the target's does not - a body-pass residual); the target's last extab
+ * entry is the 20-byte cleanup record whose `.relaextab` reloc points at `dtor_803CA338`, a local
+ * object with a destructor the range's own code does not show.
  */
 
 #include "types.h"
@@ -88,6 +97,16 @@
 #define SIGNAL_LOG(...) do { NetworkLogger* lm = fn_803C9974(); lm->signal_0C(__VA_ARGS__); } while (0)
 #define WARN_LOG(...)   do { NetworkLogger* lm = fn_803C9974(); lm->warn_10(__VA_ARGS__); } while (0)
 #define INFO_LOG(...)   do { NetworkLogger* lm = fn_803C9974(); lm->log_14(__VA_ARGS__); } while (0)
+
+/* The singleton's error dispatch read as a *data* slot.  `include/unsplit/Network.h` models the same
+ * table with a member function, whose codegen puts the vtable pointer in r3 and shifts the instance
+ * into r4 and the record into r5; retail passes the instance in r3 and the record in r4 with both
+ * loads through r12 (`lwz r12, 0x0(r3)` / `lwz r12, 0x288(r12)`), which is what loading a data slot
+ * into the indirect-call register produces.  The header fix is in this lane's outbox. */
+typedef struct NetworkInstanceVtableData {
+    /* +0x000 */ u8 pad_00[0x288];
+    /* +0x288 */ void (*postError)(NetworkInstance* self, NetworkErrorInfo* info);
+} NetworkInstanceVtableData;   /* size: 0x28C */
 
 extern "C" {
 
@@ -318,12 +337,12 @@ s32 NetworkGameSpyInterface::runConnect()
 #pragma peephole on
 void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpyEventMsg* msg)
 {
-    u32 limit;
-    u32 size;
-    s32 i;
+    u16 limit;
     GameSpyChannel* dst;
+    u32 size;
     const GameSpyChannel* src;
     u32 info[3];
+    s32 i;
 
     switch (code) {
     case 0x8000:
@@ -353,10 +372,13 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
             break;
         }
         if (msg->channelView.channel_00 != channel_18) {
+            NetworkInstance* inst;
+
             info[0] = 0x80000000;
             info[1] = 0;
             info[2] = 0;
-            getInstance_()->vtable->postError_288(getInstance_(), (NetworkErrorInfo*)info);
+            inst = getInstance_();
+            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
             break;
         }
         peerId_1C = msg->channelView.peerId_04;
@@ -384,10 +406,13 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         }
         if (msg->dataView.channel_00 != channel_18 ||
             msg->dataView.writePos_04 != writePos_8168) {
+            NetworkInstance* inst;
+
             info[0] = 0x80000000;
             info[1] = 0;
             info[2] = 0;
-            getInstance_()->vtable->postError_288(getInstance_(), (NetworkErrorInfo*)info);
+            inst = getInstance_();
+            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
             break;
         }
         size = msg->dataView.size_08;
@@ -533,10 +558,19 @@ extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s
             }
         }
         if (i >= 3 && getInstance_() != NULL) {
-            info[0] = info[3] = 0x80000007;
-            info[1] = info[4] = 0x5F;
-            info[2] = info[5] = 0x2D6A;
-            getInstance_()->vtable->postError_288(getInstance_(), (NetworkErrorInfo*)info);
+            u32 code = 0x80000007;
+            u32 type = 0x5F;
+            u32 detail = 0x2D6A;
+            NetworkInstance* inst;
+
+            info[3] = code;
+            info[4] = type;
+            info[5] = detail;
+            info[0] = code;
+            info[1] = type;
+            info[2] = detail;
+            inst = getInstance_();
+            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
         }
     } else {
         ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(-0x2DAE, 0xFF, peerId);
@@ -555,23 +589,32 @@ extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
-    if (result != 0) {
+    if (result == 0) {
+        for (i = 0; i < 3; i++) {
+            if (lbl_806D3650[i] == 0) {
+                lbl_806D3650[i] = socket;
+                ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(0, (u8)i, 0);
+                break;
+            }
+        }
+        if (i >= 3 && getInstance_() != NULL) {
+            u32 code = 0x80000007;
+            u32 type = 0x5F;
+            u32 detail = 0x2D6A;
+
+            info[3] = code;
+            info[4] = type;
+            info[5] = detail;
+            info[0] = code;
+            info[1] = type;
+            info[2] = detail;
+            NetworkInstance* inst = getInstance_();
+
+            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
+        }
+    } else {
         error = timeout > 0 ? -0x2DA0 : -0x2DAD;
         ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(error, 0xFF, 0);
-        return;
-    }
-    for (i = 0; i < 3; i++) {
-        if (lbl_806D3650[i] == 0) {
-            lbl_806D3650[i] = socket;
-            ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(0, (u8)i, 0);
-            break;
-        }
-    }
-    if (i >= 3 && getInstance_() != NULL) {
-        info[0] = info[3] = 0x80000007;
-        info[1] = info[4] = 0x5F;
-        info[2] = info[5] = 0x2D6A;
-        getInstance_()->vtable->postError_288(getInstance_(), (NetworkErrorInfo*)info);
     }
 }
 
@@ -804,7 +847,7 @@ void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
 /* Opens the GameSpy socket and installs the callback set, then applies the pending requests. */
 void GameSpyInterfaceThread::ConnectToAnybody()
 {
-    s8 addressEnd;
+    volatile s8 addressEnd;
     char address[7];
     s32 state;
     s32 phase;
@@ -1006,7 +1049,7 @@ s32 GameSpyInterfaceThread::canClose()
 /* Replies to a pending request by filling the first free return handle. */
 s32 GameSpyInterfaceThread::replyRequest(s32 handle)
 {
-    s32 count;
+    s16 count;
     s32 i;
 
     if (field_68 < 0) {
@@ -1157,8 +1200,8 @@ void GameSpyInterfaceThread::unregisterReceiver(s32 index)
     u8 count;
     u8 i;
 
-    replyRequest((s32)receiverIds_34[index]);
     count = receiverCount_28;
+    replyRequest((s32)receiverIds_34[index]);
     for (i = 0; i < count; i++) {
         if (index == receiverState_24[i]) {
             receiverState_24[i] = 3;
@@ -1172,8 +1215,8 @@ void GameSpyInterfaceThread::unregisterReceiver(s32 index)
 /* Returns the state of the slot `id` maps to, or the pending negotiation result. */
 u8 GameSpyInterfaceThread::getSlotState(u32 id)
 {
-    u8 i;
     u8 count;
+    u8 i;
 
     count = receiverCount_28;
     for (i = 0; i < count; i++) {
@@ -1475,17 +1518,19 @@ s32 GameSpyInterfaceThread::sendUnreliable(u8 index, const void* data, s32 size)
 /* The worker thread's body: drains the request flags until the stop flag is set. */
 void GameSpyInterfaceThread::tGameSpyInterface(s32 arg)
 {
+    u64 ticks;
+
     OSInitMutex(mutex_4450);
     mutexReady_444C = 1;
     for (;;) {
-        if (initRequested_124 != 0) {
+        if ((s8)initRequested_124 != 0) {
             running_6C = 1;
             updateClock();
             initRequested_124 = 0;
-        } else if (openRequested_125 != 0) {
+        } else if ((s8)openRequested_125 != 0) {
             ConnectToAnybody();
             openRequested_125 = 0;
-        } else if (stepRequested_126 != 0) {
+        } else if ((s8)stepRequested_126 != 0) {
             step();
             stepRequested_126 = 0;
         }
@@ -1494,7 +1539,8 @@ void GameSpyInterfaceThread::tGameSpyInterface(s32 arg)
             started_120 = 0;
             break;
         }
-        OSSleepTicks((u64)(*(volatile u32*)0x800000F8 / 4 / 1000) * 17);
+        ticks = (u64)(*(volatile u32*)0x800000F8 / 4 / 1000);
+        OSSleepTicks(ticks * 17);
     }
     mutexReady_444C = 0;
     INFO_LOG(lbl_80603548);
