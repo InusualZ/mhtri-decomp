@@ -119,8 +119,9 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 ## 4. Roles and responsibilities
 
 > **Tool status.** The tools 4-6 name exist and run: `recompile.py`, `claims.py`, `brief.py`, `handoff.py`,
-> `land.py` (7.1-7.5), the data queue `dataqueue.py`/`dataclaim.py` (7.17), `stylelint.py` (7.21) and
-> `recordmerge.py`. The commands below are the ones actually run; 7 keeps the status of anything still open.
+> `land.py` (7.1-7.5), the data queue `dataqueue.py`/`dataclaim.py` (7.17), `stylelint.py` (7.21),
+> `recordmerge.py` and `rescue.py` (7.27). The commands below are the ones actually run; 7 keeps the status of
+> anything still open.
 
 **The four shared files (`config/RMHE08/splits.txt`, `configure.py`, `config/RMHE08/symbols.txt`, `AGENTS.md`)
 have exactly one writer: the orchestrator.**
@@ -698,6 +699,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.24 | **done** - a `decompiler` lane matches **data** as well as code: `.agents/agents/decompiler.md` gains a Data section and every brief gains 5d, and the old propose-do-not-claim line is inverted | objdiff's unit score does not count a wrong data section, so a lane could hand over a unit whose code matched and whose `.data`/`.sdata2` was ours-extra - the whole 20-unit flip-blocker list came from that blind spot, and no lane was ever asked about it | the lane measures with `datagap.py --unit`, claims what its object emits (private pool entries, unclaimed `.data`/`.ctors` ranges; never a shared entry - playbook 58), drops definitions it should only declare (playbook 29), and reports sections and bytes before/after; a code-complete unit with a claimable data gap is finished in the same lane and flipped | ~40 |
 | 7.25 | **done** - the C++ **class shape** rule: `.agents/agents/decompiler.md` and every brief (section 5c) say a range the evidence calls a class is written as a class with member functions and real virtuals, not as a C struct plus free functions taking `self` | the owner caught a landed unit reconstructing a class that way - 403 `self->` uses in `Network/fn_8041A87C.cpp` while its own header records the target's string pool spelling `NetworkGameSpyInterface::`/`NetworkPeerGameSpy::`; MWCC only emits retail's canonical `lwz r12,0(r3)`/`lwz r12,<slot>` dispatch for a genuine `virtual`, so the shape is part of the match | both renderers carry 5c; a `fixer` lane reconverts the landed unit and records any function where the struct form measured better; 153 + 117 selftest checks green | ~40 |
 | 7.26 | **done** - `tools/units/slots.py`: a fixed pool of reusable lane directories at stable paths, one lock each, a verified-and-fail-closed reset, wired into the claim path | per-claim construction costs per lane, its teardown cannot remove a worktree holding the `tools/m2c` submodule (the careless 2026-09-24 teardown destroyed a lane's branch), and the seeder rewrites `.ninja_deps`' absolute paths every time because each path is new; a reused slot also carries the previous round's build state, and a stale tree cost a full `rm -rf build/RMHE08` rebuild | `init`/`acquire`/`release`/`status`/`verify`; a slot holds a directory, never a branch (`acquire` cuts a fresh `checkout -B worker/<slug> <tip>`); a free slot is the concurrency cap (`queue.py next` refuses at six); the kept build tree is validated against MAIN's current map/DOL with the seeder's own guard plus a `report.json` comparison and re-seeded if it cannot be proven current; one lock per slot at `MAIN/.pi/slots/<n>.json`, stale locks reclaimed; 62 selftest checks | ~340 |
+| 7.27 | **done** - `tools/units/rescue.py audit`: the `refs/rescue/*` safety net gets an audit, and `land.py resolve`'s `land/resolve-*` helper branch gets a teardown | 193 rescue refs had accumulated and nothing had ever looked at them; `land.py resolve` also left its helper branch (and its scratch worktree) behind, so a `land/*` ref outlived the batch it was made for (two were found from 2026-09-26) | every ref reports its date/subject, the unit(s) it registers (**the registration diff against the merge-base with `main`** - a whole-file name match against `main` matches every unit in the file), whether each is registered on `main` today and how the touched paths differ; verdicts `redundant`/`landed-with-drift`/`unlanded`/`unknown`; `--prune` deletes only `redundant` (printing each), is strictly read-only without it, and never touches drift/unlanded/unknown; a landing deletes its own resolve helper, visibly, only when the tip is contained by the branch or `main`, and refuses loudly otherwise; 28 checks | ~180 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
@@ -1151,6 +1153,25 @@ The rules that follow:
   `git branch worker/<slug> refs/rescue/<slug>`;
 * a branch whose work is *in main* - merged, or cherry-picked and gated - may be deleted silently. That is the normal
   teardown, and it is why `land.py` releasing a landed unit is safe.
+
+`tools/units/rescue.py audit` is what reads that safety net (193 refs by 2026-09-27, and nothing had ever
+looked at them). For each ref it derives the unit(s) the ref registers from the ref's registration **diff
+against its merge-base with `main`** - the `Object(...)` rows and `splits.txt` headers the ref *added*; a
+whole-file name match against `main` matches every unit in the file - reports whether each unit is registered
+on `main` today, and diffs the paths the ref touched against `main`. It then classifies: **`redundant`** (the
+unit is on `main` and the touched paths match), **`landed-with-drift`** (`main` has moved on), **`unlanded`**
+(no such unit on `main` - the ref may hold the only copy) and **`unknown`** (no merge-base, or nothing
+parseable). `--prune` deletes **only** `redundant` refs and prints each one; without it the audit is strictly
+read-only; `landed-with-drift`, `unlanded` and `unknown` are never touched. The classification is deliberately
+conservative about renames: an `auto/` unit that migrated to its final home still fails the by-name check and
+is surfaced as `unlanded` (and kept) rather than guessed about.
+
+`land.py resolve`'s helper branch has the same teardown rule. `scratch_resolve` parks the union on a
+`land/resolve-<slug>-<pid>` branch in its scratch worktree so the caller can fast-forward the worker branch;
+when that branch lands, `land --branch` deletes the helper **and prints the deletion**. The helper is deleted
+only when its tip is provably contained by the branch or by `main`; one that carries a hand fix the branch
+never took (2026-09-26: the `u32 mode` repair lived only on `land/resolve-8030681c-...-31048`) is refused
+loudly and left alone, because it may be the only copy.
 
 ### Teardown is part of landing (owner's rule, 2026-09-23)
 
