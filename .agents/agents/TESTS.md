@@ -55,6 +55,12 @@ The edit also exposed the T1 row's stale claim: a profile edit has to be install
 launched into a pre-edit worktree keeps the old prompt - which is exactly how this rule would have failed to
 reach the worker that needed it.
 
+**Re-probe: PASS (2026-09-26).** With the question actually asked, the child stated the seam rule in full - the
+range may be a fragment, a fragment can never match, a failed check is reported as a seam re-draw rather than
+written against, the one-copy `__FILE__` string is the decisive datum and an edge cited on both sides of it is
+false, and `_<fnaddr>s_<file>_` gives the file name only, never the emitter. The run also reported **completed**
+rather than failed, so the recall evidence is readable from the run itself - which is the point of the probe.
+
 ### T1 - discovery (2026-09-25)
 
 **PASS.** `decompiler`, `merger`, `fixer` all listed as project agents with aliases; the harness surfaced their
