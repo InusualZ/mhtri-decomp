@@ -252,3 +252,10 @@ does not use `rule 7 deferred` - that escape exists for units registered before 
 `grep -rn "rule 7 deferred" src/` is its complete list (218 of the 234 files carrying a placeholder today).
 
 T2: question 11 asks it and the checklist carries it; verdict recorded when the probe returns.
+
+**Re-probe: PASS (2026-09-26).** Asked directly, the child states both halves: names come "from evidence
+(runtime dump real name -> map -> derived-from-context guess, **guess marked in the header**)", "`fn_`/`lbl_`/`unk`
+is never the resting place", a rename's second edit is the source "in the same change, via `symedit.py`", and - the
+part that closes the escape - "**`rule 7 deferred` may not be used on a unit I am writing**". Its policy answer
+(item 7) independently repeats that a unit it writes may not use the escape at all. The seam (item 8) and data
+(item 9) rules are still stated in full, and the run reports completed.
