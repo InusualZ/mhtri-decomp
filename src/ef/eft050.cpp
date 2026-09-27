@@ -292,10 +292,10 @@ void fn_8034235C(_EFT* self, MHchar* model);
 void fn_80342CAC(_EFT* self);
 void fn_8034305C(_EFT* self);
 void fn_80343130(_EFT* self);
-void fn_80343754(_EFT* self);
+void eft_instance_release(_EFT* self);
 void fn_803432B4(_EFT* self);
-void fn_80343744(_EFT* self);
-void fn_80343754(_EFT* self);
+void eft_state_advance(_EFT* self);
+void eft_instance_release(_EFT* self);
 
 /* This unit's own `.data` run (0x805E7400..0x805E7A70), its `.sdata` tables and its `.sdata2` pool -
  * referenced by name, never defined (playbook 29). */
@@ -797,7 +797,7 @@ extern "C" void fn_803430F4(_EFT* self)
     switch (self->state_0x05) {
     case 0: return fn_80343130(self);
     case 1: return fn_803432B4(self);
-    case 2: return fn_80343744(self);
-    case 3: return fn_80343754(self);
+    case 2: return eft_state_advance(self);
+    case 3: return eft_instance_release(self);
     }
 }

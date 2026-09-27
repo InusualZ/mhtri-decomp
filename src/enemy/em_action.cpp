@@ -45,7 +45,7 @@
  * rule 7 deferred: the file's own 14 symbols are named above; what the escape still covers is
  * precisely the names this file *references* in other units - 25 callee symbols in **42**
  * occurrences (fn_80130478 x5, fn_80126324 x4, fn_8012F93C x3, fn_801303EC x2, fn_8012F5C4 x2,
- * fn_8013072C x2, fn_80133BC0 x2, fn_803438E4 x2, fn_803439D4 x2, ...; 21 of the 25 answer `zz_` in
+ * fn_8013072C x2, fn_80133BC0 x2, enemy_data_find x2, enemy_data_grp x2, ...; 21 of the 25 answer `zz_` in
  * the dump too).  Renaming those is a cross-unit rename batch in ~10 owner units, not this lane's
  * change, so the escape stays until that batch runs.
  *
@@ -118,6 +118,7 @@
 #include "sys_mem.h"
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
+#include "ef/eft_slot.h"    /* enemy_data_find / enemy_data_grp (rule 2: their owner's header) */
 
 extern "C" {
 
@@ -246,7 +247,7 @@ void em_act_frame_ck(_ENEMY_WORK* self, u8 motion, u8 state) {
             }
             return;
         case 11: {
-            _ENEMY_DATA* entry = (_ENEMY_DATA*)fn_803438E4(fn_803439D4(self->team, kind),
+            _ENEMY_DATA* entry = (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, kind),
                                                            self->field_0x46C);
             if (entry != NULL && entry->field_0x08 == 1) {
                 fn_80346268(2, self->area_no);
@@ -262,7 +263,7 @@ void em_act_frame_ck(_ENEMY_WORK* self, u8 motion, u8 state) {
         return;
     case 1:
         if (self->field_0x43C != 0) {
-            _ENEMY_DATA* entry = (_ENEMY_DATA*)fn_803438E4(fn_803439D4(self->team, kind),
+            _ENEMY_DATA* entry = (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, kind),
                                                            self->field_0x46C);
             if (entry != NULL) {
                 if (entry->field_0x0B != 1) {

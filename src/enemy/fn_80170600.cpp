@@ -35,6 +35,7 @@
 #include "unsplit/enemy.h"
 #include "unsplit/ef.h"
 #include "ef/fn_80105314.h"
+#include "ef/eft_slot.h"     /* enemy_data_find / enemy_data_grp (their owner's header) */
 
 #pragma peephole off
 
@@ -42,7 +43,7 @@
 extern "C" {
 #endif
 
-/* The record `fn_803438E4` looks up; only the flag byte at +0x08 is read here.
+/* The record `enemy_data_find` looks up; only the flag byte at +0x08 is read here.
  * size: 0x09 (approximate - only +0x08 is observed) */
 typedef struct ENEMY_ENTRY {
     /* +0x00 */ u8 unused_0x00[0x08];
@@ -52,8 +53,8 @@ typedef struct ENEMY_ENTRY {
 /* ---- foreign callees the owner's header does not declare yet ---- */
 
 extern void fn_80128A8C(_ENEMY_WORK *self, u8 a, u8 b);
-extern u32 fn_803439D4(u8 a, u8 b);
-extern ENEMY_ENTRY *fn_803438E4(u32 a, u8 b);
+/* `enemy_data_grp`/`enemy_data_find` (0x803439D4 / 0x803438E4) come from their owner's header,
+ * `include/ef/eft_slot.h` (rule 2). */
 
 /* ---- the range's functions ---- */
 
@@ -122,8 +123,8 @@ void fn_80170804(_ENEMY_WORK *self) {
         self->field_0x328--;
     }
     if (em_die_ck(self) == 0) {
-        u8 v = (u8)fn_803439D4(self->team, self->field_0x00A);
-        ENEMY_ENTRY *entry = fn_803438E4(v, self->field_0x46C);
+        u8 v = (u8)enemy_data_grp(self->team, self->field_0x00A);
+        ENEMY_ENTRY *entry = (ENEMY_ENTRY *)enemy_data_find(v, self->field_0x46C);
         if (entry != 0 && entry->field_0x08 == 0xFF) {
             self->field_0x46C = 0xFF;
             fn_8013AAC4(self);

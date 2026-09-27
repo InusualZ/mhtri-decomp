@@ -10,7 +10,7 @@
  *     fn_8013C244(self, in, ID);` - about thirty of them, all identical in shape;
  *   * the stream readers (`switch (*in)` over 0 / 2 / 255) that advance the stream through
  *     `fn_801406E0`/`fn_8013BDE4` and report a `s16` back through a stack slot;
- *   * the entries that read a field of the `_ENEMY_DATA` record `fn_803438E4` returns.
+ *   * the entries that read a field of the `_ENEMY_DATA` record `enemy_data_find` returns.
  *
  * `self` is the game's enemy work record (`_ENEMY_WORK`, the map's `11_ENEMY_WORK` mangling):
  * `get_enemy_data`, `em_sleep_ck` and `get_move_work_adrs` take it directly, and +0x188/+0x36C are its
@@ -61,6 +61,7 @@
 #include "nw4r/math.h"
 #include "enemy/fn_80138074.h"
 #include "unsplit/enemy.h"
+#include "ef/eft_slot.h"     /* eft_slot_effect_key, enemy_data_find, enemy_data_grp */
 
 #pragma peephole off
 #pragma fp_contract off
@@ -234,7 +235,7 @@ typedef struct _ENEMY_WORK {
 
 /* Callees owned by other translation units.  Addresses and the mangled spellings are the map's. */
 extern void fn_80043EA8(void *out);
-extern u32 fn_803439D4(u8 a, u8 b);
+/* `enemy_data_grp` (0x803439D4) is declared in its owner's header, `include/ef/eft_slot.h` (rule 2). */
 
 /* --------------------------------------------------------------------------------------------- */
 /* The generic parameter interpreter and its two-argument tail. */
@@ -453,7 +454,7 @@ void fn_8013D1D0(_ENEMY_WORK *self, u8 *in) {
 /* --------------------------------------------------------------------------------------------- */
 
 /* --------------------------------------------------------------------------------------------- */
-/* The enemy-data record `fn_803438E4` returns: only the offsets this unit reads are named. */
+/* The enemy-data record `enemy_data_find` returns: only the offsets this unit reads are named. */
 /* --------------------------------------------------------------------------------------------- */
 
 /* size: 0x40 (lower bound: the highest field this unit reads is +0x39) */
@@ -487,7 +488,7 @@ typedef struct _ENEMY_DATA {
 typedef struct _ENEMY_PARAM _ENEMY_PARAM;
 
 extern _ENEMY_DATA *get_enemy_data__FP11_ENEMY_WORK(_ENEMY_WORK *self);
-extern u32 fn_803438E4(u8 a, u8 b);
+/* `enemy_data_find` (0x803438E4): its owner's header, `include/ef/eft_slot.h` (rule 2). */
 extern u32 fn_80345A6C(void *a, u8 b, Vec3 *c, f32 d);
 extern u32 fn_80131BD4(void);
 extern u32 PlayMode_ck__Fv(void);
@@ -507,7 +508,7 @@ extern void fn_80128BF8(_ENEMY_WORK *self, u32 a);
 extern u32 fn_80126DAC(_ENEMY_WORK *self, u32 a, u32 b);
 extern u32 fn_80126F80(_ENEMY_WORK *self, u32 a, u32 b);
 extern u32 fn_801272C4(_ENEMY_WORK *self, Vec3 *pos, u32 a);
-extern u32 fn_8034539C(void);
+/* `eft_slot_effect_key` (0x8034539C): its owner's header, `include/ef/eft_slot.h` (rule 2). */
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
 extern u32 fn_801275F0(_ENEMY_WORK *self, u32 a);
 extern u32 fn_80127A7C(_ENEMY_WORK *self, u32 a);
@@ -535,7 +536,7 @@ s16 fn_8013CCD0(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A), self->enemy_data_id) == 0) {
+        if (enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A), self->enemy_data_id) == 0) {
             in += (u8)fn_801406E0(14, in[0]);
             fn_8013BDE4(&in, 14, &result);
         }
@@ -673,7 +674,7 @@ s16 fn_8013DA7C(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0: {
-        _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A), self->enemy_data_id);
+        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A), self->enemy_data_id);
         if (data == 0 || data->mode_0x14 != self->act_id) {
             in += (u8)fn_801406E0(37, in[0]);
             fn_8013BDE4(&in, 37, &result);
@@ -698,7 +699,7 @@ s16 fn_8013DC58(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0: {
-        _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A), self->enemy_data_id);
+        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A), self->enemy_data_id);
         if (data == 0 || data->mode_0x17 == 255) {
             in += (u8)fn_801406E0(39, in[0]);
             fn_8013BDE4(&in, 39, &result);
@@ -770,7 +771,7 @@ s16 fn_8013E180(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0: {
-        _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A), self->enemy_data_id);
+        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A), self->enemy_data_id);
         in += (u8)fn_801406E0(50, in[0]);
         if (data == 0) {
             fn_80140AF8(self, 8, 50);
@@ -1129,9 +1130,11 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
     }
     case 4: {
         u32 id;
+        _ENEMY_DATA *entry = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
+                                                            self->enemy_data_id);
 
-        if (fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A), self->enemy_data_id) != 0) {
-            id = fn_8034539C();
+        if (entry != 0) {
+            id = eft_slot_effect_key((struct EftSlot *)entry);
             self->state_0x9F8 = id;
             self->state_0x9F7 = fn_80126DAC(self, self->act_id, (u8)id);
         } else {
@@ -1320,7 +1323,7 @@ s16 fn_8013E06C(_ENEMY_WORK *self, u8 *in) {
 /* Reads the data record's action field or, when there is none, the record's own parsed value. */
 s16 fn_8013E9FC(_ENEMY_WORK *self, u8 *in) {
     s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {
@@ -1341,7 +1344,7 @@ s16 fn_8013E9FC(_ENEMY_WORK *self, u8 *in) {
 /* Same reader as `fn_8013E9FC`, for the action id 69 and the data record's +0x0D field. */
 s16 fn_8013EE2C(_ENEMY_WORK *self, u8 *in) {
     s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {
@@ -1362,7 +1365,7 @@ s16 fn_8013EE2C(_ENEMY_WORK *self, u8 *in) {
 /* Same reader as `fn_8013E9FC`, for the action id 38 and the data record's +0x08 field. */
 s16 fn_8013DB70(_ENEMY_WORK *self, u8 *in) {
     s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {
@@ -1383,7 +1386,7 @@ s16 fn_8013DB70(_ENEMY_WORK *self, u8 *in) {
 /* Same reader as `fn_8013E9FC`, for the action id 21 and the data record's +0x0F field. */
 s16 fn_8013D1E0(_ENEMY_WORK *self, u8 *in) {
     s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {
@@ -1403,7 +1406,7 @@ s16 fn_8013D1E0(_ENEMY_WORK *self, u8 *in) {
 
 /* Selects the combat sub-command the data record's mode byte names. */
 void fn_8013D34C(_ENEMY_WORK *self) {
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {
@@ -1526,7 +1529,7 @@ void fn_8013CDB4(_ENEMY_WORK *self, u8 *in) {
 /* Same reader as `fn_8013D1E0`, for the action id 18 and the data record's +0x0E field. */
 s16 fn_8013CF6C(_ENEMY_WORK *self, u8 *in) {
     s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {
@@ -1547,7 +1550,7 @@ s16 fn_8013CF6C(_ENEMY_WORK *self, u8 *in) {
 /* Sends the combat sub-command the data record's aim fields select. */
 s16 fn_8013D054(_ENEMY_WORK *self, u8 *in) {
     s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)fn_803438E4((u8)fn_803439D4(self->id_0x03, self->id_0x0A),
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->id_0x03, self->id_0x0A),
                                                    self->enemy_data_id);
 
     if (data == 0) {

@@ -107,6 +107,10 @@ void fn_801461A8(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
  * `enemy/fn_80387844.cpp` (rule 2). */
 void fn_801462A4(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
 
+/* 0x80143BF8 - no arguments; returns a word the effect band's slot scan compares with 1.  Added with
+ * `ef/eft_slot.cpp` (rule 2: this unit owns the address). */
+u8 fn_80143BF8(void);
+
 #ifdef __cplusplus
 }
 #endif

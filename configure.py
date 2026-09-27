@@ -1328,6 +1328,21 @@ config.libs = [
             # bracket).  C++; every plain `fn_` definition is `extern "C"`.  Sections: extab
             # 0x80015AB4..0x80015B54 (20 records), extabindex 0x80034674..0x80034764 (20 x 12 B).
             Object(NonMatching, "ef/fn_8030681C.cpp"),
+            # proposal/803432B4_fn_803432B4.cpp: the `_EFT` family at `.text` 0x803432B4..0x80349DD8
+            # (92 functions / 0x6B24 bytes).  Module `ef` from the code: the range's `self` is the
+            # 0x48-byte `_EFT` field for field (`flag_0x01`, `state_0x05`, `field_0x06`,
+            # `timer_0x0C`, `pos_0x18`, `work_0x38`, `area_0x44` - the `include/ef.h` layout), it
+            # spawns models through `ef/eft_res.cpp`'s `res_eft_model_create` and gates on
+            # `eft_control`; the sibling units are `ef/eft035.cpp`/`ef/fn_803066F0.c`.  The file is
+            # `ef/eft_slot.cpp`: the range is the family's 10-entry slot pool and the enemy-record
+            # scan that drives it (`eft_slot_spawn`, `eft_slot_work_update`), and every one of the 34
+            # symbols it defines is named from its own body, the unit header's NAMES section carrying
+            # the evidence - no `__FILE__` string is reachable from the range and `dumpmap.py lookup`
+            # answers only `zz_` placeholders, so the names are guesses a later pass may refine.
+            # Sections: `.text` 0x803432B4..0x80349DD8, extab 0x80016DB4..0x80016FE4, extabindex
+            # 0x800362F4..0x8003663C, `.ctors` 0x8056F3A4, `.data` 0x805E9168..0x805E91E8.  C++;
+            # every plain `fn_` definition is `extern "C"`.
+            Object(NonMatching, "ef/eft_slot.cpp"),
         ],
     },
 
