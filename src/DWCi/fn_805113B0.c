@@ -1,6 +1,16 @@
 /*
- * DWCi/fn_805113B0.c - the 0x805113B0-0x805124F4 band (21 functions, 4420 B) of the Nintendo
+ * DWCi/fn_805113B0.c - the 0x805113B0-0x80512490 band (20 functions, 4320 B) of the Nintendo
  * Wi-Fi Connection (DWCi) SDK block the game links between its own code and the NHTTP library.
+ *
+ * SEAM MOVED (recon lane, 2026-09-27).  This unit was registered as 0x805113B0..0x805124F4; the
+ * right edge is now 0x80512490.  `tools/splits/tudiscover.py at 0x80512490` reports a STRONG x2
+ * cut there (.sdata run jumps lbl_80794364 -> lbl_80794368 and lbl_80794368 -> lbl_80794370
+ * intersect at the single cut 18642), so a TU begins at 0x80512490 and the 0x64 overlap with the
+ * NHTTP-side probe is exactly `DWCi_GetStringLength`.  That function's definition moved to the new
+ * `DWCi/DWCi_NatNeg.c` (0x80512490..0x805145B8); the forward declaration below stays because the
+ * bodies here still call it.  Re-measured before/after: 91.1543 % / 21 functions / 472 B matched
+ * (before) -> 90.9439 % / 20 functions / 372 B matched (after) - the 100 B loss is exactly the
+ * 100 %-matched `DWCi_GetStringLength` leaving the unit, not a regression in any remaining body.
  *
  * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py lookup for every row of the range - all `zz_`/`fn_` placeholders - and
@@ -26,18 +36,18 @@
  *   - language: C.  Every callee is a plain C symbol (`memcpy`, `sprintf`, `SOHtoNs`, the 0x8050xxxx
  *     helpers) and no defined name in the range is mangled.
  *
- * Sections: .text 0x805113B0..0x805124F4 only.  The range loads three unowned data objects
+ * Sections: .text 0x805113B0..0x80512490 only.  The range loads three unowned data objects
  * (`lbl_80794348`'s 2-byte protocol constant, the `%s:%d`/`%s`/`:%d` format strings at
  * 0x80794358..0x80794368, and `.data` 0x8060EDB0 + the `.bss` counter 0x80795820 / ring buffers
  * 0x807625C0); none of them is claimed here - a data claim has to be measured before and after
  * (playbook 55).
  *
- * Registered NonMatching in configure.py, lib DWCi (Wii/1.3).  All 21 bodies are reconstructed and every
- * one of them is at or above the 80 % bar (unit fuzzy 91.15 % over the 4420 B of .text, 8 byte-identical,
- * 472 B matched):
+ * Registered NonMatching in configure.py, lib DWCi (Wii/1.3).  All 20 bodies are reconstructed and every
+ * one of them is at or above the 80 % bar (unit fuzzy 90.94 % over the 4320 B of .text, 7 byte-identical,
+ * 372 B matched; `DWCi_GetStringLength` is 100 % in its new home `DWCi/DWCi_NatNeg.c`):
  *
  *   100.00  fn_80511620  fn_80511680  fn_80511920  fn_80511990  fn_80512030  fn_80512170
- *           fn_80512200  fn_80512490
+ *           fn_80512200
  *    95.38  fn_80511640        94.92  fn_80511530        94.56  fn_80512210
  *    91.87  fn_80511CF0        91.76  fn_80511C20        91.32  fn_80512080
  *    90.74  fn_805113B0        89.96  fn_80511470        88.59  fn_80511F10
@@ -276,7 +286,7 @@ void fn_80512170(DWCiConn* conn);
 u16 fn_80512200(u16 port);
 char* fn_80512210(u32 addr, u16 port, char* buf);
 u32 fn_80512300(char* str, u32* outAddr, u16* outPort);
-void fn_80512490(void** buf, int* len);
+void DWCi_GetStringLength(void** buf, int* len);
 
 /* 0x805113B0 - the handshake write: { 0x0003 } when the connection is in mode 2, then the shared
  * 0xFEFE constant and the 0x68 terminator, handed to the send path. */
@@ -623,7 +633,7 @@ u32 fn_80511CF0(DWCiConn* conn, u32 addr, u16 port, void* buf, int len)
     DWCiReq* req;
     int err;
 
-    fn_80512490(&buf, &len);
+    DWCi_GetStringLength(&buf, &len);
     if (conn->mode != 3 && fn_8050C220(conn->sock) == 0) {
         return 1;
     }
@@ -878,14 +888,5 @@ u32 fn_80512300(char* str, u32* outAddr, u16* outPort)
     return 1;
 }
 
-/* 0x80512490 - default a buffer/length pair: an absent buffer becomes the empty string, and a -1
- * length becomes strlen(buffer) + 1. */
-void fn_80512490(void** buf, int* len)
-{
-    if (*buf == 0) {
-        *buf = lbl_80794368;
-        *len = 0;
-    } else if (*len == -1) {
-        *len = strlen((char*)*buf) + 1;
-    }
-}
+/* 0x80512490 moved to `DWCi/DWCi_NatNeg.c` with the seam (see the header): the body was
+ * byte-identical here and is kept there verbatim, so this unit now ends at 0x80512490. */

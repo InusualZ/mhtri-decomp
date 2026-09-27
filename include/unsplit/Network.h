@@ -4,7 +4,8 @@
  * Filled in by the `8041A87C_fn_8041A87C` lane: the helpers the 0x8041A87C..0x8041DF10 range calls
  * (the debug manager, the DWC/GameSpy socket layer, the OS thread API and the neighbouring `fn_`
  * helpers) all live in address bands that are still unsplit, so per brief section 6.5 rule 2 this is
- * their legitimate home.  Nothing owned by a registered unit is declared here.
+ * their legitimate home.  A symbol a registered unit owns is declared in that unit's header and
+ * included from here instead (`DWCi/DWCi_NatNeg.h` is the first such case).
  */
 
 #ifndef UNSPLIT_NETWORK_H
@@ -108,11 +109,11 @@ void fn_8050E2A0(u32 data, NetworkCallback callback);
 /* NHTTP / network utility layer */
 s32 fn_805073C0(s32* code, s32* type);
 void fn_80507470(void);
-void fn_80512C50(void);
-s32 fn_805132C0(u32 session, s32 flag, NetworkCallback empty, NetworkCallback callback, void* result);
-void fn_805135E0(u32 session);
-void fn_80513BB0(void);
-void fn_80514400(void* data, u32 size, void* header);
+
+/* The DWCi NATNEG / transport-tail unit (`.text` 0x80512490..0x805145B8) is registered as
+ * `src/DWCi/DWCi_NatNeg.c`, so its five entry points now live in its owner header; including
+ * it keeps the callers below compiling without redeclaring an owned symbol (rule 2). */
+#include "DWCi/DWCi_NatNeg.h"
 
 /* OS / runtime helpers */
 u16 SOHtoNs(u16 value);
