@@ -346,7 +346,9 @@ void fn_80131E00(struct _ENEMY_WORK* self);
 void fn_80131E74(struct _ENEMY_WORK* self);
 void fn_80133C3C(struct _ENEMY_WORK* self);
 f32 fn_802B0430(u8 area);
-void fn_80041E40(void* dst, const void* src);
+void* fn_80041E40(void* dst, const void* src); /* owner `src/mh3_pad.cpp`; its header is
+    * unreachable from an `include/ef.h` consumer (`fn_80043EA8`/`fn_80041E8C` conflict), so the
+    * shape here is the owner body's (`mr r3,r31` -> returns `dst`) */
 void fn_80043EA8(void* out);
 u32 fn_80133C50(struct _ENEMY_WORK* self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK* self, u32 a, u32 b);

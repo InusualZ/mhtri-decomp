@@ -229,9 +229,9 @@ void fn_80337648(NetEmStatus* dst, const NetEmStatus* src);
  * `include/mh3_pad.h`'s `(void*, const void*)` collides with `include/ef.h`'s `VEC3*` pair for
  * `fn_80043EA8` (the bracket note in `include/mh3_pad/control.h`), and the other carriers
  * (`enemy/fn_80165FC8.h`, `stage/fn_802B2AA0.h`) collide with this unit's other includes.  The
- * declaration below is the call sites' `VEC3*` view; the fold belongs to whichever lane settles
- * that pair. */
-void fn_80041E40(VEC3* dst, const VEC3* src);
+ * declaration below is normalised to the owner's own body - it returns `dst` - in the
+ * 2026-09-27 declaration fold-in. */
+void* fn_80041E40(void* dst, const void* src);
 /* `include/Pl/fn_80273B14.h` re-declares `fn_8027681C` in a spelling that collides with `pl.h`'s
  * when the two are included together, so this unit takes its four callees from that unit's
  * call-site view instead; the fold is the same outbox entry as above. */

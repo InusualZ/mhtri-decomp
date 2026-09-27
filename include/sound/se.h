@@ -111,8 +111,11 @@ u32 fn_800D8D8C(nw4r::math::VEC3* pos);
 SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos);
 s32 fn_800DBB78(s32 bank, s32 id);
 
-/* C-linkage helpers the model methods call (their owners are elsewhere in the game). */
-void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
+/* C-linkage helpers the model methods call (their owners are elsewhere in the game).
+ * 0x80041E40 is owned by `src/mh3_pad.cpp`; this copy is normalised to that owner's body
+ * (`returns dst`) - its header cannot be included from the `ef` band (fn_80043EA8/
+ * fn_80041E8C conflict, filed 2026-09-27). */
+void* fn_80041E40(void* dst, const void* src);
 void fn_80041E8C(nw4r::math::VEC3* dst, f32 x, f32 y, f32 z);
 void fn_800D3ACC(void* sub);
 void fn_8007E498(void* obj);

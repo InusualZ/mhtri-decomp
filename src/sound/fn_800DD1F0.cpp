@@ -195,7 +195,7 @@ extern "C" void fn_800DD7E0(_PLW* self, nw4r::math::VEC3* pos, s8 flag)
 extern "C" void fn_800E0808(MHchar* self, nw4r::math::VEC3* src)
 {
     if (src) {
-        return fn_80041E40((nw4r::math::VEC3*)&self->field_0xD4[2], src);
+        fn_80041E40((nw4r::math::VEC3*)&self->field_0xD4[2], src);
     }
 }
 
@@ -208,7 +208,7 @@ extern "C" void fn_800E090C(MHchar* self, u32 value)
 /* Copy `src` into the model's +0x10 vector. */
 extern "C" void fn_800E09D0(MHchar* self, nw4r::math::VEC3* src)
 {
-    return fn_80041E40(&self->field_0x10, src);
+    fn_80041E40(&self->field_0x10, src);
 }
 
 /* Broadcast the pool constant over the model's +0x10 vector. */

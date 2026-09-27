@@ -75,7 +75,8 @@ f32 fn_80050F80(const void* a, const void* b);
 void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
+void* fn_80041E40(void* dst, const void* src); /* owner `src/mh3_pad.cpp`; normalised to its body
+    * (returns `dst`) with the declaration fold-in, 2026-09-27 */
 void fn_80043EA8(nw4r::math::VEC3* out);
 s32 fn_8045AB38(s16 value);
 

@@ -43,8 +43,9 @@ struct LandData {
     /* +0x08 */ nw4r::math::VEC3 vec_0x08;
 };
 
-/* 0x80041E40 - copies one 0xC-byte float record. */
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
+/* 0x80041E40 - copies one 0xC-byte float record and returns `dst` (the owner `src/mh3_pad.cpp`'s
+ * body); normalised with the declaration fold-in of 2026-09-27. */
+void* fn_80041E40(void* dst, const void* src);
 
 /* 0x8012A624 - the `LandData` constructor: constructs the +0x08 vector. */
 void fn_8012A624(LandData* land);

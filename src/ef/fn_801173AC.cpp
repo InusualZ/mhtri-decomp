@@ -313,9 +313,11 @@ void fn_80119BB0(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 
 _EFT* fn_80119C44(u8 kind, u8 variant, u32 arg);
 void fn_80119D10(_EFT* self);
 void fn_80119D9C(_EFT* self);
-void fn_80041E40(void* dst, const void* src);
-void fn_80050850(nw4r::math::VEC3* v, nw4r::math::VEC3* in);
-void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+/* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`include/ef.h`
+ * spells `fn_80043EA8`/`fn_80041E8C` differently from `include/mh3_pad.h`, MWCC (10197)), so this
+ * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`fn_80051378` now
+ * come from their owner's header, `include/fn_8004CAD8.h` (included above, rule 2). */
+void* fn_80041E40(void* dst, const void* src);
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_800532DC(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 /* fn_800F8914 comes from the owner's header `ef/eft_res.h` (rule 2): this unit's local

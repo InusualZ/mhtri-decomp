@@ -208,15 +208,12 @@ extern "C" void fn_801B78F8(EmProgWork* self);
  *     `src/Pl/pl_act.cpp` uses for its data labels.  Both are `shared-file` requests in the outbox. */
 extern "C" {
 void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-/* 0x80050850 (normalise in place: its body moves r3/r4 into r29/r30 and calls `fn_800508A8` and
- * `fn_800508AC` with one each) and 0x80051EE0 (r3 `out`, r4 `in`, f1 the scale it saves in f31 before
- * zeroing `out` through `fn_80043EA8`).  Their owner is `fn_8004CAD8.cpp`, but that unit's header
- * cannot carry them: five other units declare the same two C-linkage names with four different
- * spellings (`src/ef/eft001.cpp`, `src/ef/eft007.cpp`, `src/ef/eft019.cpp`,
- * `src/ef/fn_801173AC.cpp`, `src/g3d/fn_80075DCC.cpp`, the last with a four-argument form), so any
- * header declaration breaks at least one of them with MWCC `(10197)/(10115)`.  The outbox carries
- * the fold-in as a `shared-file` request. */
-void fn_80050850(nw4r::math::VEC3* v, nw4r::math::VEC3* in);
+/* 0x80050850 has moved to its owner's header, `include/fn_8004CAD8.h` (included above): the two
+ * in-file copies that made that fold unsafe (`src/ef/fn_801173AC.cpp`'s and this one) were settled
+ * in the same batch, 2026-09-27.  0x80051EE0 (r3 `out`, r4 `in`, f1 the scale it saves in f31
+ * before zeroing `out` through `fn_80043EA8`) is still declared here: its owner is the same unit,
+ * but the remaining spellings (`src/g3d/fn_80075DCC.cpp`'s four-argument form) have not been
+ * settled, so the fold stays an outbox `shared-file` request. */
 void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 extern u8 lbl_805B2188[];
 }

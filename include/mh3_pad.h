@@ -22,7 +22,9 @@ void fn_80043EA8(void *sub);
 
 /* Added when `g3d/g3d_resanmchr.cpp` registered (rule 2): the `ResAnmChr` walkers copy 3-float
  * records and normalise them through this unit's helpers. */
-void fn_80041E40(void *dst, const void *src); /* 0x80041E40 - copies a 0xC-byte record */
+void* fn_80041E40(void *dst, const void *src); /* 0x80041E40 - copies a 0xC-byte record;
+    * its body keeps the destination in r31 and ends `mr r3,r31`, so it returns `dst` -- the
+    * target's own bytes, not the call sites' `void` guess (normalised 2026-09-27). */
 void fn_80041E8C(f32 *out, f32 x, f32 y, f32 z);     /* 0x80041E8C - builds a record from three floats */
 
 /* Added when `camera/fn_802B5C58.cpp` registered (rule 2): the camera accessors all start by copying a
