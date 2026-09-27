@@ -21,6 +21,15 @@ cd "$(dirname "$0")/../.." || exit 1
 src=".agents/agents"
 dst="${HOME}/.pi/agent/agents"
 [ -d "$src" ] || { echo "no $src - wrong directory?"; exit 1; }
+# The section 6.5 rule text in every profile is generated from docs/plan.md section 6.5
+# (tools/agents/sync_profiles.py). Installing a stale copy is exactly how a retired rule reached a lane last
+# time, so refuse: an edit to the plan that forgot the profiles fails here, before anything is copied.
+if ! python tools/agents/sync_profiles.py --check; then
+  echo "install.sh: refusing to install - a profile's section 6.5 block is stale." >&2
+  echo "  Run: python tools/agents/sync_profiles.py" >&2
+  exit 1
+fi
+
 mkdir -p "$dst"
 for f in "$src"/*.md; do
   [ -e "$f" ] || continue

@@ -63,8 +63,9 @@ worth naming in your report rather than dropping silently).
   2026-09-26): when the merge brings the batch to symbols the map spells as generated stems, the merger may
   rename, and must then finish the rename's other half (the map **and** every source/header that spells the
   name) inside the merge commit. This is what lets a merge lane land a unit whose registration still rests on
-  the map's `fn_XXXXXXXX` names - the gate refuses a written unit behind a `rule 7 deferred` escape
-  (`land.py`'s `rule7_defer_growth`), and a merge lane is often the only one that can fix it. Derive each name
+  the map's `fn_XXXXXXXX` names - the gate refuses a batch that leaves its own unit's symbols generated
+  (`land.py`'s `rule7_defer_growth`), a `rule 7 deferred` comment exempts nothing, and a merge lane is often the only
+  one that can fix it. Derive each name
   from the symbol's own body, mark a thin guess in the unit header, rename the file too when its stem is
   generated, and leave references to **other** units' unrenamed symbols alone. Worked pattern and the three
   branches this unblocked: `.pi/notes/naming-backlog.md`.

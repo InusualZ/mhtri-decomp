@@ -21,6 +21,7 @@ against it. Behaviour on a real task (T3) is separate and is logged in
 import io
 import json
 import os
+import subprocess
 import sys
 
 COMMON = """PROBE - do no work: run no tools, write no files, no builds, no git. Answer from your own system prompt
@@ -41,17 +42,18 @@ give, so do not paper over a gap.
 EXTRA = {
     "decompiler": """
 7. For this role specifically: what is the matching policy when a row cannot reach 100 %, and where does a
-   residual belong? Name three codegen levers that usually pay, and what a `rule 7 deferred` comment does and
-   does not defer.
+   residual belong? Name three codegen levers that usually pay, and does a `rule 7 deferred` comment exempt
+   anything from rule 7 - and why not?
 8. Also for this role: what must you check about a registered range BEFORE you write bodies into it, and what do
    you do when that check fails? Which single piece of data settles it, and what does a `_<fnaddr>s_<file>_` name
    in the dump's map tell you - and what does it NOT tell you?
 9. And for this role: what does the profile require of a unit's **data sections**, and when? What is an `extern`
    for data the unit's own functions own, and what does each direction of the mandatory `datagap` row mean?
 10. And for this role: what must you name, and from what evidence? What is a rename's second edit, and what does a
-    `rule 7 deferred: <reason>` comment cover - and not cover?
+    `rule 7 deferred: <reason>` comment cover now - and why is there no deferral?
 11. And for this role: the dump and the map give no real name for a symbol - now what? What is a generated
-    `fn_`/`lbl_`/`unk` left in `src/`, and may a `rule 7 deferred` comment be used on a unit you are writing?
+    `fn_`/`lbl_`/`unk` left in `src/` - including one **another** unit owns - and may a `rule 7 deferred` comment
+    silence it?
 """,
     "merger": """
 7. For this role specifically: which two files may be unioned automatically and which must NEVER be handled
@@ -68,6 +70,15 @@ EXTRA = {
 def main(argv):
     agents = argv[1:] or ["decompiler", "merger", "fixer"]
     main_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    # T0 freshness: a probe of a stale profile measures the wrong prompt. The section 6.5 block in every profile
+    # is generated from docs/plan.md section 6.5, so refuse to probe until it matches the plan.
+    stale = subprocess.run([sys.executable, os.path.join("tools", "agents", "sync_profiles.py"), "--check"],
+                           cwd=main_dir, capture_output=True, text=True)
+    if stale.returncode != 0:
+        sys.stderr.write(stale.stderr)
+        print("refusing to probe: a profile is stale - run `python tools/agents/sync_profiles.py` first")
+        return 1
     lanes = []
     for a in agents:
         task = (COMMON + EXTRA.get(a, "")) if a in EXTRA else COMMON
@@ -104,7 +115,9 @@ def main(argv):
         if a == "decompiler":
             print("      - best-scoring variant policy; residual in the UNIT header")
             print("      - three paying codegen levers (peephole off / fp_contract / typed params / pool off)")
-            print("      - rule 7 deferral defers the fn_ half only")
+            print("      - rule 7 has NO exemption and NO deferral: a `rule 7 deferred` comment exempts nothing")
+            print("        (the key was deleted); an EXISTING finding is the gate's --diff grandfather, an ADDED one")
+            print("        refuses, and another unit's symbol is reported, not hidden behind a comment")
             print("      - the seam check BEFORE writing bodies: a registered range is not necessarily a TU; a")
             print("        one-copy __FILE__ string is decisive (cited on both sides of an edge => that edge is")
             print("        FALSE), .data pins are candidates only, and a fragment is REPORTED - never patched")

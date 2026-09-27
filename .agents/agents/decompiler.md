@@ -177,49 +177,29 @@ lanes reported "no new violation" on 2026-09-25 while the gate found real findin
 The DOL must hash to `BF4850739478CAAEDFE675949EB7C28595A7FDE9`. If a full build is impossible in your
 worktree, say so explicitly in your report - do not imply you verified it.
 
-## Style rules (the campaign's section 6.5, section 6.5's canonical table is `docs/plan.md`; `stylelint.py` reports them by `file:line` and **`land.py verify` refuses a batch that adds a violation**)
+## Style rules (section 6.5 - the canonical table is `docs/plan.md`; `stylelint.py` reports each rule as `file:line` and **`land.py verify` refuses a batch that adds a violation**)
 
-The rules apply to new work immediately; existing units are brought into conformance as they are touched.
+The rules apply to new work immediately; existing units are brought into conformance as they are touched. The
+block below is generated from `docs/plan.md` section 6.5, so it cannot drift: regenerate it with
+`python tools/agents/sync_profiles.py` after a rule change, and treat the plan - not this copy - as the
+authority. `--check` exits non-zero when a profile is stale.
 
-* **1 - a shared type lives in one header.** A type more than one unit uses is defined **once** (under `include/`,
-  or beside its owner and included) and included where needed - never copied into a second `src/` file.
-* **2 - an extern lives with the TU that owns the symbol.** Declare it in the owner's source/header and include
-  that. A symbol nothing owns goes in `include/unsplit/<module>.h`, which is a fallback: that band must not
-  declare a symbol a registered unit owns (the typed definition collides - `(10197)`).
-* **3 - a reconstructed class/struct states its size** (`/* size: 0xNN */`), traced from evidence - the
-  allocations, `memset`/`memcpy` lengths, the object's `.data`/`.rel` records, or the runtime dump. An
-  approximation is allowed **only** if it is marked as one.
-* **4 - every field carries its offset** (`/* +0x1C */`, ascending) so the layout is checkable against the
-  disassembly at a glance.
-* **5 - every field has a name from its context** - what is stored, compared against, passed on. The only
-  exception is padding/unused (`pad_0xNN` / `unused_0xNN`), which keeps its offset.
-* **6 - pointer arithmetic to reach a field is forbidden.** `*(u32*)((u8*)self + 0x1C) = v;` must be
-  `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise
-  copy, a `sizeof`/offset computation) - and even there prefer `offsetof(Type, field)`.
-* **7 - symbols have proper names.** No `fn_XXXXXXXX` and no `unkNN` may survive in `src/`. A function gets a
-  name for what it does plus the naming scheme of its neighbours; a field a name for what it holds. There is no
-  "no evidence for a name" case, only a name to derive - when the context supports only a guess, guess and write
-  it in the unit header as an explicit **GUESS** with the evidence behind it. A file-wide `rule 7 deferred:
-  <reason>` comment is legal only for references to OTHER units' unrenamed `fn_` symbols, and defers the `fn_`
-  half only (the `unk` half stays).
-* **8 - `goto` is forbidden** (and so is a label used as control flow). Where a shared tail or a dispatch
-  layout looks like it needs one, the conformant shapes are a **helper function**, a **`switch` whose cases
-  share a `break`**, or a **`for (;;)` with `break`/`continue`**. If none of them reproduces the target's
-  codegen, that is a **residual to record with both measurements**, not a licence to use `goto`.
-* **9 - a mangled symbol is called through its owner.** A map name carrying an argument list (`Name__FP...`) or
-  a class/namespace qualifier (`Name__Q34nw4r...`) is a *mangling*: declare the class or namespace and call
-  `obj->method(args)` / `ns::function(args)`. The same holds for a *declaration* of the mangled spelling (the
-  C++ front-end mangles it a second time). An `fn_XXXXXXXX` stem is the map's placeholder, not a mangling: rule 9
-  does not route it through an owner, but it is never a resting place either - name it (see *Naming*). (This is
-  *not* about `extern "C"`: putting a genuinely mangled map name
-  at C++ scope, or an `fn_*` inside `extern "C"`, is how objdiff pairs it by name - see `rehome_decls`.)
-* **10 - a vtable we own is compiler output.** A table of code pointers inside the unit's own registered ranges
-  is **emitted by MWCC** from a class declaring its `virtual` methods plus the constructor that stores the
-  table - never written entry by entry, never `extern`, never reached through a `void**` member. A table
-  *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function
-  pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC
-  emit a table into our object - extra bytes). A table we wrote is **not** evidence of inheritance; that comes
-  from the object's structure - the slot addresses in the DOL, the constructor's store, the ctor/dtor chain.
+<!-- SECTION-6.5-RULES-BEGIN - generated from docs/plan.md section 6.5 by tools/agents/sync_profiles.py; do not edit by hand -->
+The canonical table for rules 1-10 is `docs/plan.md` section 6.5; this block is generated from it - do not edit it by hand, run `tools/agents/sync_profiles.py`.
+
+1. **A shared type lives in one header** - a type more than one unit uses is defined **once** (under `include/`, or beside its owner and included) and *included* where needed — never copied. The existing convention applies: a declaration moves to `include/` the *second* time a unit needs it, never the first
+2. **An extern lives with the TU that owns the symbol** - a function or variable declared `extern` belongs in the source or header of the translation unit that **defines** it, and consumers include that. Re-declaring someone else's symbol in your own file "to save an include" is forbidden. A symbol **no registered unit owns** (the map resolves it to an unsplit address) belongs in a band header under `include/unsplit/`, never a local `extern`
+3. **A reconstructed class/struct states its size** - every reconstructed type carries `/* size: 0xNN */`, traced from the evidence (allocations, `memset`/`memcpy` lengths, the object's `.data`/`.rel` records, the runtime dump). An approximation is allowed **only** if it is marked as one
+4. **Every field carries its offset** - `/* +0x1C */` on the field, in ascending order, so the layout is readable at a glance and a reviewer can check it against the disassembly
+5. **Every field has a name from its context** - what is stored, compared against, passed on. The **only** exception is a padding or unused field — present in the original object but untouched by the functions we match — which gets `pad_0xNN` / `unused_0xNN` **and keeps its offset**
+6. **Pointer arithmetic to reach a field is forbidden** - `*(u32*)((u8*)self + 0x1C) = v;` is not acceptable; declare the type and write `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise copy, a `sizeof`/offset computation) — and even there prefer `offsetof(Type, field)`
+7. **Symbols have proper names** - a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used; a data label (`lbl_XXXXXXXX` / `loc_XXXXXXXX`) gets a name from what it holds and where it is used, and the map row is renamed in the same change. **No auto-generated name survives in `src/`** — `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN`, whoever owns the symbol: this unit's, another unit's or an unowned one. There is no exemption and no deferral
+8. **`goto` is forbidden** - No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read
+9. **A mangled symbol is called through its owner** - a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and is rule 7's to name
+10. **A vtable we own is compiler output** - a table of code pointers inside the unit's own registered ranges is **emitted by MWCC** from a class that declares its `virtual` methods (plus the constructor that stores the table) - never written out entry by entry, never declared `extern`, never declared through a `void**` member. A table *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC emit a table into our object - extra bytes). **A table we wrote is not evidence of inheritance** - inheritance comes from the object's structure: the slot addresses read out of the DOL, the constructor's store, and the constructor/destructor chain
+
+**Enforcement is a tool, not a promise.** `tools/units/stylelint.py` (roadmap 7.21) reports each rule with `file:line`, per unit and as a backlog, and **`land.py verify` refuses a batch that adds a violation** — a rule enforced by remembering is not a rule. Rule 7 has **no exemption and no deferral**: every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` in `src/` is a finding, whoever owns the symbol. The **only** grandfather is the gate's `--diff`: an existing finding never blocks a landing, while an *added* one refuses - so committed work is not revoked, and the mounted debt cannot grow. A file with no bodies is held to the rule too, and a `rule 7 deferred` comment exempts nothing.
+<!-- SECTION-6.5-RULES-END -->
 
 Style: 4-space indent, UTF-8, LF, match the surrounding file. Comments and string/char literals are stripped
 before the lint matches, so rules 3-4 live *in comments* while the others must not fire on comment text.
@@ -276,13 +256,12 @@ often an `owner_merge` artefact - verify it.
   and who reads it. `lbl_XXXXXXXX` is never the resting place: when the context supports only a guess, guess,
   write it in the unit header as an explicit **GUESS** with the evidence behind it, and finish the rename's map
   half with `python tools/symbols/symedit.py rename lbl_XXXXXXXX <name>`.
-* `rule 7 deferred: <reason>` is legal **only for references to OTHER units' unrenamed symbols** - the
-  `fn_XXXXXXXX` names you call but do not own. They are not this batch's to fix, and the line is the durable way
-  to say so, with a reason that names the evidence. The land gate refuses a batch that grows an escape for a name
-  the batch owns (its own file registered at a generated file name, or its own `fn_` left **defined**), so a unit
-  you write does not use it for a name it owns - there is no "no evidence for a name" case, only a name to derive.
-  It covers the `fn_` half only (`unkNN` and field names stay enforced), and `grep -rn "rule 7 deferred" src/` is
-  the complete list of units that use it.
+* **A reference to another unit's unrenamed symbol is a rule-7 finding too.** The rule has **no exemption and no
+  deferral**: `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` are findings in `src/` whoever owns
+  them, and a `rule 7 deferred: <reason>` comment exempts nothing (that key no longer exists - do not re-add it).
+  Another unit's symbol is not this branch's to rename, so what you cannot fix you **report**: name the symbol,
+  its file and its count, and list it in the unit header's residual - never silence it with a comment. The only
+  grandfather is the land gate's `--diff`, which passes a finding that already existed and refuses an *added* one.
 
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 

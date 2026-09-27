@@ -354,7 +354,10 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       context - see the `symbol-map-editing` skill
                             agents/   AGENTS.md housekeeping (localonly.py): pull the local-only
                                       working-state section out before a commit and push it back after
-                                      - see the `agents-md-local-only` skill
+                                      - see the `agents-md-local-only` skill; subagent-profile sync
+                                      (sync_profiles.py): generate each profile's section 6.5 rule
+                                      block from docs/plan.md - `--check` exits non-zero when a
+                                      profile is stale
                             units/    the `decompile-symbol` helpers (symbolpreflight.py: one symbol's
                                       owner and collision pre-flight; m2cinput.py: a target object's
                                       disassembly as `tools/m2c` input) plus their self-tests, and
