@@ -1004,6 +1004,33 @@ default:
 return 0;
 ```
 
+**Refinement (2026-09-27): when the default returns the *same* constant as the tail, write `default: break;` - `default: return 0;` emits a second return-0 block.** The rule above is about MWCC if-converting
+*two different* constant arms (`return 0` / `return 1`). When the constants are the *same* (the common
+`return 1` for the allowed cases, `return 0` for everything else), the spelling decides how many copies of
+the tail it emits:
+
+```c
+default:
+    return 0;        /* a constant-return arm of its own -> its own block */
+...
+return 0;            /* the fall-through tail every `break` reaches -> a second block */
+```
+
+gives **two** return-0 blocks, while `default: break;` plus the one trailing `return 0;` makes every
+non-returning case fall into the **same** tail block - which is what retail has.
+
+**When the two forms differ, and how to tell from the target.** Count the constant-return blocks in the
+switch's region of the target: retail with a shared tail has exactly **one** `li r3, 0` reaching `blr`,
+with the case conditions branching to it, and no second `li r3, 0` at the default site. If our diff shows
+an extra constant block sitting where the default arm compiles, our `default: return 0;` created it - change
+that one word to `break`. (If the default's constant *differs* from the tail's, the two arms are the
+if-conversion pair this row's negation rule already covers, and `default: return 1;` is right.)
+
+**Measured** on all five switches of `Network/network_state.cpp`, each written `default: break;` + one
+trailing `return 0;`: `handleNetworkState1` 0.23 -> **82.50230 %**, `handleNetworkState2` 0.34 ->
+**91.28178 %**, `handleNetworkState2Fmp` 0.34 -> **81.01007 %** (the function scores with the batch's other
+levers - the per-unit `-O3`, `#pragma exceptions on` and section 61's `dont_inline` pair).
+
 ## 33. Prefer the unit's flags over a per-function flag - a TU was compiled once
 
 **Problem.** A function that will not match invites a scoped pragma (`optimization_level`, `peephole`,
@@ -1823,3 +1850,52 @@ force the include.
 **How to check.** Diff `report.json` over the **whole tree**, not the unit you touched: a fold moves a row in a
 TU that has nothing to do with the symbol being renamed, and only a whole-tree diff shows it. A batch that
 folded 114 declarations across 65 files moved **0 of 2,797 units** once it followed the net-zero rule.
+
+## 61. A kept `bl` inside one function: scope `#pragma dont_inline on` to it
+
+**Problem.** A `switch` case calls a small file-local helper that retail keeps as a `bl`, but our
+`-inline auto` folds the callee's body into the case: the kept call disappears, the case grows by the
+callee's size and every later register and offset shifts. It reads as a missing helper or a wrong case body,
+and no source shape *inside* the case recovers it - the callee is gone.
+
+**Why try it.** The inline decision row 28 names is **unit-wide** (`-inline noauto` in the library's
+`cflags_*`), which also de-inlines every call that unit wanted folded. `#pragma dont_inline on` ...
+`#pragma dont_inline off` bracketing **one function** keeps that function's callees out of line and leaves
+the rest of the TU alone - the per-function inverse of `-inline noauto`, and the reason to prefer it when
+only one call site needs the kept `bl`. It is defensible where row 33's per-function warning does not bite,
+because the original build did not inline that call either (the callee is called from another TU too, so it
+demonstrably existed as a symbol): the pragma restores the original's *call*, not codegen the original never
+had. It also does not de-inline anything else, so the unit's other `bl`s keep the folding they matched with.
+
+**Result.** `Network/network_state.cpp`'s `handleNetworkState1` measured **80.01 -> 82.50 %** with the pair
+around that one function alone (retail keeps `bl resetNetworkState3` in case 255; `-inline auto` folds the
+56-byte `resetNetworkState3`'s body into the case). The same lever carried two `lobby` units:
+`fn_8020C588.cpp` measured all three spellings - `#pragma inline off`, `#pragma inline_depth 0` and
+`#pragma dont_inline on` each keep the `bl fn_80212060` (220 B; with `-inline auto` `fn_8021213C` came out
+276 B against a 92 B target) - and kept `dont_inline on`; `fn_801EC9F8.cpp` uses the same pair for
+`fn_801ED3E8`/`fn_801ED464` (with `-inline auto` both are folded into `fn_801ED688`, 860 -> 1556 B, 7.00 %;
+95.86 % with the pragma). The *lib-wide* alternative of row 28 also fixes `fn_8020C588`, but it moved four
+other `lobby` units' numbers (`fn_801E7530` 27.65 -> 31.76, `lb_npc` 13.37 -> 13.75, `fn_8021E1EC`
+9.22 -> 9.66) - the pragma keeps the deviation inside the one unit that needs it. The pair may bracket one
+function or a whole file, whichever region needs the kept calls; both spellings measure the same codegen.
+
+**Example.**
+
+```c
+#pragma dont_inline on          /* scoped to the one function that needs the kept `bl` */
+s32 handleNetworkState1(NetworkInstance* self)
+{
+    NetworkStateMachine* st = (NetworkStateMachine*)self;
+    switch (st->sessionState_6132) {
+    case 255:
+        resetNetworkState3(self);       /* retail keeps this `bl` */
+        chooseServerAddress(st, 0, 0);
+        updatePatInterface(st, 0, 0, 0);
+        return 1;
+    default:
+        break;                          /* section 34's shared tail */
+    }
+    return 0;
+}
+#pragma dont_inline off
+```
