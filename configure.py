@@ -890,7 +890,7 @@ config.libs = [
             # enemy_control band, not here) and the dump answers only `zz_` placeholders, so the
             # file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_80181C88.cpp"),
-            Object(NonMatching, "enemy/fn_80177608.cpp"),
+            Object(Matching, "enemy/fn_80177608.cpp"),
             # proposal/80177890_fn_80177890: the enemy motion-state update set (0x80177890..0x80178128,
             # 12 functions). The neighbour TU's dispatch evidence pins the seam; cflags are this lib's.
             Object(NonMatching, "enemy/fn_80177890.cpp"),
