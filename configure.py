@@ -2435,6 +2435,19 @@ config.libs = [
             # `draw_font_idx__FUsPScUlPC10_mh_ivec2_`) reached through their real signatures (rule 9).
             # Same `cflags_lobby` as its siblings.  Same `cflags_lobby` as the band above.
             Object(NonMatching, "lobby/lb_quest_board.cpp"),
+            # Registered from proposal/8038E8E8_fn_8038E8E8.cpp: the lobby list/detail UI band
+            # (`.text` 0x8038E8E8..0x80394038, 70 functions / 22352 B) plus its extab run
+            # 0x8001819C..0x8001833C (52 x 8 B) and extabindex run 0x800380D0..0x80038340
+            # (52 x 12 B) - both runs are exactly the gap the bracketing units leave
+            # (`enemy/fn_80387844.cpp` ends at 0x8001819C / 0x800380D0).  Module `lobby`,
+            # evidence class 3 (see the unit header): the range reads `lobby_w`/`lb_param_w`,
+            # calls `LbStr` 28 times and the whole lobby/HUD 2D API, and the lobby menu
+            # dispatcher `fn_80211E68` calls two of its functions as screen entry points.  The
+            # file name is the marked GUESS `lb_quest_ui.cpp`; the seam is unproven with two
+            # candidates (0x8038EF28 strong `.sdata2` cut, 0x8038EC44 where the six
+            # `em009_prog_tbl` entry slots end) - both are in the unit header and the outbox.
+            # Same `cflags_lobby` as its siblings with the per-file `#pragma exceptions on`.
+            Object(NonMatching, "lobby/lb_quest_ui.cpp"),
         ],
     },
     {

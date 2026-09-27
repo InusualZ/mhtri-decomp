@@ -62,6 +62,11 @@ void fn_800DD514(nw4r::math::VEC3* pos);
  * these parameter types to reproduce it.  Added with `ef/eft053.cpp`; `ef/eft004.cpp` carries an
  * older local copy of the same declaration. */
 void map_se_req(u8 id, nw4r::math::VEC3* pos);
+/* 0x800E26C4 - releases the model/SE handle the caller's record holds.  Added with
+ * `lobby/lb_quest_ui.cpp`: its per-row effect step hands the record's pointer here and then flags
+ * the record through `ef/eft_res.cpp`'s `fn_800F8A44`, so the declaration belongs with this unit
+ * (rule 2) rather than in the lobby source. */
+void fn_800E26C4(void* handle);
 
 #ifdef __cplusplus
 }
