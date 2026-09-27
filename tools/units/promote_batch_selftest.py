@@ -94,7 +94,8 @@ def selftest() -> int:
         check("plan: the language entry keeps the lib", lang["lib"], "auto")
         check("plan: the language entry's front-end delta",
               (lang["flags"]["before"]["lang"], lang["flags"]["after"]["lang"]), ("-lang=c", "-lang=c++"))
-        check("plan: the language entry adds no rule-7 finding", lang["lint"]["count"], 0)
+        check("plan: the language entry carries the fixture's rule-7 findings (src/auto/ is no longer exempt)",
+              lang["lint"]["count"], 3)
         check("plan: the language entry keeps its pooled brief", lang["pool"], [])
         check("plan: the promotion entry is a promotion", promo["_kind"], pb.KIND_PROMOTION)
         check("plan: the promotion moves module", promo["new_unit"], "Pl/second.c")

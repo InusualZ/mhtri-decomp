@@ -864,19 +864,21 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("")
     lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
     lines.append("")
-    lines.append("**Rule 7 at your final path.** The lint stops enforcing rule 7 while a unit has no bodies "
-                 "yet. Once it carries bodies, every symbol the unit **defines** needs a name: use the map's "
+    lines.append("**Rule 7 at your final path.** Rule 7 has **no exemption and no deferral**: every "
+                 "`fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unk*` identifier in `src/` is a "
+                 "finding, whoever owns it. Every symbol the unit **defines** needs a name: use the map's "
                  "real name when the evidence has one, otherwise derive one from the symbol's own body and "
                  "the neighbours' scheme, and when the context supports only a guess, guess and mark it as a "
                  "GUESS in the unit header with the evidence behind it. `fn_XXXXXXXX` is never the resting "
                  "place, and a rename is the map **and** the source in one edit - request the map half of "
                  "your own unit's renames in the outbox (`config_requests`, `kind: rename`, "
-                 "old/new/evidence), since you may not edit `symbols.txt` here. A `rule 7 deferred` line is "
-                 "only for references to OTHER units' unrenamed symbols - the land gate refuses a batch that "
-                 "grows an escape for a name the batch owns:\n\n    rule 7 deferred: <the evidence, e.g. "
-                 "references only to other units' fn_XXXXXXXX symbols>\n\nIt defers the `fn_XXXXXXXX` half "
-                 "only - a bare `unk*` local still fails - and the complete set of deferrals is "
-                 "`grep -rn \"rule 7 deferred\" src/`.")
+                 "old/new/evidence), since you may not edit `symbols.txt` here.\n\nThe **only** grandfather "
+                 "is the gate's `--diff`: an existing finding never blocks a landing, so touching a file "
+                 "that already carries rule-7 findings is fine - but an ADDED one refuses. That holds for a "
+                 "reference to another unit's unrenamed symbol too: the call you add is your batch's new "
+                 "finding, so either rename the callee (its map half goes in the outbox) or do not add the "
+                 "reference. A file with no bodies is held to the rule like any other, and a "
+                 "`rule 7 deferred` comment exempts nothing.")
     lines.append("")
     lines.append(plan_section(main, "## 8. Invariants"))
     return "\n".join(lines).rstrip() + "\n"
@@ -1144,18 +1146,14 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("`fn_XXXXXXXX.cpp`) and finish the rename's map half with")
     lines.append("`python tools/symbols/symedit.py rename fn_XXXXXXXX <name>` - the map **and** the source, one edit.")
     lines.append("")
-    lines.append("The gate line is for the symbols you only *reference*: the land gate REFUSES a batch that grows a")
-    lines.append("`rule 7 deferred` escape for a name the batch owns (its own file registered at a generated file")
-    lines.append("name, or its own `fn_XXXXXXXX` name left **defined** in the source). References to OTHER units'")
-    lines.append("unrenamed `fn_XXXXXXXX` symbols are tolerated - they are not this batch's to fix - and a `rule 7")
-    lines.append("deferred` line is still the durable way to say so, with a reason that names the evidence:")
-    lines.append("")
-    lines.append("```c")
-    lines.append(" * rule 7 deferred: references only to other units' unrenamed fn_XXXXXXXX symbols (checked <how>)")
-    lines.append("```")
-    lines.append("")
-    lines.append("It is a per-unit, greppable deferral - `grep -rn \"rule 7 deferred\" src/` is the complete list,")
-    lines.append("so write it only when it is true. `unkNN` identifiers are still violations and must be named.")
+    lines.append("Rule 7 has no exemption: every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare")
+    lines.append("`unkNN` identifier in `src/` is a finding - including a reference to another unit's unrenamed")
+    lines.append("symbol. The gate grandfathers only *existing* findings (`--diff`: an unchanged count passes, a")
+    lines.append("rise refuses), so a generated name your new code adds - a call or a prototype of someone else's")
+    lines.append("`fn_XXXXXXXX` - is your batch's to fix: name it and finish its map half")
+    lines.append("(`python tools/symbols/symedit.py rename fn_XXXXXXXX <name>`, or `kind: rename` in the outbox)")
+    lines.append("in the same change. A `rule 7 deferred` comment exempts nothing, and `unkNN` identifiers are")
+    lines.append("violations too and must be named.")
     lines.append("")
     lines.append("## 3 · The inventory (from the symbol map)")
     lines.append("")
@@ -1606,8 +1604,9 @@ def selftest() -> int:
         brief_text = open(brief_path, encoding="utf-8").read()
         check("the handoff is the final message, not a subagent_done sidecar",
               "final message" in brief_text and "subagent_done" not in brief_text, True)
-        check("the brief names the rule-7 deferral declaration",
-              "rule 7 deferred:" in brief_text, True)
+        check("the brief states rule 7 has no exemption or deferral",
+              "no exemption and no deferral" in brief_text
+              and "`rule 7 deferred` comment exempts nothing" in brief_text, True)
         check("the brief tells the worker to run the gate's naming rule locally",
               "land.rule7_defer_growth" in brief_text and "land.band_ownership_warnings" in brief_text, True)
         check("the brief bans claims.py release with its consequence",
@@ -1656,17 +1655,19 @@ def selftest() -> int:
               "Register it at its final home" in text, True)
         check("the proposal brief states the shared-file exception",
               "one exception to the shared-file rule" in text, True)
-        check("the proposal brief carries the rule-7 deferral spelling", "rule 7 deferred:" in text, True)
+        check("the proposal brief carries rule 7's no-exemption text",
+              "Rule 7 has no exemption" in text and "`rule 7 deferred` comment exempts nothing" in text, True)
         check("the proposal brief tells the worker to guess and mark a name, not keep the map's stem",
               "explicit **GUESS**" in text
               and "Keeping the map's `fn_XXXXXXXX` stem as the file name is not an" in text
               and "Keep the map's `fn_XXXXXXXX` stem as the file name and say so" not in text, True)
         check("the proposal brief carries the map-side rename of the unit's own symbol",
               "symedit.py rename fn_XXXXXXXX <name>" in text, True)
-        check("the proposal brief keeps the tolerance for other units' unrenamed symbols",
-              "references only to other units' unrenamed fn_XXXXXXXX symbols" in text, True)
+        check("the proposal brief makes an added generated reference the batch's to rename",
+              "including a reference to another unit's unrenamed" in text
+              and "is your batch's to fix" in text, True)
         check("the proposal brief keeps the section 6.5 rules",
-              "## 6 · The rules" in text and "rule 7 deferred:" in text, True)
+              "## 6 · The rules" in text and "Rule 7 has no exemption" in text, True)
         check("the proposal brief carries the outbox path", str(b["handoff"]["outbox"]) in text, True)
         check("the proposal brief tells the worker to run the gate's naming rule locally",
               "land.rule7_defer_growth" in text and "land.band_ownership_warnings" in text, True)
