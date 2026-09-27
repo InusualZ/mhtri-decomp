@@ -547,6 +547,17 @@ def parse_report(out):
 def build_graph(fns, labels, force=False):
     """Per-function data references, calls and codegen fingerprint, from the disassembly."""
     files = asm_files(fns)
+    if not files:
+        # Measured 2026-09-27: a lane's first `tudiscover at` call printed "0 functions" and read as a
+        # tool bug. The build leaves `build/<game>/asm/` off (`write_asm: false`), so the dump is a
+        # separate step; name it instead of reporting an empty map as if it were a real answer.
+        raise SystemExit(
+            "no disassembly under %s - the asm dump is missing.\n"
+            "  `tudiscover` reads build/%s/asm/, which the normal build does NOT write (config.yml sets\n"
+            "  `write_asm: false`); it is a separate one-command, ~8 s step. Make it, then re-run:\n"
+            "      python tools/splits/dump_asm.py\n"
+            "  Reporting 0 functions is the missing dump, not an empty map."
+            % (repo_rel(ASM_DIR), GAME))
     stamp = {"schema": SCHEMA, "symbols": hashlib.sha1(open(SYMBOLS, "rb").read()).hexdigest(),
              "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
              "parse": parse_fingerprint()}

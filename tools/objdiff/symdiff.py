@@ -2,8 +2,14 @@
 """Side-by-side instruction diff for one symbol of a unit.
 
 Usage:
+    python tools/objdiff/symdiff.py -u <unit>                             # list every symbol + score
     python tools/objdiff/symdiff.py -u <unit> <symbol> [n] [--all]        # runs objdiff for you
     python tools/objdiff/symdiff.py <diff.json> <symbol> [n] [--all]      # reuse an existing diff
+
+A bare `-u <unit>` is the **first measurement of a unit in one command**: it lists every symbol the
+unit owns with its official report score, worst first. It used to raise an IndexError traceback
+(measured 2026-09-27: a lane lost its first turn to it), and the scores are the same
+`fuzzy_match_percent` the single-symbol path prints, so the listing and the diff never disagree.
 
 Left  = the -1 object, Right = the -2 object (file mode), or target/base in project mode
 (`-p . -u <unit>`, where left = target and right = our build).
@@ -24,13 +30,23 @@ import unitutil as uu
 
 
 def cli():
-    """(diff json path, symbol, unit or None), from `-u <unit> <symbol>` or `<diff.json> <symbol>`."""
+    """(diff json path, symbol, unit), from `-u <unit> [<symbol>]` or `<diff.json> <symbol>`.
+
+    A bare `-u <unit>` returns `(None, None, unit)`: the caller lists the unit's symbols instead of
+    diffing one (see `list_symbols`).  Returning that shape - rather than indexing `rest[0]` - is what
+    retires the IndexError a lane hit on its first measurement.
+    """
     a = sys.argv[1:]
     for flag in ("-u", "--unit"):
         if flag in a:
             i = a.index(flag)
+            if i + 1 >= len(a):
+                raise SystemExit("usage: symdiff.py -u <unit> [<symbol>] [n] [--all]"
+                                 " | symdiff.py <diff.json> <symbol> [n] [--all]")
             rest = a[:i] + a[i + 2:]
             unit = uu.resolve_unit(a[i + 1])
+            if not rest or rest[0] == "--all":
+                return None, None, unit
             symbol = rest[0]
             path, log = uu.objdiff(unit, symbol)
             if not path:
@@ -38,9 +54,37 @@ def cli():
             sys.argv = [sys.argv[0], path, symbol] + rest[1:]
             return path, symbol, unit
     if len(a) < 2:
-        raise SystemExit("usage: symdiff.py -u <unit> <symbol> [n] [--all]"
+        raise SystemExit("usage: symdiff.py -u <unit> [<symbol>] [n] [--all]"
                          " | symdiff.py <diff.json> <symbol> [n] [--all]")
     return a[0], a[1], None
+
+
+def list_symbols(unit) -> int:
+    """Every symbol `unit` owns with its official report score, worst first - the one-command recon.
+
+    The metric is `report generate`'s `fuzzy_match_percent` (the same one `-u <unit> <symbol>` prints and
+    `report.json` carries), never a fabricated 0.0: a target object that does not exist yet is an error
+    that names the path and says why, so a proposal unit's first run is not read as "everything 0 %".
+    """
+    entries = uu.report_functions(unit.target, unit.obj, unit.name)
+    if "_error" in entries:
+        raise SystemExit(
+            "cannot score %s: %s\n  target object: %s\n"
+            "  (a proposal unit has no split object until its registration lands; check the target exists "
+            "and the tree is built)" % (unit.name, entries["_error"], unit.target))
+    rows = sorted(entries.values(),
+                  key=lambda e: (e.get("fuzzy_match_percent")
+                                 if e.get("fuzzy_match_percent") is not None else 0.0,
+                                 e.get("name") or ""))
+    print("== %s: %d symbol(s), report metric (fuzzy_match_percent), worst first" % (unit.name, len(rows)))
+    print("%-44s %9s %9s  %s" % ("symbol", "size B", "match %", ""))
+    for e in rows:
+        pct = e.get("fuzzy_match_percent")
+        size = e.get("size")
+        label = "n/a" if pct is None else "%.5f" % pct
+        flag = "" if (pct is not None and pct >= 100.0) else "  <- open"
+        print("%-44s %9s %9s%s" % (e.get("name"), size if size is not None else "?", label, flag))
+    return 0
 
 
 def norm(d, side):
@@ -105,6 +149,8 @@ def official_match(unit, name):
 
 def main():
     path, name, unit = cli()
+    if name is None and unit is not None:
+        return list_symbols(unit)
     n = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else 30
     show_all = "--all" in sys.argv
     left, right = load(path)
