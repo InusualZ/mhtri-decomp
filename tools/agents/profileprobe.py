@@ -50,6 +50,8 @@ EXTRA = {
    for data the unit's own functions own, and what does each direction of the mandatory `datagap` row mean?
 10. And for this role: what must you name, and from what evidence? What is a rename's second edit, and what does a
     `rule 7 deferred: <reason>` comment cover - and not cover?
+11. And for this role: the dump and the map give no real name for a symbol - now what? What is a generated
+    `fn_`/`lbl_`/`unk` left in `src/`, and may a `rule 7 deferred` comment be used on a unit you are writing?
 """,
     "merger": """
 7. For this role specifically: which two files may be unioned automatically and which must NEVER be handled
@@ -112,8 +114,9 @@ def main(argv):
             print("        defect, and the mandatory datagap row (no ours-extra; no target-extra on a claimed one)")
             print("      - NAMING is part of the work, not a later pass: real function names from the dump/map (a")
             print("        rename is two edits - map + source), fields named from offset/use context, statics and")
-            print("        globals named from what they hold; `rule 7 deferred` is a last resort with a reason and")
-            print("        covers the fn_ half only")
+            print("        globals named from what they hold; a generated fn_/lbl_/unk left in src/ is a DEFECT - a")
+            print("        guess from context is licensed and marked in the unit header - and a unit being written")
+            print("        does not use 'rule 7 deferred'")
         if a == "merger":
             print("      - union only configure.py + splits.txt; a HEADER gets a hand union")
             print("      - the zero-rows-moved proof")

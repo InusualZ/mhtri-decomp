@@ -232,3 +232,23 @@ Why: measured over `src/`, `fn_XXXXXXXX` appears **44600** times (definitions an
 `lbl_XXXXXXXX` **15333**, `unk*` 1283, and **218 of the 234 files** that carry any of them also carry a
 `rule 7 deferred` declaration - the escape became the default. The T2 probe now asks for the rule (question 10) and
 the checklist carries it.
+
+### Profile edit - no placeholder is a resting place (2026-09-26, owner's ruling)
+
+**There is no excuse for leaving `fn_`/`lbl_`/`unk`** - when the dump and the map give no real name, derive one
+from context. This **reverses** the earlier convention ("a speculative name is a bug; leave a generated name in
+place"), which was written down in four places; all four now say the same thing:
+
+* `AGENTS.md` -> Conventions -> "Commenting and naming" (the convention itself),
+* `decompiler.md` (the profile's naming section and its `Commenting and naming` bullet),
+* `.agents/skills/decompile-symbol/SKILL.md` (the "never a speculative name" clause),
+* `.agents/skills/symbol-map-editing/SKILL.md` (the "`fn_xxxxxxxx` beats a speculative name" clause).
+
+The rule: the real name when it is known; otherwise one **derived from context** - what the function does and who
+calls it, what the data holds and who reads it, the field's offset and the value stored there - kept in the
+surrounding symbols' scheme. When the context supports only a **guess, guess**, and mark it in the unit header so a
+later pass can refine it. A generated `fn_`/`lbl_`/`unk` left in `src/` is a **defect**, and a unit being written
+does not use `rule 7 deferred` - that escape exists for units registered before this rule, and
+`grep -rn "rule 7 deferred" src/` is its complete list (218 of the 234 files carrying a placeholder today).
+
+T2: question 11 asks it and the checklist carries it; verdict recorded when the probe returns.
