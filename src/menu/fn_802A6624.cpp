@@ -117,7 +117,7 @@ extern "C" u8 fn_802A6624(MenuListWork* self)
     u8 result = 0;
     switch (self->kind_0x00F) {
     case 1:
-        if (fn_800D0708() == 1) {
+        if (game_ready_ck() == 1) {
             result = 1;
         } else if (fn_803AB028() == 1) {
             result = 2;
@@ -128,7 +128,7 @@ extern "C" u8 fn_802A6624(MenuListWork* self)
         }
         break;
     case 2:
-        result = (fn_800D0708() - 1) == 0;
+        result = (game_ready_ck() - 1) == 0;
         break;
     }
     return result;
@@ -143,12 +143,12 @@ extern "C" u8 fn_802A66BC(MenuListWork* self)
     default:
         return 0;
     case 1:
-        if (fn_800D0708() == 0 && fn_803AB028() == 0) {
+        if (game_ready_ck() == 0 && fn_803AB028() == 0) {
             self->count_0x016--;
         }
         break;
     case 2:
-        if (fn_800D0708() == 0) {
+        if (game_ready_ck() == 0) {
             self->count_0x016--;
         }
         break;
@@ -171,7 +171,7 @@ extern "C" u8 fn_802A674C(MenuListWork* self, s8 index_)
         s8 id;
 
         if (index_ < 0) {
-            index = fn_800CF384();
+            index = my_player_no();
         }
         id = 0;
         for (block = 0; block < 2; block++) {
@@ -208,7 +208,7 @@ extern "C" u8 fn_802A674C(MenuListWork* self, s8 index_)
         s32 i;
 
         if (index_ < 0) {
-            index = fn_800CF384();
+            index = my_player_no();
         }
         count = get_move_work_max(2);
         for (i = 0; i < count; i++) {

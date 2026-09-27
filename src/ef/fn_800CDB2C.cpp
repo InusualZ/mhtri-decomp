@@ -240,7 +240,7 @@ void fn_800CF270(u8 value) {
 }
 
 /* 0x800CF384 - the small mode bytes the reset path and the loader toggle. */
-u8 fn_800CF384(void) {
+u8 my_player_no(void) {
     return system_w.field_0x27;
 }
 
@@ -481,7 +481,7 @@ void fn_800D06F0(void) {
 }
 
 /* 0x800D0708 - whether the +0x7D3 flag is exactly 1. */
-u32 fn_800D0708(void) {
+u32 game_ready_ck(void) {
     return system_w.field_0x7d3 == 1;
 }
 

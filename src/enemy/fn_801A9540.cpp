@@ -164,7 +164,7 @@ void fn_801A9540(struct _ENEMY_WORK* self) {
     s32* slots = self->handles_0x328;
 
     if (fn_8012D1A0(self) == 1U) {
-        fn_80339E04((u8)fn_800CF384(), 0);
+        fn_80339E04((u8)my_player_no(), 0);
     }
     fn_8013A9F4(self);
     if (self->area_no == 2) {

@@ -43,7 +43,7 @@
 #include "lobby/lb_npc.h"
 #include "pl.h"
 
-#include "ef/fn_800CDB2C.h"      /* fn_800CF384 */
+#include "ef/fn_800CDB2C.h"      /* my_player_no */
 #include "unsplit/Pl.h"          /* Get_motion_no, Pl_chr_setX, Pl_frame_check */
 #include "unsplit/lobby.h"       /* LbStr, fn_8042E9A4, lbl_806AA6F0, lbl_80799Bxx */
 #include "Pl/pl_master.h"        /* Pl_master_ck, Pl_act_ck, fn_8026FD0C */
@@ -82,7 +82,7 @@ void fn_80207698(_LB_NPC* self);
 /* The Pl-band helpers, and this group's own neighbours. */
 u32 fn_8026A33C(_PLW* self);
 void fn_80043EA8(VEC3* out);
-u32 fn_800D0708(void);
+u32 game_ready_ck(void);
 u32 fn_8021B8A8(u8 a, u8 b);
 u32 fn_8021B8F4(u8 a, u8 b);
 void fn_801FDEE4(_LB_NPC* self, u32 motion);
@@ -110,7 +110,7 @@ void fn_802076D4(_LB_NPC* self)
     u8* work;
 
     work = (u8*)get_move_work_adrs(2);
-    work += (s8)fn_800CF384() * 0xB20;
+    work += (s8)my_player_no() * 0xB20;
     if (lobby_w.field_0x12C == 1) {
         return;
     }
@@ -324,7 +324,7 @@ u32 fn_80208928(_PLW* self)
         return 1;
     }
     work = (u8*)get_move_work_adrs(2);
-    work += (s8)fn_800CF384() * 0xB20;
+    work += (s8)my_player_no() * 0xB20;
     if (memcmp(self->name_0xB05, work + 0xB05, 10) != 0) {
         return 0;
     }
@@ -450,7 +450,7 @@ void fn_8020AD14(_LB_NPC* self)
         self->field_0x005 = 1;
         fn_8020A5EC((_PLW*)self, 0);
         Pl_chr_setX((_PLW*)self, 610, 4, 0);
-        if (Pl_master_ck((_PLW*)self) == 1 && fn_800D0708() == 1) {
+        if (Pl_master_ck((_PLW*)self) == 1 && game_ready_ck() == 1) {
             index = self->field_0x182;
             fn_8042E9A4(index + 1, &lobby_w.param_0x12F);
         }

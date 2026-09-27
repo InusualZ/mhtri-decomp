@@ -306,7 +306,7 @@ extern "C" int fn_802BECB8(char* buffer, u8 mapno)
  * first one otherwise. */
 extern "C" LightWork* fn_802BECD0(void)
 {
-    if (fn_80047058() != 0 && (s8)fn_800CF384() != 0) {
+    if (fn_80047058() != 0 && (s8)my_player_no() != 0) {
         return &lbl_806BB7E0[1];
     }
     return &lbl_806BB7E0[0];
@@ -319,9 +319,9 @@ extern "C" void* fn_802BEDE8(s8 bank)
     s32 previous;
     void* result;
 
-    previous = fn_800CF384();
+    previous = my_player_no();
     fn_800CF394(bank);
-    result = (void*)(u32)fn_802BE3EC();
+    result = (void*)(u32)camera_work_ck();
     fn_800CF394(previous);
     return result;
 }
@@ -332,7 +332,7 @@ extern "C" void fn_802BEE3C(u8 id, void* arg)
 {
     s32 previous;
 
-    previous = fn_800CF384();
+    previous = my_player_no();
 
     fn_800CF394(0);
     if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {

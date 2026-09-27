@@ -176,7 +176,7 @@ void fn_80041E8C(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 void fn_8007F0CC(s32 root, u32 id);
 
 /* `ef/fn_800CDB2C.cpp` */
-u32 fn_800CF384(void);
+u32 my_player_no(void);
 
 /* `sound/fn_800DD1F0.cpp`: refreshes the model base at `_ENEMY_WORK::char_0x024`. */
 void fn_800E0914(struct MHchar* model);
@@ -247,7 +247,7 @@ extern "C" u32 fn_80137648(_ENEMY_WORK* self)
 extern "C" void fn_8013765C(_ENEMY_WORK* self, u32 arg1)
 {
     if (fn_8012D1A0(self) == 1) {
-        fn_80339160(fn_800CF384(), arg1, 1, self->field_0x01A);
+        fn_80339160(my_player_no(), arg1, 1, self->field_0x01A);
     }
 }
 

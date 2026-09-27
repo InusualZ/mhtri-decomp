@@ -1,6 +1,8 @@
 /*
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * One player's move-indicator draw: `fn_80324F7C`, `.text` 0x80324F7C-0x803250B0 (0x134 B).
+ * rule 7 deferred: the callees this file still spells by their map stem (`fn_800526F8`, `fn_8021B890`)
+ * are bare .text entries in config/RMHE08/symbols.txt with `zz_` in the runtime dump, and neither of
+ * those addresses is this unit's own row.
+ * One player's move-indicator draw: `move_indicator_draw`, `.text` 0x80324F7C-0x803250B0 (0x134 B).
  *
  * It samples a HUD anchor with `get_lsp_data(0x20D3, …)`, derives two more anchors from it with the
  * 2D-vector copy `fn_800526F8`, and blits sprite-id runs at each with `draw_sprite_ary`.  The second
@@ -9,7 +11,7 @@
  * otherwise the expanded one.  `get_option_cfg(7)` picks between two further sprite runs.
  *
  * The argument is one element of the per-player "move work" array `get_move_work_adrs` indexes at stride
- * 0xB20 - the caller (`fn_803250B0`, 0x264) passes exactly such a pointer, and that function's own
+ * 0xB20 - the caller (`move_work_update`, 0x264) passes exactly such a pointer, and that function's own
  * `addi r26,r26,2848` gives the stride.  `_mh_move_work_` below states only the byte this unit reads.
  *
  * The sprite-id runs are the unit's own `.data`/`.sdata` pool (`lbl_805DD9C8` 0x18 B in `.data`, the
@@ -18,8 +20,8 @@
  * is what makes MWCC address it `lis`/`addi` where the `.sdata` scalars get `…@sda21` - the same split
  * the target object has (pl_act's header records the same finding).
  *
- * The name stays the map's `fn_80324F7C`: the shared runtime dump's name list has no entry at 0x80324F7C
- * (only its `zz_0324f7c_` placeholder), so there is nothing better to rename it to.
+ * The name is derived, not the dump's: the shared runtime dump's name list has no entry at 0x80324F7C
+ * (only its `zz_0324f7c_` placeholder), so it is named for what it draws - one record's move indicator.
  *
  * The one codegen deviation is `-opt nopeephole`, which the `hud` lib now carries as `cflags_hud`
  * (2026-09-27; this file said `the pragma` before that): with `-opt nopeephole` on the real command line
@@ -43,7 +45,7 @@ typedef struct _mh_ivec2_ {
 } _mh_ivec2_; /* size: 0x4 */
 
 /* One player's move-work record: `get_move_work_adrs(player)` indexes an array of these at stride 0xB20
- * (`fn_803250B0`: `mulli r0,r0,2848` / `addi r26,r26,2848`).  Only the flag byte this unit reads is
+ * (`move_work_update`: `mulli r0,r0,2848` / `addi r26,r26,2848`).  Only the flag byte this unit reads is
  * named; `fn_80321830` sets its bits 0/1 with `ori`.  size: 0xB20 */
 typedef struct _mh_move_work_ {
     /* +0x000 */ u8 unused_0x000[0xB01];
@@ -75,7 +77,7 @@ extern const u16 lbl_80792D00;
  * function, and its only observable effect is that fusion - the rest of the function is unaffected. */
 /* Draws one player's move indicator: the base sprite at the HUD anchor plus the extra sprite and the
  * shifted anchors the expanded layout needs. */
-void fn_80324F7C(_mh_move_work_* self)
+void move_indicator_draw(_mh_move_work_* self)
 {
     _mh_ivec2_ anchor;
     _mh_ivec2_ left;

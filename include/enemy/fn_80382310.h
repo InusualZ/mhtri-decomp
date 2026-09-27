@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 void fn_803839EC(void);                  /* 0x803839EC */
-void fn_80383AE4(void);                  /* 0x80383AE4 */
+void note_box_draw(void);                  /* 0x80383AE4 */
 
 #ifdef __cplusplus
 }

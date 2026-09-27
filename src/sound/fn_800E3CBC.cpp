@@ -147,8 +147,8 @@ void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
 s32 fn_802AFF58(void);
 s32 fn_800D0724(void);
 s32 fn_802BE39C(void);
-s32 fn_802BE3EC(void);
-s32 fn_800CF384(void);
+s32 camera_work_ck(void);
+s32 my_player_no(void);
 void fn_8007F77C(void* p);
 void* fn_800A60C0(void* p);
 void fn_80081714(void* a, u32 b, WorkBuf* out);
@@ -244,10 +244,10 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
             }
             if (p->flags & 0xC08) {
                 if (fn_802BE39C() == 1) {
-                    if ((p->flags & 0x400) && (s8)fn_800CF384() == 0) {
+                    if ((p->flags & 0x400) && (s8)my_player_no() == 0) {
                         continue;
                     }
-                    if ((p->flags & 0x800) && (s8)fn_800CF384() == 1) {
+                    if ((p->flags & 0x800) && (s8)my_player_no() == 1) {
                         continue;
                     }
                     if (p->flags & 0x8) {
@@ -256,7 +256,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
                 }
             }
             if (p->flags & 0x20) {
-                if (fn_802BE3EC() == 1) {
+                if (camera_work_ck() == 1) {
                     continue;
                 }
             }

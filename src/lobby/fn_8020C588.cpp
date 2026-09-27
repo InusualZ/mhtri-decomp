@@ -189,7 +189,7 @@ extern "C" void fn_80212584(void* self) {
 
 /* Toggles the item database's display byte and redraws the lobby when the pad loop is idle. */
 extern "C" void fn_802125C8(void) {
-    if (fn_800D0708() == 0) {
+    if (game_ready_ck() == 0) {
         lbl_80794880[0x3E00] ^= 1;
         if (fn_8021F238() == 1) {
             fn_801E9888();

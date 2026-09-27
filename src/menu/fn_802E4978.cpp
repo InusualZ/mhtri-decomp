@@ -216,7 +216,7 @@ void fn_802E4AD4(void) {
         st->field_0x070 = fn_803A9690();
     }
     st->field_0x074 = 0;
-    idx = (s8)fn_800CF384();
+    idx = (s8)my_player_no();
     fn_802E4978(&lbl_806BDCC8[0], &move[idx]);
     fn_802DFCD4();
     fn_802DA1B0(NULL);
@@ -324,12 +324,12 @@ void fn_802E56B4(void) {
     u16 max;
     s32 i;
 
-    if (fn_800D0708() != 0) {
+    if (game_ready_ck() != 0) {
         move = (CockpitMove*)get_move_work_adrs(2);
         max = get_move_work_max(2);
         for (i = 0; i < (s32)max; i++) {
             if (move[i].field_0x000 != 0 && Pl_master_ck((struct _PLW*)&move[i]) == 0) {
-                fn_802E00A4(&move[i], 0xFF, 0xFF, 0xFFFF);
+                draw_lsp_element(&move[i], 0xFF, 0xFF, 0xFFFF);
             }
         }
     }
@@ -390,7 +390,7 @@ void fn_802E555C(void) {
         set_zmode(0, 0, 0);
         lbl_806BDCC8[0].field_0x0CD = 0;
         fn_802E56B4();
-        fn_802DFEBC();
+        draw_lsp_parts();
         fn_802EC700();
         if (fn_802E54A8(move) == 1) {
             fn_802E71C4();
@@ -414,7 +414,7 @@ void fn_802E555C(void) {
         }
         fn_802EA33C(&lbl_806BDCC8[0]);
         fn_802E6EB4();
-        fn_80383AE4();
+        note_box_draw();
         if (fn_800CF280() != 0) {
             fn_802EF424();
         }
@@ -530,7 +530,7 @@ void fn_802E5284(void) {
         if (fn_8033A850() == 0) {
             subTransSetPrio(6, (u32)(void*)&fn_802DA3CC, 0, NULL);
         }
-        subTransSetPrio(6, (u32)(void*)&fn_802A26F4, 0, NULL);
+        subTransSetPrio(6, (u32)(void*)&menu_slot_panel_draw, 0, NULL);
     }
 }
 

@@ -100,7 +100,7 @@
  *   fn_802A23F4 (348 B);
  *   put_menu_cursor__FPUsUsPC10_mh_ivec2_ (188 B);
  *   fn_802A2620 (212 B);
- *   fn_802A26F4 (600 B);
+ *   menu_slot_panel_draw (600 B);
  *   fn_802A294C (476 B);
  *   fn_802A2B28 (72 B);
  *   fn_802A2B70 (296 B);
@@ -1310,7 +1310,7 @@ extern "C" u32 fn_802A0148(void)
 }
 
 /* 0x802A02CC: the slot-0 form of the predicate below. */
-extern "C" u32 fn_802A02CC(void)
+extern "C" u32 menu_busy_ck(void)
 {
     return fn_802A02D4(0);
 }
@@ -1424,7 +1424,7 @@ extern "C" void fn_802A054C(u8 idx, u8 value)
 extern "C" void fn_8029FA74(MenuSlot* slot)
 {
     memset(slot->entries_a, 0, sizeof(slot->entries_a));
-    if (fn_800D0708() != 0) {
+    if (game_ready_ck() != 0) {
         slot->entry_count_a = 3;
         slot->entries_a[2].field_0x02 = 1;
     } else {
@@ -1536,7 +1536,7 @@ extern "C" void fn_802A0188(void)
     }
     fn_802DB26C();
     fn_80384380();
-    if (fn_800D0708() == 1) {
+    if (game_ready_ck() == 1) {
         if (lbl_806AC8C8.slot[0].field_0x31E == 1 || lbl_806AC8C8.slot[1].field_0x31E == 1) {
             fn_804273EC(4, 0, 0);
         }
@@ -1552,7 +1552,7 @@ extern "C" u32 fn_802A025C(void)
     fn_802DA2D4(1);
     fn_80384380();
     fn_802DE238();
-    if (fn_800D0708() == 1 && lbl_806AC8C8.slot[0].field_0x31E == 1) {
+    if (game_ready_ck() == 1 && lbl_806AC8C8.slot[0].field_0x31E == 1) {
         fn_804273EC(4, 0, 0);
         released = 1;
     }

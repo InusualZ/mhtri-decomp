@@ -39,7 +39,7 @@
 extern "C" {
 void fn_8004D334(s32 size);
 void fn_8004C038(void* a, void* b);
-s32 fn_800D0708(void);
+s32 game_ready_ck(void);
 u32 fn_800D0734(s32 a);
 s32 fn_80217F4C(void*, u8, u16);
 void fn_802190FC(void*, s32, s32, void*, void*);
@@ -186,7 +186,7 @@ typedef struct LbEftWork {
 extern "C" {
 void fn_8004D334(s32 size);
 void fn_8004C038(void* a, void* b);
-s32 fn_800D0708(void);
+s32 game_ready_ck(void);
 u32 fn_800D0734(s32 a);
 s32 fn_80217F4C(void*, u8, u16);
 void fn_802190FC(void*, s32, s32, void*, void*);
@@ -396,7 +396,7 @@ void fn_801E403C(LbEftWork* self, s16 value)
 /* Whether the work block's active id is present in the lobby item table. */
 s32 fn_801E40A4(LbEftWork* self)
 {
-    if (fn_800D0708() == 0) {
+    if (game_ready_ck() == 0) {
         if (fn_802FB4BC(self->id_0x002) == 0) {
             return 0;
         }

@@ -152,7 +152,7 @@ typedef struct CamWork {
     /* +0x1ED */ u8 field_0x1ED;             /* fn_802B9740 copies it out through a parameter */
     /* +0x1EE */ u8 field_0x1EE;             /* fn_802B9740 gates on it */
     /* +0x1EF */ u8 pad_0x1EF[0x95];
-    /* +0x284 */ u8 field_0x284;             /* fn_802BE3EC tests it against 1 */
+    /* +0x284 */ u8 field_0x284;             /* camera_work_ck tests it against 1 */
     /* +0x285 */ u8 field_0x285;             /* cleared by fn_802BC468 */
     /* +0x286 */ u8 field_0x286;
     /* +0x287 */ u8 field_0x287;
@@ -655,7 +655,7 @@ u32 fn_802BE038(void)
 /*
  * Whether the +0x284 byte holds 1.
  */
-bool fn_802BE3EC(void)
+bool camera_work_ck(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
@@ -880,7 +880,7 @@ void fn_802BC7C8(u8 mode, u32 arg)
  */
 void fn_802BC89C(u8 mode, u32 arg)
 {
-    if (fn_802BE3EC()) {
+    if (camera_work_ck()) {
         fn_802BC468();
         fn_802BC4AC(mode, arg);
     }

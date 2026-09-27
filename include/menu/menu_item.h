@@ -257,7 +257,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *   * `ef/fn_800CDB2C.cpp`'s header declares `fn_800CF208` as `u8`, while the retail caller keeps a
  *     `clrlwi` on the widened form (the same per-consumer-view split `include/Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
- *   * the rest (`fn_800D0708`, `fn_8004082C`'s neighbours, `fn_804273EC`, ...) sit in no registered
+ *   * the rest (`game_ready_ck`, `fn_8004082C`'s neighbours, `fn_804273EC`, ...) sit in no registered
  *     range, so they are rule 2's unsplit case.
  */
 /* This unit's own entry points, in address order, and the callees its written bodies call.
@@ -273,7 +273,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *     `clrlwi` on the widened form (the per-consumer-view split `include/Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
  *   * the rest (`fn_803AAEC0`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
- *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `fn_800D0708`, `fn_804273EC`) sit in no
+ *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) sit in no
  *     registered range - rule 2's unsplit case.
  *
  * The `fn_*` declarations keep C linkage: the map's names for them are placeholders, not manglings.
@@ -329,7 +329,7 @@ void fn_8029FFFC(MenuSlot* slot, s32 index);
 void fn_802A0040(s32 index);
 u32 fn_802A008C(MenuSlot* slot);
 u32 fn_802A0148(void);
-u32 fn_802A02CC(void);
+u32 menu_busy_ck(void);
 u32 fn_802A02D4(u8 idx);
 u32 fn_802A0304(MenuFrameWork* self);
 u32 fn_802A03A4(void);
@@ -360,7 +360,7 @@ u32 fn_80047058(void);
 void fn_8004082C(void);
 u8 fn_800CF208(void);
 u32 fn_800CF280(void);
-u32 fn_800D0708(void);
+u32 game_ready_ck(void);
 u32 fn_803AAEC0(void);
 u32 fn_802FBA60(void);
 void fn_8031A638(MenuSlot* slot);
@@ -373,11 +373,11 @@ void fn_804273EC(s32 a, s32 b, s32 c);
 
 /* 0x802A2620 / 0x802A26F4 - the two menu-band entries the cockpit band above this range
  * (`menu/fn_802E4978.cpp`, 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses).
- * `fn_802A2620(0)` redraws the menu frame; `fn_802A26F4` is registered with `subTransSetPrio` by
+ * `fn_802A2620(0)` redraws the menu frame; `menu_slot_panel_draw` is registered with `subTransSetPrio` by
  * address, so it is declared as the function it is.  Both signatures are that consumer's call sites
  * (neither body is written yet). */
 void fn_802A2620(s32 a);
-void fn_802A26F4(void);
+void menu_slot_panel_draw(void);
 
 #ifdef __cplusplus
 }

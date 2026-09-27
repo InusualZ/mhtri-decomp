@@ -507,7 +507,7 @@ void fn_80274584(s8 value)
     struct _PLW* work = (struct _PLW*)get_move_work_adrs(2);
 
     if (work != NULL) {
-        work = (struct _PLW*)((u8*)work + (s8)fn_800CF384() * 0xB20);
+        work = (struct _PLW*)((u8*)work + (s8)my_player_no() * 0xB20);
         work->field_0x5C8 = value;
     }
 }
@@ -617,7 +617,7 @@ s8 fn_80274808(struct _PLW* plw)
 /* The player's own move work record. */
 void* fn_80274810(void)
 {
-    return (u8*)get_move_work_adrs(2) + (s8)fn_800CF384() * 0xB20;
+    return (u8*)get_move_work_adrs(2) + (s8)my_player_no() * 0xB20;
 }
 
 /* The first move work record whose slot byte differs from this player's. */

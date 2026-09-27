@@ -43,7 +43,7 @@ s32 fn_8004D27C(s32 a);
 s32 fn_8004D334(s32 a);
 void fn_800526F8(_mh_ivec2_* dst, const _mh_ivec2_* src);
 u16 fn_800CEF18(u16 id);
-u32 fn_800D0708(void);
+u32 game_ready_ck(void);
 s32 fn_800DBC84(s32 id);
 }
 
@@ -871,7 +871,7 @@ s32 fn_801EC7E4(void)
 
 void fn_801EC7AC(void)
 {
-    if (fn_800D0708() == 1U) {
+    if (game_ready_ck() == 1U) {
         lobby_w.param_0x12D = 1;
     }
 }

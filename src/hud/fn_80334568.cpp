@@ -175,7 +175,7 @@ void fn_80335200(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
     if (fn_80334A4C() == 0) {
         return;
     }
-    my = (u8)fn_800CF384();
+    my = (u8)my_player_no();
     next = my + 1;
     work = (PlMoveWork*)get_move_work_adrs(2);
     if (work == NULL) {
@@ -291,7 +291,7 @@ void fn_80335CE8(_PLW* plw, u8 kind, u16 param) {
     if (fn_80334A4C() == 0) {
         return;
     }
-    my = (u8)fn_800CF384();
+    my = (u8)my_player_no();
     next = my + 1;
     if (plw->chunk_ofs != my) {
         return;
@@ -324,7 +324,7 @@ void fn_80335DD8(u8 slot, const NetMsgHeader* msg) {
     if (fn_80334A4C() == 0) {
         return;
     }
-    own = (s8)fn_800CF384();
+    own = (s8)my_player_no();
     if (msg->from_slot == own) {
         return;
     }
@@ -370,7 +370,7 @@ void fn_8033737C(_ENEMY_WORK* work, u8 kind, u16 param) {
     if (fn_80334A4C() == 0) {
         return;
     }
-    own = (u8)fn_800CF384();
+    own = (u8)my_player_no();
     switch (kind) {
     case 1:
         fn_8033609C(work, own, 5, kind, param);
@@ -405,7 +405,7 @@ void fn_803374B0(_ENEMY_WORK* unused_work, const NetEmStateMsg* msg) {
     if (fn_80334A4C() == 0) {
         return;
     }
-    own = (s8)fn_800CF384();
+    own = (s8)my_player_no();
     if (msg->hdr.from_slot == own) {
         return;
     }
