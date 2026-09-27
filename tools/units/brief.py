@@ -726,6 +726,13 @@ def _your_tree_lines(lines: list[str], b: dict) -> None:
     lines.append("")
 
 
+    lines.append("* **A command the harness refuses cannot be confirmed.** A subagent has no UI for the "
+                 "\"dangerous command\" prompt, so a retry can never succeed - the lane that did this "
+                 "sat on a blocked `bash` for minutes of its budget. Rewrite it as the narrowest explicit "
+                 "command (one path, no recursive delete) or report it. Never `rm -rf`, `git clean -fdx` "
+                 "or `git checkout .` in your tree - if the tree itself needs repairing, ask the "
+                 "orchestrator.")
+
 def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     rng = b["sections"]
     txt = rng.get(".text")
