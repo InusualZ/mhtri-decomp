@@ -11,7 +11,7 @@ Usage (default file: config/RMHE08/symbols.txt, override with --file):
     symedit.py show   <name> [<name> ...]
     symedit.py at     <address> [--count N]          # symbols around an address, in order
     symedit.py range  <start> <end> [--section S]    # members of a split range
-    symedit.py refs   <name> [--roots src include docs]
+    symedit.py refs   <name> [--roots src include docs] [--code-only]
     symedit.py check                                 # duplicate names / addresses, bad lines
     symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]
     symedit.py rename-batch <file> [--dry-run]       # lines: "old new" (# comments allowed)
@@ -173,13 +173,82 @@ def find_refs(names, roots, limit, exclude=None):
     return hits
 
 
+# A map symbol's name is ALSO a file name whenever a unit is registered under a generated path
+# (`src/DWCi/fn_805113B0.c`, `include/Network/fn_803D3CE8.h`). Renaming the map row does NOT move that file -
+# renaming a registered unit's file is a registration move, not a symbol rename - so a mention of the name
+# *inside a path* must never be rewritten as an identifier: that breaks the `#include`, and the build is the
+# only thing that would notice. `find_refs` matches with `\b`, and `/` and `.` are word boundaries, so a path
+# IS reported as a "reference"; classifying the hits is what makes the list safe to act on.
+SRC_SUFFIXES = (".c", ".h", ".cpp", ".hpp")
+
+
+def ref_kinds(line, name):
+    """The kinds of mention of `name` on `line` - a subset of {code, path, string, comment}."""
+    kinds = set()
+    for m in re.finditer(r"\b%s\b" % re.escape(name), line):
+        before, after = line[:m.start()], line[m.end():]
+        quoted = (before.count('"') % 2) or (before.count("'") % 2)
+        commented = "//" in before or "/*" in before
+        if (before.endswith(("/", "\\")) or after.startswith(("/", "\\"))
+                or any(after.startswith(s) for s in SRC_SUFFIXES)):
+            kinds.add("path")
+        elif commented:
+            kinds.add("comment")
+        elif quoted:
+            kinds.add("string")
+        else:
+            kinds.add("code")
+    return kinds
+
+
+def group_hits(name, hits):
+    """`find_refs`' hits grouped for a reader who is about to rewrite them.
+
+    `code` is the other half of a rename. `path` is a *file* name, not the symbol: rewriting it breaks the
+    include. `mention` is a comment or a string literal - inert, and a rename may leave it alone. A hit whose
+    name appears in a path is reported under `path`, which is the subset that does damage.
+    """
+    groups = {"code": [], "path": [], "mention": []}
+    for hit in hits:
+        kinds = ref_kinds(hit[2], name)
+        if "code" in kinds:
+            groups["code"].append(hit)
+        if "path" in kinds:
+            groups["path"].append(hit)
+        elif kinds & {"string", "comment"}:
+            groups["mention"].append(hit)
+    return groups
+
+
+REF_GROUPS = (
+    ("code", "these are the other half of the rename"),
+    ("path", "DO NOT rewrite inside a path - the FILE keeps its name; renaming a unit's file is a "
+             "registration move"),
+    ("mention", "inert (a comment or a string literal): a rename may leave these alone"),
+)
+
+
 def cmd_refs(a):
     hits = find_refs([a.name], a.roots, a.limit, a.file).get(a.name, [])
     if not hits:
         print("no references to %s outside %s" % (a.name, a.file))
         return 0
-    for rel, lineno, text in hits:
-        print("%s:%d: %s" % (rel, lineno, text))
+    groups = group_hits(a.name, hits)
+    if a.code_only:
+        for rel, lineno, text in groups["code"]:
+            print("%s:%d: %s" % (rel, lineno, text))
+        print("%d code reference(s) to %s" % (len(groups["code"]), a.name))
+        return 0
+    for label, note in REF_GROUPS:
+        if not groups[label]:
+            continue
+        print("-- %s (%d): %s" % (label, len(groups[label]), note))
+        for rel, lineno, text in groups[label]:
+            print("   %s:%d: %s" % (rel, lineno, text))
+    if groups["path"]:
+        print("WARNING: %d mention(s) of %s are inside a PATH. A scripted word-boundary rewrite of the name "
+              "would corrupt them (the file on disk keeps its name), and only a build would notice - use "
+              "`--code-only` for the rewrite list." % (len(groups["path"]), a.name))
     if len(hits) >= a.limit:
         print("... (stopping at --limit %d)" % a.limit)
     return 0
@@ -519,7 +588,8 @@ def rename(a, pairs):
     if not a.no_refs:
         for old, _new in pairs:
             print("-- references to %s:" % old)
-            cmd_refs(argparse.Namespace(name=old, roots=a.roots, limit=a.limit, file=a.file))
+            cmd_refs(argparse.Namespace(name=old, roots=a.roots, limit=a.limit, file=a.file,
+                                        code_only=False))
     return 0
 
 
@@ -566,8 +636,10 @@ def main():
     p.add_argument("--section")
     p.set_defaults(func=cmd_range)
 
-    p = sub.add_parser("refs", parents=[common], help="grep the repo for references to a name")
+    p = sub.add_parser("refs", parents=[common], help="repo references to a name, classified")
     p.add_argument("name")
+    p.add_argument("--code-only", action="store_true",
+                   help="only the references a rename must update (no paths, no comment/string mentions)")
     p.set_defaults(func=cmd_refs)
 
     p = sub.add_parser("check", parents=[common], help="duplicate names, unparsed lines")
@@ -980,6 +1052,33 @@ def selftest() -> int:
               "0 merged, 0 deleted, 1 already merged" in buf.getvalue(), True)
         check("merge cmd: the bytes do not move", p.read_bytes(), once)
         check("merge cmd: no temp left", temps(tmp), [])
+
+    # --- the reference list classifies what it found: a map name is also a FILE name ------------------
+    # The bug this closes: `find_refs` matches with `\b`, so `/` and `.` are boundaries and a path such as
+    # `#include "DWCi/fn_805113B0.h"` was reported as an ordinary reference. A lane that rewrote every
+    # reported reference corrupted the include - the file on disk keeps its name - and only a build noticed.
+    check("a bare call is a code reference", ref_kinds("    bl fn_80040598", "fn_80040598"), {"code"})
+    check("a quoted include is a path, not a symbol",
+          ref_kinds('#include "DWCi/fn_805113B0.h"', "fn_805113B0"), {"path"})
+    check("a path in a comment is a path",
+          ref_kinds(" * see src/DWCi/fn_805113B0.c", "fn_805113B0"), {"path"})
+    check("a backslash path is a path", ref_kinds(" * src\\DWCi\\fn_805113B0.c", "fn_805113B0"), {"path"})
+    check("a directory mention is a path",
+          ref_kinds(" * in include/Network/fn_803D3CE8.h", "fn_803D3CE8"), {"path"})
+    check("a bare name with a source suffix is a path", ref_kinds("fn_805113B0.c", "fn_805113B0"),
+          {"path"})
+    check("a comment mention is inert", ref_kinds("/* the fn_805113B0 band */ x = 1;", "fn_805113B0"),
+          {"comment"})
+    check("a string mention is inert", ref_kinds('p = "fn_805113B0";', "fn_805113B0"), {"string"})
+    check("a line with both reports both",
+          ref_kinds('fn_80040598(); /* see fn_80040598.h */', "fn_80040598"), {"code", "path"})
+    check("an unrelated line has no kinds", ref_kinds("int x = 1;", "fn_805113B0"), set())
+    grouped = group_hits("fn_805113B0", [("a.h", 1, '#include "x/fn_805113B0.h"'),
+                                         ("b.c", 2, "    bl fn_805113B0"),
+                                         ("c.c", 3, "/* fn_805113B0 */")])
+    check("group: code is the rewrite list", [h[0] for h in grouped["code"]], ["b.c"])
+    check("group: a path is listed separately", [h[0] for h in grouped["path"]], ["a.h"])
+    check("group: a mention is neither", [h[0] for h in grouped["mention"]], ["c.c"])
 
     if fails:
         print("FAIL (%d)" % len(fails))
