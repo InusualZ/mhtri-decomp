@@ -52,6 +52,9 @@ REQUIRED = ("unit", "worker", "finished_at", "unit_percent", "symbols", "residua
 CONFIG_REQUEST_SCHEMA = (
     {"kind": "range", "needs": ("section", "start", "end"), "also": ("evidence",),
      "means": "a data range this unit owns (a splits.txt range plus its configure.py entry)"},
+    {"kind": "seam", "needs": ("section", "start", "end", "evidence"), "also": ("why",),
+     "means": "a seam finding: this code span's boundary is in the wrong place and the unit split should be "
+              "re-drawn - distinct from `range`, which claims a data run this unit already owns"},
     {"kind": "rename", "needs": ("old", "new", "evidence"), "also": (),
      "means": "a map-symbol rename, with the evidence for the new name"},
     {"kind": "flag", "needs": ("evidence",), "also": ("lib", "change"),

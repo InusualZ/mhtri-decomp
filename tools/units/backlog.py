@@ -65,7 +65,7 @@ if TOOLS not in sys.path:
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
 
 STATUSES = ("open", "done", "parked")
-NEW_KINDS = ("shared-file", "range", "flag", "tooling")  # default open; a `rename` is never carried
+NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling")  # default open; a `rename` is never carried
 
 # -----------------------------------------------------------------------------------------------------------
 # Text helpers
@@ -352,6 +352,20 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
                                   default_status=st, ask=one_line(asstr(r.get("evidence"))),
                                   flavour=flavour,
                                   filings=[Filing(source, lane, when, one_line(asstr(r.get("evidence")), 400))]))
+    elif kind == "seam":
+        # A seam finding: a code span whose boundary is wrong, so the split needs re-drawing. Its own kind
+        # rather than folded into `range`, because the ask is different - `range` claims a data run, this
+        # says the cut is in the wrong place - and two lanes filed it independently before it existed.
+        sec = asstr(r.get("section"))
+        start, end = asstr(r.get("start")), asstr(r.get("end"))
+        evidence = asstr(r.get("evidence")) or asstr(r.get("why"))
+        # A seam filed before the kind existed carries no span; fall back to a fingerprint of its evidence so
+        # two span-less findings do not collapse into one item with an empty target.
+        target = ("%s %s-%s" % (sec, start, end)).strip() or norm_defect(evidence, "seam")
+        key = ("seam", target.lower(), norm_defect(evidence, target))
+        _merge(grouped, key, Item(kind="seam", target=target, defect="seam", status="open",
+                                  default_status="open", ask=one_line(evidence),
+                                  filings=[Filing(source, lane, when, one_line(evidence, 400))]))
     elif kind == "flag":
         lib = norm_flag_target(r.get("lib"))
         change = norm_flag_defect(r.get("change"))
