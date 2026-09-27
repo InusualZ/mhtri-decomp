@@ -153,11 +153,23 @@ nothing from theirs, so **everything that used to be a prompt or a habit becomes
 
 ### 5.1 The worktree layer — the branch *is* the claim
 
-```sh
-# orchestrator: claim = create the branch (fails loudly if it exists - atomic for free)
-git worktree add -b worker/pl-act-13 ../mhtri-dtk.ws-pl-act main
+A lane's environment is a **reusable slot** from a fixed pool (`tools/units/slots.py`), never something the
+orchestrator constructs by hand. The pool is six sibling directories at **stable paths**
+(`../mhtri-dtk.slot1` … `../mhtri-dtk.slot6`), each holding a warm `build/RMHE08`, `orig/`, the toolchain and
+its initialised `tools/m2c` submodule across rounds. A stable path is the point: the depfile's absolute
+header paths stay valid across a reset, so the per-seed rewrite is a one-time cost per slot instead of a
+per-claim one. **A slot holds a directory, never a branch.**
 
-# worker, inside its worktree: source only, commits on its own branch
+```sh
+# orchestrator, once: create the pool (siblings of MAIN - gitignored territory)
+python tools/units/slots.py init                 # six slots, each seeded from MAIN once
+
+# orchestrator: a claim takes a free slot and cuts a FRESH branch off main's CURRENT tip
+python tools/units/queue.py next                 # -> reset, checkout -B worker/<slug> <tip>, verify, lock
+#   (or directly: python tools/units/claims.py claim Pl/pl_act  # uses a slot when a pool exists)
+#   --no-slots still constructs a throwaway worktree, so nothing in flight breaks
+
+# worker, inside its slot: source only, commits on its own branch
 tools/units/recompile.py main/Pl/pl_act        # direct compiler, no ninja, mtime asserted
 python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u main/Pl/pl_act fn_8027C208
 git commit --amend -am "Pl/pl_act: fn_8027C208 body"   # ONE commit per unit, on worker/pl-act-13
@@ -166,18 +178,29 @@ git commit --amend -am "Pl/pl_act: fn_8027C208 body"   # ONE commit per unit, on
 git cherry-pick --no-commit worker/pl-act-13   # or <merge-base>..worker/pl-act-13 if it left several
 python tools/units/land.py verify              # split + link + ok + regressions + ledger + delta
 git commit -F .git/land_msg.txt                # only after verify passes; --abort otherwise
-git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
+
+# orchestrator: the teardown RETURNS the slot (it is never removed); the branch still goes
+python tools/units/claims.py release Pl/pl_act # slot back to main's tip, branch deleted, warm trees kept
 ```
 
-* **No build tree per worktree — and the tooling must know that.** `build/` is ~1 GB and the split tree is a
-  shared *read-only* input, so a worktree must not get a copy (4 GB and a re-split each). A fresh worktree has
-  **no** `build.ninja`, `objdiff.json` or `build/RMHE08/`, and today's `unitutil` resolves all three from its own
-  location — so a worker in a worktree cannot measure with `mt.py` as it stands. `recompile.py` therefore
-  resolves `MAIN` with `git worktree list --porcelain` (first entry) and uses `MAIN/build/tools`,
-  `MAIN/build/binutils`, `MAIN/build/compilers` and the **target** object `MAIN/build/RMHE08/obj/<unit>.o`;
-  `mt.py` is given the target object and cflags explicitly (`--target`, `--flags`) instead of reading the main
-  worktree's `build.ninja`. Roadmap 7.1 + 7.15 owns this; it is a **prerequisite for the first worktree round**.
-* **The worker's object path is its own.** A worker writes `<worktree>/build/RMHE08/src/<unit>.o` and never
+**A free slot is the concurrency cap.** With the pool in use, `queue.py next` refuses while all six slots are
+taken (naming each holder) instead of constructing a seventh environment; `slots.py status` shows the pool and
+`slots.py verify` proves every kept tree current. **A slot is never trusted on faith:** `acquire` validates
+the kept `build/RMHE08` against MAIN's current map/DOL with the same staleness guard the seeder already uses
+(`config.json` vs `symbols.txt`/`splits.txt`/`main.dol`, plus a byte comparison of `report.json`) and
+**re-seeds if it cannot be proven current** - a stale build tree is the most expensive failure this campaign
+has hit. One lock per slot lives at `MAIN/.pi/slots/<n>.json` (the claim and the time); a stale lock - its
+claim already landed - is detected and reclaimed rather than wedging forever, and there are never two writers
+in one slot.
+
+* **A slot keeps its build tree warm; the branch is what is fresh.** The pool directory holds the toolchain,
+  `orig/`, `tools/m2c` and `build/RMHE08/` across rounds, so a lane starts without a per-claim copy - only the
+  branch and the checkout are new. A **throwaway** worktree (`--no-slots`) still has **no** `build.ninja`,
+  `objdiff.json` or `build/RMHE08/` of its own, so `recompile.py` resolves `MAIN` with
+  `git worktree list --porcelain` (first entry) and takes the toolchain from `MAIN/build/{tools,binutils,
+  compilers}` and the **target** object from `MAIN/build/RMHE08/obj/<unit>.o`; `mt.py` is handed the target
+  object and cflags explicitly (`--target`, `--flags`). Roadmap 7.1 + 7.15 owns that path.
+* **The worker's object path is its own.** A worker writes `<slot>/build/RMHE08/src/<unit>.o` and never
   anything under `MAIN/build/` — otherwise an unverified branch object could be read as `main`'s and a green `ok`
   would be meaningless. `recompile.py` prints the path it wrote and the target it compared against.
 * **A worker's diff is never committed to `main` before it is verified.** `git cherry-pick --no-commit` stages it,
@@ -206,11 +229,12 @@ git worktree remove ../mhtri-dtk.ws-pl-act     # and delete the branch
   `agent_end`/`agent_settled` grace timer belonged to `pi-herdr-subagents`, which is no longer installed, so a
   brief that asked for that tool would name a tool the worker does not have. `brief.py` emits the final-message
   instruction in part 4, and a hand-written brief must carry it too.
-* **`tools/m2c` is a submodule - do not initialise it in a worktree.** `git worktree remove` refuses to remove a
-  worktree that contains a checked-out submodule ("working trees containing submodules cannot be moved or
-  removed"), which would leave the branch - the lock - alive forever. The brief points the worker at
-  `MAIN/tools/m2c`, and `claims.py release` does `git worktree remove --force` + `git branch -D` (a cherry-picked
-  branch is *not* "merged" from git's point of view, so `-d` refuses) + `git worktree prune`.
+* **`tools/m2c` is a submodule, and a slot keeps it initialised.** A slot is never removed, so the `git
+  worktree remove` refusal around a checked-out submodule ("working trees containing submodules cannot be moved
+  or removed") never applies to it: `slots.py init` initialises `tools/m2c` once from MAIN's already-cloned
+  `.git/modules` (no network), and every round inherits it. A **throwaway** worktree (`--no-slots`) must still
+  not initialise it, which is why `release` keeps the `git worktree remove --force --force` path for that case;
+  a cherry-picked branch is *not* "merged" to git, so the delete is `-D`, not `-d`.
 * **A worker resolves the unit from its own tree, the toolchain from `MAIN`.** `recompile.py` reads the source and
   writes the object in the **current worktree** (its `cwd`) and takes only the compiler, binutils and the *target*
   object from `MAIN`. Running `MAIN/tools/units/recompile.py` from a worktree must not silently compile
@@ -259,7 +283,9 @@ and Windows refuses to delete a directory a process is sitting in ("Device or re
 `git worktree remove` failing with "Permission denied"), so releasing first fails and leaves a directory that
 nothing can remove until that pane goes away. If a worktree cannot be removed, ask who is sitting in it - it may
 be the owner's own pane. **A tool-spawned worker has no pane**, so this step is skipped for it and
-`claims.py release` only removes the worktree and the branch.
+`claims.py release <unit>` returns the slot to main's tip (keeping the warm trees), deletes the branch and
+clears the slot lock; for a **throwaway** worktree (`--no-slots`) it removes the worktree instead. Nothing
+in a round constructs a worktree by hand.
 
 ### 5.2 The worker's input — one generated file, nothing else
 
@@ -297,7 +323,7 @@ write your report.*
 | 2 | `MAIN/.pi/outbox/<slug>.json` (branch minus `worker/`) - per-symbol %, unit %, residual, **config requests** (range/seam/rename/flag/shared-file with evidence), **flag probes** (numbers + verdict), blockers, and the command it measured with | me and `land.py`, which can refuse a batch from it alone |
 | 3 | `MAIN/.pi/notes/<slug>.md` — the full evidence trail | a later session, or a re-brief of the same unit |
 | 4 | a ≤ 15-line digest in the reply | human review |
-| 5 | the claim released (worktree removed, branch deleted after the merge) | other workers |
+| 5 | the claim released (slot returned to main's tip, branch deleted after the merge) | other workers |
 
 Why JSON and not prose: four workers writing four prose reports is exactly how the orchestrator ends up
 reconciling numbers by hand — the failure mode this plan exists to remove.
@@ -308,9 +334,16 @@ reconciling numbers by hand — the failure mode this plan exists to remove.
 through `recompile.py` (direct compiler invocation, mtime asserted, section sizes printed) and measure with
 `mt.py`. Otherwise four processes fight over one build tree, and a green `ok` can come from a stale link.
 
+**A lane never builds its own environment.** The orchestrator claims through `queue.py next` (or
+`claims.py claim`), which takes a free slot from the pool, resets it, cuts a fresh branch off main's current
+tip and verifies the kept build tree; the worker starts in the directory it is handed. A free slot is the
+concurrency cap: with all six taken, `queue.py next` refuses and names the holders rather than constructing a
+seventh worktree.
+
 | failure | detected by | handling |
 | --- | --- | --- |
-| two workers, one unit | `git worktree add -b worker/<slug>` refuses | the loser takes the next unclaimed unit |
+| two workers, one unit | the branch already exists (`claims`) or the slot is locked (`slots`) | the loser takes the next unclaimed unit or the next free slot |
+| a slot's kept build tree is stale | `slots.py verify`, or `acquire`'s guard (`config.json` vs `symbols`/`splits`/DOL, plus `report.json`) | **re-seed from MAIN before handing over**; refuse if it still cannot be proven current — never hand a lane a doubt |
 | a worker dies mid-unit | stale worktree / branch never merged / no outbox entry | inspect its tree, re-issue the brief; brief step 1 is "compile and measure the unit first", so a half-written source is caught |
 | a worker edits a shared file | `land.py verify` diffs the tree against the expected file set | reject the merge, restore the file, re-brief; its other work survives |
 | a worker measures a stale object | `recompile.py` asserts the mtime advanced | rerun; discard the numbers (this bit two workers before the helper existed) |
@@ -320,7 +353,7 @@ through `recompile.py` (direct compiler invocation, mtime asserted, section size
 | a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never let a worker silently compile nothing |
 | the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse than `main` → drop the branch and re-brief; better → merge, record the residual in the header, mark the unit `partial` in the ledger |
 | `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
-| a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live pane is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: `herdr pane close <pane>`, then `claims.py release <unit>` - and if that pane is the owner's, ask first, because a stale claim blocks the unit rather than losing anything |
+| a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live pane is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: `herdr pane close <pane>`, then `claims.py release <unit>` - and if that pane is the owner's, ask first, because a stale claim blocks the unit rather than losing anything. A **slot** claim never removes the directory anyway: release detaches the slot at main's tip, deletes the branch and clears the lock |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
 ### 5.4.1 The agent profiles
@@ -640,7 +673,7 @@ construction: a tool can waste time, it cannot break the link.
 | # | tool | why it exists (incident) | acceptance test | size |
 | --- | --- | --- | --- | --- |
 | 7.1 | `tools/units/recompile.py` (+ 7.15) | two workers measured objects the compiler never rewrote (1-second mtime granularity); a worker must not run `ninja` | delete the object, compile **without ninja**, assert the mtime moved, print section sizes and both object paths; resolve `MAIN` for the toolchain and the target object | ~60 |
-| 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock, and a silent worker must be reclaimable (see the ack/heartbeat/timeout layer, §5.6) | `claim` creates the worktree+branch or refuses; `ack`/`status`/`timeout` cover liveness and reclaim (a timed-out branch is rescued to `refs/rescue/<slug>` first); `list` shows owner/age; `remove` cleans up | ~140 |
+| 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock, and a silent worker must be reclaimable (see the ack/heartbeat/timeout layer, §5.6) | `claim` takes a reusable **slot** and cuts the worktree+branch or refuses (7.26; `--no-slots` keeps the old construction path); `ack`/`status`/`timeout` cover liveness and reclaim (a timed-out branch is rescued to `refs/rescue/<slug>` first); `list` shows owner/age; `release` returns the slot | ~140 |
 | 7.3 | `tools/units/brief.py` | every fan-out cost a hand-written 40-line brief and each drifted | one file per unit with §5.2's six parts; idempotent | ~120 |
 | 7.4 | `tools/units/handoff.py` | worker replies were inconsistently shaped; detail was lost to truncation | prints the digest skeleton; validates an outbox entry against the schema | ~60 |
 | 7.5 | `tools/units/land.py` | the batch checklist was six manual commands and the regression scan was rewritten four times; a green `ok` can come from a stale link | `verify` **deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) before the run and requires both to be recreated**, then runs configure → split → report → regressions → `ok` → ledger delta → knowledge-delta check; refuses on a shared-file edit or an outbox violation; owns the baseline (7.16). The `.ninja_log` ordering idea does not work: a `NonMatching` batch never relinks, so `main.elf` never runs | ~240 |
@@ -664,6 +697,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.23 | **done** - `queue.py`'s **unlanded-branch guard**: `next` refuses to claim while any local branch holds content `main` lacks | the 2026-09-26 branch audit found a whole registered unit (`menu/fn_802E4978.cpp`, 511 + 186 + 115 lines) that no landing had ever taken, sitting on a worker branch while new lanes were being launched; finished work must not queue behind a new unit | `strictly_newer` (main's copy a strict subset - narrow on purpose, so the stale pads and comment wording a landed branch leaves behind do not block), `unlanded_branches`/`unlanded_error` wired into both spawn paths, `list` reports the state, `--allow-unlanded <branch>` parks one on purpose; 8 selftest checks | ~70 |
 | 7.24 | **done** - a `decompiler` lane matches **data** as well as code: `.agents/agents/decompiler.md` gains a Data section and every brief gains 5d, and the old propose-do-not-claim line is inverted | objdiff's unit score does not count a wrong data section, so a lane could hand over a unit whose code matched and whose `.data`/`.sdata2` was ours-extra - the whole 20-unit flip-blocker list came from that blind spot, and no lane was ever asked about it | the lane measures with `datagap.py --unit`, claims what its object emits (private pool entries, unclaimed `.data`/`.ctors` ranges; never a shared entry - playbook 58), drops definitions it should only declare (playbook 29), and reports sections and bytes before/after; a code-complete unit with a claimable data gap is finished in the same lane and flipped | ~40 |
 | 7.25 | **done** - the C++ **class shape** rule: `.agents/agents/decompiler.md` and every brief (section 5c) say a range the evidence calls a class is written as a class with member functions and real virtuals, not as a C struct plus free functions taking `self` | the owner caught a landed unit reconstructing a class that way - 403 `self->` uses in `Network/fn_8041A87C.cpp` while its own header records the target's string pool spelling `NetworkGameSpyInterface::`/`NetworkPeerGameSpy::`; MWCC only emits retail's canonical `lwz r12,0(r3)`/`lwz r12,<slot>` dispatch for a genuine `virtual`, so the shape is part of the match | both renderers carry 5c; a `fixer` lane reconverts the landed unit and records any function where the struct form measured better; 153 + 117 selftest checks green | ~40 |
+| 7.26 | **done** - `tools/units/slots.py`: a fixed pool of reusable lane directories at stable paths, one lock each, a verified-and-fail-closed reset, wired into the claim path | per-claim construction costs per lane, its teardown cannot remove a worktree holding the `tools/m2c` submodule (the careless 2026-09-24 teardown destroyed a lane's branch), and the seeder rewrites `.ninja_deps`' absolute paths every time because each path is new; a reused slot also carries the previous round's build state, and a stale tree cost a full `rm -rf build/RMHE08` rebuild | `init`/`acquire`/`release`/`status`/`verify`; a slot holds a directory, never a branch (`acquire` cuts a fresh `checkout -B worker/<slug> <tip>`); a free slot is the concurrency cap (`queue.py next` refuses at six); the kept build tree is validated against MAIN's current map/DOL with the seeder's own guard plus a `report.json` comparison and re-seeded if it cannot be proven current; one lock per slot at `MAIN/.pi/slots/<n>.json`, stale locks reclaimed; 62 selftest checks | ~340 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
@@ -1120,17 +1154,21 @@ The rules that follow:
 
 ### Teardown is part of landing (owner's rule, 2026-09-23)
 
-**When a worker finishes, its claim is released and its worktree and branch are removed** - and `claims.py` is the tool
-that does it, because the claim owns all three (branch, worktree, registry entry). Landing a unit is not finished until
-its teardown is: a landed unit must not leave a worktree, a merged branch or a registry entry behind, and the same is
-true of a worker whose round produced nothing.
+**When a worker finishes, its claim is released and its branch is removed** - and `claims.py` is the tool
+that does it, because the claim owns the branch, the environment and the registry entry. With the slot pool
+(§5.1) the environment is **returned to the pool, not destroyed**: its directory and its warm `build/RMHE08`
+stay, only the branch (the lock) and the lock file go. Landing a unit is not finished until its teardown is: a
+landed unit must not leave a claim, a merged branch or a registry entry behind, and the same is true of a worker
+whose round produced nothing.
 
-`claims.py release <unit>` is the one-shot: rescue ref -> pane close -> `git worktree remove --force` -> `branch -D` ->
-`prune`, then the registry entry. It must be **idempotent and total** - every step says what it did or why it was
-skipped (already gone, never existed, pane still active) - because aborting on an already-removed target is how the
-2026-09-23 Camellia tangle happened: its claim could not be released, a merged branch then blocked the re-claim, and a
-leftover directory blocked the new worktree, all three cleared by hand. The one real refusal is a **live pane**, which
-pins the worktree as its cwd on Windows (5.1) - that stays an abort, naming the pane.
+`claims.py release <unit>` is the one-shot: rescue ref -> pane close -> **return the slot** (detach at main's
+tip, clear the lock, refresh the warm tree) - or `git worktree remove --force` for a throwaway worktree - ->
+`branch -D` -> `prune`, then the registry entry. It must be **idempotent and total** - every step says what it
+did or why it was skipped (already gone, never existed, pane still active) - because aborting on an
+already-removed target is how the 2026-09-23 Camellia tangle happened: its claim could not be released, a
+merged branch then blocked the re-claim, and a leftover directory blocked the new worktree, all three cleared
+by hand. The one real refusal is a **live pane**, which pins the worktree as its cwd on Windows (5.1) - that
+stays an abort, naming the pane.
 
 The flow calls it, so nobody has to remember: `land.py` releases the claim of the unit it just gated, and
 `claims.py release --all-merged` sweeps every finished worker in one command.
@@ -1145,8 +1183,8 @@ worked without per-batch approval.** The loop is one unit of work wide and the s
 2. **Apply** (the orchestrator, owns the build): the `splits.txt`/`configure.py` edits or the cherry-pick, then
    **one re-split and one `land.py` gate** per batch - renames, phantom merges, range claims and source work ride
    the same split (item 4 of the constraints above).
-3. **Land** one unit at a time: cherry-pick, gate, commit, `claims.py release`, `git worktree remove` (close the
-   pane first - a live pane holds the worktree's cwd on Windows).
+3. **Land** one unit at a time: cherry-pick, gate, commit, `claims.py release` (which returns the slot for the
+   next lane and deletes the branch; close any pane first - a live pane holds the slot's cwd on Windows).
 4. **Refill**: as soon as a slot frees, launch the next item, so the round never drains.
 
 Work is chosen by the ledger: the next attribution run by the block view, the next residual unit by the per-module

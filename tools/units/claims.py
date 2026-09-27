@@ -504,13 +504,19 @@ def _ninja_deps_rewrite(data: bytes, old_root: str, new_root: str) -> bytes | No
     return _ninja_deps_serialize(version, out)
 
 
-def _copy_build_outputs(src: str, dst: str):
-    """Copy every file under a MAIN build tree into `dst`, preserving mtimes. -> (files, oldest mtime).
+def _copy_build_outputs(src: str, dst: str, overwrite: bool = False):
+    """Copy a build tree into `dst`, preserving mtimes. -> (files copied, oldest source mtime).
 
     `copy2` is load-bearing: ninja's deps log records each output's mtime, and an entry is valid only
     while they match, so preserving it is what keeps a seeded object "already built".  Reparse points are
     never walked or copied (they are somebody else's tree; see `wtsafe`), and `SEED_SKIP_DIRS` drops the
     on-demand asm dump.  Existing files are left alone, so a re-seed is cheap.
+
+    `overwrite=True` is the *slot* shape: a slot keeps its build tree at a stable path across rounds, and
+    `main` (the source) moves under it, so a file whose size or mtime differs is copied over the slot's
+    copy - that is what makes the slot's `report.json` and objects match `main`'s current build.  The
+    `oldest` returned is the oldest mtime over **every** source file walked, copied or not, so a caller
+    with nothing to copy can still age the worktree's inputs behind it.
     """
     files, oldest = 0, None
     for root_dir, dirs, names in os.walk(src):
@@ -521,33 +527,51 @@ def _copy_build_outputs(src: str, dst: str):
         os.makedirs(target, exist_ok=True)
         for name in sorted(names):
             s, d = os.path.join(root_dir, name), os.path.join(target, name)
-            if _is_reparse_point(s) or os.path.exists(d):
+            if _is_reparse_point(s) or _is_reparse_point(d):
                 continue
             try:
+                mt = os.path.getmtime(s)
+                if oldest is None or mt < oldest:
+                    oldest = mt
+                if os.path.exists(d):
+                    if not overwrite:
+                        continue
+                    st_s, st_d = os.stat(s), os.stat(d)
+                    if st_s.st_size == st_d.st_size and st_s.st_mtime_ns == st_d.st_mtime_ns:
+                        continue
                 shutil.copy2(s, d)
-                mt = os.path.getmtime(d)
             except OSError:
                 continue
             files += 1
-            if oldest is None or mt < oldest:
-                oldest = mt
     return files, oldest
 
 
-def _seed_ninja_state(main: str, wt: str) -> list[str]:
-    """Copy the generated ninja state a first `ninja` reads; move `.ninja_deps` onto the worktree."""
+def _seed_ninja_state(main: str, wt: str, overwrite: bool = False) -> list[str]:
+    """Copy the generated ninja state a first `ninja` reads; move `.ninja_deps` onto the worktree.
+
+    `overwrite=True` keeps a *slot*'s state current with `main`'s: the deps log is always re-read from
+    `main` and re-pointed at the slot (a path rewrite, never a copy of MAIN's absolute paths), and the
+    plain files are copied only when their bytes differ.  `overwrite=False` is the fresh-worktree shape.
+    """
     seeded = []
     for name in NINJA_STATE_FILES:
         src, dst = os.path.join(main, name), os.path.join(wt, name)
-        if not os.path.isfile(src) or os.path.exists(dst):
+        if not os.path.isfile(src):
             continue
         try:
             if name == ".ninja_deps":
+                if os.path.exists(dst) and not overwrite:
+                    continue
                 moved = _ninja_deps_rewrite(open(src, "rb").read(), main, wt)
                 if moved is None:
                     continue
                 open(dst, "wb").write(moved)
             else:
+                if os.path.exists(dst):
+                    if not overwrite:
+                        continue
+                    if open(src, "rb").read() == open(dst, "rb").read():
+                        continue
                 shutil.copy2(src, dst)
         except OSError:
             continue
@@ -555,8 +579,8 @@ def _seed_ninja_state(main: str, wt: str) -> list[str]:
     return seeded
 
 
-def _main_build_is_current(main: str) -> bool:
-    """Whether MAIN's build tree is the *current* one, not one from before main moved.
+def _build_is_current(build_root: str, input_root: str | None = None) -> bool:
+    """Whether the build tree under `build_root` is current for the inputs under `input_root`.
 
     A cheap staleness guard over the split (`config.json` newer than the map and DOL dtk read) and the
     manifest (`build.ninja` newer than the configure inputs).  The compile edges are not checked - that is
@@ -564,20 +588,26 @@ def _main_build_is_current(main: str) -> bool:
     `ninja`) and `claims.claim` runs right after it, so a source edited since MAIN's last build is an
     invariant rather than a hope.  When this is False the caller seeds no build tree and the first `ninja`
     is a normal full build: slower, never stale.
+
+    The two roots exist for the **slot** guard (`slots.verify`): the build outputs live at the slot's stable
+    path, but the map/DOL they must have been split against are *MAIN's current* ones.  `_main_build_is_current`
+    is the one-root case this guard was written for; it is the same function, so a slot never grows a second
+    staleness rule that can drift from the worktree seeder's.
     """
-    cfg = os.path.join(main, RMHE08_REL, "config.json")
-    ninja = os.path.join(main, "build.ninja")
+    input_root = input_root or build_root
+    cfg = os.path.join(build_root, RMHE08_REL, "config.json")
+    ninja = os.path.join(build_root, "build.ninja")
     if not os.path.isfile(cfg) or not os.path.isfile(ninja):
         return False
     try:
         t, tn = os.path.getmtime(cfg), os.path.getmtime(ninja)
     except OSError:
         return False
-    split_inputs = (os.path.join(main, "config", "RMHE08", "config.yml"),
-                    os.path.join(main, "config", "RMHE08", "symbols.txt"),
-                    os.path.join(main, "config", "RMHE08", "splits.txt"),
-                    os.path.join(main, ORIG_REL, "sys", "main.dol"),
-                    os.path.join(main, ORIG_REL, "files", "mh3.sel"))
+    split_inputs = (os.path.join(input_root, "config", "RMHE08", "config.yml"),
+                    os.path.join(input_root, "config", "RMHE08", "symbols.txt"),
+                    os.path.join(input_root, "config", "RMHE08", "splits.txt"),
+                    os.path.join(input_root, ORIG_REL, "sys", "main.dol"),
+                    os.path.join(input_root, ORIG_REL, "files", "mh3.sel"))
     for p in split_inputs:
         try:
             if os.path.getmtime(p) > t:
@@ -587,11 +617,16 @@ def _main_build_is_current(main: str) -> bool:
     for rel in ("configure.py", os.path.join("tools", "project.py"),
                 os.path.join("tools", "ninja_syntax.py")):
         try:
-            if os.path.getmtime(os.path.join(main, rel)) > tn:
+            if os.path.getmtime(os.path.join(input_root, rel)) > tn:
                 return False
         except OSError:
             continue
     return True
+
+
+def _main_build_is_current(main: str) -> bool:
+    """Whether MAIN's own build tree is current for MAIN's own inputs (the original single-root guard)."""
+    return _build_is_current(main, main)
 
 
 def _tracked_files(wt: str) -> list[str]:
@@ -642,7 +677,7 @@ def _age_seeded_inputs(wt: str, t: float) -> int:
     return touched
 
 
-def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None) -> str:
+def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None, overwrite: bool = False) -> str:
     """Seed a fresh worktree from MAIN: the build inputs (copy) and the original payload (copy or junction).
 
     A worktree must be self-sufficient: the worker compiles and measures in *its* `build/RMHE08`, and a
@@ -655,6 +690,11 @@ def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None) -> st
     deps log's paths moved onto the worktree and the worktree's own inputs aged behind the outputs.  That
     is what makes the first `ninja` incremental; without it every lane pays a full rebuild at claim time
     (measured 270 steps / 35-77 s; two lanes reported a 262-step / 3780-object time sink).
+
+    `overwrite=True` is the **slot** shape (`tools/units/slots.py`): the target already holds a warm tree at
+    its stable path and `MAIN`'s build has moved under it, so files whose size or mtime differ are copied
+    over - the current objects, `report.json` and `config.json` - and `.ninja_deps` is re-pointed at the
+    slot.  A slot path never changes, so this is the one place a deps-log rewrite happens between rounds.
 
     `orig/` is **copied** unless it is big enough to be worth the junction (see `ORIG_JUNCTION_MIN_BYTES`):
     a junction is a reparse point whose teardown class has emptied MAIN's `orig/RMHE08/{sys,files}` twice,
@@ -715,9 +755,12 @@ def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None) -> st
     rmhe_src, rmhe_dst = os.path.join(main, RMHE08_REL), os.path.join(wt, RMHE08_REL)
     if os.path.isdir(rmhe_src) and _main_build_is_current(main):
         os.makedirs(rmhe_dst, exist_ok=True)
-        n, oldest = _copy_build_outputs(rmhe_src, rmhe_dst)
-        state = _seed_ninja_state(main, wt)
-        if n and oldest is not None:
+        n, oldest = _copy_build_outputs(rmhe_src, rmhe_dst, overwrite=overwrite)
+        state = _seed_ninja_state(main, wt, overwrite=overwrite)
+        # Age the worktree's own inputs behind MAIN's build outputs.  Run it even when nothing was copied
+        # (an overwrite refresh of a tree MAIN has not moved under): the reset has just checked the tracked
+        # files out, which re-stamps their mtimes, and without aging the warm objects look stale to ninja.
+        if oldest is not None:
             _age_seeded_inputs(wt, oldest - 1.0)
         seeded = True
         parts.append("build/RMHE08: %d file(s)%s" % (n, " + " + ", ".join(state) if state else ""))
@@ -1203,25 +1246,54 @@ def claim_place_error(main: str, cwd: str | None = None) -> str | None:
     return None
 
 
-def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | None = None) -> dict:
+def _slots():
+    """`slots` imported late: slots imports claims, so a top-level import would cycle at load time."""
+    from units import slots as slots_mod
+    return slots_mod
+
+
+def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | None = None,
+          slots_mode: bool | None = None, slot: int | None = None) -> dict:
+    """Reserve `unit`: a claim is a worktree and a branch, and the branch is the lock.
+
+    With a slot pool present (`tools/units/slots.py init`) the claim takes a **reusable slot** instead of
+    constructing a throwaway worktree: `slots.acquire` resets the slot, cuts a fresh `worker/<slug>` branch off
+    MAIN's tip and verifies the kept build tree before this records the claim.  A slot holds a *directory*,
+    never a branch, so one claim is still one branch - landable and auditable on its own.  Without a pool, or
+    with `slots_mode=False` (the `--no-slots` flag), the original per-claim construction path runs unchanged.
+    """
     unit = norm_unit(unit.strip("/"))
     place = claim_place_error(main, cwd)
     if place:
         raise SystemExit("REFUSED claim %s | %s: run the claim from MAIN, on main" % (unit, place))
     branch = branch_for(unit)
-    path = worktree_for(unit, main)
+    sm = _slots()
+    use_slots = slot is not None or (slots_mode if slots_mode is not None else sm.enabled(main))
+    if use_slots and not sm.enabled(main):
+        raise SystemExit("REFUSED: the slot pool is requested but not initialised - run "
+                         "`python tools/units/slots.py init` (or pass --no-slots)")
     if branch_exists(main, branch):
         raise SystemExit("REFUSED: branch %s already exists - the unit is claimed (or was never released).\n"
                          "  see: python tools/units/claims.py list" % branch)
-    if os.path.exists(path):
-        raise SystemExit("REFUSED: %s already exists" % path)
-    base = git(["rev-parse", "HEAD"], main).strip()
-    cmd = ["worktree", "add", "-b", branch, path, base]
-    if dry_run:
-        return {"unit": unit, "branch": branch, "worktree": path, "base": base,
-                "command": "git " + " ".join(cmd), "dry_run": True}
-    git(cmd, main)
-    seed_note = seed_worktree_build(main, path)
+    slot_id: int | None = None
+    if not use_slots:
+        path = worktree_for(unit, main)
+        if os.path.exists(path):
+            raise SystemExit("REFUSED: %s already exists" % path)
+        base = git(["rev-parse", "HEAD"], main).strip()
+        cmd = ["worktree", "add", "-b", branch, path, base]
+        if dry_run:
+            return {"unit": unit, "branch": branch, "worktree": path, "base": base,
+                    "command": "git " + " ".join(cmd), "dry_run": True}
+        git(cmd, main)
+        seed_note = seed_worktree_build(main, path)
+    else:
+        if dry_run:
+            info = sm.preview(main, unit, branch, slot)
+            return {"unit": unit, "branch": branch, "worktree": info["dir"], "base": info["base"],
+                    "slot": info["slot"], "command": info["command"], "dry_run": True}
+        info = sm.acquire(main, unit, branch=branch, worker=worker, slot=slot)
+        path, base, seed_note, slot_id = info["dir"], info["base"], info["seeded"], info["slot"]
     # the worker writes its outbox and notes here (docs/plan.md 5.3); create them with the claim so the
     # paths in the brief exist before the worker tries to write to them
     for sub in ("outbox", "notes"):
@@ -1229,9 +1301,10 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
     registry = load_registry(main)
     registry[unit] = {"branch": branch, "worktree": path, "worker": worker or os.environ.get("USERNAME")
                       or os.environ.get("USER") or "unknown", "base": base,
-                      "claimed_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                      "claimed_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "slot": slot_id}
     save_registry(main, registry)
-    return {"unit": unit, "branch": branch, "worktree": path, "base": base, "seeded": seed_note}
+    return {"unit": unit, "branch": branch, "worktree": path, "base": base, "seeded": seed_note,
+            "slot": slot_id}
 
 
 def registry_key(registry: dict, unit: str) -> str | None:
@@ -1382,6 +1455,14 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
         # the worktree git has checked out for this branch, else the path its slug predicts
         entry = next((e for e in rc.main_worktree_list(main) if e.get("branch") == branch), None)
         path = (entry or {}).get("path") or worktree_for(unit, main)
+    # a slot claim (5.1's reusable pool) is torn down by *returning* the slot, not removing a worktree; the
+    # registry records the slot, and a branch selector that bypassed the registry finds it from the lock.
+    slot_id = record.get("slot")
+    if slot_id is None:
+        for row in _slots().all_slots(main):
+            if (row.get("lock") or {}).get("branch") == branch:
+                slot_id = row["slot"]
+                break
     # the outbox and the notes are keyed by the *branch* slug (`handoff_slug`), which is also the fallback for a
     # branch the registry does not know
     handoff = slug_of_branch(branch) or slug(unit)
@@ -1445,18 +1526,32 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
     for child in child_panes:
         steps.append(_done_step("herdr pane close %s (subagent pane)" % child,
                                 _close_step(child, close or herdr_close)))
-    if os.path.isdir(path):
-        steps.append(_done_step("git worktree remove --force %s" % path,
-                                lambda p=path: remove_worktree(main, p)))
+    if slot_id is not None:
+        # A slot is a persistent directory: teardown *returns* it to main's tip and keeps its warm trees;
+        # it is never removed.  The branch (the lock) still goes - a slot holds a directory, never a
+        # branch - after the rescue ref above, and the whole thing is one step so an error fails closed.
+        def _return_slot(sid=slot_id):
+            _slots().release(main, slot=sid, unit=unit, branch=branch, rescue=False, refresh=True)
+            return "returned to main's tip, branch deleted, build tree refreshed"
+        if os.path.isdir(path):
+            steps.append(_done_step("slot %d return (%s)" % (slot_id, path), _return_slot))
+        else:
+            steps.append(_skip_step("slot %d return" % slot_id, "slot directory already gone"))
+        steps.append(_skip_step("git worktree prune", "slots are persistent worktrees - nothing to prune"))
+        steps.append(_skip_step("git branch -D %s" % branch, "the slot return deleted the branch"))
     else:
-        steps.append(_skip_step("git worktree remove --force %s" % path, "worktree already gone"))
-    # prune runs *before* the branch: a worktree whose directory is already gone is still registered until git
-    # is told, and `branch -D` refuses a branch that a registered worktree has checked out
-    steps.append(_done_step("git worktree prune", lambda: git(["worktree", "prune"], main)))
-    if branch_present:
-        steps.append(_done_step("git branch -D %s" % branch, lambda b=branch: git(["branch", "-D", b], main)))
-    else:
-        steps.append(_skip_step("git branch -D %s" % branch, "branch already gone"))
+        if os.path.isdir(path):
+            steps.append(_done_step("git worktree remove --force %s" % path,
+                                    lambda p=path: remove_worktree(main, p)))
+        else:
+            steps.append(_skip_step("git worktree remove --force %s" % path, "worktree already gone"))
+        # prune runs *before* the branch: a worktree whose directory is already gone is still registered until
+        # git is told, and `branch -D` refuses a branch that a registered worktree has checked out
+        steps.append(_done_step("git worktree prune", lambda: git(["worktree", "prune"], main)))
+        if branch_present:
+            steps.append(_done_step("git branch -D %s" % branch, lambda b=branch: git(["branch", "-D", b], main)))
+        else:
+            steps.append(_skip_step("git branch -D %s" % branch, "branch already gone"))
 
     # what `--force` costs: the branch (the lock) is deleted, so the only remaining copy of its commits is the
     # rescue ref. State it and the exact restore command; the next gate names the same command from that ref.
@@ -2245,6 +2340,9 @@ def main() -> int:
     c.add_argument("--worker", default=None)
     c.add_argument("--dry-run", action="store_true")
     c.add_argument("--json", action="store_true")
+    c.add_argument("--no-slots", action="store_true",
+                   help="construct a throwaway worktree instead of taking a slot (the pre-pool path)")
+    c.add_argument("--slot", type=int, default=None, help="take this slot instead of the first free one")
     l = sub.add_parser("list", help="every claim git knows about")
     l.add_argument("--json", action="store_true")
     r = sub.add_parser("release", help="remove the worktree and the branch (idempotent, total)")
@@ -2286,16 +2384,18 @@ def main() -> int:
 
     main_wt = rc.main_root(rc.worktree_root())
     if args.cmd == "claim":
-        out = claim(args.unit, main_wt, args.worker, args.dry_run)
+        out = claim(args.unit, main_wt, args.worker, args.dry_run,
+                    slots_mode=(False if args.no_slots else None), slot=args.slot)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
         if out.get("dry_run"):
             print("would run: %s" % out["command"])
         else:
-            print("claimed %s\n  branch   %s\n  worktree %s\n  base     %s\n  seeded   %s"
-                  % (out["unit"], out["branch"], out["worktree"], out["base"],
-                     out.get("seeded", "")))
+            print("claimed %s\n  branch   %s\n  worktree %s%s\n  base     %s\n  seeded   %s"
+                  % (out["unit"], out["branch"], out["worktree"],
+                     " (slot %s)" % out["slot"] if out.get("slot") else "",
+                     out["base"], out.get("seeded", "")))
             # the brief is named after the branch the claim just made, not re-derived from the unit path
             print("\nnext: python tools/units/brief.py %s          # write the brief\n"
                   "      read tools/units/briefs/%s.md in %s, do it, write your report"

@@ -453,23 +453,34 @@ def no_ready(main: str) -> str:
 
 
 def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn,
-                profile: str = "decompiler") -> dict:
+                profile: str = "decompiler", slots_mode: bool | None = None) -> dict:
     """Claim one *selected* entry, promote its brief, and return its spawn.
 
     `next` and a wave differ only in selection, so this is the one claim path both take: the unit is
     claimed first and the brief is only promoted once the claim exists, so a worker is never handed an
     outbox path that does not exist. `claim_fn` is injectable so the selftest can exercise the whole flow
-    without a git worktree.
+    without a git worktree. The worktree is read from the claim's own result, never re-derived from the
+    unit path - a slot claim's worktree is the slot directory, and the spawn's `cwd` must be that.
     """
     unit = entry["unit"]
     slug = claims.slug(unit)
-    wt = claims.worktree_for(unit, main)
-    info = {"unit": unit, "branch": claims.branch_for(unit), "worktree": wt, "dry_run": True} \
-        if dry_run else claim_fn(unit, main, worker, False)
-    claim_slug = claims.claim_slug(main, unit) or slug
+    sm = claims._slots()
+    use_slots = slots_mode is not False and sm.enabled(main)
     if dry_run:
+        if use_slots:
+            pv = sm.preview(main, unit, claims.branch_for(unit))
+            wt = pv["dir"]
+            info = {"unit": unit, "branch": pv["branch"], "worktree": wt, "slot": pv["slot"],
+                    "dry_run": True}
+        else:
+            wt = claims.worktree_for(unit, main)
+            info = {"unit": unit, "branch": claims.branch_for(unit), "worktree": wt, "dry_run": True}
+        claim_slug = slug
         brief_path = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
     else:
+        info = claim_fn(unit, main, worker, False)
+        wt = info.get("worktree") or claims.worktree_for(unit, main)
+        claim_slug = claims.claim_slug(main, unit) or slug
         brief_path = promote(main, unit, claim_slug)
     return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
             "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
@@ -484,16 +495,28 @@ def _claim_record(out: dict, worker: str | None, ratio: int) -> dict:
             "when": _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()}
 
 
+def slot_cap(main: str, slots_mode: bool | None = None) -> str | None:
+    """The slot-pool refusal a claim path raises when the pool is exhausted (None when not in use).
+
+    A free slot **is** the concurrency cap: with a pool initialised, a seventh lane is refused instead of
+    constructing a seventh environment.  `slots_mode=False` (`--no-slots`) opts out and keeps the old path.
+    """
+    if slots_mode is False:
+        return None
+    return claims._slots().capacity_error(main)
+
+
 def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
                profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False,
-               ratio: int = backlog.RATIO_DEFAULT) -> dict:
+               ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
     Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
-    branch are cut from that HEAD; the backlog **credit gate** refuses when the balance does not cover a
-    claim (the owner's 2026-09-27 ratio: a `done` earns 1 credit, a claim spends `ratio`), unless
-    `--ignore-backlog` hands out work without spending on purpose; and `unlanded_error` refuses while any
-    branch still holds work main does not have. A real (non-dry) claim is recorded in the ledger.
+    branch are cut from that HEAD; the **slot cap** refuses when every slot is taken (a free slot is the
+    concurrency cap); the backlog **credit gate** refuses when the balance does not cover a claim (the
+    owner's 2026-09-27 ratio: a `done` earns 1 credit, a claim spends `ratio`), unless `--ignore-backlog`
+    hands out work without spending on purpose; and `unlanded_error` refuses while any branch still holds
+    work main does not have. A real (non-dry) claim is recorded in the ledger.
     """
     claim_fn = claim_fn or claims.claim
     if not dry_run:
@@ -501,6 +524,9 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
         bad_branch = branch_error(main)
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
+    cap = slot_cap(main, slots_mode)
+    if cap:
+        raise SystemExit("REFUSED queue next | %s" % cap)
     if not ignore_backlog:
         backlog_msg = backlog.refusal(main, ratio=ratio)
         if backlog_msg:
@@ -512,7 +538,7 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(no_ready(main))
-    out = claim_entry(main, entry, worker, dry_run, claim_fn, profile)
+    out = claim_entry(main, entry, worker, dry_run, claim_fn, profile, slots_mode)
     if not dry_run and not ignore_backlog:
         backlog.record_claims(main, [_claim_record(out, worker, ratio)], ratio=ratio)
     return out
@@ -520,20 +546,31 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
 
 def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
                 profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False,
-                ratio: int = backlog.RATIO_DEFAULT) -> dict:
+                ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
     """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
 
     Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
     the single pick uses. The same guards as `next_brief` run first, and the credit gate is then re-checked
     for the whole wave: a wave of N costs N x ratio credits, so a balance that covers one claim may not
-    cover three. A real wave is recorded in the ledger; `--ignore-backlog` hands out the wave without
-    spending. `claimed` below `requested` means the queue could not fill the wave.
+    cover three. A wave is also capped by the free slots - a slot is an environment, and a wave cannot claim
+    more environments than exist. A real wave is recorded in the ledger; `--ignore-backlog` hands out the
+    wave without spending. `claimed` below `requested` means the queue could not fill the wave.
     """
     claim_fn = claim_fn or claims.claim
+    requested = count
     if not dry_run:
         bad_branch = branch_error(main)
         if bad_branch:
             raise SystemExit("REFUSED queue next | %s" % bad_branch)
+    cap = slot_cap(main, slots_mode)
+    if cap:
+        raise SystemExit("REFUSED queue next | %s" % cap)
+    if slots_mode is not False:
+        sm = claims._slots()
+        if sm.enabled(main):
+            free = sm.free_count(main)
+            if free < count:
+                count = free          # a wave never claims more environments than the pool has
     if not ignore_backlog:
         backlog_msg = backlog.refusal(main, ratio=ratio)
         if backlog_msg:
@@ -549,11 +586,11 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
         backlog_msg = backlog.refusal(main, ratio=ratio, wants=len(chosen))
         if backlog_msg:
             raise SystemExit("REFUSED queue next | %s" % backlog_msg)
-    out = [claim_entry(main, entry, worker, dry_run, claim_fn, profile) for entry in chosen]
+    out = [claim_entry(main, entry, worker, dry_run, claim_fn, profile, slots_mode) for entry in chosen]
     if not dry_run and not ignore_backlog:
         backlog.record_claims(main, [_claim_record(c, worker, ratio) for c in out], ratio=ratio)
-    return {"requested": count, "claimed": len(out), "shortfall": count - len(out), "dry_run": dry_run,
-            "claims": out}
+    return {"requested": requested, "claimed": len(out), "shortfall": requested - len(out),
+            "dry_run": dry_run, "claims": out}
 
 
 def pool_state(main: str) -> dict:
@@ -1123,6 +1160,9 @@ def main() -> int:
     n.add_argument("--ignore-backlog", action="store_true",
                    help="hand out a proposal even when the backlog credit balance does not cover it, without "
                         "spending a credit - the deliberate override (a ratio of `done : claim` is the default)")
+    n.add_argument("--no-slots", action="store_true",
+                   help="construct throwaway worktrees instead of taking from the reusable slot pool "
+                        "(the pre-pool path)")
     n.add_argument("--ratio", type=int, default=backlog.RATIO_DEFAULT,
                    help="credits one claim spends - K backlog items per claim (default 1: one resolved "
                         "`done` buys one claim)")
@@ -1174,7 +1214,7 @@ def main() -> int:
         if args.count != 1:
             out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile,
                               allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
-                              ratio=args.ratio)
+                              ratio=args.ratio, slots_mode=(False if args.no_slots else None))
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0
@@ -1204,7 +1244,7 @@ def main() -> int:
             return 0
         out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile,
                          allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
-                         ratio=args.ratio)
+                         ratio=args.ratio, slots_mode=(False if args.no_slots else None))
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
