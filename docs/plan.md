@@ -491,7 +491,7 @@ never rewritten; nothing is ever pushed.
 
 ### 6.5 Type and naming discipline — mandatory in phases B and C
 
-Ten rules. Rules 1-9 are checked by the lint; rule 10 is a **landing-review rule** (the vtable-ownership
+Eleven rules. Rules 1-9 and 11 are checked by the lint; rule 10 is a **landing-review rule** (the vtable-ownership
 audit in the backlog makes it mechanical - playbook row 52). They are **not style preferences**: a wrong or unnamed type is what makes
 the *next* function in the same unit cost twice as much, and pointer arithmetic hides exactly the layout that
 rules 3 and 4 exist to record.
@@ -508,9 +508,10 @@ rules 3 and 4 exist to record.
 | 8 | **`goto` is forbidden** | No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read |
 | 9 | **A mangled symbol is called through its owner** | a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and is rule 7's to name |
 | 10 | **A vtable we own is compiler output** | a table of code pointers inside the unit's own registered ranges is **emitted by MWCC** from a class that declares its `virtual` methods (plus the constructor that stores the table) - never written out entry by entry, never declared `extern`, never declared through a `void**` member. A table *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC emit a table into our object - extra bytes). **A table we wrote is not evidence of inheritance** - inheritance comes from the object's structure: the slot addresses read out of the DOL, the constructor's store, and the constructor/destructor chain |
+| 11 | **No `void *` parameter or return type** | a `void` `*` in a function declaration's parameter list or return type is a finding by default: erasing the real type hides what the call sites are actually passing, and a heterogeneous call site is evidence the *sites* disagree, not that the declaration is untyped - name the type, and fix the sites. The only exemption is a **per-declaration** marker comment, `/* untyped: <reason> */`, on the declaration or the line above it, whose reason says which genuinely-untyped case it is: a byte range (`memcpy`-shaped), an opaque handle passed through, or a caller-owned payload, and a marker on the line above must **stand alone** (a trailing marker on one declaration never exempts the next). A `void *` **local variable** is out of scope (the lint counts them so the owner can decide), and the lint reads **declarations**, never a `(void*)p` cast in a body. `grep -rn "untyped:" src include` is the complete, reviewable list of exemptions - a file can never exempt itself, exactly as rule 7's per-file keys were removed. The rule is banned outright, so the existing tree is grandfathered only by `land.py`'s `--diff` (an existing finding never blocks a landing, an added one refuses) and the debt is filed as one `untyped` backlog item per file |
 
 **These rules are part of phase C, not a separate chore.** The residual sweep already revisits every unit that
-is not byte-identical; the conformance work (rules 1-10) rides the same pass, unit by unit, in address order.
+is not byte-identical; the conformance work (rules 1-11) rides the same pass, unit by unit, in address order.
 
 **The `goto` backlog from the first protocol round (2026-09-23).** Four functions reached 100 % with a `goto`
 shape before rule 8 existed: `Pl/pl_act`'s `fn_80278144` and `fn_80278310` (`goto ret1; ret0: return 0;`) and
@@ -533,8 +534,13 @@ duplicate map row, stay counted gaps because the map cannot judge them. Rule 7 h
 deferral**: every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` in `src/` is a finding,
 whoever owns the symbol. The **only** grandfather is the gate's `--diff`: an existing finding never blocks a
 landing, while an *added* one refuses - so committed work is not revoked, and the mounted debt cannot grow. A
-file with no bodies is held to the rule too, and a `rule 7 deferred` comment exempts nothing. The naming debt
-is worked slowly through §6.6's backlog: `stylelint.py`'s rule-7 findings are one `naming` item per file, and
+file with no bodies is held to the rule too, and a `rule 7 deferred` comment exempts nothing. **Rule 11 is
+checked the same way**: a `void *` parameter or return type is a finding by default and the only exemption is
+a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a
+byte range, an opaque handle passed through, or a caller-owned payload - so `grep -rn "untyped:" src include`
+is the complete list, and a file can never exempt itself. The naming and typing debt
+is worked slowly through §6.6's backlog: `stylelint.py`'s rule-7 findings are one `naming` item per file, its
+rule-2 findings one `band-header` item per file and its rule-11 findings one `untyped` item per file, and
 the credit ratio rations new claims against them. The audit of 2026-09-22 says how much there is to bring:
 
 | measure | count | rule |
@@ -547,6 +553,7 @@ the credit ratio rations new claims against them. The audit of 2026-09-22 says h
 | types defined in more than one unit's source | **20** names, **68** extra definitions | 1 |
 | `extern` declarations not in the owner's file | **126** foreign sites over 27 owner units, plus **209** unsplit sites the address band places in 6 modules | 2 |
 | mangled spellings used as a callable identifier | **598** sites (**446** calls, **152** declarations), **83** names | 9 |
+| `void *` parameter/return types with no `untyped` marker (measured 2026-09-27, when rule 11 was added: **5326** findings over **313** files, plus **259** `void *` locals the rule does not fire on) | **5326** | 11 |
 
 A batch that touches a unit closes its rows in that table for that unit. The lint's backlog number is the
 campaign's second burn-down (§7.11 is the first, bytes).
@@ -566,9 +573,11 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   lib) - each open until a proposal pass re-draws it, it is fixed, or it is measured and adopted/rejected.
   The tooling/environment register `tooling.py` owns is read into the same list, never duplicated. **The
   naming debt is backlog too.** `stylelint.py`'s findings are aggregated **per file**: one `naming` item per
-  file carrying rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unkNN`) and one
+  file carrying rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unkNN`), one
   `band-header` item per file carrying rule-2 findings (an `extern` that belongs in the owner's header or
-  `include/unsplit/`). Each ask names the file, the rule and the count, and they are ordinary `open` items,
+  `include/unsplit/`) and one `untyped` item per file carrying rule-11 findings (a `void *` parameter or
+  return type with no marker). Each ask names the file, the rule and the count, and they are ordinary `open`
+  items,
   so the ratio rations new claims against them with no special-casing - that is the owner's ruling's second
   half (2026-09-27): remove the exemption, but do not revoke committed progress; put the mounted debt in the
   backlog and work it slowly. **A `rename` is not backlog**: the landing applies it, so it is done when its
@@ -585,8 +594,8 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   hundred distinct items - on 2026-09-27, 64 open `shared-file`, 130 open `range`, 26 open `flag` and 4 open
   tooling - with **22 open items filed by two or more independent lanes**: a signal that was thrown away
   before this register existed.
-* **Ranking is filers, then an item's weight (a `naming`/`band-header` item's live finding count, so the
-  high-traffic file leads), then recency, then `tooling.py`'s votes**, and each item shows its age. An item
+* **Ranking is filers, then an item's weight (a lint item's - `naming`/`band-header`/`untyped` - live finding
+  count, so the high-traffic file leads), then recency, then `tooling.py`'s votes**, and each item shows its age. An item
   filed in an early phase may be stale because the code moved on - the register surfaces it, never drops it;
   a human or a lane parks it with `--set-status`.
 * **Status is persistent and per item.** `open` / `done` / `parked` lives in `MAIN/.pi/backlog.json`
@@ -616,8 +625,8 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   now **fully covered by a registered unit's range in `splits.txt`**; a `flag` is `resolved` when the lib's
   cflags group in `configure.py` already carries the requested flag; a `shared-file` is `stale` when its file
   no longer exists, and `resolved` when the file is present and the stated defect is **gone** (the named
-  `#pragma` is no longer present, or the declaration's symbol is no longer named); a `naming`/`band-header`
-  item is `resolved` when the file no longer carries that rule's findings, **re-linted with the same rule
+  `#pragma` is no longer present, or the declaration's symbol is no longer named); a `naming`/`band-header`/
+  `untyped` item is `resolved` when the file no longer carries that rule's findings, **re-linted with the same rule
   that filed it**, and carried forward from the published register so the fix can be proved after the item
   would otherwise have vanished; a `tooling` request is auto-decided only when it has a checkable artifact.
   **Anything that cannot be proved from the repository
@@ -650,7 +659,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.18 | **ground-truth guard**: `prepcommit.py` refuses `config/RMHE08/build.sha1` and `config/RMHE08/config.yml`, and a tracked **`tools/git/hooks/pre-commit`** (enabled with `git config core.hooksPath tools/git/hooks` — local config, so 7.18 also states the checks that do *not* depend on a hook: `prepcommit.py`'s and `land.py`'s path refusals) refuses `orig/**`, `build/` and the LOCAL-ONLY block on **any** commit path | `prepcommit.classify('config/RMHE08/build.sha1')` returns `stage` today: a worker or I could rewrite the DOL's expected hash and commit it, after which green `ok` means nothing | a staged `build.sha1` is refused, and the hash is checked against `orig/RMHE08/sys/main.dol`'s own sha1 | ~40 |
 | 7.19 | link-order audit for flips | 13 584 objects link in 66-131 s now; with hundreds of `Matching` units the order, pool placement and symbol collisions become real | after a batch of flips, compare `main.MAP`'s section/symbol order against the original and diff the DOL | ~60 |
 | 7.20 | transactional `attribute.py apply` | `apply` writes `splits.txt` first and can leave a half-registration; `plan` can propose overlapping data spans | no proposal overlaps a claimed range, both shared files are written via temp+rename, and a failure restores them | ~40 |
-| 7.21 | `tools/units/stylelint.py` - the nine rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b`), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
+| 7.21 | `tools/units/stylelint.py` - the rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b` and an unmarked `void *` parameter or return), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
 | 7.22 | **done** - `tools/units/datagap.py` compares a unit's **target object's section sizes with ours** (`build/RMHE08/obj/*.o` vs `build/RMHE08/src/*.o`) | a unit can read 100 % fuzzy and still emit data its original TU never had: our source defines a pooled constant or table where retail referenced a map symbol (the finding, 2026-09-26: the gap is **ours-extra** - `.sdata2 8B` on `Pl/fn_8026FFBC`, `.data 120B`/`548B` on `ef/eft002`/`ef/fn_800FD864`); the unit score hides it, so a flip looks blocked for no visible reason | `--flip-blockers` lists the units whose code already matches (>= 99 %) and whose only defect is data: **21** of 223 on 2026-09-26; the fix is playbook 29 (reference the map's symbol, never define it), since the target object has no such section to claim; 10 selftest checks | ~60 |
 | 7.23 | **done** - `queue.py`'s **unlanded-branch guard**: `next` refuses to claim while any local branch holds content `main` lacks | the 2026-09-26 branch audit found a whole registered unit (`menu/fn_802E4978.cpp`, 511 + 186 + 115 lines) that no landing had ever taken, sitting on a worker branch while new lanes were being launched; finished work must not queue behind a new unit | `strictly_newer` (main's copy a strict subset - narrow on purpose, so the stale pads and comment wording a landed branch leaves behind do not block), `unlanded_branches`/`unlanded_error` wired into both spawn paths, `list` reports the state, `--allow-unlanded <branch>` parks one on purpose; 8 selftest checks | ~70 |
 | 7.24 | **done** - a `decompiler` lane matches **data** as well as code: `.agents/agents/decompiler.md` gains a Data section and every brief gains 5d, and the old propose-do-not-claim line is inverted | objdiff's unit score does not count a wrong data section, so a lane could hand over a unit whose code matched and whose `.data`/`.sdata2` was ours-extra - the whole 20-unit flip-blocker list came from that blind spot, and no lane was ever asked about it | the lane measures with `datagap.py --unit`, claims what its object emits (private pool entries, unclaimed `.data`/`.ctors` ranges; never a shared entry - playbook 58), drops definitions it should only declare (playbook 29), and reports sections and bytes before/after; a code-complete unit with a claimable data gap is finished in the same lane and flipped | ~40 |
@@ -670,7 +679,7 @@ tool is not done until `land.py` calls it or the plan says who runs it**.
 | 7.3 `brief.py` | **done** | six parts, rules extracted verbatim from §6.5/§8, inventory parsed in-process; for `Pl/pl_act`: 115 symbols, 5 below the bar, every score real |
 | 7.4 `handoff.py` | **done** | outbox schema + validation (13 checks): unowned symbols, out-of-range percentages, a rename without evidence, a missing `measured_with` are all refused |
 | 7.5 + 7.16 `land.py` | **done (build path dry-run only)** | 13 checks; the gate refuses on a moved base, a shared-file edit, a missing/invalid outbox, a regression, and requires `ok` to be recreated by *this* run; baseline refresh |
-| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **done 2026-09-23** | `dataqueue.py` writes the queue `brief.py` reads (3728 runs / 2.27 MB, 42 checks); `attribute.py` has `--max-total-bytes` (0.5 MB cap) and a transactional `apply` that restores byte-exactly on failure (103 checks); `stylelint.py` reports §6.5 rules 1-9 as `file:line` and the gate refuses a batch that adds one (151 checks) |
+| 7.17 data queue / 7.20 transactional `apply` / 7.21 `stylelint.py` | **done 2026-09-23** | `dataqueue.py` writes the queue `brief.py` reads (3728 runs / 2.27 MB, 42 checks); `attribute.py` has `--max-total-bytes` (0.5 MB cap) and a transactional `apply` that restores byte-exactly on failure (103 checks); `stylelint.py` reports §6.5 rules 1-9 and 11 as `file:line` and the gate refuses a batch that adds one (218 checks) |
 
 **Flip campaign (7.6), round 1 2026-09-23.** Six objects are flipped and committed, each alone in its commit -
 `memset` (3e5a072), `NetworkWiiMediator` (6e0ed8c), `OSAlarm` (0806eae), `memcpy` (eadd4bd), `lobby_scene`

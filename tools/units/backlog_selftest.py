@@ -392,10 +392,13 @@ def selftest() -> int:
           {("naming", "src/a.c"): 2, ("naming", "src/b.c"): 1})
     check("lint_counts: rule 2 aggregates under `band-header`",
           bl.lint_counts([{"rule": 2, "file": "src/c.c", "line": 3}]), {("band-header", "src/c.c"): 1})
+    check("lint_counts: rule 11 aggregates under `untyped`",
+          bl.lint_counts([{"rule": 11, "file": "src/d.c", "line": 3}]), {("untyped", "src/d.c"): 1})
     check("lint_counts: the other rules are not backlog",
           bl.lint_counts([{"rule": r, "file": "src/a.c", "line": 1} for r in (1, 3, 4, 5, 6, 8, 9, 10)]), {})
-    check("the lint item kinds are declared once", sorted(bl.LINT_KINDS), ["band-header", "naming"])
-    check("the lint item rules are fixed", bl.LINT_RULES, {"naming": 7, "band-header": 2})
+    check("the lint item kinds are declared once", sorted(bl.LINT_KINDS),
+          ["band-header", "naming", "untyped"])
+    check("the lint item rules are fixed", bl.LINT_RULES, {"naming": 7, "band-header": 2, "untyped": 11})
     check("a lint item keeps the new kind and a stable defect (the key survives a partial fix)",
           [(i.kind, i.target, i.defect) for i in bl.build_items(
               obx, notes, os.path.join(tmp, "x"), {},
@@ -413,6 +416,8 @@ def selftest() -> int:
         fh.write("void fn_80040598(void) {}\nvoid fn_80040599(void) {}\n")
     with open(os.path.join(ldir, "src", "mod", "b.c"), "w", encoding="utf-8") as fh:
         fh.write("extern void foo(void);\nvoid b(void) { foo(); }\n")
+    with open(os.path.join(ldir, "src", "mod", "u.c"), "w", encoding="utf-8") as fh:
+        fh.write("void u(void *p) {\n    *(u32*)p = 0;\n}\nvoid v(void *q);\n")
     with open(os.path.join(ldir, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8") as fh:
         fh.write("fn_80040598 = .text:0x1000; // type:function\n"
                  "fn_80040599 = .text:0x1010; // type:function\n"
@@ -422,7 +427,7 @@ def selftest() -> int:
     lit = {i.kind: i for i in bl.collect_lint_items(ldir)}
     check("the lint source files one item per (file, rule)",
           sorted((i.kind, i.target) for i in bl.collect_lint_items(ldir)),
-          [("band-header", "src/mod/b.c"), ("naming", "src/mod/a.c")])
+          [("band-header", "src/mod/b.c"), ("naming", "src/mod/a.c"), ("untyped", "src/mod/u.c")])
     check("the naming item carries its rule-7 count as its weight", lit["naming"].weight, 2)
     check("the naming ask names the file, the rule and the count",
           ("src/mod/a.c" in lit["naming"].ask and "rule-7" in lit["naming"].ask
@@ -430,6 +435,9 @@ def selftest() -> int:
     check("the band-header item carries its rule-2 count", lit["band-header"].weight, 1)
     check("the band-header ask names the owner-header fix",
           ("rule-2" in lit["band-header"].ask and "include" in lit["band-header"].ask), True)
+    check("the untyped item carries its rule-11 count", lit["untyped"].weight, 2)
+    check("the untyped ask names the marker fix",
+          ("rule-11" in lit["untyped"].ask and "untyped:" in lit["untyped"].ask), True)
     check("the high-traffic file leads the register (most findings first)",
           [i.kind for i in bl.build_items(bl.outbox_dir(ldir), bl.notes_dir(ldir),
                                           os.path.join(ldir, "none.md"), {},
@@ -476,6 +484,24 @@ def selftest() -> int:
           bl._check_lint(ldir, bl.Item(kind="naming", target="src/mod/gone.c", defect="rule 7",
                                        status="open", default_status="open", ask="x"),
                          {"splits": {}})[0], "stale")
+    # rule 11's triage reads `rule11_findings` (no ownership dependency), so an untyped item stays open
+    # while its `void *` parameters are there and resolves once every declaration is marked. The band case
+    # matters: `lint_source` returns early for `include/unsplit/`, so reading it here would falsely resolve.
+    un, une = bl._check_lint(ldir, lit["untyped"], {"splits": bl._splits_ranges(ldir)})
+    check("triage: an untyped item stays open while rule 11 fires", un, "open")
+    check_true("... naming the live count", "rule-11" in (une or ""))
+    with open(os.path.join(ldir, "src", "mod", "u.c"), "w", encoding="utf-8") as fh:
+        fh.write("/* untyped: opaque handle */\nvoid u(void *p) {\n    *(u32*)p = 0;\n}\n"
+                 "/* untyped: caller-owned payload */\nvoid v(void *q);\n")
+    check("triage: the untyped item is resolved once every declaration is marked",
+          bl._check_lint(ldir, lit["untyped"], {"splits": bl._splits_ranges(ldir)})[0], "resolved")
+    os.makedirs(os.path.join(ldir, "include", "unsplit"), exist_ok=True)
+    with open(os.path.join(ldir, "include", "unsplit", "mod.h"), "w", encoding="utf-8") as fh:
+        fh.write("void bandf(void *p);\n")
+    check("triage: a band-header untyped item stays open (lint_source alone would call it resolved)",
+          bl._check_lint(ldir, bl.Item(kind="untyped", target="include/unsplit/mod.h", defect="rule 11",
+                                       status="open", default_status="open", ask="x"),
+                         {"splits": bl._splits_ranges(ldir)})[0], "open")
     check("a tree with no src/ contributes no lint items", bl.collect_lint_items(tmp), [])
 
     # --- --check semantics -------------------------------------------------------------------------
