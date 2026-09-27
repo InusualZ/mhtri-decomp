@@ -1396,7 +1396,7 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(Matching, "gx/fn_8009AA78.c"),
-                        Object(NonMatching, "gx/fn_8009ACE4.c"),
+                        Object(Matching, "gx/fn_8009ACE4.c"),
         ],
     },
 
