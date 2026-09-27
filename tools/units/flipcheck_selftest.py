@@ -10,7 +10,9 @@ this file, so the contract is pinned - how a `.comment` entry maps to an ELF sym
 by name (the target and our object order their symbol tables differently), that only an *unreferenced*
 symbol is a trim risk, and that metadata sections, 0-size labels and the reverse flag direction are ignored.
 The map-symbol check is pinned on the same means: a `@etb_`/`@eti_` symbol only the target defines that
-*another* linked object references (and no input, ours included, provides) is a link break.
+*another* linked object references (and no input, ours included, provides) is reported - now as an
+informational note, because `tools/elf/objextab.py` names those symbols in the build (a current object
+provides them, and then the check is silent).
 """
 from __future__ import annotations
 
@@ -266,30 +268,32 @@ def selftest() -> int:
             fc.NINJA = saved
 
         # 12. The resfile-flip class: a map fragment only the target defines that another linked object
-        #     references, and our object cannot provide, is a link break of its own.
+        #     references, and our object cannot provide, is reported - as a note, never a refusal.
         map_tgt = write(tmp, "map_tgt2.o", target_with_flags({"@eti_A": (0xC, "extabindex", 0x13)}, {}))
         base = dict(self_refs=set(), ref_count={"@eti_A": 1}, providers={})
-        risks = fc.external_map_symbol_risks("U", map_tgt, ours_clear, **base)
+        risks = fc.external_map_symbol_notes("U", map_tgt, ours_clear, **base)
         expect("map symbol risk reported", len(risks), 1)
         expect("map symbol risk names it", ("@eti_A" in risks[0], "undefined" in risks[0]), (True, True))
         expect("map symbol risk names the class", "rename" in risks[0], True)
+        expect("map symbol risk is not a refusal", "Informational, not a refusal" in risks[0], True)
+        expect("map symbol risk names the step", "objextab.py" in risks[0], True)
 
         # 13. Only a reference from another linked object counts; the target's own relocation does not.
         expect("self-reference is not external",
-               fc.external_map_symbol_risks("U", map_tgt, ours_clear,
+               fc.external_map_symbol_notes("U", map_tgt, ours_clear,
                                             {"@eti_A"}, {"@eti_A": 1}, {}), [])
 
         # 14. Our object (or another input) already providing it means the link still resolves.
         expect("our global definition is enough",
-               fc.external_map_symbol_risks("U", map_tgt, map_tgt, **base), [])
+               fc.external_map_symbol_notes("U", map_tgt, map_tgt, **base), [])
         other = dict(base, providers={"@eti_A": {os.path.join(tmp, "other.o")}})
         expect("another provider is enough",
-               fc.external_map_symbol_risks("U", map_tgt, ours_clear, **other), [])
+               fc.external_map_symbol_notes("U", map_tgt, ours_clear, **other), [])
 
         # 15. A source-level symbol is not a map fragment, even when externally referenced and absent.
         plain = write(tmp, "plain_tgt.o", target_with_flags({"fn_A": (0x20, ".text", 0x12)}, {}))
         expect("plain symbol ignored",
-               fc.external_map_symbol_risks("U", plain, ours_clear, set(), {"fn_A": 1}, {}), [])
+               fc.external_map_symbol_notes("U", plain, ours_clear, set(), {"fn_A": 1}, {}), [])
 
     if FAILURES:
         print("\n%d check(s) FAILED" % len(FAILURES))

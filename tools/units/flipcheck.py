@@ -302,15 +302,19 @@ def link_reference_context() -> dict | None:
     return {"refs": refs, "ref_count": ref_count, "providers": providers}
 
 
-def external_map_symbol_risks(unit: str, target_rel: str, src_path: str, self_refs: set[str],
+def external_map_symbol_notes(unit: str, target_rel: str, src_path: str, self_refs: set[str],
                               ref_count: dict[str, int], providers: dict[str, set[str]]) -> list[str]:
-    """Map symbols only the target object defines that another *linked* object references.
+    """Map symbols another *linked* object references that only the target object and the map name.
 
-    `dol split` names a unit's extab/extabindex fragments after the map (`@etb_80008000`), while MWCC emits
-    the same bytes under anonymous ordinals (`@905`). If any *other* link input relocates the map name,
-    flipping the unit removes the only definition and the link fails (`undefined: '@eti_800222FC'`). The name
-    and its global binding are assembler-level output - no source or flag can set them - so this is the
-    extab/extabindex rename class (a post-compile step fixes it), not a codegen residual.
+    `dol split` names a unit's extab/extabindex fragments after the map (`@etb_80008000`), while MWCC
+    emits the same bytes under anonymous ordinals (`@905`). If any *other* link input relocates the
+    map name, flipping the unit used to leave the name undefined and the link failed with
+    `undefined: '@eti_800222FC'` - the resfile-flip class (`.pi/notes/resfile-flip.md`). **This is no
+    longer a refusal**: `tools/elf/objextab.py`, chained into every MWCC rule, renames the entries to
+    these names and sets the binding global, so a current object defines them itself (the check then
+    says nothing). It is kept as a *note* for the one case left: an object that predates that step,
+    or whose unit has no `splits.txt` entry to take the addresses from. A rename alone is not enough
+    (the binding must be global too), and no source or flag can spell the name.
 
     `target_rel`, `self_refs`, `ref_count` and `providers` are all keyed by the link's MAIN-relative paths.
     """
@@ -330,13 +334,15 @@ def external_map_symbol_risks(unit: str, target_rel: str, src_path: str, self_re
     if not hits:
         return []
     subject = "it" if len(hits) == 1 else "them"
-    return ["map symbol(s) %s are defined only in the target object that `dol split` synthesises, and another "
-            "*linked* object references %s. Our object emits the same fragment(s) under MWCC's anonymous "
-            "local names, so after a flip nothing defines %s and the link fails with `undefined: '%s'`. The "
-            "names and their global bindings are assembler-level output no source or flag change can set "
-            "(our object and the target agree byte-for-byte in extab/extabindex) - the extab/extabindex "
-            "rename class, not a codegen residual; the fix is a post-compile rename step "
-            "(.pi/notes/resfile-flip.md)." % (", ".join(hits), subject, subject, hits[0])]
+    return ["map symbol(s) %s are defined only by the target object that `dol split` synthesises, and "
+            "another *linked* object references %s, so our object would have to define %s: MWCC emits "
+            "the same fragment(s) under anonymous ordinal names and no source or flag can spell the "
+            "map's. The extab/extabindex rename step (`tools/elf/objextab.py`, chained after objalign "
+            "in every MWCC rule) renames them and sets the binding global - so this object was built "
+            "without that step (or its unit has no splits.txt entry); a flip now would fail with "
+            "`undefined: '%s'`. Informational, not a refusal: the resfile-flip class "
+            "(.pi/notes/resfile-flip.md) is fixed in the build."
+            % (", ".join(hits), subject, subject, hits[0])]
 
 
 def comment_trim_risks(unit: str, obj_path: str, src_path: str,
@@ -426,12 +432,13 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
         notes.append(".comment: no un-exported symbol at deadstrip risk (row 36, %d target-exported symbol(s) "
                      "checked)" % checked)
 
-    # a flip can only provide what our object defines: a map symbol another linked object references, that only
-    # the target object defines, is a hard link break no codegen work can fix (the resfile-flip class).
+    # a flip can only provide what our object defines: a map symbol another linked object references, that
+    # only the target object defines, used to be a hard link break (the resfile-flip class).  The build's
+    # extab/extabindex rename step (tools/elf/objextab.py) now provides those names, so this is a note.
     target_rel = os.path.normpath(os.path.join("build", "RMHE08", "obj", unit + ".o"))
     if link_ctx is not None:
         if target_rel in link_ctx["refs"]:
-            problems += external_map_symbol_risks(
+            notes += external_map_symbol_notes(
                 unit, target_rel, os.path.join(SRC, unit + ".o"),
                 link_ctx["refs"].get(target_rel, set()), link_ctx["ref_count"], link_ctx["providers"])
         else:

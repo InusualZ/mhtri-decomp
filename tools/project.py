@@ -716,6 +716,29 @@ def generate_build_ninja(
     ):
         mwcc_implicit_list.append(objalign)
 
+    # Exception-table name normalisation, appended to every MWCC rule after the alignment step.
+    # `dtk dol split` names the extab/extabindex entries it synthesises after the map address they
+    # occupy (`@etb_800093A8`, `@eti_800222FC`); MWCC emits the same bytes under its anonymous
+    # ordinals (`@905`) with a local binding.  A unit that is `Matching` is then the only definition
+    # of the map's name, and a link input that relocates it makes `mwldeppc` fail with
+    # `undefined: '@eti_800222FC'` - 18 of the registered units own such a symbol.  objextab renames
+    # the entry symbols to the map's spelling and sets their binding global (the name alone is not
+    # enough); it writes only `.symtab`/`.strtab`, so the object's bytes - and the DOL - cannot move.
+    # Evidence: tools/elf/objextab.py (selftest), .pi/notes/resfile-flip.md and docs/matching.md.
+    objextab = Path("tools") / "elf" / "objextab.py"
+    objextab_cmd = f" && $python {objextab} $out"
+    mwcc_cmd += objextab_cmd
+    mwcc_sjis_cmd += objextab_cmd
+    mwcc_extab_cmd += objextab_cmd
+    mwcc_sjis_extab_cmd += objextab_cmd
+    for mwcc_implicit_list in (
+        mwcc_implicit,
+        mwcc_sjis_implicit,
+        mwcc_extab_implicit,
+        mwcc_sjis_extab_implicit,
+    ):
+        mwcc_implicit_list.append(objextab)
+
     # MWLD
     mwld = compiler_path / "mwldeppc.exe"
     mwld_cmd = f"{wrapper_cmd}{mwld} $ldflags -o $out @$out.rsp"
