@@ -144,11 +144,13 @@ is not measured), so measure it yourself before you report.
   entry is exactly what the claim is for, and it is what lets you flip the unit; a *shared* entry can be
   neither claimed nor named in source - write the measured blocker in the unit header, report it, claim nothing.
 * **Never spell out a symbol another unit owns** (rule 2): declare it in that unit's header and `#include` it.
-* **Encouraged, and the reason this section exists**: if the unit's code is at 100 % and the only remaining gap
-  is a data section your object emits (a private pool entry, an unclaimed `.data`/`.ctors` run), finish it in
-  this lane - claim it (or drop the definition), re-split, flip to `Object(Matching)`, and let the
-  orchestrator's gate prove the DOL hash. That is how `ef/fn_80101DF4` landed as `Matching` (data 20/20 ->
-  28/28).
+* **Required - not "once the code is at 100 %"**: the data a unit's own functions reference and own - its
+  private pool entries, its jump tables, its `__FILE__` strings, its tables - is claimed **in the registration
+  commit** and emitted by its source, in the same change that writes the bodies. An `extern` for data your unit
+  owns is a defect: the object is then not the target object, `matched_data` stays at zero, and the unit can
+  never flip. Deciding the claim belongs to the registration, not to a later lane. Claim the ranges (`start:`/
+  `end:` per section), re-split, and let the orchestrator's gate prove the DOL hash - that is how
+  `ef/fn_80101DF4` landed as `Matching` (data 20/20 -> 28/28).
 * **Report the numbers**: the unit's per-section gap before/after (sections and bytes), and whether
   `python tools/units/datagap.py --flip-blockers` lists this unit. A data blocker you leave behind goes in the
   unit header's residual list, not only in your message.
@@ -158,6 +160,14 @@ is not measured), so measure it yourself before you report.
     rm -f build/RMHE08/ok && ninja -k 0          # must end with zero FAILED targets
     rm -f build/RMHE08/ok && ninja build/RMHE08/ok   # then: build/RMHE08/main.dol: OK
     python tools/units/stylelint.py --diff main  # must add no new section 6.5 violation
+    python tools/units/datagap.py --unit <stem>  # data: no `ours-extra` row, and no `target-extra` row for a
+                                                 # section your splits block claims (see *Data*)
+
+The data row is not optional and not a later lane's work. `ours-extra` means your source emits a section the
+original TU did not own - drop the definition, or restructure the source (playbook 29/58). `target-extra` on a
+section you claim means your source does not emit what the target has - write the definitions. A unit whose
+registration claims `.text` but no data section while its bodies load a private pool, a jump table or a `__FILE__`
+string has simply not been registered yet: claim those ranges and emit them.
 
 The lint compares the tree against a ref. It now includes **untracked** files, but if a verdict ever fails
 to mention the new unit you just wrote, that is the blind spot this line exists for: `git diff` cannot see

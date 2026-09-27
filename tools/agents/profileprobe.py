@@ -103,6 +103,9 @@ def main(argv):
             print("        one-copy __FILE__ string is decisive (cited on both sides of an edge => that edge is")
             print("        FALSE), .data pins are candidates only, and a fragment is REPORTED - never patched")
             print("        with a local literal or a re-declared symbol")
+            print("      - the DATA SECTIONS are part of the registration, not a later lane: claim + emit the unit's")
+            print("        own pool entries / jump tables / __FILE__ strings, an extern for data the unit owns is a")
+            print("        defect, and the mandatory datagap row (no ours-extra; no target-extra on a claimed one)")
         if a == "merger":
             print("      - union only configure.py + splits.txt; a HEADER gets a hand union")
             print("      - the zero-rows-moved proof")
