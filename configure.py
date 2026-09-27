@@ -285,7 +285,8 @@ cflags_g3d = [
     "-Cpp_exceptions on",
 ]
 
-# Network and OS flags (src/Network/NetworkWiiMediator.c, src/OS/OSAlarm.c): cflags_base + -func_align 4.
+# Network and OS flags (src/Network/NetworkWiiMediator.cpp - formerly the 20-byte NetworkWiiMediator.c,
+# retired by the worker/net-capcom batch - and src/OS/OSAlarm.c): cflags_base + -func_align 4.
 # Evidence: both retail objects are `.text align 2**2`, while cflags_base's -O4,p implies -func_align 16, which
 # is what our objects emit. Flipping NetworkWiiMediator with that alignment made the linker round the object's
 # start up to the next 16-byte boundary: `dtk dol diff` reported fn_80413F3C expected at 0x80413F3C but found at
@@ -2146,13 +2147,29 @@ config.libs = [
         "cflags": cflags_network,
         "host": False,
         "objects": [
-            Object(Matching, "Network/NetworkWiiMediator.c"),
+            # Registered once, at its final home (docs/plan.md 12), the Capcom `Network` reconnaissance
+            # lane (branch worker/net-capcom).  Five units, all `Object(NonMatching, ...)`:
+            #   Network/initNetworkSessionStable.cpp     .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
+            #   Network/network_state.cpp              .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
+            #   Network/NetworkWiiMediator.cpp         .text 0x80413C64..0x804155D4 (6490 B, 79 fn)
+            #   Network/constructNetworkWiiMediator.cpp  .text 0x80418988..0x804189C8 (64 B, 1 fn)
+            #   Network/NetworkPat.cpp                 .text 0x80419EC4..0x8041A170 (328 B, 11 fn)
+            # The *seams*: NetworkWiiMediator's left edge 0x80413C64 is the lane's only two-signal
+            # (strong) cut (`.data` jumptable run jump); every other edge is the weak closure edge and
+            # is recorded as unproven in each file's header.  `Network/NetworkWiiMediator.cpp` folds in
+            # the retired `Network/NetworkWiiMediator.c` (`fn_80413F3C` at 0x80413F3C) so the whole
+            # class band has one owner; the fold-in is part of this batch, not a later one.
+            Object(NonMatching, "Network/initNetworkSessionStable.cpp"),
+            Object(NonMatching, "Network/network_state.cpp"),
+            Object(NonMatching, "Network/NetworkWiiMediator.cpp"),
+            Object(NonMatching, "Network/constructNetworkWiiMediator.cpp"),
+            Object(NonMatching, "Network/NetworkPat.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803D3CE8_fn_803D3CE8.cpp` (`.text` 0x803D3CE8..0x803D70B8, 101 functions / 13264 B) -
             # the Network session band: `NetworkSessionStable`'s op-code packet writers, the
             # `NetworkSessionManager` request pool/state machine and the first `NetworkSessionManagerPat`
             # virtual slots.  Module `Network` from the class names and the registered neighbour
-            # `Network/NetworkWiiMediator.c`; no `__FILE__` string and only `zz_` dump names cover the
+            # `Network/NetworkWiiMediator.cpp`; no `__FILE__` string and only `zz_` dump names cover the
             # range, and the tile spans more than one original TU, so the file keeps the map stem
             # (brief section 2, class 3 module + class 4 name).  C++ (mangled `__nw__FUl`/`__dl__FPv`),
             # exceptions off, so `.text` only.  The seam is unproven (discovery byte cap).
@@ -2163,7 +2180,7 @@ config.libs = [
             # the same source scores fn_803D53B0 59.79 % at `-O4,p` and 95.15 % at `-O3`, fn_803D4904
             # 70.42 % -> 93.24 %, fn_803D3CE8 81.63 % -> 92.23 %.  `-func_align 4` is kept (the 4-byte
             # functions `fn_803D4B5C`/`fn_803D5D64` prove it).  This is the object's cflags, not the lib's:
-            # the sibling `NetworkWiiMediator.c` is byte-identical at `-O4,p`.
+            # the sibling `NetworkWiiMediator.cpp` is byte-identical at `-O4,p`.
             Object(NonMatching, "Network/fn_803D3CE8.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Registered once, at its final home (docs/plan.md 12): proposal

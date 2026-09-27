@@ -23,6 +23,7 @@
 
 #include "types.h"
 #include "unsplit/Network.h"
+#include "Network/network_state.h"
 
 /* the records the two interface classes take pointers to, defined further down */
 struct GameSpyPeerId;

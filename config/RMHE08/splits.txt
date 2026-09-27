@@ -1279,8 +1279,30 @@ Network/fn_803D3CE8.cpp:
 	extabindex  start:0x8003A524 end:0x8003A8B4
 	.text       start:0x803D3CE8 end:0x803D70B8
 
-Network/NetworkWiiMediator.c:
-	.text       start:0x80413F3C end:0x80413F50
+Network/initNetworkSessionStable.cpp:
+	extab       start:0x8001A630 end:0x8001A648
+	extabindex  start:0x8003AB9C end:0x8003ABA8
+	.text       start:0x803DEA30 end:0x803DEB38
+
+Network/network_state.cpp:
+	extab       start:0x8001BD9C end:0x8001BE24
+	extabindex  start:0x8003C06C end:0x8003C138
+	.text       start:0x803FE8E4 end:0x804006A8
+
+Network/NetworkWiiMediator.cpp:
+	extab       start:0x8001CA4C end:0x8001CBF4
+	extabindex  start:0x8003D2F0 end:0x8003D524
+	.text       start:0x80413C64 end:0x804155D4
+
+Network/constructNetworkWiiMediator.cpp:
+	extab       start:0x8001CE34 end:0x8001CE4C
+	extabindex  start:0x8003D800 end:0x8003D80C
+	.text       start:0x80418988 end:0x804189C8
+
+Network/NetworkPat.cpp:
+	extab       start:0x8001CF70 end:0x8001CF88
+	extabindex  start:0x8003D92C end:0x8003D950
+	.text       start:0x80419EC4 end:0x8041A170
 
 Network/fn_8041A87C.cpp:
 	extab       start:0x8001CFF0 end:0x8001D16C
