@@ -39,6 +39,10 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   where the findings are - and never its trailing "not enforced: ..." legend, which on 2026-09-25 made a FAIL
   row read as a pass (`.pi/land.log`: `FAIL style lint (§6.5) adds no violation - (temporary grandfather:
   legacy scaffolding with bodies, ...)`);
+* runs `tools/selftest.py` - the one runner for every tool's `--selftest` and every `*_selftest.py`, parked
+  pre-existing failures aside - as the "all tool selftests pass" row, so a tool's own test that nothing runs
+  cannot hide (the `measure_selftest.py` was red for weeks while 31 lanes filed "recompile.py is broken"
+  incident); `--no-selftests` is the fast path.
 * refreshes the baseline afterwards (7.16), so `ninja changes` compares against the batch that just landed;
 * and **releases the claim of every unit it just gated** (owner's rule, "Teardown is part of landing"): a
   landed unit must not leave a worktree, a merged branch or a registry entry behind. A release that is
@@ -47,11 +51,11 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
 
     python tools/units/land.py record-base [--json]
     python tools/units/land.py land --units a,b [--base SHA] [--no-build] [--no-outbox] [--no-release]
-                                  [--already-applied]
+                                  [--no-selftests] [--already-applied]
     python tools/units/land.py land --branch worker/<slug> [--units a,b] [--base SHA] [--no-build]
-                                  [--no-outbox] [--no-release] [--message SUBJECT]
+                                  [--no-outbox] [--no-release] [--message SUBJECT] [--no-selftests]
     python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-outbox]
-                                  [--no-release] [--allow-regression UNIT]
+                                  [--no-release] [--allow-regression UNIT] [--no-selftests]
     python tools/units/land.py resolve --branch worker/<slug> [--worktree PATH] [--main PATH] [--base SHA]
                                   [--no-commit] [--json]
 
@@ -410,6 +414,32 @@ def command_detail(p: subprocess.CompletedProcess, limit: int = 300) -> str:
     if not lines:
         return "no output (exit %d)" % p.returncode
     return "exit %d: %s" % (p.returncode, "; ".join(lines[:2])[:limit])
+
+
+def selftest_detail(p: subprocess.CompletedProcess) -> str:
+    """A one-line reason from `tools/selftest.py --json`, so the gate NAMES the failing tool.
+
+    `command_detail` reports the *head* of a command's output, which for the selftest table is its header and
+    first data row - the failures are printed below the table. Parse the runner's own JSON instead and name
+    them, so the gate's refusal says which tool's selftest failed rather than showing a table header.
+    """
+    if p.returncode == 0:
+        return ""
+    try:
+        data = json.loads(p.stdout or "")
+    except ValueError:
+        return command_detail(p)
+    parts = []
+    bad = [f["name"] for f in (data.get("failures") or [])]
+    if bad:
+        more = " (+%d more)" % (len(bad) - 6) if len(bad) > 6 else ""
+        parts.append("failed: " + ", ".join(bad[:6]) + more)
+    stale = data.get("stale_parks") or []
+    if stale:
+        parts.append("stale park: " + ", ".join(stale[:3]))
+    if data.get("tree_clean") is False:
+        parts.append("a selftest changed the tree: " + ", ".join((data.get("tree_offenders") or [])[:3]))
+    return "exit %d: %s" % (p.returncode, "; ".join(parts) or command_detail(p))
 
 
 def land_decision(gate_ok: bool, stageable: list[str],
@@ -1008,7 +1038,7 @@ def apply_branch(main: str, branch: str, base: str | None = None
 def land_branch(main: str, branch: str, units: list[str] | None = None, base: str | None = None,
                 no_build: bool = False, allow_regression: list[str] | None = None,
                 check_outbox: bool = True, release_claims: bool = True,
-                subject: str | None = None) -> int:
+                subject: str | None = None, no_selftests: bool = False) -> int:
     """The one-command landing: clean tree -> record-base -> apply+union -> gate -> commit -> release.
 
     Idempotent and loud: every refusal prints one `REFUSED <branch> | <reason>` line (stdout) and leaves
@@ -1055,7 +1085,8 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
         print("REFUSED %s | %s (the apply was undone; main is unchanged)" % (branch, why))
         return 1
     code = land(main, norm, None, no_build, allow_regression, check_outbox=check_outbox,
-                release_claims=release_claims, subject=subject, branch=branch)
+                release_claims=release_claims, subject=subject, branch=branch,
+                no_selftests=no_selftests)
     if code != 0 and git(["rev-parse", "HEAD"], main).strip() == head_before:
         # the gate refused before committing: undo the apply so a refused landing is not a half-landing
         ug.cleanup_applied(main, applied_base, branch)
@@ -1899,7 +1930,7 @@ def compile_check(main: str, units: list[str], runner=None) -> tuple[bool, str]:
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, check_outbox: bool = True,
            release_claims: bool = True, problems: list[str] | None = None,
-           branch: str | None = None) -> int:
+           branch: str | None = None, no_selftests: bool = False) -> int:
     # `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check> [<KIND>]: <what
     # it printed> (remedy: ...)"` per failed check, so its refusal can name the gate and its kind instead of
     # saying only "the gate failed". `verify`'s
@@ -1997,7 +2028,27 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     else:
         check("style lint (§6.5)", True, info="not built yet (roadmap 7.21) - skipped")
 
-    # 4b. the registration boundary (Backlog #1): a range this batch registers makes the symbols inside it
+    # 4b. every tool's own selftest, except the explicitly parked pre-existing failures. The 2026-09-27
+    # incident: `measure_selftest.py` was red for weeks while 31 lanes filed "recompile.py is broken" - the
+    # tool's own test said so and nothing ran it. `tools/selftest.py` runs both shapes (`*_selftest.py` and
+    # `<tool> --selftest`), in parallel with a per-test timeout, and reports "green except N parked" against
+    # `tools/selftests-known-failures.json`, so one old red cannot hide every new one.
+    selftests = os.path.join(main, "tools", "selftest.py")
+    if no_selftests:
+        check("all tool selftests pass (except the parked list)", True,
+              info="--no-selftests (fast path) - the suite did not run")
+    elif os.path.exists(selftests):
+        p = run([sys.executable, selftests, "--json"], main)
+        check("all tool selftests pass (except the parked list)", p.returncode == 0,
+              selftest_detail(p),
+              remedy="fix the named tool's selftest, or park a *pre-existing* failure in "
+                     "tools/selftests-known-failures.json with a reason and a date (explicit and greppable, "
+                     "never a silent skip); `python tools/selftest.py --changed` is a lane's fast loop")
+    else:
+        check("all tool selftests pass (except the parked list)", True,
+              info="tools/selftest.py not built yet")
+
+    # 4c. the registration boundary (Backlog #1): a range this batch registers makes the symbols inside it
     # owned, so a declaration of one of them still sitting in `include/unsplit/<band>.h` is now a rule-2
     # violation - and the `(10505) illegal overloading` a mismatched signature costs a full build to show.
     # This is an ADDITIONAL signal: it is a WARNING, never a failed check, because a compatible
@@ -2235,7 +2286,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
 def land(main: str, units: list[str], base: str | None, no_build: bool,
          allow_regression: list[str] | None = None, check_outbox: bool = True,
          release_claims: bool = True, subject: str | None = None,
-         already_applied: bool = False, branch: str | None = None) -> int:
+         already_applied: bool = False, branch: str | None = None,
+         no_selftests: bool = False) -> int:
     """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
 
     The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
@@ -2284,7 +2336,8 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     with contextlib.redirect_stdout(sys.stderr):
         gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
                          allow_regression=allow_regression, check_outbox=check_outbox,
-                         release_claims=False, problems=gate_failures, branch=branch) == 0
+                         release_claims=False, problems=gate_failures, branch=branch,
+                         no_selftests=no_selftests) == 0
     rows = changed_status(main)
     outside = outside_batch([path for _code, path in rows])
     scratch = scratch_paths(outside)
@@ -2460,6 +2513,25 @@ def selftest() -> int:
           "WARNING: the index holds 1 path outside this batch - left staged, not committed: "
           "tools/units/langcheck.py")
     check("... and pluralises two", foreign_warning(["a", "b"]).count("paths"), 1)
+
+    # the gate's "all tool selftests pass" row: `tools/selftest.py --json` is parsed so the refusal NAMES the
+    # failing tool - `command_detail`'s head would show the table header, not the reason.
+    def _stp(code, stdout):
+        return subprocess.CompletedProcess(["selftest"], code, stdout, "")
+
+    check("a green selftest row is silent", selftest_detail(_stp(0, "")), "")
+    _red = json.dumps({"failures": [{"name": "tools/flags/infer"}], "stale_parks": [],
+                       "tree_clean": True})
+    check("a red selftest row names the failing tool",
+          "tools/flags/infer" in selftest_detail(_stp(1, _red)), True)
+    _stale = json.dumps({"failures": [], "stale_parks": ["tools/units/wtsafe"], "tree_clean": True})
+    check("... and a stale park", "stale park: tools/units/wtsafe" in selftest_detail(_stp(1, _stale)), True)
+    _dirty = json.dumps({"failures": [], "stale_parks": [], "tree_clean": False,
+                         "tree_offenders": ["?? tools/x"]})
+    check("... and a selftest that changed the tree",
+          "changed the tree" in selftest_detail(_stp(1, _dirty)), True)
+    check("unparseable output falls back to the head",
+          "boom" in selftest_detail(_stp(1, "boom")), True)
 
     # the 2026-09-25 `d910.json` defect. An objdiff `diff` dump from the repo root is outside the guard's
     # allowed set, so `outside_batch` still classifies it - the tolerance is a deliberate carve-out *at the
@@ -2847,7 +2919,7 @@ def selftest() -> int:
         """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
 
         def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                        release_claims=True, problems=None, branch=None):
+                        release_claims=True, problems=None, branch=None, no_selftests=False):
             write(main)
             if problems is not None:
                 problems.extend(gate_problems)
@@ -3692,7 +3764,8 @@ def selftest() -> int:
         check("clean-tree: a LOCAL-ONLY-only AGENTS.md is not dirty", require_clean_tree(tmp), None)
 
     def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
-                        check_outbox=True, release_claims=True, problems=None, branch=None):
+                        check_outbox=True, release_claims=True, problems=None, branch=None,
+                        no_selftests=False):
         write_land_message(main, "land: %s\n\nledger: (fixture)\n" % ",".join(units))
         return 0
 
@@ -3866,6 +3939,9 @@ def main() -> int:
                    help="do not release the batch's claims")
     v.add_argument("--allow-regression", action="append", default=[],
                    help="unit whose measured regression is authorised by a rule (recorded in the message); repeatable")
+    v.add_argument("--no-selftests", action="store_true", dest="no_selftests",
+                   help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
+                        "--changed` is the narrower lane loop)")
     v.add_argument("--json", action="store_true")
     ld = sub.add_parser("land", help="gate + stage + commit + release; one answer line, exit status is the answer")
     ld.add_argument("--base", default=None, help="expected main HEAD (default: the recorded base)")
@@ -3881,6 +3957,9 @@ def main() -> int:
                     help="commit without releasing the batch's claims")
     ld.add_argument("--allow-regression", action="append", default=[],
                     help="unit whose measured regression is authorised by a rule; repeatable")
+    ld.add_argument("--no-selftests", action="store_true", dest="no_selftests",
+                    help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
+                         "--changed` is the narrower lane loop)")
     ld.add_argument("--message", default=None, help="override the gate message's subject line")
     ld.add_argument("--already-applied", action="store_true", dest="already_applied",
                     help="the batch was applied before `record-base` ran, so its paths are in the base's "
@@ -3917,21 +3996,23 @@ def main() -> int:
             return 1
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
-                      check_outbox=not args.no_outbox, release_claims=not args.no_release)
+                      check_outbox=not args.no_outbox, release_claims=not args.no_release,
+                      no_selftests=args.no_selftests)
     if args.cmd == "land":
         if args.branch:
             units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
             return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
                                check_outbox=not args.no_outbox, release_claims=not args.no_release,
-                               subject=args.message)
+                               subject=args.message, no_selftests=args.no_selftests)
         if not args.units:
             print("REFUSED | land needs --units a,b or --branch worker/<slug>")
             return 1
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
-                    subject=args.message, already_applied=args.already_applied)
+                    subject=args.message, already_applied=args.already_applied,
+                    no_selftests=args.no_selftests)
     if args.cmd == "resolve":
         main = args.main or rc.main_root(rc.worktree_root())
         if args.worktree:
