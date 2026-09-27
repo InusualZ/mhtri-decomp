@@ -1002,7 +1002,7 @@ def _run_teardown(steps: list[dict]) -> bool:
 
 
 def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=None,
-            lister=None) -> dict:
+            lister=None, branch: str | None = None) -> dict:
     """The one-shot teardown of a claim: rescue ref, pane close, worktree, branch, prune, registry, ack.
 
     Idempotent and total (docs/plan.md, "Teardown is part of landing"): every step reports what it did or why
@@ -1018,15 +1018,36 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
     Every pane the claim owns is closed, not just the worker's own: a subagent's pane has no other owner and
     outlives its parent (`panes_for_claim`). `probe`, `close` and `lister` exist for the selftests; all three
     default to the real herdr layer.
+
+    `branch` names the claim by its branch instead of by its unit (see the comment in the body): the two agree
+    for a claim `claim` made itself, and differ exactly when a unit has been claimed twice.
     """
     unit = norm_unit(unit.strip("/"))
     registry = load_registry(main)
-    key = registry_key(registry, unit)
+    if branch:
+        # A *branch* selector (2026-09-27). One unit can carry two claims and the registry records only one of
+        # them - usually the older - so `release <unit>` can only ever tear down that one, and a superseded
+        # branch stays behind (the drain's `ef/eft050` resolved to `worker/eft050-2fd7`, not to the branch that
+        # held the work). Naming the branch releases the claim that actually holds it, registry entry or not:
+        # `unit` is whatever the registry records for *that* branch, and an unregistered branch keys its outbox
+        # and rescue ref off its own slug - the name a worker writes them under.
+        key = next((k for k, v in registry.items() if v.get("branch") == branch), None)
+        unit = key or (slug_of_branch(branch) or branch)
+    else:
+        key = registry_key(registry, unit)
+        branch = (registry.get(key, {}) if key else {}).get("branch") or branch_for(unit)
     record = registry.get(key, {}) if key else {}
-    branch = record.get("branch") or branch_for(unit)
-    path = record.get("worktree") or worktree_for(unit, main)
+    path = record.get("worktree")
+    if not path:
+        # the worktree git has checked out for this branch, else the path its slug predicts
+        entry = next((e for e in rc.main_worktree_list(main) if e.get("branch") == branch), None)
+        path = (entry or {}).get("path") or worktree_for(unit, main)
+    # the outbox and the notes are keyed by the *branch* slug (`handoff_slug`), which is also the fallback for a
+    # branch the registry does not know
+    handoff = slug_of_branch(branch) or slug(unit)
     ack_file = ack_path(main, unit)
-    outbox = os.path.exists(outbox_path(main, unit))
+    outbox_file = os.path.join(main, ".pi", "outbox", handoff + ".json")
+    outbox = os.path.exists(outbox_file)
     branch_present = branch_exists(main, branch)
     merged = merged_into_main(main, branch) if branch_present else True
     result = {"unit": unit, "branch": branch, "worktree": path, "merged": merged, "outbox": outbox,
@@ -1038,7 +1059,7 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
         result["refused"] = ("%s's branch %s is neither merged into main nor has an outbox entry at\n  %s\n"
                              "  releasing it would drop work with no record. Finish the handoff, or pass "
                              "--force (the branch is deleted; its commits are rescued to %s)."
-                             % (unit, branch, outbox_path(main, unit), rescue_ref_name(unit)))
+                             % (unit, branch, outbox_file, rescue_ref_name(unit)))
         return result
 
     # the pane is asked before anything is touched: a live one is the one real refusal, and closing it has to
@@ -1054,7 +1075,7 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
 
     # a subagent runs in its own pane and nothing owns that pane when its parent finishes: gather every pane
     # whose label starts with the claim's slug so teardown closes the grandchildren too (2026-09-23).
-    slug_hint = claim_slug(main, unit) or slug(unit)
+    slug_hint = handoff
     panes = (lister or herdr_panes)()
     child_panes = [p for p in panes_for_claim({"worktree": path, "pane": record.get("pane")}, panes,
                                               slug_hint) if p != pane]
@@ -1778,6 +1799,32 @@ def selftest() -> int:
         check("... the unmerged branch is kept", branch_exists(main, open_branch), True)
         check("... the unmerged worktree is kept", os.path.isdir(open_wt), True)
 
+    # a branch selector: one unit can carry two claims and the registry records only one of them - usually the
+    # older - so `release <unit>` can only ever tear down that one (2026-09-27, the drain's `ef/eft050`)
+    with tempfile.TemporaryDirectory() as tmp:
+        main = new_repo(tmp)
+        old_branch, old_wt = claimed(main, unit)
+        second_branch = "worker/8033f270-second-claim"
+        second_wt = os.path.join(os.path.dirname(main), os.path.basename(main) + ".ws-second")
+        repo_git(main, "worktree", "add", "-b", second_branch, second_wt)
+        repo_commit(second_wt, "the second claim's work")
+        # the worker names its outbox by its own branch slug, which is what a branch selector looks for
+        json.dump({"unit": unit}, open(os.path.join(main, ".pi", "outbox",
+                                                    slug_of_branch(second_branch) + ".json"), "w"))
+        out = release("", main, force=False, dry_run=True, probe=no_pane, branch=second_branch)
+        check("a branch selector resolves that branch, not the registry's", out["branch"], second_branch)
+        check("... and finds the outbox the worker named by its branch", out["outbox"], True)
+        check("... while the registry's older claim is untouched", branch_exists(main, old_branch), True)
+        done = release("", main, force=False, dry_run=False, probe=no_pane, branch=second_branch)
+        check("... and it tears that branch down", done["complete"], True)
+        check("... deleting only the named branch", branch_exists(main, second_branch), False)
+        check("... and leaving the older claim's branch alone", branch_exists(main, old_branch), True)
+        check("... and its registry entry alone", unit in load_registry(main), True)
+        # a branch the registry *does* record: the unit comes from the branch, so the entry is cleaned
+        out = release("", main, force=False, dry_run=False, probe=no_pane, branch=old_branch)
+        check("a branch selector on a registered claim releases that unit", out["unit"], unit)
+        check("... and clears its registry entry", load_registry(main), {})
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1800,6 +1847,9 @@ def main() -> int:
     l.add_argument("--json", action="store_true")
     r = sub.add_parser("release", help="remove the worktree and the branch (idempotent, total)")
     r.add_argument("unit", nargs="?", default=None, help="the unit to release; omit with --all-merged")
+    r.add_argument("--branch", default=None,
+                   help="release the claim holding this branch instead of the one the registry records for the "
+                        "unit - a unit can carry two claims, and the registry keeps only one")
     r.add_argument("--all-merged", action="store_true", dest="all_merged",
                    help="sweep every claim whose branch is already merged into main")
     r.add_argument("--force", action="store_true",
@@ -1876,6 +1926,9 @@ def main() -> int:
                   % ", ".join(r["unit"] for r in stranded[:6]))
         return 0
     if args.cmd == "release":
+        if args.all_merged and args.branch:
+            print("--branch names one claim; --all-merged sweeps every finished one - pass one or the other")
+            return 2
         if args.all_merged:
             out = release_merged(main_wt, args.dry_run)
             if args.json:
@@ -1896,10 +1949,10 @@ def main() -> int:
                       % (len(out["released"]), len(out["skipped"]), len(out["refused"]),
                          "" if out["complete"] else " - the teardown is INCOMPLETE"))
             return 0 if out["complete"] else 1
-        if not args.unit:
-            print("release needs a <unit>, or --all-merged to sweep")
+        if not args.unit and not args.branch:
+            print("release needs a <unit>, --branch <name>, or --all-merged to sweep")
             return 2
-        out = release(args.unit, main_wt, args.force, args.dry_run)
+        out = release(args.unit or "", main_wt, args.force, args.dry_run, branch=args.branch)
         if args.json:
             print(json.dumps({k: v for k, v in out.items() if k != "steps"} | {
                 "steps": [{k: v for k, v in s.items() if k != "action"} for s in out["steps"]]}, indent=2))
