@@ -1798,6 +1798,13 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
     # whichever the orchestrator typed.
     units = [claims.norm_unit(u.strip("/")) for u in units]
+    # A `--units` entry that still carries a file extension after `norm_unit` (which strips only the source
+    # extensions) is a batch PATH - a tool script, an agent prompt - and not a unit: it has no `Object(...)`
+    # line, no splits.txt block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows below
+    # (outbox, branch, registration, compile, target drift) must not assert unit properties about it. It stays
+    # in `units` for the staging and ledger rows, which is how the path is committed. (2026-09-27: a tool-only
+    # batch could not land at all before this - the registration row refused every `tools/` path.)
+    unit_units = [u for u in units if not os.path.splitext(u)[1]]
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str, str, str, str]] = []
 
@@ -1837,7 +1844,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         print(tolerate_scratch(main, scratch, act=not dry_run), file=sys.stderr)
     check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad),
           info=("tool scratch tolerated (not staged): %s" % ", ".join(scratch)) if scratch else "")
-    if units and check_outbox:
+    if unit_units and check_outbox:
         # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
         # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
         ok_units, outbox_problems = outbox_units(main, units, branch=branch)
@@ -1849,13 +1856,13 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         # ref as the branch's work, and the landing path (never `--dry-run`, which touches nothing) restores
         # the real branch from it so the teardown still has a branch to release (2026-09-26 case (a)).
         if not dry_run:
-            for u in units:
+            for u in unit_units:
                 restored = restore_rescued_branch(main, u)
                 if restored:
                     print("NOTE: %s's branch %s was gone but its work is preserved at %s - restored the "
                           "branch from the rescue ref (a `--force` release had parked it there)"
                           % (u, restored, claims.rescue_ref_name(u)), file=sys.stderr)
-        uncommitted = branch_problems(main, units, branch=branch)
+        uncommitted = branch_problems(main, unit_units, branch=branch)
         check("every unit's branch carries its work as commits", not uncommitted,
               "no commits of its own on the branch (work left uncommitted in the worktree?): %s"
               % ", ".join(uncommitted),
@@ -1972,7 +1979,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # linked) and the compile gate has no `build/RMHE08/src/<unit>.o` target to scope to. Assert all
     # three axes after configure.py has regenerated the graph.
     if built:
-        ok_reg, reg_detail = vu.registration_check(main, units)
+        ok_reg, reg_detail = vu.registration_check(main, unit_units)
         check("every batch unit is registered (configure.py + splits.txt + build graph)", ok_reg,
               reg_detail,
               remedy="commit the unit's `Object(...)` line in configure.py and its splits.txt block, "
@@ -1983,7 +1990,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # batch's own `build/RMHE08/src/<unit>.o` targets - a foreign dirty object that fails is named and
     # tolerated (`compile_check`). One `ninja -k 0`; the full `ninja` below then only links.
     if built:
-        ok_compile, compile_detail = compile_check(main, units)
+        ok_compile, compile_detail = compile_check(main, unit_units)
         check("every batch unit compiles (compile gate)", ok_compile, compile_detail,
               remedy="make the batch unit's source compile (`ninja -k 0` names the error above); "
                      "`ninja build/RMHE08/ok` cannot see this because a `NonMatching` unit is never linked")
@@ -1991,7 +1998,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
     # the split target objects after the re-split: a unit the batch does not name must be byte-identical.
     after_targets = vu.target_object_snapshot(main)
-    drift = vu.target_drift_problems(before_targets, after_targets, units)
+    drift = vu.target_drift_problems(before_targets, after_targets, unit_units)
     check("no unit's split target object moved under the batch (a neighbour re-ranged)", not drift,
           "; ".join(drift[:4]),
           remedy="the batch's splits.txt re-ranged a unit it does not name; include that unit in the "
