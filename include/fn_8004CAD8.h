@@ -155,6 +155,23 @@ void fn_8004EA58(const void* entry);
  * `mulVecMatAddTrans__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34`, so C++ linkage at global scope).
  * Added with `enemy/fn_801A4504.cpp`, its consumer (rule 2/9). */
 void mulVecMatAddTrans(VEC3* v, MTX34* m);
+
+/* 0x80050990 - build an MTX34 from the Z-X-Y Euler triple `_CP_VECTOR`.  The address sits between the
+ * registered `fn_8004C9A0.cpp` and `draw_shape.cpp` units, so no unit owns it yet; the callers are
+ * `ef/eft053.cpp` and `Pl/pl_act.cpp` (which declared its own copy before this header carried it). */
+struct _CP_VECTOR;
+void cpSetRotMatrixZXY(_CP_VECTOR* rot, MTX34* mtx);
+
+/* 0x80050F80 - the squared distance between two 3-float vectors (`fn_8004CAD8.cpp`'s range).  The
+ * same signature `ai/fn_802D0F34.h` carries, so a TU including both sees one declaration.  Added
+ * with `ef/eft053.cpp`. */
+f32 fn_80050F80(const void* a, const void* b);
+
+/* 0x80050E70 - copy the engine's `Vec` into an nw4r `VEC3` (map mangling
+ * `vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec`).  Added with `ef/eft053.cpp`, whose state machines
+ * convert the family's placement-table entries. */
+struct Vec;
+void vec_to_mh_vec3(VEC3* dst, struct Vec* src);
 #endif
 
 #endif /* MHTRI_FN_8004CAD8_H */

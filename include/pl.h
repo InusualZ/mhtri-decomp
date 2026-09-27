@@ -1053,7 +1053,10 @@ struct _PLW {
     };
     /* +0x580 */ s16 unk580;
     /* +0x582 */ u8 unk582;
-    /* +0x583 */ s8 unk583;
+    /* +0x583 */ s8 shell_ang_0x583; /* the player's shell-frame angle: `ef/eft053.cpp`'s shell
+                                      * projection reads it as a signed per-frame step (its sign
+                                      * selects the 45/35 degrees it adds), and `Pl/pl_act.cpp`
+                                      * clamps its own copy of the same byte to +/-100 */
     /* +0x584 */ union {   /* the pre-merge 0x14-byte run; the fn_8024F200 unit split it at +0x596
                            * and one later unit split its head - one member per offset (M3), so the
                            * +0x584 head pair is named once, in the second view below */

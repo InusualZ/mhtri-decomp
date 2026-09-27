@@ -236,8 +236,8 @@ void fn_802EE330(_PLW* plw, u16 id, u8 anim, u8 mask, const _mh_ivec2_* pos)
     }
 }
 
-/* 0x802EF0A0 (0x5C).  Project the caller's position through `fn_80366618` and hand the 12-byte
- * result to the same-file `fn_802EEDE4` (the three word copies are the target's own shape). */
+/* 0x802EF0A0 (0x5C).  Project the caller's position through `eft053_shell_pos_project` and hand the
+ * 12-byte result to the same-file `fn_802EEDE4` (the three word copies are the target's own shape). */
 void fn_802EF0A0(_PLW* plw, void* out)
 {
     Pos12 scratch;
@@ -245,7 +245,7 @@ void fn_802EF0A0(_PLW* plw, void* out)
 
     (void)out;
     fn_80043EA8((VEC3*)&scratch);
-    fn_80366618(plw, &scratch);
+    eft053_shell_pos_project(plw, &scratch);
     pos = scratch;
     fn_802EEDE4(&pos);
 }

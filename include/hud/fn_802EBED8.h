@@ -7,10 +7,11 @@
  * `cockpit_quest.cpp` and the registered `hud/fn_80324F7C.c`).
  *
  * Rule-2 debt, recorded rather than guessed.  The callees below whose owner is a registered unit
- * (`hud/cockpit_quest.cpp`, `hud/layout.cpp`, `menu/menu_item.cpp`) are re-declared here because the
- * owner headers do not yet carry them; the fold is a `shared-file` request in this unit's outbox, not
- * this unit's edit.  The names with a bare `fn_`/`lbl_` stem are the map's own placeholders (rule 7
- * deferral in the source) and have no registered owner, so they live here until their band is cut.
+ * (`ef/eft053.cpp`, `hud/cockpit_quest.cpp`, `hud/layout.cpp`, `menu/menu_item.cpp`) are re-declared
+ * here because the owner headers do not yet carry them; the fold is a `shared-file` request in this
+ * unit's outbox, not this unit's edit.  The names with a bare `fn_`/`lbl_` stem are the map's own
+ * placeholders (rule 7 deferral in the source) and have no registered owner, so they live here until
+ * their band is cut.
  */
 #ifndef MHTRI_HUD_FN_802EBED8_H
 #define MHTRI_HUD_FN_802EBED8_H
@@ -74,9 +75,12 @@ s32 fn_802EF62C(_PLW* plw);
 void fn_802EF6B0(void);
 void fn_802EF400(QuestSel* dst, const QuestSel* src);
 
+/* ---- a callee a registered unit owns, re-declared because the owner's header is not included here
+ * (same rule-2 debt as the block below, but the name resolves: owner `ef/eft053.cpp`) ---- */
+void eft053_shell_pos_project(void* a, void* b); /* 0x80366618 */
+
 /* ---- unsplit callees whose map name is bare (C linkage), rule-2 debt ---- */
 u8 fn_803311A0(void);                       /* 0x803311A0 */
-void fn_80366618(void* a, void* b);         /* 0x80366618 */
 void fn_80053CF8(void* a, const f32* b);    /* 0x80053CF8 */
 u32 fn_802BE39C(void);                      /* 0x802BE39C */
 u8 fn_8028E4F0(void);                       /* 0x8028E4F0 */

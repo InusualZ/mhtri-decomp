@@ -14,6 +14,9 @@ extern "C" {
 
 /* 0x80056A54 - arm the draw-shape state block (`lbl_8066ACF8`). */
 void fn_80056A54(u32 a, u32 b, u32 c);
+/* 0x80056A84 - the effect step's shape request: the position, the handle and the area byte.  Added
+ * with `ef/eft053.cpp`, whose state machine fires it (`fn_80056A84(&pos, 10, area)`). */
+void fn_80056A84(const nw4r::math::VEC3* pos, u32 handle, u8 flag);
 
 #ifdef __cplusplus
 }

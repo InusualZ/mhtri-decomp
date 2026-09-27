@@ -1448,6 +1448,17 @@ config.libs = [
             # 0x800362F4..0x8003663C, `.ctors` 0x8056F3A4, `.data` 0x805E9168..0x805E91E8.  C++;
             # every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "ef/eft_slot.cpp"),
+            # Registered from proposal/80366618_fn_80366618.cpp, whose 0x80366618..0x8036CF64 range is a
+            # discovery `--max-bytes` cut.  `tudiscover.py at 0x80366618` returns a 15-function MATCH SET,
+            # 0x80366618..0x8036A690, from two must-link `lbl_8079B744` anchors; the range's private
+            # `.sdata2` run (0x8079B740..0x8079B820, no leak) ends at its last referrer `fn_80369D50`,
+            # and the next run's first referrer is `fn_8036E320`, so the TU stops at 0x8036A690 and the
+            # 0x8036A690..0x8036CF64 tail stays unclaimed (seam re-draw, see the unit's file header).
+            # Sections: extab 0x800177D4..0x80017844, extabindex 0x80037224..0x800372CC,
+            # .text 0x80366618..0x8036A690.  The runtime dump's own `eft053_get_shell_data` /
+            # `eft053_get_model_ang` name the TU (dumpmap.py), so the module is `ef`; same
+            # `cflags_main` as the two sibling units in this block.
+            Object(NonMatching, "ef/eft053.cpp"),
         ],
     },
 
