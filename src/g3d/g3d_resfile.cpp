@@ -31,10 +31,28 @@
  *
  * Reconstruction status: all 53 functions reconstructed and measured at 100.00 % (official report
  * metric) against the retired per-range split objects under build/RMHE08/obj/; the object's `.text`
- * (0xE14), `extab` (0x138) and `extabindex` (0x1D4) sizes all equal the target's.  No residual.  The
- * one codegen lever is the `.sdata` `"ref"` member-name string: it must be declared as a *sized*
- * 4-byte array (`extern char lbl_80791294[4];`) so MWCC's small-data heuristic emits the target's
- * `li rN, @sda21` form instead of `lis`/`addi` (the same lever as `g3d/g3d_anmvis.cpp`).
+ * (0xE14), `extab` (0x138) and `extabindex` (0x1D4) sizes all equal the target's and `flipcheck.py`
+ * reports READY.  The one codegen lever is the `.sdata` `"ref"` member-name string: it must be
+ * declared as a *sized* 4-byte array (`extern char lbl_80791294[4];`) so MWCC's small-data heuristic
+ * emits the target's `li rN, @sda21` form instead of `lis`/`addi` (the same lever as
+ * `g3d/g3d_anmvis.cpp`).
+ *
+ * FLIP BLOCKER - the unit stays NonMatching (measured 2026-09-27).  `Object(Matching, ...)` does not
+ * link: `undefined: '@eti_800222FC'`, referenced from `lbl_8057CED0` in `auto_07_8057C820_data.o`.
+ * That object is the unclaimed `.data` blob at 0x8057C820 and the reference is dtk's *guessed*
+ * relocation for the word at 0x8057EA88 (value 0x80022300) - packed non-pointer data whose value only
+ * lands inside the extabindex entry at 0x800222FC (so the entry is a coincidence, not a reader of
+ * it).  It resolves today only because the *target* object defines the name, and our object cannot:
+ * MWCC emits extab/extabindex entries as anonymous locals (`@377`, `@905`) with local binding, while
+ * the target object carries the map's `@etb_<addr>`/`@eti_<addr>` names and dtk marks the
+ * externally-referenced ones global (measured: target `@eti_800222FC` `st_info` 0x11, ours `@905`
+ * 0x01).  No source or `cflags_g3d` spelling reaches it - the name and the binding are assembler
+ * output, and `mwcceppc.exe -help` has no option that names or exports an extab symbol.  The fix is a
+ * build step, not the unit: renaming this object's extabindex+0x1A4 symbol to `@eti_800222FC` and
+ * setting its `.symtab` binding to global links (rc 0) and reproduces
+ * sha1 BF4850739478CAAEDFE675949EB7C28595A7FDE9.  The class is wider than this unit - 18 of 251
+ * registered units own an extab/extabindex symbol that another *linked* object references, and each
+ * becomes unlinkable on flip (this unit is the only one of today's 48 `flipcheck`-READY units).
  */
 
 #include "types.h"
