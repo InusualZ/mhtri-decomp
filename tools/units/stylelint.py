@@ -16,24 +16,26 @@ Rules checked (each finding is `file:line`):
 | # | rule | how it is decided |
 | --- | --- | --- |
 | 1 | a shared type lives in one header | the same `struct`/`class`/`union` name defined with a body in more than one `src/` file: one finding per (type, extra file), naming both files |
-| 2 | an extern lives with the TU that owns it | an `extern` declaration of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of an unsplit symbol whose address band names a module (`include/unsplit/<module>.h`); and, in `include/unsplit/*.h` itself, any declaration of a symbol a registered unit owns (that header is a fallback, not the owner) |
+| 2 | an extern lives with the TU that owns it | an `extern` declaration of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of a symbol with **no registered owner** at all (an unsplit address), which belongs in a band header under `include/unsplit/`; and, in `include/unsplit/*.h` itself, any declaration of a symbol a registered unit owns (that header is a fallback, not the owner) |
 | 3 | a reconstructed `struct`/`class` states its size | a `size: 0xNN` comment within four lines of the definition (or two lines after its closing brace) |
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
 | 6 | no pointer arithmetic reaches a field | a `(T*)base + 0xNN` / `(T*)(base + 0xNN)` cast-plus-literal-offset expression, except an offset passed straight to `memset`/`memcpy`/`memmove` (the rule's own byte-range exception) |
-| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's); **exempt per file** - see below |
+| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, `unk*` used for anything that is not a struct field (a field is rule 5's), and a `lbl_XXXXXXXX`/`loc_XXXXXXXX` data label **this unit owns**; a reference to another unit's (or an unowned) label is that unit's, never this file's; **exempt per file** - see below |
 | 8 | `goto` is forbidden | the `goto` keyword |
 | 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
 | 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
 
 Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt`
 (each registered unit's ranges): an `extern` a file declares for a symbol another registered unit owns is a
-finding - move it to that unit's header and `#include` it. An unsplit symbol (no registered owner) is judged
-the same way, into `include/unsplit/<module>.h`, but only where the module is sound: the registered bands
-interleave across modules (a `sound` unit sits inside the `ef` band), so an address whose bracketing units
-name different modules is left as a counted gap (`Ownership.gaps`) rather than a guessed header. A symbol
-missing from the map, a duplicate map row, and an address the map gives no section are gaps too. The band
-is checked as well - `include/unsplit/*.h` is a file a batch may change, and a declaration there of a
+finding - move it to that unit's header and `#include` it. A symbol with **no registered owner** (the map
+resolves it to an unsplit address) is a finding too: the local `extern` is the defect and the declaration
+belongs in a band header under `include/unsplit/`. When the registered bands interleave across modules (a
+`sound` unit sits inside the `ef` band) so no module is sound, the finding names the band directory only
+rather than guess a `<module>.h`, and the local `extern` is still wrong in the `src/` file. A symbol missing
+from the map, a duplicate map row, and an address the map gives no section stay counted gaps
+(`Ownership.gaps`) - the map cannot judge them, so they are not guessed. The band is checked as well -
+`include/unsplit/*.h` is a file a batch may change, and a declaration there of a
 symbol a registered unit owns is a finding, because the owner's typed definition collides with it
 (`(10197) illegal function overloading`); an unowned symbol stays, which is the band's purpose. A
 definition in the band is not a declaration and is left alone.
@@ -59,8 +61,17 @@ its violations are all additions - new work is held to the rules from its first 
 3. **`rule 7 deferred: <reason>`** in a comment - the durable key, and the one that covers a unit that
    already has bodies at its final `src/<module>/<name>` home: a worker's landing commit registers the
    stub and writes the bodies together, so keys 1 and 2 cannot. It is per-unit and reviewable -
-   `grep -rn "rule 7 deferred" src/` is the complete list - and key 3 defers the `fn_` half only: a bare
-   `unk*` local is nameable from its context, so it still reports.
+   `grep -rn "rule 7 deferred" src/` is the complete list - and key 3 defers the `fn_` and `lbl_` halves
+   together: a bare `unk*` identifier is nameable from its own context, so the `unk` half still reports,
+   but the data-label half stands or falls with the function half.
+
+Rule 7's `lbl_`/`loc_` half draws an **own/foreign split**, the same distinction `land.py`'s
+`rule7_defer_growth` draws for `fn_` definitions. A label whose address falls inside one of this unit's
+registered `splits.txt` ranges (resolved through `symbols.txt`, the machinery rule 2 uses) is the unit's to
+name from its context - "what it holds and where it is used" - and the map row is renamed with the source
+in the same change. A reference to **another** unit's (or an unowned) label is that unit's; making it fire
+would be ~11.7k lines of churn for data the file does not own, so it is never a finding. Key 3
+(`rule 7 deferred: <reason>`) covers a unit that cannot yet name its own data, exactly as for a function.
 
 A key is checkable from the file alone, and a **finished** unit cannot hide behind keys 2 or 3 silently:
 key 2 needs the absence of every body, and key 3 is one greppable line whose reason must name the evidence.
@@ -92,6 +103,10 @@ SRC = "src"
 # declared here collides with the owner's typed definition (MWCC `(10197) illegal function overloading`)
 # in every translation unit that includes the band.
 UNSPLIT = "include/unsplit"
+# The pseudo-module rule 2 reports when the registered bands bracketing an unsplit address name different
+# modules (a `sound` unit inside the `ef` band): no `<module>.h` is sound, so the finding names the band
+# directory instead. It is not a path component, so it cannot collide with a real module name.
+UNSPLIT_UNRESOLVED = "<band unresolved>"
 # Every shared header lives under `include/` (the unsplit band is `include/unsplit/`).  Rule 10 scans this
 # whole tree: a codegen pragma is lexically scoped to the rest of every TU that includes the header, so
 # one in the tree silently changes code that does not belong to the header's author.
@@ -109,17 +124,17 @@ EXEMPT = [(7, "src/auto/", "temporary grandfather: legacy scaffolding with bodie
 # `rule7_state` is the authority; these strings only keep the human/JSON output honest.
 RULE7_NOTES = [
     ("a file with no bodies yet", "a stub has nothing to name"),
-    ("a file declaring `rule 7 deferred: <reason>` in a comment", "per-unit and greppable; defers `fn_` only"),
+    ("a file declaring `rule 7 deferred: <reason>` in a comment", "per-unit and greppable; defers `fn_` and `lbl_`"),
 ]
 
 RULE_NAMES = {
     1: "a shared type is defined once (in the owner's header)",
-    2: "an extern lives with the TU that owns it (or include/unsplit/<module>.h)",
+    2: "an extern lives with the TU that owns it (or a header under include/unsplit/)",
     3: "struct/class states its size (/* size: 0xNN */)",
     4: "field carries its offset (/* +0xNN */)",
     5: "no field left named unkNN (pad_0xNN / unused_0xNN are the exception)",
     6: "no pointer arithmetic to reach a field",
-    7: "no fn_XXXXXXXX / bare unkNN identifier",
+    7: "no fn_XXXXXXXX / bare unkNN / owned lbl_XXXXXXXX identifier",
     8: "goto is forbidden",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
     10: "a codegen pragma lives in the TU that needs it, not in a shared header",
@@ -638,9 +653,10 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
     """Every `extern` declaration the file makes for a symbol it does not own.
 
     Three outcomes: `owned` by this file (no finding), owned by another registered unit (move the
-    declaration to that unit's header and `#include` it), or `unsplit` (move it to
-    `include/unsplit/<module>.h`). A name not in the map, a name with duplicate map rows, and an unsplit
-    address whose bracketing units name different modules are left as counted gaps rather than guessed.
+    declaration to that unit's header and `#include` it), or `unsplit` (the symbol has no registered
+    owner: move the declaration to `include/unsplit/<module>.h`, or - when the bracketing bands name
+    different modules so no module is sound - to a header under `include/unsplit/`). A name not in the
+    map and a name with duplicate map rows are left as counted gaps rather than guessed.
     """
     out = []
     for name, _pos, line in extern_declarations(src):
@@ -661,13 +677,22 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
             continue
         module = r["module"]
         if module is None:
-            ownership.gaps["unsplit: address band interleaves modules"] += 1
-            continue
+            # The band cannot place this address: the registered units bracketing it name different
+            # modules (a `sound` unit inside the `ef` band is the canonical case), so there is no sound
+            # `<module>.h` to name. The local declaration is still the defect - a symbol with no
+            # registered owner belongs in the band, not in a `src/` file - so it is reported without
+            # guessing the module header (this used to be a counted `Ownership.gaps` entry).
+            module = UNSPLIT_UNRESOLVED
         ownership.unsplit_modules[module] += 1
         ownership.unsplit_symbols.setdefault(module, set()).add(name)
-        out.append(_finding(src, 2, line,
-                            "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
-                            % (name, module)))
+        if module == UNSPLIT_UNRESOLVED:
+            out.append(_finding(src, 2, line,
+                                "`%s` has no registered owner - declare it in a header under "
+                                "`include/unsplit/`" % name))
+        else:
+            out.append(_finding(src, 2, line,
+                                "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
+                                % (name, module)))
     return out
 
 
@@ -684,6 +709,11 @@ RULE6_RE = re.compile(
 )
 RULE7_FN_RE = re.compile(r"\bfn_[0-9A-Fa-f]{8}\b")
 RULE7_UNK_RE = re.compile(r"\bunk\w*\b")
+# Rule 7's data half: dtk's stems for an unrenamed data label - `lbl_XXXXXXXX` and its `loc_XXXXXXXX`
+# sibling. The ownership index (the machinery rule 2 uses) is what tells a label THIS unit owns, which is
+# the unit's to name, from a reference to another unit's (or an unowned) label, which is that unit's and is
+# never a finding here.
+RULE7_LBL_RE = re.compile(r"\b(?:lbl|loc)_[0-9A-Fa-f]{8}\b")
 # Rule 7 key 3: the per-unit `rule 7 deferred: <reason>` declaration, matched only against the comment
 # view (see `rule7_deferral`). `[ \t]*` rather than `\s*` keeps the declaration and its non-empty reason
 # on one line, so `rule 7 deferred:` at the end of a comment cannot borrow the next line's first token,
@@ -817,8 +847,8 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
             continue
         out.append(_finding(src, 6, src.line_of(m.start()), "pointer arithmetic: `%s`" % m.group(0).strip()))
 
-    fn7_enforced, unk7_enforced = rule7_state(src)
-    if fn7_enforced or unk7_enforced:
+    fn7_enforced, unk7_enforced, lbl7_enforced = rule7_state(src)
+    if fn7_enforced or unk7_enforced or lbl7_enforced:
         def in_field(pos: int) -> bool:
             return any(a <= pos < b for a, b in field_spans)
 
@@ -829,6 +859,21 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
             for m in RULE7_UNK_RE.finditer(src.code):
                 if not in_field(m.start()):
                     out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
+        if lbl7_enforced and ownership is not None:
+            # Own/foreign split: only a data label whose address falls inside one of THIS unit's registered
+            # `splits.txt` ranges is this file's to name. A name the map does not know, or one another unit
+            # owns, is that unit's reference and is never a finding here - making it fire would be ~11.7k
+            # lines of churn for data the file does not claim. A caller with no map leaves the half
+            # unchecked rather than report every reference as if the file owned it.
+            for m in RULE7_LBL_RE.finditer(src.code):
+                name = m.group(0)
+                r = ownership.resolve(name)
+                if r is None or r["kind"] != "owned" or not _owns(src.rel, r["unit"]):
+                    continue
+                out.append(_finding(src, 7, src.line_of(m.start()),
+                                    "data label `%s` at 0x%X is this unit's (`src/%s`) - name it from "
+                                    "what it holds and where it is used, and rename the map row"
+                                    % (name, r["address"], r["unit"])))
 
     for m in RULE8_RE.finditer(src.code):
         out.append(_finding(src, 8, src.line_of(m.start()), "goto statement"))
@@ -985,6 +1030,7 @@ def unique_names(findings: list[dict]) -> dict:
         return {m.group(1) for f in findings if f["rule"] == rule and f["detail"].startswith(prefix)
                 for m in [re.search(r"`([^`]+)`", f["detail"])] if m}
     return {"fn_names": len(names(7, "auto")), "unk_identifiers": len(names(7, "bare")),
+            "label_names": len(names(7, "data")),
             "unk_fields": len(names(5, "")), "types": len(names(3, "")),
             "shared_types": len(names(1, "")), "extern_symbols": len(names(2, "")),
             "mangled_names": len(names(9, ""))}
@@ -1000,21 +1046,25 @@ def rule7_deferral(comments: str) -> bool:
     return bool(RULE7_DEFER_RE.search(_COMMENT_DELIM_RE.sub(" ", comments)))
 
 
-def rule7_state(src: "Source") -> tuple[bool, bool]:
-    """`(fn_enforced, unk_enforced)` for rule 7 in `src`, per the three keys.
+def rule7_state(src: "Source") -> tuple[bool, bool, bool]:
+    """`(fn_enforced, unk_enforced, lbl_enforced)` for rule 7 in `src`, per the three keys.
 
     1. under `src/auto/` (temporary grandfather, `EXEMPT`): the whole rule is off;
     2. no bodies yet (`brief.text_has_bodies`): the whole rule is off;
-    3. a `rule 7 deferred: <reason>` comment declaration: the `fn_` half is off, the `unk` half stays.
+    3. a `rule 7 deferred: <reason>` comment declaration: the `fn_` and `lbl_` halves are off, the `unk`
+       half stays - a bare `unk*` local is nameable from its own context.
+
+    The three flags differ only under key 3; the `lbl_` half additionally needs `ownership` to tell this
+    unit's label from another unit's (`lint_source`), so a caller with no map leaves it unchecked.
     """
     rel = src.rel.replace("\\", "/")
     if any(r == 7 and rel.startswith(prefix) for r, prefix, _why in EXEMPT):
-        return (False, False)
+        return (False, False, False)
     if not _brief.text_has_bodies(src.text):
-        return (False, False)
+        return (False, False, False)
     if rule7_deferral(src.comments):
-        return (False, True)
-    return (True, True)
+        return (False, True, False)
+    return (True, True, True)
 
 
 def rule_enforced(rule: int, rel: str, src: "Source | None" = None) -> bool:
@@ -1171,7 +1221,8 @@ def print_rule2_report(ownership: "Ownership | None") -> None:
               % (sum(ownership.unsplit_modules.values()),
                  sum(len(v) for v in ownership.unsplit_symbols.values()),
                  ", ".join("%s %d site(s)/%d symbol(s)"
-                           % (m, n, len(ownership.unsplit_symbols.get(m, ())))
+                           % ("unresolved band" if m == UNSPLIT_UNRESOLVED else m, n,
+                              len(ownership.unsplit_symbols.get(m, ())))
                            for m, n in sorted(ownership.unsplit_modules.items()))))
     for reason, n in sorted(ownership.gaps.items()):
         print("rule 2 gap: %d declaration site(s) - %s (documented, not guessed)" % (n, reason))
@@ -1192,9 +1243,10 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None) -> 
     print("")
     u = unique_names(findings)
     print("distinct names: rule 1 %d shared type(s), rule 2 %d extern symbol(s), rule 3 %d type(s), "
-          "rule 5 %d field(s), rule 7 %d fn_* + %d unk identifier(s), rule 9 %d mangled name(s)"
+          "rule 5 %d field(s), rule 7 %d fn_* + %d unk identifier(s) + %d data label(s), "
+          "rule 9 %d mangled name(s)"
           % (u["shared_types"], u["extern_symbols"], u["types"], u["unk_fields"], u["fn_names"],
-             u["unk_identifiers"], u["mangled_names"]))
+             u["unk_identifiers"], u["label_names"], u["mangled_names"]))
     print("%d finding(s) over %d unit(s), %d file(s) with findings"
           % (b["findings"], len(b["units"]), len(source_files_of(findings))))
     print_rule2_report(ownership)
@@ -1367,6 +1419,11 @@ def selftest() -> int:
                          "/* rule 7 deferred: the map has no name */\nvoid fn_80040598(void) {}\n")),
            rule_enforced(6, "src/auto/x.c"), rule_enforced(7, "src/auto\\x.c")],
           [False, False, True, True, True, False])
+    check("rule7 keys: rule7_state carries the data-label flag too",
+          [rule7_state(Source("x.c", "src/Pl/x.c", "void f(void) {}\n")),
+           rule7_state(Source("x.c", "src/Pl/x.c",
+                              "/* rule 7 deferred: the map has no name */\nvoid f(void) {}\n"))],
+          [(True, True, True), (False, True, False)])
     check("rule7 keys: the temporary src/auto/ entry is still in the table",
           [(r, p) for r, p, _w in EXEMPT], [(7, "src/auto/")])
 
@@ -1410,6 +1467,46 @@ def selftest() -> int:
               + "void fn_802B2978(u8* p) {\n    *(u32*)((u8*)p + 4) = 1;\n    goto out;\nout:\n    return;\n}\n",
               pl)],
           [4, 5, 6, 8])
+
+    # --- rule 7: the data-label half (lbl_/loc_, own/foreign split) -------------------------------
+    lbl = Ownership({"lbl_80010000": [(".data", 0x80010000, "object")],
+                     "loc_80010120": [(".data", 0x80010120, "object")],
+                     "lbl_80020000": [(".data", 0x80020000, "object")],
+                     "lbl_80030000": [(".data", 0x80030000, "object")]},
+                    {".data": [(0x80010000, 0x80010200, "mod/a.c"),
+                               (0x80020000, 0x80020100, "mod/b.c")]})
+    own_lbl = "void f(void) {\n    u32 v = (u32)lbl_80010000;\n}\n"
+    check("rule7 lbl: this unit's own lbl_ is a finding",
+          lines_of(own_lbl, 7, "src/mod/a.c", lbl), [2])
+    check("rule7 lbl: the finding names the label, its address and this unit",
+          [f["detail"] for f in lint_source(Source("x", "src/mod/a.c", own_lbl), lbl) if f["rule"] == 7],
+          ["data label `lbl_80010000` at 0x80010000 is this unit's (`src/mod/a.c`) - name it from what it "
+           "holds and where it is used, and rename the map row"])
+    check("rule7 lbl: loc_ is the same unrenamed-data stem",
+          lines_of("void f(void) {\n    u32 v = (u32)loc_80010120;\n}\n", 7, "src/mod/a.c", lbl), [2])
+    check("rule7 lbl: the owning unit's header is covered too",
+          lines_of(own_lbl, 7, "src/mod/a.h", lbl), [2])
+    check("rule7 lbl: a reference to another unit's label is clean",
+          lines_of("void f(void) {\n    u32 v = (u32)lbl_80020000;\n}\n", 7, "src/mod/a.c", lbl), [])
+    check("rule7 lbl: the same label in a non-owner file is clean",
+          lines_of(own_lbl, 7, "src/other/c.c", lbl), [])
+    check("rule7 lbl: an unowned label reference is clean",
+          lines_of("void f(void) {\n    u32 v = (u32)lbl_80030000;\n}\n", 7, "src/mod/a.c", lbl), [])
+    check("rule7 lbl: a name not in the map is clean",
+          lines_of("void f(void) {\n    u32 v = (u32)lbl_DEADBEEF;\n}\n", 7, "src/mod/a.c", lbl), [])
+    check("rule7 lbl: a foreign label with the deferral key is clean",
+          lines_of("/* rule 7 deferred: the map has no name */\nvoid f(void) {\n    u32 v = (u32)lbl_80020000;\n}\n",
+                   7, "src/mod/a.c", lbl), [])
+    check("rule7 lbl: the deferral key also covers this unit's own label",
+          lines_of("/* rule 7 deferred: the map has no name */\nvoid f(void) {\n    u32 v = (u32)lbl_80010000;\n}\n",
+                   7, "src/mod/a.c", lbl), [])
+    check("rule7 lbl: a bodyless file is exempt (key 2)",
+          lines_of("extern u32 lbl_80010000;\n", 7, "src/mod/a.c", lbl), [])
+    check("rule7 lbl: with no ownership index the half is unchecked",
+          lines_of(own_lbl, 7, "src/mod/a.c", None), [])
+    check("rule7 lbl: the advertised name is counted as a distinct label",
+          unique_names([f for f in lint_source(Source("x", "src/mod/a.c", own_lbl), lbl)
+                        if f["rule"] == 7])["label_names"], 1)
 
     # --- rule 8: goto -----------------------------------------------------------------------------
     check("rule8: goto is a violation", lines_of("void f(void) {\n    goto out;\nout:\n    return;\n}\n", 8), [2])
@@ -1519,10 +1616,15 @@ def selftest() -> int:
           ["`mid` has no registered owner - declare it in `include/unsplit/mod.h`"])
     gap = Ownership({"gap": [(".text", 0x2500, "function")]},
                     {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "other/b.c")]})
-    check("rule2: an unsplit symbol whose brackets disagree is a documented gap",
-          lines_of("extern void gap(void);\n", 2, "src/other/c.c", gap), [])
-    check("rule2: the interleaved case is counted in ownership.gaps",
-          gap.gaps["unsplit: address band interleaves modules"], 1)
+    check("rule2: an unowned symbol whose brackets disagree is a finding (no module guessed)",
+          lines_of("extern void gap(void);\n", 2, "src/other/c.c", gap), [1])
+    check("rule2: the unresolved-band detail names the band directory, not a header",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void gap(void);\n"), gap)
+           if f["rule"] == 2],
+          ["`gap` has no registered owner - declare it in a header under `include/unsplit/`"])
+    check("rule2: the unresolved band is not counted as a gap", sum(gap.gaps.values()), 0)
+    check("rule2: the unresolved band is reported under the sentinel module",
+          sorted(gap.unsplit_modules), [UNSPLIT_UNRESOLVED])
     check("rule2: extern declarations are found by the scanner",
           [n for n, _p, _l in extern_declarations(Source("x", "x.c",
               "extern void a(void);\nextern u16 b[2];\nextern void (*c)(int);\n"))], ["a", "b", "c"])
@@ -1590,6 +1692,7 @@ def selftest() -> int:
     check("budget: unique types", b["unique"]["types"], 0)
     check("budget: unique shared types", b["unique"]["shared_types"], 0)
     check("budget: unique extern symbols", b["unique"]["extern_symbols"], 0)
+    check("budget: unique data labels", b["unique"]["label_names"], 0)
     check("budget: unique mangled names", b["unique"]["mangled_names"], 0)
     check("unique: repeated sites collapse", unique_names([
         {"rule": 5, "detail": "field `unk1`"}, {"rule": 5, "detail": "field `unk1`"},
@@ -1721,7 +1824,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("  not enforced: rule 7 for %s (%s)" % (cond, why))
         else:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
-                  "(rule 2 checked where an owner resolves; rule 7 exempt per rule7_state)" % len(rels))
+                  "(rule 2 resolves every extern to an owner or the unsplit band; rule 7 exempt per "
+                  "rule7_state)" % len(rels))
         return 1 if added else 0
 
     findings = lint_all(root, ownership)
