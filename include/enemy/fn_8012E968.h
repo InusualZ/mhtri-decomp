@@ -18,18 +18,17 @@ extern "C" {
 /* 0x8012EC3C - whether the record's `field_0x89F` is 2 or 3. */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 
-/* 0x8012EC60 - whether the record's latched mode is 1 (`fn_80130A10` latches it, 0/1).  Its body
- * reads the work record from r3, and the landed call sites spell it with **no argument**
- * (`enemy/fn_801993E0.cpp`, `enemy/fn_801CA004.cpp`, `enemy/fn_8015E854.cpp`, `enemy/fn_8013BE60.c`
- * and this band's own `fn_80181E24`): they leave the record in r3 and the call must not materialise
- * one.  MWCC rejects the two spellings in one TU (`(10197) illegal function overloading`), so a unit
- * that has to pass `self` in r3 declares that overload locally instead
- * (`enemy/fn_801502C8.cpp`, `enemy/fn_8018B3B8.cpp`, `enemy/fn_80191598.cpp`,
- * `enemy/fn_801D428C.cpp`, `enemy/fn_801D80EC.cpp`, `enemy/fn_801DB8E0.cpp`).  The `(void)` spelling
- * is therefore the one this header owns - `(arg)` or a variadic `(...)` here changes every consumer's
- * code (measured: `enemy/fn_801CA004.cpp`'s `fn_801CA004` 87.77 -> 86.67, `enemy/fn_801993E0.cpp`'s
- * `fn_8019DB9C` 100 -> 93.75). */
-u32 fn_8012EC60(void);
+/* 0x8012EC60 - whether the record's latched mode is 1 (`fn_80130A10` latches it, 0/1).  The real
+ * signature takes the record: the body loads `+0x8AA` straight out of r3 (`lbz r3,2218(r3)`), and
+ * every target call site that must set r3 does so explicitly (`em_act_effect_ck`'s `mr r3,r31`).  This
+ * header owns that signature; the old `(void)` spelling was the workaround (a caller had to reach the
+ * callee through a pointer string it could not name in the header).  A lander whose target call site
+ * leaves the record already in r3 with no setup - the C handler `fn_8013BE60.c`'s `fn_8013D4C4` - is
+ * the same spelling, `fn_8012EC60(self)`, and the compiler emits no setup because r3 already holds it.
+ * If a unit's target genuinely sets nothing (it cannot name `self`), it uses a local function-pointer
+ * typedef, never a second declaration - MWCC rejects two declarations of one C symbol
+ * (`(10197)`/`(10248)`). */
+u32 fn_8012EC60(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

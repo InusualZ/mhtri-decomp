@@ -20,7 +20,12 @@
 #include "fn_8004CAD8.h"
 #include "ef/fn_800CDB2C.h"
 
-#pragma peephole off
+/* The band's `#pragma peephole off` is NOT here: a codegen pragma in a shared header leaks into every
+ * including TU, so a lane matched a file only because of the leak and another lost rows until the
+ * pragma was restated.  It belongs to the `.c`/`.cpp` that measured the dependency, and every including
+ * TU that depends on it now states it there itself: `stage/fn_802B2AA0.cpp`, `enemy/em019_prog.cpp`,
+ * `enemy/em020_ai.cpp` and `enemy/em020_prog.cpp`.  `tools/units/stylelint.py` rule 10 fails a codegen
+ * pragma in a shared header. */
 
 /* ------------------------------------------------------------------------------------------------
  * the shared types of the band

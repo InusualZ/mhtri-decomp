@@ -33,12 +33,17 @@ u16 fn_80127E78(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
 /* 0x80128A8C / 0x8012933C - this unit's own definitions (the first is defined here, the second is an
- * address inside its range).  Signatures are the owner's: `fn_80128A8C` takes two u32; `fn_8012933C`
+ * address inside its range).  `fn_80128A8C` takes two **u8** arguments: its body narrows both with
+ * `clrlwi r4,r4,24` / `clrlwi r5,r5,24` before the tail call to `fn_801285C0`.  This unit is built
+ * with `#pragma peephole off`, and under it a u8 parameter keeps that target `clrlwi` (with the pass
+ * on the pair is folded away, so the spelling is load-bearing - the same reason the unit's note gives
+ * for `fn_80128590`/`fn_801285A0`).  The narrower spelling is the one `include/enemy/fn_80165FC8.h`
+ * already carried; this header's old `u32` copy was the second, clashing declaration.  `fn_8012933C`
  * narrows its second argument to u8 itself (`clrlwi r4,r4,24` on the way into `fn_801251D8`) and the
  * owner's own body calls it `(self, (u8)a, b, 0)`.  One declaration, hand-merged for the three
  * consumers that each moved it here (rule 2): `enemy/fn_80147CE0.cpp`, `enemy/fn_8015E854.cpp` and
  * `enemy/fn_80178378.cpp` - the sibling landings and this branch had put it in three times. */
-void fn_80128A8C(struct _ENEMY_WORK* self, u32 a, u32 b);
+void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b);
 /* 0x80126324 - the motion/area setter: r3 (`self`), a byte r4 and a scalar r5 (the body does
  * `clrlwi r4,r4,24`, folds `self->area_no (0x1E1) & 0xF` into the high byte of the id it builds,
  * and passes `clrlwi r6,r31,24` on to 0x8012B380) plus the f32 blend f1 it stores at +0x384.

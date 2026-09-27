@@ -63,6 +63,13 @@
 #include "fn_80423E74.h"
 #include "sys_mem.h"
 
+/* `stage/fn_802B2AA0.h` used to open a file-wide `#pragma peephole off` that this unit picked up by
+ * including it.  Measured: with the leak gone this unit drops (unit fuzzy 5.168 -> 4.893;
+ * `em020_aim_target_ck` 100 -> 40, `em020_hit_info_get` 100 -> 96.38, `em020_work_free` 100 -> 95.43,
+ * `em020_quest_pages_clear` 100 -> 90.83, `em020_row_ptr` 100 -> 80), so the unit owns the pass and
+ * states it here.  A codegen pragma in the shared header is a matching hazard (stylelint rule 10). */
+#pragma peephole off
+
 
 /* The shared `.bss` lobby state block `lbl_806BF530` (0x806BF530, 0x2EB8 B): this unit reads its
  * `+0x03` quest-active byte, and the lobby's `lb_npc.cpp` reads the same byte.  Its own home is the

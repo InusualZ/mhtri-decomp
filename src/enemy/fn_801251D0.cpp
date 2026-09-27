@@ -299,12 +299,12 @@ extern "C" void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b)
     fn_80128A30(self, (u8)a, (u8)b);
 }
 
-extern "C" void fn_80128A8C(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b)
 {
     if (self->action_0x1E5 == 11) {
         return;
     }
-    fn_801285C0(self, (u8)a, (u8)b, 1);
+    fn_801285C0(self, a, b, 1);
 }
 
 extern "C" void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b)

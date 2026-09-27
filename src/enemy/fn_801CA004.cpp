@@ -238,7 +238,7 @@ void fn_801CA7F0(EmSpawnRec* rec, u8 a, u16 b, u16 c) {
 /* 0x801CA004 - the per-frame aim-height fade: track the pool float toward the map's direction and
  * drive the three MHchar TEV colours from it. */
 void fn_801CA004(_ENEMY_WORK* self) {
-    if (fn_8012EC60() == 1) {
+    if (fn_8012EC60(self) == 1) {
         self->timer_0x328.field_0x328 = self->timer_0x328.field_0x328 + lbl_80799214;
         if (self->timer_0x328.field_0x328 > lbl_80799218)
             self->timer_0x328.field_0x328 = lbl_80799218;

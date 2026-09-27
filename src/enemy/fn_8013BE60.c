@@ -582,7 +582,7 @@ s16 fn_8013D4C4(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (fn_8012EC60() == 0) {
+        if (fn_8012EC60(self) == 0) {
             in += (u8)fn_801406E0(28, in[0]);
             fn_8013BDE4(&in, 28, &result);
         }
