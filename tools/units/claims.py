@@ -292,6 +292,11 @@ SEED_COPY_DIRS = (
 )
 ORIG_REL = os.path.join("orig", "RMHE08")
 
+# `orig/` is copied rather than junctioned below this size.  A junction is a reparse point whose teardown
+# class has emptied MAIN's `orig/RMHE08/{sys,files}` twice (see `wtsafe`), so it is only worth that risk for a
+# payload too big to copy - a full rip's `files/` can be gigabytes.  Measured 2026-09-27: 6.6 MB here.
+ORIG_JUNCTION_MIN_BYTES = 64 * 1024 * 1024
+
 
 def _is_reparse_point(path: str) -> bool:
     """A junction or symlink - never recurse a removal through it (see `wtsafe`)."""
@@ -342,13 +347,49 @@ def _copy_missing_files(src: str, dst: str) -> int:
     return copied
 
 
-def seed_worktree_build(main: str, wt: str) -> str:
-    """Seed a fresh worktree from MAIN: the build inputs (copy) and the original payload (junction).
+def _tree_size(path: str) -> int:
+    """Bytes under `path`, never following a reparse point (a junction is not content)."""
+    total = 0
+    for root_dir, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if not _is_reparse_point(os.path.join(root_dir, d))]
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root_dir, name))
+            except OSError:
+                pass
+    return total
+
+
+def _copy_tree_missing(src: str, dst: str) -> int:
+    """Copy `src` into `dst` recursively, skipping what is already there and never walking a reparse point
+    (copying through one would duplicate somebody else's tree)."""
+    n = 0
+    for root_dir, dirs, files in os.walk(src):
+        dirs[:] = [d for d in dirs if not _is_reparse_point(os.path.join(root_dir, d))]
+        rel = os.path.relpath(root_dir, src)
+        target = dst if rel == "." else os.path.join(dst, rel)
+        os.makedirs(target, exist_ok=True)
+        for name in files:
+            s, d = os.path.join(root_dir, name), os.path.join(target, name)
+            if os.path.exists(d) or _is_reparse_point(s):
+                continue
+            shutil.copy2(s, d)
+            n += 1
+    return n
+
+
+def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None) -> str:
+    """Seed a fresh worktree from MAIN: the build inputs (copy) and the original payload (copy or junction).
 
     A worktree must be self-sufficient: the worker compiles and measures in *its* `build/RMHE08`, and a
     split needs the original DOL and selfile under `orig/`.  None of that is tracked, so it is seeded from
     MAIN at claim time - and no MAIN path is ever written: every `build/` input is a copy and `orig/` is
     only read.  See `SEED_COPY_DIRS` / `ORIG_REL` above for why the two shapes differ (#2/#5).
+
+    `orig/` is **copied** unless it is big enough to be worth the junction (see `ORIG_JUNCTION_MIN_BYTES`):
+    a junction is a reparse point whose teardown class has emptied MAIN's `orig/RMHE08/{sys,files}` twice,
+    and measured 2026-09-27 this repo's whole payload is 6.6 MB, so the junction simply never happens here.
+    Pass `copy_orig=True/False` to force one shape or the other.
 
     Returns a one-line description of what was seeded (or why nothing was).
     """
@@ -364,23 +405,30 @@ def seed_worktree_build(main: str, wt: str) -> str:
     orig_src, orig_dst = os.path.join(main, ORIG_REL), os.path.join(wt, ORIG_REL)
     if os.path.isdir(orig_src):
         os.makedirs(orig_dst, exist_ok=True)
-        linked: list[str] = []
-        copied = 0
-        for name in sorted(os.listdir(orig_src)):
-            s, d = os.path.join(orig_src, name), os.path.join(orig_dst, name)
-            if os.path.exists(d):
-                continue
-            if os.path.isdir(s):
-                if _make_junction(d, s):
-                    linked.append(name)
-            elif os.path.isfile(s):
-                shutil.copy2(s, d)
-                copied += 1
+        size = _tree_size(orig_src)
+        if copy_orig is None:
+            copy_orig = size < ORIG_JUNCTION_MIN_BYTES
         seeded = True
-        if linked:
-            parts.append("orig/RMHE08: junction %s" % ", ".join(linked))
-        if copied:
-            parts.append("orig/RMHE08: %d file(s)" % copied)
+        if copy_orig:
+            n = _copy_tree_missing(orig_src, orig_dst)
+            parts.append("orig/RMHE08: copied %d file(s), %.1f MB" % (n, size / 1048576.0))
+        else:
+            linked: list[str] = []
+            copied = 0
+            for name in sorted(os.listdir(orig_src)):
+                s, d = os.path.join(orig_src, name), os.path.join(orig_dst, name)
+                if os.path.exists(d):
+                    continue
+                if os.path.isdir(s):
+                    if _make_junction(d, s):
+                        linked.append(name)
+                elif os.path.isfile(s):
+                    shutil.copy2(s, d)
+                    copied += 1
+            if linked:
+                parts.append("orig/RMHE08: junction %s" % ", ".join(linked))
+            if copied:
+                parts.append("orig/RMHE08: %d file(s)" % copied)
     if not seeded:
         return "skipped (MAIN has no build/tools yet - run `ninja tools`)"
     return "seeded " + "; ".join(parts)
@@ -1365,7 +1413,8 @@ def selftest() -> int:
                        lister=lambda: panes, reader=lambda _pane: "same", sleeper=lambda _s: None)
         check("a static pane is not active", p["active"], False)
         # a fresh worktree is seeded with the toolchain and the original payload, so it never reaches into
-        # MAIN's build/ or orig/ for one (#2).  build/ inputs are COPIES (#5); orig/ is a junction.
+        # MAIN's build/ or orig/ for one (#2).  build/ inputs are COPIES (#5); orig/ is copied below the
+        # junction threshold and junctioned above it (ORIG_JUNCTION_MIN_BYTES).
         _seed_main = os.path.join(tmp, "seed-main")
         os.makedirs(os.path.join(_seed_main, "build", "tools"), exist_ok=True)
         open(os.path.join(_seed_main, "build", "tools", "dtk.exe"), "w").close()
@@ -1400,22 +1449,32 @@ def selftest() -> int:
         check("writing the worktree's compiler does not touch MAIN (#5)",
               open(os.path.join(_seed_main, "build", "compilers", "Wii", "1.3", "mwcceppc.exe"),
                    "rb").read(), b"MAIN-COMPILER\n")
-        # #2: the read-only original payload is reachable and is a junction into MAIN (worth not copying)
+        # #2: the read-only original payload is reachable.  It is COPIED for a payload under
+        # ORIG_JUNCTION_MIN_BYTES (this fixture is a few bytes), so the junction - whose teardown class has
+        # emptied MAIN's orig/RMHE08/{sys,files} - does not happen at all here (2026-09-27).
         _sys = os.path.join(_seed_wt, "orig", "RMHE08", "sys")
-        check("orig/RMHE08/sys is a junction (#2)", _is_reparse_point(_sys), True)
-        check("... and its DOL reads through to MAIN",
+        check("orig/RMHE08/sys is copied, not junctioned (#2, small payload)",
+              _is_reparse_point(_sys), False)
+        check("... and its DOL is the original's bytes",
               open(os.path.join(_sys, "main.dol"), "rb").read(), b"MAIN-DOL\n")
-        check("orig/RMHE08/files is a junction (#2)",
-              _is_reparse_point(os.path.join(_seed_wt, "orig", "RMHE08", "files")), True)
-        check("the small orig files are copied, not junctioned",
+        check("orig/RMHE08/files is copied too (#2)",
+              _is_reparse_point(os.path.join(_seed_wt, "orig", "RMHE08", "files")), False)
+        check("the orig files are copied, not junctioned",
               open(os.path.join(_seed_wt, "orig", "RMHE08", "cert.bin"), "rb").read(), b"MAIN-BIN\n")
+        # the junction shape stays reachable on demand, for a payload too big to copy
+        _big_wt = os.path.join(tmp, "ws-junctioned")
+        os.makedirs(os.path.join(_big_wt, "orig", "RMHE08"), exist_ok=True)
+        _big_note = seed_worktree_build(_seed_main, _big_wt, copy_orig=False)
+        check("copy_orig=False junctions the payload (#2)",
+              _is_reparse_point(os.path.join(_big_wt, "orig", "RMHE08", "sys")), True)
+        check("... and the note says so", "junction" in _big_note, True)
         check("the worktree's tracked orig .gitkeep is left alone",
               os.path.exists(os.path.join(_seed_wt, "orig", "RMHE08", ".gitkeep")), True)
         check("the claim key ignores the source extension",
               norm_unit("auto/802B2978_fn_802B2978.c") == norm_unit("auto/802B2978_fn_802B2978"), True)
         check("the claim key ignores a .cpp too", norm_unit("Pl/pl_act.cpp") == norm_unit("Pl/pl_act"), True)
         check("seeding reports what it did", note.startswith("seeded"), True)
-        check("the seed note names the junctioned original", "junction" in note, True)
+        check("the seed note names the copied original", "copied" in note, True)
         check("seeding skips cleanly when MAIN has no toolchain",
               seed_worktree_build(os.path.join(tmp, "nowhere"), os.path.join(tmp, "ws-x")).startswith("skipped"), True)
         p = pane_probe({"worktree": r"C:\x\mhtri-dtk.ws-pl-master-6337"},
@@ -1585,14 +1644,14 @@ def selftest() -> int:
               os.path.exists(os.path.join(seed_wt, "build", "tools", "dtk.exe")), True)
         check("claim seeds build/compilers as a copy, not a junction (#5)",
               _is_reparse_point(os.path.join(seed_wt, "build", "compilers")), False)
-        check("claim junctions orig/RMHE08/sys (#2)",
-              _is_reparse_point(os.path.join(seed_wt, "orig", "RMHE08", "sys")), True)
+        check("claim copies orig/RMHE08/sys (#2, small payload)",
+              _is_reparse_point(os.path.join(seed_wt, "orig", "RMHE08", "sys")), False)
         check("claim reports the seed in its result", out.get("seeded", "").startswith("seeded"), True)
         check("the claim cut a worktree on its own branch",
               repo_git(seed_wt, "rev-parse", "--abbrev-ref", "HEAD"), out["branch"])
         rel = release("Pl/seeded", seed_main, force=True, dry_run=False, probe=no_pane)
         check("the seeded claim releases cleanly (no stray claim)", rel.get("complete"), True)
-        check("MAIN's original survives the teardown through the junction",
+        check("MAIN's original survives the claim's teardown",
               open(os.path.join(seed_main, "orig", "RMHE08", "sys", "main.dol"), "rb").read(), b"dol")
 
     with tempfile.TemporaryDirectory() as tmp:
