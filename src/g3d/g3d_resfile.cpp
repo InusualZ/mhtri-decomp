@@ -37,22 +37,23 @@
  * emits the target's `li rN, @sda21` form instead of `lis`/`addi` (the same lever as
  * `g3d/g3d_anmvis.cpp`).
  *
- * FLIP BLOCKER - the unit stays NonMatching (measured 2026-09-27).  `Object(Matching, ...)` does not
- * link: `undefined: '@eti_800222FC'`, referenced from `lbl_8057CED0` in `auto_07_8057C820_data.o`.
- * That object is the unclaimed `.data` blob at 0x8057C820 and the reference is dtk's *guessed*
- * relocation for the word at 0x8057EA88 (value 0x80022300) - packed non-pointer data whose value only
- * lands inside the extabindex entry at 0x800222FC (so the entry is a coincidence, not a reader of
- * it).  It resolves today only because the *target* object defines the name, and our object cannot:
- * MWCC emits extab/extabindex entries as anonymous locals (`@377`, `@905`) with local binding, while
- * the target object carries the map's `@etb_<addr>`/`@eti_<addr>` names and dtk marks the
- * externally-referenced ones global (measured: target `@eti_800222FC` `st_info` 0x11, ours `@905`
- * 0x01).  No source or `cflags_g3d` spelling reaches it - the name and the binding are assembler
- * output, and `mwcceppc.exe -help` has no option that names or exports an extab symbol.  The fix is a
- * build step, not the unit: renaming this object's extabindex+0x1A4 symbol to `@eti_800222FC` and
- * setting its `.symtab` binding to global links (rc 0) and reproduces
- * sha1 BF4850739478CAAEDFE675949EB7C28595A7FDE9.  The class is wider than this unit - 18 of 251
- * registered units own an extab/extabindex symbol that another *linked* object references, and each
- * becomes unlinkable on flip (this unit is the only one of today's 48 `flipcheck`-READY units).
+ * Flip status - `Object(Matching, ...)` (2026-09-27).  The unit used to be blocked by the
+ * extab/extabindex map-name class: `Object(Matching, ...)` failed with `undefined: '@eti_800222FC'`,
+ * referenced from `lbl_8057CED0` in `auto_07_8057C820_data.o` - the unclaimed `.data` blob at
+ * 0x8057C820, whose word at 0x8057EA88 (0x80022300) is dtk's *guessed* relocation into the extabindex
+ * entry at 0x800222FC (packed non-pointer data, so the entry is a coincidence, not a reader of it).
+ * That name was defined only by the *target* object `dol split` synthesises, because MWCC emits
+ * extab/extabindex entries as anonymous locals with a local binding (`@377`, `@905`) while the target
+ * carries the map's `@etb_<addr>`/`@eti_<addr>` names with a global binding for the referenced ones.
+ * No source or `cflags_g3d` spelling reaches it: the name and the binding are assembler output, and
+ * `mwcceppc.exe -help` has no option that names or exports an extab symbol.  `tools/elf/objextab.py`
+ * now does it in the build (chained into every MWCC rule, after `objalign`): it renames this object's
+ * extab/extabindex entries to the map's names - extabindex+0x1A4 (`@905`) becomes `@eti_800222FC`,
+ * since the claim starts at 0x80022158 - and sets their binding global, so our object defines the name
+ * itself.  The flip then links and reproduces sha1 BF4850739478CAAEDFE675949EB7C28595A7FDE9.  The
+ * class is wider than this unit - 18 of 254 registered units own an extab/extabindex symbol that
+ * another *linked* object references, and each of them would have been unlinkable on flip (playbook
+ * 59, `.pi/notes/resfile-flip.md`).
  */
 
 #include "types.h"

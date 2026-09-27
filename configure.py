@@ -1887,7 +1887,7 @@ config.libs = [
             # `extab` 0x800093A8-0x800094E0, `extabindex` 0x80022158-0x8002232C; the boundaries are
             # fn_800938EC before and fn_800947A4 after (the first body of the next TU, which cites
             # "g3d_resmat.cpp").
-            Object(NonMatching, "g3d/g3d_resfile.cpp"),      # 0x80093990-0x800947A4
+            Object(Matching, "g3d/g3d_resfile.cpp"),      # 0x80093990-0x800947A4
             # Registered once, at its final home (docs/plan.md 12): proposal `800947A4` - the nw4r g3d
             # `ResMat`/`ResTexSrt` resource TU (140 functions / 0x45B8 B, 0x800947A4-0x80098D5C).  `g3d`/
             # `.cpp` from the range's own `__FILE__` string (`.data` 0x80590D78 = "g3d_resmat.cpp", the
