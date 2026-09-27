@@ -18,11 +18,28 @@
  *
  * FLAGS.  Per-unit `-O3` in `configure.py` (the lib default `-O4,p` hoists every emitters's constant
  * setup into the prologue's `mflr`->`stw` latency slot and lays the switch tails out unsorted): the
- * same source measures 69.42 % at `-O4,p` and 84.16 % at `-O3`, with five more functions at 100 %.
+ * same source measures 69.42 % at `-O4,p` and 84.16 % at `-O3`.
  * `#pragma exceptions on` is required for the object's `extab` 0x88 / `extabindex` 0xCC - the splits
  * block claims both ranges, the target has them and the lib sets exceptions off; neither `.text` nor
  * any per-symbol score moves with it.  `#pragma dont_inline on` around `handleNetworkState1` keeps
- * retail's `bl resetNetworkState3` in case 255 (`-inline auto` folds the 56-byte callee in).
+ * retail's `bl resetNetworkState3` in case 255 (`-inline auto` folds the 56-byte callee in);
+ * `#pragma peephole off`/`on` around `handleNetworkState2Binary` keeps retail's unfused
+ * `extsb r0,r0` + `cmpwi r0,0` where the pass fuses them into `extsb.` (playbook 39).
+ *
+ * SOURCE SHAPES (each measured on this unit; they are levers, not preferences):
+ *  - A local that only *aliases* something is its own web and takes a register retail gives to the
+ *    parameter or field: `NetworkStateMachine* st = (NetworkStateMachine*)self`, `u8 state =
+ *    <field>`, `NetworkFmpSlot* slots = st->fmpSlots_6C40`, `NetworkUserRow* rows = ...`.  Writing
+ *    the cast/field expression at the use site instead is worth 0.3-3 points per function here.
+ *  - An `if (bad) return x;` written first compiles to `beq <body>` with the return in line; retail
+ *    branches *over* the body and leaves the return last, which is the positive test with the return
+ *    as the case's last statement (`handleNetworkState2` case 5, `handleNetworkState2Fmp` 5/20).
+ *    Same for `if`/`else`: retail's layout wants the branch-taken block written as the `else`.
+ *  - `a && b && c` guarding a body whose else is a short tail: retail falls through into the tail,
+ *    i.e. the source is the negated `a == 0 || b == 0 || c == 0` (`handleNetworkState1` 40/90/120).
+ *  - Where retail has `cmpwi`/`ble`/`cmpw`, the source compared *signed*: `(s32)field` casts
+ *    (`handleNetworkState4` 0/20/35, `handleNetworkState2` 50, `handleNetworkState2Fmp` 10/70).
+ *  - A state byte taken into a local is an `s32` local, not `u8` (retail's `cmpwi`, not `cmplwi`).
  *
  * NAMES.  The runtime dump's map ("D:/WiiExperiment/DumpSymbols.zip") names 14 of the 21 already in
  * `symbols.txt`.  The six helpers it leaves as `zz_` were named in the registration batch's naming
@@ -50,23 +67,41 @@
  * unit, not from a recovered header - the object is 0x16D08 bytes and the dump's struct views do not
  * cover it.
  *
- * RESIDUALS (measured; the unit scores 84.16 %, 7 of 21 functions at 100 % - the remaining 15.8 %):
- *  - `handleNetworkState2Binary` 61.05 %: its case-60 tokenizer is the one place the original leaves a
- *    loop from *inside* two nested loops (retail branches straight from the `== 0` test of the inner
- *    skip loop to the outer loop's exit).  The conformant shape (`&& != 0` in the skip loop plus a
- *    `break`) is written instead because `goto` is forbidden by section 6.5 rule 8, which leaves the
- *    function 112 B short of the target and most of the case body mismatched.
- *  - Register colouring: the switch value lands in `r4` where retail has `r6`
- *    (`handleNetworkState1`), `r4` vs `r6` (`handleNetworkState2`), `r31`/`r30` swapped for
- *    `self`/`session`; every affected instruction is an operand mismatch, not a different opcode.
- *  - `resetNetworkState` 99.94 % (one operand), `sendReqShut` 99.11 %, `sendServerTimeout` 99.19 %,
- *    `sendReqChargeInfo` 99.0 %, `sendReqUserListData` 98.71 %, `advanceNetworkState5` 96.0 %
- *    (`cmplwi` where retail has `cmpwi` - retail's local is signed, `s8` adds an `extsb`).
- *  - `sendReqUserObject` 82.24 %: its out-of-range error path builds two 12-byte records (retail
- *    stores `{0x80000000, 0, 0}` at `r1+20` *and* at `r1+8`) and reaches `postError_288` through a
- *    scratch register where retail's canonical vcall uses `r12` twice; ours builds one record.
- *  - `datagap`: `target-extra .text 7620 B (ours 7384 B)` - the size residual above, not a data gap;
- *    `ours-extra .rela.text 1680 B (target 1668 B)` - one extra relocation.  `extab`/`extabindex` now
+ * RESIDUALS (measured 2026-09-27: 91.87 %, 12 of 21 functions at 100 %, `.text` 7620 B target /
+ * 7488 B ours - the size gap is the `handleNetworkState2Binary` shortfall below):
+ *  - `handleNetworkState2Binary` 70.21 % (992 B): its case-60 tokenizer is the one place the original
+ *    leaves a loop from *inside* two nested loops (retail branches straight from the inner skip
+ *    loop's `== 0` test to the outer loop's exit); the conformant shape (`&& != 0` in the skip loop
+ *    plus a `break`) is 68 B short and `goto` is forbidden by section 6.5 rule 8.  Ours is
+ *    otherwise shaped differently: MWCC keeps a *rolling* pointer `self + i` where retail recomputes
+ *    the offset from `i` and uses `lbzx` off `self` - no source shape tried reproduces retail's
+ *    form (`u8* text = ...->binaryText_D409` and `(u8)count` both measure neutral or worse) - and the
+ *    `for (k = index; k < 8; k++) tokens[k] = i` fill loop is emitted as a plain counted loop where
+ *    retail has MWCC's unroll-by-8 block plus a remainder loop (`srwi`/`andi.`); the source shape that
+ *    triggers that unroll was not found.
+ *  - `sendReqUserObject` 83.39 % (520 B): retail masks every variable `tags` index (`clrlwi r0,r0,24`)
+ *    and we do not, and its out-of-range error path builds two 12-byte records (retail stores
+ *    `{0x80000000, 0, 0}` at `r1+20` *and* at `r1+8`, and reaches `postError_288` through the
+ *    canonical `lwz r12,0(r3)` + `lwz r12,0x288(r12)` vcall) where ours builds one 16-byte record
+ *    (`NetworkPostedError` in the unit header) and stages the vcall through the documented
+ *    `NetworkInstanceVtable` table view.  The mask resisted every shape tried (`u8 count`, `u16`, an
+ *    explicit `(u8)count` cast, `count++` as the index, a `u8` temp, `s8 tags[]`); the 12-byte record
+ *    needs `NetworkPostedError` to lose its 4th field, which is a change to `include/` (outbox).
+ *  - `sendReqUnknownCheck` 89.29 % (196 B): the same masked index (`block[count] = 2`) and one extra
+ *    `li` retail has because its two `1` constants do not CSE.
+ *  - `handleNetworkState2Fmp` 90.15 %, `handleNetworkState2` 95.53 %, `handleNetworkState4` 97.49 %:
+ *    residual operand colouring in the case bodies (a loop counter in `r6`/`r10` where retail uses
+ *    `r30`/`r7`) plus one branch polarity each; `handleNetworkState2Fmp`'s `+0x8040`/`+0x8044`
+ *    writing pair does not match the header's single 0x8040 field (needs a 4-byte field inserted at
+ *    0x8040 in `include/Network/network_state.h` - outbox).
+ *  - `handleNetworkState1` 99.45 % (1736 B): the switch value is in `r4` where retail has `r6`, one
+ *    cascade of 6 operand rows, plus one `li r4,2` placed one slot earlier in case 245.
+ *  - `sendReqLoginInfo` 92.21 % (228 B), `sendReqOpcode1B` 94.74 % (156 B): retail loads the two
+ *    request-header words before storing either (`header[0] = ...; header[1] = ...` stores each in
+ *    turn); a `u32 header[2] = {...}` initialiser and hoisted temporaries both measure identical to
+ *    the current form.
+ *  - `datagap`: `target-extra .text 7620 B (ours 7488 B)` - the size residual above, not a data gap;
+ *    `ours-extra .rela.text 1680 B (target 1668 B)` - one extra relocation.  `extab`/`extabindex`
  *    match the target's sizes (0x88 / 0xCC).
  *
  * DATA.  The unit owns no data section of its own: the constants it loads are unowned `.sdata2`/
@@ -224,25 +259,26 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqTermsVersion(self);
         break;
     case 40:
-        if (st->termsReady_8268 != 0 && st->dataTotal_825C != 0 && st->termsSize_826C != 0) {
-            if (st->dataTotal_825C >= st->termsSize_826C) {
-                st->dataTotal_825C = st->termsSize_826C - 1;
+        if (st->termsReady_8268 == 0 || st->dataTotal_825C == 0 || st->termsSize_826C == 0) {
+            if (st->termsSize_826C != 0) {
+                *st->termsBufferPtr_828C = 0;
             }
-            memset(st->termsBufferPtr_828C, 0, st->termsSize_826C);
-            st->dataSent_8260 = 0;
-            st->sessionState_6132 += 5;
+            st->sessionState_6132 += 20;
             break;
         }
-        if (st->termsSize_826C != 0) {
-            *st->termsBufferPtr_828C = 0;
+        if (st->dataTotal_825C >= st->termsSize_826C) {
+            st->dataTotal_825C = st->termsSize_826C - 1;
         }
-        st->sessionState_6132 += 20;
+        memset(st->termsBufferPtr_828C, 0, st->termsSize_826C);
+        st->dataSent_8260 = 0;
+        st->sessionState_6132 += 5;
         break;
     case 45:
     {
-        u32 len = st->dataTotal_825C - st->dataSent_8260;
+        u32 len;
 
         st->sessionState_6132 += 5;
+        len = st->dataTotal_825C - st->dataSent_8260;
         sendReqTerms(self, st->termsBuffer_8264, st->dataSent_8260,
                      len < 8192 ? len : 8192);
         break;
@@ -279,25 +315,26 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqVulgarityInfoLow(self, 2);
         break;
     case 90:
-        if (st->dataTotal_825C != 0 && st->vulgaritySize_8284 != 0) {
-            if (st->dataTotal_825C >= st->vulgaritySize_8284) {
-                st->dataTotal_825C = st->vulgaritySize_8284 - 1;
+        if (st->dataTotal_825C == 0 || st->vulgaritySize_8284 == 0) {
+            if (st->vulgaritySize_8284 != 0) {
+                *st->vulgarityPtr_82A4 = 0;
             }
-            memset(st->vulgarityPtr_82A4, 0, st->vulgaritySize_8284);
-            st->dataSent_8260 = 0;
-            st->sessionState_6132 += 5;
+            st->sessionState_6132 += 20;
             break;
         }
-        if (st->vulgaritySize_8284 != 0) {
-            *st->vulgarityPtr_82A4 = 0;
+        if (st->dataTotal_825C >= st->vulgaritySize_8284) {
+            st->dataTotal_825C = st->vulgaritySize_8284 - 1;
         }
-        st->sessionState_6132 += 20;
+        memset(st->vulgarityPtr_82A4, 0, st->vulgaritySize_8284);
+        st->dataSent_8260 = 0;
+        st->sessionState_6132 += 5;
         break;
     case 95:
     {
-        u32 len = st->dataTotal_825C - st->dataSent_8260;
+        u32 len;
 
         st->sessionState_6132 += 5;
+        len = st->dataTotal_825C - st->dataSent_8260;
         sendReqVulgarityLow(self, 2, st->sendSlice_8258, len < 8192 ? len : 8192);
         break;
     }
@@ -314,25 +351,26 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqVulgarityInfoLow(self, 1);
         break;
     case 120:
-        if (st->dataTotal_825C != 0 && st->userListSize_8280 != 0) {
-            if (st->dataTotal_825C >= st->userListSize_8280) {
-                st->dataTotal_825C = st->userListSize_8280 - 1;
+        if (st->dataTotal_825C == 0 || st->userListSize_8280 == 0) {
+            if (st->userListSize_8280 != 0) {
+                *st->userListPtr_82A0 = 0;
             }
-            memset(st->userListPtr_82A0, 0, st->userListSize_8280);
-            st->dataSent_8260 = 0;
-            st->sessionState_6132 += 5;
+            st->sessionState_6132 += 20;
             break;
         }
-        if (st->userListSize_8280 != 0) {
-            *st->userListPtr_82A0 = 0;
+        if (st->dataTotal_825C >= st->userListSize_8280) {
+            st->dataTotal_825C = st->userListSize_8280 - 1;
         }
-        st->sessionState_6132 += 20;
+        memset(st->userListPtr_82A0, 0, st->userListSize_8280);
+        st->dataSent_8260 = 0;
+        st->sessionState_6132 += 5;
         break;
     case 125:
     {
-        u32 len = st->dataTotal_825C - st->dataSent_8260;
+        u32 len;
 
         st->sessionState_6132 += 5;
+        len = st->dataTotal_825C - st->dataSent_8260;
         sendReqVulgarityLow(self, 1, st->sendSlice_8258, len < 8192 ? len : 8192);
         break;
     }
@@ -394,7 +432,7 @@ s32 handleNetworkState1(NetworkInstance* self)
 s32 advanceNetworkState5(NetworkInstance* self)
 {
     NetworkStateMachine* st = (NetworkStateMachine*)self;
-    u8 state = st->subState_6133;
+    s32 state = st->subState_6133;
 
     if (state == 5) {
         if (st->fmpPhase_894D != 1) {
@@ -410,26 +448,25 @@ s32 advanceNetworkState5(NetworkInstance* self)
 s32 handleNetworkState2(NetworkInstance* self)
 {
     NetworkStateMachine* st = (NetworkStateMachine*)self;
-    u8 state = st->requestState_6135;
 
-    switch (state) {
+    switch (st->requestState_6135) {
     case 5:
-        if (st->fmpPhase_894D != 1) {
-            return -(s32)(state + 1);
-        }
-        if (st->loginInfoSent_82B4 == 0) {
-            st->requestState_6135 = state + 5;
+        if (st->fmpPhase_894D == 1) {
+            if (st->loginInfoSent_82B4 == 0) {
+                st->requestState_6135 = st->requestState_6135 + 5;
+                break;
+            }
+            st->requestState_6135 = 120;
             break;
         }
-        st->requestState_6135 = 120;
-        break;
+        return -(s32)(st->requestState_6135 + 1);
     case 10:
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqLoginInfo(self);
         break;
     case 20:
         if (st->connectionPhase_894F == 1) {
-            st->requestState_6135 = state + 10;
+            st->requestState_6135 = st->requestState_6135 + 10;
             break;
         }
         if (isSubState_894F_5(st) != 0 || isSubState_894F_3(st) != 0) {
@@ -451,9 +488,9 @@ s32 handleNetworkState2(NetworkInstance* self)
             st->requestState_6135 = 225;
             break;
         }
-        return -state;
+        return -st->requestState_6135;
     case 30:
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqTicket(self);
         break;
     case 40:
@@ -471,7 +508,7 @@ s32 handleNetworkState2(NetworkInstance* self)
 
             st->userRows_8BB8 = createStack(st, st->userRowCount_8BB4 * 92, &total);
             rows = total / 92;
-            if (st->userRowCount_8BB4 > rows) {
+            if ((s32)st->userRowCount_8BB4 > (s32)rows) {
                 st->userRowCount_8BB4 = rows;
                 growStackSize(st, total - rows * 92);
             }
@@ -479,33 +516,31 @@ s32 handleNetworkState2(NetworkInstance* self)
             sendReqUserListData(self, 1, st->userRowCount_8BB4);
             break;
         }
-        st->requestState_6135 = state + 10;
+        st->requestState_6135 = st->requestState_6135 + 10;
         break;
     case 60:
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqOpcode1F(self);
         break;
     case 70:
     {
-        NetworkUserRow* rows;
-        u32 count;
-        u32 i;
+        s32 count;
+        s32 i;
 
-        count = st->userRowCount_8BB4;
-        if ((s32)count <= 0) {
-            return -(s32)(state + 1);
+        count = (s32)st->userRowCount_8BB4;
+        if (count <= 0) {
+            return -(s32)(st->requestState_6135 + 1);
         }
-        rows = (NetworkUserRow*)st->userRows_8BB8;
         for (i = 0; i < count; i++) {
-            if (rows[i].shortName_04[0] == 0) {
-                return -(s32)state;
+            if (((NetworkUserRow*)st->userRows_8BB8)[i].shortName_04[0] == 0) {
+                return -(s32)st->requestState_6135;
             }
         }
         st->requestState_6135 += 10;
         break;
     }
     case 80:
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqServerTime(self);
         break;
     case 90:
@@ -513,7 +548,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         return 1;
     case 100:
         st->loginInfoSent_82B4 = 1;
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqChargeInfo(self, 1);
         break;
     case 110:
@@ -558,34 +593,33 @@ s32 handleNetworkState2(NetworkInstance* self)
 s32 handleNetworkState2Fmp(NetworkInstance* self)
 {
     NetworkStateMachine* st = (NetworkStateMachine*)self;
-    NetworkFmpSlot* slots = st->fmpSlots_6C40;
-    u8 state = st->requestState_6135;
 
-    switch (state) {
+    switch (st->requestState_6135) {
     case 5:
-        if (st->fmpPhase_894D != 2) {
-            return -(s32)(state + 1);
-        }
-        if (st->loginInfoSent_82B4 != 0) {
-            u8 mediatorState;
+        if (st->fmpPhase_894D == 2) {
+            if (st->loginInfoSent_82B4 == 0) {
+                st->requestState_6135 = st->requestState_6135 + 5;
+            } else {
+                u8 mediatorState;
 
-            getMediatorState68A((NetworkInstance*)getInstance(), &mediatorState);
-            if (mediatorState == 1) {
-                st->requestState_6135 = 100;
-                break;
+                getMediatorState68A((NetworkInstance*)getInstance(), &mediatorState);
+                if (mediatorState == 1) {
+                    st->requestState_6135 = 100;
+                    break;
+                }
+                st->requestState_6135 += 5;
             }
-            st->requestState_6135 += 5;
         } else {
-            st->requestState_6135 = state + 5;
+            return -(s32)(st->requestState_6135 + 1);
         }
         /* falls through */
     case 10:
     {
         NetworkUserRow* rows;
-        u32 count;
-        u32 i;
+        s32 count;
+        s32 i;
 
-        count = st->userRowCount_8BB4;
+        count = (s32)st->userRowCount_8BB4;
         rows = (NetworkUserRow*)st->userRows_8BB8;
         for (i = 0; i < count; i++) {
             if (rows[i].id_00 == st->userRow_8B54.id_00) {
@@ -593,7 +627,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
             }
         }
         if (i >= count) {
-            return -(s32)state;
+            return -(s32)st->requestState_6135;
         }
         st->userRow_8B54.field_30 = 2;
         st->userRow_8B54.field_2C = getSomething3(st);
@@ -606,14 +640,14 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         break;
     }
     case 20:
-        if (st->sessionReady_8950 != 1) {
-            return -(s32)state;
+        if (st->sessionReady_8950 == 1) {
+            st->requestState_6135 = st->requestState_6135 + 5;
+            sendReqTicket(self);
+            break;
         }
-        st->requestState_6135 = state + 5;
-        sendReqTicket(self);
-        break;
+        return -(s32)st->requestState_6135;
     case 30:
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         resetNetworkState4(self);
         break;
     case 35:
@@ -622,13 +656,13 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
 
         if (result > 0) {
             if (st->fmpSlotCount_6608 <= 0) {
-                return -(s32)state;
+                return -(s32)st->requestState_6135;
             }
             st->requestState_6135 += 5;
             break;
         }
         if (result < 0) {
-            return -(s32)(state + result);
+            return -(s32)(st->requestState_6135 + result);
         }
         break;
     }
@@ -643,10 +677,10 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         for (i = 0; i < st->fmpSlotCount_6608; i++) {
             u32 remaining;
 
-            if ((s32)slots[i].total_14 <= 0) {
+            if ((s32)st->fmpSlots_6C40[i].total_14 <= 0) {
                 continue;
             }
-            remaining = slots[i].total_14 - slots[i].done_10;
+            remaining = st->fmpSlots_6C40[i].total_14 - st->fmpSlots_6C40[i].done_10;
             if (bestValue > (s32)remaining) {
                 if (secondValue <= (s32)remaining) {
                     secondValue = (s32)remaining;
@@ -665,7 +699,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         }
         st->fmpSelected_65F8 = st->fmpQueryValue_8040;
         st->requestState_6135 += 5;
-        sendReqFmpInfo(self, slots[st->fmpSelected_65F8].payload_00, 1);
+        sendReqFmpInfo(self, st->fmpSlots_6C40[st->fmpSelected_65F8].payload_00, 1);
         break;
     }
     case 50:
@@ -681,21 +715,21 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         for (i = 0; i < st->fmpSlotCount_6608; i++) {
             u32 remaining;
 
-            if ((s32)slots[i].total_14 <= 0) {
+            if ((s32)st->fmpSlots_6C40[i].total_14 <= 0) {
                 continue;
             }
-            remaining = slots[i].total_14 - slots[i].done_10;
+            remaining = st->fmpSlots_6C40[i].total_14 - st->fmpSlots_6C40[i].done_10;
             if (bestValue <= (s32)remaining) {
                 bestValue = (s32)remaining;
                 bestIndex = i;
             }
         }
         if (bestIndex < 0) {
-            return -(s32)state;
+            return -(s32)st->requestState_6135;
         }
         st->fmpSelected_65F8 = (u32)bestIndex;
         st->requestState_6135 += 5;
-        sendReqFmpInfo(self, slots[bestIndex].payload_00, 1);
+        sendReqFmpInfo(self, st->fmpSlots_6C40[bestIndex].payload_00, 1);
         break;
     }
     case 70:
@@ -706,7 +740,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         return 1;
     case 100:
         st->loginInfoSent_82B4 = 2;
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqChargeInfo(self, 2);
         break;
     case 110:
@@ -715,7 +749,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         st->requestState_6135 = 200;
         break;
     case 200:
-        st->requestState_6135 = state + 5;
+        st->requestState_6135 = st->requestState_6135 + 5;
         sendReqLoginInfo(self);
         break;
     case 210:
@@ -723,7 +757,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
             st->requestState_6135 = 10;
             break;
         }
-        return -(s32)state;
+        return -(s32)st->requestState_6135;
     default:
         break;
     }
@@ -731,117 +765,118 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
 }
 
 /* Drives the block-2 binary/circle sub-machine. */
+#pragma peephole off
 s32 handleNetworkState2Binary(NetworkInstance* self)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
-    u8 state = st->requestState_6135;
+    u8 state = ((NetworkStateMachine*)self)->requestState_6135;
 
     switch (state) {
     case 5:
-        if (st->fmpPhase_894D == 5) {
-            st->binaryState_6134 = 90;
-            st->requestState_6135 = 0;
-            st->flag_6558 = 0;
-            st->patPhase_894E = st->fmpPhase_894D;
+        if (((NetworkStateMachine*)self)->fmpPhase_894D == 5) {
+            ((NetworkStateMachine*)self)->binaryState_6134 = 90;
+            ((NetworkStateMachine*)self)->requestState_6135 = 0;
+            ((NetworkStateMachine*)self)->flag_6558 = 0;
+            ((NetworkStateMachine*)self)->patPhase_894E = ((NetworkStateMachine*)self)->fmpPhase_894D;
             break;
         }
-        st->fmpQueryValue_8040 = (u32)-1;
-        if (st->fmpPhase_894D == 3) {
-            st->shutdownFlag_6559 = 1;
-            st->requestState_6135 += 5;
+        ((NetworkStateMachine*)self)->fmpQueryValue_8040 = (u32)-1;
+        if (((NetworkStateMachine*)self)->fmpPhase_894D == 3) {
+            ((NetworkStateMachine*)self)->shutdownFlag_6559 = 1;
+            ((NetworkStateMachine*)self)->requestState_6135 += 5;
             break;
         }
         return -state;
     case 10:
-        st->requestState_6135 = state + 5;
+        ((NetworkStateMachine*)self)->requestState_6135 = state + 5;
         sendReqServerTime(self);
         break;
     case 20:
         if (isCallback(self, 3) != 0) {
-            st->requestState_6135 += 5;
+            ((NetworkStateMachine*)self)->requestState_6135 += 5;
             sendReqCircleInfoNoticeSet(self);
             break;
         }
-        st->requestState_6135 += 10;
+        ((NetworkStateMachine*)self)->requestState_6135 += 10;
         break;
     case 30:
-        if (st->binaryActive_D400 != 0) {
-            st->requestState_6135 += 5;
-            sendReqBinaryHead(self, st->binaryActive_D400, 6);
+        if (((NetworkStateMachine*)self)->binaryActive_D400 != 0) {
+            ((NetworkStateMachine*)self)->requestState_6135 += 5;
+            sendReqBinaryHead(self, ((NetworkStateMachine*)self)->binaryActive_D400, 6);
             break;
         }
-        st->requestState_6135 = 70;
+        ((NetworkStateMachine*)self)->requestState_6135 = 70;
         break;
     case 40:
-        if (st->binaryTextReady_D408 != 0 && st->dataTotal_825C != 0) {
-            st->requestState_6135 += 5;
-            sendReqBinaryData(self, st->binaryActive_D400, st->binarySize_D404, 0);
+        if (((NetworkStateMachine*)self)->binaryTextReady_D408 != 0 && ((NetworkStateMachine*)self)->dataTotal_825C != 0) {
+            ((NetworkStateMachine*)self)->requestState_6135 += 5;
+            sendReqBinaryData(self, ((NetworkStateMachine*)self)->binaryActive_D400, ((NetworkStateMachine*)self)->binarySize_D404, 0);
             break;
         }
-        st->requestState_6135 += 10;
+        ((NetworkStateMachine*)self)->requestState_6135 += 10;
         break;
     case 50:
-        st->requestState_6135 += 5;
-        sendReqBinaryFoot(self, st->binaryActive_D400);
+        ((NetworkStateMachine*)self)->requestState_6135 += 5;
+        sendReqBinaryFoot(self, ((NetworkStateMachine*)self)->binaryActive_D400);
         break;
     case 60:
-        if (st->binaryTextReady_D408 != 0) {
+        if (((NetworkStateMachine*)self)->binaryTextReady_D408 != 0) {
             u32 i = 0;
             u32 index = 0;
             u32 j;
             u32 k;
 
-            memset(st->binaryTokens_D60C, 0, sizeof(st->binaryTokens_D60C));
+            memset(((NetworkStateMachine*)self)->binaryTokens_D60C, 0, sizeof(((NetworkStateMachine*)self)->binaryTokens_D60C));
             for (j = 0; j < 8; j++) {
-                while (st->binaryText_D409[i] != '\t' && st->binaryText_D409[i] != 0) {
+                while (((NetworkStateMachine*)self)->binaryText_D409[i] != '\t' && ((NetworkStateMachine*)self)->binaryText_D409[i] != 0) {
                     i++;
                 }
-                if (st->binaryText_D409[i] == 0) {
+                if (((NetworkStateMachine*)self)->binaryText_D409[i] == 0) {
                     break;
                 }
                 i++;
-                while (st->binaryText_D409[i] == '\t') {
+                while (((NetworkStateMachine*)self)->binaryText_D409[i] == '\t') {
                     i++;
                 }
-                if (st->binaryText_D409[i] == '\r' || st->binaryText_D409[i] == '\n') {
-                    st->binaryText_D409[i] = 0;
+                if (((NetworkStateMachine*)self)->binaryText_D409[i] == '\r' || ((NetworkStateMachine*)self)->binaryText_D409[i] == '\n') {
+                    ((NetworkStateMachine*)self)->binaryText_D409[i] = 0;
                 }
-                if (st->binaryText_D409[i] == 0) {
+                if (((NetworkStateMachine*)self)->binaryText_D409[i] == 0) {
                     break;
                 }
-                st->binaryTokens_D60C[index] = i;
+                ((NetworkStateMachine*)self)->binaryTokens_D60C[index] = i;
                 index++;
                 i++;
-                while (st->binaryText_D409[i] != '\r' && st->binaryText_D409[i] != '\n' &&
-                       st->binaryText_D409[i] != 0) {
+                while (((NetworkStateMachine*)self)->binaryText_D409[i] != '\r' && ((NetworkStateMachine*)self)->binaryText_D409[i] != '\n' &&
+                       ((NetworkStateMachine*)self)->binaryText_D409[i] != 0) {
                     i++;
                 }
-                while (st->binaryText_D409[i] == '\r' || st->binaryText_D409[i] == '\n') {
-                    st->binaryText_D409[i] = 0;
+                while (((NetworkStateMachine*)self)->binaryText_D409[i] == '\r' || ((NetworkStateMachine*)self)->binaryText_D409[i] == '\n') {
+                    ((NetworkStateMachine*)self)->binaryText_D409[i] = 0;
                     i++;
                 }
-                if (st->binaryText_D409[i] == 0) {
+                if (((NetworkStateMachine*)self)->binaryText_D409[i] == 0) {
                     break;
                 }
             }
             for (k = index; k < 8; k++) {
-                st->binaryTokens_D60C[k] = i;
+                ((NetworkStateMachine*)self)->binaryTokens_D60C[k] = i;
             }
         }
-        st->requestState_6135 += 10;
+        ((NetworkStateMachine*)self)->requestState_6135 += 10;
         break;
     case 70:
-        st->requestState_6135 += 5;
+        ((NetworkStateMachine*)self)->requestState_6135 += 5;
         reqUserSearchInfoMine(self, 0);
         break;
     case 80:
-        st->requestState_6135 = 0;
+        ((NetworkStateMachine*)self)->requestState_6135 = 0;
         return 1;
     default:
         break;
     }
     return 0;
 }
+#pragma peephole on
 
 /* ------------------------------------------------------------------------------------------------ */
 /* the request emitters                                                                              */
@@ -860,14 +895,13 @@ s32 sendReqServerTime(NetworkInstance* self)
 
 s32 sendReqShut(NetworkInstance* self, s32 mode)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     s32 ret;
 
-    st->shutdownFlag_6559 = 0;
-    st->shutdownMode_6136 = mode;
-    ret = flushBuffer(st, 4, 0);
-    writeUInt8(st, mode);
-    encryptBuffer(st);
+    ((NetworkStateMachine*)self)->shutdownFlag_6559 = 0;
+    ((NetworkStateMachine*)self)->shutdownMode_6136 = mode;
+    ret = flushBuffer(((NetworkStateMachine*)self), 4, 0);
+    writeUInt8(((NetworkStateMachine*)self), mode);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
@@ -883,15 +917,14 @@ s32 sendReqTicket(NetworkInstance* self)
 
 s32 sendServerTimeout(NetworkInstance* self, const u32* values)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     SessionTimeoutPayload payload;
     s32 ret;
 
     payload.code_00 = sessionTimeoutParam;
     payload.reason_02 = sessionTimeoutParam2;
-    ret = flushBuffer(st, 17, 0);
-    putItemTaggedLongs(st, values, 3, (const u8*)&payload);
-    encryptBuffer(st);
+    ret = flushBuffer(((NetworkStateMachine*)self), 17, 0);
+    putItemTaggedLongs(((NetworkStateMachine*)self), values, 3, (const u8*)&payload);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
@@ -907,13 +940,12 @@ s32 sendReqCommonKey(NetworkInstance* self)
 
 s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u32 size)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     u8 block[8];
     u32 count = 0;
     s32 ret;
 
-    ret = flushBuffer(st, 20, 0);
-    writeUInt8Array(st, data, size);
+    ret = flushBuffer(((NetworkStateMachine*)self), 20, 0);
+    writeUInt8Array(((NetworkStateMachine*)self), data, size);
     if (tags != 0) {
         if (tags[0] != 0) {
             count = 1;
@@ -924,74 +956,70 @@ s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u
             count++;
         }
     }
-    putItemTaggedBytes(st, tags, count, block);
-    encryptBuffer(st);
+    putItemTaggedBytes(((NetworkStateMachine*)self), tags, count, block);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
 s32 sendReqLoginInfo(NetworkInstance* self)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     u8 block[4];
     u32 count = 0;
     s32 ret;
 
-    ret = flushBuffer(st, 23, 0);
-    if (st->loginInfoSent_82B4 == 0) {
+    ret = flushBuffer(((NetworkStateMachine*)self), 23, 0);
+    if (((NetworkStateMachine*)self)->loginInfoSent_82B4 == 0) {
         block[0] = 7;
         block[1] = 8;
         count = 3;
         block[2] = 9;
-    } else if (st->loginInfoSent_82B4 - 1 <= 1) {
+    } else if (((NetworkStateMachine*)self)->loginInfoSent_82B4 - 1 <= 1) {
         block[0] = 6;
         count = 2;
         block[1] = 9;
-    } else if (st->loginInfoSent_82B4 == 3) {
+    } else if (((NetworkStateMachine*)self)->loginInfoSent_82B4 == 3) {
         block[0] = 10;
         count = 2;
         block[1] = 9;
     }
-    putItemAny(st, st->loginFields_82AC, count, block);
-    encryptBuffer(st);
+    putItemAny(((NetworkStateMachine*)self), ((NetworkStateMachine*)self)->loginFields_82AC, count, block);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
 s32 sendReqChargeInfo(NetworkInstance* self, s32 mode)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     s32 ret;
 
-    ret = flushBuffer(st, 25, 0);
-    writeUInt8(st, mode);
-    encryptBuffer(st);
+    ret = flushBuffer(((NetworkStateMachine*)self), 25, 0);
+    writeUInt8(((NetworkStateMachine*)self), mode);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
 s32 sendReqOpcode1B(NetworkInstance* self, u32 a, u32 b)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     u32 header[2];
     s32 ret;
 
     header[0] = requestHeaderWord0;
     header[1] = requestHeaderWord1;
-    ret = flushBuffer(st, 27, 0);
-    writeUInt32Shared(st, a);
-    writeUInt32Shared(st, b);
-    writeUInt8Array2(st, 8, (const u8*)header);
-    encryptBuffer(st);
+    ret = flushBuffer(((NetworkStateMachine*)self), 27, 0);
+    writeUInt32Shared(((NetworkStateMachine*)self), a);
+    writeUInt32Shared(((NetworkStateMachine*)self), b);
+    writeUInt8Array2(((NetworkStateMachine*)self), 8, (const u8*)header);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
 s32 sendReqUserListData(NetworkInstance* self, s32 mode, u32 count)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     s32 ret;
 
-    ret = flushBuffer(st, 29, 0);
-    writeUInt32Shared(st, mode);
-    writeUInt32Shared(st, count);
-    encryptBuffer(st);
+    ret = flushBuffer(((NetworkStateMachine*)self), 29, 0);
+    writeUInt32Shared(((NetworkStateMachine*)self), mode);
+    writeUInt32Shared(((NetworkStateMachine*)self), count);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
@@ -1008,14 +1036,13 @@ s32 sendReqOpcode1F(NetworkInstance* self)
 /* Sends one user's row, tagging every field that differs from the local row. */
 s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
 {
-    NetworkStateMachine* st = (NetworkStateMachine*)self;
     NetworkUserRow* found;
     u8 tags[16];
     u32 count = 0;
     s32 flag;
     s32 ret;
 
-    if (index < 0 || index >= (s32)st->userRowCount_8BB4) {
+    if (index < 0 || index >= (s32)((NetworkStateMachine*)self)->userRowCount_8BB4) {
         NetworkPostedError info;
 
         info.code_00 = -2147483648;
@@ -1025,13 +1052,14 @@ s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
         ((NetworkInstance*)self)->vtable->postError_288(self, (NetworkErrorInfo*)&info);
         return -1;
     }
-    found = (NetworkUserRow*)(st->userRows_8BB8 + index * 92);
+    found = (NetworkUserRow*)(((NetworkStateMachine*)self)->userRows_8BB8 + index * 92);
     if (strcmp(row->accountName_0C, found->accountName_0C) != 0) {
         count = 1;
         tags[0] = 3;
     }
     if (row->field_30 != found->field_30) {
-        tags[count] = 5;
+        u8 n = count;
+        tags[n] = 5;
         count++;
     }
     if (row->field_2C != found->field_2C) {
@@ -1055,11 +1083,11 @@ s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
     } else {
         flag = count == 0 ? 2 : 3;
     }
-    ret = flushBuffer(st, 33, 0);
-    writeBool(st, flag);
-    writeUInt32Shared(st, (u32)(index + 1));
-    putUserSlotObjects(st, (const u8*)row, count, tags);
-    encryptBuffer(st);
+    ret = flushBuffer(((NetworkStateMachine*)self), 33, 0);
+    writeBool(((NetworkStateMachine*)self), flag);
+    writeUInt32Shared(((NetworkStateMachine*)self), (u32)(index + 1));
+    putUserSlotObjects(((NetworkStateMachine*)self), (const u8*)row, count, tags);
+    encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
 
@@ -1073,19 +1101,18 @@ s32 resetNetworkState4(NetworkInstance* self)
 s32 handleNetworkState4(NetworkInstance* self, s32 arg)
 {
     NetworkStateMachine* st = (NetworkStateMachine*)self;
-    u8 state = st->fmpState_6137;
 
-    switch (state) {
+    switch (st->fmpState_6137) {
     case 0:
-        if (st->sessionMode_65F0 != 0 && st->sessionMode_65F0 != 1) {
-            return -state;
+        if ((s32)st->sessionMode_65F0 != 0 && (s32)st->sessionMode_65F0 != 1) {
+            return -st->fmpState_6137;
         }
         st->fmpState_6137 += 5;
         sendReqFmpListVersion(self);
         break;
     case 10:
         if (st->fmpListActive_6C38 == 0) {
-            return -state;
+            return -st->fmpState_6137;
         }
         if (st->fmpListReady_6C3C != 0) {
             st->fmpSlotCount_6608 = 0;
@@ -1096,7 +1123,7 @@ s32 handleNetworkState4(NetworkInstance* self, s32 arg)
         sendReqFmpListHead(self, 1, arg);
         break;
     case 20:
-        if (st->replyTotal_8BD0 > 0) {
+        if ((s32)st->replyTotal_8BD0 > 0) {
             st->fmpState_6137 += 5;
         } else {
             st->fmpState_6137 += 20;
@@ -1114,7 +1141,7 @@ s32 handleNetworkState4(NetworkInstance* self, s32 arg)
         break;
     }
     case 35:
-        if (st->replySent_8BCC < 80 && st->replyTotal_8BD0 - st->replySent_8BCC > 0) {
+        if ((s32)st->replySent_8BCC < 80 && (s32)(st->replyTotal_8BD0 - st->replySent_8BCC) > 0) {
             st->fmpState_6137 -= 10;
         } else {
             st->fmpState_6137 += 5;
