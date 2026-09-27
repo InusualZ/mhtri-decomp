@@ -2182,6 +2182,27 @@ config.libs = [
             # (class 4).  Same `cflags_lobby` as the band below, with the per-file
             # `#pragma exceptions on` the other lobby units use to emit the unwind records.
             Object(NonMatching, "lobby/fn_8030121C.cpp"),
+            # proposal/80338808_fn_80338808.cpp: the lobby companion/status UI band
+            # (`.text` 0x80338808..0x8033F270, 133 functions / 27240 B, plus its extab run
+            # 0x80016994..0x80016CA4 and extabindex run 0x80035CC4..0x8003615C - 98 records each,
+            # both exactly the gap the bracketing split objects leave: `fn_803386C4`'s record ends
+            # at 0x80016994 / 0x80035CC4 and the next function's begins at 0x80016CA4 /
+            # 0x8003615C).  Module `lobby` (class 3): the range references the lobby work block
+            # `lobby_w` (`.bss` 0x806AAB44), `lb_param_w` (`.bss` 0x806590B4) and the global
+            # `lb_deli_data` (`.data` 0x8060DDB8), calls the lobby string helper `LbStr` 11 times,
+            # and its callee profile is exactly the one the registered lobby bands document
+            # (`LbStr`, `get_lsp_data`, `draw_sprite_ary`/`_idx`/`_anim_*`, `draw_font*`,
+            # `GetMenuFontColor`, `sysSE_req`); no `__FILE__` string covers the range and the dump
+            # answers only `zz_XXXXXXXX_` for it, so every symbol the file defines is named from its
+            # own body (the naming pass of 2026-09-26, 79 names - see the unit header and
+            # `.pi/notes/80338808-named.md`; the map's 78 `fn_` rows in the range moved with it and
+            # the 79th follows main's `hud_key_lookup`).  Same
+            # `cflags_lobby` as the bands above, with the per-file `#pragma exceptions on` the
+            # other lobby units use to emit the unwind records.  Seam UNPROVEN (measured): the
+            # decisive `__FILE__` class is absent for the whole band, no private pool crosses
+            # either edge, and the `.data`/`.sdata` runs continue across both with ascending owners
+            # (candidate-only class); see the unit header for the counts and the bracket.
+            Object(NonMatching, "lobby/lb_companion_ui.cpp"),
         ],
     },
     {

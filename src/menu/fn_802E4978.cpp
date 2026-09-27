@@ -527,7 +527,7 @@ void fn_802E5284(void) {
     }
     if (event_demo_ck() != 1) {
         subTransSet((u32)(void*)fn_802E555C, 0, NULL);
-        if (fn_8033A850() == 0) {
+        if (lb_quest_work_active_ck() == 0) {
             subTransSetPrio(6, (u32)(void*)&fn_802DA3CC, 0, NULL);
         }
         subTransSetPrio(6, (u32)(void*)&menu_slot_panel_draw, 0, NULL);

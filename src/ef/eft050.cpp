@@ -251,7 +251,7 @@ void fn_80073F68(VEC3* dst, const VEC3* src);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 const u8* fn_802D773C(u8 index);
 void fn_802D7754(u8 a, u8 b, u16* out);
-const u8* fn_8033C36C(u8 index);
+const u8* lb_entry_id_get(u8 index);
 s8* fn_802AA59C(u8 id);
 s8* fn_802AA5D8(u8 index);
 s8* fn_802AA650(u8 id);
@@ -374,7 +374,7 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
     draw_sprite_ary(lbl_805E7438, pos);
     u8 sel = lbl_80794880->player_slot_0x3E03 & 0x7F;
     const u8* rows = fn_802D773C(sel);
-    const u8* slots = fn_8033C36C(sel);
+    const u8* slots = lb_entry_id_get(sel);
     draw_font_idx(0x2043, fn_802AA5D8(sel), 1, pos);
     fn_802152A4(0x2044, self->mode_0x14, 1, pos);
     if (rows[slots[0] + 4] == 0) {

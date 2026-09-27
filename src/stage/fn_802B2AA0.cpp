@@ -1072,7 +1072,7 @@ extern "C" void fn_802B4680(void* plw, u8 index)
         return;
     }
     if (Pl_master_ck((struct _PLW*)plw) == 1U) {
-        fn_803394F0(index);
+        lb_sub12_send(index);
     }
 }
 

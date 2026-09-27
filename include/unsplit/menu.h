@@ -32,7 +32,6 @@ void draw_lsp_element(void*, u8, u8, u16);   /* 0x802E00A4 */
 void fn_802E03D4(void*, s32, void*);    /* 0x802E03D4 */
 void fn_802E0468(u8, s32);              /* 0x802E0468 */
 s32 fn_802E06B0(u16, void*, void*);     /* 0x802E06B0 */
-s32 fn_8033A850(void);                  /* 0x8033A850 */
 s32 fn_803A87E0(void);                  /* 0x803A87E0 */
 s32 fn_803A881C(void);                  /* 0x803A881C */
 s32 fn_803A8858(void);                  /* 0x803A8858 */

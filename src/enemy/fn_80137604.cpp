@@ -200,7 +200,7 @@ void fn_80144584(_ENEMY_WORK* self, s32 mode);
 
 /* the 0x803xxxxx helpers the band shares */
 void fn_8033737C(_ENEMY_WORK* self, u32 a, u32 b);
-void fn_80339160(u8 a, u16 b, u8 c, u16 d);
+void lb_sub0e_send(u8 a, u16 b, u8 c, u16 d);
 
 #ifdef __cplusplus
 }
@@ -243,11 +243,11 @@ extern "C" u32 fn_80137648(_ENEMY_WORK* self)
     return self->field_0x43F == 1;
 }
 
-/* Kicks `fn_80339160` for the record when `fn_8012D1A0` says the action is armed. */
+/* Kicks `lb_sub0e_send` for the record when `fn_8012D1A0` says the action is armed. */
 extern "C" void fn_8013765C(_ENEMY_WORK* self, u32 arg1)
 {
     if (fn_8012D1A0(self) == 1) {
-        fn_80339160(my_player_no(), arg1, 1, self->field_0x01A);
+        lb_sub0e_send(my_player_no(), arg1, 1, self->field_0x01A);
     }
 }
 

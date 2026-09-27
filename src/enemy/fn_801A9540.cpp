@@ -158,13 +158,20 @@ extern u8 lbl_80570220[];
 
 extern "C" {
 
+/* 0x80339E04 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The declaration sits here,
+ * not in `include/unsplit/unknown.h`, because that band may not carry a symbol a registered unit owns
+ * (rule 2), and the owner's header cannot be included from this unit - it redeclares `system_w` as
+ * `LbSystemView` against this unit's own view (measured - `(10563) identifier 'system_w' redeclared`).
+ * The two-argument signature is this unit's call site; the callee reads only r3. */
+void lb_area_change_send(u8 a, s32 b);
+
 /* r3 the work record; the per-action entry: resets the joint-effect slots on the request, ticks the
  * motion, and walks the two live slots through `fn_803B9588`. */
 void fn_801A9540(struct _ENEMY_WORK* self) {
     s32* slots = self->handles_0x328;
 
     if (fn_8012D1A0(self) == 1U) {
-        fn_80339E04((u8)my_player_no(), 0);
+        lb_area_change_send((u8)my_player_no(), 0);
     }
     fn_8013A9F4(self);
     if (self->area_no == 2) {
