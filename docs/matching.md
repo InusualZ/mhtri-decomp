@@ -1996,3 +1996,28 @@ s32 handleNetworkState1(NetworkInstance* self)
 }
 #pragma dont_inline off
 ```
+
+## 62. A `new` expression is not `operator new` plus a constructor call
+
+**Problem.** `NetworkWiiMediator`'s `initializeNetworkMediator` measured 1.89 % and `reflectInit` 88.34 %, and the
+first divergence was one instruction from the top: retail has `bl __nw__FUl; mr r31,r3; cmplwi r3,0x0` where ours
+had `bl __nw__FUl; cmplwi r3,0x0`. Everything after it shifted with it - `self` moved to r29, `value` to r30, the
+frame grew 0x10 -> 0x20 - so a function missing one instruction read as a function that was wrong.
+
+**Why try it.** The unit compiles `#pragma exceptions on`. A manual
+`T* p = (T*)operator new(n); if (p != NULL) ctor(p);` is coalesced: `p` lives in r3 and dies at the constructor.
+A **`new` expression whose constructor is called** (`p = new T(...)`) must keep the value alive *across* the
+constructor call, because the unwind path needs it, so MWCC spills it to a callee-saved register - that is the
+`mr r31,r3`. Five spellings of the manual form were measured; none of them emits it.
+
+**Result.** Both functions reached 100 % (212/212 B and 116/116 B), and the classes then needed a declared
+constructor plus a padding member so that `sizeof` is the size passed to `operator new` (0xD640 / 0x816C / 0x44A0).
+The unit's `.data`, `extab` and `extabindex` all matched the target afterwards.
+
+**Floor.** This corrects the "ruled out" note on `-Cpp_exceptions`: exceptions on/off is not only an `extab`
+question. With a new-expression in the body it changes **`.text`** - this instruction, and the register colouring
+that follows from it - so a unit whose target has `extab` and whose allocating functions are a register off is a
+candidate even where the sections already match.
+
+**Example.** `Network/NetworkWiiMediator.cpp`: `initializeNetworkMediator` 1.887 -> 100.00, `reflectInit` 88.345 ->
+100.00, unit 95.09 -> 98.89 % in one commit.

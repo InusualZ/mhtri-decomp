@@ -259,6 +259,7 @@ measured unit).
 | 59 | A flipped unit's `extab`/`extabindex` entries must carry the map's names, and a global binding | A C++ unit that is byte-identical and READY still cannot link: `undefined: '@eti_800222FC'`. `dol split` names the entries it synthesises after the map (`@etb_`/`@eti_<VA>`) and only the target object defines them; MWCC writes anonymous ordinals with a local binding and no source or flag can spell the name. `tools/elf/objextab.py` (chained after `objalign` in every MWCC rule) renames them to `splits.txt start + st_value` and sets the binding global, writing only `.symtab`/`.strtab`. 18 of 254 registered units own such a symbol; `g3d/g3d_resfile` was the one READY unit it unblocks. | done |
 | 60 | The declaration set is part of the codegen | A unit is byte-identical by size and one added `#include` still moves a function (96.79185 -> 96.78541): MWCC numbers the anonymous pool and colours webs in declaration order, so the *set* of declarations a TU sees is a codegen input. Fold a declaration only where one is deleted (net-zero surface); never add an owner's header "for tidiness". | done |
 | 61 | A kept `bl` inside one function: scope `#pragma dont_inline on` to it | `-inline auto` folds a small helper into a `switch` case so retail's `bl` disappears and every later register/offset shifts; the unit-wide `-inline noauto` of row 28 also de-inlines calls the unit wanted folded, so put `#pragma dont_inline on`/`off` around the one function (the per-function inverse, touches nothing else, and the original did not inline that call either). `Network/network_state.cpp` `handleNetworkState1` 80.01 -> 82.50 % keeping the 56-byte `resetNetworkState3`'s `bl`; `lobby/fn_8020C588.cpp` measured all three spellings and kept `dont_inline on`. | done |
+| 62 | A `new` expression is not `operator new` plus a constructor call | The target keeps the allocated pointer in a callee-saved register across the constructor (`mr r31,r3`) and the manual form coalesces it away, costing a register, a frame size and a whole function's colouring | done |
 
 Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
 
@@ -266,7 +267,7 @@ Ruled out for this project - recorded so nobody re-runs them (details in `docs/m
 | --- | --- | --- |
 | Compiler-version matrix | "The original used a different compiler release" is the first suspicion and has to be closed once, per unit. | no |
 | The rest of the `-opt` axis | An unknown sub-option might be what controls fusion or stack allocation. | no |
-| `-Cpp_exceptions` | `extab`/`extabindex` presence suggests exceptions were on; it adds those sections but no `.text` bytes here. | no |
+| `-Cpp_exceptions` | `extab`/`extabindex` presence suggests exceptions were on; it adds those sections, and with a `new` expression in the body it moves `.text` too - see row 62. | no |
 | `-O4`/`-O4,p`/`-O2`, `-schedule off`, `-fp_contract off`, `-ipa off` | Another optimizer level or codegen switch might be the retail setting. | no |
 | A paired-single op in a function (the SDK's vector library, `fn_8007270C`'s fill loop) | It reads as a codegen lever and eats flag and shape sweeps. Measured 2026-09-25: **176 of 19,916** functions contain one and **0** of ~2,450 matched functions do, so the frontend cannot emit the body-store form. Record it and move on. | no |
 
