@@ -1,41 +1,43 @@
-/* ef/fn_8030681C.cpp - the `eft042` effect family's machine and the head of the status/equip screen
- * band, `.text` 0x8030681C..0x8030D338 (58 functions, 27420 B).
+/* ef/fn_8030681C.cpp - the `eft041`/`eft042` effect family's machine, `.text` 0x8030681C..0x80308FB4
+ * (26 functions, 10136 B), extab 0x80015AB4..0x80015B54 (20 records) and extabindex
+ * 0x80034674..0x80034764 (20 x 12 B).
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for most of this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump names only seven of the 58
- * addresses - `eft042_set2`, `Put_status_equip_status_block`, `Put_status_equip_element_block`,
- * `Put_status_invork_skill_sep`, `Put_equip_dtl_syo_item1`, `Put_equip_dtl_basis_sword_ken1` and
- * `Put_equip_dtl_basis_sword_ken2`; every other address in the range is the dump's placeholder
- * `zz_XXXXXXXX_`, and a rename would need the map and the source in one edit).
+ * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump names only `eft042_set2`, and
+ * every other address in the range is the dump's placeholder `zz_XXXXXXXX_`; a real name would need
+ * the map and the source in one edit).
  *
- * Registration (docs/plan.md 12).  Class 4 decided the name and class 2 the module.  The range is one
- * maximal unclaimed run between the two registered units `ef/fn_803066F0.c` (ends 0x8030681C) and
- * `hud/fn_80324F7C.c` (starts 0x80324F7C), so nothing about the run is a TU boundary; it holds at
- * least two original TUs and therefore keeps the map's own `fn_8030681C` stem as its file name.  The
- * module is `ef`: the left bracket is an `ef` unit, the range's first functions are the eft041/042
- * effect machine (its first body drives the `_EFT` record's work area, and the range defines
- * `eft042_set2`), and the naming scheme of the `ef` siblings is `eft0XX.cpp`.  Language C++ (the range
- * defines seven genuinely mangled symbols; `langcheck.py --unit` on the range reports `c++ high` from
+ * Registration (docs/plan.md 12).  Class 4 decided the name and class 2 the module.  The range is the
+ * head of the maximal unclaimed run between the two registered units `ef/fn_803066F0.c` (ends
+ * 0x8030681C) and `hud/fn_80324F7C.c` (starts 0x80324F7C).  The module is `ef`: the left bracket is an
+ * `ef` unit, the range's first functions are the eft041/042 effect machine (its first body drives the
+ * `_EFT` record's work area, and the range defines `eft042_set2`), and the naming scheme of the `ef`
+ * siblings is `eft0XX.cpp`.  Language C++ (the range defines seven genuinely mangled symbols;
+ * `langcheck.py --unit` on the range reports `c++ high` from
  * `eft042_set2__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3P10_CP_VECTOR`), so every definition whose map
  * name is plain is `extern "C"` so its emitted name stays the map's stem and objdiff can pair it
  * (playbook row 42).
  *
- * Seam (unproven).  Two clusters, and the second one runs past this range's right edge (the next
- * proposal, `proposal/8030D338_Put_equip_dtl_basis_sword_colorX__FP4_PLWP12_EQU.cpp`, is the same
- * status/equip screen band), so the range's edges are the `--max-bytes` cap, not a TU seam:
- *   0x8030681C..0x80308FB4 (32 functions)  the eft041/eft042 effect machine: `_EFT` work areas at
- *       +0x38, `res_eft_*` model creation, `MHchar` transforms, `eftGetKey*` colour keys, the
+ * SEAM (settled 2026-09-26, `.pi/notes/seam-round.md`).  The right edge is 0x80308FB4, not the
+ * 0x8030D338 this unit was first registered with.  `lbl_805DCCDC` is the bare source name
+ * `"menu_infomation.cpp"`, it has **exactly one copy in the whole DOL**, and the functions whose
+ * relocations name it span 0x8030A328 .. `Set_equip_column_arrangement` (0x8031A244) - a TU-local
+ * static has one emitter, so that whole run is one TU.  Cutting it at 0x8030D338 leaves 2 referrers
+ * above and 9 below (a false boundary); at 0x80308FB4 it leaves 0 and 11, which is consistent, so
+ * every body from 0x80308FB4 up belongs to `menu/menu_infomation.cpp`, whose range now starts exactly
+ * there.  One constant stays: the two screen bodies below the cut, `fn_80308EC0` and `fn_80308F1C`,
+ * are this unit's because they sit below 0x80308FB4; they read the shared `StatusScreenWork` record
+ * from `include/menu/menu_infomation.h` and call that unit's `fn_8030A1D0`.  The effect machine's own
+ * edge is where its two clusters part:
+ *   0x8030681C..0x80308E34 (22 rows, 19 drawn)  the eft041/eft042 effect machine: `_EFT` work areas
+ *       at +0x38, `res_eft_*` model creation, `MHchar` transforms, `eftGetKey*` colour keys, the
  *       `_ENEMY_WORK` source at +0x30.  `eft042_set2` (0x80306B60) is the family's spawner.
- *   0x80308FB4..0x8030D338 (26 functions)  the status/equip screen: `get_lsp_data`/`get_menu_lsp_tbl`/
- *       `draw_sprite_ary`/`draw_font_idx`/`PutPageArrow`, `_PLW`/`_EQUIP`/`_EQUIP_INDEX` records.
- * There is one call edge across the split (`fn_80308EC0` -> `fn_8030A1D0`), so the extent is recorded
- * here and left for the seam to settle as the functions match (AGENTS.md 8.3).
- *
- * Sections: `.text` 0x8030681C..0x8030D338, `extab` 0x80015AB4..0x80015C24 (46 records) and
- * `extabindex` 0x80034674..0x8003489C (46 x 12 B) - the run `extabindex` lists for this range's own
- * functions.  Both are contiguous with the previous unit's claims (`ef/fn_803066F0.c` ends extab at
- * 0x80015AB4 / extabindex at 0x80034674) and end exactly where the next function after the range
- * (0x8030D338) starts its own.  No `.ctors` word.
+ *   0x80308E34..0x80308FB4 (4 rows, all drawn)  the machine's retire arm (`fn_80308E34`) and the
+ *       screen's entry: `fn_80308E38` (the joint walk `eft035.cpp` shares), `fn_80308EC0` and
+ *       `fn_80308F1C`.
+ * The section split follows the same boundary: `fn_80308FB4` is the first function after it and the
+ * first `extabindex` record of the next unit, so 20 records stay here and 20 is exactly the count
+ * this range's framed functions need.
  *
  * Types.  `_EFT` (include/ef.h) is the 0x48-byte record `fn_800F8788` pools; its `work_0x38` is the
  * 64-byte per-effect work area `fn_800F8B44` hands out.  The work area's head is the same everywhere
@@ -52,17 +54,16 @@
  * tables and the `.sdata2` float pool are `extern`-declared by their map names and never defined
  * (playbook 29).
  *
- * State (this round).  28 of the range's 58 functions are written and measure at or above the 80 % bar
- * (`python tools/units/recompile.py ef/fn_8030681C.cpp --measure <symbol>`, against this worktree's
- * own split target object):
+ * State.  23 of the range's 26 functions are written and every written row is at or above the 80 %
+ * bar (5 byte-identical); the official unit metric is **35.491714 % fuzzy, 144 / 10136 `.text`
+ * bytes** (`build/RMHE08/report.json`):
  *
- *   100.00  fn_80306A84  fn_80306A94  fn_80306FB4  fn_80307E08  fn_80308E34  fn_8030A1D0
- *           fn_8030A30C  fn_8030BACC  fn_8030CA50
+ *   100.00  fn_80306A84  fn_80306A94  fn_80306FB4  fn_80307E08  fn_80308E34
  *    98.68  fn_80307AE8      97.27  fn_80306D14      96.50  fn_80306B10      95.65  fn_80308EC0
  *    93.99  fn_80306BFC      93.72  fn_80306E04      93.20  fn_80306FF0      93.07  fn_80306F40
  *    89.17  fn_80306A98      88.86  fn_8030681C      87.93  fn_80307C54      86.41  eft042_set2
  *    86.27  fn_80308D00      85.29  fn_80308E38      84.96  fn_803088FC      84.87  fn_80308F1C
- *    82.50  fn_80306F10      82.11  fn_80306D6C      81.48  fn_8030B790
+ *    82.50  fn_80306F10      82.11  fn_80306D6C
  *
  * The four bodies the range's head needed beyond the obvious shape, with what settled them:
  *   - `fn_8030681C` 88.86: the two `created` slots are called through a `EftUvModel` vtable view
@@ -77,7 +78,7 @@
  *   - `fn_80306D6C` 82.11: the work area's `+0x08` word is stored twice through the effect record's
  *     origin (`source_0x30 = NULL; source_0x30 = source;`); collapsing the two stores loses 8 points.
  *
- * Residuals, in address order (what each still needs):
+ * Residuals (what each still needs):
  *   fn_80307068 (0xA80)  the kind-0 state-0 body: a 19-way type jump table (`jumptable_805DCB68`)
  *                        whose arms build one to three pooled models from `lbl_805DC724`'s per-type
  *                        animation ids and drive their key frames.  It is the range's largest single
@@ -88,28 +89,20 @@
  *   fn_80308A30 (0x2D0)  the kind-2 state-1 body: three `nw4r::g3d::ScnMdl::CopiedMatAccess` round
  *                        trips over `ResTexSrt`/`GetEffectMtx`/`SetEffectMtx`; it needs the full nw4r
  *                        g3d class views (include/nw4r/g3d/scnmdl.h carries only part of them today).
- *   fn_80308FB4 (0xE4) .. fn_8030D220 (0x118)  the 27 status/equip screen bodies the range runs into
- *                        at 0x80308FB4.  They drive the same helper set as the next proposal
- *                        (`proposal/8030D338_Put_equip_dtl_basis_sword_colorX__FP4_PLWP12_EQU`):
- *                        `get_lsp_data`, `get_menu_lsp_tbl`, `draw_sprite_ary`, `draw_font_idx`,
- *                        `PutPageArrow`, `Set_equip_column_arrangement`, `GetEquipName` and the
- *                        `_PLW`/`_EQUIP`/`_EQUIP_INDEX` records.  Only the five bodies that are
- *                        wrappers, resets or a pure row count are written here (`fn_8030A1D0`,
- *                        `fn_8030A30C`, `fn_8030BACC`, `fn_8030CA50`, `fn_8030B790`); the rest belong
- *                        to whoever takes the status/equip band, with that band's shared types.
+ * Those three are the whole remainder: the range's other 23 rows are written.
  *
  * Data (measured, 5d).  Our object emits **no** `.data`/`.sdata`/`.sdata2`/`.rodata` at all: `objdump
  * -h` on `build/RMHE08/src/ef/fn_8030681C.o` against the split target object
- * (`build/RMHE08/obj/ef/fn_8030681C.o`) differs only in `.text` (4152 vs 27420), `extab` (136 vs 368)
- * and `extabindex` (204 vs 552) - all three because 30 bodies are still unwritten, and no data section
- * is `ours-extra`.  Nothing beyond the three claimed ranges is registered: the range's own `.data` run
- * (the four `jumptable_805D*` switch tables and the 27 labels from 0x805DC5E8 to 0x805DCD08) and its
- * `.sdata2` float pool stay unclaimed until the two giant bodies that emit them are written, because a
- * claim our object does not emit is a false claim (5d, playbook 29/58).
+ * (`build/RMHE08/obj/ef/fn_8030681C.o`) differs only in `.text`, `extab` and `extabindex` - all three
+ * because four bodies are still unwritten - and no data section is `ours-extra`.  Nothing beyond the
+ * three claimed ranges is registered: the range's own `.data` run (the four `jumptable_805D*` switch
+ * tables and the 27 labels from 0x805DC5E8 to 0x805DCD08) and its `.sdata2` float pool stay unclaimed
+ * until the giant bodies that emit them are written, because a claim our object does not emit is a
+ * false claim (5d, playbook 29/58).
  *
  * Rule-2 note.  `ef/fn_803066F0.c` (the range's left neighbour) declares `fn_8030681C` and
- * `fn_80306A94` itself, which the lint now resolves to this unit.  They cannot move to a header here:
- * the neighbour's `EftWork` is its own private view of the same record this file spells `_EFT`, and a
+ * `fn_80306A94` itself, which the lint resolves to this unit.  They cannot move to a header here: the
+ * neighbour's `EftWork` is its own private view of the same record this file spells `_EFT`, and a
  * shared header would have to pick one of the two names.  Recorded as a residual for the header
  * consolidation pass (the lint's own "unsplit gap" reasoning).
  */
@@ -136,46 +129,13 @@
 #include "enemy/fn_8012BDF4.h"
 #include "unsplit/enemy.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "menu/menu_infomation.h"
 
-/* The status screen's own work record, the tail of this range's first cluster (`fn_80308EC0`/
- * `fn_80308F1C` drive it; `fn_8030A1D0` takes the `+0x190` record).  Only the fields those functions
- * reach are named, so the size is the extent they prove, not the record's own (the complete layout
- * belongs to the status/equip screen unit this range runs into at 0x80308FB4).
- * size: 0x23C (the extent these bodies prove) */
-typedef struct StatusScreenWork {
-    u8    pad_0x000[0x4];          /* +0x000 */
-    u16   field_0x04;             /* +0x004  the frame's flag word `fn_80308F1C` folds */
-    u8    pad_0x006[0x2];          /* +0x006 */
-    u16   field_0x08;             /* +0x008  its second flag word */
-    u8    pad_0x00A[0x14 - 0x0A];  /* +0x00A */
-    u8    field_0x14;             /* +0x014  the screen mode `fn_80308EC0`/`fn_8030BACC` set */
-    u8    pad_0x015[0x1C - 0x15];  /* +0x015 */
-    u8    field_0x1C;             /* +0x01C  the cursor row `fn_8030BACC` clears */
-    u8    pad_0x01D[0x190 - 0x1D]; /* +0x01D */
-    void* equip;                   /* +0x190  the record `fn_8030A1D0` walks */
-    u8    pad_0x194[0x19E - 0x194];/* +0x194 */
-    u16   field_0x19E;             /* +0x19E  the page count `fn_8030B790` counts into */
-    u8    field_0x1A0;             /* +0x1A0  one visible-row flag per row */
-    u8    field_0x1A1;             /* +0x1A1 */
-    u8    field_0x1A2;             /* +0x1A2 */
-    u8    field_0x1A3;             /* +0x1A3 */
-    u8    pad_0x1A4[0x1AE - 0x1A4];/* +0x1A4 */
-    s8    field_0x1AE;             /* +0x1AE  the page index `fn_802A8EFC` advances */
-    s8    field_0x1AF;             /* +0x1AF  the last-page index (one past the count) */
-    u8    pad_0x1B0[0x23A - 0x1B0];/* +0x1B0 */
-    u8    field_0x23A;             /* +0x23A  the `fn_80308EC0` reset byte */
-    u8    pad_0x23B[1];            /* +0x23B */
-} StatusScreenWork;
-
-/* The equip list record `fn_8030B790` counts over: one 16-bit slot id per row and a matching per-row
- * flag byte.  Only those two arrays are reached, so the size is their extent.
- * size: 0x60C (the extent `fn_8030B790` proves) */
-typedef struct EquipListWork {
-    u8  pad_0x000[0x5F2];          /* +0x000 */
-    u16 slot_id[8];                /* +0x5F2  one id per row (stride 2) */
-    u8  row_flag[8];               /* +0x602  the per-row visible flag */
-    u8  pad_0x60A[2];              /* +0x60A */
-} EquipListWork;
+/* The screen work record this range's tail reads (`fn_80308EC0`/`fn_80308F1C`) and the page count
+ * they arm it from (`fn_8030A1D0`) live with their owner, `menu/menu_infomation.cpp`'s header: the
+ * two screen bodies below the seam are all this unit needs from that unit.  The `EquipListWork`
+ * record moved with `fn_8030B790`, its only reader.
+ */
 
 /* One model record of the work area: the pooled model handle the spawner stores and the create
  * result the state-0 bodies file.  Two families disagree about the second word - the kind-2 bodies
@@ -307,14 +267,6 @@ extern "C" void fn_80308E34(_EFT* self);
 extern "C" void fn_80308E38(_EFT* self, u32 visible, u8 from, u8 to);
 extern "C" void fn_80308EC0(StatusScreenWork* self);
 extern "C" s32  fn_80308F1C(StatusScreenWork* self);
-extern "C" s32  fn_8030A1DC(void* equip, s32 mode, s32 p3, s32 p4);
-extern "C" s32  fn_8030A328(void* a, void* b, s32 c, s32 d, u16 e, s8 f);
-extern "C" s32  fn_8030A1D0(void* equip, s32 mode);
-extern "C" s32  fn_8030A30C(void* a, void* b, u32 page, s32 delta);
-extern "C" void fn_8030BACC(StatusScreenWork* self);
-extern "C" s32  fn_8030B790(EquipListWork* self);
-extern "C" s32  fn_8030CA50(void* a, void* b, u32 row, u32 sel);
-extern "C" s32  fn_8030CA68(void* a, void* b, s32 c, u16 d, u8 e);
 
 /* Neighbours of this range the map leaves plain; the ones an owner unit already has a header for are
  * declared there and included above (rule 2), the rest sit here until their owner writes one. */
@@ -891,61 +843,4 @@ extern "C" void fn_80308D00(_EFT* self)
     } else {
         self->state_0x05++;
     }
-}
-
-/* ---------------------------------------------------------------------------------------------------
- * the status/equip screen band's wrappers (the head of `proposal/8030D338`, kept here because the
- * range boundary is a size cap: their bodies are the same subsystem the range's tail belongs to)
- * --------------------------------------------------------------------------------------------------- */
-
-/* The equip page count with the default column arrangement. */
-extern "C" s32 fn_8030A1D0(void* equip, s32 mode)
-{
-    return fn_8030A1DC(equip, mode, 0, 0);
-}
-
-/* The same, for a caller that carries a page id and a signed page delta. */
-extern "C" s32 fn_8030A30C(void* a, void* b, u32 page, s32 delta)
-{
-    return fn_8030A328(a, b, 0, 0, page, delta);
-}
-
-/* The equip detail page with the row and the item list's own selector. */
-extern "C" s32 fn_8030CA50(void* a, void* b, u32 row, u32 sel)
-{
-    return fn_8030CA68(a, b, 0, row, sel);
-}
-
-/* Resets the screen's page counters and the four row flags for the equip-detail mode (mode 8). */
-extern "C" void fn_8030BACC(StatusScreenWork* self)
-{
-    self->field_0x14 = 8;
-    self->field_0x1C = 0;
-    self->field_0x1A0 = 0;
-    self->field_0x1A1 = 0;
-    self->field_0x1A2 = 0;
-    self->field_0x1A3 = 0;
-    self->field_0x19E = 0;
-}
-
-/* The number of equip rows the screen shows: every row whose slot id and flag are both set, rounded up
- * to the six-per-page step (`(n + 5) / 6`) and never below one page. */
-extern "C" s32 fn_8030B790(EquipListWork* self)
-{
-    s32 count = 0;
-    u32 i;
-
-    for (i = 0; i < 8; i++) {
-        if (self->slot_id[i] != 0 && self->row_flag[i] != 0) {
-            count++;
-        }
-    }
-
-    {
-        s8 pages = (s8)((count + 5) / 6);
-        if (pages != 0) {
-            return pages;
-        }
-    }
-    return 1;
 }

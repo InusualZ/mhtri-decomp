@@ -670,12 +670,14 @@ config.libs = [
             # library's - `get_menu_lsp_tbl`/`put_menu_cursor`/`GetMenuFontColor`/`ItemName`).
             Object(NonMatching, "menu/fn_802E4978.cpp"),
             # Registered from proposal/8030D338_Put_equip_dtl_basis_sword_colorX__FP4_PLWP12_EQU.cpp
-            # (`--max-bytes`-capped run `.text` 0x8030D338..0x80313E24, 67 functions / 27372 B).
-            # Module `menu` and file name `menu_infomation.cpp` are class-1 evidence: `.data`
-            # 0x805DCCDC is the bare `__FILE__` string referenced by this range's `fn_80312F84`
-            # Panic.  The seam is provisional (the same string is referenced out to 0x8031A244); see
-            # the unit header.  Sections: .text 0x8030D338..0x80313E24, extab
-            # 0x80015C24..0x80015DEC (57 records), extabindex 0x8003489C..0x80034B48 (57 records).
+            # and re-drawn by the seam round (`.text` 0x80308FB4..0x8031A6C0, 149 functions /
+            # 71436 B).  Module `menu` and file name `menu_infomation.cpp` are class-1 evidence:
+            # `.data` 0x805DCCDC is the bare `__FILE__` string, it has exactly one copy in the DOL
+            # and its referrers span 0x8030A328..`Set_equip_column_arrangement` (0x8031A244), so the
+            # whole run is one TU (the old 0x8030D338/0x80313E24 edges were proven false; see the
+            # unit header and `.pi/notes/seam-round.md`).  Sections: .text 0x80308FB4..0x8031A6C0,
+            # extab 0x80015B54..0x80015F3C (125 records), extabindex 0x80034764..0x80034D40
+            # (125 x 12 B).
             Object(NonMatching, "menu/menu_infomation.cpp"),
             # Registered from proposal/8031A6C0_fn_8031A6C0.cpp (the `.text` 0x8031A6C0..0x8031EA8C
             # run, 59 functions / 17356 B): the item/equipment selection screen.  Module `menu`,
@@ -1271,15 +1273,15 @@ config.libs = [
             Object(NonMatching, "ef/eft050.cpp"),
             Object(Matching, "ef/fn_803066F0.c"),
             # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8030681C_fn_8030681C.cpp: one maximal unclaimed run
-            # (`.text` 0x8030681C..0x8030D338, 58 functions / 27420 B) that holds at least two
-            # original TUs - the eft041/042 effect machine (`eft042_set2` is defined at 0x80306B60,
-            # and fn_803066F0's `_EFT` record is what the first body drives) and the head of the
-            # status/equip screen band (`Put_status_equip_status_block`, `Put_equip_dtl_*`; the run
-            # continues past 0x8030D338 into proposal/8030D338).  Class 4 therefore decided the name
-            # (the map's own fn_8030681C stem) and class 2 the module (`ef`, the left bracket).
-            # C++; every plain `fn_` definition is `extern "C"`.  Sections: extab
-            # 0x80015AB4..0x80015C24 (46 records), extabindex 0x80034674..0x8003489C (46 x 12 B).
+            # proposal/8030681C_fn_8030681C.cpp, and re-drawn by the seam round (`.text`
+            # 0x8030681C..0x80308FB4, 32 functions / 10136 B): the eft041/042 effect machine, whose
+            # first body drives fn_803066F0's `_EFT` record and which defines `eft042_set2`.  The
+            # `menu_infomation.cpp` `__FILE__` string's referrer set puts the seam at 0x80308FB4 (the
+            # screen bodies above it belong to `menu/menu_infomation.cpp`), so this range keeps only
+            # the two screen entry points below it (`fn_80308EC0`/`fn_80308F1C`).  Class 4 decided
+            # the name (the map's own fn_8030681C stem) and class 2 the module (`ef`, the left
+            # bracket).  C++; every plain `fn_` definition is `extern "C"`.  Sections: extab
+            # 0x80015AB4..0x80015B54 (20 records), extabindex 0x80034674..0x80034764 (20 x 12 B).
             Object(NonMatching, "ef/fn_8030681C.cpp"),
         ],
     },

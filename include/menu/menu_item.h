@@ -184,7 +184,19 @@ struct MenuSlot {
     /* +0x190 */ _PLW* worker;        /* the player work the slot displays */
     /* +0x194 */ u32 field_0x194;
     /* +0x198 */ u32 field_0x198;
-    /* +0x19C */ u8 unused_0x19C[0x23A - 0x19C];
+    /* +0x19C */ u8 unused_0x19C[0x19E - 0x19C];
+    /* +0x19E */ u16 field_0x19E;     /* the value `menu/menu_item.cpp`'s view calls `field_0x19E` */
+    /* +0x1A0 */ u8 field_0x1A0;      /* the column the equipment panel puts the cursor in */
+    /* +0x1A1 */ s8 field_0x1A1;      /* its row (`fn_802A8F14` resolves the height into it) */
+    /* +0x1A2 */ u8 field_0x1A2;
+    /* +0x1A3 */ u8 field_0x1A3;
+    /* +0x1A4 */ u8 unused_0x1A4[0x1B0 - 0x1A4];
+    /* +0x1B0 */ u8 field_0x1B0;
+    /* +0x1B1 */ u8 unused_0x1B1[0x1EC - 0x1B1];
+    /* +0x1EC */ u8 field_0x1EC[0x1F0 - 0x1EC];  /* the embedded selection cursor */
+    /* +0x1F0 */ u16 field_0x1F0;    /* the cursor's two item ids */
+    /* +0x1F2 */ u16 field_0x1F2;
+    /* +0x1F4 */ u8 unused_0x1F4[0x23A - 0x1F4];
     /* +0x23A */ u8 field_0x23A;
     /* +0x23B */ u8 unused_0x23B[0x31E - 0x23B];
     /* +0x31E */ u8 field_0x31E;

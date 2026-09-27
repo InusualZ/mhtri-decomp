@@ -58,13 +58,6 @@ void set_blendmode(u8, u8, u8);
 void subTransSetPrio(u8, u32, u32, u32*);
 u8** get_str_tbl(s32);
 
-/* The next band's own dispatchers (proposal 80313E24.., no owner yet). */
-u8 fn_80315440(void*, void*, void*, void*, void*);   /* 0x80315440 */
-u8 fn_803155BC(void*, void*, void*, void*, u8, void*); /* 0x803155BC */
-u8 fn_80315730(void*, void*, void*, void*, void*, void*, void*, void*, void*); /* 0x80315730 */
-u8 fn_80315A60(void*, void*, u8);                    /* 0x80315A60 */
-void fn_80315274(void*, void*, u8);                  /* 0x80315274 */
-void fn_803153F8(void*, u8);                         /* 0x803153F8 */
 void flfntSetColor(u32);
 void font_flush(void);
 void font_locate(s16, s16);

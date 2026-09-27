@@ -33,6 +33,16 @@ void fn_8027D76C(struct _PLW* self);
  * (`menu/menu_infomation.cpp`), whose header is the first consumer. */
 u8 fn_8027FF88(u32 equip);
 
+/* 0x8027F11C - the equipment "category weight" of one piece: `lbz` of its first byte, then a
+ * 0/1/6/0xB..0xF switch (`NULL` maps to 0).  `fn_8027ECAC` / `fn_8027FFFC` are the two sub-record
+ * accessors the same screen reads to classify a piece: the `_EQUIP` sub-record (NULL when absent)
+ * and the piece's "filled" flag.  All three are owned by this unit and were added with
+ * `menu/menu_infomation.cpp`, their first consumer (docs/plan.md 6.5 rule 2). */
+struct _EQUIP;
+u8 fn_8027F11C(void* equip);
+void* fn_8027ECAC(struct _EQUIP* equip);
+u32 fn_8027FFFC(struct _EQUIP* equip);
+
 #ifdef __cplusplus
 }
 #endif
