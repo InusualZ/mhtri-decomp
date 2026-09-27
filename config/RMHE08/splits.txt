@@ -1346,6 +1346,16 @@ RSO/runtime.c:
 DWCi/fn_805113B0.c:
 	.text       start:0x805113B0 end:0x805124F4
 
+NWC24/nwc24_msg.c:
+	.text       start:0x8051D710 end:0x8051E068
+	.data       start:0x80631128 end:0x80631178
+	.sdata      start:0x80794438 end:0x80794440
+	.sbss       start:0x807958A0 end:0x807958A8
+
+NWC24/nwc24_io.c:
+	.text       start:0x8051E068 end:0x8051E864
+	.sbss       start:0x807958C0 end:0x807958C8
+
 fn_805482CC.cpp:
 	.text       start:0x805482CC end:0x8054E894
 
