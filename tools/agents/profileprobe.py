@@ -46,6 +46,8 @@ EXTRA = {
 8. Also for this role: what must you check about a registered range BEFORE you write bodies into it, and what do
    you do when that check fails? Which single piece of data settles it, and what does a `_<fnaddr>s_<file>_` name
    in the dump's map tell you - and what does it NOT tell you?
+9. And for this role: what does the profile require of a unit's **data sections**, and when? What is an `extern`
+   for data the unit's own functions own, and what does each direction of the mandatory `datagap` row mean?
 """,
     "merger": """
 7. For this role specifically: which two files may be unioned automatically and which must NEVER be handled

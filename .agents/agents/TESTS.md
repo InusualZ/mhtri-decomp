@@ -78,7 +78,12 @@ data and `matched_data` cannot rise. `enemy/fn_8018B3B8` (194 externs, no data c
 not have. `dataclaim.py` decides a *proposed* run (it serves the attribution queue), so `datagap.py` is the check a
 worker runs.
 
-T2 re-probe: the checklist now asks for the data rule as well; verdict recorded when it returns.
+T2 re-probe (2026-09-26): **the check is recalled, the rule's framing is not.** The child's mandatory-verification
+list now includes `datagap.py --unit <stem>` with both directions (no `ours-extra`, no `target-extra` on a section
+it claims) and it still states the seam rule in full - but it did **not** restate the rule itself, that the data is
+claimed *in the registration* and that an `extern` for data the unit owns is a defect. That is the same probe
+defect the seam rule had: question 4 elicits the *check* and question 3 elicits *numbered* rules, and this rule is
+unnumbered. The probe now asks it directly (question 9).
 
 ### T1 - discovery (2026-09-25)
 
