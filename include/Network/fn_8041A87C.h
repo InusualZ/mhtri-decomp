@@ -408,8 +408,8 @@ extern "C" {
 void* fn_803D6A98(void);
 
 /* owner: src/DWCi/fn_805113B0.c */
-u16 fn_80512200(u16 port);
-char* fn_80512210(u32 addr, u16 port, char* buf);
+u16 DWCi_htons(u16 port);
+char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 
 /* owner: src/sound/fn_800E46E8.cpp */
 void* fn_800E89D8(void);

@@ -8,7 +8,7 @@
  * so the function above it (`getLanguage`, 0x80413C40..0x80413C64) is a different TU.  Right seam
  * 0x804155D4 is **weak** (`tudiscover at agreeReflect__18NetworkWiiMediatorFv`, share 0.247): the
  * class band may continue past it, but 0x804155D4 is the largest single jump the evidence offers and
- * the next function (`fn_804155D4`, 0x9D8) opens a new shape.  Sections: `.text`
+ * the next function (`0x804155D4`, 0x9D8) opens a new shape.  Sections: `.text`
  * 0x80413C64..0x804155D4, `extab` 0x8001CA4C..0x8001CBF4, `extabindex` 0x8003D2F0..0x8003D524
  * (47 unwind records).
  *
@@ -30,10 +30,10 @@
  * from their own code: the accessor/updater pairs after the field they touch (`getReflectField30` /
  * `setReflectField30`, `getReflectName3C` / `setReflectName3C`, `getReflectPageRange` /
  * `setReflectPageRange`), the singleton forwarders after the 0x803FE helper they call
- * (`updatePatField854` -> fn_803FE854, `queryOpeningFlag208` -> fn_803FE208), and the packet/reflect
+ * (`updatePatField854` -> 0x803FE854, `queryOpeningFlag208` -> 0x803FE208), and the packet/reflect
  * helpers after what they do (`parseReflectPacket`, `buildReflectPacket`, `validateReflectName`,
  * `getReflectModeFromLanguage`, `isShiftJisLeadByte`).  `getReflectPageBuffer` is the retired
- * `NetworkWiiMediator.c` symbol (was `fn_80413F3C`), carried across verbatim and named here.
+ * `NetworkWiiMediator.c` symbol (was `0x80413F3C`), carried across verbatim and named here.
  *
  * NAMING GUESSES (rule 6.5: a guess is stated, not hidden).  `getReflectField30/34/38` and
  * `getAccountQuery1..5` are positional - the dump has no name and no caller reveals the field's
@@ -46,9 +46,13 @@
  * (`dispatchReflectEvent`, `buildReflectPacket`, `parseReflectPacket`, `initializeNetworkMediator`,
  * `loadPatInterfaceBuffers`) are stubs.
  *
- * rule 7 deferred: the only `fn_` spellings left in this file are *references* to other units' unrenamed
- * symbols (`fn_804138E4`, `fn_804155D4`, `fn_8041A458`, `fn_8041A48C`, `fn_8041A540`) - the escape covers
- * references, not this unit's own definitions, which are all named above.
+ * The five helpers it calls that no registered unit owns are named from this file's own call sites
+ * (`getReflectService` -> the object the three reflect calls take, `reflectServiceStart` /
+ * `reflectServiceStop` / `reflectServiceAgree` -> those three calls, `updatePatInterface` -> the
+ * body `updatePatInterface180` forwards to).  Each is a GUESS and each is declared in the band
+ * header `include/unsplit/Network.h`; they are markers for a later reconstruction to confirm.
+ * Only the comment above still carries a generated stem (`0x804155D4`), an address this unit does
+ * not call.
  */
 #include "types.h"
 #include "Network/NetworkWiiMediator.h"
@@ -105,10 +109,10 @@ void getMediatorFlag78C(NetworkWiiMediatorFields* self, void* out);
 void resetMediatorState(void* self);
 void initializeNetworkMediator(void* self, u32 value);
 void* getInstance_(void);
-void* fn_804138E4(void);
-void  fn_8041A458(void* self);
-void  fn_8041A48C(void* self);
-void  fn_8041A540(void* self);
+void* getReflectService(void);
+void  reflectServiceStart(void* self);
+void  reflectServiceStop(void* self);
+void  reflectServiceAgree(void* self);
 s32   isOpeningMaintenanceTerms(void* self);
 s32   isOpeningMaintenanceServer(void* self);
 s32   isOpeningAnnounce(void* self);
@@ -117,7 +121,7 @@ u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
 void  setMediatorTimestamp(NetworkWiiMediatorFields* self, u32 unused, u32 a, u32 b);
 void  getMediatorState68A(NetworkWiiMediatorFields* self, void* out);
-void  fn_803FE180(void* self, u32 a, u32 b, u32 c);
+void  updatePatInterface(void* self, u32 a, u32 b, u32 c);
 void  setTermVersion(void* self, u32 value);
 void  updatePatInterface180(void* self, u32 a, u32 b, u32 c);
 void  updateTermVersion(void* self, u32 value);
@@ -181,14 +185,14 @@ void getReflectPageBuffer(char *self, char **subobject, unsigned int *limit)
 void NetworkWiiMediator::reflectInit(NetworkWiiMediatorReflectFn callback, void* arg) { (void)callback; (void)arg; }
 void NetworkWiiMediator::reflectStart()
 {
-    if (fn_804138E4() != NULL) {
-        fn_8041A458(fn_804138E4());
+    if (getReflectService() != NULL) {
+        reflectServiceStart(getReflectService());
     }
 }
 void NetworkWiiMediator::reflectStop()
 {
-    if (fn_804138E4() != NULL) {
-        fn_8041A48C(fn_804138E4());
+    if (getReflectService() != NULL) {
+        reflectServiceStop(getReflectService());
     }
 }
 void NetworkWiiMediator::reflectFinal() {}
@@ -221,8 +225,8 @@ void NetworkWiiMediator::getAccountWaitQueue(char* out, u32 size) { (void)out; (
 void NetworkWiiMediator::getReflectPage(u8 page) { (void)page; }
 void NetworkWiiMediator::agreeReflect()
 {
-    if (fn_804138E4() != NULL) {
-        fn_8041A540(fn_804138E4());
+    if (getReflectService() != NULL) {
+        reflectServiceAgree(getReflectService());
     }
 }
 
@@ -304,7 +308,7 @@ void updatePatInterface180(void* self, u32 a, u32 b, u32 c)
 {
     (void)self;
     if (getInstance_() != NULL) {
-        fn_803FE180(getInstance_(), a, b, c);
+        updatePatInterface(getInstance_(), a, b, c);
     }
 }
 void updateTermVersion(void* self, u32 value)

@@ -7,12 +7,12 @@
  * aligned with `gap_*` padding, this one and everything below packs on 4) is a hard instruction-level
  * boundary, and `NHTTPi_alloc` (0x805145E8), `NHTTPi_free`, `NHTTPi_SetError`, `NHTTPi_SetSSLError`
  * and `NHTTPi_Startup` (0x805146A0) begin here.  Right edge 0x80515010 is the `.sdata` run-jump
- * interval's lower bound for the next TU (`tudiscover`: `.sdata run jump lbl_80794394 -> lbl_807943A0`
+ * interval's lower bound for the next TU (`tudiscover`: `.sdata run jump 0x80794394 -> 0x807943A0`
  * admits cuts [18653,18686]); 0x80515010 is `NHTTPi_CheckCurrentThread`, the first referrer of the
  * next TU's private string, so that anchor starts the next unit.
  *
  * SOURCE FILE.  Real name recovered from the unit's own pool: `NHTTPi_Startup` loads
- * `.data:0x80630A28` = `"NHTTP_bgnend.c"` (the group lbl_80630A08, which also carries the
+ * `.data:0x80630A28` = `"NHTTP_bgnend.c"` (the group 0x80630A08, which also carries the
  * `NCDGetCurrentIpConfig`/`*warning: %d connections rests` strings).  `dumpmap.py`/the runtime dump
  * answer only `zz_05145b8_` for the code, so the `__FILE__` string is the name evidence.
  *
@@ -26,24 +26,23 @@
  * FLAGS.  `cflags_nhttp` (`Wii/1.3`, `-func_align 4`, copied from `cflags_dwc`/`cflags_os`) - the
  * 4-byte packing above is the evidence for the alignment; nothing else is tuned.
  *
- * NAMING (rule 7).  Four `fn_` names the unit owns were derived from their bodies (each a GUESS - the
- * runtime dump answers only `zz_05145b8_`):
- *   fn_80514698 -> NHTTPi_GetSSLError     the 0x7D4 getter paired with NHTTPi_SetSSLError
- *   fn_80514920 -> NHTTPi_GetError        the 0x7D8 getter paired with NHTTPi_SetError
- *   fn_80514A64 -> NHTTPi_RemoveNode      unlinks the head of the request's circular header list
- *   fn_80514928 -> NHTTPi_SetHeaderField  searches/allocates a header-field node (ref'd, body elsewhere)
- *   fn_805145B8 -> NHTTPi_InitSystemInfo  zeroes the info block (ref'd by d_nhttp's GetSystemInfoP)
- *   fn_80514EA8 -> NHTTPi_InitMutexInfo   clears the mutex-info lazy-init flag (ref'd by d_nhttp)
- * The remaining `fn_` names in this range have no body here and stay the map's placeholders.
+ * NAMING (rule 7).  Six of the names the unit owns were derived from their bodies (each a GUESS -
+ * the runtime dump answers only `zz_05145b8_`):
+ *   0x80514698 -> NHTTPi_GetSSLError     the 0x7D4 getter paired with NHTTPi_SetSSLError
+ *   0x80514920 -> NHTTPi_GetError        the 0x7D8 getter paired with NHTTPi_SetError
+ *   0x80514A64 -> NHTTPi_RemoveNode      unlinks the head of the request's circular header list
+ *   0x80514928 -> NHTTPi_SetHeaderField  searches/allocates a header-field node (ref'd, body elsewhere)
+ *   0x805145B8 -> NHTTPi_InitSystemInfo  zeroes the info block (ref'd by d_nhttp's GetSystemInfoP)
+ *   0x80514EA8 -> NHTTPi_InitMutexInfo   clears the mutex-info lazy-init flag (ref'd by d_nhttp)
+ * The remaining functions of the range have no body here, so their map rows keep the placeholder
+ * names a later body pass replaces; this file spells none of them.
  *
  * BODY (probe).  12 of the 27 functions, all small and fully pinned by the disassembly; 11 are
  * byte-identical at 100 %, `NHTTPi_RemoveNode` at 99.33 % (one evaluation-order pair).
  */
 
 #include "NHTTP/NHTTP_bgnend.h"
-
-extern void OSLockMutex(void* mutex);
-extern void OSInitMutex(void* mutex);
+#include "unsplit/OS.h"   /* OSLockMutex / OSInitMutex (rule 2 band) */
 
 /* 0x80514688 (8): store the NHTTP error into the info block. */
 void NHTTPi_SetError(NHTTPInfo* info, s32 err) {

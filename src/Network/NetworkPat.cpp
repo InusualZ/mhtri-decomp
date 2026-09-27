@@ -22,14 +22,14 @@
  * `deleteNetworkCommunityPat` install, unset and delete slot +0x08 (the getter `getNetworkCommunityPat`
  * reads +0x08), and the `layer`/`sessionManager` families follow the same scheme at +0x0C / +0x00.
  * Slot +0x04 has no getter in the dump, so its three helpers are named after the offset:
- * `clearNetworkPatSlot04` / `deleteNetworkPatSlot04`.  `fn_80419EA4` (the +0x00 installer,
+ * `clearNetworkPatSlot04` / `deleteNetworkPatSlot04`.  `0x80419EA4` (the +0x00 installer,
  * 0x80419EA4) is the same class and lies just below the left seam - a residual of the boundary,
  * recorded rather than claimed.
  *
  * NAMING GUESS.  The `+0x04` slot's type is unproven (no getter in the runtime map), so
  * `clearNetworkPatSlot04` / `deleteNetworkPatSlot04` record the slot offset, not an invented type.
  *
- * Every symbol this file defines is named; the `fn_80419EA4` above is a comment mention of the
+ * Every symbol this file defines is named; the `0x80419EA4` above is a comment mention of the
  * unclaimed +0x00 installer just below the seam, not a reference this unit makes (rule 7 clean).
  *
  * BODIES.  The three getters and the four install/uninstall helpers are reconstructed from the
@@ -39,7 +39,7 @@
 
 /* The holder the accessors walk: four `void*` slots at +0x00/+0x04/+0x08/+0x0C.  The three named
  * getters read slot +0x00 / +0x08 / +0x0C through the caller's `index`; the `+0x04` slot has no
- * getter (its installer `fn_80419EA4` sits just below the unit's left seam). */
+ * getter (its installer `0x80419EA4` sits just below the unit's left seam). */
 typedef struct NetworkPat {
     /* +0x00 */ void* sessionManager_00;
     /* +0x04 */ void* unused_04;

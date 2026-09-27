@@ -217,7 +217,7 @@ u16 fn_803F8BDC(void* self, const void* value);
 void fn_803D39BC(NetworkSessionStable* self, void* stream, u32 a, u32 b, const void* term, u32 c);
 
 /* neighbouring helpers */
-void fn_803D6870(void);   /* 0x803D6870, in this unit's span; the mediator opener's callback */
+void networkSessionReflectCallback(void);   /* 0x803D6870, in this unit's span; the mediator opener's callback */
 void fn_803CA338(void* self);
 void dtor_803CA338(void* self);
 void fn_803CA37C(void* self);

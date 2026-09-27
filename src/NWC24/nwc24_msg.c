@@ -18,38 +18,45 @@
  *
  * NAMING.  Every generated name this unit owns was renamed through
  * `python tools/symbols/symedit.py rename` (18 rows, `.pi/notes/net-nwc24.md`); no `rule 7 deferred`
- * escape is needed, because the unit now defines and references only real names.  The evidence, per row:
- *   0x8051D710 fn_8051D710 -> NWC24iGetUserId           reads the 8-byte user id (work area, else the
+ * escape is needed, because the unit now defines and references only real names.  The three data
+ * labels inside the unit's own `.sbss`/`.sdata` claims were renamed the same way, each a GUESS (the
+ * image carries no spelling for them): 0x807958A0 `0x807958A0` -> `sMsgLibOpenState` (the four
+ * values the public predicates compare: 0 closed / 1 opened by the game / 2 opened by a tool /
+ * 3 open blocked), 0x807958A4 `0x807958A4` -> `sVersionRegistered` (the flag
+ * `NWC24iRegisterVersion` sets around its one `OSRegisterVersion` call) and 0x80794438
+ * `0x80794438` -> `sVersionTag` (the `NWC24VersionTag` whose string pointer is registered).
+ * The evidence, per row:
+ *   0x8051D710 -> NWC24iGetUserId           reads the 8-byte user id (work area, else the
  *            RTC shadow at 0x800031C0), CRC-checks it with NWC24iCheckUserIdCRC and generates + stores a
  *            fresh one; the public SDK spelling of the same read is `NWC24GetUserId` (marked guess).
- *   0x8051D878 fn_8051D878 -> NWC24iRegisterVersion      passes `.sdata` 0x80794438 (the pointer to the
+ *   0x8051D878 -> NWC24iRegisterVersion      passes `.sdata` 0x80794438 (the pointer to the
  *            NWC24 version string) to OSRegisterVersion, once, behind the 0x807958A4 flag.
- *   0x8051D8D8 fn_8051D8D8 -> NWC24iIsMsgLibOpenBlocked  returns state == 3; NWC24BlockOpenMsgLib sets 3
+ *   0x8051D8D8 -> NWC24iIsMsgLibOpenBlocked  returns state == 3; NWC24BlockOpenMsgLib sets 3
  *            to block the open and callers treat a non-zero answer as the -0x1A error (marked guess:
  *            the runtime dump carries `nandIsInitialized` at this address, a Ghidra function-ID match
  *            for the `subi/cntlzw/srwi` getter shape that contradicts the state machine, so it was not
  *            taken).
- *   0x8051DB4C fn_8051DB4C -> NWC24iSetScriptMode        passes its own name string "NWC24iSetScriptMode"
+ *   0x8051DB4C -> NWC24iSetScriptMode        passes its own name string "NWC24iSetScriptMode"
  *            (`.data` 0x8063118C) to its error path.
- *   0x8051DEA8 fn_8051DEA8 -> NWC24iRequestCommand6      tail-calls NWC24iRequestIoctl(0, 6, out); its
- *            only caller is fn_8051EB38 in the SO band, which retries while it answers -0x1D.
- *   0x8051DEB8 fn_8051DEB8 -> NWC24iRequestCommand7      tail-calls NWC24iRequestIoctl(0, 7, out); its
- *            only caller is fn_8051EF60, which maps its error through jumptable_80631310.
- *   0x8051DEC8 fn_8051DEC8 -> NWC24iLockSocket           tail-calls NWC24iRequestIoctl(0, 8, 0); its
+ *   0x8051DEA8 -> NWC24iRequestCommand6      tail-calls NWC24iRequestIoctl(0, 6, out); its
+ *            only caller is 0x8051EB38 in the SO band, which retries while it answers -0x1D.
+ *   0x8051DEB8 -> NWC24iRequestCommand7      tail-calls NWC24iRequestIoctl(0, 7, out); its
+ *            only caller is 0x8051EF60, which maps its error through jumptable_80631310.
+ *   0x8051DEC8 -> NWC24iLockSocket           tail-calls NWC24iRequestIoctl(0, 8, 0); its
  *            only caller is SOiPrepareTempRm, and command 9 is the dump-named `NWC24iUnlockSocket`
  *            called by SOiConcludeTempRm (marked guess: the lock half of that pair).
- *   0x8051DEE8 fn_8051DEE8 -> NWC24iRequestCommand1      tail-calls NWC24iRequestIoctl(0, 1, 0); its
+ *   0x8051DEE8 -> NWC24iRequestCommand1      tail-calls NWC24iRequestIoctl(0, 1, 0); its
  *            only caller is NWC24SuspendScheduler.
- *   0x8051DEF8 loc_800B25F8 -> NWC24iRequestCommand3     tail-calls NWC24iRequestIoctl(0, 3, 0); its
+ *   0x8051DEF8 0x800B25F8 -> NWC24iRequestCommand3     tail-calls NWC24iRequestIoctl(0, 3, 0); its
  *            only caller is NWC24ResumeScheduler (the map's `loc_` stem was as generated as an `fn_`).
- *   0x8051DF08 fn_8051DF08 -> NWC24iRequestIoctl         opens /dev/net/kd/request, IOS_Ioctls the
+ *   0x8051DF08 -> NWC24iRequestIoctl         opens /dev/net/kd/request, IOS_Ioctls the
  *            caller's command with a 0x20-byte work buffer, copies one result word, closes, all under
  *            the work mutex.
  *
  * WHY A UNIT OF ITS OWN (registration evidence)
  *   - anchor: `tools/splits/tudiscover.py at 0x8051D8B0` closes on `NWC24IsMsgLibOpened` alone (a leaf),
  *     and its only STRONG cut is the right edge 0x8051E864 (`.sdata` pool run jump
- *     `lbl_80794440 -> lbl_8079444C`, the NWC24 -> SO library seam).  The left edge is weak, so the band
+ *     `0x80794440 -> 0x8079444C`, the NWC24 -> SO library seam).  The left edge is weak, so the band
  *     was read from the code and the pools instead: the two functions below 0x8051D8B0 are NWC24's own -
  *     `NWC24iRegisterVersion` (0x8051D878, see the `.sdata` 0x80794438 row above) and `NWC24iGetUserId`
  *     (0x8051D710, calls the whole NWC24 public API and reads the library's work pointer `.sbss`
@@ -77,9 +84,13 @@
 #include "types.h"
 #include "unsplit/OS.h"   /* OSRegisterVersion / OSDisable(Interrupts) / OSRestoreInterrupts (rule 2 band) */
 
-/* the message library's open state (the map's own data names: rule 7 covers generated function names) */
-static u32 lbl_807958A0; /* 0 closed, 1 opened by the game, 2 opened by a tool, 3 open blocked */
-static u32 lbl_807958A4; /* NWC24 version-registration flag */
+/* The library's state (`.sbss` 0x807958A0/0x807958A4, inside the unit's own `.sbss` range).  Both
+   names are GUESSes - the original spellings are not in the image - and are derived from what the
+   API does with them: the open state's four values (0 closed, 1 opened by the game, 2 opened by a
+   tool, 3 open blocked) are exactly the four the public predicates compare against, and the second
+   word is the 0/1 flag NWC24iRegisterVersion sets around its one OSRegisterVersion call. */
+static u32 sMsgLibOpenState;   /* 0 closed, 1 opened by the game, 2 opened by a tool, 3 open blocked */
+static u32 sVersionRegistered; /* NWC24 version-registration flag */
 
 /* The library's version tag (`.sdata` 0x80794438, 8 B: the version-string pointer plus a zero word -
    the DOL's own bytes there are 0x80631128 then 0x00000000).  The literal itself is pooled into `.data`. */
@@ -88,7 +99,8 @@ typedef struct NWC24VersionTag {
     u32 unused_04;          /* +0x04 */
 } NWC24VersionTag; /* size: 0x8 */
 
-static NWC24VersionTag lbl_80794438 = {
+/* NAME (a GUESS, see the header): the tag NWC24iRegisterVersion hands to OSRegisterVersion. */
+static NWC24VersionTag sVersionTag = {
     "<< RVL_SDK - NWC24 \trelease build: Jun  9 2009 11:59:51 (0x4199_60831) >>",
     0,
 };
@@ -98,24 +110,24 @@ int NWC24iRequestIoctl(u32 handle, u32 command, u32 argument);
 
 int NWC24IsMsgLibOpened(void)
 {
-    return lbl_807958A0 == 1;
+    return sMsgLibOpenState == 1;
 }
 
 int NWC24IsMsgLibOpenedByTool(void)
 {
-    return lbl_807958A0 == 2;
+    return sMsgLibOpenState == 2;
 }
 
 int NWC24iIsMsgLibOpenBlocked(void)
 {
-    return lbl_807958A0 == 3;
+    return sMsgLibOpenState == 3;
 }
 
 void NWC24iRegisterVersion(void)
 {
-    if (lbl_807958A4 == 0) {
-        OSRegisterVersion(lbl_80794438.version_00);
-        lbl_807958A4 = 1;
+    if (sVersionRegistered == 0) {
+        OSRegisterVersion(sVersionTag.version_00);
+        sVersionRegistered = 1;
     }
 }
 
@@ -127,17 +139,17 @@ int NWC24BlockOpenMsgLib(int block)
 
     level = OSDisableInterrupts();
     if (block) {
-        if (lbl_807958A0 == 0) {
-            lbl_807958A0 = 3;
-        } else if (lbl_807958A0 == 1) {
+        if (sMsgLibOpenState == 0) {
+            sMsgLibOpenState = 3;
+        } else if (sMsgLibOpenState == 1) {
             error = -10;
         } else {
             error = -26;
         }
     } else {
-        wasBlocked = lbl_807958A0 == 3;
+        wasBlocked = sMsgLibOpenState == 3;
         if (wasBlocked) {
-            lbl_807958A0 = 0;
+            sMsgLibOpenState = 0;
         }
         if (!wasBlocked) {
             error = -9;

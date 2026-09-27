@@ -428,7 +428,7 @@ extern "C" s32 fn_8041B270(NetworkInstance* self, u32 peer, u16 value, const voi
     header.value_4 = peer;
     header.peer_2 = SOHtoNs(value);
     if (memcmp(data, lbl_80794380, 6) == 0) {
-        fn_80514400((void*)data, size, &header);
+        DWCi_NatNegSendPacket((void*)data, size, &header);
         return 1;
     }
     return 0;
@@ -952,8 +952,8 @@ s32 GameSpyInterfaceThread::closeSession()
 {
     OSLockMutex(mutex_4450);
     if (sessionOpen_4484 != 0) {
-        fn_805135E0(session_447C);
-        fn_80512C50();
+        DWCi_NatNegEndSession(session_447C);
+        DWCi_NatNegCleanup();
         sessionOpen_4484 = 0;
     }
     if (lbl_80794CE0 != 0) {
@@ -1213,7 +1213,7 @@ void GameSpyInterfaceThread::step()
                     if (lbl_806D3660.result_04 == 0) {
                         session_447C = peerId_4470 ^ selfPeerId_4474;
                         fn_8050E290(lbl_80794CE0);
-                        r = fn_805132C0(session_447C, peerMatch_4478, (NetworkCallback)fn_8041B26C,
+                        r = DWCi_NatNegStartSession(session_447C, peerMatch_4478, (NetworkCallback)fn_8041B26C,
                                         (NetworkCallback)fn_8041B334, &lbl_806D3660);
                         if (r != 0) {
                             error = 0;
@@ -1242,7 +1242,7 @@ void GameSpyInterfaceThread::step()
                     break;
                 case 1:
                     if (lbl_806D3660.result_04 != 0) {
-                        fn_80512C50();
+                        DWCi_NatNegCleanup();
                         sessionOpen_4484 = 0;
                         negotiationStep_4480 = 2;
                     }
@@ -1251,7 +1251,7 @@ void GameSpyInterfaceThread::step()
                     if (lbl_806D3660.active_00 != 0) {
                         if (peerMatch_4478 == 1) {
                             if (fn_8050DFA0(lbl_80794CE0, info,
-                                            fn_80512210(lbl_806D3660.session_0C,
+                                            DWCi_formatAddress(lbl_806D3660.session_0C,
                                                         lbl_806D3660.encoded_0A, NULL),
                                             profile_4485, 0x14, 0x2710, lbl_806031A0, 0) == 0) {
                                 negotiationStep_4480 = 3;
@@ -1276,7 +1276,7 @@ void GameSpyInterfaceThread::step()
                     break;
                 }
             }
-            fn_80513BB0();
+            DWCi_NatNegProcess();
             fn_8050DF20(lbl_80794CE0);
         }
         OSUnlockMutex(mutex_4450);
@@ -1351,8 +1351,8 @@ s32 GameSpyInterfaceThread::executeError()
             state_2C = code;
             if (running_6C != 0) {
                 if (sessionOpen_4484 != 0) {
-                    fn_805135E0(session_447C);
-                    fn_80512C50();
+                    DWCi_NatNegEndSession(session_447C);
+                    DWCi_NatNegCleanup();
                     sessionOpen_4484 = 0;
                 }
                 if (lbl_80794CE0 != 0) {
@@ -1372,8 +1372,8 @@ s32 GameSpyInterfaceThread::executeError()
             state_2C = code;
             if (running_6C != 0) {
                 if (sessionOpen_4484 != 0) {
-                    fn_805135E0(session_447C);
-                    fn_80512C50();
+                    DWCi_NatNegEndSession(session_447C);
+                    DWCi_NatNegCleanup();
                     sessionOpen_4484 = 0;
                 }
                 if (lbl_80794CE0 != 0) {
