@@ -1188,6 +1188,41 @@ def _declared_names_at(main: str, base: str, rel: str) -> set[str]:
     return {name for name, _line in sl.header_declarations(sl.Source(rel, rel, p.stdout))}
 
 
+def _defer_count(text: str) -> int:
+    """How many `rule 7 deferred: <reason>` declarations a file carries (the same shape stylelint honours)."""
+    return len(sl.RULE7_DEFER_RE.findall(text))
+
+
+def rule7_defer_growth(main: str, base: str | None) -> list[str]:
+    """Files in the batch whose `rule 7 deferred` count went UP - the naming rule's refusal.
+
+    The owner's ruling (2026-09-26): a generated name is never a resting place - derive one from context, and
+    guess (marked in the unit header so a later pass can refine it) when the evidence is thin. The escape stays
+    available for the files registered before the rule, so this is a check on GROWTH, not on presence: rewriting
+    a header that already carries the comment is safe (1 -> 1 passes), adding one to a file that did not have it
+    is not (0 -> 1 fails). `grep -rn "rule 7 deferred" src/` remains the complete list of files that use it.
+
+    Returns the offending paths, sorted. `[]` when `base` is unknown, no source file changed, or nothing grew.
+    """
+    if not base:
+        return []
+    touched = run(["git", "diff", "--name-only", base, "--", "src", "include"], main)
+    if touched.returncode != 0 or not (touched.stdout or "").strip():
+        return []
+    grew = []
+    for rel in touched.stdout.split():
+        if not rel.endswith((".c", ".cpp", ".h", ".hpp", ".cc")):
+            continue
+        new_text = ""
+        path = os.path.join(main, rel)
+        if os.path.exists(path):
+            new_text = open(path, encoding="utf-8", errors="replace", newline="").read()
+        old = run(["git", "show", "%s:%s" % (base, rel)], main)
+        if _defer_count(new_text) > _defer_count(old.stdout if old.returncode == 0 else ""):
+            grew.append(rel)
+    return sorted(grew)
+
+
 def band_ownership_warnings(main: str, base: str | None) -> list[str]:
     """Rule-2 warnings a batch introduces at the registration boundary. Never a refusal.
 
@@ -1796,6 +1831,17 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
           info=("%d newly-owned symbol declaration(s) still in include/unsplit/*.h - see the WARNING "
                 "lines above" % len(band_warnings)) if band_warnings
                else "no newly-owned symbol left declared in include/unsplit/*.h")
+
+    # No batch may add a `rule 7 deferred` escape (owner's ruling, 2026-09-26): a generated name is never a
+    # resting place - derive one from context, and guess (marked in the unit header) when the evidence is thin.
+    # The escape remains for the files registered before the rule, so the check is on growth per file, not on
+    # presence: a header that already carries the comment may be rewritten, a file that did not have it may not
+    # gain one. Without this the naming rule is advisory at the gate - stylelint accepts the comment by design.
+    defer_growth = rule7_defer_growth(main, want_base)
+    check("no batch adds a `rule 7 deferred` escape", not defer_growth,
+          detail="%d file(s) gained a `rule 7 deferred` comment: %s"
+                 % (len(defer_growth), ", ".join(defer_growth[:5])),
+          info="no file in the batch gained a `rule 7 deferred` comment")
 
     before = recorded.get("ledger") or ledger_numbers(main)
     flip = flips_objects(main)
