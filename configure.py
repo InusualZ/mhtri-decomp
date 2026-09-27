@@ -1251,6 +1251,26 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/80358624_fn_80358624.cpp: the `eft052` effect family (its `_EFT` tag is 52)
+            # and the cockpit item-page band it draws from (`.text` 0x80358624..0x8035E034, 92
+            # functions / 23056 B).  Module `ef` (brief class 3): the range is an `eft` family plus
+            # the cockpit hold/item layer in exactly the shape the registered `ef/eft050.cpp`
+            # documents, and its callers are the `ef` and `lobby` bands (`ef/ef_emitter.cpp`,
+            # `ef/eft050.cpp`, `lobby/fn_801E7530.cpp`, `lobby/fn_801EC9F8.cpp`).  No `__FILE__`
+            # string is reachable (every `lbl_` reference resolves to the float pool, the `.data`
+            # run or a call) and the runtime dump answers only `zz_` placeholders, so the name is
+            # DERIVED from the tag `eft052_set` seeds `_EFT::field_0x03` with - the file name of
+            # every registered sibling the dump knows (`eft001`, `eft002`, `eft009`, `eft019`,
+            # `eft035`, `eft050`) - and stays a guess the unit header records.  Every symbol this
+            # file defines is named from its own body; the `rule 7 deferred` line in its header
+            # covers only references to OTHER units' unrenamed symbols.  C++ (`GetItemData__FUs`,
+            # `LbStr__FUcUs`, `calcDistanceSqXZ__FP...`, plus the class whose constructor
+            # `fn_8035BBE8` installs the vtable `lbl_805ED808`); every plain `fn_` definition is
+            # `extern "C"`.  Only `.text` is claimed - the `.data` run 0x805ED0C0..0x805ED938, the
+            # `.sdata2` pool 0x8079B640..0x8079B704 and the extab/extabindex records stay
+            # unclaimed (the pooled constants and tables are declared, never defined).
+            Object(NonMatching, "ef/eft052.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The `proposal/8009B374_fn_8009B374`
             # range (`.text` 0x8009B374..0x8009CD64, 16 functions / 6640 B): the NW4R effect library's
             # shared math/utility file.  The range's own `__FILE__` string (`ef_util.cpp` at 0x80591948,

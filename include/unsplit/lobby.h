@@ -19,8 +19,11 @@
 /* Owner headers (rule 2).  The menu range's list/cursor entry points and the camera range's
  * `fn_802BBA64` group were declared in this band header while their addresses were unclaimed; both
  * ranges are registered now (`menu/fn_802A6624.cpp`, `camera/fn_802B5C58.cpp`), so their declarations
- * live in these headers and this one re-exports them for the units that already include it. */
+ * live in these headers and this one re-exports them for the units that already include it.  The
+ * `ef/eft052.cpp` entry points this header used to declare (`eft052_page_count_add`,
+ * `eft052_hold_row_get`, `eft052_hold_entry_set`) made the same move into `include/ef/eft052.h`. */
 #include "camera/camera.h"
+#include "ef/eft052.h"
 #include "menu/fn_802A6624.h"
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
@@ -197,7 +200,7 @@ typedef struct LbParam {
     /* +0x0B */ u8 mode_0x0B;
 } LbParam; /* size: 0xC */
 
-/* The 0x1C-byte parameter block `fn_80359568` reads (the `fn_801E79E4` menu action). */
+/* The 0x1C-byte parameter block `eft052_hold_entry_set` reads (the `fn_801E79E4` menu action). */
 typedef struct LbSeParam {
     /* +0x00 */ s32 value_0x00;
     /* +0x04 */ s16 mode_0x04;
@@ -518,9 +521,6 @@ u16 fn_802FB54C(s32);
 s16 fn_8033B6C0(s32, s32);
 s32 fn_8033B990(void);
 s32 fn_8033C1AC(void);
-s32 fn_80359140(u16, s32);
-s32 fn_80359530(u16 *, s32 *);
-s32 fn_80359568(s32 *, s32);
 s32 fn_80359628(void);
 s32 fn_80359B00(s32);
 s32 fn_80359D98(void *, void *);

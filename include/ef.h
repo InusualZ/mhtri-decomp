@@ -236,7 +236,13 @@ struct EftModelSlot; /* ef/fn_8010D1A8.c; only pointed at here */
 typedef struct EftModel {
     /* +0x000 */ struct MHchar* model;
     /* +0x004 */ void* volatile created;
-    /* +0x008 */ u8 pad_0x8[0x2D];
+    /* +0x008 */ u8 pad_0x8[0x14];
+    /* +0x01C */ VEC3 pos_0x1C;        /* the placement position `eft052_place` clears (added by
+                                        * `ef/eft052.cpp`) */
+    /* +0x028 */ u32 field_0x28;       /* the two handles `eft052_place` clears beside it (added by
+                                        * the same unit) */
+    /* +0x02C */ u32 field_0x2C;
+    /* +0x030 */ u8 pad_0x30[0x5];
     /* +0x035 */ u8 field_0x35;
     /* +0x036 */ u8 pad_0x36[0xD6];
     /* +0x10C */ struct EftModelSlot* field_0x10C;

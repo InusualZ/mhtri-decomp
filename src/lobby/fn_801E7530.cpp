@@ -331,7 +331,7 @@ void fn_801E79E4(void)
                     param.count_0x12 = 0;
                     param.data_0x14 = self->str_0x24;
                     param.flag_0x18 = 1;
-                    fn_80359568((s32*)&param, 0);
+                    eft052_hold_entry_set((s32*)&param, 0);
                 }
                 sysSE_req(5);
                 break;

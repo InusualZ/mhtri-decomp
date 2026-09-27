@@ -1189,6 +1189,11 @@ enemy/em024_ai.cpp:
 	extabindex  start:0x80036744 end:0x80036B88
 	.text       start:0x8034C1D0 end:0x80358624
 
+ef/eft052.cpp:
+	extab       start:0x8001736C end:0x80017574
+	extabindex  start:0x80036B88 end:0x80036E94
+	.text       start:0x80358624 end:0x8035E034
+
 enemy/fn_8035E034.cpp:
 	extab       start:0x80017574 end:0x800175DC
 	extabindex  start:0x80036E94 end:0x80036F30
