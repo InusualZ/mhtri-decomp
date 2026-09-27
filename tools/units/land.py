@@ -32,22 +32,17 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md` is the standard), rather than assuming the re-range harmless;
 * checks every command's exit code, `configure.py`'s included - a failed `configure.py` leaves a stale
   `build.ninja` and every later number is a fiction;
-<<<<<<< HEAD
-* refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
-  outside the batch's expected set, or whose outbox entry does not validate;
+* **refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
+  outside the batch's expected set, or whose outbox entry does not validate**; a foreign path **already in the
+  tree** is reported - with a likely cause when it looks like lane scratch (`.tmp-*`, `.ws-*`, an `upstream/`
+  clone) - **before** the expensive gate runs (`preflight_foreign`), not only as the refusal afterwards, so a
+  mis-launched lane's leftovers cost a second, not a 5-minute build;
 * **checks rule 10 like every other rule** (`vtableaudit.py`): a table of code pointers inside a unit's own
   ranges must be compiler output, so the row is add-only - exactly like the lint's `--diff`, because the
   tree already carries violations - and it PRINTS the violation set for the batch's units even when it
   passes. The rule used to be a "landing-review rule" (a habit), and
   `Network/fn_803D3CE8.cpp`'s two `self->vtable = &NetworkSessionManagerVTable;` writes survived a landing
   through it (2026-09-27); a silent pass is what that classification bought, so a silent pass is gone;
-=======
-* **refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
-  outside the batch's expected set, or whose outbox entry does not validate**; a foreign path **already in the
-  tree** is reported - with a likely cause when it looks like lane scratch (`.tmp-*`, `.ws-*`, an `upstream/`
-  clone) - **before** the expensive gate runs (`preflight_foreign`), not only as the refusal afterwards, so a
-  mis-launched lane's leftovers cost a second, not a 5-minute build;
->>>>>>> main
 * runs the style lint when it exists (7.21), reports the ledger delta, and warns when a unit improved with no
   document or header change to show for it (7.10); the lint row carries the **head** of stylelint's output -
   where the findings are - and never its trailing "not enforced: ..." legend, which on 2026-09-25 made a FAIL
