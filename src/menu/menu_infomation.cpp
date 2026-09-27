@@ -1,77 +1,149 @@
-/* menu/menu_infomation.cpp - the equipment-information screen: the detail panels for each weapon
- * class (sword, bowgun, and the shared basis/level helpers).
+/* menu/menu_infomation.cpp - the equipment-information screen: the whole `menu_infomation.cpp` TU,
+ * `.text` 0x80308FB4..0x8031A6C0 (0x1170C B, 149 symbols), extab 0x80015B54..0x80015F3C (125
+ * records) and extabindex 0x80034764..0x80034D40 (125 x 12 B).
  *
- * `.text` 0x8030D338..0x80313E24 (0x6AEC B, 67 symbols), extab 0x80015C24..0x80015DEC (57 framed
- * functions, one 8-byte record each) and extabindex 0x8003489C..0x80034B48 (57 12-byte records).
+ * NAME AND EXTENT (class 1 evidence, `.pi/notes/seam-round.md`).  `.data` 0x805DCCDC is the bare
+ * source name `"menu_infomation.cpp"` (the retail misspelling is the original) and 0x805DCCF0 its
+ * `"NW4R:Failed assertion "` message; `fn_80312F84` (this unit) builds the pair at 0x80313020.  That
+ * static has exactly ONE copy in the DOL, and the functions whose relocations name it span
+ * 0x8030A328 .. `Set_equip_column_arrangement` (0x8031A244) - a TU-local static has one emitter, so
+ * that whole run is one original source file.  The seams that used to cut it (0x8030D338: 2 referrers
+ * above / 9 below; 0x80313E24: 3 / 8) were FALSE; the left edge 0x80308FB4 (0 above / 11 below) is
+ * the cut this file took, and 0x8031A6C0 is the right one (11 / 0, and the extab/extabindex runs tile
+ * there).  Three registrations were redrawn onto it: `ef/fn_8030681C.cpp`'s tail, this file's old
+ * 0x8030D338..0x80313E24 fragment, and the never-landed `menu/fn_80313E24.cpp`.
  *
- * MODULE AND NAME (brief section 2, evidence order).
- *   * class 1 (a `__FILE__` string): `.data` 0x805DCCDC, size 0x14, is the bare source name
- *     `"menu_infomation.cpp"` (the retail misspelling is the original), and 0x805DCCF0 (0x18 B) is
- *     its `"NW4R:Failed assertion 0"` message.  `fn_80312F84` (this range) builds the pair at
- *     0x80313020: `lis r3,0x805E; addi r3,r3,-13092` -> 0x805DCCDC and
- *     `lis r5,0x805E; addi r5,r5,-13072` -> 0x805DCCF0, i.e. an `nw4r::db::Panic(__FILE__,line,msg)`.
- *     Module `menu` (the `menu_*` file family: `menu_item.cpp`, `menu_note.cpp`, `menu_placeinfo.cpp`
- *     all sit in this band's data pool), extension `.cpp` (the range's mangled callees).
+ * MODULE is `menu` (the `menu_*` file family this band's data pool carries: `menu_item.cpp`,
+ * `menu_note.cpp`, `menu_placeinfo.cpp`), extension `.cpp` (the range's mangled callees).
+ * `fn_8027FF88`'s caller and the `Set_equip_column_arrangement` mangling are the two C++ signals.
  *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for most of this range (checked with
- * `tools/units/symedit.py range 0x8030D338 0x80313E24`: only the 4 `Put_equip_dtl_basis_*` rows are
- * named, the other 63 are bare `fn_XXXXXXXX` stems and `dumpmap.py lookup` answers `zz_<addr>_` for
- * every one of them).  The 4 named rows are written as the C++ free functions their manglings spell.
+ * rule 7 deferred: the symbol map has only fn_XXXXXXXX for most of this range (`symedit.py range`
+ * 0x80308FB4 0x8031A6C0: of 149 rows five are named - the four `Put_*` putters and
+ * `Set_equip_column_arrangement` - and `dumpmap.py lookup` answers `zz_<addr>_` for the rest).  The
+ * named rows are written as the C++ free functions their manglings spell; every bare stem is
+ * `extern "C"` so the emitted name stays the map's.
  *
- * SEAM (unproven).  The `__FILE__` string is referenced outside this range too
- * (`auto_fn_8030A328_text.o`, `auto_03_8030BF34_text.o`, `auto_fn_80313E24_text.o` ..
- * `auto_Set_equip_column_arr_text.o` at 0x8031A244), so the real `menu_infomation.cpp` TU extends
- * from at most 0x8030A328 to at least 0x8031A244 and this registration is a fragment of it; the
- * range is worked as one unit and its extent settles as the functions match (brief 8.3).
+ * SECTIONS.  extab/extabindex are this unit's own runs; the split at 0x80308FB4 is the first
+ * extabindex record whose function is `fn_80308FB4` (0x80034674 + 12*20 = 0x80034764, its extab
+ * pointer 0x80015B54), and both runs tile exactly with the neighbours `ef/fn_8030681C.cpp`
+ * (0x80015AB4 / 0x80034674) and `menu/fn_8031A6C0.cpp` (0x80015F3C / 0x80034D40).  No `.data`/`.sdata`
+ * run is claimed: every table and constant the bodies read is shared with the neighbouring units of
+ * this band, and our object emits no data section at all (`datagap.py`: ours-extra empty in every
+ * section; every gap is target-extra, i.e. an unwritten body).
  *
- * SECTIONS beyond `.text`: extab and extabindex are this unit's own runs.  No `.data` run is claimed:
- * every table/constant the bodies read is shared with the neighbouring fragments of the same TU.
- * `datagap` (target object vs ours): ours-extra is empty in every section - ours emits .text, extab
- * and extabindex only, and the target's extra extab/extabindex bytes are the 39 functions not yet
- * written (target-extra, not a defect).  No `.sdata2`/`.rodata` partial claim is made (playbook 23).
+ * STATUS (official metric, this worktree's `build/RMHE08/obj/menu/menu_infomation.o` vs ours):
+ * **7.714038 % fuzzy, 1392 / 71436 `.text` bytes matched, 22 byte-identical rows**; 83 of the 149
+ * rows are written.  They came from the three registrations this seam redrew: 28 rows of the old
+ * 0x8030D338 fragment, 5 screen wrappers of the old `ef/fn_8030681C.cpp` head, and the 50 rows the
+ * never-landed `menu/fn_80313E24.cpp` brought (13 with real bodies, 37 placeholders).  The head's
+ * other 27 rows and the 0x8030D338..0x80313D5C fragment's 39 rows are unwritten, and they are the
+ * residuals, in address order:
+ *   `fn_80311540` 46.25  its tail-call argument is masked with `rlwinm r0,r6,0,31,28` + `clrlwi` (a
+ *       bitfield/`char` conversion whose source shape is not recovered).
+ *   `fn_803159CC` 69.19  the target branches on `(flags & 2)` in three arms where MWCC folds all
+ *       four to one select.
+ *   the unwritten rows, largest first: `fn_80311C3C` (0xC64), `fn_80312F84` (0xBB8) - the Panic that
+ *       builds this unit's `__FILE__` pair at 0x80313020 -, `fn_8030A9B4`, `fn_80311920`, the bowgun
+ *       panels (`fn_8030E79C`/`fn_8031077C`/`fn_80310F30`/`fn_803116D8`) and the `fn_8031994C`/
+ *       `fn_8031949C` dispatchers.
+ *   the 37 tail placeholders (`fn_80315C00`, `fn_8031A428`, ...) are empty definitions kept so the
+ *       map's rows pair by name; each is a body still to write, not a reconstruction.
  *
- * STATUS (official metric, this worktree's `build/RMHE08/obj/menu/menu_infomation.o` target vs our
- * `build/RMHE08/src/menu/menu_infomation.o`): **28 of 67 functions written, 27 of 28 above the 80 %
- * bar, 11 byte-identical; unit 11.754055 % fuzzy, 396 / 27372 `.text` bytes matched.**  The lowest
- * written row is `fn_80311540` (46.25: its tail-call argument is masked with `rlwinm r0,r6,0,31,28`
- * + `clrlwi` - a bitfield/`char` conversion whose source shape is not recovered, so the mask is
- * written `(u8)(c & 0x9FFFFFFF)` and MWCC folds it to a different `rlwinm`).  The 39 unwritten rows
- * are the band's larger dispatchers and state machines (`fn_80311C3C` 0xC64, `fn_80312F84` 0xBB8,
- * the three bowgun panels, the `fn_8030F87C`/`fn_8030FDA0`/`fn_80310F30`/`fn_803116D8` switch bodies);
- * they are residuals, in address order, not a reason to stop (brief 5).
+ * MOVED BODIES.  The head's five wrappers and the tail's 13 bodies are the same source, with the
+ * signature reconciliations one TU needs: `fn_80315440`/`fn_803155BC`/`fn_80315730`/`fn_80315A60`/
+ * `fn_80315274`/`fn_803153F8` now take the argument list the old 0x8030D338 half already called them
+ * with (they were `void f(void)` placeholders in a separate TU), and `Set_equip_column_arrangement`
+ * was written with `void*` parameters, which mangles to a name objdiff cannot pair; it now spells the
+ * map's `Set_equip_column_arrangement__FP4_PLWP12_EQUIP_INDEXP6_EQUIP` (rule 9).  `fn_8030B790`
+ * measures 81.48 -> 94.63 across the move because the merged unit compiles it with `cflags_menu`
+ * (`-opt nopeephole`), which that body's target codegen wants.
+ *
+ * TYPES.  `MenuSlot` (include/menu/menu_item.h) is the 0x330-byte menu working record; the
+ * `+0x19E`/`+0x1A0..+0x1A3`/`+0x1B0`/`+0x1EC`/`+0x1F0` fields this unit's tail reads were named on it
+ * with `menu/fn_80313E24.cpp`, which is where `menu_item.h`'s own `fn_8031A638(MenuSlot*)` caller puts
+ * them too.  `StatusScreenWork` (include/menu/menu_infomation.h) is the head's partial view of the
+ * same record - it lives in this unit's header because `ef/fn_8030681C.cpp`'s two below-the-seam
+ * bodies read it as well.  The three tail records (`EquipColumnPanel`, `EquipSlotInfo`,
+ * `EquipSubInfo`) and `EquipListWork` are this unit's own.
  */
 
 #include "types.h"
 #include "pl.h"
 #include "hud/layout.h"
 #include "menu/menu_item.h"
+#include "menu/fn_802A6624.h"
+#include "menu/menu_infomation.h"
+#include "Pl/pl_skill.h"
 #include "Pl/fn_8027D684.h"
+#include "ef/fn_800CDB2C.h"
 #include "unsplit/menu.h"
-/* draw_font_idx is declared in include/hud/layout.h (its owner) */
 
 extern "C" int sprintf(s8*, const char*, ...);   /* 0x8045DECC, the OS Runtime's */
 
-/* The equipment slot index the detail putters walk.  It is shared with the next band's
- * `Set_equip_column_arrangement`; until that unit registers, this file is its only user, so it lives
- * here and moves to `include/unsplit/menu.h` with the second user (rule 1).  Only +0x00/+0x04 are
- * touched by this range.  size: 0x08 (approximate: max touched offset + 1) */
+/* The equipment slot index the detail putters walk (the `Set_equip_column_arrangement` this unit
+ * also holds takes it).  Only +0x00/+0x04 are touched by this range.  size: 0x08 (approximate: max
+ * touched offset + 1) */
 struct _EQUIP_INDEX {
     /* +0x00 */ u32 equip_0x00;   /* the packed equipment word `fn_8027FF88` classifies */
     /* +0x04 */ u32 unused_0x04;
 };
 
-/* This unit's own C++-linkage exports (address order). */
+/* The per-hunter panel `fn_803153F8` clears: two parallel 8-entry tables, the first `u16` and the
+ * second `u8`, starting at +0x61A.  size: 0x632 (approximate: max touched offset + 1). */
+struct EquipColumnPanel {
+    /* +0x000 */ u8  pad_0x000[0x61A];
+    /* +0x61A */ u16 field_0x61A[8];
+    /* +0x62A */ u8  field_0x62A[8];
+};
+
+/* The slot-descriptor `fn_80319178` walks (a 3-way equipment slot selection).  size: 0x0C
+ * (approximate: max touched offset + 1). */
+struct EquipSlotInfo {
+    /* +0x00 */ u8  pad_0x00;
+    /* +0x01 */ u8  idx;              /* the active slot index, 0..2 */
+    /* +0x02 */ u8  pad_0x02[2];
+    /* +0x04 */ u16 flags;            /* two bytes the caller reads as the low/high half */
+    /* +0x06 */ u16 slots[3];         /* the three slot ids */
+};
+
+/* The sub-record `fn_8027ECAC` returns and `fn_80316978` reads (+0x0C is its class byte).
+ * size: 0x10 (approximate: max touched offset + 1). */
+struct EquipSubInfo {
+    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x0C */ u8 field_0x0C;
+};
+
+/* The equip list record `fn_8030B790` counts over: one 16-bit slot id per row and a matching per-row
+ * flag byte, 0x5F2 into the record.  Only those two arrays are reached, so the size is their extent.
+ * size: 0x60C (the extent `fn_8030B790` proves) */
+typedef struct EquipListWork {
+    u8  pad_0x000[0x5F2];          /* +0x000 */
+    u16 slot_id[8];                /* +0x5F2  one id per row (stride 2) */
+    u8  row_flag[8];               /* +0x602  the per-row visible flag */
+    u8  pad_0x60A[2];              /* +0x60A */
+} EquipListWork;
+
+/* This unit's own C++-linkage exports (address order).  They are declared as their real signatures so
+ * the C++ front-end reproduces the map's mangling (rule 9). */
 void Put_equip_dtl_basis_bowgun_gan1(_PLW*, _EQUIP_INDEX*, u16, u8, _mh_ivec2_*);
 void Put_equip_dtl_basis_bowgun_gan2(_PLW*, _EQUIP_INDEX*, u16, u8, _mh_ivec2_*);
 void Put_equip_dtl_basis_bowgun_gan_lv(_PLW*, _EQUIP_INDEX*, u16, u8, _mh_ivec2_*);
+void Set_equip_column_arrangement(_PLW*, _EQUIP_INDEX*, _EQUIP*);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* This unit's own forward declarations (address order).  They carry C linkage here so the
- * definitions below emit the map's bare `fn_XXXXXXXX` stems (rule 9: an `fn_` stem is not a
- * mangling). */
+/* This unit's own forward declarations (address order).  They carry C linkage here so the definitions
+ * below emit the map's bare `fn_XXXXXXXX` stems (rule 9: an `fn_` stem is not a mangling). */
+s32  fn_8030A1D0(void*, s32);
+s32  fn_8030A1DC(void*, s32, s32, s32);
+s32  fn_8030A30C(void*, void*, u32, s32);
+s32  fn_8030A328(void*, void*, s32, s32, u16, s8);
+s32  fn_8030B790(EquipListWork*);
+void fn_8030BACC(StatusScreenWork*);
+s32  fn_8030CA50(void*, void*, u32, u32);
+s32  fn_8030CA68(void*, void*, s32, u16, u8);
 void fn_8030D6C0(void*, void*, void*, u16, u8);
 void fn_8030D6A8(void*, void*, u16, u8);
 void fn_8030D808(void*, void*, u16, u8);
@@ -100,17 +172,76 @@ void fn_8030F374(void*, void*, u16, u8);
 void fn_8030FB78(u16, u8);
 void fn_8030FB60(u16);
 void fn_8030FB6C(u16);
-void fn_8030FC58(void*, void*, void*, u16, u8);
 void fn_8030FC40(void*, void*, u16, u8);
 void fn_8030FF0C(void*, void*, void*, u16, u8);
 void fn_8030FEF4(void*, void*, u16, u8);
-void fn_80310560(void*, void*, void*, u16, u8);
 void fn_80310548(void*, void*, u16, u8);
-void fn_80310E58(void*, void*, void*, u16, u8);
 void fn_80310E40(void*, void*, u16, u8);
-void fn_80311560(void*, void*, void*, u16, u8, u8);
 void fn_80311540(void*, void*, u16, u32, u8);
 void fn_80312DF0(u32*);
+void fn_80313E24(void);
+void fn_803142C8(u32, u8, const _mh_ivec2_*);
+void fn_80314340(void);
+void fn_803144A0(void);
+u8   fn_80314604(_PLW*, s8, u32);
+void fn_8031468C(void);
+u32  fn_803149B8(u16, u32*, u8, u32*);
+u32  fn_80314A64(u16, u32, u32, u32*);
+u8   fn_80314F18(void*, void*);
+void fn_80314F90(void);
+void fn_80315274(void*, void*, u8);
+void fn_803153F8(EquipColumnPanel*, u8);
+u8   fn_80315440(void*, void*, void*, void*, void*);
+u8   fn_803155BC(void*, void*, void*, void*, u8, void*);
+u8   fn_80315730(void*, void*, void*, void*, void*, void*, void*, void*, void*);
+u8   fn_803159CC(u8);
+u8   fn_80315A60(void*, void*, u8);
+void fn_80315C00(void);
+void fn_80315D0C(void);
+void fn_80315E34(void);
+void fn_80316058(void);
+void fn_8031622C(void);
+void fn_803164D0(void);
+void fn_80316780(void);
+u32  fn_80316978(u32, _EQUIP**, u8, u8*);
+void fn_80316A14(void);
+void fn_80316DDC(void);
+void fn_803170B4(void);
+void fn_8031729C(void);
+void fn_803173C4(void);
+void fn_80317788(void);
+void fn_80317B84(void);
+void fn_80317F94(void);
+u8   fn_80318204(u8, u8*, u8*);
+void fn_803182D8(void);
+u32  fn_80318790(u32, u8**, u8);
+void fn_803188AC(void);
+void fn_80318A10(void);
+void fn_80318E08(void);
+void fn_80318FB0(void);
+u8   fn_80319178(EquipSlotInfo*, u16*, s8*);
+void fn_80319204(void);
+void fn_8031949C(void);
+void fn_8031994C(void);
+void fn_80319F18(void);
+void fn_8031A410(void*, u32*, void*);
+void fn_8031A428(void*, void*, u32, u32, void*);
+void fn_8031A58C(MenuSlot*);
+void fn_8031A638(MenuSlot*);
+
+/* Callees other units own.  Most are declared in their owner's header and included above
+ * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `fn_802715A0`
+ * and `fn_80272E30` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
+ * `fn_800CF208` in `ef/fn_800CDB2C.h`; `fn_802E06B0` and `get_str_tbl` in `include/unsplit/menu.h`).
+ * The three below cannot: `fn_802A8F14`'s owner header (`menu/fn_802A6624.h`) is included by
+ * `menu/fn_8031A6C0.cpp`, which declares the same address itself as `s8 fn_802A8F14(s32, s32)`, so a
+ * declaration there is an `(10197) illegal function overloading` in a landed unit; and
+ * `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header declares neither and
+ * `include/unsplit/menu.h` (their old home) may not.  Declared here as this unit's view, the way
+ * `lobby/fn_801EC9F8.cpp` declares its own. */
+s16  fn_802A8F14(s16 a, s16 b);
+void fn_8031AE38(MenuSlot* self);
+void fn_8031BFEC(void* cursor, s32 kind, MenuSlot* owner);
 
 extern u32 lbl_805DCD48[];          /* .data: the per-colour packed word table */
 extern const char lbl_80792BE4[3];  /* .sdata "%d" */
@@ -120,6 +251,63 @@ extern const char lbl_80792BEC[5];  /* .sdata "%d%s" */
 #ifdef __cplusplus
 }
 #endif
+
+/* ---------------------------------------------------------------------------------------------------
+ * 0x80308FB4..0x8030CA68 - the screen half's head: the five bodies the old `ef/fn_8030681C.cpp`
+ * registration held (it ran into this range at 0x80308FB4, a seam the `__FILE__` string proves false)
+ * --------------------------------------------------------------------------------------------------- */
+
+/* The equip page count with the default column arrangement. */
+s32 fn_8030A1D0(void* equip, s32 mode)
+{
+    return fn_8030A1DC(equip, mode, 0, 0);
+}
+
+/* The same, for a caller that carries a page id and a signed page delta. */
+s32 fn_8030A30C(void* a, void* b, u32 page, s32 delta)
+{
+    return fn_8030A328(a, b, 0, 0, page, delta);
+}
+
+/* The equip detail page with the row and the item list's own selector. */
+s32 fn_8030CA50(void* a, void* b, u32 row, u32 sel)
+{
+    return fn_8030CA68(a, b, 0, row, sel);
+}
+
+/* Resets the screen's page counters and the four row flags for the equip-detail mode (mode 8). */
+void fn_8030BACC(StatusScreenWork* self)
+{
+    self->field_0x14 = 8;
+    self->field_0x1C = 0;
+    self->field_0x1A0 = 0;
+    self->field_0x1A1 = 0;
+    self->field_0x1A2 = 0;
+    self->field_0x1A3 = 0;
+    self->field_0x19E = 0;
+}
+
+/* The number of equip rows the screen shows: every row whose slot id and flag are both set, rounded up
+ * to the six-per-page step (`(n + 5) / 6`) and never below one page. */
+s32 fn_8030B790(EquipListWork* self)
+{
+    s32 count = 0;
+    u32 i;
+
+    for (i = 0; i < 8; i++) {
+        if (self->slot_id[i] != 0 && self->row_flag[i] != 0) {
+            count++;
+        }
+    }
+
+    {
+        s8 pages = (s8)((count + 5) / 6);
+        if (pages != 0) {
+            return pages;
+        }
+    }
+    return 1;
+}
 
 /* 0x8030D338 - the sword's colour panel.  Classify the slot (`fn_8027FF88`), then draw the sprite
  * run `get_menu_lsp_tbl(0x8E|0x8F)` names (each frame recoloured from `lbl_805DCD48`) and, for the
@@ -320,7 +508,7 @@ void fn_8030D808(void* s0, void* s1, u16 a, u8 b) {
         Put_equip_dtl_basis_bowgun_gan1((_PLW*)s0, (_EQUIP_INDEX*)s1, 0, b, &off);
         Put_equip_dtl_basis_bowgun_gan2((_PLW*)s0, (_EQUIP_INDEX*)s1, 0, b, &off);
         Put_equip_dtl_basis_bowgun_gan_lv((_PLW*)s0, (_EQUIP_INDEX*)s1, 0, b, &off);
-        fn_803153F8(s0, b);
+        fn_803153F8((EquipColumnPanel*)s0, b);
         return;
     }
 }
@@ -475,4 +663,404 @@ void fn_803106A8(void* s0, void* s1, u16 a, u8 b) {
     fn_802E06B0(0x8F0, &pos, &src);
     copy = pos;
     fn_8031077C(s0, s1, b, &copy);
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * 0x80313E24..0x8031A638 - the second half: the equipment columns, the slot blocks and the panel's
+ * own cursor (13 bodies, the rest are placeholders - see the header's residual list)
+ * --------------------------------------------------------------------------------------------------- */
+
+/* 0x80313E24 */
+void fn_80313E24(void) {}
+
+/* 0x803142C8 - draw the base/selected run for one slot: resolve the `0x9AA` anchor against the
+ * caller's position, then the `0xD0`/`0xD2` sprite lists at it. */
+void fn_803142C8(u32 unused, u8 idx, const _mh_ivec2_* pos) {
+    u32 in = *(const u32*)pos;   /* the 4-byte `_mh_ivec2_` block, copied whole as the target does */
+    u32 out1;
+    u32 tmp;
+    u32 out2;
+    fn_802E06B0(0x9AA, &out1, &in);
+    u16* tbl = (u16*)get_menu_lsp_tbl(0xD0);
+    tmp = out1;
+    fn_802E06B0(tbl[idx], &out2, &tmp);
+    u16* tbl2 = (u16*)get_menu_lsp_tbl(0xD2);
+    draw_sprite_ary(tbl2, (const _mh_ivec2_*)&out2);
+}
+
+/* 0x80314340 */
+void fn_80314340(void) {}
+
+/* 0x803144A0 */
+void fn_803144A0(void) {}
+
+/* 0x80314604 - the next/previous slot step: the bowgun category (`fn_802715A0(plw,0xB) == 0x17`)
+ * clamps one higher than the rest. */
+u8 fn_80314604(_PLW* plw, s8 slot, u32 confirm) {
+    u8 bowgun = 0;
+    if (confirm == 1 && fn_802715A0(plw, 0xB) == 0x17) {
+        bowgun = 1;
+    }
+    if (bowgun == 1) {
+        slot++;
+        if (slot > 6) {
+            slot = 6;
+        }
+    } else {
+        if (slot > 5) {
+            slot = 5;
+        }
+    }
+    return (u8)slot;
+}
+
+/* 0x8031468C */
+void fn_8031468C(void) {}
+
+/* 0x803149B8 - route a slot selection to the two value-pair draws; kinds 1/2/5/6 use pair A and
+ * 3/4/7/8 use pair B, anything else yields 0. */
+u32 fn_803149B8(u16 a, u32* b, u8 sel, u32* out) {
+    u32 v0 = b[0];
+    u32 v1 = b[1];
+    u32 v2 = b[2];
+    u8 kind = fn_803159CC(sel);
+    switch (kind) {
+    case 1:
+    case 2:
+    case 5:
+    case 6:
+        return fn_80314A64(a, v0, 0, out);
+    case 3:
+    case 4:
+    case 7:
+    case 8:
+        return fn_80314A64(a, v1, v2, out);
+    }
+    return 0;
+}
+
+/* 0x80314A64 */
+u32 fn_80314A64(u16 a, u32 b, u32 c, u32* out) { return 0; }
+
+/* 0x80314F18 - sum the equipment "category weight" of two pieces: the second only counts when the
+ * first is a weapon (kind 0xC) and the second is its matching form (kind 0xD). */
+u8 fn_80314F18(void* a, void* b) {
+    u8 total = fn_8027F11C(a);
+    if (*(u8*)a == 0xC && b != 0 && *(u8*)b == 0xD) {
+        total = (u8)(total + fn_8027F11C(b));
+    }
+    return total;
+}
+
+/* 0x80314F90 */
+void fn_80314F90(void) {}
+
+/* 0x80315274 */
+void fn_80315274(void* a, void* b, u8 c) {}
+
+/* 0x803153F8 - clear the eight column entries of a hunter's panel. */
+void fn_803153F8(struct EquipColumnPanel* self, u8 unused) {
+    self->field_0x61A[0] = 0;
+    self->field_0x62A[0] = 0;
+    self->field_0x61A[1] = 0;
+    self->field_0x62A[1] = 0;
+    self->field_0x61A[2] = 0;
+    self->field_0x62A[2] = 0;
+    self->field_0x61A[3] = 0;
+    self->field_0x62A[3] = 0;
+    self->field_0x61A[4] = 0;
+    self->field_0x62A[4] = 0;
+    self->field_0x61A[5] = 0;
+    self->field_0x62A[5] = 0;
+    self->field_0x61A[6] = 0;
+    self->field_0x62A[6] = 0;
+    self->field_0x61A[7] = 0;
+    self->field_0x62A[7] = 0;
+}
+
+/* 0x80315440 */
+u8 fn_80315440(void* a, void* b, void* c, void* d, void* e) { return 0; }
+
+/* 0x803155BC */
+u8 fn_803155BC(void* a, void* b, void* c, void* d, u8 e, void* f) { return 0; }
+
+/* 0x80315730 */
+u8 fn_80315730(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h, void* i) { return 0; }
+
+/* 0x803159CC - unpack the three-bit equipment class from a flags byte: bit 0 selects the high/low
+ * group, bit 5 the sub-group within it, bit 1 the last choice. */
+u8 fn_803159CC(u8 flags) {
+    if (flags & 1) {
+        if (flags & 0x20) {
+            if (flags & 2) {
+                return 1;
+            }
+            return 2;
+        } else {
+            if (flags & 2) {
+                return 3;
+            }
+            return 4;
+        }
+    } else {
+        if (flags & 0x20) {
+            if (flags & 2) {
+                return 5;
+            }
+            return 6;
+        } else {
+            return (flags & 2) ? 7 : 8;
+        }
+    }
+}
+
+/* 0x80315A60 */
+u8 fn_80315A60(void* a, void* b, u8 c) { return 0; }
+
+/* 0x80315C00 */
+void fn_80315C00(void) {}
+
+/* 0x80315D0C */
+void fn_80315D0C(void) {}
+
+/* 0x80315E34 */
+void fn_80315E34(void) {}
+
+/* 0x80316058 */
+void fn_80316058(void) {}
+
+/* 0x8031622C */
+void fn_8031622C(void) {}
+
+/* 0x803164D0 */
+void fn_803164D0(void) {}
+
+/* 0x80316780 */
+void fn_80316780(void) {}
+
+/* 0x80316978 - read the class byte at +0x0C of the `fn_8027ECAC` sub-record for the classes that
+ * carry it (1/2/5/6); returns bit 0 set when the byte was written. */
+u32 fn_80316978(u32 unused, struct _EQUIP** slot, u8 sel, u8* out) {
+    u32 ret = 0;
+    u8 v = 0;
+    u8 kind = fn_803159CC(sel);
+    if ((u32)(kind - 1) <= 1 || (u32)(kind - 5) <= 1) {
+        struct EquipSubInfo* q = (struct EquipSubInfo*)fn_8027ECAC(slot[0]);
+        if (q != 0 && q->field_0x0C != 0) {
+            v = q->field_0x0C;
+            ret |= 1;
+        }
+    }
+    *out = v;
+    return ret;
+}
+
+/* 0x80316A14 */
+void fn_80316A14(void) {}
+
+/* 0x80316DDC */
+void fn_80316DDC(void) {}
+
+/* 0x803170B4 */
+void fn_803170B4(void) {}
+
+/* 0x8031729C */
+void fn_8031729C(void) {}
+
+/* 0x803173C4 */
+void fn_803173C4(void) {}
+
+/* 0x80317788 */
+void fn_80317788(void) {}
+
+/* 0x80317B84 */
+void fn_80317B84(void) {}
+
+/* 0x80317F94 */
+void fn_80317F94(void) {}
+
+/* 0x80318204 - map a packed equipment kind to its two display indices; 0 and 1 are not
+ * representable and yield 0. */
+u8 fn_80318204(u8 kind, u8* out1, u8* out2) {
+    *out1 = 0;
+    *out2 = 0;
+    switch (kind) {
+    case 0:
+        *out1 = 0;
+        break;
+    case 1:
+        *out1 = 1;
+        *out2 = 1;
+        break;
+    case 2:
+        *out1 = 2;
+        *out2 = 1;
+        break;
+    case 3:
+        *out1 = 1;
+        *out2 = 2;
+        break;
+    case 4:
+        *out1 = 2;
+        *out2 = 2;
+        break;
+    case 5:
+        *out1 = 1;
+        *out2 = 3;
+        break;
+    case 6:
+        *out1 = 2;
+        *out2 = 3;
+        break;
+    default:
+        return 0;
+    }
+    return 1;
+}
+
+/* 0x803182D8 */
+void fn_803182D8(void) {}
+
+/* 0x80318790 - true when the slot's class carries a filled "option" record: kinds 1/2/5/6 test
+ * one item, 3/4/7/8 test the primary/secondary/tertiary items in turn. */
+u32 fn_80318790(u32 unused, u8** b, u8 sel) {
+    u8* p = b[0];
+    u8* q = b[1];
+    u8* r = b[2];
+    u32 ret = 0;
+    u8 kind = fn_803159CC(sel);
+    switch (kind) {
+    case 1:
+    case 2:
+    case 5:
+    case 6:
+        if ((u8)(p[0] + 0xF5) <= 2) {
+            if (fn_8027FFFC((struct _EQUIP*)p) == 1) {
+                ret |= 1;
+            }
+        }
+        break;
+    case 3:
+    case 4:
+    case 7:
+    case 8:
+        if (p[0] == 0xB) {
+            if (fn_8027FFFC((struct _EQUIP*)p) == 1) {
+                ret |= 1;
+            }
+        }
+        if (q[0] == 0xC) {
+            if (fn_8027FFFC((struct _EQUIP*)q) == 1) {
+                ret |= 1;
+            }
+        }
+        if (r[0] == 0xD) {
+            if (fn_8027FFFC((struct _EQUIP*)r) == 1) {
+                ret |= 1;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+    return ret;
+}
+
+/* 0x803188AC */
+void fn_803188AC(void) {}
+
+/* 0x80318A10 */
+void fn_80318A10(void) {}
+
+/* 0x80318E08 */
+void fn_80318E08(void) {}
+
+/* 0x80318FB0 */
+void fn_80318FB0(void) {}
+
+/* 0x80319178 - pack the active and the next non-empty slot id (and their two colour bytes) into
+ * the caller's arrays; returns how many were written. */
+u8 fn_80319178(struct EquipSlotInfo* info, u16* ids, s8* colors) {
+    u8 n = 0;
+    u8 idx = info->idx;
+    if (idx < 3) {
+        if (info->slots[idx] != 0) {
+            ids[0] = info->slots[idx];
+            colors[0] = (s8)((u8)info->flags - 0xA);
+            n = 1;
+        }
+    }
+    idx++;
+    if (idx < 3) {
+        u16 v = info->slots[idx];
+        if (v != 0) {
+            ids[n] = v;
+            colors[n] = (s8)(((info->flags >> 8) & 0xFF) - 0xA);
+            n = n + 1;
+        }
+    }
+    return n;
+}
+
+/* 0x80319204 */
+void fn_80319204(void) {}
+
+/* 0x8031949C */
+void fn_8031949C(void) {}
+
+/* 0x8031994C */
+void fn_8031994C(void) {}
+
+/* 0x80319F18 */
+void fn_80319F18(void) {}
+
+void Set_equip_column_arrangement(_PLW* plw, _EQUIP_INDEX* index, _EQUIP* equip) {}
+
+/* 0x8031A410 - unpack a 3-word slot record and tail-call the panel updater. */
+void fn_8031A428(void* self, void* slot, u32 a, u32 b, void* work);
+void fn_8031A410(void* self, u32* slot, void* arg) {
+    fn_8031A428(self, (void*)slot[0], slot[1], slot[2], arg);
+}
+
+/* 0x8031A428 */
+void fn_8031A428(void* self, void* slot, u32 a, u32 b, void* work) {}
+
+/* 0x8031A58C - reset a menu slot into its "equipment panel" state: pick the row height from the
+ * slot's +0x10 flag, seed the panel's own fields and hand the embedded +0x1EC record to its
+ * constructor. */
+void fn_8031A58C(MenuSlot* self) {
+    s16 size = 0x18;
+    if (self->field_0x010 != 0) {
+        size = 0x20;
+    }
+    self->field_0x014 = 1;
+    self->field_0x23A = 0;
+    self->field_0x1B0 = 0;
+    self->field_0x19E = 0;
+    self->entry_count_b = 8;
+    self->field_0x1A3 = 8;
+    self->field_0x1A0 = 0;
+    s16 h = fn_802A8F14(size, 8);
+    self->field_0x1A1 = (s8)h;
+    self->field_0x1A2 = 0;
+    fn_8029FFFC(self, 0);
+    fn_8031AE38(self);
+    fn_8031BFEC(&self->field_0x1EC[0], 0, self);
+}
+
+/* 0x8031A638 - when a menu slot is a ready bowgun/gunner panel, refresh both of its option rows. */
+void fn_8031A638(MenuSlot* self) {
+    s8 st = self->field_0x014;
+    if ((u32)(st - 1) <= 1) {
+        if (self->field_0x001 == 3) {
+            if (fn_800CF208() != 2) {
+                if (self->field_0x1F0 != 0) {
+                    fn_80272E30(self->worker, self->field_0x1F0, 1);
+                }
+                if (self->field_0x1F2 != 0) {
+                    fn_80272E30(self->worker, self->field_0x1F2, 1);
+                }
+            }
+        }
+    }
 }

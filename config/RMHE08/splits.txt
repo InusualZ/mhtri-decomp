@@ -1101,14 +1101,14 @@ ef/fn_803066F0.c:
 	.text       start:0x803066F0 end:0x8030681C
 
 ef/fn_8030681C.cpp:
-	extab       start:0x80015AB4 end:0x80015C24
-	extabindex  start:0x80034674 end:0x8003489C
-	.text       start:0x8030681C end:0x8030D338
+	extab       start:0x80015AB4 end:0x80015B54
+	extabindex  start:0x80034674 end:0x80034764
+	.text       start:0x8030681C end:0x80308FB4
 
 menu/menu_infomation.cpp:
-	extab       start:0x80015C24 end:0x80015DEC
-	extabindex  start:0x8003489C end:0x80034B48
-	.text       start:0x8030D338 end:0x80313E24
+	extab       start:0x80015B54 end:0x80015F3C
+	extabindex  start:0x80034764 end:0x80034D40
+	.text       start:0x80308FB4 end:0x8031A6C0
 
 menu/fn_8031A6C0.cpp:
 	extab       start:0x80015F3C end:0x80016074
