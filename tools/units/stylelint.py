@@ -70,8 +70,10 @@ import collections
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
 SRC = "src"
 # The unsplit band (`include/unsplit/<module>.h`) is the legitimate home for a symbol with no registered
@@ -480,6 +482,45 @@ def _parse_splits(path: str) -> dict:
 
 
 _OWNERSHIP_CACHE: dict = {}
+
+
+_OWNERSHIP_REF_CACHE: dict = {}
+
+
+def load_ownership_at_ref(root: str, ref: str) -> "Ownership | None":
+    """The rule-2 index **as of `ref`** - each side of a `--diff` is judged by the map it was written against.
+
+    Judging the base side by the *working* map makes a rename read as a regression: the base copy of a file
+    still says `fn_80043EA8`, this batch renamed that row to `VEC3_ctor`, so the base side's local declarations
+    stop resolving to an owner, their rule-2 findings vanish from the `before` count, and `diff_deltas` reports
+    them as **additions** - a real batch measured "+62 added rule-2 violations" for a pure rename, and spent
+    ~30 minutes proving it was an artefact.
+
+    Judging each side by its own map keeps them comparable and still charges a batch for the ownership *it*
+    creates: a newly registered unit's ranges exist only in the working map, so the declarations it newly
+    orphans are additions there and absent from the base.
+    """
+    if not ref:
+        return load_ownership(root)
+    if (root, ref) in _OWNERSHIP_REF_CACHE:
+        return _OWNERSHIP_REF_CACHE[(root, ref)]
+    tmp = tempfile.mkdtemp(prefix="stylelint-ref-")
+    try:
+        paths = {}
+        for rel in ("config/RMHE08/symbols.txt", "config/RMHE08/splits.txt"):
+            try:
+                text = git_bytes(root, "show", "%s:%s" % (ref, rel)).decode("utf-8", "replace")
+            except RuntimeError:
+                return None
+            paths[rel] = os.path.join(tmp, os.path.basename(rel))
+            with open(paths[rel], "w", encoding="utf-8", newline="") as fh:
+                fh.write(text)
+        own = Ownership(_parse_symbols(paths["config/RMHE08/symbols.txt"]),
+                        _parse_splits(paths["config/RMHE08/splits.txt"]))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    _OWNERSHIP_REF_CACHE[(root, ref)] = own
+    return own
 
 
 def load_ownership(root: str) -> "Ownership | None":
@@ -1654,6 +1695,27 @@ def selftest() -> int:
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
 
+    # --- `--diff` judges each side by its own map -------------------------------------------------
+    # Before this, a rename read as a regression: the base copy still said the old name, the *working* map
+    # no longer resolved it, so the base side's rule-2 findings vanished and the delta called them additions
+    # (a real batch measured "+62 added rule-2 violations" for a pure rename). Stub the single call that
+    # reads REF, so the check needs no repository.
+    ref_map = "zzz_selftest_symbol = .text:0x80040598; // type:function size:0x8\n"
+    ref_splits = "Pl/pl_act.cpp:\n\t.text\tstart:0x80040598 end:0x800405A0\n"
+    real_git_bytes = globals()["git_bytes"]
+    try:
+        globals()["git_bytes"] = lambda root, *a: (
+            ref_splits if a[-1].endswith("splits.txt") else ref_map).encode()
+        ref_own = load_ownership_at_ref(".", "HEAD")
+    finally:
+        globals()["git_bytes"] = real_git_bytes
+    check("the ref's own map resolves a name the working map cannot",
+          ref_own is not None and ref_own.resolve("zzz_selftest_symbol") is not None, True)
+    working = load_ownership(".")
+    check("...and the working map really cannot resolve it",
+          working is None or working.resolve("zzz_selftest_symbol"), None)
+    check("an absent ref map falls back rather than dying", load_ownership_at_ref(".", ""), working)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1703,9 +1765,13 @@ def main(argv: list[str] | None = None) -> int:
         try:
             pairs = changed_src_files(root, args.diff)
             rels = [after for _before, after in pairs]
-            before = merge_counts(findings_at_ref(root, args.diff, pairs, ownership),
-                                  rule1_counts_at_ref(root, args.diff, pairs),
-                                  header_pragma_counts_at_ref(root, args.diff))
+            # Each side against its own map: the working tree's index cannot resolve a name this batch
+            # renamed, so using it here turned every rename into a batch of phantom rule-2 additions.
+            before = merge_counts(
+                findings_at_ref(root, args.diff, pairs,
+                                load_ownership_at_ref(root, args.diff) or ownership),
+                rule1_counts_at_ref(root, args.diff, pairs),
+                header_pragma_counts_at_ref(root, args.diff))
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
             return 2
