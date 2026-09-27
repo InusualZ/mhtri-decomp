@@ -704,6 +704,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.27 | **done** - `tools/units/rescue.py audit`: the `refs/rescue/*` safety net gets an audit, and `land.py resolve`'s `land/resolve-*` helper branch gets a teardown | 193 rescue refs had accumulated and nothing had ever looked at them; `land.py resolve` also left its helper branch (and its scratch worktree) behind, so a `land/*` ref outlived the batch it was made for (two were found from 2026-09-26) | every ref reports its date/subject, the unit(s) it registers (**the registration diff against the merge-base with `main`** - a whole-file name match against `main` matches every unit in the file), whether each is registered on `main` today and how the touched paths differ; verdicts `redundant`/`landed-with-drift`/`unlanded`/`unknown`; `--prune` deletes only `redundant` (printing each), is strictly read-only without it, and never touches drift/unlanded/unknown; a landing deletes its own resolve helper, visibly, only when the tip is contained by the branch or `main`, and refuses loudly otherwise; `claims.py release` runs the same classification on the ref it parks at teardown - `redundant` pruned and printed, `landed-with-drift` reported, `unlanded`/`unknown` surfaced with the ref, its unit(s) and its date and kept, never a gate; 28 checks in `rescue.py` + 36 in `claims.py` | ~180 |
 | 7.28 | **done** - the per-lane measurement loop is fixed: `recompile.py`/`measure.py` run from git-bash, and no score can come from a stale object or the wrong tree | `absolutize()` rewrote cmd's `/c` to `C:\c` (`os.path.join(main, "/c")` is `C:/c`, and that drive-root artifact exists on this host), so the child was an *interactive* `cmd`, no object was written, and 31 lanes filed "make this work" in the register. Two siblings of the same failure: a hand-built scorer measured a STALE object twice when a compile failed and two invented "improvements" were reported as real, and the measuring tools rooted at their own file location / the first `git worktree list` entry, so a score run from a slot could print MAIN's number (`NetworkWiiMediator/dispatchReflectEvent` 0.91743 vs 100.0) | `absolutize()` never rewrites a `-`/`/` switch; every measurement path deletes the object before compiling and `object_is_fresh()` refuses an object older than its source; both chained post-processors (`objalign.py`, `objextab.py`) are retargeted to this tree's object; `unitutil.repo_root()` resolves the caller's `git rev-parse --show-toplevel` and `recompile.main_root()` the git common dir (the gate still runs from MAIN, unchanged); the hostile selftests break a source and assert `FAILED` with no score, and score a throwaway worktree and assert its number (100.00000, not MAIN's 99.80576) | ~80 |
 | 7.29 | **done** - `measure.py --baseline`/`--against-main`/`--save`: every symbol of a unit with its before/after delta in **one call** | `symdiff.py -u <unit>` lists per-symbol scores but needs a re-invocation per symbol to see a diff, so a body lane spent minutes per iteration; the lanes' scratch scorers (`build/probe/score.py`) each re-derived "diff the probe's rows against the committed report" | one compile and one `report generate` score all N symbols (~0.3 s on `Camellia/camellia`); `--against-main` diffs each row against MAIN's `build/RMHE08/report.json`, `--baseline <file>` against a saved report or a `--save` file, `--save` writes this run for the next; a moved-down row is reported and the exit code is non-zero; the baseline selftest pins both shapes, the refusal of a unit the file lacks, and the delta direction | ~60 |
+| 7.30 | **done 2026-09-27** - `tools/selftest.py`: one runner for every tool selftest, and the gate's `all tool selftests pass` row (measured ~29 s) | `measure_selftest.py` was red for weeks while 31 lanes filed "`recompile.py` is broken" - the tool's own test said so and nothing ran it. A selftest nobody runs is decoration, and the land gate ran only `land.py --selftest`, never the suite | discovers both shapes (`tools/**/*_selftest.py` and every tool exposing `--selftest`), **dedupes** a wrapper pair to one entry per tested tool (a genuine complementary pair, e.g. `ledger.py`/`ledger_selftest.py`, keeps both); runs in parallel with a per-test timeout that kills the whole process tree; one pass/fail/checks/duration table; **`git status --porcelain` identical before and after** (a selftest that writes into the repo is named); a **park list** (`tools/selftests-known-failures.json`, reason + date) so `green except N parked` never lets one old red hide a new one (a park that now passes is `STALE` and fails); `--json`, `--changed [REF]`, `--list`, `--no-dedupe`, and a `--selftest` that the suite itself runs; 51 entries / 3,345 checks / 29 s | ~260 |
 
 Rules for building them: **a tool that writes shared files goes through 7.12**; **every tool that mutates state
 has a selftest** (`ledger_selftest.py`, `attribute_selftest.py`, `m2cinput_selftest.py` are the pattern); and **a
@@ -908,7 +909,10 @@ queue over as a list with numbers.
 
 **`land.py verify` is the land-batch gate** (once built; until then, its commands by hand): `python configure.py`
 → `ninja` → `ninja build/RMHE08/report.json` → the regression scan (`ninja changes`, no measure down) →
-`ninja build/RMHE08/ok` → `ledger.py` → the knowledge-delta check.
+`ninja build/RMHE08/ok` → `ledger.py` → the knowledge-delta check.  On top of that it runs the **cheap rows**
+before the build: the ground-truth hash, the batch base, the scope/outbox/branch guards, the style lint, and
+**`all tool selftests pass`** (`tools/selftest.py`, parked pre-existing failures aside; `--no-selftests` is the
+documented fast path).
 
 It must prove the `ok` it reads is *this* run's: `land.py` deletes `build/RMHE08/ok` (and `main.elf` when the
 batch flips an object) **before** it starts and requires both to be recreated; it also checks every command's
@@ -932,6 +936,26 @@ through.**
 
 **And the style lint is part of the same gate** (`python tools/units/stylelint.py --diff <base>`): a batch may not
 *add* a violation of §6.5, and it must not leave a violation in a unit it touched.
+
+**The tool's own selftests are the same gate** (`tools/selftest.py`, roadmap 7.30): `measure_selftest.py` was red
+for weeks while **31 lanes filed "`recompile.py` is broken"** - the tool's own test said so and nothing ran it. A
+selftest nobody runs is decoration. One command runs them all (both shapes: `tools/**/*_selftest.py` and every
+tool exposing `--selftest`), deduped to one entry per tested tool when one half is a wrapper of the other, in
+parallel with a per-test timeout, and it **guards the tree**: `git status --porcelain` must be identical before
+and after the run, so a selftest that writes into the repository is named, not tolerated. A *pre-existing*
+failure is **parked** in `tools/selftests-known-failures.json` with a reason and a date; the runner reports
+`green except N parked`, and a park whose test now passes is reported `STALE` and fails, so one old red cannot
+hide every new one. The lane's fast loop and the recipe:
+
+```sh
+python tools/selftest.py --changed     # only the selftests of the tools THIS diff touches (fast)
+python tools/selftest.py               # the whole suite: 51 entries / 3,345 checks / ~29 s wall
+python tools/selftest.py --json        # machine-readable inventory (pass/fail/checks/duration per tool)
+```
+
+Measured cost 2026-09-27: **~29 s wall** (8 workers) on a current build tree, dominated by `land.py --selftest`
+(27 s) and `claims.py --selftest` (20 s) which run concurrently - so the added gate row costs well under a minute,
+and `land.py verify --no-selftests` skips it outright if a landing must be fast.
 
 **Handover.** Before a compaction or the end of a session: the local-only block says which batch is open, the
 ledger is the state, and anything worth keeping is in `docs/`, a skill, `AGENTS.md` or a unit header. A finding
@@ -1344,6 +1368,7 @@ The fourteen incidents in `docs/process-review.md`, and the rule that now preven
 
 ```sh
 python tools/units/ledger.py                 # totals, per-module, closed >= 80 %, unclaimed
+python tools/selftest.py                      # every tool's own selftest; green except the parked list
 python tools/units/ledger.py unit <unit>     # one unit's coverage and per-symbol score
 python tools/units/ledger.py --json          # machine-readable
 ninja build/RMHE08/report.json               # 1.5-3.5 s; the report is what the bar reads

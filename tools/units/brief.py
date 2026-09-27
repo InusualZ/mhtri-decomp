@@ -674,6 +674,20 @@ def _measure_lines(lines: list[str], unit: str) -> None:
     lines.append("codegen (playbook 60), so changing which header declares a callee can move a neighbouring TU; a")
     lines.append("whole-tree diff is the only thing that shows it. Investigate what moved - never wave it through.")
     lines.append("")
+    lines.append("**If you touched a tool, run its own selftest before you commit.** The land gate has a")
+    lines.append("`all tool selftests pass` row (`docs/plan.md` 7.30), so a red selftest you never ran is a")
+    lines.append("wasted landing - the `measure_selftest.py` was-red-for-weeks incident is why the row exists. One")
+    lines.append("runner covers both shapes (`*_selftest.py` and `<tool> --selftest`):")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python tools/selftest.py --changed   # only the selftests of the tools THIS diff touches (fast)")
+    lines.append("python tools/selftest.py             # the whole suite (~30 s)")
+    lines.append("```")
+    lines.append("")
+    lines.append("A failure names the tool. A *pre-existing* failure is parked in")
+    lines.append("`tools/selftests-known-failures.json` with a reason and a date, and the runner prints")
+    lines.append("`green except N parked` - parking is a deliberate, greppable entry, never a silent skip.")
+    lines.append("")
 
 
 def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
@@ -1648,6 +1662,8 @@ def selftest() -> int:
               and "refuse to score one older than its source" in brief_text, True)
         check("the brief carries the whole-tree report diff",
               "ninja changes" in brief_text and "never wave it through" in brief_text, True)
+        check("the brief tells a lane the tool-selftest runner and its fast subset",
+              "tools/selftest.py --changed" in brief_text and "all tool selftests pass" in brief_text, True)
         check("the brief carries the order-only report.json trap",
               "order-only target of `all_source`" in brief_text
               and "rm -f build/RMHE08/report.json" in brief_text, True)

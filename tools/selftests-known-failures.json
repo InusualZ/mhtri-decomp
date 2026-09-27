@@ -1,0 +1,11 @@
+{
+  "$comment": "Pre-existing tool-selftest failures, parked. tools/selftest.py runs every tool selftest and reports 'green except N parked'; the land gate's 'all tool selftests pass' row reads that verdict. Each park is explicit and greppable - a park whose test now PASSES is reported STALE and fails the run (unpark it), so one old red cannot hide every new one. `target` is the selftest file (or the tool that runs it); `head` is the commit the failure was reproduced on; `date` is when it was parked.",
+  "parked": [
+    {
+      "target": "tools/flags/infer_selftest.py",
+      "reason": "infer's `pool` detector confidently (medium) reports `off` on enemy/em_act_step.cpp where configure.py documents `on`: 16 distinct object-local data symbols each addressed by its own lis+addi pair with no shared base. A detector false positive, not a stale fixture - the object and the documented cflags agree. Reproduces on unmodified HEAD e48be35d0.",
+      "date": "2026-09-27",
+      "head": "e48be35d0"
+    }
+  ]
+}
