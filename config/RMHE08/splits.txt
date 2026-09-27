@@ -1293,6 +1293,7 @@ Network/NetworkWiiMediator.cpp:
 	extab       start:0x8001CA4C end:0x8001CBF4
 	extabindex  start:0x8003D2F0 end:0x8003D524
 	.text       start:0x80413C64 end:0x804155D4
+	.data       start:0x806024B8 end:0x80602824
 
 Network/constructNetworkWiiMediator.cpp:
 	extab       start:0x8001CE34 end:0x8001CE4C

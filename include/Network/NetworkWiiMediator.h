@@ -34,9 +34,9 @@ public:
     s32  isOpeningMaintenanceTerms();
     s32  isOpeningMaintenanceServer();
     s32  isOpeningAnnounce();
-    void getAccountBan(char* out, u32 size);
-    void getAccountWarning(char* out, u32 size);
-    void getAccountWaitQueue(char* out, u32 size);
+    char* getAccountBan(char* out, u32 size);
+    char* getAccountWarning(char* out, u32 size);
+    char* getAccountWaitQueue(char* out, u32 size);
     void getReflectPage(u8 page);
     void agreeReflect();
 };

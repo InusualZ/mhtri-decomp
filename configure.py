@@ -2179,7 +2179,14 @@ config.libs = [
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/network_state.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
-            Object(NonMatching, "Network/NetworkWiiMediator.cpp"),
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over
+            # the unit's 79 rows, the lib's `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and
+            # getReflectName3C at 51.28 where `-O3` puts all four at 100.00, and `-inline auto` scores
+            # validateReflectName 0.00 where `-inline noauto` scores it 88.28 - no other function moves under
+            # either setting.  Same finding as the lib's other units.  Evidence: the unit header of
+            # src/Network/NetworkWiiMediator.cpp.
+            Object(NonMatching, "Network/NetworkWiiMediator.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: retail's
             # `constructNetworkWiiMediator` is the plain source order - `li r3,0x1408` lands *after*
             # the two callee-save stores and the `cmpwi r3,0` after `mr r31,r3`; `-O4,p` hoists both
