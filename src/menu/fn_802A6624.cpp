@@ -106,7 +106,7 @@ extern "C" s32 fn_802A8EFC(s32 a, s32 b, u16 c, u16 d, u16 e);
 extern "C" s16 fn_802A8F14(s16 a, s16 b);
 extern "C" void fn_802A7838(u16* item, struct _mh_ivec2_* pos);
 extern "C" void fn_802A79B8(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
-void fn_8035902C(u16 id, s32* a, s32* b, s32* c);
+void eft052_page_counts_get(u16 id, s32* a, s32* b, s32* c);
 
 /* The list length the active kind's table yields for the current selection: kind 1 walks the move
  * table's records, kind 2 the item-record table's two blocks of five.  An index of 0x80 is the "no
@@ -545,7 +545,7 @@ extern "C" s16 fn_802A8F14(s16 a, s16 b)
     return q + 1;
 }
 
-/* The item row at the position the caller supplies: `fn_8035902C` yields the row's two value words
+/* The item row at the position the caller supplies: `eft052_page_counts_get` yields the row's two value words
  * (the second already summed), which the `fn_802A79B8` page routine draws.  A null or empty item is
  * skipped. */
 extern "C" void fn_802A7B80(u16* item, struct _mh_ivec2_* pos)
@@ -557,7 +557,7 @@ extern "C" void fn_802A7B80(u16* item, struct _mh_ivec2_* pos)
 
     if (item != NULL) {
         if (item[0] != 0) {
-            fn_8035902C(item[0], &value, &low, &high);
+            eft052_page_counts_get(item[0], &value, &low, &high);
             sum = low + high;
         } else {
             value = 0;

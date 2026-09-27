@@ -42,6 +42,23 @@ void* fn_80047398(void);
 /* 0x8004C4F0 - the record copy the light unit's copy constructor calls; added with the
  * `light/light.cpp` registration (rule 2: this range owns the address). */
 void fn_8004C4F0(u8* dst, const u8* src);
+
+/* Added with the `ef/eft052.cpp` registration (rule 2: this range owns every one of these
+ * addresses - the cabinet/item-page helpers the cockpit hold band calls). */
+u16 fn_8004AE70(void* userdata);
+s32 fn_8004AEC0(void* userdata);
+s32 fn_8004AF0C(u8 idx);
+s16 fn_8004AF20(void* userdata);
+void* fn_8004AF60(void* userdata, u8 idx);
+void* fn_8004AF78(void* userdata);
+u32 fn_8004B064(u16 id, void* a, s32 b);
+u32 fn_8004B70C(u16 id, void* a, u16 b);
+void fn_8004B200(void* userdata, u16 id, s16 delta);
+s16 fn_8004B624(void* userdata, u16 id);
+s16 fn_8004B7B0(u16 id, void* a, u16 b);
+void fn_8004BCBC(void* userdata, u16 id, s16 count, s32 flag);
+void fn_8004BEA4(u16 id, s16 count, void* out);
+
 #ifdef __cplusplus
 }
 #endif

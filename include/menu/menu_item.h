@@ -100,7 +100,10 @@ struct ItemDataRecord {
     /* +0x005 */ u8 kind;             /* indexes the .data colour table `lbl_805CDE78` */
     /* +0x006 */ u8 unused_0x006[0x00A - 0x006];
     /* +0x00A */ u16 species;         /* indexes the .data record table `lbl_805DBFB8` */
-    /* +0x00C */ u8 unused_0x00C[0x014 - 0x00C];
+    /* +0x00C */ s32 field_0x00C;      /* the value `eft052_item_half_get` halves (added by
+                                       * `ef/eft052.cpp`) */
+    /* +0x010 */ u32 field_0x010;      /* the per-item value `eft052_item_value_get` hands back (added by the
+                                       * same unit) */
 };
 
 /* The item table head at `.bss:0x806AC8A8` (0x10 B), the block `fn_8029F60C` reads one word of. */

@@ -342,7 +342,7 @@ void fn_8031C8EC(void* p);
 s32 fn_8031C934(void* p, u16 a, u16 b);
 s32 fn_8033AAFC(void);
 s32 fn_8033AC78(u16 a, s32 b);
-s32 fn_80358FCC(u16 id);
+s32 eft052_item_value_get(u16 id);
 s32 fn_8035B700(s32 a, s32 b, s32 c);
 u32 fn_803768F8(void);
 }
@@ -1328,7 +1328,7 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         switch (r) {
         case 1:
             self->phase_0x00 = 0;
-            fn_8004D0E8(self->pick_max_0x18 * fn_80358FCC(db->slots_0x180[self->cursor_0x1A].id_0x00),
+            fn_8004D0E8(self->pick_max_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id_0x00),
                         &db->data_0x18[0]);
             sysSE_req(9);
             fn_8004B870(&db->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);

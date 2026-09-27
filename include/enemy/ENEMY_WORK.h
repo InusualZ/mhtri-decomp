@@ -479,6 +479,17 @@ struct _ENEMY_WORK {
             /* +0x33E */ u8 created_0x33E;  /* the model has been placed for this slot */
             /* +0x33F */ u8 unused_0x33F[0x354 - 0x33F];
         } uv_model_0x328;
+        /* the per-part value run `ef/eft052.cpp` reads (added by that unit): the four
+         * halves at +0x32C/+0x32E/+0x330/+0x332 are loaded `lha` and stored `sth` there, one per
+         * part index, and `eft052_part_gauge_add` steps +0x32C and clamps it to 0..500.  A union member
+         * because the byte/pointer views above already own those bytes. */
+        struct {
+            /* +0x328 */ u8 unused_0x328pv[0x32C - 0x328];
+            /* +0x32C */ s16 part_value_0x32C;
+            /* +0x32E */ s16 part_value_0x32E;
+            /* +0x330 */ s16 part_value_0x330;
+            /* +0x332 */ s16 part_value_0x332;
+        } part_values_0x32C;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
