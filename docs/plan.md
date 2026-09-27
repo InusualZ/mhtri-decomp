@@ -465,6 +465,14 @@ The bar, all of it: (1) the symbol's own `fuzzy_match_percent` ≥ 80 — a func
 regressed; (3) `ok` green; (4) the object measured came from the **real command line**, not a hand-written
 compile; (5) the residual is in the unit header.
 
+**What a match percentage is a fraction of.** The denominator is the game's **entire `.text`** - all of its code,
+**5,449,596** bytes (`.init` 9,928 + `.text` 5,439,668, read off the linked ELF, the same artifact the numerator
+is measured on). It is never the DOL binary (**6,683,744** bytes) and never a subset of the code - not the bytes
+we have claimed, not the bytes in registered units. The report's own `measures.total_code` (5,437,424) is that
+same universe minus unattributed padding, so quote it only when comparing like for like (it is what
+`ledger.py`'s "matched / total of .text" line prints); when reporting progress to a human, say
+"N % of the game's entire `.text`" and give the byte count so the fraction is unambiguous.
+
 **"Re-measure the unit" means exactly this:** run `recompile.py <unit>` (or `ninja build/RMHE08/src/<unit>.o`
 when I am the one at the keyboard), then `mt.py info -u <unit>` and `mt.py diff -u <unit> <symbol>` for every
 symbol the batch claims, and compare against the numbers in the worker's outbox — a difference is investigated,
