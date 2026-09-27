@@ -48,7 +48,7 @@ int ck_WideMode(void);
 int sprintf(char* dst, const char* fmt, ...);
 void draw_font_idx(u16, s8*, u32, const _mh_ivec2_*);
 /* `LbStr__FUcUs` - owned by `src/lobby/fn_8020C588.cpp`, whose header cannot be included here (it
- * declares `fn_800D0708` as `s32`, which clashes with `ef/fn_800CDB2C.h`'s `u32`). */
+ * declares `game_ready_ck` as `s32`, which clashes with `ef/fn_800CDB2C.h`'s `u32`). */
 void* LbStr(u8 kind, u16 idx);
 
 /* The effect-41/42 spawners' pooled work block (`_EFT::work_0x38`) as this band views it.  The count

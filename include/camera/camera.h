@@ -39,7 +39,7 @@ extern "C" {
 void fn_802BC564(u8 id, void* arg);
 
 /* 0x802BE3EC - whether the camera work's +0x284 byte holds 1. */
-bool fn_802BE3EC(void);
+bool camera_work_ck(void);
 
 /* 0x802BE7E8 - updates one of a light work's channels.  The parameters are typed `void*` because
  * the light work's own types are private to its unit. */

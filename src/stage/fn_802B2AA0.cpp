@@ -277,7 +277,7 @@ extern "C" void fn_802B2F60(StageRuntime* st, u8 kind)
     }
     if (group == 1U && kind == 0) {
         fn_80041E40(&poly, &get_camera_pos());
-        group = fn_800CF384();
+        group = my_player_no();
         if (fn_802B0688(&poly) == 1U) {
             keep = list->show;
             drop = list->hide;
@@ -1591,7 +1591,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
 
     fn_80043EA8(&poly);
     move = (s32)get_move_work_adrs(2);
-    area->field_0x494 = (u32)move + fn_800CF384() * 0xB20;
+    area->field_0x494 = (u32)move + my_player_no() * 0xB20;
     fn_802B7034(area);
     fn_802B5C58(area);
     fn_802B9828(area);

@@ -1965,7 +1965,7 @@ struct SeReqParamView {
 };
 
 /* One record of the per-kind "move work" table `get_move_work_adrs` returns; the per-frame driver
- * indexes it by `fn_800CF384()` (one record per actor) and copies its position into the pool.
+ * indexes it by `my_player_no()` (one record per actor) and copies its position into the pool.
  * size: 0xB20 */
 struct SeMoveWork {
     /* +0x000 */ u8 pad_0x000[0x3C];
@@ -1979,7 +1979,12 @@ extern "C" _se_w* lbl_80794978;
 extern "C" LbNpcFunc lb_npc_func;
 
 extern "C" u8 fn_800CF208(void);
-extern "C" s32 fn_800CF384(void);
+/* Owned by `ef/fn_800CDB2C.cpp` (rule 2).  The declaration stays here, in the block form, because this
+ * unit's view is `s32` where the owner's is `u32` and the return type is load-bearing (the two call
+ * sites here narrow it with `(s8)`/`(u8)` before indexing the move-work record). */
+extern "C" {
+s32 my_player_no(void);
+}
 extern "C" void fn_800CF394(s32 value);
 extern "C" u8 fn_802EED0C(SeMoveWork* work);
 extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
@@ -2031,7 +2036,7 @@ extern "C" void fn_800D80B8(void) {
 
     SeMoveWork* work = (SeMoveWork*)get_move_work_adrs__FUc(2);
     if (work != NULL) {
-        work += (s8)fn_800CF384();
+        work += (s8)my_player_no();
         if (fn_800CF208() == 1) {
             self->field_0x2927D = fn_802EED0C(work);
         }
@@ -2039,7 +2044,7 @@ extern "C" void fn_800D80B8(void) {
 
     if (self != NULL) {
         if (PlayMode_ck() == 2) {
-            u8 idx = (u8)fn_800CF384();
+            u8 idx = (u8)my_player_no();
 
             fn_800CF394(0);
             fn_80041E40(&self->field_0x004, &get_camera_pos());
@@ -2341,7 +2346,7 @@ extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView*
 
     alt = 0;
     if ((u8)(plw->field_0x002 - 4) <= 2) {
-        if ((s8)fn_800CF384() == plw->field_0x008) {
+        if ((s8)my_player_no() == plw->field_0x008) {
             alt = 1;
         }
     }

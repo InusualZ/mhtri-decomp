@@ -61,7 +61,7 @@ void  fn_800DBC84(s32 value);
 void* fn_803B43B0(MenuQuestWork* self, s32 index);
 s32   fn_803223B0(MenuQuestWork* self, u8 value);
 void  fn_80323204(MenuQuestWork* self, u16 a, s16 b);
-u32   fn_800D0708(void);
+u32   game_ready_ck(void);
 void  fn_80321130(MenuQuestWork* self, s32 value, u8 mode);
 
 /* This unit's own forward declarations (defined below). */
@@ -436,7 +436,7 @@ extern "C" s32 fn_80323C4C(s32 id) {
     if ((u32)((u16)id - 0x3E80) <= 1) {
         return 0;
     }
-    if (fn_800D0708() == 1) {
+    if (game_ready_ck() == 1) {
         if ((u16)id >= 0x2710) {
             if ((u16)id < 0xEA60) {
                 return 1;

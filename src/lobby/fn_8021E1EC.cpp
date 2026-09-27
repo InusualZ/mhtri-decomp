@@ -99,7 +99,7 @@ u32 fn_8021DF50(u32 idx, u32 limit);
 void fn_8021DDA8(LbMenuCandidate* candidate, LbMenuRow* row);
 f32 fn_8021E300(f32 v);
 s32 fn_80208AC0(void);
-s32 fn_800D0708(void);
+s32 game_ready_ck(void);
 u8 fn_8004DD74(void);
 void* fn_80041E40(void* dst, void* src);
 void fn_80043EA8(VEC3* out);
@@ -185,7 +185,7 @@ s32 fn_8021E340(LbMenuActor* self, s16* kind)
     case 11:
     case 14:
     case 15:
-        if (fn_800D0708() == 0) {
+        if (game_ready_ck() == 0) {
             ok = 0;
         }
         if (lobby_w.mode_0x000) {

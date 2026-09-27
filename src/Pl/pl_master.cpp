@@ -187,7 +187,7 @@ void fn_80043EA8(void* vec);
 void* fn_80041E40(void* dst, void* src);
 void fn_800E09D0(void* dst, void* src);
 u8 fn_800CF208(void);
-s8 fn_800CF384(void);
+s8 my_player_no(void);
 u32 fn_80212060(void);
 u16 fn_802BE038(void);
 void* memset(void* dst, int value, u32 size);
@@ -1888,7 +1888,7 @@ u32 Pl_master_ck(_PLW* self)
     if (fn_800CF208() == 3) {
         return 1;
     }
-    return fn_800CF384() == self->unk08;
+    return my_player_no() == self->unk08;
 }
 
 /* 0x8026FE44: true for the "gun" weapon classes. */

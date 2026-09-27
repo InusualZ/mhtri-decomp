@@ -153,7 +153,7 @@ s32 calcVecAng2(VEC3* a, VEC3* b);
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 u32 LbCheckKujiraEvent(void);
 void* get_move_work_adrs(u8 idx);
-s32 fn_800CF384(void);
+s32 my_player_no(void);
 s32 get_now_mapno(void);
 
 /* ---------------------------------------------------------------------------------------------------
@@ -1938,7 +1938,7 @@ void fn_80205764(_LB_NPC* self)
     f32 dist;
 
     work = (LbNpcMoveWorkEntry*)get_move_work_adrs(2);
-    fn_80041E40(&self->target_0x1EC, &work[(s8)fn_800CF384()].vec_0x3C);
+    fn_80041E40(&self->target_0x1EC, &work[(s8)my_player_no()].vec_0x3C);
     self->field_0x22C = 1;
     self->field_0x22D = 1;
 

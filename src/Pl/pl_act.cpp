@@ -252,6 +252,7 @@
 
 #include "types.h"
 #include "enemy/enemy_control.h"
+#include "ef/fn_800CDB2C.h"   /* my_player_no (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
 
 /* The actor the whole Pl_* family takes as its first argument. Only the offsets this unit touches are named;
  * everything in between is padding. */
@@ -536,7 +537,6 @@ void rotVecY(nw4r::math::VEC3*, u32);
 
 extern "C" s32 fn_802E5CFC(s32);
 extern "C" u32 fn_8042CB9C(s32);
-extern "C" u32 fn_800CF384(void);
 extern "C" void fn_80338E04(s32, u8, u8);
 extern "C" void fn_80272E30(_PLW*, u16, s16);
 extern "C" void fn_802E5D68(u16);
@@ -1898,7 +1898,7 @@ extern "C" void fn_8027AF88(_PLW* self)
     if (fn_8042CB9C(fn_802E5CFC(*(s8*)(q + 1505))) == 1) {
         *(s16*)((u8*)self + 1626) = 900;
         *((u8*)self + 1625) = 1;
-        fn_80338E04(1, (u8)fn_800CF384(), *(u8*)(q + 1505));
+        fn_80338E04(1, (u8)my_player_no(), *(u8*)(q + 1505));
         return;
     }
     *(s16*)((u8*)self + 1626) = 0;

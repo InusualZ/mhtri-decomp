@@ -113,7 +113,7 @@ extern "C" {
 s32 fn_8021F238(void);
 
 /* Unsplit-band callees with no registered owner. */
-s32 fn_800D0708(void);
+s32 game_ready_ck(void);
 void fn_801E9888(void);
 void fn_801E9C58(void);
 void fn_80220114(void);

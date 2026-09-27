@@ -134,7 +134,7 @@ typedef struct SystemWork {
     /* +0x7CD */ u8 field_0x7cd;
     /* +0x7CE */ u8 field_0x7ce;
     /* +0x7CF */ u8 pad_0x7cf[0x4];
-    /* +0x7D3 */ u8 field_0x7d3;    /* fn_800D0708: == 1 */
+    /* +0x7D3 */ u8 field_0x7d3;    /* game_ready_ck: == 1 */
     /* +0x7D4 */ u8 pad_0x7d4[0x1];
     /* +0x7D5 */ u8 field_0x7d5;
     /* +0x7D6 */ u8 pad_0x7d6[0x6];

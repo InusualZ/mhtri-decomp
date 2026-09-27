@@ -13,10 +13,12 @@
 extern "C" {
 #endif
 
-/* 0x800CF384 - r3 unused; the ef unit's live-effect count, read as a byte by
- * `enemy/fn_801A9540.cpp`'s entry point.  Added with that unit's registration (rule 2: this
- * range owns the address). */
-u32 fn_800CF384(void);
+/* 0x800CF384 - `system_w` +0x27, the local player's index (a zero-extended byte load), read as such by
+ * every consumer: `Pl/pl_master.cpp` compares it with a player's own index byte, `sound/fn_800D7F54.cpp`
+ * and `hud/move_work_update.cpp` index the per-player move-work array with it, and `main.cpp` indexes
+ * `Screen_w.fa72` with `(s8)` of it.  Added with that unit's registration (rule 2: this range owns the
+ * address). */
+u32 my_player_no(void);
 /* 0x800CF394 - the setter paired with it.  The declaration is `s8`, not the owner's own `u8`: every
  * consumer (`light/light.cpp`'s fn_802BEDE8/fn_802BEE3C) narrows its argument with `extsb` before the
  * call, which is what a signed parameter type emits, and `u8` does not (`light/light.cpp` measured
@@ -35,12 +37,13 @@ s32 fn_800CEE2C(const char* path, void* info);
 u8* fn_800D0568(s32 index);
 
 /* 0x800D0708 - the owner's own byte read (`src/ef/fn_800CDB2C.cpp:484`, `system_w`'s +0x7D3, whose
- * consumer compares the result against 1).  The map spells the symbol `fn_800D0708`, a placeholder
- * stem rather than a mangling, so it is declared at C scope (playbook 42/48) - the consumers
+ * consumer compares the result against 1).  The name is derived from the call surface, not the dump's:
+ * the runtime dump's map repeats a non-matching `SaveLoad::DidGameIDChange(void)` across this band.
+ * It carries no mangling, so it is declared at C scope (playbook 42/48) - the consumers
  * (`Pl/fn_80224AC4.cpp`, `lobby/fn_802076D4.cpp`) declare it `extern "C"` too, and a declaration
  * in the C++-scope block below clashes with those (`(10505) illegal overloading`).  Added with
  * `Pl/fn_80224AC4.cpp` (rule 2). */
-u32 fn_800D0708(void);
+u32 game_ready_ck(void);
 
 /* 0x800CF3C4 - the owner's own narrowed read, called by `menu/fn_802A6624.cpp`'s
  * `fn_802A6624`/`fn_802A674C` as a signed byte (the caller keeps an `extsb` on the widened

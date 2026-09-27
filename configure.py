@@ -614,6 +614,22 @@ config.libs = [
             # naming scheme of the band's neighbours (`layout.cpp`, `cockpit_quest.cpp`).
             # Same `cflags_hud` as the two siblings.
             Object(NonMatching, "hud/fn_802EBED8.cpp"),
+            # Registered from proposal/803250B0_fn_803250B0.cpp, at its final home (docs/plan.md 12):
+            # `.text` 0x803250B0..0x803253BC (1 function, 0x30C B) plus the range's own extab
+            # 0x80016224..0x8001622C and extabindex 0x8003519C..0x800351A8 (one framed function; both
+            # runs start exactly where `hud/fn_80324F7C.c`'s end and the next registered band begins, and
+            # the target object owns no `.data`/`.sdata2` at all).  Module `hud`: the range below is the
+            # landed `hud/fn_80324F7C.c`, which this unit calls with such a move-work record, and the
+            # range reads the same `lobby_w`/`lb_npc`/`lbl_806BE340` `.bss` keys; no `__FILE__` string
+            # covers it and the dump answers only `zz_03250b0_`, so the unit is named for what it does -
+            # the per-frame move-work update (its naming pass replaced the map's stem; see the header).
+            # `.cpp`, not `.c`: the target relocates against `get_move_work_adrs__FUc`
+            # / `set_zmode__FbUcb` / `get_option_cfg__FUc`, so the callees are C++ and rule 9 forbids
+            # spelling those manglings (see the file header).  Same `cflags_hud` as the three siblings.
+            # `Matching`: the object's `.text`/`extab`/`extabindex` are byte-identical to the target's
+            # and all 50 relocations agree on offset, type, addend and target section, so this
+            # registration substitutes the object rather than leaving the range's original bytes.
+            Object(Matching, "hud/move_work_update.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80334568_fn_80334568.cpp` - the character-state network sync (`.text`
             # 0x80334568..0x80338808, 77 functions / 17056 B; extab 0x8001677C..0x80016994 and
