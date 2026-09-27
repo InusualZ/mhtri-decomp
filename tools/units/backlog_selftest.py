@@ -382,6 +382,102 @@ def selftest() -> int:
                           tooling_register=os.path.join(tdir, "none.md"), register=treg)
     check("a hand-set status wins over the default", [i for i in items_h if i.key == hkey][0].status, "parked")
 
+    # --- the third source: stylelint's findings, aggregated per file -------------------------------
+    check("lint_counts: rule 7 aggregates under `naming`",
+          bl.lint_counts([{"rule": 7, "file": "src/a.c", "line": 1}]), {("naming", "src/a.c"): 1})
+    check("lint_counts: rule 7 stays one item per file",
+          bl.lint_counts([{"rule": 7, "file": "src/a.c", "line": 1},
+                          {"rule": 7, "file": "src/b.c", "line": 1},
+                          {"rule": 7, "file": "src/a.c", "line": 2}]),
+          {("naming", "src/a.c"): 2, ("naming", "src/b.c"): 1})
+    check("lint_counts: rule 2 aggregates under `band-header`",
+          bl.lint_counts([{"rule": 2, "file": "src/c.c", "line": 3}]), {("band-header", "src/c.c"): 1})
+    check("lint_counts: the other rules are not backlog",
+          bl.lint_counts([{"rule": r, "file": "src/a.c", "line": 1} for r in (1, 3, 4, 5, 6, 8, 9, 10)]), {})
+    check("the lint item kinds are declared once", sorted(bl.LINT_KINDS), ["band-header", "naming"])
+    check("the lint item rules are fixed", bl.LINT_RULES, {"naming": 7, "band-header": 2})
+    check("a lint item keeps the new kind and a stable defect (the key survives a partial fix)",
+          [(i.kind, i.target, i.defect) for i in bl.build_items(
+              obx, notes, os.path.join(tmp, "x"), {},
+              lint_items=[bl.Item(kind="naming", target="src/a.c", defect="rule 7", status="open",
+                                  default_status="open", ask="a", votes=3)]) if i.kind == "naming"],
+          [("naming", "src/a.c", "rule 7")])
+
+    # a real tree: one rule-7 file and one rule-2 file
+    ldir = tempfile.mkdtemp(prefix="backlog-lint-")
+    for d in ("src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
+        os.makedirs(os.path.join(ldir, d))
+    with open(os.path.join(ldir, "configure.py"), "w", encoding="utf-8") as fh:
+        fh.write("config.libs = [\n]\n")
+    with open(os.path.join(ldir, "src", "mod", "a.c"), "w", encoding="utf-8") as fh:
+        fh.write("void fn_80040598(void) {}\nvoid fn_80040599(void) {}\n")
+    with open(os.path.join(ldir, "src", "mod", "b.c"), "w", encoding="utf-8") as fh:
+        fh.write("extern void foo(void);\nvoid b(void) { foo(); }\n")
+    with open(os.path.join(ldir, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8") as fh:
+        fh.write("fn_80040598 = .text:0x1000; // type:function\n"
+                 "fn_80040599 = .text:0x1010; // type:function\n"
+                 "foo = .text:0x1800; // type:function\n")
+    with open(os.path.join(ldir, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8") as fh:
+        fh.write("mod/a.c:\n\t.text       start:0x1000 end:0x2000\n")
+    lit = {i.kind: i for i in bl.collect_lint_items(ldir)}
+    check("the lint source files one item per (file, rule)",
+          sorted((i.kind, i.target) for i in bl.collect_lint_items(ldir)),
+          [("band-header", "src/mod/b.c"), ("naming", "src/mod/a.c")])
+    check("the naming item carries its rule-7 count as its weight", lit["naming"].weight, 2)
+    check("the naming ask names the file, the rule and the count",
+          ("src/mod/a.c" in lit["naming"].ask and "rule-7" in lit["naming"].ask
+           and "2" in lit["naming"].ask), True)
+    check("the band-header item carries its rule-2 count", lit["band-header"].weight, 1)
+    check("the band-header ask names the owner-header fix",
+          ("rule-2" in lit["band-header"].ask and "include" in lit["band-header"].ask), True)
+    check("the high-traffic file leads the register (most findings first)",
+          [i.kind for i in bl.build_items(bl.outbox_dir(ldir), bl.notes_dir(ldir),
+                                          os.path.join(ldir, "none.md"), {},
+                                          lint_items=bl.collect_lint_items(ldir))][0], "naming")
+    dated = bl.Item(kind="shared-file", target="src/mod/c.c", defect="d", status="open",
+                    default_status="open", ask="a",
+                    filings=[bl.Filing("o", "w", "2026-09-27T00:00:00", "d")])
+    check("a lint item surfaces above a dated item of the same filer count",
+          bl.rank([dated, lit["naming"]])[0].kind, "naming")
+    nkey = lit["naming"].key
+    check("a naming item's key is stable across runs",
+          [i.key for i in bl.collect_lint_items(ldir) if i.kind == "naming"], [nkey])
+    check("the key is the (kind, file, rule) identity", nkey.startswith("naming-"), True)
+    check("a set-status override applies to a lint item",
+          [i.status for i in bl.build_items(bl.outbox_dir(ldir), bl.notes_dir(ldir),
+                                            os.path.join(ldir, "none.md"), {nkey: "parked"},
+                                            lint_items=bl.collect_lint_items(ldir)) if i.key == nkey],
+          ["parked"])
+    # carry-forward + triage: fix the file, the item survives and triage proves it done
+    lreg = os.path.join(ldir, ".pi", "backlog.json")
+    bl.write_register(ldir, bl.collect_lint_items(ldir), "",
+                      {"open": 2, "done": 0, "parked": 0, "total": 2}, {"claims": [], "ratio": 1}, lreg)
+    with open(os.path.join(ldir, "src", "mod", "a.c"), "w", encoding="utf-8") as fh:
+        fh.write("void named(void) {}\n")
+    check("a fixed file's item is carried forward, not silently dropped",
+          nkey in {i.key for i in bl.collect_lint_items(ldir, lreg)}, True)
+    check("... and its live count is now zero",
+          [i.weight for i in bl.collect_lint_items(ldir, lreg) if i.key == nkey], [0])
+    decd, dece = bl._check_lint(ldir, lit["naming"], {"splits": bl._splits_ranges(ldir)})
+    check("triage: the naming item is resolved once rule 7 no longer fires", decd, "resolved")
+    check_true("... and says it re-linted the file", "re-linted" in (dece or ""))
+    band, bande = bl._check_lint(ldir, lit["band-header"], {"splits": bl._splits_ranges(ldir)})
+    check("triage: an unfixed band-header item stays open", band, "open")
+    check_true("... naming the live count", "rule-2" in (bande or ""))
+    decisions3, _ = bl.triage(ldir, outbox=bl.outbox_dir(ldir), notes=bl.notes_dir(ldir),
+                              tooling_register=os.path.join(ldir, "none.md"), register=lreg)
+    check("triage classifies the carried naming item as resolved",
+          [d for it, d, _ in decisions3 if it.key == nkey], ["resolved"])
+    out3 = bl.apply_triage(ldir, decisions3, register=lreg, outbox=bl.outbox_dir(ldir),
+                           notes=bl.notes_dir(ldir), tooling_register=os.path.join(ldir, "none.md"))
+    check("triage --apply marks the naming item done", out3["changed"]["done"], 1)
+    check("... and the naming resolution earns a credit", out3["summary"]["earned"], 1)
+    check("a missing file makes the lint item stale",
+          bl._check_lint(ldir, bl.Item(kind="naming", target="src/mod/gone.c", defect="rule 7",
+                                       status="open", default_status="open", ask="x"),
+                         {"splits": {}})[0], "stale")
+    check("a tree with no src/ contributes no lint items", bl.collect_lint_items(tmp), [])
+
     # --- --check semantics -------------------------------------------------------------------------
     import contextlib
     import io
@@ -420,6 +516,12 @@ def selftest() -> int:
     check("a range item gets a decompiler lane",
           bl.lane_task(tmp, bl.Item(kind="range", target="x", defect="redraw", status="open",
                                     default_status="open", ask="x"))["agent"], "decompiler")
+    check("a naming item gets a fixer lane",
+          bl.lane_task(tmp, bl.Item(kind="naming", target="src/a.c", defect="rule 7", status="open",
+                                    default_status="open", ask="x"))["agent"], "fixer")
+    check("a band-header item gets a fixer lane",
+          bl.lane_task(tmp, bl.Item(kind="band-header", target="src/a.c", defect="rule 2", status="open",
+                                    default_status="open", ask="x"))["agent"], "fixer")
 
     if fails:
         print("FAIL (%d)" % len(fails))

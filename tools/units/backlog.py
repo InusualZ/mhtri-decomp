@@ -22,9 +22,11 @@ has since moved, so `python tools/units/backlog.py triage` classifies every open
 `stale` or `open` and prints the check that proved each. `--apply` writes the verdicts (`resolved` -> `done`,
 `stale` -> `parked`) and is idempotent, respecting any status a human already set. Anything that cannot be
 proved from the repository stays `open (no check)` - a triage that guesses is worse than the pile it is
-triaging.
+triaging. A lint-derived item follows the same rule: a `naming` / `band-header` item is `resolved` when the
+file no longer carries that rule's findings (re-linted, not remembered), `stale` when the file is gone, and
+`open` with the live count otherwise.
 
-Two sources, one register:
+Three sources, one register:
 
 * **`config_requests`** in `.pi/outbox/*.json`. A `range` (a seam re-draw, or a data run to claim) is open
   until a proposal pass re-draws it; a `shared-file` (a defect in a header a worker may not touch) is open
@@ -33,6 +35,20 @@ Two sources, one register:
   carried at all.
 * **`tools/units/tooling.py`**'s own register (`docs/tooling-requests.md`): the ranked tooling/environment
   requests with their open/done/parked statuses. It is read, never duplicated.
+* **`tools/units/stylelint.py`**'s findings, aggregated **per file**: one `naming` item per file carrying
+  rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unk*`) and one `band-header` item
+  per file carrying rule-2 findings (an `extern` that belongs in the owner's header or `include/unsplit/`).
+  The item's ask names the file, the rule and the count, and the count is the item's rank weight, so the
+  high-traffic file surfaces first. A `naming`/`band-header` item's key is the (kind, file) pair, so a
+  partial fix keeps its status; the item is carried forward from the published register even after the
+  findings are gone, so `triage` can prove the file clean and close it (and so a resolved item stays in the
+  register and earns its credit). This is the "do not revoke committed progress - work the debt slowly"
+  half of the owner's naming ruling (2026-09-27): ~400 such open items against the campaign's balance keep
+  naming work interleaved with new claims through the ratio, with no special-casing.
+
+This is also the owner's "do not revoke committed progress - put the mounted naming debt in a backlog and
+work on it slowly" half: the stylelint items are ordinary open items, so the credit ratio rations new
+claims against them exactly as it rations against the rest.
 
 The pile is not 703 problems. The same defect is filed by several lanes over weeks, so items are keyed on
 `(kind, target, normalised-defect)`: for `shared-file` the header path plus a normalised summary of the
@@ -57,10 +73,11 @@ each change.
     python tools/units/backlog.py --set-status KEY done # open / done / parked, then regenerate
     python tools/units/backlog.py --selftest
 
-Ranking is by what predicts value: the number of independent filers, then recency, then `tooling.py`'s
-votes. An item also shows how long it has been open; an item filed in an early phase may be stale because
-the code moved on, and that is exactly what the register is for - it is surfaced, never silently dropped,
-and a human or lane parks it.
+Ranking is by what predicts value: the number of independent filers, then an item's weight (a
+`naming`/`band-header` item's live finding count, so the high-traffic file leads), then recency, then
+`tooling.py`'s votes. An item also shows how long it has been open; an item filed in an early phase may be
+stale because the code moved on, and that is exactly what the register is for - it is surfaced, never
+silently dropped, and a human or lane parks it.
 """
 from __future__ import annotations
 
@@ -83,7 +100,13 @@ if TOOLS not in sys.path:
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
 
 STATUSES = ("open", "done", "parked")
-NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling")  # default open; a `rename` is never carried
+NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header")
+# default open; a `rename` is never carried
+# The lint-derived kinds: `naming` is one item per file carrying rule-7 findings, `band-header` one per file
+# carrying rule-2 findings (`build_items` / `collect_lint_items`). Both are ordinary open items, so the credit
+# ratio rations new claims against them - no special-casing.
+LINT_KINDS = ("naming", "band-header")
+LINT_RULES = {"naming": 7, "band-header": 2}
 
 # -----------------------------------------------------------------------------------------------------------
 # Text helpers
@@ -258,6 +281,7 @@ class Item:
     ask: str
     filings: list[Filing] = field(default_factory=list)
     votes: int = 0          # tooling.py's vote count (0 for a config_request item)
+    weight: int = 0         # a lint item's live finding count (0 for every other kind)
     flavour: str = ""
     first: str = ""
     last: str = ""
@@ -292,11 +316,13 @@ def _merge(items: dict, key: tuple, item: Item) -> None:
 
 def build_items(outbox_dir: str, notes_dir: str, tooling_register: str = "",
                 statuses: dict[str, str] | None = None,
-                tooling_statuses: dict[str, str] | None = None) -> list[Item]:
-    """Aggregate both sources into one de-duplicated register, then apply persisted statuses.
+                tooling_statuses: dict[str, str] | None = None,
+                lint_items: list[Item] | None = None) -> list[Item]:
+    """Aggregate all three sources into one de-duplicated register, then apply persisted statuses.
 
     `tooling_register` is the tracked `docs/tooling-requests.md`; its statuses are read from it when
-    `tooling_statuses` is not supplied.
+    `tooling_statuses` is not supplied. `lint_items` is the stylelint source (one item per file with
+    rule-7/rule-2 findings), built by `collect_lint_items`; it is `None` when a caller has no tree to lint.
     """
     statuses = statuses or {}
     if tooling_statuses is None:
@@ -332,6 +358,10 @@ def build_items(outbox_dir: str, notes_dir: str, tooling_register: str = "",
         item = Item(kind="tooling", target=e.key, defect="", ask=e.ask, status=e.status,
                     default_status=e.status, filings=filings, votes=e.votes)
         grouped[("tooling", "tooling:" + e.key, "")] = item
+
+    # The stylelint source: an already-built item per (kind, file), open until its findings are gone.
+    for it in (lint_items or []):
+        _merge(grouped, (it.kind, it.target, it.defect), it)
 
     items = list(grouped.values())
     for it in items:
@@ -407,10 +437,88 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
                                   filings=[Filing(source, lane, when, one_line(detail, 400))]))
 
 
+def stylelint_findings(main: str) -> list[dict]:
+    """`stylelint.lint_all` for `main`, or `[]` when there is no `src/` tree to lint.
+
+    A fixture tree in a self-test has no `src/`, and a lint failure must never take the other sources down
+    with it: this third source is additive, so an import/parse error leaves an empty cell rather than
+    crashing a `queue.py next` refusal.
+    """
+    if not os.path.isdir(os.path.join(main, "src")):
+        return []
+    try:
+        from units import stylelint as sl
+        return sl.lint_all(main)
+    except Exception:
+        return []
+
+
+def lint_counts(findings: list[dict]) -> dict:
+    """`{(kind, file): n}` for the lint findings the backlog is filed against (rule 7 and rule 2 only)."""
+    out: dict = {}
+    for f in findings:
+        kind = {7: "naming", 2: "band-header"}.get(f["rule"])
+        if kind:
+            key = (kind, f["file"])
+            out[key] = out.get(key, 0) + 1
+    return out
+
+
+def _prior_lint_items(register: dict) -> dict:
+    """The `(kind, file)` lint items the published register already carries, keyed for carry-forward.
+
+    A lint item must survive the regeneration that follows its fix: the findings are gone, but the item is
+    still the `triage` subject and the ledger's unit of credit. The published payload's `items` list is the
+    only place that remembers it between runs; `statuses` alone would remember the status but not the ask.
+    """
+    out: dict = {}
+    for it in (register or {}).get("items", []):
+        if isinstance(it, dict) and it.get("kind") in LINT_KINDS:
+            out[(it["kind"], it.get("target", ""))] = it
+    return out
+
+
+def collect_lint_items(main: str, register: str | None = None) -> list[Item]:
+    """The third source: the lint's rule-7/rule-2 findings as one item per (file, rule).
+
+    Current findings create items; `_prior_lint_items` carries the already-published ones forward so a file
+    whose findings were fixed is not silently dropped - its item stays for `triage` to prove done (and, once
+    done, stays in the register and earns the credit). The item's key is the (kind, file) pair with a stable
+    `defect` (`rule 7` / `rule 2`), so a partial fix keeps its status. `weight` is the live finding count, so
+    `rank` surfaces the high-traffic file first; a zero-count carry-forward keeps the last known count in its
+    ask for the human reading it, but weighs nothing.
+    """
+    counts = lint_counts(stylelint_findings(main))
+    prior = _prior_lint_items(load_register(main, register))
+    items: list[Item] = []
+    for key in sorted(set(counts) | set(prior)):
+        kind, target = key
+        live = counts.get(key, 0)
+        last = int((prior.get(key) or {}).get("weight") or 0)
+        rule = LINT_RULES[kind]
+        if kind == "naming":
+            ask = ("`%s` carries %d rule-7 finding(s) (auto-generated `fn_`/`lbl_`/`loc_` or bare `unk*` "
+                   "names) - name each from what it does or holds and rename the map row in the same "
+                   "change" % (target, live or last))
+        else:
+            ask = ("`%s` carries %d rule-2 finding(s) (an `extern` declared where it is not owned) - move "
+                   "each declaration to its owner's header (or `include/unsplit/`) and #include it"
+                   % (target, live or last))
+        items.append(Item(kind=kind, target=target, defect="rule %d" % rule, status="open",
+                          default_status="open", ask=ask, weight=live,
+                          filings=[Filing(source="stylelint", lane="stylelint", when="", detail=ask)]))
+    return items
+
+
 def rank(items: list[Item]) -> list[Item]:
-    """Filers first (the priority signal), then recency, then tooling.py's votes; open before closed."""
+    """Filers first (the priority signal), then the item's weight, then recency; open before closed.
+
+    The weight is a `naming`/`band-header` item's live finding count, so the high-traffic file surfaces
+    first even though it carries no filing date; every other kind weighs 0, which leaves their existing
+    filer/recency/vote order untouched. `votes` (`tooling.py`'s) stays the last tie-break.
+    """
     order = {"open": 0, "parked": 1, "done": 2}
-    return sorted(items, key=lambda it: (order.get(it.status, 3), -it.filer_count,
+    return sorted(items, key=lambda it: (order.get(it.status, 3), -it.filer_count, -it.weight,
                                          _neg(it.last), -it.votes, it.kind, it.target, it.defect))
 
 
@@ -553,6 +661,7 @@ def payload(items: list[Item], as_of: str, counts: dict, ledger=None) -> dict:
                 "filers": it.filers,
                 "filer_count": it.filer_count,
                 "votes": it.votes,
+                "weight": it.weight,
                 "first": it.first,
                 "last": it.last,
                 "age_days": None if it.age_days is None else round(it.age_days, 2),
@@ -591,7 +700,8 @@ def build(main: str, outbox: str | None = None, notes: str | None = None,
     tooling_register = tooling_register or tooling_register_path(main)
     statuses = load_statuses(main, register)
     ledger = load_ledger(main, register)
-    items = build_items(outbox, notes, tooling_register, statuses)
+    items = build_items(outbox, notes, tooling_register, statuses,
+                        lint_items=collect_lint_items(main, register))
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
@@ -639,6 +749,7 @@ def record_claims(main: str, claims: list[dict], ratio: int = RATIO_DEFAULT,
 def lane_task(main: str, item: Item) -> dict:
     """A ready-to-paste lane for a backlog item - mirroring how `queue.py next` prints its spawn line."""
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
+               "naming": "fixer", "band-header": "fixer",
                "tooling": "worker"}.get(item.kind, "worker")
     task = ("Work the campaign backlog item `%s` (%s %s): %s. "
             "This is on the backlog, so `queue.py next` spends a credit on a new proposal claim until it is "
@@ -1025,6 +1136,35 @@ def _check_tooling(main: str, item: Item, ctx: dict):
                     "(tracked in docs/tooling-requests.md)")
 
 
+def _check_lint(main: str, item: Item, ctx: dict):
+    """Whether a lint-derived item's findings are gone - re-linted now, never remembered.
+
+    The count is read from the file itself with `stylelint.lint_source`, the same function that produced the
+    item, so the check cannot drift from the lint. A missing file is `stale`; a rule-2 check needs the
+    symbols/splits map, so with the map absent it stays open rather than call itself resolved.
+    """
+    rule = LINT_RULES.get(item.kind)
+    path = _resolve_repo_path(main, item.target)
+    if not path:
+        return ("stale", "the file no longer exists: %s" % item.target)
+    try:
+        from units import stylelint as sl
+    except ImportError:  # pragma: no cover - the tool is always beside this module
+        return ("open", "no check: stylelint.py is not importable")
+    if rule == 2 and "ownership" not in ctx:
+        ctx["ownership"] = sl.load_ownership(main)
+    ownership = ctx.get("ownership")
+    if rule == 2 and ownership is None:
+        return ("open", "no check: config/RMHE08/symbols.txt or splits.txt is absent")
+    findings = [f for f in sl.lint_source(sl.Source(path, item.target, read(path)), ownership)
+                if f["rule"] == rule]
+    if findings:
+        return ("open", "%s still carries %d rule-%d finding(s)"
+                % (item.target, len(findings), rule))
+    return ("resolved", "rule %d no longer fires in %s (re-linted with the same rule that filed it)"
+            % (rule, item.target))
+
+
 def triage_item(main: str, item: Item, ctx: dict):
     if item.kind == "range":
         return _span_decision(ctx["splits"], item.target)
@@ -1034,6 +1174,8 @@ def triage_item(main: str, item: Item, ctx: dict):
         return _check_flag(main, item, ctx)
     if item.kind == "shared-file":
         return _check_shared(main, item, ctx)
+    if item.kind in LINT_KINDS:
+        return _check_lint(main, item, ctx)
     return _check_tooling(main, item, ctx)
 
 
@@ -1077,7 +1219,8 @@ def apply_triage(main: str, decisions: list, register: str | None = None, **kw) 
     outbox = kw.get("outbox") or outbox_dir(main)
     notes = kw.get("notes") or notes_dir(main)
     tooling_register = kw.get("tooling_register") or tooling_register_path(main)
-    items = build_items(outbox, notes, tooling_register, statuses)
+    items = build_items(outbox, notes, tooling_register, statuses,
+                        lint_items=collect_lint_items(main, register))
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
               "parked": sum(1 for i in items if i.status == "parked"),
@@ -1178,13 +1321,14 @@ def main() -> int:
 
     statuses = load_statuses(main_wt, register)
     ledger = load_ledger(main_wt, register)
+    lint = collect_lint_items(main_wt, register)   # the third source: one item per (file, rule)
     if args.set_status:
         key, status = args.set_status
         status = status.lower()
         if status not in STATUSES:
             print("status must be one of: %s" % ", ".join(STATUSES), file=sys.stderr)
             return 2
-        known = {it.key for it in build_items(outbox, notes, tooling_register, statuses)}
+        known = {it.key for it in build_items(outbox, notes, tooling_register, statuses, lint_items=lint)}
         if key not in known:
             print("unknown backlog key %r - see `python tools/units/backlog.py --print`" % key, file=sys.stderr)
             return 2
@@ -1194,7 +1338,7 @@ def main() -> int:
         decisions, _ = triage(main_wt, outbox=outbox, notes=notes,
                               tooling_register=tooling_register, register=register)
         rep = triage_report(decisions)
-        all_items = build_items(outbox, notes, tooling_register, statuses)
+        all_items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint)
         balance = ledger_summary(all_items, ledger["claims"], args.ratio)
         if args.json:
             print(json.dumps({"triage": rep, "credits": balance,
@@ -1217,7 +1361,7 @@ def main() -> int:
             print("dry run: nothing written (pass --apply to mark resolved/stale)")
         return 0
 
-    items = build_items(outbox, notes, tooling_register, statuses)
+    items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint)
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),

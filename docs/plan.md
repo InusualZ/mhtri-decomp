@@ -504,9 +504,9 @@ rules 3 and 4 exist to record.
 | 4 | **Every field carries its offset** | `/* +0x1C */` on the field, in ascending order, so the layout is readable at a glance and a reviewer can check it against the disassembly |
 | 5 | **Every field has a name from its context** | what is stored, compared against, passed on. The **only** exception is a padding or unused field — present in the original object but untouched by the functions we match — which gets `pad_0xNN` / `unused_0xNN` **and keeps its offset** |
 | 6 | **Pointer arithmetic to reach a field is forbidden** | `*(u32*)((u8*)self + 0x1C) = v;` is not acceptable; declare the type and write `self->field = v;`. A raw byte offset is allowed only where no field is being named (`memset`, a byte-wise copy, a `sizeof`/offset computation) — and even there prefer `offsetof(Type, field)` |
-| 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used. Neither `fn_XXXXXXXX` nor `unkNN` may survive in `src/`. A data label this unit **owns** (`lbl_XXXXXXXX` / `loc_XXXXXXXX`) is the same: name it from what it holds and where it is used, and rename the map row in the same change - a reference to **another** unit's label is that unit's, not this file's |
+| 7 | **Symbols have proper names** | a function that arrives as `fn_XXXXXXXX` gets a name for **what it does** plus the naming scheme of its neighbours; a variable or field that arrives as `unkNN` gets a name for **what it holds** and where it is used; a data label (`lbl_XXXXXXXX` / `loc_XXXXXXXX`) gets a name from what it holds and where it is used, and the map row is renamed in the same change. **No auto-generated name survives in `src/`** — `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN`, whoever owns the symbol: this unit's, another unit's or an unowned one. There is no exemption and no deferral |
 | 8 | **`goto` is forbidden** | No `goto`, and no label used as a control-flow device. Where a shared tail or a dispatch layout looks like it needs one, the conformant shapes are a **helper function**, a `switch` whose cases share a `break`, or a `for (;;)` with `break`/`continue` - and if none of them reproduces the target's codegen, that is a **residual to record with both measurements**, not a licence to use `goto`. The rule exists because the shape is unreadable in isolation (the target of a jump can be a hundred lines away) and it defeats the point of a reconstruction that someone has to read |
-| 9 | **A mangled symbol is called through its owner** | a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and stays legal (row 7's deferral) |
+| 9 | **A mangled symbol is called through its owner** | a map name that carries an argument list (`Name__FP...`) or a class/namespace qualifier (`Name__Q34nw4r...`) is a **mangling**, i.e. a compiler spelling of a class member or a namespaced function, and must never be written as the callable identifier. Declare the owner (the class or namespace) and call `obj->method(args)` / `ns::function(args)`. The same holds for a **declaration** of the mangled spelling, which is where the C++ front-end mangles it a second time (playbook row 50); an `fn_XXXXXXXX` stem is the map's own placeholder, not a mangling, and is rule 7's to name |
 | 10 | **A vtable we own is compiler output** | a table of code pointers inside the unit's own registered ranges is **emitted by MWCC** from a class that declares its `virtual` methods (plus the constructor that stores the table) - never written out entry by entry, never declared `extern`, never declared through a `void**` member. A table *outside* our ranges belongs to another TU: reference its `lbl_` symbol, and a struct of typed function pointers is the way to call a slot without dragging a class into the TU (declaring the class would make MWCC emit a table into our object - extra bytes). **A table we wrote is not evidence of inheritance** - inheritance comes from the object's structure: the slot addresses read out of the DOL, the constructor's store, and the constructor/destructor chain |
 
 **These rules are part of phase C, not a separate chore.** The residual sweep already revisits every unit that
@@ -529,13 +529,13 @@ resolves the symbol but **no** registered unit owns it, the local `extern` is it
 declaration belongs in a band header under `include/unsplit/`. Where the registered bands bracketing an unsplit
 address name different modules (a `sound` unit sits inside the `ef` band) no `<module>.h` is sound, so the
 finding names the band directory rather than guess a header; a symbol the map does not contain at all, and a
-duplicate map row, stay counted gaps because the map cannot judge them. Rule 7 has one exemption and one
-ownership split: a registered unit with **no bodies yet** is not held to it (§12) - its names are still the
-map's until the worker writes the bodies from the evidence - and a `lbl_XXXXXXXX` / `loc_XXXXXXXX` data label
-whose address falls in one of the unit's **own** registered ranges is a finding, while a reference to another
-unit's (or an unowned) label is that unit's and is never this file's (reporting those would be ~11.7k lines of
-churn for data the file does not claim). A `rule 7 deferred: <reason>` comment defers the `fn_` and `lbl_`
-halves for a unit that cannot yet name its own. The audit of 2026-09-22 says how much there is to bring:
+duplicate map row, stay counted gaps because the map cannot judge them. Rule 7 has **no exemption and no
+deferral**: every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` in `src/` is a finding,
+whoever owns the symbol. The **only** grandfather is the gate's `--diff`: an existing finding never blocks a
+landing, while an *added* one refuses - so committed work is not revoked, and the mounted debt cannot grow. A
+file with no bodies is held to the rule too, and a `rule 7 deferred` comment exempts nothing. The naming debt
+is worked slowly through §6.6's backlog: `stylelint.py`'s rule-7 findings are one `naming` item per file, and
+the credit ratio rations new claims against them. The audit of 2026-09-22 says how much there is to bring:
 
 | measure | count | rule |
 | --- | --- | --- |
@@ -564,9 +564,15 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   different ask from "claim this data"), a `shared-file` (a defect in a header a worker may not touch: a
   conflicting declaration, a `#pragma` that leaks, a wrong signature) and a `flag` (a compiler flag for a
   lib) - each open until a proposal pass re-draws it, it is fixed, or it is measured and adopted/rejected.
-  The tooling/environment register `tooling.py` owns is read into the same list, never duplicated. **A
-  `rename` is not backlog**: the landing applies it, so it is done when its batch lands, and carrying it
-  would drown the signal.
+  The tooling/environment register `tooling.py` owns is read into the same list, never duplicated. **The
+  naming debt is backlog too.** `stylelint.py`'s findings are aggregated **per file**: one `naming` item per
+  file carrying rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unkNN`) and one
+  `band-header` item per file carrying rule-2 findings (an `extern` that belongs in the owner's header or
+  `include/unsplit/`). Each ask names the file, the rule and the count, and they are ordinary `open` items,
+  so the ratio rations new claims against them with no special-casing - that is the owner's ruling's second
+  half (2026-09-27): remove the exemption, but do not revoke committed progress; put the mounted debt in the
+  backlog and work it slowly. **A `rename` is not backlog**: the landing applies it, so it is done when its
+  batch lands, and carrying it would drown the signal.
 * **A record is not a request.** Most `shared-file` entries are past-tense records of a change the branch
   already made ("Added one union member to the +0x328 union ..."); those default to `done`. Only an entry
   that states a live defect ("line 67 declares X while ... declares Y, so any TU that includes both fails
@@ -579,9 +585,10 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   hundred distinct items - on 2026-09-27, 64 open `shared-file`, 130 open `range`, 26 open `flag` and 4 open
   tooling - with **22 open items filed by two or more independent lanes**: a signal that was thrown away
   before this register existed.
-* **Ranking is filers, then recency, then `tooling.py`'s votes**, and each item shows its age. An item filed
-  in an early phase may be stale because the code moved on - the register surfaces it, never drops it; a
-  human or a lane parks it with `--set-status`.
+* **Ranking is filers, then an item's weight (a `naming`/`band-header` item's live finding count, so the
+  high-traffic file leads), then recency, then `tooling.py`'s votes**, and each item shows its age. An item
+  filed in an early phase may be stale because the code moved on - the register surfaces it, never drops it;
+  a human or a lane parks it with `--set-status`.
 * **Status is persistent and per item.** `open` / `done` / `parked` lives in `MAIN/.pi/backlog.json`
   (gitignored, like `claims.json`, so it survives a regeneration); set it with
   `python tools/units/backlog.py --set-status KEY done`, and `--check` exits 1 when the register is missing or
@@ -609,8 +616,11 @@ The owner replaced it with a **ratio** (option 3) and a **triage** of the pile (
   now **fully covered by a registered unit's range in `splits.txt`**; a `flag` is `resolved` when the lib's
   cflags group in `configure.py` already carries the requested flag; a `shared-file` is `stale` when its file
   no longer exists, and `resolved` when the file is present and the stated defect is **gone** (the named
-  `#pragma` is no longer present, or the declaration's symbol is no longer named); a `tooling` request is
-  auto-decided only when it has a checkable artifact. **Anything that cannot be proved from the repository
+  `#pragma` is no longer present, or the declaration's symbol is no longer named); a `naming`/`band-header`
+  item is `resolved` when the file no longer carries that rule's findings, **re-linted with the same rule
+  that filed it**, and carried forward from the published register so the fix can be proved after the item
+  would otherwise have vanished; a `tooling` request is auto-decided only when it has a checkable artifact.
+  **Anything that cannot be proved from the repository
   stays `open (no check)`** - a triage that guesses is worse than the pile it is triaging.
 
 ## 7. The tooling roadmap — build order, why, and the acceptance test
@@ -1065,10 +1075,10 @@ stub -> later promotion to a real name and location) touched every unit twice an
   (`docs/memory-dump.md`), then what the code does plus the naming scheme of its neighbours. **The map's
   `fn_XXXXXXXX` stem is not an outcome** (owner, 2026-09-26): when the evidence is thin, derive a name from the
   context and **mark the guess** in the unit header so a later pass can refine it - a generated `fn_`/`lbl_`/
-  `unk` name left in `src/` is a defect, and `rule 7 deferred` is not for a unit being written (the escape
-  covers the files registered before the rule, and the land gate refuses one a batch *grows* for a symbol its
-  own unit defines, or a unit registered at a generated file name). **Inventing a module is forbidden** - a
-  module comes from the `__FILE__` string, the dump or the subsystem, never from a guess.
+  `unk` name left in `src/` is a defect, and a `rule 7 deferred` comment exempts nothing - the lint honours
+  no key (the escape's files are pure comment text now); the land gate still refuses a batch that *grows* one
+  for a symbol its own unit defines, or registers a unit at a generated file name). **Inventing a module is
+  forbidden** - a module comes from the `__FILE__` string, the dump or the subsystem, never from a guess.
 * **Registration before measurement is the constraint.** A worker cannot score a unit that is not in the build
   graph, so it makes the registration - `splits.txt` range, `configure.py` entry, source file - **inside its own
   worktree** and measures there. The orchestrator applies that registration on `main` (§5.1's cherry-pick), so

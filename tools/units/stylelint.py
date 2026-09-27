@@ -21,7 +21,7 @@ Rules checked (each finding is `file:line`):
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
 | 6 | no pointer arithmetic reaches a field | a `(T*)base + 0xNN` / `(T*)(base + 0xNN)` cast-plus-literal-offset expression, except an offset passed straight to `memset`/`memcpy`/`memmove` (the rule's own byte-range exception) |
-| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, `unk*` used for anything that is not a struct field (a field is rule 5's), and a `lbl_XXXXXXXX`/`loc_XXXXXXXX` data label **this unit owns**; a reference to another unit's (or an unowned) label is that unit's, never this file's; **exempt per file** - see below |
+| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, `lbl_XXXXXXXX`/`loc_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's) - **whoever owns the symbol**; no exemption, no deferral |
 | 8 | `goto` is forbidden | the `goto` keyword |
 | 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
 | 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
@@ -50,33 +50,17 @@ The backlog is a burn-down, not a gate: `--diff` fails only when a (rule, file) 
 unit with 300 `unk*` fields is allowed as long as the touch adds none. A **new** file starts from zero, so
 its violations are all additions - new work is held to the rules from its first commit.
 
-**Rule 7 is keyed on the file, not the directory.** Three exemption keys, narrowest last (`rule7_state`):
+**Rule 7 has no exemption and no deferral.** Every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare
+`unk*` identifier in `src/` is a finding, whoever owns the symbol: this unit's, another unit's, an unowned
+one, or a name the map does not know. A data label is not "the owner's to name" any more - leaving a
+generated spelling on either side of an ownership line is the defect. The rule applies to a file with no
+bodies too, and **no comment exempts anything**: a `rule 7 deferred` line is now just inert text, not a key.
 
-1. under `src/auto/` - a **temporary grandfather** for the legacy scaffolding units that already have
-   bodies. The `auto/` bucket is retired and its units are being named and moved to their final homes,
-   so this entry goes with the migration (`EXEMPT` below).
-2. **no bodies yet** - a stub is a file-header comment and forward declarations; it has nothing to name,
-   so rule 7 cannot apply. This is exactly `brief.text_has_bodies` (a brace outside the comments), so the
-   pool and the gate never disagree about what a stub is.
-3. **`rule 7 deferred: <reason>`** in a comment - the durable key, and the one that covers a unit that
-   already has bodies at its final `src/<module>/<name>` home: a worker's landing commit registers the
-   stub and writes the bodies together, so keys 1 and 2 cannot. It is per-unit and reviewable -
-   `grep -rn "rule 7 deferred" src/` is the complete list - and key 3 defers the `fn_` and `lbl_` halves
-   together: a bare `unk*` identifier is nameable from its own context, so the `unk` half still reports,
-   but the data-label half stands or falls with the function half.
-
-Rule 7's `lbl_`/`loc_` half draws an **own/foreign split**, the same distinction `land.py`'s
-`rule7_defer_growth` draws for `fn_` definitions. A label whose address falls inside one of this unit's
-registered `splits.txt` ranges (resolved through `symbols.txt`, the machinery rule 2 uses) is the unit's to
-name from its context - "what it holds and where it is used" - and the map row is renamed with the source
-in the same change. A reference to **another** unit's (or an unowned) label is that unit's; making it fire
-would be ~11.7k lines of churn for data the file does not own, so it is never a finding. Key 3
-(`rule 7 deferred: <reason>`) covers a unit that cannot yet name its own data, exactly as for a function.
-
-A key is checkable from the file alone, and a **finished** unit cannot hide behind keys 2 or 3 silently:
-key 2 needs the absence of every body, and key 3 is one greppable line whose reason must name the evidence.
-**Rules 1-6, 8 and 9 still apply under every key** (sized types, fields with offsets and context names, no
-pointer arithmetic, no `goto`, no mangled spelling used as a callable identifier).
+The **only** grandfather is the gate's own `--diff`: touching a file that already carries findings is
+allowed (an existing finding never blocks a landing), while adding one is refused. That is the owner's
+"do not revoke committed progress" - the mounted debt is worked slowly through the backlog register
+(`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9 and 10 apply as
+before.**
 """
 
 from __future__ import annotations
@@ -88,14 +72,6 @@ import os
 import re
 import subprocess
 import sys
-
-# `brief.text_has_bodies` is the one definition of "a file with no bodies yet" (rule 7 key 2, `rule7_state`).
-# Reuse it rather than keep a second brace scanner. Imported as a package module under land.py/promote.py,
-# as a sibling script for `python tools/units/stylelint.py`.
-try:
-    from units import brief as _brief  # noqa: E402
-except ImportError:  # `python tools/units/stylelint.py ...`
-    import brief as _brief  # type: ignore  # noqa: E402
 
 SRC = "src"
 # The unsplit band (`include/unsplit/<module>.h`) is the legitimate home for a symbol with no registered
@@ -114,18 +90,16 @@ HEADERS = "include"
 HEADER_SUFFIXES = (".h", ".hpp", ".hh")
 SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
 
-# Rule 7's path-keyed exemption table. This is now only a **temporary grandfather** for the legacy
-# `src/auto/` units that already have bodies; the auto/ migration is naming and moving them, and this
-# entry is removed with it. Do not add entries: the durable keys are per-file (`rule7_state`).
+# Rule 7's path-keyed exemption table is **empty and stays empty** (owner's ruling, 2026-09-27): the
+# `src/auto/` bucket is retired and no path exempts a rule. The table is kept so `exemptions()` and the
+# "not enforced" report lines stay honest - an empty table is a statement, not an omission.
 # One entry per (rule, path prefix); every other rule still applies under the prefix.
-EXEMPT = [(7, "src/auto/", "temporary grandfather: legacy scaffolding with bodies, until the auto/ migration lands")]
+EXEMPT: list = []
 
-# The per-file rule-7 keys, reported alongside `EXEMPT` because they are conditions, not path prefixes.
-# `rule7_state` is the authority; these strings only keep the human/JSON output honest.
-RULE7_NOTES = [
-    ("a file with no bodies yet", "a stub has nothing to name"),
-    ("a file declaring `rule 7 deferred: <reason>` in a comment", "per-unit and greppable; defers `fn_` and `lbl_`"),
-]
+# The per-file rule-7 keys are gone too: a file with no bodies is fired on like any other, and a
+# `rule 7 deferred: <reason>` comment is inert. Reported alongside `EXEMPT` because both are conditions
+# rather than path prefixes; empty now, and the JSON output says so.
+RULE7_NOTES: list = []
 
 RULE_NAMES = {
     1: "a shared type is defined once (in the owner's header)",
@@ -134,7 +108,7 @@ RULE_NAMES = {
     4: "field carries its offset (/* +0xNN */)",
     5: "no field left named unkNN (pad_0xNN / unused_0xNN are the exception)",
     6: "no pointer arithmetic to reach a field",
-    7: "no fn_XXXXXXXX / bare unkNN / owned lbl_XXXXXXXX identifier",
+    7: "no auto-generated name survives (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unkNN`)",
     8: "goto is forbidden",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
     10: "a codegen pragma lives in the TU that needs it, not in a shared header",
@@ -710,16 +684,14 @@ RULE6_RE = re.compile(
 RULE7_FN_RE = re.compile(r"\bfn_[0-9A-Fa-f]{8}\b")
 RULE7_UNK_RE = re.compile(r"\bunk\w*\b")
 # Rule 7's data half: dtk's stems for an unrenamed data label - `lbl_XXXXXXXX` and its `loc_XXXXXXXX`
-# sibling. The ownership index (the machinery rule 2 uses) is what tells a label THIS unit owns, which is
-# the unit's to name, from a reference to another unit's (or an unowned) label, which is that unit's and is
-# never a finding here.
+# sibling. Ownership is deliberately **not** consulted any more: a label left generated is a finding in
+# every file that spells it, own, foreign or unowned alike.
 RULE7_LBL_RE = re.compile(r"\b(?:lbl|loc)_[0-9A-Fa-f]{8}\b")
-# Rule 7 key 3: the per-unit `rule 7 deferred: <reason>` declaration, matched only against the comment
-# view (see `rule7_deferral`). `[ \t]*` rather than `\s*` keeps the declaration and its non-empty reason
-# on one line, so `rule 7 deferred:` at the end of a comment cannot borrow the next line's first token,
-# and a normal comment's closing `*/` cannot count as the reason.
+# The `rule 7 deferred: <reason>` spelling is no longer a key - a comment exempts nothing. The regex is
+# kept because `land.py`'s `rule7_defer_growth` still refuses a batch that *adds* the escape (a second,
+# stricter row on top of rule 7 firing on the generated names themselves). `[ \t]*` rather than `\s*`
+# keeps the declaration and its non-empty reason on one line.
 RULE7_DEFER_RE = re.compile(r"rule[ \t]*7[ \t]+deferred[ \t]*:[ \t]*\S")
-_COMMENT_DELIM_RE = re.compile(r"/\*|\*/|//")
 RULE8_RE = re.compile(r"\bgoto\b")
 
 # Rule 9: a compiler-mangled name used as a callable identifier. MWCC's manglings carry an argument list
@@ -847,33 +819,20 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
             continue
         out.append(_finding(src, 6, src.line_of(m.start()), "pointer arithmetic: `%s`" % m.group(0).strip()))
 
-    fn7_enforced, unk7_enforced, lbl7_enforced = rule7_state(src)
-    if fn7_enforced or unk7_enforced or lbl7_enforced:
-        def in_field(pos: int) -> bool:
-            return any(a <= pos < b for a, b in field_spans)
+    def in_field(pos: int) -> bool:
+        return any(a <= pos < b for a, b in field_spans)
 
-        if fn7_enforced:
-            for m in RULE7_FN_RE.finditer(src.code):
-                out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
-        if unk7_enforced:
-            for m in RULE7_UNK_RE.finditer(src.code):
-                if not in_field(m.start()):
-                    out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
-        if lbl7_enforced and ownership is not None:
-            # Own/foreign split: only a data label whose address falls inside one of THIS unit's registered
-            # `splits.txt` ranges is this file's to name. A name the map does not know, or one another unit
-            # owns, is that unit's reference and is never a finding here - making it fire would be ~11.7k
-            # lines of churn for data the file does not claim. A caller with no map leaves the half
-            # unchecked rather than report every reference as if the file owned it.
-            for m in RULE7_LBL_RE.finditer(src.code):
-                name = m.group(0)
-                r = ownership.resolve(name)
-                if r is None or r["kind"] != "owned" or not _owns(src.rel, r["unit"]):
-                    continue
-                out.append(_finding(src, 7, src.line_of(m.start()),
-                                    "data label `%s` at 0x%X is this unit's (`src/%s`) - name it from "
-                                    "what it holds and where it is used, and rename the map row"
-                                    % (name, r["address"], r["unit"])))
+    # Rule 7 is unconditional: no path is exempt, a file with no bodies is held to it, and a
+    # `rule 7 deferred` comment is inert. Every generated spelling fires, whoever owns the symbol.
+    for m in RULE7_FN_RE.finditer(src.code):
+        out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
+    for m in RULE7_UNK_RE.finditer(src.code):
+        if not in_field(m.start()):
+            out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
+    for m in RULE7_LBL_RE.finditer(src.code):
+        out.append(_finding(src, 7, src.line_of(m.start()),
+                            "data label `%s` - name it from what it holds and where it is used, and "
+                            "rename the map row" % m.group(0)))
 
     for m in RULE8_RE.finditer(src.code):
         out.append(_finding(src, 8, src.line_of(m.start()), "goto statement"))
@@ -1036,47 +995,11 @@ def unique_names(findings: list[dict]) -> dict:
             "mangled_names": len(names(9, ""))}
 
 
-def rule7_deferral(comments: str) -> bool:
-    """Whether a file's comment view carries a `rule 7 deferred: <reason>` declaration.
-
-    `comments` is `Source.comments`, which keeps comment bodies and blanks string/char literals, so a
-    declaration inside a literal cannot match. Comment delimiters are blanked before the search: an empty
-    `rule 7 deferred:` followed by a `*/` must not borrow the `*` as its reason.
-    """
-    return bool(RULE7_DEFER_RE.search(_COMMENT_DELIM_RE.sub(" ", comments)))
-
-
-def rule7_state(src: "Source") -> tuple[bool, bool, bool]:
-    """`(fn_enforced, unk_enforced, lbl_enforced)` for rule 7 in `src`, per the three keys.
-
-    1. under `src/auto/` (temporary grandfather, `EXEMPT`): the whole rule is off;
-    2. no bodies yet (`brief.text_has_bodies`): the whole rule is off;
-    3. a `rule 7 deferred: <reason>` comment declaration: the `fn_` and `lbl_` halves are off, the `unk`
-       half stays - a bare `unk*` local is nameable from its own context.
-
-    The three flags differ only under key 3; the `lbl_` half additionally needs `ownership` to tell this
-    unit's label from another unit's (`lint_source`), so a caller with no map leaves it unchecked.
-    """
-    rel = src.rel.replace("\\", "/")
-    if any(r == 7 and rel.startswith(prefix) for r, prefix, _why in EXEMPT):
-        return (False, False, False)
-    if not _brief.text_has_bodies(src.text):
-        return (False, False, False)
-    if rule7_deferral(src.comments):
-        return (False, True, False)
-    return (True, True, True)
-
-
 def rule_enforced(rule: int, rel: str, src: "Source | None" = None) -> bool:
-    """Whether `rule` is enforced at all for `rel` (rule 7 may be half-deferred, see `rule7_state`).
-
-    With `src` this consults all three rule-7 keys; without it only the path-keyed `EXEMPT` table can be
-    consulted. Rules other than 7 are enforced everywhere.
-    """
-    if rule == 7 and src is not None:
-        return any(rule7_state(src))
-    norm = rel.replace("\\", "/")
-    return not any(rule == r and norm.startswith(prefix) for r, prefix, _why in EXEMPT)
+    """Whether `rule` is enforced for `rel`. It always is: the rule-7 exemptions and per-file keys are
+    gone (owner's ruling, 2026-09-27) and no other rule ever had one. Kept as an API because the brief
+    and `promote.py` ask before they count."""
+    return True
 
 
 def exemptions() -> list[dict]:
@@ -1387,88 +1310,78 @@ def selftest() -> int:
     check("rule7: a name that merely contains unk is clean", lines_of("void f(void) {\n    u32 junk = 0;\n}\n", 7), [])
     check("rule7: fn_ with the wrong digit count is clean", lines_of("void fn_1234(void) {}\n", 7), [])
 
-    # --- rule 7 exemption under src/auto/ (docs/plan.md, "The breadth blocker") --------------------
+    # --- rule 7 has no exemption: every generated name in src/ fires, everywhere -------------------
     auto = "src/auto/802B2978_fn_802B2978.c"
-    check("rule7 exempt: an auto file's own fn_ name is clean",
-          lines_of("void fn_802B2978(void) {}\n", 7, auto), [])
-    check("rule7 exempt: an auto body calling fn_ is clean",
-          lines_of("void fn_802B2978(void) {\n    fn_80040598();\n}\n", 7, auto), [])
-    check("rule7 exempt: a bare unk local is clean under src/auto/ too",
-          lines_of("void fn_802B2978(void) {\n    u32 unk4 = 0;\n}\n", 7, auto), [])
-    check("rule7 exempt: a subdirectory of src/auto/ is covered",
-          lines_of("void fn_802B2978(void) {}\n", 7, "src/auto/deep/x.c"), [])
-    check("rule7 exempt: a path that merely contains auto is not covered",
-          lines_of("void fn_802B2978(void) {}\n", 7, "src/auto_tools/x.c"), [1])
-    check("rule7 exempt: a sibling prefix is not covered",
-          lines_of("void fn_802B2978(void) {}\n", 7, "src/automaton/x.c"), [1])
-    check("rule7 exempt: the same code under src/Pl/ is still a violation",
+    check("rule7: a src/auto/ file's own fn_ name fires (the bucket exemption is gone)",
+          lines_of("void fn_802B2978(void) {}\n", 7, auto), [1])
+    check("rule7: a src/auto/ body calling fn_ fires",
+          lines_of("void fn_802B2978(void) {\n    fn_80040598();\n}\n", 7, auto), [1, 2])
+    check("rule7: a src/auto/ bare unk local fires too",
+          lines_of("void fn_802B2978(void) {\n    u32 unk4 = 0;\n}\n", 7, auto), [1, 2])
+    check("rule7: a subdirectory of src/auto/ fires (no path exempts anything)",
+          lines_of("void fn_802B2978(void) {}\n", 7, "src/auto/deep/x.c"), [1])
+    check("rule7: the same shape under src/Pl/ fires",
           lines_of("void fn_802B2978(void) {}\n", 7, "src/Pl/pl_act.cpp"), [1])
-    check("rule7 exempt: a src/Pl/ body calling fn_ is still a violation",
-          lines_of("void Pl_x(void) {\n    fn_80040598();\n}\n", 7, "src/Pl/pl_act.cpp"), [2])
-    check("rule7 exempt: only rule 7 is exempt - rule 4 still fires under src/auto/",
+    check("rule7: only rule 7 ever had an exemption - rule 4 still fires under src/auto/",
           lines_of("/* size: 0x8 */\nstruct A {\n    u32 x;\n};\n", 4, auto), [3])
-    check("rule7 exempt: rule 6 still fires under src/auto/",
-          lines_of("void fn_802B2978(u8* p) {\n    *(u32*)((u8*)p + 4) = 1;\n}\n", 6, auto), [2])
-    check("rule7 exempt: rule 8 still fires under src/auto/",
-          lines_of("void fn_802B2978(void) {\n    goto out;\nout:\n    return;\n}\n", 8, auto), [2])
-    check("rule7 keys: rule_enforced consults all three keys when given the file",
+    check("rule7: the EXEMPT table is empty (every path is enforced)", EXEMPT, [])
+    check("rule7: the reported exemption list is empty", exemptions(), [])
+    check("rule7: rule_enforced is True everywhere, with or without the file",
           [rule_enforced(7, "src/auto/x.c"),
            rule_enforced(7, "src/Pl/x.c", Source("x.c", "src/Pl/x.c", "/* stub: only a header comment */\n")),
-           rule_enforced(7, "src/Pl/x.c", Source("x.c", "src/Pl/x.c", "void fn_80040598(void) {}\n")),
            rule_enforced(7, "src/Pl/x.c", Source("x.c", "src/Pl/x.c",
                          "/* rule 7 deferred: the map has no name */\nvoid fn_80040598(void) {}\n")),
            rule_enforced(6, "src/auto/x.c"), rule_enforced(7, "src/auto\\x.c")],
-          [False, False, True, True, True, False])
-    check("rule7 keys: rule7_state carries the data-label flag too",
-          [rule7_state(Source("x.c", "src/Pl/x.c", "void f(void) {}\n")),
-           rule7_state(Source("x.c", "src/Pl/x.c",
-                              "/* rule 7 deferred: the map has no name */\nvoid f(void) {}\n"))],
-          [(True, True, True), (False, True, False)])
-    check("rule7 keys: the temporary src/auto/ entry is still in the table",
-          [(r, p) for r, p, _w in EXEMPT], [(7, "src/auto/")])
+          [True, True, True, True, True])
 
-    # --- rule 7 key 2: no bodies yet (the re-key - the first landing at a final path) -------------
+    # --- rule 7 key 2 is gone: a file with no bodies is held to it too ----------------------------
     pl = "src/Pl/pl_act.cpp"
-    check("rule7 bodyless: a src/Pl fn_ prototype is clean",
-          lines_of("void fn_802B2978(void);\n", 7, pl), [])
-    check("rule7 bodyless: a src/Pl fn_ call with no body is clean",
-          lines_of("fn_80040598();\n", 7, pl), [])
-    check("rule7 bodyless: a src/Pl bare unk local is clean",
-          lines_of("u32 unk4;\n", 7, pl), [])
-    check("rule7 bodyless: adding a body and no declaration removes the exemption",
+    check("rule7 bodyless: a fn_ prototype fires with no body in the file",
+          lines_of("void fn_802B2978(void);\n", 7, pl), [1])
+    check("rule7 bodyless: a fn_ call with no body fires",
+          lines_of("fn_80040598();\n", 7, pl), [1])
+    check("rule7 bodyless: a bare unk declaration fires",
+          lines_of("u32 unk4;\n", 7, pl), [1])
+    check("rule7 bodyless: adding a body changes nothing about rule 7",
           lines_of("void fn_802B2978(void) {}\n", 7, pl), [1])
-    check("rule7 bodyless: a bodyfull unit at another final path is a violation too",
-          lines_of("void fn_802B2978(void) {}\n", 7, "src/enemy/em_act.c"), [1])
     check("rule7 bodyless: rule 6 still fires without a body",
           lines_of("u32 v = *(u32*)((u8*)p + 4);\n", 6, pl), [1])
     check("rule7 bodyless: rule 8 still fires without a body",
           lines_of("goto out;\n", 8, pl), [1])
-    check("rule7 unk: a bare unk local in a bodyfull, undeclared src/Pl file still violates",
-          lines_of("void f(void) {\n    u32 unk4 = 0;\n}\n", 7, pl), [2])
 
-    # --- rule 7 key 3: the per-unit `rule 7 deferred: <reason>` declaration ------------------------
+    # --- rule 7 key 3 is gone: no comment exempts anything ----------------------------------------
     defer = "/* rule 7 deferred: the map has only fn_XXXXXXXX for this range */\n"
-    check("rule7 deferred: a declared bodyfull src/Pl fn_ definition is clean",
-          lines_of(defer + "void fn_802B2978(void) {}\n", 7, pl), [])
-    check("rule7 deferred: a declared fn_ call inside a body is clean",
-          lines_of(defer + "void f(void) {\n    fn_80040598();\n}\n", 7, pl), [])
-    check("rule7 deferred: an empty reason does not defer",
-          lines_of("/* rule 7 deferred: */\nvoid fn_802B2978(void) {}\n", 7, pl), [2])
-    check("rule7 deferred: a declaration inside a string does not defer",
-          lines_of('const char* s = "rule 7 deferred: x";\nvoid fn_802B2978(void) {}\n', 7, pl), [2])
-    check("rule7 deferred: a declaration in a line comment defers",
-          lines_of("// rule 7 deferred: the map has no name\nvoid fn_802B2978(void) {}\n", 7, pl), [])
-    check("rule7 deferred: the declaration does not defer a bare unk local",
+    check("rule7 deferred: the comment does not hide a fn_ definition",
+          lines_of(defer + "void fn_802B2978(void) {}\n", 7, pl), [2])
+    check("rule7 deferred: the comment does not hide a fn_ call",
+          lines_of(defer + "void f(void) {\n    fn_80040598();\n}\n", 7, pl), [3])
+    check("rule7 deferred: the comment does not hide a bare unk local",
           lines_of(defer + "void f(void) {\n    u32 unk4 = 0;\n}\n", 7, pl), [3])
-    check("rule7 deferred: rules 4/5/6/8 still fire in a deferred file",
+    check("rule7 deferred: a line-comment spelling is inert too",
+          lines_of("// rule 7 deferred: the map has no name\nvoid fn_802B2978(void) {}\n", 7, pl), [2])
+    check("rule7 deferred: the spelling inside a string is not even a comment",
+          lines_of('const char* s = "rule 7 deferred: x";\nvoid fn_802B2978(void) {}\n', 7, pl), [2])
+    check("rule7 deferred: a comment naming a generated symbol is not itself a finding",
+          lines_of("/* fn_80040598 unk4 lbl_80010000 */\nvoid f(void) {}\n", 7), [])
+    check("rule7 deferred: rules 1-6 and 8 still fire in a file carrying the comment",
           [r for r, _l in rules_of(
               defer
               + "/* size: 0x8 */\nstruct A {\n    u32 x;\n    /* +0x04 */ u32 unk04;\n};\n"
               + "void fn_802B2978(u8* p) {\n    *(u32*)((u8*)p + 4) = 1;\n    goto out;\nout:\n    return;\n}\n",
               pl)],
-          [4, 5, 6, 8])
+          [4, 5, 6, 7, 8])
+    # The dead-key proof on the real incident file: `src/ef/eft053.cpp` carries a `rule 7 deferred:`
+    # comment AND unrenamed `fn_` references, and must still report every one of them. If this ever goes
+    # quiet the comment is suppressing again - which is the defect this whole change exists to remove.
+    if os.path.exists("src/ef/eft053.cpp"):
+        real = [f for f in lint_source(Source("src/ef/eft053.cpp", "src/ef/eft053.cpp",
+                                              read_text("src/ef/eft053.cpp"))) if f["rule"] == 7]
+        check("rule7 deferred: the real ef/eft053.cpp (comment + generated names) still reports rule 7",
+              bool(real), True)
+        check("... and every finding is a generated name, not an unk field",
+              all(f["detail"].startswith(("auto-generated name", "data label", "bare ")) for f in real), True)
 
-    # --- rule 7: the data-label half (lbl_/loc_, own/foreign split) -------------------------------
+    # --- rule 7: the data-label half fires on every lbl_/loc_ reference ----------------------------
     lbl = Ownership({"lbl_80010000": [(".data", 0x80010000, "object")],
                      "loc_80010120": [(".data", 0x80010120, "object")],
                      "lbl_80020000": [(".data", 0x80020000, "object")],
@@ -1476,34 +1389,28 @@ def selftest() -> int:
                     {".data": [(0x80010000, 0x80010200, "mod/a.c"),
                                (0x80020000, 0x80020100, "mod/b.c")]})
     own_lbl = "void f(void) {\n    u32 v = (u32)lbl_80010000;\n}\n"
-    check("rule7 lbl: this unit's own lbl_ is a finding",
+    check("rule7 lbl: this unit's own lbl_ fires",
           lines_of(own_lbl, 7, "src/mod/a.c", lbl), [2])
-    check("rule7 lbl: the finding names the label, its address and this unit",
+    check("rule7 lbl: the finding names the label and the fix",
           [f["detail"] for f in lint_source(Source("x", "src/mod/a.c", own_lbl), lbl) if f["rule"] == 7],
-          ["data label `lbl_80010000` at 0x80010000 is this unit's (`src/mod/a.c`) - name it from what it "
-           "holds and where it is used, and rename the map row"])
-    check("rule7 lbl: loc_ is the same unrenamed-data stem",
+          ["data label `lbl_80010000` - name it from what it holds and where it is used, and rename the "
+           "map row"])
+    check("rule7 lbl: loc_ is the same unrenamed-data stem and fires",
           lines_of("void f(void) {\n    u32 v = (u32)loc_80010120;\n}\n", 7, "src/mod/a.c", lbl), [2])
     check("rule7 lbl: the owning unit's header is covered too",
           lines_of(own_lbl, 7, "src/mod/a.h", lbl), [2])
-    check("rule7 lbl: a reference to another unit's label is clean",
-          lines_of("void f(void) {\n    u32 v = (u32)lbl_80020000;\n}\n", 7, "src/mod/a.c", lbl), [])
-    check("rule7 lbl: the same label in a non-owner file is clean",
-          lines_of(own_lbl, 7, "src/other/c.c", lbl), [])
-    check("rule7 lbl: an unowned label reference is clean",
-          lines_of("void f(void) {\n    u32 v = (u32)lbl_80030000;\n}\n", 7, "src/mod/a.c", lbl), [])
-    check("rule7 lbl: a name not in the map is clean",
-          lines_of("void f(void) {\n    u32 v = (u32)lbl_DEADBEEF;\n}\n", 7, "src/mod/a.c", lbl), [])
-    check("rule7 lbl: a foreign label with the deferral key is clean",
-          lines_of("/* rule 7 deferred: the map has no name */\nvoid f(void) {\n    u32 v = (u32)lbl_80020000;\n}\n",
-                   7, "src/mod/a.c", lbl), [])
-    check("rule7 lbl: the deferral key also covers this unit's own label",
-          lines_of("/* rule 7 deferred: the map has no name */\nvoid f(void) {\n    u32 v = (u32)lbl_80010000;\n}\n",
-                   7, "src/mod/a.c", lbl), [])
-    check("rule7 lbl: a bodyless file is exempt (key 2)",
-          lines_of("extern u32 lbl_80010000;\n", 7, "src/mod/a.c", lbl), [])
-    check("rule7 lbl: with no ownership index the half is unchecked",
-          lines_of(own_lbl, 7, "src/mod/a.c", None), [])
+    check("rule7 lbl: another unit's label fires in this file too (no own/foreign split)",
+          lines_of("void f(void) {\n    u32 v = (u32)lbl_80020000;\n}\n", 7, "src/mod/a.c", lbl), [2])
+    check("rule7 lbl: the same label in a non-owner file fires",
+          lines_of(own_lbl, 7, "src/other/c.c", lbl), [2])
+    check("rule7 lbl: an unowned label fires",
+          lines_of("void f(void) {\n    u32 v = (u32)lbl_80030000;\n}\n", 7, "src/mod/a.c", lbl), [2])
+    check("rule7 lbl: a label the map does not know fires",
+          lines_of("void f(void) {\n    u32 v = (u32)lbl_DEADBEEF;\n}\n", 7, "src/mod/a.c", lbl), [2])
+    check("rule7 lbl: a bodyless file's lbl_ declaration fires (key 2 is gone)",
+          lines_of("extern u32 lbl_80010000;\n", 7, "src/mod/a.c", lbl), [1])
+    check("rule7 lbl: no ownership index is needed for the lbl_ half",
+          lines_of(own_lbl, 7, "src/mod/a.c", None), [2])
     check("rule7 lbl: the advertised name is counted as a distinct label",
           unique_names([f for f in lint_source(Source("x", "src/mod/a.c", own_lbl), lbl)
                         if f["rule"] == 7])["label_names"], 1)
@@ -1824,8 +1731,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("  not enforced: rule 7 for %s (%s)" % (cond, why))
         else:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
-                  "(rule 2 resolves every extern to an owner or the unsplit band; rule 7 exempt per "
-                  "rule7_state)" % len(rels))
+                  "(rule 2 resolves every extern to an owner or the unsplit band; rule 7 fires on every "
+                  "auto-generated name and grandfathers only pre-existing findings)" % len(rels))
         return 1 if added else 0
 
     findings = lint_all(root, ownership)

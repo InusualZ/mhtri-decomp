@@ -1190,7 +1190,11 @@ def _declared_names_at(main: str, base: str, rel: str) -> set[str]:
 
 
 def _defer_count(text: str) -> int:
-    """How many `rule 7 deferred: <reason>` declarations a file carries (the same shape stylelint honours)."""
+    """How many `rule 7 deferred: <reason>` declarations a file carries.
+
+    The spelling is still matched by `stylelint.RULE7_DEFER_RE`, but the lint no longer honours it (the
+    no-exemption ruling deleted the key); this row is a second, narrower guard on the escape's growth.
+    """
     return len(sl.RULE7_DEFER_RE.findall(text))
 
 
@@ -1244,11 +1248,12 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
     (1 -> 1 passes); adding one to a file that did not have it is examined. `grep -rn "rule 7
     deferred" src/` remains the complete list of files that use it.
 
-    A *bodyless* file is not examined even when its escape is new, because it is exempt from rule 7
-    anyway (key 2, `stylelint.rule7_state` / `brief.text_has_bodies`) and its file name is provisional -
-    `enemy/fn_8033041C.cpp` is the seam re-draw's second half, whose band has no name evidence at all.
-    When that unit is written it grows bodies, its escape becomes load-bearing and this row then demands
-    the name (`ef/fn_803432B4.cpp`, 33 generated definitions, is refused for exactly that).
+    A *bodyless* file is not examined even when its escape is new: this row only judges a written unit,
+    and the file's name is provisional - `enemy/fn_8033041C.cpp` is the seam re-draw's second half, whose
+    band has no name evidence at all. The *lint* is not so lenient - its key 2 is gone, so a bodyless file's
+    generated names are `--diff` additions that refuse a batch on their own. When the unit is written it
+    grows bodies and this row then demands the name too (`ef/fn_803432B4.cpp`, 33 generated definitions, is
+    refused for exactly that).
 
     Returns one line per offender, sorted. `[]` when `base` is unknown, no source file changed, or the
     growth is in files that name their own symbols.
@@ -1905,19 +1910,19 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                 "lines above" % len(band_warnings)) if band_warnings
                else "no newly-owned symbol left declared in include/unsplit/*.h")
 
-    # No batch may leave its OWN symbols generated behind a `rule 7 deferred` escape (owner's ruling,
-    # 2026-09-26, narrowed the same day): the escape may cover references to other units' unrenamed symbols -
-    # in a wholly unnamed region they are most of rule 7's findings and cannot be fixed from that lane - but
-    # not a name this batch's unit defines, and not a file registered at a generated stem. See
-    # `rule7_defer_growth` for the two conditions and why a bodyless file is exempt.
+    # A second, narrower naming guard on top of stylelint's (the no-exemption ruling, 2026-09-27, deleted
+    # rule 7's keys; this row keeps its own growth test on the escape's spelling). It refuses a batch that
+    # grows a `rule 7 deferred` escape for a name the batch's own unit defines, or at a generated file stem.
+    # See `rule7_defer_growth` for the two conditions and why a bodyless file is skipped here.
     defer_growth = rule7_defer_growth(main, want_base)
     check("no batch leaves its own symbols generated behind a `rule 7 deferred` escape",
           not defer_growth,
           detail="%d file(s) grew a `rule 7 deferred` escape for a name the batch owns: %s"
                  % (len(defer_growth), "; ".join(defer_growth[:4])),
           remedy="name the symbols the batch's own unit defines - derive a name from context and mark "
-                 "the guess in the unit header - and register the unit at a named path; references to "
-                 "OTHER units' unrenamed symbols are tolerated and are not this batch's to fix",
+                 "the guess in the unit header - and register the unit at a named path; an added reference "
+                 "to another unit's unrenamed symbol is now a stylelint `--diff` finding too, so name it as "
+                 "well",
           info="no file in the batch grew a `rule 7 deferred` escape")
 
     before = recorded.get("ledger") or ledger_numbers(main)
@@ -2694,10 +2699,10 @@ def selftest() -> int:
     import io
     import unittest.mock as mock
     module = sys.modules[__name__]
-    # the rule-7 row, narrowed (2026-09-26): the escape may cover references to OTHER units' unrenamed
-    # symbols (most of rule 7's findings in a wholly unnamed band, unfixable from that lane) but not a name
-    # the batch's own unit defines, and not a file registered at a generated stem. The three cases are
-    # exactly the ones the 803253bc and 8032c920 lanes produced.
+    # the rule-7 row still judges GROWTH of the `rule 7 deferred` escape (the escape itself is inert to the
+    # lint since the 2026-09-27 no-exemption ruling): an existing escape is tolerated, a grown one is refused
+    # for a name the batch's own unit defines, and for a file registered at a generated stem. The cases are
+    # the ones the 803253bc and 8032c920 lanes produced.
     def defer_repo(rel, base_text, text):
         tmp = tempfile.mkdtemp(prefix="land-defer-")
         repo_git(tmp, "init", "-q")
