@@ -36,15 +36,17 @@ Three sources, one register:
 * **`tools/units/tooling.py`**'s own register (`docs/tooling-requests.md`): the ranked tooling/environment
   requests with their open/done/parked statuses. It is read, never duplicated.
 * **`tools/units/stylelint.py`**'s findings, aggregated **per file**: one `naming` item per file carrying
-  rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unk*`) and one `band-header` item
-  per file carrying rule-2 findings (an `extern` that belongs in the owner's header or `include/unsplit/`).
-  The item's ask names the file, the rule and the count, and the count is the item's rank weight, so the
-  high-traffic file surfaces first. A `naming`/`band-header` item's key is the (kind, file) pair, so a
-  partial fix keeps its status; the item is carried forward from the published register even after the
-  findings are gone, so `triage` can prove the file clean and close it (and so a resolved item stays in the
-  register and earns its credit). This is the "do not revoke committed progress - work the debt slowly"
-  half of the owner's naming ruling (2026-09-27): ~400 such open items against the campaign's balance keep
-  naming work interleaved with new claims through the ratio, with no special-casing.
+  rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unk*`), one `band-header` item
+  per file carrying rule-2 findings (an `extern` that belongs in the owner's header or `include/unsplit/`),
+  and one `untyped` item per file carrying rule-11 findings (a `void *` parameter or return type with no
+  `/* untyped: <reason> */` marker). The item's ask names the file, the rule and the count, and the count
+  is the item's rank weight, so the high-traffic file surfaces first. A lint item's key is the (kind, file)
+  pair, so a partial fix keeps its status; the item is carried forward from the published register even
+  after the findings are gone, so `triage` can prove the file clean and close it (and so a resolved item
+  stays in the register and earns its credit). This is the "do not revoke committed progress - work the
+  debt slowly" half of the owner's naming ruling (2026-09-27): hundreds of such open items against the
+  campaign's balance keep naming and typing work interleaved with new claims through the ratio, with no
+  special-casing.
 
 This is also the owner's "do not revoke committed progress - put the mounted naming debt in a backlog and
 work on it slowly" half: the stylelint items are ordinary open items, so the credit ratio rations new
@@ -100,13 +102,14 @@ if TOOLS not in sys.path:
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
 
 STATUSES = ("open", "done", "parked")
-NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header")
+NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped")
 # default open; a `rename` is never carried
 # The lint-derived kinds: `naming` is one item per file carrying rule-7 findings, `band-header` one per file
-# carrying rule-2 findings (`build_items` / `collect_lint_items`). Both are ordinary open items, so the credit
-# ratio rations new claims against them - no special-casing.
-LINT_KINDS = ("naming", "band-header")
-LINT_RULES = {"naming": 7, "band-header": 2}
+# carrying rule-2 findings, `untyped` one per file carrying rule-11 findings (`build_items` /
+# `collect_lint_items`). All are ordinary open items, so the credit ratio rations new claims against them -
+# no special-casing.
+LINT_KINDS = ("naming", "band-header", "untyped")
+LINT_RULES = {"naming": 7, "band-header": 2, "untyped": 11}
 
 # -----------------------------------------------------------------------------------------------------------
 # Text helpers
@@ -454,10 +457,10 @@ def stylelint_findings(main: str) -> list[dict]:
 
 
 def lint_counts(findings: list[dict]) -> dict:
-    """`{(kind, file): n}` for the lint findings the backlog is filed against (rule 7 and rule 2 only)."""
+    """`{(kind, file): n}` for the lint findings the backlog is filed against (rules 7, 2 and 11)."""
     out: dict = {}
     for f in findings:
-        kind = {7: "naming", 2: "band-header"}.get(f["rule"])
+        kind = {7: "naming", 2: "band-header", 11: "untyped"}.get(f["rule"])
         if kind:
             key = (kind, f["file"])
             out[key] = out.get(key, 0) + 1
@@ -500,6 +503,11 @@ def collect_lint_items(main: str, register: str | None = None) -> list[Item]:
             ask = ("`%s` carries %d rule-7 finding(s) (auto-generated `fn_`/`lbl_`/`loc_` or bare `unk*` "
                    "names) - name each from what it does or holds and rename the map row in the same "
                    "change" % (target, live or last))
+        elif kind == "untyped":
+            ask = ("`%s` carries %d rule-11 finding(s) (a `void *` parameter or return type) - name the "
+                   "real type at every call site, or mark the declaration `/* untyped: <byte range|opaque "
+                   "handle|caller-owned payload> */` with the case that makes it genuinely untyped"
+                   % (target, live or last))
         else:
             ask = ("`%s` carries %d rule-2 finding(s) (an `extern` declared where it is not owned) - move "
                    "each declaration to its owner's header (or `include/unsplit/`) and #include it"
@@ -749,7 +757,7 @@ def record_claims(main: str, claims: list[dict], ratio: int = RATIO_DEFAULT,
 def lane_task(main: str, item: Item) -> dict:
     """A ready-to-paste lane for a backlog item - mirroring how `queue.py next` prints its spawn line."""
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
-               "naming": "fixer", "band-header": "fixer",
+               "naming": "fixer", "band-header": "fixer", "untyped": "fixer",
                "tooling": "worker"}.get(item.kind, "worker")
     task = ("Work the campaign backlog item `%s` (%s %s): %s. "
             "This is on the backlog, so `queue.py next` spends a credit on a new proposal claim until it is "
@@ -1139,7 +1147,8 @@ def _check_tooling(main: str, item: Item, ctx: dict):
 def _check_lint(main: str, item: Item, ctx: dict):
     """Whether a lint-derived item's findings are gone - re-linted now, never remembered.
 
-    The count is read from the file itself with `stylelint.lint_source`, the same function that produced the
+    The count is read from the file itself with `stylelint.lint_source` (rule 11 with `rule11_findings`,
+    which has no ownership dependency and sees the unsplit band), the same functions that produced the
     item, so the check cannot drift from the lint. A missing file is `stale`; a rule-2 check needs the
     symbols/splits map, so with the map absent it stays open rather than call itself resolved.
     """
@@ -1156,8 +1165,14 @@ def _check_lint(main: str, item: Item, ctx: dict):
     ownership = ctx.get("ownership")
     if rule == 2 and ownership is None:
         return ("open", "no check: config/RMHE08/symbols.txt or splits.txt is absent")
-    findings = [f for f in sl.lint_source(sl.Source(path, item.target, read(path)), ownership)
-                if f["rule"] == rule]
+    if rule == 11:
+        # Rule 11 is source-local and has no ownership dependency, so it is read straight from the file:
+        # `lint_source` returns early for the unsplit band (rule 2 only), which would call a band item
+        # resolved while its `void *` parameters are still there.
+        findings = sl.rule11_findings(sl.Source(path, item.target, read(path)))
+    else:
+        findings = [f for f in sl.lint_source(sl.Source(path, item.target, read(path)), ownership)
+                    if f["rule"] == rule]
     if findings:
         return ("open", "%s still carries %d rule-%d finding(s)"
                 % (item.target, len(findings), rule))

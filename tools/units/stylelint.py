@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lint `src/` against the type and naming discipline of docs/plan.md section 6.5 (roadmap 7.21).
 
-A rule enforced by remembering is not a rule: eight conformance rules were agreed with the owner and the
+A rule enforced by remembering is not a rule: the conformance rules were agreed with the owner and the
 only thing keeping them is the reviewer's attention. This tool turns the mechanically checkable ones into
 `file:line` findings, and `land.py verify` calls it with `--diff <base>` so a batch that **adds** a
 violation is refused before it is committed.
@@ -25,6 +25,7 @@ Rules checked (each finding is `file:line`):
 | 8 | `goto` is forbidden | the `goto` keyword |
 | 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
 | 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
+| 11 | no `void *` parameter or return type | a `void` `*` in a function declaration's parameter list or return type (a declaration, never a cast). Erasing the type hides what a heterogeneous call site is actually passing; the only exemption is a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a byte range, an opaque handle passed through, or a caller-owned payload |
 
 Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt`
 (each registered unit's ranges): an `extern` a file declares for a symbol another registered unit owns is a
@@ -59,8 +60,19 @@ bodies too, and **no comment exempts anything**: a `rule 7 deferred` line is now
 The **only** grandfather is the gate's own `--diff`: touching a file that already carries findings is
 allowed (an existing finding never blocks a landing), while adding one is refused. That is the owner's
 "do not revoke committed progress" - the mounted debt is worked slowly through the backlog register
-(`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9 and 10 apply as
+(`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as
 before.**
+
+**Rule 11 has no per-file key either.** A `void *` parameter or return type is a finding by default, and
+the exemption is a **per-declaration** marker comment - `/* untyped: <reason> */` on the declaration or the
+line above it (a marker on the line above must stand alone, so a trailing marker on one declaration never
+exempts the next) - whose reason says which genuinely-untyped case it is (a byte range, an opaque handle
+passed through, or a caller-owned payload). A file cannot exempt itself, exactly as rule 7's per-file keys
+were removed; `grep -rn "untyped:" src include` is the complete, reviewable list of exemptions, and a
+marker with an empty or vague reason is still a finding. The scan reads **declarations** (the same
+`_declared_name` parser rule 2 uses), so a `(void*)p` cast inside a body is never a finding; a `void *`
+**local variable** is out of the rule's scope and is only counted (the report prints the number) so the
+owner can decide later. The rule is ticked in the register as its own `untyped` kind.
 """
 
 from __future__ import annotations
@@ -114,6 +126,7 @@ RULE_NAMES = {
     8: "goto is forbidden",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
     10: "a codegen pragma lives in the TU that needs it, not in a shared header",
+    11: "no `void *` parameter or return type (mark the declaration `/* untyped: <reason> */` if genuinely untyped)",
 }
 
 # The codegen-affecting pragma names for rule 10.  A `#pragma` is lexically scoped to the rest of the
@@ -810,6 +823,267 @@ def _finding(src: Source, rule: int, line: int, detail: str) -> dict:
             "text": src.line_text(line).strip()[:160], "detail": detail}
 
 
+# --------------------------------------------------------------------------------------------------
+# rule 11: a `void *` parameter or return type is a finding
+# --------------------------------------------------------------------------------------------------
+# A `void *` parameter or return type is banned outright: erasing the type hides what the call sites
+# actually pass, and a heterogeneous call site is evidence the *sites* disagree, not that the declaration
+# is untyped. The rule reads **declarations**, so it can never fire on a cast: a cast lives in a body, and
+# the scanner walks only file-scope/namespace/class-scope statements and function definition headers.
+RULE11_VOID_PTR_RE = re.compile(r"\bvoid\s*\*")
+# The marker's reason must say which genuinely-untyped case it is: a byte range (memcpy-shaped), an opaque
+# handle passed through, or a caller-owned payload. An empty or vague reason is still a finding.
+RULE11_REASON_RES = (
+    re.compile(r"\bbyte|\brange\b|\braw\b|\bbuffer\b|\bblob\b|mem(?:cpy|move|set)\b", re.I),
+    re.compile(r"\bopaque\b|\bhandle\b|\btoken\b|\bcookie\b|\bcontext\b|pass(?:ed)?[- ]?through\b|"
+               r"\bpassthrough\b|\bforward(?:ed)?\b", re.I),
+    re.compile(r"\bpayload\b|\bcaller\b|\bowned\b|\bownership\b|user[- ]data", re.I),
+)
+# `RULE11_LOCAL_RE` counts a `void *` local (out of the rule's scope): an identifier must follow the star(s),
+# which a cast cannot satisfy - `(void*)p` has `)` there - so the count is of declarations, not casts.
+RULE11_LOCAL_RE = re.compile(r"\bvoid\s*\*+\s*([A-Za-z_]\w*)")
+RULE11_MARKER_RE = re.compile(r"untyped\s*:\s*([^\n]*)")
+# A statement head that opens a `{` but is not a declaration: a control-flow block, or a macro/keyword that
+# is an expression at file scope (`static_assert(sizeof(void*) == 4)`). The rule must not read such a
+# parenthesised expression as a parameter list.
+RULE11_NON_DECL_HEADS = _DECL_KEYWORDS | {
+    "catch", "alignof", "__alignof", "static_assert", "_Static_assert", "assert", "asm", "__asm",
+}
+
+
+def match_paren(code: str, open_pos: int) -> int:
+    """Index of the `)` matching the `(` at `open_pos`, or -1."""
+    depth = 0
+    for i in range(open_pos, len(code)):
+        if code[i] == "(":
+            depth += 1
+        elif code[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
+def _mask_preproc(code: str) -> str:
+    """Blank every preprocessor line (and its continuations), positions and newlines preserved.
+
+    A macro body is not a declaration and its braces need not be balanced, so leaving one in place could
+    corrupt the scope walk. Blanking keeps a reported line number exact.
+    """
+    out = []
+    cont = False
+    for line in code.split("\n"):
+        directive = cont or line.lstrip().startswith("#")
+        cont = directive and line.rstrip().endswith("\\")
+        out.append(" " * len(line) if directive else line)
+    return "\n".join(out)
+
+
+def _declared_name_pos(segment: str) -> tuple[str | None, int]:
+    """`(name, position)` for the declaration `segment`, using rule 2's `_declared_name` for the name.
+
+    The position is recovered with the same discrimination `_declared_name` uses: a function pointer
+    (`(*name)` or `(*name(`) names the identifier inside the parens, anything else names the last
+    identifier before the first `(`. Reusing the parser keeps rule 11 from disagreeing with rule 2 about
+    what a declaration's name is.
+    """
+    name = _declared_name(segment)
+    if name is None:
+        return None, -1
+    i = segment.find("(")
+    if i >= 0:
+        tail = segment[i:]
+        for rx in (r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", r"\(\s*\*\s*([A-Za-z_]\w*)\s*\("):
+            m = re.match(rx, tail)
+            if m and m.group(1) == name:
+                return name, i + m.start(1)
+        k = i
+        while k > 0 and (segment[k - 1].isascii() and (segment[k - 1].isalnum() or segment[k - 1] == "_")):
+            k -= 1
+        return name, k
+    m = re.search(r"\b%s\b" % re.escape(name), segment)
+    return (name, m.start()) if m else (None, -1)
+
+
+def _declarator_parens(segment: str, name_pos: int, name_len: int) -> tuple[int, int] | None:
+    """`(open, close)` of a function declarator's parameter list, or None when this is not a function.
+
+    A direct declarator has `(` right after the name; a function-pointer declarator has `)` (closing
+    `(*name)`) before its own `(`. The text after `)` must be empty, a qualifier, a constructor-init `:`,
+    or a trailing `{`/`;` (the delimiters are outside `segment`), which is what rejects a variable
+    initializer (`void (*cb)(void *) = 0;`) and an expression (`static_assert`) rather than reading its
+    parenthesised operand as a parameter list.
+    """
+    j = name_pos + name_len
+    while j < len(segment) and segment[j].isspace():
+        j += 1
+    if j < len(segment) and segment[j] == "(":
+        open_pos = j
+    elif j < len(segment) and segment[j] == ")":
+        k = j + 1
+        while k < len(segment) and segment[k].isspace():
+            k += 1
+        if k >= len(segment) or segment[k] != "(":
+            return None
+        open_pos = k
+    else:
+        return None
+    close = match_paren(segment, open_pos)
+    if close < 0:
+        return None
+    tail = segment[close + 1:].lstrip()
+    if tail and not tail.startswith(("const", "volatile", "noexcept", "override", "final",
+                                     "__attribute__", ":", "&", "throw", ")")):
+        return None
+    return open_pos, close
+
+
+def _declaration_from(src: Source, start: int, end: int, code: str) -> dict | None:
+    """The function declaration `code[start:end]` describes, or None when the segment is not one."""
+    seg = code[start:end]
+    name, name_pos = _declared_name_pos(seg)
+    if name is None or name in RULE11_NON_DECL_HEADS:
+        return None
+    parens = _declarator_parens(seg, name_pos, len(name))
+    if parens is None:
+        return None
+    open_pos, close_pos = parens
+    first = start + (len(seg) - len(seg.lstrip()))
+    return {"name": name, "pos": start + name_pos, "line": src.line_of(start + name_pos),
+            "start_line": src.line_of(first),
+            "end_line": src.line_of(start + close_pos),
+            "params": seg[open_pos + 1:close_pos], "params_pos": start + open_pos + 1,
+            "ret": seg[:name_pos], "ret_pos": start}
+
+
+def function_declarations(src: Source) -> list[dict]:
+    """Every function declaration/definition header in the file, with its parameter and return text.
+
+    The walk is rule 2's `header_declarations` shape (brace depth decides scope, a linkage block is
+    transparent), with the scope stack extended so a declaration inside a `namespace`/`class` is seen too
+    while a statement inside a function **body** is not: that is what keeps a cast out of the rule. A `{`
+    ends a statement wherever it is (an inline method body sits at class scope), and the declarator check
+    separates a function header from a type body, an initializer and a control block.
+    """
+    code = _mask_preproc(src.code)
+    out: list[dict] = []
+    scopes: list[str] = []          # "function" for a body, "other" for a type/namespace/block, "linkage"
+    stmt_start = 0
+    for i, c in enumerate(code):
+        if c == "{":
+            if _LINKAGE_OPEN_RE.search(code[stmt_start:i]):
+                scopes.append("linkage")
+            else:
+                decl = _declaration_from(src, stmt_start, i, code)
+                if decl is not None:
+                    decl["body"] = (i, match_brace(code, i))
+                    scopes.append("function")
+                    out.append(decl)
+                else:
+                    scopes.append("other")
+            stmt_start = i + 1
+        elif c == "}":
+            if scopes:
+                scopes.pop()
+            stmt_start = i + 1
+        elif c == ";":
+            if "function" not in scopes:
+                decl = _declaration_from(src, stmt_start, i, code)
+                if decl is not None:
+                    out.append(decl)
+            stmt_start = i + 1
+    return out
+
+
+def _untyped_marker(src: Source, start_line: int, end_line: int) -> str | None:
+    """The reason of a `/* untyped: <reason> */` marker on the declaration or the line above it.
+
+    The window is `start_line - 1 .. end_line`, exactly the owner's "on the declaration or the line above
+    it". The line above must be a **standalone** marker (its code view is blank): a trailing marker on the
+    previous declaration's own line is that declaration's, not the next one's, so one marker can never
+    exempt two declarations. Per-file keys are gone (rule 7's removal is the precedent): a file may never
+    exempt itself.
+    """
+    for line in range(max(1, start_line - 1), end_line + 1):
+        seg_start = src._starts[line - 1]
+        seg_end = src._starts[line] if line < len(src._starts) else len(src.comments)
+        m = RULE11_MARKER_RE.search(src.comments[seg_start:seg_end])
+        if not m:
+            continue
+        if line == start_line - 1 and src.code[seg_start:seg_end].strip():
+            continue
+        reason = m.group(1)
+        if reason.endswith("*/"):
+            reason = reason[:-2]
+        return reason.strip()
+    return None
+
+
+def _untyped_reason_ok(reason: str) -> bool:
+    """Whether a marker's reason names a genuinely-untyped case rather than restating the ban."""
+    return bool(reason.strip()) and any(rx.search(reason) for rx in RULE11_REASON_RES)
+
+
+def _split_parameters(code: str, start: int, end: int) -> list[tuple[str, int]]:
+    """`(chunk, absolute_offset)` for each top-level comma-separated parameter in `code[start:end]`."""
+    out = []
+    depth = 0
+    chunk_start = start
+    for i in range(start, end):
+        c = code[i]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            out.append((code[chunk_start:i], chunk_start))
+            chunk_start = i + 1
+    out.append((code[chunk_start:end], chunk_start))
+    return out
+
+
+_RULE11_PARAM_DETAIL = ("`void *` parameter type - name the real type (every call site passes one), or "
+                        "mark the declaration `/* untyped: <byte range|opaque handle|caller-owned "
+                        "payload> */`")
+_RULE11_RET_DETAIL = ("`void *` return type - name the real type, or mark the declaration "
+                      "`/* untyped: <byte range|opaque handle|caller-owned payload> */`")
+
+
+def rule11_findings(src: Source) -> list[dict]:
+    """Rule 11 for one file: every `void *` parameter or return type without a valid marker."""
+    code = _mask_preproc(src.code)
+    out = []
+    for d in function_declarations(src):
+        marker = _untyped_marker(src, d["start_line"], d["end_line"])
+        if marker is not None and _untyped_reason_ok(marker):
+            continue
+        for chunk, off in _split_parameters(code, d["params_pos"], d["params_pos"] + len(d["params"])):
+            if RULE11_VOID_PTR_RE.search(chunk):
+                first = off + (len(chunk) - len(chunk.lstrip()))
+                out.append(_finding(src, 11, src.line_of(first), _RULE11_PARAM_DETAIL))
+        if RULE11_VOID_PTR_RE.search(d["ret"]):
+            out.append(_finding(src, 11, d["line"], _RULE11_RET_DETAIL))
+    return out
+
+
+def rule11_local_count(src: Source) -> int:
+    """The `void *` locals in the file's function bodies - out of rule 11's scope, counted for the owner.
+
+    Bodies are merged so a nested block is not counted twice; a cast cannot match because an identifier
+    must follow the star(s).
+    """
+    ranges = sorted((d["body"] for d in function_declarations(src)
+                     if d.get("body") and d["body"][1] > d["body"][0]), key=lambda r: r[0])
+    merged: list[list[int]] = []
+    for a, b in ranges:
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    return sum(len(RULE11_LOCAL_RE.findall(src.code[a + 1:b])) for a, b in merged)
+
+
+
 def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]:
     """All section 6.5 findings for one file, in rule then line order.
 
@@ -897,6 +1171,8 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     if ownership is not None:
         out.extend(rule2_findings(src, ownership))
 
+    out.extend(rule11_findings(src))
+
     out.sort(key=lambda f: (f["rule"], f["line"]))
     return out
 
@@ -978,6 +1254,41 @@ def header_pragma_counts_at_ref(root: str, ref: str) -> dict:
     return out
 
 
+def header_rule11_findings(root: str) -> list[dict]:
+    """Rule 11 over the whole shared-header tree (`include/`), including the unsplit band.
+
+    A shared header is a declaration a batch is judged against, and a `void *` parameter there is the same
+    defect as one in a `src/` file. The band is covered here - `lint_source` returns early for it.
+    """
+    out = []
+    for path in header_files(root):
+        out.extend(rule11_findings(Source(path, rel_of(root, path), read_text(path))))
+    return out
+
+
+def header_rule11_counts_at_ref(root: str, ref: str) -> dict:
+    """Rule-11 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+    out: dict = {}
+    for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
+        if not path.endswith(HEADER_SUFFIXES):
+            continue
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        for f in rule11_findings(Source(path, path, text)):
+            out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
+    return out
+
+
+def rule11_local_total(root: str) -> int:
+    """Every `void *` local variable in `src/` and `include/` - the rule-11 scope note's count."""
+    total = sum(rule11_local_count(s) for s in all_sources(root))
+    for path in header_files(root):
+        total += rule11_local_count(Source(path, rel_of(root, path), read_text(path)))
+    return total
+
+
 def lint_tree(root: str, paths: list[str] | None = None,
               ownership: "Ownership | None" = None) -> list[dict]:
     """Per-file findings (rules 2-9) for `paths`, or for the whole tree when `paths` is None.
@@ -1007,6 +1318,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
         out.extend(lint_source(src, ownership))
     out.extend(rule1_findings(sources))
     out.extend(header_pragma_findings(root))
+    out.extend(header_rule11_findings(root))
     out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out
 
@@ -1194,7 +1506,8 @@ def print_rule2_report(ownership: "Ownership | None") -> None:
         print("rule 2: every extern declaration was judged")
 
 
-def print_budget(findings: list[dict], ownership: "Ownership | None" = None) -> None:
+def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
+                 root: str | None = None) -> None:
     b = budget(findings)
     width = max([len(row["file"]) for row in b["units"]] + [len("TOTAL")])
     head = "".join("  r%d" % r for r in RULE_NAMES)
@@ -1213,6 +1526,12 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None) -> 
              u["unk_identifiers"], u["label_names"], u["mangled_names"]))
     print("%d finding(s) over %d unit(s), %d file(s) with findings"
           % (b["findings"], len(b["units"]), len(source_files_of(findings))))
+    r11 = [f for f in findings if f["rule"] == 11]
+    print("rule 11 (banned outright): %d finding(s) over %d file(s) with a `void *` parameter/return type"
+          % (len(r11), len(source_files_of(r11))))
+    if root is not None:
+        print("rule 11 note: %d `void *` local variable(s) - out of the rule's scope, counted so the owner "
+              "can decide" % rule11_local_total(root))
     print_rule2_report(ownership)
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))
@@ -1689,8 +2008,82 @@ def selftest() -> int:
         check("rule10: the motivating header is clean after the fix",
               codegen_pragma_findings(Source(hdr, hdr, read_text(hdr))), [])
 
+    # --- rule 11: no `void *` parameter or return type -------------------------------------------
+    check("rule11: an unmarked void* parameter is a finding",
+          lines_of("void f(void *p) {\n}\n", 11), [1])
+    check("rule11: an unmarked void* return type is a finding",
+          lines_of("void *f(void) {\n}\n", 11), [1])
+    check("rule11: a prototype is judged too", lines_of("void f(void *p);\n", 11), [1])
+    check("rule11: a `void **` return is still a void pointer",
+          lines_of("void **f(void) {\n}\n", 11), [1])
+    check("rule11: `const void *` is a void pointer",
+          lines_of("void f(const void *src) {\n}\n", 11), [1])
+    check("rule11: two void* parameters are two findings",
+          lines_of("void f(void *a, void *b) {\n}\n", 11), [1, 1])
+    check("rule11: a parameter and a return are both reported",
+          lines_of("void *f(void *p) {\n}\n", 11), [1, 1])
+    check("rule11: void alone is clean", lines_of("void f(void) {\n}\n", 11), [])
+    check("rule11: a real parameter type is clean",
+          lines_of("void f(Vec *out, u32 n) {\n}\n", 11), [])
+    check("rule11: a function pointer parameter with a clean signature is clean",
+          lines_of("void f(void (*cb)(int)) {\n}\n", 11), [])
+    check("rule11: a `void*` local's parenthesised cast is not read as a type",
+          lines_of("void f(void) {\n    u32 v = (u32)(void *)p;\n}\n", 11), [])
+    check("rule11: a file-scope initializer cast is clean",
+          lines_of("void *p = (void *)0;\n", 11), [])
+    check("rule11: a parameter on a continuation line is reported on its own line",
+          lines_of("void f(s32 a, void *first,\n       void *second);\n", 11), [1, 2])
+    check("rule11: a function returning a function pointer is judged",
+          lines_of("void (*f(void *self, int n))(void);\n", 11), [1])
+    check("rule11: a file-scope void* variable is not a parameter/return",
+          lines_of("void *g_buffer;\n", 11), [])
+    check("rule11: a static_assert operand is not a parameter list",
+          lines_of("static_assert(sizeof(void *) == 4);\n", 11), [])
+    check("rule11: a macro body is not a declaration",
+          lines_of("#define PTR ((void *)0)\nvoid f(void) {\n}\n", 11), [])
+    check("rule11: a call-shaped control block is not a declaration",
+          lines_of("void f(void) {\n    while (memcmp(p, (void *)q, 4)) {\n    }\n}\n", 11), [])
+    check("rule11: a namespace-scoped definition is judged",
+          lines_of("namespace nw4r {\nvoid f(void *p) {\n}\n}\n", 11), [2])
+    check("rule11: a class-scoped inline method is judged",
+          lines_of("class A {\npublic:\n    void f(void *p) {\n    }\n};\n", 11), [3])
+
+    # the marker: per-declaration, on the declaration or the line above it
+    check("rule11 marker: on the line above exempts the declaration",
+          lines_of("/* untyped: opaque handle */\nvoid f(void *h) {\n}\n", 11), [])
+    check("rule11 marker: trailing on the same line exempts it",
+          lines_of("void f(void *h); /* untyped: opaque handle */\n", 11), [])
+    check("rule11 marker: a memcpy-shaped byte range is an accepted reason",
+          lines_of("/* untyped: memcpy-shaped byte range */\nvoid f(void *dst) {\n}\n", 11), [])
+    check("rule11 marker: a caller-owned payload is an accepted reason",
+          lines_of("/* untyped: caller-owned payload */\nvoid f(void *data) {\n}\n", 11), [])
+    check("rule11 marker: an empty reason is still a finding",
+          lines_of("/* untyped: */\nvoid f(void *p) {\n}\n", 11), [2])
+    check("rule11 marker: a vague reason is still a finding",
+          lines_of("/* untyped: TODO, it is untyped */\nvoid f(void *p) {\n}\n", 11), [2])
+    check("rule11 marker: a marker in a string is not a marker",
+          lines_of('const char* s = "untyped: opaque handle";\nvoid f(void *p) {\n}\n', 11), [2])
+    check("rule11 marker: a marker on an unrelated declaration does not leak",
+          lines_of("/* untyped: opaque handle */\nvoid g(void *h);\n\nvoid f(void *p) {\n}\n", 11), [4])
+    check("rule11 marker: a trailing marker on the previous declaration does not exempt the next",
+          lines_of("void g(void *h); /* untyped: opaque handle */\nvoid f(void *p);\n", 11), [2])
+    check("rule11 marker: each declaration needs its own marker",
+          lines_of("/* untyped: opaque handle */\nvoid g(void *h);\n"
+                   "/* untyped: opaque handle */\nvoid f(void *p);\n", 11), [])
+
+    # the scope note: a `void *` local is out of scope, only counted
+    check("rule11 locals: a local void* is not a finding but is counted",
+          (lines_of("void f(void) {\n    void *p = 0;\n}\n", 11),
+           rule11_local_count(Source("x.c", "x.c", "void f(void) {\n    void *p = 0;\n}\n"))), ([], 1))
+    check("rule11 locals: a cast is not counted",
+          rule11_local_count(Source("x.c", "x.c", "void f(void) {\n    u32 v = (u32)(void *)p;\n}\n")), 0)
+    check("rule11 locals: a parameter is not counted",
+          rule11_local_count(Source("x.c", "x.c", "void f(void *p) {\n}\n")), 0)
+    check("rule11 locals: a nested block is not counted twice",
+          rule11_local_count(Source("x.c", "x.c", "void f(void) {\n    if (1) {\n        void *p = 0;\n    }\n}\n")), 1)
+
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
     check("e2e: no rule is declared unchecked", UNCHECKED, [])
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
@@ -1771,14 +2164,16 @@ def main(argv: list[str] | None = None) -> int:
                 findings_at_ref(root, args.diff, pairs,
                                 load_ownership_at_ref(root, args.diff) or ownership),
                 rule1_counts_at_ref(root, args.diff, pairs),
-                header_pragma_counts_at_ref(root, args.diff))
+                header_pragma_counts_at_ref(root, args.diff),
+                header_rule11_counts_at_ref(root, args.diff))
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
             return 2
         after = merge_counts(
             rule_counts(lint_tree(root, [os.path.join(root, a) for _b, a in pairs], ownership)),
             rule_counts(rule1_findings(all_sources(root))),
-            rule_counts(header_pragma_findings(root)))
+            rule_counts(header_pragma_findings(root)),
+            rule_counts(header_rule11_findings(root)))
         added = diff_deltas(before, after)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
@@ -1798,12 +2193,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
                   "(rule 2 resolves every extern to an owner or the unsplit band; rule 7 fires on every "
-                  "auto-generated name and grandfathers only pre-existing findings)" % len(rels))
+                  "auto-generated name; rule 11 fires on every unmarked `void *` parameter/return type; "
+                  "only pre-existing findings are grandfathered)" % len(rels))
         return 1 if added else 0
 
     findings = lint_all(root, ownership)
     if args.json:
         print(json.dumps({"budget": budget(findings),
+                          "rule11_locals": rule11_local_total(root),
                           "rule2_gaps": dict(ownership.gaps) if ownership else {},
                           "rule2_unsplit_modules": (
                               {m: {"sites": n, "symbols": len(ownership.unsplit_symbols.get(m, ()))}
@@ -1811,7 +2208,7 @@ def main(argv: list[str] | None = None) -> int:
                           "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
                           "exempt": exemptions()}, indent=2))
     elif args.budget:
-        print_budget(findings, ownership)
+        print_budget(findings, ownership, root)
     else:
         print_findings(findings)
     return 0
