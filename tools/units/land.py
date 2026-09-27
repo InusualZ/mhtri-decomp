@@ -1245,9 +1245,10 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
     deferred" src/` remains the complete list of files that use it.
 
     A *bodyless* file is not examined even when its escape is new, because it is exempt from rule 7
-    anyway (key 2, `stylelint.rule7_state`) and its file name is provisional - `enemy/fn_8033041C.cpp`
-    is the seam re-draw's second half, whose band has no name evidence at all. When that unit is
-    written it grows bodies, its escape becomes load-bearing and this row then demands the name.
+    anyway (key 2, `stylelint.rule7_state` / `brief.text_has_bodies`) and its file name is provisional -
+    `enemy/fn_8033041C.cpp` is the seam re-draw's second half, whose band has no name evidence at all.
+    When that unit is written it grows bodies, its escape becomes load-bearing and this row then demands
+    the name (`ef/fn_803432B4.cpp`, 33 generated definitions, is refused for exactly that).
 
     Returns one line per offender, sorted. `[]` when `base` is unknown, no source file changed, or the
     growth is in files that name their own symbols.
@@ -1267,6 +1268,12 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
             new_text = open(path, encoding="utf-8", errors="replace", newline="").read()
         old = run(["git", "show", "%s:%s" % (base, rel)], main)
         if _defer_count(new_text) <= _defer_count(old.stdout if old.returncode == 0 else ""):
+            continue
+        # a bodyless unit is not "being written" yet: it is rule-7-exempt anyway (key 2, stylelint's own
+        # `text_has_bodies`) and its file name is provisional - `enemy/fn_8033041C.cpp` is the seam
+        # re-draw's second half, whose band has no name evidence at all. Once it carries bodies the row
+        # demands the name (the 803432b4 unit is the case: 33 generated definitions, refused).
+        if not brief_mod.text_has_bodies(new_text):
             continue
         if _GENERATED_STEM_RE.match(os.path.splitext(os.path.basename(rel))[0]):
             offenders.append("%s: registered at a generated file name" % rel)
@@ -2711,7 +2718,11 @@ def selftest() -> int:
                           defer + "/* rewritten header */\nvoid em_act_dispatch(void) {}\n")
     check("rule7: rewriting a file that already had the escape passes",
           module.rule7_defer_growth(d4, sha4), [])
-    for d in (d1, d2, d3, d4):
+    d5, sha5 = defer_repo("src/enemy/fn_8033041C.cpp", "",
+                          defer + "void em_act_dispatch(void);\n/* no bodies yet: the name is provisional */\n")
+    check("rule7: a BODYLESS unit at a generated file name is tolerated",
+          module.rule7_defer_growth(d5, sha5), [])
+    for d in (d1, d2, d3, d4, d5):
         shutil.rmtree(d, ignore_errors=True)
 
 
