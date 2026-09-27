@@ -114,6 +114,15 @@ f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
  * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
  * registered as the first consumer (rule 2) - the owner header did not declare it yet. */
 void fn_80051378(VEC3* out, VEC3* a, VEC3* b);
+/* 0x80050850 - the in-place normaliser this range owns (unmangled `fn_80050850`, so C
+ * linkage).  Its body saves r3/r4 in r29/r30, hands r3 to `PSVECNormalize`'s `src` (r3) and
+ * r4 to its `dst` (the target body reads 0(r3)/8(r3) and stores 0(r4)/8(r4)), then restores
+ * `mr r3,r29`, so the shape is `dst = normalize(src); return dst;`: two pointers, the source
+ * read-only, the destination returned.  Declared here because this unit owns the address
+ * (rule 2).  `void*`/`const void*` is the spelling every call site reaches without a cast
+ * (`ef`, `g3d` and `enemy` callers mix `VEC3*` and `void*` pointers) - the body moves
+ * pointers and cannot distinguish them. */
+void* fn_80050850(void* dst, const void* src);
 /* 0x80052300 / 0x80052408 / 0x80052370 - the animation key-frame readers this unit owns (the
  * manglings `getKeyData__FPff` / `getKeyData3__FPffPfPfPf` say the real C++ signatures, which is how
  * the consumers call them; rule 9).  Added with `Pl/fn_80224AC4.cpp`. */
