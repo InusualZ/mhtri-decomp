@@ -361,7 +361,8 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
         evidence = asstr(r.get("evidence")) or asstr(r.get("why"))
         # A seam filed before the kind existed carries no span; fall back to a fingerprint of its evidence so
         # two span-less findings do not collapse into one item with an empty target.
-        target = ("%s %s-%s" % (sec, start, end)).strip() or norm_defect(evidence, "seam")
+        span = "-".join(x for x in (start, end) if x)
+        target = " ".join(x for x in (sec, span) if x).strip() or norm_defect(evidence, "seam")
         key = ("seam", target.lower(), norm_defect(evidence, target))
         _merge(grouped, key, Item(kind="seam", target=target, defect="seam", status="open",
                                   default_status="open", ask=one_line(evidence),
