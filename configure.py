@@ -1120,6 +1120,36 @@ config.libs = [
             # 0x80033E04 / .ctors 0x8056F38C, and `fn_802FA9A0`'s object starts extab at 0x800156B4 /
             # extabindex 0x80034074).
             Object(NonMatching, "enemy/fn_802F5138.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/8032C920_fn_8032C920.cpp, whose range 0x8032C920..0x80334568 turned out to be
+            # two TUs (`--max-bytes` had cut them in one).  FIRST TU 0x8032C920..0x8033041C, 74
+            # functions / 15100 B: the enemy work record's action band - it hands its r3 record to
+            # `em_frame_check`/`em_act_ck`/`em_die_ck`/`em_after_frame_check`/`em_get_mot_no`
+            # (67 sites) and every field it reads on that pointer is one `include/enemy/ENEMY_WORK.h`
+            # names.  It owns the class vtable `lbl_805E04E0`, the table run `.data`
+            # 0x805DFC9C..0x805E0510, extab 0x80016464..0x8001662C, extabindex
+            # 0x800354FC..0x800357A8, the `.ctors` word 0x8056F3A0 -> `fn_80330128` and its
+            # `.sdata2` pool half 0x8079B108..0x8079B210 (declared, not claimed - playbook 23).
+            # Module `enemy` from the code and the link band; C++ because every out-of-range callee
+            # is a mangled symbol.  No `__FILE__` string is reachable and the runtime dump answers
+            # only `zz_` placeholders, so the file name and its own symbols come from the bodies and
+            # the module's `em_<noun>_<verb>` scheme (the merger lane's naming pass, 2026-09-26).
+            Object(NonMatching, "enemy/em_act_step.cpp"),
+            # SECOND TU of that proposal, 0x8033041C..0x80334568, 48 functions / 16716 B - the other
+            # half of the same band, registered bodyless.  The cut is measured, not guessed: the
+            # extabindex run names its own functions (entry 57, at 0x800357A8, is `fn_8033041C`) and
+            # the `.sdata2` run 0x8079B108..0x8079B2AC is two objects' pools - the compiler's
+            # u32->f32 magic `0x4330000080000000` sits at 0x8079B140 (first TU) and at 0x8079B228
+            # (this one), and 0.0f / 0.5f / 1.0f / 10.0f / 20.0f / 30.0f / 60.0f / 0.8f / -30.0f each
+            # appear twice, one copy per half, with no label shared.  Module `enemy` from the link
+            # band (the neighbours are `enemy/` and the band's pool and extab runs bracket both
+            # halves); its own content is the *player* work record it drives, which is a hint for a
+            # later module decision, not a module - see the file header.  Its `.data` run
+            # 0x805E0510..0x805E201C stays unclaimed: the next band's `fn_803346B4` owns an object at
+            # 0x805E1ED0 *inside* it, so it is not claimable as one run (playbook 53).  Keeps the
+            # `fn_8033041C` stem for now: bodyless, so rule 7 does not apply yet - the pass that
+            # writes the bodies names it from them (31 of its 48 functions call `Pl_frame_check`).
+            Object(NonMatching, "enemy/em_pl_frame.cpp"),
         ],
     },
 

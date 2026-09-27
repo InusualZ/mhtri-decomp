@@ -1137,6 +1137,18 @@ enemy/em_action.cpp:
 	.text       start:0x803253BC end:0x8032C920
 	.ctors      start:0x8056F39C end:0x8056F3A0
 
+enemy/em_act_step.cpp:
+	extab       start:0x80016464 end:0x8001662C
+	extabindex  start:0x800354FC end:0x800357A8
+	.text       start:0x8032C920 end:0x8033041C
+	.ctors      start:0x8056F3A0 end:0x8056F3A4
+	.data       start:0x805DFC9C end:0x805E0510
+
+enemy/em_pl_frame.cpp:
+	extab       start:0x8001662C end:0x8001677C
+	extabindex  start:0x800357A8 end:0x800359A0
+	.text       start:0x8033041C end:0x80334568
+
 hud/fn_80334568.cpp:
 	extab       start:0x8001677C end:0x80016994
 	extabindex  start:0x800359A0 end:0x80035CC4
