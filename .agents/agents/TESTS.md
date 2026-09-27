@@ -85,6 +85,13 @@ claimed *in the registration* and that an `extern` for data the unit owns is a d
 defect the seam rule had: question 4 elicits the *check* and question 3 elicits *numbered* rules, and this rule is
 unnumbered. The probe now asks it directly (question 9).
 
+**Re-probe: PASS (2026-09-26).** Asked directly, the child states the whole rule - the data is claimed *in the
+registration commit, in the same change as the bodies* (private pool entries, jump tables, `__FILE__` strings,
+tables); an `extern` for data its own functions own is a defect because the object is then not the target object and
+`matched_data` stays at 0; and it gives both directions of the `datagap` row (`ours-extra` = it defined something
+the original TU did not own; `target-extra` on a claimed section = it does not emit what the target has). The seam
+rule is still stated in full alongside it, and the run reports completed.
+
 ### T1 - discovery (2026-09-25)
 
 **PASS.** `decompiler`, `merger`, `fixer` all listed as project agents with aliases; the harness surfaced their
