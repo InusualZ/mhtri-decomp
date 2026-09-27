@@ -1942,7 +1942,7 @@ config.libs = [
             # `.text` 0x8009B140..0x8009B374, `extab` 0x80009A28..0x80009A38, `extabindex`
             # 0x80022B18..0x80022B30 (gapless against gx/fn_8009ACE4.c below them).  The right edge
             # 0x8009B374 is the discovery byte cap, not a proven TU end - the file's header records it.
-            Object(NonMatching, "g3d/g3d_gpu.cpp"),           # 0x8009B140-0x8009B374
+            Object(Matching, "g3d/g3d_gpu.cpp"),           # 0x8009B140-0x8009B374
         ],
     },
     {
