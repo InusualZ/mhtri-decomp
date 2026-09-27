@@ -2611,6 +2611,9 @@ def main() -> int:
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
+        # the brief is named after the branch the claim just made, not re-derived from the unit path
+        claim_slug = slug_of_branch(out.get("branch") or "") or slug(out["unit"])
+        brief_path = os.path.join(main_wt, "tools", "units", "briefs", claim_slug + ".md")
         if out.get("dry_run"):
             print("would run: %s" % out["command"])
         else:
@@ -2618,13 +2621,25 @@ def main() -> int:
                   % (out["unit"], out["branch"], out["worktree"],
                      " (slot %s)" % out["slot"] if out.get("slot") else "",
                      out["base"], out.get("seeded", "")))
-            # the brief is named after the branch the claim just made, not re-derived from the unit path
-            print("\nnext: python tools/units/brief.py %s          # write the brief" % out["unit"])
+            # Write the brief HERE rather than leaving it as a next step.  The paste-ready spawn line
+            # below names this path, and a line that points at a file nobody wrote is a footgun: the
+            # orchestrator pasted one and the lane opened a missing file.  `promote` renders it against
+            # the claim's OWN worktree, so the brief's "your tree" block names the slot - rendering it by
+            # hand from MAIN (what the orchestrator did instead) names MAIN, which is the one thing that
+            # block exists to prevent.
+            try:
+                from units import queue as queue_mod
+                queue_mod.promote(main_wt, out["unit"], claim_slug, out["worktree"])
+                print("\n  brief    %s" % brief_path)
+                print("  to replace part 5: python tools/units/brief.py %s --out %s --task \"...\""
+                      % (out["unit"], brief_path))
+            except Exception as exc:  # a brief failure must never lose the claim
+                print("\n  brief    NOT WRITTEN (%s)" % exc)
+                print("  write it before launching: python tools/units/brief.py %s --out %s"
+                      % (out["unit"], brief_path))
         # The paste-ready line names the claim's OWN worktree as `cwd` - the slot, never MAIN.  A lane
         # launched with cwd=MAIN cloned its upstream inside the repository root (`.tmp-mwcc/`) and the next
         # landing was refused over it, so the cwd is printed here rather than left to the orchestrator.
-        claim_slug = slug_of_branch(out.get("branch") or "") or slug(out["unit"])
-        brief_path = os.path.join(main_wt, "tools", "units", "briefs", claim_slug + ".md")
         try:
             from units import queue as queue_mod
             sp = queue_mod.spawn_line(main_wt, out["unit"], claim_slug, out["worktree"], brief_path)
