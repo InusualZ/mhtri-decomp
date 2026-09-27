@@ -39,10 +39,21 @@ reliable vs `.data` pins candidate-only, `extab`/`extabindex` tiling), the `_<fn
 prefix is not the emitter), and the worked case: `menu_infomation.cpp`'s one-copy string is cited on both sides of
 0x8030D338 and 0x80313E24, so three registered ranges were one TU with its seam at 0x80308FB4..0x8031A6C0.
 
-Checks: **T1 PASS** (still listed as a project agent with its aliases) and **T2** re-probe launched from
-`.pi/workflows/probe-decompiler.js`. The edit also exposed the T1 row's stale claim: a profile edit has to be
-installed to user scope, or a lane launched into a pre-edit worktree keeps the old prompt - which is exactly how
-this rule would have failed to reach the worker that needed it.
+Checks: **T1 PASS** (still listed as a project agent with its aliases). **T2** - two probes were launched
+(`.pi/workflows/probe-decompiler.js`); both PASSed the pre-existing checklist (job, the MAIN tell, all ten 6.5
+rules with the right numbers, the verification order, the FAILED-count primacy, the report sections, the rule-7
+nuance, the best-variant policy, the three levers) but **neither stated the seam rule** - and that was a probe
+defect, not a profile one:
+
+* the probe's **task text** never asked about the seam (the checklist did, but the checklist only judges), so the
+  question was added; a probe that cannot ask about a rule cannot test it.
+* `emit(...)` sent `status: r.status`, which the runner does not populate - so every probe reported **workflow
+  failed** even when the child completed. The child's answer was still saved, but a later reader sees a failed
+  run and the recall evidence disappears behind it. `emit` now sends `key` and `out` only.
+
+The edit also exposed the T1 row's stale claim: a profile edit has to be installed to user scope, or a lane
+launched into a pre-edit worktree keeps the old prompt - which is exactly how this rule would have failed to
+reach the worker that needed it.
 
 ### T1 - discovery (2026-09-25)
 
