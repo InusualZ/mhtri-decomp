@@ -69,6 +69,27 @@ A row that reads **unmeasurable** because no auto object covers its address is e
 registration lands: the band is unclaimed while the neighbouring units' blocks bracket it, and the row pairs
 once your split is registered. It is not a coverage bug - do not hunt one.
 
+**A registered range is not necessarily a TU - check the seam before you write bodies.** Your band is bounded by
+*registrations*, not by a proven seam, and a range that is a fragment of a larger TU can never match: the TU's
+pooled constants, jump tables and `__FILE__` string belong to the larger unit, so your object is missing data the
+target has. Settle it from the data, in this order:
+
+* a `__FILE__` string with **exactly one copy in the DOL** is decisive - the static is TU-local, so one copy means
+  one emitter and every function whose relocations name it belongs to that one TU. Count the copies in the DOL
+  itself, not in the map. If that string is cited on **both sides** of one of your range's edges, the edge is
+  **false**: report it as a seam re-draw instead of writing bodies against it. The `_<fnaddr>s_<file>_` prefix in
+  the dump's map is **not** the emitter - only the file name is reliable.
+* `.sdata2` label pairs whose referrer runs are disjoint and ordered are reliable; the same test on `.data` is a
+  **candidate only** (~7 % of adjacent single-owner `.data` pairs invert, which is impossible inside one object).
+* `extab`/`extabindex` and the data-section fragments tile in link order, so a boundary shows as a jump in their
+  owner sequence - and an `extabindex` entry names its own function, which pins a split exactly.
+
+Never compensate for a missing pool or string with a local literal or a re-declared symbol: that bakes the
+fragment's shape into the source and has to be undone when the seam is fixed. `tu-boundary-discovery` carries the
+full evidence table. Worked example (2026-09-26): `menu_infomation.cpp`'s one-copy string is cited from 0x8030A328
+to `Set_equip_column_arrangement`(0x8031A244), so the three registered ranges 0x8030681C..0x8030D338,
+0x8030D338..0x80313E24 and 0x80313E24..0x8031A6C0 were **one** TU; the real seam is 0x80308FB4..0x8031A6C0.
+
 2. **Recon and register before writing bodies.** Registration is a real deliverable, not paperwork: a unit with
    no source file is a bug. Decide the module and file name from evidence (see *Naming*), then land, in the
    **same commit**: `src/<module>/<file>.c|cpp`, one `Object(NonMatching, "...")` line in `configure.py`

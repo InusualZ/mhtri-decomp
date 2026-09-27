@@ -6,7 +6,7 @@ mis-numbered the rule table (see T2 below).
 
 | # | test | how | what counts as passing |
 | --- | --- | --- | --- |
-| T1 | discovery | `subagent({ action: "list" })` | the name shows as a **project** agent with its aliases (project agents are read from `.agents/agents/`; there is no install step) |
+| T1 | discovery | `subagent({ action: "list" })`, run from **MAIN** *and* from a fresh worktree | the name shows as a **project** agent with its aliases. Project agents are read from the **cwd's** `.agents/agents/`, so a lane in a worktree cut *before* a profile edit sees the old prompt - and the user-scope copy (`~/.pi/agent/agents/`, consulted for every cwd) is what closes that gap. **Run `tools/agents/install.sh` after every profile edit.** T1's original "there is no install step" was proven only from MAIN and is wrong for worktrees |
 | T2 | recall | `python tools/agents/profileprobe.py <agent>...` then launch the printed call | the reader child, running nothing, states its job, its write limits **and the tell for being launched in MAIN**, the numbered rules **with the right numbers**, the pre-report verification **and that the `FAILED` count is the primary signal**, its report sections, and its role-specific rules - and names anything missing rather than inventing it |
 | T3 | behaviour | give it a **real** task of that shape and judge the result against the gate | lands through `landbranch.sh` first try; MAIN untouched; the role-specific proof present (see below); no row lower than before |
 
@@ -29,12 +29,33 @@ before trusting a profile with lanes.
 
 ## Results
 
+### Profile edit - the seam rule (2026-09-26)
+
+`decompiler` gained a pre-registration rule: **a registered range is not necessarily a TU** - settle the seam from
+*data* before writing bodies, because a fragment can never match (the TU's pooled constants, jump tables and
+`__FILE__` string belong to the larger unit), and never compensate for the missing pool with a local literal or a
+re-declared symbol. The profile carries the evidence order (one-copy `__FILE__` string decisive, `.sdata2` pins
+reliable vs `.data` pins candidate-only, `extab`/`extabindex` tiling), the `_<fnaddr>s_<file>_` correction (the
+prefix is not the emitter), and the worked case: `menu_infomation.cpp`'s one-copy string is cited on both sides of
+0x8030D338 and 0x80313E24, so three registered ranges were one TU with its seam at 0x80308FB4..0x8031A6C0.
+
+Checks: **T1 PASS** (still listed as a project agent with its aliases) and **T2** re-probe launched from
+`.pi/workflows/probe-decompiler.js`. The edit also exposed the T1 row's stale claim: a profile edit has to be
+installed to user scope, or a lane launched into a pre-edit worktree keeps the old prompt - which is exactly how
+this rule would have failed to reach the worker that needed it.
+
 ### T1 - discovery (2026-09-25)
 
 **PASS.** `decompiler`, `merger`, `fixer` all listed as project agents with aliases; the harness surfaced their
 `skills:` references as "proactive skill subagent suggestions". Discovery from `.agents/agents/` was proven by
 moving the `~/.pi/agent/agents/` copy away and re-listing: the agent was still there, so the tracked file is the
 live one and there is no install or sync step.
+
+**Correction (2026-09-26).** That conclusion holds **from MAIN only**. The harness discovers project agents under
+the **cwd's** `.agents/`, and every campaign lane runs in a worktree cut at its claim time - so a worktree created
+before a profile edit sees the *old* prompt, silently. The user-scope copy (`~/.pi/agent/agents/`, consulted for
+every cwd) is what closes that gap, so `tools/agents/install.sh` must run after **every** profile edit. The
+original test moved the user-scope copy away while cwd was MAIN, which cannot distinguish the two scopes.
 
 ### T2 - recall (2026-09-25)
 
