@@ -25,21 +25,9 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
-/* The record `fn_803438E4` returns: the enemy's per-entry data table record.  Only the offsets this
- * unit reads are named; +0x24 is the first of the record's 0x0C-byte vectors.
- * size: 0x40 (lower bound: the highest byte any reader names is +0x39) */
-typedef struct _ENEMY_DATA {
-    /* +0x00 */ u8 pad_0x00[0x08];
-    /* +0x08 */ u8 field_0x08;   /* `fn_801671AC` latches the work's +0x46C to 0xFF when it is 0xFF */
-    /* +0x09 */ u8 pad_0x09[0x0B];
-    /* +0x14 */ u8 field_0x14;   /* `fn_80166DF8` compares it against the work's +0x1E1 */
-    /* +0x15 */ u8 pad_0x15[0x02];
-    /* +0x17 */ u8 field_0x17;   /* `fn_801671AC` compares it against the work's +0x46C */
-    /* +0x18 */ struct _ENEMY_WORK* work_0x18; /* the entry's live enemy work, or NULL */
-    /* +0x1C */ u8 pad_0x1C[0x08];
-    /* +0x24 */ nw4r::math::VEC3 vec_0x24; /* the entry's seat/aim vector */
-    /* +0x30 */ u8 pad_0x30[0x10];
-} _ENEMY_DATA;
+/* The record `fn_803438E4` returns lives in `include/enemy/ENEMY_DATA.h` (rule 1: one home
+ * for the type, now that a second unit reads it). */
+#include "enemy/ENEMY_DATA.h"
 
 /* The user-data accessor record `enemy/fn_80138074.c` reconstructs: the vtable at +0 (emitted by the
  * other TU, `lbl_805A6D28`), the enemy work at +4, a flag word at +8.  size: 0x0C */

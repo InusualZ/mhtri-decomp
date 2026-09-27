@@ -85,6 +85,12 @@ void fn_80131D84(struct _ENEMY_WORK* self);
 /* r3 the work record; plays the armed motion's end reaction. */
 void fn_80132160(struct _ENEMY_WORK* self);
 
+/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
+ * had not declared it yet). */
+void fn_801354AC(struct _ENEMY_WORK* self);
+void fn_801354B4(struct _ENEMY_WORK* self);
+void fn_8013581C(VEC3* out, VEC3* a, VEC3* b, u32 c, u16 d, f32 e);
+
 #ifdef __cplusplus
 }
 #endif

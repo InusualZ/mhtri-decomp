@@ -23,4 +23,9 @@ struct PlBox {
 
 #endif /* __cplusplus */
 
+
+/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
+ * had not declared it yet). */
+void fn_8028F558(void* a, void* b);
+
 #endif /* MHTRI_PL_FN_80288CEC_H */

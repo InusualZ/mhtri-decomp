@@ -101,4 +101,9 @@ void fn_800DB2DC(void);
  * (fn_800D7F54.cpp:144), so it is declared here at C++ scope, outside the `extern "C"` block
  * above.  Added with `menu/menu_item.cpp` (rule 2: this TU owns the address). */
 void sysSE_req(s32 id);
+
+/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
+ * had not declared it yet). */
+void fn_800DC9A4(struct _se_w* work, VEC3* pos);
+
 #endif /* MHTRI_SOUND_FN_800D7F54_H */

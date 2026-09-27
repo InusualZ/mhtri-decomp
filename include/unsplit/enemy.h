@@ -306,10 +306,134 @@ void fn_801A98F8(struct _ENEMY_WORK* self);
  * first four `state_sub` handlers `fn_80388144` dispatches to.  Unowned (the bracketing registered
  * units are `enemy` on both sides), so the band header is their rule-2 home.  Each drives the shared
  * `_ENEMY_WORK`; `fn_803874C8` takes the work record, the other three take none (they forward r3). */
+/* 0x80346268 - the two-argument request `enemy/em_action.cpp`'s entry action's case 11
+ * makes when the enemy data entry is latched; no registered unit owns the address, so this is
+ * its rule-2 home. */
+void fn_80346268(u32 a, u32 b);
 void fn_803874C8(struct _ENEMY_WORK* self);
 void fn_80387528(void);
 void fn_803875A4(void);
 void fn_80387620(void);
+/* The `0x803253BC` band's pooled constants - the `.sdata2` run 0x8079AF4C..0x8079B100 and the
+ * `.data` word its action record's first field is set to.  Declared, never defined (playbook 29):
+ * the target object owns no data section at all, so the original TU referenced pool entries that
+ * live in the unclaimed data bands, and a definition here would emit a second copy.  Their values
+ * are the DOL's own (0.0f at 0x8079AF54, 1300.0f at 0x8079AF4C, ...). */
+extern const f32 lbl_8079AF4C;   /* 1300f */
+extern const f32 lbl_8079AF50;   /* 700f */
+extern const f32 lbl_8079AF54;   /* 0f */
+extern const f32 lbl_8079AF58;   /* 5f */
+extern const f32 lbl_8079AF5C;   /* 50f */
+extern const f32 lbl_8079AF64;
+extern const f32 lbl_8079AF68;   /* 40f */
+extern const f32 lbl_8079AF6C;   /* -3f */
+extern const f32 lbl_8079AF70;   /* 2f */
+extern const f32 lbl_8079AF74;   /* 45f */
+extern const f32 lbl_8079AF78;   /* 0.7f */
+extern const f32 lbl_8079AF7C;   /* 1.5f */
+extern const f32 lbl_8079AF80;   /* 150f */
+extern const f32 lbl_8079AF84;   /* 0.9f */
+extern const f32 lbl_8079AF88;   /* 0.5f */
+extern const f32 lbl_8079AF8C;   /* 65536f */
+extern const f32 lbl_8079AF90;   /* 360f */
+extern const f32 lbl_8079AF94;   /* 90f */
+extern const f32 lbl_8079AF98;   /* -6f */
+extern const f32 lbl_8079AF9C;
+extern const f32 lbl_8079AFA0;
+extern const f32 lbl_8079AFA4;
+extern const f32 lbl_8079AFA8;
+extern const f32 lbl_8079AFAC;
+extern const f32 lbl_8079AFB0;
+extern const f32 lbl_8079AFB4;
+extern const f32 lbl_8079AFB8;
+extern const f32 lbl_8079AFBC;
+extern const f32 lbl_8079AFC0;
+extern const f32 lbl_8079AFC4;
+extern const f32 lbl_8079AFC8;
+extern const f32 lbl_8079AFCC;
+extern const f32 lbl_8079AFD0;
+extern const f32 lbl_8079AFD4;
+extern const f32 lbl_8079AFD8;
+extern const f32 lbl_8079AFDC;
+extern const f32 lbl_8079AFE0;
+extern const f32 lbl_8079AFE4;
+extern const f32 lbl_8079AFE8;
+extern const f32 lbl_8079AFEC;
+extern const f32 lbl_8079AFF0;
+extern const f32 lbl_8079AFF4;
+extern const f32 lbl_8079AFF8;
+extern const f32 lbl_8079AFFC;
+extern const f32 lbl_8079B000;
+extern const f32 lbl_8079B004;
+extern const f32 lbl_8079B008;
+extern const f32 lbl_8079B00C;
+extern const f32 lbl_8079B010;
+extern const f32 lbl_8079B014;
+extern const f32 lbl_8079B018;
+extern const f32 lbl_8079B01C;
+extern const f32 lbl_8079B020;
+extern const f32 lbl_8079B024;
+extern const f32 lbl_8079B028;
+extern const f32 lbl_8079B02C;
+extern const f32 lbl_8079B030;
+extern const f32 lbl_8079B034;
+extern const f32 lbl_8079B038;
+extern const f32 lbl_8079B03C;
+extern const f32 lbl_8079B040;
+extern const f32 lbl_8079B044;
+extern const f32 lbl_8079B048;
+extern const f32 lbl_8079B04C;
+extern const f32 lbl_8079B050;
+extern const f32 lbl_8079B054;
+extern const f32 lbl_8079B058;
+extern const f32 lbl_8079B05C;
+extern const f32 lbl_8079B060;
+extern const f32 lbl_8079B064;
+extern const f32 lbl_8079B068;
+extern const f32 lbl_8079B06C;
+extern const f32 lbl_8079B070;
+extern const f32 lbl_8079B074;
+extern const f32 lbl_8079B078;
+extern const f32 lbl_8079B07C;
+extern const f32 lbl_8079B080;
+extern const f32 lbl_8079B084;
+extern const f32 lbl_8079B088;
+extern const f32 lbl_8079B08C;
+extern const f32 lbl_8079B090;
+extern const f32 lbl_8079B094;
+extern const f32 lbl_8079B098;
+extern const f32 lbl_8079B09C;
+extern const f32 lbl_8079B0A0;
+extern const f32 lbl_8079B0A4;
+extern const f32 lbl_8079B0A8;
+extern const f32 lbl_8079B0AC;
+extern const f32 lbl_8079B0B0;
+extern const f32 lbl_8079B0B4;
+extern const f32 lbl_8079B0B8;
+extern const f32 lbl_8079B0BC;
+extern const f32 lbl_8079B0C0;
+extern const f32 lbl_8079B0C4;
+extern const f32 lbl_8079B0C8;
+extern const f32 lbl_8079B0CC;
+extern const f32 lbl_8079B0D0;
+extern const f32 lbl_8079B0D4;
+extern const f32 lbl_8079B0D8;
+extern const f32 lbl_8079B0DC;
+extern const f32 lbl_8079B0E0;
+extern const f32 lbl_8079B0E4;
+extern const f32 lbl_8079B0E8;
+extern const f32 lbl_8079B0EC;
+extern const f32 lbl_8079B0F0;
+extern const f32 lbl_8079B0F4;
+extern const f32 lbl_8079B0F8;
+extern const f32 lbl_8079B0FC;
+extern const f32 lbl_8079B100;
+extern const f32 lbl_8079AF60;   /* the low word of the 0.0 double at 0x8079AF60 */
+
+/* The word the 0xC-byte action record's first field is set to (the shared vtable of that
+ * record's class; the table itself is outside this unit's ranges - rule 10). */
+extern u32 lbl_805DFC00[];
+
 #ifdef __cplusplus
 }
 #endif
