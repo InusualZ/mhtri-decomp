@@ -507,6 +507,19 @@ struct _ENEMY_WORK {
             /* +0x33E */ s16 timer_0x33E;   /* the second countdown, gated on the byte stack */
             /* +0x340 */ u8 unused_0x340gt[0x354 - 0x340];
         } em020_0x328;
+        /* the same three bytes read as the material K-colour triple `enemy/em020_handlers.cpp`'s
+         * `em020_model_refresh` copies into the 6/3 TEV K-colour slot one byte at a time
+         * (`lbz`/`stb` per component, the alpha byte left as the getter returned it).  A second
+         * view of the bytes `em020_0x328.sel_0x339..0x33B` holds, which is why it is a union
+         * member and not a field: the em020_prog side names them as the lookup result it stores,
+         * this side as the colours it publishes. */
+        struct {
+            /* +0x328 */ u8 unused_0x328kc[0x339 - 0x328];
+            /* +0x339 */ u8 kcolor_r_0x339;
+            /* +0x33A */ u8 kcolor_g_0x33A;
+            /* +0x33B */ u8 kcolor_b_0x33B;
+            /* +0x33C */ u8 unused_0x33Ckc[0x354 - 0x33C];
+        } em020_kcolor_0x328;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four

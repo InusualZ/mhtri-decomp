@@ -28,6 +28,12 @@ extern "C" {
 struct EnemyData* fn_80140C00(u8 group, u8 index);
 u8* fn_8014260C(u8 id);
 
+/* 0x803754F4 - the em020 band's own `+0x836` bit-0x8000 test (the handler below
+ * `enemy/em020_handlers.cpp`'s range owns it; its `.text` proposal, 0x80375424, is the neighbouring
+ * run and is not registered yet), so the declaration lives in this band until that unit lands.  Its
+ * body is `lhz r0,0x836(r3)` + `rlwinm r3,r0,0,16,16` + the `neg`/`or`/`srwi 31` bool, i.e.
+ * `(flags_0x836 & 0x8000) != 0`. */
+
 void CancelFade(struct _ENEMY_WORK *self);
 u32 em_frame_check__FP11_ENEMY_WORKUsff(struct _ENEMY_WORK *self, u16 a, f32 b, f32 c);
 u32 em_sleep_ck__FP11_ENEMY_WORKUc(struct _ENEMY_WORK* enemy, u8 kind);

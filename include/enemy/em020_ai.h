@@ -15,6 +15,8 @@
 /* The network singleton `getInstance_` returns: the owner of the record is
  * `include/unsplit/Network.h`, which only needs the tag here. */
 struct NetworkInstance;
+/* The shared enemy work record `em020_aim_target_ck` takes a pointer to. */
+struct _ENEMY_WORK;
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +28,8 @@ struct NetworkInstance* getInstance_(void);
 u32 fn_803768F8(void);
 /* 0x80377664 - the network big-data request entry (the `fn_804273EC(1, 0, 0)` wrapper). */
 s32 fn_80377664(void* unused);
+/* 0x803754F4 - the "aim target found" predicate (`+0x836` bit 15). */
+u32 em020_aim_target_ck(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

@@ -1222,6 +1222,11 @@ enemy/em020_prog.cpp:
 	extabindex  start:0x800373BC end:0x800375F0
 	.text       start:0x8036CF64 end:0x80375084
 
+enemy/em020_handlers.cpp:
+	extab       start:0x80017A5C end:0x80017A74
+	extabindex  start:0x800375F0 end:0x80037614
+	.text       start:0x80375084 end:0x80375424
+
 enemy/em020_ai.cpp:
 	extab       start:0x80017A74 end:0x80017C44
 	extabindex  start:0x80037614 end:0x800378CC
