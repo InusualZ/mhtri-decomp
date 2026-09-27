@@ -690,6 +690,42 @@ def _measure_lines(lines: list[str], unit: str) -> None:
     lines.append("")
 
 
+def _your_tree_lines(lines: list[str], b: dict) -> None:
+    """Section 0's first half: the tree this lane must be in, and the one-line check that proves it.
+
+    Added 2026-09-27.  A lane was launched with its cwd set to MAIN, so it cloned its upstream into
+    `.tmp-mwcc/` **inside the repository root**; the next landing was refused over the foreign path, after
+    the fact and against a different lane's batch.  The launch pattern is fixed in `queue.py`/`claims.py`
+    (the spawn line hands out the slot's `cwd`), and this block is the lane's own first-turn check, so a
+    mis-launch is caught in one turn instead of an hour of MAIN pollution.
+    """
+    wt = (b.get("worktree") or "").replace("\\", "/")
+    main = (b.get("main") or "").replace("\\", "/")
+    lines.append("## 0 · Your tree, then acknowledge")
+    lines.append("")
+    if wt:
+        lines.append("**Your tree is `%s`.** It is the only directory you may write to." % wt)
+    else:
+        lines.append("**Your tree is the worktree the spawn line's `cwd` names.** It is the only directory "
+                     "you may write to.")
+    lines.append("")
+    lines.append("* Write **nothing** outside it - not MAIN, not a sibling slot, not a new directory at the "
+                 "repository root. Scratch belongs under *that tree's own* ignored paths (`build/`, `*.ctx`, "
+                 "`d<digits>.json` - whatever `.gitignore` already covers there). MAIN's working tree belongs "
+                 "to the orchestrator, and an edit there blocks every other lane's landing gate.")
+    lines.append("* **Self-check before you do any work.** Run this as your first tool call:")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("git rev-parse --show-toplevel     # must print exactly: %s" % (wt or "your tree"))
+    lines.append("```")
+    lines.append("")
+    lines.append("If it prints anything else - MAIN%s, another slot, a `.ws-*` tree - **STOP and report it "
+                 "instead of working.** A lane launched in the wrong tree silently pollutes MAIN; catching "
+                 "it here costs one turn, missing it costs a refused landing."
+                 % (" (`%s`)" % main if main else ""))
+    lines.append("")
+
+
 def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     rng = b["sections"]
     txt = rng.get(".text")
@@ -705,7 +741,8 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
-    lines.append("## 0 · Acknowledge first, then heartbeat")
+    _your_tree_lines(lines, b)
+    lines.append("## 0b · Acknowledge first, then heartbeat")
     lines.append("")
     lines.append("Before anything else, say you are alive:")
     lines.append("")
@@ -1101,7 +1138,8 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
         lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
-    lines.append("## 0 · Acknowledge first, then heartbeat")
+    _your_tree_lines(lines, b)
+    lines.append("## 0b · Acknowledge first, then heartbeat")
     lines.append("")
     lines.append("```sh")
     lines.append("python tools/units/claims.py ack %s --agent <your-name>" % label)
@@ -1301,6 +1339,9 @@ def brief_for(main: str, wt: str, unit: str, task: str | None = None, assume_cla
     p = proposal_by_label(main, unit)
     if p is not None:
         b = build_proposal(main, p, task, assume_claim=assume_claim)
+        # the tree the claim *will* create: the "your tree" block and §4 name it, and a pooled brief prepared
+        # before the claim uses the same path the spawn line will hand out.
+        b["worktree"], b["main"] = wt, main
         return b, render_proposal(main, b, task, pool=pool)
     b = build(main, wt, unit, task, assume_claim=assume_claim)
     return b, render(main, b, task, pool=pool)
@@ -1671,6 +1712,11 @@ def selftest() -> int:
               "python tools/splits/dump_asm.py" in brief_text and "0 functions" in brief_text, True)
         check("the brief carries the git add hygiene",
               "`git add -A` with no path arguments" in brief_text and "`git show --stat`" in brief_text, True)
+        check("the brief carries the your-tree block, naming the worktree and the self-check",
+              "## 0 · Your tree, then acknowledge" in brief_text
+              and claims.worktree_for("auto/stub", tmp).replace("\\", "/") in brief_text
+              and "git rev-parse --show-toplevel" in brief_text
+              and "STOP and report it" in brief_text, True)
         check("pool is idempotent", pool(tmp)["skipped"], ["auto/stub"])
         open(os.path.join(tmp, "src", "auto", "stub.c"), "w").write("int f(void) { return 1; }\n")
         check("pool prunes a unit that gained a body",
@@ -1736,6 +1782,12 @@ def selftest() -> int:
               "`git add -A` with no path arguments" in text and "`git show --stat`" in text, True)
         check("a proposal brief still says where the report goes",
               "final message" in text and "subagent_done" not in text, True)
+        check("the proposal brief carries the your-tree block and the self-check",
+              "## 0 · Your tree, then acknowledge" in text
+              and "git rev-parse --show-toplevel" in text and "STOP and report it" in text, True)
+        _pb, _ptext = brief_for(tmp, os.path.join(tmp, "ws"), entry["label"], assume_claim=True)
+        check("... and names the worktree the claim will create",
+              os.path.join(tmp, "ws").replace("\\", "/") in _ptext, True)
 
         # the TU probe: the queue tags each entry with what `tudiscover`'s anchors and `segments`' notes
         # say, and a range that is not one TU gets a plain warning at the top of the brief

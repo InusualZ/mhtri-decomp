@@ -32,8 +32,11 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md` is the standard), rather than assuming the re-range harmless;
 * checks every command's exit code, `configure.py`'s included - a failed `configure.py` leaves a stale
   `build.ninja` and every later number is a fiction;
-* refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
-  outside the batch's expected set, or whose outbox entry does not validate;
+* **refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
+  outside the batch's expected set, or whose outbox entry does not validate**; a foreign path **already in the
+  tree** is reported - with a likely cause when it looks like lane scratch (`.tmp-*`, `.ws-*`, an `upstream/`
+  clone) - **before** the expensive gate runs (`preflight_foreign`), not only as the refusal afterwards, so a
+  mis-launched lane's leftovers cost a second, not a 5-minute build;
 * runs the style lint when it exists (7.21), reports the ledger delta, and warns when a unit improved with no
   document or header change to show for it (7.10); the lint row carries the **head** of stylelint's output -
   where the findings are - and never its trailing "not enforced: ..." legend, which on 2026-09-25 made a FAIL
@@ -1162,6 +1165,59 @@ def tolerate_scratch(main: str, paths: list[str], act: bool = True) -> str:
             note += (" (WARNING: %s is staged and `git reset` failed - unstage it by hand before any "
                      "`git commit` without a pathspec)" % ", ".join(held))
     return note
+
+
+# A foreign path whose *name* looks like a lane's scratch names the likely cause, so the pre-flight's report
+# is actionable the moment it is printed - not after a 5-minute build.  A lane launched with its cwd set to
+# MAIN leaves exactly these behind (`.tmp-mwcc/upstream/` was the 2026-09-27 case).
+LANE_SCRATCH_MARKERS = (".tmp-", ".ws-", "tmp-")
+
+
+def likely_cause(path: str) -> str | None:
+    """A named cause for a foreign path that looks like lane scratch - `None` when the name says nothing.
+
+    Deliberately name-based and conservative: this only *suggests* a cause in the pre-flight report, it never
+    changes the verdict.  What it names is the failure this lane exists for - a lane launched in MAIN rather
+    than in its slot.
+    """
+    parts = path.replace("\\", "/").split("/")
+    if any(p.startswith(m) for p in parts for m in LANE_SCRATCH_MARKERS):
+        return ("looks like lane scratch in MAIN - a lane was launched with its cwd set to MAIN (or cloned "
+                "its upstream there) instead of working in its slot; delete it and relaunch the lane with "
+                "the slot as its cwd (`queue.py next` prints that line)")
+    if any(p.startswith(".slot") for p in parts):
+        return ("a slot directory sits inside MAIN - slots are siblings of MAIN, never inside it")
+    if "upstream" in parts:
+        return ("a cloned upstream repository left in MAIN - typically the same mis-launched lane")
+    return None
+
+
+def preflight_foreign(main: str) -> list[dict]:
+    """Foreign paths already in `main` **before** the build, each with a likely cause.  Read-only.
+
+    The same information the post-build refusal prints (`land`'s `paths outside the batch appeared during the
+    build`), delivered *before* the expensive work: a refusal that arrives after a 5-minute build is the same
+    information, late.  It does not change the verdict - a path that appears during the build is still refused
+    afterwards - it just makes the common case (a foreign path already there) cost a second, not minutes.
+    """
+    rows = changed_status(main)
+    outside = outside_batch([path for _code, path in rows])
+    scratch = set(scratch_paths(outside))
+    return [{"path": p, "cause": likely_cause(p)} for p in outside if p not in scratch]
+
+
+def preflight_report(main: str, foreign: list[dict] | None = None) -> str | None:
+    """The pre-flight report line(s), or `None` when the tree already holds no foreign path."""
+    foreign = preflight_foreign(main) if foreign is None else foreign
+    if not foreign:
+        return None
+    lines = ["PRE-FLIGHT | %d path(s) outside this batch are already in %s BEFORE the build:"
+             % (len(foreign), main)]
+    for row in foreign:
+        lines.append("  %s%s" % (row["path"], "  <- %s" % row["cause"] if row["cause"] else ""))
+    lines.append("  the post-build gate would refuse these too; they are another lane's or a mis-launch's "
+                 "scratch, not this batch's - remove them first")
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -2332,6 +2388,17 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
         clear_land_message(main)
         print("REFUSED %s | %s" % (",".join(norm_units), bad_branch))
         return 1
+    # pre-flight: a foreign path ALREADY in the tree is reported - with a likely cause - before the gate's
+    # expensive build.  The same information the post-build refusal prints, delivered a build earlier; a
+    # foreign path cannot disappear during the build, so an early refusal loses nothing and saves minutes.
+    foreign_now = preflight_foreign(main)
+    if foreign_now:
+        clear_land_message(main)
+        print(preflight_report(main, foreign_now), file=sys.stderr)
+        print("REFUSED %s | %d path(s) outside the batch are already in the tree before the build; the "
+              "post-build gate would refuse them too - clear the tree first"
+              % (",".join(norm_units), len(foreign_now)))
+        return 1
     gate_failures: list[str] = []
     with contextlib.redirect_stdout(sys.stderr):
         gate_ok = verify(main, norm_units, base, dry_run=False, no_build=no_build,
@@ -2440,6 +2507,16 @@ def selftest() -> int:
     check("outside the batch: ground truth", outside_batch(["config/RMHE08/build.sha1"]),
           ["config/RMHE08/build.sha1"])
     check("outside the batch: the local-only state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
+
+    # the pre-flight names the likely cause of a foreign path whose name looks like lane scratch (the
+    # `.tmp-mwcc/upstream` incident); an ordinary foreign file gets no invented cause
+    check("preflight: `.tmp-*` names the mis-launch cause",
+          "cwd set to MAIN" in (likely_cause(".tmp-mwcc/upstream/x.c") or ""), True)
+    check("preflight: `.ws-*` also names lane scratch",
+          "cwd set to MAIN" in (likely_cause(".ws-foo/f.txt") or ""), True)
+    check("preflight: a bare `upstream` names a leftover clone",
+          "cloned upstream" in (likely_cause("upstream/x.c") or ""), True)
+    check("preflight: an ordinary foreign file gets no invented cause", likely_cause("NOTES.md"), None)
 
     # `land` stages the batch's own files only: a tracked change is the batch, but an untracked file that is
     # not a named unit's source is another stream's in-flight work (the round's `tools/units/playbook.py`)
@@ -2971,6 +3048,37 @@ def selftest() -> int:
     def write_both(main):
         write_scratch(main)
         write_foreign(main)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # the pre-flight: a foreign path ALREADY in the tree (not during the build) is named - with a likely
+        # cause when it looks like lane scratch - and refused BEFORE the expensive gate runs.
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+        with open(os.path.join(tmp, "src", "batch.c"), "w", encoding="utf-8") as fh:
+            fh.write("base\n")
+        repo_git(tmp, "add", "-A")
+        repo_git(tmp, "commit", "-q", "-m", "base")
+        os.makedirs(os.path.join(tmp, ".tmp-mwcc", "upstream"), exist_ok=True)
+        with open(os.path.join(tmp, ".tmp-mwcc", "upstream", "x.c"), "w", encoding="utf-8") as fh:
+            fh.write("a clone inside MAIN\n")
+        called = []
+
+        def recording_verify(*_a, **_k):
+            called.append(True)
+            return 0
+
+        buf, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(module, "verify", recording_verify), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+            code = land(tmp, ["Pl/pl_act"], None, no_build=True, check_outbox=False,
+                        release_claims=False, subject="x")
+        check("preflight: a foreign path before the build refuses early", code, 1)
+        check("... and the expensive gate never ran", called, [])
+        check("... the answer line is a REFUSED", buf.getvalue().startswith("REFUSED"), True)
+        check("... the pre-flight names the planted path", ".tmp-mwcc/upstream/x.c" in err.getvalue(), True)
+        check("... and the likely cause (a lane launched in MAIN)", "cwd set to MAIN" in err.getvalue(), True)
+        check("... and nothing was committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "base")
 
     with tempfile.TemporaryDirectory() as tmp:
         # (a) scratch appears during the build: the batch lands, the scratch is never staged or committed, and
