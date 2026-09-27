@@ -223,8 +223,10 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
     f32 scalef;
     f32 f31;
 
-    MTX34_ctor(&b40);
-    MTX34_ctor(&b10);
+    /* `b40` is the unit's own `WorkBuf`, whose leading block is the matrix (its `.text` is what
+     * the calls below hand on); the record's type is the helper's (rule 11). */
+    MTX34_ctor((MTX34*)&b40);
+    MTX34_ctor((MTX34*)&b10);
     GXInvalidateVtxCache();
     fn_80075394(a, &b40);
     DrawCtx* ctx = (DrawCtx*)fn_80047234(a);

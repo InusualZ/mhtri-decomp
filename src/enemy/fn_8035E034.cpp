@@ -69,9 +69,9 @@
  * Callees outside this unit.
  * ---------------------------------------------------------------------------------------------- */
 
-/* The three vector helpers the game-root draw layer owns; `enemy.h` pulls `ef.h`'s
- * `VEC3_ctor(VEC3*)`, and `include/mh3_pad.h`'s `VEC3_ctor(void*)` cannot be included beside it,
- * so `copyVec3` is declared here (the rule 2 named gap). */
+/* The three vector helpers the game-root draw layer owns; `include/mh3_pad.h` and `include/ef.h`
+ * now spell them with the same record type (`nw4r::math::VEC3*`, docs/plan.md 6.5 rule 11), so no
+ * local copy of the declaration is needed. */
 void fn_8008E8D0(void* a, void* b);
 void fn_8008DA10(void* a, void* b);
 void fn_800513F0(VEC3* v, f32 s);

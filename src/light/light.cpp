@@ -128,7 +128,7 @@ typedef struct LightMidBlock {
 typedef struct LightQuadMid {
     /* +0x00 */ nw4r::math::VEC3 v[4];
     /* +0x30 */ u8 unused_0x30[0x1C];
-    /* +0x4C */ LightMidBlock mid;
+    /* +0x4C */ MTX34 mid;
     /* +0x7C */ nw4r::math::VEC3 tail;
 } LightQuadMid; /* size: 0x88 */
 

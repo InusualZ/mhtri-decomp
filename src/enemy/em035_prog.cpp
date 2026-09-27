@@ -85,12 +85,10 @@
  *     this one (98.54) and the reversed-declaration form (95.00, which swaps the two loads instead).
  *     `tools/m2c` (run through `tools/units/m2cinput.py`) drafts the same shape with the same f2/f0
  *     split - the allocator's web order is the residual, not the source.
- *   * `em035_part_node_init` 98.48 - retail passes the `setVec3` result straight on
- *     (`mr r4,r3`), which needs the helper's *pointer* return type; the owner header
- *     `include/mh3_pad.h` spells it `void setVec3(f32*, f32, f32, f32)` for its C consumers, and
- *     with that spelling the second call reloads `&scale` (`addi r4,r1,8`) instead.  Declaring the
- *     owner's signature locally reaches 100.00 but adds two rule 2 violations, which the land gate
- *     refuses - so the conformant spelling keeps the four-byte residual.
+ *   * `em035_part_node_init` 98.48 - retail passes the `setVec3` result straight on (`mr r4,r3`),
+ *     which needs the helper's *pointer* return type.  The owner's header carries it now
+ *     (`VEC3* setVec3(VEC3*, f32, f32, f32)`, docs/plan.md 6.5 rule 11); the remaining four-byte
+ *     residual is the allocator's, not the spelling's.
  */
 
 #include "types.h"
@@ -560,7 +558,7 @@ extern "C" void em035_part_node_init(EmPartNode* part, const nw4r::math::VEC3* v
     EmNode* node = &part->node_0x34;
     nw4r::math::VEC3 scale;
 
-    setVec3((f32*)&scale, lbl_8079B728, lbl_8079B728, lbl_8079B728);
+    setVec3(&scale, lbl_8079B728, lbl_8079B728, lbl_8079B728);
     copyVec3(&node->vec_0x00, &scale);
     node->field_0x0C = 0;
     if (flags & 2)

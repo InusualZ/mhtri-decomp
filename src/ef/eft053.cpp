@@ -15,7 +15,7 @@
  * `eft0NN.cpp` scheme of the neighbouring units (`ef/eft035.cpp`, `ef/eft050.cpp`).  3./4. The other
  * 13 addresses answer the dump's `zz_XXXXXXXX_` placeholder, so no dump name exists for them: the
  * eight this unit DEFINES are named from their own bodies (NAMES below, each a GUESS), and only the
- * five still unwritten keep the map's `fn_` stems (rule 7 deferral below).
+ * five still unwritten keep the map's `fn_` stems (Naming note below).
  *
  * NAMES.  Every symbol this file defines is `eft053_<what the body does>`, derived from the body and
  * left as a GUESS a later pass may refine - the family's own tag names the band (`eft053_set` seeds

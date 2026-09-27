@@ -210,11 +210,9 @@ s32 em_get_mot_no(_ENEMY_WORK* enemy);
 void get_camera_pos(nw4r::math::VEC3* out);
 
 
-/* `src/mh3_pad.cpp` owns both of these, but its header `include/mh3_pad.h` cannot be included here:
- * it spells `VEC3_ctor(void*)` while `include/ef.h` spells the same C-linkage symbol
- * `VEC3_ctor(VEC3*)`, and MWCC rejects the pair with "illegal function overloading" (a shared-file
- * conflict recorded in the outbox's config_requests).  The VEC3 spelling below equals `ef.h`'s, so
- * there is one view of the symbol; the parameter type is the same register either way. */
+/* `src/mh3_pad.cpp` owns the three 3-float helpers; `include/mh3_pad.h` and `include/ef.h` now
+ * spell them with the same record type (`nw4r::math::VEC3*`, docs/plan.md 6.5 rule 11), so both
+ * headers can be included here and neither needs a local copy of the declaration. */
 }
 
 /* `get_em_scale` (0x80135940) is in the unsplit enemy band, so its home is `include/unsplit/enemy.h` -

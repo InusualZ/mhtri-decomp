@@ -834,7 +834,7 @@ void* fn_8007663C(s32 *arg0) {
     *arg0 = 0;
     var_r30 = arg0 + 4;
     do {
-        MTX34_ctor((void*)(var_r30));
+        MTX34_ctor((nw4r::math::MTX34*)(var_r30));
         var_r30 = &((RawView_4*)var_r30)->field_0x30;
     } while ((u32)var_r30 < (u32)(arg0 + 0x94));
     return arg0;
@@ -1289,7 +1289,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
         return NULL;
     }
     var_r29 = 0;
-    MTX34_ctor((void*)(&spC8));
+    MTX34_ctor((nw4r::math::MTX34*)&spC8);
     temp_r3 = (void **)(fn_80088048());
     ((RawView_16*)(*temp_r3))->field_0x10();
     var_r28 = 0U;
@@ -1339,17 +1339,17 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     spF4 = temp_f31;
                     spE4 = temp_f31;
                     spD4 = temp_f31;
-                    setVec3((void*)(&sp80), (f32)(spC8), (f32)(spD8), (f32)(spE8));
+                    setVec3((nw4r::math::VEC3*)&sp80, (f32)(spC8), (f32)(spD8), (f32)(spE8));
                     fn_80050850((void*)(&sp80), (void*)(&sp80), 0, 0);
                     spC8 = sp80;
                     spD8 = sp84;
                     spE8 = sp88;
-                    setVec3((void*)(&sp74), (f32)(spCC), (f32)(spDC), (f32)(spEC));
+                    setVec3((nw4r::math::VEC3*)&sp74, (f32)(spCC), (f32)(spDC), (f32)(spEC));
                     fn_80050850((void*)(&sp74), (void*)(&sp74), 0, 0);
                     spCC = sp74;
                     spDC = sp78;
                     spEC = sp7C;
-                    setVec3((void*)(&sp68), (f32)(spD0), (f32)(spE0), (f32)(spF0));
+                    setVec3((nw4r::math::VEC3*)&sp68, (f32)(spD0), (f32)(spE0), (f32)(spF0));
                     fn_80050850((void*)(&sp68), (void*)(&sp68), 0, 0);
                     spD0 = sp68;
                     spE0 = sp6C;
@@ -1360,22 +1360,22 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
             }
             temp_r3_5 = fn_80088260((s8)(fn_80088270((s8)((s8) *var_r30))));
             if ((temp_r3_5 != 0) && (fn_8006518C() != 0)) {
-                VEC3_ctor((void*)(&sp5C));
+                VEC3_ctor((nw4r::math::VEC3*)&sp5C);
                 if (fn_80077DD8((s32 *)(temp_r3_5)) != 0) {
                     fn_8007A7E4((s32)(temp_r3_5), (s32)(&sp5C));
                     if ((temp_f31 == sp5C) && (temp_f31 == sp60) && (temp_f31 == sp64)) {
                         fn_8007A7C8((s32)(temp_r3_5), (s32)(&sp5C));
                         fn_80077DBC((void *)(&sp44), (void*)(&sp5C));
-                        copyVec3((void*)(&sp5C), (void*)(&sp44));
+                        copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp44);
                         fn_80050850((void*)(&sp5C), (void*)(&sp5C), 0, 0);
                     }
                 } else if (fn_80077D64((s32)(temp_r3_5)) != 0) {
                     fn_8007A7C8((s32)(temp_r3_5), (s32)(&sp5C));
                     fn_80077DBC((void *)(&sp38), (void*)(&sp5C));
-                    copyVec3((void*)(&sp5C), (void*)(&sp38));
+                    copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp38);
                     fn_80050850((void*)(&sp5C), (void*)(&sp5C), 0, 0);
                 } else {
-                    VEC3_ctor((void*)(&sp50));
+                    VEC3_ctor((nw4r::math::VEC3*)&sp50);
                     if (fn_80077D4C((s32 *)(temp_r3_5)) == 0) {
                         nw4r::db::Panic((const char*)&lbl_8058E880, 0xAB, (const char*)&lbl_8058E8B8);
                     }
@@ -1421,7 +1421,7 @@ typedef struct {
     /* +0x08 */ u32 field_0x08;
 } RawView_20; /* size: 0xC */
 u32 fn_80077DBC(void *arg1, void* a1) {
-    setVec3((void*)(-((RawView_20*)arg1)->field_0x00), (f32)(-((RawView_20*)arg1)->field_0x04), (f32)(-((RawView_20*)arg1)->field_0x08), 0);
+    setVec3((nw4r::math::VEC3*)(-((RawView_20*)arg1)->field_0x00), (f32)(-((RawView_20*)arg1)->field_0x04), (f32)(-((RawView_20*)arg1)->field_0x08), 0);
 }
 
 s32 fn_80077DD8(s32 *arg0) {
@@ -2845,7 +2845,7 @@ s32 dtor_8007BA44(s32 arg0, s16 arg1) {
 void* fn_8007BAA0(u32 **arg0) {
     TheBeatMatchOutput();
     *arg0 = &lbl_8058F4C8;
-    setVec3((arg0 + 0xDC), (f32)(lbl_80795E58), (f32)(lbl_80795E58), (f32)(lbl_80795E58));
+    setVec3((nw4r::math::VEC3*)(arg0 + 0xDC), (f32)(lbl_80795E58), (f32)(lbl_80795E58), (f32)(lbl_80795E58));
     return arg0;
 }
 

@@ -9,11 +9,11 @@
  * `VEC3*`/`Vec*`, so a TU including both headers failed with MWCC `(10197) illegal function
  * overloading` (measured on `src/Pl/fn_8028F66C.cpp`).  Every referrer includes this header now.
  *
- * The parameter types are deliberately type-erased (`void*`): two of the three bodies only store
- * floats and the third is empty, so there is no pointee evidence, while the ~1,400 call sites pass the
- * engine's `Vec*`, nw4r's `VEC3*`, `f32*` and `void*` for the same argument.  `copyVec3`/`setVec3`
- * returning `void*` IS evidenced: the callers keep the first argument as the result (`mr r4,r3` after
- * the `bl`, e.g. `fn_80166330` in `enemy/fn_80165FC8.cpp`) and the bodies leave r3 untouched.
+ * The parameter types are the record's real one, `nw4r::math::VEC3*` (see `mh3_pad/vec3.h` for the
+ * evidence); they were `void*` until the type-fix pass - the erased form docs/plan.md 6.5 rule 11
+ * bans.  `copyVec3`/`setVec3` return that pointer: the callers keep the first argument as the result
+ * (`mr r4,r3` after the `bl`, e.g. `fn_80166330` in `enemy/fn_80165FC8.cpp`) and the bodies leave r3
+ * untouched.
  *
  * GUESS (naming - confirm or rename when a body pass reaches the record type):
  *   * `VEC3_ctor` (0x80043EA8) - a 4-byte `blr` no-op called 1,873 times in the DOL, always with the
@@ -40,10 +40,12 @@ extern "C" {
 
 /* Added when `camera/fn_802B5C58.cpp` registered (rule 2): the camera accessors all start by copying a
  * 4-byte camera handle through this unit's helper (`fn_8004726C` does the word copy). */
-/* 0x8004723C - copies the word `*src` into `*out` and returns `out`.  The types are erased because
- * the two call sites pass different ones for the same slot (`camera/fn_802B5C58.cpp` a `void**`,
- * `stage/fn_802B2AA0.cpp` a `s32*`); the owner's body is `fn_8004726C` + `mr r3,r31`. */
-void* fn_8004723C(void *out, const void *src);
+/* 0x8004723C - copies the word `*src` into `*out` and returns `out`.  A raw 4-byte word copy, so
+ * the parameters carry no pointee type: the two call sites pass different ones for the same slot
+ * (`camera/fn_802B5C58.cpp` a `void**`, `stage/fn_802B2AA0.cpp` a `s32*`); the owner's body is
+ * `fn_8004726C` + `mr r3,r31`.  docs/plan.md 6.5 rule 11 exemption. */
+void* fn_8004723C(void *out /* untyped: a raw word the callee copies byte-wise */,
+                  const void *src /* untyped: a raw word the callee copies byte-wise */);
 /* 0x80047058 - `Screen_w`'s +0x1A byte as a 0/1 flag; added with the `light/light.cpp` registration
  * (rule 2: this range owns the address), whose `fn_802BECD0` gates the second light work on it. */
 s32 fn_80047058(void);

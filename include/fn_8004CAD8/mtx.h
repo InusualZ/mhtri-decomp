@@ -13,6 +13,16 @@
 
 #include "types.h"
 
+/* The record `MTX34_ctor` constructs.  Forward-declared by name so this header needs no typedef
+ * set of its own: `nw4r/math.h` (and the units that still carry the type locally) define it. */
+#ifdef __cplusplus
+namespace nw4r { namespace math { struct MTX34; } }
+#define MHTRI_MTX34 nw4r::math::MTX34
+#else
+struct MTX34;
+#define MHTRI_MTX34 struct MTX34
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,11 +30,14 @@ extern "C" {
 /* 0x8005050C - a 4-byte `blr`: it does nothing.  Every call site passes the address of an
  * `nw4r::math::MTX34` local right after its declaration (`MTX34 mtx; MTX34_ctor(&mtx);`), so it is
  * kept as the record's constructor-shaped no-op - the same reading as `mh3_pad/vec3.h`'s
- * `VEC3_ctor`, whose 0x80043EA8 is the 3-float twin of this one (365 call sites in the DOL).
+ * `VEC3_ctor`, whose 0x80043EA8 is the 3-float twin of this one (365 call sites in the DOL).  The
+ * parameter carries that type rather than the erased `void*` the name pass left here: the owner's
+ * band is the nw4r math band (`rotLocalMatX__FUlPQ34nw4r4math5MTX34` is the code right before it),
+ * so the library spelling is the evidenced one (rule 11).
  *
  * GUESS (naming): the body is empty, so the name comes from the call context only.  Confirm when the
  * owner's band is written. */
-void MTX34_ctor(void *out);
+void MTX34_ctor(MHTRI_MTX34* out);
 
 /* 0x8004CAD8 - writes the `0xFFFF` "none" sentinel into one of six `s16` fields of `rec`
  * (rec+0x92, 0x94, 0x96, 0x98, 0x9A, 0x9C) selected by a 1-based `kind`, through a 16-way jump table
@@ -39,5 +52,7 @@ s32 set_slot_none(void *rec, u32 kind);
 #ifdef __cplusplus
 }
 #endif
+
+#undef MHTRI_MTX34
 
 #endif /* MHTRI_FN_8004CAD8_MTX_H */

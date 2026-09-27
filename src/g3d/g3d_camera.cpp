@@ -313,7 +313,9 @@ void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
     }
     if (pOut != NULL && fn_80067EE8(pSelf)) {
         CameraData* pData = fn_80074A54(pSelf);
-        copyVec3(pOut, &pData->mPosX);
+        /* `mPosX/mPosY/mPosZ` are three consecutive floats of the camera record, so the vector
+         * is the address of the first of them (the engine's own view; rule 11). */
+        copyVec3(pOut, (const nw4r::math::VEC3*)&pData->mPosX);
     }
 }
 
@@ -355,17 +357,17 @@ void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut)
     u32 flags = pData->mFlags;
     if ((flags & 1) != 0) {
         pOut->mType = 0;
-        copyVec3(&pOut->mPosX, &pData->mTargetX);
-        copyVec3(&pOut->mTargetX, &pData->mUpX);
+        copyVec3((nw4r::math::VEC3*)&pOut->mPosX, (const nw4r::math::VEC3*)&pData->mTargetX);
+        copyVec3((nw4r::math::VEC3*)&pOut->mTargetX, (const nw4r::math::VEC3*)&pData->mUpX);
         return;
     }
     if ((flags & 2) != 0) {
         pOut->mType = 1;
-        copyVec3(&pOut->mUpX, &pData->mUnk98);
+        copyVec3((nw4r::math::VEC3*)&pOut->mUpX, (const nw4r::math::VEC3*)&pData->mUnk98);
         return;
     }
     pOut->mType = 2;
-    copyVec3(&pOut->mTargetX, &pData->mUpX);
+    copyVec3((nw4r::math::VEC3*)&pOut->mTargetX, (const nw4r::math::VEC3*)&pData->mUpX);
     pOut->mUnk28 = pData->mUnkA4;
 }
 
@@ -449,7 +451,7 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
     f32 projMtx[16];
     ProjParams params;
     f32 frustum[6];
-    MTX34_ctor(viewMtx);
+    MTX34_ctor((nw4r::math::MTX34*)viewMtx);
     fn_80075390(projMtx);
     fn_80075394(pSelf, viewMtx);
     fn_80075440(pSelf, projMtx);
@@ -728,7 +730,7 @@ void nw4r::g3d::Camera::SetPosition(const math::VEC3& rPos) {
     }
     if (fn_80067EE8(this)) {
         CameraData* pData = fn_800748E4(this);
-        copyVec3(&pData->mPosX, &rPos);
+        copyVec3((nw4r::math::VEC3*)&pData->mPosX, (const nw4r::math::VEC3*)&rPos);
         pData->mFlags &= ~8;
     }
 }
@@ -747,8 +749,8 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
             fn_80074D38(&rInfo.mTargetX, &pData->mUpX) != 0) {
             pData->mFlags &= ~7;
             pData->mFlags |= 1;
-            copyVec3(&pData->mTargetX, &rInfo.mPosX);
-            copyVec3(&pData->mUpX, &rInfo.mTargetX);
+            copyVec3((nw4r::math::VEC3*)&pData->mTargetX, (const nw4r::math::VEC3*)&rInfo.mPosX);
+            copyVec3((nw4r::math::VEC3*)&pData->mUpX, (const nw4r::math::VEC3*)&rInfo.mTargetX);
             pData->mFlags &= ~8;
         }
         break;
@@ -757,7 +759,7 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
         if ((pData->mFlags & 2) == 0 || fn_80074D38(&rInfo.mUpX, &pData->mUnk98) != 0) {
             pData->mFlags &= ~7;
             pData->mFlags |= 2;
-            copyVec3(&pData->mUnk98, &rInfo.mUpX);
+            copyVec3((nw4r::math::VEC3*)&pData->mUnk98, (const nw4r::math::VEC3*)&rInfo.mUpX);
             pData->mFlags &= ~8;
         }
         break;
@@ -767,7 +769,7 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
             rInfo.mUnk28 != pData->mUnkA4) {
             pData->mFlags &= ~7;
             pData->mFlags |= 4;
-            copyVec3(&pData->mUpX, &rInfo.mTargetX);
+            copyVec3((nw4r::math::VEC3*)&pData->mUpX, (const nw4r::math::VEC3*)&rInfo.mTargetX);
             pData->mUnkA4 = rInfo.mUnk28;
             pData->mFlags &= ~8;
         }

@@ -77,7 +77,7 @@ extern "C" {
 
 /* Unsplit helpers whose address band names different modules on either side (the rule-2 gap):
  * fn_8009C484 at 0x8009C484 (gx band | ef band) and fn_80463F04 at 0x80463F04 (the runtime). */
-extern void fn_8009C484(Vec* out, Vec* in);
+extern void fn_8009C484(VEC3* out, VEC3* in);
 extern f32 fn_80463F04(f32 x);
 
 void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
@@ -124,11 +124,11 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     total = swept ? count * count : count;
     tube = 0.0f;
     for (i = 0; i < total; i++) {
-        Vec v_pt, v_out, v_norm, v_flat, v_dir;
+        VEC3 v_pt, v_out, v_norm, v_flat, v_dir;
         f32 c1, s1, c2, s2;
 
-        VEC3_ctor((VEC3*)&v_pt);
-        VEC3_ctor((VEC3*)&v_out);
+        VEC3_ctor(&v_pt);
+        VEC3_ctor(&v_out);
         ratio = (100.0f - params->rate) / (100.0f + params->rate);
         if (!swept) {
             angle = (params->angle_end - params->angle_base) * fn_800A8A08(&em->progress);
@@ -141,11 +141,11 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         v_pt.y = scale_b * c2;
         v_pt.z = scale_c * (s1 * (-ratio * s2) - s1) / (1.0f + ratio);
 
-        fn_80051490(&v_norm, &v_pt);
+        fn_80051490((Vec*)&v_norm, (Vec*)&v_pt);
         fn_8009C484(&v_norm, &v_norm);
         setVec3(&v_flat, v_pt.x, 0.0f, v_pt.z);
         fn_8009C484(&v_flat, &v_flat);
-        VEC3_ctor((VEC3*)&v_dir);
+        VEC3_ctor(&v_dir);
         if (ratio == 0.0f) {
             v_dir.x = c1 * (scale_a * s2);
             v_dir.y = scale_b * c2;
@@ -157,11 +157,11 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         }
         fn_8009C484(&v_dir, &v_dir);
 
-        fn_800A99B4(ctx, &v_out, em, &v_pt, &v_dir, &v_norm, &v_flat);
-        Vec v_out_copy = v_out;
-        Vec v_pt_copy = v_pt;
+        fn_800A99B4(ctx, (Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
+        VEC3 v_out_copy = v_out;
+        VEC3 v_pt_copy = v_pt;
         ratio = 1.0f + 0.01f * (f32)em->scale_rate * fn_800A8A08(&em->progress);
-        pm->slots->spawn(pm, fn_800A9FB0(ctx, id, scale, em), &v_pt_copy, &v_out_copy, spawn_arg,
+        pm->slots->spawn(pm, fn_800A9FB0(ctx, id, scale, em), (Vec*)&v_pt_copy, (Vec*)&v_out_copy, spawn_arg,
                          &em->spawn_data, em->spawn_extra, em->spawn_flag, ratio);
 
         if (swept) {

@@ -630,10 +630,10 @@ void fn_800C7250(u8 x, u8 y, u8 z) {
 
 /* The shared draw-strategy singletons this unit's setup writes (owned by the effect state; the map
  * leaves them `lbl_`).  Declared, never defined here. */
-extern Vec lbl_80694C08;  /* .bss 0x80694C08 - the four basis vectors */
-extern Vec lbl_80694C14;  /* .bss 0x80694C14 */
-extern Vec lbl_80694C20;  /* .bss 0x80694C20 */
-extern Vec lbl_80694C2C;  /* .bss 0x80694C2C */
+extern VEC3 lbl_80694C08;  /* .bss 0x80694C08 - the four basis vectors */
+extern VEC3 lbl_80694C14;  /* .bss 0x80694C14 */
+extern VEC3 lbl_80694C20;  /* .bss 0x80694C20 */
+extern VEC3 lbl_80694C2C;  /* .bss 0x80694C2C */
 extern Mtx34 lbl_80694C38; /* .bss 0x80694C38 - the identity matrix */
 
 /* Sets the alpha compare from a particle's alpha thresholds, skipping the GX call when nothing moved. */

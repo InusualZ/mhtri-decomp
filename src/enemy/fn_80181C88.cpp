@@ -182,7 +182,7 @@ extern f32 lbl_80797E98;
 extern u32 lbl_805A950C[];
 extern u32 lbl_805A9518[];
 /* The four 0xC-byte vectors `fn_80182B94` seeds (`.data`, no module). */
-extern u32 lbl_806A79D0[];
+extern nw4r::math::VEC3 lbl_806A79D0[];
 
 } /* extern "C" */
 
@@ -445,7 +445,7 @@ u32 fn_80182430(_ENEMY_WORK* self, u32 arg) {
     if ((arg & 0xFF) == 0) {
         return 1;
     }
-    setVec3((f32*)&rel, lbl_80797B18, lbl_80797B18, lbl_80797D08 * get_em_chg_scale(self));
+    setVec3(&rel, lbl_80797B18, lbl_80797B18, lbl_80797D08 * get_em_chg_scale(self));
     copyVec3(&b, &rel);
     rotVecY(&b, self->field_0x1C0);
     fn_80051378(&probe, &self->pos, &b);
@@ -632,7 +632,7 @@ void fn_80182978(_ENEMY_WORK* self) {
  * ------------------------------------------------------------------------------------------------ */
 void fn_80182AB8(struct EmWorkItem* out, u32 a, s16 b, s16 c) {
     VEC3 vec;
-    setVec3((f32*)&vec, lbl_80797B18, lbl_80797E7C, lbl_80797B64);
+    setVec3(&vec, lbl_80797B18, lbl_80797E7C, lbl_80797B64);
     out->type_0x00 = 0x1A;
     copyVec3(&out->vec_0x04, &vec);
     out->field_0x10 = (u8)a;
@@ -662,14 +662,14 @@ void fn_80182B94(void) {
     VEC3 b;
     VEC3 c;
     VEC3 d;
-    setVec3((f32*)&a, lbl_80797B18, lbl_80797B18, lbl_80797E80);
+    setVec3(&a, lbl_80797B18, lbl_80797B18, lbl_80797E80);
     copyVec3(&lbl_806A79D0[0], &a);
-    setVec3((f32*)&b, lbl_80797B18, lbl_80797B18, lbl_80797B18);
-    copyVec3(&lbl_806A79D0[3], &b);
-    setVec3((f32*)&c, lbl_80797C34, lbl_80797B18, lbl_80797B18);
-    copyVec3(&lbl_806A79D0[6], &c);
-    setVec3((f32*)&d, lbl_80797B18, lbl_80797B18, lbl_80797B18);
-    copyVec3(&lbl_806A79D0[9], &d);
+    setVec3(&b, lbl_80797B18, lbl_80797B18, lbl_80797B18);
+    copyVec3(&lbl_806A79D0[1], &b);
+    setVec3(&c, lbl_80797C34, lbl_80797B18, lbl_80797B18);
+    copyVec3(&lbl_806A79D0[2], &c);
+    setVec3(&d, lbl_80797B18, lbl_80797B18, lbl_80797B18);
+    copyVec3(&lbl_806A79D0[3], &d);
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -708,7 +708,7 @@ void fn_80182C40(_ENEMY_WORK* self, u32 kind, void* out) {
     }
     rotVecY(&v, (u16)(self->field_0x1C0 + offset));
     fn_80051378(&rel, &self->pos, &v);
-    copyVec3(out, &rel);
+    copyVec3((nw4r::math::VEC3*)out, &rel);
 }
 
 /* ------------------------------------------------------------------------------------------------

@@ -220,7 +220,7 @@ extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self);
 extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self);
 extern "C" u8* fn_800ADE50(void* self);
 extern "C" u16 fn_800AD230(void* self);
-extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, void* d, f32 f);
+extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, const nw4r::math::VEC3* d, f32 f);
 extern "C" void fn_800AEE14();
 
 /* Scale a normalised rate onto the sine table. */
@@ -234,7 +234,7 @@ extern "C" EfPmManager* fn_800AB664(EfPmManager* self) {
     self->vtable = lbl_805934E0;
     fn_800A3FFC(&self->list, 0x14);
     fn_800AB6BC(&self->stateA);
-    MTX34_ctor(&self->pos);
+    MTX34_ctor((MTX34*)&self->pos);
     return self;
 }
 
@@ -302,15 +302,15 @@ extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p) {
     fn_800AC100(self, p->mode, &p->colorPri, &p->colorSec, &p->vec, p->scale);
 }
 
-extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, void* d, f32 f);
+extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, const nw4r::math::VEC3* d, f32 f);
 
 /* The setter fn_800AC0E4 forwards to. */
-extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, void* d, f32 f) {
+extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, const nw4r::math::VEC3* d, f32 f) {
     self->stateA.b.dirMode = a;
     fn_8004C4F0(self->stateA.b.colorPri, b);
     fn_8004C4F0(self->stateA.b.colorSec, c);
     self->stateA.b.scale = f;
-    copyVec3(&self->stateA.b.vec, d);
+    copyVec3(&self->stateA.b.vec, (const nw4r::math::VEC3*)d);
 }
 
 /* Delete-like helper: free only a live object. */
@@ -387,7 +387,7 @@ extern "C" s32 fn_800ADA24(void* out, EfPmDirParam* p, void* v) {
 }
 
 /* Set the manager's scale and copy a source position into the live block. */
-extern "C" void fn_800AE298(EfPmManager* self, f32 f, const void* src) {
+extern "C" void fn_800AE298(EfPmManager* self, f32 f, const nw4r::math::VEC3* src) {
     self->scale = f;
     copyVec3(&self->pos, src);
 }

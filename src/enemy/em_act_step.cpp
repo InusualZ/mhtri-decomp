@@ -407,7 +407,7 @@ extern "C" u32 em_act_face_away(_EM_CHARA_WORK* self, _PLW* pl)
     }
 
     VEC3_ctor(&dir);
-    setVec3((Vec*)&seed, lbl_8079B108, lbl_8079B108, lbl_8079B110);
+    setVec3(&seed, lbl_8079B108, lbl_8079B108, lbl_8079B110);
     copyVec3(offset, &seed);
 
     fn_80050CA0(&target, &self->pos, &pl->vec_0x03C);

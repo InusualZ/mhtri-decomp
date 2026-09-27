@@ -393,7 +393,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
     u8 len;
     u32 i = 0;
 
-    VEC3_ctor(&save);
+    VEC3_ctor(&save.vec_0x00);
 
     if (self->stream_0x958 == NULL) {
         return 0;

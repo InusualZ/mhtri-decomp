@@ -77,13 +77,10 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
-typedef struct Vec3 {
-    f32 x;
-    f32 y;
-    f32 z;
-} Vec3;
+typedef nw4r::math::VEC3 Vec3;
 
 /* The actor the whole Pl_* family takes as its first argument. Only the offsets this unit touches are named;
  * everything in between is padding. The 132-byte block `fn_8026F7B4`/`fn_8026F828` memset (0xB8..0x13B) is
@@ -1865,7 +1862,7 @@ extern "C" void fn_8026FD0C(_PLW* self)
     p[10] = self->unk54;
     p[11] = self->unk58;
     p[12] = self->unk5C;
-    copyVec3(&p[1], (u8*)self + 60);
+    copyVec3((nw4r::math::VEC3*)&p[1], (const nw4r::math::VEC3*)((u8*)self + 60));
     vec.x = self->unk68;
     vec.y = self->unk6C;
     vec.z = self->unk70;

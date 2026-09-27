@@ -265,18 +265,8 @@ struct _CP_VECTOR {
     u32 z;
 };
 
-namespace nw4r {
-namespace math {
-struct VEC3 {
-    f32 x;
-    f32 y;
-    f32 z;
-};
-struct MTX34 {
-    f32 m[3][4];
-};
-}  // namespace math
-}  // namespace nw4r
+/* `nw4r::math::VEC3` / `MTX34` come from `nw4r/math.h`, reached through `enemy_control.h`
+ * (rule 1: the layout is defined once).  This file used to carry a second copy. */
 
 extern u8 lbl_806AB848[];
 
@@ -3879,10 +3869,10 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
     nw4r::math::VEC3 v;
     u8 buf[12];
     nw4r::math::MTX34 m;
-    u8 m2[0x30];
+    nw4r::math::MTX34 m2;
     s32 part;
     MTX34_ctor(&m);
-    MTX34_ctor(m2);
+    MTX34_ctor(&m2);
     VEC3_ctor(&v);
     u8 t = fn_80224E28(self, lbl_805BAA90[self->unk002]);
     out->x = lbl_8079A084;
@@ -3895,8 +3885,8 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
         break;
     case 1:
         if (self->unk002 == 3) {
-            copyVec3(&v, fn_80143174(buf, lbl_805BAC98 + self->unk002 * 0x18 + 0xC,
-                                         self->unk002 * 0x18));
+            copyVec3(&v, (const nw4r::math::VEC3*)fn_80143174(buf, lbl_805BAC98 + self->unk002 * 0x18 + 0xC,
+                                                              self->unk002 * 0x18));
         }
         /* fall through */
     case 0:
@@ -3905,9 +3895,9 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
         break;
     }
     fn_8026A394(self, part, &m);
-    fn_800504D4(m2);
-    fn_8008C484(m2, v.x, v.y, v.z);
-    fn_80051574(&m, m2);
+    fn_800504D4(&m2);
+    fn_8008C484(&m2, v.x, v.y, v.z);
+    fn_80051574(&m, &m2);
     mulVecMat(out, &m);
     out->x = out->x + m.m[0][3];
     out->y = out->y + m.m[1][3];

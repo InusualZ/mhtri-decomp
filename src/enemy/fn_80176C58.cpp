@@ -27,7 +27,7 @@
  * (`__nw__FUl`), so the file is C++: the mangled callees are declared through their real signatures
  * (the front-end mangles them back to the map spellings) and the definitions keep their unmangled map
  * names with `extern "C"`.  No `__FILE__` string names a source file, so the map's `fn_XXXXXXXX`
- * placeholder is kept (rule 7 deferral above).
+ * placeholder is kept (Naming note above).
  *
  * Types.  `_ENEMY_WORK` is the shared record in `include/enemy.h`; this unit's additions to it
  * (the death meter `field_0x1E4`, the death timers `field_0x32F`/`field_0x330`/`timer_0x332`,

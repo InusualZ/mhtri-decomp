@@ -13,7 +13,7 @@
  * Name.  No `__FILE__` string covers the range (the DOL's data pool holds no memory/matrix source name),
  * so class 1 fails.  The runtime dump gives *real* SDK function names (`dumpmap.py lookup 0x804C1760` ->
  * `FindContainHeap_`, `MEMiInitHeapHead`, `PSMTXIdentity`, `__MIXSetPan`, ...), so those names are used
- * as-is; where the map/dump carries only `fn_XXXXXXXX` the stem is kept (rule 7 deferral below).
+ * as-is; where the map/dump carries only `fn_XXXXXXXX` the stem is kept (Naming note below).
  *
  * Extent / seam.  `tudiscover at` finds the mtx cluster (0x804C5C10..0x804C6898, 19 functions; owns
  * `.sdata2` 0x8079D278..0x8079D2B8) and the vec cluster (0x804C6B60..) each as *certainly one TU*, so the

@@ -596,7 +596,7 @@ extern "C" void fn_8010CE80(void* arg)
         fn_8010CFCC(self, &mtxB, &mtxA, i);
         fn_8010D12C(&mtxB, &mtxB);
         s = fn_8010D1A8(self, i, f31);
-        setVec3((Vec*)&scale, s, s, s);
+        setVec3(&scale, s, s, s);
         scaleMat34W(&mtxB, &scale);
         base = fn_800E0A8C((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
         handle = fn_80097EB0(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114, i + 1);
@@ -619,7 +619,7 @@ extern "C" void fn_8010CFCC(_EFT* self, nw4r::math::MTX34* out, nw4r::math::MTX3
     VEC3_ctor(&v14);
     copyVec3(&v14, &work->vec_0x38);
     mulVecMat(&v14, mtx);
-    setVec3((Vec*)&v8, lbl_80796810, lbl_80796810, work->scale_0x44 * lbl_8059F518[index]);
+    setVec3(&v8, lbl_80796810, lbl_80796810, work->scale_0x44 * lbl_8059F518[index]);
     copyVec3(&v20, &v8);
     rotVecY(&v20, self->rot_0x24.y + index * 0x3333);
     angle = lbl_8079682C * lbl_8059F574[index];

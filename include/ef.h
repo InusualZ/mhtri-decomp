@@ -263,18 +263,20 @@ typedef struct _se_w _se_w;
 extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
 
 /* nw4r::math and effect-library helpers, all still `fn_*` in the symbol map.
- * The three `src/mh3_pad.cpp` helpers (`VEC3_ctor`, `setVec3`, `copyVec3`) are spelled EXACTLY as
- * `include/mh3_pad.h` spells them - that header is their owner's.  They used to be `VEC3*`/`Vec*`
- * here, so a TU including both headers failed with MWCC `(10197) illegal function overloading`
- * (measured on `src/Pl/fn_8028F66C.cpp`; the `mh3_pad/control.h` bracket note, filed 2026-09-27).
+ * The two `src/mh3_pad.cpp` helpers declared here (`VEC3_ctor`, `setVec3`) are spelled EXACTLY as
+ * `include/mh3_pad/vec3.h` spells them - that header is their owner's.  The two used to disagree
+ * (the owner's header carried the record's type, these carried `void*`), so a TU including both
+ * failed with MWCC `(10197) illegal function overloading` (measured on `src/Pl/fn_8028F66C.cpp`;
+ * the `mh3_pad/control.h` bracket note, filed 2026-09-27).  Both spellings now name the record's
+ * real type, `nw4r::math::VEC3` (docs/plan.md 6.5 rule 11).
  * Folding these two into an `#include "mh3_pad.h"` is the remaining step; it is deferred because
  * `mh3_pad.h` also carries `fn_80047058`/`fn_8004723C`/`get_ControlType`, whose other declarations in
  * the tree are still being settled.  Keeping the two here (rather than in `mh3_pad/vec3.h`) also keeps
  * this header's consumers' declaration set byte-for-byte what it was, which the compiler's anonymous
  * pool numbering is sensitive to (measured: adding one declaration to `ef/ef_disc.cpp` moved
  * `fn_800CC5B0` by 0.006). */
-extern void VEC3_ctor(void *out);                                   /* 0x80043EA8 - owner mh3_pad.cpp */
-extern void* setVec3(void *out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
+extern void VEC3_ctor(VEC3* out);                                   /* 0x80043EA8 - owner mh3_pad.cpp */
+extern VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
 extern void fn_80051490(Vec* out, Vec* in);                         /* out = in */
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
 extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */

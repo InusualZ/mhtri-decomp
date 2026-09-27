@@ -199,6 +199,9 @@ void PSVECSubtract(void* dst, void* a, void* b);
 /* The two small-data seeds `fn_8028F400` fills, and the 256-byte-stride table `fn_8028F1E8` indexes.
  * `setVec3` itself is declared by `include/ef.h` (pulled in by `pl.h`) as `(Vec*, f32, f32,
  * f32)`; re-declaring it here with `void*` is an illegal overload, so the call site casts. */
+/* Two 0xC-byte records, still referenced by their own `lbl_` names (a `VEC3[]` view would fold
+ * `lbl_806AB83C` into `lbl_806AB830 + 0xC` and lose the second relocation, measured 100 -> 77.84
+ * on fn_8028F400). */
 extern u8 lbl_806AB830[];
 extern u8 lbl_806AB83C[];
 extern u8 lbl_806E3E10[];
@@ -539,18 +542,18 @@ u32 fn_8028F368(void) {
 
 /* 0x8028F400 - seed the two `setVec3` vectors from the small-data literals. */
 void fn_8028F400(void) {
-    setVec3((Vec*)lbl_806AB830, 573.0f, -1265.0f, 3392.0f);
-    setVec3((Vec*)lbl_806AB83C, 1413.0f, -571.0f, 1740.0f);
+    setVec3((nw4r::math::VEC3*)lbl_806AB830, 573.0f, -1265.0f, 3392.0f);
+    setVec3((nw4r::math::VEC3*)lbl_806AB83C, 1413.0f, -571.0f, 1740.0f);
 }
 
 /* 0x8028F44C - build the first 0x24 bytes of a box from two vectors and their cross product. */
 void fn_8028F44C(PlBox* a, PlBox* b) {
     f32 cross[3];
 
-    copyVec3(b, a);
+    copyVec3(&b->vec_0x00, &a->vec_0x00);
     copyVec3(&b->vec_0x0C, &a->vec_0x0C);
-    fn_80050CA0(cross, &a->vec_0x0C, a);
-    copyVec3(&b->vec_0x18, cross);
+    fn_80050CA0(cross, &a->vec_0x0C, &a->vec_0x00);
+    copyVec3(&b->vec_0x18, (const nw4r::math::VEC3*)cross);
 }
 
 } /* extern "C" */

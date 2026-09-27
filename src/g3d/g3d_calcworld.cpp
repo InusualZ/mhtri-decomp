@@ -349,7 +349,10 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
                 pMtxIDList[numMtx++] = nodeID;
                 pMtxIDs[nodeID] = pMtxIDs[targetID];
                 fn_8007100C(pMtxArray + nodeID * 0x30, pMtxArray + targetID * 0x30);
-                copyVec3(pScale + nodeID * 3, pScale + targetID * 3);
+                /* `pScale` is the frame's flat float array (`fn_8005CED0`), so the record is
+                 * reached by index; the helper's own type is the real one (rule 11). */
+                copyVec3((nw4r::math::VEC3*)(pScale + nodeID * 3),
+                         (const nw4r::math::VEC3*)(pScale + targetID * 3));
                 pCode += 5;
                 break;
             }

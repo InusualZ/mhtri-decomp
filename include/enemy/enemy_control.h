@@ -11,6 +11,7 @@
 #define MHTRI_ENEMY_ENEMY_CONTROL_H
 
 #include "types.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 - the sparkle record's position (rule 11) */
 
 /* one 0x18-byte per-enemy slot of `emc_work` (the array `fn_801413D0` scans and `fn_80141358`
  * clears; `enemy/fn_8013F764.cpp` calls the same record `EmcWork`).
@@ -32,7 +33,7 @@ struct EmcSlot {
  * first free element, `senko_set` fills it, `fn_80141690` frees an element).
  * size: 0x14 */
 struct SenkoRec {
-    /* +0x00 */ u8 unused_0x00[0x0C];
+    /* +0x00 */ nw4r::math::VEC3 pos_0x00;
     /* +0x0C */ f32 value_0x0C;  /* `senko_set`'s float */
     /* +0x10 */ s16 countdown;   /* `senko_set`'s third value / the tick `fn_801417FC` steps */
     /* +0x12 */ u8 value_0x12;

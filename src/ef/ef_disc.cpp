@@ -75,12 +75,12 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     }
 
     for (i = 0; i < count; i++) {
-        Vec v88, v76, v64, v52, v40, v28, v16;
+        VEC3 v88, v76, v64, v52, v40, v28, v16;
         f32 fC, f8;
         f32 scale, rate, t;
 
-        VEC3_ctor((VEC3*)&v88);   /* the declaration takes the nw4r vector; same 3-float layout */
-        VEC3_ctor((VEC3*)&v76);
+        VEC3_ctor(&v88);   /* the declaration takes the nw4r vector; same 3-float layout */
+        VEC3_ctor(&v76);
         t = fn_800A8A08(&em->progress);
         rate = params->rate / 100.0f;
         if (flags & 0x01000000) {
@@ -100,23 +100,23 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         v88.x = scale_a * (v64.x * scale);
         v88.y = 0.0f;
         v88.z = scale_b * (v64.z * scale);
-        fn_80051490(&v52, &v64);
-        VEC3_ctor((VEC3*)&v40);
+        fn_80051490((Vec*)&v52, (Vec*)&v64);
+        VEC3_ctor(&v40);
         if (0.0f == em->spread) {
             v40.x = 0.0f;
             v40.y = 1.0f;
             v40.z = 0.0f;
         } else {
             f32 s = scale * em->spread;
-            fn_8009C6F0(&v40, s);
+            fn_8009C6F0((Vec*)&v40, s);
             v40.z = -f8 * v40.x;
             v40.x = v40.x * fC;
         }
-        fn_800A99B4(ctx, &v76, em, &v88, &v40, &v52, &v64);
+        fn_800A99B4(ctx, (Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
         v16 = v76;
         v28 = v88;
         scale = 1.0f + 0.01f * (f32)em->scale_rate * fn_800A8A08(&em->progress);
-        pm->slots->spawn(pm, fn_800A9FB0(ctx, id, farg0, em), &v28, &v16, arg7, &em->spawn_data,
+        pm->slots->spawn(pm, fn_800A9FB0(ctx, id, farg0, em), (Vec*)&v28, (Vec*)&v16, arg7, &em->spawn_data,
                          em->spawn_extra, em->spawn_flag, scale);
         if (swept) {
             angle += step;

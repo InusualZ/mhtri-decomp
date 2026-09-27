@@ -705,7 +705,7 @@ void fn_8010D928(Eft* self)
     fn_801116B0(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3__FPQ34nw4r4math4VEC3fff(&work->slots_0x10.items.items_0x10[i]->pos_0x1C, lbl_80796848, lbl_80796848, lbl_80796848);
-        copyVec3(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
+        copyVec3((struct VEC3*)&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
     work->field_0x2C = fn_802BF814();
@@ -730,7 +730,7 @@ void fn_8010DE40(Eft* self)
     fn_80111754(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3__FPQ34nw4r4math4VEC3fff(&work->slots_0x10.items.items_0x10[i]->pos_0x1C, lbl_80796848, lbl_80796848, lbl_80796848);
-        copyVec3(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
+        copyVec3((struct VEC3*)&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
     work->field_0x2C = fn_802BF814();
@@ -752,7 +752,7 @@ void fn_8010DF38(Eft* self)
     fn_801117F8(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3__FPQ34nw4r4math4VEC3fff(&work->slots_0x10.items.items_0x10[i]->pos_0x1C, lbl_80796848, lbl_80796848, lbl_80796848);
-        copyVec3(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
+        copyVec3((struct VEC3*)&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
     fn_8010E008(self);
