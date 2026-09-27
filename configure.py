@@ -737,6 +737,21 @@ config.libs = [
             # `cflags_menu` as its file family (`menu_item.cpp` and `menu_infomation.cpp` carry the
             # same `menu_*` name pattern); the body keeps no fold-shaped pair.
             Object(Matching, "menu/menu_note.cpp"),
+            # Registered once, at its final home, from proposal/803967F0_fn_803967F0.cpp: the
+            # quest-result screen band (`.text` 0x803967F0..0x8039D278, 85 functions / 0x6A88 B).
+            # Module `menu` (evidence class 3): the `.data` band its own tables sit in carries
+            # `menu_note.cpp` (0x805E91F8) below and `menu_placeinfo.cpp` (0x80604780) above, and
+            # every callee is the menu library's (`get_menu_lsp_tbl`, `put_menu_cursor`,
+            # `GetMenuFontColor`, `ItemName`, `PutPageArrow`, `font_print_ex`).  C++ because the
+            # bodies reach genuinely mangled callees (`get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`).
+            # The seam at 0x803967F0 is a real TU edge, not the brief's `--max-bytes` cap: the
+            # `.data` referrer runs below and above it are disjoint (last below 0x803960BC, first
+            # above 0x80396BBC) and this unit's `.data` run ends where `em029_prog_tbl` begins.
+            # Same `cflags_menu` as its menu siblings: the band keeps unfused narrow-load pairs.
+            # This pass writes 24 of the 85 bodies; the rest are map stems measuring 0 %, and the
+            # unit's `.data`/`.sdata`/`.sdata2` runs are not claimed until the bodies that emit
+            # them land (see the unit header's residual list).
+            Object(NonMatching, "menu/menu_result.cpp"),
         ],
     },
 
