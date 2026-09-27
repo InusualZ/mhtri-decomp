@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Deterministic self-test for the `.comment` active-flags check in tools/units/flipcheck.py.
+"""Deterministic self-test for the link-wide checks in tools/units/flipcheck.py (the `.comment`
+active-flags row-36 check and the extab/extabindex map-symbol link check).
 
     python tools/units/flipcheck_selftest.py
     python tools/units/flipcheck.py --selftest
@@ -8,6 +9,8 @@ No build, no `ninja` and no repository state: every object is a fixture ELF32 bi
 this file, so the contract is pinned - how a `.comment` entry maps to an ELF symbol, that entries are paired
 by name (the target and our object order their symbol tables differently), that only an *unreferenced*
 symbol is a trim risk, and that metadata sections, 0-size labels and the reverse flag direction are ignored.
+The map-symbol check is pinned on the same means: a `@etb_`/`@eti_` symbol only the target defines that
+*another* linked object references (and no input, ours included, provides) is a link break.
 """
 from __future__ import annotations
 
@@ -230,6 +233,63 @@ def selftest() -> int:
         no_comment = write(tmp, "no_comment.o", build_obj([(".text", b"\0" * 4)], [("fn_A", 0x20, ".text", 0x12)],
                                                          with_comment=False))
         expect("no .comment: skipped", fc.comment_trim_risks("U", tgt, no_comment, set()), ([], 0, False))
+
+        # 10. A global binding is what the linker can use across objects; a local one cannot.
+        expect("provides_global: global",
+               fc.provides_global({"S": ("extabindex", 0x13)}, "S"), True)
+        expect("provides_global: weak",
+               fc.provides_global({"S": ("extabindex", 0x23)}, "S"), True)
+        expect("provides_global: local",
+               fc.provides_global({"S": ("extabindex", 0x03)}, "S"), False)
+        expect("provides_global: absent", fc.provides_global({}, "S"), False)
+
+        # 11. `link_inputs` reads the link edge and stops at the implicit dependencies (`|`).
+        ninja = write(tmp, "build.ninja",
+                      b"rule link\n  command = x\n\n"
+                      b"build build\\RMHE08\\main.elf: link build\\RMHE08\\obj\\a.o $\n"
+                      b"    build\\RMHE08\\src\\b.o | $\n"
+                      b"    build\\RMHE08\\ldscript.lcf build\\compilers || post-compile\n")
+        saved = fc.NINJA
+        fc.NINJA = ninja
+        try:
+            got = fc.link_inputs()
+        finally:
+            fc.NINJA = saved
+        expect("link_inputs parses the edge", got,
+               [os.path.normpath("build\\RMHE08\\obj\\a.o".replace("\\", os.sep)),
+                os.path.normpath("build\\RMHE08\\src\\b.o".replace("\\", os.sep))])
+        expect("link_inputs stops at the implicit deps", [x for x in (got or []) if "ldscript" in x], [])
+        fc.NINJA = os.path.join(tmp, "nope.ninja")
+        try:
+            expect("link_inputs without build.ninja", fc.link_inputs(), None)
+        finally:
+            fc.NINJA = saved
+
+        # 12. The resfile-flip class: a map fragment only the target defines that another linked object
+        #     references, and our object cannot provide, is a link break of its own.
+        map_tgt = write(tmp, "map_tgt2.o", target_with_flags({"@eti_A": (0xC, "extabindex", 0x13)}, {}))
+        base = dict(self_refs=set(), ref_count={"@eti_A": 1}, providers={})
+        risks = fc.external_map_symbol_risks("U", map_tgt, ours_clear, **base)
+        expect("map symbol risk reported", len(risks), 1)
+        expect("map symbol risk names it", ("@eti_A" in risks[0], "undefined" in risks[0]), (True, True))
+        expect("map symbol risk names the class", "rename" in risks[0], True)
+
+        # 13. Only a reference from another linked object counts; the target's own relocation does not.
+        expect("self-reference is not external",
+               fc.external_map_symbol_risks("U", map_tgt, ours_clear,
+                                            {"@eti_A"}, {"@eti_A": 1}, {}), [])
+
+        # 14. Our object (or another input) already providing it means the link still resolves.
+        expect("our global definition is enough",
+               fc.external_map_symbol_risks("U", map_tgt, map_tgt, **base), [])
+        other = dict(base, providers={"@eti_A": {os.path.join(tmp, "other.o")}})
+        expect("another provider is enough",
+               fc.external_map_symbol_risks("U", map_tgt, ours_clear, **other), [])
+
+        # 15. A source-level symbol is not a map fragment, even when externally referenced and absent.
+        plain = write(tmp, "plain_tgt.o", target_with_flags({"fn_A": (0x20, ".text", 0x12)}, {}))
+        expect("plain symbol ignored",
+               fc.external_map_symbol_risks("U", plain, ours_clear, set(), {"fn_A": 1}, {}), [])
 
     if FAILURES:
         print("\n%d check(s) FAILED" % len(FAILURES))

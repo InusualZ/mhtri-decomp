@@ -24,6 +24,8 @@ MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 OBJDUMP = os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objdump.exe")
 SPLITS = os.path.join(MAIN, "config", "RMHE08", "splits.txt")
 SRC = os.path.join(MAIN, "build", "RMHE08", "src")
+# the link's input list - the only objects a link-wide symbol/reference check may read (see `link_inputs`)
+NINJA = os.path.join(MAIN, "build.ninja")
 
 # the unit spelling rule has exactly one definition (`claims.norm_unit`), so `flipcheck.py runtime.c` and
 # `flipcheck.py runtime` name the same unit and the same object (aliased: `claims` is a local function here)
@@ -40,6 +42,13 @@ IGNORE = (".comment", ".note.split", ".symtab", ".strtab", ".shstrtab", ".rela")
 # (The target object is dtk's synthesised object, so its *in-object section order* is dtk's, not the original
 # compiler's, and comparing the two orders says nothing.)
 COMPILER_GENERATED = ("extab", "extabindex", ".ctors", ".dtors")
+
+# dtk's symbol map names a unit's exception-table fragments `@etb_<VA>` (extab) and `@eti_<VA>`
+# (extabindex); MWCC emits the same fragments under anonymous ordinal names (`@905`) instead. When another
+# *linked* object relocates the map name, only the target object `dol split` synthesises defines it, so a flip
+# leaves it undefined and the link fails - the resfile-flip class (`.pi/notes/resfile-flip.md`).
+MAP_FRAGMENT_PREFIXES = ("@etb_", "@eti_")
+GLOBAL_BINDING, WEAK_BINDING = 1, 2
 
 
 def sections(path: str) -> dict[str, tuple[int, int]]:
@@ -175,18 +184,24 @@ def comment_symbols(path: str) -> list[dict] | None:
     return out
 
 
-def code_references_in(path: str) -> set[str]:
-    """The symbol names `path` references from a non-bookkeeping section (code, data or ctors)."""
-    _order, secs = elf_sections(path)
+def object_symbols(path: str) -> tuple[set[str], dict[str, tuple[str, int]]]:
+    """(names referenced from non-bookkeeping sections, {defined name: (section, st_info)}) in one pass.
+
+    One read of the ELF serves both the row-36 reference set and the link-symbol check; the link has thousands
+    of inputs, so reading each twice is worth avoiding.
+    """
+    order, secs = elf_sections(path)
     symtab = secs.get(".symtab")
     strtab = secs.get(".strtab")
     if symtab is None or strtab is None:
-        return set()
-    names = []
+        return set(), {}
+    syms: list[tuple[str, int, int]] = []
     for i in range(len(symtab) // 16):
-        name, _value, _size, _info, _other, _shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
+        name, _value, _size, info, _other, shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
         end = strtab.find(b"\0", name) if name < len(strtab) else -1
-        names.append(strtab[name:end].decode("latin1") if end != -1 else "")
+        syms.append((strtab[name:end].decode("latin1") if end != -1 else "", info, shndx))
+    defined = {name: (order[shndx] if shndx < len(order) else "", info)
+               for name, info, shndx in syms if name and shndx}
     refs = set()
     for sec, data in secs.items():
         if not sec.startswith(".rela") or sec[5:].startswith(BOOKKEEPING_SECTIONS):
@@ -194,9 +209,19 @@ def code_references_in(path: str) -> set[str]:
         for i in range(len(data) // 12):
             _off, info, _add = struct.unpack_from(">IIi", data, i * 12)
             index = info >> 8
-            if index < len(names) and names[index]:
-                refs.add(names[index])
-    return refs
+            if index < len(syms) and syms[index][0]:
+                refs.add(syms[index][0])
+    return refs, defined
+
+
+def code_references_in(path: str) -> set[str]:
+    """The symbol names `path` references from a non-bookkeeping section (code, data or ctors)."""
+    return object_symbols(path)[0]
+
+
+def provides_global(defined: dict[str, tuple[str, int]], name: str) -> bool:
+    """Whether `name` is defined in the object with a binding the linker resolves across objects."""
+    return defined.get(name, ("", 0))[1] >> 4 in (GLOBAL_BINDING, WEAK_BINDING)
 
 
 def forced_active(path: str = LDSCRIPT) -> set[str]:
@@ -229,6 +254,89 @@ def code_reference_index(roots: list[str]) -> tuple[set[str], int]:
                     count += 1
                     refs |= code_references_in(os.path.join(dirpath, f))
     return refs, count
+
+
+def link_inputs() -> list[str] | None:
+    """The object inputs on `main.elf`'s link line in build.ninja, as MAIN-relative paths (None if unknown).
+
+    The link's inputs are the only objects whose symbols and relocations matter: `build/RMHE08/obj/` also
+    keeps stale objects from earlier splits, and scanning that directory instead overstates any link-wide
+    property by ~44 % (measured 2026-09-27: 18 units of the `@eti_`/`@etb_` class, versus 26 by directory).
+    """
+    if not os.path.exists(NINJA):
+        return None
+    lines = open(NINJA, encoding="utf-8", errors="replace").read().splitlines()
+    for i, line in enumerate(lines):
+        head = line.split(":", 1)[0]
+        if not head.startswith("build ") or ": link " not in line or not head.rstrip().endswith("main.elf"):
+            continue
+        edge = [line]
+        while edge[-1].rstrip().endswith("$"):
+            i += 1
+            edge.append(lines[i])
+        inputs = []
+        for token in " ".join(edge).replace("$", " ").split()[3:]:      # skip `build`, the target and `link`
+            if token in ("|", "||"):
+                break
+            inputs.append(os.path.normpath(token.replace("\\", os.sep)))
+        return inputs
+    return None
+
+
+def link_reference_context() -> dict | None:
+    """{refs by path, reference count per name, provider paths per name} over the link inputs only."""
+    paths = link_inputs()
+    if not paths:
+        return None
+    refs: dict[str, set[str]] = {}
+    ref_count: dict[str, int] = {}
+    providers: dict[str, set[str]] = {}
+    for rel in paths:
+        referenced, defined = object_symbols(os.path.join(MAIN, rel))
+        refs[rel] = referenced
+        for name in referenced:
+            ref_count[name] = ref_count.get(name, 0) + 1
+        for name, (_section, info) in defined.items():
+            if info >> 4 in (GLOBAL_BINDING, WEAK_BINDING):
+                providers.setdefault(name, set()).add(rel)
+    return {"refs": refs, "ref_count": ref_count, "providers": providers}
+
+
+def external_map_symbol_risks(unit: str, target_rel: str, src_path: str, self_refs: set[str],
+                              ref_count: dict[str, int], providers: dict[str, set[str]]) -> list[str]:
+    """Map symbols only the target object defines that another *linked* object references.
+
+    `dol split` names a unit's extab/extabindex fragments after the map (`@etb_80008000`), while MWCC emits
+    the same bytes under anonymous ordinals (`@905`). If any *other* link input relocates the map name,
+    flipping the unit removes the only definition and the link fails (`undefined: '@eti_800222FC'`). The name
+    and its global binding are assembler-level output - no source or flag can set them - so this is the
+    extab/extabindex rename class (a post-compile step fixes it), not a codegen residual.
+
+    `target_rel`, `self_refs`, `ref_count` and `providers` are all keyed by the link's MAIN-relative paths.
+    """
+    defined = object_symbols(os.path.join(MAIN, target_rel))[1]
+    ours = object_symbols(src_path)[1]
+    hits = []
+    for name in sorted(defined):
+        if not name.startswith(MAP_FRAGMENT_PREFIXES):
+            continue
+        if ref_count.get(name, 0) - (1 if name in self_refs else 0) <= 0:
+            continue                          # no linked object other than the target references it
+        if provides_global(ours, name):
+            continue                          # our object can provide it to the link
+        if providers.get(name, set()) - {target_rel}:
+            continue                          # another input already defines it; the link still resolves
+        hits.append(name)
+    if not hits:
+        return []
+    subject = "it" if len(hits) == 1 else "them"
+    return ["map symbol(s) %s are defined only in the target object that `dol split` synthesises, and another "
+            "*linked* object references %s. Our object emits the same fragment(s) under MWCC's anonymous "
+            "local names, so after a flip nothing defines %s and the link fails with `undefined: '%s'`. The "
+            "names and their global bindings are assembler-level output no source or flag change can set "
+            "(our object and the target agree byte-for-byte in extab/extabindex) - the extab/extabindex "
+            "rename class, not a codegen residual; the fix is a post-compile rename step "
+            "(.pi/notes/resfile-flip.md)." % (", ".join(hits), subject, subject, hits[0])]
 
 
 def comment_trim_risks(unit: str, obj_path: str, src_path: str,
@@ -269,7 +377,8 @@ def comment_trim_risks(unit: str, obj_path: str, src_path: str,
     return problems, checked, True
 
 
-def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None) -> tuple[list[str], list[str]]:
+def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
+          link_ctx: dict | None = None) -> tuple[list[str], list[str]]:
     ours = sections(os.path.join(SRC, unit + ".o"))
     if not ours:
         return ["no compiled object (build/RMHE08/src/%s.o) - compile it first" % unit], []
@@ -316,6 +425,18 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None) -
     if compared and not flag_problems:
         notes.append(".comment: no un-exported symbol at deadstrip risk (row 36, %d target-exported symbol(s) "
                      "checked)" % checked)
+
+    # a flip can only provide what our object defines: a map symbol another linked object references, that only
+    # the target object defines, is a hard link break no codegen work can fix (the resfile-flip class).
+    target_rel = os.path.normpath(os.path.join("build", "RMHE08", "obj", unit + ".o"))
+    if link_ctx is not None:
+        if target_rel in link_ctx["refs"]:
+            problems += external_map_symbol_risks(
+                unit, target_rel, os.path.join(SRC, unit + ".o"),
+                link_ctx["refs"].get(target_rel, set()), link_ctx["ref_count"], link_ctx["providers"])
+        else:
+            notes.append("already Object(Matching) - %s is not a link input, so there is no flip to check"
+                         % target_rel.replace(os.sep, "/"))
     return problems, notes
 
 
@@ -332,9 +453,9 @@ def main() -> int:
         import flipcheck_selftest
         return flipcheck_selftest.selftest()
 
-    refs, objects = code_reference_index([os.path.join(MAIN, "build", "RMHE08", "obj"), SRC])
-    if objects:
-        refs |= forced_active() | set(ENTRY_SYMBOLS)
+    link_ctx = link_reference_context()
+    if link_ctx is not None:
+        refs = set(link_ctx["ref_count"]) | forced_active() | set(ENTRY_SYMBOLS)
     else:
         refs = None
 
@@ -359,7 +480,7 @@ def main() -> int:
 
     bad = 0
     for unit, claim in sorted(wanted.items()):
-        problems, notes = check(unit, claim, refs)
+        problems, notes = check(unit, claim, refs, link_ctx)
         if problems:
             bad += 1
             print("NOT READY  %s" % unit)
