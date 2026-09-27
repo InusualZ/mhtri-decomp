@@ -1,11 +1,12 @@
 # Subagent profile tests
 
-A profile is a prompt, so "it looks fine" is not evidence. Each profile is tested three ways, and this file is
+A profile is a prompt, so "it looks fine" is not evidence. Each profile is tested four ways, and this file is
 the record. Re-run the checks after **any** profile edit - prompt drift is silent, and one draft already
 mis-numbered the rule table (see T2 below).
 
 | # | test | how | what counts as passing |
 | --- | --- | --- | --- |
+| T0 | freshness | `python tools/agents/sync_profiles.py --check` | exits 0: every profile's generated section 6.5 block matches `docs/plan.md` section 6.5. A rule change that forgot the profiles fails here (`install.sh` and `profileprobe.py` both run it first) |
 | T1 | discovery | `subagent({ action: "list" })`, run from **MAIN** *and* from a fresh worktree | the name shows as a **project** agent with its aliases. Project agents are read from the **cwd's** `.agents/agents/`, so a lane in a worktree cut *before* a profile edit sees the old prompt - and the user-scope copy (`~/.pi/agent/agents/`, consulted for every cwd) is what closes that gap. **Run `tools/agents/install.sh` after every profile edit.** T1's original "there is no install step" was proven only from MAIN and is wrong for worktrees |
 | T2 | recall | `python tools/agents/profileprobe.py <agent>...` then launch the printed call | the reader child, running nothing, states its job, its write limits **and the tell for being launched in MAIN**, the numbered rules **with the right numbers**, the pre-report verification **and that the `FAILED` count is the primary signal**, its report sections, and its role-specific rules - and names anything missing rather than inventing it |
 | T3 | behaviour | give it a **real** task of that shape and judge the result against the gate | lands through `landbranch.sh` first try; MAIN untouched; the role-specific proof present (see below); no row lower than before |
@@ -259,3 +260,52 @@ is never the resting place", a rename's second edit is the source "in the same c
 part that closes the escape - "**`rule 7 deferred` may not be used on a unit I am writing**". Its policy answer
 (item 7) independently repeats that a unit it writes may not use the escape at all. The seam (item 8) and data
 (item 9) rules are still stated in full, and the run reports completed.
+
+### Profile edit - the section 6.5 rules are generated, not hand-copied (2026-09-27)
+
+**The drift, measured.** Both profiles still documented `rule 7 deferred: <reason>` as a legal escape. Commit
+`4f3cb4ea1` deleted that key: rule 7 now fires on every `fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / `unkNN`
+identifier in `src/`, **whoever owns it**, with no exemption and no deferral - the land gate's `--diff` is the only
+grandfather. Neither profile mentioned rule 11 (`void *`). The cause was duplication: the brief is generated and
+cannot drift, but both profiles *inlined* the rule text by hand (`decompiler.md` across ~110 lines), and nothing
+detected the copy going stale.
+
+file:line before -> after:
+
+* `decompiler.md:202` - "A file-wide `rule 7 deferred:` ... defers the `fn_` half only" -> **gone**: the rule list
+  it sat in is now the generated block (the block's rule 7 line ends "There is no exemption and no deferral").
+* `decompiler.md:279-285` - "`rule 7 deferred: <reason>` is legal **only for references to OTHER units' unrenamed
+  symbols** ... It covers the `fn_` half only" -> `decompiler.md:259-264`: "the rule has **no exemption and no
+  deferral** ... a `rule 7 deferred: <reason>` comment exempts nothing (that key no longer exists - do not re-add
+  it) ... what you cannot fix you **report** ... the only grandfather is the land gate's `--diff`".
+* `fixer.md:102` - "`rule 7 deferred: <reason>` is legal only for references to OTHER units' unrenamed `fn_`
+  symbols" -> `fixer.md:100-106`: "There is **no deferral**: a `rule 7 deferred: <reason>` comment exempts nothing
+  ... report it and leave the reference; the gate's `--diff` grandfathers an existing finding only".
+* `merger.md:66` - "the gate refuses a written unit behind a `rule 7 deferred` escape" -> "the gate refuses a
+  batch that leaves its own unit's symbols generated ..., a `rule 7 deferred` comment exempts nothing".
+* `tools/agents/profileprobe.py` asked its probes what a `rule 7 deferred` comment "does and does not defer" and
+  checked for "rule 7 deferral defers the fn_ half only" - both now state the current law.
+
+**The mechanism.** `tools/agents/sync_profiles.py` injects a block between
+`<!-- SECTION-6.5-RULES-BEGIN ... -->` / `<!-- SECTION-6.5-RULES-END -->` in `decompiler.md` and `fixer.md`: one
+line per row of `docs/plan.md` section 6.5's rule table (number, title, meaning verbatim - so rule 2's
+`include/unsplit/` and rule 7's "no exemption and no deferral" cannot be summarised away) plus the section's
+enforcement sentences, selected from its enforcement paragraph so the audit table never leaks. Everything outside
+the markers stays hand-written prose.
+
+**Wiring.** `python tools/agents/sync_profiles.py --check` exits non-zero when a profile is stale;
+`tools/agents/install.sh` and `tools/agents/profileprobe.py` both run it first and refuse, so a section-6.5 edit
+that forgets the profiles fails the profile tests instead of silently installing a stale prompt. It is deliberately
+**not** a `land.py` gate row: a worker landing an unrelated unit must not be refused over a stale profile.
+
+Checks (2026-09-27): `--check` **0** (both profiles in sync, rules 1-10);
+`python tools/agents/sync_profiles_selftest.py` - **38 checks, green** - a fixture table including a rule 11 with
+its `/* untyped: <reason> */` marker (proves the pickup needs no code change), the marker refusal cases, a
+deliberately stale profile reported stale and then in sync, and both real profiles against the real plan.
+
+**Rule 11 was NOT in `docs/plan.md` section 6.5 when this ran** (the table read rules 1-10), so the generated
+block carries rules 1-10. Because the generator parses the table, the rule-11 landing makes both profiles stale
+and `--check`/`install.sh` fail until `python tools/agents/sync_profiles.py` is re-run - the continuation must
+regenerate, and nothing else needs editing.
+
+T1/T2/T3 are re-run after this edit; T2's probe questions were corrected with it.
