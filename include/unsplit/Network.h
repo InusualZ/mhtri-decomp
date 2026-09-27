@@ -66,8 +66,10 @@ extern "C" {
 /* debug manager */
 NetworkLogger* fn_803C9974(void);
 
-/* network singleton and its callbacks */
-NetworkInstance* getInstance_(void);
+/* network singleton and its callbacks.  `getInstance_` (0x803768F0) is owned by
+ * `enemy/em020_ai.cpp` now that its range is registered - rule 2: the declaration moved to the
+owner's header and is included here. */
+#include "enemy/em020_ai.h"
 s32 isCallback(NetworkInstance* self, s32 index);
 void resetCallback(NetworkInstance* self, s32 index);
 

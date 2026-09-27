@@ -1135,6 +1135,34 @@ config.libs = [
             # `em020_prog_tbl`'s first entry (0x8036E2BC) is the apparent cut - a re-cut is requested
             # in this batch's `config_requests`.  See the unit header for the full evidence.
             Object(NonMatching, "enemy/em020_prog.cpp"),
+            # proposal/80375424_fn_80375424.cpp: the em020 monster-AI file's tail
+            # (`.text` 0x80375424..0x80378F9C, 78 functions / 0x3B78 bytes) with its extab
+            # 0x80017A74..0x80017C44 (58 records) and extabindex 0x80037614..0x800378CC
+            # (58 x 12 B).  Module `enemy` and the name `em020` from the `.data` program table
+            # `em020_prog_tbl` (0x805EE098, `scope:global`), whose entry-point list is this band's
+            # own functions (fn_80375084/fn_80375290/fn_803753A0/fn_80375424/fn_80375494 and the
+            # 0x8036Exxx head); every body drives `_ENEMY_WORK` and calls only the `em_*` core.
+            # The brief's range is an `attribute.py` `--max-bytes` run: its left edge is false
+            # (the original em020 file starts before 0x80375424 - the same program table reaches
+            # 0x8036E2BC) and its right edge cuts the next program's file, so the run is registered
+            # as TWO units - this one and `enemy/em019_ai.cpp` - with the seam at 0x80378F9C
+            # (`fn_80378F7C` is called only from the em020 side, `fn_80378F9C` only from the em019
+            # side, and the `.data` block boundary is 0x805EE518 = `em019_prog_tbl`).  The head
+            # (0x8036xxxx..0x80375424) is left for its own lane; a `range` config_request records
+            # it.  C++; every plain `fn_` definition is `extern "C"`.  See the unit's file header.
+            Object(NonMatching, "enemy/em020_ai.cpp"),
+            # Registered once, at its final home (docs/plan.md 12) from
+            # proposal/80375424_fn_80375424.cpp: the em019 monster-AI file's body
+            # (`.text` 0x80378F9C..0x8037EA64, 61 functions / 0x5AC8 bytes) with its extab
+            # 0x80017C44..0x80017DBC (47 records) and extabindex 0x800378CC..0x80037B00
+            # (47 x 12 B).  Module `enemy` and the name `em019` from `em019_prog_tbl`
+            # (0x805EE518, `scope:global`), which starts the `.data` block right after the em020
+            # one and lists this band's entry points (fn_80379090, fn_80379124, fn_8037946C,
+            # fn_8037924C, fn_8037939C, fn_8037F524); the file's real extent is
+            # 0x80378F9C..0x8037F940 (the strong right seam `tudiscover.py at 0x8037E0E8`
+            # reports), and the brief's 0x8037EA64 cut is a `range` config_request.  C++;
+            # every plain `fn_` definition is `extern "C"`.  See the unit's file header.
+            Object(NonMatching, "enemy/em019_ai.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803253BC_fn_803253BC` (the map stem it was claimed under) - the 0x803253BC-0x8032C920
             # band (85 functions / 30052 B) between the registered `hud/fn_80324F7C.c` above and the

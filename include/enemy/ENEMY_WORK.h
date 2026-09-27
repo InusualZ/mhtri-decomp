@@ -675,7 +675,10 @@ struct _ENEMY_WORK {
     /* +0x836 */ u16 flags_0x836;       /* bit 0x8000 is the "aim target found" flag `fn_801D75D0`
                                          * mirrors `self->action_0x328.field_0x345` into (added by
                                          * `enemy/fn_801D428C.cpp`) */
-    /* +0x838 */ u8 unused_0x838[0x888 - 0x838];
+    /* +0x838 */ u8 unused_0x838[0x83C - 0x838];
+    /* +0x83C */ s16 field_0x83C;     /* the facing angle `enemy/em020_ai.cpp`'s `em020_hit_info_get`
+                                        * copies into its out record (added by that unit) */
+    /* +0x83E */ u8 unused_0x83E[0x888 - 0x83E];
     /* +0x888 */ s32 field_0x888;       /* the effect handle `enemy/fn_801B4458.cpp`'s `fn_801B4E3C`
                                         * releases through `fn_803B9994` and clears to -1; `fn_801B6C38`
                                         * tests it against -1 (added by that unit) */
