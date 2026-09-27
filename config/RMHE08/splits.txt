@@ -1194,6 +1194,12 @@ enemy/fn_8035E034.cpp:
 	extabindex  start:0x80036E94 end:0x80036F30
 	.text       start:0x8035E034 end:0x8035F2B4
 
+lobby/lb_menu_page.cpp:
+	extab       start:0x800177C4 end:0x800177D4
+	extabindex  start:0x8003720C end:0x80037224
+	.text       start:0x80365C84 end:0x80366618
+	.data       start:0x805EDAB4 end:0x805EDAE0
+
 enemy/fn_80382310.cpp:
 	extab       start:0x80017E2C end:0x80018094
 	extabindex  start:0x80037BA8 end:0x80037F44
