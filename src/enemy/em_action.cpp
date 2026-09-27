@@ -23,8 +23,8 @@
  * Module `enemy` (evidence class 3): the range drives the shared `_ENEMY_WORK`
  * record (`em_frame_check`, `em_get_mot_no`, `em_die_ck`, `em_after_frame_check`, `get_em_scale`)
  * and calls into the registered enemy units `enemy/enemy_control.cpp`,
- * `enemy/fn_801251D0.cpp` and `enemy/fn_8012EC74.cpp` (fn_8012F5B8 x75, fn_80130478 x62,
- * fn_801251D0 x60, fn_801303EC x51, fn_8012F93C x44, fn_801280F4 x42).  Lib `enemy` (cflags_main),
+ * `enemy/fn_801251D0.cpp` and `enemy/fn_8012EC74.cpp` (em_mot_set x75, em_move_mode_set x62,
+ * fn_801251D0 x60, fn_801303EC x51, em_mot_end_ck x44, fn_801280F4 x42).  Lib `enemy` (cflags_main),
  * the group its link neighbours use.
  *
  * Naming.  The map has no real name for any of the range's 85 addresses: `dumpmap.py join --kind
@@ -44,7 +44,7 @@
  *
  * Naming note: the file's own 14 symbols are named above; what the escape still covers is
  * precisely the names this file *references* in other units - 25 callee symbols in **42**
- * occurrences (fn_80130478 x5, fn_80126324 x4, fn_8012F93C x3, fn_801303EC x2, fn_8012F5C4 x2,
+ * occurrences (em_move_mode_set x5, fn_80126324 x4, em_mot_end_ck x3, fn_801303EC x2, fn_8012F5C4 x2,
  * fn_8013072C x2, fn_80133BC0 x2, enemy_data_find x2, enemy_data_grp x2, ...; 21 of the 25 answer `zz_` in
  * the dump too).  Renaming those is a cross-unit rename batch in ~10 owner units, not this lane's
  * change, so the escape stays until that batch runs.
@@ -201,12 +201,12 @@ void em_act_slots_clr(_ENEMY_WORK* self) {    self->band_0x328.arm_0x32A = 0;
 void em_act_entry_start(_ENEMY_WORK* self, u8 mode) {
     switch (mode) {
     case 0:
-        fn_80130478(self, 4);
+        em_move_mode_set(self, 4);
         fn_80128A8C(self, 6, 0x20);
         fn_80133BC0(self);
         break;
     case 3:
-        fn_80130478(self, 4);
+        em_move_mode_set(self, 4);
         fn_80128A8C(self, 6, 0x16);
         em_rot_reset(self);
         fn_80133BC0(self);
@@ -280,7 +280,7 @@ void em_act_frame_ck(_ENEMY_WORK* self, u8 motion, u8 state) {
 
 /* Arms the band's fifth action: motion 6 sub-state 7. */
 void em_act_arm_m06s07(_ENEMY_WORK* self) {
-    fn_80130478(self, 4);
+    em_move_mode_set(self, 4);
     fn_80128AAC(self, 6, 7);
     fn_80133BB4(self);
 }
@@ -294,12 +294,12 @@ void em_act_hold(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = (u8)(state + 1);
-        fn_80130478(self, 0);
+        em_move_mode_set(self, 0);
         fn_8012F5C4(self, 1, 6, 0, 3);
         return;
     case 1:
-        if (fn_8012F93C(self) == 1U) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1U) {
+            em_action_finish(self);
         }
         return;
     }
@@ -312,13 +312,13 @@ void em_act_follow(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = (u8)(state + 1);
-        fn_80130478(self, 4);
+        em_move_mode_set(self, 4);
         fn_8012F5C4(self, 1, 6, 0, 3);
         fn_801303EC(self, lbl_8079AF54);
         return;
     case 1:
         em_act_move_step(NULL, 0, lbl_8079AF58);
-        if (fn_8012F93C(self) == 1U) {
+        if (em_mot_end_ck(self) == 1U) {
             fn_801280F4(self);
         }
         return;
@@ -333,10 +333,10 @@ void em_act_mot21(_ENEMY_WORK* self) {
     case 0:
         self->state = (u8)(state + 1);
         fn_801305C4(self);
-        fn_8012F5B8(self, 0x15, 2, 0);
+        em_mot_set(self, 0x15, 2, 0);
         return;
     case 1:
-        if (fn_8012F93C(self) == 1U) {
+        if (em_mot_end_ck(self) == 1U) {
             fn_80127FE4(self);
         }
         return;

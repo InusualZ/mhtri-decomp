@@ -48,14 +48,14 @@ void fn_8004C4F0(u8* dst, const u8* src);
 /* 0x8004A1F8 - the 6-byte (u16, s16) record copy: `dst[0] = src[0]; dst[1] = src[1];` on two
  * `A0 04 00 00`/`A8 04 00 02` pairs.  Added with `menu/menu_result.cpp`, whose result-row
  * initialiser hands it the row state it was given (rule 2: this TU owns the address). */
-void fn_8004A1F8(void* dst, const void* src);
+void item_pair_copy(void* dst, const void* src);
 u16 fn_8004AE70(void* userdata);
 s32 fn_8004AEC0(void* userdata);
 s32 fn_8004AF0C(u8 idx);
 s16 fn_8004AF20(void* userdata);
 void* fn_8004AF60(void* userdata, u8 idx);
 void* fn_8004AF78(void* userdata);
-u32 fn_8004B064(u16 id, void* a, s32 b);
+u32 item_count_find(u16 id, void* a, s32 b);
 u32 fn_8004B70C(u16 id, void* a, u16 b);
 void fn_8004B200(void* userdata, u16 id, s16 delta);
 s16 fn_8004B624(void* userdata, u16 id);

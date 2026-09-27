@@ -3258,7 +3258,7 @@ extern "C" void fn_8029F538(void*);
 extern "C" void fn_8035B700(s32, s32, s32);
 extern "C" void fn_8033A920(s32);
 extern "C" u16 ran_suu__Fl(s32);
-extern "C" void fn_8004A1F8(void*, void*);
+extern "C" void item_pair_copy(void*, void*);
 extern "C" u32 fn_80274DCC(_PLW*, u8);
 extern "C" s32 fn_8027D968(_PLW*, void*, void*, void*);
 extern "C" s32 fn_8027DC90(void);
@@ -3574,11 +3574,11 @@ extern "C" u16 fn_8027993C(_PLW* self, u16 arg1, u8 arg2)
     }
     u8 ring[33 * 4];
     for (i = 0; i < 0x18; i++) {
-        fn_8004A1F8(ring + i * 4, (u8*)self + 0x278 + i * 4);
+        item_pair_copy(ring + i * 4, (u8*)self + 0x278 + i * 4);
     }
     for (i = 0; i < 9; i++) {
         s16 j = (s16)i;
-        fn_8004A1F8(ring + (j + 0x18) * 4, (u8*)self + 0x278 + (j + 0x1A) * 4);
+        item_pair_copy(ring + (j + 0x18) * 4, (u8*)self + 0x278 + (j + 0x1A) * 4);
     }
     slot = arg1;
     if ((slot & 0x80) != 0) {

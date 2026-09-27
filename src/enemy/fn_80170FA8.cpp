@@ -4,9 +4,9 @@
  *
  * What it is.  Four steps of one enemy action.  `fn_80170FA8`, `fn_80171038` and `fn_801710B4` are the
  * same two-state machine on `state_0x05`: state 0 advances the state and posts the action's message
- * through `fn_80130478` + `fn_8012F62C` (`0xC9`) or `fn_8012F5B8` (`0xE`); state 1 waits on the shared
- * frame checks (`em_frame_check`, `fn_8012F93C`) and then fires the action result (`fn_80128A14`) or
- * the next move (`fn_80127F48`).  `fn_80171130` is the dispatcher: it reads `state_sub` (+0x1E6) and
+ * through `em_move_mode_set` + `em_mot_set_ck` (`0xC9`) or `em_mot_set` (`0xE`); state 1 waits on the shared
+ * frame checks (`em_frame_check`, `em_mot_end_ck`) and then fires the action result (`em_state_set`) or
+ * the next move (`em_action_finish`).  `fn_80171130` is the dispatcher: it reads `state_sub` (+0x1E6) and
  * tail-calls one handler per action code, codes 0 and 9 doing nothing.
  *
  * Object: `_ENEMY_WORK`, included from `include/enemy.h` (name evidence: the mangled callee
@@ -47,12 +47,12 @@ extern "C" void fn_80170FA8(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
     case 0:
         self->state_0x05 = (u8)(self->state_0x05 + 1);
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 0xC9, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 0xC9, 6, 0);
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_80797928, lbl_80797910) == 1U) {
-            fn_80128A14(self, 1, 0xD);
+            em_state_set(self, 1, 0xD);
         }
         break;
     }
@@ -63,12 +63,12 @@ extern "C" void fn_80171038(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
     case 0:
         self->state_0x05 = (u8)(self->state_0x05 + 1);
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 0xC9, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 0xC9, 6, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1U) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1U) {
+            em_action_finish(self);
         }
         break;
     }
@@ -79,12 +79,12 @@ extern "C" void fn_801710B4(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
     case 0:
         self->state_0x05 = (u8)(self->state_0x05 + 1);
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xE, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xE, 6, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1U) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1U) {
+            em_action_finish(self);
         }
         break;
     }

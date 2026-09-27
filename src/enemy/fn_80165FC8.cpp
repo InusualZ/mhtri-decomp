@@ -15,8 +15,8 @@
  *   * `fn_801663E4` is the big nested dispatch that maps (map, area, entry-state) to the same
  *     `fn_80126324` ids and reports whether the entry is still running.
  *   * `fn_801671AC` is the per-tick seat hook; the `fn_8016730C`..`fn_801678A0` set is the
- *     per-motion state step (`switch (self->state)` -> set a motion through `fn_8012F5B8`/
- *     `fn_8012F62C` and wait on `fn_8012F93C`/`em_frame_check`), dispatched by `fn_80167404` /
+ *     per-motion state step (`switch (self->state)` -> set a motion through `em_mot_set`/
+ *     `em_mot_set_ck` and wait on `em_mot_end_ck`/`em_frame_check`), dispatched by `fn_80167404` /
  *     `fn_80167968` on `self->state_sub` (+0x1E6).
  *   * `fn_80166330` is the `.ctors` initializer that seeds the two global float vectors
  *     (`lbl_806A7868`, `lbl_806A7880`); the range owns `.ctors 0x8056F328..0x8056F32C`.
@@ -564,18 +564,18 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
         }
         if (running == 0) {
             if (fn_801663E4(self) == 0) {
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 fn_80128A8C(self, 2, 0);
             } else {
-                fn_80130478(self, 0);
+                em_move_mode_set(self, 0);
                 fn_80128A8C(self, 0xC, 1);
             }
         } else if (map == 2 && self->area_no == 4) {
-            fn_80130478(self, 0);
+            em_move_mode_set(self, 0);
             fn_80126324(self, 0x13, 0x14, lbl_80797500);
             fn_80128A8C(self, 0xC, 1);
         } else if (map == 2 && self->area_no == 5) {
-            fn_80130478(self, 0);
+            em_move_mode_set(self, 0);
             fn_80126324(self, 0x13, 0x15, lbl_807974F8);
             fn_80128A8C(self, 0xC, 1);
         } else {
@@ -627,12 +627,12 @@ void fn_8016730C(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 1, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 1, 6, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -644,12 +644,12 @@ void fn_80167388(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F62C(self, 0xB, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 0xB, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -678,12 +678,12 @@ void fn_80167458(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 8, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 8, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -695,12 +695,12 @@ void fn_801674D4(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0x12, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x12, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -712,12 +712,12 @@ void fn_80167550(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xC, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xC, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -729,12 +729,12 @@ void fn_801675CC(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xD, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xD, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -746,12 +746,12 @@ void fn_80167648(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xC8, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xC8, 4, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -767,8 +767,8 @@ void fn_801676C4(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 3, 2, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 3, 2, 0);
         fn_8012FCC4(self, 0x1A, lbl_807974FC);
         break;
     case 1:
@@ -789,8 +789,8 @@ void fn_80167770(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 4, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 4, 4, 0);
         break;
     case 1:
         if (em_frame_check(self, 0, lbl_80797508, lbl_807974FC) == 1) {
@@ -823,8 +823,8 @@ void fn_801678A0(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = state + 1;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xE, 8, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xE, 8, 0);
         fn_8012FCC4(self, 0x1E, lbl_807974FC);
         self->timer_0x020 = 0x20;
         break;

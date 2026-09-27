@@ -8,7 +8,7 @@
  * `_ENEMY_WORK` record: the action dispatcher `fn_802F96B4` switches on its `action` (+0x1E5) and
  * the sub-state dispatchers (`fn_802F5D24`, `fn_802F92E8`, `fn_802F9678`, `fn_802F9BF0`,
  * `fn_802FA964`) on `state_sub` (+0x1E6); the bodies drive the enemy motion API
- * (`fn_80130478`, `fn_8012F5B8`, `fn_8012F62C`, `fn_8012F93C`, `fn_80128030`), place the effects
+ * (`em_move_mode_set`, `em_mot_set`, `em_mot_set_ck`, `em_mot_end_ck`, `fn_80128030`), place the effects
  * (`res_eft_UV_model_create_name`, `fn_801251D0`/`fn_801251D8` with the record tables
  * `lbl_805D6F70`..`lbl_805D7300`) and step the work record's own state bytes.  The band's `.data`
  * holds those record tables and the compiler-emitted switch tables (`jumptable_805D6E50`,
@@ -186,16 +186,16 @@ extern "C" void fn_802F5B98(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 0);
+        em_move_mode_set(work, 0);
         if (work->field_0x00A <= 2 || (u8)(work->field_0x00A - 5) <= 1) {
-            fn_8012F62C(work, 1, 20, 0);
+            em_mot_set_ck(work, 1, 20, 0);
         } else if (work->field_0x00A == 3 || work->field_0x00A == 4) {
-            fn_8012F62C(work, 10, 10, 0);
+            em_mot_set_ck(work, 10, 10, 0);
         }
         break;
     case 1:
-        if (fn_8012F93C(work) == 1) {
-            fn_80127F48(work);
+        if (em_mot_end_ck(work) == 1) {
+            em_action_finish(work);
         }
         break;
     }
@@ -208,15 +208,15 @@ extern "C" void fn_802F5C58(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
+        em_move_mode_set(work, 2);
         if (work->field_0x00A <= 2 || (u8)(work->field_0x00A - 5) <= 1) {
-            fn_8012F62C(work, 1, 20, 0);
+            em_mot_set_ck(work, 1, 20, 0);
         } else if (work->field_0x00A == 3 || work->field_0x00A == 4) {
-            fn_8012F62C(work, 10, 10, 0);
+            em_mot_set_ck(work, 10, 10, 0);
         }
         break;
     case 1:
-        if (fn_8012F93C(work) == 1) {
+        if (em_mot_end_ck(work) == 1) {
             fn_80128030(work);
         }
         break;
@@ -403,8 +403,8 @@ extern "C" s32 fn_802F8B68(_ENEMY_WORK* work) {
 
 /* First step of the band's own "place" action. */
 extern "C" void fn_802F929C(_ENEMY_WORK* work) {
-    fn_80130478(work, 2);
-    fn_8012F5B8(work, 10, 0, 0);
+    em_move_mode_set(work, 2);
+    em_mot_set(work, 10, 0, 0);
     fn_80128030(work);
 }
 
@@ -428,8 +428,8 @@ extern "C" void fn_802F930C(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
-        fn_8012F5B8(work, 2, 0, 0x46);
+        em_move_mode_set(work, 2);
+        em_mot_set(work, 2, 0, 0x46);
         fn_80146058(work, lbl_8079AB74, lbl_8079AB78, lbl_8079AB7C);
         fn_8014610C(work, lbl_8079AB80, lbl_8079AB84, lbl_8079AB88);
         fn_801462A4(work, fn_80145FE4(), lbl_805D7328, lbl_805D75C0, 5, 7);
@@ -450,13 +450,13 @@ extern "C" void fn_802F943C(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
-        fn_8012F5B8(work, 1, 0, 0);
+        em_move_mode_set(work, 2);
+        em_mot_set(work, 1, 0, 0);
         fn_80146058(work, lbl_8079AB8C, lbl_8079AB78, lbl_8079AB90);
         fn_8014610C(work, lbl_8079AAB0, lbl_8079AB94, lbl_8079AAB0);
         break;
     case 1:
-        if (fn_8012F93C(work) == 1) {
+        if (em_mot_end_ck(work) == 1) {
             fn_80128030(work);
         }
         break;
@@ -469,8 +469,8 @@ extern "C" void fn_802F94EC(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
-        fn_8012F5B8(work, 2, 0, 0x14);
+        em_move_mode_set(work, 2);
+        em_mot_set(work, 2, 0, 0x14);
         fn_80146058(work, lbl_8079AB98, lbl_8079AB9C, lbl_8079ABA0);
         fn_801462A4(work, fn_80145FE4(), lbl_805D7B80, lbl_805D7DA0, 5, 7);
         break;
@@ -486,13 +486,13 @@ extern "C" void fn_802F95C8(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
-        fn_8012F5B8(work, 1, 0, 0);
+        em_move_mode_set(work, 2);
+        em_mot_set(work, 1, 0, 0);
         fn_80146058(work, lbl_8079ABA4, lbl_8079ABA8, lbl_8079ABAC);
         fn_8014610C(work, lbl_8079AAB0, lbl_8079AAB0, lbl_8079ABB0);
         break;
     case 1:
-        if (fn_8012F93C(work) == 1) {
+        if (em_mot_end_ck(work) == 1) {
             fn_80128030(work);
         }
         break;
@@ -635,7 +635,7 @@ extern "C" void fn_802F51DC(_ENEMY_WORK* work, u32 arg) {
         break;
     }
     if ((u8)arg == 0) {
-        fn_80130478(work, 2);
+        em_move_mode_set(work, 2);
         fn_80128A8C(work, 0, 4);
         switch (work->field_0x00A) {
         case 0:
@@ -654,7 +654,7 @@ extern "C" void fn_802F621C(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
+        em_move_mode_set(work, 2);
         fn_80134964(work, lbl_80570740, 0, 1, 0);
         break;
     case 1:
@@ -670,7 +670,7 @@ extern "C" void fn_802F62A8(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130478(work, 2);
+        em_move_mode_set(work, 2);
         fn_80134964(work, lbl_80570780, 0, 1, 0);
         break;
     case 1:

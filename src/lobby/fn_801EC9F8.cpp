@@ -109,7 +109,7 @@ typedef struct LbListPane {
     /* +0x016 */ u8 row_sub_0x016;      /* the 8-step row pair `fn_802A8EC0` walks */
     /* +0x017 */ u8 row_sub_max_0x017;
     /* +0x018 */ s16 column_0x018;      /* the cursor column */
-    /* +0x01A */ u8 column_sub_0x01A;   /* the 8-step column pair `fn_802A8EFC` walks */
+    /* +0x01A */ u8 column_sub_0x01A;   /* the 8-step column pair `menu_cursor_step` walks */
     /* +0x01B */ u8 column_sub_max_0x01B;
     /* +0x01C */ s16 move_0x01C;        /* the pad-driven 4-step state at +0x1C (fn_802A8EC0's base) */
     /* +0x01E */ s16 move_max_0x01E;
@@ -202,7 +202,7 @@ typedef struct LbEquipRec {
  * +0xE00, and the current-equipment kind at +0x8C. */
 typedef struct LbItemDb {
     /* +0x0000 */ u8 unused_0x0000[0x18];
-    /* +0x0018 */ u8 data_0x18[0x74];  /* the block `fn_8004D0E8` is handed as a work area */
+    /* +0x0018 */ u8 data_0x18[0x74];  /* the block `score_add_clamped` is handed as a work area */
     /* +0x008C */ s16 kind_0x8C;       /* the equipped item's kind (0xB is a bowgun) */
     /* +0x008E */ s16 sub_0x8E;
     /* +0x0090 */ s16 sub_0x90;
@@ -269,7 +269,7 @@ extern u8 jumptable_805B8B98[0x2C];
 extern "C" {
 /* The lobby UI API.  Signatures are the caller-side ones the call sites imply (the callee is
  * `NonMatching` in every case, so the width a call site uses is what its codegen needs). */
-s32 fn_8004A1F8(LbItemSlot* dst, const LbItemSlot* src);
+s32 item_pair_copy(LbItemSlot* dst, const LbItemSlot* src);
 s32 fn_8004A20C(LbEquipRec* dst, const LbEquipRec* src);
 u16 fn_8004AE70(LbItemDb* db);
 s16 fn_8004AE98(LbItemDb* db);
@@ -284,7 +284,7 @@ s32 fn_8004B460(LbItemDb* db, u8 side);
 s16 fn_8004B624(LbItemDb* db, u16 id);
 s16 fn_8004B7B0(u16 id, void* slots, u16 count);
 s16 fn_8004BA00(u16 id, LbItemSlot* base, s16 count);
-s32 fn_8004BA3C(u16 id, s16 a, void* p, s32 b, s32 c, s32 d);
+s32 item_take(u16 id, s16 a, void* p, s32 b, s32 c, s32 d);
 void fn_8004BBEC(LbItemDb* db, u16 id, s16 a, u8 side, s32 b);
 s32 fn_8004BD30(void* p);
 s32 fn_8004BD58(void* dst, u16 count, u16 id, s16 v, void* tmp);
@@ -294,7 +294,7 @@ s32 fn_8004BF28(void* dst, u16 count);
 u16 fn_8004C004(void* slots, u16 count);
 s32 fn_8004C038(void* p, u16 a, u16 b);
 void fn_8004C7BC(void* p, u16 a);
-s32 fn_8004D0E8(s32 a, void* p);
+s32 score_add_clamped(s32 a, void* p);
 s32 fn_8004D27C(s32 a);
 s32 fn_8004D70C(s32 a);
 void fn_800DBC84(s32 id);
@@ -325,7 +325,7 @@ s32 fn_802738E8(s32 a);
 s32 fn_8027EFB4(u8 kind);
 s16 fn_802A8EC0(u8 value, u8 max, u16 pad, s32 step, s32 step2, void* state);
 s32 fn_802A8EEC(u8 value, u8 max, u16 pad, s32 a, s32 b, s32 c, void* state);
-s16 fn_802A8EFC(s16 value, s16 max, u16 pad, s32 step, s32 step2);
+s16 menu_cursor_step(s16 value, s16 max, u16 pad, s32 step, s32 step2);
 u8 fn_802A8F14(s16 value, s32 max);
 s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
 s32 fn_802A91AC(void* state, s16 index, u16 pad, u16 value, void* step);
@@ -435,7 +435,7 @@ s32 fn_801ECB40(void)
                 result = 2;
                 sysSE_req(1);
             } else if (fn_802121F4(3) != 0) {
-                panel->row_0x06 = fn_802A8EFC(panel->row_0x06, panel->row_max_0x0C, fn_802122AC(), 1, 2);
+                panel->row_0x06 = menu_cursor_step(panel->row_0x06, panel->row_max_0x0C, fn_802122AC(), 1, 2);
             }
             break;
         case 1:
@@ -445,7 +445,7 @@ s32 fn_801ECB40(void)
                 panel->page_0x0A -= 1;
                 sysSE_req(1);
             } else if (fn_802121F4(3) != 0) {
-                panel->cursor_0x08 = fn_802A8EFC(panel->cursor_0x08, panel->stage_0x0E, fn_802122AC(), 1, 2);
+                panel->cursor_0x08 = menu_cursor_step(panel->cursor_0x08, panel->stage_0x0E, fn_802122AC(), 1, 2);
             }
             break;
         }
@@ -477,10 +477,10 @@ void fn_801ECDD4(LbDigitPane* self)
 {
     if (fn_802121F4(0xF) != 0) {
         if (fn_802121F4(0xC) != 0) {
-            self->digit_ones_0x0A = fn_802A8EFC(self->digit_ones_0x0A, 10, fn_802122AC(), 4, 8);
+            self->digit_ones_0x0A = menu_cursor_step(self->digit_ones_0x0A, 10, fn_802122AC(), 4, 8);
         }
         if (fn_802121F4(3) != 0) {
-            self->digit_tens_0x0C = fn_802A8EFC(self->digit_tens_0x0C, 10, fn_802122AC(), 1, 2);
+            self->digit_tens_0x0C = menu_cursor_step(self->digit_tens_0x0C, 10, fn_802122AC(), 1, 2);
         }
     } else if (fn_8021213C(0x300) != 0) {
         self->digit_hundreds_0x02 = fn_802A8EEC(self->digit_hundreds_0x02, self->digit_hundreds_max_0x03,
@@ -789,7 +789,7 @@ s32 fn_801ED688(LbListPane* self, u8 arg)
             sysSE_req(1);
             result = 2;
         } else if (fn_802121F4(3) != 0) {
-            self->row_0x014 = fn_802A8EFC(self->row_0x014, 8, fn_802122AC(), 1, 2);
+            self->row_0x014 = menu_cursor_step(self->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             self->row_sub_0x016 = fn_802A8EC0(self->row_sub_0x016, self->row_sub_max_0x017,
                                              fn_802122AC(), 4, 8, &self->move_0x01C);
@@ -981,7 +981,7 @@ s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
             self->phase_0x00 -= 1;
             sysSE_req(1);
         } else if (fn_802121F4(3) != 0) {
-            list->row_0x014 = fn_802A8EFC(list->row_0x014, 8, fn_802122AC(), 1, 2);
+            list->row_0x014 = menu_cursor_step(list->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             list->row_sub_0x016 = fn_802A8EC0(list->row_sub_0x016, list->row_sub_max_0x017,
                                               fn_802122AC(), 4, 8, &list->move_0x01C);
@@ -996,14 +996,14 @@ s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
             id = slots[self->cursor_0x1A].id_0x00;
             if (fn_8004AF78(lbl_80794880)[list->entry_max_0x022].id_0x00 != 0
                 && id != fn_8004AF78(lbl_80794880)[list->entry_max_0x022].id_0x00) {
-                fn_8004A1F8(&tmp, &fn_8004AF78(lbl_80794880)[list->entry_max_0x022]);
+                item_pair_copy(&tmp, &fn_8004AF78(lbl_80794880)[list->entry_max_0x022]);
                 fn_8004BD30(&fn_8004AF60(lbl_80794880, list->side_0x005)[list->entry_max_0x022]);
-                fn_8004BA3C(id, self->pick_max_0x18,
+                item_take(id, self->pick_max_0x18,
                             &fn_8004AF60(lbl_80794880, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
                 fn_8004B870(&lbl_80794880->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
                 fn_8004BEA4(tmp.id_0x00, tmp.value_0x02, &value);
             } else {
-                fn_8004BA3C(id, self->pick_max_0x18,
+                item_take(id, self->pick_max_0x18,
                             &fn_8004AF60(lbl_80794880, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
                 fn_8004B870(&lbl_80794880->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
             }
@@ -1097,7 +1097,7 @@ s32 fn_801EE1E4(LbListPane* self)
             sysSE_req(1);
             result = 2;
         } else if (fn_802121F4(3) != 0) {
-            self->column_0x018 = fn_802A8EFC(self->column_0x018, 8, fn_802122AC(), 1, 2);
+            self->column_0x018 = menu_cursor_step(self->column_0x018, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             self->column_sub_0x01A = fn_802A8EC0(self->column_sub_0x01A, self->column_sub_max_0x01B,
                                                  fn_802122AC(), 4, 8, &self->move_0x01C);
@@ -1114,9 +1114,9 @@ s32 fn_801EE1E4(LbListPane* self)
                 if (fn_8004AFC8(lbl_80794880, id) != 0
                     && fn_8004B460(lbl_80794880, side) <= 0) {
                     self->phase_0x001 = 3;
-                    fn_8004A1F8(&tmp2, &fn_8004AF78(lbl_80794880)[id]);
+                    item_pair_copy(&tmp2, &fn_8004AF78(lbl_80794880)[id]);
                     fn_8004BD30(&fn_8004AF60(lbl_80794880, self->side_0x005)[id]);
-                    fn_8004BA3C(self->item_id_0x024, self->move_max_0x01E,
+                    item_take(self->item_id_0x024, self->move_max_0x01E,
                                 &fn_8004AF60(lbl_80794880, self->side_0x005)[id], 1, 1, 0);
                     fn_8004BBEC(lbl_80794880, self->item_id_0x024, -self->move_max_0x01E, side, 1);
                     fn_8004BBEC(lbl_80794880, tmp2.id_0x00, tmp2.value_0x02, side, 1);
@@ -1137,7 +1137,7 @@ s32 fn_801EE1E4(LbListPane* self)
             self->phase_0x001 -= 1;
             sysSE_req(1);
         } else if (fn_802121F4(3) != 0) {
-            self->row_0x014 = fn_802A8EFC(self->row_0x014, 8, fn_802122AC(), 1, 2);
+            self->row_0x014 = menu_cursor_step(self->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             self->row_sub_0x016 = fn_802A8EC0(self->row_sub_0x016, self->row_sub_max_0x017,
                                               fn_802122AC(), 4, 8, &self->move_0x01C);
@@ -1151,14 +1151,14 @@ s32 fn_801EE1E4(LbListPane* self)
             side = self->side_0x005 == 0;
             if (fn_8004AF78(lbl_80794880)[self->entry_max_0x022].id_0x00 != 0
                 && self->item_id_0x024 != fn_8004AF78(lbl_80794880)[self->entry_max_0x022].id_0x00) {
-                fn_8004A1F8(&tmp2, &fn_8004AF78(lbl_80794880)[self->entry_max_0x022]);
+                item_pair_copy(&tmp2, &fn_8004AF78(lbl_80794880)[self->entry_max_0x022]);
                 fn_8004BD30(&fn_8004AF60(lbl_80794880, self->side_0x005)[self->entry_max_0x022]);
-                fn_8004BA3C(self->item_id_0x024, self->entry_0x020,
+                item_take(self->item_id_0x024, self->entry_0x020,
                             &fn_8004AF60(lbl_80794880, self->side_0x005)[self->entry_max_0x022], 1, 1, 0);
                 fn_8004BBEC(lbl_80794880, self->item_id_0x024, -self->entry_0x020, side, 1);
                 fn_8004BBEC(lbl_80794880, tmp2.id_0x00, tmp2.value_0x02, side, 1);
             } else {
-                fn_8004BA3C(self->item_id_0x024, self->entry_0x020,
+                item_take(self->item_id_0x024, self->entry_0x020,
                             &fn_8004AF60(lbl_80794880, self->side_0x005)[self->entry_max_0x022], 1, 1, 0);
                 fn_8004BBEC(lbl_80794880, self->item_id_0x024, -self->entry_0x020, side, 1);
             }
@@ -1242,9 +1242,9 @@ s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list)
                     sysSE_req(2);
                 } else {
                     self->phase_0x00 -= 1;
-                    fn_8004A1F8(&tmp, &slots[value]);
-                    fn_8004A1F8(&slots[value], &slots[self->cursor_0x1A]);
-                    fn_8004A1F8(&slots[self->cursor_0x1A], &tmp);
+                    item_pair_copy(&tmp, &slots[value]);
+                    item_pair_copy(&slots[value], &slots[self->cursor_0x1A]);
+                    item_pair_copy(&slots[self->cursor_0x1A], &tmp);
                     sysSE_req(0xF);
                 }
                 break;
@@ -1328,7 +1328,7 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         switch (r) {
         case 1:
             self->phase_0x00 = 0;
-            fn_8004D0E8(self->pick_max_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id_0x00),
+            score_add_clamped(self->pick_max_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id_0x00),
                         &db->data_0x18[0]);
             sysSE_req(9);
             fn_8004B870(&db->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);

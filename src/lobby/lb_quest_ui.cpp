@@ -239,7 +239,7 @@ void em009_act_clear_param(_ENEMY_WORK* work) {
 
 /* Fills a slot-kind pair after arming the work's effect slot 4. */
 void em009_act_slot_init(_ENEMY_WORK* work, u8* kind, u8* value) {
-    fn_80130478(work, 4);
+    em_move_mode_set(work, 4);
     *kind = 12;
     *value = 0;
 }

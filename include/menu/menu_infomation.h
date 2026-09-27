@@ -37,7 +37,7 @@ typedef struct StatusScreenWork {
     u8    field_0x1A2;             /* +0x1A2 */
     u8    field_0x1A3;             /* +0x1A3 */
     u8    pad_0x1A4[0x1AE - 0x1A4];/* +0x1A4 */
-    s8    field_0x1AE;             /* +0x1AE  the page index `fn_802A8EFC` advances */
+    s8    field_0x1AE;             /* +0x1AE  the page index `menu_cursor_step` advances */
     s8    field_0x1AF;             /* +0x1AF  the last-page index (one past the count) */
     u8    pad_0x1B0[0x23A - 0x1B0];/* +0x1B0 */
     u8    field_0x23A;             /* +0x23A  the `fn_80308EC0` reset byte */

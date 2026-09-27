@@ -51,7 +51,7 @@ void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b);
 void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x8012B380 - r3 (`self`) and three scalars; the motion/state setter the action band calls after
- * `fn_8012F93C` reports done (this unit owns the address).  Added with `enemy/fn_80387844.cpp`
+ * `em_mot_end_ck` reports done (this unit owns the address).  Added with `enemy/fn_80387844.cpp`
  * (rule 2; the same signature `include/enemy/fn_80165FC8.h` carried). */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
@@ -118,7 +118,7 @@ void* fn_80126704(struct _ENEMY_WORK* self);
 void fn_80126898(struct _ENEMY_WORK* self);
 void fn_801280F4(struct _ENEMY_WORK* self);
 /* 0x80128030 - one `self` argument, no return.  Added with its owner by
- * `enemy/fn_80182D5C.cpp`, whose state machines call it after `fn_8012F93C` reports done; the
+ * `enemy/fn_80182D5C.cpp`, whose state machines call it after `em_mot_end_ck` reports done; the
  * existing consumers (`enemy/fn_80176C58.cpp`, `enemy/fn_80178128.cpp`) spell it the same way. */
 void fn_80128030(struct _ENEMY_WORK* self);
 void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
@@ -127,10 +127,10 @@ void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
  * `fn_801A9724` asks the area table for action 13's slot through it. */
 void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80128A14 - r3 the work record and the two scalars its own body narrows; the neighbour state
- * machines call it after `fn_8012F93C` reports the motion done (declaration moved here from
+ * machines call it after `em_mot_end_ck` reports the motion done (declaration moved here from
  * include/unsplit/enemy.h by `enemy/fn_801A9540.cpp`'s registration: this range owns the
  * address). */
-void fn_80128A14(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in
  * 0x10-byte steps; the caller (`enemy/fn_8015E854.cpp`'s `fn_8015EFAC`) reads the f32 at +0x4. */
 f32* fn_80126454(struct _ENEMY_WORK* self);

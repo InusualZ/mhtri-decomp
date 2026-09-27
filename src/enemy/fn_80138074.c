@@ -278,7 +278,7 @@ extern void fn_8012A3B4(EnemyWork* work);
 extern void fn_8012A414(EnemyWork* work);
 extern void fn_8012A658(EnemyWork* work, s32 arg1);
 extern void fn_8012B64C(EnemyWork* work);
-extern void fn_8012CF20(EnemyWork* work);
+extern void em_busy_set(EnemyWork* work);
 extern u32 fn_80133BCC(EnemyWork* work);
 extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
 extern void fn_8029EFDC(void* arg0);
@@ -834,7 +834,7 @@ void fn_8013823C(EnemyWork* self) {
         }
         if (self->field_0x784 != 0) {
             fn_80131E74(self);
-            fn_8012CF20(self);
+            em_busy_set(self);
             fn_80131D9C(self);
         }
         fn_80138E64(self);
@@ -1071,7 +1071,7 @@ void fn_80139024(EnemyWork* self) {
     case 0:
         self->field_0x005 = (u8)(state + 1);
         fn_8012FCC4(self, 0, lbl_80796D40);
-        fn_8012F5B8(self, 1, 0, 0);
+        em_mot_set(self, 1, 0, 0);
         self->field_0x001 = 0;
         return;
     case 1:

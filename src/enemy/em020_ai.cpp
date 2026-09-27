@@ -6,7 +6,7 @@
  * WHAT IT IS.  Monster-AI code of the em020 program.  Every body takes the shared `_ENEMY_WORK`
  * record (`include/enemy/ENEMY_WORK.h`) and drives it through the enemy core API -
  * `em_frame_check` (124 calls), `em_parts_damage_level_get`, `em_magma_check`, `get_em_chg_scale`,
- * `get_joint_wpos_em`, `fn_8012F5B8`/`fn_8012F62C`/`fn_8012F93C` - and through the game's work
+ * `get_joint_wpos_em`, `em_mot_set`/`em_mot_set_ck`/`em_mot_end_ck` - and through the game's work
  * blocks `system_w` (38 calls), `lobby_w` (45), `get_move_work_adrs`, `my_player_no`,
  * `work_mem_alloc`/`work_mem_free`.
  *

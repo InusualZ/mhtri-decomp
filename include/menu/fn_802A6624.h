@@ -41,7 +41,7 @@ typedef struct MenuMoveRecord {
 /* The 2D integer position the menu/HUD helpers exchange.  Same record as `include/unsplit/lobby.h`'s
  * `_mh_ivec2_` (0x4 B); named locally so the calls can keep the map's `...P10_mh_ivec2_` mangling
  * (via `struct _mh_ivec2_` forward declarations) without including that header, whose
- * `fn_802A8EFC` declaration this range owns - see the unit header's rule-2 note.
+ * `menu_cursor_step` declaration this range owns - see the unit header's rule-2 note.
  * size: 0x4 */
 typedef struct MenuLspPos {
     /* +0x00 */ s16 x;
@@ -96,7 +96,7 @@ extern "C" {
 void fn_802A7C04(u16 id, u16* item);
 s32 fn_802A8EC0(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
 s32 fn_802A8ED8(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
-s32 fn_802A8EFC(s32 a, s32 b, u16 c, u16 d, u16 e);
+s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
 s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
 
 #ifdef __cplusplus

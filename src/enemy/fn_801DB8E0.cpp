@@ -137,7 +137,7 @@ s32 fn_8012A204(struct _ENEMY_WORK* self);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
 /* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604). */
-void fn_80130478(struct _ENEMY_WORK* self, u32 a);
+void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 u32 fn_8013023C(struct _ENEMY_WORK* self);
 u8* fn_801377D0(u8 index);
@@ -405,11 +405,11 @@ u32 fn_801DF540(struct _ENEMY_WORK* self, u8 a) {
     return 0;
 }
 
-/* 0x801DF568 (0x2A4) - arm the part's motion (`fn_80130478`) and pick the `fn_80126278` effect id
+/* 0x801DF568 (0x2A4) - arm the part's motion (`em_move_mode_set`) and pick the `fn_80126278` effect id
  * from the work record's map kind (`fn_802B0668`) and `area_no`. */
 void fn_801DF568(struct _ENEMY_WORK* self, u8* outA, u8* outB) {
     u32 kind;
-    fn_80130478(self, 4);
+    em_move_mode_set(self, 4);
     *outA = 0xc;
     *outB = 0;
     kind = fn_802B0668(self->field_0x1E0);

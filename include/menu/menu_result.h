@@ -149,6 +149,11 @@ void q_result_page_step_a(QResultScreen* self);
 void q_result_page_step_b(QResultScreen* self);
 void q_result_noop(void* unused);
 BOOL q_result_phase_ck(QResultScreen* self, u8 mode);
+/* 0x8039D110 / 0x803980F0 - the screen's phase entry and its per-frame phase advance, the two
+ * helpers `menu/multi_result.cpp` drives its box band through (rule 2: this unit owns both
+ * addresses; the declarations were added when that unit became their first consumer). */
+void q_result_phase_enter(QResultScreen* self, u32 phase);
+void q_result_phase_apply(QResultScreen* self);
 
 #ifdef __cplusplus
 }

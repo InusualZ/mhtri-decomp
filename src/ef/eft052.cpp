@@ -440,14 +440,14 @@ extern "C" void eft052_hold_entry_copy(CockpitHoldEntry* dst, CockpitHoldEntry* 
 extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 {
     u32 a = fn_8004AF20(lbl_80794880);
-    u32 b = fn_8004B064(id, fn_8004AF78(lbl_80794880), a);
+    u32 b = item_count_find(id, fn_8004AF78(lbl_80794880), a);
     u32 c = fn_8004B70C(id, &lbl_80794880->field_0x0180, fn_8004AE70(lbl_80794880));
     u32 d;
 
     if (fn_8004AEC0(lbl_80794880) == 1)
-        d = fn_8004B064(id, fn_8004AF60(lbl_80794880, 0), fn_8004AF0C(0));
+        d = item_count_find(id, fn_8004AF60(lbl_80794880, 0), fn_8004AF0C(0));
     else
-        d = fn_8004B064(id, fn_8004AF60(lbl_80794880, 1), fn_8004AF0C(1));
+        d = item_count_find(id, fn_8004AF60(lbl_80794880, 1), fn_8004AF0C(1));
     if (out1 != NULL)
         *out1 = b;
     if (out2 != NULL)

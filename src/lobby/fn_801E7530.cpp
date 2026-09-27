@@ -35,9 +35,9 @@ int sprintf(char* dst, const char* fmt, ...);
  * keyword), which is how the existing units carry the callees their owners' headers do not yet publish.
  * Each is filed as a shared-file request so the declaration can move to its owner's header. */
 extern "C" {
-void fn_8004A1F8(void* p);
+void item_pair_copy(void* p);
 s32 fn_8004B0A4(u16 id, void* out);
-s32 fn_8004BA3C(s16 a, void* b, s32 c, s32 d, s32 e);
+s32 item_take(s16 a, void* b, s32 c, s32 d, s32 e);
 void* fn_8004D134(void);
 s32 fn_8004D27C(s32 a);
 s32 fn_8004D334(s32 a);
@@ -238,7 +238,7 @@ s32 fn_801E790C(LbMenuWork* self)
         self->list_mode_0x0C = value;
         fn_801E7530(self, value);
     } else if (fn_802121F4(3) != 0) {
-        self->selected_0x08 = fn_802A8EFC(self->selected_0x08, self->count_0x10, fn_802122AC(0), 1, 2);
+        self->selected_0x08 = menu_cursor_step(self->selected_0x08, self->count_0x10, fn_802122AC(0), 1, 2);
     }
     return result;
 }

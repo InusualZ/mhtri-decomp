@@ -139,7 +139,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                 req->done_0x001 = 1;
                 sysSE_req(1);
             } else if (fn_802121F4(3) != 0) {
-                req->value_0x004 = fn_802A8EFC(req->value_0x004, req->count_0x006, fn_802122AC(), 1, 2);
+                req->value_0x004 = menu_cursor_step(req->value_0x004, req->count_0x006, fn_802122AC(), 1, 2);
             }
         }
         break;

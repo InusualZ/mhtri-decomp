@@ -528,12 +528,12 @@ void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
     switch ((u8)fn_802B0668(self->field_0x1E0)) {
     case 1:
         if (self->area_no == 7) {
-            fn_80130478(self, 2);
+            em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
             fn_80126324(self, 14, 15, lbl_80797B18);
         } else if (self->area_no == 12) {
-            fn_80130478(self, 2);
+            em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
             fn_80126324(self, 23, 24, lbl_80797B18);
@@ -541,12 +541,12 @@ void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
         break;
     case 3:
         if (self->area_no == 4) {
-            fn_80130478(self, 2);
+            em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
             fn_80126324(self, 6, 7, lbl_80797B18);
         } else if (self->area_no == 8) {
-            fn_80130478(self, 2);
+            em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
             fn_80126324(self, 6, 0, lbl_80797B18);
@@ -555,7 +555,7 @@ void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
     case 9:
     case 11:
         if (self->area_no == 1) {
-            fn_80130478(self, 2);
+            em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
             fn_80126324(self, 0, 1, lbl_80797B18);

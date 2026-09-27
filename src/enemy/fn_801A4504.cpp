@@ -1489,7 +1489,7 @@ void fn_801A94C0(_ENEMY_WORK* self) {
 
 /* Clear the two bytes and reset the position and the three rotation words. */
 void fn_801A94C4(_ENEMY_WORK* self, u8* a, u8* b) {
-    fn_80130478(self, 0);
+    em_move_mode_set(self, 0);
     *a = 0;
     *b = 0;
     setVector3(&self->pos, lbl_80798538, lbl_80798538, lbl_80798538);

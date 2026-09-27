@@ -8,7 +8,7 @@
  *
  * SEAM EVIDENCE (measured, 2026-09-27):
  *   - the left edge 0x8039D278 is the cap `menu/menu_result.cpp` was registered at, and the two
- *     bands share a record layout: that unit's `fn_8039D110`/`fn_8039D0C8` iterate the same
+ *     bands share a record layout: that unit's `q_result_phase_enter`/`fn_8039D0C8` iterate the same
  *     +0x33DC array of 0x18-byte records that `multi_box_records_step` walks, so the real boundary
  *     may sit further down.  Nothing in the range carries a `__FILE__` string (the only menu source
  *     names in the DOL - `menu_item.cpp`, `menu_note.cpp`, `menu_placeinfo.cpp`, `arenatask.cpp`,
@@ -36,16 +36,36 @@
  * Wii/1.3) - the band is C++ (its two defining symbols carry real manglings) and its box bodies
  * keep unfused narrow loads.
  *
- * RESIDUAL: 15 of the 80 functions are written - 14 of them at 100.0 % and `multi_box_rem_exist_ck`
- * at 96.27 % (2 instructions short: the target keeps a *dead* loop counter, see that body's note).
- * `.text` 1160 B of 26584 B.  The rest are blocked by *other units' unrenamed
- * symbols*, which a batch may not leave behind as new rule-7 findings: e.g. `fn_8039DBC8` (0x780 B)
- * needs `fn_8004D0E8`/`fn_8004F3B4`/`fn_802A8EFC`, `fn_8039E348` (0x284 B) needs `fn_80058F08`/
- * `fn_80047074`/`fn_803980F0`, the enemy band's bodies need `fn_80127F48`/`fn_80130478`/
- * `fn_8012F5B8`/`fn_8012F93C` (456-782 reference sites repo-wide, so a rename is not this lane's),
- * and `fn_8039D944` (0x1B8 B, understood) needs `get_vsUser_work` declared by its owner,
- * `fn_8004CAD8.cpp`.  The dispatchers below are written and the handlers they tail-call are
- * declared (their map rows are renamed in this change), so the next pass can fill them in place.
+ * RESIDUAL: 24 of the 80 functions are written - 21 of them at 100.0 %, `multi_box_phase_ck` at
+ * 99.59 %, `multi_box_grid_clear` at 97.40 % and `multi_box_rem_exist_ck` at 96.27 % (2
+ * instructions short: the target keeps a *dead* loop counter, see that body's note).  `.text`
+ * 2840 B of 26584 B.  The two colouring residuals are the allocator's, not the source's:
+ *   - `multi_box_phase_ck` is 440/440 B and differs only in which callee-saved register holds the
+ *     ready mask (`r30` retail, `r31` ours) over the loop index.  Declaring the mask/index/n at
+ *     function scope is what closed the 4-byte gap (a `break` - not a second constant return -
+ *     stops MWCC if-converting the mask test into a branchless `srwi`); the register pair itself
+ *     did not move for a swapped declaration order, so it is a ceiling (playbook 22).
+ *   - `multi_box_grid_clear` is 180/180 B and differs the same way (`items`/`i` mirrored) plus a
+ *     commutative `mullw` operand order; both spellings of the product measure 97.40 %.
+ * The functions still unwritten are blocked by evidence, not by effort:
+ *   - the enemy band's shared `.sdata2` run 0x8079C330..0x8079C438: 65 four-byte floats whose only
+ *     dump name is `FLOAT_<addr>`.  ~15 in-range bodies (`em_action1_sub0/1/2/7`, `em_action2_sub0..5`,
+ *     `em_action3_sub0/2`, `em_action6_sub0/1`, `fn_8039E5CC`, `fn_803A1110`, ...) take them as motion
+ *     parameters; naming them from the value alone would invent semantics the binary does not carry,
+ *     so they stay unclaimed until the enemy band's own unit registers and claims the run.
+ *   - the `+0x328` union in `include/enemy/ENEMY_WORK.h` has no byte view: `fn_8039E68C`, `fn_8039E718`
+ *     and `em_action1_sub5` all write +0x328/+0x329 as *separate bytes* (the target emits two `stb`
+ *     where the existing `s16 field_0x328` view would emit one `sth`), so they need a named byte-pair
+ *     union member added by whoever owns that header next.
+ *   - `multi_box_cursor_clamp` (0x8C) and `multi_box_grid_step` (0x308) read the pad key words at
+ *     `+0x2C4`/`+0x2D4` of `Psw[player_no]`; `PlayerPad` is a *local* type in `src/mh3_pad.cpp`, and
+ *     reaching it from here is the rule-1 move (two users) that must be measured against `mh3_pad`.
+ *   - `multi_box_result_step` (0x284) takes an object whose `+0x150` is the screen - the caller that
+ *     names that type is not in a registered unit, so its parameter has no evidence yet.
+ *   - `fn_8039DBC8` (0x780) is the save/VS-wpad band: it needs `fn_8004F3B4`, `fn_802D9EA4` and
+ *     `ai_torch_ck`'-style names whose bodies are outside this range.
+ * The 24 renames this band needed are in the map (see the previous commit's message); the sweep is
+ * complete, so a later pass can write the rest in place.
  *
  * Data (measured, `datagap.py --unit menu/multi_result`): `ours-extra .data 128B, .rela.data 384B,
  * .sdata2 8B`.  The 128 B are the three switch tables the dispatchers own - `.data` 0x805F1774
@@ -60,6 +80,40 @@
 
 #include "types.h"
 #include "menu/multi_result.h"
+#include "menu/menu_result.h"    /* `q_result_phase_enter` (rule 2: its owner's header) */
+#include "menu/menu_item.h"      /* `GetItemData`/`ItemDataRecord` */
+#include "fn_8004CAD8.h"         /* `get_vsUser_work`/`score_add_clamped`/_vs_user_data */
+#include "fn_80056F24.h"         /* `system_copy_filter_clear` */
+#include "unsplit/enemy.h"   /* the enemy band's helpers (rule 2: their owners' band header) */
+#include "enemy/fn_8012BDF4.h" /* `em_busy_set` */
+
+/* The box band's phase latch: enter the phase the screen names, then step the sub-state on.  Cases 0
+ * and 1 enter the same phase - the target keeps the two bodies separately, so the source does too. */
+void multi_box_phase_apply(QResultScreen* self) {
+    switch (self->phase) {
+    case 0:
+        q_result_phase_enter(self, 1);
+        self->sub_state++;
+        break;
+    case 1:
+        q_result_phase_enter(self, 1);
+        self->sub_state++;
+        break;
+    case 5:
+        system_copy_filter_clear();
+        q_result_phase_enter(self, 5);
+        self->sub_state++;
+        break;
+    case 8:
+        q_result_phase_enter(self, 8);
+        self->sub_state++;
+        break;
+    case 9:
+        q_result_phase_enter(self, 9);
+        self->sub_state++;
+        break;
+    }
+}
 
 /* Returns the box grid slot the cursor is on: `x + y * width` of the record's own cursor. */
 u16 multi_box_cursor_index(_multi_result_work* box) {
@@ -103,6 +157,70 @@ u32 multi_box_rem_exist_ck(_multi_result_work* box) {
         }
     }
     return 0;
+}
+
+/* Credits every item the player's box still holds into the VS user block's point counter, then
+ * empties the 16 slots.  The `items != NULL` guard is retail's own (the grids hang off `work`). */
+void multi_box_grid_clear(_multi_result_work* box, _vs_user_data* user) {
+    MultiResultBoxGrids* work = box->work;
+    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
+
+    if (items != NULL) {
+        u32 i;
+
+        for (i = 0; i < 16; i++) {
+            if (items[i].item_id != 0 && items[i].count > 0) {
+                score_add_clamped(GetItemData(items[i].item_id)->field_0x010 * items[i].count,
+                                  &user->point_0x18);
+                items[i].item_id = 0;
+                items[i].count = 0;
+            }
+        }
+    }
+}
+
+/* Whether the screen may enter the phase `mode` names: 1 is refused while the quest result is still
+ * showing, and 8 waits until every player has seven of the eight slots settled. */
+u32 multi_box_phase_ck(QResultScreen* self, u8 mode) {
+    u16 mask = 0;
+    u8 n = 0;
+    s32 i;
+
+    switch (mode) {
+    case 0:
+        return 0;
+    case 1:
+        if (q_result_phase_is_2(self) == 1 || q_result_phase_is_3(self) == 1) {
+            return 0;
+        }
+        break;
+    case 8: {
+        s32 i;
+
+        for (i = 0; i < self->field_0x0007; i++) {
+            _vs_user_data* user = get_vsUser_work(i);
+
+            mask |= user->ready_mask_0xBC;
+            n = 0;
+            if (user->slot_a_0x6C[0] != 0 || user->slot_b_0x94[0] != 0) n++;
+            if (user->slot_a_0x6C[1] != 0 || user->slot_b_0x94[1] != 0) n++;
+            if (user->slot_a_0x6C[2] != 0 || user->slot_b_0x94[2] != 0) n++;
+            if (user->slot_a_0x6C[3] != 0 || user->slot_b_0x94[3] != 0) n++;
+            if (user->slot_a_0x6C[4] != 0 || user->slot_b_0x94[4] != 0) n++;
+            if (user->slot_a_0x6C[5] != 0 || user->slot_b_0x94[5] != 0) n++;
+            if (user->slot_a_0x6C[6] != 0 || user->slot_b_0x94[6] != 0) n++;
+            if (n >= 7) break;
+        }
+        if (n >= 7) {
+            if ((mask & 0x380) != 0x380) {
+                break;
+            }
+            return 0;
+        }
+        return 0;
+    }
+    }
+    return 1;
 }
 
 /* Advances the screen's phase: each phase names the next one, and the phase only latches once the
@@ -277,6 +395,114 @@ void em_action6_dispatch(struct _ENEMY_WORK* self) {
         break;
     case 1:
         em_action6_sub1(self);
+        break;
+    }
+}
+
+/* Action 0's per-frame step: arm the motion once, then finish the action when the motion ends. */
+void em_action0_step(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 1, 10, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+/* Action 1's sub-state 3: the two-stage motion, the second stage starting when the first ends. */
+void em_action1_sub3(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 23, 20, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            self->state++;
+            em_mot_set(self, 24, 20, 0);
+        }
+        break;
+    case 2:
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+/* Action 1's sub-state 4: the single-stage motion. */
+void em_action1_sub4(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 25, 10, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+/* Action 1's sub-state 6: the single-stage motion, with the busy flag left to sub-state 8. */
+void em_action1_sub6(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 29, 16, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+/* Action 1's sub-state 8: the record stays busy for the whole step, which runs the short motion. */
+void em_action1_sub8(struct _ENEMY_WORK* self) {
+    em_busy_set(self);
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 12, 4, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+/* Action 7's step: after the motion, hand the record on when its area already holds a team-19
+ * enemy, otherwise finish the action. */
+void em_action7_step(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 29, 16, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            if (em_area_team_ck(self->area_no) == 1) {
+                em_state_set(self, 13, 0);
+            } else {
+                em_action_finish(self);
+            }
+        }
         break;
     }
 }

@@ -8,8 +8,8 @@
  * which is where this unit's runs begin) and above, after the still-unclaimed 0x801CA004..0x801D428C
  * run, `enemy/fn_801D428C.cpp` (its extab starts at 0x800100D4, the next record after this unit's
  * 0x8000FDFC).  Every callee out of the range is the enemy work API (`get_joint_wpos_em`,
- * `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check__FP11_ENEMY_WORKUsff`, `fn_80130478`,
- * `fn_8012F93C`, `get_now_areano__Fv`).
+ * `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check__FP11_ENEMY_WORKUsff`, `em_move_mode_set`,
+ * `em_mot_end_ck`, `get_now_areano__Fv`).
  *
  * Seam.  `tudiscover at 0x801BD6C0` reports a weak left edge (the closure edge): the bounding cut is
  * the size cap the proposal records, not a translation-unit boundary - the region's edges are
@@ -135,8 +135,8 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 4);
-        fn_8012F62C(self, 1, 0, 0);
+        em_move_mode_set(self, 4);
+        em_mot_set_ck(self, 1, 0, 0);
         fn_801303EC(self, fn_8013032C(self));
         self->timer_0x020 = 0;
         break;
@@ -183,9 +183,9 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
     case 0:
         self->state++;
         self->state_0x006 = 0;
-        fn_80130478(self, 4);
-        fn_8012F5B8(self, 8, 0, 0);
-        fn_8012F8C8(self, lbl_80798E90);
+        em_move_mode_set(self, 4);
+        em_mot_set(self, 8, 0, 0);
+        em_mot_speed_set(self, lbl_80798E90);
         fn_8012933C(self, 0, 0x21, 2);
         fn_80134004(self, 0, lbl_80798EA8);
         fn_801303EC(self, fn_8013032C(self));
@@ -216,14 +216,14 @@ extern "C" void fn_801BDA28(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0x2F, 4, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x2F, 4, 0);
         fn_80129668(self, 0, 1);
         fn_80129668(self, 1, 2);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -235,14 +235,14 @@ extern "C" void fn_801BDEF8(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xD1, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xD1, 6, 0);
         fn_80129668(self, 0, 6);
         fn_80129668(self, 1, 0x18);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -254,13 +254,13 @@ extern "C" void fn_801BDF94(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xD2, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xD2, 6, 0);
         fn_80129668(self, 0, 7);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -272,18 +272,18 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 4);
-        fn_8012F5B8(self, 0xCE, 0, 0);
+        em_move_mode_set(self, 4);
+        em_mot_set(self, 0xCE, 0, 0);
         fn_80129668(self, 0, 0x16);
         fn_801303EC(self, fn_8013032C(self));
         fn_80130CDC(self, -0xA);
-        fn_8012CF20(self);
+        em_busy_set(self);
         fn_80131E74(self);
         fn_80136D14(self);
         fn_80131E00(self);
         break;
     case 1:
-        fn_8012CF20(self);
+        em_busy_set(self);
         fn_80131E74(self);
         if (em_frame_check(self, 2, lbl_80798E54, lbl_80798E40) == 1) {
             fn_80131E00(self);
@@ -292,11 +292,11 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
             fn_80136D14(self);
         }
         if (em_frame_check(self, 0, lbl_80798E58, lbl_80798E40) == 1) {
-            fn_80130478(self, 0);
+            em_move_mode_set(self, 0);
             fn_801303EC(self, lbl_80798E40);
         }
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }
@@ -308,8 +308,8 @@ extern "C" void fn_801BE198(_ENEMY_WORK* self, u8 arg1)
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0xD4, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0xD4, 6, 0);
         fn_80130CDC(self, -6);
         fn_8012933C(self, 0, 9, 8);
         fn_8012933C(self, 1, 0x29, 0x18);
@@ -321,14 +321,14 @@ extern "C" void fn_801BE198(_ENEMY_WORK* self, u8 arg1)
         if (arg1 == 1) {
             if (em_frame_check(self, 0, lbl_80798ED0, lbl_80798E40) == 1) {
                 self->state++;
-                fn_8012F5B8(self, 0xD9, 0, 0);
+                em_mot_set(self, 0xD9, 0, 0);
                 fn_8012933C(self, 0, 0x1A, 8);
                 fn_8012933C(self, 1, 0x2A, 0x18);
                 return;
             }
         } else {
-            if (fn_8012F93C(self) == 1) {
-                fn_80127F48(self);
+            if (em_mot_end_ck(self) == 1) {
+                em_action_finish(self);
             }
         }
         break;
@@ -336,8 +336,8 @@ extern "C" void fn_801BE198(_ENEMY_WORK* self, u8 arg1)
         if (em_frame_check(self, 0, lbl_80798E7C, lbl_80798E40) == 1) {
             fn_8012933C(self, 0, 0x1B, 0x10);
         }
-        if (fn_8012F93C(self) == 1) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
         }
         break;
     }

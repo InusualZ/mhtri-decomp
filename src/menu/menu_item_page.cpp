@@ -66,7 +66,7 @@
  *     try there (not tried - the row's remaining diff is dominated by the block order).
  *   * `item_page_item_price` 97.5 (260/256 B): the return and callee widths are load-bearing - the
  *     target masks NOTHING on the three `fn_8004B*` results or on `fn_8026FE44`'s compare, so this
- *     unit's view declares `item_page_item_price` and `fn_8004B0A4`/`fn_8004B064`/`fn_8004B70C` as
+ *     unit's view declares `item_page_item_price` and `fn_8004B0A4`/`item_count_find`/`fn_8004B70C` as
  *     `u32` and `fn_8026FE44` as `u32`, and the price chain is two statements
  *     (`base = fn_802731B4(worker, id); base += fn_8004B70C(...);`) so the worker call comes first
  *     like retail's.  That took the row 81.09 -> 97.5; the residual is one instruction, the mask the
@@ -393,9 +393,9 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
     base = fn_802731B4(worker, id);
     base += fn_8004B70C(id, (void*)&lbl_80794880->field_0x0180, fn_8004AE70((void*)lbl_80794880));
     if (fn_8026FE44(worker) == 1) {
-        return base + fn_8004B064(id, fn_8004AF60((void*)lbl_80794880, 0), fn_8004AF0C(0));
+        return base + item_count_find(id, fn_8004AF60((void*)lbl_80794880, 0), fn_8004AF0C(0));
     }
-    return base + fn_8004B064(id, fn_8004AF60((void*)lbl_80794880, 1), fn_8004AF0C(1));
+    return base + item_count_find(id, fn_8004AF60((void*)lbl_80794880, 1), fn_8004AF0C(1));
 }
 
 /* 0x8034A914: the page-0 detail panel - the panel frame, then the row record's own fields rendered

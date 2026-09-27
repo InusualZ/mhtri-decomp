@@ -32,11 +32,11 @@
  *
  * What the written bodies do: the small work-block accessors and the quest/VS result buffers
  * (`get_qResult_work` / `clear_qResult_work` / `clear_FqResult_work` over the 0x438 B and 0x27C B blocks,
- * `get_vsUser_work` over the two 0x100 B VS slots, `fn_8004D0E8`'s 0..9999999 counter clamp) and two of
+ * `get_vsUser_work` over the two 0x100 B VS slots, `score_add_clamped`'s 0..9999999 counter clamp) and two of
  * the nw4r math helpers the rest of the range is built on (`setVector3`, `copyMat33`).
  *
  * Status: partial (phase B first pass).  9 of the 277 symbols have bodies, measured against the retired
- * per-range targets (the auto_*_text.o objects under build/RMHE08/obj/): 8 at 100 % (`fn_8004D0E8`,
+ * per-range targets (the auto_*_text.o objects under build/RMHE08/obj/): 8 at 100 % (`score_add_clamped`,
  * `fn_8004D134`, `get_qResult_work`, `clear_FqResult_work`, `clear_qResult_work`, `fn_8004D1A4`,
  * `setVector3`, `copyMat33`) and `get_vsUser_work` at 81.67 %.  The remaining ~268 symbols are unwritten
  * (0 %), biggest first `drawshape_exec` (0x4BC), `write_wpad_memory` (0x434), `fn_8004CDA4` (0x318),
@@ -86,7 +86,7 @@ extern u8 lbl_8066A620[0x200];
 
 /* --- the unit's own functions, declared so each has one signature --------------------------------- */
 
-extern "C" void fn_8004D0E8(s32 delta, s32* value);
+extern "C" void score_add_clamped(s32 delta, s32* value);
 extern "C" void* fn_8004D134(void);
 extern "C" void fn_8004D1A4(void);
 /* These four carry a C++ mangling in the map (`__Fv`/`__Fl`), so they are real C++ functions: the
@@ -99,7 +99,7 @@ void clear_qResult_work(void);
 /* --- bodies, in address order --------------------------------------------------------------------- */
 
 /* Clamp `*value += delta` into [0, 9999999].  The map gives no mangling, so it is C linkage. */
-extern "C" void fn_8004D0E8(s32 delta, s32* value)
+extern "C" void score_add_clamped(s32 delta, s32* value)
 {
     *value += delta;
     if (*value > 9999999) {

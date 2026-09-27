@@ -38,12 +38,12 @@ void CancelFade(struct _ENEMY_WORK *self);
 u32 em_frame_check__FP11_ENEMY_WORKUsff(struct _ENEMY_WORK *self, u16 a, f32 b, f32 c);
 u32 em_sleep_ck__FP11_ENEMY_WORKUc(struct _ENEMY_WORK* enemy, u8 kind);
 u32 fn_8012ECF0(void);
-void fn_8012F5B8(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
-/* 0x8012F504 - the five-argument motion setter `fn_8012F5B8` tail-calls; moved here from
- * `enemy/fn_801550FC.cpp` on landing (rule 2).  `fn_8012F5B8` narrows its second argument to u16
+void em_mot_set(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
+/* 0x8012F504 - the five-argument motion setter `em_mot_set` tail-calls; moved here from
+ * `enemy/fn_801550FC.cpp` on landing (rule 2).  `em_mot_set` narrows its second argument to u16
  * (`clrlwi r4,r4,16`) before the tail call, so the owner's first argument is u16. */
 void fn_8012F504(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
-void fn_8012F62C(struct _ENEMY_WORK *self, u32 a, u32 b, u32 c);
+void em_mot_set_ck(struct _ENEMY_WORK *self, u32 a, u32 b, u32 c);
 /* 0x8012F7D4 - reads r3, r4, r5, r6 and f1 (its body does `mr r4,r5` / `mr r5,r6` before the tail
  * call to 0x8012F758), so the four scalar arguments and the float are in the call sites' order. */
 void fn_8012F7D4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
@@ -57,14 +57,14 @@ void fn_8012F860(struct _ENEMY_WORK* self, f32 a, f32 b);
  * wrong: `enemy/fn_8014A1BC.c` calls it with `self` only and `enemy/fn_801550FC.cpp` with a float,
  * so C keeps the old-style declaration and C++ gets the real one. */
 #ifdef __cplusplus
-void fn_8012F8C8(struct _ENEMY_WORK* self, f32 a);
+void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 #else
-void fn_8012F8C8();
+void em_mot_speed_set();
 #endif
 f32 fn_8012F8E4(struct _ENEMY_WORK *self);
 f32 fn_8012F8EC(struct _ENEMY_WORK *self);
 f32 fn_8012F8F4(struct _ENEMY_WORK *self);
-u32 fn_8012F93C(struct _ENEMY_WORK *self);
+u32 em_mot_end_ck(struct _ENEMY_WORK *self);
 u32 fn_8012F948(struct _ENEMY_WORK *self);
 void fn_8012FC60(struct _ENEMY_WORK* work);
 void fn_8012FCC4(struct _ENEMY_WORK* work, s32 arg1, f32 arg2);
@@ -97,7 +97,7 @@ void fn_801303FC(struct _ENEMY_WORK* self, f32 a);
 void fn_801303FC();
 #endif
 void fn_80130438(struct _ENEMY_WORK* work);
-void fn_80130478(struct _ENEMY_WORK *self, u32 a);
+void em_move_mode_set(struct _ENEMY_WORK *self, u32 a);
 void fn_801305C4(struct _ENEMY_WORK *self);
 u32 fn_80130778(s32 kind);
 void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
@@ -208,18 +208,18 @@ void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* 
 /* The enemy action band 0x80127F48.. and the handler band 0x80170A54..0x80170EF4, owned by the
  * not-yet-registered proposals `proposal/8016xxxx`/`proposal/8017xxxx`.  Added by the
  * `enemy/fn_80170FA8.cpp` registration: its dispatcher tail-calls the 0x80170xxx handlers and the
- * state machines call `fn_80127F48`/`fn_80128A14`.  The band brackets as `enemy` on both sides
+ * state machines call `em_action_finish`/`em_state_set`.  The band brackets as `enemy` on both sides
  * (fn_8014A1BC .. fn_80170FA8), so rule 2 sends the declarations here.  Signatures: `self` only for
  * the handlers that take one argument, and `fn_80170EF4` takes the action's extra selector in r4.
  *
- * `fn_80128A14`'s last two are u8 in the consumer's view, but the owner's body narrows them itself
+ * `em_state_set`'s last two are u8 in the consumer's view, but the owner's body narrows them itself
  * (`clrlwi r4,r4,24`/`clrlwi r5,r5,24`), so the definition takes u32 and the declaration here is
  * widened to match the owner (enemy/fn_801251D0.cpp).  Three landed units used to declare them three
  * ways in their own files (`u8` in
  * fn_80149D6C, `u32` in fn_8014A1BC, `s32` in fn_80177890) - the same rule-2 debt.  Every
  * call site passes a constant, so the spelling is codegen-neutral. */
-void fn_80127F48(struct _ENEMY_WORK* self);
-void fn_80128A14(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_action_finish(struct _ENEMY_WORK* self);
+void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80170A54(struct _ENEMY_WORK* self);
 void fn_80170AD0(struct _ENEMY_WORK* self);
 void fn_80170B4C(struct _ENEMY_WORK* self);

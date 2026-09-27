@@ -673,7 +673,7 @@ extern "C" void fn_80308EC0(StatusScreenWork* self)
 
 /* The screen's per-frame SE/scroll step: the `+0x04`/`+0x08` flag words are folded into one 16-bit
  * mask - the SE request bit plays the confirm SE and reports 2, the scroll bits advance the page
- * index through `fn_802A8EFC` and report 0. */
+ * index through `menu_cursor_step` and report 0. */
 extern "C" s32 fn_80308F1C(StatusScreenWork* self)
 {
     s32 result = 0;
@@ -683,7 +683,7 @@ extern "C" s32 fn_80308F1C(StatusScreenWork* self)
         result = 2;
         sysSE_req(1);
     } else if ((flags & 0xC) != 0) {
-        self->field_0x1AE = (s8)fn_802A8EFC(self->field_0x1AE, self->field_0x1AF, flags, 4, 8);
+        self->field_0x1AE = (s8)menu_cursor_step(self->field_0x1AE, self->field_0x1AF, flags, 4, 8);
     }
     return result;
 }

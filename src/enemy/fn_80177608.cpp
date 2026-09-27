@@ -6,7 +6,7 @@
  * What it is: a two-function slice of one enemy action - `fn_80177608` seeds a VEC3 from the engine's
  * vector helper, walks `state_0x05` through two steps and drives the effect/frame helpers
  * (`em_frame_check`, the `setVector3`/`fn_80304508` effect spawns); `fn_80177774` is the four-step
- * sibling that opens the action, waits on `fn_8012F93C`, counts `field_0x20` down and closes it.
+ * sibling that opens the action, waits on `em_mot_end_ck`, counts `field_0x20` down and closes it.
  *
  * Object: `_ENEMY_WORK` (name evidence: the mangled callee
  * `em_frame_check__FP11_ENEMY_WORKUsff` carries the 11-character type name).  Field offsets and widths
@@ -25,10 +25,10 @@
  * does not emit must not be claimed (docs/plan.md 8.4).  The `extab`/`extabindex` fragments travel
  * with the code unit and ARE claimed in `splits.txt`.
  *
- * Declarations: `fn_80130478`, `fn_8012F5B8`, `fn_8012F93C` and `VEC3_ctor` come from the shared
+ * Declarations: `em_move_mode_set`, `em_mot_set`, `em_mot_end_ck` and `VEC3_ctor` come from the shared
  * headers (`include/unsplit/enemy.h`, `include/ef.h`); their signatures are the shared ones.  The
  * symbols whose owning unit is not registered and whose band has no sound header
- * (`fn_80304508`, `fn_80056A54`, `fn_8012933C`, `fn_80127F48`) are declared here, as the landed
+ * (`fn_80304508`, `fn_80056A54`, `fn_8012933C`, `em_action_finish`) are declared here, as the landed
  * `enemy/fn_8014A1BC.c` does.  `fn_8013221C`, `fn_80132224`, `fn_80132264` belong to the `enemy` band
  * too, but `include/unsplit/enemy.h` does not carry them yet - see the outbox `shared-file` request.
  */
@@ -56,7 +56,7 @@ extern "C" {
 void fn_80304508(_ENEMY_WORK* self, u32 a, u32 b, VEC3* v, f32 s);
 void fn_80056A54(_ENEMY_WORK* self, u32 a, u32 b);
 void fn_8012933C(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_80127F48(_ENEMY_WORK* self);
+void em_action_finish(_ENEMY_WORK* self);
 
 /* `enemy`-band, not yet in include/unsplit/enemy.h (see the outbox `shared-file` request). */
 void fn_8013221C(_ENEMY_WORK* self, f32 a, u32 b, u32 c);
@@ -84,8 +84,8 @@ extern "C" void fn_80177608(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
     case 0:
         self->state_0x05++;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 0x1A, 0xA, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x1A, 0xA, 0);
         self->field_0x20 = 0;
         break;
     case 1:
@@ -103,8 +103,8 @@ extern "C" void fn_80177608(_ENEMY_WORK* self) {
             }
             self->field_0x20 = self->field_0x20 + 1;
         }
-        if (fn_8012F93C(self) == 1U) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1U) {
+            em_action_finish(self);
         }
         break;
     }
@@ -114,13 +114,13 @@ extern "C" void fn_80177774(_ENEMY_WORK* self) {
     switch (self->state_0x05) {
     case 0:
         self->state_0x05++;
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 8, 6, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 8, 6, 0);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1U) {
+        if (em_mot_end_ck(self) == 1U) {
             self->state_0x05++;
-            fn_8012F5B8(self, 4, 0, 0);
+            em_mot_set(self, 4, 0, 0);
             self->field_0x20 = 0x708;
             fn_80132224(self);
         }
@@ -130,13 +130,13 @@ extern "C" void fn_80177774(_ENEMY_WORK* self) {
         self->field_0x20 = self->field_0x20 - 1;
         if ((s32)self->field_0x20 <= 0) {
             self->state_0x05++;
-            fn_8012F5B8(self, 5, 4, 0);
+            em_mot_set(self, 5, 4, 0);
             fn_80132264(self);
         }
         break;
     case 3:
-        if (fn_8012F93C(self) == 1U) {
-            fn_80127F48(self);
+        if (em_mot_end_ck(self) == 1U) {
+            em_action_finish(self);
         }
         break;
     }

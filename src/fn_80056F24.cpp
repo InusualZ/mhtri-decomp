@@ -448,20 +448,20 @@ extern "C" void fn_800584E8(void* dst) {
     fn_800403AC(dst, lbl_8066ACF8.vec_0x120);
 }
 
-/* `fn_80058BB0`/`fn_80058EE8`/`fn_80058F08`: the copy-filter handshake with the system block. */
+/* `fn_80058BB0`/`system_copy_filter_arm`/`system_copy_filter_clear`: the copy-filter handshake with the system block. */
 extern "C" void fn_80058BB0(void) {
     if (system_w.field_0x868 != 1) {
         system_w.field_0x868 = 1;
     }
 }
 
-extern "C" void fn_80058EE8(void) {
+extern "C" void system_copy_filter_arm(void) {
     if (system_w.field_0x868 == 2) {
         system_w.pad_0x869[0] = 1;
     }
 }
 
-extern "C" void fn_80058F08(void) {
+extern "C" void system_copy_filter_clear(void) {
     system_w.field_0x868 = 0;
     system_w.pad_0x869[0] = 0;
 }

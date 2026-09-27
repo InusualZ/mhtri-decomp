@@ -277,7 +277,7 @@ extern "C" void fn_8012B604(void)
 extern "C" void fn_80128998(struct _ENEMY_WORK* self, u8 a, u8 b);
 extern "C" void fn_801285C0(struct _ENEMY_WORK* self, u8 a, u8 b, u32 c);
 
-extern "C" void fn_80128A14(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
     if (self->action_0x1E5 == 11) {
         return;

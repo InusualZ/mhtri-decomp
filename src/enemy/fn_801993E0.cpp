@@ -103,7 +103,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_801251D0.h"
-#include "enemy/fn_8012BDF4.h" /* fn_8012CF20, em_act_ck */
+#include "enemy/fn_8012BDF4.h" /* em_busy_set, em_act_ck */
 #include "enemy/fn_8012EC74.h" /* em_water_check, get_em_chg_scale */
 #include "enemy/fn_80138074.h" /* fn_8013A654, fn_8013918C */
 #include "enemy/fn_80191598.h" /* fn_80192370, fn_80192618 */
@@ -170,18 +170,18 @@ void fn_8019E948(struct _ENEMY_WORK* self);
  * ------------------------------------------------------------------------------------------------ */
 
 /* 0x801993E0 - the state-advance entry of the enemy's "em" action: state 0 arms the motion, state 1
- * waits for `fn_8012F93C` to report the current action finished and then runs the band's
- * `fn_80128A14(self, 13, 5)` completion. */
+ * waits for `em_mot_end_ck` to report the current action finished and then runs the band's
+ * `em_state_set(self, 13, 5)` completion. */
 void fn_801993E0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 49, 20, 0, 1);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
-            fn_80128A14(self, 13, 5);
+        if (em_mot_end_ck(self) == 1) {
+            em_state_set(self, 13, 5);
         }
         break;
     }
@@ -193,12 +193,12 @@ void fn_80199468(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 2);
+        em_move_mode_set(self, 2);
         fn_8012F504(self, 46, 6, 0, 1);
         fn_80130CDC(self, 1000);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
+        if (em_mot_end_ck(self) == 1) {
             fn_80128030(self);
         }
         break;
@@ -207,19 +207,19 @@ void fn_80199468(struct _ENEMY_WORK* self) {
 
 /* 0x80199A2C - the motion step of the action `fn_80199ADC` dispatches case 7 to: state 0 arms mode
  * 31 with the band's `fn_80146058`/`fn_8014610C` pair and zeroes the stored height, state 1 waits for
- * `fn_8012F93C` and then runs `fn_80128030`. */
+ * `em_mot_end_ck` and then runs `fn_80128030`. */
 void fn_80199A2C(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130478(self, 2);
-        fn_8012F5B8(self, 31, 0, 0);
+        em_move_mode_set(self, 2);
+        em_mot_set(self, 31, 0, 0);
         fn_80146058(self, lbl_807983F0, lbl_807983F4, lbl_807983F8);
         fn_8014610C(self, lbl_80798238, lbl_807983B0, lbl_80798238);
         fn_801303EC(self, lbl_80798238);
         break;
     case 1:
-        if (fn_8012F93C(self) == 1) {
+        if (em_mot_end_ck(self) == 1) {
             fn_80128030(self);
         }
         break;
@@ -258,7 +258,7 @@ void fn_80199ADC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80199B24 - the per-action `action` (0x1E5) dispatcher of the run above, plus the common tail
- * every action shares: the +0x1E2 gate that runs the pair `fn_8012CF20`/`fn_80131E74`, then this
+ * every action shares: the +0x1E2 gate that runs the pair `em_busy_set`/`fn_80131E74`, then this
  * unit's own `fn_8019E398`. */
 void fn_80199B24(struct _ENEMY_WORK* self) {
     switch (self->action) {
@@ -294,7 +294,7 @@ void fn_80199B24(struct _ENEMY_WORK* self) {
         break;
     }
     if (self->field_0x1E2 == 1) {
-        fn_8012CF20(self);
+        em_busy_set(self);
         fn_80131E74(self);
     }
     fn_8019E398(self);
@@ -472,18 +472,18 @@ void fn_8019DAC0(struct _ENEMY_WORK* self) {
         }
     }
     if (state == 1) {
-        fn_80130478(self, 0);
-        fn_8012F5B8(self, 1, 0, 0);
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 1, 0, 0);
     } else if (state == 2) {
-        fn_80130478(self, 2);
-        fn_8012F5B8(self, 40, 0, 0);
+        em_move_mode_set(self, 2);
+        em_mot_set(self, 40, 0, 0);
     }
 }
 
 /* 0x8019D9BC - the "load the action's joint position" init: arm mode 4, publish the two record
  * bytes and ask `fn_80126278` for the area's joint, then run the band's common tail. */
 void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
-    fn_80130478(self, 4);
+    em_move_mode_set(self, 4);
     *out_a = 12;
     *out_b = 0;
     switch (fn_802B0668(self->field_0x1E0)) {

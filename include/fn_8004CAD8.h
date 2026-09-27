@@ -12,6 +12,28 @@
 
 #ifdef __cplusplus
 void wii_sysmsg_gen(long id, char* buf, long a);
+
+/* The 0x100 B VS user block `get_vsUser_work` indexes (the two slots at 0x8066A620/0x8066A720).
+ * The block's own name is the mangling's (`ck_mydata_vs__FP13_vs_user_dataP13_vs_user_data`), so a
+ * caller that reaches a mangled consumer spells it `_vs_user_data`.  Only the fields this project's
+ * functions touch are named; every other byte is filler.  size: 0x100 */
+struct _vs_user_data {
+    /* +0x00 */ u8 pad_0x00[0x18];
+    /* +0x18 */ s32 point_0x18;      /* the credit `score_add_clamped` accumulates for the player */
+    /* +0x1C */ u8 pad_0x1C[0x2C - 0x1C];
+    /* +0x2C */ u32 item_0x2C[0x10]; /* the 16 four-byte item slots `item_count_find`/`item_take` walk */
+    /* +0x6C */ u32 slot_a_0x6C[7];  /* the first of the two per-slot flag runs `multi_box_phase_ck` counts */
+    /* +0x88 */ u8 pad_0x88[0x94 - 0x88];
+    /* +0x94 */ u32 slot_b_0x94[7];  /* its sibling; the two are read as a pair per slot */
+    /* +0xB0 */ u8 pad_0xB0[0xBC - 0xB0];
+    /* +0xBC */ u16 ready_mask_0xBC; /* the per-player ready bits the phase gate tests against 0x380 */
+    /* +0xBE */ u8 pad_0xBE[0x100 - 0xBE];
+};
+
+/* 0x8004D14C - one of the two 0x100 B VS user slots, or null when the index is out of range (the
+ * owner defines it with the same `long` parameter, which is what its mangling `__Fl` asks for).
+ * Added with `menu/multi_result.cpp`, its first consumer (rule 2). */
+_vs_user_data* get_vsUser_work(long index);
 #endif
 
 /* 0x80050A90 - `calcVecAng2`, the two-vector angle helper: it loads the two vectors' x/z floats and
@@ -42,6 +64,10 @@ u32 fn_8004D27C(s32 id);
  * `src/lobby/*.cpp` files, which is the rule-2 backlog this declaration closes). */
 s32 fn_8004D70C(s32 id);
 #endif
+/* 0x8004D0E8 - clamp `*value += delta` into [0, 9999999], the score/point accumulator the VS result
+ * and skill bands credit.  The owner defines it at C linkage, so the declaration sits inside the
+ * `extern "C"` region (rule 2: added with `menu/multi_result.cpp`, its second consumer). */
+void score_add_clamped(s32 delta, s32* value);
 u32 fn_80051570(u32);
 /* 0x8004D140 - the quest-result record accessor this range owns (`get_qResult_work__Fv`, a
  * 12-byte `lis`/`addi`/`blr` over the 0x438 B `qResult` buffer `src/fn_8004CAD8.cpp` defines).

@@ -84,7 +84,7 @@ typedef struct FaceWork {
 
 extern FaceWork lbl_806694E8;
 
-/* The per-id 4-byte pair the map's tables use: an id and a signed value/index (fn_8004B064, fn_8004BA00,
+/* The per-id 4-byte pair the map's tables use: an id and a signed value/index (item_count_find, fn_8004BA00,
  * fn_8004BD30, fn_8004C004). */
 typedef struct IdValue {
     /* +0x00 */ u16 id;
@@ -412,7 +412,7 @@ extern "C" u32 fn_8004B034(u16 id)
 }
 
 /* Looks up an id in a 4-byte `{id, value}` table; 0 when it is absent. */
-extern "C" s32 fn_8004B064(u16 id, const IdValue* table, s32 count)
+extern "C" s32 item_count_find(u16 id, const IdValue* table, s32 count)
 {
     s32 value = 0;
 
