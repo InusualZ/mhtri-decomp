@@ -2407,6 +2407,19 @@ config.libs = [
             # `cflags_lobby` as the band above, with the per-file `#pragma exceptions on` and
             # `#pragma peephole off` the other lobby units use (both measured, see the unit header).
             Object(NonMatching, "lobby/lb_menu_page.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): proposal
+            # `80394038_fn_80394038.cpp` (`.text` 0x80394038..0x803967F0, 41 functions / 10168 B;
+            # extab 0x8001833C..0x8001843C, extabindex 0x80038340..0x800384C0 - each run exactly the
+            # gap the bracketing split objects leave).  Module `lobby` from the code (42 `lobby_w`
+            # reads, `LbStr`, `lb_npc_Get_motion_no`, `get_now_areano`, `get_move_work_adrs`,
+            # `get_option_cfg`, the lobby/HUD 2D layer) and from the module's own units; the file name
+            # is derived from the range's one real map name `draw_quest_board` in the `lb_*` scheme of
+            # its siblings (`lb_npc.cpp`, `lb_menu_page.cpp`, `lb_companion_ui.cpp`) - MARKED GUESS,
+            # no `__FILE__` string covers the range and the dump answers `zz_` for 40 of 41 addresses.
+            # C++: mangled callees (`LbStr__FUcUs`, `set_zmode__FbUcb`, `sysSE_req__Fl`,
+            # `draw_font_idx__FUsPScUlPC10_mh_ivec2_`) reached through their real signatures (rule 9).
+            # Same `cflags_lobby` as its siblings.  Same `cflags_lobby` as the band above.
+            Object(NonMatching, "lobby/lb_quest_board.cpp"),
         ],
     },
     {
