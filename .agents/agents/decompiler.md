@@ -241,6 +241,22 @@ the sibling units' naming scheme, 4. the map's stem (`fn_XXXXXXXX.cpp`). `python
 lookup <addr>` answers class 2. A discovery `seam_note` about "one source file" is often an `owner_merge`
 artefact - verify it.
 
+**Naming is part of the unit's work, not a later pass - for every symbol the unit owns.**
+
+* **Functions**: use the real name whenever the evidence has one - the shared runtime dump first (`dumpmap.py
+  lookup <addr>`), then the map. A rename is **two** edits (the map and the source) or objdiff pairs nothing
+  (playbook 31/48): `symedit.py rename <old> <new>`, never a hand edit. `fn_XXXXXXXX` is what you leave when the
+  evidence has no name - and then the file header says which addresses are still unnamed and why.
+* **Fields**: every field carries its offset and a name from the context it is used in - what is stored, what it
+  is compared against, which SDK type the offset belongs to, what the value is later passed to (rules 4/5).
+  `unkNN` is the fallback, `pad_0xNN`/`unused_0xNN` the exception; a bare `unkNN` identifier is a rule 7 finding.
+* **Statics and globals**: name them from what they hold and how they are used (a table becomes
+  `stage_random_placement_table`, not `lbl_805DC5E8`). `lbl_XXXXXXXX` is what you leave when the meaning is
+  genuinely unknown - and then say so in the unit header rather than inventing a name.
+* `rule 7 deferred: <reason>` is a **last resort with a concrete reason**, never a default: it covers the `fn_`
+  half only (`unkNN` and field names stay enforced), and `grep -rn "rule 7 deferred" src/` is the complete list of
+  units that used it. If your unit does not need it, do not add it.
+
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 
 The target's own evidence decides the language, and it decides the *shape* too. When the range is a class's

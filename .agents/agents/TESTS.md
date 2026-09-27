@@ -218,3 +218,17 @@ which gives a direct comparison on real units.
 
 The `worker`-based baseline this is measured against: five branches refused on rule 3/6/7 items, four hand-built
 merge lanes, one worker editing MAIN, and one lane spending 130 turns / 1.36 Mt on a single unit.
+
+### Profile edit - naming (2026-09-26)
+
+`decompiler` gained the rule that **naming is part of the unit's work, not a later pass**: real function names from
+the runtime dump or the map (a rename is **two** edits, map + source, or objdiff pairs nothing), fields named from
+their offset and use context, statics/globals named from what they hold - with `fn_XXXXXXXX`/`lbl_XXXXXXXX`/`unkNN`
+left only where the evidence genuinely has no name, and said so in the unit header. `rule 7 deferred: <reason>` is a
+last resort with a concrete reason, covers the `fn_` half only, and `grep -rn "rule 7 deferred" src/` is its
+complete list.
+
+Why: measured over `src/`, `fn_XXXXXXXX` appears **44600** times (definitions and cross-unit calls together),
+`lbl_XXXXXXXX` **15333**, `unk*` 1283, and **218 of the 234 files** that carry any of them also carry a
+`rule 7 deferred` declaration - the escape became the default. The T2 probe now asks for the rule (question 10) and
+the checklist carries it.
