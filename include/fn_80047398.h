@@ -45,6 +45,10 @@ void fn_8004C4F0(u8* dst, const u8* src);
 
 /* Added with the `ef/eft052.cpp` registration (rule 2: this range owns every one of these
  * addresses - the cabinet/item-page helpers the cockpit hold band calls). */
+/* 0x8004A1F8 - the 6-byte (u16, s16) record copy: `dst[0] = src[0]; dst[1] = src[1];` on two
+ * `A0 04 00 00`/`A8 04 00 02` pairs.  Added with `menu/menu_result.cpp`, whose result-row
+ * initialiser hands it the row state it was given (rule 2: this TU owns the address). */
+void fn_8004A1F8(void* dst, const void* src);
 u16 fn_8004AE70(void* userdata);
 s32 fn_8004AEC0(void* userdata);
 s32 fn_8004AF0C(u8 idx);

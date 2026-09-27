@@ -42,6 +42,12 @@ u32 fn_8004D27C(s32 id);
 s32 fn_8004D70C(s32 id);
 #endif
 u32 fn_80051570(u32);
+/* 0x8004D140 - the quest-result record accessor this range owns (`get_qResult_work__Fv`, a
+ * 12-byte `lis`/`addi`/`blr` over the 0x438 B `qResult` buffer `src/fn_8004CAD8.cpp` defines).
+ * Added with `menu/menu_result.cpp`, whose whole band reads the record (rule 2: the declaration
+ * belongs with the owner, which had not declared it yet - `src/lobby/fn_801F9CD4.cpp` carried a
+ * local copy of this spelling). */
+void* get_qResult_work(void);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
  * owns the address). */
 f32 fn_8005220C(f32 value);

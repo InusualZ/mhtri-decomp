@@ -60,6 +60,11 @@ void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);
  * defines it `extern "C" void fn_800DCC24(_se_w*, s32, u8)` (`fn_800D7F54.cpp:1798`).  Added with
  * `ai/fn_802C474C.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_800DCC24(struct _se_w* work, s32 kind, u8 c);
+/* 0x800DBDD4 - the fixed-SE request the quest-result band's swap timer arms (`li r3,0x18` then
+ * `fn_800F04FC`/`fn_800DBB78(0x18,0)`), so it takes no argument and is declared at C linkage like
+ * its `fn_` siblings here (the map name is the plain `fn_800DBDD4`).  Added with
+ * `menu/menu_result.cpp` (rule 2: this TU owns the address). */
+void fn_800DBDD4(void);
 
 #ifdef __cplusplus
 }
