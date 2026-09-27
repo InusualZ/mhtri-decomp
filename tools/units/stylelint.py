@@ -1553,6 +1553,22 @@ def selftest() -> int:
 # --------------------------------------------------------------------------------------------------
 # cli
 # --------------------------------------------------------------------------------------------------
+def _warn_if_ref_not_ancestor(root: str, ref: str) -> None:
+    """`--diff REF` compares the working tree with REF, so when REF is not an ancestor of HEAD the diff also
+    contains whatever landed on REF after this branch was cut - which reads as *this* batch's regression.
+    Measured 2026-09-27: a lane spent a diagnosis on another lane's landing exactly this way. Warn without
+    changing the comparison: the land gate's semantics must stay "relative to the batch base".
+    """
+    rc = subprocess.run(["git", "merge-base", "--is-ancestor", ref, "HEAD"],
+                        cwd=root, capture_output=True).returncode
+    if rc != 0:
+        base = subprocess.run(["git", "merge-base", ref, "HEAD"], cwd=root,
+                              capture_output=True, text=True).stdout.strip()
+        print("stylelint: warning: %s is not an ancestor of HEAD, so this diff includes changes that landed "
+              "after the branch was cut - they are not this batch's. If that is not what you meant, compare "
+              "against the merge base instead: --diff %s" % (ref, base[:12] or "HEAD"), file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Lint src/ against docs/plan.md 6.5 (roadmap 7.21).")
     ap.add_argument("--diff", metavar="REF",
@@ -1570,6 +1586,7 @@ def main(argv: list[str] | None = None) -> int:
     ownership = load_ownership(root)
 
     if args.diff is not None:
+        _warn_if_ref_not_ancestor(root, args.diff)
         try:
             pairs = changed_src_files(root, args.diff)
             rels = [after for _before, after in pairs]
