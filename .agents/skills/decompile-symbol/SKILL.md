@@ -216,7 +216,9 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
   idea, a corrected rule) and report the write in the handover. Keep the local-only block rules:
   `python tools/agents/localonly.py pull` before staging and `push` after a commit
   (skill: `agents-md-local-only`). It is not a free-for-all: another agent edits that file too, so only
-  meaningful improvements, and never a speculative name or an unevidenced flag.
+  meaningful improvements, and never an unevidenced flag. A **name** is not in that category: a symbol gets the
+  best name its context supports (a guess is licensed, and marked in the unit header so a later pass can refine
+  it), because a generated `fn_`/`lbl_`/`unk` left in `src/` is a defect.
 * **Prepare the commit — always, and stop there.** This is the last step of a run, because a finding that is
   not staged is a finding the next session re-derives:
 

@@ -228,8 +228,10 @@ before the lint matches, so rules 3-4 live *in comments* while the others must n
 * The **unit's file header comment** is the one place for the unit's own facts: what it is, its `.text` range,
   where its flags/evidence live, and every residual - what still differs and why. Keep it to essentials.
 * Use the real name when it is known (the retail map, the shared runtime dump via `docs/memory-dump.md`, the
-  SDK), or a descriptive name that fits the surrounding symbols' scheme. A speculative name is a bug; leave
-  `fn_xxxxxxxx` rather than invent one.
+  SDK); otherwise **derive one from context** - what the function does and who calls it, what the data holds and
+  who reads it, the field's offset and the value stored there - fitting the surrounding symbols' scheme. **A
+  generated name left in `src/` is a defect**: when the context supports only a guess, guess, and mark it in the
+  unit's header so a later pass can refine it. `fn_xxxxxxxx`/`lbl_xxxxxxxx`/`unkNN` are never the answer.
 * Never print `config/RMHE08/symbols.txt` (4.5 MB, 65k lines) into output. Grep it, or use
   `python tools/symbols/symedit.py`. A rename is always *two* edits - the map and the source - via the proxy.
 
@@ -245,17 +247,19 @@ artefact - verify it.
 
 * **Functions**: use the real name whenever the evidence has one - the shared runtime dump first (`dumpmap.py
   lookup <addr>`), then the map. A rename is **two** edits (the map and the source) or objdiff pairs nothing
-  (playbook 31/48): `symedit.py rename <old> <new>`, never a hand edit. `fn_XXXXXXXX` is what you leave when the
-  evidence has no name - and then the file header says which addresses are still unnamed and why.
+  (playbook 31/48): `symedit.py rename <old> <new>`, never a hand edit. **Otherwise derive the name from
+  context** - what it does, what it returns, who calls it, what it writes - and when that supports only a guess,
+  guess and record it in the file header as a guess. `fn_XXXXXXXX` is never the resting place.
 * **Fields**: every field carries its offset and a name from the context it is used in - what is stored, what it
   is compared against, which SDK type the offset belongs to, what the value is later passed to (rules 4/5).
   `unkNN` is the fallback, `pad_0xNN`/`unused_0xNN` the exception; a bare `unkNN` identifier is a rule 7 finding.
 * **Statics and globals**: name them from what they hold and how they are used (a table becomes
-  `stage_random_placement_table`, not `lbl_805DC5E8`). `lbl_XXXXXXXX` is what you leave when the meaning is
-  genuinely unknown - and then say so in the unit header rather than inventing a name.
-* `rule 7 deferred: <reason>` is a **last resort with a concrete reason**, never a default: it covers the `fn_`
-  half only (`unkNN` and field names stay enforced), and `grep -rn "rule 7 deferred" src/` is the complete list of
-  units that used it. If your unit does not need it, do not add it.
+  `stage_random_placement_table`, not `lbl_805DC5E8`) - its contents (floats? pointers? a jump table?), its size,
+  and who reads it. `lbl_XXXXXXXX` is never the resting place: guess from that evidence and mark the guess in the
+  unit header.
+* `rule 7 deferred: <reason>` exists for the units registered before this rule; **a unit you write does not use
+  it** - there is no "no evidence for a name" case, only a name to derive. It covers the `fn_` half only (`unkNN`
+  and field names stay enforced), and `grep -rn "rule 7 deferred" src/` is the complete list of units that used it.
 
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 

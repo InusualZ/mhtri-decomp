@@ -546,8 +546,11 @@ regression if the hash goes red.
     to fit the **naming scheme of the surrounding symbols**, especially where siblings are already named:
     in the `RSO/runtime` unit `RSOStaticLocateObject`/`RSOUnLocateObject` make `LocateObject` an obvious fit,
     and `RSORelocate`/`RSORelocateSmallDataSection`/`RSOUnLink`/`RSONotifyPreRSOLink` match the `RSO*` public
-    API around them. A name that reads like it belongs to another module is worse than `fn_xxxxxxxx`. Leave
-    a generated name in place when there is no known or clearly better one - a speculative name is a bug.
+    API around them. **A generated name is not an acceptable resting place**: derive one from context - what the
+    function does and who calls it, what the data holds and who reads it, the field's offset and the value stored
+    there - and keep it in the surrounding symbols' scheme, because a name that reads like it belongs to another
+    module is still worse than a dull one. When the context supports only a guess, **guess**, and mark it in the
+    unit's header so a later pass can refine it. `fn_xxxxxxxx`/`lbl_xxxxxxxx`/`unkNN` left in `src/` is a defect.
   * **A rename is always two edits**: `config/RMHE08/symbols.txt` (which names the *target* object) and the
     source that defines/references it, in the same change - otherwise objdiff stops matching the symbol by
     name and reports it as 0 %. Do it through the proxy, never by hand:

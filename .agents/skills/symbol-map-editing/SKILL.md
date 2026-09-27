@@ -48,8 +48,9 @@ flood the context.
    show the same match as before, and `ninja build/RMHE08/main.dol` must keep the same hash.
 5. **Never regenerate the map for a rename.** It is hand-editable; a regeneration (`ninja apply`) brings the
    generated names back and silently loses every documented rename.
-6. **Choosing the name is its own judgement call** - real name when it is known, fitting the surrounding
-   naming scheme, `fn_xxxxxxxx` beats a speculative name. The rules are in `AGENTS.md` -> Conventions ->
+6. **Choosing the name is its own judgement call** - the real name when it is known, otherwise one **derived from
+   context** that fits the surrounding naming scheme. A guess is licensed and marked in the unit header; a
+   generated `fn_xxxxxxxx` left in `src/` is a defect. The rules are in `AGENTS.md` -> Conventions ->
    "Commenting and naming", and `docs/memory-dump.md` is where real names come from.
 
 ## Merging phantom symbols (roadmap 7.9)
