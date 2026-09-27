@@ -459,6 +459,15 @@ struct _ENEMY_WORK {
             /* +0x334 */ u8 field_0x334;   /* the em030 "in range" latch */
             /* +0x335 */ u8 unused_0x335[0x354 - 0x335];
         };
+        /* the two one-shot latches `enemy/em035_prog.cpp`'s action-11 effect trigger and its
+         * K-colour helper set: the same +0x32C/+0x32D bytes the views above read as a word/colour,
+         * reached here as the two bytes the object's `lbz`/`stb` pair touches. */
+        struct {
+            /* +0x328 */ u8 unused_0x328fm[0x32C - 0x328];
+            /* +0x32C */ u8 effect_latch_0x32C;  /* set once the action-11 trigger has run */
+            /* +0x32D */ u8 kcolor_latch_0x32D;  /* set once the K-colour override has run */
+            /* +0x32E */ u8 unused_0x32Efm[0x354 - 0x32E];
+        };
         /* the UV-model slot view `enemy/fn_802F5138.cpp` keeps (added by that unit): the slot index
          * `fn_802F51C8` clears, the "armed" flag cleared beside it, and the "model created" flag
          * `fn_802F5464` arms for the two idle modes and `fn_802F8B28` reads back by index.  A union

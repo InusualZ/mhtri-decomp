@@ -1095,6 +1095,27 @@ config.libs = [
             # carries covers only the callee names it references in other units.  C++; every plain
             # `fn_` definition is `extern "C"`.  See the unit header for the residuals.
             Object(NonMatching, "enemy/em024_ai.cpp"),
+            # Registered from proposal/8035F2B4_fn_8035F2B4.cpp, re-cut to the em035 program's own
+            # half: `.text` 0x8035F2B4..0x8035FC18 (20 functions / 2404 B) plus its extab run
+            # 0x800175DC..0x80017634 (11 records) and extabindex run 0x80036F30..0x80036FB4
+            # (11 x 12 B), both contiguous with `enemy/fn_8035E034.cpp`'s runs above.  The brief's
+            # `--max-bytes` range was 0x8035F2B4..0x80365C84, which is TWO TUs: the `em035_prog_tbl`
+            # (0x805ED838) entry-point list ends at `fn_8035FB60`, whose body ends exactly at
+            # 0x8035FC18, and from there the run drives the lobby work block `lobby_w` and the
+            # crafting-screen path (`seisan_data`, `fn_8021AA78`, `Get_pl_type`), not `_ENEMY_WORK` -
+            # the 61-record extab run splits 11 + 50 at the same address and our object's own extab
+            # equals the first 11 records byte for byte.  The lobby half
+            # (0x8035FC18..0x80365C84, 59 functions, extab 0x80017634..0x800177C4) is left for its own
+            # `lobby` unit (see the unit header).  Module `enemy` (the entry points come from
+            # `em035_prog_tbl`, every body drives `_ENEMY_WORK`, no `__FILE__` string is reachable and
+            # the dump answers only `zz_`), and the file and all 20 symbols are GUESSES from their own
+            # bodies on the module's `em*` scheme (`em_action.cpp`'s `em_act_*` sibling precedent) -
+            # the map had only `fn_XXXXXXXX`, so the batch also renames its own 20 rows (see the unit
+            # header's NAMING section for each derivation).  C++;
+            # every plain `fn_` definition is `extern "C"`.  Same `cflags_main` as its enemy
+            # neighbours plus a file-wide `#pragma peephole off` (the target keeps the unfused
+            # `addi`+`cmpwi` timer compares).
+            Object(NonMatching, "enemy/em035_prog.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803253BC_fn_803253BC` (the map stem it was claimed under) - the 0x803253BC-0x8032C920
             # band (85 functions / 30052 B) between the registered `hud/fn_80324F7C.c` above and the
