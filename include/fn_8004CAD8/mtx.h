@@ -1,0 +1,43 @@
+/*
+ * The two `src/fn_8004CAD8.cpp` symbols that other bands reach without needing that unit's whole
+ * header: 0x8005050C (`MTX34_ctor`) and 0x8004CAD8 (`set_slot_none`).  `include/fn_8004CAD8.h`
+ * includes this file; it is split out because its own declaration set (`fn_80052BC0`,
+ * `fn_80050850`, `fn_800504D4`, ...) still disagrees with several consumers' local copies, so
+ * pulling the whole header into the `ef`/`g3d`/`Pl` bands fails to compile (measured: 30 TUs,
+ * MWCC `(10505)`/`(10197)` on the *other* symbols).
+ *
+ * docs/plan.md 6.5 rule 2: the declaration lives in the owner's header, once.
+ */
+#ifndef MHTRI_FN_8004CAD8_MTX_H
+#define MHTRI_FN_8004CAD8_MTX_H
+
+#include "types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x8005050C - a 4-byte `blr`: it does nothing.  Every call site passes the address of an
+ * `nw4r::math::MTX34` local right after its declaration (`MTX34 mtx; MTX34_ctor(&mtx);`), so it is
+ * kept as the record's constructor-shaped no-op - the same reading as `mh3_pad/vec3.h`'s
+ * `VEC3_ctor`, whose 0x80043EA8 is the 3-float twin of this one (365 call sites in the DOL).
+ *
+ * GUESS (naming): the body is empty, so the name comes from the call context only.  Confirm when the
+ * owner's band is written. */
+void MTX34_ctor(void *out);
+
+/* 0x8004CAD8 - writes the `0xFFFF` "none" sentinel into one of six `s16` fields of `rec`
+ * (rec+0x92, 0x94, 0x96, 0x98, 0x9A, 0x9C) selected by a 1-based `kind`, through a 16-way jump table
+ * at 0x80581584, and returns 1 for kinds 1..6 / 0 for the rest.  The lobby menu panel is the only
+ * caller (`fn_801F1874`/`fn_801F2040` in `lobby/fn_801EC9F8.cpp` and `lobby/fn_801F3294.cpp`:
+ * `if (entry->field_0x10 == 0xFFFF) set_slot_none(rec, 3)`) over the global pointer at 0x806DBA60.
+ *
+ * GUESS (naming): the six fields and the kind code are read as item/equipment slots; the record's
+ * type is not reconstructed yet, hence `void*`.  Confirm when the owner's band is written. */
+s32 set_slot_none(void *rec, u32 kind);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_FN_8004CAD8_MTX_H */

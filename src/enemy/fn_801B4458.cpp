@@ -56,7 +56,7 @@
  *     `#pragma peephole off` was probed and rejected: it fixes those two to 100 but regresses the
  *     bodies that keep the fused/eliminated form (fn_801B4F08 100 -> 96.77, fn_801B5AE4 100 ->
  *     96.77, fn_801B5030 97.87 -> 92.31, fn_801B6010 97.65 -> 93.57).
- *   * `.ctors` REGISTER ORDER - fn_801B6FB0 84.93: the two `fn_80041E8C` calls colour their float
+ *   * `.ctors` REGISTER ORDER - fn_801B6FB0 84.93: the two `setVec3` calls colour their float
  *     registers differently.
  *   * MOTION SELECT - fn_801B63E8 86.33: the `field_0x00A & 1` motion select materialises in a
  *     different register, and fn_801B65B8 87.24 the same in the effect-id select.
@@ -70,6 +70,7 @@
 #include "enemy/fn_801B0010.h"
 #include "enemy/fn_801B4458.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* Flags: no deviation - the `enemy` lib's `cflags_main` (peephole on) measured every body below.
  * The band's unfused `clrlwi`/`rlwinm` + `cmpwi` near-misses (`fn_801B4C54`, `fn_801B6C38`) are a
@@ -117,9 +118,6 @@ void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
 u32 fn_80132184(void);
 
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
-void fn_80043EA8(nw4r::math::VEC3* out);
-void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
-void fn_80041E8C(void* out, f32 x, f32 y, f32 z);
 void fn_80051490(void* out, void* in);
 void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
@@ -240,9 +238,9 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
     list = NULL;
     best = 0xFF;
     bestDist = lbl_80798C68;
-    fn_80043EA8(&mid);
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&mid);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     count = (u8)fn_801B4398(self, kind, (u32*)&list);
     for (i = 0; i < count; i++) {
         if (list->code == 1) {
@@ -250,10 +248,10 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
             vec_to_mh_vec3(&b, (Vec*)list->vec_0x10);
             fn_80051378(&delta, &a, &b);
             fn_800AD9C0(&point, &delta, lbl_80798C6C);
-            fn_80041E40(&mid, &point);
+            copyVec3(&mid, &point);
         } else {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
-            fn_80041E40(&mid, &a);
+            copyVec3(&mid, &a);
         }
         dist = fn_80050EF4(&self->pos, &mid);
         if (i == 0 || bestDist > dist) {
@@ -276,8 +274,8 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
 
     rec = (EmSeatRec*)seat;
     fn_800FA378(box);
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     if (rec->code == 1) {
         vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
         vec_to_mh_vec3(&b, (Vec*)rec->vec_0x10);
@@ -307,8 +305,8 @@ extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
     u16 phase;
 
     list = NULL;
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     count = (u8)fn_801B4398(self, self->area_no, (u32*)&list);
     if ((u8)index < count) {
         phase = ran_suu(0);
@@ -1415,7 +1413,7 @@ extern "C" void fn_801B64FC(_ENEMY_WORK* self) {
 extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 arg4, f32 scale) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     switch (kind) {
     case 0:
         switch (id) {
@@ -1457,7 +1455,7 @@ extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 ar
 extern "C" void fn_801B670C(_ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     switch (em_get_mot_no(self)) {
     case 0x9:
         if ((self->field_0x228 & 6) != 0 &&
@@ -1633,7 +1631,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
         *out_state = 0;
         *out_flag = 0;
         if (fn_801421E4(self->field_0x01A, &rec) == 1) {
-            fn_80041E40(&self->pos, &rec.pos_0x08);
+            copyVec3(&self->pos, &rec.pos_0x08);
             fn_800FC0D4(&self->field_0x1BC, &rec.field_0x14);
         }
     } else {
@@ -1669,9 +1667,9 @@ extern "C" void fn_801B6EF4(_ENEMY_WORK* self, u8 kind) {
 extern "C" void fn_801B6FB0(void) {
     nw4r::math::VEC3 tmp;
 
-    fn_80041E8C(&tmp, lbl_80798C74, lbl_80798CE8, lbl_80798CEC);
+    setVec3(&tmp, lbl_80798C74, lbl_80798CE8, lbl_80798CEC);
     fn_80051490(lbl_806A7AA0, &tmp);
-    fn_80041E8C(&tmp, lbl_80798C74, lbl_80798CF0, lbl_80798CF4);
+    setVec3(&tmp, lbl_80798C74, lbl_80798CF0, lbl_80798CF4);
     fn_80051490(lbl_806A7AA0 + 0x0C, &tmp);
 }
 

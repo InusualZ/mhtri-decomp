@@ -127,8 +127,8 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         Vec v_pt, v_out, v_norm, v_flat, v_dir;
         f32 c1, s1, c2, s2;
 
-        fn_80043EA8((VEC3*)&v_pt);
-        fn_80043EA8((VEC3*)&v_out);
+        VEC3_ctor((VEC3*)&v_pt);
+        VEC3_ctor((VEC3*)&v_out);
         ratio = (100.0f - params->rate) / (100.0f + params->rate);
         if (!swept) {
             angle = (params->angle_end - params->angle_base) * fn_800A8A08(&em->progress);
@@ -143,9 +143,9 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
 
         fn_80051490(&v_norm, &v_pt);
         fn_8009C484(&v_norm, &v_norm);
-        fn_80041E8C(&v_flat, v_pt.x, 0.0f, v_pt.z);
+        setVec3(&v_flat, v_pt.x, 0.0f, v_pt.z);
         fn_8009C484(&v_flat, &v_flat);
-        fn_80043EA8((VEC3*)&v_dir);
+        VEC3_ctor((VEC3*)&v_dir);
         if (ratio == 0.0f) {
             v_dir.x = c1 * (scale_a * s2);
             v_dir.y = scale_b * c2;

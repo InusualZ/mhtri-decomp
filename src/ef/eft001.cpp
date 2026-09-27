@@ -29,6 +29,8 @@
 #include "enemy/ENEMY_WORK.h"
 #include "sound/fn_800D7F54.h"
 #include "ef/eft002.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the +0x38 pool block, in its two per-family views (ef.h's `_EFT_WORK` is the generic 0x10 prefix)
@@ -151,9 +153,6 @@ f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
  * included above).  A linkage block keeps them out of the per-declaration checker; the owned ones
  * come from their owner's header. */
 extern "C" {
-void fn_80043EA8(nw4r::math::VEC3* out);
-void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
-void fn_8005050C(nw4r::math::MTX34* m);
 void fn_800504D4(nw4r::math::MTX34* m);
 void fn_80050850(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_80050CA0(nw4r::math::VEC3* out, nw4r::math::MTX34* m, nw4r::math::VEC3* v);
@@ -373,7 +372,7 @@ extern "C" _EFT* fn_800FC27C(nw4r::math::VEC3* pos, u32 type, u32 param, u32 are
     work->scale_0x0C = scale;
     effect->field_0x03 = 1;
     effect->timer_0x0C = 0;
-    fn_80041E40(&effect->pos_0x18, pos);
+    copyVec3(&effect->pos_0x18, pos);
     effect->rot_0x24.y = param;
     effect->area_0x44 = (u8)area;
     fn_800F9DF4(effect, 0, 4);
@@ -419,7 +418,7 @@ extern "C" void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u32 field_08, u32 a
     effect->demo_flag_0x08 = (u8)field_08;
     effect->field_0x03 = 1;
     effect->timer_0x0C = 0;
-    fn_80041E40(&effect->pos_0x18, pos);
+    copyVec3(&effect->pos_0x18, pos);
     fn_800FC0D4(&effect->rot_0x24, rot);
     effect->area_0x44 = (u8)area;
     work->value_0x18 = scale;
@@ -468,7 +467,7 @@ extern "C" void fn_800FC7EC(_EFT* self)
 
     model = (MHchar*)work->effect_0x08;
     SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
-    fn_80041E40(&model->pos_0x04, &self->pos_0x18);
+    copyVec3(&model->pos_0x04, &self->pos_0x18);
     fn_800FC0D4(&model->rot_0x54, &self->rot_0x24);
 
     model->field_0x2C -= 3641;
@@ -529,7 +528,7 @@ extern "C" void fn_800FBBC0(_EFT* self, u32 index, u32 flags)
     MHchar* model;
     _EFT001_MODEL_WORK* work;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     work = (_EFT001_MODEL_WORK*)self->work_0x38;
     plw = (_EFT001_PLW_VIEW*)self->source_0x30;
 
@@ -570,7 +569,7 @@ extern "C" void fn_800FBBC0(_EFT* self, u32 index, u32 flags)
         break;
     }
 
-    fn_80041E40(&work->models[index]->pos_0x04, &pos);
+    copyVec3(&work->models[index]->pos_0x04, &pos);
 }
 
 /* The per-frame body of a model effect: builds its models on the first frame, then places and
@@ -620,7 +619,7 @@ extern "C" void fn_800FAE08(_EFT* self)
             }
 
             if (enemy->joint_0x204 == (u32)-1) {
-                fn_80041E40(&self->pos_0x18, &enemy->pos_0x188);
+                copyVec3(&self->pos_0x18, &enemy->pos_0x188);
             } else {
                 get_joint_wpos_em((_ENEMY_WORK*)enemy, enemy->joint_0x204, &self->pos_0x18);
             }
@@ -674,7 +673,7 @@ extern "C" void fn_800FCA54(_EFT* self)
     _EFT001_EFFECT_WORK* work;
 
     fn_800834F0(buf);
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     work = (_EFT001_EFFECT_WORK*)self->work_0x38;
 
     if (self->field_0x06 == 0) {

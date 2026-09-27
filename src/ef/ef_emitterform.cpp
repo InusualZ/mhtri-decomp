@@ -34,6 +34,7 @@
 #include "types.h"
 #include "ef.h"
 #include "unsplit/g3d.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* This unit's own pooled data (still another unit's range in splits.txt - declared, never defined). */
 extern char lbl_80592CD0[]; /* "ef_emitterform.cpp"                                          .data */
@@ -54,7 +55,7 @@ extern f32 lbl_80796058; /* 65535.0f                .sdata2 */
  * references them by their plain `fn_XXXXXXXX` map name, so they are declared with C linkage here;
  * a C++ spelling mangles them and the reloc no longer pairs (relocaudit). */
 extern "C" {
-void fn_8005050C(void* mtx);                                    /* unit matrix */
+                                    /* unit matrix */
 void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);               /* Euler rotation */
 void fn_800514FC(void* out, const void* mtx, const void* in);   /* mulVecMat */
 void fn_80051424(void* out, const void* in);                    /* copy */
@@ -113,7 +114,7 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
         nw4r::db::Panic(lbl_80592CD0, 49, lbl_80592D1C, em);
     }
 
-    fn_80043EA8(&tmp);
+    VEC3_ctor(&tmp);
 
     if (lbl_80796030 != em->dir_weight) {
         fn_80051424(out, rot);
@@ -149,9 +150,9 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
 
     if (lbl_80796030 != em->axis_angle_scale) {
         if (lbl_80796030 == em->axis_angle_y) {
-            fn_8005050C(&mtx_a);
+            MTX34_ctor(&mtx_a);
             fn_8009CA30(&mtx_a, em->euler_x, em->euler_y, em->euler_z);
-            fn_80041E8C(&axis_a, lbl_80796030, lbl_8079603C, lbl_80796030);
+            setVec3(&axis_a, lbl_80796030, lbl_8079603C, lbl_80796030);
             fn_800514FC(&axis_a, &mtx_a, &axis_a);
             out->x += em->axis_angle_scale * axis_a.x;
             out->y += em->axis_angle_scale * axis_a.y;
@@ -159,10 +160,10 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
         } else {
             f32 ang;
 
-            fn_8005050C(&mtx_b);
+            MTX34_ctor(&mtx_b);
             ang = lbl_80796034 * (lbl_80796038 * fn_800A8A08(&em->progress));
             fn_8009CA30(&mtx_b, em->axis_angle_y * fn_800A8A08(&em->progress), ang, lbl_80796030);
-            fn_8005050C(&axis_b);
+            MTX34_ctor(&axis_b);
             fn_8009CA30(&axis_b, em->euler_x, em->euler_y, em->euler_z);
             fn_800710BC(&mtx_b, (const Mtx34*)&axis_b, &mtx_b);
             out->x += em->axis_angle_scale * mtx_b.m[0][1];

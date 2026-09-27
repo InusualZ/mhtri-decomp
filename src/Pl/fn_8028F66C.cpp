@@ -72,8 +72,9 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
-#include "pl.h"              /* the Pl module header; pulls in `ef.h`'s `fn_80043EA8` */
+#include "pl.h"              /* the Pl module header; pulls in `ef.h`'s `VEC3_ctor` */
 #include "fn_8004CAD8.h"     /* the vector helpers this unit calls (rule 2) */
 #include "ef/fn_800AEE48.h"  /* `fn_800B0B90` (rule 2) */
 #include "Pl/fn_80288CEC.h"
@@ -130,7 +131,7 @@ s32 fn_8028F66C(HitSphere* a, HitSphere* b, VEC3* out) {
     f32 dist;
     f32 reach;
 
-    fn_80043EA8(&sep);
+    VEC3_ctor(&sep);
     dist = fn_80050EAC(a, b);
     reach = a->radius + b->radius;
     if (dist <= reach * reach) {
@@ -153,7 +154,7 @@ s32 fn_8028F758(HitSphere* a, HitSphere* b, VEC3* out) {
     f32 dist;
     f32 reach;
 
-    fn_80043EA8(&sep);
+    VEC3_ctor(&sep);
     dist = fn_80050EAC(a, b);
     reach = a->radius + b->radius;
     if (dist <= reach * reach) {
@@ -221,21 +222,21 @@ f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out) {
 
     fn_8012A8F8(&box);
     param = 0.0f;
-    fn_80041E40(&box.vec_0x00, start);
-    fn_80041E40(&box.vec_0x0C, end);
+    copyVec3(&box.vec_0x00, start);
+    copyVec3(&box.vec_0x0C, end);
     fn_80050CA0(&diff, end, start);
-    fn_80041E40(&box.vec_0x18, &diff);
+    copyVec3(&box.vec_0x18, &diff);
     dist = fn_8028F86C(&box, point, &param);
     fn_80051EE0(&scaled, &box.vec_0x18, param);
     fn_80051378(&pos, &scaled, start);
-    fn_80041E40(out, &pos);
+    copyVec3(out, &pos);
     return dist;
 }
 
 /* 0x802910C0 - `out = in * scale`, with `out` run through the record writer first (as the target
  * does). */
 void fn_802910C0(VEC3* out, const VEC3* in, f32 scale) {
-    fn_80043EA8(out);
+    VEC3_ctor(out);
     fn_80051424(&out->x, &in->x, scale);
 }
 
@@ -291,7 +292,7 @@ VEC3* fn_80292468(VEC3* pair) {
 
     p = pair;
     do {
-        fn_80043EA8(p);
+        VEC3_ctor(p);
         p++;
     } while (p < pair + 2);
     return pair;
@@ -305,7 +306,7 @@ void fn_80293A7C(VEC3* v, f32 divisor) {
 
 /* 0x8029573C - construct one vector in place and return it. */
 VEC3* fn_8029573C(VEC3* v) {
-    fn_80043EA8(v);
+    VEC3_ctor(v);
     return v;
 }
 

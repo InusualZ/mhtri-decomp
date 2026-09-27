@@ -33,6 +33,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 #pragma fp_contract off
 #pragma peephole off
@@ -81,10 +82,10 @@ struct Emitter {
  * map's spelling exactly: tools/units/mangle.py confirms it. */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 /* The nw4r helper callees are C functions: the target object's relocations carry their plain names
- * (`fn_80043EA8`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
+ * (`VEC3_ctor`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
 extern "C" void fn_8009C760(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
-extern "C" void fn_80043EA8(VEC3* v);                     /* VEC3::VEC3() */
-extern "C" void fn_80041E8C(VEC3* v, f32 x, f32 y, f32 z); /* VEC3::VEC3(f32, f32, f32) */
+                     /* VEC3::VEC3() */
+ /* VEC3::VEC3(f32, f32, f32) */
 extern "C" f32 fn_800A8A08(Random* r);                    /* Random::RandFloat */
 extern "C" void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
                         VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */
@@ -140,19 +141,19 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
             fn_8009C760(&sy, &cy, params[2]);
             fn_8009C760(&sz, &cz, params[3]);
 
-            fn_80043EA8(&p);
+            VEC3_ctor(&p);
             p.x = (cx * cz * sy + sx * sz) * pos;
             p.y = (-cz * sx + cx * sy * sz) * pos;
             p.z = (cx * cy) * pos;
 
-            fn_80043EA8(&normal);
+            VEC3_ctor(&normal);
             normal.x = lbl_807962E8;
             normal.y = lbl_807962F0;
             normal.z = lbl_807962E8;
 
-            fn_80041E8C(&fromYAxis, p.x, lbl_807962E8, p.z);
+            setVec3(&fromYAxis, p.x, lbl_807962E8, p.z);
 
-            fn_80043EA8(&v);
+            VEC3_ctor(&v);
             fn_800A99B4(self, &v, em, &p, &normal, &p, &fromYAxis);
 
             velArg = v;

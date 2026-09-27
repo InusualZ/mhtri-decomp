@@ -84,6 +84,8 @@
 #include "unsplit/g3d.h"
 #include "sound/fn_800D7F54.h"
 #include "ef/ef_particlemanager.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the unit's own prototypes (plain C linkage: the map's stems must stay unmangled)
@@ -111,8 +113,6 @@ void fn_80114CC8(void* actor, u8 key);
 void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
 
 /* unsplit ef-band helpers (the band's bracketing units disagree, so they have no owner header) */
-void fn_80041E40(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-void fn_8005050C(nw4r::math::MTX34* mtx);
 void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_8005696C(s32 id, s32 kind, s32 mode, s32* color, s32 timer, f32 x, f32 y);
@@ -121,7 +121,6 @@ _EFT* fn_800F8788(u32 pool);
 void fn_800F886C(_EFT* self);
 void fn_80306D6C(void* self, s32 a, void* b, void* c, u8 d, f32 e);
 u8 fn_80331210(void* self);
-void fn_8005050C(nw4r::math::MTX34* mtx);
 void fn_800E0A14(void* chr, u32 joint, nw4r::math::MTX34* out);
 
 #ifdef __cplusplus
@@ -320,7 +319,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     nw4r::math::VEC3 d0, d1, d2, d3, d4, d5, d6, d7, d8;
     _EFT* effect;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     effect = fn_80114A1C(pos, (u8)area, (u8)type);
     if (effect == 0) {
         return;
@@ -329,7 +328,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     switch (type) {
     case 0: {
         d0 = get_camera_direction();
-        fn_80041E40(&v, &d0);
+        copyVec3(&v, &d0);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -339,7 +338,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     case 1: {
         _EFT019_WORK* work;
         d1 = get_camera_direction();
-        fn_80041E40(&v, &d1);
+        copyVec3(&v, &d1);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -352,7 +351,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     case 2: {
         _EFT019_WORK* work;
         d2 = get_camera_direction();
-        fn_80041E40(&v, &d2);
+        copyVec3(&v, &d2);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -364,7 +363,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 14: {
         d3 = get_camera_direction();
-        fn_80041E40(&v, &d3);
+        copyVec3(&v, &d3);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -373,7 +372,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 15: {
         d4 = get_camera_direction();
-        fn_80041E40(&v, &d4);
+        copyVec3(&v, &d4);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -382,7 +381,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 16: {
         d5 = get_camera_direction();
-        fn_80041E40(&v, &d5);
+        copyVec3(&v, &d5);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -400,7 +399,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     case 28: {
         _EFT019_WORK* work;
         d6 = get_camera_direction();
-        fn_80041E40(&v, &d6);
+        copyVec3(&v, &d6);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -413,7 +412,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     case 29: {
         _EFT019_WORK* work;
         d7 = get_camera_direction();
-        fn_80041E40(&v, &d7);
+        copyVec3(&v, &d7);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -425,7 +424,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 57: {
         d8 = get_camera_direction();
-        fn_80041E40(&v, &d8);
+        copyVec3(&v, &d8);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
         fn_80073F68(pos, &v);
@@ -588,14 +587,14 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
     _EFT* effect;
     _EFT019_WORK* work;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     effect = fn_80114A1C(pos, (u8)area, (u8)type);
     if (effect != 0) {
         work = (_EFT019_WORK*)effect->work_0x38;
         switch (type) {
         case 0: {
             dir = get_camera_direction();
-            fn_80041E40(&v, &dir);
+            copyVec3(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
             fn_80073F68(pos, &v);
@@ -604,7 +603,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
         }
         case 1: {
             dir = get_camera_direction();
-            fn_80041E40(&v, &dir);
+            copyVec3(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
             fn_80073F68(pos, &v);
@@ -615,7 +614,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
         }
         case 2: {
             dir = get_camera_direction();
-            fn_80041E40(&v, &dir);
+            copyVec3(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
             fn_80073F68(pos, &v);
@@ -764,8 +763,8 @@ void fn_80112D58(_EFT* self)
         self->timer_0x0C = 2;
         return;
     }
-    fn_8005050C(&mtx);
-    fn_80043EA8(&dir);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&dir);
     work = (_EFT019_WORK*)self->work_0x38;
     snd = eft_control.field_0x04;
     self->state_0x05++;
@@ -1157,7 +1156,7 @@ void fn_80112D58(_EFT* self)
     }
     if ((u32)(self->type_0x02 - 0x66) <= 1) {
         cam = get_camera_direction();
-        fn_80041E40(&dir, &cam);
+        copyVec3(&dir, &cam);
         fn_80050850(&dir, &dir);
         fn_800513F0(&dir, lbl_807969D8);
         for (i = 1; i < work->count; i++) {
@@ -1244,7 +1243,7 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area)
     if (effect != 0) {
         effect->field_0x03 = 19;
         effect->type_0x02 = 6;
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
         effect->area_0x44 = area;
         effect->source_0x30 = 0;
         effect->dispatch_0x34 = fn_80112D1C;
@@ -1264,7 +1263,7 @@ void fn_801148E4(_EFT* self)
     f32 rx;
     f32 ry;
 
-    fn_80043EA8((nw4r::math::VEC3*)v);
+    VEC3_ctor((nw4r::math::VEC3*)v);
     if (self->area_0x44 == get_now_areano() && self->timer_0x0C > 0) {
         fn_8004030C((struct _MH_VEC2*)max);
         handle = fn_80082BCC(pRoot);
@@ -1309,7 +1308,7 @@ _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
     effect->timer_0x0C = 0;
     effect->field_0x10 = 0;
     effect->type_0x02 = type;
-    fn_80041E40(&effect->pos_0x18, pos);
+    copyVec3(&effect->pos_0x18, pos);
     effect->area_0x44 = area;
     fn_800F9DF4(effect, 0, 0);
     effect->release_0x40 = fn_80112CE0;
@@ -1332,9 +1331,9 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     nw4r::math::VEC3 pos;
     _CP_VECTOR rot;
 
-    fn_80043EA8(&axis);
-    fn_80043EA8(&spin);
-    fn_80043EA8(&pos);
+    VEC3_ctor(&axis);
+    VEC3_ctor(&spin);
+    VEC3_ctor(&pos);
     fn_800E0A14(&((_EFT019_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 7, mtx);
     fn_8010140C(mtx, &pos);
     axis.x = -mtx->m[0][2];

@@ -75,11 +75,11 @@
  *     `if`-chain spelling is 4 B short and does not pair).
  *   * BLOCK ORDER AFTER A SHARED TAIL - `fn_801B4244` 91.09 and `fn_801B42DC` 84.93: MWCC places the
  *     `return 0` block inline where the target keeps it last, and the `.ctors` body's two
- *     `fn_80041E8C` calls colour their float registers differently.
+ *     `setVec3` calls colour their float registers differently.
  *   * `clrlwi` FUSION - the peephole fuses the `clrlwi rX,rY,24` + `cmpwi rX,0` pair of a byte test
  *     into the record form `clrlwi.`; `fn_801B4244` needs it off (`#pragma peephole off` scoped to
  *     that one body: 59.78 -> 91.09).  Every other body in the unit keeps the peephole on.
- *   * ARGUMENT SET ORDER - `fn_801B2514` 91.74: its `fn_80133DB0`-family rows and the `fn_80041E8C`
+ *   * ARGUMENT SET ORDER - `fn_801B2514` 91.74: its `fn_80133DB0`-family rows and the `setVec3`
  *     float arguments are materialised in a different order.
  *   * `fn_801B0230` 95.64 and `fn_801B03E8` 93.65 (both improved by the transport): the remaining
  *     rows are the `Pl_Skill_ck`/`fn_802731B4` argument setup and `fn_801B03E8`'s two
@@ -97,10 +97,9 @@
  * unsplit enemy-band symbols in `unsplit/enemy.h`, the registered units' in their own headers, and
  * this unit's own band symbols in `include/enemy/fn_801B0010.h`.
  *
- * `pl.h` (which brings `ef.h`) and `mh3_pad.h` both spell `fn_80043EA8`/`fn_80041E8C` with different
- * parameter types, which MWCC rejects as a C-linkage overload; this unit wants only the owner's
- * `fn_80041E40`, so the two stale duplicates are renamed out of the way for that include - the same
- * workaround `enemy/fn_801550FC.cpp` and `ef/ef_creationqueue.cpp` use. */
+ * `pl.h` (which brings `ef.h`) and `mh3_pad.h` both declare the owner's `VEC3_ctor`/`setVec3`; the
+ * macro workaround that used to guard the include is gone because the two headers now spell them
+ * identically (the `(10197)` clash they were working around is closed). */
 #include "types.h"
 
 #include "nw4r/math.h"
@@ -123,11 +122,7 @@
 #include "unsplit/enemy.h"
 #include "Pl/fn_80262940.h" /* fn_80267270 (rule 2: its owner's header) */
 
-#define fn_80043EA8 mhtri_mh3pad_fn_80043EA8
-#define fn_80041E8C mhtri_mh3pad_fn_80041E8C
 #include "mh3_pad.h"
-#undef fn_80043EA8
-#undef fn_80041E8C
 
 /* ------------------------------------------------------------------------------------------------ */
 /* declarations this unit needs whose owner's header does not carry them yet                          */
@@ -542,7 +537,7 @@ extern "C" u32 fn_801B0810(_ENEMY_WORK* work) {
         if (other->area_no != work->area_no) {
             continue;
         }
-        fn_80041E40(&work->aim, &other->pos);
+        copyVec3(&work->aim, &other->pos);
         return 1;
     }
     return 0;
@@ -1272,7 +1267,7 @@ extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
     u32 angA;
     u32 angB;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
 
     switch (work->state) {
     case 0:
@@ -1294,7 +1289,7 @@ extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
                 step = 0;
             }
             fn_80050CA0(&diff, &work->vec_0x36C, &work->pos);
-            fn_80041E40(&vec, &diff);
+            copyVec3(&vec, &diff);
             calcVecAngXY(&vec, &angA, &angB);
             if ((u8)kind == 1) {
                 step = -step;
@@ -1481,7 +1476,7 @@ extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
     u32 angA;
     u32 angB;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
 
     switch (work->state) {
     case 0:
@@ -1497,7 +1492,7 @@ extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
             work->timer_0x020 = 0x3C;
         }
         fn_80050CA0(&diff, &work->vec_0x36C, &work->pos);
-        fn_80041E40(&vec, &diff);
+        copyVec3(&vec, &diff);
         calcVecAngXY(&vec, &angA, &angB);
         work->field_0x37C = angB;
         break;
@@ -1627,9 +1622,9 @@ extern "C" void fn_801B42C8(_ENEMY_WORK* work, u8* state, u8* flag) {
 extern "C" void fn_801B42DC(void) {
     VEC3 rec;
 
-    fn_80041E8C((Vec*)&rec, lbl_80798B48, lbl_80798B94, lbl_80798C58);
+    setVec3((Vec*)&rec, lbl_80798B48, lbl_80798B94, lbl_80798C58);
     fn_80051490((Vec*)lbl_806A7A88, (Vec*)&rec);
-    fn_80041E8C((Vec*)&rec, lbl_80798B48, lbl_80798C5C, lbl_80798C60);
+    setVec3((Vec*)&rec, lbl_80798B48, lbl_80798C5C, lbl_80798C60);
     fn_80051490((Vec*)(lbl_806A7A88 + 0x0C), (Vec*)&rec);
 }
 
@@ -1640,7 +1635,7 @@ extern "C" void fn_801B4348(_ENEMY_WORK* work) {
 
     fn_80125F54(&rec);
     if (fn_801421E4(work->field_0x01A, &rec) == 1) {
-        fn_80041E40(&work->aim, &rec.pos_0x08);
+        copyVec3(&work->aim, &rec.pos_0x08);
     }
 }
 

@@ -11,7 +11,7 @@
  * matrix translation, then hands the result to `SetRootMtxTrans`.  The sibling `fn_8027C064`
  * (`Pl/pl_act.cpp`) is the same shape and was the template for the tail.
  *
- * The two "empty" callees are real: `fn_80043EA8` and `fn_8005050C` are one-instruction `blr` stubs in
+ * The two "empty" callees are real: `VEC3_ctor` and `MTX34_ctor` are one-instruction `blr` stubs in
  * the DOL, so their calls must still be written out to reproduce the target's bytes.
  *
  * Result: 100 %; `.text` (0x1F8), `extab` (0x8), `extabindex` (0xC) and all 26 `.rela.text` relocation
@@ -47,6 +47,8 @@
 #include "nw4r/math.h"
 #include "ef/fn_800FD718.h"
 #include "unsplit/sound.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math types the mangled callees take
@@ -99,8 +101,8 @@ struct _PLW {
  * externs - the callees and the shared pool
  * ------------------------------------------------------------------------------------------------- */
 
-extern void fn_80043EA8(VEC3* out);      /* a `blr` stub in the DOL: a no-op, but the call is in the bytes */
-extern void fn_8005050C(MTX34* mtx);     /* likewise */
+      /* a `blr` stub in the DOL: a no-op, but the call is in the bytes */
+     /* likewise */
 extern u32 fn_800F92F4(struct _EFT* self, u32 mode);
 /* fn_800FD718 / fn_800FD860 come from their owner's header (rule 2). */
 
@@ -141,8 +143,8 @@ void fn_800FD520(struct _EFT* self)
     struct _EFT_WORK* work;
 
     work = self->work_0x38;
-    fn_80043EA8(&v);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v);
+    MTX34_ctor(&mtx);
 
     self->state_0x05++;
     work->effect = res_eft_create__FUsUsUl(lbl_807916E0[self->type_0x02],

@@ -432,7 +432,7 @@ s32 fn_8024AA04(u16 motion) {
 void fn_8024A248(_PLW* self, s32 arg1) {
     VEC3 vec;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;

@@ -54,6 +54,7 @@
  * `target-extra` row, so this object declares them and emits none of them (playbook 23).
  */
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/EM_PART_BLOCK.h"
 #include "enemy/ENEMY_WORK.h"
@@ -114,7 +115,7 @@ extern "C" f32 lbl_8079BD08;   /* 110.0 */
 extern "C" f32 lbl_8079BD24;   /* 100.0 */
 extern "C" f32 lbl_8079BE88;   /* -20.0 */
 
-/* `include/stage/fn_802B2AA0.h` (this unit's `shell_set_func_ptr` owner) declares `fn_80041E8C` with
+/* `include/stage/fn_802B2AA0.h` (this unit's `shell_set_func_ptr` owner) declares `setVec3` with
  * a `void` result, while the target's call site consumes the returned pointer; the band reaches it
  * through the signature its own body has.  `em035_prog.cpp` records the same gap, and the outbox
  * carries the shared-file request. */
@@ -260,7 +261,7 @@ extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
 extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     fn_8012CF20(self);
     fn_80131E74(self);
     switch (self->state) {
@@ -284,7 +285,7 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
             nw4r::math::VEC3 off;
 
             fn_80136B50(self, -1, 5);
-            fn_80041E40(&pos, ((Fn80041E8C)fn_80041E8C)(&off, lbl_8079BC88, lbl_8079BC88,
+            copyVec3(&pos, ((Fn80041E8C)setVec3)(&off, lbl_8079BC88, lbl_8079BC88,
                                                         lbl_8079BD08));
             ((EmShellFuncs*)shell_set_func_ptr)
                 ->method_0x2C(self, 9, 1, &pos, lbl_8079BC94, self->field_0xAEA);
@@ -558,7 +559,7 @@ extern "C" void em_parts_damage_ck(_ENEMY_WORK* self) {
 extern "C" void em_act_effect_ck(_ENEMY_WORK* self) {
     nw4r::math::VEC3 off;
 
-    fn_80043EA8(&off);
+    VEC3_ctor(&off);
     if (fn_8012EC60(self) == 1) {
         if (system_w.field_0x0c % 20 == 0) {
             setVector3(&off, lbl_8079BC88, lbl_8079BE88, lbl_8079BD24);

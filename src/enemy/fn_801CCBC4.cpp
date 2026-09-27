@@ -103,6 +103,7 @@
 
 #include "enemy/ENEMY_WORK.h"
 #include "fn_8004CAD8.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The band's owner headers are NOT included: several of them publish spellings that do not match the
  * callees' own bodies (`fn_8012EC60(void)` where the body reads +0x8AA, `fn_80126278(u16,VEC3*)`
@@ -346,10 +347,9 @@ void fn_80131E00(struct _ENEMY_WORK* self);
 void fn_80131E74(struct _ENEMY_WORK* self);
 void fn_80133C3C(struct _ENEMY_WORK* self);
 f32 fn_802B0430(u8 area);
-void* fn_80041E40(void* dst, const void* src); /* owner `src/mh3_pad.cpp`; its header is
-    * unreachable from an `include/ef.h` consumer (`fn_80043EA8`/`fn_80041E8C` conflict), so the
+ /* owner `src/mh3_pad.cpp`; its header is
+    * unreachable from an `include/ef.h` consumer (`VEC3_ctor`/`setVec3` conflict), so the
     * shape here is the owner body's (`mr r3,r31` -> returns `dst`) */
-void fn_80043EA8(void* out);
 u32 fn_80133C50(struct _ENEMY_WORK* self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80133DB0(struct _ENEMY_WORK* self, u32 a);
@@ -2007,7 +2007,7 @@ void fn_801D08A8(struct _ENEMY_WORK* self) {
 void fn_801D2ED0(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 spot;
     u32 have_spot = 0;
-    fn_80043EA8(&spot);
+    VEC3_ctor(&spot);
     switch (self->state) {
     case 0:
         if ((u8)fn_802B0668(self->field_0x1E0) == 4) {
@@ -2030,8 +2030,8 @@ void fn_801D2ED0(struct _ENEMY_WORK* self) {
             self->state++;
             fn_80130248(self);
             fn_801305C4(self);
-            fn_80041E40(&self->action_0x328.vec_0x334, &self->vec_0x36C);
-            fn_80041E40(&self->vec_0x36C, &spot);
+            copyVec3(&self->action_0x328.vec_0x334, &self->vec_0x36C);
+            copyVec3(&self->vec_0x36C, &spot);
             fn_80134F70(self, lbl_805704D0);
             fn_80134004(self, 0x19, lbl_80799220);
             fn_80130248(self);
@@ -2048,7 +2048,7 @@ void fn_801D2ED0(struct _ENEMY_WORK* self) {
     case 1:
         if (fn_80134114(self, 0, 0) == 1) {
             self->state++;
-            fn_80041E40(&self->vec_0x36C, &self->action_0x328.vec_0x334);
+            copyVec3(&self->vec_0x36C, &self->action_0x328.vec_0x334);
             fn_8012F5B8(self, 0x1A, 0x0A, 0);
         } else {
             fn_80135000(self, 2, lbl_805704D0);

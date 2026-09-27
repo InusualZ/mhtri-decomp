@@ -67,6 +67,8 @@
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"
 #include "sound/fn_800D7F54.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The engine's own 3-float vector.  It is NOT `nw4r::math::VEC3`: `vec_to_mh_vec3` exists to convert
  * between the two (`nw4r::math::VEC3* dst, Vec* src`), so they are distinct types that happen to share
@@ -334,9 +336,6 @@ extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg
 
 extern "C" u8 fn_800CF208(void);
 
-extern "C" void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
-extern "C" void fn_80041E8C(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
-extern "C" void fn_8005050C(nw4r::math::MTX34* mtx);
 extern "C" void fn_800532DC(void* dst, void* src);
 extern "C" void fn_80073F68(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos, f32 z);
@@ -475,7 +474,7 @@ extern "C" void fn_80114FAC(_EFT* self)
     s32 n;
     _EFT_WORK_A* work;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     work = (_EFT_WORK_A*)self->work_0x38;
     self->state_0x05++;
     if (self->type_0x02 == 0) {
@@ -529,8 +528,8 @@ extern "C" void fn_80115100(_EFT* self)
 
     dead = 0;
     work = (_EFT_WORK_A*)self->work_0x38;
-    fn_80043EA8(&v);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v);
+    MTX34_ctor(&mtx);
     flags = 1;
     switch (self->mode_0x08) {
     case 0:
@@ -539,7 +538,7 @@ extern "C" void fn_80115100(_EFT* self)
             self->state_0x05++;
             return;
         }
-        fn_80041E40(&v, &lbl_806A4538);
+        copyVec3(&v, &lbl_806A4538);
         get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(
             &((_PLW*)self->source_0x30)->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
         fn_80073F68(&self->pos_0x18, &v);
@@ -610,7 +609,7 @@ extern "C" void fn_801153B4(_EFT* self)
 /* Zeroes the shared effect-origin vector. */
 extern "C" void fn_801153B8(void)
 {
-    fn_80041E8C(&lbl_806A4538, lbl_80796A28, lbl_80796A2C, lbl_80796A28);
+    setVec3(&lbl_806A4538, lbl_80796A28, lbl_80796A2C, lbl_80796A28);
 }
 
 /* Creates the actor's eft021 record and seeds its work block. */
@@ -879,7 +878,7 @@ void eft022_set(nw4r::math::VEC3* pos, u8 area)
     effect->release_0x40 = fn_801164F0;
     effect->field_0x03 = 22;
     effect->area_0x44 = area;
-    fn_80041E40(&effect->pos_0x18, pos);
+    copyVec3(&effect->pos_0x18, pos);
     effect->type_0x02 = 0;
     effect->timer_0x0C = 0;
     effect->flag_0x01 = 1;
@@ -905,7 +904,7 @@ extern "C" void fn_80116430(void* source, nw4r::math::VEC3* pos, u8 area)
     effect->release_0x40 = fn_801164F0;
     effect->field_0x03 = 22;
     effect->area_0x44 = area;
-    fn_80041E40(&effect->pos_0x18, pos);
+    copyVec3(&effect->pos_0x18, pos);
     effect->type_0x02 = 1;
     effect->timer_0x0C = 0;
     effect->flag_0x01 = 1;
@@ -1234,8 +1233,8 @@ extern "C" void fn_801156A0(_EFT* self)
     s32 j;
     f32 z;
 
-    fn_80043EA8(&v);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v);
+    MTX34_ctor(&mtx);
     work = (_EFT_WORK_B*)self->work_0x38;
     self->state_0x05++;
     for (i = 0; i < work->count; i++) {
@@ -1295,7 +1294,7 @@ extern "C" void fn_801156A0(_EFT* self)
         work->mtx[i][0].m[1][3] += v.y;
         work->mtx[i][0].m[2][3] = z + v.z;
         fn_8010140C(&work->mtx[i][0], &self->pos_0x18, z);
-        fn_80041E40(&work->models[i]->pos_0x04, &self->pos_0x18);
+        copyVec3(&work->models[i]->pos_0x04, &self->pos_0x18);
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;
         work->models[i]->field_0x30 = self->field_0x2C;
@@ -1392,8 +1391,8 @@ extern "C" void fn_80115A80(_EFT* self)
     f32 f30 = lbl_80796A44;
     f32 f31 = lbl_80796A48;
 
-    fn_80043EA8(&v);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&v);
+    MTX34_ctor(&mtx);
     work = (_EFT_WORK_B*)self->work_0x38;
     if (self->type_0x02 != 2) {
         plw = (_PLW*)self->source_0x30;
@@ -1487,7 +1486,7 @@ extern "C" void fn_80115A80(_EFT* self)
         work->mtx[i][0].m[1][3] += v.y;
         work->mtx[i][0].m[2][3] = f1 + v.z;
         fn_8010140C(&work->mtx[i][0], &self->pos_0x18, f1);
-        fn_80041E40(&work->models[i]->pos_0x04, &self->pos_0x18);
+        copyVec3(&work->models[i]->pos_0x04, &self->pos_0x18);
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;
         work->models[i]->field_0x30 = self->field_0x2C;
@@ -1525,13 +1524,13 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
 
     effect = obj->owner_0x04;
     work = (_EFT_WORK_B*)effect->work_0x38;
-    fn_80043EA8((nw4r::math::VEC3*)&out);
-    fn_80043EA8((nw4r::math::VEC3*)&ma);
-    fn_80043EA8((nw4r::math::VEC3*)&mb);
-    fn_8005050C(&mc);
-    fn_8005050C(&out);
-    fn_8005050C(&ma);
-    fn_8005050C(&mb);
+    VEC3_ctor((nw4r::math::VEC3*)&out);
+    VEC3_ctor((nw4r::math::VEC3*)&ma);
+    VEC3_ctor((nw4r::math::VEC3*)&mb);
+    MTX34_ctor(&mc);
+    MTX34_ctor(&out);
+    MTX34_ctor(&ma);
+    MTX34_ctor(&mb);
     fn_8005D1AC(&h0, 0);
     fn_8005D1AC(&h1, 0);
     src = &work->mtx[obj->index_0x08][0];

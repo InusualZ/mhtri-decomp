@@ -63,15 +63,15 @@
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
 #include "ef/fn_800CDB2C.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------- *
  * Callees outside this unit.
  * ---------------------------------------------------------------------------------------------- */
 
 /* The three vector helpers the game-root draw layer owns; `enemy.h` pulls `ef.h`'s
- * `fn_80043EA8(VEC3*)`, and `include/mh3_pad.h`'s `fn_80043EA8(void*)` cannot be included beside it,
- * so `fn_80041E40` is declared here (the rule 2 named gap). */
-void fn_80041E40(VEC3* dst, const VEC3* src);
+ * `VEC3_ctor(VEC3*)`, and `include/mh3_pad.h`'s `VEC3_ctor(void*)` cannot be included beside it,
+ * so `copyVec3` is declared here (the rule 2 named gap). */
 void fn_8008E8D0(void* a, void* b);
 void fn_8008DA10(void* a, void* b);
 void fn_800513F0(VEC3* v, f32 s);
@@ -140,8 +140,8 @@ extern "C" u8 fn_8035E034(_ENEMY_WORK* self, u8 mode)
     VEC3 b;
     VEC3 c;
 
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     switch (mode) {
     case 0:
         return self->field_0x1E4;
@@ -150,19 +150,19 @@ extern "C" u8 fn_8035E034(_ENEMY_WORK* self, u8 mode)
     case 2:
         fn_8035EE40(self, 0, &a);
         fn_80050CA0(&c, &a, &self->pos);
-        fn_80041E40(&b, &c);
+        copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B704;
     case 3:
         fn_8035EE40(self, 1, &a);
         fn_80050CA0(&c, &a, &self->pos);
-        fn_80041E40(&b, &c);
+        copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B708;
     case 4:
         return self->field_0x33F;
     case 5:
         fn_8035EE40(self, 2, &a);
         fn_80050CA0(&c, &a, &self->pos);
-        fn_80041E40(&b, &c);
+        copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B70C;
     case 6:
         return fn_803BDFF4(self->field_0x33B, self->act_id) != 0;
@@ -285,8 +285,8 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
     u8 n;
     int i;
 
-    fn_80043EA8(&v1);
-    fn_80043EA8(&v2);
+    VEC3_ctor(&v1);
+    VEC3_ctor(&v2);
     n = (u8)fn_803BDF0C(self->act_id, buf, 0x10);
     if (n > 0x10) {
         return 0xFF;
@@ -303,7 +303,7 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
                     if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
                         VEC3 v3;
                         fn_80050CA0(&v3, &v1, p);
-                        fn_80041E40(&v2, &v3);
+                        copyVec3(&v2, &v3);
                         if (fn_80050F24((const f32*)&v2) > fn_803BDECC(id)->field_0x1F0) {
                             ok = 0;
                         }
@@ -452,7 +452,7 @@ extern "C" void fn_8035EAA0(_ENEMY_WORK* self, u8 a)
 
     if (id != 0xFF) {
         self->field_0x33B = id;
-        fn_80041E40(&self->target, fn_803BDFF4(id, self->act_id));
+        copyVec3(&self->target, fn_803BDFF4(id, self->act_id));
         fn_8012B380(self, 6, 0xFF, 0);
         fn_8013072C(self, 5, 1);
     } else {
@@ -475,21 +475,21 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
     VEC3 v2;
     VEC3 v3;
 
-    fn_80043EA8(&v1);
-    fn_80043EA8(&v2);
+    VEC3_ctor(&v1);
+    VEC3_ctor(&v2);
     if (fn_8035E984(self->field_0x33B, self->act_id) == 1) {
         VEC3* p = fn_803BDFF4(self->field_0x33B, self->act_id);
         u16 ang = fn_80127E78(self);
         int keep = 1;
         if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
             fn_80050CA0(&v3, &v1, p);
-            fn_80041E40(&v2, &v3);
+            copyVec3(&v2, &v3);
             if (fn_80050F24((const f32*)&v2) > fn_803BDECC(self->field_0x33B)->field_0x1F0) {
                 keep = 0;
             }
         }
         if (keep) {
-            fn_80041E40(&self->target, p);
+            copyVec3(&self->target, p);
             fn_8012B380(self, 6, 0xFF, 0);
             self->field_0x33F = 2;
         }
@@ -584,7 +584,7 @@ extern "C" void fn_8035EF58(void* a, void* b, void* c, void* d, u32 e, u8* f)
     VEC3 v;
     struct EmAimSource* p = (struct EmAimSource*)((struct EmAimOwner*)a)->field_0x004;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if (f[4] == 0xFF) {
         if (e - 5 <= 1) {
             if (p->field_0x00A == 1) {
@@ -632,17 +632,17 @@ extern "C" void fn_8035F060(_ENEMY_WORK* self, u8 a)
         }
         self->field_0x1CC = lbl_8079B718;
         if (self->run_flags_0xB12 & 1) {
-            fn_80041E40(&self->pos, (VEC3*)&self->run_0xB04[0]);
+            copyVec3(&self->pos, (VEC3*)&self->run_0xB04[0]);
             self->pos_0x1BC.y = self->run_angle_0xB10;
         } else {
             self->run_angle_0xB10 = (u16)self->pos_0x1BC.y;
-            fn_80041E40((VEC3*)&self->run_0xB04[0], &self->pos);
+            copyVec3((VEC3*)&self->run_0xB04[0], &self->pos);
         }
         fn_80133BC0(self);
         break;
     case 0:
         if (self->field_0x00A != 0) {
-            fn_80041E40(&self->pos, (VEC3*)&self->run_0xB04[0]);
+            copyVec3(&self->pos, (VEC3*)&self->run_0xB04[0]);
             self->pos_0x1BC.y = self->run_angle_0xB10;
         }
         break;

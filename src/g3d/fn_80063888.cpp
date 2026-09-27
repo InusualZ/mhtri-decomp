@@ -43,7 +43,7 @@
 #include "unsplit/g3d.h"      /* unsplit g3d neighbours (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_80063888.h"
-#include "mh3_pad.h"        /* fn_80043EA8, owned by mh3_pad.cpp (rule 2) */
+#include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
 
 /* The `g3d`-band helpers owned by unsplit units (their address band - bracketed by the `main` unit
  * `fn_8004C9A0.cpp` and this one - names no single module, so they stay local declarations). */
@@ -613,7 +613,7 @@ extern "C" u32 fn_8006405C(void *p)
 
 /* --------------------------------------------------------------------------------------------- *
  * The composite teardown destructors (0x80067B5C/0x80067E70/0x80067EB4): construct-or-clear each
- * sub-record of the object through `fn_80043EA8`/`fn_80064834`, then hand the object back.
+ * sub-record of the object through `VEC3_ctor`/`fn_80064834`, then hand the object back.
  * --------------------------------------------------------------------------------------------- */
 
 typedef struct {
@@ -643,15 +643,15 @@ extern "C" void *fn_80067B5C(void *self)
 extern "C" void *fn_80067E70(void *self)
 {
     G3dTripleVecObj *obj = (G3dTripleVecObj *)self;
-    fn_80043EA8(&obj->vec_0x04);
-    fn_80043EA8(&obj->vec_0x10);
-    fn_80043EA8(&obj->vec_0x1C);
+    VEC3_ctor(&obj->vec_0x04);
+    VEC3_ctor(&obj->vec_0x10);
+    VEC3_ctor(&obj->vec_0x1C);
     return self;
 }
 
 extern "C" void *fn_80067EB4(void *self)
 {
-    fn_80043EA8(&((G3dSingleVecObj *)self)->vec_0x08);
+    VEC3_ctor(&((G3dSingleVecObj *)self)->vec_0x08);
     return self;
 }
 
@@ -1059,8 +1059,8 @@ typedef struct {
 extern "C" void *fn_800677D8(void *self)
 {
     G3dTeardownObj *obj = (G3dTeardownObj *)self;
-    fn_80043EA8(&obj->vec_0x08);
-    fn_80043EA8(&obj->vec_0x14);
+    VEC3_ctor(&obj->vec_0x08);
+    VEC3_ctor(&obj->vec_0x14);
     fn_80064834(&obj->sub_0x20);
     fn_80064834(&obj->sub_0x38);
     return self;

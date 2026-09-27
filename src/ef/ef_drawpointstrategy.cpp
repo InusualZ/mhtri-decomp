@@ -45,6 +45,7 @@
 #include "ef.h"
 #include "gx.h"
 #include "ef/ef_drawstrategy.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
@@ -74,7 +75,6 @@ f32* fn_800BF5B0(f32* limit, f32* value);
 void fn_800AE360(EfDrawArgs* args, Mtx34* mtx);
 void fn_800B7DB0(void* em, Mtx34* mtx);
 void fn_800710BC(Mtx34* out, Mtx34* a, Mtx34* b);
-void fn_8005050C(Mtx34* mtx);
 Mtx34* fn_80050508(Mtx34* mtx);
 void fn_800C6064(EfDrawStrategyObj* self, EfDrawArgs* args, EfEmitterShape* shape, void* em);
 void fn_800C68E8(EfDrawStrategyObj* self, void* particle, EfEmitterShape* shape, void* em, u32 first,
@@ -195,9 +195,9 @@ void fn_800BF818(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
 
     flag = (self->flag_0xD0 != 0);
 
-    fn_8005050C(&mtx_view);
+    MTX34_ctor(&mtx_view);
     fn_800AE360(args, &mtx_view);
-    fn_8005050C(&mtx_result);
+    MTX34_ctor(&mtx_result);
     fn_800B7DB0(em, &mtx_result);
     fn_800710BC(&mtx_result, &mtx_result, &mtx_view);
     GXLoadPosMtxImm(fn_80050508(&mtx_result), 0);

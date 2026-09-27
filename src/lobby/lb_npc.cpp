@@ -57,6 +57,7 @@
 #include "nw4r/math.h"
 
 #include "lobby/lb_npc.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * Data
@@ -657,7 +658,6 @@ void fn_801FD4BC(_LB_NPC* self);
 void fn_801FD594(_LB_NPC* self);
 void fn_801FDBD0(_LB_NPC* self);
 void fn_801FF9E0(u8* sub, _LB_NPC* self);
-void fn_80041E40(VEC3* dst, VEC3* src);
 }
 
 extern "C" {
@@ -699,7 +699,7 @@ void fn_801FD174(_LB_NPC* self)
     self->pos_0x10.x = lbl_80799880;
     self->pos_0x10.y = lbl_80799880;
     self->pos_0x10.z = lbl_80799880;
-    fn_80041E40(&self->field_0x01C, &self->pos_0x10);
+    copyVec3(&self->field_0x01C, &self->pos_0x10);
     self->field_0x028 = 0;
     self->field_0x02C = 0;
     self->field_0x030 = 0;

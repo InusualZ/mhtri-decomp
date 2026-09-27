@@ -63,6 +63,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "pl.h"
 #include "ai/ai_npc.h"
@@ -277,8 +278,8 @@ void fn_802D15DC(struct _AINPC_W* self)
     u16 flags = 0x20;
     s32 blocked = 0;
 
-    fn_80043EA8(&probe);
-    fn_80043EA8(&current);
+    VEC3_ctor(&probe);
+    VEC3_ctor(&current);
     if (self->field_0x3CA > 0) {
         self->field_0x3C8 = 0;
         return;
@@ -292,9 +293,9 @@ void fn_802D15DC(struct _AINPC_W* self)
     if ((u32)(self->motion - 4) > 1 && blocked == 0) {
         flags = 0x20 | 0xC0;
     }
-    fn_80041E40(&probe, &self->pos_0x184);
+    copyVec3(&probe, &self->pos_0x184);
     probe.y = probe.y + lbl_8079A7A8;
-    fn_80041E40(&current, &self->pos_0x178);
+    copyVec3(&current, &self->pos_0x178);
     current.y = current.y + lbl_8079A7A8;
     self->field_0x3C8 = (s8)fn_8029208C(&probe, &current, &self->pos_0x178, 0xFFFF, flags, 1,
                                         self->area, lbl_8079A7A8);
@@ -370,7 +371,7 @@ void fn_802D1954(struct _AINPC_W* self)
     nw4r::math::VEC3 offset;
     nw4r::math::VEC3 position;
 
-    fn_80043EA8(&offset);
+    VEC3_ctor(&offset);
     if (fn_802D948C(self) != 1) {
         if (fn_802D94A0(self) == 1 && plw->area_0x16 == 0) {
             self->field_0x486 = 0x5A;
@@ -380,8 +381,8 @@ void fn_802D1954(struct _AINPC_W* self)
         setVector3(&offset, lbl_8079A7AC, lbl_8079A670, lbl_8079A7B0);
         rotVecY(&offset, self->vec_0x190.y);
         fn_80051378(&position, &plw->vec_0x03C, &offset);
-        fn_80041E40(&self->pos_0x184, &position);
-        fn_80041E40(&self->pos_0x178, &self->pos_0x184);
+        copyVec3(&self->pos_0x184, &position);
+        copyVec3(&self->pos_0x178, &self->pos_0x184);
         if (plw->kind_0x09 != 3) {
             fn_802D29F8(self, 0);
         } else {
@@ -486,7 +487,7 @@ void fn_802D1D90(struct _AINPC_W* self)
     _PLW* plw = self->plw_0x16C;
     u8 i;
 
-    fn_80041E40(&self->pos_0x184, &self->pos_0x178);
+    copyVec3(&self->pos_0x184, &self->pos_0x178);
     self->field_0x3C4 = 0;
     self->field_0x417 = 0;
     self->field_0x450 = 0;
@@ -531,7 +532,7 @@ void fn_802D1D90(struct _AINPC_W* self)
     fn_802D6888(self);
     fn_802D1FFC(self);
     self->model.move(0);
-    fn_80041E40(&self->pos_0x178, &self->model.pos_0x04);
+    copyVec3(&self->pos_0x178, &self->model.pos_0x04);
     if (self->variant != 1) {
         if (self->variant != 2) {
             fn_800524C0(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
@@ -558,7 +559,7 @@ void fn_802D1FFC(struct _AINPC_W* self)
     self->model.field_0x28 = self->vec_0x190.x;
     self->model.field_0x2C = self->vec_0x190.y;
     self->model.field_0x30 = self->vec_0x190.z;
-    fn_80041E40(&self->model.pos_0x04, &self->pos_0x178);
+    copyVec3(&self->model.pos_0x04, &self->pos_0x178);
 }
 
 /* 0x802D2024 - advances the four counter-attack counter blocks. */
@@ -597,7 +598,7 @@ void fn_802D214C(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 offset;
 
-    fn_80043EA8(&offset);
+    VEC3_ctor(&offset);
     setVector3(&offset, lbl_8079A670, lbl_8079A68C, lbl_8079A670);
     if (self->motion != 5) {
         s16 count = self->field_0x21C;
@@ -1168,8 +1169,8 @@ void fn_802D3210(struct _AINPC_W* self, u32* angles)
 {
     nw4r::math::VEC3 offset;
 
-    fn_80043EA8(&offset);
-    fn_80041E40(&offset, &self->pos_0x1D4);
+    VEC3_ctor(&offset);
+    copyVec3(&offset, &self->pos_0x1D4);
     rotVecX(&offset, angles[0]);
     rotVecY(&offset, angles[1]);
     fn_80073F68(&self->pos_0x178, &offset);
@@ -1542,13 +1543,13 @@ s32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy)
     }
     if (moved == 1) {
         if (copy == 1) {
-            fn_80041E40(&self->pos_0x1B0, &self->pos_0x178);
+            copyVec3(&self->pos_0x1B0, &self->pos_0x178);
             fn_802D3CB8(self);
             return 0;
         }
         if ((self->field_0x358 != 0 || self->field_0x35C != 0) &&
             calcDistanceSqXZ(&self->pos_0x178, &self->pos_0x1B0) < lbl_8079A6E0) {
-            fn_80041E40(&self->pos_0x1B0, &self->pos_0x178);
+            copyVec3(&self->pos_0x1B0, &self->pos_0x178);
             fn_802D3CB8(self);
             return 0;
         }
@@ -1814,14 +1815,14 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
     nw4r::math::VEC3 pos;
     u8 code = kind;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if ((self->field_0x324 & 0x4000) != 0 || a1 != 0) {
         return;
     }
     if (joint != 0xFF) {
         self->model.get_joint_wpos(joint, &pos);
     } else {
-        fn_80041E40(&pos, &self->pos_0x178);
+        copyVec3(&pos, &self->pos_0x178);
     }
     if ((self->field_0x324 & 6) != 0) {
         pos.y = lbl_8079A7B8 + self->field_0x1A0;

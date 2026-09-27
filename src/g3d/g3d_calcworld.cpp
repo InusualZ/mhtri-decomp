@@ -23,6 +23,7 @@
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
 #include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -46,8 +47,6 @@ struct G3DWorkObj;
 /* externs: the SDK and the neighbouring units this one calls (the map owns their names)            */
 /* ------------------------------------------------------------------------------------------------ */
 
-extern "C" void fn_80041E40(void* pDst, const void* pSrc);
-extern "C" void fn_80043EA8(void* pOut);
 extern "C" void fn_800513CC(void* pOut, const void* pIn);
 extern "C" s32 fn_8005AAEC(const void* p);
 extern "C" f32* fn_8005CED0(void);
@@ -301,8 +300,8 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
                     reset = 0;
                 }
                 if (nodeID != 0 && mayaDisable != 0 && reset == 0) {
-                    fn_80043EA8(&vA);
-                    fn_80043EA8(&vB);
+                    VEC3_ctor(&vA);
+                    VEC3_ctor(&vB);
                     if (pRec != &rec) {
                         fn_80073FA0(&rec, pRec);
                         pRec = &rec;
@@ -350,7 +349,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
                 pMtxIDList[numMtx++] = nodeID;
                 pMtxIDs[nodeID] = pMtxIDs[targetID];
                 fn_8007100C(pMtxArray + nodeID * 0x30, pMtxArray + targetID * 0x30);
-                fn_80041E40(pScale + nodeID * 3, pScale + targetID * 3);
+                copyVec3(pScale + nodeID * 3, pScale + targetID * 3);
                 pCode += 5;
                 break;
             }

@@ -49,6 +49,7 @@
 #include "sys_mem.h"
 #include "unsplit/ef.h"
 #include "g3d/fn_80063888.h" /* fn_80067E54, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 #ifdef __cplusplus
 namespace nw4r {
@@ -92,8 +93,6 @@ extern f32 lbl_80796140;    /* a stripe-strategy constant                       
 extern void  MEMInitList(void* list, u16 offset);
 extern void* fn_80501C9C(void* list, u16 index);
 extern void  PSVECSubtract(Vec* dst, const Vec* a, const Vec* b);
-extern void  fn_80041E40(void* dst, void* src);
-extern void  fn_80043EA8(VEC3* out);
 
 /* `fn_800C5F74` has no registered owner, so its declaration lives in `unsplit/ef.h` (rule 2);
  * `__dl__FPv` is `sys_mem.cpp`'s `operator delete`, reached through its owner (rules 2 and 9). */
@@ -316,7 +315,7 @@ void fn_800B2810(void* self, f32 value) {
 
 /* Copies a source block over the resolved parameter's second block. */
 void fn_800B2840(void* self, void* src) {
-    fn_80041E40(&fn_800B26F8(self)->field_0x54, src);
+    copyVec3(&fn_800B26F8(self)->field_0x54, src);
 }
 
 /* Constructs the resource record and installs its vtable. */
@@ -338,13 +337,13 @@ Vec* fn_800B0B90(Vec* self, Vec* b) {
 
 /* Copies the particle's +0x98 block into `dst`. */
 void fn_800B87C8(void* dst, EfParticleState* particle) {
-    fn_80041E40(dst, &particle->field_0x98);
+    copyVec3(dst, &particle->field_0x98);
 }
 
 /* Builds the particle's +0xB0 transform into a local and copies it into `dst`. */
 void fn_800B8788(void* dst, EfParticleState* particle) {
     u8 tmp[0x10];
-    fn_80041E40(dst, fn_80067E54(tmp, &particle->field_0xB0));
+    copyVec3(dst, fn_80067E54(tmp, &particle->field_0xB0));
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -385,9 +384,9 @@ void* fn_800B5ACC(void* self, void* node);
 
 /* Zeroes the three positions of a stripe sample and returns it. */
 EfStripeSample* fn_800B6954(EfStripeSample* self) {
-    fn_80043EA8((VEC3*)&self->a);
-    fn_80043EA8((VEC3*)&self->b);
-    fn_80043EA8((VEC3*)&self->c);
+    VEC3_ctor((VEC3*)&self->a);
+    VEC3_ctor((VEC3*)&self->b);
+    VEC3_ctor((VEC3*)&self->c);
     return self;
 }
 
@@ -601,7 +600,7 @@ void* fn_800B3DBC(void* self, u32 index, EfResFile* arg) {
 void fn_800B87D0(Vec* a, EfParticleState* particle, EfAheadItem* item) {
     PSVECSubtract(a, &item->field_0xAC, &particle->field_0xA4);
     if (fn_800B59E4(a) == 0) {
-        fn_80041E40(a, &particle->field_0x98);
+        copyVec3(a, &particle->field_0x98);
     }
 }
 
@@ -609,7 +608,7 @@ void fn_800B87D0(Vec* a, EfParticleState* particle, EfAheadItem* item) {
 void fn_800B882C(Vec* a, EfParticleState* particle, void* arg) {
     fn_800A7F00(arg, a);
     if (fn_800B59E4(a) == 0) {
-        fn_80041E40(a, &particle->field_0x98);
+        copyVec3(a, &particle->field_0x98);
     }
 }
 

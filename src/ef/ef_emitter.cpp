@@ -69,6 +69,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h" /* fn_800AB9F4 / fn_800AE360 are that unit's (rule 2) */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -163,10 +165,7 @@ f32 fn_80050BC0(f32 x);
 void fn_80050CA0(void* dst, void* a, void* b);
 void* fn_800508AC(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
-void fn_80041E40(void* dst, const void* src);
-void fn_80043EA8(void* out);
 void fn_800504D4(void* mtx);
-void fn_8005050C(void* mtx);
 void fn_80051424(void* dst, void* src, f32 scale);
 void fn_80051490(void* dst, void* src);
 void fn_800514FC(void* dst, void* mtx, void* vec);
@@ -668,9 +667,9 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     self->rate = (f32)work->rate / lbl_80796000;
     self->life = lbl_80796004;
     self->transform_dirty = 1;
-    fn_80041E40(&self->position, &work->vec_0x78);
-    fn_80041E40(&self->vec_0x9C, &work->vec_0x60);
-    fn_80041E40(&self->rotation, &work->vec_0x6C);
+    copyVec3(&self->position, &work->vec_0x78);
+    copyVec3(&self->vec_0x9C, &work->vec_0x60);
+    copyVec3(&self->rotation, &work->vec_0x6C);
     self->flags3 = 3;
     self->alpha = 100;
     self->field_0x066 = work->field_0x36;
@@ -678,7 +677,7 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     for (s32 i = 0; i < 7; i++) {
         self->float_0x068[i] = work->float_0x38[i];
     }
-    fn_80041E40(&self->vec_0x84, &work->vec_0x54);
+    copyVec3(&self->vec_0x84, &work->vec_0x54);
     fn_800B2878();
     self->seed = (u16)work->field_0x088;
     if (self->seed == 0) {
@@ -824,8 +823,8 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         e->position.y = lbl_80796004;
         e->position.z = lbl_80796004;
         fn_800A95D8(e);
-        fn_8005050C(&m1);
-        fn_8005050C(&m2);
+        MTX34_ctor(&m1);
+        MTX34_ctor(&m2);
         fn_800504D4(&m1);
         fn_8009CA30(&m1, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m1, &m1, &e->vec_0x9C);
@@ -899,9 +898,9 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             e.flags3 |= 4;
         }
         if ((params->field_0x07 & 1) != 0 && params->field_0x00 != 0) {
-            fn_80043EA8(&v);
-            fn_8005050C(&m1);
-            fn_8005050C(&m2);
+            VEC3_ctor(&v);
+            MTX34_ctor(&m1);
+            MTX34_ctor(&m2);
             fn_800AE360((void*)pm->manager, &m2);
             m2.m[0][3] = lbl_80796004;
             m2.m[1][3] = lbl_80796004;
@@ -925,8 +924,8 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             e.position.y = lbl_80796004;
             e.position.z = lbl_80796004;
             fn_800A95D8(&e);
-            fn_8005050C(&m1);
-            fn_8005050C(&m2);
+            MTX34_ctor(&m1);
+            MTX34_ctor(&m2);
             fn_800504D4(&m1);
             fn_8009CA30(&m1, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m1, &m1, &e.vec_0x9C);
@@ -1018,8 +1017,8 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             }
             {
                 nw4r::math::MTX34 m3, m4;
-                fn_8005050C(&m3);
-                fn_8005050C(&m4);
+                MTX34_ctor(&m3);
+                MTX34_ctor(&m4);
                 fn_800AE360((void*)created, &m4);
                 fn_800883C4(&m4, &m4);
                 fn_800A94A4(&e, &m3);
@@ -1050,7 +1049,7 @@ extern "C" EfVec* fn_800A7F00(EfParticleRec* self, EfVec* result) {
     {
         EfVec v;
         fn_80050CA0(&v, &self->offset, &self->position);
-        fn_80041E40(result, &v);
+        copyVec3(result, &v);
     }
     return result;
 }
@@ -1141,7 +1140,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
         if ((self->flags2 & 0x100) != 0) {
             EfEffectData* effect = self->managerEF->effect;
             EfVec v;
-            fn_80043EA8(&v);
+            VEC3_ctor(&v);
             fn_800514FC(&v, fn_800A94A4(self, NULL), &self->position);
             step *= self->color_b +
                     (lbl_8079601C - self->color_b) *
@@ -1405,8 +1404,8 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
     if (self->state == 1) {
         EfParticleRec* pm = (EfParticleRec*)fn_800A5250(&self->particles);
         nw4r::math::MTX34 m1, m2;
-        fn_8005050C(&m1);
-        fn_8005050C(&m2);
+        MTX34_ctor(&m1);
+        MTX34_ctor(&m2);
         fn_800AE360((void*)pm->manager, &m2);
         fn_800883C4(&m2, &m2);
         fn_800A94A4(self, &m1);
@@ -1439,13 +1438,13 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
     }
     {
         nw4r::math::MTX34 m1, m2, m3, m4;
-        fn_8005050C(&m1);
+        MTX34_ctor(&m1);
         self->rotation.x = lbl_80796004;
         self->rotation.y = lbl_80796004;
         self->rotation.z = lbl_80796004;
         self->transform_dirty = 1;
         fn_800A94A4(self, &m1);
-        fn_8005050C(&m2);
+        MTX34_ctor(&m2);
         fn_800710BC(&m2, &self->managerEF->effect->ref_mtx, &m1);
         fn_800A89A0(&m3, &m2);
         m3.m[0][0] = fn_8009CD64(&m3, 0);
@@ -1458,7 +1457,7 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
         m3.m[1][2] = lbl_80796004;
         m3.m[0][2] = lbl_80796004;
         if ((self->flags2 & 0x10000) != 0) {
-            fn_8005050C(&m4);
+            MTX34_ctor(&m4);
             fn_8009CA30(&m4, lbl_80796028, lbl_80796004, lbl_80796004);
             fn_800710BC(&m3, &m3, &m4);
         }
@@ -1496,12 +1495,12 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
         EfVec offset;
         EfVec pt;
         nw4r::math::MTX34 m;
-        fn_80043EA8(&offset);
+        VEC3_ctor(&offset);
         fn_8009BF08(orig, &offset);
         if (c == 100) {
             fn_80501390(dst, dst, &offset);
         } else if (c != 0) {
-            fn_80043EA8(&pt);
+            VEC3_ctor(&pt);
             fn_80051424(&pt, &offset, (f32)c / lbl_80796000);
             fn_80501390(dst, dst, &pt);
         }
@@ -1510,17 +1509,17 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
                 fn_80501390(dst, dst, &offset);
             }
             if (b != 0) {
-                fn_8005050C(&m);
+                MTX34_ctor(&m);
                 fn_8009B650(orig, &m);
                 fn_800710BC(dst, dst, &m);
             }
             if (a != 0) {
-                fn_80043EA8(&pt);
+                VEC3_ctor(&pt);
                 fn_8009C040(orig, &pt);
                 fn_8009CBA0(dst, dst, &pt);
             }
             if (d != 0 && c != 100) {
-                fn_80043EA8(&pt);
+                VEC3_ctor(&pt);
                 fn_80051424(&pt, &offset, lbl_80796018);
                 fn_80501390(dst, dst, &pt);
             }
@@ -1536,12 +1535,12 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
 extern "C" void* fn_800A94A4(EfEmitterObj* self, void* out) {
     if (self->transform_dirty != 0) {
         nw4r::math::MTX34 m;
-        fn_8005050C(&m);
+        MTX34_ctor(&m);
         if (self->parent == NULL) {
             fn_8007100C(&self->matrix, fn_800A60C0(self->managerEF));
         } else {
             nw4r::math::MTX34 p;
-            fn_8005050C(&p);
+            MTX34_ctor(&p);
             fn_800A94A4(self->parent, &p);
             fn_800A90AC(&self->matrix, &p, self->flags3 & 1, self->flags3 & 2, (s8)self->alpha,
                         self->flags3 & 4);

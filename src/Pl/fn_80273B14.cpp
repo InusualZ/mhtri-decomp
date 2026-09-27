@@ -1474,7 +1474,7 @@ s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out)
     nw4r::math::VEC3 pos;
     s16 before;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     if (out != NULL) {
         *out = 0;
     }

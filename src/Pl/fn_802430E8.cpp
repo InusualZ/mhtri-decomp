@@ -41,19 +41,15 @@
  * here only as far as a written caller needs them, and build as undefined relocations; the inventory
  * is `config/RMHE08/symbols.txt`.  Two of them are half-blocked on a header clash rather than on
  * codegen: `fn_80246654` needs `get_move_work_adrs` from `include/enemy/fn_80165FC8.h`, which cannot
- * be included beside `sound/se.h` (both declare `fn_800532DC`/`fn_80041E8C` with different types), and
- * `fn_80247CC4` needs `fn_80043EA8`/`fn_8012A624` and a full `VEC3` local through `include/ef.h`.
+ * be included beside `sound/se.h` (both declare `fn_800532DC`/`setVec3` with different types), and
+ * `fn_80247CC4` needs `VEC3_ctor`/`fn_8012A624` and a full `VEC3` local through `include/ef.h`.
  */
 
 #include "types.h"
 #include "pl.h"
-/* `incldue/pl.h` pulls in `ef.h`, and `ef.h` and `sound/se.h` declare `fn_80041E8C` with different
- * record types (`Vec*` vs `nwbr::math::VEC3*`), which MWCC rejects as `(10197) illegal function
- * overloading`.  This unit needs both headers and never calls it, so se.h's copy is renamed out of
- * the way for the include - the same workaround `enemy/fn_801550FC.cpp` uses. */
-#define fn_80041E8C mhtri_se_h_fn_80041E8C
+/* `sound/se.h` no longer declares `setVec3` (its owner `mh3_pad.h` does, and `ef.h` spells it the
+ * same way), so the macro that used to guard this include is gone. */
 #include "sound/se.h"
-#undef fn_80041E8C
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
@@ -61,13 +57,10 @@
 /* `include/Pl/fn_8025F088.h` is the owner of `fn_80260198` (0x80260198 sits inside that unit's
  * range 0x8025F088-0x80262940) and carries the unregistered `GetItemData` declaration, so this unit
  * takes both from it rather than keeping copies (rule 2).  The header also declares
- * `fn_80041E40(void*, const void*)`, whose owner is `mh3_pad.cpp` (`include/mh3_pad.h`), while
- * `sound/se.h` below declares the same name over `VEC3*`; this unit calls neither, so the header's
- * copy is renamed out of the way for the include - the same workaround the se.h copy already uses. */
-#define fn_80041E40 mhtri_fn8025f088_h_fn_80041E40
+ * `copyVec3`, which this header no longer declares (its owner `mh3_pad.h` does).  The
+ * `fn_80335CE8` macro still guards that header's own duplicate. */
 #define fn_80335CE8 mhtri_fn8025f088_h_fn_80335CE8
 #include "Pl/fn_8025F088.h"
-#undef fn_80041E40
 #undef fn_80335CE8
 #include "Pl/fn_802693C4.h"
 #include "Pl/pl_act.h"
@@ -550,8 +543,8 @@ extern "C" s32 fn_80245E20(_PLW* self) {
 extern "C" void fn_80246158(_PLW* self) {
     VEC3 vec;
     VEC3 scratch;
-    fn_80043EA8(&vec);
-    fn_80043EA8(&scratch);
+    VEC3_ctor(&vec);
+    VEC3_ctor(&scratch);
     vec.x = lbl_805C4898[self->chunk_ofs * 2];
     vec.y = lbl_80799E00;
     vec.z = lbl_805C4898[self->chunk_ofs * 2 + 1];

@@ -78,6 +78,8 @@
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
@@ -314,10 +316,6 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, void* p, u16* out, f32 a); /* enemy/f
 u32 fn_801E0058(struct _ENEMY_WORK* self, u32 a);                     /* enemy/fn_801DB8E0.cpp */
 
 /* ef / ai / stage module helpers */
-void fn_80041E40(void* dst, const void* src);
-void* fn_80041E8C(void* out, f32 x, f32 y, f32 z);
-void fn_80043EA8(void* out);
-void fn_8005050C(void* out);
 void fn_80050CA0(void* out, void* a, void* b);
 f32 fn_80050EF4(void* a, void* b);
 f32 fn_80050F80(void* a, void* b);
@@ -909,7 +907,7 @@ extern "C" void fn_801D944C(struct _ENEMY_WORK* self) {
     u16 var_r3;
     u8 temp_r3;
 
-    fn_80043EA8(&sp1C);
+    VEC3_ctor(&sp1C);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -919,7 +917,7 @@ extern "C" void fn_801D944C(struct _ENEMY_WORK* self) {
         fn_8012933C(self, 0, 7, 0x80);
         fn_80130CDC(self, (u32)-0x14);
         fn_80050CA0(&sp10, &self->vec_0x36C, &self->pos);
-        fn_80041E40(&sp1C, &sp10);
+        copyVec3(&sp1C, &sp10);
         calcVecAngXY(&sp1C, &spC, &sp8);
         var_r3 = sp8 - (u16)(self->field_0x1C0 + 0xD334);
         if ((u32)(var_r3 - 1) <= 0x7FFE) {
@@ -949,7 +947,7 @@ extern "C" void fn_801D9584(struct _ENEMY_WORK* self, u8 arg1) {
     u32 var_r0;
     u8 temp_r3;
 
-    fn_80043EA8(&sp1C);
+    VEC3_ctor(&sp1C);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -959,7 +957,7 @@ extern "C" void fn_801D9584(struct _ENEMY_WORK* self, u8 arg1) {
         fn_8012933C(self, 0, 8, 0x80);
         fn_80130CDC(self, (u32)-0x14);
         fn_80050CA0(&sp10, &self->vec_0x36C, &self->pos);
-        fn_80041E40(&sp1C, &sp10);
+        copyVec3(&sp1C, &sp10);
         calcVecAngXY(&sp1C, &spC, &sp8);
         temp_r0 = sp8 - (u16)(self->field_0x1C0 + 0x2CCD);
         if ((s32)temp_r0 > 0x8000) {
@@ -988,7 +986,7 @@ extern "C" void fn_801D9708(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 sp8;
     u8 temp_r3;
 
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp8);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1044,11 +1042,11 @@ extern "C" void fn_801D9918(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
     u8 temp_r3;
 
     var_r31 = arg2;
-    fn_80043EA8(&sp38);
-    fn_80043EA8(&sp2C);
-    fn_80043EA8(&sp20);
-    fn_80043EA8(&sp14);
-    fn_8005050C(&sp60);
+    VEC3_ctor(&sp38);
+    VEC3_ctor(&sp2C);
+    VEC3_ctor(&sp20);
+    VEC3_ctor(&sp14);
+    MTX34_ctor(&sp60);
     fn_80149788(&sp48);
     temp_r3 = self->state;
     switch (temp_r3) {
@@ -1092,13 +1090,13 @@ extern "C" void fn_801D9918(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
         }
         if (em_frame_check(self, 0, lbl_807995D8, lbl_807994FC) == 1) {
             sp48 = 0x17;
-            fn_80041E40(&sp4C, fn_80041E8C(&sp8, lbl_807994FC, lbl_8079956C, lbl_80799568));
-            fn_80041E40(&sp38, &sp4C);
+            copyVec3(&sp4C, setVec3(&sp8, lbl_807994FC, lbl_8079956C, lbl_80799568));
+            copyVec3(&sp38, &sp4C);
             get_joint_wmat_em(self, sp48, &sp60);
             setVector3(&sp2C, sp60.m[0][3], sp60.m[1][3], sp60.m[2][3]);
             mulVecMat(&sp38, &sp60);
             fn_80073F68(&sp2C, &sp38);
-            fn_80041E40(&sp14, &self->pos);
+            copyVec3(&sp14, &self->pos);
             temp_f1 = sp14.y;
             sp14.y = temp_f1 + lbl_8079950C;
             temp_r29 = findInterSection(&sp14, &sp2C, &sp20, 1, 0xFFFF, self->area_no,
@@ -1145,7 +1143,7 @@ extern "C" void fn_801D9CE4(struct _ENEMY_WORK* self) {
     f32 var_f31;
     u8 temp_r3;
 
-    fn_80043EA8(&sp14);
+    VEC3_ctor(&sp14);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1174,7 +1172,7 @@ extern "C" void fn_801D9CE4(struct _ENEMY_WORK* self) {
         }
         if (em_frame_check(self, 0, lbl_807995F8, lbl_807994FC) == 1) {
             fn_80136B50(self, (u32)-1, 1);
-            fn_80041E40(&sp14, fn_80041E8C(&sp8, lbl_807994FC, lbl_807994FC, lbl_807994FC));
+            copyVec3(&sp14, setVec3(&sp8, lbl_807994FC, lbl_807994FC, lbl_807994FC));
             shell_set_func_ptr->field_0x2c(self, 5, 0x21, &sp14, self->field_0xAEA,
                                            shell_set_func_ptr, lbl_807994F8);
         }
@@ -1246,8 +1244,8 @@ extern "C" void fn_801DA0D8(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp8;
     u8 temp_r3;
 
-    fn_80043EA8(&sp14);
-    fn_80043EA8(&sp8);
+    VEC3_ctor(&sp14);
+    VEC3_ctor(&sp8);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1340,8 +1338,8 @@ extern "C" s32 fn_801DA410(struct _ENEMY_WORK* self, u8 arg1) {
     s32 temp_r31;
     u8* temp_r31_2;
 
-    fn_80043EA8(&sp2C);
-    fn_80043EA8(&sp20);
+    VEC3_ctor(&sp2C);
+    VEC3_ctor(&sp20);
     temp_r31 = (s32)get_move_work_adrs(2);
     if ((s32)arg1 < (s32)get_move_work_max(2)) {
         temp_r31_2 = (u8*)(temp_r31 + (arg1 * 0xB20));
@@ -1350,7 +1348,7 @@ extern "C" s32 fn_801DA410(struct _ENEMY_WORK* self, u8 arg1) {
             rotVecY(&sp2C, self->field_0x1C0);
             fn_80051EE0(&sp8, &sp2C, lbl_80799618 * get_em_chg_scale(self));
             fn_80051378(&sp14, &self->pos, &sp8);
-            fn_80041E40(&sp20, &sp14);
+            copyVec3(&sp20, &sp14);
             if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) == lbl_8079961C) {
                 return 1;
             }
@@ -1370,8 +1368,8 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
     s32 temp_r0;
     u8 temp_r3;
 
-    fn_80043EA8(&sp3C);
-    fn_80043EA8(&sp30);
+    VEC3_ctor(&sp3C);
+    VEC3_ctor(&sp30);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1380,14 +1378,14 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
         fn_80130478(self, 0);
         fn_801DFD3C(self, &sp3C, &sp8, lbl_80799620);
         fn_80050CA0(&sp24, &sp3C, &self->pos);
-        fn_80041E40(&sp30, &sp24);
+        copyVec3(&sp30, &sp24);
         fn_80128BF8(self, &sp3C);
         fn_80134964(self, lbl_80570680, 2, 1, sp8);
         fn_801353E4(self);
         temp_f31 = fn_8012F8E4(self);
         fn_80051EE0(&spC, &sp30, lbl_80799624);
         fn_80051EE0(&sp18, &spC, temp_f31);
-        fn_80041E40(&self->offset_0x30C.vec_0x310, &sp18);
+        copyVec3(&self->offset_0x30C.vec_0x310, &sp18);
         self->field_0x314 = lbl_807994FC;
         return;
     case 1:
@@ -1675,7 +1673,7 @@ extern "C" void fn_801DB1C8(struct _ENEMY_WORK* self) {
     f32 var_f31;
     u8 temp_r3;
 
-    fn_80043EA8(&sp14);
+    VEC3_ctor(&sp14);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1703,7 +1701,7 @@ extern "C" void fn_801DB1C8(struct _ENEMY_WORK* self) {
         }
         if (em_frame_check(self, 0, lbl_807995F8, lbl_807994FC) == 1) {
             fn_80136B50(self, (u32)-1, 1);
-            fn_80041E40(&sp14, fn_80041E8C(&sp8, lbl_807994FC, lbl_807994FC, lbl_807994FC));
+            copyVec3(&sp14, setVec3(&sp8, lbl_807994FC, lbl_807994FC, lbl_807994FC));
             shell_set_func_ptr->field_0x2c(self, 5, 0x21, &sp14, self->field_0xAEA,
                                            shell_set_func_ptr, lbl_807994F8);
         }
@@ -1727,8 +1725,8 @@ extern "C" void fn_801DB3F8(struct _ENEMY_WORK* self) {
     u16 sp8;
     u8 temp_r3;
 
-    fn_80043EA8(&sp30);
-    fn_80043EA8(&sp24);
+    VEC3_ctor(&sp30);
+    VEC3_ctor(&sp24);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1737,12 +1735,12 @@ extern "C" void fn_801DB3F8(struct _ENEMY_WORK* self) {
         fn_80130478(self, 0);
         fn_801DFD3C(self, &sp30, &sp8, lbl_80799618);
         fn_80050CA0(&sp18, &sp30, &self->pos);
-        fn_80041E40(&sp24, &sp18);
+        copyVec3(&sp24, &sp18);
         fn_80128BF8(self, &sp30);
         fn_80134964(self, lbl_80570680, 2, 1, sp8);
         fn_801353E4(self);
         fn_80051EE0(&spC, &sp24, lbl_807994F8 / fn_8012F8F4(self));
-        fn_80041E40(&self->offset_0x30C.vec_0x310, &spC);
+        copyVec3(&self->offset_0x30C.vec_0x310, &spC);
         self->field_0x314 = lbl_807994FC;
         return;
     case 1:

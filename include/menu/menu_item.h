@@ -405,7 +405,10 @@ u32 fn_8027E120(_PLW* worker);
 /* `fn_8027D738` is `Pl/fn_8027D684.cpp`'s (its address is inside that unit's range) and it is written
  * there, so its declaration is the owner's header `include/Pl/fn_8027D684.h` (rule 2).  The two
  * unwritten siblings above have no owner header entry yet and keep this unit's call-site shape. */
-u32 fn_80047058(void);
+/* 0x80047058 is `mh3_pad.cpp`'s (no argument, `Screen_w+0x1A != 0`).  It was `u32` here, which
+ * MWCC reports as `(10505) illegal overloading` against the owner's `s32` as soon as both headers
+ * are visible in one TU. */
+s32 fn_80047058(void);
 void fn_8004082C(void);
 u8 fn_800CF208(void);
 u32 fn_800CF280(void);

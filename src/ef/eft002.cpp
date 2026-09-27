@@ -69,6 +69,7 @@
 #include "unsplit/g3d.h"
 #include "unsplit/sound.h"
 #include "sound/fn_800D7F54.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the Dolphin types the material calls take
@@ -234,7 +235,6 @@ struct _EFT_MODEL {
  * externs
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_8005050C(void* mtx);
 extern "C" void fn_800504D4(void* mtx);
 extern "C" void fn_800532DC(void* dst, const nw4r::math::MTX34& src);
 extern "C" void fn_80051574(void* dst, void* src);
@@ -339,8 +339,8 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
     nw4r::math::MTX34 mtx_b;
     _GXColor color;
 
-    fn_8005050C(&mtx_a);
-    fn_8005050C(&mtx_b);
+    MTX34_ctor(&mtx_a);
+    MTX34_ctor(&mtx_b);
 
     _EFT_MODEL_WORK* work = self->work_0x38;
     s32 timer = --self->timer_0x0C;

@@ -94,6 +94,8 @@
 #include "hud/cockpit_quest.h" /* hud/layout.h + pl.h: the 2D element library and its records */
 #include "ef/fn_800CDB2C.h" /* push_g3d_wk */
 #include "Runtime.PPCEABI.H/memset.h" /* memset - owner Runtime.PPCEABI.H/memset.c */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the records this unit reads
@@ -173,7 +175,7 @@ typedef struct Eft050Work {
     /* +0x00 */ MHchar* models_0x00[1]; /* the pooled handle list */
     /* +0x04 */ u8 count_0x04;          /* its used length */
     /* +0x05 */ u8 unused_0x05[0x03];
-    /* +0x08 */ VEC3 pos_0x08;          /* the spawned position `fn_80041E40` copies in */
+    /* +0x08 */ VEC3 pos_0x08;          /* the spawned position `copyVec3` copies in */
     /* +0x14 */ VEC3 spin_0x14;         /* the rotation the alive state advances */
     /* +0x20 */ u8 unused_0x20[0x04];
     /* +0x24 */ f32 scale_0x24;         /* the spawner's first scale argument */
@@ -244,9 +246,6 @@ extern "C" {
 #endif
 
 void fn_802152A4(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
-VEC3* fn_80041E40(VEC3* dst, const VEC3* src);
-void fn_80043EA8(VEC3* out);
-void fn_8005050C(f32* out);
 void fn_80073F68(VEC3* dst, const VEC3* src);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 const u8* fn_802D773C(u8 index);
@@ -552,7 +551,7 @@ extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param
     work->param_0x3C = param;
     work->flag_0x60 = 0;
     work->scale_0x30 = scale2;
-    fn_80041E40(&eft->pos_0x18, fn_80041E40(&work->pos_0x08, pos));
+    copyVec3(&eft->pos_0x18, copyVec3(&work->pos_0x08, pos));
     eft->rot_0x24.x = 0;
     eft->rot_0x24.y = 0;
     eft->rot_0x24.z = 0;
@@ -783,7 +782,7 @@ void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
     memset(work->works_0x1C, 0, 8);
     eft->field_0x03 = 0x32;
     fn_800F9DF4(eft, 1, 0);
-    fn_80041E40(&eft->pos_0x18, pos);
+    copyVec3(&eft->pos_0x18, pos);
     eft->area_0x44 = flag;
     eft->source_0x30 = plw;
     eft->flag_0x01 = 1;

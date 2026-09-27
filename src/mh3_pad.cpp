@@ -27,7 +27,7 @@
  *
  * This session reconstructed 67 of the 145 functions to the 80 % bar: the RSO sub-overlay loader state
  * machine (fn_800408A8..fn_80040FDC), the task-slot table (fn_80041640..fn_80041944), the vector
- * helpers (fn_80041E40..fn_80041E9C), the RcRecord accessors (fn_80042B34..fn_80042F60), the pad
+ * helpers (copyVec3..fn_80041E9C), the RcRecord accessors (fn_80042B34..fn_80042F60), the pad
  * callbacks and the Psw pad-record accessors, the KPAD/WPAD setup and the small flag/word helpers.
  *
  * Residuals (measured against the target object, symbol by symbol):
@@ -547,17 +547,20 @@ extern "C" void fn_80041E70(void* dst, void* src)
     ((f32*)dst)[2] = ((f32*)src)[2];
 }
 
-extern "C" void* fn_80041E40(void* dst, void* src)
+extern "C" void* copyVec3(void* dst, const void* src)
 {
-    fn_80041E70(dst, src);
+    fn_80041E70(dst, (void*)src);
     return dst;
 }
 
-extern "C" void fn_80041E8C(void* dst, f32 x, f32 y, f32 z)
+/* The return is the first argument, as the callers use it (`mr r4,r3` after the `bl`); the body
+ * leaves r3 alone, so `return out;` costs no instruction. */
+extern "C" void* setVec3(void* out, f32 x, f32 y, f32 z)
 {
-    ((f32*)dst)[0] = x;
-    ((f32*)dst)[1] = y;
-    ((f32*)dst)[2] = z;
+    ((f32*)out)[0] = x;
+    ((f32*)out)[1] = y;
+    ((f32*)out)[2] = z;
+    return out;
 }
 
 extern "C" void* fn_80041E9C(void* base, u32 size)
@@ -631,8 +634,10 @@ extern "C" void fn_800438B8(s32 arg0)
     }
 }
 
-extern "C" void fn_80043EA8(void)
+/* The retail body is a bare `blr`; the parameter is the record the call sites pass. */
+extern "C" void VEC3_ctor(void* out)
 {
+    (void)out;
 }
 
 extern "C" void fn_80045164(f32* dst, f32* src)
@@ -893,9 +898,9 @@ extern "C" void fn_8004726C(s32* dst, s32* src)
     *dst = *src;
 }
 
-extern "C" s32* fn_8004723C(s32* dst, s32* src)
+extern "C" void* fn_8004723C(void* dst, const void* src)
 {
-    fn_8004726C(dst, src);
+    fn_8004726C((s32*)dst, (s32*)src);
     return dst;
 }
 

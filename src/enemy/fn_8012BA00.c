@@ -51,7 +51,7 @@
  *   * `flag` and `add` are `u32`, and `fn_8012D7FC`/`em_sleep_ck` return `u32`: retail's `== 1` tests
  *     are `cmplwi`, and a signed operand gives `cmpwi`.
  *   * the local declaration order `result, thresholds, frames, flag, add` is what colours those five
- *     r31..r27; `result = 0` must precede `fn_80043EA8(&vec)` and `add = 0` must follow it.
+ *     r31..r27; `result = 0` must precede `VEC3_ctor(&vec)` and `add = 0` must follow it.
  *   * `0.5f * (0.7f * x)` keeps the two `fmuls`s separate - the folded spelling is one `fmadds`.
  *
  * Residuals (relocation *names* only - the section bytes are identical and the official report metric
@@ -73,6 +73,7 @@
 #include "Pl/pl_master.h"
 #include "enemy/fn_8012BDF4.h"
 #include "unsplit/enemy.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * types
@@ -132,8 +133,8 @@ typedef struct _ENEMY_WORK {
  * file is compiled `-lang=c`, so the identifier and the relocation pair with the map's symbol)
  * ------------------------------------------------------------------------------------------------- */
 
-extern void fn_80041E40(VEC3* dst, const VEC3* src); /* vector copy */
-extern void fn_80043EA8(VEC3* v);                    /* v = (0, 0, 0) */
+ /* vector copy */
+                    /* v = (0, 0, 0) */
 extern f32 fn_80050EF4(const VEC3* a, const VEC3* b); /* the distance between two positions */
 extern s32 fn_802D2B78(_ENEMY_WORK* other, u16 mask); /* tests a bit of other's `+0x1EC` */
 
@@ -166,7 +167,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
     const s32* extra;
     f32 dist;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     add = 0;
 
     thresholds = motion->thresholds;
@@ -194,7 +195,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
 
     case 2:
         flag = (fn_8012D188(enemy, other) == 1);
-        fn_80041E40(&vec, &other->pos_0x178);
+        copyVec3(&vec, &other->pos_0x178);
         extra = motion->extra_frames;
         if (extra != 0) {
             if (fn_802D2B78(other, 1) != 0) {
@@ -211,7 +212,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
 
     case 3:
         flag = (enemy->area_no == other->area_no);
-        fn_80041E40(&vec, &other->pos_0x188);
+        copyVec3(&vec, &other->pos_0x188);
         if (other->state_0x1E2 == 2) {
             add = 1;
         }

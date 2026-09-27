@@ -54,6 +54,7 @@
 #include "types.h"
 
 #include "Runtime.PPCEABI.H/memset.h"
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 #pragma peephole off
 #pragma dont_inline on
@@ -293,7 +294,6 @@ s32 fn_8004BF28(void* dst, u16 count);
 u16 fn_8004C004(void* slots, u16 count);
 s32 fn_8004C038(void* p, u16 a, u16 b);
 void fn_8004C7BC(void* p, u16 a);
-s32 fn_8004CAD8(void);
 s32 fn_8004D0E8(s32 a, void* p);
 s32 fn_8004D27C(s32 a);
 s32 fn_8004D70C(s32 a);

@@ -235,7 +235,7 @@ typedef struct CamTarget {
 } CamTarget; /* size: 0x1E4 */
 
 /* The previous/current value pairs `fn_802BD260` latches: eight slots, four of them vectors that go
- * through `fn_80041E40` and the rest scalars.  The size is a lower bound - the record's real extent
+ * through `copyVec3` and the rest scalars.  The size is a lower bound - the record's real extent
  * belongs to whoever allocates it. size: >= 0xF0 */
 typedef struct CamTrack {
     /* +0x000 */ u8 pad_0x000[0x4C];
@@ -683,7 +683,7 @@ void fn_802BD54C(CamWork* self, u32* out, nw4r::math::VEC3* vec)
 
     if (target != NULL && target->alive != 0) {
         *out = target->field_0x1C0;
-        fn_80041E40(vec, &target->vec_0x188);
+        copyVec3(vec, &target->vec_0x188);
         return;
     }
     self->word_0x040.flags.field_0x041 |= 1;
@@ -700,7 +700,7 @@ void fn_802BD588(CamWork* self, u32* out_a, u32* out_b, nw4r::math::VEC3* vec)
     if (target != NULL && target->alive != 0) {
         *out_a = target->field_0x1BC;
         *out_b = target->field_0x1C0;
-        fn_80041E40(vec, &target->vec_0x188);
+        copyVec3(vec, &target->vec_0x188);
         return;
     }
     self->word_0x040.flags.field_0x041 |= 1;
@@ -712,9 +712,9 @@ void fn_802BD588(CamWork* self, u32* out_a, u32* out_b, nw4r::math::VEC3* vec)
 void fn_802BD260(CamTrack* self, u32 mask)
 {
     if ((mask & 1) != 0)
-        fn_80041E40(&self->cur_0x58, &self->prev_0x4C);
+        copyVec3(&self->cur_0x58, &self->prev_0x4C);
     if ((mask & 2) != 0)
-        fn_80041E40(&self->cur_0x70, &self->prev_0x64);
+        copyVec3(&self->cur_0x70, &self->prev_0x64);
     if ((mask & 4) != 0)
         self->cur_0xAC = self->prev_0xA8;
     if ((mask & 8) != 0)
@@ -737,7 +737,7 @@ void fn_802BE44C(CamQuake* slot, const nw4r::math::VEC3* origin, u8 kind, u8 fla
     slot->active_0x0C = 1;
     slot->kind_0x0D = kind;
     slot->timer_0x0E = lbl_805D1E7C[kind & 0x1F];
-    fn_80041E40(&slot->vec_0x00, origin);
+    copyVec3(&slot->vec_0x00, origin);
     slot->flag_0x10 = flag;
 }
 
@@ -749,7 +749,7 @@ void fn_802BE4FC(u8 kind)
     CamWork* self = (CamWork*)fn_802BECD0();
     nw4r::math::VEC3 origin;
 
-    fn_80043EA8(&origin);
+    VEC3_ctor(&origin);
     setVector3(&origin, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
     fn_802BE44C(&self->quake_0x4A8, &origin, (u8)(kind | 0x80), 0);
 }
@@ -784,7 +784,7 @@ void fn_802BE77C(u8 kind)
     CamWork* self = (CamWork*)fn_802BECD0();
     nw4r::math::VEC3 origin;
 
-    fn_80043EA8(&origin);
+    VEC3_ctor(&origin);
     setVector3(&origin, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
     fn_802BE44C(&self->quake_0x4D0, &origin, (u8)(kind | 0xA0), 0);
 }
@@ -907,7 +907,7 @@ nw4r::math::VEC3 get_camera_pos(void)
     nw4r::math::VEC3 tmp;
     void* cam;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     cam = fn_80047398();
     fn_8004723C(&tmp, &cam);
     fn_800749C8(&tmp, &pos);

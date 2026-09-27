@@ -105,6 +105,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012EC74.h"
@@ -392,7 +393,7 @@ void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
 {
     Vec3 keys;
 
-    fn_80043EA8(&keys);
+    VEC3_ctor(&keys);
 
     switch (self->state) {
     case 0:

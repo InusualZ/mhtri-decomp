@@ -85,9 +85,9 @@
  *     this one (98.54) and the reversed-declaration form (95.00, which swaps the two loads instead).
  *     `tools/m2c` (run through `tools/units/m2cinput.py`) drafts the same shape with the same f2/f0
  *     split - the allocator's web order is the residual, not the source.
- *   * `em035_part_node_init` 98.48 - retail passes the `fn_80041E8C` result straight on
+ *   * `em035_part_node_init` 98.48 - retail passes the `setVec3` result straight on
  *     (`mr r4,r3`), which needs the helper's *pointer* return type; the owner header
- *     `include/mh3_pad.h` spells it `void fn_80041E8C(f32*, f32, f32, f32)` for its C consumers, and
+ *     `include/mh3_pad.h` spells it `void setVec3(f32*, f32, f32, f32)` for its C consumers, and
  *     with that spelling the second call reloads `&scale` (`addi r4,r1,8`) instead.  Declaring the
  *     owner's signature locally reaches 100.00 but adds two rule 2 violations, which the land gate
  *     refuses - so the conformant spelling keeps the four-byte residual.
@@ -131,7 +131,7 @@ extern "C" u8 lbl_805ED930[];
  * the 0x34-byte head belongs to the caller and is left unnamed.
  * size: 0x44 (the extent this unit's body reaches) */
 struct EmNode {
-    /* +0x00 */ nw4r::math::VEC3 vec_0x00;  /* the three copies `fn_80041E40` writes */
+    /* +0x00 */ nw4r::math::VEC3 vec_0x00;  /* the three copies `copyVec3` writes */
     /* +0x0C */ u16 field_0x0C;             /* 0 at entry, then the source word's low half */
     /* +0x0E */ u8 flags_0x0E;              /* bit 0 is set once the node has been seeded */
 };
@@ -560,11 +560,11 @@ extern "C" void em035_part_node_init(EmPartNode* part, const nw4r::math::VEC3* v
     EmNode* node = &part->node_0x34;
     nw4r::math::VEC3 scale;
 
-    fn_80041E8C((f32*)&scale, lbl_8079B728, lbl_8079B728, lbl_8079B728);
-    fn_80041E40(&node->vec_0x00, &scale);
+    setVec3((f32*)&scale, lbl_8079B728, lbl_8079B728, lbl_8079B728);
+    copyVec3(&node->vec_0x00, &scale);
     node->field_0x0C = 0;
     if (flags & 2)
-        fn_80041E40(&node->vec_0x00, vec);
+        copyVec3(&node->vec_0x00, vec);
     if (flags & 4)
         node->field_0x0C = (u16)src->field_0x04;
     node->flags_0x0E |= 1;

@@ -12,7 +12,7 @@
  * evidence is the split objects' own `__FILE__` strings (from MAIN's `build/RMHE08/asm/auto_*.s`,
  * which carries the pooled `.data` labels), in address order:
  *   - `ef_sphere.cpp` (0x80595058, the `em`/`pm`/`params` pointer asserts at 0x800CDCA4..0x800CDEC4)
- *     names the first function only, `fn_800CDB2C` (0xA78).  `src/ef/ef_point.cpp`'s own header
+ *     names the first function only, `ef_sphere_spawn` (0xA78).  `src/ef/ef_point.cpp`'s own header
  *     records the seam `ef_point.cpp -> ef_sphere.cpp`, so the range starts inside the ef band.
  *   - `00/saveicon.tpl` (0x80595198), `00/capcom.tpl` (0x805951A8) then `m.m.tpl` are the texture
  *     names of the loading/UI tail (TPLtexLoad et al.), which is not ef code.
@@ -35,7 +35,7 @@
  * range (0x800CE5A8..0x800D2FEC, minus the ones this round did not reach).  `fn_800D20F0` (a
  * `fn_800E4E3C` thunk) is left out on purpose: declaring that sound unit's symbol here would be a
  * rule-2 addition, and the owner's header does not exist yet.  The 95 missing symbols are
- * the large players in the middle and tail: the ef_sphere emitter `fn_800CDB2C` (0xA78), the loader
+ * the large players in the middle and tail: the ef_sphere emitter `ef_sphere_spawn` (0xA78), the loader
  * state machine `fn_800CE6A0`/`fn_800CE884`/`fn_800CE920` (the 0x154-entry record copier), the file
  * loader `file_loading_ck`/`load_file_req`/`load_file`, the mode reset block `fn_800CF154`..`fn_800CF3E4`,
  * `fn_800CF948` (the 0x800D streams), the texture loader `fn_800D0764`..`fn_800D104C`, the hbm/PMIC

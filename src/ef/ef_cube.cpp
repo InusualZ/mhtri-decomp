@@ -1,3 +1,4 @@
+#include "mh3_pad/vec3.h" /* the owner header (rule 2) */
 /* auto/800C9DD0_fn_800C9DD0.c - the ef_cube.cpp translation unit, .text 0x800C9DD0..0x800CB948.
  *
  * fn_800C9DD0 (0x800C9DD0, 1072 B) is complete and matches except for one register choice (99.94 %).
@@ -11,7 +12,7 @@
  *     The three asserts are lines 94/95/96 with the "em"/"pm"/"params" messages.
  *   * a `Vec3` array of 14 elements at r1+8 (offsets 8,20,...,164, stride 0xC); every block below
  *     works on one *pair* of it, in descending order: (152,164), (128,140), (104,116), (80,92).
- *   * six near-identical blocks, each: `fn_80043EA8(&pair[0])`, `fn_80043EA8(&pair[1])`, fill both,
+ *   * six near-identical blocks, each: `VEC3_ctor(&pair[0])`, `VEC3_ctor(&pair[1])`, fill both,
  *     scale one component by `fn_800A8A08(&em->field_0xEC)`, take `fn_80463F04` (fabsf) of a component
  *     and compare it against `lbl_80796268`, then `fn_80463F98` + `fn_800610AC` + `fn_80050BC0`
  *     (nw4r::math::FrSqrt) and finish with `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d, f, e)`.
@@ -82,6 +83,11 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800C9DD0_fn_800C9DD0.c`.
  */
 
+/* The unit keeps its own scalar typedefs: `types.h` spells `u32` `unsigned long` while this unit's
+ * manglings encode `unsigned int` (`fn_800C9DD0__FUiP4Vec3...` in the target object), so including
+ * `types.h` here re-mangles both functions and unpairs them.  `mh3_pad/vec3.h` is the owner's header
+ * for the three vector helpers and deliberately pulls in no typedefs. */
+
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
@@ -126,7 +132,6 @@ extern void fn_8009C484(Vec3* dst, Vec3* src);
 extern void fn_80051490(Vec3* dst, const Vec3* src);
 extern f32 fn_80050EDC(const Vec3* v);
 extern f32 fn_800A8A08(const void* p);
-extern void fn_80043EA8(Vec3* v);
 extern u16 fn_800A9FB0(u32 a, u16 b, f32 f, void* em);
 extern void fn_800A99B4(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
 }
@@ -211,7 +216,7 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
         v2.z = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
     fn_8009C484(&v2, &v2);
-    fn_80043EA8(&v3);
+    VEC3_ctor(&v3);
     fn_800A99B4(a, &v3, em, b, c, &v1, &v2);
     v3_copy = v3;
     b_copy = *b;

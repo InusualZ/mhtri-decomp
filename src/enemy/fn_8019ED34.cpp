@@ -77,7 +77,7 @@
 #include "enemy/fn_8012BDF4.h" /* em_act_ck */
 #include "enemy/fn_8012EC74.h" /* em_get_mot_no, em_after_frame_check, get_joint_wmat_em */
 #include "enemy/fn_801993E0.h"
-#include "fn_8004CAD8.h" /* fn_8005050C, mulVecMatAddTrans */
+#include "fn_8004CAD8.h" /* MTX34_ctor, mulVecMatAddTrans */
 #include "unsplit/enemy.h"
 
 extern "C" {
@@ -1083,7 +1083,7 @@ void fn_801A4218(struct _ENEMY_WORK* self) {
  * `out`.  The four-argument call sites are the distance probes in `fn_801A28C8`. */
 void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* out, Vec3* tmp) {
     nw4r::math::MTX34 m;
-    fn_8005050C(&m);
+    MTX34_ctor(&m);
     get_joint_wmat_em(self, joint, &m);
     mulVecMatAddTrans(tmp, &m);
     out->x = tmp->x;

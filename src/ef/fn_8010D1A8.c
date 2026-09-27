@@ -52,6 +52,8 @@
 #include "unsplit/g3d.h"
 #include "unsplit/sound.h"
 #include "ef/eft004.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---- math types ---- */
 /* `Vec3` (and the `VEC3`/`MTX34`/`Mtx34` spellings) come from `nw4r/math.h` - one definition, in the
@@ -224,8 +226,6 @@ extern u32 event_demo_ck__Fv(void);
 extern void* fn_800F8788(u32 size);
 extern void fn_800F886C(Eft* eft);
 extern void fn_800F9DF4(Eft* eft, s32 a, s32 b);
-extern void fn_80041E40(void* dst, void* src);
-extern void fn_8005050C(Mtx34* mtx);
 extern void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effect, s32 n);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPMtxVec* rot, Mtx34* mtx);
 extern void SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34(void* effect, Mtx34* mtx);
@@ -340,7 +340,7 @@ void fn_8010D2B0(void* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
             work->scale_0x0C = farg0;
             eft->kind_0x03 = 0x11;
             eft->type_0x02 = arg2;
-            fn_80041E40(&eft->pos_0x18, arg0);
+            copyVec3(&eft->pos_0x18, arg0);
             eft->rot_0x24.raw.field_0x28 = arg3;
             eft->areano_0x44 = arg1;
             eft->cb_0x40 = fn_8010D388;
@@ -398,7 +398,7 @@ void fn_8010D400(Eft* self)
     EftWork* work;
     u32 color;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     work = self->work_0x38;
     self->state_0x05++;
     work->effect = res_eft_create__FUsUsUl(lbl_8059F588[self->type_0x02],
@@ -705,7 +705,7 @@ void fn_8010D928(Eft* self)
     fn_801116B0(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3__FPQ34nw4r4math4VEC3fff(&work->slots_0x10.items.items_0x10[i]->pos_0x1C, lbl_80796848, lbl_80796848, lbl_80796848);
-        fn_80041E40(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
+        copyVec3(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
     work->field_0x2C = fn_802BF814();
@@ -730,7 +730,7 @@ void fn_8010DE40(Eft* self)
     fn_80111754(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3__FPQ34nw4r4math4VEC3fff(&work->slots_0x10.items.items_0x10[i]->pos_0x1C, lbl_80796848, lbl_80796848, lbl_80796848);
-        fn_80041E40(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
+        copyVec3(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
     work->field_0x2C = fn_802BF814();
@@ -752,7 +752,7 @@ void fn_8010DF38(Eft* self)
     fn_801117F8(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3__FPQ34nw4r4math4VEC3fff(&work->slots_0x10.items.items_0x10[i]->pos_0x1C, lbl_80796848, lbl_80796848, lbl_80796848);
-        fn_80041E40(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
+        copyVec3(&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
     fn_8010E008(self);

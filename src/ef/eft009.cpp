@@ -16,7 +16,7 @@
  *   fn_801048B0 (0x04)   destroys the effect object (`fn_800F886C`)
  *   fn_801048B4 (0x98)   setter: single effect, re-scaled by `get_em_chg_scale`
  *   eft009_set_pos (0x84) setter: position + rotation vector, no scale
- *   fn_801049D0 (0x98)   setter: as fn_801048B4 plus `fn_80041E40`
+ *   fn_801049D0 (0x98)   setter: as fn_801048B4 plus `copyVec3`
  *   fn_80104A68 (0xEC)   the allocator every setter funnels through
  *   fn_80104B54 (0x40)   pool release handler (`release_0x40`)
  *   fn_80104B94 (0x3C)   `state_0x05` dispatcher (`dispatch_0x34`)
@@ -65,6 +65,8 @@
 #include "sound/fn_800D7F54.h"   /* se_req_pos_ps - owner sound/fn_800D7F54.cpp */
 #include "ef/fn_80105314.h"
 #include "unsplit/ef.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * engine types the mangled callees encode
@@ -176,9 +178,6 @@ struct _EFT {
  * externs
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_80041E40(nw4r::math::VEC3* out, void* src);
-extern "C" void fn_80043EA8(nw4r::math::VEC3* out);
-extern "C" void fn_8005050C(void* mtx);
 extern "C" void fn_80073F68(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 extern "C" void fn_800F886C(void* self);
 extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg);
@@ -246,7 +245,7 @@ extern "C" void fn_80103D28(_EFT* self)
     _ENEMY_WORK* enemy = self->source_0x30;
     s32 i;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     self->state_0x05++;
     if ((s32)self->type_0x02 == 0x23) {
         for (i = 0; i < work->count; i++) {
@@ -310,7 +309,7 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x3F:
     case 0x40:
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
         fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
@@ -337,7 +336,7 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x3D:
     case 0x3E:
     case 0x41:
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
         fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
@@ -352,7 +351,7 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x23: {
         f32 neg = lbl_80796750;
         for (i = 0; i < work->count; i++) {
-            fn_80041E40(&vec, &work->offset_0x3C);
+            copyVec3(&vec, &work->offset_0x3C);
             if (i == 1) {
                 vec.x *= neg;
             }
@@ -366,7 +365,7 @@ extern "C" void fn_80103D28(_EFT* self)
     }
     case 0x1B:
     case 0x1C:
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
         fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
@@ -381,7 +380,7 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x38:
     case 0x39:
         get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         fn_8010140C(&work->mtx_0x0C, &self->pos_0x18);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
@@ -422,10 +421,10 @@ extern "C" void fn_801041BC(_EFT* self)
     s32 moved = 0;
     s32 i;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     _EFT_GROUP_WORK* work = self->work_0x38.group;
     _ENEMY_WORK* enemy = self->source_0x30;
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     self->timer_0x0C--;
     if (self->timer_0x0C >= 0) {
         return;
@@ -456,7 +455,7 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x41:
         get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
         fn_8010140C(&work->mtx_0x0C, &self->pos_0x18);
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
         fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
@@ -472,7 +471,7 @@ extern "C" void fn_801041BC(_EFT* self)
         fn_8010140C(&work->mtx_0x0C, &self->pos_0x18);
         f32 neg = lbl_80796750;
         for (i = 0; i < work->count; i++) {
-            fn_80041E40(&vec, &work->offset_0x3C);
+            copyVec3(&vec, &work->offset_0x3C);
             if (i == 1) {
                 vec.x *= neg;
             }
@@ -490,7 +489,7 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x2D:
         get_joint_wpos_em(enemy, lbl_8059DCF8[self->type_0x02], &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
         fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
@@ -512,7 +511,7 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x1C:
         get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
         fn_8010140C(&work->mtx_0x0C, &self->pos_0x18);
-        fn_80041E40(&vec, &work->offset_0x3C);
+        copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         fn_80073F68(&self->pos_0x18, &vec);
         fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
@@ -673,7 +672,7 @@ void eft009_set_pos(u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, 
         effect->rot_0x24.y = rot->y;
         effect->rot_0x24.z = 0;
         effect->source_0x30 = NULL;
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
     }
 }
 
@@ -689,7 +688,7 @@ extern "C" void fn_801049D0(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta
         effect->rot_0x24.y = self->rot_y_0x1C0 + joint_delta;
         effect->rot_0x24.z = 0;
         effect->source_0x30 = self;
-        fn_80041E40(&effect->pos_0x18, pos);
+        copyVec3(&effect->pos_0x18, pos);
     }
 }
 

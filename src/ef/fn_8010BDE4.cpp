@@ -50,6 +50,8 @@
 #include "ef.h"
 #include "pl.h"
 #include "enemy/ENEMY_WORK.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the two per-family `_EFT::work_0x38` blocks
@@ -165,9 +167,7 @@ void scaleMat34W(nw4r::math::MTX34* mtx, nw4r::math::VEC3* v);
 
 /* The unmangled `fn_XXXXXXXX` callees: inside a linkage block they need no per-declaration spelling. */
 extern "C" {
-void fn_80041E40(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 void fn_800504D4(nw4r::math::MTX34* mtx);
-void fn_8005050C(nw4r::math::MTX34* mtx);
 void fn_800513F0(nw4r::math::VEC3* v, f32 s);
 void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void fn_8007100C(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
@@ -333,7 +333,7 @@ extern "C" void fn_8010C5DC(void* source, u32 id, nw4r::math::VEC3* vec, f32 sca
     eft->source_0x30 = source;
     work->mode_0x48 = 1;
     work->id_0x34 = id;
-    fn_80041E40(&work->vec_0x38, vec);
+    copyVec3(&work->vec_0x38, vec);
     work->scale_0x44 = scale;
     eft->area_0x44 = ((_EFT_ENEMY_VIEW*)source)->field_0x1e1;
     work->count2_0x30 = 5;
@@ -440,9 +440,9 @@ extern "C" void fn_8010C8F8(_EFT* self)
     f32 f31;
     s32 i;
 
-    fn_8005050C(&mtxA);
-    fn_8005050C(&mtxB);
-    fn_80043EA8(&vec);
+    MTX34_ctor(&mtxA);
+    MTX34_ctor(&mtxB);
+    VEC3_ctor(&vec);
 
     if (self->source_0x30 == NULL) {
         self->state_0x05++;
@@ -576,8 +576,8 @@ extern "C" void fn_8010CE80(void* arg)
     f32 f31;
     s16 i;
 
-    fn_8005050C(&mtxA);
-    fn_8005050C(&mtxB);
+    MTX34_ctor(&mtxA);
+    MTX34_ctor(&mtxB);
 
     if (enemy != NULL && work->mode_0x48 == 1) {
         if (em_work_die_ck(enemy) == 1) {
@@ -596,7 +596,7 @@ extern "C" void fn_8010CE80(void* arg)
         fn_8010CFCC(self, &mtxB, &mtxA, i);
         fn_8010D12C(&mtxB, &mtxB);
         s = fn_8010D1A8(self, i, f31);
-        fn_80041E8C((Vec*)&scale, s, s, s);
+        setVec3((Vec*)&scale, s, s, s);
         scaleMat34W(&mtxB, &scale);
         base = fn_800E0A8C((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
         handle = fn_80097EB0(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114, i + 1);
@@ -615,12 +615,12 @@ extern "C" void fn_8010CFCC(_EFT* self, nw4r::math::MTX34* out, nw4r::math::MTX3
     VEC3 v8;
     f32 angle;
 
-    fn_80043EA8(&v20);
-    fn_80043EA8(&v14);
-    fn_80041E40(&v14, &work->vec_0x38);
+    VEC3_ctor(&v20);
+    VEC3_ctor(&v14);
+    copyVec3(&v14, &work->vec_0x38);
     mulVecMat(&v14, mtx);
-    fn_80041E8C((Vec*)&v8, lbl_80796810, lbl_80796810, work->scale_0x44 * lbl_8059F518[index]);
-    fn_80041E40(&v20, &v8);
+    setVec3((Vec*)&v8, lbl_80796810, lbl_80796810, work->scale_0x44 * lbl_8059F518[index]);
+    copyVec3(&v20, &v8);
     rotVecY(&v20, self->rot_0x24.y + index * 0x3333);
     angle = lbl_8079682C * lbl_8059F574[index];
     angle = angle / lbl_80796830;
@@ -639,7 +639,7 @@ extern "C" void fn_8010D12C(nw4r::math::MTX34* a, nw4r::math::MTX34* b)
 {
     nw4r::math::MTX34 m;
 
-    fn_8005050C(&m);
+    MTX34_ctor(&m);
     fn_800532DC(&m, &get_current_view_mtx());
     m.m[0][3] = lbl_80796810;
     m.m[1][3] = lbl_80796810;
@@ -654,7 +654,7 @@ extern "C" void fn_8010CD68(_EFT* self, MHchar** models, s32 count)
     VEC3 vec;
     s32 i;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
 
     if ((u8)self->area_0x44 != (u8)get_now_areano()) {
         return;
@@ -709,7 +709,7 @@ extern "C" void fn_8010BDE4(_EFT* self)
     s32 base_c;
     s32 i;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
 
     self->state_0x05++;
     scale = (fn_800F9D80(self) == 1) ? lbl_807967E8 : lbl_807967EC;
@@ -760,8 +760,8 @@ extern "C" void fn_8010C0E0(_EFT* self)
     VEC3 vec;
     s32 i;
 
-    fn_8005050C(&mtx);
-    fn_80043EA8(&vec);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&vec);
 
     if (work->entries[0].state_0x00 == 3 && work->entries[1].state_0x00 == 3) {
         self->state_0x05++;

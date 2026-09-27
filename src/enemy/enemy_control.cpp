@@ -93,6 +93,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_80138074.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* retail keeps the unfused clrlwi/rlwinm + cmpwi pairs this band's -O3 peephole folds, so the whole
  * unit is built with the peephole off (the same finding as `enemy/fn_80147CE0.cpp`,
@@ -131,7 +132,6 @@ s32* fn_80054FE8(s32* dst, s32 value);
 u32  fn_8009380C(void* self, s32* value);
 void fn_800F0F38(u8 kind);
 void fn_800D58B0(s32 handle);
-void fn_80041E40(f32* dst, f32* src);
 
 /* this unit's own functions, forward-declared so they may be called before their definitions */
 EmcSlot* fn_801413D0(u32 index);
@@ -546,7 +546,7 @@ void fn_80144240(void* self) {
 void senko_set(nw4r::math::VEC3* pos, f32 value, u8 arg2, s16 arg3) {
     SenkoRec* rec = fn_801416EC();
     if (rec != 0) {
-        fn_80041E40((f32*)rec, (f32*)pos);
+        copyVec3((f32*)rec, (f32*)pos);
         rec->value_0x0C = value;
         rec->value_0x12 = arg2;
         rec->countdown = arg3;
@@ -558,7 +558,7 @@ void senko_set(nw4r::math::VEC3* pos, f32 value, u8 arg2, s16 arg3) {
 void kemuri_set(nw4r::math::VEC3* pos, f32 value, u8 arg2) {
     SenkoRec* rec = fn_8014192C();
     if (rec != 0) {
-        fn_80041E40((f32*)rec, (f32*)pos);
+        copyVec3((f32*)rec, (f32*)pos);
         rec->value_0x0C = value;
         rec->value_0x12 = arg2;
         rec->countdown = 570;

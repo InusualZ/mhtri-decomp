@@ -189,7 +189,7 @@ extern "C" void fn_803879EC(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     fn_8012CF20(self);
     switch (self->state) {
     case 0:
@@ -559,7 +559,7 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
     f32 s1;
     f32 s2;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -580,7 +580,7 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
         if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1
             && (system_w.field_0x0c & 3) == 0) {
             if (em_magma_check(self) == 1) {
-                fn_80041E40(&v, &self->pos);
+                copyVec3(&v, &self->pos);
                 v.y = lbl_8079C09C + self->field_0x214;
                 eft009_set_pos(0x8B, &v, (struct _CP_VECTOR*)&self->field_0x1BC, lbl_8079C00C, self->area_no);
             } else {
@@ -982,8 +982,8 @@ extern "C" void fn_803896E8(_ENEMY_WORK* self)
     f32 g;
     u16 ang;
 
-    fn_8005050C(&mtx);
-    fn_80043EA8(&v);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1035,7 +1035,7 @@ extern "C" void fn_8038995C(_ENEMY_WORK* self, u8 a)
     f32 t;
     s32 idx;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1099,7 +1099,7 @@ extern "C" void fn_80389C50(_ENEMY_WORK* self)
     f32 s;
     f32 t;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1148,7 +1148,7 @@ extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
     u32 id2;
     u32 kind;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if (a == 1) {
         id1 = 0xCB;
         id2 = 0xCA;
@@ -1482,7 +1482,7 @@ extern "C" void fn_8038CC20(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if (fn_8012EC60(self) == 1 && (system_w.field_0x0c & 0x1F) == 0) {
         setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C000);
         fn_8010562C(self, 0x18, 0x14, &v, lbl_8079C00C);
@@ -1501,8 +1501,8 @@ extern "C" void fn_8038A198(_ENEMY_WORK* self, u8 a)
     f32 h;
     u16 ang;
 
-    fn_8005050C(&mtx);
-    fn_80043EA8(&v);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1615,7 +1615,7 @@ extern "C" void fn_8038C124(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     self->timer_0x020++;
     fn_80131D84(self);
     switch (self->state) {
@@ -1658,7 +1658,7 @@ extern "C" void fn_8038C124(_ENEMY_WORK* self)
             fn_801048B4(self, 1, 6, 0, lbl_8079C00C);
         }
         if (fn_80145FE4() == 0xC1 || fn_80145FE4() == 0xE5) {
-            fn_80041E40(&v, &self->pos);
+            copyVec3(&v, &self->pos);
             v.y = lbl_8079C09C + self->field_0x20C;
             fn_8010D2B0(&v, self->area_no, 1, 0, lbl_8079C1A0);
         }
@@ -1791,7 +1791,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
     u8 kind;
 
     kind = b;
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (a) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -1851,7 +1851,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
             }
         }
         if (c == 0xFF) {
-            fn_80041E40(&v, &self->pos);
+            copyVec3(&v, &self->pos);
         } else {
             get_joint_wpos_em(self, c, &v);
         }
@@ -1860,7 +1860,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
         return;
     case 2:
         if (c == 0xFF) {
-            fn_80041E40(&v, &self->pos);
+            copyVec3(&v, &self->pos);
         } else {
             get_joint_wpos_em(self, c, &v);
         }

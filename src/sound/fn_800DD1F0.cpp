@@ -21,6 +21,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "sound/se.h"
 
@@ -195,7 +196,7 @@ extern "C" void fn_800DD7E0(_PLW* self, nw4r::math::VEC3* pos, s8 flag)
 extern "C" void fn_800E0808(MHchar* self, nw4r::math::VEC3* src)
 {
     if (src) {
-        fn_80041E40((nw4r::math::VEC3*)&self->field_0xD4[2], src);
+        copyVec3((nw4r::math::VEC3*)&self->field_0xD4[2], src);
     }
 }
 
@@ -208,7 +209,7 @@ extern "C" void fn_800E090C(MHchar* self, u32 value)
 /* Copy `src` into the model's +0x10 vector. */
 extern "C" void fn_800E09D0(MHchar* self, nw4r::math::VEC3* src)
 {
-    fn_80041E40(&self->field_0x10, src);
+    copyVec3(&self->field_0x10, src);
 }
 
 /* Broadcast the pool constant over the model's +0x10 vector. */
@@ -419,7 +420,7 @@ extern "C" SeSlot* fn_800DD3B8(u32 arg)
 {
     nw4r::math::VEC3 v;
     f32 c = lbl_807963E0;
-    fn_80041E8C(&v, c, c, c);
+    setVec3(&v, c, c, c);
     return fn_800DA72C(46, ((u8)arg & 3) + 30, &v);
 }
 
@@ -517,7 +518,7 @@ extern "C" void fn_800DD9FC(_PLW* self, nw4r::math::VEC3* pos, u8 kind)
     slot->field_0x30 = -1;
     slot->field_0x34 = -1;
     slot->param = 0;
-    fn_80041E40(&slot->pos, pos);
+    copyVec3(&slot->pos, pos);
     slot->field_0x10 = slot->pos;
 }
 

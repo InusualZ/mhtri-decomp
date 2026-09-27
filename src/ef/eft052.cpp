@@ -287,7 +287,7 @@ extern "C" u8 eft052_part_damage_ck(_ENEMY_WORK* self, u32 part)
     f32 near_dist;
     f32 far_dist;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
 
     switch ((u8)part) {
     case 0:

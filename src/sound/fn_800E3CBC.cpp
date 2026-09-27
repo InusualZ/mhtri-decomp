@@ -47,6 +47,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "sound/fn_800E46E8.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 #pragma peephole off
 
@@ -74,7 +76,7 @@ struct PrimRec {
     /* 0x30 */ u8 pad_0x30[4];
 };
 
-/* The working buffer `fn_8005050C` initialises; fn_800E4148 reads +0x20..+0x2C, fn_800E3E1C reads +0x1C.
+/* The working buffer `MTX34_ctor` initialises; fn_800E4148 reads +0x20..+0x2C, fn_800E3E1C reads +0x1C.
  * Only the read fields are named; the rest is untouched padding.  size: 0x30 (approximate) */
 typedef struct WorkBuf {
     /* 0x00 */ u8 pad_0x00[0x1C];
@@ -139,7 +141,6 @@ extern f32 lbl_80796464;
 extern f32 lbl_80796468;
 extern f64 lbl_80796470;
 void fn_800E3C90(void* p);
-void fn_8005050C(WorkBuf* out);
 void fn_80075394(void* a, WorkBuf* out);
 void* fn_80047234(void* a);
 s32 fn_802AFF38(void);
@@ -152,7 +153,6 @@ s32 my_player_no(void);
 void fn_8007F77C(void* p);
 void* fn_800A60C0(void* p);
 void fn_80081714(void* a, u32 b, WorkBuf* out);
-void fn_80043EA8(VEC3* out);
 f32 fn_80052214(const VEC3* a, const VEC3* b);
 void* fn_8007B544(void* a, u32 b);
 void fn_80049728(void* p, s32 n);
@@ -223,8 +223,8 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
     f32 scalef;
     f32 f31;
 
-    fn_8005050C(&b40);
-    fn_8005050C(&b10);
+    MTX34_ctor(&b40);
+    MTX34_ctor(&b10);
     GXInvalidateVtxCache();
     fn_80075394(a, &b40);
     DrawCtx* ctx = (DrawCtx*)fn_80047234(a);
@@ -323,7 +323,7 @@ extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
 {
     VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if (self->flags & 0x1) {
         fn_80052214(&self->pos, &arg->v_0x20);
         self->key = -(arg->f_0x2C + fn_80052214(&self->pos, &arg->v_0x20));

@@ -55,7 +55,7 @@
  * and the ahead resolver fn_800BBCF8).  Residual: fn_800BA710/fn_800BC070 (85.6 %) miss only the
  * 4-byte `b` retail materialises between the three vector loads and the FIFO base load;
  * fn_800BB748/fn_800BDB60 (94.9/95.9 %) differ in the GXSetArray sda21 access; fn_800BBBBC (94.9 %)
- * in the fn_80041E8C/fn_80041E40 pairing; fn_800B9A80/fn_800BB93C/fn_800BC1B4/fn_800BDD34 (98-99 %)
+ * in the setVec3/copyVec3 pairing; fn_800B9A80/fn_800BB93C/fn_800BC1B4/fn_800BDD34 (98-99 %)
  * in the inlined IsValidPointer short-circuit on one guard.  The eleven unwritten emitters
  * (fn_800B9DF8, fn_800BA1E0, fn_800BA854, fn_800BAC30, fn_800BAFBC, fn_800BB488, fn_800BC428,
  * fn_800BCD14, fn_800BCE98, fn_800BD234) are large nw4r paired-single (AltiVec) particle walkers that
@@ -65,6 +65,8 @@
 #include "ef.h"
 #include "gx.h"
 #include "sys_mem.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
@@ -153,7 +155,6 @@ void fn_800BDB60(EfDrawStrategyObj* self, void* em, EfDrawArgs* args);
 u32 fn_800BC41C(void* unused, EfParticleFlags* self);
 
 /* SDK GX state setters and the mtx helpers (unsplit / SDK: rule 2's named gap). */
-extern void fn_8005050C(Mtx34* mtx);
 extern void fn_800504D4(Mtx34* mtx);
 extern void fn_80050508(Mtx34* mtx);
 void fn_800C6064(void* self, EfDrawArgs* args, EfEmitterShape* shape, void* em);
@@ -171,7 +172,6 @@ extern char lbl_80791320[]; /* the GX texcoord array descriptor (.sdata) */
  * use (all still `fn_*`/SDK, defined outside this range). */
 extern void PSVECSubtract(Vec* out, Vec* a, Vec* b);
 extern int fn_800B59E4(Vec* v);
-extern void fn_80041E40(Vec* dst, Vec* src);
 extern EfWalkerObj* fn_800B5ACC(void* particle, EfWalkerObj* em);
 extern EfWalkerObj* fn_800B8D48(void* particle, EfWalkerObj* em);
 extern f32 lbl_80796154; /* the zero/one constant the walkers initialise with (.sdata2) */
@@ -446,7 +446,7 @@ void fn_800BBCF8(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
         PSVECSubtract(out, &em->world_pos, &args->pos);
     }
     if (fn_800B59E4(out) == 0) {
-        fn_80041E40(out, &args->prev_pos);
+        copyVec3(out, &args->prev_pos);
     }
 }
 
@@ -459,25 +459,25 @@ void fn_800BBBBC(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
     EfWalkerObj* first = fn_800B5ACC(args->particle, em);
     EfWalkerObj* second = fn_800B8D48(args->particle, em);
 
-    fn_80041E8C(&a, lbl_80796154, lbl_80796154, lbl_80796154);
+    setVec3(&a, lbl_80796154, lbl_80796154, lbl_80796154);
     if (first != 0) {
         PSVECSubtract(&a, &first->world_pos, &em->world_pos);
         if (fn_800B59E4(&a) == 0) {
-            fn_80041E8C(&c, lbl_80796154, lbl_80796154, lbl_80796154);
-            fn_80041E40(&a, &c);
+            setVec3(&c, lbl_80796154, lbl_80796154, lbl_80796154);
+            copyVec3(&a, &c);
         }
     }
-    fn_80041E8C(&b, lbl_80796154, lbl_80796154, lbl_80796154);
+    setVec3(&b, lbl_80796154, lbl_80796154, lbl_80796154);
     if (second != 0) {
         PSVECSubtract(&b, &second->world_pos, &em->world_pos);
         if (fn_800B59E4(&b) == 0) {
-            fn_80041E8C(&d, lbl_80796154, lbl_80796154, lbl_80796154);
-            fn_80041E40(&b, &d);
+            setVec3(&d, lbl_80796154, lbl_80796154, lbl_80796154);
+            copyVec3(&b, &d);
         }
     }
     PSVECSubtract(out, &a, &b);
     if (fn_800B59E4(out) == 0) {
-        fn_80041E40(out, &args->prev_pos);
+        copyVec3(out, &args->prev_pos);
     }
 }
 
@@ -498,7 +498,7 @@ void fn_800BB748(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
     }
     GXSetVtxAttrFmt(0, 9, 1, 4, 0);
     GXSetVtxAttrFmt(0, 0xD, 1, 0, 0);
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     fn_800504D4(&mtx);
     fn_80050508(&mtx);
     GXLoadPosMtxImm(&mtx, 0);
@@ -549,10 +549,10 @@ void fn_800BBE28(void* mtx, Vec* src, u32 flags) {
     if (!IsValidPointer((u32)src)) {
         nw4r::db::Panic(lbl_80594070, 92, lbl_80594090, src);
     }
-    fn_80043EA8((VEC3*)&v0);
-    fn_80043EA8((VEC3*)&v1);
-    fn_80043EA8((VEC3*)&v2);
-    fn_80043EA8((VEC3*)&v3);
+    VEC3_ctor((VEC3*)&v0);
+    VEC3_ctor((VEC3*)&v1);
+    VEC3_ctor((VEC3*)&v2);
+    VEC3_ctor((VEC3*)&v3);
     fn_800514FC(&v0, mtx, &src[0]);
     fn_800514FC(&v1, mtx, &src[1]);
     fn_800514FC(&v2, mtx, &src[2]);

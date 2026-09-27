@@ -67,6 +67,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h" /* the canonical nw4r::ef::Effect declaration (RetireEmitterAll, rule 1) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* `nw4r::db::Panic`: declaring the owner's real spelling makes the C++ front-end reproduce the map's
  * mangling (`Panic__Q24nw4r2dbFPCciPCce`) exactly; spelling the mangling itself would re-mangle it
@@ -163,7 +164,7 @@ extern "C" {
  * MEMInitList family is unsplit, so the prototypes stay here. */
 void fn_800AE628(void* pm);                                    /* particle manager: world matrix */
 void fn_800AE6A4(void* pm);                                    /* particle manager: tail (a `blr`) */
-void fn_8005050C(void* mtx);                                   /* matrix helper (fn_8004CAD8.cpp) */
+                                   /* matrix helper (fn_8004CAD8.cpp) */
 void fn_80501AD4(void* list, void* before, void* elem);        /* ut::List insert-before/append */
 void* fn_80501C60(void* list, void* node);                     /* ut::List GetNext (head when 0) */
 void* fn_80501C80(void* list, void* node);                     /* ut::List GetPrev (tail when 0) */
@@ -242,8 +243,8 @@ EfDrawOrderObject* fn_800A3F98(EfDrawOrderObject* self) {
     fn_800A4080(self);
     self->mpVtbl = lbl_80592588;
     fn_800A3FFC(&self->mGroup, 0x14);
-    fn_8005050C(&self->mMat_0x58);
-    fn_80043EA8(&self->mVec_0x88);
+    MTX34_ctor(&self->mMat_0x58);
+    VEC3_ctor(&self->mVec_0x88);
     MEMInitList(&self->mDrawList, 0x30);
     return self;
 }

@@ -62,6 +62,7 @@
 #include "enemy/fn_80138074.h"
 #include "unsplit/enemy.h"
 #include "ef/eft_slot.h"     /* eft_slot_effect_key, enemy_data_find, enemy_data_grp */
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off
@@ -234,7 +235,6 @@ typedef struct _ENEMY_WORK {
 } _ENEMY_WORK;
 
 /* Callees owned by other translation units.  Addresses and the mangled spellings are the map's. */
-extern void fn_80043EA8(void *out);
 /* `enemy_data_grp` (0x803439D4) is declared in its owner's header, `include/ef/eft_slot.h` (rule 2). */
 
 /* --------------------------------------------------------------------------------------------- */
@@ -502,7 +502,6 @@ extern f32 fn_80463E08(f32 y, f32 x);
 extern u32 fn_80125FF0(u8 a, u8 b);
 extern void fn_801285C0(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80126278(_ENEMY_WORK *self, u16 a, Vec3 *out);
-extern void fn_80041E40(Vec3 *dst, Vec3 *src);
 extern void fn_8012B380(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80128BF8(_ENEMY_WORK *self, u32 a);
 extern u32 fn_80126DAC(_ENEMY_WORK *self, u32 a, u32 b);
@@ -1162,10 +1161,10 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
 void fn_8013D41C(_ENEMY_WORK *self, u8 *in) {
     switch (in[0]) {
     case 0:
-        fn_80041E40(&self->aim, &self->pos);
+        copyVec3(&self->aim, &self->pos);
         break;
     case 1:
-        fn_80041E40(&self->aim, &self->target);
+        copyVec3(&self->aim, &self->target);
         break;
     default:
         fn_80140AF8(self, 9, 0);
@@ -1249,14 +1248,14 @@ void fn_8013D8C8(_ENEMY_WORK *self, u8 *in, u32 param) {
 /* Moves the converted target position into the record's position and remembers the old one. */
 void fn_8013DE80(_ENEMY_WORK *self, u8 *in) {
     fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | in[0]), &self->pos);
-    fn_80041E40(&self->prev_pos, &self->pos);
+    copyVec3(&self->prev_pos, &self->pos);
 }
 
 /* Rebuilds the aim vector from a parameter record and stores the facing angle and zero offsets. */
 void fn_8013DEFC(_ENEMY_WORK *self, u8 *in) {
     Vec3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | in[0]), &v);
     self->param_0x1BC = 0;
     self->param_0x1C0 = calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(&self->pos, &v);
@@ -1440,8 +1439,8 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
     Vec3 c;
     Vec3 d;
 
-    fn_80043EA8(&a);
-    fn_80043EA8(&b);
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
     switch (in[0]) {
     case 0:
         if (self->state_0x9F7 != 255) {
@@ -1454,9 +1453,9 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
     case 255:
         if (self->state_0x9F7 != self->act_id && self->state_0x9F7 != 255) {
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&c, &self->pos, self->act_id);
-            fn_80041E40(&a, &c);
+            copyVec3(&a, &c);
             fn_802B01AC(&d, &a, self->state_0x9F7);
-            fn_80041E40(&self->pos, &d);
+            copyVec3(&self->pos, &d);
             self->pos.y = fn_802B0430(self->state_0x9F7);
             fn_8012A658(self, 0);
             fn_80128BF8(self, 0);

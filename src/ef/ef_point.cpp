@@ -48,6 +48,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* Types                                                                                          */
@@ -130,8 +131,6 @@ extern void fn_800A99B4(void *self, struct EfVec3 *out, struct EfEmitter *em, st
 extern f32 fn_80050BC0(f32 x);
 extern void fn_8009C760(f32 *a, f32 *b, f32 angle);
 extern void fn_8009C484(struct EfVec3 *a, struct EfVec3 *b);
-extern void fn_80041E8C(struct EfVec3 *out, f32 x, f32 y, f32 z);
-extern void fn_80043EA8(struct EfVec3 *out);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -179,8 +178,8 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
         for (i = 0; i < count; i++) {
             f32 rate, t, s, r, scale;
 
-            fn_80041E8C(&v_44, lbl_80796300, lbl_80796300, lbl_80796300);
-            fn_80043EA8(&v_38);
+            setVec3(&v_44, lbl_80796300, lbl_80796300, lbl_80796300);
+            VEC3_ctor(&v_38);
             rate = fn_800A8A08(&em->rate);
             t = lbl_80796304 * rate - lbl_80796308;
             if (t >= lbl_80796300)
@@ -193,9 +192,9 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
                         lbl_80796304 * (lbl_80796314 * fn_800A8A08(&em->rate)));
             v_38.y = v_38.y * r;
             v_38.z = v_38.z * r;
-            fn_80041E8C(&v_2C, v_38.x, lbl_80796300, v_38.z);
+            setVec3(&v_2C, v_38.x, lbl_80796300, v_38.z);
             fn_8009C484(&v_2C, &v_2C);
-            fn_80043EA8(&v_20);
+            VEC3_ctor(&v_20);
             fn_800A99B4(self, &v_20, em, &v_44, &v_38, &v_38, &v_2C);
             v_b = v_20;
             v_a = v_44;

@@ -93,7 +93,7 @@
  * union copy's own `pad_0xB18[0x4]` tail and predates this unit).  This unit added ONE named field
  * inside what was `pad_0x474`: `+0x482 field_0x482`, offsets unchanged (0x474 pad_0x474[0xE], 0x482
  * the field, 0x483 pad_0x483[0x141], 0x5C4 flags_0x5C4, 0xB14 se_handle_0xB14 - compile-proved, see
- * MERGE below).  `VEC3`/`Vec3` and the nw4r globals come from `include/nw4r/math.h`, `fn_80043EA8`
+ * MERGE below).  `VEC3`/`Vec3` and the nw4r globals come from `include/nw4r/math.h`, `VEC3_ctor`
  * from `ef.h`.  The declarations this unit consumes live in the owner's header (rule 2):
  * `enemy/fn_801251D0.h`, `enemy/fn_8012BDF4.h`, `enemy/fn_80176C58.h`, `enemy/fn_80177890.h`,
  * `enemy/fn_80178128.h`; the ones whose owner is still unsplit are in `include/unsplit/enemy.h` -
@@ -598,7 +598,7 @@ extern "C" void fn_8017C5DC(_ENEMY_WORK* self) {
 extern "C" void fn_8017C918(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    fn_80043EA8(&vec);
+    VEC3_ctor(&vec);
     switch (self->state_0x05) {
     case 0: {
         u8 state = self->state_0x05;

@@ -119,7 +119,7 @@ typedef struct LightOctal {
     /* +0x84 */ nw4r::math::VEC3 w[4];
 } LightOctal; /* size: 0xB4 */
 
-/* The sub-record fn_8005050C constructs; only its extent is traced. */
+/* The sub-record MTX34_ctor constructs; only its extent is traced. */
 typedef struct LightMidBlock {
     /* +0x00 */ u8 bytes[0x30];
 } LightMidBlock; /* size: 0x30 */
@@ -379,17 +379,17 @@ extern "C" LightWork* fn_802BEF00(LightWork* self)
 /* Constructs a channel's position vector. */
 extern "C" LightChannel* fn_802BEF84(LightChannel* self)
 {
-    fn_80043EA8(&self->pos);
+    VEC3_ctor(&self->pos);
     return self;
 }
 
 /* Constructs a record of four vectors and a LightTriple. */
 extern "C" LightQuadTriple* fn_802BEFB4(LightQuadTriple* self)
 {
-    fn_80043EA8(&self->v[0]);
-    fn_80043EA8(&self->v[1]);
-    fn_80043EA8(&self->v[2]);
-    fn_80043EA8(&self->v[3]);
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
     fn_802BF004(&self->inner);
     return self;
 }
@@ -397,33 +397,33 @@ extern "C" LightQuadTriple* fn_802BEFB4(LightQuadTriple* self)
 /* Constructs a record of three vectors. */
 extern "C" LightTriple* fn_802BF004(LightTriple* self)
 {
-    fn_80043EA8(&self->a);
-    fn_80043EA8(&self->b);
-    fn_80043EA8(&self->c);
+    VEC3_ctor(&self->a);
+    VEC3_ctor(&self->b);
+    VEC3_ctor(&self->c);
     return self;
 }
 
 /* Constructs a record of eight vectors. */
 extern "C" LightOctal* fn_802BF044(LightOctal* self)
 {
-    fn_80043EA8(&self->v[0]);
-    fn_80043EA8(&self->v[1]);
-    fn_80043EA8(&self->v[2]);
-    fn_80043EA8(&self->v[3]);
-    fn_80043EA8(&self->w[0]);
-    fn_80043EA8(&self->w[1]);
-    fn_80043EA8(&self->w[2]);
-    fn_80043EA8(&self->w[3]);
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
+    VEC3_ctor(&self->w[0]);
+    VEC3_ctor(&self->w[1]);
+    VEC3_ctor(&self->w[2]);
+    VEC3_ctor(&self->w[3]);
     return self;
 }
 
 /* Constructs a record of four vectors. */
 extern "C" LightQuad* fn_802BF138(LightQuad* self)
 {
-    fn_80043EA8(&self->v[0]);
-    fn_80043EA8(&self->v[1]);
-    fn_80043EA8(&self->v[2]);
-    fn_80043EA8(&self->v[3]);
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
     return self;
 }
 
@@ -433,21 +433,21 @@ extern "C" LightParams* fn_802BF0AC(LightParams* self)
     nw4r::math::VEC3* vec;
     nw4r::math::VEC3* end;
 
-    fn_80043EA8(&self->v0);
-    fn_80043EA8(&self->v1);
-    fn_80043EA8(&self->v2);
-    fn_80043EA8(&self->v3);
+    VEC3_ctor(&self->v0);
+    VEC3_ctor(&self->v1);
+    VEC3_ctor(&self->v2);
+    VEC3_ctor(&self->v3);
 
     vec = &self->runs[0];
     end = &self->runs[2];
     do {
-        fn_80043EA8(vec);
+        VEC3_ctor(vec);
         vec++;
     } while (vec < end);
 
     end = &self->runs[4];
     do {
-        fn_80043EA8(vec);
+        VEC3_ctor(vec);
         vec++;
     } while (vec < end);
     return self;
@@ -456,33 +456,33 @@ extern "C" LightParams* fn_802BF0AC(LightParams* self)
 /* Constructs a record of four vectors, a mid block and a trailing vector. */
 extern "C" LightQuadMid* fn_802BF180(LightQuadMid* self)
 {
-    fn_80043EA8(&self->v[0]);
-    fn_80043EA8(&self->v[1]);
-    fn_80043EA8(&self->v[2]);
-    fn_80043EA8(&self->v[3]);
-    fn_8005050C(&self->mid);
-    fn_80043EA8(&self->tail);
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
+    MTX34_ctor(&self->mid);
+    VEC3_ctor(&self->tail);
     return self;
 }
 
 /* Constructs the scene root record's fifteen vectors. */
 extern "C" LightRoot* fn_802BF1D8(LightRoot* self)
 {
-    fn_80043EA8(&self->v0);
-    fn_80043EA8(&self->v1);
-    fn_80043EA8(&self->v2);
-    fn_80043EA8(&self->v3);
-    fn_80043EA8(&self->v4);
-    fn_80043EA8(&self->v5);
-    fn_80043EA8(&self->v6);
-    fn_80043EA8(&self->v7);
-    fn_80043EA8(&self->v8);
-    fn_80043EA8(&self->v9);
-    fn_80043EA8(&self->v10);
-    fn_80043EA8(&self->v11);
-    fn_80043EA8(&self->v12);
-    fn_80043EA8(&self->v13);
-    fn_80043EA8(&self->v14);
+    VEC3_ctor(&self->v0);
+    VEC3_ctor(&self->v1);
+    VEC3_ctor(&self->v2);
+    VEC3_ctor(&self->v3);
+    VEC3_ctor(&self->v4);
+    VEC3_ctor(&self->v5);
+    VEC3_ctor(&self->v6);
+    VEC3_ctor(&self->v7);
+    VEC3_ctor(&self->v8);
+    VEC3_ctor(&self->v9);
+    VEC3_ctor(&self->v10);
+    VEC3_ctor(&self->v11);
+    VEC3_ctor(&self->v12);
+    VEC3_ctor(&self->v13);
+    VEC3_ctor(&self->v14);
     return self;
 }
 
@@ -598,7 +598,7 @@ extern "C" LightWrap2* fn_802C2698(LightWrap2* self)
 /* Constructs the record's vector member. */
 extern "C" LightVecAt4* fn_802C26CC(LightVecAt4* self)
 {
-    fn_80043EA8(&self->vec);
+    VEC3_ctor(&self->vec);
     return self;
 }
 

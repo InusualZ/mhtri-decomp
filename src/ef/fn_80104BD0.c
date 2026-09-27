@@ -57,6 +57,8 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * types
@@ -123,10 +125,9 @@ typedef struct _EM_EFT {
  * ------------------------------------------------------------------------------------------------- */
 
 /* C-linkage callees (the map spells these plainly). */
-void fn_8005050C(MTX34* mtx);                  /* mtx = identity */
-void fn_80043EA8(VEC3* vec);       /* vec = (0, 0, 0) */
+                  /* mtx = identity */
+       /* vec = (0, 0, 0) */
 void fn_800FBB90(MTX34* mtx, VEC3* pos);
-void fn_80041E40(VEC3* dst, const VEC3* src);
 void fn_80105314(_EM_EFT* self);
 void fn_80105560(_EM_EFT* self);               /* effect creation failed */
 void fn_80105564(_EM_EFT* self);
@@ -171,8 +172,8 @@ void fn_80104BD0(_EM_EFT* self)
 
 #pragma peephole off
 
-    fn_8005050C(&mtx);
-    fn_80043EA8(&vec);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&vec);
 
     work = self->work_0x38;
     enemy = self->enemy_0x30;
@@ -378,7 +379,7 @@ void fn_80104BD0(_EM_EFT* self)
         if (enemy != NULL) {
             mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&self->pos_0x18, &mtx);
             fn_800FBB90(&mtx, &self->pos_0x18);
-            fn_80041E40(&self->pos_0x18, &enemy->field_0x188);
+            copyVec3(&self->pos_0x18, &enemy->field_0x188);
         }
 
         switch (self->type_0x02) {

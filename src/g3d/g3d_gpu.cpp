@@ -40,7 +40,7 @@
  *     the two words through the pipe writer `fn_8009AB1C`.
  *   * `fn_8009B2CC(const Mat33*, u32 id)` expands a stored 3x3 rotation into a 3x4 texture matrix
  *     (the fourth column is the pooled 0.0f) and loads it as texgen matrix `id`
- *     (`GXLoadTexMtxImm(..., id, GX_MTX3x4)`), between the `fn_8005050C`/`fn_80050508` matrix
+ *     (`GXLoadTexMtxImm(..., id, GX_MTX3x4)`), between the `MTX34_ctor`/`fn_80050508` matrix
  *     begin/end pair the rest of the g3d/ef units use.
  *
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit g3d/g3d_gpu.cpp`.
@@ -69,7 +69,7 @@
 #include "types.h"
 #include "nw4r/math.h"      /* nw4r::math::MTX34 */
 #include "gx/fn_8009AA78.h" /* fn_8009AB1C / fn_8009AC44 - owner gx/fn_8009AA78.c (rule 2) */
-#include "fn_8004CAD8.h"    /* fn_8005050C / fn_80050508 - owner src/fn_8004CAD8.cpp (rule 2) */
+#include "fn_8004CAD8.h"    /* MTX34_ctor / fn_80050508 - owner src/fn_8004CAD8.cpp (rule 2) */
 
 /* `Panic(const char* pFile, int line, const char* pFmt, ...)`; the map's name is the C++ mangling
  * `Panic__Q24nw4r2dbFPCciPCce`, so it is called through its owner, never by the mangled spelling
@@ -169,7 +169,7 @@ void fn_8009B140(Array8* self) {
 void fn_8009B2CC(const Mat33* pSrc, u32 id) {
     nw4r::math::MTX34 mtx;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     mtx.m[0][0] = pSrc->m[0][0];
     mtx.m[0][1] = pSrc->m[0][1];
     mtx.m[0][2] = pSrc->m[0][2];

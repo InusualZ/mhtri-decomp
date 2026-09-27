@@ -61,7 +61,7 @@
 #include "unsplit/g3d.h"       /* unsplit g3d neighbours (rule 2) */
 #include "g3d/g3d_anmchr.h"    /* fn_8005DC24, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/fn_80063888.h"   /* fn_800639D0, owned by g3d/fn_80063888.cpp (rule 2) */
-#include "fn_8004CAD8.h"       /* fn_800504D4/fn_8005050C, owned by fn_8004CAD8.cpp (rule 2) */
+#include "fn_8004CAD8.h"       /* fn_800504D4/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_camera.h"    /* fn_80075390..fn_80075620, owned by g3d/g3d_camera.cpp (rule 2) */
 #include "g3d/fn_80075DCC.h"    /* fn_8007B5F4/fn_8007BB8C, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
@@ -90,7 +90,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 /* The SDK entry points the target reaches with their own `lis`/`addi` (their bracketing registered
  * units name different modules, so the unsplit band does not carry them - rule 2's named gap).
- * fn_800504D4/fn_8005050C (owner fn_8004CAD8.cpp) and fn_80075390..fn_80075620 (owner
+ * fn_800504D4/MTX34_ctor (owner fn_8004CAD8.cpp) and fn_80075390..fn_80075620 (owner
  * g3d/g3d_camera.cpp) are now declared in those owners' headers and #included above (rule 2). */
 extern "C" void fn_80501658(void* p);
 

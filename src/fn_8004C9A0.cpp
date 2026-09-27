@@ -3,7 +3,7 @@
  *
  * One function. It is handed the game's user-data block, an equipment-pool index and a one-byte out
  * flag, and writes that index into the per-category "selected equipment" slot the record's kind
- * belongs to.  The sibling 0x8004CAD8 (`fn_8004CAD8`) is the exact inverse (it clears the same slots
+ * belongs to.  The sibling 0x8004CAD8 (`set_slot_none`) is the exact inverse (it clears the same slots
  * to 0xFFFF); `fn_8004C514` allocates the pool record whose index this function stores, and
  * `Gunner_opt_ok_ck` (Pl band, 0x8027F0C4) gates the kind-0xB (bowgun) case.
  *
@@ -14,7 +14,7 @@
  *   Class 3/4 decide it: nothing supports a descriptive name, so the map's `fn_8004C9A0` stem is kept,
  *     and the unit is registered in the game-root `main` lib at `src/` - the link band whose
  *     neighbours are `main.cpp`, `sys_mem.cpp`, `fn_80040598.cpp`, `mh3_pad.cpp`, `fn_80047398.cpp`
- *     and `nw_resource.cpp`.  Its physical neighbours `fn_8004CAD8` (0x8004CAD8) and `get_userdata`
+ *     and `nw_resource.cpp`.  Its physical neighbours `set_slot_none` (0x8004CAD8) and `get_userdata`
  *     (0x8004D120) are plainly one subsystem (the user-data pool) and belong in the same module.
  *
  * Residual (measured 97.88 %, target 312 B vs ours 308 B, the one instruction):

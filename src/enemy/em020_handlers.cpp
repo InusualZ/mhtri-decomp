@@ -62,7 +62,7 @@
  *   * `include/Pl/fn_8027D684.h` - `fn_8027DC64` declared `u32` here, not the owner's `s32`: the
  *     target's caller compares it unsigned (`cmplwi r3,0x1`), which is what mode 2 needs.
  *
- * rule 7 deferred: references only to other units' unrenamed `fn_XXXXXXXX` symbols (`fn_8005050C`,
+ * rule 7 deferred: references only to other units' unrenamed `fn_XXXXXXXX` symbols (`MTX34_ctor`,
  * `fn_8005024C`, `fn_800E2994`, `fn_8006F304`, `fn_8013A9F4`, `fn_802B0668`, `fn_802B0A98`,
  * `fn_802D94C4`, `fn_8027DC64`), each declared by its
  * owner's header below; checked with `grep -n "fn_" include/fn_8004CAD8.h include/unsplit/{g3d,sound,unknown}.h
@@ -78,7 +78,7 @@
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"     /* ScnMdl::CopiedMatAccess */
 #include "nw4r/g3d/g3d_resmat.h" /* ResTexSrt */
-#include "fn_8004CAD8.h"         /* fn_8005050C, fn_8005024C (their owner's header) */
+#include "fn_8004CAD8.h"         /* MTX34_ctor, fn_8005024C (their owner's header) */
 #include "unsplit/g3d.h"         /* fn_8006F304 */
 #include "unsplit/sound.h"       /* fn_800E2994 */
 #include "unsplit/unknown.h"     /* SystemWork / system_w, fn_802B0668 */
@@ -112,7 +112,7 @@ extern "C" void em020_model_refresh(_ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
     _GXColor color;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     {
         nw4r::g3d::ScnMdl::CopiedMatAccess access_a((nw4r::g3d::ScnMdl*) self->field_0x13C, 8);
         nw4r::g3d::ScnMdl::CopiedMatAccess access_b((nw4r::g3d::ScnMdl*) self->field_0x13C, 9);

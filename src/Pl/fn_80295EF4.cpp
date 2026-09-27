@@ -224,10 +224,10 @@ u16 get_hit_id(void)
 /* Zeroes the four vectors of one land record. */
 extern "C" LandData* fn_80297D9C(LandData* self)
 {
-    fn_80043EA8(&self->vec_0x0C);
-    fn_80043EA8(&self->vec_0x18);
-    fn_80043EA8(&self->box_min_0x48);
-    fn_80043EA8(&self->box_max_0x54);
+    VEC3_ctor(&self->vec_0x0C);
+    VEC3_ctor(&self->vec_0x18);
+    VEC3_ctor(&self->box_min_0x48);
+    VEC3_ctor(&self->box_max_0x54);
     return self;
 }
 
@@ -314,10 +314,10 @@ extern "C" void* fn_80297DE8(void* self)
 {
     PlHitBox* box = (PlHitBox*)self;
 
-    fn_80043EA8(&box->vec_0x08);
-    fn_80043EA8(&box->vec_0x14);
-    fn_80043EA8(&box->vec_0x20);
-    fn_80043EA8(&box->vec_0x2C);
+    VEC3_ctor(&box->vec_0x08);
+    VEC3_ctor(&box->vec_0x14);
+    VEC3_ctor(&box->vec_0x20);
+    VEC3_ctor(&box->vec_0x2C);
     return self;
 }
 

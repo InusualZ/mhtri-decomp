@@ -47,6 +47,7 @@
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
 #include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling (Panic__Q24nw4r2dbFPCciPCce); declaring
  * that spelling as a C++ identifier re-mangles it, so the owner is declared instead and the front-end
@@ -102,7 +103,6 @@ extern void GXSetCurrentMtx(u32 id);
  * unowned ef-band helpers (fn_800B7DB0/B4B04/B54B4 -> unsplit/ef.h) are declared in those headers. */
 extern void fn_800514FC(Vec3* out, const MTX34* mtx, const Vec3* in); /* out = mtx * in */
 extern MTX34* fn_80050508(MTX34* mtx);                               /* returns its argument (size 0x4) */
-extern void fn_8005050C(MTX34* mtx);
 
 /* The effect-particle record this unit walks.  Only the fields the walk reads are named; the record
  * continues past what is touched here.  `EfDrawState` (below) is a *different* view: its +0xAD byte lies
@@ -196,10 +196,10 @@ void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag) {
     if (!IsValidPointer((u32)verts))
         nw4r::db::Panic(lbl_805941F8, 88, lbl_80594210, verts);
 
-    fn_80043EA8(&v0);
-    fn_80043EA8(&v1);
-    fn_80043EA8(&v2);
-    fn_80043EA8(&v3);
+    VEC3_ctor(&v0);
+    VEC3_ctor(&v1);
+    VEC3_ctor(&v2);
+    VEC3_ctor(&v3);
     fn_800514FC(&v0, mtx, &verts[0]);
     fn_800514FC(&v1, mtx, &verts[1]);
     fn_800514FC(&v2, mtx, &verts[2]);
@@ -283,9 +283,9 @@ void fn_800BE3C0(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
 
     flag = (self->field_0xD0 != 0);
 
-    fn_8005050C(&mtx_view);
+    MTX34_ctor(&mtx_view);
     fn_800AE360(pm, &mtx_view);
-    fn_8005050C(&mtx_mgr);
+    MTX34_ctor(&mtx_mgr);
     fn_800B7DB0(a2, &mtx_mgr);
     fn_800710BC(&mtx_mgr, &mtx_mgr, &mtx_view);
     GXLoadPosMtxImm(fn_80050508(&mtx_mgr), 0);
@@ -365,7 +365,7 @@ void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode) {
     if (!IsValidPointer((u32)pp))
         nw4r::db::Panic(lbl_805941F8, 136, lbl_805942E4, pp);
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     fn_800B54B4((const void*)pp, &v);
 
     switch (mode) {

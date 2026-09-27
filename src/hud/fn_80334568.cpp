@@ -76,6 +76,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "pl.h"
 #include "enemy.h"
 #include "nw4r/math.h"
@@ -126,7 +127,7 @@ u32 fn_80334A4C(void) {
 
 /* Constructs the 0x4C-byte player-state message's position sub-object and returns the message. */
 void* fn_80334C60(NetPlStateMsg* msg) {
-    fn_80043EA8(&msg->pos);
+    VEC3_ctor(&msg->pos);
     return msg;
 }
 
@@ -138,7 +139,7 @@ void fn_8033502C(_PLW* plw, u8 from, u8 to, u8 kind) {
     fn_80335114(&msg);
     memset(&msg, 0, sizeof(msg));
     fn_80334A34(&msg.hdr, from, to, kind);
-    fn_80041E40(&msg.pos, &plw->vec_0x03C);
+    copyVec3(&msg.pos, &plw->vec_0x03C);
     msg.field_0x10 = plw->field_0x0AC;
     msg.field_0x14 = plw->field_0x0A8;
     msg.field_0x18 = 0;
@@ -155,7 +156,7 @@ void fn_8033502C(_PLW* plw, u8 from, u8 to, u8 kind) {
 
 /* Constructs the 0x30-byte player message's position sub-object and returns the message. */
 void* fn_80335114(NetPlPosMsg* msg) {
-    fn_80043EA8(&msg->pos);
+    VEC3_ctor(&msg->pos);
     return msg;
 }
 
@@ -186,7 +187,7 @@ void fn_80335200(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
         return;
     }
     fn_80334A34(&msg.hdr, my, next, kind);
-    fn_80041E40(&msg.pos, pos);
+    copyVec3(&msg.pos, pos);
     msg.field_0x10 = 0;
     msg.field_0x14 = param;
     msg.field_0x18 = 0;
@@ -204,7 +205,7 @@ void fn_80335200(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
 
 /* Constructs the 0x28-byte attack message's position sub-object and returns the message. */
 void* fn_80335328(NetPlAtkMsg* msg) {
-    fn_80043EA8(&msg->pos);
+    VEC3_ctor(&msg->pos);
     return msg;
 }
 
@@ -248,7 +249,7 @@ void fn_80335468(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
 
 /* Constructs the 0x38-byte player message's position sub-object and returns the message. */
 void* fn_80335574(NetPlExtraMsg* msg) {
-    fn_80043EA8(&msg->pos);
+    VEC3_ctor(&msg->pos);
     return msg;
 }
 
@@ -275,7 +276,7 @@ void fn_803356F0(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
 
 /* Constructs the 0x4C-byte player-state message's position sub-object and returns the message. */
 void* fn_80335B1C(NetPlStateMsg* msg) {
-    fn_80043EA8(&msg->pos);
+    VEC3_ctor(&msg->pos);
     return msg;
 }
 

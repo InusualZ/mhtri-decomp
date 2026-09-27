@@ -81,6 +81,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 #pragma peephole off
 
@@ -94,7 +95,7 @@ extern f32 lbl_80796D34;
 extern f32 lbl_80796D38;
 extern f32 lbl_80796D3C;
 
-/* The four 0x0C-byte colour records `fn_80041E8C` rebuilds; the table's bytes belong to the data pass. */
+/* The four 0x0C-byte colour records `setVec3` rebuilds; the table's bytes belong to the data pass. */
 extern nw4r::math::VEC3 lbl_806A4560[];
 
 /* The scene root `fn_8007F0CC` looks a model up in. */
@@ -170,7 +171,6 @@ void fn_80139024(_ENEMY_WORK* self);
 void fn_8013A978(_ENEMY_WORK* self);
 
 /* `mh3_pad.cpp`: rebuilds one 0x0C-byte record from three floats. */
-void fn_80041E8C(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 
 /* `g3d/g3d_scnmdl.cpp`: finds a scene model by id. */
 void fn_8007F0CC(s32 root, u32 id);
@@ -341,10 +341,10 @@ extern "C" u8* fn_801377D0(u8 mode, u8 mask)
 /* Rebuilds the record's four light records. */
 extern "C" void fn_801378A0(void)
 {
-    fn_80041E8C(&lbl_806A4560[0], lbl_80796D34, lbl_80796D38, lbl_80796C58);
-    fn_80041E8C(&lbl_806A4560[1], lbl_80796C58, lbl_80796D38, lbl_80796D3C);
-    fn_80041E8C(&lbl_806A4560[2], lbl_80796D3C, lbl_80796D38, lbl_80796C58);
-    fn_80041E8C(&lbl_806A4560[3], lbl_80796C58, lbl_80796D38, lbl_80796D34);
+    setVec3(&lbl_806A4560[0], lbl_80796D34, lbl_80796D38, lbl_80796C58);
+    setVec3(&lbl_806A4560[1], lbl_80796C58, lbl_80796D38, lbl_80796D3C);
+    setVec3(&lbl_806A4560[2], lbl_80796D3C, lbl_80796D38, lbl_80796C58);
+    setVec3(&lbl_806A4560[3], lbl_80796C58, lbl_80796D38, lbl_80796D34);
 }
 
 /* ------------------------------------------------------------------------------------------------ *

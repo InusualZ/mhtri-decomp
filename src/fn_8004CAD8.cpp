@@ -23,7 +23,7 @@
  *   * Class 2 (runtime-dump name) FAILS: `dumpmap.py lookup 0x8004CAD8` answers `zz_004cad8_`, and the
  *     `join` pass proposes names (`DBClose`, `GXPosition3f32`, `J3DColorBlockLightOff::setColorChanNum`)
  *     that are address coincidences from another build's dump - not evidence.
- *   * Class 3 decides it: the file keeps the map's stem `fn_8004CAD8`, registered in the game-root band -
+ *   * Class 3 decides it: the file keeps the map's stem `set_slot_none`, registered in the game-root band -
  *     the `main` lib at the `src/` root with `cflags_main`, exactly where its link neighbours sit
  *     (`fn_80040598.cpp`, `mh3_pad.cpp` 0x800408A8..0x80047398, `fn_80047398.cpp` 0x80047398..0x8004C9A0,
  *     the `8004C9A0` run 0x8004C9A0..0x8004CAD8 - which ends where this unit begins).  Module `main` is a
@@ -65,7 +65,7 @@
  *     (`fn_800501B4`/`fn_8005024C` = Sin/CosFIdx of a bit-cast u16, `fn_80050BC0` = FrSqrt) and the
  *     `SinFIdx`/`CosFIdx`/`FrSqrt` declarations, which have no owner header yet - a rule-2 gap, recorded
  *     rather than re-declared here.
- *   * `fn_8004CAD8` (the 16-way `kind` dispatch over the +0x92..+0x9C half-words) is declared but not
+ *   * `set_slot_none` (the 16-way `kind` dispatch over the +0x92..+0x9C half-words) is declared but not
  *     written: those six fields have no context name yet (rule 5).
  *
  * Inventory / addresses / sizes: `python tools/units/ledger.py unit fn_8004CAD8.cpp`.

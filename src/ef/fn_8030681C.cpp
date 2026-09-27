@@ -107,6 +107,8 @@
  * consolidation pass (the lint's own "unsplit gap" reasoning).
  */
 #include "types.h"
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 
 #include "nw4r/math.h"
 #include "gx.h"
@@ -298,7 +300,7 @@ extern "C" void fn_8030681C(_EFT* self)
     u32 pos_num;
     u32 i;
 
-    fn_80043EA8(&pos);
+    VEC3_ctor(&pos);
     pos_tbl = NULL;
     if ((mapno == 2 || mapno == 13) && self->area_0x44 == 10) {
         pos_tbl = lbl_805DC5E8;
@@ -355,7 +357,7 @@ extern "C" void fn_8030681C(_EFT* self)
             break;
         }
 
-        fn_80041E40(&pos, &model->model->pos_0x04);
+        copyVec3(&pos, &model->model->pos_0x04);
         pos.y -= lbl_8079ADE8;
         eft004_set(0, &pos, lbl_8079ADEC, 0, self->area_0x44);
     }
@@ -415,7 +417,7 @@ void eft042_set2(_ENEMY_WORK* source, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR
         if (type == 3 && (source->field_0x228 & 6) != 0) {
             eft->type_0x02 = 4;
         }
-        fn_80041E40(&eft->pos_0x18, pos);
+        copyVec3(&eft->pos_0x18, pos);
         fn_800FC0D4(&eft->rot_0x24, rot);
         eft->source_0x30 = source;
         eft->timer_0x0C = 0;
@@ -487,7 +489,7 @@ extern "C" void fn_80306D6C(void* source, u8 type, nw4r::math::VEC3* pos, _CP_VE
     _EFT* eft = fn_80306E04(type, area);
 
     if (eft != NULL) {
-        fn_80041E40(&eft->pos_0x18, pos);
+        copyVec3(&eft->pos_0x18, pos);
         fn_800FC0D4(&eft->rot_0x24, rot);
         eft->source_0x30 = NULL;
         eft->source_0x30 = source;
@@ -698,7 +700,7 @@ extern "C" void fn_80307AE8(_EFT* self)
     _ENEMY_WORK* source = (_ENEMY_WORK*)self->source_0x30;
     nw4r::math::VEC3 offset;
 
-    fn_80043EA8(&offset);
+    VEC3_ctor(&offset);
     self->state_0x05++;
 
     if (res_eft_model_create(work->model, lbl_805DC724[self->type_0x02], 0) == NULL) {
@@ -715,7 +717,7 @@ extern "C" void fn_80307AE8(_EFT* self)
 
     setVector3(&offset, lbl_8079AE10, lbl_8079AE14, lbl_8079AE18);
     rotVecY(&offset, self->rot_0x24.y);
-    fn_80041E40(&work->v_0x0C.offset, &offset);
+    copyVec3(&work->v_0x0C.offset, &offset);
     work->field_0x18 = lbl_8079AE1C;
 
     if (fn_800F9D80(self) == 1) {
@@ -748,7 +750,7 @@ extern "C" void fn_80307C54(_EFT* self)
         return;
     }
 
-    fn_80041E40(&model->pos_0x04, &self->pos_0x18);
+    copyVec3(&model->pos_0x04, &self->pos_0x18);
     fn_800FC0D4((_CP_VECTOR*)&model->field_0x28, &self->rot_0x24);
     model->field_0x2C += 16384;
     model->field_0x28 += ran_suu(0);
@@ -794,8 +796,8 @@ extern "C" void fn_803088FC(_EFT* self)
     nw4r::math::VEC3 pos;
     nw4r::math::MTX34 mtx;
 
-    fn_80043EA8(&pos);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&pos);
+    MTX34_ctor(&mtx);
 
     if (fn_800F92F4(self, 0) == 0) {
         self->flag_0x01 = 0;
@@ -835,7 +837,7 @@ extern "C" void fn_80308D00(_EFT* self)
 
         work->v_0x0C.color.a -= self->demo_flag_0x08;
         get_joint_wpos_em(source, lbl_805DCB1C[self->type_0x02], &self->pos_0x18);
-        fn_80041E40(&work->model->pos_0x04, &self->pos_0x18);
+        copyVec3(&work->model->pos_0x04, &self->pos_0x18);
         fn_800FC0D4(&work->model->rot_0x54, (_CP_VECTOR*)&source->field_0x1BC);
         work->model->setMatColor(0, GX_COLOR0A0, work->v_0x0C.color, false);
         work->model->move(0);

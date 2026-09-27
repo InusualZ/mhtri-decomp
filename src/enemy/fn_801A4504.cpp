@@ -232,10 +232,10 @@ void fn_801A4504(_ENEMY_WORK* self) {
     f32 temp_f1_7;
     u16 temp_r3;
 
-    fn_8005050C(&mtx);
-    fn_80043EA8(&v2C);
-    fn_80043EA8(&v20);
-    fn_80043EA8(&v14);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&v2C);
+    VEC3_ctor(&v20);
+    VEC3_ctor(&v14);
     fn_801A3E90(self);
     fn_801A3FD8(self);
     fn_801A4218(self);
@@ -1402,7 +1402,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                 if (idx != 0xFF) {
                     EmDataEntry* e = &data->table_0x2C[idx];
                     get_joint_wmat_em(self, e->joint, &mtx);
-                    fn_80041E40(&v2C, fn_80143174(&rec8, &e->vec, 0));
+                    copyVec3(&v2C, fn_80143174(&rec8, &e->vec, 0));
                     mulVecMatAddTrans(&v2C, &mtx);
                     fn_803B993C(self->handles_0x328[i], &v2C, self->area_no);
                 }
@@ -1419,7 +1419,7 @@ void fn_801A9210(_ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
     _GXColor color;
 
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     if (fn_802B0668(self->field_0x1E0) == 6 && self->area_no == 1) {
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*) self->field_0x13C, 6);
         if (fn_800E2994(&access) != 0) {

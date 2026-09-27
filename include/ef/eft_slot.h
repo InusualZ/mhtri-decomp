@@ -23,9 +23,9 @@
  *     declaration surface changed `eft_slot_work_update` from 92.87 to 90.24, so the two views are not
  *     interchangeable for this unit's call sites.
  *
- * So this is the `fn_80041E40` pattern (`include/hud/fn_80334568.h`'s own note): the consumer keeps
- * the call-site spelling until the owner's header is reachable.  The declaration below MUST stay
- * identical to the owner's; the fold is a `shared-file` request in this unit's outbox.
+ * `copyVec3` itself (0x80041E40, `src/mh3_pad.cpp`) is no longer one of these: it comes from
+ * `include/mh3_pad.h`, which this unit includes (the `(10197)` clash that used to make that header
+ * unreachable is closed).
  */
 #ifndef MHTRI_EF_EFT_SLOT_H
 #define MHTRI_EF_EFT_SLOT_H

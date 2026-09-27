@@ -27,6 +27,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_8012BDF4.h"
@@ -68,7 +69,7 @@ void fn_80170610(_ENEMY_WORK *self, u8 a) {
     Vec3 v;
     u8 b, c;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if ((a & 0xFF) == 2) {
         fn_80176090(self, &b, &c);
         fn_80128A8C(self, b, c);

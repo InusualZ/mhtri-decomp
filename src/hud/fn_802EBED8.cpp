@@ -244,7 +244,7 @@ void fn_802EF0A0(_PLW* plw, void* out)
     Pos12 pos;
 
     (void)out;
-    fn_80043EA8((VEC3*)&scratch);
+    VEC3_ctor((VEC3*)&scratch);
     eft053_shell_pos_project(plw, &scratch);
     pos = scratch;
     fn_802EEDE4(&pos);

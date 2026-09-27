@@ -44,14 +44,9 @@
 #include "nw4r/math.h"
 #include "mh3_pad.h"
 
-/* `unsplit/ef.h` and `mh3_pad.h` both spell `fn_80043EA8` - the owner's header with a `void*`
- * parameter, the band header with the `VEC3*` its ef consumers cast to - and including both is a
- * C-linkage overload error.  This unit wants only the owner's `fn_80041E40` and the band's
- * `fn_800A7750`, so the band's stale duplicate is renamed out of the way for this one include; the ef
- * consumers of the band spelling are untouched. */
-#define fn_80043EA8 mhtri_band_fn_80043EA8
+/* The `VEC3_ctor` macro that used to guard this include is gone: `unsplit/ef.h` no longer declares
+ * the symbol (its owner `mh3_pad.h` does), so the two headers no longer clash. */
 #include "unsplit/ef.h"
-#undef fn_80043EA8
 
 #pragma peephole off
 
@@ -188,11 +183,11 @@ extern "C" void fn_800A3044(CreationQueue* self, const Setting* setting, EffectM
     self->mEntry[self->mCount].mpHandle = eh;
     if (pos != 0) {
         self->mEntry[self->mCount].mFlags |= 1;
-        fn_80041E40(&self->mEntry[self->mCount].mPos, pos);
+        copyVec3(&self->mEntry[self->mCount].mPos, pos);
     }
     if (vel != 0) {
         self->mEntry[self->mCount].mFlags |= 2;
-        fn_80041E40(&self->mEntry[self->mCount].mVel, vel);
+        copyVec3(&self->mEntry[self->mCount].mVel, vel);
     }
     self->mCount++;
 }
@@ -235,11 +230,11 @@ extern "C" void fn_800A33DC(CreationQueue* self, const Setting* setting, EffectM
     self->mEntry[self->mCount].mpHandle = eh;
     if (pos != 0) {
         self->mEntry[self->mCount].mFlags |= 1;
-        fn_80041E40(&self->mEntry[self->mCount].mPos, pos);
+        copyVec3(&self->mEntry[self->mCount].mPos, pos);
     }
     if (vel != 0) {
         self->mEntry[self->mCount].mFlags |= 2;
-        fn_80041E40(&self->mEntry[self->mCount].mVel, vel);
+        copyVec3(&self->mEntry[self->mCount].mVel, vel);
     }
     self->mCount++;
 }

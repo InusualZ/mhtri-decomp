@@ -92,9 +92,9 @@
  *     the callee's own body reads +0x04/+0x08 (settled from the callee, rule 6 of the playbook).
  *   * the plain prototypes at the top of this file (`fn_80130478`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `fn_80139A64`, `fn_80139A7C`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
- *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `fn_80101428`, `fn_8010140C`, `fn_8005050C`,
- *     `fn_800516F0`, `fn_80041E8C`, `fn_80041E40`, `fn_80043EA8`, `fn_80051490`, `fn_802B0668`,
- *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `fn_80041E8C`'s
+ *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `fn_80101428`, `fn_8010140C`, `MTX34_ctor`,
+ *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `fn_802B0668`,
+ *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
  *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
  *   * the unit registers a `.ctors` word (0x8056F33C..0x8056F340, added by the split itself): the
  *     original translation unit has a static constructor, most plausibly the one that fills the five
@@ -103,6 +103,8 @@
 #include "types.h"
 
 #include "nw4r/math.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* Retail keeps the `extsh` + `cmpwi` pair a value test needs: this build's -O3 peephole fuses
  * them into the record form `extsh.`.  Measured on this unit: with the peephole on `fn_80191EF8`
@@ -117,7 +119,7 @@
 struct _ENEMY_WORK;
 
 /* `_CP_VECTOR` is `include/ef.h`'s type (three words).  That header is not includable here: its
- * `fn_80041E8C` declaration returns void, where this range's call sites read the callee's r3 (see
+ * `setVec3` declaration returns void, where this range's call sites read the callee's r3 (see
  * `fn_80192108`/`fn_80192204`), so the outbox carries the header fix instead. */
 struct _CP_VECTOR;
 
@@ -331,11 +333,7 @@ void fn_800FC0D4(void* dst, void* src);
 void fn_805012E8(EmMtx33* dst, const MTX34* src);
 void fn_80101428(MTX34* mtx, VEC3* vec);
 void fn_8010140C(MTX34* mtx, VEC3* out);
-void fn_8005050C(void* mtx);
 void fn_800516F0(void* mtx);
-void* fn_80041E8C(void* out, f32 x, f32 y, f32 z);
-void* fn_80041E40(void* dst, const void* src);
-void fn_80043EA8(void* out);
 void fn_80051490(void* dst, const void* src);
 
 /* This range's own entry points (rule 2: declared where they are defined, i.e. here). */
@@ -646,7 +644,7 @@ void fn_80191CE4(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
     EmActWork* work;
 
     work = self->work_0x04;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     fn_800516F0(&dst);
     switch (item->type_0x04) {
     case 0xFF:
@@ -688,7 +686,7 @@ void fn_80191E30(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
     EmActWork* work;
 
     work = self->work_0x04;
-    fn_8005050C(&mtx);
+    MTX34_ctor(&mtx);
     switch (item->type_0x04) {
     case 0xFF:
         switch (kind) {
@@ -798,11 +796,11 @@ void fn_80192080(EmActWork* self) {
 /* Fills in one effect request (id 0x17) from the default vector. */
 void fn_80192108(EmEffRequest* out, u8 a, s16 b, s16 c) {
     if (lbl_80794AA0 == 0) {
-        fn_80041E8C(&lbl_806A7A60, lbl_80797E88, lbl_80797E88, lbl_80797EB4);
+        setVec3(&lbl_806A7A60, lbl_80797E88, lbl_80797E88, lbl_80797EB4);
         lbl_80794AA0 = 1;
     }
     out->id_0x00 = 0x17;
-    fn_80041E40(&out->pos_0x04, &lbl_806A7A60);
+    copyVec3(&out->pos_0x04, &lbl_806A7A60);
     out->field_0x10 = a;
     out->field_0x12 = b;
     out->field_0x14 = c;
@@ -831,21 +829,21 @@ void fn_80192204(void) {
     VEC3 v8;
 
     fn_80051490(&lbl_806A7A00.vec_0x00,
-                fn_80041E8C(&v1, lbl_80797E88, lbl_807981C0, lbl_80797E88));
+                setVec3(&v1, lbl_80797E88, lbl_807981C0, lbl_80797E88));
     fn_80051490(&lbl_806A7A00.vec_0x0C,
-                fn_80041E8C(&v2, lbl_80797E88, lbl_80797E88, lbl_80797E88));
+                setVec3(&v2, lbl_80797E88, lbl_80797E88, lbl_80797E88));
     fn_80051490(&lbl_806A7A18.vec_0x00,
-                fn_80041E8C(&v3, lbl_80797E88, lbl_80798230, lbl_80797E88));
+                setVec3(&v3, lbl_80797E88, lbl_80798230, lbl_80797E88));
     fn_80051490(&lbl_806A7A18.vec_0x0C,
-                fn_80041E8C(&v4, lbl_80797E88, lbl_80797E88, lbl_80797E88));
+                setVec3(&v4, lbl_80797E88, lbl_80797E88, lbl_80797E88));
     fn_80051490(&lbl_806A7A30.vec_0x00,
-                fn_80041E8C(&v5, lbl_80797E88, lbl_80797F80, lbl_80797E88));
+                setVec3(&v5, lbl_80797E88, lbl_80797F80, lbl_80797E88));
     fn_80051490(&lbl_806A7A30.vec_0x0C,
-                fn_80041E8C(&v6, lbl_80797E88, lbl_80798234, lbl_80797E88));
+                setVec3(&v6, lbl_80797E88, lbl_80798234, lbl_80797E88));
     fn_80051490(&lbl_806A7A48.vec_0x00,
-                fn_80041E8C(&v7, lbl_80797E88, lbl_80797E88, lbl_80797EB4));
+                setVec3(&v7, lbl_80797E88, lbl_80797E88, lbl_80797EB4));
     fn_80051490(&lbl_806A7A48.vec_0x0C,
-                fn_80041E8C(&v8, lbl_80797E88, lbl_80797F24, lbl_80797E88));
+                setVec3(&v8, lbl_80797E88, lbl_80797F24, lbl_80797E88));
 }
 
 /* Sets the aim bits the caller's mask names. */
@@ -927,9 +925,9 @@ void fn_8019255C(EmActWork* self) {
     VEC3 ofs;
     MTX34 mtx;
 
-    fn_80043EA8(&out);
-    fn_80043EA8(&ofs);
-    fn_8005050C(&mtx);
+    VEC3_ctor(&out);
+    VEC3_ctor(&ofs);
+    MTX34_ctor(&mtx);
     fn_8012933C(self, 0, 0x12, 0x205);
     setVector3(&ofs, lbl_80797E88, lbl_80797E88, lbl_8079800C);
     get_joint_wmat_em((struct _ENEMY_WORK*)self, 0x1A, &mtx);
@@ -952,8 +950,8 @@ void fn_80192630(EmActWork* self) {
     VEC3 v1;
     VEC3 v2;
 
-    fn_80041E40(&rec->angle_0x00, fn_80041E8C(&v1, lbl_8079824C, lbl_8079824C, lbl_8079824C));
-    fn_80041E40(&rec->rot_0x10, fn_80041E8C(&v2, lbl_8079824C, lbl_8079824C, lbl_8079824C));
+    copyVec3(&rec->angle_0x00, setVec3(&v1, lbl_8079824C, lbl_8079824C, lbl_8079824C));
+    copyVec3(&rec->rot_0x10, setVec3(&v2, lbl_8079824C, lbl_8079824C, lbl_8079824C));
     rec->vec_0x1C.x = lbl_80798238;
     rec->vec_0x1C.y = lbl_80798250;
     rec->vec_0x1C.z = lbl_80798254;

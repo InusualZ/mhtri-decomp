@@ -113,10 +113,8 @@ s32 fn_800DBB78(s32 bank, s32 id);
 
 /* C-linkage helpers the model methods call (their owners are elsewhere in the game).
  * 0x80041E40 is owned by `src/mh3_pad.cpp`; this copy is normalised to that owner's body
- * (`returns dst`) - its header cannot be included from the `ef` band (fn_80043EA8/
- * fn_80041E8C conflict, filed 2026-09-27). */
-void* fn_80041E40(void* dst, const void* src);
-void fn_80041E8C(nw4r::math::VEC3* dst, f32 x, f32 y, f32 z);
+ * (`returns dst`) - its header cannot be included from the `ef` band (VEC3_ctor/
+ * setVec3 conflict, filed 2026-09-27). */
 void fn_800D3ACC(void* sub);
 void fn_8007E498(void* obj);
 void fn_80054FE8(void* obj, s32 flag);
@@ -133,7 +131,9 @@ void fn_800532DC(void* dst, void* src);
 void fn_80080B10(void* obj, s32 kind);
 void fn_800810DC(void* obj, s32 flag);
 SeSlot* fn_800D8E58(_se_w* work, s32 id);
-void fn_80047058(void* obj);
+/* 0x80047058 is `mh3_pad.cpp`'s: the retail body takes NO argument (it loads `Screen_w` itself), so
+ * the `void* obj` this header carried was the call site's guess and collided with the owner. */
+s32 fn_80047058(void);
 
 /* this unit's read-only pool constants (referenced, not defined here - playbook 29) */
 extern const f32 lbl_807963E0;

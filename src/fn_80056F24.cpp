@@ -52,6 +52,7 @@
 #include "gx.h"
 #include "unsplit/unknown.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The peephole pass is off for this whole TU: the retail FIFO writers keep the narrowing the pass would
  * fold away (`clrlwi r0,r3,24; stb r0,-0x8000(r3)` in `fn_800572A4`/`fn_80058B64`, `extsh r0,r3,16` in
@@ -205,7 +206,6 @@ void GXSetTexCoordGen2(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f);
 
 void fn_800403AC(void* dst, const void* src);
 void fn_8004030C(struct _MH_VEC2* v);
-void fn_80043EA8(void* p);
 void fn_800569CC(void);
 void fn_80056F04(void);
 
@@ -491,7 +491,7 @@ extern "C" void fn_8005913C(GameDrawState* s) {
  * ------------------------------------------------------------------------------------------------- */
 
 /* The sub-object chain `fn_800594DC` walks: the global state's +0x3C block, whose +0x28 node is the
- * `fn_80043EA8` target.  Only the node's base is used. size: 0x3C */
+ * `VEC3_ctor` target.  Only the node's base is used. size: 0x3C */
 typedef struct CtorBlock {
     /* +0x00 */ u8 pad_0x00[0x28];
     /* +0x28 */ u8 node_0x28[0x14];
@@ -605,9 +605,9 @@ extern "C" void fn_800594C8(void) {
 }
 
 /* The constructor chain `fn_800594DC` runs over the global state: the +0x3C sub-object's own +0x28
- * node is handed to `fn_80043EA8`.  Typed so no raw offset reaches a field (rule 6). */
+ * node is handed to `VEC3_ctor`.  Typed so no raw offset reaches a field (rule 6). */
 extern "C" void* fn_8005951C(CtorBlock* self) {
-    fn_80043EA8(self->node_0x28);
+    VEC3_ctor(self->node_0x28);
     return self;
 }
 

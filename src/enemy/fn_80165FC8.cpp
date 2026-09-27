@@ -48,6 +48,8 @@
  */
 
 #include "types.h"
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_80165FC8.h"
@@ -121,8 +123,8 @@ void fn_801661FC(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3) {
 
     (void)arg3;
     fn_8005D1AC(head, 0);
-    fn_8005050C(&out);
-    fn_8005050C(&local);
+    MTX34_ctor(&out);
+    MTX34_ctor(&local);
     idx = (s32)(u32)fn_80097EB0(cursor, 0x18);
     fn_8005D0CC(head, &idx);
     {
@@ -152,10 +154,12 @@ void fn_80166330(void) {
     VEC3 v2;
     VEC3 v3;
 
-    fn_80051490(&lbl_806A7868[0], fn_80041E8C(&v0, lbl_80797330, lbl_80797338, lbl_80797330));
-    fn_80051490(&lbl_806A7868[1], fn_80041E8C(&v1, lbl_80797330, lbl_807974EC, lbl_80797330));
-    fn_80051490(&lbl_806A7880[0], fn_80041E8C(&v2, lbl_80797330, lbl_80797330, lbl_80797330));
-    fn_80051490(&lbl_806A7880[1], fn_80041E8C(&v3, lbl_80797330, lbl_807974EC, lbl_80797330));
+    /* `setVec3` returns its first argument (the retail call site keeps it in r4 across the `bl`), so
+     * the cast back to the callee's `VEC3*` costs no instruction. */
+    fn_80051490(&lbl_806A7868[0], (VEC3*)setVec3(&v0, lbl_80797330, lbl_80797338, lbl_80797330));
+    fn_80051490(&lbl_806A7868[1], (VEC3*)setVec3(&v1, lbl_80797330, lbl_807974EC, lbl_80797330));
+    fn_80051490(&lbl_806A7880[0], (VEC3*)setVec3(&v2, lbl_80797330, lbl_80797330, lbl_80797330));
+    fn_80051490(&lbl_806A7880[1], (VEC3*)setVec3(&v3, lbl_80797330, lbl_807974EC, lbl_80797330));
 }
 
 u32 fn_801663E4(_ENEMY_WORK* self) {
@@ -494,7 +498,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
     u32 running;
     u8 map;
 
-    fn_80041E8C(&origin, lbl_807974FC, lbl_807974FC, lbl_807974FC);
+    setVec3(&origin, lbl_807974FC, lbl_807974FC, lbl_807974FC);
     self->field_0x835 = 1;
     switch ((u8)kind) {
     case 0:
@@ -597,7 +601,7 @@ void fn_801671AC(_ENEMY_WORK* self) {
                 (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
             if (data != 0) {
                 if (self->field_0x46C == data->field_0x17) {
-                    fn_80041E40(&self->aim, &data->vec_0x24);
+                    copyVec3(&self->aim, &data->vec_0x24);
                 }
                 if (self->field_0x011 == 0) {
                     if (data->work_0x18 != 0 && data->work_0x18->area_no == self->area_no

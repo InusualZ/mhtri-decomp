@@ -8,6 +8,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "fn_8004CAD8/mtx.h" /* MTX34_ctor / set_slot_none - the two this unit's consumers share */
 
 #ifdef __cplusplus
 void wii_sysmsg_gen(long id, char* buf, long a);
@@ -78,7 +79,9 @@ void PSVECSubtract(f32* dst, const f32* a, const f32* b);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved
  * out of that unit's local extern block on landing, 2026-09-25). */
 void fn_800504D4(void* pOut);
-void fn_8005050C(void* pOut);
+/* `MTX34_ctor` (0x8005050C) and `set_slot_none` (0x8004CAD8) live in `fn_8004CAD8/mtx.h`, included
+ * below - this header's other declarations still disagree with several consumers, so a band that
+ * only needs those two takes the light one. */
 /* 0x80052BC0/0x800534B0 - the `ResTex`/`ResPltt` value-type constructors the
  * `g3d/g3d_resanmtexsrt.cpp` `ResFile` accessors use (rule 2: declared in their owner's header). */
 void* fn_80052BC0(void* out, u32 v);
@@ -97,7 +100,7 @@ void* fn_80050508(void* pOut);
 f32 fn_80050EF4(void* a, void* b);
 /* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
  * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `fn_80050CA0(out, a, b)` is
- * `fn_80043EA8(out); PSVECSubtract(out, a, b)`, and `fn_80050F80(a, b)` calls `fn_80050CA0(&local, b, a)`
+ * `VEC3_ctor(out); PSVECSubtract(out, a, b)`, and `fn_80050F80(a, b)` calls `fn_80050CA0(&local, b, a)`
  * then the length helper `fn_80050F24(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
  * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
  * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
@@ -110,7 +113,7 @@ f32 fn_80050EAC(const void* a, const void* b);
  * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 /* 0x80051378 - the three-pointer vector helper this range owns (unmangled `fn_80051378`, so C
- * linkage).  Its body saves r3/r4/r5, zeroes the first through `fn_80043EA8`, then tail-forwards all
+ * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3_ctor`, then tail-forwards all
  * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
  * registered as the first consumer (rule 2) - the owner header did not declare it yet. */
 void fn_80051378(VEC3* out, VEC3* a, VEC3* b);
@@ -132,7 +135,7 @@ f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `fn_800513CC(out, a, b)`
  * is the paired-single add `out = a + b`, `fn_80050028(out, src)` the field-by-field three-float copy,
- * `fn_80051EE0(out, in, s)` the scale (`fn_80043EA8` then `fn_80051424`), and `fn_800513F0` the
+ * `fn_80051EE0(out, in, s)` the scale (`VEC3_ctor` then `fn_80051424`), and `fn_800513F0` the
  * in-place scale.  Added with `Pl/fn_8028F66C.cpp`, the first consumer to need them here.  The
  * parameter spellings are the ones the consumers that already include this header declare
  * (`ef/fn_801173AC.cpp`, `enemy/fn_801B7020.cpp`, `enemy/fn_8035E034.cpp`): `fn_800513F0`'s return

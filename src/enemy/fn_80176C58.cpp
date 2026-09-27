@@ -88,7 +88,7 @@ extern "C" u8 lbl_805AA900[];
 /* callees                                                                                        */
 /* --------------------------------------------------------------------------------------------- */
 
-/* Declared in a shared header: `fn_80043EA8`, `setVector3` (`nw4r/math.h`); `fn_8012ECF0`,
+/* Declared in a shared header: `VEC3_ctor`, `setVector3` (`nw4r/math.h`); `fn_8012ECF0`,
  * `fn_8012F93C`, `fn_80130478` (`unsplit/enemy.h`).  The C++ free functions are declared by their
  * real signatures so the front-end mangles them to the map spellings. */
 extern "C" u8 fn_802B0668(u8 id);
@@ -123,7 +123,7 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
     u8 kind;
     u8 mode;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     if (fn_801391E8(self) == 0) {
         helper = (Helper_80176E50*)operator new(0xC);
         if (helper != 0) {

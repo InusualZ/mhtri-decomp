@@ -36,6 +36,7 @@
  */
 
 #include "types.h"
+#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* A 3-float engine vector.  `Pl/pl_act.cpp` carries the same type as `nw4r::math::VEC3`; the two belong
  * in one header (rules 1-2 are not linted, see tools/units/stylelint.py).  size: 0xC */
@@ -52,7 +53,6 @@ u8 get_now_mapno(void);
 u8 get_now_areano(void);
 extern "C" {
 u32 fn_802B0668(u8 mapno);
-void fn_80041E8C(VEC3* v, f32 x, f32 y, f32 z);
 u32 fn_800DA72C(u32 se_work, u32 se_code, VEC3* pos);
 }
 
@@ -128,7 +128,7 @@ extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
             if ((u8)arg0 == 0) {
                 VEC3 fixed_pos;
 
-                fn_80041E8C(&fixed_pos, lbl_80796410, lbl_80796414, lbl_80796418);
+                setVec3(&fixed_pos, lbl_80796410, lbl_80796414, lbl_80796418);
                 fn_800DA72C(46, 8, &fixed_pos);
                 return;
             }

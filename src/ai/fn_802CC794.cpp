@@ -26,7 +26,7 @@
  * `switch` on `field_0x420` emits a 4-instruction signed range test where the target emits the
  * 3-instruction `subi`/`cmplwi` unsigned one (a `u32` switch local made it worse at 74.3 %).
  * (3) 21 functions are not attempted: they read `_PLW` fields at +0x3C, and `pl.h` cannot be
- * included beside `mh3_pad.h` because `ef.h` re-declares `fn_80043EA8`/`fn_80041E8C` with
+ * included beside `mh3_pad.h` because `ef.h` re-declares `VEC3_ctor`/`setVec3` with
  * signatures that clash with their owners' headers ((10197) illegal function overloading).
  */
 
@@ -39,7 +39,7 @@
 
 /* The target's player work (`_PLW`), stored at +0x16C; only pointed at and forwarded by this band
  * (its +0x3C triple is the position).  `pl.h` cannot be included beside `mh3_pad.h` - `ef.h`
- * re-declares `fn_80043EA8`/`fn_80041E8C` with signatures that clash with the owners' headers. */
+ * re-declares `VEC3_ctor`/`setVec3` with signatures that clash with the owners' headers. */
 struct _PLW;
 
 /* The 0x10-byte record `+0x41C` points at; only its float at +0xC (`fn_802CDAB8`'s frame-budget
@@ -311,7 +311,7 @@ void fn_802CE170(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 tmp;
 
-    fn_80043EA8(&tmp);
+    VEC3_ctor(&tmp);
     switch (self->step) {
     case 0:
     {
@@ -321,7 +321,7 @@ void fn_802CE170(struct _AINPC_W* self)
         setVector3(&tmp, 0.0f, 0.0f, 800.0f);
         rotVecY(&tmp, angle);
         fn_80051378(&offset, &self->vec_0x178, &tmp);
-        fn_80041E40(&self->vec_0x1B0, &offset);
+        copyVec3(&self->vec_0x1B0, &offset);
         self->field_0x389 = 0;
         fn_802D4230(self, 30.0f);
         fn_802D2A00(self, 3, 0x12, 0);
@@ -681,7 +681,7 @@ void fn_802D0358(struct _AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->step) {
     case 0:
     {
@@ -720,7 +720,7 @@ void fn_802D04CC(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 == 400.0f) {
@@ -759,7 +759,7 @@ void fn_802D063C(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 v;
 
-    fn_80043EA8(&v);
+    VEC3_ctor(&v);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 == 400.0f) {
@@ -1129,7 +1129,7 @@ void fn_802CFC94(struct _AINPC_W* self)
     nw4r::math::VEC3 tmp;
     nw4r::math::VEC3 offset;
 
-    fn_80043EA8(&tmp);
+    VEC3_ctor(&tmp);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 > 800.0f) {
@@ -1141,7 +1141,7 @@ void fn_802CFC94(struct _AINPC_W* self)
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecY(&tmp, angle);
             fn_80051378(&offset, &self->vec_0x178, &tmp);
-            fn_80041E40(&self->vec_0x1B0, &offset);
+            copyVec3(&self->vec_0x1B0, &offset);
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);
             fn_802D2A00(self, 2, 4, 0);
@@ -1173,7 +1173,7 @@ void fn_802CFE20(struct _AINPC_W* self)
     nw4r::math::VEC3 offset;
     u32 x, z;
 
-    fn_80043EA8(&tmp);
+    VEC3_ctor(&tmp);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 > 800.0f) {
@@ -1181,13 +1181,13 @@ void fn_802CFE20(struct _AINPC_W* self)
             fn_802D2A00(self, 2, 0xF, 0);
         } else {
             fn_80050CA0(&delta, &self->vec_0x178, &self->vec_0x1B0);
-            fn_80041E40(&tmp, &delta);
+            copyVec3(&tmp, &delta);
             calcVecAngXY(&tmp, &x, &z);
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecX(&tmp, x);
             rotVecY(&tmp, (u16)z);
             fn_80051378(&offset, &self->vec_0x178, &tmp);
-            fn_80041E40(&self->vec_0x1B0, &offset);
+            copyVec3(&self->vec_0x1B0, &offset);
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);
             fn_802D2A00(self, 2, 0xF, 0);
