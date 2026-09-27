@@ -1483,7 +1483,7 @@ extern "C" void fn_8038CC20(_ENEMY_WORK* self)
     nw4r::math::VEC3 v;
 
     fn_80043EA8(&v);
-    if (fn_8012EC60() == 1 && (system_w.field_0x0c & 0x1F) == 0) {
+    if (fn_8012EC60(self) == 1 && (system_w.field_0x0c & 0x1F) == 0) {
         setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C000);
         fn_8010562C(self, 0x18, 0x14, &v, lbl_8079C00C);
     }

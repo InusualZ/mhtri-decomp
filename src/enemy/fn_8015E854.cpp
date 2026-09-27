@@ -364,7 +364,7 @@ extern "C" s32 fn_80165C20(_ENEMY_WORK* self, u8 arg1) {
     u8 temp_r4 = arg1;
 
     if ((u8) (temp_r4 - 3) <= 1U) {
-        if (fn_8012EC60() == 1U) {
+        if (fn_8012EC60(self) == 1U) {
             return 1;
         }
     }

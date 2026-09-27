@@ -71,8 +71,9 @@
 /* Retail keeps this band's unfused narrow forms: the seven `em_parts_damage_ck` slot `clrlwi`
  * pairs and `em_act_prog_8`'s countdown compare are the peephole's input (`em_act_prog_7` 100 -> 96,
  * `em_parts_damage_ck` 100 -> 95.43, `em_act_effect_ck` 100 -> 97.24 and the unit 97.62 -> 96.41 with
- * the pass on).  `stage/fn_802B2AA0.h` already opens a `#pragma peephole off` for its own band and
- * this unit includes it, so the request is restated here rather than inherited (playbook 39). */
+ * the pass on).  The `stage/fn_802B2AA0.h` include no longer carries the pragma this unit used to
+ * inherit, so the unit states it here (playbook 39); `tools/units/stylelint.py` rule 10 keeps a
+ * codegen pragma out of the shared header. */
 #pragma peephole off
 
 /* This band's view of the shell object `shell_set_func_ptr` points at: +0x2C is the job-injection
@@ -118,13 +119,6 @@ extern "C" f32 lbl_8079BE88;   /* -20.0 */
  * through the signature its own body has.  `em035_prog.cpp` records the same gap, and the outbox
  * carries the shared-file request. */
 typedef nw4r::math::VEC3* (*Fn80041E8C)(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
-
-/* `include/enemy/fn_8012E968.h` (pulled in by `unsplit/enemy.h`) owns this callee's `(void)`
- * spelling, which its four other consumers need; this band's call site passes the record, so it
- * reaches it through a pointer of the signature the body has - the two spellings cannot coexist in
- * one TU (MWCC `(10197)`/`(10248)`, the gap `enemy/fn_801502C8.cpp` and `enemy/fn_8018B3B8.cpp`
- * record by declaring it locally).  The outbox carries the shared-file request. */
-typedef u32 (*Fn8012EC60)(struct _ENEMY_WORK* self);
 
 /* The out-of-range callees whose owning band is still a `fn_` row in the map - each spelling is the
  * callee's own body (the same gap the sibling bands `enemy/em_act_step.cpp` and
@@ -565,7 +559,7 @@ extern "C" void em_act_effect_ck(_ENEMY_WORK* self) {
     nw4r::math::VEC3 off;
 
     fn_80043EA8(&off);
-    if (((Fn8012EC60)fn_8012EC60)(self) == 1) {
+    if (fn_8012EC60(self) == 1) {
         if (system_w.field_0x0c % 20 == 0) {
             setVector3(&off, lbl_8079BC88, lbl_8079BE88, lbl_8079BD24);
             fn_8010562C(self, 25, 25, &off, lbl_8079BCA8);

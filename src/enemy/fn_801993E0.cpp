@@ -303,7 +303,7 @@ void fn_80199B24(struct _ENEMY_WORK* self) {
 /* 0x8019DB9C - the "action 2 still running" gate: true only in mode 4 of the enemy-control state
  * machine while `fn_8012EC60` reports not-yet-armed. */
 u32 fn_8019DB9C(struct _ENEMY_WORK* self) {
-    if (self->field_0x1E2 == 4 && fn_8012EC60() == 0) {
+    if (self->field_0x1E2 == 4 && fn_8012EC60(self) == 0) {
         return 1;
     }
     return 0;

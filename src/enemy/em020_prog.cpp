@@ -112,6 +112,13 @@
 #include "stage/fn_802B2AA0.h"
 #include "unsplit/enemy.h"
 
+/* `stage/fn_802B2AA0.h` used to open a file-wide `#pragma peephole off` that this unit picked up by
+ * including it.  Measured: with the leak gone this unit drops (unit fuzzy 5.672 -> 5.650;
+ * `em020_arm_approach_mot1_wait55` 92.41 -> 91.01, `em020_arm_mot1_side_wait80` 92.46 -> 91.23), so
+ * the unit owns the pass and states it here.  A codegen pragma in the shared header is a matching
+ * hazard (stylelint rule 10). */
+#pragma peephole off
+
 /* The `.sdata2` pool half this range reads (0x8079B820..0x8079BC60, 86 single-referrer entries that
  * only this unit's functions load).  Declared, never defined - playbook 29/58: a definition would
  * make MWCC emit the named constant *and* a pool copy, so the section would grow instead of

@@ -270,7 +270,7 @@ void fn_80181E24(_ENEMY_WORK* self) {
     ((MHchar*)self->char_0x024)->getTevKColor(5, GX_KCOLOR3, &color);
     if (fn_8012EC3C(self) == 1) {
         color.a = 0;
-    } else if (fn_8012EC60() == 1) {
+    } else if (fn_8012EC60(self) == 1) {
         color.a = (u8)((s32)(lbl_80797BB0 * (lbl_80797B14 *
                     (lbl_80797B34 + fn_8005024C((u16)(system_w.field_0x0c << 13))))) + 225);
     } else {
@@ -284,7 +284,7 @@ void fn_80181E24(_ENEMY_WORK* self) {
  * fn_80182040 - true for the dead mode (0x1E2 == 2) while the record has not latched its aim state.
  * ------------------------------------------------------------------------------------------------ */
 u32 fn_80182040(_ENEMY_WORK* self) {
-    if (self->field_0x1E2 == 2 && fn_8012EC60() == 0) {
+    if (self->field_0x1E2 == 2 && fn_8012EC60(self) == 0) {
         return 1;
     }
     return 0;

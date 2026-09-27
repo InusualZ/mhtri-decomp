@@ -319,7 +319,7 @@ extern "C" u32 fn_80382C00(_ENEMY_WORK* self) {
 /* 0x80382C40 */
 extern "C" s32 fn_80382C40(_ENEMY_WORK* self) {
     if (self->field_0x1E2 == 4) {
-        if (fn_8012EC60() == 0) {
+        if (fn_8012EC60(self) == 0) {
             return 1;
         }
     }
