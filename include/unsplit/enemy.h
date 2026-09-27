@@ -313,6 +313,7 @@ void fn_803874C8(struct _ENEMY_WORK* self);
 void fn_80387528(void);
 void fn_803875A4(void);
 void fn_80387620(void);
+
 /* The `0x803253BC` band's pooled constants - the `.sdata2` run 0x8079AF4C..0x8079B100 and the
  * `.data` word its action record's first field is set to.  Declared, never defined (playbook 29):
  * the target object owns no data section at all, so the original TU referenced pool entries that
@@ -433,6 +434,56 @@ extern const f32 lbl_8079AF60;   /* the low word of the 0.0 double at 0x8079AF60
  * record's class; the table itself is outside this unit's ranges - rule 10). */
 extern u32 lbl_805DFC00[];
 
+/* Added with `enemy/em_act_step.cpp`'s registration (rule 2): the `.sdata2` pool half
+ * 0x8079B108..0x8079B210 that unit's 74 functions load their constants from, and the class vtable
+ * `lbl_805E04E0` its constructor installs.  No registered unit owns either (the pool's bracketing
+ * units are the same unclaimed band), so this header is their home.  The pool labels are used as load
+ * operands and never defined (playbook 29: defining one would rebuild the section and move every later
+ * constant); the comment after each is the value the DOL holds at that address.
+ *
+ * This is the FIRST of the two halves of the proposal's range, and the pool run splits with it: the
+ * next word 0x8079B210 begins `enemy/em_pl_frame.cpp`'s pool half 0x8079B210..0x8079B2AC, so that
+ * half's labels (0x8079B210, 0x8079B214, 0x8079B218, 0x8079B21C, 0x8079B220, 0x8079B228's magic,
+ * 0x8079B230, 0x8079B238, 0x8079B23C, 0x8079B240, 0x8079B244, 0x8079B258, 0x8079B294, 0x8079B2A0)
+ * are NOT declared here - they belong to that unit and are listed in its file header.  The two halves
+ * are two objects, proved by the compiler's own pool: `0x4330000080000000` (the u32->f32 magic) is
+ * emitted at 0x8079B140 for this unit and at 0x8079B228 for the other, and 0.0f / 0.5f / 1.0f /
+ * 10.0f / 20.0f / 30.0f / 60.0f / 0.8f / -30.0f likewise occur once per half (two emitters - see
+ * `enemy/em_pl_frame.cpp`).  MWCC's pool emits one copy per object, and our own object emits one
+ * 8-byte magic for two functions that use it (the linker merges nothing: that magic occurs >= 40x in
+ * the DOL).  0x8079B13C is not a symbol: it is the 4-byte alignment hole before the 8-aligned double
+ * at 0x8079B140, and a declaration of it was deleted here (finding, seam redraw 2026-09-26). */
+extern const f32 lbl_8079B108; /* 0.0 */
+extern const f32 lbl_8079B10C; /* -35.0 */
+extern const f32 lbl_8079B110; /* 10.0 */
+extern const f32 lbl_8079B114; /* 500.0 */
+extern const f32 lbl_8079B118; /* 0.25 */
+extern const f32 lbl_8079B11C; /* 1.4 */
+extern const f32 lbl_8079B120; /* 0.01 */
+extern const f32 lbl_8079B124; /* -100.0 */
+extern const f32 lbl_8079B128; /* 1000.0 */
+extern const f32 lbl_8079B12C; /* 30.0 */
+extern const f32 lbl_8079B130; /* 1.0 */
+extern const f32 lbl_8079B134; /* 0.1 */
+extern const f32 lbl_8079B138; /* -200.0 */
+extern const f32 lbl_8079B148; /* 4.0 */
+extern const f32 lbl_8079B14C; /* 0.2 */
+extern const f32 lbl_8079B150; /* 800.0 */
+extern const f32 lbl_8079B158; /* 700.0 */
+extern const f32 lbl_8079B15C; /* 25.0 */
+extern const f32 lbl_8079B160; /* 20.0 */
+extern const f32 lbl_8079B164; /* -3.0 */
+extern const f32 lbl_8079B168; /* 60.0 */
+extern const f32 lbl_8079B16C; /* -15.0 */
+extern const f32 lbl_8079B170; /* -25.0 */
+extern const f32 lbl_8079B174; /* -10.0 */
+extern const f32 lbl_8079B178; /* 0.8 */
+extern const f32 lbl_8079B17C; /* -30.0 */
+extern const f32 lbl_8079B180; /* 40.0 */
+extern const f32 lbl_8079B184; /* 10000.0 */
+extern const f32 lbl_8079B188; /* -20.0 */
+extern const f32 lbl_8079B18C; /* -5.0 */
+extern const f32 lbl_8079B1E4; /* 0.5 */
 #ifdef __cplusplus
 }
 #endif
