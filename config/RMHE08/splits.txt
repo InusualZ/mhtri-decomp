@@ -1137,6 +1137,10 @@ ef/eft050.cpp:
 	extabindex  start:0x8003615C end:0x800362F4
 	.text       start:0x8033F270 end:0x803432B4
 
+menu/menu_note.cpp:
+	.text       start:0x8034C0C4 end:0x8034C1D0
+	.data       start:0x805E9220 end:0x805E9248
+
 enemy/fn_8035E034.cpp:
 	extab       start:0x80017574 end:0x800175DC
 	extabindex  start:0x80036E94 end:0x80036F30
