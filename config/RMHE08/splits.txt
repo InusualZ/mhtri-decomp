@@ -1302,7 +1302,7 @@ Network/constructNetworkWiiMediator.cpp:
 Network/NetworkPat.cpp:
 	extab       start:0x8001CF70 end:0x8001CF88
 	extabindex  start:0x8003D92C end:0x8003D950
-	.text       start:0x80419EC4 end:0x8041A170
+	.text       start:0x80419EC4 end:0x8041A194
 
 Network/fn_8041A87C.cpp:
 	extab       start:0x8001CFF0 end:0x8001D16C

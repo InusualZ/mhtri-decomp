@@ -25,7 +25,14 @@
  * (`sNetworkWiiMediatorInstance`) are named from their use here, so no generated spelling survives
  * in this file.
  *
- * BODY.  Reconstructed from the disassembly; the 4-instruction shape is exact bar the alloc call.
+ * FLAGS.  The object deviates from the lib on one point, and it is in `configure.py` with the
+ * evidence: `-O3` in place of the lib's `-O4,p`.  Retail's order is the plain source order -
+ * `li r3,0x1408` lands *after* the two callee-save stores and `cmpwi r3,0` after `mr r31,r3` -
+ * while `-O4,p` hoists both ahead of their producers (same 18 instructions, same multiset).
+ * Measured: 75.00000 at `-O4,p`, 100.00000 at `-O3`, both with a 64 B `.text`.
+ *
+ * BODY.  Reconstructed from the disassembly; the 18-instruction shape is exact - the unit is
+ * byte-identical at `-O3`.
  */
 #include "types.h"
 #include "sys_mem.h"

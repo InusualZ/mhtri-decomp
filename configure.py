@@ -2168,8 +2168,26 @@ config.libs = [
             Object(NonMatching, "Network/initNetworkSessionStable.cpp"),
             Object(NonMatching, "Network/network_state.cpp"),
             Object(NonMatching, "Network/NetworkWiiMediator.cpp"),
-            Object(NonMatching, "Network/constructNetworkWiiMediator.cpp"),
-            Object(NonMatching, "Network/NetworkPat.cpp"),
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence: retail's
+            # `constructNetworkWiiMediator` is the plain source order - `li r3,0x1408` lands *after*
+            # the two callee-save stores and the `cmpwi r3,0` after `mr r31,r3`; `-O4,p` hoists both
+            # ahead of their producers (18/18 instructions, same multiset).  Measured: 75.00000 at
+            # `-O4,p`, 100.00000 (64 B, byte-identical) at `-O3`.
+            Object(NonMatching, "Network/constructNetworkWiiMediator.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence: the three
+            # `deleteNetwork*Pat` helpers get the target's block order and the target's `bl` to the
+            # sibling `clearNetwork*Pat` (retail calls it; `-inline auto` folds the 36-byte callee in
+            # and costs the unit 4 bytes per helper), and the eight already-matching rows do not move.
+            # Measured on the freshly written bodies: 2.85714 at the lib's `-O4,p`/`-inline auto`,
+            # 99.71429 at `-O3`/`-inline noauto` (140 B, the target size).  The file's
+            # `#pragma exceptions on` is not a flag change: the lib's `-Cpp_exceptions off` leaves our
+            # object with no `extab`/`extabindex` while the target has 24 B / 36 B, and the pragma
+            # reproduces both exactly without moving a `.text` byte.  The unit's `.text` right edge is
+            # 0x8041A194, not the pre-fix 0x8041A170: the map's `clearNetworkLayerPat` starts at
+            # 0x8041A170 (+0x24), so the old edge orphaned that function into an `auto_*` unit.
+            Object(NonMatching, "Network/NetworkPat.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803D3CE8_fn_803D3CE8.cpp` (`.text` 0x803D3CE8..0x803D70B8, 101 functions / 13264 B) -
             # the Network session band: `NetworkSessionStable`'s op-code packet writers, the
