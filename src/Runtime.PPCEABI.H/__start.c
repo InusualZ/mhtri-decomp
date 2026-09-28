@@ -4,8 +4,8 @@
  * .init 0x800062C0-0x800065C0 - __check_pad3 (0x28), __set_debug_bba (0xC), __get_debug_bba (0x8),
  * __start (0x16C), __init_registers (0x90), __init_data (0xA8), in that order, separated by 4-12 B of
  * padding: every function is 16-byte aligned, which only `-O4,p`'s implied -func_align 16 produces (-O3
- * packs them to 8 B and moves every symbol after the first), so the layout needs the cflags_runtime the
- * registration already uses. The range holds nothing else.
+ * packs them to 8 B and moves every symbol after the first), so the layout needs cflags_ppceabi16, the
+ * lib's own group (cflags_runtime + an explicit `-func_align 16`). The range holds nothing else.
  *
  * Attribution: the map marks the five statics `scope:local` and their only caller is __start
  * (0x8000639C/0x80006454/0x80006458, __init_registers, __init_data), and the GCN-era SDK source
@@ -13,7 +13,7 @@
  * ".init"`. __start is `scope:weak` (the SDK declares it `__declspec(weak)`) and is the DOL's entry point
  * (header entry 0x80006310). The next range, 0x800065C0-0x80006624 (__init_hardware, __flush_cache), is a
  * separate SDK file (Runtime.PPCEABI.H/__ppc_eabi_init.cpp).
- * Registered NonMatching under the Runtime.PPCEABI.H lib (Wii/1.3, cflags_runtime).
+ * Registered Matching under the `Runtime.PPCEABI.H/init` lib (Wii/1.3, cflags_ppceabi16).
  *
  * Load-bearing source shapes (do not "clean up" without re-measuring):
  *   - `#pragma section code_type ".init"` for the file, and `asm`/`nofralloc` blocks for __start and
@@ -37,14 +37,16 @@
  *     .sbss 10:0x807953C9`) and that block also holds PowerCallback/ResetCallback. dtk therefore names the
  *     scaffold symbol `Debug_BBA_807953C8`, and objdiff matches a relocation by name.
  *
- * Residual: none since the map declares Debug_BBA scope:global (the split then keeps the name, so the two
- *   SDA21 relocations resolve; with scope:local it spelled them Debug_BBA_807953C8 and both functions were
- *   98.33 %/97.5 %). All six functions are
- * instruction- and hint-bit-identical (.rela.init identical, 30 relocations) and .init's first 760 bytes
- * match byte for byte - the target's 8 trailing bytes (0x800065B8) are the DOL's link-time padding before
- * __init_hardware, not object content. The mismatch leaves __set_debug_bba at 98.33 % and __get_debug_bba
- * at 97.5 %; a probe compiled with `extern u8 Debug_BBA_807953C8;` measures 100 % on both, so the missing
- * piece is dtk's scaffold name, not the source.
+ * Residual: none - all six functions are instruction- and hint-bit-identical (.rela.init identical, 30
+ *   relocations) and .init's first 760 bytes match the target byte for byte. The target object's 8 further
+ *   bytes (0x800065B8-0x800065C0) are the LINKER's fill, not object content: the link map prints that row
+ *   as `*fill*` (it realigns the next input, `__ppc_eabi_init.o`, whose section alignment is 16), and MWCC
+ *   emits no trailing section padding (our object is 760 B under the very same flags), so 760 B is the
+ *   whole original object. That is why `flipcheck`/`datagap` read `.init` 768 vs 760 on this claim (which
+ *   ends at 0x800065C0, the next symbol's start): the 8 bytes belong to no object, and moving the claim to
+ *   0x800065B8 would only put a permanent 8-byte `auto_00_800065B8_init` range where nothing can be
+ *   written. Measured both ways: the DOL links byte-identically either way, so the claim stays tiled to
+ *   the next unit's start.
  */
 
 #pragma section code_type ".init"
@@ -101,6 +103,13 @@ extern u8 _stack_addr[];
 extern u8 _SDA2_BASE_[];
 extern u8 _SDA_BASE_[];
 
+/* Both init tables are emitted by the LINKER, not by this or any other TU: the link map's `.init` rows
+   read `_rom_copy_info`/`_bss_init_info   Linker Generated Symbol File` at 0x80006624/0x800066A8 (and
+   mwldeppc.exe's own string table lists both among the symbols it generates, next to `_eti_init_info`).
+   Their contents are link-time facts - every data section's finished address and size, and the .bss runs
+   to clear - so the 164 B at 0x80006624-0x800066C8 is not claimable: a definition in source would have to
+   hard-code the final layout. The externs below are the correct spelling (the split objects agree: no
+   object in build/RMHE08/obj defines either symbol). */
 extern __rom_copy_info _rom_copy_info[];
 extern __bss_init_info _bss_init_info[];
 
