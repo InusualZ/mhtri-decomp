@@ -841,6 +841,29 @@ config.libs = [
             # is recorded in the unit header.  This pass writes 12 of the 139 bodies; the rest keep
             # their original bytes and measure 0 %.
             Object(NonMatching, "enemy/em_pop.cpp"),
+            # Registered once, at its final home: the arena task band (`.text`
+            # 0x804459E4..0x80448404, 19 functions / 10784 B; extab 0x8001DE9C..0x8001DF24 and
+            # extabindex 0x8003EB20..0x8003EBEC, both exactly this run's records - every entry is an
+            # 8-byte extab chunk and the sequence is monotone, so they tile the band with no cut).
+            # Module `quest` and file name `arenatask.cpp` are class-1 evidence: the range's own
+            # `.data` 0x80607390 is the bare `__FILE__` string "arenatask.cpp", one copy in the DOL,
+            # and its only referrer (0x80445B3C) is inside the range's head, `arena_resource_load`
+            # (0x804459E4) - which `ArenaSelExec` (0x80041A34) reaches through its task `arena_task`
+            # (0x804463C4).  The left edge is the band's own `.data`/`.sdata` run start (the previous
+            # object's `.data` ends exactly at 0x80607210); the right edge is the save-file module's
+            # first function, whose nine-function block shares the private `.bss` path buffer
+            # `lbl_806E40C0` and calls `strcpy`/`OSReport`/`NAND*`.  One internal cut (0x80446990) is
+            # a candidate the data cannot settle - it is written up in the unit header, and
+            # `tudiscover.py`'s "strong" cuts in this band are unusable: it has no strong cut at
+            # either registered edge (share 0.005 left, 0.003 right), its strong left candidate is 23
+            # functions earlier in another band, and the one in-band `.sdata2` pin is vetoed by this
+            # unit's own shared pool constants (`arena_zero_f`/`arena_50f`, must-link 15578..15585) -
+            # measured with `at 0x804459E4 --window 48`, and the phenomenon behind the caveat is real
+            # (640 of the 7245 `.sdata2` labels are cited by more than one registered unit).  Same
+            # `cflags_menu` as its link neighbours `quest/quest_entry.cpp` and `menu/arena_result.cpp`.
+            # This pass writes 6 of the 19 bodies (740 B of 10784); the other 13 keep their original
+            # bytes and are listed with their blockers in the unit header and the outbox.
+            Object(NonMatching, "quest/arenatask.cpp"),
         ],
     },
 

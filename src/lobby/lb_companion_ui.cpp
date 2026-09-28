@@ -968,9 +968,9 @@ void lb_sub1d_send(u8 value, s8 flag) {
 }
 
 /* Act 25: hands the request's two bytes to the pad handler.
- * Name: act 25: the request's two bytes go to `fn_80445D58` */
+ * Name: act 25: the request's two bytes go to `arena_other_player_eq_set` */
 void lb_act_pad_apply(u8 unused, LbActReq* req) {
-    fn_80445D58(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
+    arena_other_player_eq_set(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
 }
 
 /* Scans the ten 0x130-byte page records for the six-byte key the caller points at; 0xFF on a hole.
