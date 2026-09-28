@@ -92,7 +92,7 @@
  *     but the rows do not pair. 7CFC0 additionally gets two extra `extsh` before its clamp stores.
  *   * `mulli` vs the shift/subf/shift form of `* 14` (78590): MWCC folds `* 7 * 2` before strength
  *     reduction, so the three-instruction form cannot be recovered from a constant product.
- *   * A57C (1668 B): the body (the flag reads, the `fn_803BECA0` swaps, the `lbl_805C6118`
+ *   * A57C (1668 B): the body (the flag reads, the `get_cfg` swaps, the `lbl_805C6118`
  *     interpolation loop, the per-motion write-back) is instruction-for-instruction, but the two shared
  *     tails were reached through labels until the conformance pass below; see its note for the residual.
  *   * `Pl_zanzo_set` and C89C/A044 read `Get_motion_no` as `s16`: the shared declaration has to stay `s16`
@@ -3020,7 +3020,7 @@ extern "C" void fn_80279EBC(_PLW*, u16, u16);
 extern "C" s32 fn_8027A340(_PLW*);
 extern "C" u32 fn_80287244(_PLW*, s32);
 extern "C" void fn_802B9740(_PLW*, u8*, u8*, f32*);
-extern "C" u8 fn_803BECA0(u8, s32);
+extern "C" u8 get_cfg(u8, s32);
 extern u8 lbl_805C6118[];
 extern const f32 lbl_8079A080;
 extern const f32 lbl_8079A0F0;
@@ -3088,7 +3088,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                 } else if (fn_8026A6A4(self, 3) != 0) {
                     f26 = 1;
                 }
-                r = fn_803BECA0(self->unk008, 2);
+                r = get_cfg(self->unk008, 2);
                 if (r == 1 || r == 3) {
                     c = f25;
                     f25 = f24;
@@ -3119,7 +3119,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                 } else if (fn_8026A644(self, 0x3B) != 0) {
                     f26 = 1;
                 }
-                r = fn_803BECA0(self->unk008, 2);
+                r = get_cfg(self->unk008, 2);
                 if (r == 1 || r == 3) {
                     c = f25;
                     f25 = f24;
@@ -3157,7 +3157,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                     } else if ((s32)(w & 0x400) != 0) {
                         f26 = 1;
                     }
-                    r = fn_803BECA0(self->unk008, 9);
+                    r = get_cfg(self->unk008, 9);
                     if (r == 1 || r == 3) {
                         c = f25;
                         f25 = f24;

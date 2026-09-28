@@ -299,7 +299,7 @@ void fn_802E5414(u8 arg0) {
 u32 fn_802E54A8(CockpitMove* move) {
     u32 r;
 
-    r = fn_803BECA0((u8)move->field_0x008, 0xD) == 0;
+    r = get_cfg((u8)move->field_0x008, 0xD) == 0;
     if (move->field_0x308 == 1) {
         r = 1;
     }

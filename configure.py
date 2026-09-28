@@ -784,6 +784,18 @@ config.libs = [
             # the residual list; a seam re-draw is the follow-up.  Same `cflags_menu` as its menu
             # siblings.
             Object(NonMatching, "menu/multi_result.cpp"),
+            # Registered once, at its final home, from proposal/803BE30C_get_pop_dat_ptr__Fv.cpp: the
+            # pop-data / option / demo system file (`.text` 0x803BE30C..0x803C4BA0, 110 functions /
+            # 26772 B).  Module `menu` (evidence class 3): the range's callee surface is the menu 2D
+            # library's and it shares 48-66 callees with `menu_result.cpp`/`menu_item.cpp`/
+            # `menu_item_page.cpp`; the file name keeps the range's first symbol, which is the runtime
+            # dump's own real name (`get_pop_dat_ptr`).  The seam is UNPROVEN - the discovery
+            # `--max-bytes` cap, with `tudiscover`'s best cut at 0x803BF294 only weak; the unit header
+            # carries the full evidence.  Only `.text` is claimed this pass: the unit's extab
+            # 0x80019164..0x800193D4, extabindex 0x8003987C..0x80039C24 and its own `.data`/`.sdata`/
+            # `.sdata2`/`.bss`/`.sbss` runs are claimed by the pass that writes the bodies emitting
+            # them (docs/plan.md 8.4).  Same `cflags_menu` as its menu siblings.
+            Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
         ],
     },
 

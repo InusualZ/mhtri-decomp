@@ -200,7 +200,7 @@ extern "C" u8 fn_80290598(const EmEffectQuad* quad, const nw4r::math::VEC3* pos,
 extern "C" s32 fn_802AFF38(void);
 extern "C" u32 fn_802B45D4(void);
 extern "C" u32 fn_802BE39C(void);
-extern "C" u8 fn_803BEE04(void);
+extern "C" u8 get_option_21(void);
 /* get_now_areano / get_now_mapno / eftGetKeyAlpha / vec_to_mh_vec3 come from `unsplit/unknown.h` as
  * their real declarations (rule 9).  get_camera_pos / get_camera_direction are NOT converted: their map
  * names are no-argument manglings (`__Fv`) but every call site passes an out pointer, so the only
@@ -469,7 +469,7 @@ extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos) 
     if ((s32)work->type == 12) {
         unit->color.a = (u8)((u32)unit->color.a >> 1);
     }
-    if (fn_803BEE04() != 0) {
+    if (get_option_21() != 0) {
         unit->color.a = (u8)((u32)unit->color.a >> 1);
     }
     copyVec3(&unit->self->pos, pos);

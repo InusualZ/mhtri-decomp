@@ -166,7 +166,9 @@ typedef struct SystemWork {
     /* +0x887 */ u8 pad_0x887[0x9];
     /* +0x890 */ u32 field_0x890;
     /* +0x894 */ u32 field_0x894;
-    /* +0x898 */ u8 pad_0x898[0x19];
+    /* +0x898 */ u8 pad_0x898[0x18];
+    /* +0x8B0 */ u8 vs_mode_0x8b0;  /* non-zero in VS/arena mode: `get_cfg`/`ck_cfg` then read the VS
+                                    * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;
     /* +0x8B2 */ u8 pad_0x8b2[0x22];
     /* +0x8D4 */ void (*field_0x8d4)(void);

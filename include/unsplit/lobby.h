@@ -587,7 +587,10 @@ void draw_sprite_ary(const u16*, const _mh_ivec2_*);
 void draw_sprite_idx(u16, const _mh_ivec2_*);
 void font_set_size(s16, s16);
 void* get_lsp_data(u16, _mh_ivec2_*);
-u8 get_option_cfg(u8);
+/* `get_option_cfg` (0x803BEC70) is no longer declared here: the range that defines it,
+ * `src/menu/get_pop_dat_ptr.cpp`, owns it and publishes it in `include/menu/get_pop_dat_ptr.h`,
+ * which this header includes below (rule 2). */
+#include "menu/get_pop_dat_ptr.h"
 
 #endif /* __cplusplus */
 
