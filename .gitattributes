@@ -1,5 +1,10 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+# Keep LF in the WORKING TREE as well as in the repository. `text=auto` alone normalises on add but
+# leaves the checkout to `core.autocrlf`, which is `true` on this host - so every text file came back
+# CRLF while every blob was LF (613 of 714), and any tool whose anchor is written with a newline
+# silently failed to match its own file. `eol=lf` removes that dependency for every path; a later rule
+# with its own `eol` still wins (`.bat` below).
+* text=auto eol=lf
 
 # Explicitly declare text files
 *.py   text
