@@ -16,7 +16,22 @@
 
 #include "types.h"
 
+/* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
+
+/* Only the sizes are evidenced: `NetworkStreamWriter` is the 0x24-byte local every op-code sender
+   in this range reserves, `NetworkStreamWriterDefault` the one `NetworkSessionStable_move`
+   reserves.  Their members belong to the writer's own band. */
+typedef struct NetworkStreamWriter {
+    u8 bytes_00[0x24];   /* +0x00..+0x23 */
+} NetworkStreamWriter;   /* size: 0x24 */
+
+typedef struct NetworkStreamWriterDefault {
+    u8 bytes_00[0x1C];   /* +0x00..+0x1B */
+} NetworkStreamWriterDefault;   /* size: 0x1C */
+
 /* ---------------- bit-stream writer (owned by the network-serialization band) -------------- */
+
+typedef struct NetworkBuffer NetworkBuffer;
 
 typedef struct NetworkBufferVtable {
     void* rtti_00;
@@ -27,11 +42,21 @@ typedef struct NetworkBufferVtable {
     u32 (*end_14)(void* self);                                   /* +0x14 */
     u8 pad18[0x08];
     u32 (*available_20)(void* self);                                   /* +0x20 */
-    u8 pad24[0x14];
+    u8 pad24[0x0C];
+    void (*slot_30)(NetworkBuffer* self);                        /* +0x30 (GUESS: offset-derived, the name is the buffer class owner's) */
+    void (*slot_34)(NetworkBuffer* self);                        /* +0x34 (GUESS) */
     u16 (*put_38)(void* self, u32 a, u32 b, u32 c, u32 d, const void* data, u32 e); /* +0x38 */
     u8 pad3C[0x08];
     void (*flush_44)(void* self);                                  /* +0x44 */
-    u8 pad48[0x44];
+    u8 pad48[0x08];
+    void (*slot_50)(NetworkBuffer* self);                        /* +0x50 (GUESS) */
+    void (*slot_54)(NetworkBuffer* self);                        /* +0x54 (GUESS) */
+    u8 pad58[0x04];
+    void (*slot_5C)(NetworkBuffer* self);                        /* +0x5C (GUESS) */
+    void (*slot_60)(NetworkBuffer* self);                        /* +0x60 (GUESS) */
+    void (*slot_64)(NetworkBuffer* self);                        /* +0x64 (GUESS) */
+    void (*slot_68)(NetworkBuffer* self);                        /* +0x68 (GUESS) */
+    u8 pad6C[0x20];
     f32 (*getFloat_8C)(void* self, s32 idx);                     /* +0x8C */
     s32 (*getInt_90)(void* self, s32 idx);                       /* +0x90 */
 } NetworkBufferVtable;
@@ -41,6 +66,88 @@ typedef struct NetworkBuffer {
     u8 pad04[0x08];
     u8 payload_0C[];               /* +0x0C */
 } NetworkBuffer;
+
+/* ---------------- the manager's logger (its accessor is another band's) ------------------- */
+
+typedef struct NetworkManagerLoggerVtable {
+    u8 pad00[0x0C];
+    void (*verbose_0C)(void* self, u32 level, const char* fmt, ...);   /* +0x0C */
+    void (*warn_10)(void* self, const char* fmt, ...);                 /* +0x10 */
+    void (*log_14)(void* self, const char* fmt, ...);                  /* +0x14 */
+    u8 pad18[0x48];
+    f32 (*getTime_60)(void* self);                                     /* +0x60 */
+    u8 pad64[0x08];              /* the real vtable is longer; only the called slots are named */
+} NetworkManagerLoggerVtable;   /* size: 0x6C (approximation) */
+
+typedef struct NetworkSessionManagerLogger {
+    NetworkManagerLoggerVtable* vtable;   /* +0x00 */
+} NetworkSessionManagerLogger;   /* size: 0x04 */
+
+/* The 0x60-byte record block `NetworkRequest_copyRecord` moves.  Only its size (24 words) is
+   evidenced - the two leading scalars are how MWCC splits the copy, not a field the range reads. */
+typedef struct NetworkSessionRecordPair {
+    u32 lo_00;         /* +0x00 */
+    u32 hi_04;         /* +0x04 */
+} NetworkSessionRecordPair;   /* size: 0x08 */
+
+typedef struct NetworkSessionRecordBlock {
+    u32 first_00;      /* +0x00 */
+    u32 second_04;     /* +0x04 */
+    NetworkSessionRecordPair rest_08[11];   /* +0x08..+0x5F */
+} NetworkSessionRecordBlock;   /* size: 0x60 */
+
+/* The record classes the Pat layer's arrays hold.  Each size is evidenced (the `__construct_array` /
+   `__destroy_arr` element sizes, and the field offsets the range addresses); only the one member each
+   constructor initialises is named, everything else is filler. */
+/* The small object the writer band's `networkSmallObject_construct`/`_dtor` manage.  Its +0x00 word
+   is a function-pointer table - `NetworkSessionManagerPat::clear` dispatches its +0x18 slot - so it is
+   modelled as a struct with a vtable member, never as a polymorphic class: a class would make MWCC
+   initialise the vptr of every element of the four record arrays, which the target does not do. */
+typedef struct NetworkSmallObjectVtable {
+    void* rtti_00;
+    void* rtti_04;
+    u8 pad08[0x10];
+    void (*slot_18)(void* self);   /* +0x18 */
+} NetworkSmallObjectVtable;   /* size: 0x1C (approximation - only +0x18 is called) */
+
+typedef struct NetworkSmallObject {
+    NetworkSmallObjectVtable* vtable;   /* +0x00 */
+    u8 pad_04[0x0C];                    /* +0x04..+0x0F */
+} NetworkSmallObject;   /* size: 0x10 (approximation - only the +0x18 dispatch is evidenced) */
+
+typedef struct NetworkSessionSlotInfo {
+    NetworkSmallObject smallObject_00;   /* +0x00 */
+    u8 pad_10[0x64];                     /* +0x10..+0x73 (size not evidenced; only +0x00 is built) */
+} NetworkSessionSlotInfo;   /* size: 0x74 (approximation) */
+
+typedef struct NetworkSessionCircleInfo {
+    u8 pad_000[0x108];
+    NetworkSmallObject smallObject_108;   /* +0x108 */
+    u8 pad_118[0x204];                    /* +0x118..+0x31B */
+} NetworkSessionCircleInfo;   /* size: 0x31C */
+
+typedef struct NetworkSessionCircleList {
+    u8 pad_00[0x04];
+    NetworkSessionCircleInfo items_04[32];   /* +0x04..+0x6383 */
+} NetworkSessionCircleList;   /* size: 0x6384 */
+
+typedef struct NetworkSessionPlayerRecord {
+    u8 pad_00[0x08];
+    NetworkSmallObject smallObject_08;   /* +0x08 */
+    u8 pad_18[0x30];                     /* +0x18..+0x47 */
+} NetworkSessionPlayerRecord;   /* size: 0x48 */
+
+/* The variadic helpers: the pinned toolchain ships no `<stdarg.h>`, so the CodeWarrior `va_list`
+   layout and the two compiler intrinsics the header expands to are declared here. */
+typedef struct NetworkVaState {
+    u8  gpr;                 /* +0x00 */
+    u8  fpr;                 /* +0x01 */
+    u16 reserved;            /* +0x02 */
+    u8* input_arg_area;      /* +0x04 */
+    u8* reg_save_area;       /* +0x08 */
+} NetworkVaState;            /* size: 0x0C */
+extern "C" void __va_start(NetworkVaState* ap);
+extern "C" u32* __va_arg(NetworkVaState* ap, s32 type);
 
 /* ---------------- NetworkRequest ---------------------------------------------------------- */
 
@@ -113,7 +220,7 @@ public:
     virtual void init(u32 a, u32 b);                       /* +0x00C */
     virtual void clear();                                  /* +0x010 */
     virtual void release();                                /* +0x014 */
-    virtual void slot_18();                                /* +0x018 */
+    virtual void move();                                   /* +0x018 - "NetworkSessionManager::move: ..." */
     virtual void request364();                             /* +0x01C */
     virtual void request368();                             /* +0x020 */
     virtual s32 hasBuffer();                               /* +0x024 */
@@ -181,14 +288,14 @@ public:
     virtual void pure_11C() = 0;                           /* +0x11C */
     virtual s32 getInt(s8 value);                          /* +0x120 */
     virtual f32 getFloat(s8 value);                        /* +0x124 */
-    virtual void broadcastPlayerSlots();                   /* +0x128 */
+    virtual void broadcastPlayerSlots(u32 a, u32 b);       /* +0x128 */
     virtual void putTerminatorA(u32 a, u32 b, u8 c);       /* +0x12C */
     virtual void putTerminatorB(u32 a, u32 b);             /* +0x130 */
     virtual void putTerminatorC(u32 a, u32 b, u8 c);       /* +0x134 */
-    virtual void sendBatch_138(u32 count, const s8* data); /* +0x138 */
-    virtual void slot_13C();                               /* +0x13C */
-    virtual void slot_140();                               /* +0x140 */
-    virtual void slot_144();                               /* +0x144 */
+    virtual void sendBatch_138(u32 a, u32 b, s32 count, const s8* data);       /* +0x138 */
+    virtual void slot_13C(u32 a, u32 b, s32 count, const s8* data, u8 flags);  /* +0x13C */
+    virtual void slot_140(u32 a, u32 b, s8 idx);           /* +0x140 */
+    virtual void slot_144(u32 a, u32 b, s8 idx, u8 flags); /* +0x144 */
     virtual void flush();                                  /* +0x148 */
     virtual void slot_14C();                               /* +0x14C */
     virtual void slot_150();                               /* +0x150 */
@@ -233,6 +340,79 @@ public:
     NetworkRequest pool_7C[2];                 /* +0x7C..+0x1C3 */
 };   /* size: 0x1C4 */
 
+/* ---------------- NetworkSessionManagerPat ------------------------------------------------- */
+
+/* The derived class the tail of the range defines.  It is declared here so MWCC emits the
+   constructor's vptr store and the destructor itself (rule 10).  `move` is declared **first**: it is
+   the class's key function and its body lives in the next band (0x803D70B8), so no Pat vtable is
+   emitted into this object - which is what the target shows (its `.data` is the base table alone). */
+class NetworkSessionManagerPat : public NetworkSessionManager {
+public:
+    virtual void move();                     /* +0x018 - the key function, defined in the next band */
+    NetworkSessionManagerPat();
+    virtual ~NetworkSessionManagerPat();     /* +0x008 */
+    virtual void init(u32 a, u32 b);         /* +0x00C */
+    virtual void clear();                    /* +0x010 */
+    virtual void release();                  /* +0x014 - the Pat flush ("finalNetwork") */
+
+    NetworkRequest pool2_1C4[2];               /* +0x1C4..+0x30B */
+    u8 pad_30C[0x54];                          /* +0x30C..+0x35F */
+    s32 field_360[21];                         /* +0x360..+0x3B3 */
+    u8 pad_3B4[0x04];                          /* +0x3B4..+0x3B7 */
+    f32 field_3B8;                             /* +0x3B8 */
+    f32 field_3BC;                             /* +0x3BC */
+    u8 field_3C0;                              /* +0x3C0 */
+    u8 field_3C1;                              /* +0x3C1 */
+    u8 field_3C2;                              /* +0x3C2 */
+    u8 field_3C3;                              /* +0x3C3 */
+    s32 field_3C4;                             /* +0x3C4 */
+    u8 field_3C8;                              /* +0x3C8 */
+    u8 pad_3C9[0x03];                          /* +0x3C9..+0x3CB */
+    NetworkSmallObject field_3CC;              /* +0x3CC */
+    u8 pad_3DC[0x10];                          /* +0x3DC..+0x3EB */
+    u8 field_3EC[0x30];                        /* +0x3EC..+0x41B */
+    u8 pad_41C[0x11C];                         /* +0x41C..+0x537 */
+    NetworkSessionPlayerRecord players_538[4]; /* +0x538..+0x657 */
+    s32 field_658;                             /* +0x658 */
+    s32 field_65C;                             /* +0x65C */
+    s32 field_660;                             /* +0x660 */
+    u8 pad_664[0x48C];                         /* +0x664..+0xAF0 */
+    NetworkSessionCircleList circleList_AF0;   /* +0xAF0..+0x6E73 */
+    u8 field_6E74;                             /* +0x6E74 */
+    u8 field_6E75;                             /* +0x6E75 */
+};   /* size: 0x6E76 */
+
+/* the Pat interface singletons the Pat methods build on demand (another band) */
+class PatInterface {
+public:
+    virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
+    PatInterface();
+    static PatInterface* getInstance();
+};
+class GameSpyInterfaceThread {
+public:
+    virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
+    GameSpyInterfaceThread();
+    void canClose();
+    void armCancel();
+    bool requestClose();
+};
+
+/* the Pat accessors keep their plain (unmangled) map names.
+
+   The singleton accessor at 0x803768F0 and `memset` are deliberately **not** declared here: both are
+   owned by another registered unit (`getInstance_` sits inside `enemy/em020_ai.cpp`'s range,
+   `memset` is `Runtime.PPCEABI.H/memset.c`), and rule 2 puts the declaration in the owner's header -
+   which the consumer includes (`enemy/em020_ai.h`, `Runtime.PPCEABI.H/memset.h`). */
+extern "C" void PatInterface_clear(void);
+extern "C" int PatInterface_isReady(void);
+extern "C" GameSpyInterfaceThread* GameSpyInterfaceThread_getInstance(void);
+/* untyped: opaque handle passed through - the context's layout belongs to the Pat band */
+extern "C" void networkLog_destroyContext(NetworkSessionManagerLogger* log, void* context);
+extern "C" void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index);
+extern "C" void networkPatAttachBuffer(NetworkBuffer* buffer);
+extern "C" void networkPatReleaseBuffer(NetworkSessionManagerPat* self);
+
 /* ---------------- NetworkSessionStable ---------------------------------------------------- */
 
 typedef struct NetworkSessionStableVtable {
@@ -251,7 +431,7 @@ typedef struct NetworkSessionSlot {
     u8  pad0A;
     u8  ready_0B;              /* +0x0B */
     u8  pad0C[0x10];
-    s32 active_1C;              /* +0x1C */
+    NetworkBuffer* active_1C;   /* +0x1C - the stream buffer this slot transmits on */
     u32 state_20;              /* +0x20 */
     u8  pad24[0x1C];
     u32 playerId_40;              /* +0x40 */
@@ -294,53 +474,144 @@ extern "C" {
 /* class vtables live in another TU's `.data` - reference, never rebuild (rule 10) */
 extern NetworkSessionStableVtable NetworkSessionStable_VTable;
 
-extern NetworkRequestDesc lbl_805FA7CC;
-extern NetworkRequestDesc lbl_805FA7D8;
-extern NetworkRequestDesc lbl_805FA7E4;
-extern NetworkRequestDesc lbl_805FA7F0;
-extern NetworkRequestDesc lbl_805FA7FC;
-extern NetworkRequestDesc lbl_805FA808;
-extern NetworkRequestDesc lbl_805FA814;
-extern NetworkRequestDesc lbl_805FA820;
-extern NetworkRequestDesc lbl_805FA82C;
-extern NetworkRequestDesc lbl_805FA838;
-extern NetworkRequestDesc lbl_805FA844;
-extern NetworkRequestDesc lbl_805FA850;
-extern NetworkRequestDesc lbl_805FA85C;
-extern NetworkRequestDesc lbl_805FA868;
-extern NetworkRequestDesc lbl_805FA874;
-extern NetworkRequestDesc lbl_805FA880;
-extern NetworkRequestDesc lbl_805FA88C;
-extern NetworkRequestDesc lbl_805FA898;
-extern NetworkRequestDesc lbl_805FA8A4;
-extern NetworkRequestDesc lbl_805FA8B0;
-extern NetworkRequestDesc lbl_805FA8BC;
+extern NetworkRequestDesc networkRequestDesc364;
+extern NetworkRequestDesc networkRequestDesc368;
+extern NetworkRequestDesc networkRequestDesc372;
+extern NetworkRequestDesc networkRequestDesc376;
+extern NetworkRequestDesc networkRequestDesc380;
+extern NetworkRequestDesc networkRequestDesc384;
+extern NetworkRequestDesc networkRequestDesc388;
+extern NetworkRequestDesc networkRequestDesc432;
+extern NetworkRequestDesc networkRequestDesc416;
+extern NetworkRequestDesc networkRequestDesc420;
+extern NetworkRequestDesc networkRequestDesc424;
+extern NetworkRequestDesc networkRequestDesc404;
+extern NetworkRequestDesc networkRequestDesc436;
+extern NetworkRequestDesc networkRequestDesc440;
+extern NetworkRequestDesc networkRequestDesc444;
+extern NetworkRequestDesc networkRequestDesc408;
+extern NetworkRequestDesc networkRequestDesc412;
+extern NetworkRequestDesc networkRequestDesc392;
+extern NetworkRequestDesc networkRequestDesc396;
+extern NetworkRequestDesc networkRequestDesc400;
+extern NetworkRequestDesc networkRequestDesc428;
 
-/* bit-stream writer API (another unit) */
-void fn_803CB9B4(void* self);
-void fn_803CB9F0(void* self);
-void dtor_803CB958(void* self, s32 flags);
-void dtor_803CB8FC(void* self, s32 flags);
-void fn_803F89D0(void* self, const void* buffer, u32 size);
-void fn_803F8A14(void* self, s32 mode);
-u16 writeByte(void* self, u32 value);
-u16 writeUInt(void* self, u32 value);
-u16 writeSize(void* self, u16 size);
-u16 writeBytes(void* self, const void* data, u32 len);
-u16 fn_803F8BDC(void* self, const void* value);
+/* bit-stream writer API (another band).  The two writer classes are reconstructions from the frame
+   each constructor is given: `NetworkStreamWriter` is the 0x24-byte local every op-code sender
+   reserves, `NetworkStreamWriterDefault` the one `NetworkSessionStable_move` reserves. */
+void fn_803CB9B4(NetworkStreamWriter* self);
+void dtor_803CB958(NetworkStreamWriter* self, s32 flags);
+void networkStreamWriter_constructDefault(NetworkStreamWriterDefault* self);
+void dtor_803CB8FC(NetworkStreamWriterDefault* self, s32 flags);
+void fn_803F89D0(NetworkStreamWriter* self, const void* buffer, u32 size);
+void fn_803F8A14(NetworkStreamWriter* self, s32 mode);
+u16 writeByte(NetworkStreamWriter* self, u32 value);
+u16 writeUInt(NetworkStreamWriter* self, u32 value);
+u16 writeSize(NetworkStreamWriter* self, u16 size);
+u16 writeBytes(NetworkStreamWriter* self, const void* data, u32 len);
+u16 fn_803F8BDC(NetworkStreamWriter* self, const void* value);
+
+/* the writer's remaining entry points the tail of the range drives (the second writer class) */
+void networkStreamWriter_attach(NetworkBuffer* buffer, NetworkStreamWriterDefault* stream);
+void networkStreamWriter_reserve(NetworkBuffer* buffer, u32 a, u32 b, u32 c);
+void networkStreamWriter_putBytes(NetworkStreamWriterDefault* self, const void* data, u32 size);
+void networkStreamWriter_flush(NetworkStreamWriterDefault* self);
+void networkStreamWriter_setMode(NetworkStreamWriterDefault* self, u32 mode);
+void networkStreamWriter_putU16(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_putU16b(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_putU32(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_putU32b(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_enable1(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_enable2(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_enable3(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_commit(NetworkStreamWriterDefault* self);
+void networkStreamWriter_bytes(NetworkStreamWriterDefault* self);
+u32 networkStreamWriter_size(const void* sub);
 
 /* the send/flush tail */
-void fn_803D39BC(NetworkSessionStable* self, void* stream, u32 a, u32 b, const void* term, u32 c);
+void fn_803D39BC(NetworkSessionStable* self, NetworkStreamWriter* stream, u32 a, u32 b, const void* term, u32 c);
 
-/* neighbouring helpers */
-void networkSessionReflectCallback(void);   /* 0x803D6870, in this unit's span; the mediator opener's callback */
+/* the manager logger accessor (another band): the returned logger is a NetworkSessionManagerLogger */
+NetworkSessionManagerLogger* fn_803C9974(void);
+
+/* the band's float constants and singleton slots (unowned addresses - playbook 29: declared, never
+   defined).  Each value is read off the DOL; the name is derived from the use the range makes of it. */
+extern f32 networkMillisecondsPerSecond;   /* 0x8079C6EC = 1000.0f */
+extern f32 networkRateScale;               /* 0x8079C6F0 = 2.0f */
+extern f32 networkRateMax;                 /* 0x8079C6F8 = 1.0f */
+extern f32 networkRateMin;                 /* 0x8079C708 = 0.1f */
+extern f32 networkRateUpStep;              /* 0x8079C718 = 0.017f */
+extern f32 networkRateUpLerp;              /* 0x8079C730 = 0.5f */
+extern f32 networkRateDownStep;            /* 0x8079C734 = 0.008f */
+extern f32 networkRateDecay;               /* 0x8079C738 = 0.002f */
+extern f32 networkRateDownLerp;            /* 0x8079C73C = 0.25f */
+extern f32 networkRateFloor;               /* 0x8079392C = 0.032f (.sdata) */
+extern f32 networkRequestZero;             /* 0x8079C740 = 0.0f */
+extern f32 networkRequestTimerIdle;        /* 0x8079C748 = 0.0f */
+extern f32 networkRequestTimerReset;       /* 0x8079C750 = 0.0f */
+extern f32 networkSessionPatTimeOrigin;    /* 0x8079C754 = -3600.0f */
+extern void* sGameSpyInterfaceThread;      /* 0x80794CE4 (.sbss) */
+extern const char NetworkSessionStable_downPerformancePackMessage[];
+extern const char NetworkSessionStable_downPerformanceByteMessage[];
+extern const char NetworkSessionStable_upPerformancePackMessage[];
+extern const char NetworkSessionStable_upPerformanceByteMessage[];
+extern const char NetworkSessionStable_moveOutOfBandMessage[];
+extern const char NetworkSessionManager_moveStandByMessage[];
+extern const char NetworkSessionManagerPat_finalMessage[];
+
+/* neighbouring helpers.  Each `untyped:` marker below is the honest case for that declaration: a
+   callback adapter whose arguments are forwarded unchanged, or a record whose layout this range
+   never reads. */
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
+void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5);
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
+void networkSessionReflect1(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void networkSmallObject_construct(void* self);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void networkSmallObject_dtor(void* self, s32 flags);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
 void fn_803CA338(void* self);
-void dtor_803CA338(void* self);
-void fn_803CA37C(void* self);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void dtor_803CA338(void* self, s32 flags);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void networkInstance_initMutex(void* self);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void LockMutex(void* mutex);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void UnlockMutex(void* mutex);
 void fn_803CF66C(s32 value);
-void fn_803F87B8(void* self);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+s32 __ptmf_scall(void* self);
+
+/* the two reflection adapters (this unit defines them; `initNetworkSessionStable` takes the first
+   one's address as the session vtable's +0x0C callback) */
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
+void networkSessionReflectCallback(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5);
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
+void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
+
+/* this unit's own record/stream helpers, defined in the tail of the range */
+s32 NetworkRequest_isTimedOut(NetworkRequest* self);
+void NetworkRequest_restartTimer(NetworkRequest* self, f32 interval);
+void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);
+NetworkSessionSlotInfo* NetworkSessionSlotInfo_construct(NetworkSessionSlotInfo* self);
+NetworkSessionSlotInfo* NetworkSessionSlotInfo_dtor(NetworkSessionSlotInfo* self, s16 flags);
+NetworkSessionCircleList* NetworkSessionCircleList_construct(NetworkSessionCircleList* self);
+NetworkSessionCircleList* NetworkSessionCircleList_dtor(NetworkSessionCircleList* self, s16 flags);
+NetworkSessionCircleInfo* NetworkSessionCircleInfo_construct(NetworkSessionCircleInfo* self);
+NetworkSessionCircleInfo* NetworkSessionCircleInfo_dtor(NetworkSessionCircleInfo* self, s16 flags);
+NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_construct(NetworkSessionPlayerRecord* self);
+NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_dtor(NetworkSessionPlayerRecord* self, s16 flags);
+NetworkRequest* NetworkRequestPat_construct(NetworkRequest* self);
+NetworkRequest* NetworkRequestPat_dtor(NetworkRequest* self, s16 flags);
+void NetworkRequestPat_reset(NetworkRequest* self);
+void NetworkRequestPat_clear(NetworkRequest* self);
+/* untyped: caller-owned payload - the array constructors take raw element pointers */
 void __construct_array(void* ptr, void* ctor, void* dtor, u32 size, u32 count);
+/* untyped: caller-owned payload - the array destructors take raw element pointers */
 void __destroy_arr(void* ptr, void* dtor, u32 size, u32 count);
+
 s32 __ptmf_scall(void* self);
 void LockMutex(void* mutex);
 void UnlockMutex(void* mutex);

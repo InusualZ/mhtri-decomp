@@ -58,7 +58,9 @@ void constructNetworkSessionObject(void);   /* the session object's constructor,
 
 }
 
-/* The `+0x0C` callback slot's function-pointer type (`networkSessionReflectCallback`'s shape). */
+/* The `+0x0C` callback slot's function-pointer type.  The slot is unprototyped here (the target only
+   materialises the callback's address into an argument register), so the real six-argument
+   `networkSessionReflectCallback` is cast to it at the call site. */
 typedef void (*NetworkReflectCallback)();
 
 /* The session the opener builds; declared only so the vtable's +0x0C slot can name its owner. */
@@ -123,7 +125,7 @@ s8 initNetworkSessionStable(NetworkSessionStableInit* self)
     if (session == NULL) {
         return -2;
     }
-    session->v01(1, networkSessionReflectCallback, self, self->work_3CC, 0);
+    session->v01(1, (NetworkReflectCallback)networkSessionReflectCallback, self, self->work_3CC, 0);
     self->session_0C->v20(networkSessionPeriodSeconds);
     self->session_0C->v22(networkSessionTimeoutSeconds);
     self->session_0C->v19(networkSessionIntervalSeconds);
