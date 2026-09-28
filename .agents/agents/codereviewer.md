@@ -165,7 +165,7 @@ Run the project's own tools and cite their output rather than re-deriving a judg
   added; it selects the merge base itself);
 * `python tools/symbols/symedit.py find|show|range|refs` for names, addresses, ownership and the referrers a
   rename would have to sweep - never open or print `symbols.txt` (rule 7 of the non-negotiables: it is 4.5 MB);
-* `python tools/objdiff/symdiff.py -u <unit> [<symbol>]` for a per-symbol score, and the `objdiff-verify`
+* `python tools/objdiff/unitscore.py <unit>` for the unit's rows in one call (`--threshold` to filter), and the `objdiff-verify`
   skill for what "matches" really requires;
 * `python tools/units/vtableaudit.py`, `declclash.py`, `datagap.py --unit <unit>` for the specific defect
   classes they own;
