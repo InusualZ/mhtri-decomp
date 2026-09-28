@@ -682,12 +682,32 @@ def _measure_lines(lines: list[str], unit: str) -> None:
     lines.append("```sh")
     lines.append("rm -f build/RMHE08/report.json   # order-only target: see below")
     lines.append("ninja build/RMHE08/report.json")
-    lines.append("python tools/objdiff/symdiff.py -u %s   # the official report metric per symbol" % unit)
+    lines.append("python tools/objdiff/unitscore.py %s   # every symbol, one report read" % unit)
     lines.append("```")
+    lines.append("")
+    lines.append("**Score the whole unit in one command - never a scratch script.** `unitscore.py` prints every")
+    lines.append("symbol of the unit's registered ranges worst-first with the report's own percentage, the unit's")
+    lines.append("`matched_functions`/`matched_code`/`total_code` and a summary line, from **one** report read")
+    lines.append("(zero objdiff invocations):")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python tools/objdiff/unitscore.py <your-unit>                 # every row + the freshness verdict")
+    lines.append("python tools/objdiff/unitscore.py <your-unit> --measure      # one objdiff call over the objects")
+    lines.append("python tools/objdiff/unitscore.py <your-unit> --threshold 99 # only the rows below 99 %")
+    lines.append("python tools/objdiff/unitscore.py <your-unit> --json         # the whole record, mtimes included")
+    lines.append("```")
+    lines.append("")
+    lines.append("It **refuses to print a stale report's numbers** (exit 1) and names which mtime lost - the report,")
+    lines.append("the unit's object, or the newest source under the unit (its include closure included, so a header")
+    lines.append("edit counts). `--force-stale` overrides it and keeps the STALE verdict visible; `--measure` skips")
+    lines.append("the report entirely and refuses instead when the object is older than its source - the same stale")
+    lines.append("number from the other side. One symbol's **instruction rows** (the first divergence, never the")
+    lines.append("percentage) are still `python tools/objdiff/symdiff.py -u <your-unit> <symbol>`.")
     lines.append("")
     lines.append("**`build/RMHE08/report.json` is an order-only target of `all_source`**: after a source edit ninja")
     lines.append("says \"no work to do\" and you read the PREVIOUS build's scores. `rm -f build/RMHE08/report.json`")
     lines.append("first - that trap cost one lane three iterations that looked like \"all new functions score 0 %\".")
+    lines.append("`unitscore.py` refuses a report it can see is stale, so the trap is reported rather than read.")
     lines.append("")
     lines.append("**Before you report, the whole-tree check - one command:**")
     lines.append("")
@@ -1750,6 +1770,9 @@ def selftest() -> int:
         check("the brief carries the order-only report.json trap",
               "order-only target of `all_source`" in brief_text
               and "rm -f build/RMHE08/report.json" in brief_text, True)
+        check("the brief ships the one-report unit scorer and its freshness guard",
+              "tools/objdiff/unitscore.py" in brief_text and "--force-stale" in brief_text
+              and "refuses to print a stale report's numbers" in brief_text, True)
         check("the brief says tudiscover needs the on-demand asm dump",
               "python tools/splits/dump_asm.py" in brief_text and "0 functions" in brief_text, True)
         check("the brief carries the git add hygiene",
@@ -1818,6 +1841,9 @@ def selftest() -> int:
               "ninja changes" in text and "never wave it through" in text, True)
         check("the proposal brief carries the order-only report.json trap",
               "order-only target of `all_source`" in text and "rm -f build/RMHE08/report.json" in text, True)
+        check("the proposal brief ships the one-report unit scorer and its freshness guard",
+              "tools/objdiff/unitscore.py" in text and "--force-stale" in text
+              and "refuses to print a stale report's numbers" in text, True)
         check("the proposal brief says tudiscover needs the on-demand asm dump",
               "python tools/splits/dump_asm.py" in text and "0 functions" in text, True)
         check("the proposal brief carries the git add hygiene",
