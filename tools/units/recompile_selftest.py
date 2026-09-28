@@ -24,9 +24,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.join(ROOT, "tools", "units") not in sys.path:
@@ -688,6 +690,185 @@ def resolve_invocation_rows() -> int:
     return failures
 
 
+def _fresh_shape(tmp):
+    """A MAIN plus a worktree carrying the **fresh-checkout mtime shape** F40's guard has to survive.
+
+    A real `git worktree add` writes every tracked file at checkout time while `build/` is seeded from MAIN
+    with `copy2` (mtimes preserved), so `config.json`/`build.ninja` are *older* than the map and the split
+    inputs - measured on this host, not assumed.  `claims._build_is_current(wt, wt)` is therefore False in
+    **every** fresh worktree, which is why the mtime evidence alone cannot be the refusal.
+    """
+    main = _fake_main(tmp)
+    wt = os.path.join(tmp, "wt")
+    for rel in ("config/RMHE08", "build/RMHE08", "orig/RMHE08/sys", "orig/RMHE08/files"):
+        os.makedirs(os.path.join(wt, *rel.split("/")), exist_ok=True)
+
+    def put(rel, text):
+        with open(os.path.join(wt, *rel.split("/")), "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    put("config/RMHE08/config.yml", "object: orig/RMHE08/sys/main.dol\n")
+    put("config/RMHE08/symbols.txt",
+        "fn_80001000 = .text:0x80001000; // type:function size:0x10\n"
+        "fn_80001020 = .text:0x80001020; // type:function size:0x30\n")
+    put("config/RMHE08/splits.txt",
+        "prop/unit.cpp:\n\t.text       start:0x80000000 end:0x80000100\n")
+    put("orig/RMHE08/sys/main.dol", "dol\n")
+    put("orig/RMHE08/files/mh3.sel", "sel\n")
+    shutil.copyfile(os.path.join(main, "build", "RMHE08", "config.json"),
+                    os.path.join(wt, "build", "RMHE08", "config.json"))
+    put("build.ninja", "# seeded from MAIN\n")
+    # the fresh checkout: the tree's own files are newer than the seeded build
+    old = time.time() - 3600
+    for rel in ("build.ninja", "build/RMHE08/config.json"):
+        os.utime(os.path.join(wt, *rel.split("/")), (old, old))
+    return main, wt
+
+
+def split_staleness_rows() -> int:
+    """F40: a split older than this tree's own edited map/splits is refused, never silently measured.
+
+    The failure this pins: a lane edits `splits.txt` (a seam re-draw) and does not re-split, so
+    `build/RMHE08/obj/<unit>.o` is still the previous range's object - and MAIN holds the same previous
+    range, so "falling back" is not a fix. `--measure` used to print that old object's number as if it were
+    the new range's.  The second half of the contract is the *false positive that must not happen*: a fresh
+    worktree has every tracked file newer than the seeded `build/`, so a pure-mtime rule refuses there - the
+    uncommitted-edit test is what tells the two apart.
+    """
+    failures = 0
+    claims = rc._claims()
+    with tempfile.TemporaryDirectory() as tmp:
+        main, wt = _fresh_shape(tmp)
+        cfg = os.path.join(wt, "build", "RMHE08", "config.json")
+
+        # the measured shape: the reused seeder guard says "not current" for a *fresh* worktree
+        failures = _ok("a fresh worktree's split is not `current` per the seeder guard",
+                       claims._build_is_current(wt, wt), False, failures)
+        failures = _ok("... but with no uncommitted edit it is not `stale`, so the common case measures",
+                       rc.split_staleness(wt, main, dirty=lambda w, r: False), (False, []), failures)
+        failures = _ok("... and the CLI gate lets it through",
+                       rc.refuse_if_split_stale(wt, main, dirty=lambda w, r: False), (False, []), failures)
+
+        # the filed bug: this tree edited its splits.txt and has not re-split
+        stale, lines = rc.split_staleness(wt, main,
+                                          dirty=lambda w, r: r.endswith("splits.txt"))
+        failures = _ok("an uncommitted splits.txt edit behind the split refuses", stale, True, failures)
+        failures = _ok("... naming the file", "splits.txt" in (lines[0] if lines else ""), True, failures)
+        failures = _ok("... and naming BOTH mtimes ('edited' and 'split')",
+                       ("edited" in lines[0] and "split" in lines[0]) if lines else False, True, failures)
+        failures = _ok("the guard is only as wide as the edited input", len(lines), 1, failures)
+
+        refused = None
+        try:
+            rc.refuse_if_split_stale(wt, main, dirty=lambda w, r: r.endswith("splits.txt"))
+        except SystemExit as exc:
+            refused = str(exc)
+        failures = _ok("the CLI gate refuses loudly", refused is not None, True, failures)
+        failures = _ok("... saying which input moved", "splits.txt" in (refused or ""), True, failures)
+        failures = _ok("... and how to proceed", "ninja build/RMHE08/config.json" in (refused or ""), True,
+                       failures)
+        failures = _ok("... offering the deliberate override", rc.STALE_SPLIT_FLAG in (refused or ""), True,
+                       failures)
+        failures = _ok("the override skips the gate",
+                       rc.refuse_if_split_stale(wt, main, allow_stale=True,
+                                                dirty=lambda w, r: r.endswith("splits.txt")), (False, []),
+                       failures)
+
+        # a re-split (config.json newest) clears it even with every input dirty
+        now = time.time() + 5
+        os.utime(cfg, (now, now))
+        failures = _ok("a re-split clears the refusal",
+                       rc.split_staleness(wt, main, dirty=lambda w, r: True), (False, []), failures)
+        failures = _ok("... and the seeder guard agrees", claims._build_is_current(wt, wt), True, failures)
+        old = time.time() - 3600
+        os.utime(cfg, (old, old))
+
+        # run from MAIN: the registered path is untouched
+        failures = _ok("run from MAIN there is no gate",
+                       rc.split_staleness(main, main, dirty=lambda w, r: True), (False, []), failures)
+
+        # a tree with no split of its own: nothing to be stale, MAIN's object is the answer
+        bare = os.path.join(tmp, "bare")
+        os.makedirs(bare)
+        failures = _ok("no config.json means no split of this tree's own to be stale",
+                       rc.split_staleness(bare, main, dirty=lambda w, r: True), (False, []), failures)
+
+        # the premise of the whole guard: in this shape *every* present split input is newer than the
+        # seeded `config.json`, so the mtime evidence alone cannot separate a checkout from an edit
+        failures = _ok("every split input in the fresh shape is newer than the seeded split",
+                       [os.path.getmtime(os.path.join(wt, *rel.split("/"))) > os.path.getmtime(cfg)
+                        for rel in rc.SPLIT_INPUTS],
+                       [True, True, True, True, True], failures)
+
+        # `git_dirty`'s three answers: differs, clean, and "git could not answer" (which is not a doubt)
+        def git_rc(code):
+            return lambda argv, **kw: subprocess.CompletedProcess(argv, code, "", "")
+
+        failures = _ok("git diff --quiet returns 1 -> dirty", rc.git_dirty(wt, "x", runner=git_rc(1)), True,
+                       failures)
+        failures = _ok("git diff --quiet returns 0 -> clean", rc.git_dirty(wt, "x", runner=git_rc(0)), False,
+                       failures)
+        failures = _ok("a git that cannot answer is not evidence of an edit",
+                       rc.git_dirty(wt, "x", runner=git_rc(128)), False, failures)
+        seen = []
+
+        def recording_runner(argv, **kwargs):
+            seen.append(list(argv))
+            return subprocess.CompletedProcess(argv, 1, "", "")
+
+        rc.git_dirty(wt, "config/RMHE08/splits.txt", runner=recording_runner)
+        failures = _ok("the dirty test asks about HEAD, per path",
+                       ["git", "-C", wt, "diff", "--quiet", "HEAD", "--", "config/RMHE08/splits.txt"]
+                       in seen, True, failures)
+
+        # every input this module names must be one `claims._build_is_current` reacts to, or the refusal
+        # message silently loses a file the day the seeder's list grows
+        os.utime(cfg, (time.time() + 5, time.time() + 5))
+        failures = _ok("the fixture starts current", claims._build_is_current(wt, wt), True, failures)
+        for rel in rc.SPLIT_INPUTS:
+            p = os.path.join(wt, *rel.replace("/", os.sep).split(os.sep))
+            before = os.stat(p).st_mtime
+            future = time.time() + 60
+            os.utime(p, (future, future))
+            failures = _ok("claims reacts to %s" % rel, claims._build_is_current(wt, wt), False, failures)
+            os.utime(p, (before, before))
+    return failures
+
+
+def target_label_rows() -> int:
+    """The `--measure` target line must say **which tree** the object came from - the F40 double-take.
+
+    `registered` is the pre-existing kind and stays (the lanes and `measure_selftest` read it), but on its
+    own it did not say whose registered tree; a worktree without an object for the unit got MAIN's number
+    under a label that read like its own. The note and the `target_tree` field make it explicit.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = _fake_main(tmp)
+        wt = os.path.join(tmp, "wt")
+        os.makedirs(os.path.join(wt, "build", "RMHE08", "obj", "prop"))
+
+        path, kind, note = rc.resolve_target(wt, main, "prop/unit", "fn_80002000")
+        failures = _ok("a worktree with no object uses MAIN's, kind unchanged", kind, "registered", failures)
+        failures = _ok("... and the note names this tree's missing object",
+                       "no split object" in note and "prop/unit" in note, True, failures)
+        failures = _ok("... and says to re-split", "re-split" in note, True, failures)
+        failures = _ok("... and the tree is labelled `main`", rc.target_tree(path, wt, main), "main",
+                       failures)
+
+        wt_obj = os.path.join(wt, "build", "RMHE08", "obj", "prop", "unit.o")
+        open(wt_obj, "wb").write(b"\x7fELF")
+        path, kind, note = rc.resolve_target(wt, main, "prop/unit", "fn_80002000")
+        failures = _ok("this tree's own object wins", rc.target_tree(path, wt, main), "worktree", failures)
+        failures = _ok("... with no note to explain away", note, "", failures)
+
+        # from MAIN, `registered` is MAIN's own and needs no note - the pre-existing shape
+        path, kind, note = rc.resolve_target(main, main, "prop/unit", "fn_80002000")
+        failures = _ok("from MAIN the shape is unchanged", (kind, note), ("registered", ""), failures)
+        failures = _ok("... and it is labelled `main`", rc.target_tree(path, wt, main), "main", failures)
+    return failures
+
+
 def _raises(fn) -> bool:
     try:
         fn()
@@ -842,6 +1023,8 @@ def main() -> int:
     failures += proposal_rows()
     failures += map_invocation_rows()
     failures += resolve_invocation_rows()
+    failures += split_staleness_rows()
+    failures += target_label_rows()
     failures += main_root_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")

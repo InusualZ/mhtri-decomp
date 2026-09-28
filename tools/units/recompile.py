@@ -52,9 +52,21 @@ in whichever tree has it - the same original bytes the split will put in the reg
 
 A registered unit run from MAIN takes exactly the path it took before (MAIN's rule, MAIN's object). A unit
 run from a worktree that has its own copy - the filed double-take - takes **that** copy, and the CLI prints
-the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[auto-fallback]`), so a
-measurement is never ambiguous about which tree it came from. The score is still `report generate`'s
-`fuzzy_match_percent`.
+the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[auto-fallback]`) **and the
+tree it came from**, so a measurement is never ambiguous about which tree it came from. The score is still
+`report generate`'s `fuzzy_match_percent`.
+
+**A stale split is refused, not silently measured (F40).** Preferring this tree's object is only safe while
+this tree's split actually reflects its own `symbols.txt`/`splits.txt`/DOL. A lane that edits its `splits.txt`
+(a seam re-draw, a new registration) and has **not** re-split still has the previous build's object on disk,
+so the "this tree's copy" the resolution just preferred is the *old range's* bytes - and MAIN's copy is the
+same old range, so falling back is not a fix either. `split_staleness` reuses the seeder's own guard
+(`claims._build_is_current`, the one `slots.verify` uses) and then asks which split input is both newer than
+this tree's `build/RMHE08/config.json` **and** an uncommitted edit to this tree (`git diff --quiet HEAD`),
+and the CLI refuses with the file and both mtimes named. The dirty test is load-bearing, not decoration: a
+fresh worktree's tracked files are all written at checkout time while `build/` keeps MAIN's mtimes, so
+`_build_is_current` is False in **every** fresh worktree and a pure-mtime rule would refuse every measurement.
+`--allow-stale-split` is the deliberate override.
 
 **The map follows the invocation too (F43).** The fallback locates the retired `auto_*text.o` by *address*,
 and the address comes from `config/RMHE08/symbols.txt`. Reading MAIN's copy alone made the tool refuse a
@@ -429,6 +441,11 @@ def source_path(wt: str, unit: str) -> str:
     return os.path.join(wt, "src", *unit_source(unit).split("/"))
 
 
+def _stamp(seconds: float) -> str:
+    """A local wall-clock stamp for a file's mtime - the form the refusal messages name."""
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(seconds))
+
+
 def object_is_fresh(object_path: str, source: str) -> tuple[bool, str]:
     """(fresh, reason) - the stale-object guard every measurement path must pass before reading an object.
 
@@ -450,9 +467,10 @@ def object_is_fresh(object_path: str, source: str) -> tuple[bool, str]:
     obj_m, src_m = os.stat(object_path).st_mtime_ns, os.stat(source).st_mtime_ns
     if obj_m < src_m:
         return False, (
-            "STALE OBJECT: %s is older than its source %s (%d ns) - the compile did not rewrite it; "
-            "refusing to measure, because a score read from here would be last build's number dressed as "
-            "this one's" % (object_path, source, src_m - obj_m))
+            "STALE OBJECT: %s is older than its source %s (object %s, source %s) - the compile did not "
+            "rewrite it; refusing to measure, because a score read from here would be last build's number "
+            "dressed as this one's"
+            % (object_path, source, _stamp(obj_m / 1e9), _stamp(src_m / 1e9)))
     return True, ""
 
 
@@ -761,6 +779,119 @@ def target_rel(unit: str) -> str:
     return os.path.splitext(head)[0] + ".o"
 
 
+# ---------------------------------------------------------------------------------------------------
+# The invocation tree's split must postdate the tree's own map/splits/DOL, or every object it holds
+# (and MAIN's for the same range) is the previous build's.
+# ---------------------------------------------------------------------------------------------------
+# The inputs dtk's split reads.  Kept in step with `claims._build_is_current` (the seeder's own guard,
+# which `slots.verify` uses) - the selftest asserts claims reacts to each of them, so a change there that is
+# not mirrored here is caught rather than silently leaving the refusal message short one file.  Relative
+# paths, so the same tuple reads both roots.
+SPLIT_INPUTS = (os.path.join("config", "RMHE08", "config.yml"),
+                os.path.join("config", "RMHE08", "symbols.txt"),
+                os.path.join("config", "RMHE08", "splits.txt"),
+                os.path.join("orig", "RMHE08", "sys", "main.dol"),
+                os.path.join("orig", "RMHE08", "files", "mh3.sel"))
+
+# The deliberate override for `--measure` when the caller knows the stale split cannot touch its unit.
+STALE_SPLIT_FLAG = "--allow-stale-split"
+
+
+def _claims():
+    """`claims` imported late: it imports this module at import time, so a top-level import would cycle."""
+    from units import claims
+    return claims
+
+
+def git_dirty(wt: str, rel: str, runner=subprocess.run) -> bool:
+    """Whether this tree carries an **uncommitted** change to the tracked path `rel` (worktree vs HEAD).
+
+    A split input being newer than the split is by itself not evidence of a doubt: a fresh worktree writes
+    every tracked file at checkout time, so all of them are newer than the `build/` tree seeded from MAIN.
+    This is what separates "the checkout wrote the file" from "this lane edited the file", and it is the
+    only signal that survives MAIN moving under a lane (the branch's own files stay byte-equal to its base,
+    while a lane's edit does not).  `git diff --quiet` answers 0 (clean) or 1 (differs); any other status
+    means git could not answer, which is not evidence of a difference - the guard then keeps today's
+    behaviour rather than manufacturing a doubt out of a question git never answered.
+    """
+    p = runner(["git", "-C", wt, "diff", "--quiet", "HEAD", "--", rel],
+               capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return p.returncode == 1
+
+
+def split_staleness(wt: str, main: str, dirty=None):
+    """(stale, lines) - whether this tree's split can back a `--measure` number, and why not.
+
+    Three gates, cheapest first, and every one of them must agree before the refusal fires:
+
+    1. **the trees differ** - run from MAIN the resolved target is MAIN's own object, which is the path a
+       registered unit has always taken; nothing changes there.
+    2. **the seeder's guard** - `claims._build_is_current(wt, wt)`.  This is the existing staleness rule
+       (`slots.verify`, `seed_worktree_build`) rather than a second one that can drift from it.
+    3. **this tree's own edit** - `config.json` predates a split input that `git diff` says this tree has
+       changed.  Gate 2 alone is not enough: it is False in every fresh worktree (checkout mtimes vs the
+       seeded `build/`), and pure mtimes cannot tell a checkout artefact from a lane's edit or from MAIN
+       moving under the lane.  The dirty test can, so it is what the refusal actually rests on.
+
+    No `build/RMHE08/config.json` at all means this tree has no split of its own to be stale - that is a
+    fresh worktree's normal state and the resolution below deliberately falls back to MAIN there.
+    """
+    if dirty is None:
+        dirty = git_dirty
+    if same_tree(wt, main):
+        return False, []
+    cfg = os.path.join(wt, "build", "RMHE08", "config.json")
+    if not os.path.isfile(cfg):
+        return False, []
+    if _claims()._build_is_current(wt, wt):
+        return False, []
+    try:
+        cfg_m = os.path.getmtime(cfg)
+    except OSError:
+        return False, []
+    lines = []
+    for rel in SPLIT_INPUTS:
+        try:
+            m = os.path.getmtime(os.path.join(wt, rel))
+        except OSError:
+            continue
+        if m > cfg_m and dirty(wt, rel):
+            lines.append("%s (edited %s, split %s)" % (rel, _stamp(m), _stamp(cfg_m)))
+    return (True, lines) if lines else (False, [])
+
+
+def refuse_if_split_stale(wt: str, main: str, allow_stale: bool = False, dirty=None):
+    """Raise with the evidence unless this tree's split provably reflects its own map/splits/DOL.
+
+    Returns (False, []) when the split is usable (or `allow_stale` skips the gate).  A refusal names every
+    input that is both newer than the split and an uncommitted edit here, so the remedy is one command
+    (`ninja build/RMHE08/config.json`) and never a guess about which file moved.
+    """
+    if allow_stale:
+        return False, []
+    stale, lines = split_staleness(wt, main, dirty=dirty)
+    if stale:
+        raise SystemExit(
+            "REFUSED: %s/build/RMHE08/config.json is older than map/split input(s) this tree has edited, "
+            "so the split object here is the *previous* range - measuring against it (or falling back to "
+            "MAIN, which holds the same previous split) would print a number that looks like a "
+            "measurement and is not:\n  %s\n"
+            "  re-split this tree first: ninja build/RMHE08/config.json\n"
+            "  or measure deliberately against the stale object: %s"
+            % (wt, "\n  ".join(lines), STALE_SPLIT_FLAG))
+    return stale, lines
+
+
+def target_tree(path: str, wt: str, main: str) -> str:
+    """Which tree a resolved target object lives in - what the CLI labels the `target` line with."""
+    p = os.path.normcase(os.path.abspath(path))
+    for name, root in (("worktree", wt), ("main", main)):
+        root = os.path.normcase(os.path.abspath(root))
+        if p == root or p.startswith(root + os.sep):
+            return name
+    return os.path.dirname(os.path.abspath(path))
+
+
 def resolve_target(wt: str, main: str, unit: str, symbol: str):
     """(target object, kind, note) for `--measure`, resolved from THIS invocation's tree outward.
 
@@ -779,7 +910,8 @@ def resolve_target(wt: str, main: str, unit: str, symbol: str):
 
     The returned path is absolute, and the CLI prints it, so a measurement is never ambiguous about which
     tree it came from; `resolve_map` and the printed map line do the same for the map the address came
-    from.
+    from.  When the object is MAIN's while the invocation is a worktree - step 2 - the `note` says so and
+    names the path this tree would need, because `registered` alone does not say *which* tree registered it.
     """
     rel = target_rel(unit)
     same = same_tree(wt, main)
@@ -787,7 +919,16 @@ def resolve_target(wt: str, main: str, unit: str, symbol: str):
     if not same and os.path.exists(p_wt):
         return p_wt, "worktree-split", ""
     if os.path.exists(p_main):
-        return p_main, "registered", ""
+        # Run from a worktree that has no object for this unit: the score is MAIN's, and the caller must
+        # be able to see that without reading the path.  `resolve_target` uses MAIN's split object where
+        # MAIN is the registered tree - a plain `registered` label hides which of the two trees that is,
+        # which is exactly how the filed double-take read a MAIN number as this lane's.
+        note = ""
+        if not same:
+            note = ("this tree has no split object for %s at %s - the score is MAIN's split object; "
+                    "re-split this tree (ninja build/RMHE08/config.json, or a plain ninja) to score your own"
+                    % (unit, rel))
+        return p_main, "registered", note
     found, note = proposal_target(wt, main, symbol)
     if found:
         return found, "auto-fallback", note
@@ -841,6 +982,8 @@ def main() -> int:
     ap.add_argument("unit", nargs="?", help="unit path from the repository root, e.g. Pl/pl_act")
     ap.add_argument("--main", default=None, help="main worktree (default: resolved with git)")
     ap.add_argument("--measure", default=None, help="symbol to diff against the target object afterwards")
+    ap.add_argument(STALE_SPLIT_FLAG, action="store_true", dest="allow_stale_split",
+                    help="measure even when this tree's split is older than its own edited map/splits")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="print the command, compile nothing")
     ap.add_argument("--selftest", action="store_true", help="run the self-test and exit")
@@ -854,6 +997,11 @@ def main() -> int:
     wt = worktree_root()
     main_wt = args.main or main_root(wt)
     unit = args.unit.strip("/")
+    if args.measure and not args.dry_run:
+        # before the compile: a stale split is refused in ~0 s rather than after a wasted one.  Only a
+        # real measurement needs it - a plain recompile does not read a target object, and `--dry-run`
+        # prints a command without producing a number.
+        refuse_if_split_stale(wt, main_wt, allow_stale=args.allow_stale_split)
     map_path, map_kind = resolve_map(wt, main_wt)
     tokens, cmd_source = unit_tokens(main_wt, wt, unit)
     result = compile_unit(unit, main_wt, wt, dry_run=args.dry_run, tokens=tokens)
@@ -870,6 +1018,7 @@ def main() -> int:
         result["target"] = target
         result["target_kind"] = target_kind
         result["target_note"] = target_note
+        result["target_tree"] = target_tree(target, wt, main_wt)
         if target_kind == "missing":
             result["measure"] = {"symbol": args.measure, "error": target_note}
         else:
@@ -903,7 +1052,12 @@ def main() -> int:
     print("compiled %s" % result["unit"])
     print("  object  %s  (%d bytes, fresh=%s)" % (result["object"], result["bytes"], result["fresh"]))
     kind = result.get("target_kind")
-    print("  target  %s%s" % (result["target"], "  [%s]" % kind if kind else ""))
+    # name the tree explicitly: the path already does, but a lane reading `[registered]` cannot tell
+    # whose registered tree it is, which is the filed F40 double-take.
+    where = {"worktree": "this tree", "main": "MAIN"}.get(result.get("target_tree"),
+                                                        result.get("target_tree"))
+    print("  target  %s%s%s" % (result["target"], "  [%s]" % kind if kind else "",
+                                 "  (%s)" % where if where else ""))
     if result.get("target_note"):
         print("          %s" % result["target_note"])
     # the map the address lookup used - without this line a measurement is ambiguous about its map, which
