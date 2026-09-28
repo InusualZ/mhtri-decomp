@@ -62,6 +62,7 @@ Read-only by construction: no `ninja`, no compile, no link, no write anywhere. S
     python tools/units/vtableaudit.py --fields           # only the fn-table-pointer fields at +0x00
     python tools/units/vtableaudit.py --unit Pl/pl_master
     python tools/units/vtableaudit.py --diff <ref>       # exit 0 = the batch adds no rule-10 violation
+    python tools/units/vtableaudit.py --at 0x80050F28   # one vtable, its slots and each target's owner
     python tools/units/vtableaudit.py --json
     python tools/units/vtableaudit.py --selftest
 
@@ -72,6 +73,12 @@ which is how a worktree audits `MAIN`'s built objects without a build of its own
 with `git show`) - and only a set that *grew* is a refusal. The run half is judged with the working tree's
 objects on both sides, so the ownership change a batch makes (a new `.data` claim) is what the diff sees;
 a batch that only *removed* an emission is not refused by that half - it is named in the report instead.
+
+`--at <addr>` is the census mode: it reads the vtable at `<addr>` straight out of the DOL and prints every
+slot with the registered unit that **owns** its target (by address, never by name) and the symbol the map
+names there, plus the reference object's relocation symbol for that slot (`dossier.parse_elf`). One lane
+hand-built that list twice and got 62 of 114 slots wrong, each time by parsing the DOL header's grouped
+offset/address/size fields by hand - this mode parses them once, in `dol_segments`/`dol_read`.
 """
 
 from __future__ import annotations
@@ -93,6 +100,7 @@ for _p in (HERE, os.path.join(ROOT, "tools", "elf")):
 
 import elfsect  # noqa: E402  (the project's ELF section reader)
 import langcheck  # noqa: E402  (registered_units - the same list every other unit tool uses)
+import dossier  # noqa: E402  (parse_elf - the one ELF object reader, for the `--at` reference side)
 
 GAME = "RMHE08"
 SPLITS_REL = os.path.join("config", GAME, "splits.txt")
@@ -924,20 +932,152 @@ def _same_unit(path: str, spec: str) -> bool:
     return a == b or os.path.splitext(a)[0] == os.path.splitext(b)[0]
 
 
-def violation_keys(s: dict) -> list:
+def violation_rows(s: dict, rename: dict | None = None) -> dict:
+    """`{key: {"unit", "where", "kind"}}` for every rule-10 violation in a sweep result.
+
+    The keys are `--diff`'s comparison unit, and they are deliberately **rename-stable**, because this
+    campaign re-homes placeholder-path units routinely (plan §12: `fn_80429B94.cpp` ->
+    `Network/network_pat_control.cpp`), and a whole-tree diff keyed by path read one such rename as seven
+    ADDED violations:
+
+    * `run:<section>:<address>` - an address is unique in the DOL (two units cannot own the same range)
+      and a re-home keeps it, so the unit name does not belong in the key. Keying on the unit made the
+      same seven `.data` runs under a new path read as seven additions.
+    * `ref:<file>:<line>:<symbol>` - `<file>` is translated through `rename` (`{path_at_ref: path_now}`,
+      `rename_map`) so the base side's copy lines up with the working tree's. This is the same move
+      `stylelint.py`'s `rule1_counts_at_ref` makes for a renamed `src/` file.
+    """
+    rename = rename or {}
+    rows: dict = {}
+    for run in s["violations"]:
+        key = "run:%s:%08X" % (run["section"], run["address"])
+        rows[key] = {"unit": run["unit"], "kind": "run",
+                     "where": "%s %s 0x%08X (%d words)" % (run["unit"], run["section"],
+                                                           run["address"], run["words"])}
+    for ref in s["references"]:
+        if ref["kind"] != "own":
+            continue
+        key = "ref:%s:%d:%s" % (rename.get(ref["file"], ref["file"]), ref["line"], ref["symbol"])
+        rows[key] = {"unit": ref["unit"], "kind": "ref",
+                     "where": "%s:%d assigns %s" % (ref["file"], ref["line"], ref["symbol"])}
+    return rows
+
+
+def violation_keys(s: dict, rename: dict | None = None) -> list:
     """Stable identifiers for every rule-10 violation in a sweep result - the `--diff` comparison's unit.
 
-    A key is `run:<unit>:<section>:<address>` for an owned code-pointer run our object neither emits nor
-    references, and `ref:<file>:<line>:<symbol>` for an assignment whose table the unit itself owns. The
-    `land.py` gate row refuses a batch whose set *grew* - an existing violation is grandfathered exactly the
-    way the lint's `--diff` grandfathers a finding - so the existing ones (`fn_80429B94.cpp`'s seven,
-    `fn_80423E74.cpp`, `ai/fn_802CC794.cpp`, `enemy/em_act_step.cpp`'s own-range assignment) do not refuse
-    every batch forever.
+    `land.py`'s gate row refuses a batch whose set *grew* - an existing violation is grandfathered exactly
+    the way the lint's `--diff` grandfathers a finding - so the existing ones (`fn_80423E74.cpp`,
+    `ai/fn_802CC794.cpp`, `enemy/em_act_step.cpp`'s own-range assignment) do not refuse every batch
+    forever. `rename` maps a path at the compared ref to the path it has now (`rename_map`).
     """
-    keys = ["run:%s:%s:%08X" % (r["unit"], r["section"], r["address"]) for r in s["violations"]]
-    keys += ["ref:%s:%d:%s" % (r["file"], r["line"], r["symbol"])
-             for r in s["references"] if r["kind"] == "own"]
-    return sorted(keys)
+    return sorted(violation_rows(s, rename))
+
+
+def rename_map(main: str, ref: str) -> dict:
+    """`{path_at_ref: path_now}` for every `src/` rename the working tree made against `ref`.
+
+    The base side of `--diff` scans the files the ref carried, so a unit the batch re-homed keeps its old
+    path in `ref:` keys unless it is translated here. `git diff -M` is the same rename detection the lint
+    uses (`stylelint.py`'s `changed_src_files`), so both tools agree on what a rename is.
+    """
+    out: dict = {}
+    for line in _git(main, "diff", "--name-status", "-M", "--diff-filter=d", ref, "--", "src").splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3 and parts[0].startswith("R"):
+            out[parts[1]] = parts[2]
+    return out
+
+
+# --------------------------------------------------------------------------------------------------
+# `--at`: one vtable, read out of the DOL, with the owner of every target
+# --------------------------------------------------------------------------------------------------
+def owner_at(tree: dict, address: int, sections=None) -> str | None:
+    """The registered unit whose range covers `address`, or None.
+
+    `sections` limits the search (`.text` for a code-pointer target); None searches every range. The
+    hand-built slot censuses matched owners by *name* and got 62 of one vtable's 114 slots wrong, so the
+    lookup here is by address - the one thing a rename or a re-split cannot move.
+    """
+    for unit, ranges in tree["splits"].items():
+        for r in ranges:
+            if sections is not None and r["section"] not in sections:
+                continue
+            if r["start"] <= address < r["end"]:
+                return unit
+    return None
+
+
+def vtable_slots(tree: dict, address: int, max_words: int = 512) -> list:
+    """The vtable at `address`, read out of the DOL: one row per slot.
+
+    The DOL is the linked image, so each slot already holds the *resolved* target address (no relocation
+    to chase, and no `parse_elf` on this side). A word that is not a code pointer ends the table, and
+    fewer than `MIN_RUN_WORDS` slots is not a table. Each row carries the slot address, the target, the
+    target's **owner** (by address, `owner_at`) and the symbol `symbols.txt` names at it - the census a
+    lane hand-built twice and got wrong the second time.
+    """
+    blob = tree.get("blob")
+    if not blob:
+        return []
+    # a registered range that covers the address bounds the table: the DOL has no section boundary for a
+    # vtable, so without this the walk reads past it into the next table's pointers.
+    limit = max_words
+    for ranges in tree["splits"].values():
+        for r in ranges:
+            if r["start"] <= address < r["end"]:
+                limit = min(limit, (r["end"] - address) // 4)
+                break
+    rows = []
+    for i in range(limit):
+        raw = dol_read(blob, address + 4 * i, 4)
+        if raw is None or len(raw) < 4:
+            break
+        value = struct.unpack(">I", raw)[0]
+        if not is_code_pointer("raw", value, None, tree["text_ranges"]):
+            break
+        rows.append({"index": i, "address": address + 4 * i, "target": value,
+                     "owner": owner_at(tree, value, sections=CODE_SECTIONS),
+                     "symbol": symbol_at(tree["symbols"], ".text", value)})
+    return rows if len(rows) >= MIN_RUN_WORDS else []
+
+
+def reference_slots(main: str, tree: dict, address: int, count: int) -> dict:
+    """`{slot_index: symbol}` from the **reference object**'s relocations over the table at `address`.
+
+    The DOL resolves addresses, so the symbol behind a slot is only in the reference object's `.rela`
+    rows - and `dossier.parse_elf` is the one ELF reader (this tool's `read_object` re-implements it; the
+    mode exists so nobody writes a third). `{}` when the table's unit has no built object.
+    """
+    unit = owner_at(tree, address)
+    if unit is None:
+        return {}
+    rng = next((r for r in tree["splits"][unit] if r["start"] <= address < r["end"]), None)
+    if rng is None:
+        return {}
+    obj_path = os.path.join(main, "build", GAME, "obj", os.path.splitext(unit)[0] + ".o")
+    try:
+        with open(obj_path, "rb") as fh:
+            blob = fh.read()
+    except OSError:
+        return {}
+    try:
+        _sections, _symbols, relocs = dossier.parse_elf(blob)
+    except ValueError:
+        return {}
+    base_off = address - rng["start"]
+    out = {}
+    # the relocation section's own name (`.rela<object>`) is the robust match: `parse_elf`'s `target`
+    # comes from `sh_info`, which a hand-built fixture may leave 0, while the section name is always set.
+    rela_name = ".rela" + rng["object"]
+    for rel in relocs:
+        if rel["section"] != rela_name or not (base_off <= rel["offset"] < base_off + 4 * count):
+            continue
+        name = rel["symbol"] or ""
+        if rel["addend"]:
+            name = "%s + 0x%X" % (name, rel["addend"])
+        out[(rel["offset"] - base_off) // 4] = name
+    return out
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1031,6 +1171,9 @@ def main(argv=None) -> int:
     ap.add_argument("--fields", action="store_true", help="report only the +0x00 fn-table-pointer fields")
     ap.add_argument("--diff", metavar="REF", default=None,
                     help="compare the working tree with REF; exit 1 when the rule-10 set grows")
+    ap.add_argument("--at", metavar="ADDR", default=None,
+                    help="read the vtable at ADDR out of the DOL and list its slots with each target's "
+                         "owner (the census, not by hand)")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
@@ -1038,16 +1181,46 @@ def main(argv=None) -> int:
         import vtableaudit_selftest
         return vtableaudit_selftest.selftest()
     main_tree = args.main or ROOT
+    if args.at is not None:
+        try:
+            address = int(args.at, 0)
+        except ValueError:
+            print("vtableaudit: --at wants an address (`0x80050000` or `2147745792`)", file=sys.stderr)
+            return 2
+        tree = load_tree(main_tree)
+        slots = vtable_slots(tree, address)
+        refs = reference_slots(main_tree, tree, address, len(slots)) if slots else {}
+        if args.json:
+            print(json.dumps({"address": address,
+                              "slots": [dict(s, reference=refs.get(s["index"])) for s in slots]},
+                             indent=2))
+            return 0 if slots else 2
+        if not slots:
+            print("vtableaudit --at 0x%08X: no vtable there (a table needs %d consecutive code pointers; "
+                  "check the address, or that the DOL covers it)" % (address, MIN_RUN_WORDS))
+            return 2
+        print("vtableaudit --at 0x%08X: %d slot(s)" % (address, len(slots)))
+        for s in slots:
+            print("  +0x%03X  0x%08X  %-28s %-30s %s"
+                  % (4 * s["index"], s["target"], s["owner"] or "(unowned)", s["symbol"] or "",
+                     ("ref %s" % refs[s["index"]]) if s["index"] in refs else ""))
+        return 0
     s = sweep(main_tree, only=args.unit)
     if args.diff is not None:
         back = sweep(main_tree, only=args.unit, text_ref=args.diff)
-        added = sorted(set(violation_keys(s)) - set(violation_keys(back)))
+        # the batch's renames (plan §12 re-homes a unit routinely): the base side scanned the ref's files,
+        # so its `ref:` keys have to be translated to the paths the working tree now spells.  Run keys are
+        # already keyed on the range, which a rename keeps.
+        rename = rename_map(main_tree, args.diff)
+        before = violation_keys(back, rename)
+        after = violation_keys(s)
+        added = sorted(set(after) - set(before))
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added,
-                              "before": violation_keys(back), "after": violation_keys(s)}, indent=2))
+                              "before": before, "after": after}, indent=2))
             return 1 if added else 0
         print("vtableaudit --diff %s: %d rule-10 violation(s) before, %d after, %d added"
-              % (args.diff, len(set(violation_keys(back))), len(set(violation_keys(s))), len(added)))
+              % (args.diff, len(before), len(after), len(added)))
         for key in added:
             print("  ADDED %s" % key)
         return 1 if added else 0
