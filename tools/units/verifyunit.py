@@ -46,6 +46,16 @@ The gate (through this module) now covers these documented checks; they no longe
 * **§5.3 cross-check the arithmetic** - `arithmetic_crosscheck` is that identity.
 * **§5.4 data/byte content, not just size** - `raw_symbol_rows` byte-compares every symbol, so a
   report 100 % whose bytes differ refuses even when the size matches.
+* **a dtk-generated row name is resolved by ADDRESS, not by name** - `dol split` names a range it
+  cannot attribute `pad_*`/`auto_*` (the TRK interrupt vectors have no function prologue, so the
+  target object carries `pad_00_80004380_init` for the bytes the map calls
+  `gTRKInterruptVectorTable`, and the label cannot win: an extent on it makes `dtk dol split` fail on
+  the overlap). objdiff pairs by name, so such a row is never paired and *no* report can score it -
+  the row is matched to our symbol at the same section+offset and judged by its bytes, which is what
+  it actually claims. Related, and the reason that byte rule is load-bearing rather than decorative:
+  `Object(Matching, ...)` sets `metadata.complete` in `objdiff.json`, and objdiff-cli then reports a
+  unit as complete **without diffing it at all** (measured 2026-09-28: a corrupted `.init` object
+  still reads 100 %), so `report.json`'s score for a Matching unit is a claim the objects must back.
 * **§7 a report number that disagrees with an object diff is a stale report** - `verify_units`'
   symbol-for-symbol comparison of a *fresh* `report generate` against the committed `report.json`.
 * **the merger's regression proof (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md`)** - per-symbol
@@ -332,15 +342,17 @@ def target_drift_problems(before: dict[str, str | None], after: dict[str, str | 
 # 2b/3. the independent per-symbol re-measure
 # --------------------------------------------------------------------------------------------------
 
-def object_symbols(path: str) -> dict[str, tuple[int, bytes]]:
-    """`{symbol_name: (size, bytes)}` for an ELF object - functions and data alike.
+def symbol_locations(path: str) -> dict[str, tuple[str, int, int, bytes]]:
+    """`{symbol_name: (section, offset, size, bytes)}` for an ELF object - functions and data alike.
 
-    The raw side of the comparison: it never touches objdiff or the report. A duplicate name keeps the
-    first definition (the map can carry aliases); a symbol the object does not define (section index
-    0) is skipped.
+    The raw side of the comparison: it never touches objdiff or the report. The **section and offset**
+    are what let a symbol be found by ADDRESS rather than by name (`raw_symbol_rows`), which a
+    dtk-generated name makes necessary. A duplicate name keeps the first definition (the map can carry
+    aliases); a symbol the object does not define (section index 0, or an absolute/section index) is
+    skipped.
     """
     secs, syms = unitutil.read_elf(path)
-    out: dict[str, tuple[int, bytes]] = {}
+    out: dict[str, tuple[str, int, int, bytes]] = {}
     for name, val, size, _typ, shndx in syms:
         if name in out:
             continue
@@ -348,23 +360,66 @@ def object_symbols(path: str) -> dict[str, tuple[int, bytes]]:
             sec = secs[shndx]
         except (IndexError, TypeError):
             continue
-        out[name] = (size, bytes(sec["data"][val:val + size]))
+        out[name] = (sec["sname"], val, size, bytes(sec["data"][val:val + size]))
     return out
 
 
+def object_symbols(path: str) -> dict[str, tuple[int, bytes]]:
+    """`{symbol_name: (size, bytes)}` for an ELF object - `symbol_locations` with the location dropped."""
+    return {n: (size, data) for n, (_sec, _off, size, data) in symbol_locations(path).items()}
+
+
+def _same_place(locations: dict[str, tuple[str, int, int, bytes]],
+                section: str, offset: int) -> list[tuple[str, int, bytes]]:
+    """Candidate symbols that start exactly at `(section, offset)`, best first.
+
+    Best first = the extent that can actually be compared: a symbol with no bytes (a section symbol,
+    or a sizeless map label like the `gTRKInterruptVectorTable` that sits at the same offset as the
+    `pad_` symbol dtk generated for it) is never chosen while a real one is available, and the caller
+    pulls the equal-size symbol forward before falling back to a differently-shaped one.
+    """
+    return [(n, size, data) for n, (sec, off, size, data) in locations.items()
+            if sec == section and off == offset and size > 0]
+
+
 def raw_symbol_rows(target_obj: str, candidate_obj: str) -> dict[str, dict]:
-    """Per symbol: both sizes, both presences, and whether the bytes are identical."""
-    t = object_symbols(target_obj)
-    c = object_symbols(candidate_obj)
+    """Per symbol: both sizes, both presences, whether the bytes are identical, and how ours was found.
+
+    A row is keyed by the **target object's** symbol name, because that is the name objdiff lists and
+    the name `report.json` is quoted by. For a range dtk cannot attribute, that name is dtk's own
+    generated one: the analyzer finds no function prologue in the TRK interrupt vectors, so its target
+    object carries `pad_00_80004380_init` for bytes the map names `gTRKInterruptVectorTable` (and the
+    map label cannot win - giving it an extent makes `dtk dol split` fail on the overlap). objdiff
+    pairs by name, so such a row can never pair, and a name-keyed byte comparison reads our object as
+    not defining the symbol at all - which is how a byte-identical claim measured as a refusal
+    (2026-09-28, `worker/trk-init-vectors-2226`).
+
+    So when the name lookup misses, the candidate symbol starting at the **same section and offset**
+    stands in and `resolved_by` says `"address"`. `identical` stays the strict test it always was -
+    equal sizes and equal bytes - so a symbol that resolves by address but is truncated, mis-sized or
+    different still refuses; `symbol_problems` is what decides how far the resolution is trusted.
+    """
+    t = symbol_locations(target_obj)
+    c = symbol_locations(candidate_obj)
     rows: dict[str, dict] = {}
     for name in set(t) | set(c):
         te, ce = t.get(name), c.get(name)
+        resolved_by = "name" if ce is not None else None
+        candidate_name = name if ce is not None else None
+        if ce is None and te is not None:
+            found = _same_place(c, te[0], te[1])
+            found.sort(key=lambda e: (e[1] != te[2], e[1]))   # the equal-size symbol first
+            if found:
+                candidate_name, cand_size, cand_data = found[0]
+                ce, resolved_by = (te[0], te[1], cand_size, cand_data), "address"
         rows[name] = {
-            "target_size": te[0] if te else None,
-            "candidate_size": ce[0] if ce else None,
+            "target_size": te[2] if te else None,
+            "candidate_size": ce[2] if ce else None,
             "in_target": te is not None,
             "in_candidate": ce is not None,
-            "identical": bool(te and ce and te[0] == ce[0] and te[1] == ce[1]),
+            "identical": bool(te and ce and te[2] == ce[2] and te[3] == ce[3]),
+            "candidate_name": candidate_name,
+            "resolved_by": resolved_by,
         }
     return rows
 
@@ -472,6 +527,18 @@ def symbol_problems(rep_funcs: dict[str, dict], fresh: dict[str, dict],
 
     Advisory: bytes identical but the report scores below 100 % - a byte-identical symbol should
     close, so this is surfaced but not refused (objdiff's own normalisation is the arbiter).
+
+    **A row that resolved by ADDRESS is compared by its bytes, not by its score** (`raw_symbol_rows`):
+    objdiff pairs by name, so a row dtk named itself (`pad_*`/`auto_*`) can never pair with our
+    object's symbol and *no* `report generate` - the project's own or a fresh one - can score it; the
+    two reports therefore disagree by construction, which is not evidence about the objects. What the
+    row actually claims is "our object carries the target's bytes at that address", and that is the
+    byte rule carried out unchanged below (a 100 % row that is not byte-identical still refuses). Note
+    that this is the *load-bearing* rule for such a row: `Object(Matching, ...)` sets
+    `metadata.complete` in `objdiff.json`, and objdiff-cli then reports a unit complete without
+    diffing it at all (measured 2026-09-28: a deliberately corrupted `.init` still reads 100 %), so
+    `report.json`'s score for a Matching unit is a claim the objects have to back, never a
+    measurement.
     """
     hard: list[str] = []
     soft: list[str] = []
@@ -479,7 +546,11 @@ def symbol_problems(rep_funcs: dict[str, dict], fresh: dict[str, dict],
         r = rep_funcs.get(name)
         f = fresh.get(name)
         rs, fs = _score(r), _score(f)
+        row = raw.get(name)
+        by_address = bool(row and row.get("resolved_by") == "address")
         if (r is None) != (f is None):
+            # which symbols a report lists is never address-resolved: a row only one side knows is a
+            # rename or a stale generation, whatever the row resolved its bytes through.
             if r is None and f is not None and not (raw.get(name) or {}).get("in_target"):
                 # our object defines a symbol the target does not - not a report disagreement, just a
                 # candidate-only helper; surfaced, never a refusal.
@@ -490,7 +561,7 @@ def symbol_problems(rep_funcs: dict[str, dict], fresh: dict[str, dict],
                 # reproducible from the objects (a rename, or a stale generation).
                 which = "report.json" if r is not None else "a fresh `report generate`"
                 hard.append("%s: %s lists it but the other report does not pair it" % (name, which))
-        elif r is not None and f is not None:
+        elif r is not None and f is not None and not by_address:
             if (rs is None) != (fs is None):
                 scored = "report.json" if rs is not None else "a fresh `report generate`"
                 hard.append("%s: %s scores it but the other report reads it as 0%% (no "
@@ -498,15 +569,19 @@ def symbol_problems(rep_funcs: dict[str, dict], fresh: dict[str, dict],
             elif rs is not None and fs is not None and abs(rs - fs) > ARITH_TOL:
                 hard.append("%s: report.json %.2f vs fresh `report generate` %.2f - the report is "
                             "not reproducible from the objects" % (name, rs, fs))
-        row = raw.get(name)
         if row is not None and r is not None and rs is not None:
+            # an address-resolved row names the symbol our object actually carries, so a refusal says
+            # which two things were compared (dtk's own name never exists on our side).
+            ours = name if row.get("resolved_by") != "address" else "%s at the same address" % (
+                row.get("candidate_name"),)
             if rs >= 100.0 - 1e-6:
                 if row["target_size"] != row["candidate_size"]:
-                    hard.append("%s: report scores 100 but the sizes differ (target %s, ours %s)"
-                                % (name, row["target_size"], row["candidate_size"]))
+                    hard.append("%s: report scores 100 but the sizes differ (target %s, ours %s [%s])"
+                                % (name, row["target_size"], row["candidate_size"], ours))
                 elif not row["identical"]:
-                    hard.append("%s: report scores 100 but the %s code bytes are not identical"
-                                % (name, row["target_size"]))
+                    hard.append("%s: report scores 100 but the %s code bytes this unit claims are not "
+                                "identical to the target's [%s]"
+                                % (name, row["target_size"], ours))
             elif row["identical"]:
                 soft.append("%s: bytes are identical but the report scores only %.2f" % (name, rs))
     return hard, soft
