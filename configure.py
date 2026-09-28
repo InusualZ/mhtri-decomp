@@ -1716,6 +1716,8 @@ config.libs = [
         "progress_category": "sdk",
         "host": False,
         "objects": [
+            Object(Matching, "Runtime.PPCEABI.H/TRK_interrupt_vectors.c"),
+            Object(Matching, "Runtime.PPCEABI.H/TRK_interrupt_vector_stubs.c"),
             Object(Matching, "Runtime.PPCEABI.H/__start.c"),
             Object(Matching, "Runtime.PPCEABI.H/__ppc_eabi_init.cpp"),
         ],
