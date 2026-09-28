@@ -170,13 +170,38 @@ in the body when the fix is not obvious. One commit for the fix, on the branch.
     Anything you deliberately did not do, and any residual you recorded in the unit header.
 
 
-## Asking the orchestrator (`contact_supervisor`)
+## Asking the orchestrator (`contact_supervisor`) - and the claim-amendment protocol
 
-You can make a **blocking request to the orchestrator** with the `contact_supervisor` tool, and it is answered with a
-decision - it is exempt from the per-tool timeout, so a long tool call cannot kill it. Use it **when the decision is
-not yours**: a scope change (a symbol or a file outside your unit), a missing data claim you cannot take, an
-ambiguous name whose evidence you cannot settle, or a conflict between your brief and what the binary shows. Say
-what you need decided in one line, give the option you would take, and the smallest next step - then stop and wait
-rather than guessing. Do **not** ask routinely: a round trip costs the lane more than the answer usually saves, so
-ask only where a wrong guess would waste a whole unit-run. If the channel is unavailable, put the blocking decision
-in your final report instead of guessing silently.
+You can make a **blocking request to the orchestrator** with `contact_supervisor`; it is answered with a decision, is
+exempt from the per-tool timeout, and it is the correct channel for anything the orchestrator owns rather than you. Ask
+**only when the decision is not yours** (below), and ask in the shape that makes the answer one message:
+
+1. **The proposal in the artefact's own format.** A range claim is the exact `splits.txt` lines (tab-indented,
+   `start:`/`end:`), not a description of them; a name is the map row as it would read.
+2. **The evidence as command + output** - the relocation or instruction that proves the extent, `objdump -t` showing the
+   words are one object, the neighbouring claims that bound the range. Addresses and sizes, never adjectives.
+3. **What it changes**: which rows the amendment unblocks and their sizes; what else it drags in (a claim pulls in the
+   symbols inside its range, and rule 2 inverts - a band declaration of a range you now own must move into your own
+   header); and what it will **not** unblock, so no estimate reads as a promise.
+4. **The options, and which you would take** - including the narrower one - plus what you have **not** touched and will
+   not until ruled.
+5. **The decision as one question.**
+
+Then **stop and wait**. Apply exactly what is ruled and no more; if the ruling is narrower than your evidence supports say
+so in your report rather than silently accepting it or silently widening it. Afterwards re-measure, report before/after per
+row, and state whether any score moved - a silent move is a refusal.
+
+**Take claims in increments.** One verified claim that lands beats three argued in one commit: if the full extent needs a
+`.data` claim whose cost is unmeasured (playbook 23 can drop the target's `R_PPC_NONE` pool relocations), take the
+`.sbss`/`.bss` part now and leave the rest as its own measured step.
+
+**Do not ask** for what you can settle yourself: a peer's row you do not own, a name you can derive and mark as a guess
+(row 76), a lever you can measure in your own tree. A round trip costs a lane more than the answer usually saves, so spend
+it only where a wrong guess would waste a whole unit-run.
+
+**Your refusal is a closed list: clear exactly what it lists.** If a finding cannot be cleared without something the
+refusal does not authorise - a claim amendment, a declaration in a header you do not own, a rename inside another unit's
+range, a `splits.txt` edit - ask first with the ruling request above rather than widening scope on your own judgement. Do
+not silently drop the finding either: if you do not ask, report it as blocked, with the reason and the smallest change that
+would clear it. A fix that also satisfies an out-of-scope improvement is not the same as a scope widening, provided the
+refusal's own row is what you were asked to clear.
