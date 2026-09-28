@@ -211,6 +211,11 @@ from units import verifyunit as vu  # noqa: E402
 # `self->vtable = &NetworkSessionManagerVTable;` writes survived a landing through it (2026-09-27). The
 # gate row below is that habit, as a check.
 from units import vtableaudit as vta  # noqa: E402
+# `undefrefs` owns the relocation-name row: a `bl`/pointer under a *different relocation name* scores the
+# same, so a 100 % row can call a symbol no link input defines and no score-reading gate can see it
+# (`quest/arenatask`'s wrong struct tag, `hud/cockpit_quest`'s C-linkage spelling). The row is the
+# actionable half - does our object relocate a name nothing can provide - not a relocation diff.
+from units import undefrefs as uref  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
@@ -2360,6 +2365,19 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         check("every batch unit compiles (compile gate)", ok_compile, compile_detail,
               remedy="make the batch unit's source compile (`ninja -k 0` names the error above); "
                      "`ninja build/RMHE08/ok` cannot see this because a `NonMatching` unit is never linked")
+        # the relocation-name row (2026-09-28): the object is built, so its relocations can be read. A
+        # different relocation *name* scores the same, so refuse a unit that calls a symbol no link input
+        # defines - the flip would answer `undefined: '<name>'` even at 100 %. Cheap: the batch's own
+        # objects plus a cached link-symbol index (`undefrefs.link_symbol_index`), built only when a
+        # candidate name exists.
+        undefined = uref.check_units(main, unit_units)
+        check("every batch unit's relocations resolve against the link", not undefined,
+              "; ".join(undefined[:4]),
+              info=("no batch unit relocates a name the link cannot provide" if not undefined else ""),
+              remedy="our object relocates a name no `symbols.txt` row and no other link input defines, so "
+                     "a flip would answer `undefined: '<name>'` even when the row reads 100 %. The refusal "
+                     "names the target's own spelling where it records a different one - match that "
+                     "spelling and its map row; `python tools/units/undefrefs.py <unit>` prints the detail")
     built = gate("ninja", ["ninja"]) and built
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
     # rule 10 (vtable ownership), the row: a table of code pointers inside a unit's own ranges must be
