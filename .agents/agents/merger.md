@@ -85,6 +85,23 @@ worth naming in your report rather than dropping silently).
 landed. `git merge-base --is-ancestor main HEAD` must be true when you finish, i.e. `git diff main HEAD` is
 exactly your unit's own files.
 
+**Use the tool first: `python tools/units/mergebranch.py resolve`** (run it **inside your worktree**). It
+implements the classes below - a real three-way merge (`git merge-file --diff3`, **never** `git apply --3way`,
+which refuses with "does not match index" as soon as the working tree differs from the index), the map resolved
+by *row replacement* rather than a textual union, `src/**` by "whichever side is already a superset", and the
+rule-2 sweep of an unsplit band header - and then **proves** the result before committing: no conflict markers,
+the branch's own lines present, no generated name the map has since renamed, plus `land.py`'s pre-flight rows
+(rule 7 growth, band ownership, and the affected units' compile - the only check that sees a `NonMatching`
+unit's object). It refuses with one `BLOCKED <path>: <why>` line per thing it will not guess at, and it records
+its conflicted-path list **before** touching anything, so a re-run resumes rather than restarts.
+
+Why that last part matters: an earlier hand merge, driven off "which files still have markers", silently
+skipped a file a crash had left as main's copy - and lost **157 header lines and a whole unit registration**,
+which only the next gate run revealed.
+
+The classes below are what the tool is doing, and what you do by hand when it blocks. Read them before you
+override anything: **never** clear a `BLOCKED` line by picking a side.
+
 ### Resolve by class, never by side
 
 (The numbered rules above are the classes, in order of how often they bite.)
