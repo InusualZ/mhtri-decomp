@@ -109,7 +109,7 @@ extern u16 lbl_805D43A0[0x7C];
 extern u16 lbl_805D44EC[0x2A];
 extern u8 lb_param_w[];            /* .bss:0x806BF838, the lobby/option parameter block */
 
-s32 fn_803AB028(void);
+s32 quest_move_state_valid_ck(void);
 f32 fn_80050EAC(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 fn_80050EF4(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
@@ -129,7 +129,7 @@ void fn_802D2A00(struct _AINPC_W* self, s32 a, s32 b, s32 c);
  * the distance test. */
 void fn_802D6534(void)
 {
-    if (fn_803AB028() == 0) {
+    if (quest_move_state_valid_ck() == 0) {
         return;
     }
     if (lbl_806BD360.active == 0) {

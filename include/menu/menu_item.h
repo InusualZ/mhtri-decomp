@@ -321,7 +321,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *   * `ef/fn_800CDB2C.cpp`'s header declares `fn_800CF208` as `u8`, while the retail caller keeps a
  *     `clrlwi` on the widened form (the per-consumer-view split `include/Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
- *   * the rest (`fn_803AAEC0`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
+ *   * the rest (`quest_select_ready_ck`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
  *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) sit in no
  *     registered range - rule 2's unsplit case.
  *
@@ -416,7 +416,7 @@ void fn_8004082C(void);
 u8 fn_800CF208(void);
 u32 move_work_state_ck(void);
 u32 game_ready_ck(void);
-u32 fn_803AAEC0(void);
+u32 quest_select_ready_ck(void);
 u32 fn_802FBA60(void);
 void fn_8031A638(MenuSlot* slot);
 void fn_802DA2D4(s32 flag);

@@ -371,12 +371,12 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             if (mode == 1) {
                 return;
             }
-            if (fn_803AAF88() == 1) {
+            if (quest_id_head_ck() == 1) {
                 flag = 1;
             }
             break;
         case 1:
-            if (fn_803AAFE0() == 1) {
+            if (quest_id_tail_ck() == 1) {
                 flag = 1;
             }
             break;

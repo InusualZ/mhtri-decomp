@@ -121,12 +121,76 @@
  *   * `quest_item_pair_tbl_copy`'s own shape is that same lever one level down: its counter's `li` is
  *     emitted first while MWCC colours locals in declaration order, so `a`/`b` are declared (empty)
  *     before `i` and assigned after it.
+ *
+ * THE STATE-PROBE PASS wrote nine bodies and the fix-up pass took the tenth: 14.14 -> 17.34 %, code
+ * 1848 -> 2724 B, 16 -> 25 functions at 100 %.
+ *   * `quest_move_state_valid_ck` (0x803AB028, 72 B, 100 %) was WRONG when that pass landed it, and the
+ *     residual it recorded misread the target: `lbz r0,0x22d4(r3)` + `rlwinm r3,r0,0,24,24` has
+ *     MB=ME=24, which selects bit 24 of the loaded value - the mask is **0x00000080**, not a widening
+ *     of the byte - so the body is `(state_0x22D4 & 0x80) != 0`, and `neg`/`or`/`srwi 31` booleanizes
+ *     the MASKED value.  The twelve spellings the old residual listed were all `!= 0`-shaped, and a
+ *     plain nonzero test folds to a direct `lbz`, so none of them could ever reach the mask - the
+ *     shape was never missing, the question was the wrong one.  The bit's meaning is corroborated: the
+ *     sibling `quest_move_state_get` masks the SAME byte with `0x7F`, and `fn_803B849C`/`fn_803AEED0`
+ *     read bit 7 and then hand the low seven bits to `fn_800EF270` - bit 7 is "a state code follows",
+ *     the low seven bits are the code.  Peephole ON is enough - no pragma: with the mask in the source
+ *     the pair stays `rlwinm` + `srwi` and the row is byte-identical to the target.
+ *   * SHAPES that were load-bearing here (each one was the difference between 74-82 % and 100 %):
+ *     `quest_item_work_merge`'s `item_value_0x10E` must be **`s16`** - a `u16` member masks the stored
+ *     `s16` into `clrlwi`+`sth` where the target stores it raw; `quest_select_ready_ck` wants the two
+ *     option-block tests joined by `&&` inside one `if` (an `if (...) return 0;` chain is if-converted
+ *     into a boolean AND); `quest_work_busy_ck` wants three flat `if (...) return 1;` arms with the
+ *     LAST arm written `if (record != 0) return ...;  return 1;` (a nested `if` collapses all three
+ *     into one shared return block); `quest_id_head_ck`/`_tail_ck` compare `(u16)(quest_id_get() +
+ *     0xFFFF)` (a `- 1` spelling loses the `addis`, and the comparison constant is `<= 2` / `> 3`, not
+ *     the `< 2` / `< 3` the ranges suggest); `quest_element_find` wants `i` declared BEFORE the element
+ *     pointer (register colouring, playbook 63) and both sides of the id test cast to `u32` for the
+ *     target's `cmplw`.
+ *   * RENAMES this pass made, each with its referrer half swept in the same change (all were map rows
+ *     whose owners are other registered units, so the sweep is the rename's other half - rule 7 has no
+ *     deferral): `fn_803A8D4C` -> `quest_id_get` (owner `lobby/lb_quest_screen.cpp`; its declaration
+ *     now sits in that unit's own header, swept in `src/enemy/fn_80176C58.cpp`), `fn_80125F9C` ->
+ *     `enemy_kind_same_ck` (owner `enemy/fn_801251D0.cpp`, 2 sites in its own source + header), and
+ *     this unit's own `fn_803AAB80`/`fn_803AB028`/`fn_803AB070`/`fn_803AAEC0`/`fn_803AAF3C`/
+ *     `fn_803AAF88`/`fn_803AAFE0`/`fn_803ADF84` (their 22 reference sites across `ai`, `ef`, `menu`,
+ *     `stage`, `enemy` were swept with the map edit).  The fix-up pass renamed `quest_move_state_ck`
+ *     -> `quest_move_state_valid_ck`: the old name came from the wrong `!= 0` body, and the map row
+ *     plus its 11 code sites in `ai`/`menu` and this unit moved together.
+ *
+ * FILED, not half-done (each is a cross-unit sweep this lane did not take on):
+ *   * `fn_8042CB9C` (`fn_80429B94.cpp`) - **43 reference sites in 16 files + 5 headers**.  It blocks
+ *     `fn_803AB0FC` (0x803AB0FC) and, through it, the whole entry/loader group.
+ *   * `fn_80125F54` (21 sites/9 files), `fn_80137604` (13/11), `fn_80141B88` (11/6), `fn_80272E30`
+ *     (29/14) - these block `fn_803AE030` (0x803AE030, 1012 B), `fn_803AE424` (0x803AE424, 1296 B)
+ *     and `fn_803AAC0C` (0x803AAC0C, 624 B).
+ *   * `fn_803AA060` (`lobby/lb_quest_screen.cpp`, 3 sites in 2 files) - blocks
+ *     `quest_item_work_notify` (0x803AB190, 96 B).
+ *   * the unowned `.data` span 0x805F7AB0..0x805F7B78 (200 B): only its FIRST run
+ *     `0x805F7AB0..0x805F7AF8` (72 B - `lbl_805F7AB0`/`_AC0`/`_AD8`/`_AE8`) has in-unit referrers
+ *     only (`fn_803AB914`, `fn_803ABB74`, `fn_803ABCDC`, `fn_803ABE44`, `quest_monster_setup`), so
+ *     that run is this unit's to claim and a PARTIAL pass on it IS possible: 5 bodies = 3868 B, whose
+ *     real extra cost is rule 7 - those four `lbl_` rows must be NAMED in the same change.  The 88 B
+ *     between the runs is NOT this unit's: `arena_time_table` (0x805F7AF8, 0x30) and
+ *     `multi_arena_clr_time` (0x805F7B28, 0x28) are read by three other units
+ *     (`menu/menu_result.cpp` 1 site, `menu/arena_result.cpp` 2 + 2, `quest/arenatask.cpp` 1), so the
+ *     SECOND run `0x805F7B50..0x805F7B78` (40 B - `fn_803AEED0`'s two 0x14 blocks) is what drags the
+ *     gap in with it: playbook 53 owns the bytes between two claimed runs of one section, which is
+ *     the whole 200 B span's real reason, and it means those two tables get named too.  `fn_803AC6B0`
+ *     references NONE of the span (its data relocations are this unit's own `quest_item_pair_tbl_a..d`
+ *     plus `em_hokaku_rem_l/h`), so the blocked total is **5376 B, not 7008 B**: the full span
+ *     unblocks `fn_803ABE44` 2156 + `fn_803AEED0` 1508 + `fn_803AB914` 608 + `fn_803ABB74` 360 +
+ *     `fn_803ABCDC` 360 + `quest_monster_setup` 384, and the first run alone 3868 of them.
+ *   * `lbl_805F76A0` (`quest_pair_apply`, `fn_803AE030`, `menu/arena_result.cpp`,
+ *     `enemy/enemy_control.cpp`) - already filed by the previous pass, unchanged.
  */
 
 #include "quest/quest_entry.h"
 #include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/fn_800CDB2C.cpp (rule 2) */
 #include "unsplit/menu.h"       /* `quest_work_ptr` - the band data no registered unit claims */
+#include "unsplit/lobby.h"      /* `lb_param_w` - the option block no registered unit claims */
+#include "unsplit/unknown.h"    /* `system_w` - the system block no registered unit claims */
 #include "enemy/em_pop.h"       /* `quest_flag_*_ck` - owned by enemy/em_pop.cpp (rule 2) */
+#include "enemy/fn_801251D0.h"  /* `enemy_kind_same_ck` - owned by enemy/fn_801251D0.cpp (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset (owner: the Runtime.PPCEABI.H lib) */
 
 /* The band's quest-work pointer in this unit's own view of the record.  `quest_work_ptr` itself is
@@ -201,6 +265,27 @@ s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count) {
     return result;
 }
 
+/* Records the item a caller hands over in the local slot's move work, then merges it into the item
+ * work's own five-slot list with the negated value (the callers pass -1, so the merge adds one).
+ * `owner` is the player work record `src/enemy/fn_801B0010.cpp` passes and the target never reads. */
+void quest_item_work_merge(_PLW* owner, u16 id, s16 value) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    Q_ItemWork* item;
+
+    if (work == NULL) {
+        return;
+    }
+    work->item_id_0x10C = id;
+    work->item_value_0x10E = value;
+    work->item_flag_0x110 = 1;
+    item = work->item_work;
+    if (item == NULL) {
+        return;
+    }
+    quest_item_slot_add(item->slots_0x40, &item->rot_0x54, id, (s16)-value);
+    item->flag_0x55 = 1;
+}
+
 /* ---- the picked-pair table copy (0x803AB3BC) ---- */
 
 /* Copies both of the band's first two picked-pair tables into a result record's own two adjacent
@@ -221,6 +306,71 @@ void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b) {
 }
 
 /* ---- the band's small state getters ---- */
+
+/* The current quest id when it is a low-table key (below 0x64), and 0 otherwise. */
+u32 quest_id_low_get(void) {
+    u32 id = quest_id_get();
+
+    return quest_item_id_low_ck((u16)id) == 1 ? (u8)id : 0;
+}
+
+/* Whether the current quest id is one of the three at the head of the low list, and the local slot has
+ * a quest selected at all (`(u16)(id + 0xFFFF) <= 2`, i.e. id is 1, 2 or 3). */
+u32 quest_id_head_ck(void) {
+    if (quest_select_ready_ck() == 0) {
+        return 0;
+    }
+    return (u16)(quest_id_get() + 0xFFFF) <= 2;
+}
+
+/* The complementary probe for a slot whose move work is not yet in its quest state: the current quest
+ * id is past the head of the low list (`(u16)(id + 0xFFFF) > 3`, i.e. id is 5 or above). */
+u32 quest_id_tail_ck(void) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    return (u16)(quest_id_get() + 0xFFFF) > 3;
+}
+
+/* Whether the local slot's move work carries a state: bit 7 of the +0x22D4 byte (`rlwinm` MB=ME=24
+ * selects 0x00000080).  `fn_803B849C`/`fn_803AEED0` read the same bit before handing the low seven
+ * bits to `fn_800EF270`, so it is the "there is a state code here" flag, not a mere nonzero test. */
+u32 quest_move_state_valid_ck(void) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+
+    if (work == NULL) {
+        return 0;
+    }
+    return (work->state_0x22D4 & 0x80) != 0;
+}
+
+/* The state code itself: the low seven bits of that same byte, or 0xFF when the slot has no move work
+ * or no state. */
+u32 quest_move_state_get(void) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    u8 state;
+
+    if (work == NULL) {
+        return 0xFF;
+    }
+    state = work->state_0x22D4;
+    if (state == 0) {
+        return 0xFF;
+    }
+    return state & 0x7F;
+}
+
+/* Whether the local slot has a quest selected: the player's move work must be live and the option
+ * block must carry both the selected flag and a nonzero quest id. */
+u32 quest_select_ready_ck(void) {
+    if (move_work_state_ck() != 1) {
+        return 0;
+    }
+    if (lb_param_w.flag_0x0b == 1 && lb_param_w.field_0x00 != 0) {
+        return 1;
+    }
+    return 0;
+}
 
 /* Whether the local slot's move work has its +0x22DC flag byte set. */
 u32 quest_move_flag_ck(void) {
@@ -272,6 +422,43 @@ u32 quest_item_work_flag_ck(void) {
         return 0;
     }
     return (s8)item->count_0x6A2A != 0;
+}
+
+/* The index of the quest-work element `kind` names: the first of the three whose +0x00 gate bit is set
+ * and whose +0x04 id either equals `kind` or maps to the same enemy kind, or -1 when none does. */
+s32 quest_element_find(u8 kind) {
+    s32 i;
+    QuestElement* e = quest_work.elements_0x0094;
+
+    if (e == NULL) {
+        return -1;
+    }
+    for (i = 0; i < 3; i++, e++) {
+        if (e->flags & 1) {
+            if ((u32)e->id == (u32)kind) {
+                return i;
+            }
+            if (enemy_kind_same_ck((u8)e->id, kind) == 1) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+/* Whether the quest work is busy: either of the system block's two pre-quest flags, or a live work
+ * whose record is missing or whose +0x2E8 counter is set. */
+u32 quest_work_busy_ck(void) {
+    if (system_w.field_0x7d2 == 1) {
+        return 1;
+    }
+    if (system_w.field_0x7d1 == 1) {
+        return 1;
+    }
+    if (quest_work_ptr->record_0x03C != 0) {
+        return quest_work_ptr->field_0x2E8 > 0;
+    }
+    return 1;
 }
 
 /* Whether the local slot's sub-state byte is the entry pair (6 or 7), or 4. */

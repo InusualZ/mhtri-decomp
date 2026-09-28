@@ -109,7 +109,7 @@ extern "C" u8 fn_80125F88(u32 idx)
     return lbl_805A1ADC[(u8)idx];
 }
 
-extern "C" u32 fn_80125F9C(u32 a, u32 b)
+extern "C" u32 enemy_kind_same_ck(u32 a, u32 b)
 {
     return fn_80125F88((u8)a) == fn_80125F88((u8)b);
 }

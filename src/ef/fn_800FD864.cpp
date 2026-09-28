@@ -16,7 +16,7 @@
  * (`fn_800FF8D4`, `fn_800FFC98`, `fn_800FFCA8`).
  *
  * Language.  The unit's own symbols (`fn_800FD864`, `fn_800FE8E8`, `fn_800FE93C`) and the plain helpers
- * (`fn_800F8788`, `fn_800F886C`, `fn_800F9DF4`, `fn_803AAF88`) are plain, unmangled names, so those carry
+ * (`fn_800F8788`, `fn_800F886C`, `fn_800F9DF4`, `quest_id_head_ck`) are plain, unmangled names, so those carry
  * C linkage.  The mangled callees (`get_now_mapno__Fv` / `get_now_areano__Fv` / the
  * `push_eft_effect_heap_num(nw4r::ef::Effect**, long)` the map spells with an argument list) are declared
  * with their real C++ signatures and called through them (rule 9); the file is a `.cpp` for that reason,
@@ -107,7 +107,7 @@ struct _EFT_MAP_WORK {
  * documented rule-2 gap the shared band header leaves. */
 extern "C" void* fn_800F8788(u32 work_size);
 extern "C" void fn_800F886C(void* self);
-extern "C" u8 fn_803AAF88(void);
+extern "C" u8 quest_id_head_ck(void);
 
 /* The mangled callees, called through their real signatures (rule 9). */
 u8 get_now_mapno();
@@ -150,7 +150,7 @@ switch (mapno) {
         switch (areano) {
             case 0:
                 self->type_0x02 = 0;
-                if (fn_803AAF88() == 1) {
+                if (quest_id_head_ck() == 1) {
                     a = 0x3E;
                     b = 7;
                 } else {
@@ -647,7 +647,7 @@ switch (mapno) {
         switch (areano) {
             case 0:
                 self->type_0x02 = 0;
-                if (fn_803AAF88() == 1) {
+                if (quest_id_head_ck() == 1) {
                     a = 1768;
                     b = 7;
                 } else {

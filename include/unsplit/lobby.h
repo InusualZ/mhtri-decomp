@@ -234,7 +234,8 @@ typedef struct LbParamWork {
     /* +0x00 */ u16 field_0x00;
     /* +0x02 */ u8 pad_0x02[2];
     /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[4];
+    /* +0x08 */ u8 pad_0x08[3];
+    /* +0x0B */ u8 flag_0x0b;      /* == 1 with +0x00 set is `quest_select_ready_ck` */
     /* +0x0C */ u8 flag_0x0C[3];
     /* +0x0F */ u8 pad_0x0F;
     /* +0x10 */ u16 value_0x10[3];
