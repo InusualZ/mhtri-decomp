@@ -73,7 +73,7 @@
  *   * 7885C: `(s16)fn_802753E4(...)` - retail's `mr r0,r3; mr r3,self; extsh r4,r0` says the shared helper
  *     returns `s16`, but changing that declaration would disturb 789EC/78D1C, so the cast stays and each of
  *     the five call sites costs one row.
- *   * B358/C89C-family: `fn_803B6150`/`fn_802731B4`/`fn_803B31E0` take/return `s32` (not `s16`/`s8`) - the
+ *   * B358/C89C-family: `quest_element_remaining_get`/`fn_802731B4`/`fn_803B31E0` take/return `s32` (not `s16`/`s8`) - the
  *     missing `extsb` at the call site is the tell; and an `s8` field assigned from an `s32` local needs the
  *     field typed `s8` so `stb` keeps retail's `extsb`.
  *   * `int -> s16`/`s8` store conversion (A044, CA48, 76CE8, 76E08): retail stores the *raw* int sum
@@ -2131,7 +2131,7 @@ extern "C" void fn_8027B918(_PLW* self)
 extern "C" s32 fn_802731B4(_PLW*, u16);
 extern "C" s32 fn_803B31E0(s8);
 extern "C" void fn_803B6078(u16, u16*);
-extern "C" s32 fn_803B6150(u16);
+extern "C" s32 quest_element_remaining_get(u16);
 extern "C" void fn_803B2C60(_PLW*, u16, s8);
 
 /* 0x8027B358: steps the shell-selection state machine - the clutch index the move work stores plus the
@@ -2159,7 +2159,7 @@ extern "C" void fn_8027B358(_PLW* self)
         return;
     }
     fn_803B6078((u16)*(s8*)(q + 0x68C), &sp8);
-    s32 r28 = fn_803B6150((u16)*(s8*)(q + 0x68C));
+    s32 r28 = quest_element_remaining_get((u16)*(s8*)(q + 0x68C));
     *(u16*)(q + 0x696) = 0;
     switch (*(u8*)((u8*)self + 0x5C0)) {
     case 0:

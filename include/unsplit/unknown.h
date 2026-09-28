@@ -166,7 +166,9 @@ typedef struct SystemWork {
     /* +0x887 */ u8 pad_0x887[0x9];
     /* +0x890 */ u32 field_0x890;
     /* +0x894 */ u32 field_0x894;
-    /* +0x898 */ u8 pad_0x898[0x18];
+    /* +0x898 */ u8 pad_0x898[0x17];
+    /* +0x8AF */ u8 field_0x8af;   /* non-zero selects the second column of `multi_arena_clr_time`
+                                    * in `menu/arena_result.cpp`'s arena time formatter */
     /* +0x8B0 */ u8 vs_mode_0x8b0;  /* non-zero in VS/arena mode: `get_cfg`/`ck_cfg` then read the VS
                                     * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;

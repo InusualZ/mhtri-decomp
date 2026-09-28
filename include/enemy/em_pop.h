@@ -116,13 +116,46 @@ void em_roster_record_copy(EmPopRec* dst, const EmPopRec* src);
 void em_roster_record_unlink(EmPopRec* rec);
 u32 em_roster_record_result_get(const EmPopRec* rec);
 
-/* The quest-condition predicates that live at 0x803B4BEC..0x803B5120 - inside this unit's own range,
- * so this header is their owner's home (rule 2).  Each one takes the result record (NULL selects the
- * work's own through `quest_record_get`) and reports one condition bit of `rec->0x310`; the bits are
- * this header's own reading of the eight call sites, all in the quest board and the result screens.
- * Added with `quest/quest_entry.cpp`, whose entry predicate is the 0x800000 one. */
-struct QuestRecord;
-u32 quest_flag_800000_ck(struct QuestRecord* rec);
+/* The quest/arena accessors that share this unit's registered `.text` range.  `em_pop`'s band
+ * 0x803B465C..0x803BE30C is the discovery `--max-bytes` cap over several bands (its header says so);
+ * the `quest_flag_*_ck` / `quest_arena_*_get` / `quest_element_value_get` accessors at
+ * 0x803B4BEC..0x803B68F0 sit inside it and are the quest/arena UI band's own.  Their callers, from
+ * the target objects' undefined references (2987 objects scanned), are **20**: enemy/em020_prog,
+ * enemy/fn_8011D448, enemy/fn_801251D0, enemy/fn_8012EC74, enemy/fn_8013F764,
+ * lobby/lb_quest_screen, menu/fn_8031EA8C, menu/menu_result, menu/arena_result, quest/quest_entry
+ * and nine unclaimed `auto_*` bands - this file defines none of them and is not among them.  The
+ * declarations live here because the registered range is this unit's (rule 2); the seam re-draw is
+ * filed in both units' residual lists. */
+struct QuestRecord;   /* defined in `unsplit/menu.h` (the arena-result band's record) */
+/* The result record's +0x310 flag word, one test per bit; `rec` 0 means the current record (NULL
+ * selects the work's own through `quest_record_get`).  The bit names are this header's reading of
+ * the call sites, all in the quest board and the result screens; the 0x800000 predicate came in
+ * with `quest/quest_entry.cpp`, whose entry test it is. */
+u32 quest_flag_10_ck(QuestRecord* rec);
+u32 quest_flag_100_ck(QuestRecord* rec);
+u32 quest_flag_100000_ck(QuestRecord* rec);
+u32 quest_flag_80000_ck(QuestRecord* rec);
+u32 quest_flag_800000_ck(QuestRecord* rec);
+u32 quest_flag_2000000_ck(QuestRecord* rec);
+u32 quest_flag_4000000_ck(QuestRecord* rec);
+u32 quest_flag_80000000_ck(QuestRecord* rec);
+u32 quest_flag_10000000_ck(QuestRecord* rec);
+/* The arena element `id`'s stored value; `out` gets it, and the return is 0 when no element
+ * matches (0x803B5F28). */
+s32 quest_element_value_get(u16 id, s16* out);
+/* Element `index`'s stored value when `id` matches its own id, else -1 (0x803B5FF0). */
+s32 quest_element_value_at(u16 id, u16 index);
+/* Element `index`'s stored value, ignoring its id, else -1 (0x803B5F84). */
+s32 quest_element_value_index_get(u16 index);
+/* Element `index`'s value minus the local player's held count, clamped up to 0 (0x803B6150). */
+s32 quest_element_remaining_get(u16 index);
+/* The item `id`'s count over every player slot `system_w`'s player count covers, 0 when no element
+ * carries the id (0x803B61DC). */
+s32 quest_all_player_item_count_sum(u16 id);
+/* How many of arena element `index`'s item the player still holds, and how many are still needed
+ * (-1 when the element is not live). */
+s32 quest_arena_count_get(s32 index);
+s32 quest_arena_need_get(s32 index);
 
 #ifdef __cplusplus
 }

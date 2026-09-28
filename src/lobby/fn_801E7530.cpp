@@ -428,7 +428,7 @@ void fn_801E7EA8(u16 id, const _mh_ivec2_* pos)
 
     data = (LbItemData*)fn_801E6F10(id);
     draw_sprite_ary(&lbl_805B7D18[0], pos);
-    draw_font_idx(0x1DD9U, (s8*)fn_802DFACC((u8)id), 4, pos);
+    draw_font_idx(0x1DD9U, (s8*)str_tbl_33_get((u8)id), 4, pos);
     a = fn_801E6EA8(id, 0);
     b = fn_801E6EA8(id, 1);
     sprintf((char*)buf, (char*)lbl_80791B88, a);
@@ -449,7 +449,7 @@ void fn_801E7FEC(u16 id, const _mh_ivec2_* pos)
 
     data = (LbItemData*)fn_801E6F48(id);
     draw_sprite_ary(&lbl_805B7D38[0], pos);
-    draw_font_idx(0x1DEFU, (s8*)fn_802DFACC((u8)id), 4, pos);
+    draw_font_idx(0x1DEFU, (s8*)str_tbl_33_get((u8)id), 4, pos);
     a = fn_801E6EA8(id, 0);
     sprintf((char*)buf, (char*)lbl_80791B88, a);
     draw_font_idx(0x1DF0U, (s8*)buf, 2, pos);
@@ -615,7 +615,7 @@ void fn_801E843C(LbMenuWork* self)
             pos.y += anchor.y;
             draw_sprite_ary((const u16*)lbl_805B7E0C, &pos);
             draw_monstericon_idx(0x1D59, lbl_805B7A88[id], &pos);
-            draw_font_idx(0x1D5FU, (s8*)fn_802DFACC(lbl_805B7A88[id]), 0, &pos);
+            draw_font_idx(0x1D5FU, (s8*)str_tbl_33_get(lbl_805B7A88[id]), 0, &pos);
             shown++;
         }
         np += 2;
@@ -752,7 +752,7 @@ void fn_801E8CDC(u8 id, s8* str)
 
     get_lsp_data(0x1E36U, &pos);
     draw_sprite_ary((const u16*)lbl_805B7F00, &pos);
-    draw_font_idx(0x1E37U, (s8*)fn_802DFACC(id), 1, &pos);
+    draw_font_idx(0x1E37U, (s8*)str_tbl_33_get(id), 1, &pos);
     draw_font_idx(0x1E38U, str, 0, &pos);
 }
 
@@ -817,7 +817,7 @@ void fn_801E8D5C(LbMenuWork* self)
         {
             s32 color = GetMenuFontColor(1, selected != 0, 1, 0);
 
-            fn_802DFACC(entry->kind_0x00);
+            str_tbl_33_get(entry->kind_0x00);
             fn_80215C98(selected, (s16*)&pos, color, 0xC);
             sprintf((char*)buf, (char*)lbl_80791BC0, entry->id_0x02, LbStr(1, 0x2CU));
             fn_801E6850((s16*)&data, (s16*)get_lsp_data(0x1E62U, NULL));
