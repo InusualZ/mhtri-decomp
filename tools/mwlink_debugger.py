@@ -32,15 +32,35 @@ they are the documented Row 46 mystery, and ``anchors --prove`` (gdb) counts
 the hits on a real link - a breakpoint that never fires is reported as
 *unproven*, not as an anchor.
 
+**The phase table.**  ``phases`` derives the linker's *phase* code the way
+``locate/pass_points.py`` derives the compiler's pass table, but it has to go
+one level further because the phase messages are referenced by resource id:
+the message loader is the `call [LoadStringA]` site whose ``uID`` argument is
+not a constant, its callers are the one-per-message formatters, and the return
+address of ``call <formatter>`` is a phase anchor.  ``phases --prove`` breaks on
+them - and on the loader itself - during a real link, prints the ``(id, text)``
+stream the linker really emits, and reports every anchor that never fired as
+unproven.  That run is also what corrected this tool's catalogue numbering: the
+id is ``(block_name - 1) * 16 + slot`` (50 of 50 observed messages agree).
+
+**Tracing one object.**  ``trace <object>`` answers "how did this unit get
+linked?": whether the link kept it, where each of its sections landed (checked
+by reading the object's bytes back out of the output ELF), how its symbols
+resolved (the map *and* the output ELF's own symbol table), which relocations
+touched it (each one's field decoded out of the artifact and compared with the
+ABI), and where its ctor/dtor fragment went in the linker's fixed class order.
+``trace --link`` runs the build's own link first, into ``build/scratch/``, never
+over ``build/RMHE08/main.elf``.
+
 **Health check.**  ``verify`` clasps the link map against the ELF
 ``elf2dol`` will be run on: section addresses and sizes in ``main.MAP`` must
 *be* the section headers of ``main.elf``.  It classifies first and stays loud:
 a ``FAIL`` names the first section that disagrees, and it is never a formality.
 
-**Ground truth check for a run**: ``run --gdb`` also harnesses the anchors
-proven above - it stops the linker at each derived anchor and prints the
-section name being classified, then reports whether the produced ELF is
-byte-identical to the one ``ninja`` built.
+**Ground truth check for a run**: ``anchors --prove`` and ``phases --prove``
+stop the linker at the derived anchors and report what it was doing there;
+``trace --link`` reports whether the artifact it traced is byte-identical to the
+one ``ninja`` built.
 
 Provenance: no code is copied from ``tools/mwcc-debugger/``.  The PE header /
 section / data-directory / resource parsing here is our own, stdlib-only
@@ -289,16 +309,22 @@ def decode_string_block(pe, rva, size):
 
 
 def message_catalogue(pe):
-    """``{msgid: text}`` for the whole RT_STRING table, ids numbered from 1.
+    """``{msgid: text}`` for the whole RT_STRING table.
 
-    The first block's slot 0 is id 16 (Windows numbers the string table from
-    1, one id per slot); the linker's phase messages sit in ids 38-60, so the
-    offset is 16 per block, which is what ``block_id * 16 + slot`` restores.
+    The id is **the linker's own id**, and it is the one `LoadStringA` is
+    called with: blocks are 16 strings, the first block is named 1 and holds
+    ids 0..15, so ``msgid = (block_name - 1) * 16 + slot``.  That is not a
+    guess: `phases --prove` breaks at the linker's own message loader on a real
+    link and reports the ``(id, string)`` pairs it really asks for, and the
+    ids observed there (27 = ``Linking: '%c'``, 29 = ``Writing: '%c'``,
+    41 = ``Optimizing: '%c'``) are exactly this formula's answer.  An earlier
+    revision of this tool numbered from ``block_name * 16``, i.e. 16 too high -
+    those labels were indices into the table, not the ids the linker uses.
     """
     msgs = {}
     for block_id, rva, size in pe.string_blocks():
         for slot, text in decode_string_block(pe, rva, size):
-            msgs[block_id * 16 + slot] = text
+            msgs[(block_id - 1) * 16 + slot] = text
     return msgs
 
 
@@ -492,11 +518,18 @@ def parse_map(text):
             continue
         srel, size, vaddr, foff = (int(fm.group(i), 16) for i in range(1, 5))
         frag_name = fm.group(6) or ""
+        # The last tab-separated column names the *input file* the row came
+        # from (``__init_cpp_exceptions.o``, ``Linker Generated Symbol File``),
+        # which is what makes the map a per-object trace: it is how a row is
+        # attributed to one input unit at all.
+        source = line.split("\t")[1].strip() if "\t" in line else ""
         block = cur["blocks"][-1]
         if block["start"] is None:
             block["start"] = vaddr
         block["fragments"].append({"name": frag_name, "offset": srel,
-                                   "size": size, "addr": vaddr, "file_off": foff})
+                                   "size": size, "addr": vaddr,
+                                   "file_off": foff, "source": source,
+                                   "flags": int(fm.group(5) or 0)})
         block["extent"] = max(block["extent"], srel + size)
     return out
 
@@ -528,6 +561,30 @@ class Elf:
             name, typ, flags, addr, off, size, link, info, align, entsize = sh(i)
             out.append({"name": nm(name), "type": typ, "addr": addr,
                         "offset": off, "size": size, "flags": flags})
+        return out
+
+    def symbols(self):
+        """``{name: [value, ...]}`` from the output ELF's own symbol table.
+
+        This is the artifact's view of a symbol's address - the second,.
+        independent witness for the map's rows (and where ``_SDA_BASE_``,
+        which the map only prints in its symbol-file listing, comes from).
+        """
+        d, en = self.data, self.end
+        secs = {s["name"]: s for s in self.sections()}
+        st = secs.get(".symtab")
+        strt = secs.get(".strtab")
+        if st is None or strt is None or st["size"] == 0:
+            return {}
+        out = {}
+        for k in range(st["size"] // 16):
+            nameoff, value, size, info, other, shndx = struct.unpack_from(
+                en + "IIIBBH", d, st["offset"] + 16 * k)
+            if not nameoff:
+                continue
+            end = d.find(b"\0", strt["offset"] + nameoff)
+            nm = d[strt["offset"] + nameoff:end].decode("latin-1")
+            out.setdefault(nm, []).append(value)
         return out
 
 
@@ -962,6 +1019,1084 @@ def cmd_verify(args):
 
 
 # ---------------------------------------------------------------------------
+# The input object: what one unit hands the link
+# ---------------------------------------------------------------------------
+#
+# A Metrowerks object is an ELF32 *big-endian* PowerPC relocatable with RELA
+# (addend-carrying) relocation sections.  Nothing here is specific to dtk:
+# the fields read are the ones the linker reads (`sh_name`, `sh_size`,
+# `st_shndx`, `st_value`, `r_offset`, `r_info`, `r_addend`), which is what
+# makes the trace below a description of the *linker's* input rather than of
+# our tooling's view of it.
+
+STB_LOCAL, STB_GLOBAL, STB_WEAK = 0, 1, 2
+STT_NOTYPE, STT_OBJECT, STT_FUNC, STT_SECTION, STT_FILE = 0, 1, 2, 3, 4
+SHN_ABS, SHN_UNDEF = 0xFFF1, 0
+
+# Standard PowerPC ELF relocation numbers.  Only names that are *used* are
+# named; a type this build emits that is not in the standard list stays a
+# number in the output rather than being guessed at.
+PPC_RELOCS = {
+    0: "NONE", 1: "ADDR32", 2: "ADDR24", 3: "ADDR16", 4: "ADDR16_LO",
+    5: "ADDR16_HI", 6: "ADDR16_HA", 7: "ADDR14", 8: "ADDR14_BRTAKEN",
+    9: "ADDR14_BRNTAKEN", 10: "REL24", 11: "REL14", 12: "REL14_BRTAKEN",
+    13: "REL14_BRNTAKEN", 18: "SECTOFF", 19: "SECTOFF_LO", 20: "SECTOFF_HI",
+    21: "SECTOFF_HA", 22: "ADDR30",
+}
+
+
+def reloc_name(t):
+    return PPC_RELOCS.get(t, f"type {t}")
+
+
+class MwObject:
+    """One input object: its sections, symbols and relocations."""
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.data = self.path.read_bytes()
+        d = self.data
+        if d[:4] != b"\x7fELF":
+            raise ValueError(f"{self.path} is not an ELF")
+        if d[4] != 1:
+            raise ValueError(f"{self.path} is not ELF32")
+        if d[5] != 2:
+            raise ValueError(f"{self.path} is not big-endian")
+        self.end = ">"
+        self._load_sections()
+        self._load_symbols()
+        self._load_relocs()
+
+    # ---- sections --------------------------------------------------------
+    def _load_sections(self):
+        d, en = self.data, self.end
+        shoff = struct.unpack_from(en + "I", d, 0x20)[0]
+        shentsize, shnum, shstrndx = struct.unpack_from(en + "HHH", d, 0x2E)
+        self.shentsize, self.shnum = shentsize, shnum
+        rows = [struct.unpack_from(en + "IIIIIIIIII", d, shoff + i * shentsize)
+                for i in range(shnum)]
+        so = rows[shstrndx][4]
+
+        def nm(x):
+            end = d.find(b"\0", so + x)
+            return d[so + x:end].decode("latin-1")
+
+        self.sections = []
+        for i, (name, typ, flags, addr, off, size, link, info, align, entsize) in enumerate(rows):
+            self.sections.append({"index": i, "name": nm(name), "type": typ,
+                                  "flags": flags, "addr": addr, "offset": off,
+                                  "size": size, "link": link, "info": info,
+                                  "align": align, "entsize": entsize,
+                                  "sh_name": name})
+
+    def section(self, name):
+        for s in self.sections:
+            if s["name"] == name:
+                return s
+        return None
+
+    def contents(self, sec):
+        """The section's bytes; empty for a NOBITS section (.bss/.sbss)."""
+        if sec["type"] == 8 or sec["size"] == 0:
+            return b""
+        return self.data[sec["offset"]:sec["offset"] + sec["size"]]
+
+    # ---- symbols ---------------------------------------------------------
+    def _load_symbols(self):
+        d, en = self.data, self.end
+        self.symbols = []
+        st = next((s for s in self.sections if s["type"] == 2), None)  # SHT_SYMTAB
+        if st is None:
+            return
+        strtab = self.sections[st["link"]]
+        for k in range(st["size"] // 16):
+            o = st["offset"] + 16 * k
+            nameoff, value, size, info, other, shndx = struct.unpack_from(
+                en + "IIIBBH", d, o)
+            e = d.find(b"\0", strtab["offset"] + nameoff)
+            name = d[strtab["offset"] + nameoff:e].decode("latin-1")
+            sh = self.sections[shndx] if shndx < len(self.sections) else None
+            self.symbols.append({
+                "index": k, "name": name, "value": value, "size": size,
+                "bind": info >> 4, "type": info & 0xF, "shndx": shndx,
+                "shndx_name": sh["name"] if sh else ("ABS" if shndx == SHN_ABS else "UNDEF"),
+                "shndx_value": sh["addr"] if sh else 0,
+            })
+
+    # ---- relocations -----------------------------------------------------
+    def _load_relocs(self):
+        d, en = self.data, self.end
+        self.relocs = []
+        for s in self.sections:
+            if s["type"] != 4 or not s["size"]:      # SHT_RELA
+                continue
+            symtab = self.sections[s["link"]] if s["link"] < len(self.sections) else None
+            target = self.sections[s["info"]] if s["info"] < len(self.sections) else None
+            for k in range(s["size"] // 12):
+                off, info, add = struct.unpack_from(en + "IIi", d, s["offset"] + 12 * k)
+                sym = info >> 8
+                self.relocs.append({
+                    "section": s["name"],
+                    "target": target["name"] if target else "?",
+                    "target_index": s["info"],
+                    "offset": off, "type": info & 0xFF, "sym_index": sym,
+                    "addend": add,
+                    "sym_name": self.symbols[sym]["name"] if symtab is not None and sym < len(self.symbols) else "?",
+                })
+
+    def ctor_dtor_sections(self):
+        return [s for s in self.sections
+                if s["flags"] & 0x2 and s["size"] and is_ctor_dtor_name(s["name"])]
+
+
+def is_ctor_dtor_name(name):
+    return bool(re.match(r"^\.(ctors|dtors)(\$\w+)?$", name or ""))
+
+
+# The linker validates the C++ runtime's ctor/dtor entry symbols *by name*: an
+# object that defines one of these under a different name aborts the link with
+# the linker's own runtime-version diagnostic.  Derived twice: the names are
+# immediate operands inside the section-name selector at RVA 0x42e15-0x42f80
+# (``push <va>; call <name lookup>``), and the class each one lands in is what
+# the real map shows for the object that defines it.
+RUNTIME_CTOR_SYMBOLS = {
+    "__init_cpp_exceptions_reference": (".ctors", "$10"),
+    "__destroy_global_chain_reference": (".dtors", "$10"),
+    "__fini_cpp_exceptions_reference": (".dtors", "$15"),
+}
+
+
+# ---------------------------------------------------------------------------
+# Relocation verification: did the linker actually apply it?
+# ---------------------------------------------------------------------------
+#
+# The check is a *read-back*: resolve the symbol the relocation names, compute
+# the value the ABI says the field must hold, and compare it with the word that
+# is really in the output ELF at the relocation's place.  A relocation this
+# recognises and that disagrees is a MATCH failure, not a formality.
+
+def reloc_field(reloc_type, word, S, A, P, sda_base=None):
+    """``(checked, expected_field, actual_field, where)`` for one relocation.
+
+    ``S`` is the resolved symbol address, ``A`` the addend, ``P`` the place's
+    address in the output.  ``where`` records which halfword the field was
+    found in, because that is part of the ABI and not something to guess.
+
+    ``sda_base`` is the map's ``_SDA_BASE_`` value, needed by the
+    small-data-area form: type 109 writes ``(S - _SDA_BASE_) & 0xFFFF`` into the
+    low halfword (the value was *derived from* the artifact - the SDA base is a
+    linker-generated symbol the map prints - not assumed).
+    """
+    value = (S + A) & 0xFFFFFFFF
+    if reloc_type == 1:                                    # R_PPC_ADDR32
+        return True, value, word, "word"
+    if reloc_type == 10:                                   # R_PPC_REL24
+        return True, (value - P) & 0x03FFFFFC, word & 0x03FFFFFC, "branch24"
+    if reloc_type == 109:                                  # SDA-relative disp
+        if sda_base is None:
+            return False, None, None, ""
+        want = (value - sda_base) & 0xFFFF
+        if word & 0xFFFF == want:
+            return True, want, word & 0xFFFF, "sda disp at +2"
+        if word >> 16 == want:
+            return True, want, word >> 16, "sda disp at +0"
+        return True, want, word & 0xFFFF, "sda disp at +2"
+    if reloc_type == 4:                                    # ADDR16_LO / low half
+        for shift, where in ((0, "low half at +0"), (16, "low half at +2")):
+            if (word >> shift) & 0xFFFF == value & 0xFFFF:
+                return True, value & 0xFFFF, (word >> shift) & 0xFFFF, where
+        return True, value & 0xFFFF, (word >> 16) & 0xFFFF, "low half at +2"
+    if reloc_type == 5:                                    # ADDR16_HI
+        hi = (value >> 16) & 0xFFFF
+        for shift, where in ((16, "high half at +0"), (0, "high half at +2")):
+            if (word >> shift) & 0xFFFF == hi:
+                return True, hi, (word >> shift) & 0xFFFF, where
+        return True, hi, word & 0xFFFF, "high half at +2"
+    if reloc_type == 6:                                    # ADDR16_HA (adjusted)
+        ha = ((value + 0x8000) >> 16) & 0xFFFF
+        for shift, where in ((16, "high half at +0"), (0, "high half at +2")):
+            if (word >> shift) & 0xFFFF == ha:
+                return True, ha, (word >> shift) & 0xFFFF, where
+        return True, ha, word & 0xFFFF, "high half at +2"
+    return False, None, None, ""
+
+
+# ---------------------------------------------------------------------------
+# The trace: one input object, followed through one real link
+# ---------------------------------------------------------------------------
+
+
+def _map_rows(map_text):
+    """``[(output_section, row), ...]`` in map order."""
+    out = []
+    for sec, info in parse_map(map_text).items():
+        for block in info["blocks"]:
+            for row in block["fragments"]:
+                out.append((sec, row))
+    return out
+
+
+def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
+    """Follow one object through the link the map describes.
+
+    Every claim made here is a comparison against the artifact: a section's
+    landing address is checked by reading the object's own bytes back out of
+    the output ELF at that address, a symbol's resolution is checked against
+    the map row that names it, and a relocation is checked by decoding the
+    word the linker wrote.  ``verdict`` is ``MATCH`` only if nothing
+    disagreed; a disagreement names itself in ``problems``.
+    """
+    obj = MwObject(obj_path)
+    name = Path(obj_path).name
+    rows = _map_rows(map_text)
+    mine = [(sec, r) for sec, r in rows if r.get("source") == name]
+    problems = []
+    rsp = None
+    if rsp_path and Path(rsp_path).exists():
+        rsp = [ln.strip() for ln in Path(rsp_path).read_text(errors="replace").splitlines()
+               if ln.strip()]
+
+    elf = Elf(elf_path) if elf_path and Path(elf_path).exists() else None
+    elf_secs = {s["name"]: s for s in elf.sections()} if elf else {}
+    elf_data = elf.data if elf else b""
+    elf_syms = elf.symbols() if elf else {}
+
+    if not mine:
+        in_rsp = None if rsp is None else any(
+            Path(ln.replace("\\", "/")).name == name for ln in rsp)
+        why = ("it is an input but no row in the map is attributed to it - the "
+               "link did not keep any of it (dead-stripped, or an archive "
+               "member that was never pulled in)")
+        if in_rsp is False:
+            why = "it is not an input of this link at all"
+        return {"object": str(obj_path), "object_name": name, "kept": False,
+                "in_rsp": in_rsp, "why": why, "sections": [], "symbols": [],
+                "relocations": [], "ctor_dtor": [], "problems": [],
+                "verdict": "DROPPED", "elf": str(elf_path) if elf else None,
+                "map": None, "rows_total": 0}
+
+    report = {"object": str(obj_path), "object_name": name, "kept": True,
+              "in_rsp": None if rsp is None else any(
+                  Path(ln.replace("\\", "/")).name == name for ln in rsp),
+              "rows_total": len(mine), "sections": [], "symbols": [],
+              "relocations": [], "ctor_dtor": [], "problems": problems,
+              "elf": str(elf_path) if elf else None, "map": None}
+
+    # ---- where each of its sections landed -------------------------------
+    landing = {}          # object section name -> output address
+    out_of = {}           # object section name -> output section name
+    reloc_words = {}      # object section name -> {byte offset: relocation}
+    for rel in obj.relocs:
+        reloc_words.setdefault(rel["target"], {})[rel["offset"]] = rel
+    sda_base = None
+    for _s, r in rows:
+        if r["name"] == "_SDA_BASE_":
+            sda_base = r["addr"]
+    if sda_base is None and elf_syms.get("_SDA_BASE_"):
+        sda_base = elf_syms["_SDA_BASE_"][0]
+    for sec in obj.sections:
+        if sec["index"] == 0 or not (sec["flags"] & 0x2) or sec["size"] == 0:
+            continue
+        cand = [r for s_, r in mine if r.get("flags") == 1 and r["name"] == sec["name"]]
+        entry_rows = cand
+        if not cand:
+            # `extab`/`extabindex` are not listed as one fragment per object:
+            # the map names every *entry* it owns (`@etb_<VA>`/`@eti_<VA>`), so
+            # the landing of this object's part of the section is where its
+            # first row in that output section sits.  That is the artifact's
+            # own statement about this object, not a guess.
+            entry_rows = [r for s_, r in mine
+                          if s_ == sec["name"] and r.get("flags") != 1]
+        if not entry_rows:
+            report["sections"].append({"name": sec["name"], "size": sec["size"],
+                                       "align": sec["align"], "landed": False,
+                                       "why": "no map row for it"})
+            problems.append(f"section '{sec['name']}' of {name} has no map row "
+                            f"attributed to it (kept out of the output?)")
+            continue
+        r = entry_rows[0] if not cand else cand[0]
+        if not cand:
+            first = min(entry_rows, key=lambda r: r["addr"])
+            r = dict(first)
+            r["size"] = sec["size"]
+        out_sec = next(s_ for s_, rr in mine if rr["name"] == r["name"]
+                       and rr["addr"] == r["addr"] and rr["offset"] == r["offset"])
+        entry = {"name": sec["name"], "output_section": out_sec,
+                 "addr": r["addr"], "size": r["size"], "align": sec["align"],
+                 "landed": True, "entry_rows": len(entry_rows)}
+        osec = elf_secs.get(out_sec)
+        if osec is not None:
+            entry["in_output_section"] = (osec["addr"] <= r["addr"]
+                                          and r["addr"] + r["size"] <= osec["addr"] + osec["size"])
+            if not entry["in_output_section"]:
+                problems.append(f"section '{sec['name']}' lands at {r['addr']:#x} "
+                                f"outside {out_sec} [{osec['addr']:#x}, "
+                                f"+{osec['size']:#x})")
+        if sec["size"] != r["size"] and cand:
+            problems.append(f"section '{sec['name']}': object size {sec['size']:#x} "
+                            f"!= map row size {r['size']:#x}")
+        # The read-back that makes the address real: the linker had to copy
+        # these bytes there.  The words a relocation lands on are exempt - the
+        # linker *wrote* those, which is exactly what the relocation check
+        # below verifies.  (A NOBITS section has no bytes to read back.)
+        body = obj.contents(sec)
+        if elf and body and r["size"] and osec is not None:
+            start = osec_off(osec, r["addr"])
+            got = elf_data[start:start + len(body)]
+            skip = set()
+            for off in reloc_words.get(sec["name"], {}):
+                skip.update(range(off, off + 4))
+            same = len(got) == len(body) and all(
+                i in skip or got[i] == body[i] for i in range(len(body)))
+            entry["bytes_identical"] = same
+            entry["bytes_relocated"] = len(skip)
+            if not same:
+                first = next(i for i in range(min(len(got), len(body)))
+                             if i not in skip and got[i] != body[i])
+                problems.append(
+                    f"section '{sec['name']}' at {r['addr']:#x}: the output ELF "
+                    f"does not carry this object's bytes (first difference at "
+                    f"+{first:#x}: {body[first]:#04x} -> {got[first]:#04x})")
+        landing[sec["name"]] = r["addr"]
+        out_of[sec["name"]] = out_sec
+        report["sections"].append(entry)
+
+    # ---- how its symbols resolved ----------------------------------------
+    by_name = {}
+    for sec, r in rows:
+        if r.get("flags") == 4 and r["name"]:
+            by_name.setdefault(r["name"], []).append((sec, r))
+    for sym in obj.symbols:
+        if sym["type"] in (STT_SECTION, STT_FILE) or sym["name"] == "":
+            continue
+        if sym["shndx"] == SHN_UNDEF:
+            hit = by_name.get(sym["name"])
+            report["symbols"].append({
+                "name": sym["name"], "kind": "undefined",
+                "resolved_from": hit[0][1]["source"] if hit else None,
+                "addr": hit[0][1]["addr"] if hit else None,
+                "section": hit[0][0] if hit else None,
+            })
+            if not hit:
+                problems.append(f"undefined symbol '{sym['name']}' is not "
+                                f"defined anywhere in the map")
+            continue
+        want = landing.get(sym["shndx_name"])
+        expected = None if want is None else want + sym["value"]
+        hit = by_name.get(sym["name"])
+        entry = {"name": sym["name"], "kind": "defined",
+                 "section": sym["shndx_name"], "bind": sym["bind"],
+                 "value": sym["value"], "expected": expected}
+        if hit:
+            entry["addr"] = hit[0][1]["addr"]
+            entry["from"] = hit[0][1]["source"]
+            entry["output_section"] = hit[0][0]
+            if expected is not None and hit[0][1]["addr"] != expected:
+                problems.append(
+                    f"symbol '{sym['name']}': {sym['shndx_name']}+{sym['value']:#x} "
+                    f"should be {expected:#x} but the map puts it at "
+                    f"{hit[0][1]['addr']:#x}")
+            if hit[0][1]["source"] != name:
+                entry["kind"] = "defined and also attributed elsewhere"
+            # The second witness: the output ELF's own symbol table.
+            if elf_syms.get(sym["name"]):
+                entry["elf_addrs"] = elf_syms[sym["name"]]
+                if hit[0][1]["addr"] not in elf_syms[sym["name"]]:
+                    problems.append(
+                        f"symbol '{sym['name']}': the map says "
+                        f"{hit[0][1]['addr']:#x}, the ELF symbol table says "
+                        + ", ".join(f"{a:#x}" for a in elf_syms[sym['name']]))
+        else:
+            entry["addr"] = expected
+            entry["from"] = ("local, carried in the fragment" if sym["bind"] == STB_LOCAL
+                             else "not named in the map")
+            if elf_syms.get(sym["name"]):
+                entry["elf_addrs"] = elf_syms[sym["name"]]
+        report["symbols"].append(entry)
+
+    # ---- the relocations that touched it ---------------------------------
+    for rel in obj.relocs:
+        place = landing.get(rel["target"])
+        if place is None:
+            continue
+        P = place + rel["offset"]
+        sym = obj.symbols[rel["sym_index"]] if rel["sym_index"] < len(obj.symbols) else None
+        entry = dict(rel, place=P, reloc_name=reloc_name(rel["type"]))
+        if sym is None:
+            entry["verdict"] = "no symbol"
+            report["relocations"].append(entry)
+            continue
+        # Resolve S: defined in this object, or resolved from the map.
+        if sym["shndx"] == SHN_UNDEF:
+            hit = by_name.get(sym["name"])
+            entry["resolved_from"] = hit[0][1]["source"] if hit else None
+            entry["S"] = hit[0][1]["addr"] if hit else None
+        else:
+            entry["resolved_from"] = name
+            base = landing.get(sym["shndx_name"])
+            entry["S"] = None if base is None else base + sym["value"]
+        if entry["S"] is None:
+            entry["verdict"] = "unresolved"
+            problems.append(f"relocation at {rel['target']}+{rel['offset']:#x} "
+                            f"names '{sym['name']}', which resolves nowhere")
+            report["relocations"].append(entry)
+            continue
+        entry["S"] = entry["S"] & 0xFFFFFFFF
+        out_sec = out_of.get(rel["target"])
+        word = None
+        if elf and out_sec in elf_secs:
+            off = osec_off(elf_secs[out_sec], P)
+            if off is not None and 0 <= off and off + 4 <= len(elf_data):
+                word = struct.unpack_from(">I", elf_data, off)[0]
+        entry["output_section"] = out_sec
+        entry["applied_word"] = word
+        if word is None:
+            entry["verdict"] = "not checked (no ELF at that place)"
+        else:
+            checked, exp, act, where = reloc_field(rel["type"], word, entry["S"],
+                                                   rel["addend"], P, sda_base)
+            entry["expected"], entry["actual"], entry["field"] = exp, act, where
+            if not checked:
+                entry["verdict"] = f"not checked ({reloc_name(rel['type'])})"
+            elif exp == act:
+                entry["verdict"] = "applied"
+            else:
+                entry["verdict"] = "MISMATCH"
+                problems.append(
+                    f"relocation {reloc_name(rel['type'])} at {P:#x} "
+                    f"('{sym['name']}': S={entry['S']:#x} A={rel['addend']:#x}) "
+                    f"holds {act:#x} in the {where}, expected {exp:#x}")
+        report["relocations"].append(entry)
+
+    # ---- where its ctor/dtor fragment went -------------------------------
+    rank = {}
+    if order and order.get("names"):
+        rank = {n: i for i, n in enumerate(order["names"])}
+    runtime = sorted(set(RUNTIME_CTOR_SYMBOLS) & {s["name"] for s in obj.symbols})
+    for sec in obj.ctor_dtor_sections():
+        entry = {"section": sec["name"], "size": sec["size"],
+                 "class_rank": rank.get(sec["name"]), "rows": [],
+                 "runtime_symbols": runtime}
+        srows = [r for _s, r in mine if r["name"] == sec["name"] and r.get("flags") == 1]
+        for r in srows:
+            entry["rows"].append({"addr": r["addr"], "size": r["size"],
+                                  "source": r["source"]})
+        out_sec = next((s_ for s_, r in mine if r["name"] == sec["name"]), None)
+        entry["output_section"] = out_sec
+        if out_sec:
+            ctx = [(r["addr"], r["name"], r["source"]) for s_, r in rows
+                   if s_ == out_sec and r.get("flags") == 1]
+            ctx.sort()
+            entry["slots"] = ctx
+            entry["slot"] = next((i for i, (a, n, _s) in enumerate(ctx)
+                                  if n == sec["name"] and a == (srows[0]["addr"] if srows else None)), None)
+        if not srows:
+            entry["why"] = ("the linker put this unit's entry in a *synthesized* "
+                            "fragment (map source 'Linker Generated Symbol File'): "
+                            "the class is decided by the runtime symbol name, not "
+                            "by this section's name")
+        report["ctor_dtor"].append(entry)
+
+    report["verdict"] = "MATCH" if not problems else "FAIL"
+    return report
+
+
+def osec_off(sec, addr):
+    """File offset of output address `addr` inside output section `sec`."""
+    if sec is None:
+        return None
+    return sec["offset"] + (addr - sec["addr"])
+
+
+def render_trace(rep):
+    """The trace as a report a human reads, one claim per line."""
+    out = []
+    out.append(f"object:   {rep['object']}")
+    if not rep["kept"]:
+        out.append(f"KEPT:     NO - {rep['why']}")
+        if rep.get("in_rsp") is not None:
+            out.append(f"          in the link's input list: {rep['in_rsp']}")
+        return out
+    out.append(f"KEPT:     YES - {rep['rows_total']} map row(s) name this object")
+    if rep.get("in_rsp") is not None:
+        out.append(f"          in the link's input list: {rep['in_rsp']}")
+    out.append("")
+    out.append("where each of its sections landed (map address, read back from the ELF):")
+    out.append(f"  {'section':<16} {'output':<12} {'address':>10} {'size':>8} {'align':>6}  bytes")
+    for s in rep["sections"]:
+        if not s["landed"]:
+            out.append(f"  {s['name']:<16} {'-':<12} {'-':>10} {s['size']:>#8x} "
+                       f"{s['align']:>6}  NOT IN THE MAP ({s.get('why')})")
+            continue
+        chk = ("identical" if s.get("bytes_identical")
+               else ("n/a (no bytes)" if "bytes_identical" not in s else "DIFFERENT"))
+        out.append(f"  {s['name']:<16} {s['output_section']:<12} {s['addr']:>#10x} "
+                   f"{s['size']:>#8x} {s['align']:>6}  {chk}")
+    out.append("")
+    out.append("how its symbols resolved:")
+    for s in rep["symbols"]:
+        if s["kind"] == "undefined":
+            where = s["resolved_from"] or "NOWHERE"
+            out.append(f"  U {s['name']:<44} -> {where}"
+                       + (f" at {s['addr']:#x}" if s.get("addr") else ""))
+        else:
+            addr = s.get("addr")
+            elfnote = ("  ELF " + ", ".join(f"{a:#x}" for a in s["elf_addrs"])
+                       if s.get("elf_addrs") else "")
+            out.append(f"  D {s['name']:<44} {s['section']}+{s['value']:#x} = "
+                       + (f"{addr:#x}" if addr is not None else "?")
+                       + f"  [{s.get('from')}]{elfnote}")
+    out.append("")
+    out.append("relocations applied to it (value decoded out of the output ELF):")
+    for r in rep["relocations"]:
+        if r.get("verdict") in ("applied",):
+            out.append(f"  {r['target']}+{r['offset']:#05x} {r['reloc_name']:<12} "
+                       f"'{r['sym_name']}' S={r['S']:#x} A={r['addend']:#x} "
+                       f"-> {r['actual']:#x} ({r['field']})  APPLIED")
+        else:
+            out.append(f"  {r['target']}+{r['offset']:#05x} {r['reloc_name']:<12} "
+                       f"'{r['sym_name']}'  {r['verdict']}"
+                       + (f" (word {r['applied_word']:#010x})" if r.get("applied_word") is not None else ""))
+    if rep["ctor_dtor"]:
+        out.append("")
+        out.append("its ctor/dtor fragment (the Row 46 question):")
+        for c in rep["ctor_dtor"]:
+            out.append(f"  {c['section']:<12} size {c['size']:#x}  fixed-order rank "
+                       f"{c['class_rank']}  -> {c['output_section']}"
+                       + (f" slot {c['slot']}" if c.get("slot") is not None else ""))
+            for r in c["rows"]:
+                out.append(f"      row {r['addr']:#x} size {r['size']:#x} "
+                           f"credited to {r['source'] or '(none)'}")
+            if c.get("why"):
+                out.append(f"      {c['why']}")
+            if c.get("slots"):
+                for i, (a, n, src) in enumerate(c["slots"]):
+                    mark = "->" if a == (c["rows"][0]["addr"] if c["rows"] else None) else "  "
+                    out.append(f"      {mark} [{i}] {a:#x} {n:<12} {src}")
+            if c["runtime_symbols"]:
+                for sym in c["runtime_symbols"]:
+                    cls = RUNTIME_CTOR_SYMBOLS[sym]
+                    out.append(f"      runtime symbol '{sym}' -> {cls[0]}{cls[1]} "
+                               f"(the linker keys this class on the symbol name)")
+    out.append("")
+    out.append(f"VERDICT: {rep['verdict']}")
+    for p in rep["problems"]:
+        out.append("  " + p)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# The phases: the message machinery, derived from the PE
+# ---------------------------------------------------------------------------
+#
+# The README's open item was that the engine's phase messages are referenced by
+# resource *id*, so no immediate operand names them.  They are still findable,
+# because the linker loads them with USER32's `LoadStringA`, which is an import
+# - so the call site is derivable from the import table:
+#
+#   * the IAT slot of `LoadStringA` comes from the import directory;
+#   * `call dword ptr [slot]` sites in `.text` are the two places the linker
+#     loads a message string (one message loader, one one-off with a fixed id);
+#   * the *callers* of the loader are the linker's message formatters - one
+#     per engine message - and each pushes its catalogue id two instructions
+#     before the call (arg3; the loader reads it at `[esp+0x18]` after its own
+#     two pushes and passes it to `LoadStringA` as `uID`);
+#   * the return address of `call <formatter>` is therefore a phase anchor, and
+#     the message id it prints is what names the phase.
+#
+# `phases --prove` breaks at the *observation anchor* (the instruction after
+# the `LoadStringA` call, where the pushed id and the buffer pointer are still
+# live) and reports the `(id, string)` pairs the linker really asked for - which
+# is also what validates the catalogue's own id numbering against the artifact.
+
+LOADSTRING = "LoadStringA"
+
+
+def _imm(op_str):
+    """The integer value of an immediate operand string, or None."""
+    if op_str and re.fullmatch(r"0x[0-9a-f]+", op_str or ""):
+        return int(op_str, 16)
+    return None
+
+
+def _iat_slots(pe):
+    """``{imported function name: VA of its IAT slot}``."""
+    d = pe.data
+    rva, size = pe.data_dir(1)
+    out = {}
+    o = pe.rva2off(rva)
+    i = 0
+    while o is not None:
+        oft, ts, fc, namerva, fta = struct.unpack_from("<IIIII", d, o + 20 * i)
+        if namerva == 0 and fta == 0 and oft == 0:
+            break
+        no = pe.rva2off(namerva)
+        thunk = oft or fta
+        to = pe.rva2off(thunk)
+        j = 0
+        while to is not None:
+            v = struct.unpack_from("<I", d, to + 4 * j)[0]
+            if v == 0:
+                break
+            if not (v & 0x80000000):
+                ho = pe.rva2off(v)
+                nm = d[ho + 2:d.find(b"\0", ho + 2)].decode("latin-1")
+                out.setdefault(nm, pe.image_base + fta + 4 * j)
+            j += 1
+        i += 1
+    return out
+
+
+def _function_start(insns, idx):
+    """The address of the function containing ``insns[idx]``.
+
+    These binaries carry no symbols, so the boundary has to come from the
+    layout: Metrowerks pads *between* functions with `nop`/`int3` runs, so the
+    entry is the first real instruction after the closest such run at or before
+    ``idx``.  The derivation checks itself: ``derive_message_io`` reports how
+    many of the entries it found are the target of a `call`, and an entry that
+    nothing calls is reported as unproven rather than used.
+    """
+    j = idx
+    while j > 0:
+        if insns[j - 1].mnemonic in ("nop", "int3") and \
+                insns[j].mnemonic not in ("nop", "int3"):
+            return insns[j].address
+        j -= 1
+    return insns[0].address
+
+
+def derive_message_io(pe):
+    """The linker's message loader, its observation anchor, and the formatters."""
+    cs = _capstone()
+    if cs is None:
+        return None
+    slots = _iat_slots(pe)
+    slot = slots.get(LOADSTRING)
+    if slot is None:
+        return None
+    md = cs.Cs(cs.CS_ARCH_X86, cs.CS_MODE_32)
+    md.detail = True
+    text = pe.section(".text")
+    insns = list(md.disasm(pe.read_rva(text.va, text.vsize),
+                           pe.image_base + text.va))
+    sites = []
+    for i, ins in enumerate(insns):
+        if ins.mnemonic != "call" or not ins.operands:
+            continue
+        op = ins.operands[0]
+        if op.type == cs.x86.X86_OP_MEM and op.mem.base == cs.x86.X86_REG_INVALID \
+                and op.mem.index == cs.x86.X86_REG_INVALID and op.mem.disp == slot:
+            sites.append(i)
+    if not sites:
+        return None
+
+    def push_stream(i, n):
+        """The last `n` pushes before `i`, in **instruction order** (first push first).
+
+        ``argN`` of the callee is the *last* push, so ``stream[-N]`` is the
+        argument - and saying it that way is what keeps the id derivation
+        honest: nothing here assumes the pushes are immediates.
+        """
+        near = []
+        k = i - 1
+        while k >= 0 and len(near) < n:
+            if insns[k].mnemonic == "push":
+                near.append(insns[k].op_str)
+            k -= 1
+        return list(reversed(near))
+
+    loaders = []
+    for i in sites:
+        start = _function_start(insns, i)
+        args = push_stream(i, 4)
+        # `LoadStringA(HINSTANCE, UINT uID, LPSTR, int)`: arg2 is the id, i.e.
+        # the second push from the call.
+        loaders.append({
+            "call_rva": insns[i].address - pe.image_base,
+            "after_rva": (insns[i].address + insns[i].size) - pe.image_base,
+            "entry_rva": start - pe.image_base,
+            "pushed": args,
+            "msgid_arg2": _imm(args[-2]) if len(args) >= 2 else None,
+            # The message loader takes the id as an *argument*; the other site
+            # loads one fixed string for its own use, so its arg2 is a
+            # constant.  That is the rule that tells them apart.
+            "arg2_is_constant": _imm(args[-2]) is not None if len(args) >= 2 else False,
+        })
+    # The message loader is the one with many callers; a one-off `LoadStringA`
+    # with a constant id is a different thing and is reported as such.
+    call_targets = {}
+    for ins in insns:
+        if ins.mnemonic == "call" and ins.operands \
+                and ins.operands[0].type == cs.x86.X86_OP_IMM:
+            call_targets.setdefault(ins.operands[0].imm, 0)
+            call_targets[ins.operands[0].imm] += 1
+    for ld in loaders:
+        callers = [ins.address - pe.image_base for ins in insns
+                   if ins.mnemonic == "call" and ins.operands
+                   and ins.operands[0].type == cs.x86.X86_OP_IMM
+                   and ins.operands[0].imm == pe.image_base + ld["entry_rva"]]
+        ld["callers"] = sorted(callers)
+        ld["entry_is_call_target"] = call_targets.get(pe.image_base + ld["entry_rva"], 0)
+    loader = max([l for l in loaders if not l["arg2_is_constant"]] or loaders,
+                 key=lambda l: (len(l["callers"]), -l["call_rva"]))
+    # The id is the *third* push in source order: the loader reads arg3 (its
+    # `movsx ecx, word ptr [esp+0x18]` after two pushes, with arg1 in EBX as
+    # the buffer) and hands it to `LoadStringA` as uID.  That reading is
+    # falsifiable and `--prove` checks it against a real link.
+    formatters = []
+    for i, ins in enumerate(insns):
+        if ins.mnemonic != "call" or not ins.operands:
+            continue
+        op = ins.operands[0]
+        if op.type != cs.x86.X86_OP_IMM or op.imm - pe.image_base != loader["entry_rva"]:
+            continue
+        pushed = push_stream(i, 3)
+        formatters.append({
+            "func_rva": _function_start(insns, i) - pe.image_base,
+            "call_rva": ins.address - pe.image_base,
+            "msgid": _imm(pushed[-3]) if len(pushed) >= 3 else None,
+            "pushed": pushed,
+        })
+    # Self-check: a printer entry has to be something the binary calls.
+    for f in formatters:
+        f["entry_is_call_target"] = call_targets.get(pe.image_base + f["func_rva"], 0)
+    return {"iat_slot": slot, "loader": loader, "loaders": loaders,
+            "formatters": formatters,
+            "unproven_entries": sorted({f["func_rva"] for f in formatters
+                                        if not f["entry_is_call_target"]})}
+
+
+def derive_phase_anchors(pe):
+    """``{anchor RVA: (msgid, what printed it)}`` for every phase call site."""
+    io = derive_message_io(pe)
+    if io is None:
+        return None
+    cs = _capstone()
+    md = cs.Cs(cs.CS_ARCH_X86, cs.CS_MODE_32)
+    md.detail = True
+    text = pe.section(".text")
+    insns = list(md.disasm(pe.read_rva(text.va, text.vsize),
+                           pe.image_base + text.va))
+    by_func = {}
+    for f in io["formatters"]:
+        by_func.setdefault(f["func_rva"], []).append(f)
+    anchors = []
+    for i, ins in enumerate(insns):
+        if ins.mnemonic != "call" or not ins.operands:
+            continue
+        op = ins.operands[0]
+        if op.type != cs.x86.X86_OP_IMM:
+            continue
+        rva = op.imm - pe.image_base
+        for f in by_func.get(rva, []):
+            anchors.append({
+                "anchor": ins.address + ins.size - pe.image_base,
+                "formatter": rva,
+                "msgid": f["msgid"],
+                "printer": _function_start(insns, i) - pe.image_base,
+            })
+    anchors.sort(key=lambda a: a["anchor"])
+    return {"io": io, "anchors": anchors}
+
+
+def cmd_phases(args):
+    pe = Pe(args.linker)
+    der = derive_phase_anchors(pe)
+    if der is None:
+        print("phases needs capstone (pip install capstone)", file=sys.stderr)
+        return 2
+    io = der["io"]
+    ld = io["loader"]
+    print(f"linker: {pe.path}")
+    print(f"{LOADSTRING} import slot: {io['iat_slot']:#x}")
+    print(f"message loader:  RVA {ld['entry_rva']:#x}  (calls {LOADSTRING} at "
+          f"{ld['call_rva']:#x}; {len(ld['callers'])} caller(s))")
+    print(f"  observation anchor: RVA {ld['after_rva']:#x} - the instruction after the "
+          f"call; on a real link the uID reads at [esp+0x10] and the buffer "
+          f"pointer is still in EBX (measured, not assumed)")
+    for other in io["loaders"]:
+        if other is ld:
+            continue
+        print(f"  not the loader: {LOADSTRING} at {other['call_rva']:#x} in the function "
+              f"at {other['entry_rva']:#x}: arg2 is the constant {other['msgid_arg2']}, "
+              f"so it loads one fixed string ({len(other['callers'])} caller(s))")
+    print(f"message formatters: {len(io['formatters'])} (callers of the loader, one per "
+          f"engine message; each pushes its id as arg3)")
+    for f in sorted(io["formatters"], key=lambda f: (f["msgid"] is None, f["msgid"])):
+        entry = ("" if f["entry_is_call_target"] else "  ENTRY UNPROVEN (nothing calls it)")
+        print(f"  msgid={f['msgid']!s:<6} formatter RVA {f['func_rva']:#x} "
+              f"pushes {f['pushed']}{entry}")
+    if io["unproven_entries"]:
+        print(f"  {len(io['unproven_entries'])} formatter entry/entries are not a call "
+              f"target: " + ", ".join(hex(e) for e in io["unproven_entries"]), file=sys.stderr)
+    print(f"phase anchors (return address of call <formatter>): {len(der['anchors'])}")
+    for a in der["anchors"][:40]:
+        print(f"  {a['anchor']:#08x}  msgid={a['msgid']}  printer RVA {a['printer']:#x}")
+    if args.json:
+        print(json.dumps(der, indent=2))
+    if args.prove:
+        return prove_phases(pe, der, args)
+    return 0
+
+
+def prove_phases(pe, der, args):
+    """Run a real link and observe (a) the ids the linker asks for and (b) the anchors."""
+    gdb = find_gdb(args.gdb)
+    if not gdb:
+        print("no gdb found; pass --gdb", file=sys.stderr)
+        return 2
+    if not args.args:
+        print("--prove needs --args '<the link argument list>'", file=sys.stderr)
+        return 2
+    work = Path(args.out).resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    script = work / "mwlink-phases.gdb"
+    ld = der["io"]["loader"]
+    anchors = "\n".join("  (0x%x, '%x')," % (pe.image_base + a["anchor"], a["anchor"])
+                        for a in der["anchors"])
+    # The stack layout at the observation anchor was *measured* on a real link
+    # (`[esp]`=hInstance, `[esp+4]`=the loader's return address, `[esp+8]`=arg1
+    # the buffer, `[esp+0xC]`=arg2, `[esp+0x10]`=arg3, the uID) - so the uID is
+    # read at +0x10 and the buffer from EBX, which the loader also holds.
+    script.write_text(
+        "set pagination off\nset confirm off\nset width 0\n"
+        f"file {pe.path.as_posix()}\n"
+        "set args " + args.args + "\n"
+        "python\nimport gdb\n"
+        f"LOADER = 0x{pe.image_base + ld['after_rva']:x}\n"
+        "class Msg(gdb.Breakpoint):\n"
+        "    def stop(self):\n"
+        "        try:\n"
+        "            esp = int(gdb.parse_and_eval('$esp')) & 0xffffffff\n"
+        "            uID = int(gdb.parse_and_eval('*(unsigned int*)%d' % (esp + 0x10)))\n"
+        "            ebx = int(gdb.parse_and_eval('$ebx')) & 0xffffffff\n"
+        "            raw = gdb.selected_inferior().read_memory(ebx, 96).tobytes().split(b'\\0')[0]\n"
+        "            text = raw.decode('latin-1').replace('\\n', ' ').replace('\\t', ' ')\n"
+        "            print('MWLINK-MSG %d %s' % (uID, text))\n"
+        "        except Exception as exc:\n"
+        "            print('MWLINK-MSGERR %s' % exc)\n"
+        "        return False\n"
+        "class Phase(gdb.Breakpoint):\n"
+        "    def __init__(self, addr, tag):\n"
+        "        super().__init__('*0x%x' % addr, internal=True)\n"
+        "        self.tag = tag\n"
+        "    def stop(self):\n"
+        "        print('MWLINK-ANCHOR %s' % self.tag)\n"
+        "        return False\n"
+        "Msg('*0x%x' % LOADER)\n"
+        "_n = 0\n"
+        "for _a, _t in [\n" + anchors + "\n]:\n"
+        "    Phase(_a, _t)\n"
+        "    _n += 1\n"
+        "print('MWLINK-BPS %d %d' % (_n, len(gdb.breakpoints())))\n"
+        "end\nrun\nprintf \"MWLINK-DONE\\n\"\nquit\n")
+    argv = [gdb, "-batch", "-nx", "-x", str(script)]
+    print(f"# gdb {script}")
+    proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+    stream, counts = [], {}
+    last = [None]
+    for line in proc.stdout.splitlines():
+        body = line.strip()
+        m = re.match(r"^MWLINK-ANCHOR ([0-9a-f]+)$", body)
+        if m:
+            counts[m.group(1)] = counts.get(m.group(1), 0) + 1
+            last[0] = m.group(1)
+            continue
+        m = re.match(r"^MWLINK-MSG (\d+) (.*)$", body)
+        if m:
+            stream.append((last[0], int(m.group(1)), m.group(2)))
+            last[0] = None
+            continue
+        m = re.match(r"^MWLINK-BPS (\d+) (\d+)$", body)
+        if m:
+            print(f"# breakpoints: {m.group(1)} phase anchor(s), {m.group(2)} total")
+    if not stream and not counts:
+        print("# the run produced no observation; gdb stderr follows", file=sys.stderr)
+        print(proc.stderr.strip()[:2000], file=sys.stderr)
+        return 1
+    cat = message_catalogue(pe)
+    print(f"the link's phase stream, as the linker's own message loader printed it:")
+    for anchor, mid, text in stream:
+        who = f"anchor {anchor}" if anchor else "(no anchor seen)"
+        known = cat.get(mid)
+        tag = ("  [catalogue agrees]" if known and known.split("%")[0][:24] == text.split("%")[0][:24]
+               else (f"  [catalogue says {known!r}]" if known else "  [id not in the catalogue]"))
+        print(f"  {who:<14} id={mid:<4} {text}{tag}")
+    agree = sum(1 for _a, mid, text in stream
+                if cat.get(mid) and cat[mid].split("%")[0][:24] == text.split("%")[0][:24])
+    print(f"# catalogue cross-check: {agree} of {len(stream)} observed messages match "
+          f"the catalogue's id -> text")
+    fired = sum(1 for a in der["anchors"]
+                if f"{a['anchor']:x}" in counts)
+    print(f"phase anchors: {fired}/{len(der['anchors'])} fired in this link "
+          f"(the other side of the count is the run's own verbosity)")
+    seen_ids = {}
+    for anchor, mid, _t in stream:
+        if anchor:
+            seen_ids.setdefault(anchor, []).append(mid)
+    for a in der["anchors"]:
+        key = f"{a['anchor']:x}"
+        n = counts.get(key, 0)
+        ids = sorted(set(seen_ids.get(key, [])))
+        print(f"  {'FIRED   ' if n else 'UNPROVEN'} {key:>8} candidate-id {a['msgid']} "
+              f"x{n}" + (f"  observed ids {ids}" if ids else ""))
+    if args.require_all:
+        return 0 if fired == len(der["anchors"]) else 1
+    return 0 if fired else 1
+
+
+# ---------------------------------------------------------------------------
+# Finding the link line the build itself uses
+# ---------------------------------------------------------------------------
+
+def derive_rsp(out="build/RMHE08/main.elf", dest=None):
+    """The link's list of inputs, read out of ``build.ninja``'s own statement.
+
+    ``ninja`` writes ``$out.rsp`` for the link and deletes it again, so the
+    response file a trace needs is derived from the build statement rather than
+    kept: the tokens between ``link`` and the first ``|``/``||`` are exactly
+    what ninja puts in the response file.  Nothing is transcribed - if the
+    build's input list changes, so does this.
+    """
+    ninja = ROOT / "build.ninja"
+    if not ninja.exists():
+        return None
+    lines = ninja.read_text(errors="replace").splitlines()
+    want = out.replace("\\", "/")
+    for i, line in enumerate(lines):
+        m = re.match(r"^build\s+(\S+):\s+link\s+(.*)$", line)
+        if not m or m.group(1).replace("\\", "/") != want:
+            continue
+        parts = [m.group(2)]
+        j = i
+        while parts[-1].rstrip().endswith("$") and j + 1 < len(lines):
+            j += 1
+            parts.append(lines[j])
+        toks, stop = [], False
+        for tok in " ".join(parts).replace("$", " ").split():
+            if tok in ("|", "||"):
+                stop = True
+            if not stop:
+                toks.append(tok)
+        if dest is not None:
+            Path(dest).write_text("\n".join(toks) + "\n", encoding="utf-8")
+        return toks
+    return None
+
+
+def derive_link_line(rsp, ldscript=None):
+    """The linker argument list for a link, with the build's own flags.
+
+    ``ldflags`` is read from ``build.ninja`` (the global assignment *and* the
+    per-build one that appends ``-lcf``), so the trace links the way the build
+    does instead of the way a default would.
+    """
+    ninja = ROOT / "build.ninja"
+    flags = None
+    lcf = ldscript
+    if ninja.exists():
+        txt = ninja.read_text(errors="replace")
+        m = re.search(r"^ldflags\s*=\s*(.*)$", txt, re.M)
+        if m:
+            flags = m.group(1).strip()
+            for extra in re.findall(r"^\s+ldflags\s*=\s*\$ldflags\s*(.*)$", txt, re.M):
+                seg = extra.strip()
+                m2 = re.match(r"-lcf\s+(\S+)", seg)
+                if m2:
+                    lcf = m2.group(1)
+                flags += " " + re.sub(r"-lcf\s+\S+", "", seg).strip()
+    if flags is None:
+        flags = "-fp hardware -nodefaults"
+    argv = [flags]
+    if lcf:
+        argv.append("-lcf " + str(lcf))
+    argv.append("-o {out} -map {map} @" + str(rsp))
+    return " ".join(argv)
+
+
+def cmd_trace(args):
+    """Trace one input object through one real link.
+
+    The map and the ELF are the ground truth, and they have to *be* the same
+    link: if the ELF does not exist the trace still reports what the map says,
+    but it says so (`not checked`) instead of pretending.  With ``--link`` the
+    tool runs the build's own link command, redirected to a scratch path, so
+    the artifact it traces is one it produced itself.
+    """
+    if args.link:
+        work = Path(args.out).resolve()
+        work.mkdir(parents=True, exist_ok=True)
+        rsp = Path(args.rsp) if args.rsp else None
+        if rsp is None:
+            rsp = work / "trace.rsp"
+            if derive_rsp(args.link_out, rsp) is None:
+                print("cannot derive the link's input list from build.ninja; "
+                      "pass --rsp", file=sys.stderr)
+                return 2
+            print(f"# response file derived from build.ninja: {rsp} "
+                  f"({len(rsp.read_text().split())} inputs)")
+        if not rsp.exists():
+            print(f"--link needs the link's response file (--rsp); {rsp} is not there",
+                  file=sys.stderr)
+            return 2
+        args.rsp = str(rsp)
+        elf_out = work / "trace.elf"
+        map_out = work / "trace.MAP"
+        line = derive_link_line(rsp, args.ldscript or "build/RMHE08/ldscript.lcf")
+        line = line.format(out=str(elf_out), map=str(map_out))
+        argv = [str(args.linker)] + line.split()
+        print("# " + " ".join(argv))
+        proc = subprocess.run(argv, capture_output=True, text=True,
+                              errors="replace", cwd=str(ROOT))
+        if proc.returncode != 0:
+            print(proc.stdout[-2000:] + proc.stderr[-2000:], file=sys.stderr)
+            print(f"the link failed (rc={proc.returncode}); refusing to trace a stale artifact",
+                  file=sys.stderr)
+            return 1
+        args.elf = args.elf or str(elf_out)
+        args.map = str(map_out)
+        print(f"# linked {elf_out} ({elf_out.stat().st_size} bytes)")
+    else:
+        args.map = args.map or "build/RMHE08/main.MAP"
+    if not Path(args.map).exists():
+        print(f"no link map at {args.map} - run a link with -map, or pass --link",
+              file=sys.stderr)
+        return 2
+    map_text = Path(args.map).read_text(encoding="utf-8", errors="replace")
+    if args.elf and not Path(args.elf).exists():
+        print(f"# WARNING: no ELF at {args.elf}; addresses and relocations stay unverified",
+              file=sys.stderr)
+        args.elf = None
+    order = derive_order(Pe(args.linker)) if _linker_exists(args) else None
+    rep = build_trace(args.object, map_text, args.elf, args.rsp, order)
+    rep["map"] = str(args.map)
+    if args.json:
+        print(json.dumps(rep, indent=2))
+        return 0 if rep["verdict"] != "FAIL" else 1
+    print(f"# map {args.map}" + (f"   elf {args.elf}" if args.elf else ""))
+    for line in render_trace(rep):
+        print(line)
+    if args.full_ctor:
+        print()
+        print("the whole merged .ctors/.dtors layout, as the linker laid it out:")
+        for name in (".ctors", ".dtors"):
+            info = parse_map(map_text).get(name)
+            if not info:
+                continue
+            for block in info["blocks"]:
+                for r in block["fragments"]:
+                    if r["name"] in (name,) or is_ctor_dtor_name(r["name"]):
+                        print(f"  {name:<8} +{r['offset']:#06x} {r['size']:#06x} "
+                              f"{r['name']:<12} {r['source']}")
+    return 0 if rep["verdict"] != "FAIL" else 1
+
+
+def _linker_exists(args):
+    return getattr(args, "linker", None) is not None and Path(args.linker).exists()
+
+
+# ---------------------------------------------------------------------------
 # Selftest - fixtures only, no gdb, no compiler, no linker
 # ---------------------------------------------------------------------------
 
@@ -1026,8 +2161,11 @@ def selftest():
     dec = decode_string_block(FakePe(block), 0, len(block))
     ok(dec == [(0, "Link"), (2, "Linking: '%c'")], f"rt_string decode: {dec!r}")
 
-    # 2. The message catalogue numbers ids from 1 per block (block*16+slot).
-    ok(16 * 1 + 0 == 16, "message ids number from 16 in the first block")
+    # 2. Catalogue ids are the linker's own: (block_name - 1) * 16 + slot, so
+    #    the first block (named 1) holds ids 0..15.  Proven against a real
+    #    link by `phases --prove` (observed ids 27/29/41).
+    ok((1 - 1) * 16 + 0 == 0, "message ids start at 0 in the block named 1")
+    ok((2 - 1) * 16 + 11 == 27, "Linking: sits at the id the loader asks for (27)")
 
     # 3. MAP parsing.
     mp = """\n.ctors section layout\n"""
@@ -1088,12 +2226,174 @@ def selftest():
     ok(classify_phase("#   Layout: 'x.elf' (.text)", cat)[0] == 58,
        "classify_phase maps a Layout line to msgid 58")
 
+    # 7. The input object reader: sections, symbols and RELA relocations, as
+    #    the linker sees them (big-endian, symbol index << 8 | type).
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        op = td / "fixture.o"
+        op.write_bytes(_fixture_obj())
+        obj = MwObject(op)
+        ok([s["name"] for s in obj.sections][1:3] == [".text", ".ctors$10"],
+           f"object sections: {[s['name'] for s in obj.sections]}")
+        ok([s["name"] for s in obj.symbols][2:4] == ["foo", ""],
+           f"object symbols: {[s['name'] for s in obj.symbols]}")
+        ok(obj.symbols[2]["bind"] == STB_GLOBAL and obj.symbols[2]["type"] == STT_FUNC,
+           "symbol bind/type from st_info")
+        ok(len(obj.relocs) == 1 and obj.relocs[0]["target"] == ".text"
+           and obj.relocs[0]["sym_name"] == "foo" and obj.relocs[0]["type"] == 1,
+           f"relocations: {obj.relocs}")
+        ok([s["name"] for s in obj.ctor_dtor_sections()] == [".ctors$10"],
+           "ctor/dtor sections recognised")
+
+        # 8. Relocation field verification (the read-back, not a transcription).
+        ok(reloc_field(1, 0x80004000, 0x80004000, 0, 0)[0:3] == (True, 0x80004000, 0x80004000),
+           "ADDR32 field")
+        ok(reloc_field(10, 0x4800004C, 0x8000404C, 0, 0x80004000)[0:3]
+           == (True, 0x4C, 0x4C), "REL24 field is (S+A-P) masked to bits 2..25")
+        # The real one: the linker only rewrites the LI field, so the `bl`'s LK
+        # bit (0x1) survives - 0x4800004D has LI<<2 == 0x4C == S-P.
+        ok(reloc_field(10, 0x4800004D, 0x80457490, 0, 0x80457444)[1] == 0x4C,
+           "REL24 against the real __register_fragment branch")
+        ok(reloc_field(6, 0x3C008004, 0x8003F1C8, 0, 0)[0:3] == (True, 0x8004, 0x8004),
+           "ADDR16_HA rounds (the real trace's value)")
+        ok(reloc_field(109, 0x800DAEA8, 0x80793CC8, 0, 0, 0x80798E20)[0:3]
+           == (True, 0xAEA8, 0xAEA8), "SDA-relative disp from the map's _SDA_BASE_")
+        ok(reloc_field(109, 0x800DAEA8, 0x80793CC8, 0, 0, None)[0] is False,
+           "type 109 is not claimed without a _SDA_BASE_")
+        ok(reloc_field(40, 0x12345678, 0, 0, 0)[0] is False,
+           "an un-derived type is reported unchecked")
+
+        # 9. The map carries the input file each row came from - that is what
+        #    makes a per-object trace possible at all.
+        mrows = {r["name"]: r for _s, r in _map_rows(mp)}
+        ok(mrows[".ctors$10"]["source"] == "__init_cpp_exceptions.o",
+           f"map row source: {mrows['.ctors$10']}")
+        ok(mrows[".ctors$10"]["flags"] == 1, "map row flags")
+
+        # 10. End to end on fixtures: a link whose map and ELF agree traces as
+        #     MATCH, verifies the ADDR32 relocation against the ELF's word, and
+        #     FAILs loudly when the ELF stops carrying the bytes.
+        A = 0x8056F2C0
+        objmap = "\n.text section layout\n"
+        objmap += f"  00000000 000004 {A:08x} 00000200  1 .text \tfixture.o \n"
+        objmap += f"  00000000 000004 {A:08x} 00000200  4 foo \tfixture.o \n"
+        objmap += "\n.ctors section layout\n"
+        objmap += f"  00000000 000004 {A + 0x10:08x} 00000210  1 .ctors$10 \tfixture.o \n"
+        objmap += f"  00000010 000004 {A + 0x10:08x} 00000210  4 bar \tfixture.o \n"
+        elf = td / "fixture.elf"
+        elf.write_bytes(_fixture_elf2([
+            (".text", 1, A, 4, struct.pack(">I", A)),        # the relocated word
+            (".ctors", 1, A + 0x10, 4, b"\0\0\0\0"),
+        ]))
+        rep = build_trace(op, objmap, elf)
+        ok(rep["kept"], "fixture trace: kept")
+        ok(rep["verdict"] == "MATCH", f"fixture trace verdict: {rep['verdict']} {rep['problems']}")
+        rel = rep["relocations"][0]
+        ok(rel["verdict"] == "applied" and rel["actual"] == A,
+           f"fixture relocation verified from the ELF: {rel}")
+        ok([s for s in rep["sections"] if s["name"] == ".text"][0]["bytes_identical"],
+           "fixture section bytes read back")
+        # A word that is not what the relocation must have written -> FAIL.
+        bad = td / "bad.elf"
+        bad.write_bytes(_fixture_elf2([
+            (".text", 1, A, 4, struct.pack(">I", A + 4)),
+            (".ctors", 1, A + 0x10, 4, b"\0\0\0\0")]))
+        rep = build_trace(op, objmap, bad)
+        ok(rep["verdict"] == "FAIL" and any("holds" in p for p in rep["problems"]),
+           f"fixture trace FAILs on a wrong relocation word: {rep['problems']}")
+        # An object no row names is reported as dropped, not as traced.
+        rep = build_trace(td / "fixture.o", objmap.replace("fixture.o", "other.o"), elf,
+                          rsp_path=None)
+        ok(rep["verdict"] == "DROPPED" and "dead-stripped" in rep["why"],
+           f"dropped object: {rep['why']}")
+
     if fails:
         for f in fails:
             print("FAIL " + f, file=sys.stderr)
         return 1
     print(f"ok - {checks} checks")
     return 0
+
+
+def _fixture_elf2(sections):
+    """A minimal big-endian ELF32 *with section contents* (for read-backs)."""
+    names = [""] + [s[0] for s in sections] + [".shstrtab"]
+    sblob = b"\0"
+    offs = {}
+    for n in names:
+        if n and n not in offs:
+            offs[n] = len(sblob)
+            sblob += n.encode() + b"\0"
+    strndx = len(names) - 1
+    body = bytearray(b"\0" * 0x200)
+    content_off = {}
+    for name, _typ, _addr, _size, content in sections:
+        if content:
+            content_off[name] = len(body)
+            body += content
+    body += sblob
+    shoff = len(body)
+    hdr = b"\x7fELF\x01\x02\x01\x00" + b"\0" * 8
+    hdr += struct.pack(">HHIIIIIHHHHHH", 2, 20, 1, 0, 0, shoff, 0, 52,
+                       0, 0, 40, len(sections) + 2, strndx)
+    body[:0x40] = hdr.ljust(0x40, b"\0")
+
+    def sh(name, typ, addr, size, offset, flags=0):
+        return struct.pack(">IIIIIIIIII", offs.get(name, 0), typ, flags, addr,
+                           offset, size, 0, 0, 4, 0)
+
+    shdrs = [sh("", 0, 0, 0, 0)]
+    for name, typ, addr, size, content in sections:
+        shdrs.append(sh(name, typ, addr, size, content_off.get(name, 0),
+                        0x2 if typ == 1 else 0))
+    shdrs.append(sh(".shstrtab", 3, 0, len(sblob), len(body) - len(sblob)))
+    return bytes(body) + b"".join(shdrs)
+
+
+def _fixture_obj():
+    """A tiny Metrowerks-shaped object: .text + .ctors$10 + one ADDR32 reloc."""
+    names = ["", ".text", ".ctors$10", ".rela.text", ".symtab", ".strtab",
+             ".shstrtab"]
+    sblob = b"\0"
+    offs = {}
+    for n in names:
+        if n and n not in offs:
+            offs[n] = len(sblob)
+            sblob += n.encode() + b"\0"
+    strtab = b"\0" + b"foo\0" + b"bar\0"
+    syms = [(0, 0, 0, 0, 0, 0),        # null
+            (0, 0, 0, 0x03, 0, 1),     # .text (STT_SECTION)
+            (1, 0, 4, 0x12, 0, 1),     # foo: GLOBAL FUNC in .text
+            (0, 0, 0, 0x03, 0, 2),     # .ctors$10 section symbol
+            (5, 0, 4, 0x11, 0, 2)]     # bar: GLOBAL OBJECT in .ctors$10
+    symblob = b"".join(struct.pack(">IIIBBH", *s) for s in syms)
+    rel = struct.pack(">IIi", 0, (2 << 8) | 1, 0)      # ADDR32 -> foo
+    text = b"\0\0\0\0"
+    ctors = b"\0\0\0\0"
+    head = 0x34
+    off = head
+    parts, secdefs = b"", []
+
+    def add(name, typ, flags, blob, link=0, info=0, entsize=0):
+        nonlocal parts, off
+        secdefs.append((name, typ, flags, off, len(blob), link, info, entsize))
+        parts += blob
+        off += len(blob)
+    add(".text", 1, 0x6, text)
+    add(".ctors$10", 1, 0x2, ctors)
+    add(".rela.text", 4, 0, rel, link=4, info=1, entsize=12)
+    add(".symtab", 2, 0, symblob, link=5, info=2, entsize=16)
+    add(".strtab", 3, 0, strtab, entsize=1)
+    add(".shstrtab", 3, 0, sblob, entsize=1)
+    shoff = head + len(parts)
+    hdr = b"\x7fELF\x01\x02\x01\x00" + b"\0" * 8
+    hdr += struct.pack(">HHIIIIIHHHHHH", 1, 20, 1, 0, 0, shoff, 0, 52, 0, 0,
+                       40, len(secdefs) + 1, 6)
+    shdrs = [struct.pack(">IIIIIIIIII", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]
+    for name, typ, flags, o, size, link, info, entsize in secdefs:
+        shdrs.append(struct.pack(">IIIIIIIIII", offs[name], typ, flags, 0, o,
+                                 size, link, info, 4, entsize))
+    return hdr.ljust(head, b"\0") + parts + b"".join(shdrs)
 
 
 def _write_tmp_orders(text):
@@ -1154,6 +2454,35 @@ def build_parser():
     p.add_argument("elf")
     p.add_argument("--identity", default=None,
                    help="also byte-compare the ELF against this file")
+
+    p = sub.add_parser("trace", help="follow one input object through a real link")
+    p.add_argument("object", help="the input object to trace (build/RMHE08/.../*.o)")
+    p.add_argument("--map", default=None,
+                   help="the link map of the link to trace (default: "
+                        "build/RMHE08/main.MAP; use --link to make one)")
+    p.add_argument("--elf", default=None, help="the ELF that link produced")
+    p.add_argument("--rsp", default=None,
+                   help="the link's response file (decides whether the object is an input)")
+    p.add_argument("--link", action="store_true",
+                   help="run the build's own link first, into a scratch path")
+    p.add_argument("--link-out", default="build/RMHE08/main.elf",
+                   help="with --link, the build output whose input list to use")
+    p.add_argument("--ldscript", default=None, help="with --link, the -lcf script")
+    p.add_argument("--out", default="build/mwlink-debug", help="scratch dir for --link")
+    p.add_argument("--full-ctor", action="store_true",
+                   help="also print the whole merged .ctors/.dtors layout")
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("phases", help="the linker's phase table (msgid -> anchor)")
+    linker_arg(p)
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--prove", action="store_true",
+                   help="run a real link and observe the message ids and anchors")
+    p.add_argument("--args", default=None, help="the linker argument list")
+    p.add_argument("--out", default="build/mwlink-debug", help="scratch dir")
+    p.add_argument("--gdb", default=None)
+    p.add_argument("--require-all", action="store_true",
+                   help="with --prove, fail unless every anchor fired")
     return ap
 
 
@@ -1175,7 +2504,8 @@ def main(argv=None):
         print(f"linker not found: {args.linker}", file=sys.stderr)
         return 2
     fn = {"info": cmd_info, "messages": cmd_messages, "order": cmd_order,
-          "anchors": cmd_anchors, "timeline": cmd_timeline, "verify": cmd_verify}[args.cmd]
+          "anchors": cmd_anchors, "timeline": cmd_timeline, "verify": cmd_verify,
+          "trace": cmd_trace, "phases": cmd_phases}[args.cmd]
     try:
         return fn(args)
     except ValueError as exc:
