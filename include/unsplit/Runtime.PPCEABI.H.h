@@ -44,6 +44,13 @@ char* strcpy(char* dst, const char* src);     /* 0x8045F554, added with `menu/ar
 char* strcat(char* dst, const char* src);     /* 0x8045F658, likewise */
 int printf(const char* fmt, ...);          /* 0x8045EDBC, added with `NHTTP/NHTTP_bgnend.c` */
 
+/* The three below were declared locally in `Network/fn_8041A87C.cpp`; moved here with that unit's
+ * rule-2 pass.  They sit in the same MSL band (0x8045Bxxx / 0x8045Dxxx) and no registered unit
+ * covers their addresses. */
+void* memmove(void* dst, const void* src, u32 n);        /* 0x8045B598; untyped: memcpy-shaped byte range */
+int memcmp(const void* a, const void* b, u32 n);         /* 0x8045B6BC; untyped: byte range */
+int snprintf(char* dst, u32 size, const char* fmt, ...); /* 0x8045DDD8 - bounded formatter */
+
 #ifdef __cplusplus
 }
 #endif
