@@ -340,6 +340,15 @@ often an `owner_merge` artefact - verify it.
 
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 
+**Trace the shape before you type it.** Three steps answer "is this a class hierarchy?" cheaply, and any
+one of them can end the question (row 76): (1) the map's manglings - `__ct__<len><Name>Fv` / `__dt__` / `__vt__`
+name a real class, and a name with none of them is not a class however our source spells it; (2) a constructor
+that stores a table address at `+0x00` declares the vtable and names its table; (3) the shared slot offsets at
+the indirect call sites (`lwz r12,0(obj); lwz r12,NN(r12)`) - equal `NN` across **unrelated** objects is a
+duck-typed protocol, not a shared base, and that is exactly the distinction a hand-modelled table erases. A
+by-index accessor family over four names is usually one container with four slots: check whether the object's
+`+0x00` holds a code address (vtable) or a data address (container) before writing either.
+
 **Never hand-model a vtable.** A `struct` of function pointers written to stand in for a class's vtable is not a
 reconstruction and is not evidence of inheritance (row 52): the vtable must be **emitted by the compiler** from
 the class, which means the class itself has to be reconstructed - the constructor stores it at `+0x00` and the

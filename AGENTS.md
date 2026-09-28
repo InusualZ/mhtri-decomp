@@ -308,6 +308,7 @@ that section's own problem sentence, truncated at 220 characters - so this index
 | 73 | Never append `, ...` to a definition to dodge an argument-count mismatch | A retired object calls a function through a declaration with more arguments than the source signature carries, so the compiler refuses it. The tempting fix is to make the definition variadic (`void fn(int a, ...)`),... |
 | 74 | A data range dtk calls link PADDING needs a `type:function` symbol over the claim | `Runtime.PPCEABI.H/TRK_interrupt_vectors` - the 8,000 B TRK interrupt-vector image in `.init` - matched byte-for-byte and **could not land**: `dtk dol split` classifies the range as link padding (the analyzer finds no... |
 | 75 | `complete_code_percent` is a FLAG we set, not a measurement | `tools/project.py` writes `metadata.complete: true` into `objdiff.json` for every `Object(Matching, ...)`, and the report's unit row then reads `complete_code: 404, complete_code_percent: 100.0` **whatever the bytes... |
+| 76 | A class hierarchy is traced from MANGLINGS, the CTOR's vtable store and SHARED SLOT OFFSETS - and a by-index accessor family is usually a container | Our source modelled four `Network` entities (`NetworkSessionManagerPat`, `NetworkPatSlot04`, `NetworkCommunityPat`, `NetworkLayerPat`) as four classes behind a family of `void*` accessors (`getXPat(self, index)`,... |
 <!-- PLAYBOOK-INDEX-END -->
 
 The two tables below hold ideas with **no section of their own**: tried in one unit's context and failed,
