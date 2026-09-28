@@ -77,8 +77,8 @@ typedef struct NetworkStateMachine {
     /* +0x6C3C */ u8 fmpListReady_6C3C;
     /* +0x6C3D */ u8 pad_6C3D[0x03];
     /* +0x6C40 */ NetworkFmpSlot fmpSlots_6C40[80];
-    /* +0x8040 */ u32 fmpQueryValue_8040;   /* the FMP list query argument / result */
-    /* +0x8044 */ u8 pad_8044[0x04];
+    /* +0x8040 */ u32 fmpSelected_8040;     /* the FMP slot the query settled on (`getFmpSelected`) */
+    /* +0x8044 */ u32 fmpQueryValue_8044;   /* the FMP list query argument / result */
     /* +0x8048 */ u8 fmpReply_8048[0x0106];
     /* +0x814E */ u8 pad_814E[0x0106];
     /* +0x8254 */ u8 patState_8254;   /* == 3 means the PAT handshake is up */
@@ -147,8 +147,7 @@ typedef struct NetworkPostedError {
     /* +0x00 */ s32 code_00;
     /* +0x04 */ s32 param1_04;
     /* +0x08 */ s32 param2_08;
-    /* +0x0C */ s32 reported_0C;
-} NetworkPostedError;   /* size: 0x10 */
+} NetworkPostedError;   /* size: 0x0C */
 
 extern "C" {
 
@@ -216,7 +215,7 @@ extern const u16 sessionTimeoutParam;      /* 0x8079C7D8 */
 extern const u8  sessionTimeoutParam2;     /* 0x8079C7DA */
 extern const u32 requestHeaderWord0;       /* 0x8079C7E0 */
 extern const u32 requestHeaderWord1;       /* 0x8079C7E4 */
-extern const char maskedUserName[];        /* 0x80793968 */
+extern const char maskedUserName[7];       /* 0x80793968 - the map's own size, so MWCC uses sda21 */
 
 }
 

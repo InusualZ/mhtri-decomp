@@ -40,6 +40,24 @@
  *  - Where retail has `cmpwi`/`ble`/`cmpw`, the source compared *signed*: `(s32)field` casts
  *    (`handleNetworkState4` 0/20/35, `handleNetworkState2` 50, `handleNetworkState2Fmp` 10/70).
  *  - A state byte taken into a local is an `s32` local, not `u8` (retail's `cmpwi`, not `cmplwi`).
+ *  - A `u32` count/limit compared against a small constant is `cmpwi` in retail, i.e. the source
+ *    cast: `(s32)count < 30` not `count < 30`, `(s32)i < (s32)field` not `i < field`,
+ *    `(s32)field == -1` not `field == (u32)-1`.
+ *  - A *u8-typed* comparison survives only on a memory-loaded operand: `(u8)(field + 255) <= 1`
+ *    reproduces retail's `addi r0,rX,255; clrlwi r0,r0,24; cmplwi r0,1` where `field - 1 <= 1` gives
+ *    `subi`/`cmpwi` and `(u8)(field - 1)` gives `addi r0,rX,-1` + the mask.  On a local whose range
+ *    the optimizer proves (the tag index) the same cast measures byte-identical - the mask is folded
+ *    away, which is why `sendReqUserObject`'s masked index cannot be reached from the source side.
+ *  - A local byte buffer's *declared* size is the frame: `u8 block[4]` gives a 0x20 frame where the
+ *    target's 0x30 needs `u8 block[16]` (the bytes actually used are the same three), and every
+ *    prologue and save offset follows from it.
+ *  - An extern whose target reference is `R_PPC_EMB_SDA21` needs the symbol's real *size* in the
+ *    declaration (`extern const char maskedUserName[7]`, the map's own size); with `[]` MWCC emits
+ *    `lis`/`addi` plus two `R_PPC_ADDR16_*` relocations instead of one sda21 reference.
+ *  - An index store written `count = count + 1; tags[count - 1] = v` instead of
+ *    `tags[count] = v; count++` scores 3 points better on both rows that have it and emits
+ *    `addi r3,r1,base-1` + the unmasked index - an address-base fold (alignment), not retail's
+ *    `addi r3,r1,base` + masked copy.
  *
  * NAMES.  The runtime dump's map ("D:/WiiExperiment/DumpSymbols.zip") names 14 of the 21 already in
  * `symbols.txt`.  The six helpers it leaves as `zz_` were named in the registration batch's naming
@@ -67,42 +85,93 @@
  * unit, not from a recovered header - the object is 0x16D08 bytes and the dump's struct views do not
  * cover it.
  *
- * RESIDUALS (measured 2026-09-27: 91.87 %, 12 of 21 functions at 100 %, `.text` 7620 B target /
- * 7488 B ours - the size gap is the `handleNetworkState2Binary` shortfall below):
- *  - `handleNetworkState2Binary` 70.21 % (992 B): its case-60 tokenizer is the one place the original
- *    leaves a loop from *inside* two nested loops (retail branches straight from the inner skip
- *    loop's `== 0` test to the outer loop's exit); the conformant shape (`&& != 0` in the skip loop
- *    plus a `break`) is 68 B short and `goto` is forbidden by section 6.5 rule 8.  Ours is
- *    otherwise shaped differently: MWCC keeps a *rolling* pointer `self + i` where retail recomputes
- *    the offset from `i` and uses `lbzx` off `self` - no source shape tried reproduces retail's
- *    form (`u8* text = ...->binaryText_D409` and `(u8)count` both measure neutral or worse) - and the
- *    `for (k = index; k < 8; k++) tokens[k] = i` fill loop is emitted as a plain counted loop where
- *    retail has MWCC's unroll-by-8 block plus a remainder loop (`srwi`/`andi.`); the source shape that
- *    triggers that unroll was not found.
- *  - `sendReqUserObject` 83.39 % (520 B): retail masks every variable `tags` index (`clrlwi r0,r0,24`)
- *    and we do not, and its out-of-range error path builds two 12-byte records (retail stores
- *    `{0x80000000, 0, 0}` at `r1+20` *and* at `r1+8`, and reaches `postError_288` through the
- *    canonical `lwz r12,0(r3)` + `lwz r12,0x288(r12)` vcall) where ours builds one 16-byte record
- *    (`NetworkPostedError` in the unit header) and stages the vcall through the documented
- *    `NetworkInstanceVtable` table view.  The mask resisted every shape tried (`u8 count`, `u16`, an
- *    explicit `(u8)count` cast, `count++` as the index, a `u8` temp, `s8 tags[]`); the 12-byte record
- *    needs `NetworkPostedError` to lose its 4th field, which is a change to `include/` (outbox).
- *  - `sendReqUnknownCheck` 89.29 % (196 B): the same masked index (`block[count] = 2`) and one extra
- *    `li` retail has because its two `1` constants do not CSE.
- *  - `handleNetworkState2Fmp` 90.15 %, `handleNetworkState2` 95.53 %, `handleNetworkState4` 97.49 %:
- *    residual operand colouring in the case bodies (a loop counter in `r6`/`r10` where retail uses
- *    `r30`/`r7`) plus one branch polarity each; `handleNetworkState2Fmp`'s `+0x8040`/`+0x8044`
- *    writing pair does not match the header's single 0x8040 field (needs a 4-byte field inserted at
- *    0x8040 in `include/Network/network_state.h` - outbox).
- *  - `handleNetworkState1` 99.45 % (1736 B): the switch value is in `r4` where retail has `r6`, one
- *    cascade of 6 operand rows, plus one `li r4,2` placed one slot earlier in case 245.
- *  - `sendReqLoginInfo` 92.21 % (228 B), `sendReqOpcode1B` 94.74 % (156 B): retail loads the two
- *    request-header words before storing either (`header[0] = ...; header[1] = ...` stores each in
- *    turn); a `u32 header[2] = {...}` initialiser and hoisted temporaries both measure identical to
- *    the current form.
- *  - `datagap`: `target-extra .text 7620 B (ours 7488 B)` - the size residual above, not a data gap;
- *    `ours-extra .rela.text 1680 B (target 1668 B)` - one extra relocation.  `extab`/`extabindex`
- *    match the target's sizes (0x88 / 0xCC).
+ * RESIDUALS (measured 2026-09-27, second pass: 93.85 %, 12 of 21 functions at 100 %, `.text` 7620 B
+ * target / 7472 B ours - the whole size gap is `handleNetworkState2Binary`'s tokenizer below; every
+ * other function is within 4-8 B of the target):
+ *  - `handleNetworkState2Binary` 71.25 % (992 B / 916 B): its case-60 tokenizer is the one place the
+ *    original leaves a loop from *inside* two nested loops (retail branches straight from the inner
+ *    skip loop's `== 0` test to the outer loop's exit), and the conformant shape (`&& != 0` in the
+ *    skip loop plus a `break`) is 76 B short.  Ours keeps a *rolling* pointer `self + i` where retail
+ *    recomputes the offset from `i` and uses `lbzx` off `self`; MWCC emits the
+ *    `for (k = index; k < 8; k++) tokens[k] = i` fill loop as a plain `subfic`/`mtctr` counted loop
+ *    where retail has the unroll-by-8 block plus an `andi.` remainder; and our prologue saves 5
+ *    callee-saved registers (`bl _savegpr_27`) where retail saves 2 in line - the only remaining
+ *    relocation difference in the object (`target 1668 B` vs `ours 1692 B` of `.rela.text`).
+ *    Rejected for this row: a local `u8*`/`char* text` (60.8 %), a `u32* tokens` alias (60.1 %),
+ *    `-O2` (71.66 % on the row, 89.58 % unit), `-opt nostrength` (62.23 %, unit 90.47 %), and every
+ *    statement/declaration/loop-form permutation tried (byte-identical or worse).  The one landed
+ *    change is the `u32* tokens = self->binaryTokens_D60C;` alias (+1.03 % on the row, object 24 B
+ *    *smaller*) - an alignment effect of the fuzzy metric, not retail's shape.
+ *  - `sendReqUserObject` 89.87 % (520 B): the out-of-range error path is retail's now - two 12-byte
+ *    `{0x80000000, 0, 0}` records written high-then-low with the *low* one's address passed - which
+ *    is what a by-value `postError_288(self, info)` call produces (`NetworkPostedError` is 0x0C; a
+ *    by-value parameter makes MWCC build the argument copy and re-materialise the constants), and it
+ *    restores retail's 0x50 frame and every `r1+0x20` tag offset.  Left: (a) the masked tag index -
+ *    retail `mr r0,rX; addi rX,rX,1; clrlwi r0,r0,24; stbx` on all five variable indices, ours
+ *    index-only and unmasked; every shape tried measures byte-identical (`u8 count`, `s32 count`,
+ *    block- and function-scope `u8`/`u32` temps, `(u8)count` in all positions, `count++` as the index,
+ *    `tags[count++]`, `*(block + count)` and an inlined `appendTag` helper).  The reason is visible
+ *    now: `count` is a *local* whose range MWCC proves clean, so it folds the u8 conversion - the
+ *    mask survives only where the operand comes from memory (see `sendReqLoginInfo`) or is a
+ *    `u8`-typed conversion the optimizer cannot see through; (b) the vcall's vptr load - retail's
+ *    `lwz r12,0(r3)` + `lwz r12,0x288(r12)` is the genuine-virtual shape while our table view stages
+ *    it through a scratch register (`lwz r5,0(r27)`), and the sibling `Network/fn_8041A87C.cpp` gets
+ *    the r12 form from the same table view, so it is allocator choice, not the declaration.  Two
+ *    measured shapes are landed: `count` declared *before* `found`, and the index/increment pair
+ *    written `count = count + 1; tags[count - 1] = N;` rather than `tags[count] = N; count++;`.
+ *  - `sendReqUnknownCheck` 92.92 % (196 B / 184 B): the same masked index (`block[count] = 2`) and one
+ *    extra `li` retail has because its two `1` constants do not CSE.  The same index/increment
+ *    spelling as above (89.29 -> 92.92 %).
+ *  - `handleNetworkState2Fmp` 95.12 % (1192 B / 1184 B): one extra callee-saved register in the
+ *    prologue (`stw r29`) - ours caches `fmpSlotCount_6608` in `r30` and keeps the case-40 loop
+ *    counter in `r29`, where retail reloads the count from the object every iteration and keeps `i`
+ *    in the volatile `r10`; a `while` rewrite of that loop (to force the reload) measures 92.74 %, so
+ *    the caching is the optimizer's, not the shape's.  Elsewhere residual colouring (a loop counter
+ *    in `r6`/`r10` where retail has `r30`/`r7`) and the `memcpy` argument order in case 50.  Landed
+ *    here: case 35's `if (result > 0) { if (count > 0) {...; break;} return ...; }` layout (+1.16 %),
+ *    case 40's `if (bestValue <= remaining) {...} else if (secondValue <= remaining) {...}` with the
+ *    `<=` arm first (+3.59 %), the signed `(s32)fmpQueryValue_8044 == -1` test and the signed loop
+ *    bounds (+0.20 %).
+ *  - `handleNetworkState2` 98.19 % (1164 B / 1160 B): the loop's char test is retail's unfused
+ *    `lbz; extsb; cmpwi r0,0` where ours folds to `extsb.` - and this one is **not** a peephole row
+ *    (measured: a scoped peephole off/on pair around this function changes neither its bytes nor its
+ *    score, unlike `handleNetworkState2Binary`'s).  Nothing tried unfuses it: an `s8`/`char` local,
+ *    `(s32)`/`(s8)` casts on the element, `-O2`, and `-opt nocse` / `nopropagation` / `nodeadcode` /
+ *    `nolifetimes` (each byte-identical).  Also one `mr r5,r30` and the two `setConnectionPaths`
+ *    argument setups one slot out of place.  Landed here: case 70 as `if (count > 0) { loop } else
+ *    { return ...; } st->requestState_6135 += 10;` (95.53 -> 98.19 %) and the signed
+ *    `(s32)st->userRowCount_8BB4 > 0`.
+ *  - `handleNetworkState4` 98.01 % (464 B / 460 B): the same unfused `subf` + `cmpwi r0,0` (vs our
+ *    `subf.`) as `handleNetworkState2` in case 35, plus the `memset` argument order in case 10
+ *    (retail computes `addi r3,r3,0x6c40` before the two `li`s).  Hoisting the subtraction into a
+ *    `s32 remaining` local matches the target's *size* but drops the row to 95.47 %, so it is not
+ *    landed.  Landed: case 25's `(s32)count < 30` signed min-clamp (+0.52 %).
+ *  - `handleNetworkState1` 99.45 % (1736 B, byte-identical size): the switch value is in `r4` where
+ *    retail has `r6`, a cascade of 6 operand rows in the two `len < 8192 ? len : 8192` argument
+ *    setups (the transient `dataSent` lands in `r4`/`r6` where retail uses `r6`/`r7`) and one
+ *    `li r4,2` one slot earlier in case 245.  Pure allocator colouring; no shape found moves it.
+ *  - `sendReqLoginInfo` 95.30 % (228 B, byte-identical size): the u8-narrowed test is
+ *    `(u8)(loginInfoSent_82B4 + 255) <= 1` - retail's `addi r0,r3,255; clrlwi r0,r0,24;
+ *    cmplwi r0,1`, i.e. mod-256 arithmetic on a *memory-loaded* u8 field, which MWCC can neither fold
+ *    into `subi`/`cmpwi` nor drop.  `(u8)(field - 1)` measures 95.19 % (`addi r0,r3,-1`) and the
+ *    un-cast `field - 1 <= 1` 92.39 %.  `u8 block[4]` was the other half of this row: the target's
+ *    frame is 0x30 and ours 0x20 until the array is declared `u8 block[16]`, which makes the whole
+ *    prologue match (92.21 -> 92.39 % before the comparison fix).
+ *  - `sendReqOpcode1B` 94.74 % (156 B, byte-identical size): retail loads *both* request-header words
+ *    before storing either (`lwz r4,0(0); lwz r0,0(0); stw r4,8(r1); stw r0,12(r1)`); ours interleaves
+ *    load/store/load/store.  A brace initialiser, hoisted `u32` temporaries, a struct-typed local,
+ *    the reversed statement order and a `word0`/`word1` re-association all measure byte-identical.
+ *  - `datagap`: `target-extra .text 7620 B (ours 7472 B)` - the size residual above, not a data gap;
+ *    `ours-extra .rela.text 1692 B (target 1668 B)` - exactly the two `_savegpr_27`/`_restgpr_27`
+ *    relocations of `handleNetworkState2Binary`'s five-register prologue (the `maskedUserName`
+ *    reference is the target's `R_PPC_EMB_SDA21` again since the extern carries the map's size).
+ *    `extab`/`extabindex` match the target's sizes (0x88 / 0xCC).  The unit is not a
+ *    `datagap --flip-blockers` row.
+ *  - FLAG AXIS (each measured with `measure.py --main .`; `recompile.py`/`measure.py` take the command
+ *    line from MAIN's `build.ninja`, so a per-unit flag that has not landed cannot be measured with
+ *    the default form): `-O3` is best.  `-O2` 89.58 % unit (2Binary 71.66 %); `-opt nostrength`
+ *    90.47 % unit (2Binary 62.23 %); `-opt nocse`, `-opt nopropagation`, `-opt nodeadcode` and
+ *    `-opt nolifetimes` all byte-identical.
  *
  * DATA.  The unit owns no data section of its own: the constants it loads are unowned `.sdata2`/
  * `.sdata` rows that dtk keeps in the band's auto objects, declared `extern` in the unit header and
@@ -502,7 +571,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         sendReqOpcode1B(self, 1, 6);
         break;
     case 50:
-        if (st->userRowCount_8BB4 > 0) {
+        if ((s32)st->userRowCount_8BB4 > 0) {
             u32 total;
             u32 rows;
 
@@ -528,13 +597,14 @@ s32 handleNetworkState2(NetworkInstance* self)
         s32 i;
 
         count = (s32)st->userRowCount_8BB4;
-        if (count <= 0) {
-            return -(s32)(st->requestState_6135 + 1);
-        }
-        for (i = 0; i < count; i++) {
-            if (((NetworkUserRow*)st->userRows_8BB8)[i].shortName_04[0] == 0) {
-                return -(s32)st->requestState_6135;
+        if (count > 0) {
+            for (i = 0; i < count; i++) {
+                if (((NetworkUserRow*)st->userRows_8BB8)[i].shortName_04[0] == 0) {
+                    return -(s32)st->requestState_6135;
+                }
             }
+        } else {
+            return -(s32)(st->requestState_6135 + 1);
         }
         st->requestState_6135 += 10;
         break;
@@ -655,11 +725,11 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         s32 result = handleNetworkState4(self, 80);
 
         if (result > 0) {
-            if (st->fmpSlotCount_6608 <= 0) {
-                return -(s32)st->requestState_6135;
+            if ((s32)st->fmpSlotCount_6608 > 0) {
+                st->requestState_6135 += 5;
+                break;
             }
-            st->requestState_6135 += 5;
-            break;
+            return -(s32)st->requestState_6135;
         }
         if (result < 0) {
             return -(s32)(st->requestState_6135 + result);
@@ -673,31 +743,29 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         s32 secondValue = -1;
         u32 i;
 
-        st->fmpQueryValue_8040 = (u32)-1;
-        for (i = 0; i < st->fmpSlotCount_6608; i++) {
+        st->fmpQueryValue_8044 = (u32)-1;
+        for (i = 0; (s32)i < (s32)st->fmpSlotCount_6608; i++) {
             u32 remaining;
 
             if ((s32)st->fmpSlots_6C40[i].total_14 <= 0) {
                 continue;
             }
             remaining = st->fmpSlots_6C40[i].total_14 - st->fmpSlots_6C40[i].done_10;
-            if (bestValue > (s32)remaining) {
-                if (secondValue <= (s32)remaining) {
-                    secondValue = (s32)remaining;
-                    st->fmpQueryValue_8040 = i;
-                }
-            } else {
+            if (bestValue <= (s32)remaining) {
                 secondValue = bestValue;
-                st->fmpQueryValue_8040 = bestIndex;
+                st->fmpQueryValue_8044 = bestIndex;
                 bestValue = (s32)remaining;
                 bestIndex = i;
+            } else if (secondValue <= (s32)remaining) {
+                secondValue = (s32)remaining;
+                st->fmpQueryValue_8044 = i;
             }
         }
-        if (st->fmpQueryValue_8040 == (u32)-1) {
+        if ((s32)st->fmpQueryValue_8044 == -1) {
             st->requestState_6135 += 20;
             break;
         }
-        st->fmpSelected_65F8 = st->fmpQueryValue_8040;
+        st->fmpSelected_65F8 = st->fmpQueryValue_8044;
         st->requestState_6135 += 5;
         sendReqFmpInfo(self, st->fmpSlots_6C40[st->fmpSelected_65F8].payload_00, 1);
         break;
@@ -712,7 +780,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         s32 bestValue = -1;
         u32 i;
 
-        for (i = 0; i < st->fmpSlotCount_6608; i++) {
+        for (i = 0; (s32)i < (s32)st->fmpSlotCount_6608; i++) {
             u32 remaining;
 
             if ((s32)st->fmpSlots_6C40[i].total_14 <= 0) {
@@ -779,7 +847,7 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
             ((NetworkStateMachine*)self)->patPhase_894E = ((NetworkStateMachine*)self)->fmpPhase_894D;
             break;
         }
-        ((NetworkStateMachine*)self)->fmpQueryValue_8040 = (u32)-1;
+        ((NetworkStateMachine*)self)->fmpQueryValue_8044 = (u32)-1;
         if (((NetworkStateMachine*)self)->fmpPhase_894D == 3) {
             ((NetworkStateMachine*)self)->shutdownFlag_6559 = 1;
             ((NetworkStateMachine*)self)->requestState_6135 += 5;
@@ -825,6 +893,7 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
             u32 j;
             u32 k;
 
+            u32* tokens = ((NetworkStateMachine*)self)->binaryTokens_D60C;
             memset(((NetworkStateMachine*)self)->binaryTokens_D60C, 0, sizeof(((NetworkStateMachine*)self)->binaryTokens_D60C));
             for (j = 0; j < 8; j++) {
                 while (((NetworkStateMachine*)self)->binaryText_D409[i] != '\t' && ((NetworkStateMachine*)self)->binaryText_D409[i] != 0) {
@@ -843,7 +912,7 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
                 if (((NetworkStateMachine*)self)->binaryText_D409[i] == 0) {
                     break;
                 }
-                ((NetworkStateMachine*)self)->binaryTokens_D60C[index] = i;
+                tokens[index] = i;
                 index++;
                 i++;
                 while (((NetworkStateMachine*)self)->binaryText_D409[i] != '\r' && ((NetworkStateMachine*)self)->binaryText_D409[i] != '\n' &&
@@ -859,7 +928,7 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
                 }
             }
             for (k = index; k < 8; k++) {
-                ((NetworkStateMachine*)self)->binaryTokens_D60C[k] = i;
+                tokens[k] = i;
             }
         }
         ((NetworkStateMachine*)self)->requestState_6135 += 10;
@@ -952,8 +1021,8 @@ s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u
             block[0] = 1;
         }
         if (tags[1] != 0) {
-            block[count] = 2;
-            count++;
+            count = count + 1;
+            block[count - 1] = 2;
         }
     }
     putItemTaggedBytes(((NetworkStateMachine*)self), tags, count, block);
@@ -963,7 +1032,7 @@ s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u
 
 s32 sendReqLoginInfo(NetworkInstance* self)
 {
-    u8 block[4];
+    u8 block[16];
     u32 count = 0;
     s32 ret;
 
@@ -973,7 +1042,7 @@ s32 sendReqLoginInfo(NetworkInstance* self)
         block[1] = 8;
         count = 3;
         block[2] = 9;
-    } else if (((NetworkStateMachine*)self)->loginInfoSent_82B4 - 1 <= 1) {
+    } else if ((u8)(((NetworkStateMachine*)self)->loginInfoSent_82B4 + 255) <= 1) {
         block[0] = 6;
         count = 2;
         block[1] = 9;
@@ -1036,9 +1105,9 @@ s32 sendReqOpcode1F(NetworkInstance* self)
 /* Sends one user's row, tagging every field that differs from the local row. */
 s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
 {
+    u32 count = 0;
     NetworkUserRow* found;
     u8 tags[16];
-    u32 count = 0;
     s32 flag;
     s32 ret;
 
@@ -1048,8 +1117,7 @@ s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
         info.code_00 = -2147483648;
         info.param1_04 = 0;
         info.param2_08 = 0;
-        info.reported_0C = 0;
-        ((NetworkInstance*)self)->vtable->postError_288(self, (NetworkErrorInfo*)&info);
+        ((void (*)(void*, NetworkPostedError))((NetworkInstance*)self)->vtable->postError_288)(self, info);
         return -1;
     }
     found = (NetworkUserRow*)(((NetworkStateMachine*)self)->userRows_8BB8 + index * 92);
@@ -1058,25 +1126,24 @@ s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
         tags[0] = 3;
     }
     if (row->field_30 != found->field_30) {
-        u8 n = count;
-        tags[n] = 5;
-        count++;
+        count = count + 1;
+        tags[count - 1] = 5;
     }
     if (row->field_2C != found->field_2C) {
-        tags[count] = 4;
-        count++;
+        count = count + 1;
+        tags[count - 1] = 4;
     }
     if (row->field_34 != found->field_34) {
-        tags[count] = 6;
-        count++;
+        count = count + 1;
+        tags[count - 1] = 6;
     }
     if (row->field_38 != found->field_38) {
-        tags[count] = 7;
-        count++;
+        count = count + 1;
+        tags[count - 1] = 7;
     }
     if (strcmp(row->playerName_3C, found->playerName_3C) != 0) {
-        tags[count] = 8;
-        count++;
+        count = count + 1;
+        tags[count - 1] = 8;
     }
     if (strcmp(found->shortName_04, maskedUserName) == 0) {
         flag = 1;
@@ -1137,7 +1204,7 @@ s32 handleNetworkState4(NetworkInstance* self, s32 arg)
         st->fmpState_6137 += 5;
         finished = st->replySent_8BCC;
         count = st->replyTotal_8BD0 - finished;
-        sendReqFmpListData(self, finished + 1, count < 30 ? count : 30);
+        sendReqFmpListData(self, finished + 1, (s32)count < 30 ? (s32)count : 30);
         break;
     }
     case 35:
@@ -1152,7 +1219,7 @@ s32 handleNetworkState4(NetworkInstance* self, s32 arg)
         sendReqFmpListFoot(self);
         break;
     case 50:
-        st->fmpSelected_65F8 = getFmpSlotIndex(st, st->fmpQueryValue_8040);
+        st->fmpSelected_65F8 = getFmpSlotIndex(st, st->fmpSelected_8040);
         return 1;
     default:
         break;
