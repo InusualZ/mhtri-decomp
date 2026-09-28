@@ -20,13 +20,60 @@ positional `diff` value shown beside it when it differs. A pre-existing `diff.js
 so that path prints the positional value and says so: objdiff's `match_percent` is positional (one
 inserted/deleted instruction shifts every later instruction, so a single early divergence can report
 ~0 %) and its relocation default differs from the report's. Read the first divergence, not the percentage.
+
+Every run writes its project, report and diff JSON under a **unique** temp directory
+(`session_tmpdir()`), removed at exit.  The shared `build/tmp/unitutil/unitutil_report.json` was held by
+another process twice and raised `PermissionError [WinError 5]`, costing a measurement round (2026-09-28);
+a unique directory (with a transient-lock retry) removes the collision.
 """
+import atexit
 import json
 import os
+import shutil
 import sys
+import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
 import unitutil as uu
+
+
+_TMPDIR = None
+
+
+def session_tmpdir() -> str:
+    """A **unique** scratch directory for this invocation, removed at exit.
+
+    The shared `build/tmp/unitutil/unitutil_report.json` cost a measurement round twice: a review lane
+    hit `PermissionError [WinError 5]` removing/creating it while another process held it, and fell back
+    to `build/RMHE08/report.json` (2026-09-28).  Each invocation now owns its project/report/diff files
+    (`build/tmp/` is shared scratch), so two concurrent `symdiff.py` runs cannot collide, and the
+    directory is cleaned up on exit.
+    """
+    global _TMPDIR
+    if _TMPDIR is None:
+        _TMPDIR = tempfile.mkdtemp(prefix="symdiff-")
+        atexit.register(shutil.rmtree, _TMPDIR, ignore_errors=True)
+    return _TMPDIR
+
+
+def retry_transient(fn, attempts: int = 4):
+    """Call `fn()`, retrying the transient Windows sharing violation (WinError 5) with backoff.
+
+    The unique directory already removes the collision; this covers a transient antivirus/indexer lock
+    on the file the caller just created, which `os.remove`/`open` can still raise once.
+    """
+    delay = 0.05
+    last: PermissionError | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except PermissionError as exc:
+            last = exc
+            if i + 1 < attempts:
+                time.sleep(delay)
+                delay *= 2
+    raise (last if last else PermissionError("transient file lock"))
 
 
 def cli():
@@ -48,7 +95,7 @@ def cli():
             if not rest or rest[0] == "--all":
                 return None, None, unit
             symbol = rest[0]
-            path, log = uu.objdiff(unit, symbol)
+            path, log = uu.objdiff(unit, symbol, out=os.path.join(session_tmpdir(), "diff.json"))
             if not path:
                 raise SystemExit("objdiff failed: " + log)
             sys.argv = [sys.argv[0], path, symbol] + rest[1:]
@@ -66,7 +113,8 @@ def list_symbols(unit) -> int:
     `report.json` carries), never a fabricated 0.0: a target object that does not exist yet is an error
     that names the path and says why, so a proposal unit's first run is not read as "everything 0 %".
     """
-    entries = uu.report_functions(unit.target, unit.obj, unit.name)
+    entries = retry_transient(lambda: uu.report_functions(unit.target, unit.obj, unit.name,
+                                                          tmpdir=session_tmpdir()))
     if "_error" in entries:
         raise SystemExit(
             "cannot score %s: %s\n  target object: %s\n"
@@ -141,7 +189,8 @@ def official_match(unit, name):
     """The report metric for `name`, or None when it cannot be obtained (never a fabricated score)."""
     if unit is None:
         return None
-    m = uu.report_measure(unit.target, unit.obj, name, unit.name)
+    m = retry_transient(lambda: uu.report_measure(unit.target, unit.obj, name, unit.name,
+                                                  tmpdir=session_tmpdir()))
     if "error" in m:
         return None
     return m.get("match_percent")
