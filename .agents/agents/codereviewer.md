@@ -97,7 +97,11 @@ them before you form an opinion, and cite the rule number rather than your taste
    reason is one of the genuinely untyped cases. A type defined twice is a finding - one header owns it.
 5. **Comments.** A function comment describes what the function does, in one or two lines, present tense, and
    **contains neither the symbol's name nor a percentage**. Unit-level facts (residuals, flags, name
-   provenance, source shapes that are load-bearing) belong in the file header. A header longer than the two
+   provenance, source shapes that are load-bearing) belong in the file header. **Judge a header by whether its
+   content is *residual* or *inventory*:** the matching policy *requires* the residual, so a 21-function unit
+   at 91.9 % legitimately carries thirteen residual bullets, while a one-function unit carrying thirteen is the
+   defect. (The "longer than the two reference units'" phrasing that used to sit here named no reference unit,
+   in this profile or in AGENTS.md, and was unactionable as written.)
    reference units' is itself a finding: it is noise the next reader has to skip.
 6. **Codegen-adjacent hygiene.** A `#pragma` lives in the `.c`/`.cpp` it targets, never in a shared header
    (it leaks into every TU that includes it). Adding an `#include` to a unit is a codegen change in this
@@ -114,6 +118,36 @@ them before you form an opinion, and cite the rule number rather than your taste
    findings, parked decisions, unowned bands). Do not report it as new: check `docs/tooling-requests.md` and
    `.pi/notes/` for the register entry, and if a finding *is* new, say so in terms that match the register's
    kind vocabulary (`naming`, `band-header`, `untyped`, `range`, `shared-file`, `flag`) so it can be filed.
+  * **the relocation half is a check you can run**: every symbol name our object references must be defined by
+    our object, or be a row in `symbols.txt`, or be provided by a link input **other than the target object**.
+    `flipcheck.py` covers only the `@etb_`/`@eti_` fragment class; the general question is
+    `flipcheck.object_symbols()` + `flipcheck.link_reference_context()` over the link inputs (~15 lines), and it
+    is what found `Network/NetworkWiiMediator`'s four undefined constructors - a flip would have answered
+    `undefined: '__ct__12PatInterfaceFv'`. Also diff the relocation **names** our object emits against
+    `symbols.txt`: a source calling a name no map row carries is a flip blocker no per-symbol score shows.
+  * **a permutation - the section is the right size, every symbol is at 100 %, and the bytes are in the wrong
+    place.** `Network/NetworkPat` measured 99.83 % with twelve symbols at 100 %, `extab`/`extabindex`
+    byte-identical and equal section sizes - and **577 of 720 `.text` bytes mislaid**, because the object's
+    layout is the source's definition order and ours was not the address order. The project writes the rule
+    down (`src/Pl/pl_act.cpp:227`, `src/g3d/g3d_resnode.cpp:113`, `src/menu/menu_item_page.cpp:37`) and no tool
+    checks it. When sizes match and symbols score ~100 % but `flipcheck` still reports a section byte difference,
+    compare our symbol address order to the target's (`objdump -t | sort`): its "first differing byte" message
+    reads the same as a three-instruction residual, and the fix is forward declarations plus source order =
+    address order.
+  * **row 36 by name**: an exported symbol our object does not force active is deadstripped by a flip (the
+    target's `.comment` marks it force-active `0x08`). The fix is `__declspec(export)` per symbol; the census is
+    broad (`Network/NetworkWiiMediator` alone carries 14), so read `flipcheck.py`'s row-36 lines rather than
+    assuming the class is absent.
+   **Know the lint's limits before writing "placement clean".** `stylelint.py` rule 2 matches an `extern`
+   **keyword** and runs on `src/**` and `include/unsplit/*.h` only - so a plain prototype in a `.cpp` and a
+   foreign declaration in `include/<module>/*.h` are invisible to it (measured: 0 rule-2 findings across the
+   whole `Network` scope, against four real sites). Probe those two shapes by hand with
+   `stylelint.header_declarations` + `stylelint.load_ownership` + `_owns`, and note that `_owns()` recognises
+   only `src/<unit>` today, so an owner's own header reads as foreign until that is fixed.
+   The registers are `tools/units/backlog.py` (fed by `.pi/outbox/*.json` and `.pi/notes/*.md`) and
+   `docs/tooling-requests.md`. **`rename` is not one of `backlog.py`'s kinds**, so a rename filed in a
+   lane's outbox is picked up by nothing - a filed-but-unapplied change is a lost record, and you should
+   say so explicitly, quoting the outbox file and the note line it came from.
 
 ## How to gather evidence (never an impression)
 
