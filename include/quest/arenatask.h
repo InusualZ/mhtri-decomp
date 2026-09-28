@@ -57,6 +57,14 @@ extern nw4r::math::VEC3 arena_light_vec[4];    /* four direct-light positions */
 extern ArenaQuestInfoList* que_info;
 extern u8* arena_lsp_data_adrs;
 
+/* The 0x200-byte arena user-data record buffer the two `arena_eqdata_from_*` fillers build their
+ * record in and `arena_userdata_apply` consumes (`.bss` 0x806E3E10, claimed with this unit).  Its two
+ * 0x100-byte records are selected by the player work's own `chunk_ofs << 8`; the GUESS in the name is
+ * that stride, which is what `arena_eqdata_from_vsuser` and `Pl/fn_80288CEC.cpp`'s `fn_8028F1E8`
+ * both index it with.  `Pl/fn_80288CEC.cpp` is the one foreign reader (rule 2: it includes this
+ * header for it). */
+extern u8 arena_user_data_buf[];
+
 /* Pooled float constants the band's setup functions address as globals (playbook 29: declare, never
  * define - a definition would make MWCC emit a second copy in `.sdata2`).  Each is named for the
  * place `arena_camera_light_vec_init` writes it into. */
@@ -73,19 +81,55 @@ extern const f32 arena_n20f;              /* .sdata2 0x8079C990, -20.0f */
 extern const f32 arena_100f;              /* .sdata2 0x8079C994, 100.0f */
 
 /* The `.data`/`.sdata2` colour pair `arena_light_init` hands to the light unit: the four direct-light
- * colours (`lbl_806073E0` until this pass) and the single ambient colour (`lbl_8079C970`).  They are
+ * colours and the single ambient colour (the two `lbl_` rows these replaced were renamed in the
+ * band's naming pass).  They are
  * spelled as the 4-byte words the target itself copies (`lwz`/`stw`, not the four `lbz`/`stb` a
  * struct-of-bytes member copy emits), and the caller reinterprets each word as the `_GXColor` the two
  * setters take. */
 extern u32 arena_light_colors[4];         /* .data 0x806073E0 */
 extern const u32 arena_ambient_color;     /* .sdata2 0x8079C970 */
 
+/* The ten-float spawn-offset table `arena_player_init` indexes with a three-float stride (`.data`
+ * 0x806073B8): its three 12-byte rows are slot kind 0/1/2's `(x, y, z)`.  Declared extern like the
+ * pool above - the range is this unit's own, so a definition would rebuild the run. */
+extern const f32 arena_player_offset_table[10];
+
+/* The arena stage configuration table the band's three task bodies index with `stage_0x0C * 0x3B0`
+ * (`.data` 0x80604D30, ten 0x3B0-byte records).  It is the first symbol of this unit's `.data`
+ * claim on the low side, and the definition is a TRANSCRIPTION - see its own comment in
+ * `src/quest/arenatask.cpp` for why the record internals are not reconstructed yet. */
+extern u32 arena_stage_config[2360];
+
 /* 0x80446B8C - installs the arena scene's ambient light and the four direct lights (its body is in
  * `src/quest/arenatask.cpp`). */
 void arena_light_init(void);
 
+/* 0x80445C84 - packs each of a player's six `_EQUIP` records into its `+0x04` word.  The parameter is
+ * the move-work record `get_move_work_adrs(2)` hands back, so the shape is forward-declared here. */
+struct _PLW;
+void arena_equip_color_set(struct _PLW* plw);
+
+/* 0x80445EB8 / 0x804461B4 - build the arena user-data record the two Vs modes read.  Both take a
+ * player's move-work record and both are in `src/quest/arenatask.cpp`. */
+void arena_eqdata_from_userdata(struct _PLW* plw);
+void arena_eqdata_from_vsuser(struct _PLW* plw);
+
+/* 0x80446990 - places every player's move work at its arena spawn offset, gives it the motion its
+ * equip slot's kind selects, and marks the slot the player index agrees with (its body is in
+ * `src/quest/arenatask.cpp`). */
+void arena_player_init(ArenaEqParams* params);
+
 #ifdef __cplusplus
 }
+
+/* ---- the mangled half (rule 9) ---- */
+
+/* 0x80445DBC - converts one 0xEC-byte acdata equip record into the arena's own `_arena_eq_data`
+ * view: its eight 0xC-byte head records, the `6` slot count and the two trailing blobs (0x60 +
+ * 0x20).  The record's own tag is `_arena_eq_data` - the map row's spelling
+ * (`dl_acdata_to_ar_eqdata__FP14_arena_eq_dataUc`) is the evidence for it, and the tag is what MWCC
+ * mangles the parameter type from. */
+void dl_acdata_to_ar_eqdata(_arena_eq_data* data, u8 index);
 #endif
 
 #endif /* MHTRI_QUEST_ARENATASK_H */

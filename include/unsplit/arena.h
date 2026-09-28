@@ -34,7 +34,7 @@ typedef struct ArenaWork {
     /* +0x04 */ u8 mode_0x04;             /* 1 vs 2 selects the Vs (2-player) variant, read by `arena_task` */
     /* +0x05 */ u8 unused_0x05[0x07];
     /* +0x0C */ s32 stage_0x0C;           /* 0..9, the arena stage index; `arena_task` writes `0x2328 + stage` to `lb_param_w+0x00` and indexes the 0x3B0-byte config record with it */
-    /* +0x10 */ u8 unused_0x10[0x04];
+    /* +0x10 */ const u8* eq_data_0x10;   /* the arena's 0xEC-byte acdata equip records `arena_eqdata_from_userdata` indexes with the player's chunk slot (`arena_work + 0x10` is loaded as a full word) */
     /* +0x14 */ u8 eq_slot_0x14;          /* 0..3, the 0xEC-byte eq record inside the stage's config */
     /* +0x15 */ u8 unused_0x15[0x17];
     /* +0x2C */ u8 other_eq_0x2C;         /* the equip index a *remote* player chose */
@@ -74,13 +74,13 @@ typedef struct ArenaEqDataHead {
 
 /* The 0xEC-byte arena equipment record `dl_acdata_to_ar_eqdata` fills: eight heads, a count byte and
  * two trailing blobs copied verbatim out of the acdata record. size: 0xEC */
-typedef struct ArenaEqData {
+typedef struct _arena_eq_data {
     /* +0x00 */ ArenaEqDataHead head_0x00[8];
     /* +0x60 */ u8 count_0x60;
     /* +0x61 */ u8 unused_0x61[0x0B];
     /* +0x6C */ u8 body_0x6C[0x60];
     /* +0xCC */ u8 tail_0xCC[0x20];
-} ArenaEqData; /* size: 0xEC */
+} _arena_eq_data; /* size: 0xEC */
 
 /* One 0x18-byte per-player arena equip slot: `arena_eqdata_reset` clears it and `arena_eqdata_apply`
  * fills `kind_0x08`/`state_0x03` in it.  Only the offsets those two functions touch are named. size: 0x18 */

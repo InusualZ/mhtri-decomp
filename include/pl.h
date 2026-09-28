@@ -220,7 +220,10 @@ struct _PLW {
                                 /* +0x01B */ u8 field_0x01B;   /* the "no surface contact" byte `Pl/fn_8025F088.cpp` clears */
         };
     };
-    /* +0x01C */ u8 pad_0x1C[0x1];
+    /* +0x01C */ u8 user_profile_0x1C;   /* the local player's profile byte `arena_eqdata_from_vsuser`
+                                          * copies into the arena user-data record's byte 8 (the same
+                                          * slot the game's user-data block fills at its +158);
+                                          * GUESS - derived from that body's store, see the unit header */
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
     /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `Pl/fn_80224AC4.cpp` */
     /* +0x01F */ union {   /* one byte, two spellings (rule 5) */
@@ -1130,7 +1133,7 @@ struct _PLW {
                                                     * main's `fn_8027D6DC` sets on every call */
                     /* +0x5CA */ union {   /* the 0x1B-byte tail, two spellings (rule 5) */
                         /* +0x5CA */ u8 pad_0x5CA[0x1B];
-                        /* +0x5CA */ u8 unk5CA[0x5E5 - 0x5CA];
+                        /* +0x5CA */ u8 user_profile_0x5CA[0x5E5 - 0x5CA]; /* the 17 bytes `arena_eqdata_from_userdata` copies out of the game's user-data block (its offsets 3..19); GUESS - the run has no name in the dump */
                     };
                 };
             };
@@ -1242,7 +1245,11 @@ struct _PLW {
     /* +0xB05 */ u8 name_0xB05[10];  /* the hunter name the lobby compares with the move work */
     /* +0xB0F */ u8 pad_0xB0F[0xB];
     /* +0xB1A */ u8 field_0xB1A;
-    /* +0xB1B */ u8 pad_0xB1B[0x5];
+    /* +0xB1B */ u8 pad_0xB1B[0x1];
+    /* +0xB1C */ u8 user_profile_0xB1C[0x4];  /* the four profile bytes `arena_eqdata_from_vsuser`
+                                               * serialises into the arena user-data record's bytes
+                                               * 9/10/12/13; GUESS - derived from that body's four
+                                               * stores, see the unit header */
 };
 
 #ifdef __cplusplus

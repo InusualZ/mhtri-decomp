@@ -42,6 +42,14 @@ void* fn_80047398(void);
 /* 0x8004C4F0 - the record copy the light unit's copy constructor calls; added with the
  * `light/light.cpp` registration (rule 2: this range owns the address). */
 void fn_8004C4F0(u8* dst, const u8* src);
+/* 0x8004A240 - applies one 0x100-byte arena user-data record to a player's move-work record: it
+ * copies the record's header bytes, unpacks its two packed big-endian words into the work's own
+ * `+0x258`/`+0x25C` byte pairs, copies six `_EQUIP` records and two `{u16 id, s16 level}` arrays
+ * into the work, and stores the equip type it derives.  Its two consumers are the arena task band's
+ * `aqua_eqdata_from_userdata`/`from_vsuser` (both publish the record they built) and
+ * `Pl/fn_80288CEC.cpp`'s `fn_8028F1E8`.  Both call sites hand it byte views, so the parameters are
+ * the byte pointers they pass.  Renamed from `fn_8004A240` with `quest/arenatask.cpp` (rule 7). */
+void arena_userdata_apply(u8* user_data, u8* work);
 
 /* Added with the `ef/eft052.cpp` registration (rule 2: this range owns every one of these
  * addresses - the cabinet/item-page helpers the cockpit hold band calls). */
