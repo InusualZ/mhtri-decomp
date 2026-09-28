@@ -57,8 +57,9 @@ typedef struct NHTTPRequest {
     /* +0x3A */ char code[0x12];             /* the 18-byte code NHTTPAddPostDataRaw walks */
 } NHTTPRequest; /* size: 0x4C */
 
-/* the cancellation callback `NHTTPi_CleanupAsync` invokes when the caller passed one */
-typedef void (*NHTTPCompletionCallback)(void);
+/* the cancellation callback `NHTTPi_CleanupAsync` invokes when the caller passed one:
+ * `NHTTPCompletionCallback` moved to `NHTTP/d_nhttp.h`, which this file includes - `NHTTPDestroy`
+ * there is handed the same callback. */
 
 void NHTTPi_SetError(NHTTPInfo* info, s32 err);
 void NHTTPi_SetSSLError(NHTTPInfo* info, s32 err);
