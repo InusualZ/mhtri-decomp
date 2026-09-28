@@ -168,16 +168,20 @@ typedef struct QuestRecord {
     /* +0x13C */ u8 unused_0x13C[0x05C];
     /* +0x198 */ u8 field_0x198;      /* index into string table 41 */
     /* +0x199 */ u8 unused_0x199[0x173];
-    /* +0x30C */ s32 field_0x30C;
+    /* +0x30C */ u8 field_0x30C[2];  /* the two per-slot monster ids (bytes 0/1)
+                                      * `quest_monster_text_get` renders through string table 33 */
+    /* +0x30E */ u8 unused_0x30E[0x002];
     /* +0x310 */ u8 unused_0x310[0x038];
     /* +0x348 */ s32 field_0x348;
     /* +0x34C */ s32 field_0x34C;
     /* +0x350 */ s32 field_0x350;
     /* +0x354 */ s32 field_0x354;
-    /* +0x358 */ u8 unused_0x358[0x01A];
+    /* +0x358 */ u8 unused_0x358[0x014];
+    /* +0x36C */ u16 field_0x36C;     /* `quest_slot_progress_get` returns its low byte */
+    /* +0x36E */ u8 unused_0x36E[0x004];
     /* +0x372 */ u16 field_0x372;
     /* +0x374 */ u8 unused_0x374[0x3A0];
-} QuestRecord;
+} QuestRecord; /* size: 0x714 (lower bound) */
 /* One 0x60-byte entry of the quest work block's element array at `quest_work` +0x94: `flags` gates
  * the entry, `id` is the u16 the callers match on and `value` is the count/target they compare.
  * `key_bytes` is the same +0x04..+0x06 pair as three bytes - `quest_players_state_get` reads the
@@ -191,7 +195,7 @@ typedef struct QuestElement {
         };
         /* +0x04 */ u8 key_bytes[3];
     };
-    /* +0x07 */ u8 unused_0x07[0x59];
+    /* +0x08 */ u8 unused_0x08[0x58];
 } QuestElement;
 /* The quest/arena work block (`quest_work`, .bss 0x806C5858, 0x6AB8 B - the size `quest_init`
  * memsets).  `quest_work_ptr` (.sbss 0x80794C40) is the same object's address.  Only the offsets
@@ -262,7 +266,7 @@ extern "C" ScreenGeomView Screen_w;
 /* The band's own data tables. */
 extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] */
 extern u8 quest_byte_table[];      /* .data 0x805F78B4 */
-extern u8* arena_time_table[];     /* .data 0x805F7AF8, 12 pointers to u16 time tables */
+extern u16* arena_time_table[];    /* .data 0x805F7AF8, 12 pointers to u16 time tables */
 extern char* quest_grade_none_text_table[];   /* .data 0x8060DAD8, indexed by `system_w`'s map index */
 extern u16 multi_arena_clr_time[];     /* .data 0x805F7B28, 10 u16 pairs */
 /* Pooled float constants the target objects address as globals (playbook 29: declare, never
