@@ -57,6 +57,7 @@
 #include "RSO/runtime.h"     /* RSOModule + RSOStaticLocateObject (rule 2) */
 #include "fn_80040598.h"     /* the game-root RSO loaders (rule 2) */
 #include "ef/fn_800CDB2C.h"  /* fn_800CF208 / fn_800CEE2C (rule 2) */
+#include "quest/arenatask.h" /* arena_task: the arena-select task ArenaSelExec installs (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/g3d.h"     /* fn_8007A510 (rule 2) */
 
@@ -178,7 +179,6 @@ extern void fn_80523490(void);
 extern s32 task_func;
 extern void fn_8028DDCC(void);
 extern void fn_8028E528(void);
-extern void fn_804463C4(void);
 extern void fn_8028BF1C(void);
 extern void fn_803A13B4(void);
 extern void fn_8021F3A8(void);
@@ -492,7 +492,7 @@ extern "C" TaskSlot* fn_8004192C(s16 slot)
     return &lbl_80659150[slot];
 }
 
-/* The arena-select task entry: load the four-overlay mode and hand slot 4 to fn_804463C4. */
+/* The arena-select task entry: load the four-overlay mode and hand slot 4 to `arena_task`. */
 extern "C" void fn_80041944(void)
 {
     fn_80040CA8();
@@ -513,7 +513,7 @@ extern "C" void fn_80041A30(void)
 void ArenaSelExec(void)
 {
     fn_80040CA8();
-    Tsk_Change((void*)&fn_804463C4, 4);
+    Tsk_Change((void*)&arena_task, 4);
 }
 
 extern "C" void fn_80041A64(void* block)

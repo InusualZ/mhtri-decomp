@@ -15,6 +15,7 @@
 #define MHTRI_LOBBY_LB_COMPANION_UI_H
 
 #include "types.h"
+#include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
@@ -492,7 +493,6 @@ s32 fn_8042CB9C(void);
 u32 fn_8042CC20(void);
 s32 fn_8042CB6C(u8 index);
 s8 fn_8042C850(void);
-void fn_80445D58(u8 a, u8 b);
 void fn_80125F54(void* text);
 void fn_80142C58(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void fn_80146C00(s8 value, u8 index);
