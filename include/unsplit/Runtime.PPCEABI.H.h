@@ -37,6 +37,7 @@ void __construct_array(void* array, void* ctor, void* dtor, u32 size, u32 count)
  * `src/homebutton/keyboard_ui.cpp`, `src/light/light.cpp`, `src/g3d/g3d_anmchr.cpp`) can adopt this
  * header when they are next touched. */
 u32 strlen(const char* s);                    /* 0x804565C0 */
+int strcmp(const char* a, const char* b);      /* 0x8045F684, consumed by `Network/network_state.cpp` */
 int sprintf(char* dst, const char* fmt, ...); /* 0x8045DECC */
 char* strchr(const char* s, int c);           /* 0x8045F7E0 */
 int atoi(const char* s);                      /* 0x804616B4 */

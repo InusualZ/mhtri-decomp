@@ -12,11 +12,12 @@
 #include "NHTTP/d_nhttp.h"
 #include "unsplit/OS.h"
 
-/* one block of the receive ring's overflow list: the next block, then 508 bytes of stream */
+/* one block of the receive ring's overflow list: the next block, then 512 bytes of stream.  The
+ * helpers index `data` with the ring offset masked to 9 bits, so the block is 4 + 512 B. */
 typedef struct NHTTPRecvBlock {
     /* +0x000 */ struct NHTTPRecvBlock* next;
-    /* +0x004 */ u8 data[0x1FC];
-} NHTTPRecvBlock; /* size: 0x200 */
+    /* +0x004 */ u8 data[0x200];
+} NHTTPRecvBlock; /* size: 0x204 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,12 +34,34 @@ void NHTTPi_CheckCurrentThread(NHTTPThreadInfo* info, BOOL onThread);
  * 512-byte blocks for the part of the stream past the first 1024 bytes, then the 1024 bytes the
  * header addresses directly.  Only the fields the helpers touch are modelled. size: 0x438 */
 typedef struct NHTTPRecvBuf {
-    /* +0x000 */ u8 pad_0x000[0x1C];
+    /* +0x000 */ s32 capacity;               /* the ring's total byte count (NHTTPi_RecvBufCopy) */
+    /* +0x004 */ u8 pad_0x004[0x18];
     /* +0x01C */ u32 length;                 /* bytes buffered (NHTTPi_isRecvBufFull) */
     /* +0x020 */ u8 pad_0x020[0x14];
     /* +0x034 */ NHTTPRecvBlock* blocks;     /* the 512-byte block list */
     /* +0x038 */ u8 data[0x400];             /* everything below offset 1024 lives here */
 } NHTTPRecvBuf;
+
+/* 0x805155AC (0x144): copy `length` bytes out of the receive ring starting at `offset` - the first
+ * 1024 bytes live in the ring itself, everything past them in the 512-byte block list, and each
+ * chunk is clamped to what its container has left.  Answers 0 when the range runs past the ring's
+ * capacity, 1 otherwise. */
+BOOL NHTTPi_RecvBufCopy(NHTTPRecvBuf* ring, u8* dst, s32 offset, s32 length);
+
+/* 0x805150CC (0x1F8): walk the ring from `start` to `end` for the end of a line, recording the
+ * first `:` in `*offset` and the terminator it found (1 = LF, 2 = CRLF) in `*flag`.  Answers the
+ * offset past the terminator (0 when the terminator ends the range), or -1 when there is none. */
+s32 NHTTPi_RecvBufFindLine(NHTTPRecvBuf* ring, s32 start, s32 end, s32* offset, s32* flag);
+
+/* 0x8051570C (0x20): hand the raw receive the socket buffer that starts `offset` bytes into the
+ * connection's receive area, with the length left from there.  Retail keeps the tail call, so the
+ * two are one pair. */
+s32 NHTTPi_SocRecvFromOffset(s32 handle, NHTTPConnection* conn, s32 flags, s32 offset, s32 arg);
+
+/* 0x8051572C (0x3C): the same, clamped to what the socket has left and refusing an offset past the
+ * end with -1003. */
+s32 NHTTPi_SocRecvOffsetRange(s32 handle, NHTTPConnection* conn, s32 flags, s32 offset, s32 length,
+                              s32 arg);
 
 /* 0x805156F0 (0x1C): true when the ring holds at least `size` bytes. */
 BOOL NHTTPi_isRecvBufFull(NHTTPRecvBuf* info, u32 size);
