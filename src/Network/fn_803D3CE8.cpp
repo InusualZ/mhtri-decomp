@@ -106,10 +106,14 @@
 #define net_va_arg(ap, type) (*(type*)__va_arg(&(ap), 1))
 #include "unsplit/NetworkData.h"
 
-/* Rule 2: the two symbols this unit calls but does not own come from their owner's header, never from
-   a declaration here - `getInstance_` (0x803768F0) is inside `enemy/em020_ai.cpp`'s registered range
-   and `memset` is `Runtime.PPCEABI.H/memset.c`. */
+/* Rule 2: the symbols this unit calls but does not own come from their owner's headers, never from a
+   declaration here - `getInstance_` (0x803768F0) is inside `enemy/em020_ai.cpp`'s registered range,
+   `memset` is `Runtime.PPCEABI.H/memset.c`, and `getNetworkLogger` (0x803C9974, the band's log-manager
+   getter) is owned by nobody, so it is declared with the rest of the Network band in
+   `unsplit/Network.h` - where it is typed as the class `NetworkLogger` the logging band uses.  The
+   sites below keep the older `NetworkSessionManagerLogger` view of that object and cast. */
 #include "enemy/em020_ai.h"
+#include "unsplit/Network.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
 /* EXCEPTIONS.  The lib builds with `-Cpp_exceptions off` while this range's target object carries
@@ -148,7 +152,7 @@ s32 NetworkRequest_getArgument(NetworkRequest*, u32);
 /* The four addresses themselves are declared in the band's data header (rule 2).  They cannot come
    from `include/unsplit/Network.h`: that header declares `dtor_803CA338(void*, s32)` where this
    file's own header declares `dtor_803CA338(void*)`, and including both fails to compile - the
-   reason `include/unsplit/NetworkData.h` exists.  `fn_803C9974` and the logger type live in this
+   reason `include/unsplit/NetworkData.h` exists.  `getNetworkLogger` and the logger type live in this
    unit's own header. */
 
 /* ----------------------------------------------------------------------------------------- */
@@ -336,7 +340,7 @@ extern "C" void NetworkSessionStable_downPerformance(NetworkSessionStable* self,
         } else {
             slot->rate2_BC = slot->rate2_BC + delta;
         }
-        log = (NetworkSessionManagerLogger*)fn_803C9974();
+        log = (NetworkSessionManagerLogger*)getNetworkLogger();
         log->vtable->verbose_0C(log, 1, NetworkSessionStable_downPerformancePackMessage, (u32)idx,
                                 slot->rate2_BC);
     }
@@ -347,7 +351,7 @@ extern "C" void NetworkSessionStable_downPerformance(NetworkSessionStable* self,
         } else {
             slot->counter_C0 = slot->counter_C0 - step;
         }
-        log = (NetworkSessionManagerLogger*)fn_803C9974();
+        log = (NetworkSessionManagerLogger*)getNetworkLogger();
         log->vtable->verbose_0C(log, 1, NetworkSessionStable_downPerformanceByteMessage, (u32)idx,
                                 slot->counter_C0);
     }
@@ -388,7 +392,7 @@ extern "C" void NetworkSessionStable_upPerformance(NetworkSessionStable* self, s
         } else {
             slot->rate2_BC = slot->rate2_BC - (slot->rate2_BC - slot->base_C8) * networkRateUpLerp;
         }
-        log = (NetworkSessionManagerLogger*)fn_803C9974();
+        log = (NetworkSessionManagerLogger*)getNetworkLogger();
         log->vtable->verbose_0C(log, 1, NetworkSessionStable_upPerformancePackMessage, (u32)idx,
                                 slot->rate2_BC);
     }
@@ -398,7 +402,7 @@ extern "C" void NetworkSessionStable_upPerformance(NetworkSessionStable* self, s
         } else {
             slot->counter_C0 = slot->counter_C0 + (slot->limit_CC - slot->counter_C0) / 2;
         }
-        log = (NetworkSessionManagerLogger*)fn_803C9974();
+        log = (NetworkSessionManagerLogger*)getNetworkLogger();
         log->vtable->verbose_0C(log, 1, NetworkSessionStable_upPerformanceByteMessage, (u32)idx,
                                 slot->counter_C0);
     }
@@ -441,7 +445,7 @@ extern "C" void NetworkSessionStable_move(NetworkSessionStable* self, s8 idx)
     networkStreamWriter_reserve(buffer, 0, 0, 0);
     size5C = networkStreamWriter_size(&used->bits_5C) & 0xFFFF;
     size44 = networkStreamWriter_size(&used->bits_44) & 0xFFFF;
-    log = (NetworkSessionManagerLogger*)fn_803C9974();
+    log = (NetworkSessionManagerLogger*)getNetworkLogger();
     log->vtable->verbose_0C(log, 3, NetworkSessionStable_moveOutOfBandMessage,
                             (u32)self->field_14826, (u32)slotIndex, (u32)idx, (u32)size44, (u32)size5C);
     dtor_803CB8FC(&stream, -1);
@@ -652,7 +656,7 @@ void NetworkSessionManager::move()
                     if (j == 21) {
                         break;
                     }
-                    log = fn_803C9974();
+                    log = (NetworkSessionManagerLogger*)getNetworkLogger();
                     log->vtable->log_14(log, NetworkSessionManager_moveStandByMessage, j);
                     continue;
                 }
@@ -732,7 +736,7 @@ extern "C" void NetworkRequest_begin(NetworkRequest* req, NetworkSessionManager*
     u32 i;
 
     NetworkRequest_reset(req);
-    log = fn_803C9974();
+    log = (NetworkSessionManagerLogger*)getNetworkLogger();
     req->timeout_50 = log->vtable->getTime_60(log);
     req->requestId_70 = NetworkRequest_idCounter;
     NetworkRequest_idCounter = req->requestId_70 + 1;
@@ -1283,7 +1287,7 @@ extern "C" void NetworkSessionManager_deleteRequest(NetworkSessionManager* self,
 {
     if (*slot != 0) {
         if (NetworkRequest_isOwned(*slot) != 0) {
-            NetworkSessionManagerLogger* log = fn_803C9974();
+            NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
             log->vtable->log_14(log, NetworkSessionManager_deleteRequestMessage);
         }
         NetworkRequest_clear(*slot);
@@ -1323,7 +1327,7 @@ extern "C" s32 NetworkRequest_getArgument(NetworkRequest* self, u32 idx)
 
     count = self->count_28;
     if (count <= idx) {
-        log = fn_803C9974();
+        log = (NetworkSessionManagerLogger*)getNetworkLogger();
         log->vtable->warn_10(log, NetworkRequest_getArgumentMessage, count, idx);
         return 0;
     }
@@ -1343,7 +1347,7 @@ extern "C" s32 NetworkRequest_isTimedOut(NetworkRequest* self)
     result = 0;
     LockMutex(self->mutex_78);
     if (self->interval_4C != networkRequestTimerIdle) {
-        log = fn_803C9974();
+        log = (NetworkSessionManagerLogger*)getNetworkLogger();
         if (log->vtable->getTime_60(log) - self->timeout_50 > self->interval_4C) {
             result = 1;
         }
@@ -1358,7 +1362,7 @@ extern "C" void NetworkRequest_restartTimer(NetworkRequest* self, f32 interval)
     NetworkSessionManagerLogger* log;
 
     LockMutex(self->mutex_78);
-    log = fn_803C9974();
+    log = (NetworkSessionManagerLogger*)getNetworkLogger();
     self->timeout_50 = log->vtable->getTime_60(log);
     self->interval_4C = interval;
     UnlockMutex(self->mutex_78);
@@ -1585,8 +1589,8 @@ void NetworkSessionManagerPat::clear()
     this->field_3C8 = 0;
     this->field_3CC.vtable->slot_18(&this->field_3CC);
     memset(&this->field_3EC[0], 0, 48);
-    this->field_658 = 0;
-    this->field_65C = 0;
+    this->receiver_658 = 0;
+    this->requestQueue_65C = 0;
     this->field_660 = 0;
     networkPatAttachBuffer((NetworkBuffer*)this);
     this->circleList_AF0.pad_00[0] = 0;
@@ -1631,12 +1635,12 @@ void NetworkSessionManagerPat::release()
     }
     context = (void*)this->field_660;
     if (context != 0) {
-        networkLog_destroyContext(fn_803C9974(), context);
+        networkLog_destroyContext((NetworkSessionManagerLogger*)getNetworkLogger(), context);
         this->field_660 = 0;
     }
     if (GameSpyInterfaceThread_getInstance() != 0) {
         if (this->field_6E75 != 0) {
-            NetworkSessionManagerLogger* log = fn_803C9974();
+            NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
             log->vtable->warn_10(log, NetworkSessionManagerPat_finalMessage);
             this->field_6E75 = 0;
             thread = GameSpyInterfaceThread_getInstance();

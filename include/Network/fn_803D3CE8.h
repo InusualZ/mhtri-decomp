@@ -161,7 +161,6 @@ extern "C" void __va_start(NetworkVaState* ap);
 extern "C" u32* __va_arg(NetworkVaState* ap, s32 type);
 
 /* ---------------- NetworkRequest ---------------------------------------------------------- */
-
 typedef struct NetworkRequestDesc {
     u32 id_0;
     u32 value_4;
@@ -351,12 +350,72 @@ public:
     NetworkRequest pool_7C[2];                 /* +0x7C..+0x1C3 */
 };   /* size: 0x1C4 */
 
-/* ---------------- NetworkSessionManagerPat ------------------------------------------------- */
+/* ---------------- the Pat band's channel records -------------------------------------------- */
+
+/* The two channel objects the Pat manager holds at +0x658 / +0x65C and pumps once per frame.  Only
+ * their *pointers* are ever held here - their layouts belong to the band that builds them, which is
+ * still unclaimed - so both are incomplete classes and the manager only forwards them.  Their names
+ * are **GUESSED** from the two pumps (`receivePatInterfaces`, `flushPatRequests`), which is all the
+ * binary gives: the manager's own fields were anonymous (`field_658`/`field_65C`) before this pass. */
+class PatReceiver;      /* +0x658 - `receivePatInterfaces` reads its transport at +0x04 */
+class PatRequestQueue;  /* +0x65C - `flushPatRequests` walks its request list */
+
+/* The name/entry list `buildCircleInfoName` packs: a count at +0x04 and the entries after it.  The
+ * sizes are bounded by the manager's own layout (the list runs from +0x7A0 up to the circle-record
+ * count at +0x950), not read from the list itself.  size: 0x1B0 (approximate). */
+typedef struct NetworkNameList {
+    /* +0x000 */ u32 head_00;
+    /* +0x004 */ u32 count_04;
+    /* +0x008 */ u8 entries_08[0x1A8];
+} NetworkNameList;   /* size: 0x1B0 */
+
+/* The circle-info request block `move` fills and `sendReqCircleInfoSet` sends: the packed records at
+ * +0x56 (at most 256 - the copy is capped there), their count as a u16 at +0x156, and the mode byte
+ * at +0x378.  `move` zeroes 892 bytes of it, which is the size below. */
+typedef struct PatCircleInfo {
+    /* +0x000 */ u8 pad_00[0x56];
+    /* +0x056 */ u8 records_56[0x100];
+    /* +0x156 */ u16 recordCount_156;
+    /* +0x158 */ u8 pad_158[0x220];
+    /* +0x378 */ u8 mode_378;
+    /* +0x379 */ u8 pad_379[0x3];
+} PatCircleInfo;   /* size: 0x37C */
+
+/* The Pat band's helpers.  No registered unit owns their addresses, and this header - not
+ * `include/unsplit/Network.h` - is where this band's unowned helpers already live (`networkPatAttachBuffer`,
+ * `networkPatResetCircleInfo`, `PatInterface_*`), so they are declared beside the records they take.
+ * The first three were the map's `fn_803CE064` / `fn_803CE5F0` / `fn_803DE524` until this pass renamed
+ * them from what their bodies do (**GUESSES**, each recorded where it is declared); the last two are
+ * the map's own names. */
+extern "C" void receivePatInterfaces(PatReceiver* receiver);
+extern "C" void flushPatRequests(PatRequestQueue* queue);
+/* the manager itself is declared below - the band's helpers take it, so name it first, and
+ * `NetworkInstance` is the session singleton's class (`include/unsplit/Network.h` defines it; a
+ * forward declaration is enough here because only a pointer crosses the call) */
+class NetworkSessionManagerPat;
+class NetworkInstance;
+extern "C" void buildCircleInfoName(NetworkSessionManagerPat* self, char* dst, NetworkNameList* src);
+extern "C" s32 circleAvailable(NetworkSessionManagerPat* self);
+extern "C" void sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, PatCircleInfo* info,
+                                      const char* name);
+
+/* -------------------------------- NetworkSessionManagerPat ---------------------------------- */
 
 /* The derived class the tail of the range defines.  It is declared here so MWCC emits the
    constructor's vptr store and the destructor itself (rule 10).  `move` is declared **first**: it is
-   the class's key function and its body lives in the next band (0x803D70B8), so no Pat vtable is
-   emitted into this object - which is what the target shows (its `.data` is the base table alone). */
+   the class's key function and its body lives in the next band (0x803D70B8, now named after what it
+   overrides - `move__24NetworkSessionManagerPatFv` in the map), so no Pat vtable is emitted into this
+   object - which is what the target shows (its `.data` is the base table alone).
+
+   THE VTABLE IS STILL NOBODY'S (2026-09-28).  MWCC emits a class's table in the TU that defines its
+   key function, so `__vt__24NetworkSessionManagerPat` (0x805FB0F0, 0x1C8 B / 114 slots) belongs to the
+   band that opens at 0x803D70B8 - unclaimed, and its `.data` run 0x805FAAD0..0x805FB2B8 (the two
+   message strings, the three jump tables and the table itself) is unclaimed with it.  This declaration
+   still overrides only the five slots above, while the target's table is filled by 112 functions: 49
+   of them in 0x803D70B8..0x803DDB64, 49 inside this unit's range, 14 elsewhere.  No unit can emit a
+   matching table until those ~100 overrides are declared - which is why 0x805FB0F0 is left unclaimed
+   rather than owned-but-wrong.  The slot - address census is in
+   `.pi/notes/network-pat-abstraction.md` section (a) and in the 2026-09-28 `network-pat-class` report. */
 class NetworkSessionManagerPat : public NetworkSessionManager {
 public:
     virtual void move();                     /* +0x018 - the key function, defined in the next band */
@@ -382,12 +441,20 @@ public:
     NetworkSmallObject field_3CC;              /* +0x3CC */
     u8 pad_3DC[0x10];                          /* +0x3DC..+0x3EB */
     u8 field_3EC[0x30];                        /* +0x3EC..+0x41B */
-    u8 pad_41C[0x11C];                         /* +0x41C..+0x537 */
+    u32 circleInfoRequestId_41C;               /* +0x41C - the id `sendReqCircleInfoSet` sends under */
+    u8 pad_420[0x118];                         /* +0x420..+0x537 */
     NetworkSessionPlayerRecord players_538[4]; /* +0x538..+0x657 */
-    s32 field_658;                             /* +0x658 */
-    s32 field_65C;                             /* +0x65C */
+    PatReceiver* receiver_658;                 /* +0x658 - pumped by `receivePatInterfaces` */
+    PatRequestQueue* requestQueue_65C;         /* +0x65C - pumped by `flushPatRequests` */
     s32 field_660;                             /* +0x660 */
-    u8 pad_664[0x48C];                         /* +0x664..+0xAF0 */
+    u8 pad_664[0x13C];                         /* +0x664..+0x79F */
+    NetworkNameList nameList_7A0;              /* +0x7A0..+0x94F - `buildCircleInfoName` reads it */
+    u32 circleRecordCount_950;                 /* +0x950 - records waiting to be sent (max 256) */
+    u8 circleRecords_954[0x100];               /* +0x954..+0xA53 - the records `move` copies out */
+    u8 pad_A54[0x91];                          /* +0xA54..+0xAE4 */
+    u8 field_AE5;                              /* +0xAE5 */
+    u8 field_AE6;                              /* +0xAE6 - pending-mode flag `move` consumes */
+    u8 pad_AE7[0x9];                           /* +0xAE7..+0xAF0 */
     NetworkSessionCircleList circleList_AF0;   /* +0xAF0..+0x6E73 */
     u8 field_6E74;                             /* +0x6E74 */
     u8 field_6E75;                             /* +0x6E75 */
@@ -400,6 +467,19 @@ public:
     PatInterface();
     static PatInterface* getInstance();
 };
+/* The error record `GameSpyInterfaceThread::getErrorStruct` fills and `NetworkInstance::postError`
+ * (declared in `include/unsplit/Network.h`, which only forward-declares this type) takes back.  It is
+ * declared here beside that handshake, from the Pat band's `move`: it reads +0x04 as the error
+ * **code** (it forwards the record only when it is 0x4B) and copies the three words
+ * +0x00/+0x04/+0x08 into its own copy, so only those three are named; the tail is untouched anywhere
+ * and is padding.  size: 0x10 (approximate - only +0x00..+0x0B is evidenced). */
+struct NetworkErrorInfo {
+    /* +0x00 */ u32 value_00;
+    /* +0x04 */ u32 code_04;
+    /* +0x08 */ u32 extra_08;
+    /* +0x0C */ u32 pad_0C;
+};
+
 class GameSpyInterfaceThread {
 public:
     virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
@@ -407,6 +487,12 @@ public:
     void canClose();
     void armCancel();
     bool requestClose();
+    /* The error handshake `move` runs (all three are plain members - the target calls them by their
+     * own mangling, not through the table): the result the thread finished with (negative = error),
+     * the error record it filled in, and the acknowledgement that clears it. */
+    s32 getResult();
+    void getErrorStruct(NetworkErrorInfo* info);
+    void clearError();
 };
 
 /* the Pat accessors keep their plain (unmangled) map names.
@@ -544,8 +630,10 @@ u32 networkStreamWriter_size(const void* sub);
 /* the send/flush tail */
 void fn_803D39BC(NetworkSessionStable* self, NetworkStreamWriter* stream, u32 a, u32 b, const void* term, u32 c);
 
-/* the manager logger accessor (another band): the returned logger is a NetworkSessionManagerLogger */
-NetworkSessionManagerLogger* fn_803C9974(void);
+/* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
+   so rule 2 puts it in the band header `include/unsplit/Network.h` (which types it as the class
+   `NetworkLogger` that the logging band uses).  A consumer that wants the older
+   `NetworkSessionManagerLogger` view of the same object casts. */
 
 /* the band's float constants and singleton slots (unowned addresses - playbook 29: declared, never
    defined).  Each value is read off the DOL; the name is derived from the use the range makes of it. */

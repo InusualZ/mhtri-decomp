@@ -2,7 +2,7 @@
  * fn_80423E74.h - views for the 0x80423E74 band (network work record + PatCamellia crypto).
  *
  * The band is the TU that owns the arena/base vectors of the `net_ctrl_wk` record and the PatCamellia
- * wrapper over the retail Camellia cipher.  `NetCtrlWk` itself lives in `fn_80429B94.h` (one definition,
+ * wrapper over the retail Camellia cipher.  `NetCtrlWk` itself lives in `Network/network_pat_control.h` (one definition,
  * docs/plan.md 6.5 rule 1) - this header only adds what this unit needs on top.
  *
  * A symbol with no registered owner is declared here rather than in the .cpp (docs/plan.md 6.5 rule 2's
@@ -12,7 +12,7 @@
 #define MHTRI_FN_80423E74_H
 
 #include "types.h"
-#include "fn_80429B94.h"
+#include "Network/network_pat_control.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,9 +40,9 @@ void fn_8042ED64(int code);
 s32 fn_8042CC38(void);
 s32 fn_804C2380(u32 id);
 
-/* The layer facade both network units drive (mirrors `getNetworkSessionManagerPat` in fn_80429B94.h:
- * `getPatsObject()` is the owner, `index` the layer). */
-void* getNetworkLayerPat(void* pats, int index);
+/* The layer facade both network units drive.  `getNetworkLayerPat` and the holder type it takes are
+ * declared in their owner's header, `Network/NetworkPat.h`, which this header reaches through
+ * `Network/network_pat_control.h` (rule 2) - this unit only calls them. */
 
 /* The slot mode-word source value (.sdata2 0x8079C888). */
 extern f32 lbl_8079C888;

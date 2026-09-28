@@ -130,13 +130,13 @@
 /* The target object carries `extab`/`extabindex` (380/540 B) while the `Network` lib is built with
  * exceptions off, so the front-end is told per file (the pragma pair of playbook 30). */
 
-/* The debug manager's virtual slots: the target re-runs `bl fn_803C9974` at *every* logging site
+/* The debug manager's virtual slots: the target re-runs `bl getNetworkLogger` at *every* logging site
  * (never once per function), so each site expands to its own block that fetches the singleton and
  * dispatches through its vtable - a real virtual call, which is the only shape MWCC emits as
  * `lwz r12, 0x0(r3)` / `lwz r12, 0xC(r12)`. */
-#define SIGNAL_LOG(...) do { NetworkLogger* lm = fn_803C9974(); lm->signal_0C(__VA_ARGS__); } while (0)
-#define WARN_LOG(...)   do { NetworkLogger* lm = fn_803C9974(); lm->warn_10(__VA_ARGS__); } while (0)
-#define INFO_LOG(...)   do { NetworkLogger* lm = fn_803C9974(); lm->log_14(__VA_ARGS__); } while (0)
+#define SIGNAL_LOG(...) do { NetworkLogger* lm = getNetworkLogger(); lm->signal_0C(__VA_ARGS__); } while (0)
+#define WARN_LOG(...)   do { NetworkLogger* lm = getNetworkLogger(); lm->warn_10(__VA_ARGS__); } while (0)
+#define INFO_LOG(...)   do { NetworkLogger* lm = getNetworkLogger(); lm->log_14(__VA_ARGS__); } while (0)
 
 extern "C" {
 
@@ -217,7 +217,7 @@ void NetworkGameSpyInterface::updateCallbackStep()
         callbackStep_17 = (u8)(callbackStep_17 + 1);
         break;
     case 6: {
-        NetworkLogger* lm = fn_803C9974();
+        NetworkLogger* lm = getNetworkLogger();
         if (lm->isVerbose_3C() > 0) {
             callbackStep_17 = (u8)(callbackStep_17 + 1);
         }
@@ -1625,7 +1625,7 @@ void GameSpyInterfaceThread::startNegotiation(const GameSpyPeerId* a, const Game
         lbl_806D3660.active_00 = 1;
         lbl_806D3660.session_0C = a->session_08;
         {
-            NetworkLogger* lm = fn_803C9974();
+            NetworkLogger* lm = getNetworkLogger();
             lbl_806D3660.encoded_0A = lm->encode_4C(a->port_0C);
         }
     }
@@ -1713,7 +1713,7 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
         total = 2;
     } else {
         {
-            NetworkLogger* lm = fn_803C9974();
+            NetworkLogger* lm = getNetworkLogger();
             aLen16 = lm->encode_4C((u16)aLen);
         }
         memcpy(record, &aLen16, 2);
@@ -1727,7 +1727,7 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
         total = total + 2;
     } else {
         {
-            NetworkLogger* lm = fn_803C9974();
+            NetworkLogger* lm = getNetworkLogger();
             bLen16 = lm->encode_4C((u16)(bLen + 1));
         }
         memcpy(cursor, &bLen16, 2);
@@ -1736,9 +1736,9 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
         total = total + 3 + bLen;
     }
     {
-        NetworkLogger* lm = fn_803C9974();
+        NetworkLogger* lm = getNetworkLogger();
         if (lm->flag_48(aLen16) == 0) {
-            NetworkLogger* lm2 = fn_803C9974();
+            NetworkLogger* lm2 = getNetworkLogger();
             if (lm2->flag_48(bLen16) == 0) {
                 return 0;
             }
@@ -1787,14 +1787,14 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
     cursor = recvBuffer_614;
     memcpy(&aLen16, cursor, 2);
     {
-        NetworkLogger* lm = fn_803C9974();
+        NetworkLogger* lm = getNetworkLogger();
         aLen16 = lm->flag_48(aLen16);
     }
     bLen16 = 0;
     if (received_10 >= (u32)aLen16 + 4) {
         memcpy(&bLen16, cursor + aLen16 + 2, 2);
         {
-            NetworkLogger* lm = fn_803C9974();
+            NetworkLogger* lm = getNetworkLogger();
             payload = lm->flag_48(bLen16);
         }
         bLen16 = payload;

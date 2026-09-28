@@ -10,7 +10,7 @@
  * and `lbl_806C...` string rows, never a bare source-file name).  The runtime dump answers only
  * `zz_0423e74_`-style placeholders for every address in the range except `PatCryptDecrypt` and
  * `setErrorHappened`.  So the module is the same un-moduled game-root band as its link neighbour
- * `fn_80429B94.cpp` (the network/server-control band that starts where this one ends and also
+ * `Network/network_pat_control.cpp` (the network pat-control band that starts where this one ends and also
  * dereferences `net_ctrl_wk` and calls `getPatsObject`/`getNetworkLayerPat`), and the file takes the
  * game-root `main` lib and `cflags_main` (Wii/1.3, -O3, -inline noauto, -Cpp_exceptions on - the target
  * object carries extab/extabindex).  The stem is the map's `fn_80423E74` (classes 3/4 in the brief).
@@ -22,7 +22,8 @@
  * Sections this unit owns: .text 0x80423E74-0x80429B94, extab 0x8001D1B4-0x8001D368,
  * extabindex 0x8003DC44-0x8003DE54, and the two `.data` runs its functions reference
  * (0x80603750-0x80603858, the two jump tables; 0x80603888-0x806038D8, the alloc-failure strings).
- * The array at 0x80603858 and the string at 0x806038D8 belong to the neighbour `fn_80429B94.cpp`.
+ * The array at 0x80603858 and the string at 0x806038D8 belong to the neighbour
+ * `Network/network_pat_control.cpp`.
  *
  * Residuals: the two state machines `fn_804247D0` (0xE78, three jump tables) and `fn_80425790`
  * (0x1580, one jump table) and the message-pool families that follow them are not reconstructed yet;

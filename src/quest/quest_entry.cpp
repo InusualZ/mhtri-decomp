@@ -158,7 +158,7 @@
  *     plus its 11 code sites in `ai`/`menu` and this unit moved together.
  *
  * FILED, not half-done (each is a cross-unit sweep this lane did not take on):
- *   * `fn_8042CB9C` (`fn_80429B94.cpp`) - **43 reference sites in 16 files + 5 headers**.  It blocks
+ *   * `fn_8042CB9C` (`Network/network_pat_control.cpp`) - **43 reference sites in 16 files + 5 headers**.  It blocks
  *     `fn_803AB0FC` (0x803AB0FC) and, through it, the whole entry/loader group.
  *   * `fn_80125F54` (21 sites/9 files), `fn_80137604` (13/11), `fn_80141B88` (11/6), `fn_80272E30`
  *     (29/14) - these block `fn_803AE030` (0x803AE030, 1012 B), `fn_803AE424` (0x803AE424, 1296 B)

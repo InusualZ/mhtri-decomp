@@ -1,5 +1,6 @@
 /*
- * fn_80429B94.h - shared views for the 0x80429B94 band (network/server-control work).
+ * include/Network/network_pat_control.h - shared views for the network pat-control band
+ * (`Network/network_pat_control.cpp`, `.text` 0x80429B94..0x8043065C).
  *
  * The `net_ctrl_wk` singleton (map: `.sbss:0x80794CF8`, a 4-byte pointer) is the record every
  * function in the band dereferences; its owner TU is unclaimed, so the extern lives here beside the
@@ -8,11 +9,16 @@
  *
  * `NetCtrlWk` size: 0xC3F3 approximate - the highest offset any function in the band touches is
  * +0xC3F2; the record is larger than anything this unit proves.
+ *
+ * The four-slot "*Pat" holder and the accessor family that walks it live in their owner's header,
+ * `Network/NetworkPat.h`, which this file includes (rule 1/2) - the family is declared once, by the
+ * unit that defines it.
  */
-#ifndef MHTRI_FN_80429B94_H
-#define MHTRI_FN_80429B94_H
+#ifndef MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
+#define MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
 
 #include "types.h"
+#include "Network/NetworkPat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,7 +41,7 @@ typedef struct NetCtrlEntry {
 typedef struct NetSlot {
     /* +0x00 */ u8 state_0x00;
     /* +0x01 */ u8 pad_0x01[0x3];
-    /* +0x04 */ void* owner_0x04;
+    /* +0x04 */ void* owner_0x04;   /* untyped: opaque handle - the slot hands its owner back to the caller */
     /* +0x08 */ u8 pad_0x08[0x34];
     /* +0x3C */ f32 valueA_0x3C;
     /* +0x40 */ f32 valueB_0x40;
@@ -104,34 +110,30 @@ typedef struct NetCtrlWk {
     /* +0xC3F3 */ u8 tail_0xC3F3[];
 } NetCtrlWk; /* size: 0xC3F3 (approximate, see above) */
 
-/* A view of an SDK/vtable object that only the slot at +0x128 / +0x148 is ever called through
- * (docs/plan.md 6.5 rule 10: a table outside our ranges is referenced as a struct of typed function
- * pointers, never as a class). */
-typedef struct NetSessionManagerVtbl {
-    /* +0x000 */ void* pad_0x000[0x128 / 4];
-    /* +0x128 */ void (*fn_0x128)(void* self, u32 a, u32 b);
-    /* +0x12C */ void* pad_0x12C[0x1C / 4];
-    /* +0x148 */ void (*fn_0x148)(void* self);
-} NetSessionManagerVtbl;
-
 /* The work-record singleton, defined by another (unclaimed) TU. */
 extern NetCtrlWk* net_ctrl_wk;
 
-/* The network facade the band drives; both are unsplit addresses. */
+/* The network facade the band drives. */
 /* 0x8042CC20 - no arguments; the sibling predicate of `fn_8042CB9C`, reached by
  * `ef/eft_slot.cpp`.  Added here because this unit owns the address (rule 2). */
 BOOL fn_8042CC20(void);
-void* getPatsObject(void);
-void* getNetworkSessionManagerPat(void* pats, int index);
-BOOL fn_803DF1A8(void* session_manager);
+/* The holder `getPatsObject` returns is `NetworkPat` (include/Network/NetworkPat.h).  The accessor
+ * itself is at 0x803DA020, inside the unclaimed 0x803D70B8-0x803DDB64 Pat band, so no registered unit
+ * owns it yet and its declaration sits here with the one unit that calls it. */
+NetworkPat* getPatsObject(void);
+/* `fn_803DF1A8` (0x803DF1A8) is the session manager's readiness probe: it is handed the object slot
+ * +0x00 holds, so its parameter is that object's class. */
+BOOL fn_803DF1A8(NetworkSessionManagerPat* session_manager);
 
 #ifdef __cplusplus
 }
 #endif
 
 /* Mangled callees are declared with their real signatures, never with the map's mangling
- * (docs/plan.md 6.5 rule 9): the C++ front-end emits the map's name itself. */
+ * (docs/plan.md 6.5 rule 9): the C++ front-end emits the map's name itself.  `sysSE_req` (`__Fl`) has
+ * no registered owner; `flfntStrLen` (`__FPc`, 0x8005B874) is owned by `g3d/g3d_anmchr.cpp`, so it is
+ * declared in that unit's header (`g3d/g3d_anmchr.h`) and included where it is called (rule 2) -
+ * `g3d/g3d_anmchr.h` and this header declare no other symbol in common, so a TU may include both. */
 void sysSE_req(long id);
-int flfntStrLen(char* str);
 
-#endif /* MHTRI_FN_80429B94_H */
+#endif /* MHTRI_NETWORK_NETWORK_PAT_CONTROL_H */

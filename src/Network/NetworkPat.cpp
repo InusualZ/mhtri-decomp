@@ -1,5 +1,5 @@
 /*
- * Network/NetworkPat.cpp - the `sNetworkLibrary` "*Pat" accessor class
+ * Network/NetworkPat.cpp - the `sNetworkLibrary` "*Pat" accessor family
  * (`.text` 0x80419EC4..0x8041A194, 12 functions / 720 B).
  *
  * BOUNDARY.  Both seams are weak and **unproven** as *code* cuts, but the right edge is now settled
@@ -14,10 +14,20 @@
  * 0x80419EC4..0x8041A194, `extab` 0x8001CF70..0x8001CF88, `extabindex` 0x8003D92C..0x8003D950 (3
  * unwind records, byte-identical to ours under the exceptions pragma below).
  *
- * WHAT IT IS.  A four-slot holder class: each slot +0x00 / +0x04 / +0x08 / +0x0C has an "install"
- * setter, an "uninstall" (`self->slot != value ? -1 : clear`), a "delete" helper and - for three of
- * the slots - a named getter (`getNetworkSessionManagerPat` +0x00, `getNetworkCommunityPat` +0x08,
- * `getNetworkLayerPat` +0x0C).  C++ but every symbol is unmangled (`extern "C"`).
+ * WHAT IT IS.  The four-slot holder's accessor family: each slot +0x00 / +0x04 / +0x08 / +0x0C has an
+ * "install" setter, an "uninstall" (`self->slot != value ? -1 : clear`), a "delete" helper and - for
+ * three of the slots - a named getter (`getNetworkSessionManagerPat` +0x00, `getNetworkCommunityPat`
+ * +0x08, `getNetworkLayerPat` +0x0C).  C++ but every symbol is unmangled (`extern "C"`).  The holder
+ * type and the family's declarations live in `include/Network/NetworkPat.h` (this file's own header,
+ * rule 2); the type moved there when the `network_pat_control` unit needed it (rule 1).
+ *
+ * TYPES.  The slots are typed from the install site `fn_804292F8` (0x804294A0..0x8042951C), which
+ * stores the pointer each slot's own **class constructor** has just returned, and from the accessor's
+ * own value dispatch: slot +0x00 is a `NetworkSessionManagerPat` (`__ct__24NetworkSessionManagerPatFv`
+ * 0x803D68D0), +0x08 the object built by `fn_803F02C4`, +0x0C the `NetworkLayer`-derived object built
+ * by `fn_803E0C18`.  Slot +0x04 is never installed - no setter and no getter for it exists anywhere in
+ * the DOL (a whole-image scan for the setter shape finds +0x00/+0x08/+0x0C only) - so its value stays
+ * an untyped handle and the `delete`/`clear` pair is dead code that always sees NULL.
  *
  * NAMES.  The three `*Pat` getters are the runtime dump's and already in `symbols.txt`.  The nine
  * helpers answer only `zz_...` in the dump, so this batch's naming pass named them from the slot each
@@ -29,16 +39,24 @@
  * 0x80419EA4) is the same class and lies just below the left seam - a residual of the boundary,
  * recorded rather than claimed.
  *
- * NAMING GUESS.  The `+0x04` slot's type is unproven (no getter in the runtime map), so
- * `clearNetworkPatSlot04` / `deleteNetworkPatSlot04` record the slot offset, not an invented type.
+ * NAMING GUESS.  `NetworkCommunityPat` is this batch's name for slot +0x08's class: the map carries no
+ * mangled row, no `__vt__` and no ctor for it, and the only name the binary gives the slot is the
+ * accessor `getNetworkCommunityPat`.  `NetworkLayer` (+0x0C) is the map's own table name
+ * (`NetworkLayer_VTable` 0x805FB5D0), i.e. the root of that slot's hierarchy.
  *
- * Every symbol this file defines is named; the `0x80419EA4` above is a comment mention of the
- * unclaimed +0x00 installer just below the seam, not a reference this unit makes (rule 7 clean).
+ * SLOT PROTOCOL.  The three `deleteNetwork*Pat` helpers share one shape and it is the only thing the
+ * four unrelated element classes have in common - not a shared base class.  With `index == 0` they
+ * take the entry from the slot (`(&self->slot)[index]`), call its **release hook through vtable
+ * `+0x14`**, clear the slot through the sibling `clearNetwork*Pat`, and - when the entry is still
+ * non-NULL - run its **deleting destructor at `+0x08`** with the delete flag 1.  The element's own
+ * table is emitted by its class's band, so `NetworkPatSlotProtocol` below only *declares* the two
+ * virtuals those calls need: declaring virtuals without defining any emits no table of ours (rule 10),
+ * and the cast to it is a reinterpretation of the same pointer, not a vtable we model.
  *
- * EXCEPTIONS.  The lib is built with `-Cpp_exceptions off` while this range's target object carries
- * `extab` 24 B and `extabindex` 36 B, so the file turns the front-end's exceptions back on
- * (playbook 30): without the pragma our object emits neither section and `datagap` reports both as
- * `target-extra`; with it both sizes match the target exactly and no `.text` byte moves.
+ * EXCEPTIONS.  The target object carries `extab` 24 B and `extabindex` 36 B and our object emits the
+ * same two sections with no pragma at all, so this file needs none: the lib's flags already match
+ * this range's front end (the earlier note here claimed the file turned the front end's exceptions
+ * back on - it never did, and `datagap` is clean either way).
  *
  * PEEPHOLE.  The three `deleteNetwork*Pat` helpers need the peephole pass **off**, scoped to each
  * one by a `#pragma peephole off`/`on` pair: with it on MWCC copies the entry into r3 for the
@@ -54,65 +72,22 @@
  * ORDER.  The definitions are laid out in address order (an object's `.text` follows the source's
  * definition order, not the map's addresses); `flipcheck` refuses the unit otherwise, even with
  * every row at 100 %.
- *
- * BODIES.  All twelve functions are reconstructed from the disassembly.  The three `0x8C`-byte
- * `deleteNetwork*Pat` helpers share one shape: with `index == 0`, take the entry from the slot
- * (`(&self->slot)[index]`), call its release hook through the vtable (+0x14), clear the slot through
- * the sibling `clearNetwork*Pat`, and - when the entry is still non-NULL - run its deleting
- * destructor (+0x08) with the delete flag 1.  The entry's own vtable lives in another TU's `.data`,
- * so `NetworkPatEntry` below only *declares* the four virtuals whose offsets the calls need: declaring
- * virtuals without defining any emits no table of ours (rule 10).
  */
-#include "types.h"
+#include "Network/NetworkPat.h"
 
-/* The holder the accessors walk: four `void*` slots at +0x00/+0x04/+0x08/+0x0C.  The three named
- * getters read slot +0x00 / +0x08 / +0x0C through the caller's `index`; the `+0x04` slot has no
- * getter (its installer `0x80419EA4` sits just below the unit's left seam). */
-typedef struct NetworkPat {
-    /* +0x00 */ void* sessionManager_00;
-    /* +0x04 */ void* unused_04;
-    /* +0x08 */ void* community_08;
-    /* +0x0C */ void* layer_0C;
-} NetworkPat;  /* size: 0x10 */
-
-/* The polymorphic base every installed entry shares: only two of its slots are ever called from this
- * unit - the +0x14 release hook and the +0x08 deleting destructor the `deleteNetwork*Pat` helpers
- * run - and its table is emitted by the class's own TU, not this one.  Declaring the virtuals and
- * defining none is what keeps MWCC from emitting a table here (rule 10); the two unnamed slots
- * between them hold the entry's own entry points, so they are padding in this view. */
-class NetworkPatEntry {
+/* The slot calling convention, as a view: only the two slots the `deleteNetwork*Pat` helpers call are
+ * named, and no slot is defined here - the element's own table is emitted by its class's band.  The
+ * +0x18 driver the holder's `fn_80419CF0` dispatches is deliberately absent: this unit never reaches
+ * it, and a declared virtual at index i sits at +8+4*i. */
+class NetworkPatSlotProtocol {
 public:
     /* +0x08 */ virtual void destroy_08(u32 flags);
     /* +0x0C */ virtual void pad_0C();
     /* +0x10 */ virtual void pad_10();
     /* +0x14 */ virtual void release_14();
-};   /* size: 0x04 (the entry's leading vtable word) */
+};   /* size: 0x04 - the element's own leading vtable word; only ever reached through a pointer */
 
-extern "C" {
-
-/* getters */
-void* getNetworkSessionManagerPat(NetworkPat* self, s32 index);
-void* getNetworkCommunityPat(NetworkPat* self, s32 index);
-void* getNetworkLayerPat(NetworkPat* self, s32 index);
-
-/* install helpers */
-s32 setNetworkCommunityPat(NetworkPat* self, void* value);
-s32 setNetworkLayerPat(NetworkPat* self, void* value);
-
-/* uninstall helpers */
-s32 clearNetworkSessionManagerPat(NetworkPat* self, void* value);
-s32 clearNetworkPatSlot04(NetworkPat* self, void* value);
-s32 clearNetworkCommunityPat(NetworkPat* self, void* value);
-s32 clearNetworkLayerPat(NetworkPat* self, void* value);
-
-/* delete helpers */
-void deleteNetworkPatSlot04(NetworkPat* self, s32 index);
-void deleteNetworkCommunityPat(NetworkPat* self, s32 index);
-void deleteNetworkLayerPat(NetworkPat* self, s32 index);
-
-} /* extern "C" */
-
-void* getNetworkSessionManagerPat(NetworkPat* self, s32 index)
+NetworkSessionManagerPat* getNetworkSessionManagerPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
         return (&self->sessionManager_00)[index];
@@ -120,7 +95,7 @@ void* getNetworkSessionManagerPat(NetworkPat* self, s32 index)
     return NULL;
 }
 
-s32 clearNetworkSessionManagerPat(NetworkPat* self, void* value)
+s32 clearNetworkSessionManagerPat(NetworkPat* self, NetworkSessionManagerPat* value)
 {
     if (self->sessionManager_00 == value) {
         self->sessionManager_00 = NULL;
@@ -133,7 +108,7 @@ s32 clearNetworkSessionManagerPat(NetworkPat* self, void* value)
 void deleteNetworkPatSlot04(NetworkPat* self, s32 index)
 {
     if (index == 0) {
-        NetworkPatEntry* entry = (NetworkPatEntry*)(&self->unused_04)[index];
+        NetworkPatSlotProtocol* entry = (NetworkPatSlotProtocol*)(&self->slot04_04)[index];
         if (entry != NULL) {
             entry->release_14();
             clearNetworkPatSlot04(self, entry);
@@ -145,10 +120,11 @@ void deleteNetworkPatSlot04(NetworkPat* self, s32 index)
 }
 #pragma peephole on
 
+/* untyped: opaque handle - slot +0x04 is never installed (the DOL has no setter for it) */
 s32 clearNetworkPatSlot04(NetworkPat* self, void* value)
 {
-    if (self->unused_04 == value) {
-        self->unused_04 = NULL;
+    if (self->slot04_04 == value) {
+        self->slot04_04 = NULL;
         return 0;
     }
     return -1;
@@ -158,10 +134,10 @@ s32 clearNetworkPatSlot04(NetworkPat* self, void* value)
 void deleteNetworkCommunityPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
-        NetworkPatEntry* entry = (NetworkPatEntry*)(&self->community_08)[index];
+        NetworkPatSlotProtocol* entry = (NetworkPatSlotProtocol*)(&self->community_08)[index];
         if (entry != NULL) {
             entry->release_14();
-            clearNetworkCommunityPat(self, entry);
+            clearNetworkCommunityPat(self, (NetworkCommunityPat*)entry);
             if (entry != NULL) {
                 entry->destroy_08(1);
             }
@@ -170,7 +146,7 @@ void deleteNetworkCommunityPat(NetworkPat* self, s32 index)
 }
 #pragma peephole on
 
-s32 setNetworkCommunityPat(NetworkPat* self, void* value)
+s32 setNetworkCommunityPat(NetworkPat* self, NetworkCommunityPat* value)
 {
     if (self->community_08 == NULL) {
         self->community_08 = value;
@@ -179,7 +155,7 @@ s32 setNetworkCommunityPat(NetworkPat* self, void* value)
     return -1;
 }
 
-void* getNetworkCommunityPat(NetworkPat* self, s32 index)
+NetworkCommunityPat* getNetworkCommunityPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
         return (&self->community_08)[index];
@@ -187,7 +163,7 @@ void* getNetworkCommunityPat(NetworkPat* self, s32 index)
     return NULL;
 }
 
-s32 clearNetworkCommunityPat(NetworkPat* self, void* value)
+s32 clearNetworkCommunityPat(NetworkPat* self, NetworkCommunityPat* value)
 {
     if (self->community_08 == value) {
         self->community_08 = NULL;
@@ -200,10 +176,10 @@ s32 clearNetworkCommunityPat(NetworkPat* self, void* value)
 void deleteNetworkLayerPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
-        NetworkPatEntry* entry = (NetworkPatEntry*)(&self->layer_0C)[index];
+        NetworkPatSlotProtocol* entry = (NetworkPatSlotProtocol*)(&self->layer_0C)[index];
         if (entry != NULL) {
             entry->release_14();
-            clearNetworkLayerPat(self, entry);
+            clearNetworkLayerPat(self, (NetworkLayer*)entry);
             if (entry != NULL) {
                 entry->destroy_08(1);
             }
@@ -212,7 +188,7 @@ void deleteNetworkLayerPat(NetworkPat* self, s32 index)
 }
 #pragma peephole on
 
-s32 setNetworkLayerPat(NetworkPat* self, void* value)
+s32 setNetworkLayerPat(NetworkPat* self, NetworkLayer* value)
 {
     if (self->layer_0C == NULL) {
         self->layer_0C = value;
@@ -221,7 +197,7 @@ s32 setNetworkLayerPat(NetworkPat* self, void* value)
     return -1;
 }
 
-void* getNetworkLayerPat(NetworkPat* self, s32 index)
+NetworkLayer* getNetworkLayerPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
         return (&self->layer_0C)[index];
@@ -229,7 +205,7 @@ void* getNetworkLayerPat(NetworkPat* self, s32 index)
     return NULL;
 }
 
-s32 clearNetworkLayerPat(NetworkPat* self, void* value)
+s32 clearNetworkLayerPat(NetworkPat* self, NetworkLayer* value)
 {
     if (self->layer_0C == value) {
         self->layer_0C = NULL;

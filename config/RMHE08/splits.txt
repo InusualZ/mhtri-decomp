@@ -1318,6 +1318,13 @@ Network/fn_803D3CE8.cpp:
 	.text       start:0x803D3CE8 end:0x803D70B8
 	.data       start:0x805FA908 end:0x805FAAD0
 
+Network/NetworkSessionManagerPat.cpp:
+	extab       start:0x8001A348 end:0x8001A350
+	extabindex  start:0x8003A8B4 end:0x8003A8C0
+	.text       start:0x803D70B8 end:0x803D72F4
+	.data       start:0x805FB0F0 end:0x805FB2B8
+	.sdata2     start:0x8079C758 end:0x8079C75C
+
 Network/initNetworkSessionStable.cpp:
 	extab       start:0x8001A630 end:0x8001A648
 	extabindex  start:0x8003AB9C end:0x8003ABA8
@@ -1362,7 +1369,7 @@ fn_80423E74.cpp:
 	.text       start:0x80423E74 end:0x80429B94
 	.data       start:0x80603750 end:0x806038E8
 
-fn_80429B94.cpp:
+Network/network_pat_control.cpp:
 	extab       start:0x8001D368 end:0x8001D558
 	extabindex  start:0x8003DE54 end:0x8003E0DC
 	.text       start:0x80429B94 end:0x8043065C
@@ -1373,6 +1380,7 @@ fn_80429B94.cpp:
 	.data       start:0x80603C40 end:0x80603C6C
 	.data       start:0x80603C6C end:0x80603CE4
 	.data       start:0x80603CE4 end:0x80603D10
+	.sbss       start:0x80794CF8 end:0x80794CFC
 
 quest/arenatask.cpp:
 	extab       start:0x8001DE9C end:0x8001DF24
