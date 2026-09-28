@@ -91,7 +91,10 @@ struct ItemDataRecord {
         };
     };
     /* +0x002 */ u8 field_0x002;      /* the mask `fn_8029F73C` ANDs its second argument with */
-    /* +0x003 */ u8 unused_0x003;
+    /* +0x003 */ u8 max_num_0x003;    /* the cap a slot's count is clamped to (`quest/quest_entry.cpp`'s
+                                       * `quest_item_slot_add` compares a slot's own count against it
+                                       * as a signed byte, and clamps both on overflow and on a negative
+                                       * merge) */
     /* +0x004 */ u8 tex_idx_0x004;    /* the texture index `draw_itemicon_item_id`/`fn_802E1190`
                                        * (both in `hud/layout.cpp`) hand to `fn_80055C5C`, and the
                                        * byte `fn_802E1024`'s callers read next to `kind`.  Spliced

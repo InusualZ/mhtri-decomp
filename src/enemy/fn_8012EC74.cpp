@@ -136,7 +136,7 @@ u32 em_magma_check(_ENEMY_WORK* self);
 extern "C" s32 fn_8011E640(_ENEMY_WORK* self, u32 mask);
 extern "C" u8 fn_802B0668(u32 map_no);
 extern "C" u32 fn_803B5CA4(u32 id);
-extern "C" u32 fn_803B0CD4(void);
+extern "C" u32 quest_entry_active_ck(void);
 
 /* Whether the enemy's area/group state admits the record (see the file header). */
 extern "C" s32 fn_8012ECF0(_ENEMY_WORK* self)
@@ -207,7 +207,7 @@ extern "C" s32 fn_8012EE80(u8 team, u8 kind)
 extern "C" s32 fn_8012EF98(_ENEMY_WORK* self)
 {
     if (fn_803B5CA4(self->team) != 0) {
-        if (fn_803B0CD4() == 1) return 1;
+        if (quest_entry_active_ck() == 1) return 1;
     }
     return 0;
 }
