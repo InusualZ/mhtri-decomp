@@ -485,7 +485,7 @@ void fn_803A9130(s32 delay, f32 scale);
 void fn_802A0188(void);
 void fn_800F4538(void);
 void fn_803AF98C(u8 index);
-void fn_802EA050(s8 index);
+void quest_slot_arm_all_a(s8 index);
 void fn_80272E30(u16 id, s16 value);
 void fn_802E5D68(u16 id, s8 index);
 void fn_8042C9C8(void* cmd, u32 size);

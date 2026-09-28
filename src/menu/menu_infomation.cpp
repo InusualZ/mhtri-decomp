@@ -230,7 +230,7 @@ void fn_8031A58C(MenuSlot*);
 void fn_8031A638(MenuSlot*);
 
 /* Callees other units own.  Most are declared in their owner's header and included above
- * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `fn_802715A0`
+ * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
  * and `fn_80272E30` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
  * `fn_800CF208` in `ef/fn_800CDB2C.h`; `fn_802E06B0` and `get_str_tbl` in `include/unsplit/menu.h`).
  * The three below cannot: `fn_802A8F14`'s owner header (`menu/fn_802A6624.h`) is included by
@@ -694,11 +694,11 @@ void fn_80314340(void) {}
 /* 0x803144A0 */
 void fn_803144A0(void) {}
 
-/* 0x80314604 - the next/previous slot step: the bowgun category (`fn_802715A0(plw,0xB) == 0x17`)
+/* 0x80314604 - the next/previous slot step: the bowgun category (`Pl_Skill_slot_item_get(plw,0xB) == 0x17`)
  * clamps one higher than the rest. */
 u8 fn_80314604(_PLW* plw, s8 slot, u32 confirm) {
     u8 bowgun = 0;
-    if (confirm == 1 && fn_802715A0(plw, 0xB) == 0x17) {
+    if (confirm == 1 && Pl_Skill_slot_item_get(plw, 0xB) == 0x17) {
         bowgun = 1;
     }
     if (bowgun == 1) {

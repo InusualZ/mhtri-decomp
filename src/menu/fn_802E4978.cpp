@@ -135,7 +135,7 @@ void fn_802E704C(u16, s32, _mh_ivec2_*);
 void fn_802E70F0(s32, _mh_ivec2_*);
 void fn_802E71C4(void);
 u32 fn_802E73B4(void);
-s32 fn_802E73B8(s32, s32);
+s32 quest_bar_id_keep(s32, s32);
 void fn_802E4C5C(CockpitMove*, CockpitText*);
 
 }
@@ -346,7 +346,7 @@ void fn_802E5BB4(void) {
         fn_8027B918((struct _PLW*)move);
     }
     if (move->field_0x5BD == 0xFF) {
-        if (fn_802A0304((MenuFrameWork*)move) == 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
             self->field_0x17E = 1;
             return;
         }
@@ -402,11 +402,11 @@ void fn_802E555C(void) {
         if (m0->field_0x0EF != 0) {
             fn_802EF0FC(&lbl_806BDCC8[0]);
         }
-        if (fn_802A0304((MenuFrameWork*)move) == 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
             if (move->field_0x5BC != 0) {
             } else if (move->field_0x5BE != 0) {
             } else if (move->field_0x5BD != 0) {
-                fn_802E8E64();
+                quest_marker_arm();
                 if (fn_802E54A8(move) == 1) {
                     fn_802EE65C(move, &lbl_806BDCC8[0].field_0x16F);
                     fn_802EDCE4(move, &lbl_806BDCC8[0].field_0x16B);
@@ -437,7 +437,7 @@ void fn_802E5A14(void) {
         fn_8027B358((struct _PLW*)move);
     }
     if (move->field_0x5BC != 0) {
-        if (fn_802A0304((MenuFrameWork*)move) == 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
             self->field_0x176 = 1;
         } else {
             self->field_0x176 = 0;
@@ -460,7 +460,7 @@ void fn_802E5A14(void) {
                 self->field_0x17C = 1;
             }
         }
-        if (fn_802A0304((MenuFrameWork*)move) == 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
             self->field_0x17A = 0;
         } else {
             self->field_0x17A = 1;
@@ -472,7 +472,7 @@ void fn_802E5A14(void) {
         self->field_0x17C = 0;
     }
     if (move->field_0x5BE != 0) {
-        if (fn_802A0304((MenuFrameWork*)move) == 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
             self->field_0x17D = 1;
             return;
         }
@@ -486,7 +486,7 @@ u32 fn_802E73B4(void) {
     return move_work_state_ck();
 }
 
-s32 fn_802E73B8(s32 arg0, s32 arg1) {
+s32 quest_bar_id_keep(s32 arg0, s32 arg1) {
     s32 r;
     s32 mask;
     u16 v;
@@ -514,7 +514,7 @@ void fn_802E5284(void) {
             fn_802E5220(&lbl_806BDCC8[0]);
         }
         fn_802EDB0C(move, &lbl_806BDCC8[0].field_0x16B, &lbl_806BDCC8[0].field_0x16F);
-        fn_802E8C8C(&lbl_806BDCC8[0]);
+        quest_targets_update_b(&lbl_806BDCC8[0]);
         fn_802EC4F0(&lbl_806BDCC8[0]);
         fn_802E5A14();
         fn_802E5BB4();

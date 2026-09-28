@@ -1338,7 +1338,7 @@ void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d)
             if (plw->field_0x37A <= 0x96) {
                 fn_80275C18(plw, 0x12F, a, b, d);
             } else {
-                switch (fn_802B0598(plw->area_0x16)) {
+                switch (pl_act_kind_get(plw->area_0x16)) {
                 case 1:
                     if (Pl_Skill_ck(plw, 0x7C) == 1U || Pl_Skill_ck(plw, 0x7D) == 1U
                         || Pl_condition_ck(plw, 0x400) == 1U) {
@@ -1631,7 +1631,7 @@ u32 fn_80276800(struct _PLW* self, s32 v)
 }
 
 /* True while the act's hold-gauge re-arm word is set. */
-u32 fn_8027681C(struct _PLW* plw)
+u32 Pl_act_state_ck(struct _PLW* plw)
 {
     if (Pl_master_ck(plw) == 0) {
         return 0;
@@ -1642,7 +1642,7 @@ u32 fn_8027681C(struct _PLW* plw)
 /* Steps the act's stagger budget by `amount`, clamped to 0..`+0x37A`. */
 void fn_80276868(struct _PLW* plw, s16 amount)
 {
-    if (Pl_master_ck(plw) != 0 && (amount >= 0 || fn_8027681C(plw) != 1)) {
+    if (Pl_master_ck(plw) != 0 && (amount >= 0 || Pl_act_state_ck(plw) != 1)) {
         s16 value;
 
         plw->field_0x378 += amount;

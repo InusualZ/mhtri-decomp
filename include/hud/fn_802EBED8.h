@@ -2,9 +2,10 @@
  *
  * This unit is the continuation of the cockpit HUD band above `hud/cockpit_quest.cpp`: the same
  * quest-window / item-slot / act-flag work the sibling bands drive, but no `__FILE__` string of its
- * own survives (checked below), so the file keeps the map's `fn_802EBED8` stem (brief section 2,
- * class 4) and the module is `hud` (the naming scheme of the band's neighbours `layout.cpp`,
- * `cockpit_quest.cpp` and the registered `hud/fn_80324F7C.c`).
+ * own survives (checked below), so the file keeps the map's `fn_802EBED8` stem while the symbol
+ * itself is named `quest_marker_draw` (brief section 2, class 4), and the module is `hud` (the
+ * naming scheme of the band's neighbours `layout.cpp`, `cockpit_quest.cpp` and the registered
+ * `hud/fn_80324F7C.c`).
  *
  * Rule-2 debt, recorded rather than guessed.  The callees below whose owner is a registered unit
  * (`ef/eft053.cpp`, `hud/cockpit_quest.cpp`, `hud/layout.cpp`, `menu/menu_item.cpp`) are re-declared

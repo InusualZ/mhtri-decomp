@@ -15,7 +15,7 @@ extern "C" {
  * player act helpers (`Pl/pl_act.cpp`) and the stage units read; the owner defines it `extern "C"`
  * at `stage/stg_w.cpp:489`.  The consumer narrows the result to a byte, so the declaration here is
  * `u8` where the definition's own return is `u32`. */
-u8 fn_802B0598(u8 id);
+u8 pl_act_kind_get(u8 id);
 
 /* 0x802B0688 - the stage resource query the light unit's `fn_802BEE3C` hands a block to; added with
  * the `light/light.cpp` registration (rule 2: this range owns the address).  The owner defines it

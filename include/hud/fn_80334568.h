@@ -228,7 +228,7 @@ void fn_80337648(NetEmStatus* dst, const NetEmStatus* src);
 /* `copyVec3` (0x80041E40) is `src/mh3_pad.cpp`'s and now comes from `include/mh3_pad.h`, which this
  * unit includes - the `(10197)` clash with `include/ef.h`'s `VEC3*` pair is closed (both headers
  * spell the helpers identically, 2026-09-27). */
-/* `include/Pl/fn_80273B14.h` re-declares `fn_8027681C` in a spelling that collides with `pl.h`'s
+/* `include/Pl/fn_80273B14.h` re-declares `Pl_act_state_ck` in a spelling that collides with `pl.h`'s
  * when the two are included together, so this unit takes its four callees from that unit's
  * call-site view instead; the fold is the same outbox entry as above. */
 void fn_80275B04(struct _PLW* self, u16 a, u32 b, u32 c);            /* Pl/fn_80273B14.cpp */

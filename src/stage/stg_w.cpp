@@ -127,7 +127,7 @@ typedef struct StageGroup {
     /* +0x00 */ u8 kind;
     /* +0x01 */ u8 pad_0x01[0x03];
     /* +0x04 */ StageElem** elems;
-    /* +0x08 */ u32 field_0x08;   /* fn_802B0230 reads it */
+    /* +0x08 */ u32 field_0x08;   /* screen_projection_get reads it */
     /* +0x0C */ u32* field_0x0C;
     /* +0x10 */ u8 pad_0x10[0x04];
     /* +0x14 */ u32* field_0x14;    /* base of a j*16-byte table */
@@ -303,7 +303,7 @@ extern "C" void* fn_802B050C(u8 index)
 }
 
 /* Returns the word at +8 of the current map/area group. */
-extern "C" u32 fn_802B0230()
+extern "C" u32 screen_projection_get()
 {
     return ((StageGroup*)fn_802AE564((u8)get_now_mapno()))->field_0x08;
 }
@@ -486,7 +486,7 @@ extern "C" u32 fn_802B04A0(u8 id)
 }
 
 /* Returns the current map's descriptor field +0x38 for `id`, or 0. */
-extern "C" u32 fn_802B0598(u8 id)
+extern "C" u32 pl_act_kind_get(u8 id)
 {
     StageWork* w = SW;
     StageElem* e;

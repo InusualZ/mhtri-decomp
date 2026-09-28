@@ -119,10 +119,10 @@ extern "C" {
 #endif
 
 /* The `fn_8005xxxx` helpers of the draw-shape band (`src/fn_8004CAD8.cpp` and `src/draw_shape.cpp`
- * own these addresses; rule 2 debt above).  `fn_800526E4`/`fn_800526F8` are the two-halfword copy,
+ * own these addresses; rule 2 debt above).  `fn_800526E4`/`uv_pair_copy` are the two-halfword copy,
  * the rest are the pipeline steps the `draw_*` family drives. */
 void fn_800526E4(void* dst, const void* src);                  /* 0x800526E4 */
-void fn_800526F8(void* dst, const void* src);                  /* 0x800526F8 */
+void uv_pair_copy(void* dst, const void* src);                  /* 0x800526F8 */
 void fn_80053E78(const f32* scale, const f32* offset, u16 id); /* 0x80053E78 */
 void fn_80055C5C(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055C5C */
 void fn_80055D20(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D20 */

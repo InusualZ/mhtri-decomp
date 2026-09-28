@@ -105,7 +105,7 @@
  *
  * Still blocked on a **cross-unit rename** (filed, not half-done - each is another registered
  * unit's symbol, so the sweep is theirs to take): `fn_802E1C74` and `fn_802E29F4` call
- * `fn_800526F8` (`fn_8004CAD8.cpp`, 16 referrer lines in 5 files, 66 call sites in the DOL);
+ * `uv_pair_copy` (`fn_8004CAD8.cpp`, 16 referrer lines in 5 files, 66 call sites in the DOL);
  * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
  * entries call `fn_802A9508`/`fn_802A9630`/`fn_802A9558` (`menu/fn_802A6624.cpp`, 11 call sites) and
  * `fn_802E21C0` also `fn_8005C8F0` (`g3d/g3d_anmchr.cpp`, 4 call sites); `fn_802E23D0` calls
@@ -188,7 +188,7 @@ void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos)
     f32 scale[2];
     f32 posf[2];
 
-    fn_800526F8(&anchor, &spr.pos);
+    uv_pair_copy(&anchor, &spr.pos);
     fn_800526E4(&uv0, &spr.uv0);
     fn_800526E4(&uv1, &spr.uv1);
     if (pos != 0) {

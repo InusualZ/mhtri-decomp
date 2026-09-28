@@ -44,7 +44,7 @@ s32 fn_802739F0(struct _PLW* plw, s16 value, s32 mode, s8* out);
 /* 0x802715A0 - the skill/slot classifier the equipment screen steps its slot selection through
  * (its own row height `fn_802A8F14` is resolved from this).  Owned by this unit
  * (`Pl/pl_skill.cpp:738`); added with `menu/menu_infomation.cpp` (docs/plan.md 6.5 rule 2). */
-u8 fn_802715A0(struct _PLW* plw, u32 slot);
+u8 Pl_Skill_slot_item_get(struct _PLW* plw, u32 slot);
 /* 0x802731B4 - the item/skill timer lookup the same unit's consumers and `Pl/fn_8027D684.cpp`'s
  * `fn_8027D76C` call; the owner defines it `int` (`Pl/pl_skill.cpp:1265`), so the declaration keeps
  * that return (docs/plan.md 6.5 rule 2: this is the owner's header). */

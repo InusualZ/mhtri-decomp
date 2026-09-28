@@ -437,7 +437,7 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
     _SPR_DATA_ frame;
     fn_801E6850(&frame, get_lsp_data(0x1307, 0));
     _mh_ivec2_ frame_pos;
-    fn_800526F8(&frame_pos, &frame);
+    uv_pair_copy(&frame_pos, &frame);
     _mh_ivec2_ cursor = { 0, 0 };
     for (s32 i = 0; i < 0x32; i++) {
         _mh_ivec2_ digit;
@@ -445,13 +445,13 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
         u16 id = (i < 0x14) ? 0x2092 : 0x209B;
         _SPR_DATA_ rec;
         fn_801E6850(&rec, get_lsp_data(id, 0));
-        fn_800526F8(&rec, &digit);
+        uv_pair_copy(&rec, &digit);
         frame.pos.x = (s16)(digit.x + frame_pos.x);
         frame.pos.y = (s16)(digit.y + frame_pos.y);
         draw_sprite(rec, &anchor);
         if (self->cursor_0x0E == i) {
             found = 1;
-            fn_800526F8(&cursor, &digit);
+            uv_pair_copy(&cursor, &digit);
         }
         if ((u8)(self->state_0x00 + 0xFF) <= 1) {
             if (chk_pointer() == 0) {

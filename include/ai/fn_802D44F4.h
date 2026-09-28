@@ -22,6 +22,8 @@ void fn_802DA1A8(void* work);            /* 0x802DA1A8 */
 void fn_802DA1B0(void* work);            /* 0x802DA1B0 */
 void fn_802DA344(void);                  /* 0x802DA344 */
 s32 fn_802DA454(s32, s32, s16, s16, s32, s32, s32); /* 0x802DA454 */
+void ai_npc_hold_item_arm(void);                  /* 0x802D6534, called by hud/cockpit_quest.cpp's
+                                          * `quest_slot_arm_a` (its body is written in this unit) */
 
 void fn_802DA3CC(void);                  /* 0x802DA3CC, registered by address */
 

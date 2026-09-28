@@ -301,7 +301,7 @@ u32 fn_804B7C30(s32);
 u32 fn_804B9C60(void*, u16, s32);
 u32 fn_804C6900(f32, f32, f32, f32, f32, f32);
 u32 fn_804C69A0(f32, f32, f32, f32);
-u32 fn_80500EF4(f32);
+u32 math_sincos_idx(f32);
 u32 fn_805015C8(void*, s32, void*);
 u32 fn_80502678(void);
 u32 fn_805026D8(void);
@@ -517,7 +517,7 @@ u32 fn_805026D8(void);
 
 
 void fn_80075DCC(f32 farg0) {
-    fn_80500EF4((f32)(lbl_80795DFC * farg0));
+    math_sincos_idx((f32)(lbl_80795DFC * farg0));
 }
 
 typedef struct {

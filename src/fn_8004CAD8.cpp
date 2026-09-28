@@ -62,7 +62,7 @@
  *     here rather than copied (rule 1 forbids a local copy).
  *   * The nw4r-math wrappers `rotMatrixX/Y/Z`, `rotLocalMat*`, `rotVecX/Y/Z`, `atan2ang`, `calcVecAng*`,
  *     `calcDistanceSqXZ`, `mulVecMat*` are NOT written: they need the unnamed in-range helpers
- *     (`fn_800501B4`/`fn_8005024C` = Sin/CosFIdx of a bit-cast u16, `fn_80050BC0` = FrSqrt) and the
+ *     (`anim_tick_cos`/`fn_8005024C` = Sin/CosFIdx of a bit-cast u16, `fn_80050BC0` = FrSqrt) and the
  *     `SinFIdx`/`CosFIdx`/`FrSqrt` declarations, which have no owner header yet - a rule-2 gap, recorded
  *     rather than re-declared here.
  *   * `set_slot_none` (the 16-way `kind` dispatch over the +0x92..+0x9C half-words) is declared but not

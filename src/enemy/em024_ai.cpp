@@ -114,7 +114,7 @@
  *      separate registers (`slwi r4,r0,4` + `li r0,0` + `stwx r0,r3,r4`), ours reuses one.
  * NOT written (the honest residual, in address order): `fn_8034C350` (8 B), `note_slot_cursor_bounds`'s
  * callee `fn_8034CCBC` (0xB0) and `fn_8034CD6C` (0x70) - the last two read `_SPR_DATA_`'s rectangle and
- * cannot be typed here: `hud/layout.h` (the owner of `_SPR_DATA_`, `fn_802E1978`, `fn_800526F8`) and
+ * cannot be typed here: `hud/layout.h` (the owner of `_SPR_DATA_`, `fn_802E1978`, `uv_pair_copy`) and
  * `menu/menu_item.h` (which `menu/menu_item_page.h` pulls) both define `_mh_ivec2_`, so the two
  * headers collide in one TU - the per-consumer-view split `include/menu/menu_item_page.h` documents.
  * Then `fn_8034CDDC` (0x348) and the whole AI body of the range from `fn_8034D124` on: 106 functions,

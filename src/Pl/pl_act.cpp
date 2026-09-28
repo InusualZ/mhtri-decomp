@@ -482,10 +482,10 @@ s32 Pl_master_ck(_PLW*);
 u32 Pl_Skill_ck(_PLW*, u16);
 u32 Pl_cat_skill_ck(_PLW*, u16);
 
-extern "C" u32 fn_8027681C(_PLW*);
+extern "C" u32 Pl_act_state_ck(_PLW*);
 extern "C" void fn_80276868(_PLW*, s16);
 extern "C" void fn_80276CE8(_PLW*, s16);
-extern "C" u8 fn_802B0598(u8);
+extern "C" u8 pl_act_kind_get(u8);
 extern "C" s32 fn_80331104(void);
 extern "C" void fn_8010D688(_PLW*);
 extern "C" u32 fn_8026FE44(_PLW*);
@@ -630,7 +630,7 @@ extern "C" void fn_80276CE8(_PLW* self, s16 arg1)
     if (Pl_master_ck(self) == 0) {
         return;
     }
-    if (arg1 < 0 && fn_8027681C(self) == 1) {
+    if (arg1 < 0 && Pl_act_state_ck(self) == 1) {
         return;
     }
     {
@@ -661,7 +661,7 @@ extern "C" void fn_80276D94(_PLW* self, s32 arg1)
 extern "C" void fn_80276E08(_PLW* self)
 {
     if (Pl_master_ck(self) != 0) {
-        s16 cls = fn_802B0598(self->unk016);
+        s16 cls = pl_act_kind_get(self->unk016);
         s32 v = 0;
         if (cls == 2 || cls == 4) {
             if (self->unk466 == 0 && (cls != 2 || (Pl_Skill_ck(self, 0x80) != 1 && Pl_Skill_ck(self, 0x81) != 1))
@@ -709,7 +709,7 @@ extern "C" void fn_80276E08(_PLW* self)
         if ((s16)v > 0) {
             self->unk37C -= (s16)v;
             if ((s16)self->unk37C <= 0) {
-                if (fn_8027681C(self) == 1) {
+                if (Pl_act_state_ck(self) == 1) {
                     self->unk37C = 1;
                     return;
                 }
