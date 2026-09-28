@@ -1911,9 +1911,19 @@ def outbox_units(main: str, units: list[str], branch: str | None = None) -> tupl
     registration**: its outbox keeps the pre-registration slug, so the unit-derived path misses it while
     the branch-derived one finds it.  When the branch-derived path is missing too, the failure names
     `--no-outbox` as the remedy, because a missing record must be stated plainly, not hidden.
+
+    The outbox is validated against the **batch's** owned symbols, not one unit's: a branch that registers or
+    touches several units writes one outbox naming all of them, and a per-unit check flagged every other
+    unit's symbols as "not owned".
     """
     ok, problems = [], []
     branch_slug = claims.slug_of_branch(branch) if branch else None
+    # The ownership check reads the *batch's* units as one set: a branch that registers or touches several
+    # units writes one outbox naming all of them, and validating it against a single unit flags every symbol
+    # of the others as "not owned" - a refusal whose only documented escape is `--no-outbox`, which turns the
+    # outbox check off entirely. A symbol owned by no unit in the batch is still an error, and a single-unit
+    # batch is unchanged.
+    batch_owned = handoff_mod.owned_symbols(main, [claims.norm_unit(u.strip("/")) for u in units])
     for unit in units:
         unit = claims.norm_unit(unit.strip("/"))
         if branch_slug:
@@ -1926,9 +1936,7 @@ def outbox_units(main: str, units: list[str], branch: str | None = None) -> tupl
             problems.append("%s: no outbox at %s%s" % (unit, path, hint))
             continue
         entry = json.loads(open(path, encoding="utf-8").read())
-        rng = brief_mod.splits_range(main, unit)
-        owned = {s["name"] for s in brief_mod.symbols_in_range(main, *rng[".text"][:2])} if rng.get(".text") else set()
-        errors, _warnings = handoff_mod.validate(entry, owned)
+        errors, _warnings = handoff_mod.validate(entry, batch_owned)
         if errors:
             problems.extend("%s: %s" % (unit, e) for e in errors)
         else:
@@ -3749,6 +3757,31 @@ def selftest() -> int:
               ["Pl/pl_act"])
         check("the outbox row then validates only the unit",
               outbox_units(tmp, unit_rows(tmp, [header, "Pl/pl_act"])), (["Pl/pl_act"], []))
+
+    # a multi-unit batch: one outbox names both units' symbols. Validating it against one unit at a time made
+    # every symbol of the other unit "not owned", so the batch could only land with --no-outbox (which turns
+    # the outbox check off entirely). The row now reads the batch's whole owned set.
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = os.path.join(tmp, "config", "RMHE08")
+        os.makedirs(cfg)
+        with open(os.path.join(cfg, "splits.txt"), "w", encoding="utf-8") as fh:
+            fh.write("A/a.c:\n    .text start:0x100 end:0x200\nB/b.c:\n    .text start:0x200 end:0x300\n")
+        with open(os.path.join(cfg, "symbols.txt"), "w", encoding="utf-8") as fh:
+            fh.write("fn_a = .text:0x100; // type:function size:0x10\n"
+                     "fn_b = .text:0x200; // type:function size:0x10\n")
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
+        branch = "worker/two-units-abcd"
+        obx = os.path.join(tmp, ".pi", "outbox", claims.slug_of_branch(branch) + ".json")
+        json.dump(dict(entry, unit="A/a.c + B/b.c",
+                       symbols=[{"name": "fn_a", "percent": 50.0}, {"name": "fn_b", "percent": 50.0}]),
+                  open(obx, "w"))
+        check("a multi-unit outbox validates against the batch's whole owned set",
+              outbox_units(tmp, ["A/a", "B/b"], branch=branch), (["A/a", "B/b"], []))
+        # typo/stale detection stays: a symbol no batch unit owns is still refused
+        json.dump(dict(entry, unit="A/a.c + B/b.c", symbols=[{"name": "fn_zzz", "percent": 50.0}]),
+                  open(obx, "w"))
+        check("... but a symbol no batch unit owns is still refused",
+              bool(outbox_units(tmp, ["A/a", "B/b"], branch=branch)[1]), True)
 
     # the teardown step (owner's rule): a green gate releases the batch's claims, a failed one leaves them
     green = [("ground truth", True, "", ""), ("ok", True, "", "")]
