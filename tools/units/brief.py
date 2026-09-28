@@ -446,17 +446,42 @@ def shared_headers(main: str, wt: str, unit: str, symbol_names) -> list:
     return typeregistry.relevant_headers(reg, text, symbol_names, unit_file=rel)
 
 
-def plan_section(main: str, heading: str) -> str:
-    """One section of docs/plan.md, verbatim - the rules have exactly one source."""
-    path = os.path.join(main, "docs", "plan.md")
-    if not os.path.exists(path):
-        return ""
-    text = open(path, encoding="utf-8", errors="replace").read()
+# A section a brief quotes lives in `docs/plan.md`, but a section that outgrows it moves to
+# `docs/pipeline.md` (owner, 2026-09-28: the coordinator protocol left `plan.md` 5 for `pipeline.md` 10).
+# The lookup is therefore by the heading's *title* across both files: the rules keep exactly one source,
+# the brief cannot drift from it, and the next move needs no edit here.
+RULE_DOCS = (("docs", "plan.md"), ("docs", "pipeline.md"))
+
+
+def _section_span(text: str, heading: str):
+    """The span `heading` covers: matched literally first, otherwise by its title (the number may move)."""
     start = text.find(heading)
-    if start < 0:
-        return ""
-    nxt = re.search(r"\n## ", text[start + len(heading):])
-    return text[start:start + len(heading) + (nxt.start() if nxt else len(text))].strip()
+    if start >= 0:
+        nxt = re.search(r"\n## ", text[start + len(heading):])
+        return start, start + len(heading) + (nxt.start() if nxt else len(text))
+    m = re.match(r"(#{2,4})\s+[0-9]+(?:\.[0-9]+)*\.?\s+(.*)$", heading.strip())
+    if m is None:
+        return None
+    title = " ".join(m.group(2).split()).lower()
+    for hit in re.finditer(r"(?m)^(#{2,4})\s+(?:[0-9]+(?:\.[0-9]+)*\.?\s+)?(.*?)\s*$", text):
+        got = " ".join(hit.group(2).split()).lower()
+        if got == title or got.startswith(title):
+            nxt = re.search(r"(?m)^#{1,%d} " % len(hit.group(1)), text[hit.end():])
+            return hit.start(), hit.end() + (nxt.start() if nxt else len(text))
+    return None
+
+
+def plan_section(main: str, heading: str) -> str:
+    """One section, verbatim, wherever it lives - the rules have exactly one source."""
+    for parts in RULE_DOCS:
+        path = os.path.join(main, *parts)
+        if not os.path.exists(path):
+            continue
+        text = open(path, encoding="utf-8", errors="replace").read()
+        span = _section_span(text, heading)
+        if span:
+            return text[span[0]:span[1]].strip()
+    return ""
 
 
 def data_queue_entries(main: str, unit: str) -> list[dict]:
@@ -2034,6 +2059,25 @@ def selftest() -> int:
           "fan out subagents" in plan_section(".", "### 5.5 A worker may fan out subagents"), True)
     check("plan_section finds §8", "Invariants" in plan_section(".", "## 8. Invariants"), True)
     check("plan_section is empty for nonsense", plan_section(".", "### 99 nope"), "")
+    # A section that MOVED out of docs/plan.md must still be found: the pipeline doc took section 5 to
+    # `docs/pipeline.md` section 10 (owner, 2026-09-28), and this lookup is what keeps the brief in step
+    # with the rules - without it, that move leaves a red selftest and cannot land.
+    import shutil
+    import tempfile
+    moved = tempfile.mkdtemp(prefix="brief_sec_")
+    os.makedirs(os.path.join(moved, "docs"), exist_ok=True)
+    open(os.path.join(moved, "docs", "plan.md"), "w", encoding="utf-8").write(
+        "# plan\n\n## 5. The protocol\n\nMoved to pipeline.md 10.\n\n## 6. Next\n\nafter\n")
+    open(os.path.join(moved, "docs", "pipeline.md"), "w", encoding="utf-8").write(
+        "# pipeline\n\n## 10. The protocol\n\n### 10.6 A worker may fan out subagents\n\nbody-10-6\n\n"
+        "### 10.7 Acknowledgement, heartbeats and timeouts\n\nbody-10-7\n")
+    sec = plan_section(moved, "### 5.5 A worker may fan out subagents")
+    check("plan_section follows a section that moved (old number, new file)", "body-10-6" in sec, True)
+    check("a moved section stops at its own next heading", "body-10-7" not in sec, True)
+    check("plan_section still reads the section that stayed in plan.md",
+          "Moved to pipeline.md 10." in plan_section(moved, "## 5. The protocol"), True)
+    shutil.rmtree(moved, ignore_errors=True)
+
 
     # the slug is the claim's branch minus worker/, because that is what land.py's gate keys the outbox by
     import tempfile
