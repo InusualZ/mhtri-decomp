@@ -1571,30 +1571,25 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
 def rule10_violations(main: str, text_ref: str | None = None) -> dict | None:
     """`{key: {"unit", "where", "kind"}}` for every rule-10 violation in the tree as it stands.
 
-    Two shapes, and the key is stable so the gate can diff two snapshots: `run:<unit>:<section>:<addr>`
+    The key shape is `vtableaudit.violation_rows`'s, and it is **rename-stable**: `run:<section>:<addr>`
     for a code-pointer run inside the unit's own registered ranges that our object neither emits nor
     references, and `ref:<file>:<line>:<symbol>` for a source assignment to a `+0x00` function-pointer-table
-    member whose table the unit itself owns. `text_ref` judges the text half as of that revision - the gate
-    passes the batch base for its BEFORE snapshot. `None` when the audit cannot read the tree at all (a
-    missing DOL, a broken `configure.py`) - the row then says so instead of refusing every batch.
+    member whose table the unit itself owns (with `<file>` translated through the batch's renames when
+    `text_ref` is the base). `text_ref` judges the text half as of that revision - the gate passes the
+    batch base for its BEFORE snapshot, so a unit the batch re-homed (plan §12) must not read as seven
+    added violations. `None` when the audit cannot read the tree at all (a missing DOL, a broken
+    `configure.py`) - the row then says so instead of refusing every batch.
     """
     try:
         sweep = vta.sweep(main, text_ref=text_ref)
     except Exception as exc:                                   # noqa: BLE001 - the row must never crash
         print("rule 10: vtableaudit could not read this tree (%s)" % exc, file=sys.stderr)
         return None
+    rename = vta.rename_map(main, text_ref) if text_ref else {}
     rows = {}
-    for run in sweep["violations"]:
-        key = "run:%s:%s:%08X" % (run["unit"], run["section"], run["address"])
-        rows[key] = {"unit": claims.norm_unit(run["unit"]), "kind": "run",
-                     "where": "%s %s 0x%08X (%d words)" % (run["unit"], run["section"],
-                                                           run["address"], run["words"])}
-    for ref in sweep["references"]:
-        if ref["kind"] != "own":
-            continue
-        key = "ref:%s:%d:%s" % (ref["file"], ref["line"], ref["symbol"])
-        rows[key] = {"unit": claims.norm_unit(ref["unit"]), "kind": "ref",
-                     "where": "%s:%d assigns %s" % (ref["file"], ref["line"], ref["symbol"])}
+    for key, row in vta.violation_rows(sweep, rename).items():
+        rows[key] = {"unit": claims.norm_unit(row["unit"]), "kind": row["kind"],
+                     "where": row["where"]}
     return rows
 
 
@@ -3207,8 +3202,10 @@ def selftest() -> int:
         shutil.rmtree(d, ignore_errors=True)
 
     # --- rule 10: the row is ADD-only, like the lint's `--diff` ------------------------------------
-    existing = {"run:ai/fn_802CC794.cpp:.data:805D4D38": {"unit": "ai/fn_802CC794",
-                                                            "where": "ai/fn_802CC794.cpp .data"},
+    # The keys are `vtableaudit.violation_rows`'s rename-stable shape: a run by its range (an address is
+    # unique in the DOL and a re-home keeps it), a `ref:` by the path the tree now spells.
+    existing = {"run:.data:805D4D38": {"unit": "ai/fn_802CC794",
+                                       "where": "ai/fn_802CC794.cpp .data"},
                 "ref:src/old/unit.cpp:9:OldVTable": {"unit": "old/unit",
                                                       "where": "src/old/unit.cpp:9 assigns OldVTable"}}
     same = dict(existing, **{"ref:src/new/unit.cpp:3:NewVTable":
