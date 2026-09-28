@@ -54,7 +54,7 @@ The gate (through this module) now covers these documented checks; they no longe
   the row is matched to our symbol at the same section+offset and judged by its bytes, which is what
   it actually claims. Related, and the reason that byte rule is load-bearing rather than decorative:
   `Object(Matching, ...)` sets `metadata.complete` in `objdiff.json`, and objdiff-cli then reports a
-  unit as complete **with its per-symbol diff still run** (measured 2026-09-28: a corrupted `.init` object
+  pins the unit's completion percent at 100 (measured 2026-09-28: a corrupted `.init` object
   still reads 100 %), so `report.json`'s score for a Matching unit is a claim the objects must back.
 * **§7 a report number that disagrees with an object diff is a stale report** - `verify_units`'
   symbol-for-symbol comparison of a *fresh* `report generate` against the committed `report.json`.
