@@ -26,13 +26,17 @@
  *
  * FLAGS.  Per-unit `-O3` in `configure.py` (the lib default `-O4,p` hoists the constant setup into the
  * prologue and lays the two early returns out inline): the source scores 81.393936 % at `-O4,p` and
- * 100.00000 % at `-O3` (re-measured on this revision, both pragmas in place) - the same flag shape as
- * the sibling `Network/fn_803D3CE8.cpp`.  Two file-scope pragmas, each with the instruction evidence:
+ * 100.00000 % at `-O3` (re-measured on this revision, the lib flag and the peephole pragma in place) - the
+ * same flag shape as the sibling `Network/fn_803D3CE8.cpp`.  The lib flag and one file-scope pragma, each
+ * with the instruction evidence:
  *
- *   - `#pragma exceptions on` (the lib sets `-Cpp_exceptions off`) is what makes MWCC emit the
- *     `extab`/`extabindex` pair at all: without it our object carries neither section (1232 B against
- *     the target's 1928) while `.text` stays byte-identical.  The `new` expression below is then what
- *     gives the record the target's 24-byte shape - the pragma alone stays at the 8-byte header.
+ *   - C++ exceptions come from the **lib flag** `-Cpp_exceptions on` (`cflags_network`, flags-audit
+ *     2026-09-28), not a file pragma: this file used to spell `#pragma exceptions on` because the lib
+ *     default sets them off, and measured byte-identical with the pragma removed and the flag on.  Either
+ *     way it is what makes MWCC emit the `extab`/`extabindex` pair at all: without it our object carries
+ *     neither section (1232 B against the target's 1928) while `.text` stays byte-identical.  The `new`
+ *     expression below is then what gives the record the target's 24-byte shape - exceptions alone stay at
+ *     the 8-byte header.
  *   - `#pragma peephole off` is the last byte of the match.  With the pass on, MWCC folds the first
  *     dispatch's vptr-load base into the `mr r3,r31` copy (`lwz r12,0(r31)` at +0x78) where retail
  *     keeps `lwz r12,0(r3)`; with it off `.text`, `extab` and `extabindex` are all byte-identical
@@ -71,10 +75,6 @@
 #include "sys_mem.h"
 #include "Network/fn_803D3CE8.h"
 #include "unsplit/NetworkData.h"   /* the band's unowned constants (rule 2) */
-
-/* The target object carries `extab` 0x18 / `extabindex` 0x0C, so the original TU was built with C++
- * exceptions on while the lib sets them off; the pragma is what makes MWCC emit the pair. */
-#pragma exceptions on
 
 /* Retail keeps the unfused `lwz r12,0(r3)` in the first dispatch: with the peephole pass on MWCC folds
  * the base register into the `mr r3,r31` copy and emits `lwz r12,0(r31)`, the one byte that kept this

@@ -70,8 +70,6 @@
  *     are named from the pane's state order and their bodies are the next pass's work.
  */
 
-#pragma exceptions on /* every framed function of the range owns an extab record */
-
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/note_work.h"

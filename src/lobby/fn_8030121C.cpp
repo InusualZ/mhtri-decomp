@@ -18,8 +18,8 @@
  * references) and the extab/extabindex runs, which are exactly the gaps between the bracketing
  * registered units (extab 0x80015964..0x80015AAC, extabindex 0x8003447C..0x80034668).
  *
- * Flags: the `lobby` lib's `cflags_lobby` (`-O3`, `-inline noauto`), plus `#pragma exceptions on`
- * because `cflags_lobby` turns exceptions off and the lobby target objects carry the unwind records.
+ * Flags: the `lobby` lib's `cflags_lobby` (`-O3`, `-inline noauto`), whose `-Cpp_exceptions on`
+ * (flags-audit 2026-09-28) emits the unwind records the lobby target objects carry.
  */
 #include "types.h"
 #include "ef.h"
@@ -71,7 +71,6 @@ typedef struct Eft8030Work {
     /* +0x01C */ u8* source_0x01C;
 } Eft8030Work; /* size: 0x20 (approximate: the pooled block is larger) */
 
-#pragma exceptions on
 #pragma peephole off
 
 extern "C" {

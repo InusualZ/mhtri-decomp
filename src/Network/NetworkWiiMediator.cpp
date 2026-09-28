@@ -27,9 +27,9 @@
  * `-inline noauto` scores it 88.28; every other function is byte-identical under either `-inline`
  * setting (a 79-row report diff).  The `-O4,p` epilogue-swap / hoisted-`li` signature this band showed
  * (updatePatInterface180, updateTermVersion, resetMediatorFlags) is playbook 27's -O3 evidence, and the
- * two sibling units in the same library are already `-O3`.  `#pragma exceptions on` in the source, not
- * a flag: the target object carries `extab` 0x1a8 + `extabindex` 0x234 (one unwind record per
- * frame-bearing function, 47 of them) while our object emitted none.
+ * two sibling units in the same library are already `-O3`.  `-Cpp_exceptions on` now comes from
+ * `cflags_network` (flags-audit 2026-09-28), not a per-file pragma: the target object carries `extab`
+ * 0x1a8 + `extabindex` 0x234 (one unwind record per frame-bearing function, 47 of them).
  *
  * NAMES.  The `NetworkWiiMediator::*` spellings are the runtime dump's and already in `symbols.txt`.
  * The 65 helpers answer only `zz_XXXXXXXX_` in the dump, so the registration batch named them from their
@@ -89,7 +89,7 @@
  * residuals are the same one instruction - a `mr r31,r3` between `bl __nw__FUl` and the null check -
  * and it is **not** reachable from `T* p = (T*)operator new(n); if (p != NULL) ctor(p);`: MWCC coalesces
  * that copy away.  It appears when the allocation is a real **`new` expression whose constructor is
- * called** - with `#pragma exceptions on` (this unit's setting) the new-expression's value must survive
+ * called** - with `-Cpp_exceptions on` (the lib's setting) the new-expression's value must survive
  * the constructor for the unwind path, so MWCC keeps it in a callee-saved register and emits the copy.
  * The three classes therefore each carry a declared (out-of-line) ctor plus a padding member that makes
  * `sizeof` the size the allocation passes to `operator new` (0xD640 / 0x816C / 0x44A0), and the three
@@ -125,7 +125,6 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
-#pragma exceptions on
 
 /* The mediator's field layout, traced from the disassembly: every offset below is one an instruction
  * in this unit addresses.  `buffer_A`/`buffer_B` are the two 0x106-byte blocks the accessors copy,

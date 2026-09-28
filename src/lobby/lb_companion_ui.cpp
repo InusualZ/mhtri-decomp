@@ -77,13 +77,13 @@
  * `sysSE_req__Fl`) that rule 9 forbids spelling as identifiers, so they are declared at C++ scope
  * with the real signatures in this unit's header; every plain `fn_` definition is `extern "C"` so
  * it keeps the map's name (playbook 42).  Lib `lobby` (`cflags_lobby`: `-O3`, `-inline noauto` -
- * the target packs its functions on 4 B, so it is not `-O4,p`), with the per-file
- * `#pragma exceptions on` the other lobby units use: the target object carries extab
+ * the target packs its functions on 4 B, so it is not `-O4,p`): the target object carries extab
  * 0x80016994..0x80016CA4 (98 records) and extabindex 0x80035CC4..0x8003615C (98 x 12 B).
  *
- * FLAGS.  `cflags_lobby` plus two per-file pragmas, both measured over this whole file:
- *   * `#pragma exceptions on` - the target object carries the 98 unwind records cflags_lobby's
- *     `-Cpp_exceptions off` would not emit (the same pragma the other lobby units use).
+ * FLAGS.  `cflags_lobby` (which now sets `-Cpp_exceptions on`, flags-audit 2026-09-28) plus one
+ * per-file pragma, measured over this whole file:
+ *   * `-Cpp_exceptions on` - the target object carries the 98 unwind records the old default
+ *     (`-Cpp_exceptions off`) did not emit.
  *   * `#pragma peephole off` - retail keeps the unfused narrow forms (`clrlwi` + `slwi`, `lbl_80794880
  *     + (i >> 3)` kept in a register) that the pass folds into one `rlwinm`/`addi`.  A/B over the whole
  *     file: 24 -> 47 functions byte-identical and 60 -> 73 of the 133 at or above the 80 % bar.
@@ -117,7 +117,6 @@
 #include "types.h"
 #include "lobby/lb_companion_ui.h"
 
-#pragma exceptions on
 #pragma peephole off
 
 extern "C" {

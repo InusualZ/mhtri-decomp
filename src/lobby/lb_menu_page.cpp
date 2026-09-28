@@ -49,9 +49,8 @@
  * LANGUAGE AND FLAGS.  C++: the range reaches genuinely mangled callees (`set_zmode__FbUcb`,
  * `set_blendmode__FUcUcUc`) through their real signatures (rule 9), and every plain `fn_` definition
  * is `extern "C"` so it keeps the map's name (playbook 42).  Lib `lobby` (`cflags_lobby`: -O3,
- * -inline noauto), with the per-file `#pragma exceptions on` the other lobby units use to emit their
- * unwind records: the target objects carry one extab record each (8 B) and one extabindex entry each
- * (12 B), and `cflags_lobby`'s `-Cpp_exceptions off` would emit none.
+ * -inline noauto), whose `-Cpp_exceptions on` (flags-audit 2026-09-28) emits the unwind records: the
+ * target objects carry one extab record each (8 B) and one extabindex entry each (12 B).
  *
  * DATA.  `.data` 0x805EDAB4..0x805EDAE0 (0x2C B) is this unit's own jump table: MWCC emits it for
  * `lb_menu_page_step`'s dense 0..10 switch, the map records it as `jumptable_805EDAB4` (`scope:local`,
@@ -66,7 +65,8 @@
  * with `cpSetRotMatrixZXY`/`mulVecMatAddTrans` and lead into `eft053` at 0x803669A0, and no evidence
  * class settles where this unit ends.
  *
- * FLAGS, MEASURED.  `#pragma exceptions on` is required: without it this object emits no
+ * FLAGS, MEASURED.  The lib's `-Cpp_exceptions on` (flags-audit 2026-09-28) is required: without it
+ * the object emits no
  * extab/extabindex at all (`datagap.py --mode both` reports `extab 16B (ours 0B)`,
  * `extabindex 24B (ours 0B)`, `matched_data` 44 of 84).  `#pragma peephole off` is required too:
  * retail keeps the unfused `rlwinm` + `cmpwi` and `clrlwi` + `cmpwi` pairs this unit is full of,
@@ -113,7 +113,6 @@
 
 /* The target objects carry one 8-byte extab record and one 12-byte extabindex entry per function
  * (both runs are claimed in splits.txt); `cflags_lobby`'s `-Cpp_exceptions off` would emit none. */
-#pragma exceptions on
 #pragma peephole off
 
 typedef struct LbMenuPage LbMenuPage;

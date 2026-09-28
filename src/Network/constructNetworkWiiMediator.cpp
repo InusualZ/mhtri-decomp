@@ -27,8 +27,8 @@
  * guarded range it describes ends at 0x28, the `stw` that publishes the result.  The manual
  * `operator new` + `if (p != NULL)` spelling emits the same 16 instructions but only the record's
  * 8-byte header (`08080000 00000000`), which is what `flipcheck.py` reported as "splits.txt claims
- * extab (0x18) but the object emits no such section".  `#pragma exceptions on` - the lib sets
- * `-Cpp_exceptions off` - is what makes MWCC emit the record at all.
+ * extab (0x18) but the object emits no such section".  `-Cpp_exceptions on` (`cflags_network`,
+ * flags-audit 2026-09-28) is what makes MWCC emit the record at all.
  *
  * ALLOCATED TYPE.  `NetworkLibrary` is the 0x1408 bytes the allocation's `li r3,0x1408` sizes; its
  * constructor body is the *neighbouring* 0x804189C8 (0x98 B, outside this range), which stores a
@@ -52,8 +52,6 @@
 #include "types.h"
 #include "sys_mem.h"
 #include "unsplit/Network.h"
-
-#pragma exceptions on
 
 extern "C" {
 

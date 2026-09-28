@@ -58,8 +58,6 @@
  */
 #include "types.h"
 
-#pragma exceptions on
-
 /* The holder the accessors walk: four `void*` slots at +0x00/+0x04/+0x08/+0x0C.  The three named
  * getters read slot +0x00 / +0x08 / +0x0C through the caller's `index`; the `+0x04` slot has no
  * getter (its installer `0x80419EA4` sits just below the unit's left seam). */

@@ -39,9 +39,8 @@
  * 12 rows are frameless), so the unit claims 0x80010DBC..0x80010F7C / 0x8002D384..0x8002D624 - pinned
  * by the split's own per-function objects, whose `extabindex` relocations run `@etb_80010DBC` (this
  * range's `fn_802029B4`) up to `@etb_80010F74` and then hand `@etb_80010F7C` to `fn_802076D4`, the
- * next proposal's first framed function.  `#pragma exceptions on` (the lib's `cflags_lobby` turns
- * exceptions off, and every lobby target object carries extab anyway) is what emits them; see the
- * residual note below.
+ * next proposal's first framed function.  `cflags_lobby`'s `-Cpp_exceptions on` (flags-audit
+ * 2026-09-28, no longer a per-file pragma) is what emits them; see the residual note below.
  *
  * Seam.  Unproven, as the brief says.  Both edges are function boundaries at the registered units'
  * addresses; the left edge is `attribute.py`'s byte cap rather than evidence, and this band may be the
@@ -56,7 +55,7 @@
  *   - fn_802050AC 98.2377 %: the target schedules the accumulation's `lwz r4,44(r31)` between the
  *     `(s16)(u16)` mask and the signed `/ 5`, ours issues the load after the divide; `+=`, `a = a + b`
  *     and a named temporary all measure the same.
- *   - extab 63.19 %: all 56 records are emitted (the `#pragma exceptions on` above) and paired, and a
+ *   - extab 63.19 %: all 56 records are emitted (the lib's `-Cpp_exceptions on`) and paired, and a
  *     few records' flag words differ from the target's.
  *   - extabindex 0 %: the 672 bytes are emitted at the target's exact size but objdiff pairs none of
  *     the entries (the target's carry relocations to functions the linker placed at their DOL
@@ -82,8 +81,6 @@
  */
 #include "types.h"
 #include "nw4r/math.h"
-
-#pragma exceptions on
 
 #include "lobby/lb_npc.h"
 #include "unsplit/lobby.h"
