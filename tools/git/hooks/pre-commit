@@ -23,7 +23,10 @@ fi
 # The LOCAL-ONLY working-state block is never committed (non-negotiable 8). prepcommit.py pulls it before
 # staging; this catches a hand-run `git add AGENTS.md && git commit` instead.
 if printf '%s\n' "$staged" | grep -q '^AGENTS\.md$'; then
-    if git diff --cached -U0 -- AGENTS.md | grep -q '^+.*<!-- LOCAL-ONLY'; then
+    # Anchor the match at line start, like `localonly.find_block`: the rule's own prose quotes the marker
+    # (this file did, and so does a rule-8 edit that shows the verify command), and `^+.*` matched that
+    # text as if it were the block, refusing three landings of a refactored AGENTS.md on 2026-09-28.
+    if git diff --cached -U0 -- AGENTS.md | grep -q '^+<!-- LOCAL-ONLY'; then
         echo "pre-commit: refusing AGENTS.md - the staged version contains the LOCAL-ONLY working-state block." >&2
         echo "  Run 'python tools/agents/localonly.py pull' before staging it (non-negotiable 8)." >&2
         exit 1

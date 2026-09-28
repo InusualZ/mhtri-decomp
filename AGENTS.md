@@ -53,12 +53,14 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
-   content: pull it out before `git add AGENTS.md`, restore it afterwards, and commit every *other* AGENTS.md
-   edit normally. Use the tool, not `sed`: `python tools/agents/localonly.py pull` before staging and
-   `python tools/agents/localonly.py push` after the commit (skill: `agents-md-local-only`). Verify with
-   `python tools/agents/localonly.py verify` - i.e. `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'`
-   must print `0`. (This rule's own prose mentions the markers, so anchor the match at line start; the tool
-   matches whole marker lines for the same reason.)
+   content. **`land.py` handles it for you**: when AGENTS.md is in the batch it runs `localonly pull` before
+   the commit and `push` in a `finally`, and it tells the block apart from a real edit
+   (`agents_md_real_change`). So **never run `localonly.py pull` + `git checkout -- AGENTS.md` by hand** -
+   that checkout silently reverts the real AGENTS.md edit you are landing; land the batch and let the tool
+   do it. Use the tool directly (`python tools/agents/localonly.py pull|push`, skill: `agents-md-local-only`)
+   only for a manual AGENTS.md commit, and verify a revision with
+   `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` → `0`. (This rule's own prose mentions the
+   markers, so anchor the match at line start; the tool matches whole marker lines for the same reason.)
 
 ## Matching policy: flags and source variants
 
@@ -83,7 +85,7 @@ A unit's flag evidence belongs next to its definition in `configure.py` (a per-l
 override below `cflags_runtime`), not in this file; this file only carries the policy.
 
 The *how* - the ideas, the problem each one solves and whether it has been tried - is the playbook index
-below, which doubles as the todo list for whatever unit is being worked on.
+below.
 
 ## Operational mode: production runs
 
@@ -123,14 +125,21 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step (see
   Non-negotiables).
 * **A lane is launched with the profile that matches its job - not with the generic `worker` (owner's
-  instruction, 2026-09-26).** The project defines three profiles in `.agents/agents/` (tracked):
+  instruction, 2026-09-26).** The project defines **four** profiles in `.agents/agents/` (tracked):
   **`decompiler`** is *unit work* - register a proposal at its final home and reconstruct its bodies;
   **`fixer`** is a refused gate or a measured regression on a branch; **`merger`** is a refused *apply* -
-  two lanes' views of one record or type, and a fold (the `recordmerge.py` class). `worker` stays the
-  fallback for a task that is none of those, and `scout`/`planner`/`reviewer` are read-only. `queue.py next`
-  already emits the profile in its paste-ready spawn (`agent: "decompiler"` for a proposal lane) and takes
-  `--profile` for the rest; the roster is `docs/plan.md` 5.4.1. A lane launched with the wrong profile is not
+  two lanes' views of one record or type, and a fold (the `recordmerge.py` class); **`codereviewer`** is
+  read-only review of source against section 6.5 and the conventions. `worker` stays the fallback for a task
+  that is none of those, and `scout`/`planner`/`reviewer` are the read-only globals. `queue.py next` emits
+  the profile in its paste-ready spawn (`agent: "decompiler"` for a proposal lane) and takes `--profile` for
+  the rest; the roster is `docs/plan.md` 5.4.1. A lane launched with the wrong profile is not
   a cosmetic mistake: it is missing the rules its job is held to.
+  **The launcher now decides both**: `python tools/units/slots.py spawn --kind KIND [--slot N]` maps
+  `unit`->`decompiler`, `fix`->`fixer`, `merge`->`merger`, **`tooling`/`docs`->`worker`**,
+  `review`->`codereviewer`, and `scout`/`plan` to the read-only globals; it takes a pooled slot by number and
+  prints the paste-ready launch line with the "your tree" block. An unknown kind is refused rather than
+  guessed. So a tooling or docs lane is a `worker` lane - launching it as `decompiler` hands it unit policy
+  it can never satisfy, and a review lane as a writer risks the tree it reviews.
 * **Land the orchestrator-side batch first: `land.py land --already-applied` stages what it finds in MAIN.**
   Measured 2026-09-26: an uncommitted `AGENTS.md` + `docs/plan.md` pair rode the `OS/FindContainHeap_.c` unit
   commit (`4fad00522`), because the gate's commit-sweep guard protects a path only when the base's
@@ -150,8 +159,10 @@ The steady loop, per unit:
 1. `queue.py next` claims one proposal - one worktree, one branch, one brief - and prints the paste-ready spawn.
 2. The worker registers its range at its final home and commits the bodies on its branch, measured.
 3. Apply that branch with `.pi/bin/applybranch.sh` (the merge-base diff; the local-only block records why the
-   two obvious alternatives lose work), resolve the shared-file conflicts, then
-   `land.py record-base` -> `land.py land --units <claim>` -> `claims.py release`.
+   two obvious alternatives lose work), and resolve the shared-file conflicts: `python
+   tools/units/mergebranch.py resolve` resolves the classes it can (a comment that names a unit **file** is not
+   a stale symbol; a comment-only `src/**` difference takes main's comment and the branch's code) and refuses
+   the rest. Then `land.py record-base` -> `land.py land --units <claim>` -> `claims.py release`.
 4. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
 
 Two tool behaviours the loop leans on, both fixed this session: `queue.py` never offers a proposal whose range
@@ -163,26 +174,31 @@ backlog disappears.
 ## Matching playbook (index of `docs/matching.md`)
 
 `docs/matching.md` is the playbook for making a unit match its original object. Every idea in it is
-indexed below together with the problem it solves. **Treat this table as the todo list**: for a unit that
-does not match yet, work down the rows and keep the status current.
+indexed below. **The index is generated** from the playbook by `tools/agents/sync_playbook_index.py`, so it
+cannot describe an idea the playbook does not hold and a duplicate section number is refused rather than
+listed twice: the number is the section in `docs/matching.md`, the row is that section's title, and the
+problem column is the opening of that section's own problem sentence (truncated at 220 characters). Only
+**numbered** ideas get a row - a short unnumbered section (the paired-single note, the RSO worked example)
+does not. Read the index as the map of what is already known when a unit is opened; the *work* of matching
+one unit is "The core loop" below.
 
 The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matching/` (tracked - the
 `.gitignore` excepts it), so an agent can load it on demand instead of reading the playbook every session: `SKILL.md` holds the loop and the idea list,
 `references/` is *generated* from `docs/matching.md` (never edit it - run
 `python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py`, or `--check` to detect staleness),
 and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
-`variants`, `diff`, `slots`, `sections`, `dwarf`). The table below stays the source of truth for state.
+`variants`, `shapes`, `diff`, `slots`, `sections`, `dwarf`). The playbook - not this index - is the
+authority; the
+index is derived from it.
 
-All project **subagent profiles** live in one tracked folder too, `.agents/agents/` (`/.gitignore` excepts it
-next to `.agents/skills/`). The harness discovers them as *project* agents - no install step: write the file,
-`subagent({ action: "list" })` shows it, and `{ agent: "decompiler" }` runs it. `.agents/agents/decompiler.md`
-is the role for unit work: it inherits the project context (`inheritProjectContext: true`, so this file is in
-the child's prompt), loads the matching/verify/registration skills (`skills:`), and carries the operational
-rules that used to be hand-typed into every launch - isolation (write only in your worktree, read the brief in
-MAIN), convergence (best-scoring variant, never a regression, residual in the unit header), the per-symbol
-measurement traps, the section 6.5 style rules and the standard report. The generic `worker` role stays for
-non-unit tasks. When a launch prompt and the profile disagree, the profile wins - so **keep the rules in the
-profile, not in the prompt** (QA: `subagent({ action: "list" })` must show `decompiler (project)`).
+All project **subagent profiles** live in `.agents/agents/` (tracked), discovered by the harness as *project*
+agents. `decompiler.md` is the unit-work role: it inherits this file (`inheritProjectContext: true`), loads
+the matching/verify/registration skills (`skills:`), and carries the rules that used to be hand-typed into
+every launch. When a launch prompt and the profile disagree, **the profile wins** - so the rules live there,
+not in the prompt. Which profile a lane gets, and why it is not a cosmetic choice, is the rule in
+"Operational mode" below. A profile edit is not live until `tools/agents/install.sh` has copied
+`.agents/agents/*.md` to `~/.pi/agent/agents/` (it refuses when the section 6.5 block is stale), because the
+harness reads the installed copy - a worktree cut before the edit otherwise serves the old prompt.
 
 All project skills live in one tracked folder, `.agents/skills/`, so every harness sees the same set:
 `mwcc-unit-matching/` (this playbook), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
@@ -194,82 +210,96 @@ translation unit, before any source is written) and `decompile-symbol/` (`tools/
 plus `tools/units/m2cinput.py` for the `tools/m2c` decompiler - one symbol from an address to a registered,
 measured unit).
 
-| # | idea | problem it solves | status |
-| --- | --- | --- | --- |
-| 1 | Per-unit instrument | The project-wide pass/fail cannot measure one unit (`ninja build/RMHE08/ok` cannot pass while any object is `NonMatching`, and `complete_code_percent` says 100 % for wrong code), so no change can be judged. | no |
-| 2 | First divergence, not the percentage | `match_percent` is positional, so one instruction too many in the prologue reports the same ~0 % as completely wrong code and sends you hunting in the wrong place. | no |
-| 3 | Read the target's disassembly | The diff says *what* differs, not what code shape the original source had - and a prologue or an addressing idiom is a flag fingerprint. | no |
-| 4 | Codegen is the oracle, not `.comment` | A synthesized `.comment`/`mw_comment_version` looks like a compiler fingerprint and invites a version hunt that cannot pay off. | no |
-| 5 | One flag at a time, real command line | A hand-written command drifts from what ninja runs, and with several flags in play it is unclear which one explains which symptom. | no |
-| 6 | Guard against stale objects | Scripted compiles silently measure an object the compiler never wrote (MWCC's `-o` is a *directory*), producing impossible "all versions identical" results. | no |
-| 7 | Scratch files to attribute a symptom | The full-unit diff cannot tell whether an instruction choice comes from a source idiom or from an optimizer pass, so the wrong thing gets blamed. | no |
-| 8 | Ask the compiler what is on (`-opt display`) | One `-O` level sets several switches, so what a flag set actually resolves to (peephole? scheduling?) is guesswork. | no |
-| 9 | Enumerate options from `-help` | Invented spellings are silently accepted and ignored, so "no effect" looks like evidence; other spellings do not parse at all. | no |
-| 10 | Frame size is not a success signal | Locals are rounded to 16 bytes, so several unrelated variants hit the target's frame while emitting wrong code. | no |
-| 11 | Size gap is not "different source" | Aggressive flags *remove* instructions, so a target that is hundreds of bytes bigger can be purely a flag problem - and rewriting correct code wastes days. | no |
-| 12 | Check the flag's relocations | A flag can match the code shape while referencing symbols (save helpers, table bases) the original build never had. | no |
-| 13 | Stop when the diff is not flag-shaped | A near-miss variant that fixes one symptom (a frame, a single instruction) keeps you hunting flags when the residual is really source or liveness. | no |
-| 14 | Prove the committed flags reproduce the object | A hand-written `cflags_*` list can silently differ from the command line that was tested (leftover `-O4,p`, duplicated `-inline`). | no |
-| 15 | Pin a metric that does not drift | Fuzzy percentages change between objdiff versions, so a decision made against one number is meaningless against the other. | no |
-| 16 | Scope optimizer settings per function with pragmas | The `-opt` levers are global, so a per-function codegen difference looks unreachable from the source side - a pragma pair scopes them to one function. | no |
-| 17 | Cross-family version matrix | `mw_version` is inherited project-wide and the target's `.comment` is synthesized, so a unit built by a different toolchain (a prebuilt SDK library, say) looks like an unexplainable residual. | done |
-| 18 | Named temporaries, declaration order, operand order | With the opcodes already equal the residual is register numbers only and looks unreachable - but the allocator colours live ranges from the source's temporary structure. | done |
-| 19 | Loop shape decides the loop idiom | A countdown loop only becomes `mtctr`/`bdnz` from the right source shape; the wrong shape adds an instruction and shifts every later register. | done |
-| 20 | Loop-invariant address through a `u32` local | Retail keeps a field address in a callee-saved register where we fold it into a load displacement, which costs a register and the whole function's colouring. | done |
-| 21 | Record-form count as the peephole/scheduling fingerprint | `-opt` is per unit, and the old whole-DOL `extrwi` scan could not see the fused form at all (it is an objdump alias). | done |
-| 22 | Stop when retail's colouring is your mirror image | Once only the allocator's web priority differs, more source shapes cannot help - record the residual and move on. | done |
-| 23 | `splits.txt` data ranges: what objdiff can and cannot fix | Defining a data symbol fixes name rows only by (section, offset), and can make dtk drop the target's `R_PPC_NONE` pool relocs - a regression.  A **partial `.sdata2` claim is not linkable** (`ELF_gen.c` 2802) - claim the pool only when our object emits none, `.data`/`.sdata` are safe; and force a re-split (`rm build/RMHE08/config.json`) when testing a claim, or you link the old object and see a false green. | done |
-| 24 | Merging a probe into the unit is its own step | Probe numbers are not unit numbers, and one struct definition has to serve every function, so types need use-site casts and everything must be re-measured. | done |
-| 25 | Shared memory dump as a name/signature/struct oracle | Unnamed `fn_*` functions and untyped structs can be resolved in one query from the game's runtime dump (`docs/memory-dump.md`). | done |
-| 26 | The target's section is part of the match | objdiff pairs sections, so a unit whose code landed in `.text` while the target object says `.init` diffs perfectly and still reports `None` (`__declspec(section "...")`). | done |
-| 27 | Same instructions, different order names the `-O` level - probe it per unit | An epilogue swap looks like an unreachable scheduling residual and is not source-shaped. `-O4,p` vs `-O3` is per unit (g3d/lobby want `-O3`, OSAlarm/NetworkWiiMediator want `-O4,p`), and the two-variant probe can be run against the split target object that covers the region before the unit is registered. The level also decides function packing (`-O4,p` implies `-func_align 16`), which is the second reason to probe it. | done |
-| 28 | A kept `bl` to a tiny static names the unit's inlining setting | The callee is inlined away, so the caller is an instruction short and it reads as a missing helper. `-O3` + `-inline noauto` closed four `main.cpp` functions (74 -> 100, 21.18 -> 100, 71.12 -> 96.73) - `noauto`, not `off`, because `off` also de-inlines retail's aggregate copy (fn_8003F940 99.02). `#pragma peephole off` is the only spelling the compiler honours. | done |
-| 29 | A claimed literal pool: declare the constants, never define them | With the unit's `.sdata2`/`.sdata` claimed, the map's pool names can be `extern`-declared and used as load operands so they pair; *defining* them rebuilds the pool and moves the whole section. | done |
-| 30 | A C++ unit's exception settings live in its object, not in the source | Every function matches and the unit still falls short because the target has `extab`/`extabindex` and ours has none: `-Cpp_exceptions on` per lib (Pl, unchanged `.text`, all 12 entries equal) or `#pragma exceptions on` per file (`sys_mem.cpp`'s `throw()` specs, `Gecko_ExceptionPPC.cp`'s `0x10`+`0x18`). Compare the two objects' extab sizes and bytes, and use the pragma *pair* for a `$`-section. | done |
-| 31 | A function unpaired by name measures 0 %, not 60 % | objdiff pairs by symbol name, so a `fn_XXXXXXXX` the map never renamed (or a mangled name it spells differently) contributes nothing even when the bytes are perfect - read the name the object emits and rename the map to it. Three `Gecko_ExceptionPPC.cp` functions went 0 % -> 100 % with no source edit; the reverse also holds, a stale *target* object keeps the old reloc name until the next re-split. | done |
-| 32 | A pragma region is not local to the functions it covers | A scoped `#pragma peephole off` pair fixes one function's residual, but the *reset* decides where the region ends - moving it past two more functions in `main.cpp` flipped them 99.52 -> 100 and 99.47 -> 100, functions the pragma was never aimed at. | done |
-| 33 | Prefer the unit's flags over a per-function flag | A TU is compiled once, with one flag set: if the unit's other functions match, a function that needs *different* flags is a source, boundary or stale-target problem, not a flag one. A scoped pragma that fixes one function fights the rest (RSO's level-3 pragma cost `RSOUnLink` and `FindExportIndex` their 100 %), and `optimization_level`/`opt_*` are whole-function anyway. | done |
-| 34 | A switch tail's constant returns are if-converted | The target's `return 0` tail and a `default: return 1` look like a missing arm, but MWCC folds two constant return arms into a branchless bool - so the case bodies must be written negated (`if (!c) return 1; break;`) and in body-address order. **Refined 2026-09-27:** when the default returns the *same* constant as the tail, `default: return 0;` + a trailing `return 0;` emits **two** return-0 blocks; `default: break;` + one trailing `return 0;` gives retail's single shared tail. Count the `li r3, 0` blocks in the target: one shared tail means `break`. All five switches of `Network/network_state.cpp` are written that way (`handleNetworkState1` 0.23 -> 82.50230, `handleNetworkState2` 0.34 -> 91.28178, `handleNetworkState2Fmp` 0.34 -> 81.01007). | done |
-| 35 | A dead copy chain steers the allocator's web priority | Two webs sharing one register pair look unreachable from the source - but the allocator colours in web-list order and the IR's *dead* copy webs count, so a chain of dead copies of the competing value plus one live load flips the pair without changing an instruction. | done |
-| 36 | A flipped unit's unreferenced trailing function is trimmed | The object is byte-identical and the flip still breaks the DOL by exactly the last function's size: `dol split` stamps `active_flags=0x08` in `.comment` (export_all) while MWCC writes `0x00`, so the linker drops the unreferenced tail. `__declspec(export)` fixes it. **Refined (2026-09-28):** the flag is byte 5 of the 8-byte `.comment` entry, bit `0x08`, **per symbol**, proved by four controlled relinks (`single` drops exactly the one symbol whose byte was cleared; `badmagic`, which clears the same bytes but breaks the `CodeWarrior` magic, drops nothing), and `flipcheck.py`'s census is a **superset** - 8 candidates, 6 really trimmed. The phase that does the strip is still unfiled. | done |
-| 37 | A switch's `default` arm goes first in the source | MWCC emits the default body after the compare chain wherever it is written, so `default:` written first lands where retail has it - written last the chain is ordered the other way and the function grows by a word. | done |
-| 38 | An `s16` parameter with a compound assignment makes a narrow field store raw | A masked `stb`/`sth` (a `clrlwi` retail does not have) means MWCC is narrowing the value to the field - taking it through an `s16` parameter and writing with `+=` leaves it the right width, so it stores raw. | done |
-| 39 | A unit whose retail code keeps unfused peephole folds needs the peephole pass off | Retail keeps the unfused form of a fold our `-O3` peephole makes - a masked `clrlwi` before a narrowing store, a separate `clrlwi`+`cmpwi`, an `li r0` + `psq_lx` epilogue; `#pragma peephole off` (or `-opt nopeephole`) restores it. | done |
-| 40 | A unit whose retail code keeps unfused multiply-adds needs `-fp_contract off` | Our default `-fp_contract on` fuses `a*b + c` into one `fmadds`/`fmsubs` where retail keeps `fmuls` + `fadds`; `#pragma fp_contract off` restores the two instructions. | done |
-| 41 | `#pragma optimization_level 1` does not turn the peephole off | A unit needs the peephole pass off and `#pragma optimization_level 1` looks like the way to get it; the pragma only sets the level, so the command line's peephole still folds. The lever is `#pragma peephole off`. | done |
-| 42 | A C++ free function needs `extern "C"` so objdiff can pair it by name | A `fn_*` defined in a `.cpp` measures 0 % with byte-perfect code: MWCC mangles the name and objdiff pairs by symbol name; `extern "C"` makes the emitted name the map's name. | done |
-| 43 | Retail's per-string `lis`/`addi` addressing means the unit was built with `-pool off` | Our string literals are addressed through one `@stringBase0` base register where retail materialises each string with its own `lis`/`addi`; `-pool off` stops the pooling. | done |
-| 44 | A string pool in `.data` means the build was not `-str readonly` | Retail's string pool in `.data` (not `.rodata`) says the build did not use `-str readonly`; it is a placement diagnostic even when the score does not move on its own. | done |
-| 45 | A hand-written string literal's `\n` becomes CRLF on this host | MWCC on this host translates the `\n` in a literal to CRLF, so a string pool written in-source does not match the DOL's LF bytes; leave the range to the data pass. | done |
-| 46 | A flipped unit's `.ctors$10` fragment is reordered by the linker | The object is byte-identical and `flipcheck.py` says READY, and the flip still loses the unit's `.ctors$10`/`.dtors$15` words; re-split first, then suspect the linker's fixed ctor/dtor name order. | done |
-| 50 | An already-mangled map name must not be declared as a C++ identifier | The map carries a *real* mangling (`Panic__Q24nw4r2dbFPCciPCce`) and the C++ source declares that spelling as an identifier, so the front-end mangles it AGAIN (`...__FPCciPCce`) and the link cannot resolve it - invisible while the unit is `NonMatching`, because its object is never linked. The map's name IS the real declaration's mangling: write `namespace nw4r { namespace db { void Panic(const char*, int, const char*, ...); } }` and the front-end reproduces it exactly (confirm with `tools/units/mangle.py`). This is row 48's complement: a `fn_XXXXXXXX` stem is a placeholder (write C++ and rename the map), an already-mangled name is real (write the real declaration). Five `ef` units had it, all flipped `.c`->`.cpp` by the promotion. | done |
-| 47 | Automate the shape search: generate, compile, score and rank source variants | The residual is codegen, so finding the source shape was a hand-run search of hundreds of variants per function; `tools/flags/shapesearch.py` does it mechanically (declaration order/types, `for`-decl hoisting, temps, casts, statement order, compound assignment, field form, dead copies, switch/cond/ternary/loop shape) and ranks by the official report metric. On `Pl/pl_act`'s worst 20: 12/20 improved, two byte-identical to 100 % (`fn_8027D40C` via `loop_decl_top`, `Pl_get_gunner_vec` via `deadcopy_plain_x`), combined unit mean 98.888 -> 99.086. | done |
-| 53 | A sparse switch's compiler-emitted jump table is readable once its `.data` range is claimed | The table reads as zeros while the range is unclaimed, so the arms look unreachable and the function gets parked as a ceiling; claiming the range puts the bytes and the `lis`/`addi` relocations into the unit. `Pl/fn_802430E8` went 99.999 -> 100.0 on the claim and then found 52 of 59 arms instruction-identical to its landed sibling; `Pl/fn_802373AC` generated 145 arms mechanically (calibrated against a landed sibling first) for a 99.986 % unit. Read tables from `main.elf`, never by hand-mapping DOL VAs. **Refined 2026-09-26 (evening):** claim the *table's own* range (4 x cases, a size the compare chain proves), not the band around it - those labels are target bytes nothing reproduces and claiming them lowers the score. The row can be **0 %**, not just 99.999: with the table claimed our object emits it (`.data` pairs at 100 %) and the arms come out of `main.elf` (`stage/fn_802B3270`: 0 -> 100.00 % byte-identical at 3688 B, unit 59.05 -> 88.75 %).  A unit claiming **several** runs of one section must own the bytes between them, or the unclaimed gap becomes an `auto_*_data` unit *inside* the unit's range and the split dies with a link-order cycle - leading/trailing gaps are harmless. | done |
-| 54 | Dolphin's `.map` names a jump table's OWNER and a `__FILE__`'s file, not its emitter | Section 53 says to claim the table's `.data` range but not *whose* it is, and naming-evidence class 1 (the `__FILE__` static) does not say which function emitted the string; the dump's own local symbols encode the owner (`_<fnaddr>switchdataD_<addr>`) and the file name (`_<fnaddr>s_<file>_<addr>`) in one query. **The `<fnaddr>` prefix is not the emitter** (0/46 are a function start, 0/24 a referrer of that string - measured 2026-09-26): take the file name, and get the emitter from the referrer graph or from the string being single-copy in the DOL, which is the decisive test. One query named `menu_item.cpp` and proved its seam. | done |
-| 55 | An odd-start section claim cannot be linked with MWCC's alignment | A byte-identical object refuses to flip and every later table is 4 bytes late: mwld cannot honour a 4-mod-8 address for a section MWCC marked align 8. `tools/elf/objalign.py` lowers the emitted alignment to `lowbit(claimed start)`, dtk's own rule, chained into every MWCC rule. **Refined (2026-09-28):** it is not a refusal - mwld aligns the fragment up to the **input section's own** `sh_addralign` and prints a `*fill*` row (the `align 4` vs `align 8` differential relinks clean either way, no diagnostic), so `objalign.py` is about matching the layout, not avoiding a refusal; over the whole link `mwlink_debugger.py align` compares **798 sections and 0** that cannot be honoured. | done |
-| 56 | Two lanes' views of one work record are merged by tiling, not by choosing a side | Two neighbouring lanes write the same `include/<area>/<rec>.h` and the second landing hits an add/add conflict on a file `main` already has - neither side is a superset and one offset has two names. Taking the live header as the base and splicing the other's only-fields into the covering filler (size from *its* layout, every filler recomputed so the tiling is exact) keeps one definition and both consumers - but splicing without shrinking the filler silently grows the struct and drops **every** row of **every** consumer a fraction while build, stylelint and the gate all pass. Only re-measuring the consumers' rows proves it.  A header may hold more than one struct, so key members *per struct*, and compare the **declaration**, not just `(offset, name)`: a scalar where the other view has an array builds one side's source and not the other's, so the test is that **both** sides' sources compile (whole-tree `ninja -k 0`) plus the rows.  `tools/units/recordmerge.py` is the tool: it refuses to write while anything is unresolved, carries the other view's top-level declarations, and reproduces the hand merge exactly. | done |
-| 57 | A call-site mask means the callee's parameter is declared wider than the value | A caller is one instruction off at a `bl` - retail masks the argument, ours passes it through - and the residual reads as scheduling or source order in the caller, where a mask cannot come from. MWCC converts an argument to the *callee's* declared parameter width, so widening that parameter to `s32`/`u32` (narrowing at the use) restores retail's mask; a mask that is *too* wide is the same lever the other way, and a field's width comes from its access (`lbz` = 1 B), not from the type you guessed - a wrong one shifted every later field and cost ~20 functions ~20 points each. | done |
-| 52 | A vtable we own must be compiler-emitted; a hand-modelled table is not evidence of inheritance | A `NonMatching` unit whose source only *views* its own vtable still scores 100 % (the DOL keeps the bytes), so the class can be missing from the reconstruction and nothing fails until the flip - and a table the worker wrote cannot prove the layout it was written from. Owner's concern, audited repo-wide 2026-09-26: 23 `vtable = lbl_*` assignments, **all 23** aimed outside our ranges (correct), and of 6 code-pointer runs inside registered ranges only one is vtable-like (`Pl/pl_master.cpp`'s `jumptable_805C5FA0`, a compiler-emitted switch table in a `Matching` unit) - zero hand-built tables, zero owned-but-unemitted vtables. | done |
-| 48 | Never append `, ...` to a definition to dodge an argument-count mismatch | The variadic spelling compiles and links and looks cosmetic, but MWCC emits a full varargs prologue for EVERY function declared that way: a 12-byte thunk became 108 bytes and the unit scored 27 %. A fixed unused parameter of the caller width (`void* unused`) changes nothing in the prologue. | done |
-| 48 | A C++ unit's unmangled map name is not a reason for `extern "C"` | The unit is C++ but the map spells its symbols `fn_XXXXXXXX`, so a C++ definition mangles, pairs nothing and reports 0 % - and a member function cannot be `extern "C"` at all. The map is a build input, not the original's symbol table: `tools/units/mangle.py` compiles a probe with a real unit's command line and prints the mangled spelling, so the fix is a map+source rename (validated by exact reproduction: `void Pl_Skill_ck(_PLW*, u16)` -> `Pl_Skill_ck__FP4_PLWUs`). | done |
-| 49 | `extab` in a no-exceptions lib is a cheap C++ language signal | A unit's language has to come from evidence, but the conclusive signals (mangled definition, `.cpp` `__FILE__` string) can be absent at registration, so the extension is a guess that a later pass must undo. C has no exceptions, so `extab`/`extabindex` in the object proves C++ - **unless the lib sets `-Cpp_exceptions on`** (`cflags_pl`/`cflags_main`/`cflags_g3d`/`cflags_camellia`), which lets a C unit emit it too. `tools/units/langcheck.py` resolves the lib flag (`cflags_exceptions`) and reports the signal as *suggested* C++ (never conclusive, one-directional: no extab is not evidence of C), so a wrong `.c`/`.cpp` in a no-exceptions lib is caught at registration. Measured: 43 objects carry extab but **0** decisive candidates (all 25 `.c`-with-extab sit in exceptions-ON libs), 2 `.cpp` with no extab. | done |
-| 51 | A shared type, an extern and a mangled name each have one owner | Three defects that used to survive by review are the same mistake: an identifier that belongs to someone else is spelled out locally. A type more than one unit uses is **copied** (20 names, 68 extra definitions under `src/`), an `extern` for a symbol another unit **defines** is declared in the consumer's file (126 declarations into 27 owner units), and a compiler **mangling** (`Name__FP...`/`Name__Q...`, a class member `name__<len>ClassF...`) is written as the callable identifier - the last is how row 50's double-mangle is born. `tools/units/stylelint.py` checks all three (`--diff` refuses only new ones); ownership is derived from `symbols.txt` + `splits.txt`, and the rule-2 unsplit case is a **named** gap where the registered address bands interleave, not a guessed header. | done |
+<!-- PLAYBOOK-INDEX-BEGIN - generated from docs/matching.md by tools/agents/sync_playbook_index.py; do not edit by hand -->
+Every **numbered** idea in the playbook is listed below - a short unnumbered section (the paired-single
+note, the RSO worked example) has no row of its own. The number **is** the section in
+`docs/matching.md`, the idea column is that section's title, and the problem column is the opening of
+that section's own problem sentence, truncated at 220 characters - so this index cannot describe an idea the playbook does not have, and a duplicate section number is refused rather than listed twice.
 
-| 58 | A compiler-synthesised pool entry can be claimed only while your unit is its sole referencer | A unit's `.text` is 100 % and it still cannot flip: MWCC pools an implicit int->double magic per TU, the `splits.txt` claim links green while the unit is `NonMatching`, and the flip dies on `undefined: 'lbl_8079A008'` - dtk defines the map's global name only in the claiming unit's target object, and our object can emit nothing but its own local pool entry. | done |
-| 59 | A flipped unit's `extab`/`extabindex` entries must carry the map's names, and a global binding | A C++ unit that is byte-identical and READY still cannot link: `undefined: '@eti_800222FC'`. `dol split` names the entries it synthesises after the map (`@etb_`/`@eti_<VA>`) and only the target object defines them; MWCC writes anonymous ordinals with a local binding and no source or flag can spell the name. `tools/elf/objextab.py` (chained after `objalign` in every MWCC rule) renames them to `splits.txt start + st_value` and sets the binding global, writing only `.symtab`/`.strtab`. 18 of 254 registered units own such a symbol; `g3d/g3d_resfile` was the one READY unit it unblocks. | done |
-| 60 | The declaration set is part of the codegen | A unit is byte-identical by size and one added `#include` still moves a function (96.79185 -> 96.78541): MWCC numbers the anonymous pool and colours webs in declaration order, so the *set* of declarations a TU sees is a codegen input. Fold a declaration only where one is deleted (net-zero surface); never add an owner's header "for tidiness". | done |
-| 61 | A kept `bl` inside one function: scope `#pragma dont_inline on` to it | `-inline auto` folds a small helper into a `switch` case so retail's `bl` disappears and every later register/offset shifts; the unit-wide `-inline noauto` of row 28 also de-inlines calls the unit wanted folded, so put `#pragma dont_inline on`/`off` around the one function (the per-function inverse, touches nothing else, and the original did not inline that call either). `Network/network_state.cpp` `handleNetworkState1` 80.01 -> 82.50 % keeping the 56-byte `resetNetworkState3`'s `bl`; `lobby/fn_8020C588.cpp` measured all three spellings and kept `dont_inline on`. | done |
-| 62 | A `new` expression is not `operator new` plus a constructor call | The target keeps the allocated pointer in a callee-saved register across the constructor (`mr r31,r3`) and the manual form coalesces it away, costing a register, a frame size and a whole function's colouring | done |
-| 63 | A local's DECLARATION ORDER colours registers - locals are coloured before parameters | The residual is one register: a local the target keeps in `r31` is materialised late, and no shape *inside* a statement moves it - MWCC colours the **local** webs before the **parameter** webs, so the order of the declarations above the body decides it (a parameter can never be moved to the front). Two independent filers: `NHTTPi_Startup` 0 -> 93.85 %, two NWC24 schedulers to 98.85/95.67 %, `ConnectToAnybody` 99.40 -> 100. | done |
-| 64 | An unknown-size `extern` array is addressed absolutely - give it its size for the SDA form | The caller materialises `lis`+`addi` where retail has one `li sym@sda21`: an array of **unknown size** cannot go in the small-data area, while a scalar `extern` is sda21 either way - so the target object's relocations say which externs want which form, and one header can hold both. `fn_8041B538` 98.61 -> 99.92, `ConnectToAnybody` 96.90 -> 100. | done |
-| 65 | A 32-bit member at an ODD offset needs `#pragma pack(1)` | A `u32` at an odd offset silently aligns (0x4485 -> 0x4488) and moves every later field - and the whole unit must be re-measured after the pack, because a `field + 4` that was a byte offset becomes +16. `startNegotiation` 93.39 -> 98.23. | done |
-| 66 | A narrow RETURN TYPE is visible at the caller | A call site masks the result where retail stores it raw (a `clrlwi`/`extsh` retail does not have): MWCC converts to the *callee's* declared width, so a raw `sth` means the callee returns `u16`, not `s32` (row 57 in the return position). `receive` 92.30 -> 94.99, `send` +0.03. | done |
-| 67 | A band's `.data` LOG STRINGS name their own emitters | Each string is loaded by exactly one function in the range, so the function's name is *evidenced* by the string ("NetworkSessionStable::downPerformance", "...Pat::final") - a rule-7 naming-evidence class that needs no runtime dump (`callers.py <address>` gives the loader). Five strings named five functions of `Network/fn_803D3CE8`. | done |
-| 68 | A derived class's VTABLE is emitted where its KEY FUNCTION is defined | The unit must store `__vt__24NetworkSessionManagerPat` without emitting a table (the target's `.data` is the base table alone, 0x1C8 B): declare the **first** virtual - the key function - first and put its body in the next band, and MWCC emits the ctor's vtable **store** but no table. A class whose first declared virtual is the destructor (the base's case) does emit. | done |
-| 69 | A POLYMORPHIC MEMBER CLASS makes MWCC initialise the vptr of every array element | Declaring the four `Pat` record types as classes blew the constructor 252 -> 544 B (`__construct_array` vptr loops): a member that is itself polymorphic makes **every** array element polymorphic. The records are structs whose member is a struct with a vtable member (rule 10 Case 2 - another owner's table, only read), and only the object at `+0x3CC` is dispatched through. | done |
-| 70 | Data a unit uses that nobody owns is the unit's to claim - an `extern` for it is the defect | Data a unit reads whose address no registered `splits.txt` range covers stays unowned while the source declares an `extern`, so the unit measures and the flip fails at the link. **Rule 12**: the unit claims the range in its own section and matches it as its own object. The Network band's `sessionTimeoutParam`/`sessionTimeoutParam2` (0x8079C7D8/DA), `requestHeaderWord0`/`Word1` (0x8079C7E0/E4) and `maskedUserName[7]` (0x80793968) are the seed. Rows 23/29/53/58 hold the caveats: a partial `.sdata2` claim does not link, declare-never-define when the range is ALREADY yours, own the bytes between several runs of one section, and claim a compiler-synthesised entry only while you are its sole referencer. | done |
+| # | idea | problem it solves |
+| --- | --- | --- |
+| 1 | Use a per-unit instrument, not the project-wide check | The project-level pass/fail signal is useless while any object is `NonMatching`: `ninja build/RMHE08/ok` cannot pass, and the progress report's `complete_code_percent` says 100 % even when the code is wrong. A unit can... |
+| 2 | Read the *first divergence*, never the percentage | `match_percent` is positional: one inserted or deleted instruction shifts every following instruction, so a function that is a single instruction away from a match reports exactly the same ~0 % as a function that is... |
+| 3 | Read the target's disassembly, not just the diff | The diff shows *what* differs, not *what the original source looked like*. Several flags are only discoverable if you already know the target's code shape. |
+| 4 | Ignore version/`.comment` hints; make codegen the oracle | A unit's `.comment` section and `mw_comment_version` in `config.yml` look like a compiler fingerprint and invite "we must be using the wrong compiler version". |
+| 5 | Sweep one flag at a time, against the project's own command line | Several flags are usually in play at once (`-O4,p`, `-inline auto`, `-use_lmw_stmw on`, `-Cpp_exceptions off`, `-str ...,pool,...`), and it is unclear which single one explains which symptom. |
+| 6 | Guard against stale objects when scripting the compiler | A scripted matrix run can report all compilers producing *identical* output - which cannot be true. Every run was diffing the same stale object, one the compiler never wrote. |
+| 7 | Use scratch files to attribute an instruction choice | Two candidate source idioms produce visibly different instructions, and the full-unit diff cannot tell you whether the difference comes from the source idiom or from an optimizer pass. |
+| 8 | Ask the compiler which optimizations are actually on | After a long sweep it is still unclear what a flag *set* resolves to: `-O3` and `-opt level=3,peephole` are the same thing, and one `-O` level can set five switches at once. |
+| 9 | Enumerate the option space from the compiler, not from memory | Guessed spellings waste runs, and worse, they lie: some invented keywords are **silently accepted and ignored**, so "no effect" looks like evidence when it is noise. Others do not parse at all (an `-O` level cannot... |
+| 10 | Do not use frame size as a success signal | When the last remaining diff is a stack-frame size, it is tempting to accept any flag variant that produces the target's frame - and several do. |
+| 11 | Do not read a large size gap as "different source" | The target object is often hundreds of bytes bigger than ours, and several functions sit at 0 %, which reads like the original source containing code ours does not have (different unrolling, extra rounds, extra... |
+| 12 | Check that the flag's side effects still link | Some flags change the *relocations*, not just the instructions: a save idiom that calls runtime helpers, or a table base that changes how a symbol is addressed. Matching the code shape while referencing a symbol the... |
+| 13 | Stop when the remaining diff is no longer flag-shaped | After the flags that clearly apply are found, a near-miss variant often remains: a flag combination that fixes one visible symptom (a frame size, a single instruction) while leaving the code different. |
+| 14 | Prove the committed flag list reproduces the proven object | The flags eventually get written into `configure.py` as a per-library override. A hand-written list can silently differ from the command line that was tested - a leftover `-O4,p`, a duplicated `-inline auto`, a flag... |
+| 15 | Pin a metric that does not drift | Per-symbol fuzzy percentages change between tool versions: the same two objects can score 82.72 % with one `objdiff-cli` build and 99.83 % with another. A decision made against one number is meaningless against the... |
+| 16 | Scope optimizer settings per function with pragmas | The optimizer levers are command-line flags, i.e. global: `-opt level=4` fixes one function's frame but reorders instructions elsewhere, so a per-function codegen difference looks unreachable from the source side. |
+| 17 | Cross-family version matrix: a unit's compiler is per unit, not per project | `mw_version` is set once per library in `configure.py` and every unit inherits the same one (the template default here is `Wii/1.3`). Prebuilt SDK libraries in particular were compiled by Nintendo with whatever compiler... |
+| 18 | Named temporaries, declaration order and operand order steer the allocator | Once the opcodes, sizes and relocations all match, the residual is often nothing but register numbers, and it looks unreachable from the source side. |
+| 19 | Loop shape decides the loop idiom | A loop can compile to a `mtctr`/`bdnz` countdown, to a compare-and-branch, or to a bottom-tested loop; the wrong idiom adds or removes instructions and moves every later register. |
+| 20 | Force a loop-invariant address through a `u32` local | Retail materialises a loop-invariant field address into a callee-saved register in the loop preheader (`addi r30,r26,84` then `lwz r0,0(r30)`); our build folds it into a load displacement (`lwz r4,0x54(r27)`). That... |
+| 21 | Count record-form instructions to fingerprint peephole/scheduling per unit | The flags of one unit were inferred for the whole binary from "the DOL contains no `extrwi`" - wrong twice over: it is not a whole-binary property, and the detector could not see what it was looking for. |
+| 22 | When retail's colouring is your exact mirror, stop | A residual that is nothing but register numbers invites another hundred source variants, each of which costs a compile-and-diff cycle and none of which can be reasoned about. |
+| 23 | Data ranges in `splits.txt`: what objdiff can and cannot fix | A unit's near-miss rows are often just *symbol names* for data the unit owns but whose range is not claimed in `splits.txt` (`@1841_80629B90` in the target vs our `lbl_80629B90`), so it looks like a one-line fix. |
+| 24 | Merging a probe into the unit is its own step | Probes are measured standalone, in their own translation unit, so their numbers are not the unit's numbers - and a probe cannot see the unit's types. |
+| 25 | Use the shared memory dump as a name/signature/struct oracle | Before a function can be matched it has to be *understood*, and this repo's `symbols.txt` has thousands of `fn_XXXX` names and no types at all. |
+| 26 | The target's section is part of the match | A unit can be instruction-identical and relocation-identical and still measure as *unmatched*, because the code landed in the wrong section. The compiler emits `.text` by default; the map and the split object may say... |
+| 27 | Same instructions, different order names the `-O` level - probe both, per unit | The instruction multiset and the relocations agree, but independent instructions are swapped or split across registers - typically the epilogue's `lwz r0,0x14(r1)` (LR reload) and the function's real last load. It reads... |
+| 28 | A kept `bl` to a tiny static names the unit's inlining setting | The target calls a small file-local function the source could just as well inline (`bl fn_8003F554`), while our build inlines it away - the callee has no counterpart in our object and the caller comes out an instruction... |
+| 29 | A claimed literal pool: declare the constants, never define them | A unit whose `.sdata2`/`.sdata` fragment is claimed in `splits.txt` still shows its pooled constants as `ARG` rows - the target loads `lbl_80795AC0@sda21`, our source loads a literal the compiler put in a pool of its... |
+| 30 | A C++ unit's exception settings live in its object, not in the source | Every function of a unit matches instruction for instruction, and the *unit* still measures short because its target object carries `extab`/`extabindex` while ours carries none, or carries different records. It reads as... |
+| 31 | A function unpaired by name measures 0 %, not 60 % | A unit's functions are written and their bytes are right, and the score stays near zero. The instinct is to re-read the code - the wrong place, because objdiff pairs functions **by symbol name**. |
+| 32 | A pragma region is not local to the functions it covers | A function whose residual is a missing instruction - a `lis` the build CSE-ed away, a base re-materialised at a merge - needs a scoped `#pragma peephole off` pair (row 28's spelling). The pair fixes it, but the *reset*... |
+| 33 | Prefer the unit's flags over a per-function flag - a TU was compiled once | A function that will not match invites a scoped pragma (`optimization_level`, `peephole`, `scheduling`) aimed at that function alone. Three wins this session did exactly that. |
+| 34 | A switch tail's constant returns are if-converted, so write the arms negated | A `switch` whose default is `return 1` and whose allowed cases `break` leaves the target as `return 0` looks like a missing arm: the diff shows the target loading a constant and branching while ours returns early per... |
+| 35 | A dead copy chain steers the allocator's web priority | The residual is two live ranges sharing one register pair - retail colours them one way, we colour them the mirror - and no source shape, type, cast, statement order or flag moves it. `Pl/pl_master`'s `fn_8026F908` sat... |
+| 36 | A flipped unit's unreferenced trailing function is trimmed by the linker | The unit's object is byte-identical, `flipcheck.py` is happy and `linkorder.py` says `LINK OK` - and the flip still breaks the DOL, by exactly the size of the object's *last* function, with every later section shifted.... |
+| 37 | A switch's `default` arm goes first in the source | A `switch` whose default dispatches into a helper comes out a few bytes too big - 364 against the target's 360 - with the default body sitting in the middle of the compare chain and the function stuck around 94 %, even... |
+| 38 | An `s16` parameter with a compound assignment is what makes a field store raw | A store into a narrow field (`u8`/`u16`) comes out masked - a `clrlwi` before the `stb` - where retail stores the value as it stands. The function sits at 82-94 % with one extra instruction and every later register... |
+| 39 | A unit whose retail code keeps unfused peephole folds needs the peephole pass off | The unit's retail object keeps instructions our peephole pass folds away: a masked `clrlwi` before a narrowing store, a separate `clrlwi`+`cmpwi`, a record-form `clrlwi.` the target does not have, or an `li r0,<slot>` +... |
+| 40 | A unit whose retail code keeps unfused multiply-adds needs `-fp_contract off` | Retail keeps `a*b + c` as two instructions (`fmuls` + `fadds`/`fsubs`) where our default `-fp_contract on` emits one fused `fmadds`/`fmsubs`, so the function is a few instructions short and every later register shifts.... |
+| 41 | `#pragma optimization_level 1` does not turn the peephole off | A unit needs the peephole pass off and `#pragma optimization_level 1` looks like the way to get it: `-O1` resolves to `-opt level=1`, and the level's switch set reads as if it includes the peephole. It compiles, the... |
+| 42 | A C++ free function needs `extern "C"` so objdiff can pair it by name | A `fn_*` function defined in a `.cpp` file measures 0 % while its bytes are right: MWCC mangles the free function (`fn_80073398__FP9ResHandle`) and objdiff pairs symbols by name, so neither side pairs and the function... |
+| 43 | Retail's per-string `lis`/`addi` addressing means the unit was built with `-pool off` | Our string literals are addressed through one `@stringBase0` base register (one `lis`, then `addi` displacements) where retail materialises each string with its own `lis`/`addi` - 0x20 bytes of `.text` short, and the... |
+| 44 | A string pool in `.data` means the build was not `-str readonly` | The unit's retail string pool sits in `.data`, but our `cflags` carry `-str reuse,pool,readonly`, so our strings land in `.rodata` and the section does not pair. It reads as a missing data range. |
+| 45 | A hand-written string literal's `\n` becomes CRLF on this host | A data range's string pool cannot be written in-source because MWCC on this host translates the `\n` in the literals to CRLF, so the emitted bytes do not match the DOL's LF. It reads as a data-claim problem and invites... |
+| 46 | A flipped unit's `.ctors$10` fragment is reordered by the linker | A unit's object is byte-identical, `flipcheck.py` says READY, and the flip still breaks the DOL on the unit's `.ctors$10`/`.dtors$15` words, shifting the merged `.ctors`/`.dtors` tables. It reads as a linker/ordering... |
+| 47 | Automate the shape search: generate, compile, score and rank source variants | Every near-match residual in this project has been *codegen* - an allocator web order, a branch direction, a register colouring - and the source shape that reproduces it was found by hand: the outboxes record "~200... |
+| 48 | A C++ unit's unmangled map name is not a reason for `extern "C"` | The unit is C++ - a `__FILE__` string names a `.cpp`, or a callee is mangled - but the symbol map spells its symbols unmangled (`fn_800CCCF8`), because dtk could not demangle them. objdiff pairs by symbol name, so a C++... |
+| 49 | `extab` in a no-exceptions lib is a cheap C++ language signal | A unit's language has to be decided from evidence, not from convenience (`docs/plan.md`, "The language comes from the symbol"), because the extension decides the front-end (`-lang`) and the name objdiff pairs by. The... |
+| 50 | An already-mangled map name must not be declared as a C++ identifier | The map carries a *real* C++ mangling - `Panic__Q24nw4r2dbFPCciPCce`, not a `fn_XXXXXXXX` placeholder - and a C++ source declares it with that spelling as an identifier: |
+| 51 | A shared type, an extern and a mangled name each have one owner | Three defects are the same mistake in three shapes: an identifier that belongs to someone else is spelled out locally instead of reached through its owner. A type two units share is **copied** into each unit's source... |
+| 52 | A vtable we own must be compiler-emitted; a hand-modelled table is not evidence of inheritance | A unit whose registered ranges contain a vtable can score 100 % while its source only *views* that table (a struct of function pointers, a cast `extern`). For a `NonMatching` unit the bytes come from the DOL, so nothing... |
+| 53 | A sparse switch's jump table is readable once its `.data` range is claimed | A unit whose switch has a compiler-emitted jump table measures just short of 100 % and its arms are unreachable from the `.text` alone: the table lives in `.data`, which the unit's `splits.txt` does not claim, so the... |
+| 54 | Dolphin's `.map` names a jump table's OWNER and a `__FILE__` emitter | Section 53 says to claim a jump table's `.data` range, but not *whose* range it is - so the claim is a guess at the boundaries, and two lanes can claim one table or split one TU's data across two units. Separately, the... |
+| 55 | An odd-start section claim cannot be linked with MWCC's alignment | A unit whose object is byte-identical to its target still refuses to flip: `flipcheck.py` says READY, the bytes match, and `ninja build/RMHE08/ok` still fails with a DOL in which the tables are four bytes late. It reads... |
+| 56 | Two lanes' views of one work record are merged by tiling, not by choosing a side | Two lanes register neighbouring bands that both take the same work record, so both write `include/<area>/<rec>.h` - and the second landing hits an **add/add conflict on a file that already exists in `main`**. Neither... |
+| 57 | A call-site mask means the callee's parameter is declared wider than the value | A wrapper (or any caller) sits at 50-90 % and the first divergence is one instruction at the `bl`: retail masks or sign-extends the argument (`clrlwi r4,r4,16`, `extsh r5,r5`, a `slwi`/`srawi` pair) and ours passes it... |
+| 58 | A compiler-synthesised pool entry can be claimed only while your unit is its sole referencer | A unit's `.text` matches 100 % and it still cannot flip, because its object emits an 8-byte `.sdata2` entry - MWCC's implicit int->double magic (`0x4330000080000000`), which the compiler pools per TU - that the target's... |
+| 59 | A flipped unit's `extab`/`extabindex` entries must carry the map's names, and a global binding | A C++ unit whose object is byte-identical to its target - every section compared, `flipcheck.py` saying READY, `extab` and `extabindex` included - cannot link once it is `Matching`: |
+| 60 | The declaration set is part of the codegen - fold a declaration only where one is deleted | A unit sits at 100 %, you add one `#include` of a header that declares a callee the file already sees through another header, and a function drops by a hair - `fn_800CC5B0` went 96.79185 -> 96.78541 with a... |
+| 61 | A kept `bl` inside one function: scope `#pragma dont_inline on` to it | A `switch` case calls a small file-local helper that retail keeps as a `bl`, but our `-inline auto` folds the callee's body into the case: the kept call disappears, the case grows by the callee's size and every later... |
+| 62 | A `new` expression is not `operator new` plus a constructor call | `NetworkWiiMediator`'s `initializeNetworkMediator` measured 1.89 % and `reflectInit` 88.34 %, and the first divergence was one instruction from the top: retail has `bl __nw__FUl; mr r31,r3; cmplwi r3,0x0` where ours had... |
+| 63 | A local's DECLARATION ORDER colours registers - locals are coloured before parameters | `NHTTP/NHTTP_bgnend`'s `NHTTPi_Startup` measured **0 %** with an instruction stream that was otherwise byte-equivalent: the message-group address was materialised late (`lis r31`) where retail materialises it first... |
+| 64 | An unknown-size `extern` array is addressed absolutely - give it its size for the SDA form | A band declares `extern const char lbl_80793998[];` and the caller materialises the address with `lis r5, sym@ha` + `addi r5, r5, sym@l`, where the target has a single `li r5, sym@sda21`. The extra instruction shifts... |
+| 65 | A 32-bit member at an ODD offset needs `#pragma pack(1)`, and the whole unit must be re-measured | `Network/fn_8041A87C`'s `profile_4485` is five `u32` starting at an **odd** offset (`stw r0, 0x4485(r31)`, then `0x4489`, ...). Declared without a pragma the member silently aligns to `0x4488` and every later field... |
+| 66 | A narrow RETURN TYPE is visible at the caller | The caller is one instruction off at the `bl`: the target stores the result with a raw `sth`, ours masks it first - a `clrlwi`/`extsh` retail does not have - and every later instruction shifts with it. It reads as... |
+| 67 | A band's `.data` LOG STRINGS name their own emitters | A band arrives as a hundred `fn_XXXXXXXX` and the naming evidence is the runtime dump (playbook 25), a `__FILE__` string (54) or the neighbours' scheme - all of which can be absent at registration. The band's own... |
+| 68 | A derived class's VTABLE is emitted where its KEY FUNCTION is defined | The unit reconstructs a derived class that must store the base's vtable pointer (`__vt__24NetworkSessionManagerPat`) without emitting a table of its own - the target's `.data` is the base table alone, 0x1C8 bytes.... |
+| 69 | A POLYMORPHIC MEMBER CLASS makes MWCC initialise the vptr of every array element | Declaring the four `Pat` record types as **classes** with a `NetworkSmallObject` member blew `NetworkSessionManagerPat`'s constructor from **252 to 544 bytes**: the arrays are built with `__construct_array`, and MWCC... |
+| 70 | Data a unit uses that nobody owns is the unit's to claim - an `extern` for it is the defect | A unit reads or writes bytes the target object carries, the address is covered by **no** registered `splits.txt` range, and the only thing the source has for it is an `extern` declaration. The shape that prompted this... |
+| 71 | The condition's POLARITY decides the exit - a ternary merges arms where `if/else` does not | A function whose logic and instruction set are right still misses by a register shuffle and an exit: the two arms do not merge, an early return arrives as a `beq`+`b` pair where retail has one `bne`, or a `memcmp` test... |
+| 72 | The declared SHAPE is a codegen input: a struct's exact size, an index's signedness, and arity | Three residuals no statement order and no flag moves: MWCC peels a word off a copy because a reconstructed struct's `sizeof` is not the size the target's copy used; a loop test reads `cmplw` where retail has `cmpw`; a... |
+| 73 | Never append `, ...` to a definition to dodge an argument-count mismatch | A retired object calls a function through a declaration with more arguments than the source signature carries, so the compiler refuses it. The tempting fix is to make the definition variadic (`void fn(int a, ...)`),... |
+<!-- PLAYBOOK-INDEX-END -->
 
-Ruled out for this project - recorded so nobody re-runs them (details in `docs/matching.md`):
+The two tables below hold ideas with **no section of their own**: tried in one unit's context and failed,
+or not tried at all. `no` means tried and it did not work (or does not apply) - it stays listed so nobody
+re-runs it; `todo` means not tried yet. Neither table needs a status kept current: the moment an idea works
+it earns a section, and the index above picks it up by number. A few `todo` rows were raised by the
+`Camellia` flag hunt (`camellia_setup256`), which is closed - re-queue one only if the same shape reappears.
+
+Ruled out so far - tried, and it did not work (details in `docs/matching.md`):
 
 | idea | problem it solves | status |
 | --- | --- | --- |
@@ -279,24 +309,7 @@ Ruled out for this project - recorded so nobody re-runs them (details in `docs/m
 | `-O4`/`-O4,p`/`-O2`, `-schedule off`, `-fp_contract off`, `-ipa off` | Another optimizer level or codegen switch might be the retail setting. | no |
 | A paired-single op in a function (the SDK's vector library, `fn_8007270C`'s fill loop) | It reads as a codegen lever and eats flag and shape sweeps. Measured 2026-09-25: **176 of 19,916** functions contain one and **0** of ~2,450 matched functions do, so the frontend cannot emit the body-store form. Record it and move on. | no |
 
-The status column is about the **current target** - the one unit/diff being worked on - not about whether
-an idea is any good. The target and the step being worked are kept in the local-only `Current task / plan`
-section at the top of this file.
-
-| status | meaning |
-| --- | --- |
-| `todo` | queued for the current target, not tried yet |
-| `no` | tried for the current target and it did not resolve it, or it does not apply |
-| `done` | this is what resolved the current target (and it is the `docs/matching.md` section with this row's number) |
-
-Rows 1-16 read `no` because the table was derived from the `Camellia` flag hunt: the ideas all worked there
-and their outcome is already in `configure.py`, but none of them is what the open `camellia_setup256`
-residual needs. Rows 17-25 are `done` for the target in flight, the `RSO/runtime` unit - each one is the
-idea that closed part of it, and the full walkthrough is the "Worked example: the `RSO/runtime` unit"
-section of `docs/matching.md`. Every idea that produced a win gets recorded here (and as a section) **in the
-same session it worked** - see "How to work the list" below.
-
-New ideas for the current target (no `docs/matching.md` section yet - they earn one only if they work):
+New ideas with no section yet (inexpensive to try, and they earn a section only if they work):
 
 | idea | problem it solves | status |
 | --- | --- | --- |
@@ -308,22 +321,21 @@ New ideas for the current target (no `docs/matching.md` section yet - they earn 
 
 How to work the list:
 
-1. Set the **target** in the local-only section, queue the rows as `todo`, and start at row 1. Do **one
-   idea at a time** and record *evidence* - numbers, sizes, first-divergence indices - not impressions.
-2. Update the row's status and put the step you are on in the local-only section, so a fresh session knows
-   where to resume.
-3. A `done` idea gets a section in `docs/matching.md` in the house style - **Problem / Why try it /
-   Result / Example**, short and to the point - and the row's number is that section's number. **Record it in
-   the same session, as soon as it works**: a win that only exists in a chat message or a scratch report is
-   lost at the next compaction and the next unit re-derives it (this has already happened once here), so
-   treat "the idea is written into the table and the playbook" as part of the win, not as follow-up work.
-   The same commit has to bring the skill's copy with it: `python
+1. **Work one idea at a time** and record *evidence* - numbers, sizes, first-divergence indices - not
+   impressions. For a unit that does not match, walk the ideas in `docs/matching.md` in the order they were
+   learned; the index above is the map, the sections are the detail.
+2. When an idea works, it earns a `docs/matching.md` section in the house style - **Problem / Why it
+   happens / How to work it / Result / Example**, short and to the point - and the index above updates
+   itself: the section's number is the row's number. **Record it in the same session it works**: a win that
+   exists only in a chat message or a scratch report is lost at the next compaction, and the next unit
+   re-derives it.
+3. The same commit brings the skill's copy with it: `python
    .agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check` must come back clean, because
-   `references/` is what a fresh session and every subagent actually load - it sat 55 lines behind
-   `docs/matching.md` the day this was written, i.e. current knowledge that no agent could see.
-4. When every row is `no` again, the target needs **new** ideas: add them here as `todo` rows first
-   (idea + problem it solves), try them, and promote the ones that work into `docs/matching.md` (same
-   style, next free number). Ideas that fail stay in the table as `no`, so they are not re-run.
+   `references/` is what a fresh session and every subagent actually load. The index itself is checked by
+   `python tools/agents/sync_playbook_index.py --check` (wired into `tools/selftest.py`).
+4. An idea that fails stays in the table below as `no`, with the evidence that killed it, so it is not
+   re-run. A new idea goes there as `todo` first, with the problem it solves; a duplicate number is refused
+   by the index tool, so a new section takes the next free number.
 5. Unit-specific findings that are not playbook material (a residual diff, a known-bad flag) belong in
    the unit's own header comment, per the matching policy above.
 
@@ -398,7 +410,7 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
                           matching.md is the matching playbook; its ideas are indexed in the
-                          "Matching playbook" section above, which doubles as the todo list.
+                          "Matching playbook" section above.
                           plan.md is the campaign plan: every symbol in symbols.txt, the four steps per
                           symbol, the 80 % bar for closing one, and the order to work in.
                           memory-dump.md documents the shared Ghidra runtime memory dump: real SDK
@@ -475,7 +487,7 @@ Notes:
 Verifying whether a unit, function or symbol matches is its own procedure — per-symbol objdiff plus raw ELF
 evidence, and a specific set of traps (`complete_code_percent` lies, `ninja build/RMHE08/ok` cannot isolate
 one unit, a function missing from the report is 0 %). Follow skill **`.agents/skills/objdiff-verify/SKILL.md`**
-(the only tracked path under `.pi/`; everything else there is gitignored).
+(everything under `.pi/` is gitignored - the tracker holds no path there).
 
 ## The core loop: adding / matching a translation unit
 
@@ -501,8 +513,8 @@ one unit, a function missing from the report is 0 %). Follow skill **`.agents/sk
 5. **Compile and diff:**
    `python configure.py && ninja build/RMHE08/src/Dir/file.o`, then produce/refresh the report and inspect
    the unit's per-function diff (objdiff GUI reads the generated `objdiff.json`). When it does not match,
-   work the **Matching playbook** index above - one idea at a time, keeping its status column current -
-   instead of guessing at flags.
+   work the ideas the **Matching playbook** index points at, one idea at a time, and read the section it
+   names instead of guessing at flags.
 6. **Flip to `Object(Matching, ...)`** only once the unit matches (bytes/instructions + relocations).
 7. **Prove it end-to-end:** `ninja build/RMHE08/ok` must finish green, i.e. `main.dol` matches
    `config/RMHE08/build.sha1`.
@@ -545,6 +557,7 @@ regression if the hash goes red.
   Prefer a clean rebuild of the specific unit, and `rm -rf build/RMHE08` when in doubt.
 * Local agent scratch directories (`.lavish/` and everything under `.pi/` - notes, prompts, scratch) are
   gitignored; keep them that way and never add their contents to commits. `.agents/` is ignored **except**
+`agents/` and
   its skills folder, which is tracked in full (`.agents/skills/`) so every harness shares one set of skills.
 
 ## Conventions
@@ -554,10 +567,11 @@ regression if the hash goes red.
   `configure.py: add REL flags`. Describe *why* when fixing a mismatch.
 * **Keep generated/large churn separate.** A `symbols.txt` regeneration or an analyzer settings change gets
   its own commit; never mix it with source changes or unrelated formatting.
-* **Naming and commenting** (see "Commenting and naming" below): use the real name when it's known, leave
-  dtk's generated `FUN_xxxxxxxx`/`fn_xxxxxxxx` names in place until they're understood, and keep function
-  comments descriptive. Vendor files keep vendor naming (e.g. `Camellia/` uses `CAMELLIA_*` constants and its
-  original MPL-1.1 header — keep those intact).
+* **Naming and commenting** (see "Commenting and naming" below): use the real name when it is known, and
+  treat dtk's generated `FUN_xxxxxxxx`/`fn_xxxxxxxx` name as a **placeholder to replace** (rule 7: derive the
+  name from context, rename the map row and sweep the referrers in the same change) - leaving one in `src/` is
+  a finding, not a resting place. Keep function comments descriptive. Vendor files keep vendor naming (e.g.
+  `Camellia/` uses `CAMELLIA_*` constants and its original MPL-1.1 header — keep those intact).
 * **Commenting and naming** (applies to every unit we write):
   * **A comment on top of a function is a short description of what the function does** - one or two lines,
     in the present tense ("Rebases the module's section pointers, then patches every import's relocation
@@ -598,7 +612,8 @@ regression if the hash goes red.
     `unkNN` may survive in `src/`, every reconstructed type states its size, every field carries its offset and a
     context name (padding excepted), shared types live in one header, an `extern` lives with the unit that owns
     the symbol, and pointer arithmetic to reach a field is forbidden. `tools/units/stylelint.py` (roadmap 7.21)
-    enforces those seven rules at the campaign's land gate.
+    enforces those twelve rules at the campaign's land gate (the table is `docs/plan.md` section 6.5;
+    regenerate the profiles with `tools/agents/sync_profiles.py` after a rule change).
 * **Style:** match the file you're editing (vendor sources mirror upstream formatting; new project code
   follows the surrounding 4-space-indent C style). Files are UTF-8, LF endings (`.gitattributes`
   enforces the checkout).
@@ -611,7 +626,8 @@ regression if the hash goes red.
 ## Before claiming success
 
 * [ ] `ninja build/RMHE08/ok` passes (for anything affecting the linked DOL), or the change is explicitly
-      described as unverified.
+      described as unverified. **Check the `FAILED` count first**: `ok` is order-only and prints OK off a
+      stale `main.dol`, so a `NonMatching` object that does not compile still looks green.
 * [ ] For a single unit/symbol: the object compiled **and** its objdiff diff shows the claimed match level
       (per-symbol `match_percent`, equal section sizes) — see the `objdiff-verify` skill.
 * [ ] `git status --short` shows only intended files (no `build/`, no `orig/`, no scratch dirs). A lone
@@ -621,11 +637,15 @@ regression if the hash goes red.
 * [ ] `symbols.txt` / `splits.txt` edits are byte-clean for the lines you didn't mean to touch
       (`git diff --stat` sanity check — these files are huge; a symbol rename goes through
       `python tools/symbols/symedit.py rename`, so its diff is exactly one line per symbol).
-* [ ] For a tool change: the suite is green - `python tools/selftest.py --changed` locally, and the land
-      gate runs all of it as the row **"all tool selftests pass (except the parked list)"** (~30 s, before
-      the build, so a failure refuses early). A failure is fixed or **parked** in
-      `tools/selftests-known-failures.json` with a reason and a date - never ignored, and never silently
-      skipped: a park whose test now *passes* is itself an error, so parked debt cannot rot.
+* [ ] For source or `include/` work: `python tools/units/stylelint.py --diff main` adds no section 6.5
+      violation - the land gate enforces the same row, so an added one refuses the batch.
+* [ ] For a tool change: the suite is green - `python tools/selftest.py --changed main` (plain `--changed`
+      selects nothing on a committed clean tree), and the land gate runs all of it as the row **"all tool
+      selftests pass (except the parked list)"** (~30 s, before the build, so a failure refuses early). A
+      failure is fixed or **parked** in `tools/selftests-known-failures.json` with a reason and a date - never
+      ignored, and never silently skipped: a park whose test now *passes* is itself an error, so parked debt
+      cannot rot.
 * [ ] No new compiler flags / tool version changes smuggled in.
-* [ ] Nothing was committed or pushed unless the user asked for it (see Non-negotiables rule 6); staged vs.
-      unstaged state reported clearly.
+* [ ] A lane **commits its own fix on its own branch** - that is the deliverable (see "Operational mode");
+      nothing beyond it is committed, and nothing is ever pushed (rule 6: only the orchestrator has standing
+      approval, and it still never pushes). Staged vs. unstaged state reported clearly.

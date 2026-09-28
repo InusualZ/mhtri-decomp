@@ -91,9 +91,11 @@ SR_REL = ".agents/skills/mwcc-unit-matching/scripts/sync_reference.py"
 # `SOURCE_CHECKS`:  source path -> ((tool path relative to the root, extra argv), ...) to run as `--check`.
 SOURCE_ENTRIES = {
     "docs/plan.md": ("tools/agents/sync_profiles",),
+    "AGENTS.md": ("tools/agents/sync_playbook_index",),
 }
 SOURCE_CHECKS = {
     "docs/matching.md": ((SR_REL, ("--check",)),),
+    "AGENTS.md": (("tools/agents/sync_playbook_index.py", ("--check",)),),
 }
 
 

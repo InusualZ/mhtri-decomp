@@ -113,7 +113,7 @@ KIND_PROFILE = {
     "merge": "merger",        # a refused apply
     "tooling": "worker",      # the fallback for a task that is none of the specific ones
     "docs": "worker",
-    "review": "reviewer",      # read-only
+    "review": "codereviewer",  # the tracked project review profile (the global `reviewer` is separate)
     "scout": "scout",          # read-only
     "plan": "planner",         # read-only
 }
@@ -1647,7 +1647,7 @@ def selftest() -> int:
         # `decompiler` - unit policy they could never satisfy. `spawn` makes both explicit.)
         check("the kind mapping is the whole table", KIND_PROFILE,
               {"unit": "decompiler", "fix": "fixer", "merge": "merger", "tooling": "worker",
-               "docs": "worker", "review": "reviewer", "scout": "scout", "plan": "planner"})
+               "docs": "worker", "review": "codereviewer", "scout": "scout", "plan": "planner"})
         for _kind, _profile in sorted(KIND_PROFILE.items()):
             check("kind %s -> %s" % (_kind, _profile), profile_for_kind(_kind), _profile)
         try:
