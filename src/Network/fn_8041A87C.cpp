@@ -42,6 +42,14 @@
  * same literals), so per playbook 58 it can be neither claimed nor named here.  Our object keeps the
  * empty `ours-extra` set: the view classes are never constructed, so no vtable is emitted.
  *
+ * DATA CLAIMED (2026-09-28).  `.sbss` 0x80794CE0..0x80794CE8 - the pair the worker thread owns:
+ * 0x80794CE0 (stored four times here, read ten) and 0x80794CE4 `sGameSpyInterfaceThread`, the
+ * singleton this unit publishes at `.text`+0x1E14 and its destructor zeroes at +0x1EE0 (both
+ * `stw rX, 0(0)` + `R_PPC_EMB_SDA21`).  The band header `include/unsplit/Network.h` declared both,
+ * which is rule 12.  The *other* unit that names the singleton, `Network/fn_803D3CE8.cpp`, only
+ * loads it (`GameSpyInterfaceThread_getInstance`), so the definer is this unit and the claim is
+ * here.  One contiguous run, symbol- and 8-byte-aligned, so the split needs no interior auto band.
+ *
  * FLAGS.  The object deviates from the lib on three points, all in `configure.py` or in this file
  * with the evidence: `-O3` + `-inline noauto` in place of `-O4,p` + `-inline auto` (retail calls the
  * file-static helpers - the peer's `isQueued` is 72 B against our 64 B when the inliner folds them

@@ -1346,6 +1346,7 @@ Network/fn_8041A87C.cpp:
 	extab       start:0x8001CFF0 end:0x8001D16C
 	extabindex  start:0x8003D9BC end:0x8003DBD8
 	.text       start:0x8041A87C end:0x8041DF10
+	.sbss       start:0x80794CE0 end:0x80794CE8
 
 Camellia/camellia.c:
 	extab       start:0x8001D16C end:0x8001D1B4
@@ -1405,12 +1406,17 @@ RSO/runtime.c:
 
 DWCi/DWCi_Np_CPUCopyFast.c:
 	.text       start:0x80507C40 end:0x80509DB0
+	.sdata      start:0x80794200 end:0x80794210
+	.sbss       start:0x807957D0 end:0x807957F8
 
 DWCi/fn_805113B0.c:
 	.text       start:0x805113B0 end:0x80512490
 
 DWCi/DWCi_NatNeg.c:
 	.text       start:0x80512490 end:0x805145B8
+	.bss        start:0x807614D8 end:0x80762A20
+	.sdata      start:0x80794368 end:0x807943A0
+	.sbss       start:0x80795828 end:0x80795878
 
 NHTTP/NHTTP_bgnend.c:
 	.text       start:0x805145B8 end:0x80515010

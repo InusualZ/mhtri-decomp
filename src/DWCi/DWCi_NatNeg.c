@@ -25,7 +25,37 @@
  * the range also holds the DWCi address-format helpers ("%s:%d", "%s.%s", the "%s" ring buffer) that
  * the negotiator and the transport share.  Rename if the SDK's real file name is recovered.
  *
- * SECTIONS.  `.text` only - the `.bss`/`.sbss`/`.sdata` objects it loads are declared, never defined.
+ * SECTIONS.  `.text` plus the three data runs the next paragraph lists; every other
+ * `.bss`/`.sbss`/`.sdata` object it loads stays declared in `include/unsplit/DWCi.h`, never defined.
+ *
+ * DATA CLAIMED (2026-09-28, rule 12).  Three runs of the band's own data.  One per section, and the
+ * `.bss` one widened to a single run, because a second run of one section whose gap no registered unit
+ * owns makes `dtk dol split` die with `Cyclic dependency encountered while resolving link order`
+ * (playbook 53):
+ *   .sdata 0x80794368..0x807943A0 - the unit's own pool: the empty string, the "%s:%d"/"%s"/":%d"
+ *     trio, the 8-byte NATNEG message signature, the protocol id and the two idle-socket fds.  Three
+ *     are stored by this object; the rest are `const` strings it reads, and this object is their
+ *     **only** referencer among the current link inputs - which is the definer test for a literal
+ *     (the store test does not apply to a read-only pool).
+ *   .sbss 0x80795828..0x80795878 - the address-ring index, the four ready flags, the seen-type flags,
+ *     the socket list and the server address/token words (all stored here) through the last-poll tick
+ *     and the poll callback (read here, referred to by nothing else in the current link set).
+ *     The run stops at 0x80795878 because `NHTTP/d_nhttp.c` owns 0x80795878; it starts at
+ *     0x80795828 because 0x80795820 `DWCi_addressRingIndex` is `DWCi/fn_805113B0.c`'s (that symbol
+ *     appears in that object's relocations and no other's) - a single 0x80795818..0x80795878 claim
+ *     would sweep another unit's word.
+ *   .bss 0x807614D8..0x80762A20 - ONE run, deliberately wider than this unit's three words: the
+ *     0x80-byte host-name text at 0x807614D8 (read at 15 sites, written nowhere in the link set),
+ *     the second address ring and the 0xE0-byte session record at 0x80762900/0x80762940.  The three
+ *     are 0x1520 bytes apart with no registered owner between them - 0x80761558 and 0x807615C0 (a
+ *     0x1000-byte block) belong to the *unregistered* DWCi band 0x80509DB0..0x805113B0, 0x807625C0
+ *     `DWCi_addressRing` to `DWCi/fn_805113B0.c` and 0x807625F0 to another unregistered band - so this
+ *     is playbook 53's "must own the bytes between them": claiming the three as separate runs leaves
+ *     an `auto_08_*` band inside this unit's `.bss` and `dtk dol split` dies with `Cyclic dependency
+ *     encountered while resolving link order` (measured, verbatim).  RE-DRAW THIS RANGE when
+ *     0x80509DB0..0x805113B0 is registered: 0x80761558, 0x807615C0 and 0x807625F0 are that unit's, and
+ *     0x807625C0 is `DWCi/fn_805113B0.c`'s.  The thin claim that would be right today cannot be
+ *     expressed (one run per section), which is the residual this claim carries.
  *
  * FLAGS.  Copies `cflags_dwc` (`-func_align 4`); the 16-alignment finding above says the original TU
  * was `-func_align 16`, recorded for the flip pass (same note as `DWCi_Np_CPUCopyFast.c`).
