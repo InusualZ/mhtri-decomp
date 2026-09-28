@@ -29,7 +29,7 @@ typedef void (*NHTTPFreeFn)(void* block); /* untyped: byte range */
 typedef struct NHTTPRequestNode {
     /* +0x00 */ struct NHTTPRequestNode* next;
     /* +0x04 */ struct NHTTPRequestNode* prev;
-    /* +0x08 */ u32 id;           /* the handle NHTTPi_insertRequest returns */
+    /* +0x08 */ s32 id;           /* the handle NHTTPi_insertRequest returns */
     /* +0x0C */ s32 request;      /* the request object NHTTPi_cancelRequest destroys */
     /* +0x10 */ s32 state;        /* -1 until the request completes */
     /* +0x14 */ u32 unused_0x14;
@@ -39,7 +39,7 @@ typedef struct NHTTPRequestNode {
  * size: 0x08 */
 typedef struct NHTTPRequestList {
     /* +0x00 */ NHTTPRequestNode* head;
-    /* +0x04 */ u32 nextId;
+    /* +0x04 */ s32 nextId;
 } NHTTPRequestList;
 
 /* The NHTTP request record; only the fields this unit's header path touches are modelled.  Both
@@ -85,7 +85,7 @@ NHTTPHeaderField* NHTTPi_RemoveNode(NHTTPHeaderField** ppHead);
 NHTTPHeaderField* NHTTPi_RemoveHeaderField(NHTTPHeaderField** ppHead);
 
 u32 NHTTPi_insertRequest(NHTTPRequestList* list, s32 request);
-s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, u32 id); /* untyped: opaque handle */
+s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, s32 id); /* untyped: opaque handle */
 void NHTTPi_cancelConnectionRequests(NHTTPRequestList* list, void* connection); /* untyped: opaque handle */
 
 s32 NHTTPi_createCommThread(NHTTPThreadInfo* thread, u32 arg, u8* stack);

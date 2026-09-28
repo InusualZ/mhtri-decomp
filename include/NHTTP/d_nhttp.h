@@ -31,6 +31,27 @@ typedef struct NHTTPHeaderField {
     /* +0x14 */ u32 field_0x14;
 } NHTTPHeaderField;
 
+/* The socket record the `NHTTPi_SocRecv*` wrappers read through a connection's +0x2C slot: the base
+ * of the receive area and the number of bytes still available at it.  Only those two fields are
+ * touched by the reconstructed bodies. size: 0x2C (approximate) */
+typedef struct NHTTPSock {
+    /* +0x000 */ u8 pad_0x000[0x1C];
+    /* +0x01C */ u32 length;   /* bytes still available at `base` */
+    /* +0x020 */ u8 pad_0x020[0x8];
+    /* +0x028 */ u8* base;     /* the receive area's base */
+} NHTTPSock;
+
+/* The connection object `NHTTPi_Request2Connection` hands back and `NHTTPi_CompleteCallback` takes.
+ * `NHTTPi_cancelRequest` marks its +0x04 word with 8 before completing the request and the
+ * `NHTTPi_SocRecv*` wrappers read the socket at +0x2C.  Only the fields the reconstructed bodies
+ * touch are modelled. size: 0x30 (approximate) */
+typedef struct NHTTPConnection {
+    /* +0x00 */ u32 field_0x00;
+    /* +0x04 */ u32 field_0x04;   /* 8 once the request was cancelled */
+    /* +0x08 */ u8 pad_0x08[0x24];
+    /* +0x2C */ NHTTPSock* sock;  /* the socket `NHTTPi_SocRecvOffsetRange` reads */
+} NHTTPConnection;
+
 /* The list-info record (`NHTTPi_InitListInfo` zeroes head/tail). size: 0x08 */
 typedef struct NHTTPListInfo {
     /* +0x00 */ void* head;
@@ -97,17 +118,28 @@ void NHTTPi_InitThreadInfo(NHTTPThreadInfo* info);
  * (this unit is registered `.text`-only and most of its range is still unwritten), so their names
  * are derived from their own bodies: a `strlen` tail, a bounded substring search, and the comm
  * thread's ready flag plus the loop it runs. */
-s32 NHTTPi_strlen(const char* s);
+u32 NHTTPi_strlen(const char* s);
 s32 NHTTPi_containsString(const char* haystack, s32 haystackLen, const char* needle, s32 needleLen);
 void NHTTPi_markCommThreadReady(NHTTPThreadInfo* info);
 s32 NHTTPi_isCommThreadReady(NHTTPThreadInfo* info);
 void NHTTPi_commThreadLoop(void);
+int NHTTPi_strcmp(const char* a, const char* b);
+s32 NHTTPi_strnicmp(const char* s1, const char* s2, s32 n);
+s32 NHTTPi_encodeUrlChar(u8* dst, char c);
+s32 NHTTPi_urlEncodedLength(const char* s);
+s32 NHTTPi_urlEncodedLengthN(const char* s, s32 n);
 s32 NHTTPi_compareToken(const char* a, const char* b);
 s32 NHTTPi_GetConnectionListLength(void);
 void NHTTPi_InitConnectionList(void);
 void NHTTPi_cancelAllRequests(NHTTPInfo* info);
 void NHTTPi_CompleteCallback(void* connection, void* response); /* untyped: opaque handle */
-s32 NHTTPi_Request2Connection(void* connection, s32 request); /* untyped: opaque handle */
+NHTTPConnection* NHTTPi_Request2Connection(void* connection, s32 request); /* untyped: opaque handle */
+
+/* The raw socket receive the RVL wrappers end in.  Its body belongs to `d_nhttp.c` (still
+ * unwritten); the six-parameter signature is a GUESS - only the register mapping is proven, from
+ * `NHTTPi_SocRecvFromOffset`/`NHTTPi_SocRecvOffsetRange`, which forward their own arguments
+ * unchanged. */
+s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 length, s32 arg);
 void NHTTPi_destroyRequestObject(void* connection, s32 request); /* untyped: opaque handle */
 
 #ifdef __cplusplus

@@ -51,31 +51,50 @@
  * `NHTTPi_markCommThreadReady` / `NHTTPi_isCommThreadReady` / `NHTTPi_strlen` /
  * `NHTTPi_containsString` in `d_nhttp.h`).
  *
- * BODY.  All 27 functions are reconstructed and measured; 21 are byte-identical, the unit is 93.24 %
- * fuzzy over the 2648 B of `.text` (2644 B ours), and the remaining five rows are:
+ * BODY.  All 27 functions are reconstructed and measured; 23 are byte-identical, the unit is 97.62 %
+ * fuzzy over the 2648 B of `.text` (2648 B ours), and the remaining four rows are:
  *
  *    93.85  NHTTPi_Startup             (400/400)
- *    93.99  NHTTPi_SetHeaderField       (316/316)
- *    85.64  NHTTPAddPostDataRaw        (396/384)
- *    84.45  NHTTPi_insertRequest       (204/200)
- *    83.68  NHTTPi_cancelRequest       (284/296)
+ *    92.68  NHTTPAddPostDataRaw        (396/396)
+ *    96.85  NHTTPi_cancelRequest       (284/284)
  *    99.33  NHTTPi_RemoveNode          (72/72)
  *
- * Residuals (each measured with `measure.py --diff` on this file):
- *   - NHTTPi_Startup: retail gives the first parameter register r31 and ours gives it r26, so every
- *     `info` use is one register off (`mr r3,r26` where retail has `mr r3,r31`); the function's shape
- *     (including the one `NCDGetCurrentIpConfig` call and the hoisted message-group base) is identical.
- *     The colouring follows the source's *declaration order* - declaring the message-group local first
- *     is what fixed `lis r31` vs `lis r30` - and moving the parameter's web to the front of that order
- *     is not reachable from the C side (tried: parameter copy to a local first, declaration reorder).
- *   - NHTTPi_SetHeaderField: register naming in the search walk plus a two-instruction tail.
- *   - NHTTPAddPostDataRaw: the inner walk re-derives the buffer slot per statement where retail keeps
- *     `request + i` live in a register, and the `advance` flag's two exits are re-tested.
- *   - NHTTPi_insertRequest / NHTTPi_cancelRequest: a four-byte frame difference and the loop variable's
- *     colouring (`r4` vs `r7`); the id comparison is `cmplw` in both.
- *   - `NHTTPi_alloc`/`NHTTPi_free`/`NHTTPi_insertRequest`/`NHTTPi_SetHeaderField`/`NHTTPi_RemoveHeaderField`
- *     all needed `#pragma dont_inline on`: with `-inline auto` MWCC folds the small callees and drops
- *     retail's `bl` (72 B instead of 4 B on the tail wrapper, 228 B instead of 204 on the insert).
+ * Residuals (each measured with `symdiff.py -u NHTTP/NHTTP_bgnend` on this file):
+ *   - NHTTPi_Startup: retail colours the `base`/`info` parameter web r31 and the message-group local
+ *     r30; ours colours the message group r31 and `info` r26, so every `info` use is one register off
+ *     (`mr r3,r26` where retail has `mr r3,r31`).  The instruction stream is otherwise identical.  Six
+ *     declaration permutations of the local block (message group first, last, `memory` moved, `base`
+ *     dropped in favour of the parameter) were measured: every one keeps `lis r31` for the message
+ *     group, so this is the allocator's web priority, not a declaration-order lever.
+ *   - NHTTPAddPostDataRaw: the two walks differ in the flag's live range - retail's `doRegister` is
+ *     only read once, after both loops (`li r0,1` / `li r0,0` then one `cmpwi r0,0`), ours is read
+ *     inside the outer loop as well, so it is held in a callee-saved register (r24) and re-tested
+ *     (`li r24,1; cmpwi r24,0; bne`).  Retail's single read after the loops is the `goto`-shaped exit
+ *     rule 8 forbids; no non-goto shape tried (`if (doRegister) break;` in the outer body, the flag as
+ *     the loop condition, `i = 1` to force the outer exit) reproduces it.  The two walks themselves
+ *     (`request->code[i - 2]` / `NHTTPi_postDataRawCode[i]`, the in-register `next++`) match.
+ *   - NHTTPi_cancelRequest: two residuals.  (a) The unlink pair loads its LHS base before its RHS value
+ *     (`lwz r4,0(r31)` then `lwz r0,4(r31)`) where retail loads the value first; the same swap is
+ *     NHTTPi_RemoveNode's only residual, and five source spellings (a `prev`/`next` local before or
+ *     after the statement, a nested block, a `next` local as the destination) all keep our order.
+ *     (b) The `obj->field_0x04 = 8` store schedules before the argument setup (`mr r3,r29`), retail's
+ *     after it.
+ *   - `NHTTPi_alloc`/`NHTTPi_free`/`NHTTPi_insertRequest`/`NHTTPi_SetHeaderField`/`NHTTPi_RemoveHeaderField`/
+ *     `NHTTPi_cancelRequest` all needed `#pragma dont_inline on`: with `-inline auto` MWCC folds the
+ *     small callees and drops retail's `bl` (72 B instead of 4 B on the tail wrapper, 228 B instead of
+ *     204 on the insert, and the whole `NHTTPi_free` body on the cancel).
+ *
+ * Load-bearing source shapes (each measured):
+ *   - `NHTTPi_insertRequest` declares `id` *before* the `NHTTPi_alloc` call (so the -1 lives in a
+ *     callee-saved register across it) and post-increments `list->nextId` in the assignment
+ *     (`node->id = list->nextId++`), which is what stops the second `lwz r4,0x4(r29)`.
+ *   - `NHTTPi_SetHeaderField` declares `found` before `node`; the `else { found = 1; }` arm (the
+ *     negated test) is what puts the first comparison's hit block out of line.
+ *   - `NHTTPAddPostDataRaw` walks `request->code[i - 2]` (not a flat byte offset) - that is what makes
+ *     MWCC emit retail's `add r22,r27,r24` + `lbz r25,0x38(r22)` - and its tail reads the field list
+ *     back through `request->postDataList->next`.
+ *   - `NHTTPRequestNode.id` / `NHTTPi_cancelRequest`'s `id` are `s32`: retail's comparison is `cmpw`,
+ *     not `cmplw`.
  */
 
 #include "NHTTP/NHTTP_bgnend.h"
@@ -256,19 +275,19 @@ s32 NHTTPi_GetError(NHTTPInfo* info) {
 #pragma dont_inline on
 s32 NHTTPi_SetHeaderField(NHTTPHeaderField** ppHead, NHTTPInfo* owner, const char* token,
                           const char* value) {
-    NHTTPHeaderField* node = *ppHead;
     s32 found = 0;
+    NHTTPHeaderField* node = *ppHead;
 
     if (node != 0) {
-        if (NHTTPi_compareToken(token, node->token) == 0) {
-            found = 1;
-        } else {
+        if (NHTTPi_compareToken(token, node->token) != 0) {
             for (node = node->prev; node != *ppHead; node = node->prev) {
                 if (NHTTPi_compareToken(token, node->token) == 0) {
                     found = 1;
                     break;
                 }
             }
+        } else {
+            found = 1;
         }
     }
     if (found) {
@@ -336,6 +355,7 @@ s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* tok
                         const char* value) {
     s32 length = 0;
     s32 doRegister = 0;
+    s32 result = 0;
     s32 i;
 
     if (request->field_0x04 != 0) {
@@ -352,9 +372,10 @@ s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* tok
         doRegister = 1;
     } else {
         for (i = 19; i >= 2; i--) {
-            for (;;) {
-                u8 next = (u8)((u8*)request)[56 + i] + 1;
+            u8 next = (u8)request->code[i - 2];
 
+            for (;;) {
+                next++;
                 if (next == '{') {
                     next = '0';
                 } else if (next == '[') {
@@ -362,7 +383,7 @@ s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* tok
                 } else if (next == ':') {
                     next = 'A';
                 }
-                ((u8*)request)[56 + i] = next;
+                request->code[i - 2] = next;
                 if ((char)next == NHTTPi_postDataRawCode[i]) {
                     break;
                 }
@@ -376,18 +397,13 @@ s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* tok
             }
         }
     }
-    {
-        NHTTPHeaderField* node = 0;
-
-        if (doRegister) {
-            node = (NHTTPHeaderField*)NHTTPi_SetHeaderField(&request->postDataList, owner, token,
-                                                            value);
-            if (node != 0) {
-                node->field_0x10 = (u32)length;
-            }
+    if (doRegister) {
+        result = NHTTPi_SetHeaderField(&request->postDataList, owner, token, value);
+        if (result != 0) {
+            request->postDataList->next->field_0x10 = (u32)length;
         }
-        return (s32)node;
     }
+    return result;
 }
 
 /* 0x80514C58 (0x10): zero a list-info record. */
@@ -401,8 +417,8 @@ void NHTTPi_InitListInfo(NHTTPListInfo* info) {
  * Retail keeps the `bl NHTTPi_alloc`, so the inliner is held off here (playbook 61). */
 #pragma dont_inline on
 u32 NHTTPi_insertRequest(NHTTPRequestList* list, s32 request) {
-    NHTTPRequestNode* node = (NHTTPRequestNode*)NHTTPi_alloc(20, 4);
     u32 id = (u32)-1;
+    NHTTPRequestNode* node = (NHTTPRequestNode*)NHTTPi_alloc(20, 4);
 
     if (node != 0) {
         if (list->head != 0) {
@@ -415,8 +431,7 @@ u32 NHTTPi_insertRequest(NHTTPRequestList* list, s32 request) {
             node->prev = node;
             list->head = node;
         }
-        node->id = list->nextId;
-        list->nextId = list->nextId + 1;
+        node->id = list->nextId++;
         node->request = request;
         node->state = -1;
         id = node->id;
@@ -429,19 +444,20 @@ u32 NHTTPi_insertRequest(NHTTPRequestList* list, s32 request) {
 #pragma dont_inline off
 
 /* 0x80514D34 (0x11C): unlink the request with the given id, tear its request object down and
- * complete the connection it belonged to. */
+ * complete the connection it belonged to.  Retail keeps the `bl NHTTPi_free`, so the inliner is
+ * held off here (playbook 61). */
+#pragma dont_inline on
 /* untyped: opaque handle */
-s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, u32 id) {
+s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, s32 id) {
     NHTTPRequestNode* head = list->head;
     NHTTPRequestNode* node = 0;
+    NHTTPRequestNode* n;
     s32 ret = 0;
 
     if (head != 0) {
         if (head->id == id) {
             node = head;
         } else {
-            NHTTPRequestNode* n;
-
             for (n = head->prev; n != head; n = n->prev) {
                 if (n->id == id) {
                     node = n;
@@ -451,7 +467,7 @@ s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, u32 id) {
         }
     }
     if (node != 0) {
-        s32 obj;
+        NHTTPConnection* obj;
 
         if (head != head->next) {
             node->next->prev = node->prev;
@@ -466,12 +482,14 @@ s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, u32 id) {
         NHTTPi_destroyRequestObject(connection, node->request);
         NHTTPi_free(node);
         if (obj != 0) {
-            NHTTPi_CompleteCallback(connection, (void*)obj);
+            obj->field_0x04 = 8;
+            NHTTPi_CompleteCallback(connection, obj);
         }
         ret = 1;
     }
     return ret;
 }
+#pragma dont_inline off
 
 /* 0x80514E50 (0x54): cancel every request the list holds for one connection. */
 /* untyped: opaque handle */
