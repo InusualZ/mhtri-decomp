@@ -26,6 +26,7 @@ Rules checked (each finding is `file:line`):
 | 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
 | 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
 | 11 | no `void *` parameter or return type | a `void` `*` in a function declaration's parameter list or return type (a declaration, never a cast). Erasing the type hides what a heterogeneous call site is actually passing; the only exemption is a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a byte range, an opaque handle passed through, or a caller-owned payload |
+| 12 | data a unit uses that no registered range claims is the unit's to claim | an `extern` declaration (the `extern` keyword) of a symbol whose `symbols.txt` type is an **object** and whose address falls in **no** registered `splits.txt` range. The declaration is the defect: the unit that reads or writes the bytes claims the range in its own section and matches it, so the finding names the address the claim covers |
 
 Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt`
 (each registered unit's ranges) and reads **both** declaration shapes a file can make: the `extern` keyword
@@ -81,6 +82,19 @@ marker with an empty or vague reason is still a finding. The scan reads **declar
 `_declared_name` parser rule 2 uses), so a `(void*)p` cast inside a body is never a finding; a `void *`
 **local variable** is out of the rule's scope and is only counted (the report prints the number) so the
 owner can decide later. The rule is ticked in the register as its own `untyped` kind.
+
+**Rule 12 (owner, 2026-09-28).** An `extern` declaration of a **data** symbol - `symbols.txt` says
+`type:object` - whose address no registered `splits.txt` range covers is a finding: the unit that reads or
+writes those bytes **claims the range in its own `splits.txt`** and matches it as part of its own object.
+The old "no registered owner; declared, never defined" header comment was the finding naming itself, so a
+band header under `include/unsplit/` is judged by this rule too - rule 2's band is the fallback for a
+symbol no unit can claim, not the answer for data a unit demonstrably uses. The same `Ownership` index as
+rule 2 decides it, so the map-absent / duplicate-row / not-in-the-map cases stay counted gaps here as well;
+`rule 2` and `rule 12` may both name one `extern` line and that is intended - rule 2 says whose header the
+declaration belongs in, rule 12 says the bytes must be claimed. The declare-never-define carve-out is
+unchanged and is *not* checked here: when the address is already inside the file's own registered range,
+`resolve` returns `owned` and rule 12 does not fire (playbook 29). A **function** declaration is rule 2's,
+never rule 12's.
 """
 
 from __future__ import annotations
@@ -135,6 +149,7 @@ RULE_NAMES = {
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
     10: "a codegen pragma lives in the TU that needs it, not in a shared header",
     11: "no `void *` parameter or return type (mark the declaration `/* untyped: <reason> */` if genuinely untyped)",
+    12: "data no registered range claims is the unit's to claim and match (an `extern` for it is the finding)",
 }
 
 # The codegen-affecting pragma names for rule 10.  A `#pragma` is lexically scoped to the rest of the
@@ -827,6 +842,36 @@ def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
     return out
 
 
+def rule12_findings(src: Source, ownership: "Ownership | None") -> list[dict]:
+    """Rule 12 for one file: every `extern` of a **data** symbol no registered range claims.
+
+    The owner's ruling (2026-09-28): data a unit reads or writes that nothing claims is the unit's to
+    **claim and match** - claim the range in its own `splits.txt`, in the section the bytes live in, and
+    reconstruct the bytes so they byte-match the target. The `extern` declaration is the finding, wherever
+    it sits (`src/` file, `include/<module>/` header, or the `include/unsplit/` band: the band is rule 2's
+    fallback for a symbol nobody can claim, not the answer for data a unit demonstrably uses).
+
+    Only the `extern` keyword is read, and only symbols the map types as an object: a function declaration
+    is rule 2's. The `Ownership` index is the same one rule 2 resolves through, so an `owned` address is
+    clean - which is the declare-never-define carve-out (playbook 29: the range is already the unit's own,
+    so defining the constants would rebuild the pool) - while a name absent from the map or a duplicate row
+    is left alone (rule 2's `Ownership.gaps` is the one place those are counted). Rule 2 may name the same
+    line: rule 2 says whose header the declaration belongs in, rule 12 says the bytes must be claimed.
+    """
+    if ownership is None:
+        return []
+    out = []
+    for name, _pos, line in extern_declarations(src):
+        r = ownership.resolve(name)
+        if r is None or r["kind"] != "unsplit" or r.get("type") != "object":
+            continue
+        out.append(_finding(src, 12, line,
+                            "`%s` is unowned data - no registered range covers `%s:0x%X`; the unit that "
+                            "uses it claims the range in its own `splits.txt` and matches the bytes "
+                            "(rule 12)" % (name, r["section"], r["address"])))
+    return out
+
+
 # --------------------------------------------------------------------------------------------------
 # rules
 # --------------------------------------------------------------------------------------------------
@@ -1201,14 +1246,17 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     if is_unsplit_header(src.rel):
         if ownership is not None:
             out.extend(rule2_band_findings(src, ownership))
+            out.extend(rule12_findings(src, ownership))
         out.sort(key=lambda f: (f["rule"], f["line"]))
         return out
     if is_shared_header(src.rel):
-        # an ordinary `include/` header: rule 2 is the only section-6.5 rule it carries. Rules 3-9 are
+        # an ordinary `include/` header: rules 2 and 12 are the section-6.5 rules it carries. Rules 3-9 are
         # body/`src/` rules, and rules 10/11 for headers are reported by `header_pragma_findings` and
-        # `header_rule11_findings` rather than here (2026-09-28).
+        # `header_rule11_findings` rather than here (2026-09-28). Rule 12 is here because a header is where
+        # the unowned data a `src/` unit reads is declared (2026-09-28).
         if ownership is not None:
             out.extend(rule2_header_findings(src, ownership))
+            out.extend(rule12_findings(src, ownership))
         out.sort(key=lambda f: (f["rule"], f["line"]))
         return out
     defs = struct_defs(src)
@@ -1281,6 +1329,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
 
     if ownership is not None:
         out.extend(rule2_findings(src, ownership))
+        out.extend(rule12_findings(src, ownership))
 
     out.extend(rule11_findings(src))
 
@@ -1377,6 +1426,24 @@ def header_rule11_findings(root: str) -> list[dict]:
     return out
 
 
+def header_rule12_findings(root: str, ownership: "Ownership | None" = None) -> list[dict]:
+    """Rule 12 over the whole shared-header tree (`include/`), the unsplit band included.
+
+    A header declares the unowned data a `src/` unit reads (`include/Network/network_state.h`'s
+    `sessionTimeoutParam` block, `include/unsplit/NetworkData.h`'s constants), so the finding has to be
+    reachable there; `lint_source` returns early for both header classes, exactly as it does for rule 11.
+    """
+    if ownership is None:
+        ownership = load_ownership(root)
+    if ownership is None:
+        return []
+    out = []
+    for path in header_files(root):
+        rel = rel_of(root, path)
+        out.extend(rule12_findings(Source(path, rel, read_text(path)), ownership))
+    return out
+
+
 def header_rule2_findings(root: str, ownership: "Ownership | None" = None) -> list[dict]:
     """Rule 2 over the shared-header tree (`include/`) - the non-unsplit headers.
 
@@ -1410,6 +1477,29 @@ def header_rule11_counts_at_ref(root: str, ref: str) -> dict:
         except RuntimeError:
             continue
         for f in rule11_findings(Source(path, path, text)):
+            out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
+    return out
+
+
+def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | None" = None) -> dict:
+    """Rule-12 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
+
+    Each side of a `--diff` is judged by the map it was written against (the rule-2 precedent): a rename
+    that moves a data symbol out of a registered range must not read as a rule-12 addition.
+    """
+    if ownership is None:
+        ownership = load_ownership_at_ref(root, ref)
+    if ownership is None:
+        return {}
+    out: dict = {}
+    for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
+        if not path.endswith(HEADER_SUFFIXES):
+            continue
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        for f in rule12_findings(Source(path, path, text), ownership):
             out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
     return out
 
@@ -1453,6 +1543,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
     out.extend(header_pragma_findings(root))
     out.extend(header_rule2_findings(root, ownership))
     out.extend(header_rule11_findings(root))
+    out.extend(header_rule12_findings(root, ownership))
     out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out
 
@@ -1479,7 +1570,7 @@ def unique_names(findings: list[dict]) -> dict:
             "label_names": len(names(7, "data")),
             "unk_fields": len(names(5, "")), "types": len(names(3, "")),
             "shared_types": len(names(1, "")), "extern_symbols": len(names(2, "")),
-            "mangled_names": len(names(9, ""))}
+            "mangled_names": len(names(9, "")), "unowned_data_symbols": len(names(12, ""))}
 
 
 def rule_enforced(rule: int, rel: str, src: "Source | None" = None) -> bool:
@@ -2119,6 +2210,47 @@ def selftest() -> int:
     check("rule2 band: a plain prototype in a src/ file is now rule 2's too",
           lines_of("void foo(void);\n", 2, "src/other/c.c", idx), [1])
 
+    # --- rule 12: an `extern` of data no registered range claims is the finding ---------------------
+    # Owner's ruling 2026-09-28: the unit that reads/writes the bytes claims the range and matches it, so
+    # the declaration is the finding - in a `src/` file, a module header, or the unsplit band.
+    dat = Ownership({"lbl_8079C7D8": [(".sdata2", 0x8079C7D8, "object")],
+                     "maskedUserName": [(".sdata", 0x80793968, "object")],
+                     "lbl_805FA908": [(".data", 0x805FA908, "object")],
+                     "fn_80010000": [(".text", 0x80010000, "function")],
+                     "owned_data": [(".data", 0x1500, "object")]},
+                    {".data": [(0x1000, 0x2000, "mod/a.c")],
+                     ".sdata2": [(0x80800000, 0x80800100, "mod/a.c")]})
+    check("rule12: an extern of unowned data is a finding",
+          lines_of("extern const u16 lbl_8079C7D8;\n", 12, "src/other/c.c", dat), [1])
+    check("rule12: the detail names the address the claim covers",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c",
+              "extern const u16 lbl_8079C7D8;\n"), dat) if f["rule"] == 12],
+          ["`lbl_8079C7D8` is unowned data - no registered range covers `.sdata2:0x8079C7D8`; the unit that "
+           "uses it claims the range in its own `splits.txt` and matches the bytes (rule 12)"])
+    check("rule12: an extern of OWNED data is clean (the declare-never-define carve-out)",
+          lines_of("extern u32 owned_data;\n", 12, "src/other/c.c", dat), [])
+    check("rule12: a function declaration is rule 2's, never rule 12's",
+          lines_of("extern void fn_80010000(void);\n", 12, "src/other/c.c", dat), [])
+    check("rule12: an array of unowned data is a finding too",
+          lines_of("extern const char maskedUserName[7];\n", 12, "src/other/c.c", dat), [1])
+    check("rule12: a module header is judged (the unowned data is declared there)",
+          lines_of("extern const u16 lbl_8079C7D8;\n", 12, "include/mod/user.h", dat), [1])
+    check("rule12: the unsplit band is judged too - the band is not the answer for data a unit uses",
+          lines_of("extern const u16 lbl_8079C7D8;\n", 12, "include/unsplit/mod.h", dat), [1])
+    check("rule12: a name not in the map is not a finding",
+          lines_of("extern u32 not_in_map;\n", 12, "src/other/c.c", dat), [])
+    check("rule12: a definition is not a declaration",
+          lines_of("const u16 lbl_8079C7D8 = 1;\n", 12, "src/other/c.c", dat), [])
+    check("rule12: no map means unchecked, not a crash",
+          [f for f in lint_source(Source("x", "src/other/c.c",
+                                         "extern const u16 lbl_8079C7D8;\n"), None)
+           if f["rule"] == 12], [])
+    check("rule12: an unsplit FUNCTION is rule 2's, not rule 12's",
+          lines_of("extern void mid(void);\n", 12, "src/other/c.c", mid), [])
+    check("rule12 and rule 2 both name an unowned data extern (different remedies)",
+          sorted(r for r, _l in rules_of("extern const u16 lbl_8079C7D8;\n", "src/other/c.c", dat)),
+          [2, 7, 12])
+
     # the real map: the ownership lookup resolves a symbol we name, from the tree's own data
     if os.path.exists(os.path.join(".", "config", "RMHE08", "symbols.txt")):
         real = load_ownership(".")
@@ -2281,7 +2413,7 @@ def selftest() -> int:
           rule11_local_count(Source("x.c", "x.c", "void f(void) {\n    if (1) {\n        void *p = 0;\n    }\n}\n")), 1)
 
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
     check("e2e: no rule is declared unchecked", UNCHECKED, [])
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
@@ -2414,7 +2546,9 @@ def main(argv: list[str] | None = None) -> int:
                                 load_ownership_at_ref(root, args.diff) or ownership),
                 rule1_counts_at_ref(root, args.diff, pairs),
                 header_pragma_counts_at_ref(root, args.diff),
-                header_rule11_counts_at_ref(root, args.diff))
+                header_rule11_counts_at_ref(root, args.diff),
+                header_rule12_counts_at_ref(root, args.diff,
+                                            load_ownership_at_ref(root, args.diff) or ownership))
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
             return 2
@@ -2422,7 +2556,8 @@ def main(argv: list[str] | None = None) -> int:
             rule_counts(lint_tree(root, [os.path.join(root, a) for _b, a in pairs], ownership)),
             rule_counts(rule1_findings(all_sources(root))),
             rule_counts(header_pragma_findings(root)),
-            rule_counts(header_rule11_findings(root)))
+            rule_counts(header_rule11_findings(root)),
+            rule_counts(header_rule12_findings(root, ownership)))
         added = diff_deltas(before, after)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
@@ -2443,7 +2578,8 @@ def main(argv: list[str] | None = None) -> int:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
                   "(rule 2 resolves every extern to an owner or the unsplit band; rule 7 fires on every "
                   "auto-generated name; rule 11 fires on every unmarked `void *` parameter/return type; "
-                  "only pre-existing findings are grandfathered)" % len(rels))
+                  "rule 12 fires on every `extern` of unowned data; only pre-existing findings are "
+                  "grandfathered)" % len(rels))
         return 1 if added else 0
 
     findings = lint_all(root, ownership)

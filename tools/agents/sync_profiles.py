@@ -10,7 +10,9 @@ decompiler inlined it across ~110 lines). Duplicated policy drifts, and nothing 
 `4f3cb4ea1` deleted the `rule 7 deferred: <reason>` escape (rule 7 now fires on every `fn_` / `lbl_` /
 `loc_` / `unk` identifier in `src/`, whoever owns it - no exemption, no deferral; the land gate's
 `--diff` is the only grandfather), and both profiles went on teaching the deleted key as legal. The
-same rot was waiting for rule 11 (`void *`), which neither profile knew about.
+same rot was waiting for rule 11 (`void *`), which neither profile knew about - and again for rule 12
+(unowned data the unit must claim), which is why the block's rule count is computed from the table
+rather than written down here.
 
 THE MECHANISM: the rules are generated, the prose around them is hand-written.
 
@@ -25,11 +27,12 @@ It is idempotent (`python tools/agents/sync_profiles.py` writes the block only w
 `--check` exits non-zero when a profile's block does not match what the plan says today - so a rule
 change that forgets the profiles fails the check instead of silently leaving the prompts stale.
 
-The block is generated from the *table*, so a new rule (rule 11) and every exception clause (rule 2's
+The block is generated from the *table*, so a new rule (rule 12) and every exception clause (rule 2's
 unowned extern -> `include/unsplit/`; rule 7's "no exemption and no deferral"; rule 11's
 `/* untyped: <reason> */`) reach both profiles the moment the plan does. If the plan's section-6.5
 shape changes enough that the table cannot be parsed, this tool refuses loudly instead of writing a
-stale or empty block - that refusal is the next rule change's tripwire.
+stale or empty block - that refusal is the next rule change's tripwire. The block's title says
+`rules 1-N` from the table's row count (N = 12 today), so no rule count is written down here to drift.
 
     python tools/agents/sync_profiles.py            # regenerate every profile's block in place
     python tools/agents/sync_profiles.py --check    # exit 1 when a profile is stale (writes nothing)
@@ -80,6 +83,8 @@ RULE_RE = re.compile(r"^\|\s*(\d+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*$")
 ENFORCEMENT_ANCHORS = ("land.py verify", "--diff", "exempts nothing", "no exemption and no deferral")
 
 MIN_RULES = 8   # a table that lost half its rows is a parse failure, not a rule change
+# The block's title says `rules 1-N` with N = the table's row count, so a new rule (rule 12, 2026-09-28)
+# reaches every profile without a code change here; there is no rule count to keep in step.
 
 
 def repo_root(start):
