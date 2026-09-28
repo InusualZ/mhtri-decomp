@@ -1612,8 +1612,14 @@ def header_pragma_findings(root: str) -> list[dict]:
     return out
 
 
-def header_pragma_counts_at_ref(root: str, ref: str) -> dict:
-    """Rule-10 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+def header_pragma_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
+    """Rule-10 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
+
+    `rename` is `{path_at_ref: path_now}` (see `renames_of`): a renamed header keeps its finding under the
+    path the *working tree* spells, so the whole-tree walk lines up with `header_pragma_findings`'s walk -
+    without it, a rename alone reported the header's existing rule-10 finding as an addition.
+    """
+    rename = rename or {}
     out: dict = {}
     for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
         if not path.endswith(HEADER_SUFFIXES):
@@ -1622,7 +1628,7 @@ def header_pragma_counts_at_ref(root: str, ref: str) -> dict:
             text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        for f in codegen_pragma_findings(Source(path, path, text)):
+        for f in codegen_pragma_findings(Source(path, rename.get(path, path), text)):
             out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
     return out
 
@@ -1679,8 +1685,15 @@ def header_rule2_findings(root: str, ownership: "Ownership | None" = None) -> li
     return out
 
 
-def header_rule11_counts_at_ref(root: str, ref: str) -> dict:
-    """Rule-11 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+def header_rule11_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
+    """Rule-11 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
+
+    `rename` is `{path_at_ref: path_now}`: rule 11 has no per-file walk to fall back on (it is reported
+    only by `header_rule11_findings`), so an untranslated base path was the *only* key a renamed header had
+    - `include/fn_80429B94.h`'s six `void *` findings read as +6 on the rename to
+    `include/Network/network_pat_control.h` alone.
+    """
+    rename = rename or {}
     out: dict = {}
     for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
         if not path.endswith(HEADER_SUFFIXES):
@@ -1689,21 +1702,27 @@ def header_rule11_counts_at_ref(root: str, ref: str) -> dict:
             text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        for f in rule11_findings(Source(path, path, text)):
+        for f in rule11_findings(Source(path, rename.get(path, path), text)):
             out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
     return out
 
 
-def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | None" = None) -> dict:
+def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | None" = None,
+                                rename: dict | None = None) -> dict:
     """Rule-12 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
 
     Each side of a `--diff` is judged by the map it was written against (the rule-2 precedent): a rename
     that moves a data symbol out of a registered range must not read as a rule-12 addition.
+
+    `rename` is `{path_at_ref: path_now}` (`renames_of`). Rule 12 is also judged per changed file by
+    `findings_at_ref`, which already keys by the *new* path; this whole-tree walk is merged with it, so an
+    untranslated base path both split one finding into two keys and read the rename as a +1.
     """
     if ownership is None:
         ownership = load_ownership_at_ref(root, ref)
     if ownership is None:
         return {}
+    rename = rename or {}
     out: dict = {}
     for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
         if not path.endswith(HEADER_SUFFIXES):
@@ -1712,7 +1731,7 @@ def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | Non
             text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        for f in rule12_findings(Source(path, path, text), ownership):
+        for f in rule12_findings(Source(path, rename.get(path, path), text), ownership):
             out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
     return out
 
@@ -1973,6 +1992,15 @@ def src_paths_at_ref(root: str, ref: str) -> list[str]:
             if line.endswith(SUFFIXES)]
 
 
+def renames_of(pairs: list[tuple[str | None, str]]) -> dict:
+    """`{path_at_ref: path_now}` for the renames in a changed-pairs list (`changed_src_files`).
+
+    A rename is one pair carrying both names, so a walk that reads the *ref* tree can key its findings by
+    the path the working tree now spells - the rename-stable key `--diff` compares against.
+    """
+    return {before: after for before, after in pairs if before and before != after}
+
+
 def rule1_counts_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> dict:
     """Rule-1 counts for the ref's whole `src/` tree, keyed by the path each file has now.
 
@@ -1980,7 +2008,7 @@ def rule1_counts_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]
     every file: a batch can duplicate a type that already lives in an untouched file. A rename is keyed by
     its new path so the two sides stay comparable.
     """
-    rename = {before: after for before, after in pairs if before and before != after}
+    rename = renames_of(pairs)
     sources = []
     for path in src_paths_at_ref(root, ref):
         try:
@@ -2970,6 +2998,75 @@ def selftest() -> int:
                and "nothing to compare it against" not in out.getvalue()), True)
         rgit("checkout", "-q", "main")
 
+    # --- `--diff`/`--ref` are rename-stable: a renamed header's rule-10/11/12 findings are not additions --
+    # The rename that hit it (`include/fn_80429B94.h` -> `include/Network/network_pat_control.h`, the
+    # network-pat lane) alone reported "+6 rule 11 ... (0 -> 6)" and "+1 rule 12 ... (1 -> 2)": the
+    # whole-tree header walks read the *base* tree and keyed its findings by the old path, while the
+    # per-file walk and the working tree keyed by the new one.  Rule 10 has the same shape.  A rename must
+    # measure delta 0 - that is the whole point of the comparison.
+    with tempfile.TemporaryDirectory() as tmp:
+        def dgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+
+        def dput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def drev(where: str = "HEAD") -> str:
+            return subprocess.run(["git", "rev-parse", where], cwd=tmp, capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace").stdout.strip()
+
+        dgit("init", "-q")
+        dgit("checkout", "-q", "-b", "main")
+        dput("config/RMHE08/symbols.txt",
+             "owned_fn = .text:0x80002000; // type:function size:0x10\n"
+             "unowned_data = .data:0x80003000; // type:object size:0x10\n")
+        dput("config/RMHE08/splits.txt",
+             "other/other_unit.c:\n\t.text       start:0x80002000 end:0x80002010\n")
+        dput("src/other/other_unit.c", "void owned_fn(void) {}\n")
+        # one finding of each header rule: rule 10 (a codegen pragma), rule 11 (`void *` parameter), rule
+        # 12 (`extern` of data no registered range claims).
+        dput("include/mod/a.h",
+             "#pragma pool\nvoid takes_void_star(void *p);\nextern u8 unowned_data[];\n")
+        dgit("add", "-A")
+        dgit("commit", "-q", "-m", "base")
+        base_sha = drev()
+        # a positive control: the base header really carries one finding of each header rule, so a delta 0
+        # below is the rename being stable and not the fixture carrying nothing.
+        base_own = load_ownership_at_ref(tmp, base_sha)
+        base_src = Source("include/mod/a.h", "include/mod/a.h",
+                          git_bytes(tmp, "show", "%s:include/mod/a.h" % base_sha).decode("utf-8"))
+        check("... the base header really carried one finding of each header rule",
+              sorted(f["rule"] for f in (codegen_pragma_findings(base_src) + rule11_findings(base_src)
+                                          + rule12_findings(base_src, base_own))),
+              [10, 11, 12])
+        # the rename, committed on `lane`, so both comparisons (working tree `--diff`, read-only `--ref`)
+        # measure it the same way
+        dgit("checkout", "-q", "-b", "lane")
+        dgit("mv", "include/mod/a.h", "include/mod/b.h")
+        dgit("commit", "-q", "-m", "rename a header that carries all three header findings")
+        old_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_diff_rename = main(["--diff", base_sha, "--json"])
+            diff_rename = json.loads(out.getvalue())
+        finally:
+            os.chdir(old_cwd)
+        check("--diff on a renamed header measures delta 0 (exit 0)", rc_diff_rename, 0)
+        check("... with no added row", diff_rename["added"], [])
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc_ref_rename = ref_comparison(tmp, "lane", load_ownership(tmp), as_json=True)
+        ref_rename = json.loads(out.getvalue())
+        check("--ref on the same rename also measures delta 0", rc_ref_rename, 0)
+        check("... with no added row", ref_rename["added"], [])
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -3082,12 +3179,16 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
         if f.get("rule") == 2 and f.get("symbol"):
             base_symbols.setdefault(f["file"], set()).add(f["symbol"])
     base_gaps = unresolved_declarations_at_ref(root, base, pairs, base_ownership)
+    # the renames between the base and the branch, base-path -> branch-path: the whole-tree header walks
+    # read the *base* side, so a renamed header must be keyed by the path the branch spells (a rename alone
+    # is not an addition), exactly as `--diff` does it.
+    rename = renames_of(pairs)
     before = merge_counts(
         rule_counts(base_findings),
         rule1_counts_at_ref(root, base, pairs),
-        header_pragma_counts_at_ref(root, base),
-        header_rule11_counts_at_ref(root, base),
-        header_rule12_counts_at_ref(root, base, base_ownership))
+        header_pragma_counts_at_ref(root, base, rename),
+        header_rule11_counts_at_ref(root, base, rename),
+        header_rule12_counts_at_ref(root, base, base_ownership, rename))
     touched = findings_of_ref(root, branch, pairs, after_ownership)
     after_sources = sources_of_ref(root, branch, pairs)
     freed_gaps = {src.rel: base_gaps.get(src.rel, set()) - unresolved_declarations(src, after_ownership)
@@ -3165,13 +3266,18 @@ def main(argv: list[str] | None = None) -> int:
             # renamed, so using it here turned every rename into a batch of phantom rule-2 additions.
             base_ownership = load_ownership_at_ref(root, args.diff) or ownership
             base_findings = findings_at_ref(root, args.diff, pairs, base_ownership)
+            # the renames in this batch, ref-path -> now-path: the whole-tree header walks below read the
+            # *ref* tree, so without this a header renamed by the batch keys its existing finding under the
+            # old path and `diff_deltas` reads it as an addition (rule 11's six on one rename, rule 12's
+            # one) even though the per-file walks already key by the new path.
+            rename = renames_of(pairs)
             before = merge_counts(
                 rule_counts(base_findings),
                 rule1_counts_at_ref(root, args.diff, pairs),
-                header_pragma_counts_at_ref(root, args.diff),
-                header_rule11_counts_at_ref(root, args.diff),
+                header_pragma_counts_at_ref(root, args.diff, rename),
+                header_rule11_counts_at_ref(root, args.diff, rename),
                 header_rule12_counts_at_ref(root, args.diff,
-                                            load_ownership_at_ref(root, args.diff) or ownership))
+                                            load_ownership_at_ref(root, args.diff) or ownership, rename))
             # the base copy's rule-2 symbols, so a credit can only ever touch a name that is *new* to the
             # file: one it already declared is part of `before`, never one of the batch's additions
             base_symbols: dict = {}

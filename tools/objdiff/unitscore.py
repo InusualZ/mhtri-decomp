@@ -441,7 +441,11 @@ def summary_line(spec: Spec, measures: dict, rows: list[Row], shown: int,
     matched = sum(1 for r in rows if r.percent >= 100.0)
     unscored = sum(1 for r in rows if not r.scored)
     total_code = measures.get("total_code")
-    matched_code = measures.get("matched_code")
+    # `matched_code` can be absent (None) while `total_code` is present: the report gives a unit with one
+    # partial function `total_code` but no `matched_code` (measured on Network/NetworkSessionManagerPat,
+    # one row at 93.14 %), and `None * 100.0` is a TypeError. The absent count reads as 0, exactly the way
+    # an absent `fuzzy_match_percent` reads as 0 % in `rows_of`.
+    matched_code = measures.get("matched_code") or 0
     parts = ["%d symbol(s): %d at 100.00 %%, %d open" % (len(rows), matched, len(rows) - matched)]
     if unscored:
         parts.append("%d row(s) carry no score in the report - an absent `fuzzy_match_percent` is 0 %%, "

@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import os
 import struct
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -482,12 +483,92 @@ def selftest() -> int:
     # -- violation_keys: the `--diff` comparison's unit -------------------------------------------------
     check("violation_keys names a run and an own-range assignment distinctly",
           va.violation_keys({"violations": [{"unit": "u.cpp", "section": ".data",
-                                              "address": 0x80050000}],
+                                              "address": 0x80050000, "words": 2}],
                              "references": [{"file": "src/u.cpp", "line": 3,
-                                             "symbol": "X", "kind": "own"},
+                                             "symbol": "X", "kind": "own", "unit": "u"},
                                             {"file": "src/u.cpp", "line": 4,
-                                             "symbol": "Y", "kind": "external"}]}),
-          ["ref:src/u.cpp:3:X", "run:u.cpp:.data:80050000"])
+                                             "symbol": "Y", "kind": "external", "unit": "u"}]}),
+          ["ref:src/u.cpp:3:X", "run:.data:80050000"])
+
+    # -- a rename must produce delta 0 (the incident `--diff` exists for) ---------------------------
+    # plan §12 re-homes a placeholder-path unit routinely (`fn_80429B94.cpp` ->
+    # `Network/network_pat_control.cpp`), and `--diff` reported "17 before, 17 after, 7 added" for a pure
+    # rename because the run key carried the unit name.  The run key is the range now, which a rename keeps
+    # (an address is unique in the DOL); the `ref:` key's file is translated through the rename map.
+    run_before = {"violations": [{"unit": "fn_80429B94.cpp", "section": ".data",
+                                  "address": 0x806038E8, "words": 5}],
+                  "references": [{"file": "src/fn_80429B94.cpp", "line": 9, "symbol": "lbl_80594A18",
+                                  "kind": "own", "unit": "fn_80429B94.cpp"}]}
+    run_after = {"violations": [{"unit": "Network/network_pat_control.cpp", "section": ".data",
+                                 "address": 0x806038E8, "words": 5}],
+                 "references": [{"file": "src/Network/network_pat_control.cpp", "line": 9,
+                                 "symbol": "lbl_80594A18", "kind": "own",
+                                 "unit": "Network/network_pat_control.cpp"}]}
+    rename = {"fn_80429B94.cpp": "Network/network_pat_control.cpp",
+              "src/fn_80429B94.cpp": "src/Network/network_pat_control.cpp"}
+    check("a renamed unit's runs and own-range refs measure delta 0",
+          sorted(set(va.violation_keys(run_after)) - set(va.violation_keys(run_before, rename))), [])
+    check("... because the run key is the range, not the unit",
+          va.violation_keys(run_before, rename), va.violation_keys(run_after))
+    check("... and a `ref:` without the translation is the one that would read as an addition",
+          sorted(set(va.violation_keys(run_after)) - set(va.violation_keys(run_before))),
+          ["ref:src/Network/network_pat_control.cpp:9:lbl_80594A18"])
+
+    # -- rename_map: the ref path -> the path the working tree now spells ---------------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        def rmg(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+        rmg("init", "-q")
+        os.makedirs(os.path.join(tmp, "src", "old"))
+        with open(os.path.join(tmp, "src", "old", "unit.cpp"), "w", encoding="utf-8") as fh:
+            fh.write("int x;\n")
+        rmg("add", "-A")
+        rmg("commit", "-q", "-m", "base")
+        base_ref = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace").stdout.strip()
+        os.makedirs(os.path.join(tmp, "src", "new"))
+        os.rename(os.path.join(tmp, "src", "old", "unit.cpp"),
+                  os.path.join(tmp, "src", "new", "unit.cpp"))
+        rmg("add", "-A")
+        rmg("commit", "-q", "-m", "re-home the unit")
+        check("rename_map reads a committed `git mv` (what `--diff <base>` sees)",
+              va.rename_map(tmp, base_ref), {"src/old/unit.cpp": "src/new/unit.cpp"})
+        check("... and an unchanged tree maps nothing",
+              va.rename_map(tmp, "HEAD"), {})
+
+    # -- `--at`: one vtable out of the DOL, with each target's owner ---------------------------------
+    # The census a lane hand-built twice (114 slots, 62 wrong) - the mode exists so it is never built by
+    # hand again.  The fixture's DOL is the table one, so the slots are real DOL words.
+    with tempfile.TemporaryDirectory() as tmp:
+        make_tree(tmp)
+        with open(os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol"), "wb") as fh:
+            fh.write(table_dol())
+        at_tree = va.load_tree(tmp)
+        slots = va.vtable_slots(at_tree, 0x80050000)
+        check("--at reads the table's slots out of the DOL",
+              [(s["address"], s["target"]) for s in slots],
+              [(0x80050000, 0x80004000), (0x80050004, 0x80004010)])
+        check("... with each target's OWNER, by address not by name",
+              [s["owner"] for s in slots], ["t/unit.cpp", "t/unit.cpp"])
+        check("... and the symbol the map names at it",
+              [s["symbol"] for s in slots], ["fn_80004000", "fn_80004010"])
+        check("... stopping at the data section's end (a non-code word ends the table)", len(slots), 2)
+        check("--at names the reference object's relocation for each slot (dossier.parse_elf)",
+              va.reference_slots(tmp, at_tree, 0x80050000, len(slots)),
+              {0: "fn_80004000", 1: "fn_80004010"})
+        check("a lone code word is not a table", va.vtable_slots(at_tree, 0x80050004), [])
+        check("a word outside the DOL's sections is not a table", va.vtable_slots(at_tree, 0x80060000), [])
+        tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vtableaudit.py")
+        p = subprocess.run([sys.executable, tool, "--main", tmp, "--at", "0x80050000"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        check("--at on the CLI lists the slots and exits 0",
+              (p.returncode, "+0x000" in p.stdout and "t/unit.cpp" in p.stdout), (0, True))
+        p = subprocess.run([sys.executable, tool, "--main", tmp, "--at", "0x80060000"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        check("--at with no table there exits 2 and says so",
+              (p.returncode, "no vtable there" in p.stdout), (2, True))
 
     # -- end to end, over the fixture tree ------------------------------------------------------
     with tempfile.TemporaryDirectory() as tmp:

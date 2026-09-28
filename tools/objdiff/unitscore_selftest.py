@@ -136,7 +136,11 @@ class Fixture:
 def check(name, got, want, fails):
     if got == want:
         print("ok    " + name)
-        return 0
+        # `fails`, not 0: returning 0 here reset the accumulator, so a single earlier failure was wiped by
+        # the next passing check and the selftest printed "ok" and exited 0 with a real failure in its log.
+        # (The same latent bug is in symdiff_selftest.py; this file needs the honest count for its new
+        # `matched_code` check to be able to fail.)
+        return fails
     print("FAIL  %s\n        got:  %r\n        want: %r" % (name, got, want))
     return fails + 1
 
@@ -321,6 +325,19 @@ def selftest() -> int:
         fails = check("... and marks it unscored", [r.scored for r in rows], [False, True, True], fails)
         fails = check("below() filters strictly", [r.name for r in us.below(rows, 50.0)], ["a"], fails)
         fails = check("below(None) is everything", len(us.below(rows, None)), 3, fails)
+        # a unit the report gives `total_code` but no `matched_code`: `measures_of` reads it as None (the
+        # key is absent, exactly as `fuzzy_match_percent` is), and the summary must read the absent count
+        # as 0 instead of multiplying `None` by 100.0. Measured on Network/NetworkSessionManagerPat (one
+        # partial function at 93.14 %): `summary_line` raised `TypeError: unsupported operand type(s) for
+        # *: 'float' and 'NoneType'` and the whole tool died.
+        no_matched = us.measures_of({"measures": {"total_code": 52, "total_functions": 1,
+                                                   "matched_functions": 0}})
+        try:
+            summary = us.summary_line(None, no_matched, rows, len(rows), None)
+        except TypeError as exc:                       # the pre-fix shape, named instead of a traceback
+            summary = "TypeError: %s" % exc
+        fails = check("summary_line: a missing matched_code reads as 0, not a TypeError",
+                      "code 0/52 B" in summary, True, fails)
         fails = check("freshness: an equal stamp is current",
                       us.freshness(True, 10.0, 10.0, ("s.c", 10.0), "r.json", "o.o"), [], fails)
         fails = check("freshness: one second older is stale",
@@ -356,7 +373,7 @@ def selftest() -> int:
     if fails:
         print("FAIL (%d)" % fails)
         return 1
-    print("ok - 73 checks")
+    print("ok - 74 checks")
     return 0
 
 
