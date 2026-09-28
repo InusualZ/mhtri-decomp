@@ -5,10 +5,30 @@ unit's `splits.txt` entry claims - same size, same alignment. Comparing against 
 enough: dtk's split object is itself incomplete (a unit can claim extab/extabindex/data ranges that no single
 object in the build emits), which is how a byte-identical object still scrambles main.dol.
 
+**What a refusal says, and what the three classes are.** The `   - ` lines are the reasons a flip would
+break the DOL, and they are *add-only*: lanes and the profiles parse them, so no wording here is ever
+rewritten. Three of them carry a class a lane has to tell apart:
+
+* `no compiled object (build/RMHE08/src/<unit>.o) - compile it first` means the object is absent. When the
+  object **is** there but emits none of the sections this check compares (a bodyless unit whose object is
+  `.comment` and nothing else - `NHTTP/NHTTP_os_RVL`), the line says exactly that and names what `splits.txt`
+  claims instead, because the old wording sent lanes into a rebuild loop (`ninja -n` answers "no work to
+  do").
+* A section byte difference prints the **first** differing byte on its own line (unchanged), then the
+  **differing-byte count**, then - when the two sections are the same size and every symbol's bytes match at
+  its *own* address - names the section a **permutation**: the object's layout is the source's definition
+  order, not the address order. That class (`Network/NetworkPat`: 577 of 720 `.text` bytes mislaid, every
+  per-symbol score at 100 %) is invisible to the first-byte line, which reads the same as a three-instruction
+  residual.
+* Referenced symbol(s) our object relocates that a flip would leave **undefined**: not defined by our object,
+  no row in `symbols.txt`, no link input other than the target object providing them, and the target object
+  not defining them either (`Network/NetworkWiiMediator`: four constructor names, `undefined: '<name>'` on a
+  flip). This is the general relocation half of a flip check, not just the `@etb_`/`@eti_` fragment class.
+
 Usage:
     python tools/units/flipcheck.py                 # every registered unit
     python tools/units/flipcheck.py <unit> [...]    # named units
-    python tools/units/flipcheck.py --selftest      # the `.comment` check, against fixtures only
+    python tools/units/flipcheck.py --selftest      # the link/byte/claim checks, against fixtures only
 Exit status is non-zero when any unit is not flip-ready.
 """
 from __future__ import annotations
@@ -26,6 +46,8 @@ SPLITS = os.path.join(MAIN, "config", "RMHE08", "splits.txt")
 SRC = os.path.join(MAIN, "build", "RMHE08", "src")
 # the link's input list - the only objects a link-wide symbol/reference check may read (see `link_inputs`)
 NINJA = os.path.join(MAIN, "build.ninja")
+# the symbol map: a name with a row here is a definition the project has, whatever object emits it
+SYMBOLS = os.path.join(MAIN, "config", "RMHE08", "symbols.txt")
 
 # the unit spelling rule has exactly one definition (`claims.norm_unit`), so `flipcheck.py runtime.c` and
 # `flipcheck.py runtime` name the same unit and the same object (aliased: `claims` is a local function here)
@@ -62,6 +84,27 @@ def sections(path: str) -> dict[str, tuple[int, int]]:
         if m and not m.group(1).startswith(IGNORE):
             res[m.group(1)] = (int(m.group(2), 16), int(m.group(3)))
     return res
+
+
+def emitted_sections(path: str) -> list[str]:
+    """Every section name the object carries, ignored ones included, in section-header order."""
+    return [n for n in elf_sections(path)[0] if n]
+
+
+def missing_or_empty_object(unit: str, src_path: str, claim: dict[str, tuple[int, int]]) -> list[str]:
+    """Why there is nothing to check: the object is absent, or it exists and emits nothing comparable.
+
+    `sections()` returns `{}` for both, and the two must not read the same. A lane told "compile it first"
+    for an object that exists - a bodyless unit whose object is `.comment` and nothing else
+    (`NHTTP/NHTTP_os_RVL`, and `ninja -n` answers "no work to do") - rebuilds in a loop and stays stuck.
+    The empty case says what it is and what the claim needs.
+    """
+    if not os.path.exists(src_path):
+        return ["no compiled object (build/RMHE08/src/%s.o) - compile it first" % unit]
+    claim_txt = ", ".join("%s 0x%X" % (n, size) for n, (size, _align) in sorted(claim.items())) or "no section"
+    return ["the object (build/RMHE08/src/%s.o) exists but emits none of the sections this check compares "
+            "(only %s): splits.txt claims %s, which a rebuild cannot supply (`ninja -n` reports no work to do)"
+            % (unit, ", ".join(emitted_sections(src_path)) or "no section at all", claim_txt)]
 
 
 def claims() -> dict[str, dict[str, tuple[int, int]]]:
@@ -103,6 +146,87 @@ def raw_section(path: str, name: str) -> bytes | None:
     return data
 
 
+def differing_bytes(mine: bytes, tgt: bytes) -> int:
+    """How many bytes the two sections differ by; a length difference counts its extra bytes."""
+    shared = min(len(mine), len(tgt))
+    return sum(1 for i in range(shared) if mine[i] != tgt[i]) + abs(len(mine) - len(tgt))
+
+
+def section_symbols(path: str, name: str) -> dict[str, tuple[int, int]]:
+    """{symbol name: (offset in the section, size)} for the symbols defined in section `name`."""
+    order, secs = elf_sections(path)
+    symtab = secs.get(".symtab")
+    strtab = secs.get(".strtab")
+    if symtab is None or strtab is None:
+        return {}
+    out: dict[str, tuple[int, int]] = {}
+    for i in range(len(symtab) // 16):
+        sname, value, size, _info, _other, shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
+        if not sname or shndx >= len(order) or order[shndx] != name:
+            continue
+        end = strtab.find(b"\0", sname) if sname < len(strtab) else -1
+        if end == -1:
+            continue
+        out[strtab[sname:end].decode("latin1")] = (value, size)
+    return out
+
+
+def mislaid_layout(mine: bytes, tgt: bytes, ours_path: str, obj_path: str, name: str):
+    """(symbols compared, differing bytes) when two same-sized sections hold the same symbols mislaid.
+
+    A **permutation** - the object's layout is the source's definition order and not the address order -
+    is the one defect no per-symbol score can see: every symbol carries the original's bytes at its own
+    address, the section sizes agree, and the section still differs (`Network/NetworkPat`: 99.83 % with
+    twelve symbols at 100 %, 577 of 720 `.text` bytes mislaid). `NetworkPat`'s first-differing-byte line
+    reads exactly like a three-instruction residual, so the class has to be named.
+
+    Returns None unless that is what this is: equal sizes, at least two symbols defined in the section on
+    both sides, every one of them identical at its own address, and at least one of them at a *different*
+    address. The last condition is what separates a permutation from a section whose differences sit outside
+    every symbol (a differing alignment pad between unmoved functions) - a refusal there would be a false
+    alarm, and a false alarm here misleads the whole flip campaign.
+    """
+    if len(mine) != len(tgt) or not mine:
+        return None
+    ours = section_symbols(ours_path, name)
+    theirs = section_symbols(obj_path, name)
+    compared, moved = 0, False
+    for sym in sorted(set(ours) & set(theirs)):
+        o_off, o_size = ours[sym]
+        t_off, t_size = theirs[sym]
+        if o_size == 0 and t_size == 0:
+            continue                       # a 0-size label has no bytes to compare
+        if o_size != t_size or o_off + o_size > len(mine) or t_off + t_size > len(tgt):
+            return None                    # a differently-sized or out-of-range symbol is not a permutation
+        if mine[o_off:o_off + o_size] != tgt[t_off:t_off + t_size]:
+            return None                    # this symbol's own bytes differ: a byte defect, not a layout one
+        compared += 1
+        moved = moved or o_off != t_off
+    if compared < 2 or not moved:
+        return None
+    return compared, differing_bytes(mine, tgt)
+
+
+def section_byte_problems(name: str, mine: bytes, tgt: bytes, ours_path: str,
+                          obj_path: str) -> list[str]:
+    """The byte-level refusal lines for one section: the first difference, the count, the permutation."""
+    at = next((i for i in range(min(len(mine), len(tgt))) if mine[i] != tgt[i]), min(len(mine), len(tgt)))
+    span = max(len(mine), len(tgt))
+    problems = ["%s: bytes differ from the target object at +0x%X (ours %02x, target %02x) - "
+                "the object is not the original's code"
+                % (name, at, mine[at] if at < len(mine) else 0, tgt[at] if at < len(tgt) else 0),
+                "%s: %d of %d bytes differ from the target object"
+                % (name, differing_bytes(mine, tgt), span)]
+    perm = mislaid_layout(mine, tgt, ours_path, obj_path, name)
+    if perm is not None:
+        problems.append("%s: the section is a permutation - every one of the %d symbol(s) defined in it has "
+                        "its original bytes at its own address and the sizes agree, but the object's layout "
+                        "is the source's definition order, not the address order; order (or forward-declare) "
+                        "the source so the layout matches (%d of %d bytes mislaid)"
+                        % (name, perm[0], perm[1], span))
+    return problems
+
+
 # Row 36 (docs/matching.md): `dol split` writes the target objects with `export_all: true`, which stamps
 # `active_flags=0x08` (force-active / export) on every entry of the `.comment` symbol table, while MWCC writes
 # 0x00. The linker honours the flag, so a symbol the target exports and our object does not - *and that
@@ -120,6 +244,12 @@ BOOKKEEPING_SECTIONS = ("extab", "extabindex")
 # A symbol defined in one of these is fragment/metadata data, not trimmable code.
 FRAGMENT_PREFIXES = ("extab", "extabindex", ".ctors", ".dtors")
 LDSCRIPT = os.path.join(MAIN, "build", "RMHE08", "ldscript.lcf")
+# an lcf assignment (`_stack_addr = _stack_end + 0x10000;`) defines a symbol the *linker* supplies: no
+# object emits it, so a reference to it is not a flip blocker.
+LINKER_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*=")
+# mwldeppc defines the EABI small-data base symbols itself, and no object and no symbols.txt row carries
+# them (`Runtime.PPCEABI.H/__start` references both).
+EABI_LINKER_SYMBOLS = ("_SDA_BASE_", "_SDA2_BASE_")
 # mwldeppc's default entry symbol: the linker roots it, but it is not in FORCEACTIVE and no object relocates it.
 ENTRY_SYMBOLS = ("__start",)
 
@@ -283,6 +413,35 @@ def link_inputs() -> list[str] | None:
     return None
 
 
+def linker_assigned(path: str | None = None) -> set[str]:
+    """Names the linker script defines itself (`_stack_addr = ...;`): the link supplies them, no object does."""
+    path = LDSCRIPT if path is None else path
+    if not os.path.exists(path):
+        return set()
+    out: set[str] = set()
+    for line in open(path, encoding="utf-8", errors="replace"):
+        m = LINKER_ASSIGN_RE.match(line)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def map_symbols(path: str | None = None) -> set[str]:
+    """The symbol names `config/RMHE08/symbols.txt` carries a row for (the map's definition of a name)."""
+    path = SYMBOLS if path is None else path
+    if not os.path.exists(path):
+        return set()
+    out: set[str] = set()
+    for line in open(path, encoding="utf-8", errors="replace"):
+        text = line.strip()
+        if not text or text.startswith(("#", "//")):
+            continue
+        name = text.split("=", 1)[0].strip()
+        if name:
+            out.add(name)
+    return out
+
+
 def link_reference_context() -> dict | None:
     """{refs by path, reference count per name, provider paths per name} over the link inputs only."""
     paths = link_inputs()
@@ -300,6 +459,60 @@ def link_reference_context() -> dict | None:
             if info >> 4 in (GLOBAL_BINDING, WEAK_BINDING):
                 providers.setdefault(name, set()).add(rel)
     return {"refs": refs, "ref_count": ref_count, "providers": providers}
+
+
+def undefined_reference_problems(unit: str, target_rel: str, obj_path: str, src_path: str,
+                                 link_ctx: dict, map_rows: set[str]) -> list[str]:
+    """The names our object relocates that the link would answer `undefined:` for once the flip lands.
+
+    Every name our object references must be defined by our object, carry a row in `symbols.txt`, or be
+    provided by a link input **other than the target object**: a flip replaces the target object, so only
+    the other inputs survive. `Network/NetworkWiiMediator` is the measured case - four constructor names
+    (`__ct__12PatInterfaceFv`, ...) with no map row and no provider anywhere; the target object does not
+    reference them either, so the flip would be the first to reference them and the link would fail with
+    `undefined: '__ct__12PatInterfaceFv'`.
+
+    Two cases are deliberately left alone, because flagging them would be the false alarm that misleads a
+    whole flip campaign: a name the *target* object references too but does not define (the reference is
+    already in the link, unresolved - this is how the linker script's `_f_text`/`_stack_addr` and the EABI
+    `_SDA_BASE_` pass through), and a name no input provides that another input already references (the
+    link resolves it or is already broken; the flip adds no provider either way). Names the linker script
+    defines itself (`linker_assigned`) and the EABI base symbols are exempt outright.
+
+    `target_rel` is the target object's MAIN-relative path (the key into `link_ctx`); `obj_path` is the
+    target object itself; `map_rows` is `map_symbols()`.
+    """
+    referenced, defined = object_symbols(src_path)
+    target_refs = link_ctx["refs"].get(target_rel, set())
+    target_defined = object_symbols(obj_path)[1]
+    ref_count, providers = link_ctx["ref_count"], link_ctx["providers"]
+    known = map_rows | linker_assigned() | set(EABI_LINKER_SYMBOLS)
+    hits = []
+    for name in sorted(referenced):
+        if name in defined or name in known:
+            continue                        # our object defines it, or the map does
+        if providers.get(name, set()) - {target_rel}:
+            continue                        # another link input defines it, so the link still resolves
+        if name in target_refs and not provides_global(target_defined, name):
+            continue                        # the target only references it too: already unresolved
+        if not providers.get(name) and ref_count.get(name, 0) > 0:
+            continue                        # no input defines it, but the link already references it
+        hits.append(name)
+    if not hits:
+        return []
+    line = ("%s: %d referenced symbol(s) are defined by nothing a flip can use - %s - our object does not "
+            "define them, `symbols.txt` carries no row and no link input other than the target object "
+            "provides them, so the link answers `undefined: '%s'`"
+            % (unit, len(hits), ", ".join(hits), hits[0]))
+    variants = []
+    for name in hits:
+        near = sorted(x for x in target_refs if x.startswith(name) and x != name)
+        if len(near) == 1:
+            variants.append("%s -> `%s`" % (name, near[0]))
+    if variants:
+        line += " (the target object references the differently-spelled %s - match the map's spelling)" \
+                % ", ".join(variants)
+    return [line]
 
 
 def external_map_symbol_notes(unit: str, target_rel: str, src_path: str, self_refs: set[str],
@@ -384,10 +597,13 @@ def comment_trim_risks(unit: str, obj_path: str, src_path: str,
 
 
 def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
-          link_ctx: dict | None = None) -> tuple[list[str], list[str]]:
-    ours = sections(os.path.join(SRC, unit + ".o"))
+          link_ctx: dict | None = None, map_rows: set[str] | None = None) -> tuple[list[str], list[str]]:
+    src_path = os.path.join(SRC, unit + ".o")
+    target_rel = os.path.normpath(os.path.join("build", "RMHE08", "obj", unit + ".o"))
+    obj_path = os.path.join(MAIN, target_rel)
+    ours = sections(src_path)
     if not ours:
-        return ["no compiled object (build/RMHE08/src/%s.o) - compile it first" % unit], []
+        return missing_or_empty_object(unit, src_path, claim), []
     problems = []
     notes: list[str] = []
     for name, (size, _) in sorted(claim.items()):
@@ -409,24 +625,18 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
 
     # sizes and alignment matching is not enough: the bytes have to be the original's too.
     for name in sorted(set(ours) & set(claim)):
-        mine = raw_section(os.path.join(SRC, unit + ".o"), name)
-        tgt = raw_section(os.path.join(MAIN, "build", "RMHE08", "obj", unit + ".o"), name)
+        mine = raw_section(src_path, name)
+        tgt = raw_section(obj_path, name)
         if mine is None or tgt is None:
             continue
         if mine != tgt:
-            at = next((i for i in range(min(len(mine), len(tgt))) if mine[i] != tgt[i]),
-                      min(len(mine), len(tgt)))
-            problems.append("%s: bytes differ from the target object at +0x%X (ours %02x, target %02x) - "
-                            "the object is not the original's code"
-                            % (name, at, mine[at] if at < len(mine) else 0, tgt[at] if at < len(tgt) else 0))
+            problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
     flag_problems, checked, compared = ([], 0, False)
     if refs is not None:
-        flag_problems, checked, compared = comment_trim_risks(
-            unit, os.path.join(MAIN, "build", "RMHE08", "obj", unit + ".o"),
-            os.path.join(SRC, unit + ".o"), refs)
+        flag_problems, checked, compared = comment_trim_risks(unit, obj_path, src_path, refs)
     problems += flag_problems
     if compared and not flag_problems:
         notes.append(".comment: no un-exported symbol at deadstrip risk (row 36, %d target-exported symbol(s) "
@@ -435,12 +645,16 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     # a flip can only provide what our object defines: a map symbol another linked object references, that
     # only the target object defines, used to be a hard link break (the resfile-flip class).  The build's
     # extab/extabindex rename step (tools/elf/objextab.py) now provides those names, so this is a note.
-    target_rel = os.path.normpath(os.path.join("build", "RMHE08", "obj", unit + ".o"))
     if link_ctx is not None:
         if target_rel in link_ctx["refs"]:
             notes += external_map_symbol_notes(
-                unit, target_rel, os.path.join(SRC, unit + ".o"),
+                unit, target_rel, src_path,
                 link_ctx["refs"].get(target_rel, set()), link_ctx["ref_count"], link_ctx["providers"])
+            # the general relocation half: only a *flip* can break a reference, so this runs where the
+            # target object is still a link input (a matched unit is already carrying our object).
+            problems += undefined_reference_problems(
+                unit, target_rel, obj_path, src_path, link_ctx,
+                map_symbols() if map_rows is None else map_rows)
         else:
             notes.append("already Object(Matching) - %s is not a link input, so there is no flip to check"
                          % target_rel.replace(os.sep, "/"))
@@ -463,8 +677,10 @@ def main() -> int:
     link_ctx = link_reference_context()
     if link_ctx is not None:
         refs = set(link_ctx["ref_count"]) | forced_active() | set(ENTRY_SYMBOLS)
+        map_rows = map_symbols()
     else:
         refs = None
+        map_rows = set()
 
     all_claims = claims()
     if args.units:
@@ -487,7 +703,7 @@ def main() -> int:
 
     bad = 0
     for unit, claim in sorted(wanted.items()):
-        problems, notes = check(unit, claim, refs, link_ctx)
+        problems, notes = check(unit, claim, refs, link_ctx, map_rows)
         if problems:
             bad += 1
             print("NOT READY  %s" % unit)
