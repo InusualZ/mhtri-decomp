@@ -27,6 +27,7 @@ on (docs/plan.md 5.1).
     python tools/units/slots.py acquire <unit> [--slot N] [--worker NAME] [--force] [--dry-run]
     python tools/units/slots.py spawn --kind KIND [--slot N] [--unit U] [--task-file PATH] [--json]
     python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
+    python tools/units/slots.py reclaim [--slot N | --unit U | --branch B] [--json]
     python tools/units/slots.py status [--json]
     python tools/units/slots.py verify [--slot N] [--json]
     python tools/units/slots.py shadow <slot> <dir> [--seed-build] [--force]
@@ -82,6 +83,26 @@ costing a full `rm -rf build/RMHE08` rebuild):
   pending count.  A ninja that cannot run is reported as *unknown*, never silently as 0.
 * **release** returns the slot to main's tip, keeps the warm trees, deletes the branch (rescue-ref first, as
   `claims.release` does) and refreshes the build tree so the next acquire is instant.
+* **reclaim** turns "the slot still holds a **landed** branch" from a hand dance into one step.  A branch
+  whose content is already in main is not work in progress, so `spawn`/`acquire` test it with the campaign's
+  own free test (`git merge-tree --write-tree main <branch>` vs `git rev-parse main^{tree}` - equal means
+  fully applied, the same test the held-branch audit uses) and, when it is applied, park the rescue ref
+  (`refs/rescue/<slug>`) **first**, then detach the worktree, delete the branch, release the slot and take
+  it - printing one line saying what it did and why.  The test compares **trees, not commits**, so the one
+  rule covers both routes: a gate-landed branch stays ahead of main by its own commits but its tree equals
+  main's, and the direct path-limited landing does the same.  An **unlanded** branch keeps today's refusal
+  verbatim, and a test that cannot run or is ambiguous **refuses** (fail closed) rather than reclaim: the
+  refusal is load-bearing.  The marker is not the signal: a slot whose `.used` is **MISSING** but whose
+  branch is proven applied is reclaimable (a crash remnant), while the same missing marker next to an
+  unlanded branch still refuses.  `python tools/units/slots.py reclaim [--slot N | --unit U | --branch B]`
+  runs the same step by name so the orchestrator (or the next lane) can do it deliberately instead of by hand.
+* **the cap is `pool.json`'s `count`** (`pool_size`), **not** a count of slot directories: a slot whose worktree
+  is missing or broken is still a slot.  `status`/`capacity_error` enumerate every one and say per slot *why*
+  it is not usable - `no worktree` / `branch` / `claimed` / `debris`, plus a `missing record` or
+  `stale record: its base predates main` note with the remedy - so a full pool can never read as a phantom
+  shortage.  A bulk `init --force` **refuses while any slot holds live work** (the pool is the campaign's
+  concurrency cap, not a scratch file), and `tools/selftest.py` guards `.pi/slots/pool.json` **by bytes**
+  (`.pi/` is gitignored) so no test run can shrink it.
 """
 
 from __future__ import annotations
@@ -388,8 +409,9 @@ def slot_dir(main: str, n: int) -> str:
 def slot_count(main: str) -> int:
     """How many slot directories exist right now (0 means the pool is not initialised).
 
-    The pool size is persisted by `init` (`.pi/slots/pool.json`) so an `init --count N` that is not the
-    default is seen by every later call; with no manifest the default six is assumed.
+    The manifest's `count` bounds the scan; with no manifest the default six is assumed.  This is the
+    *presence* reading (`enabled`); the **cap** is `pool_size`, which is the manifest's own count - see the
+    note there for why counting directories is the wrong authority.
     """
     count = pool_manifest(main).get("count")
     if not isinstance(count, int) or count < 1:
@@ -400,6 +422,22 @@ def slot_count(main: str) -> int:
         if os.path.isdir(d) and os.path.exists(os.path.join(d, ".git")):
             n += 1
     return n
+
+
+def pool_size(main: str) -> int:
+    """The pool's SIZE: `pool.json`'s `count` - the **authority** for the cap - or 0 with no manifest.
+
+    The cap is a persisted fact `init` wrote, **not** a count of directories that happen to exist right
+    now.  Counting directories (the old `all_slots` range) let one broken slot shrink the whole pool: slot
+    2's worktree was gone, so a full pool of 6 enumerated as `slots 1..5`, silently dropping slot 6 - a
+    live lane - and the refusal then read like a pool shortage instead of one slot needing a reset.  Every
+    slot in the manifest is enumerated, and `status` says per slot *why* it is not usable.
+    """
+    count = pool_manifest(main).get("count")
+    if isinstance(count, int) and count >= 1:
+        return count
+    # No manifest: the pool is not initialised, but any slot dirs that were made by hand still enumerate.
+    return slot_count(main)
 
 
 def enabled(main: str) -> bool:
@@ -620,74 +658,166 @@ def lock_stale(main: str, n: int, lock: dict | None = None) -> bool:
     return slot_attached_branch(slot_dir(main, n)) != branch
 
 
-def slot_state(main: str, n: int, runs: list | None = None) -> dict:
+def slot_of_path(main: str, path: str | None) -> int | None:
+    """The slot number `path` resolves to, or None - a legacy registry row may carry only a `worktree`."""
+    if not path:
+        return None
+    want = os.path.normcase(os.path.realpath(path))
+    for n in range(1, pool_size(main) + 1):
+        if os.path.normcase(os.path.realpath(slot_dir(main, n))) == want:
+            return n
+    return None
+
+
+def registry_claims_by_slot(main: str) -> tuple[dict, bool]:
+    """`(claims keyed by slot number, readable)` from the **claim registry** (`.pi/claims.json`).
+
+    The claim registry is the authority for liveness: it records the unit, branch, worker and **slot** a
+    claimant holds, and a `claims.py claim`/`release` pair keeps it in step.  The per-slot JSON lock
+    (`.pi/slots/<n>.json`) is a convenience copy that a partial teardown can leave behind, so this reading is
+    what decides "is somebody's work in this slot" - and it is read here, once, for every row.
+
+    An **absent** file means "no claims" and is readable.  A file that exists but cannot be parsed (or is not
+    a JSON object) is **not readable** (`readable=False`), and a caller that would hand a slot out or reclaim
+    one must refuse rather than guess.  A row is keyed by ITS slot number; a legacy row that carries only a
+    `worktree` is matched by resolving that path to a slot directory (`slot_of_path`).
+    """
+    path = _claims().registry_path(main)
+    if not os.path.exists(path):
+        return {}, True
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}, False
+    if not isinstance(data, dict):
+        return {}, False
+    by_slot: dict = {}
+    for unit, rec in data.items():
+        if not isinstance(rec, dict):
+            continue
+        n = rec.get("slot")
+        if not isinstance(n, int):
+            n = slot_of_path(main, rec.get("worktree"))
+        if n is None or n in by_slot:
+            continue
+        by_slot[n] = dict(rec, unit=rec.get("unit") or unit)
+    return by_slot, True
+
+
+def slot_state(main: str, n: int, runs: list | None = None, claims_by_slot: dict | None = None) -> dict:
     """One slot's row: whether it exists, what it has checked out, its `.used` marker and whether it is free.
 
-    **`free`/`used` is read from two sources of the same fact, and both must agree that the slot is empty.**
-    The primary is the `.used` sentinel `acquire` creates and `release` removes; the second is the worktree
-    state - a slot whose worktree still has a branch checked out is **in use**, whatever any file says.  The
-    lock record is a convenience; the worktree is the truth.  Today the two disagreed (slot 2 was reported
-    `free` while its worktree held `worker/rule10-fix-14f8`), and that disagreement *was* the bug, so both
-    readings are kept.
+    **`free`/`used` is read from several sources of the same fact, and all must agree that the slot is
+    empty.**  The primary is the `.used` sentinel `acquire` creates and `release` removes; the second is the
+    worktree state - a slot whose worktree still has a branch checked out is **in use**; the third is the
+    **claim registry** (`.pi/claims.json`) and the per-slot lock record, which name a live claim even when the
+    sentinel has been lost.  The two disagreed in the wild (slot 2 was reported `free` while its worktree held
+    `worker/rule10-fix-14f8`), and that disagreement *was* the bug, so every reading is kept.
 
-    A **third** reading rides along and is the only one that can see a lane rather than a claim: `run`, the
-    RUNNING subagent run whose cwd is this slot (`runs_in_slot`).  A lane holds the slot even when the
-    sentinel, the lock and the worktree all say otherwise - the sentinel can be cleared and the worktree
-    detached by a release while the lane keeps working - so `status` reports it and `release_blockers`
-    refuses on it.
+    The row carries a one-word **`state`** so `status` can say *why* a slot is not free instead of a bare
+    `in use`:
 
-    A `.used` marker on a *detached* worktree with no live lock record is a crash remnant, not a live claim -
-    it is named reclaimable and the slot is free, so a crashed acquire can never wedge a slot.  It still
-    reports its OWNER label: a reclamable marker that names somebody is exactly what `acquire` refuses
+    * `free` / `no worktree`;
+    * `LIVE` - a RUNNING subagent run's cwd is the slot (the only reading that sees a *lane*);
+    * `claimed` - a live claim: a registry row names this slot, or a non-stale lock record does;
+    * `branch` - a branch is checked out and no live claim holds it (the reclaim/refusal decision);
+    * `debris` - a `.used` sentinel on a *detached* worktree with no live claim: a crash remnant.
+
+    `why` carries the actionable detail, and for a non-free slot it also names a bad **record** (`.pi/slots/<n>
+    .json`): `missing record` when a branch/sentinel exists with no record, `stale record: its base predates
+    main` when the record names a state the slot has left.  A missing or broken worktree is `no worktree`, and
+    the slot is still enumerated (the cap is `pool.json`'s `count`), so a full pool never reads as a shortage.
+
+    A `.used` marker on a *detached* worktree with no live claim is a crash remnant, not a lane - it is named
+    `debris`, the slot still reads **free** (so a crashed acquire can never wedge a slot) and `reclaim` clears
+    it.  It still reports its OWNER label: a marker that names somebody is exactly what `acquire` refuses
     (`marker_claim_conflict`) unless the takeover is meant.
 
-    `runs` is the already-resolved live-run list, so `all_slots` reads the registry once instead of once per
-    slot.
+    `runs` is the already-resolved live-run list and `claims_by_slot` the already-read registry, so `all_slots`
+    reads each once instead of once per slot.
     """
     d = slot_dir(main, n)
     exists = os.path.isdir(d) and os.path.exists(os.path.join(d, ".git"))
+    if claims_by_slot is None:
+        claims_by_slot, registry_ok = registry_claims_by_slot(main)
+    else:
+        registry_ok = True
+    claim = claims_by_slot.get(n)
     lock = read_lock(main, n)
     stale = lock_stale(main, n, lock) if lock else False
     live_lock = bool(lock and not stale)
     attached = slot_attached_branch(d) if exists else None
     marked = marker_present(d) if exists else False
     marker = marker_info(d) if marked else {}
-    marker_stale = marked and not attached and not live_lock
-    used = bool(attached) or (marked and not marker_stale)
+    live_claim = bool(claim) or live_lock
+    marker_stale = marked and not attached and not live_claim
+    used = bool(attached) or bool(claim) or live_lock or (marked and not marker_stale)
     free = exists and not used
     run = None
     if exists:
         runs = runs_in_slot(d) if runs is None else [r for r in runs if _same_tree(r.get("cwd"), d)]
         run = runs[0] if runs else None
-    owner = marker.get("owner") or (lock.get("worker") if lock else "") or ""
+    owner = marker.get("owner") or ((claim or {}).get("worker") if claim else "") \
+        or (lock.get("worker") if lock else "") or ""
     if not exists:
-        why = "no such slot directory"
+        state = "no worktree"
+        why = ("no worktree at %s (its directory or `.git` is missing) - re-create it (`slots.py init`) or "
+               "use another slot" % d)
     elif run:
-        why = "in use by a RUNNING subagent run %s" % run_label(run)
+        state, why = "LIVE", "in use by a RUNNING subagent run %s" % run_label(run)
+    elif claim:
+        state = "claimed"
+        why = "in use by a live claim: %s (%s, branch %s)" % (
+            claim.get("unit") or "?", claim.get("worker") or "?", claim.get("branch") or "?")
     elif live_lock:
-        why = "in use by %s (%s)" % (lock.get("unit") or "?", lock.get("worker") or "?")
+        state, why = "claimed", "in use by %s (%s)" % (lock.get("unit") or "?", lock.get("worker") or "?")
     elif attached:
-        why = "in use - holds branch %s (its `.used` marker is %s%s); release it first" % (
-            attached, "present" if marked else "MISSING",
-            ", owner %s" % owner if owner else "")
+        state = "branch"
+        why = "in use - holds branch %s (its `.used` marker is %s%s); release it first, or reclaim it if it " \
+              "is already landed: slots.py reclaim --slot %d" % (
+                  attached, "present" if marked else "MISSING",
+                  ", owner %s" % owner if owner else "", n)
     elif marked and not marker_stale:
+        state = "claimed"
         why = "used (`.used` marker present, worktree detached%s)" % (", owner %s" % owner if owner else "")
     elif marker_stale:
-        why = "stale `.used` marker on a detached worktree with no live lock - reclaimable%s" % (
-            "; it names owner %s" % owner if owner else "")
+        state = "debris"
+        why = ("debris: a `.used` marker on a detached worktree with no live claim - reclaimable%s"
+               % ("; it names owner %s" % owner if owner else ""))
     elif lock and stale:
-        why = "stale lock (%s) - reclaimable" % (lock.get("unit") or "?")
+        state, why = "free", "stale lock (%s) - reclaimable" % (lock.get("unit") or "?")
     else:
-        why = "free"
+        state, why = "free", "free"
+    # A bad per-slot RECORD is worth naming: it is the difference between "this slot is busy" and "this
+    # slot's bookkeeping is from a claim it has left".  `missing record` when a branch/sentinel exists with
+    # no `.pi/slots/<n>.json`; `stale record` when the record names a state the slot has left.
+    record_note = ""
+    if exists and (attached or marked) and not lock:
+        record_note = "missing record (no `.pi/slots/%d.json`) - reclaim --slot %d if it is landed, else release" \
+                      % (n, n)
+    elif exists and lock and stale:
+        record_note = ("stale record: it names branch %s (base %s) but the slot holds %s - `acquire --slot %d` "
+                       "resets it" % (lock.get("branch") or "?", (lock.get("base") or "?")[:9],
+                                       attached or "nothing", n))
+    if record_note and "free" not in why:
+        why = "%s; %s" % (why, record_note)
     return {"slot": n, "dir": d, "exists": exists, "attached": attached, "lock": lock, "stale": stale,
             "marked": marked, "marker": marker, "owner": owner, "marker_stale": marker_stale,
-            "used": used, "free": free, "run": run, "why": why}
+            "claim": claim, "live_claim": live_claim, "registry_ok": registry_ok, "state": state,
+            "record_note": record_note, "used": used, "free": free, "run": run, "why": why}
 
 
-def all_slots(main: str, runs: list | None = None) -> list[dict]:
-    """Every slot's row.  The registry is read **once** and handed to each row (`runs`)."""
+def all_slots(main: str, runs: list | None = None, claims_by_slot: dict | None = None) -> list[dict]:
+    """Every slot in the pool - the manifest's `count`, not the directories that happen to exist.
+
+    The run registry and the claim registry are each read **once** (`runs`, `claims_by_slot`).
+    """
     live = live_runs() if runs is None else runs
-    return [slot_state(main, n, runs=live) for n in range(1, slot_count(main) + 1)]
+    if claims_by_slot is None:
+        claims_by_slot, _ok = registry_claims_by_slot(main)
+    return [slot_state(main, n, runs=live, claims_by_slot=claims_by_slot)
+            for n in range(1, pool_size(main) + 1)]
 
 
 def free_slots(main: str) -> list[dict]:
@@ -983,8 +1113,20 @@ def init(main: str, count: int = DEFAULT_COUNT, force: bool = False, seed: bool 
     Idempotent: an existing slot is left alone unless `--force`, which removes and re-creates it.  Each new
     slot is a **detached** worktree, so it carries no branch; `seed_worktree_build` fills the warm tree
     (toolchain, `orig/`, `tools/m2c`, `build/RMHE08` and ninja state).
+
+    **The pool is not a scratch file.**  `--force` removes worktrees, so it **refuses while any slot in the
+    pool holds live work** - a branch checked out, a RUNNING lane, or a live claim - naming each one.  Only
+    that slot's own `release`/`reclaim` may touch it; a bulk repair must not delete four live lanes.
     """
     claims = _claims()
+    if force:
+        live = [s for s in all_slots(main)
+                if s.get("attached") or s.get("live_claim") or s.get("run") or s.get("marked")]
+        if live:
+            raise SystemExit("REFUSED init --force: %d slot(s) still hold live work - the pool is the "
+                             "campaign's concurrency cap, not a scratch file; release or reclaim each slot "
+                             "first:\n%s" % (len(live), "\n".join(
+                                 "  slot %d: %s" % (s["slot"], s["why"]) for s in live)))
     os.makedirs(locks_dir(main), exist_ok=True)
     with open(os.path.join(locks_dir(main), "pool.json"), "w", encoding="utf-8") as fh:
         json.dump({"count": count, "created_at": time.strftime("%Y-%m-%dT%H:%M:%S")}, fh, indent=1,
@@ -1101,9 +1243,248 @@ def shadow(main: str, slot: int, dest: str, seed_build: bool = False, force: boo
             "head": git(["rev-parse", "HEAD"], dest_abs)}
 
 
+# --- reclaim: a slot whose checked-out branch is already LANDED -----------------------------------
+
+#: The OID shape `git merge-tree --write-tree` prints first: the tree a merge would produce.
+_TREE_OID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+
+
+def _merge_tree_oid(returncode: int, stdout: str) -> str | None:
+    """`merge-tree`'s result tree OID, or **None** when the run cannot be read as one.
+
+    A nonzero exit is a **conflict** - the test never reached an answer - and a first line that is not a bare
+    hex OID is not a tree either.  Both are ambiguity, and the caller must refuse rather than guess.  Split
+    out as a pure function so the ambiguous cases can be pinned without a repository.
+    """
+    if returncode != 0:
+        return None
+    lines = (stdout or "").splitlines()
+    if not lines or not _TREE_OID.fullmatch(lines[0].strip().lower()):
+        return None
+    return lines[0].strip().lower()
+
+
+def merge_tree_of(main: str, ref: str) -> str | None:
+    """The tree `git merge-tree --write-tree main <ref>` computes, or None when the test cannot answer.
+
+    The free test the held-branch audit uses (AGENTS.md): it touches no worktree and no index, so it is safe
+    to run on a slot that is still checked out.  A conflict (nonzero exit) or anything unparseable is None.
+    """
+    p = subprocess.run(["git", "merge-tree", "--write-tree", "main", ref], cwd=main, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
+    return _merge_tree_oid(p.returncode, p.stdout)
+
+
+def branch_fully_applied(main: str, branch: str) -> bool | None:
+    """Whether `branch`'s **content** is already in main - the documented free test, fail closed.
+
+    `git merge-tree --write-tree main <branch>` merges in memory; when its result tree equals `main^{tree}`
+    the branch adds no content and is fully applied.  This is the campaign's own test (AGENTS.md, the
+    held-branch drain): `git diff main <b>` cannot decide it, because main has moved and an already-landed
+    branch shows a huge deletion diff and looks unlanded.
+
+    **It compares TREES, not commits, and that is exactly why the one test covers both landing routes.**  A
+    gate-landed branch (`land.py land --branch` applies its content with `git apply -3` and commits) stays
+    *ahead of main by its own commits*, so any commit-based test would call it unlanded - but its tree is
+    main's tree, so the equality holds.  The same is true of the direct path-limited landing.  Measured on
+    three real slots (two gate-landed, one direct-landed): all three equal.  There is deliberately **no
+    second, weaker "the branch's own paths look applied" test**: a heuristic like that can read a fully
+    applied branch as catastrophe (the merge base predates main's progress) and, worse, could delete a
+    branch that is not actually applied.
+
+    -> True (applied), False (not applied), or **None** when the answer cannot be established (a conflict,
+    an unparseable tree line, an unreadable `main^{tree}`, git unavailable).  The caller MUST treat None as
+    "do not reclaim": acting on a doubt would detach an unlanded branch under a lane.
+    """
+    merged = merge_tree_of(main, branch)
+    if merged is None:
+        return None
+    p = subprocess.run(["git", "rev-parse", "main^{tree}"], cwd=main, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    main_tree = (p.stdout or "").strip().lower()
+    if p.returncode != 0 or not _TREE_OID.fullmatch(main_tree):
+        return None
+    return merged == main_tree
+
+
+def reclaim_line(out: dict) -> str:
+    """The one line a reclaim prints - what it did and why, in one sentence (never a newline)."""
+    if not out.get("branch"):
+        return ("slot %d: RECLAIMED - debris: a `.used` sentinel with no live claim and no branch checked "
+                "out; cleared the sentinel and released the slot (a slot holds a directory, never a branch)"
+                % out["slot"])
+    return ("slot %d: RECLAIMED - branch %r is already fully applied to main "
+            "(git merge-tree --write-tree main %s == main^{tree}); parked %s at %s, detached the worktree, "
+            "deleted the branch and released the slot (a slot holds a directory, never a branch)"
+            % (out["slot"], out["branch"], out["branch"], out["rescue_ref"],
+               (out["rescue_tip"] or "?")[:8]))
+
+
+def reclaim_verdict(main: str, n: int, branch: str | None = None, run_registry: str | None = None) -> dict:
+    """Whether slot `n` is reclaimable, and why - **read-only** (it touches nothing).
+
+    This is the one place the gate lives, shared by the action (`reclaim_slot`) and the dry run
+    (`preview`), so a preview can never promise a reclaim the action would refuse.  It covers the four
+    states a non-free slot can be in:
+
+    * **(a)** a branch checked out whose **tree equals main's** (`branch_fully_applied`) and **no live
+      claim** -> reclaimable (`kind="branch"`);
+    * **(b)** a branch checked out whose tree **differs** -> refuse (today's message; the load-bearing guard);
+    * **(c)** no branch, but a `.used` sentinel and **no live claim** -> reclaimable debris (`kind="debris"`);
+    * **(d)** a **live claim** holds it (a claim-registry row names this slot, or a non-stale lock record
+      does) -> refuse, whatever the worktree says: *never reclaim a slot with a live claim*.  The mirror
+      case - a registry row with no sentinel - is the same refusal, and is why the registry is read at all.
+
+    **Fail closed.**  If the claim registry cannot be read, or the merge-tree test cannot run / is ambiguous,
+    the slot is refused.  `run_registry` is the harness' async-run registry (`release_blockers`' seam), not
+    the claim registry.  `-> {"reclaimable", "reason", "branch", "applied", "kind", "live_claim"}`.
+    """
+    claims = _claims()
+    d = slot_dir(main, n)
+    v = {"reclaimable": False, "reason": "", "branch": branch, "applied": None,
+         "kind": None, "live_claim": None}
+    if not os.path.exists(os.path.join(d, ".git")):
+        v["reason"] = "slot %d is not a worktree (%s)" % (n, d)
+        return v
+    by_slot, registry_ok = registry_claims_by_slot(main)
+    if not registry_ok:
+        v["reason"] = ("the claim registry (%s) cannot be read - liveness cannot be established, so the "
+                        "slot is NOT reclaimed (fail closed)" % claims.registry_path(main))
+        return v
+    claim = by_slot.get(n)
+    lock = read_lock(main, n)
+    live_lock = bool(lock and not lock_stale(main, n, lock))
+    if claim or live_lock:
+        who = claim or lock
+        v["live_claim"] = who
+        v["reason"] = ("a live claim holds the slot: %s (%s, branch %s) - never reclaim a slot with live "
+                        "work (the claim registry is the authority for liveness)"
+                        % (who.get("unit") or "?", who.get("worker") or "?", who.get("branch") or "?"))
+        return v
+    attached = branch or slot_attached_branch(d)
+    v["branch"] = attached
+    if attached:
+        v["applied"] = applied = branch_fully_applied(main, attached)
+        if applied is None:
+            v["reason"] = ("the merge-tree test for branch %r could not run or its output was ambiguous - "
+                            "failing closed, NOT reclaiming" % attached)
+            return v
+        if not applied:
+            v["reason"] = ("branch %r is NOT fully applied to main (git merge-tree --write-tree main %s != "
+                            "main^{tree}) - it is unlanded work" % (attached, attached))
+            return v
+        v["kind"] = "branch"
+    elif marker_present(d):
+        v["kind"] = "debris"
+    else:
+        v["reason"] = "the slot holds no branch and no `.used` sentinel - nothing to reclaim"
+        return v
+    blockers = release_blockers(main, n, d, registry=run_registry)
+    if blockers:
+        v["reason"] = ("the slot is %s but not safe to reclaim: %s"
+                        % (("on a fully applied branch" if attached else
+                            "carrying a `.used` sentinel with no live claim"),
+                           "; ".join(summary for summary, _ in blockers)))
+        v["blockers"] = blockers
+        return v
+    v["reclaimable"] = True
+    v["reason"] = ("branch %r is fully applied to main" % attached if attached else
+                    "a `.used` sentinel with no live claim and no branch checked out (debris)")
+    return v
+
+
+def reclaim_slot(main: str, n: int, branch: str | None = None, unit: str | None = None,
+                 registry: str | None = None) -> dict:
+    """Reclaim slot `n` when the branch it holds is **already landed** - never one holding real work.
+
+    The refusal "a slot holds a directory, never a branch" is load-bearing for an *unlanded* branch, which is
+    a claim's live work; but a branch whose content is already in main is bookkeeping, not work in progress,
+    and detaching/deleting it by hand after every landing cost a round trip.  This does the by-hand dance -
+    park the rescue ref, detach, delete, release - as one named step.  It also reclaims **debris**: a `.used`
+    sentinel on a detached worktree with no live claim (a crash remnant), which has no branch to rescue.
+
+    **Fail closed.**  It acts only when `reclaim_verdict` says so: no live claim (the claim registry is the
+    authority) and either a fully applied branch or debris, with `release_blockers` reporting nothing live (a
+    RUNNING run) or unrecorded (a dirty tree).  A live claim, an unreadable claim registry, a conflict, an
+    ambiguous merge-tree, an unlanded branch, a live run or a dirty tree all return `reclaimed=False` with
+    the reason - the caller keeps its refusal.
+
+    For a branch, the rescue ref is parked **before** the worktree is detached or the branch deleted (`steps`
+    records the order), so a crash in the middle leaves the branch's tip at `refs/rescue/<slug>` and loses
+    nothing.  `registry` is the harness' async-run registry (`release_blockers`' seam).
+    """
+    claims = _claims()
+    d = slot_dir(main, n)
+    out = {"slot": n, "dir": d, "branch": branch, "unit": unit, "reclaimed": False, "reason": "",
+           "applied": None, "kind": None, "live_claim": None, "rescue_ref": None, "rescue_tip": None,
+           "detached": False, "branch_deleted": False, "cleaned": [], "refreshed": None,
+           "marker_cleared": False, "released": False, "steps": [], "line": None}
+    verdict = reclaim_verdict(main, n, branch, run_registry=registry)
+    out.update({"branch": verdict["branch"], "applied": verdict["applied"], "kind": verdict["kind"],
+                "live_claim": verdict["live_claim"], "reason": verdict["reason"]})
+    if verdict.get("blockers"):
+        out["blockers"] = verdict["blockers"]
+    if not verdict["reclaimable"]:
+        return out
+    if verdict["kind"] == "debris":
+        # No branch to rescue, detach or delete: clear the sentinel, discard scratch, clear the lock.
+        out["cleaned"] = clean_slot(d)
+        out["marker_cleared"] = clear_marker(d)
+        clear_lock(main, n)
+        out["released"] = True
+        out["steps"].append({"step": "release"})
+        out["reclaimed"] = True
+        out["line"] = reclaim_line(out)
+        return out
+    attached = verdict["branch"]
+    # The rescue-ref name follows the EXISTING convention (`refs/rescue/<slug>`): the lock's unit when it
+    # names one, else the branch's OWN slug read straight off the branch - never re-slugged, which would add
+    # a second hash suffix and park the ref under a name no one looking for the branch would find.
+    named_unit = unit or read_lock(main, n).get("unit")
+    branch_slug = claims.slug_of_branch(attached)
+    out["unit"] = named_unit or branch_slug or attached
+    ref = claims.rescue_ref_name(named_unit) if named_unit else ("refs/rescue/%s" % (branch_slug or attached))
+    tip = slot_head(d)
+    # 1. the rescue ref FIRST: everything after this is repeatable, and a crash here loses nothing
+    p = subprocess.run(["git", "update-ref", ref, attached], cwd=main, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    if p.returncode != 0:
+        out["reason"] = ("could not park the rescue ref %s (%s) - refusing to delete the branch"
+                         % (ref, (p.stderr or "").strip()))
+        return out
+    out["rescue_ref"], out["rescue_tip"] = ref, tip
+    out["steps"].append({"step": "rescue", "ref": ref, "tip": tip})
+    # 2. detach the worktree: the branch is no longer checked out, so it can be deleted
+    main_tip = git(["rev-parse", "HEAD"], main)
+    git(["checkout", "-f", "-q", "--detach", main_tip], d)
+    out["detached"] = True
+    out["steps"].append({"step": "detach", "at": main_tip})
+    # 3. delete the branch - the lock - now that its commits are parked
+    git(["branch", "-D", attached], main)
+    out["branch_deleted"] = True
+    out["steps"].append({"step": "delete-branch", "branch": attached})
+    # 4. release the slot: discard scratch, keep the warm trees, clear the marker and the lock
+    out["cleaned"] = clean_slot(d)
+    if claims._main_build_is_current(main):
+        out["refreshed"] = claims.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
+    out["marker_cleared"] = clear_marker(d)
+    clear_lock(main, n)
+    out["released"] = True
+    out["steps"].append({"step": "release"})
+    out["reclaimed"] = True
+    out["reason"] = "branch %r was fully applied to main" % attached
+    out["line"] = reclaim_line(out)
+    return out
+
+def _announce_reclaim(res: dict) -> None:
+    """Print a reclaim's one line to stderr - diagnostics, never part of `spawn`'s stdout artifact."""
+    if res.get("reclaimed") and res.get("line"):
+        print(res["line"], file=sys.stderr)
+
+
 # --- acquire -------------------------------------------------------------------------------------
 
-def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
+def _pick_free(main: str, slot: int | None = None, claim=None, reclaim: bool = True) -> dict:
     """Pick a free slot, falling through to the next genuinely free one.
 
     `free` is the worktree truth (`slot_state`), so an occupied slot is **skipped**, never failed on.  With
@@ -1114,14 +1495,33 @@ def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
 
     A slot explicitly targeted with `slot=N` is a search *by name*, not a search: it refuses when occupied -
     the "a slot holds a directory, never a branch" rule - or when the mark cannot be taken.
+
+    `reclaim` is what makes a slot occupied by a **landed** branch recoverable instead of a refusal: a
+    genuinely free slot is always taken first (no side effect), and only when none is free is a slot whose
+    checked-out branch is *proven* fully applied to main (and no live claim holds it) reclaimed
+    (`reclaim_slot`) and taken.  A slot holding an unlanded branch, or one a live claim holds, is still
+    refused with the same message, verbatim.  `preview` passes `reclaim=False`, because a dry run must touch
+    nothing.
+
+    **The claim registry is read here and gates the whole search (fail closed).**  If `.pi/claims.json` cannot
+    be parsed, no slot is handed out: a slot's liveness would be unknown and this tool must not guess.
     """
-    rows = all_slots(main)
+    by_slot, registry_ok = registry_claims_by_slot(main)
+    if not registry_ok:
+        raise SystemExit("REFUSED: the claim registry (%s) cannot be read - no slot can be handed out while "
+                         "liveness is unknown (fail closed)" % _claims().registry_path(main))
+    rows = all_slots(main, claims_by_slot=by_slot)
     if not rows:
         raise SystemExit("REFUSED: the slot pool is not initialised - run `python tools/units/slots.py init`")
     if slot is not None:
         row = next((s for s in rows if s["slot"] == slot), None)
         if row is None:
             raise SystemExit("REFUSED: no slot %d (the pool is slots 1..%d)" % (slot, len(rows)))
+        if not row["free"] and reclaim:
+            res = reclaim_slot(main, slot, branch=row.get("attached"))
+            if res["reclaimed"]:
+                _announce_reclaim(res)
+                row = dict(slot_state(main, slot, claims_by_slot=by_slot), landed_reclaim=res)
         if not row["free"]:
             if row["attached"]:
                 raise SystemExit("REFUSED slot %d: it still has branch %r checked out - a slot holds a "
@@ -1133,11 +1533,25 @@ def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
                              "retry, or drop `--slot` to let the search fall through to the next free slot"
                              % slot)
         return row
+    # A genuinely free slot first: taking one has no side effect, so reclaiming is only the fallback.
     for row in rows:
         if not row["free"]:
             continue
         if claim is None or claim(row):
             return row
+    # Nothing free: reclaim a slot whose checked-out branch is ALREADY LANDED and unclaimed (safe), then
+    # take it.  A debris slot is already `free` and was taken in the pass above.
+    if reclaim:
+        for row in rows:
+            if row["free"] or not row.get("attached"):
+                continue
+            res = reclaim_slot(main, row["slot"], branch=row["attached"])
+            if not res["reclaimed"]:
+                continue
+            _announce_reclaim(res)
+            row = dict(slot_state(main, row["slot"], claims_by_slot=by_slot), landed_reclaim=res)
+            if claim is None or claim(row):
+                return row
     raise SystemExit("REFUSED: %s" % capacity_error(main))
 
 
@@ -1146,18 +1560,33 @@ def preview(main: str, unit: str, branch: str | None = None, slot: int | None = 
     """What `acquire` would do, touching nothing (for a dry run). -> the slot row and the command.
 
     The candidate slot's sentinel is checked here too, so a dry run surfaces the same
-    "that `.used` belongs to another claim" refusal the real acquire would give.
+    "that `.used` belongs to another claim" refusal the real acquire would give.  A slot holding a **fully
+    applied** branch is one `acquire` will reclaim; a dry run says so (in `reclaim`) without reclaiming,
+    because it must touch nothing.
     """
     claims = _claims()
     unit = claims.norm_unit(unit.strip("/"))
     branch = branch or claims.branch_for(unit)
-    row = _pick_free(main, slot)
-    conflict = marker_claim_conflict(row["dir"], owner_label(unit, branch, worker), row["slot"])
+    reclaimed = None
+    try:
+        row = _pick_free(main, slot, reclaim=False)
+    except SystemExit:
+        if slot is None:
+            raise
+        verdict = reclaim_verdict(main, slot)
+        if not verdict["reclaimable"]:
+            raise
+        reclaimed = {"slot": slot, "branch": verdict["branch"]}
+        row = slot_state(main, slot)
+    # A predicted reclaim clears the slot's `.used` marker before the claim is marked, so the foreign-marker
+    # refusal does not apply to that path - checking it against the pre-reclaim state would be a false refusal.
+    conflict = None if reclaimed else marker_claim_conflict(
+        row["dir"], owner_label(unit, branch, worker), row["slot"])
     if conflict and not force:
         raise SystemExit(conflict.split("\n")[0] + "\n  (a dry run reports the same refusal `acquire` gives)")
     tip = git(["rev-parse", "HEAD"], main)
     return {"slot": row["slot"], "dir": row["dir"], "branch": branch, "base": tip,
-            "owner": owner_label(unit, branch, worker),
+            "owner": owner_label(unit, branch, worker), "reclaim": reclaimed,
             "command": "git -C %s checkout -B %s %s" % (row["dir"], branch, tip)}
 
 
@@ -1170,6 +1599,11 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
     silently reused - and when the slot's `.used` sentinel **names a different owner**
     (`marker_claim_conflict`): that is another claim's sentinel, and taking the slot under it is how a lane's
     HEAD got detached mid-run.  `force` is the deliberate override for a sentinel whose owner is gone.
+
+    A slot whose worktree holds a branch whose **content is already fully applied to main** is NOT refused:
+    `_pick_free` reclaims it first (`reclaim_slot` - rescue ref, detach, delete, release) and takes it, and
+    the reclaimed record rides back in `landed_reclaim`.  Only an *unlanded* (or unprovable) branch keeps
+    the refusal.
 
     The slot is **marked `.used` atomically before the reset**, with this claim's OWNER label in the marker,
     so a racing acquire falls through to the next free slot instead of colliding; a failure after the mark
@@ -1273,7 +1707,7 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
                              "compile_outputs": v["compile_outputs"], "pending": cur["pending"]})
         return {"slot": n, "dir": d, "worktree": d, "branch": branch, "base": tip, "unit": unit,
                 "seeded": seed_note, "refreshed": refreshed, "verify": v, "currency": cur,
-                "reclaimed": reclaimed}
+                "reclaimed": reclaimed, "landed_reclaim": row.get("landed_reclaim")}
     except BaseException:
         # a failed acquire must not leave the slot marked: the marker is the occupancy signal the next search
         # reads, so clearing it here is what keeps a refused acquire from wedging the slot.
@@ -1412,9 +1846,11 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
     followed by the standard "your tree" block.
 
     **The slot is an explicit launch parameter.**  `slot=N` takes that slot *by number* through `acquire` -
-    same fail-closed reset/seed, same refusal for a slot holding an unlanded branch, never a reimplementation
-    - and no `slot` takes the first genuinely free slot and **names which one it took**, so the orchestrator
-    chooses the slot and can see it instead of two racing lanes choosing the same one.
+    same fail-closed reset/seed, same refusal for a slot holding an **unlanded** branch, never a
+    reimplementation - and no `slot` takes the first genuinely free slot and **names which one it took**, so
+    the orchestrator chooses the slot and can see it instead of two racing lanes choosing the same one.  A
+    slot holding a branch whose content is already landed is reclaimed on the way in (see `reclaim_slot`),
+    so a landing no longer costs a hand teardown before the next spawn.
 
     **`kind` is the mapping.**  It decides the agent profile (`profile_for_kind`) and is both printed and
     recorded: printed in the returned header/JSON, recorded in the slot's lock (`kind`/`agent`) and in the
@@ -1489,6 +1925,7 @@ def selftest() -> int:
         except SystemExit:
             return True
 
+    import contextlib
     import shutil
     import tempfile
     claims = _claims()
@@ -1708,6 +2145,20 @@ def selftest() -> int:
         again = init(repo, count=2)
         check("init is idempotent", (again["created"], sorted(again["present"])), ([], [1, 2]))
 
+        # THE CAP IS pool.json's COUNT, the authority - a broken slot must not drop a LIVE one from the
+        # enumeration (slot 2's missing worktree used to shrink a pool of 6 to `slots 1..5`, hiding slot 6).
+        check("pool_size reads the manifest's count", pool_size(repo), 2)
+        moved = slot_dir(repo, 2) + ".moved-for-test"
+        os.rename(slot_dir(repo, 2), moved)
+        try:
+            rows2 = all_slots(repo)
+            check("... every slot in the manifest is still enumerated when one has no worktree",
+                  [r["slot"] for r in rows2], [1, 2])
+            check("... and the broken one says `no worktree`", rows2[1]["state"], "no worktree")
+            check("... so a live slot is never hidden behind a broken one", rows2[0]["exists"], True)
+        finally:
+            os.rename(moved, slot_dir(repo, 2))
+
         # (0b) A SHADOW: a lane-shaped tree INSIDE the slot, for fixture tests.  `git worktree add` is the
         # obvious way and the wrong one - it writes metadata into MAIN's `.git/worktrees`, outside the slot.
         wts_before = [line for line in g(repo, "worktree", "list", "--porcelain").splitlines()
@@ -1830,6 +2281,9 @@ def selftest() -> int:
         check("... and it is a different, fresh branch", second["branch"], claims.branch_for("auto/stub-b"))
         check("... while the released branch is gone",
               claims.branch_exists(repo, claims.branch_for("auto/stub-a")), False)
+        # Give the held branch a commit main does not have, so it is genuinely UNLANDED (tree differs) - the
+        # shape the refusal is for; an empty branch's tree equals main's and is now reclaimable instead.
+        commit(d, "unlanded work on the held branch")
         # a slot holding an unlanded branch (lock lost, branch left attached) is surfaced loudly
         clear_lock(repo, first["slot"])          # simulate a crash between detach and unlock
         clear_marker(d)                          # ... and losing the marker too: the HOSTILE case
@@ -2235,6 +2689,307 @@ def selftest() -> int:
         release(repo, slot=tfs["slot"], unit="lane/spawn-taskfile", rescue=False)
         check("the pool is left as it was found (both slots free)", free_count(repo), 2)
 
+        # --- RECLAIM: a slot holding a LANDED branch is bookkeeping, not work in progress ----------------
+        # The refusal "a slot holds a directory, never a branch" is load-bearing for an *unlanded* branch,
+        # but after a landing the branch's content is in main and detaching/deleting it by hand cost a round
+        # trip every time.  These fixtures pin both directions, the rescue-first ordering, and fail-closed.
+
+        def land_into_main(branch, rel="f.txt", msg="land the branch"):
+            """Simulate the GATE landing (`land.py land --branch`): apply the branch's content onto main as a
+            NEW commit, so the branch stays *ahead of main by its own commit* while its TREE now equals
+            main's - exactly the shape the merge-tree equality must still call applied, because it compares
+            trees and not commits.
+
+            A pathspec on the commit keeps unrelated untracked state (the claims registry) out of main, so
+            the only tree difference between main and the branch is the change itself.
+            """
+            g(repo, "cherry-pick", "--no-commit", branch)
+            g(repo, "commit", "-q", "-m", msg, "--", rel)
+
+        # (e1) the merge-tree read itself: a conflict or unreadable output is ambiguity, never "applied"
+        _oid40 = "a" * 40
+        check("merge-tree: a clean run yields its tree OID", _merge_tree_oid(0, _oid40 + "\n"), _oid40)
+        check("... a conflict (nonzero exit) is NOT a tree", _merge_tree_oid(1, _oid40 + "\n"), None)
+        check("... an unparseable first line is ambiguity", _merge_tree_oid(0, "CONFLICT (content)\n"), None)
+        check("... empty output is ambiguity", _merge_tree_oid(0, ""), None)
+        check("... and a merge-tree that cannot resolve the branch is unknown",
+              branch_fully_applied(repo, "worker/ghost-does-not-exist"), None)
+
+        # (c) a genuinely FREE slot is untouched: reclaim refuses and writes nothing
+        rescue_before = g(repo, "for-each-ref", "--format=%(refname)", "refs/rescue/")
+        free_v = reclaim_slot(repo, 1)
+        check("reclaim leaves a genuinely free slot untouched", free_v["reclaimed"], False)
+        check("... saying it holds no branch", "no branch" in free_v["reason"], True)
+        check("... and parking no rescue ref",
+              g(repo, "for-each-ref", "--format=%(refname)", "refs/rescue/"), rescue_before)
+        check("... which the read-only verdict agrees with", reclaim_verdict(repo, 1)["reclaimable"], False)
+
+        # (a)+(d) a slot holding a LANDED branch is reclaimed and taken, rescue ref FIRST
+        land = acquire(repo, "auto/landed", slot=1)
+        d_land = land["dir"]
+        lbranch = land["branch"]
+        commit(d_land, "a landed change")
+        land_into_main(lbranch, msg="land: a landed change")
+        clear_lock(repo, 1)                      # the claim was released; the branch/worktree remain
+        ltip = g(repo, "rev-parse", lbranch)
+        check("the branch's content is now fully in main (the free test)",
+              branch_fully_applied(repo, lbranch), True)
+        # THE GATE-ROUTE PIN: the branch is still ahead of main by its own commit (a commit-based test would
+        # call it unlanded), yet its TREE equals main's - which is why the one merge-tree rule is enough.
+        check("... the GATE-landed branch is still ahead of main by its own commits",
+              claims.commits_ahead(repo, lbranch) >= 1, True)
+        check("... and merge-tree really equals main^{tree}", merge_tree_of(repo, lbranch),
+              g(repo, "rev-parse", "main^{tree}"))
+        check("the read-only verdict confirms the landed branch", reclaim_verdict(repo, 1)["reclaimable"], True)
+        pv = preview(repo, "auto/after-land", slot=1)
+        check("a dry run predicts the reclaim without doing it",
+              (pv.get("reclaim") or {}).get("branch"), lbranch)
+        check("... and touches nothing (the branch is still attached)",
+              slot_attached_branch(d_land), lbranch)
+        check("... so the landed branch is still there", claims.branch_exists(repo, lbranch), True)
+        taken = acquire(repo, "auto/after-land", slot=1)
+        check("acquire RECLAIMS a slot holding a landed branch and takes it", taken["slot"], 1)
+        check("... the slot now holds the NEW claim's branch", slot_attached_branch(d_land), taken["branch"])
+        rec = taken.get("landed_reclaim") or {}
+        check("... reporting the reclaim", rec.get("reclaimed"), True)
+        lref = claims.rescue_ref_name("auto/landed")
+        check("... the rescue ref exists", claims.rescue_exists(repo, "auto/landed"), lref)
+        check("... pointing at the branch tip", g(repo, "rev-parse", lref), ltip)
+        check("... and the landed branch is deleted", claims.branch_exists(repo, lbranch), False)
+        lsteps = [s["step"] for s in rec.get("steps", [])]
+        check("... the rescue ref is parked BEFORE the detach and the delete",
+              lsteps.index("rescue") < lsteps.index("detach") < lsteps.index("delete-branch"), True)
+        check("... and the one line says what it did and why", "RECLAIMED" in (rec.get("line") or ""), True)
+        release(repo, slot=1, unit="auto/after-land", rescue=False)
+
+        # (a2) the named action `slots.py reclaim` does the same thing deliberately, for one slot
+        act = acquire(repo, "auto/act", slot=1)
+        d_act = act["dir"]
+        commit(d_act, "action landed")
+        land_into_main(act["branch"], msg="land: action landed")
+        clear_lock(repo, 1)
+        atip = g(repo, "rev-parse", act["branch"])
+        check("the action's branch is fully applied", branch_fully_applied(repo, act["branch"]), True)
+        aout = reclaim_slot(repo, 1)
+        check("the explicit reclaim action reclaims a landed slot", aout["reclaimed"], True)
+        check("... freeing the slot for the next acquire", slot_state(repo, 1)["free"], True)
+        check("... parking the rescue ref at the branch tip",
+              g(repo, "rev-parse", claims.rescue_ref_name("auto/act")), atip)
+        check("... and deleting the branch", claims.branch_exists(repo, act["branch"]), False)
+
+        # (b) an UNLANDED branch is still refused, with today's message, verbatim
+        unl = acquire(repo, "auto/unlanded", slot=1)
+        d_unl = unl["dir"]
+        commit(d_unl, "definitely not landed")
+        clear_lock(repo, 1)
+        check("the unlanded branch is NOT applied", branch_fully_applied(repo, unl["branch"]), False)
+        v_unl = reclaim_slot(repo, 1)
+        check("reclaim REFUSES an unlanded branch", v_unl["reclaimed"], False)
+        check("... with the test's own verdict", v_unl["applied"], False)
+        try:
+            acquire(repo, "auto/unlanded-2", slot=1)
+            check("acquire still refuses an unlanded branch", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("acquire still refuses an unlanded branch", "it still has branch" in str(exc), True)
+            check("... keeping the rule verbatim",
+                  "a slot holds a directory, never a branch" in str(exc), True)
+        check("... and the unlanded branch is untouched", slot_attached_branch(d_unl), unl["branch"])
+        check("... with no rescue ref parked for it", claims.rescue_exists(repo, "auto/unlanded"), None)
+        check("... and `status` names the missing record",
+              "missing record" in slot_state(repo, 1)["record_note"], True)
+        # a record that names a branch the slot has left is STALE, and `status` says so with the remedy
+        write_lock(repo, 1, {"slot": 1, "unit": "ghost/unit", "branch": "worker/ghost-gone",
+                             "base": "0" * 40})
+        check("... a stale record is named", "stale record" in slot_state(repo, 1)["record_note"], True)
+        check("... with its remedy in `why`", "acquire --slot 1" in slot_state(repo, 1)["why"], True)
+        clear_lock(repo, 1)
+        release(repo, slot=1, unit="auto/unlanded", rescue=False)
+
+        # (b2) a MISSING `.used` marker is a crash remnant, not a claim: a LANDED branch is still reclaimable
+        nm = acquire(repo, "auto/nomark-land", slot=1)
+        commit(nm["dir"], "nomark landed")
+        land_into_main(nm["branch"], msg="land: nomark landed")
+        clear_lock(repo, 1)
+        clear_marker(nm["dir"])                  # crash remnant: branch attached, marker MISSING
+        check("a MISSING-marker slot still shows its branch attached",
+              slot_state(repo, 1)["attached"], nm["branch"])
+        check("... with the marker gone", marker_present(nm["dir"]), False)
+        check("... and the branch proven applied", branch_fully_applied(repo, nm["branch"]), True)
+        nm_taken = acquire(repo, "auto/nomark-after", slot=1)
+        check("acquire RECLAIMS a MISSING-marker slot whose branch is applied", nm_taken["slot"], 1)
+        check("... and takes it", slot_attached_branch(nm["dir"]), nm_taken["branch"])
+        check("... with the rescue ref parked", claims.rescue_exists(repo, "auto/nomark-land"),
+              claims.rescue_ref_name("auto/nomark-land"))
+        check("... and the old branch deleted", claims.branch_exists(repo, nm["branch"]), False)
+        release(repo, slot=1, unit="auto/nomark-after", rescue=False)
+
+        # (b3) ... but the same MISSING marker next to an UNLANDED branch still refuses
+        nm2 = acquire(repo, "auto/nomark-unl", slot=1)
+        commit(nm2["dir"], "nomark unlanded")
+        clear_lock(repo, 1)
+        clear_marker(nm2["dir"])
+        nm2_v = reclaim_slot(repo, 1)
+        check("a MISSING-marker slot holding an UNLANDED branch still refuses", nm2_v["reclaimed"], False)
+        check("... with the test's verdict", nm2_v["applied"], False)
+        check("... and the branch untouched", slot_attached_branch(nm2["dir"]), nm2["branch"])
+        release(repo, slot=1, unit="auto/nomark-unl", rescue=False)
+
+        # (c) DEBRIS: no branch checked out, a `.used` sentinel, and NO registry row - a crash remnant
+        db = acquire(repo, "auto/debris", slot=1)
+        db_branch = db["branch"]
+        clear_lock(repo, 1)
+        g(db["dir"], "checkout", "-q", "--detach", g(repo, "rev-parse", "HEAD"))   # at main's tip
+        g(repo, "branch", "-D", db_branch)      # "no branch": the ref is gone, the sentinel survives
+        check("a detached sentinel with no claim is named `debris`", slot_state(repo, 1)["state"], "debris")
+        check("... and reads free so it can never wedge the pool", slot_state(repo, 1)["free"], True)
+        db_v = reclaim_verdict(repo, 1)
+        check("... and the verdict says reclaimable debris",
+              (db_v["reclaimable"], db_v["kind"]), (True, "debris"))
+        db_out = reclaim_slot(repo, 1)
+        check("reclaim clears the debris sentinel", (db_out["reclaimed"], db_out["kind"]), (True, "debris"))
+        check("... with no branch to rescue", db_out["rescue_ref"], None)
+        check("... and the sentinel is gone", marker_present(db["dir"]), False)
+        check("... naming the state in its one line", "debris" in (db_out["line"] or ""), True)
+
+        # (d) a sentinel WITH a live claim is refused - someone's work is in it
+        cl = acquire(repo, "auto/claimed", slot=1)
+        check("a live lock makes the slot `claimed`", slot_state(repo, 1)["state"], "claimed")
+        cl_v = reclaim_slot(repo, 1)
+        check("reclaim REFUSES a slot a live claim holds", cl_v["reclaimed"], False)
+        check("... naming the live claim", "live claim" in cl_v["reason"], True)
+        check("... and leaving the branch attached", slot_attached_branch(cl["dir"]), cl["branch"])
+        release(repo, slot=1, unit="auto/claimed", rescue=False)
+
+        # (d2) SLOT 2'S REAL SHAPE (measured 2026-09-28): marker present, branch checked out and alive, its
+        # worktree missing from `git worktree list`, and the ONLY evidence of life a REGISTRY row whose
+        # progress advances.  The registry row - the same liveness record `claims.expire`/`claim_status` read
+        # - must refuse, even with the lock cleared.  ("The label is not the measurement.")
+        l2 = acquire(repo, "auto/live2", slot=1)
+        claims.save_registry(repo, {"network/dwci-band": {
+            "branch": l2["branch"], "slot": 1, "worker": "loop-6", "worktree": l2["dir"],
+            "claimed_at": "2026-09-28T18:00:00"}})
+        clear_lock(repo, 1)                      # no owner string on the lock: the registry row is the evidence
+        check("a registry-held slot reads `claimed`", slot_state(repo, 1)["state"], "claimed")
+        check("... and is NOT free", slot_state(repo, 1)["free"], False)
+        l2_v = reclaim_slot(repo, 1)
+        check("reclaim REFUSES a registry-held slot (progress moves = life)", l2_v["reclaimed"], False)
+        check("... naming the live claim", "live claim" in l2_v["reason"], True)
+        try:
+            acquire(repo, "auto/live2b", slot=1)
+            check("... and acquire refuses it too", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("... and acquire refuses it too", "it still has branch" in str(exc), True)
+        claims.save_registry(repo, {})
+        release(repo, slot=1, unit="auto/live2", branch=l2["branch"], rescue=False)
+
+        # (d3) the MIRROR: a registry row with NO sentinel still counts as in use (never hand a live branch
+        # to a new lane)
+        mir = acquire(repo, "auto/mirror", slot=1)
+        claims.save_registry(repo, {"x/y": {"branch": mir["branch"], "slot": 1, "worker": "w"}})
+        clear_lock(repo, 1)
+        clear_marker(mir["dir"])
+        g(mir["dir"], "checkout", "-q", "--detach", g(repo, "rev-parse", "HEAD"))
+        check("a registry row with no sentinel still reads `claimed`", slot_state(repo, 1)["state"], "claimed")
+        check("... and is NOT free", slot_state(repo, 1)["free"], False)
+        check("... so reclaim refuses", reclaim_slot(repo, 1)["reclaimed"], False)
+        claims.save_registry(repo, {})
+        release(repo, slot=1, branch=mir["branch"], rescue=False)
+
+        # (e-reg) fail closed: an UNREADABLE claim registry refuses rather than guesses
+        os.makedirs(os.path.join(repo, ".pi"), exist_ok=True)
+        with open(os.path.join(repo, ".pi", "claims.json"), "w", encoding="utf-8") as fh:
+            fh.write("{ this is not json")
+        bad = reclaim_slot(repo, 1)
+        check("an unreadable claim registry refuses the reclaim", bad["reclaimed"], False)
+        check("... naming the registry", "cannot be read" in bad["reason"], True)
+        try:
+            acquire(repo, "auto/noreg", slot=1)
+            check("... and no slot is handed out", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("... and no slot is handed out", "cannot be read" in str(exc), True)
+        claims.save_registry(repo, {})
+        check("... restored, the pool is usable again", slot_state(repo, 1)["free"], True)
+
+        # (pool) a bulk `init --force` REFUSES while any slot holds live work - the pool is the campaign's
+        # concurrency cap, not a scratch file
+        keep = acquire(repo, "auto/keep", slot=1)
+        try:
+            init(repo, count=2, force=True)
+            check("init --force refuses while a slot holds live work", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("init --force refuses while a slot holds live work", "REFUSED init --force" in str(exc), True)
+            check("... naming the slot", "auto/keep" in str(exc), True)
+        check("... and the live slot is untouched", slot_attached_branch(keep["dir"]), keep["branch"])
+        release(repo, slot=1, unit="auto/keep", rescue=False)
+        check("... while a drained pool may be forced", init(repo, count=2, force=True)["created"], [1, 2])
+
+        # (e2) fail-closed for real: a CONFLICTING branch is an ambiguity, so nothing is reclaimed
+        conf = acquire(repo, "auto/conflict", slot=1)
+        d_conf = conf["dir"]
+        with open(os.path.join(d_conf, "f.txt"), "w", encoding="utf-8") as fh:
+            fh.write("branch side\n")
+        g(d_conf, "add", "-A")
+        g(d_conf, "commit", "-q", "-m", "branch side")
+        with open(os.path.join(repo, "f.txt"), "w", encoding="utf-8") as fh:
+            fh.write("main side\n")
+        g(repo, "commit", "-q", "-m", "main side", "--", "f.txt")
+        clear_lock(repo, 1)
+        check("a conflicting branch cannot be tested - ambiguity, not 'applied'",
+              branch_fully_applied(repo, conf["branch"]), None)
+        conf_v = reclaim_slot(repo, 1)
+        check("... so reclaim fails closed and does not act", conf_v["reclaimed"], False)
+        check("... naming the doubt", "failing closed" in conf_v["reason"], True)
+        check("... and the conflicting branch is left attached", slot_attached_branch(d_conf),
+              conf["branch"])
+        try:
+            acquire(repo, "auto/conflict-2", slot=1)
+            check("... and acquire keeps its refusal for it", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("... and acquire keeps its refusal for it", "never a branch" in str(exc), True)
+        release(repo, slot=1, unit="auto/conflict", rescue=False)
+
+        # (e3) the live-lane guard is not bypassed: a landed branch with a RUNNING lane in the slot refuses
+        live_land = acquire(repo, "auto/live-land", slot=1)
+        d_ll = live_land["dir"]
+        commit(d_ll, "landed under a live lane")
+        land_into_main(live_land["branch"], msg="land: under a live lane")
+        clear_lock(repo, 1)                      # the claim is gone; the only life left is the RUNNING run
+        check("the live-lane branch is fully applied", branch_fully_applied(repo, live_land["branch"]), True)
+        reg_root2 = os.path.join(tmp, "pi-subagents-reclaim", RUNS_DIRNAME)
+        os.makedirs(reg_root2, exist_ok=True)
+        run_id2 = "99999999-8888-7777-6666-555555555555"
+        os.makedirs(os.path.join(reg_root2, run_id2), exist_ok=True)
+        with open(os.path.join(reg_root2, run_id2, "status.json"), "w", encoding="utf-8") as fh:
+            json.dump({"runId": run_id2, "state": "running", "cwd": d_ll,
+                       "steps": [{"agent": "worker", "status": "running"}]}, fh)
+        live_v = reclaim_slot(repo, 1, registry=reg_root2)
+        check("reclaim refuses a landed branch while a RUNNING lane is in the slot",
+              live_v["reclaimed"], False)
+        check("... naming the live run", run_id2 in live_v["reason"], True)
+        check("... and leaving the branch attached", slot_attached_branch(d_ll), live_land["branch"])
+        os.makedirs(os.path.join(reg_root2, ".terminal-runs"), exist_ok=True)
+        open(os.path.join(reg_root2, ".terminal-runs", run_id2), "w").close()
+        live_done = reclaim_slot(repo, 1, registry=reg_root2)
+        check("... and reclaims once the run is finished", live_done["reclaimed"], True)
+        check("... leaving the pool free", free_count(repo), 2)
+
+        # (f) the exact line `spawn` prints when it reclaims, and its stdout artifact stays clean
+        sl = acquire(repo, "auto/spawn-land", slot=1)
+        commit(sl["dir"], "spawn landed")
+        land_into_main(sl["branch"], msg="land: spawn landed")
+        clear_lock(repo, 1)
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            sp_rec = spawn(repo, "tooling", slot=1, unit="lane/spawn-reclaim", task="x")
+        check("spawn reclaims a landed slot on the way in", sp_rec["slot"], 1)
+        check("... and prints the one RECLAIMED line",
+              "RECLAIMED" in buf.getvalue() and sl["branch"] in buf.getvalue(), True)
+        check("... leaving the paste-ready stdout line untouched",
+              sp_rec["spawnLine"].startswith('subagent(agent="worker", cwd="%s"'
+                                              % slot_dir(repo, 1).replace("\\", "/")), True)
+        release(repo, slot=1, unit="lane/spawn-reclaim", rescue=False)
+        check("... and the pool is left as it was found", free_count(repo), 2)
+
     NINJA_RUNNER = saved_ninja
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -2280,6 +3035,13 @@ def main() -> int:
                         "holds commits no branch reaches")
     r.add_argument("--dry-run", action="store_true")
     r.add_argument("--json", action="store_true")
+    rc = sub.add_parser("reclaim", help="release a slot whose checked-out branch is ALREADY fully applied "
+                                         "to main, or whose `.used` sentinel is debris with no claim (an "
+                                         "unlanded branch keeps today's refusal)")
+    rc.add_argument("--slot", type=int, default=None)
+    rc.add_argument("--unit", default=None)
+    rc.add_argument("--branch", default=None)
+    rc.add_argument("--json", action="store_true")
     sp = sub.add_parser("spawn", help="take a slot for a lane of a kind and print the paste-ready launch")
     sp.add_argument("--kind", required=True,
                     help="the kind of work -> agent profile: " + ", ".join(KIND_PROFILE))
@@ -2329,6 +3091,9 @@ def main() -> int:
             out = preview(main_wt, args.unit, args.branch, args.slot, args.worker, args.force)
             print("would acquire slot %d for %s (owner %s): %s"
                   % (out["slot"], args.unit, out["owner"], out["command"]))
+            if out.get("reclaim"):
+                print("  ... after RECLAIMING it - its branch %r is already fully applied to main"
+                      % out["reclaim"]["branch"])
             return 0
         info = acquire(main_wt, args.unit, args.branch, args.worker, args.slot, args.force)
         if args.json:
@@ -2342,6 +3107,8 @@ def main() -> int:
         for line in currency_lines(info["currency"]):
             print("  " + line.replace("**", ""))
         print("  owner   %s (in `.used`)" % marker_owner(info["dir"]))
+        if (info.get("landed_reclaim") or {}).get("reclaimed"):
+            print("  reclaimed a landed branch first: %s" % info["landed_reclaim"]["line"])
         return 0
     if args.cmd == "release":
         out = release(main_wt, args.slot, args.unit, args.branch, delete_branch=not args.keep_branch,
@@ -2356,6 +3123,20 @@ def main() -> int:
                                        "" if not out["refreshed"] else "\n  %s" % out["refreshed"]))
         if out.get("overridden"):
             print("  --force overrode:\n  - %s" % "\n  - ".join(out["overridden"]))
+        return 0
+    if args.cmd == "reclaim":
+        n, lock = _resolve_slot(main_wt, args.slot, args.unit, args.branch)
+        out = reclaim_slot(main_wt, n, branch=args.branch or lock.get("branch"),
+                           unit=args.unit or lock.get("unit"))
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        if not out["reclaimed"]:
+            raise SystemExit("REFUSED reclaim slot %d: %s\n  the refusal is load-bearing: a slot holds a "
+                             "directory, never a branch, and only a branch whose content is PROVEN in main "
+                             "is bookkeeping to reclaim (land it, or `release --slot %d`)."
+                             % (n, out["reason"], n))
+        print(out["line"])
         return 0
     if args.cmd == "spawn":
         out = spawn(main_wt, args.kind, slot=args.slot, unit=args.unit, task_file=args.task_file,
@@ -2393,21 +3174,22 @@ def main() -> int:
         print("%-5s %-9s %-16s %-20s %-20s %-7s %-9s %s"
               % ("slot", "state", "owner", "unit", "branch", ".used", "run", "build tree"))
         for row in rows:
+            claim = row.get("claim") or {}
             lock = row.get("lock") or {}
-            if row["free"]:
-                state = "free"
-            elif row.get("run"):
-                state = "LIVE"
-            elif row["attached"]:
-                state = "in use"
-            else:
-                state = "used"
+            # one word for WHY it is not free, so a silent cap becomes a diagnosis (`branch`/`claimed`/`debris`)
+            state = row.get("state") or ("free" if row["free"] else "used")
             marker = "stale" if row.get("marker_stale") else ("yes" if row["marked"] else "-")
             run = (row["run"]["run_id"][:8] if row.get("run") else "-")
             print("%-5d %-9s %-16s %-20s %-20s %-7s %-9s %s" % (
-                row["slot"], state, (row.get("owner") or "-")[:16], (lock.get("unit") or "-")[:20],
+                row["slot"], state, (row.get("owner") or "-")[:16],
+                (claim.get("unit") or lock.get("unit") or "-")[:20],
                 (row["attached"] or "detached")[:20], marker, run,
                 "current" if row["build_ok"] else "; ".join(row["build_reasons"])))
+        # every slot in the manifest gets a reason line when it is not simply free, so a silent cap is a
+        # diagnosis: `no worktree`, `branch`, `claimed`, `debris`, with a bad record named where there is one
+        for row in rows:
+            if not row["free"] or row.get("state") == "no worktree" or row.get("record_note"):
+                print("  slot %d: %s" % (row["slot"], row["why"]))
         return 0
     if args.cmd == "verify":
         rows = all_slots(main_wt)

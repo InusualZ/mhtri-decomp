@@ -40,7 +40,10 @@ count and its duration; a failure carries the head of its output.
 
 **The tree-dirty guard.** `git status --porcelain` is captured before and after the whole run and must be
 identical - a selftest that writes into the real repository is a defect, and it is invisible unless something
-checks. If it moved, the offender is named with the exact before/after rows.
+checks. If it moved, the offender is named with the exact before/after rows.  **The live slot manifest**
+(`.pi/slots/pool.json`) is guarded the same way but by **bytes**, because `.pi/` is gitignored and the dirty
+guard cannot see it: that file is the campaign's concurrency cap, and a run that rewrites it shrinks the pool
+for every live lane.
 
 **The park list** (`tools/selftests-known-failures.json`) records each *pre-existing* failure with a reason
 and a date, so one old red cannot hide every new one: the summary reads "green except N parked". Parking is
@@ -294,6 +297,24 @@ def git_status(root: str) -> list[str]:
     if p.returncode != 0:
         return []
     return [ln for ln in p.stdout.splitlines() if ln.strip()]
+
+
+#: The one file that IS the slot concurrency cap, and is invisible to `git status` (`.pi/` is gitignored).
+POOL_MANIFEST_REL = os.path.join(".pi", "slots", "pool.json")
+
+
+def pool_manifest_bytes(root: str) -> bytes | None:
+    """The live slot manifest's bytes, or None when there is none.
+
+    Captured before and after the whole run and required to be identical: a selftest that rewrites
+    `.pi/slots/pool.json` silently changes the campaign's concurrency cap while live lanes sit in the pool,
+    which is exactly the phantom "the pool shrank" this guard turns into a one-line failure.
+    """
+    try:
+        with open(os.path.join(root, POOL_MANIFEST_REL), "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
 
 
 def load_parks(path: str = PARK_FILE) -> tuple[list[dict], str | None]:
@@ -584,11 +605,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     dirty_before = git_status(root)
+    pool_before = pool_manifest_bytes(root)
     started = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as pool:
         results = list(pool.map(lambda e: run_one(e, a.timeout, root), entries))
     wall = time.time() - started
     dirty_after = git_status(root)
+    pool_after = pool_manifest_bytes(root)
 
     entry_by_name = {e.name: e for e in entries}
     # classify failures against the park list
@@ -624,10 +647,15 @@ def main(argv: list[str] | None = None) -> int:
                                % (p.get("target") or p.get("name"), p.get("date", "?")))
 
     tree_ok = dirty_before == dirty_after
+    pool_ok = pool_before == pool_after
     offenders = []
     if not tree_ok:
         before, after = set(dirty_before), set(dirty_after)
         offenders = sorted(after - before) + ["removed: " + x for x in sorted(before - after)]
+    if not pool_ok:
+        offenders.append("the live slot manifest %s changed during the run (it IS the concurrency cap)"
+                         % POOL_MANIFEST_REL)
+        tree_ok = False
 
     passed = sum(1 for r in results if r["status"] == "pass")
     total_checks = sum(r["checks"] or 0 for r in results)
@@ -647,6 +675,7 @@ def main(argv: list[str] | None = None) -> int:
             "jobs": a.jobs,
             "tree_clean": tree_ok,
             "tree_offenders": offenders,
+            "pool_manifest_unchanged": pool_ok,
             "green": green,
             "results": [{k: v for k, v in r.items() if k != "output"} for r in results],
             "dedupe_notes": notes,
