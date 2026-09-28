@@ -91,6 +91,7 @@ typedef struct NetworkErrorInfo {
  * read +0x1FBC - and the four tail accessors (`getPeerId`, `isNegotiating`,
  * `getNegotiationResult`, `setBufferSize`) each lost the displacement while 19 more rows moved up
  * with the fix. */
+#pragma pack(1)   /* `profile_4485` is five 32-bit values at the odd offset 0x4485 */
 class GameSpyInterfaceThread {
 public:
     /* +0x0000 */ void* vtable_00;
@@ -155,8 +156,8 @@ public:
     /* +0x4480 */ s8  negotiationStep_4480;
     /* +0x4481 */ u8  pad_4481;
     /* +0x4482 */ s16 bufferSize_4482;
-    /* +0x4484 */ u8  sessionOpen_4484;
-    /* +0x4485 */ u8  profile_4485[0x14];
+    /* +0x4484 */ s8  sessionOpen_4484;
+    /* +0x4485 */ u32 profile_4485[5];
 
     /* the constructor: stores the vtable, publishes the singleton, resets the tables and calls the
      * thread init.  Callers reach it only as `new GameSpyInterfaceThread()`, so the map row at
@@ -226,12 +227,13 @@ public:
     void  setRequestResult(s32 error, s32 value);
     /* publishes a completed request: rewrites the slot tables and the negotiation result */
     void  publishRequest(s32 error, u8 index, u32 value);
-    /* opens the GameSpy socket and installs the callback set, then applies the pending requests */
-    void  ConnectToAnybody();
+    /* opens the GameSpy socket and installs the callback set, then applies the pending requests;
+     * the caller's thread argument is unused here but retail's caller passes it (see the unit header) */
+    void  ConnectToAnybody(s32 arg);
     /* starts a GameSpy match for `count` players and stores the peer id it was given */
     s32   startMatch(s32 count, u32 value, s32 a, u16 b, s32 c, s32 d, s32 e);
     /* registers a receiver for `id` in the first free slot */
-    u8    registerReceiver(void* receiver, u32 id);
+    s32   registerReceiver(void* receiver, u32 id);
     /* releases the receiver slot at `index` and clears its id */
     void  unregisterReceiver(s32 index);
     /* returns the state of the slot `id` maps to, or the pending negotiation result; the callers
@@ -247,6 +249,7 @@ public:
     /* compares a received peer profile against the one this interface published */
     s32   checkPeerProfile(const void* profile, u32 size);
 };   /* size: 0x8450 (approximation: the 0x4000-byte stack at +0x4448 is the upper bound) */
+#pragma pack()
 
 /* --------------------------------------------------------------------------------------------- */
 /* the small timed handler whose ctor sits at the end of the range                                */

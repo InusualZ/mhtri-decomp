@@ -50,35 +50,60 @@
  * of a folded compare, `extsb`+`cmpwi` in place of `extsb.`), with the five functions whose retail
  * bodies DO carry the folded forms bracketed back on.
  *
- * RESIDUALS.  Unit 96.84 % fuzzy, 42/71 functions byte-identical, `.text` 13976 B against 13972 B,
- * every function >= 80 %.  The error record a caller builds is three constants that stay live across
- * six stores - retail groups them `[3],[4],[5],[0],[1],[2]` from three named temporaries - and the
- * record is *dispatched*, not returned: with `NetworkInstanceVtableData` the call passes the instance
- * in r3 the way retail's virtual-call expansion does (`fn_8041B720` 74.25 -> 99.89, `fn_8041B538`
- * 93.77 -> 98.61, `applyEvent`'s two sites each -4 instructions).  `tGameSpyInterface` 87.45 -> 93.82:
- * the request flags are read as `s8` (`lbz`+`extsb`) and the sleep length is a `u64` local, which is
- * what makes MWCC keep the `hi * 17` term of the 64-bit multiply (`mullw r28, r24=0, r27=17`) the way
- * retail does.  What is left: fn_8041B720 keeps its vtable pointer in r5 where retail's expansion
- * uses r12 (two rows, the only difference left in that function); `tGameSpyInterface` also passes its
- * `arg` to `ConnectToAnybody()` (`mr r4, r30`) although the map's row - a name this band invented -
- * mangles `Fv`, so the real signature is probably `...Fl` and the re-anchor is an outbox rename;
- * `applyEvent` 88.71 stages a *second* 3-word record and a 0x28-byte channel through locals this
- * reconstruction does not declare (retail's frame is 0x60 against our 0x30); `publishRequest` 90.18,
- * `receive` 92.30 and `runNasLogin` 94.34 are register colourings of the same statements.
- * isQueued 83.89: retail keeps `extsb`+`cmpwi` (the unfused pair) and jumps to the clamp, ours emits
- * the peephole's `extsb.` form and inverts the branch - the shapesearch "winner" for it negates the
- * guard, which is a *different* function (the same trap `startNegotiation`'s 94.92 candidate is),
- * so both are rejected and the 83.89 / 93.39 shapes below 100 % stay.  `runThread` and the thread
- * body it calls are emitted in the reverse of the target's address order (the map has `runThread` at
- * 0x8041D31C and the body at 0x8041D344): a source order defect that costs no row.  Data:
- * `extabindex` 540/540 exact, `extab` 360 against 380 and `.rela.text` 5640 against 5616 (ours
- * carries two relocations the target's does not - a body-pass residual); the target's last extab
- * entry is the 20-byte cleanup record whose `.relaextab` reloc points at `dtor_803CA338`, a local
- * object with a destructor the range's own code does not show.
+ * SHAPES THAT MATTER (measured, easy to undo by accident).  The runtime entry points the band needs
+ * are the owners' headers (`Runtime.PPCEABI.H/memcpy.h`, `memset.h`, `unsplit/Runtime.PPCEABI.H.h`),
+ * never local declarations (rule 2; the swap is score-neutral, but playbook 60 says measure it).
+ * `registerReceiver` returns `s32`, not the u8 the call sites cast - retail's early returns are
+ * `li r3, -1` / `-2` and the tail masks the slot it returns (`bind` then stores with a plain `stw`).
+ * `sessionOpen_4484` is `s8` (retail `lbz`+`extsb` at every test), `bufferSize_4482` is read unsigned
+ * (`(u16)` at its one use), and `profile_4485` is five `u32` at the *odd* offset 0x4485, which needs
+ * the class's `#pragma pack(1)` (retail stores them `stw r0, 0x4485(r31)`, `0x4489`, ...).
+ * `NetworkLogger::flag_48` returns `u16` (`include/unsplit/Network.h`): retail stores the result with
+ * a raw `sth` and masks it only where it is widened.  An extern whose size is unknown is addressed
+ * absolutely - `lbl_80793990[3]`/`lbl_80793998[4]` give retail's `li r5, sym@sda21` where `char[]`
+ * gave `lis`/`addi`; `lbl_80794380` stays unsized because the target relocates it ADDR16_HA/LO.  The
+ * error record a caller builds is three constants stored twice (retail's five 12-byte frame objects
+ * at 0x08..0x43): the by-value dispatch is emulated with a per-site `u32 info[6]` whose `[3],[4],[5]`
+ * half is written first (`fn_8041B720` 74.25 -> 99.89, `fn_8041B538` 93.77 -> 99.92, `applyEvent`'s
+ * two sites).  A `switch` whose cases all leave 0 is written `break` + one trailing `return 0;`, and
+ * `default: break;` (playbook 34): `runSearch`/`runConnect`/`runNasLogin` only match that way.  The
+ * clamp in `runSearch` is the ternary `size = size >= 0x2000 ? 0x2000 : size;` (retail plants the
+ * constant first and copies in the other arm).  `ConnectToAnybody(s32 arg)` takes the thread argument
+ * even though its body ignores it - retail's caller sets r4 - so the map row is `...Fl`.
+ *
+ * RESIDUALS.  Unit 98.47 % fuzzy, 51/71 functions byte-identical, `.text` 13968 B against 13972 B,
+ * mean 99.09 %, every function >= 80 %.  isQueued 83.89: retail keeps the *unfused* `extsb`+`cmpwi`
+ * and branches to the clamp; with the peephole on ours fuses to `extsb.` and inverts, with it off it
+ * is unfused but still inverts and puts the slot in r4 - both measure below the fused shape, so it
+ * stays (the shapesearch candidate that scores higher negates the guard: a different shape that
+ * measures 84.44).  unregisterReceiver 91.375 keeps its `count` local cached in r30 across the
+ * `replyRequest` call; reading `receiverCount_28` at the loop - retail's `lbz r4, 0x28(r28)` *after*
+ * the call - has the right instruction stream but rotates every callee-saved register (90.93), and
+ * assigning the local after the call measures 85.93.  startMatch 93.63, send 95.68, receive 94.99,
+ * publishRequest 96.83, executeError 97.88, updateCallbackStep 96.22 (five `clrlwi.`/`rlwinm.` pairs
+ * retail keeps unfused; a scoped peephole pragma pair inside the function does nothing and switching
+ * the function to `peephole off` measures 95.68), startNegotiation 98.23 (the third guard's branch
+ * polarity - retail `bne return`, ours `beq body` + `b return`), tGameSpyInterface 98.48,
+ * checkPeerProfile 98.38, fn_8041B334 98.52, applyEvent 94.42 (the record pairs land as two 24-byte
+ * arrays where retail packs five 12-byte objects, and the `ticks * 17` 64-bit multiply materialises
+ * a fresh `li r0, 0x0` where retail reuses its zero) and the two `fn_8041B5xx` callbacks 99.92/99.89
+ * are register colourings of statements that measure byte-identical on their own.  Every postError
+ * site keeps the vtable pointer in a scratch register (r5) where retail's virtual expansion uses
+ * r12 - the front-end's shape for a table view, not the declaration (the sibling
+ * `Network/network_state.cpp` records the same); declaring 162 virtuals to get the real expansion is
+ * not worth it.  `runThread` and the thread body it calls are emitted in the reverse of the target's
+ * address order (the map has `runThread` at 0x8041D31C and the body at 0x8041D344): a source-order
+ * defect that costs no row.  Data: `extabindex` 540/540 exact, `.rela.text` 5616/5616, `extab` 360
+ * against 380 and `.relaextab` 12 B short - the target's last extab entry is the 20-byte cleanup
+ * record whose reloc points at `dtor_803CA338`, a local object with a destructor the range's own code
+ * does not show.
  */
 
 #include "types.h"
 #include "Network/fn_8041A87C.h"
+#include "Runtime.PPCEABI.H/memcpy.h"    /* memcpy  - owner Runtime.PPCEABI.H/memcpy.c */
+#include "Runtime.PPCEABI.H/memset.h"    /* memset  - owner Runtime.PPCEABI.H/memset.c */
+#include "unsplit/Runtime.PPCEABI.H.h"   /* memmove / memcmp / snprintf - no registered owner */
 
 /* retail keeps the *unfused* peephole forms across this band: `clrlwi`+`slwi` in place of
  * `clrlslwi`, `extsh`+`cmpwi` in place of a folded compare, `extsb`+`cmpwi` in place of
@@ -109,13 +134,6 @@ typedef struct NetworkInstanceVtableData {
 } NetworkInstanceVtableData;   /* size: 0x28C */
 
 extern "C" {
-
-/* ---- the runtime's own library entry points (the same spelling the sibling units use) --------- */
-void* memset(void* dst, s32 c, u32 n);
-void* memcpy(void* dst, const void* src, u32 n);
-void* memmove(void* dst, const void* src, u32 n);
-s32 memcmp(const void* a, const void* b, u32 n);
-s32 snprintf(char* buffer, u32 size, const char* fmt, ...);
 
 /* ---- this unit's free (callback and entry-point) bodies, in address order --------------------- -
  * Every other body in the range is a member of one of the four classes, so those are declared in
@@ -237,7 +255,7 @@ s32 NetworkGameSpyInterface::runSearch()
         flags_0C = 0;
         fn_80403F60(getInstance_(), channel_18);
         searchStep_14 = 5;
-        return 0;
+        break;
     case 5:
         pending = flags_0C;
         if ((pending & 1) != 0) {
@@ -248,17 +266,15 @@ s32 NetworkGameSpyInterface::runSearch()
             writePos_8168 = 0;
             searchStep_14 = 0x0A;
         }
-        return 0;
+        break;
     case 0x0A:
         flags_0C = 0;
         offset = writePos_8168;
         size = limit_8164 - offset;
-        if (size >= 0x2000) {
-            size = 0x2000;
-        }
+        size = size >= 0x2000 ? 0x2000 : size;
         fn_80403FE4(getInstance_(), channel_18, offset, size);
         searchStep_14 = 0x0F;
-        return 0;
+        break;
     case 0x0F:
         pending = flags_0C;
         if ((pending & 1) != 0) {
@@ -272,7 +288,7 @@ s32 NetworkGameSpyInterface::runSearch()
                 searchStep_14 = 0x14;
             }
         }
-        return 0;
+        break;
     case 0x14:
         fn_8041A5A8(this, 0x6004, 0, 0, 1, &channel_18);
         return 1;
@@ -288,8 +304,9 @@ s32 NetworkGameSpyInterface::runSearch()
         fn_8041A5A8(this, 0x6001, 0, (s32)info[0], 1, info);
         return 1;
     default:
-        return 0;
+        break;
     }
+    return 0;
 }
 
 /* Runs the GameSpy NAT/connect sub-machine, one step per frame. */
@@ -303,7 +320,7 @@ s32 NetworkGameSpyInterface::runConnect()
         flags_0C = 0;
         fn_80404070(getInstance_());
         searchStep_14 = 5;
-        return 0;
+        break;
     case 5:
         pending = flags_0C;
         if ((pending & 1) != 0) {
@@ -313,7 +330,7 @@ s32 NetworkGameSpyInterface::runConnect()
         } else if ((pending & 0x200) != 0) {
             searchStep_14 = 0x0A;
         }
-        return 0;
+        break;
     case 0x0A:
         fn_8041A5A8(this, 0x6005, 0, 0, 0, NULL);
         return 1;
@@ -329,30 +346,33 @@ s32 NetworkGameSpyInterface::runConnect()
         fn_8041A5A8(this, 0x6001, 0, (s32)info[0], 1, info);
         return 1;
     default:
-        return 0;
+        break;
     }
+    return 0;
 }
 
 /* Applies a DWC event to the interface, then folds the event bits into the state machine's flags. */
 #pragma peephole on
 void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpyEventMsg* msg)
 {
-    u16 limit;
+    u32 limit;
     GameSpyChannel* dst;
     u32 size;
     const GameSpyChannel* src;
-    u32 info[3];
     s32 i;
 
     switch (code) {
     case 0x8000:
-    case 0x8007:
+    case 0x8007: {
+        u32 info[3];
+
         if (task_10 <= 0) {
             fn_803FD794(getInstance_(), info);
             fn_8041A5A8(this, 0x6001, 0, (s32)info[0], 1, info);
         }
         flags_0C |= 1;
         break;
+    }
     case 0x8002:
         flags_0C |= 2;
         break;
@@ -372,8 +392,12 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
             break;
         }
         if (msg->channelView.channel_00 != channel_18) {
+            u32 info[6];
             NetworkInstance* inst;
 
+            info[3] = 0x80000000;
+            info[4] = 0;
+            info[5] = 0;
             info[0] = 0x80000000;
             info[1] = 0;
             info[2] = 0;
@@ -387,7 +411,10 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
             channelCount_8020 = 8;
         }
         limit = msg->channelView.limit_08;
-        limit_8164 = limit > 0x8000 ? 0x7FFF : limit;
+        limit_8164 = limit;
+        if (limit_8164 > 0x8000) {
+            limit_8164 = 0x7FFF;
+        }
         src = msg->channelView.channels_10;
         dst = channels_8024;
         for (i = 0; i < channelCount_8020; i++) {
@@ -406,8 +433,12 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         }
         if (msg->dataView.channel_00 != channel_18 ||
             msg->dataView.writePos_04 != writePos_8168) {
+            u32 info[6];
             NetworkInstance* inst;
 
+            info[3] = 0x80000000;
+            info[4] = 0;
+            info[5] = 0;
             info[0] = 0x80000000;
             info[1] = 0;
             info[2] = 0;
@@ -696,10 +727,10 @@ s32 GameSpyInterfaceThread::runNasLogin()
     case 0:
         if (fn_8050A8A0() == 0) {
             stage_98 = 4;
-            return 0;
+            break;
         }
         stage_98 = stage_98 + 1;
-        return 0;
+        break;
     case 1:
         result = fn_8050A8D0();
         switch (result) {
@@ -719,7 +750,7 @@ s32 GameSpyInterfaceThread::runNasLogin()
         default:
             break;
         }
-        return 0;
+        break;
     case 2:
         if (fn_8050A990() == 0) {
             fn_8050A9A0();
@@ -730,7 +761,7 @@ s32 GameSpyInterfaceThread::runNasLogin()
         } else {
             stage_98 = stage_98 + 1;
         }
-        return 0;
+        break;
     case 3:
         result = fn_8050A9D0();
         switch (result) {
@@ -742,16 +773,16 @@ s32 GameSpyInterfaceThread::runNasLogin()
             SIGNAL_LOG(3, lbl_8060336C);
             fn_8050A9A0();
             stage_98 = 4;
-            return 0;
+            break;
         case 5:
             SIGNAL_LOG(3, lbl_80603378);
             fn_8050A9A0();
             stage_98 = 4;
-            return 0;
+            break;
         default:
             break;
         }
-        return 0;
+        break;
     case 4:
         executeError();
         return -1;
@@ -803,19 +834,17 @@ void GameSpyInterfaceThread::setRequestResult(s32 error, s32 value)
 /* Publishes a completed request: rewrites the slot tables and the negotiation result. */
 void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
 {
-    u8 count;
     u8 i;
     u32 peer;
 
     if (error == 0) {
-        count = receiverCount_28;
-        receiverIds_34[count - 1] = value_30;
-        slotState_54[count - 1] = 1;
+        receiverIds_34[receiverCount_28 - 1] = value_30;
+        slotState_54[receiverCount_28 - 1] = 1;
         peer = value;
         if (peer == 0) {
             peer = peerId_4470;
         }
-        for (i = 0; i < count; i++) {
+        for (i = 0; i < receiverCount_28; i++) {
             if (slotIds_44[i] == peer) {
                 if (i != index) {
                     slotIds_44[i] = 0;
@@ -829,7 +858,7 @@ void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
         slotIds_44[index] = peer;
         slotState_54[index] = 1;
         receiverState_24[index] = 3;
-        for (i = 0; i < count; i++) {
+        for (i = 0; i < receiverCount_28; i++) {
             if (receiverIds_34[i] == slotIds_44[index]) {
                 receiverState_24[index] = i;
                 break;
@@ -845,12 +874,11 @@ void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
 }
 
 /* Opens the GameSpy socket and installs the callback set, then applies the pending requests. */
-void GameSpyInterfaceThread::ConnectToAnybody()
+void GameSpyInterfaceThread::ConnectToAnybody(s32 arg)
 {
-    volatile s8 addressEnd;
     char address[7];
-    s32 state;
     s32 phase;
+    s32 state;
 
     state = 1;
     phase = state_2C;
@@ -859,8 +887,8 @@ void GameSpyInterfaceThread::ConnectToAnybody()
         phase_74 = -1;
         return;
     }
-    snprintf(address, 7, lbl_80793998, bufferSize_4482);
-    addressEnd = 0;
+    snprintf(address, 7, lbl_80793998, (u16)bufferSize_4482);
+    address[6] = 0;
     if (fn_8050DEC0(&lbl_80794CE0, address, 0x2000, 0x2000, (NetworkCallback)fn_8041B194) == 0) {
         fn_8050E2A0(lbl_80794CE0, (NetworkCallback)fn_8041B270);
         fn_8050DF70(lbl_80794CE0, (NetworkCallback)fn_8041B538);
@@ -1049,7 +1077,6 @@ s32 GameSpyInterfaceThread::canClose()
 /* Replies to a pending request by filling the first free return handle. */
 s32 GameSpyInterfaceThread::replyRequest(s32 handle)
 {
-    s16 count;
     s32 i;
 
     if (field_68 < 0) {
@@ -1062,8 +1089,7 @@ s32 GameSpyInterfaceThread::replyRequest(s32 handle)
         return -1;
     }
     if (started_120 != 0) {
-        count = receiverCount_28;
-        for (i = 0; i < count; i++) {
+        for (i = 0; i < receiverCount_28; i++) {
             if (slotHandles_58[i] == 0) {
                 slotHandles_58[i] = handle;
                 break;
@@ -1161,13 +1187,13 @@ void GameSpyInterfaceThread::onDestroy()
 }
 
 /* Registers a receiver for `id` in the first free slot. */
-u8 GameSpyInterfaceThread::registerReceiver(void* receiver, u32 id)
+s32 GameSpyInterfaceThread::registerReceiver(void* receiver, u32 id)
 {
     u8 slot;
     u8 i;
 
     if (receiver == NULL) {
-        return 0xFF;
+        return -1;
     }
     for (slot = 0; slot < receiverCount_28; slot++) {
         if (receivers_14[slot] == 0) {
@@ -1175,7 +1201,7 @@ u8 GameSpyInterfaceThread::registerReceiver(void* receiver, u32 id)
         }
     }
     if (slot >= receiverCount_28) {
-        return 0xFE;
+        return -2;
     }
     receivers_14[slot] = (u32)receiver;
     receiverIds_34[slot] = id;
@@ -1216,11 +1242,9 @@ void GameSpyInterfaceThread::unregisterReceiver(s32 index)
 /* Returns the state of the slot `id` maps to, or the pending negotiation result. */
 u8 GameSpyInterfaceThread::getSlotState(u32 id)
 {
-    u8 count;
     u8 i;
 
-    count = receiverCount_28;
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < receiverCount_28; i++) {
         if (slotIds_44[i] == id) {
             return slotState_54[i];
         }
@@ -1529,7 +1553,7 @@ void GameSpyInterfaceThread::tGameSpyInterface(s32 arg)
             updateClock();
             initRequested_124 = 0;
         } else if ((s8)openRequested_125 != 0) {
-            ConnectToAnybody();
+            ConnectToAnybody(arg);
             openRequested_125 = 0;
         } else if ((s8)stepRequested_126 != 0) {
             step();
@@ -1600,11 +1624,11 @@ void GameSpyInterfaceThread::startNegotiation(const GameSpyPeerId* a, const Game
             lbl_806D3660.encoded_0A = lm->encode_4C(a->port_0C);
         }
     }
-    profile_4485[0] = (u8)selfPeerId_4474;
-    profile_4485[4] = (u8)paramA_7C;
-    profile_4485[8] = (u8)paramB_80;
-    profile_4485[0x0C] = (u8)paramC_84;
-    profile_4485[0x10] = (u8)paramD_88;
+    profile_4485[0] = selfPeerId_4474;
+    profile_4485[1] = paramA_7C;
+    profile_4485[2] = paramB_80;
+    profile_4485[3] = paramC_84;
+    profile_4485[4] = paramD_88;
     negotiationStep_4480 = 0;
     negotiation_446C = 1;
 }
@@ -1632,7 +1656,7 @@ s32 GameSpyInterfaceThread::checkPeerProfile(const void* profile, u32 size)
         if (memcmp(profile, profile_4485, 4) != 0) {
             SIGNAL_LOG(3, lbl_80603638);
         }
-        if (memcmp((const u8*)profile + 4, profile_4485 + 4, 0x10) != 0) {
+        if (memcmp((const u8*)profile + 4, (const u8*)profile_4485 + 4, 0x10) != 0) {
             SIGNAL_LOG(3, lbl_80603660);
         }
         return 0;
@@ -1652,7 +1676,7 @@ void NetworkPeerGameSpy::bind(const u32* id)
 {
     interface_6634 = (GameSpyInterfaceThread*)id[0];
     peer_6638 = id[1];
-    field_6630 = (s32)interface_6634->registerReceiver(this, peer_6638);
+    field_6630 = interface_6634->registerReceiver(this, peer_6638);
     memset(sendBuffer_14, 0, 0x600);
     memset(recvBuffer_614, 0, 0x6000);
     received_10 = 0;
@@ -1759,14 +1783,14 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
     memcpy(&aLen16, cursor, 2);
     {
         NetworkLogger* lm = fn_803C9974();
-        aLen16 = (u16)lm->flag_48(aLen16);
+        aLen16 = lm->flag_48(aLen16);
     }
     bLen16 = 0;
     if (received_10 >= (u32)aLen16 + 4) {
         memcpy(&bLen16, cursor + aLen16 + 2, 2);
         {
             NetworkLogger* lm = fn_803C9974();
-            payload = (u16)lm->flag_48(bLen16);
+            payload = lm->flag_48(bLen16);
         }
         bLen16 = payload;
         cursor = recvBuffer_614;

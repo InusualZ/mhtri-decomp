@@ -43,7 +43,7 @@ public:
     /* +0x3C */ virtual s32  isVerbose_3C();
     /* +0x40 */ virtual void pad_40();
     /* +0x44 */ virtual void pad_44();
-    /* +0x48 */ virtual s32  flag_48(u16 value);
+    /* +0x48 */ virtual u16  flag_48(u16 value);
     /* +0x4C */ virtual u16  encode_4C(u32 value);
 };   /* size: 0x04 (the object's leading vtable word) */
 
@@ -142,9 +142,9 @@ extern u32 lbl_80603740[];
 extern u32 lbl_806D3650[3];
 extern u32 lbl_80794CE0;
 extern void* lbl_80794CE4;
-extern const char lbl_80793990[];
+extern const char lbl_80793990[3];
 extern u32 lbl_80793994;
-extern const char lbl_80793998[];
+extern const char lbl_80793998[4];
 extern const u8 lbl_80794380[];
 
 /* the range's own string pool */
