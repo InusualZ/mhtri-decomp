@@ -363,7 +363,10 @@ were launched in MAIN and said they would stop and report; that is T2 exercising
 
 **Residual gaps the probes named (recorded, not fixed here).** (1) AGENTS.md's playbook index has a
 **duplicate row number** - 48 appears twice (the variadic-definition row and the `extern "C"` row) and 52
-follows 57 - so "playbook 48" is ambiguous in a finding's evidence line; renumbering touches the table plus
-every citation in `docs/matching.md`, the profiles and TESTS.md, so it wants its own batch. (2) The profiles
+follows 57 - so "playbook 48" was ambiguous in a finding's evidence line. **Fixed the same day**, with the
+index generator: the out-of-place section is now **73**, `docs/matching.md`'s numbers are unique and
+contiguous from 1 (asserted on the real plan by `sync_playbook_index_selftest.py`, which is what would have
+caught it), the one live citation of that section (`.pi/notes/802a6624-fn-802a6624-d9e7.md`, the
+float-varargs trap) was repointed, and AGENTS.md's index is now generated rather than hand-copied. (2) The profiles
 carry the playbook *index*, never `docs/matching.md`, so a lane can cite a row but not read it. (3) A
 `rename`-class finding has no `backlog.py` kind, so a reviewer's rename request is picked up by nothing.

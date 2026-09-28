@@ -29,7 +29,7 @@ never by editing `cflags_base`/`cflags_runtime` for everybody.
 
 The tricks below are the individual moves; the worked example at the end is the whole loop run once.
 They are indexed in `AGENTS.md` ("Matching playbook") together with the problem each one solves and a
-status column that doubles as the todo list for whatever unit is being worked on - a successful new idea
+status of each idea, kept current as a unit is worked on - a successful new idea
 becomes a section here in the same style.
 
 ## Toolbox
@@ -1548,7 +1548,7 @@ place.** Two additions from the DWCi band (`.pi/notes/dwci-band-9050.md`, `.pi/n
   (`Ownership.resolve`: name -> `symbols.txt` address -> the `splits.txt` range covering it), so a half-done
   rename leaves both spellings visible to `--diff`, and finishing a rename the base already made moves the
   finding rather than adding one.
-## 48. Never append `, ...` to a definition to dodge an argument-count mismatch
+## 73. Never append `, ...` to a definition to dodge an argument-count mismatch
 
 **Problem.** A retired object calls a function through a declaration with more arguments than the source
 signature carries, so the compiler refuses it. The tempting fix is to make the definition variadic
