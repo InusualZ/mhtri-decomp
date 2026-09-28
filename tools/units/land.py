@@ -1583,6 +1583,21 @@ def rule7_defer_growth(main: str, base: str | None) -> list[str]:
     return sorted(offenders)
 
 
+ALLOW_RULE10: list[str] = []
+
+
+def set_allow_rule10(keys: list[str] | None) -> None:
+    """Record the rule-10 keys *this invocation* accepts deliberately - the command's own audit trail.
+
+    The row lives in `verify()`, which `land()` and the CLI's `--dry-run` path both reach, so the value
+    travels on the module rather than through two more signatures. It is set only from the command line and
+    printed by the row; nothing in a file can grant it, which is the difference between this and the
+    `rule 7 deferred` key the no-exemption ruling removed.
+    """
+    global ALLOW_RULE10                                                   # noqa: PLW0603 - one invocation
+    ALLOW_RULE10 = [a.strip() for a in (keys or []) if a.strip()]
+
+
 def rule10_violations(main: str, text_ref: str | None = None) -> dict | None:
     """`{key: {"unit", "where", "kind"}}` for every rule-10 violation in the tree as it stands.
 
@@ -2422,7 +2437,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         # printed here so the landing's own log carries the exception **and** the key it excused. An
         # allowance that matches nothing is visible too: it stays out of `accepted` and the row still
         # refuses, so a stale allowance cannot quietly keep excusing a key that no longer exists.
-        authorised = {a.strip() for a in (allow_rule10 or []) if a.strip()}
+        authorised = set(ALLOW_RULE10)
         accepted = sorted(k for k in grew if k in authorised)
         grew = sorted(k for k in grew if k not in authorised)
         if accepted:
@@ -2571,6 +2586,7 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
          already_applied: bool = False, branch: str | None = None,
          no_selftests: bool = False, allow_rule10: list[str] | None = None) -> int:
     """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
+
 
     The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
     batch whose gate had *failed* was committed by hand - twice, leaving a partial source on `main` while
@@ -4505,6 +4521,7 @@ def main() -> int:
             print("REFUSED | land needs --units a,b or --branch worker/<slug>")
             return 1
         units = [u.strip() for u in args.units.split(",") if u.strip()]
+        set_allow_rule10(args.allow_rule10)
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     allow_rule10=args.allow_rule10,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
