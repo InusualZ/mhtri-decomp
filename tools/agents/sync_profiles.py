@@ -68,6 +68,7 @@ PLAN_REL = os.path.join("docs", "plan.md")
 PROFILES = (
     os.path.join(".agents", "agents", "decompiler.md"),
     os.path.join(".agents", "agents", "fixer.md"),
+    os.path.join(".agents", "agents", "codereviewer.md"),
 )
 
 # A rule table row: `| 1 | **title** | meaning |`. The meaning cell is one physical line in the plan.
