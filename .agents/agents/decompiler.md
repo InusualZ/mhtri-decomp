@@ -161,6 +161,13 @@ this tree** (the signal that matters in a fresh worktree: "newer than the seeded
 everything there by construction). If it refuses, re-split; do not work around it.
 
 ## Data (match it *with* the code, not after it)
+* **A range dtk classifies as link PADDING** (`pad_NN_ADDR_section`) cannot be claimed with a label: give
+  the map a **`type:function` symbol over the exact claimed extent** (row 73; `mitsevox/tw2004` precedent).
+  With a sizeless `label` the claim links but the report's row keeps dtk's name; with `type:object` the split
+  itself fails on an overlap. Then verify the claim: no `pad_` row for the range in `report.json`, the
+  object's bytes identical to the target's, `ninja build/RMHE08/ok` unchanged. A claim over the *linker's* own
+  tables (`_rom_copy_info`, `_bss_init_info`) is inert by design - dtk strips them from splits, so leave
+  `__start.c`'s `extern`s alone.
 
 A unit is not finished when its `.text` matches - the object has to be the target's object, and the data
 sections are part of it. objdiff's unit score does **not** count a wrong data section (an extra section simply
@@ -203,6 +210,10 @@ is not measured), so measure it yourself before you report.
   unit header's residual list, not only in your message.
 
 ## Verification before you report
+* **Never cite the completion flag.** `Object(Matching, ...)` sets `metadata.complete` in `objdiff.json`, and
+  the report's `complete_code_percent` is then 100 whatever the bytes are (measured: one changed byte left
+  `fuzzy_match_percent` at 99.95049 and `complete_code_percent` at 100.0, while `ok` failed). Evidence is the
+  row's `fuzzy_match_percent`, the byte-level comparison (`tools/units/verifyunit.py`) and the DOL hash.
 
     rm -f build/RMHE08/ok && ninja -k 0          # must end with zero FAILED targets
     rm -f build/RMHE08/ok && ninja build/RMHE08/ok   # then: build/RMHE08/main.dol: OK

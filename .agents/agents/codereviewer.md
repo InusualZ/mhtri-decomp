@@ -59,6 +59,12 @@ them before you form an opinion, and cite the rule number rather than your taste
   flag hunt.
 
 ## The review dimensions, in the order they bite
+* **A `Matching` unit's completion percent is a flag we set.** `Object(Matching, ...)` writes
+  `metadata.complete`, so `complete_code_percent` reads 100 whatever the bytes are (measured: a corrupted
+  `Matching` unit kept 100.0 there while `fuzzy_match_percent` fell to 99.95049 and `ok` failed). Judge such a
+  unit by `fuzzy_match_percent` and by bytes - `tools/units/verifyunit.py` reports `resolved_by: "address"`
+  when a dtk `pad_`-named row was matched by address - and treat `flipcheck.py` READY as necessary, not
+  sufficient.
 
 1. **Honesty of the match claim.** `Object(Matching, …)` is a claim that an object links into a byte-identical
    DOL - check the evidence, not the intent (`objdiff` per symbol plus the section sizes; see the
