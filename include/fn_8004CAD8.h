@@ -18,7 +18,8 @@ void wii_sysmsg_gen(long id, char* buf, long a);
  * caller that reaches a mangled consumer spells it `_vs_user_data`.  Only the fields this project's
  * functions touch are named; every other byte is filler.  size: 0x100 */
 struct _vs_user_data {
-    /* +0x00 */ u8 pad_0x00[0x18];
+    /* +0x00 */ u8 cfg_0x00[0x18];  /* the per-index option bytes `get_arena_cfg` reads (the
+                                     * `0x803BE30C` band's arena twin of `option_w`) */
     /* +0x18 */ s32 point_0x18;      /* the credit `score_add_clamped` accumulates for the player */
     /* +0x1C */ u8 pad_0x1C[0x2C - 0x1C];
     /* +0x2C */ u32 item_0x2C[0x10]; /* the 16 four-byte item slots `item_count_find`/`item_take` walk */

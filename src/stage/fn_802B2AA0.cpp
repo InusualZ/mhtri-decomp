@@ -1689,7 +1689,7 @@ extern "C" void fn_802B59F8(StageAreaObj* area)
     calcVecAngXY(&poly, &area->ang_x, &area->ang_y);
     area->field_0x06C = area->ang_x;
     area->field_0x070 = area->ang_y;
-    mode = fn_803BECA0(area->field_0x498, 3);
+    mode = get_cfg(area->field_0x498, 3);
     switch (mode) {
     case 0:
         area->field_0x07C = 0;

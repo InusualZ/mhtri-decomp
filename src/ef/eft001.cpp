@@ -173,7 +173,7 @@ void fn_802B00AC(nw4r::math::VEC3* out, u8 area);
 void fn_802BE038(void* self);
 void fn_802D2B78(_ENEMY_WORK* enemy);
 void fn_80331210(void* model);
-void fn_803BEE04(void);
+void get_option_21(void);
 void* fn_800F8788(u32 pool);
 void fn_800F886C(void* self);
 void* fn_800F8914();

@@ -90,7 +90,7 @@ typedef struct StageAreaObj {
     /* +0x070 */ s32 field_0x070;
     /* +0x074 */ s32 field_0x074;
     /* +0x078 */ s32 field_0x078;
-    /* +0x07C */ u8 field_0x07C; /* the camera mode `fn_803BECA0` selects */
+    /* +0x07C */ u8 field_0x07C; /* the camera mode `get_cfg` selects */
     /* +0x07D */ u8 pad_0x07D[3];
     /* +0x080 */ s32 field_0x080;
     /* +0x084 */ u8 field_0x084;
@@ -154,7 +154,7 @@ typedef struct StageAreaObj {
     /* +0x43C */ u8 field_0x43C;
     /* +0x43D */ u8 pad_0x43D[0x057];
     /* +0x494 */ u32 field_0x494; /* the area's 0xB20-byte move work */
-    /* +0x498 */ u8 field_0x498; /* kind index into `fn_803BECA0`'s table */
+    /* +0x498 */ u8 field_0x498; /* kind index into `get_cfg`'s table */
     /* +0x499 */ u8 field_0x499;
     /* +0x49A */ u8 field_0x49A;
     /* +0x49B */ u8 field_0x49B; /* the resolved kind, 0xFF while unresolved */
@@ -418,7 +418,7 @@ extern "C" void lb_sub12_send(u8 index);
 extern "C" s32 fn_803A87E0(void);
 extern "C" s32 fn_803A8858(void);
 extern "C" u8 fn_803A8F60(s32 value);
-extern "C" u8 fn_803BECA0(u8 kind, s32 mode);
+extern "C" u8 get_cfg(u8 kind, u8 mode);
 
 /* C++ free functions whose map names are manglings (rule 9). */
 u32 LbCheckKujiraEvent(void);

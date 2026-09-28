@@ -401,10 +401,10 @@ extern const f32 lbl_8079A268; /* 176.0f */
  * (docs/plan.md 6.5 rule 9). */
 s32 Pl_atk_act_flag_ck(struct _PLW* self, u8 mask);
 
-/* 0x803C4814 - `event_demo_ck__Fv`, a C++ free function the Pl/ef band reads.  Unregistered, and the
- * files that spell it `int` locally would clash with a `u32` in `unsplit/unknown.h`, so it lives
- * here. */
-u32 event_demo_ck(void);
+/* 0x803C4814 - `event_demo_ck__Fv`: the range that defines it,
+ * `src/menu/get_pop_dat_ptr.cpp`, owns it and publishes it in `include/menu/get_pop_dat_ptr.h`,
+ * which this header includes below (rule 2). */
+#include "menu/get_pop_dat_ptr.h"
 
 /* 0x8029F6DC - the item-record lookup, spelled `GetItemData__FUs` in the map: a C++ free function
  * taking the 16-bit item id and returning the record, so it is declared at C++ scope and the
