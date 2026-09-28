@@ -5,6 +5,13 @@ Usage:
     python tools/objdiff/symdiff.py -u <unit>                             # list every symbol + score
     python tools/objdiff/symdiff.py -u <unit> <symbol> [n] [--all]        # runs objdiff for you
     python tools/objdiff/symdiff.py <diff.json> <symbol> [n] [--all]      # reuse an existing diff
+    python tools/objdiff/symdiff.py -u <unit> --force-stale               # score a stale object anyway
+
+`-u <unit>` scores the unit's **prebuilt** object (`build/RMHE08/src/<unit>.o`), so it refuses to print
+numbers when a source or header under the unit is newer than that object (exit 1, naming the newer
+file): a lane that measured a stale object reported two "improvements" that were never built. The rule
+and its arithmetic live in `tools/objdiff/freshguard.py`, shared with `unitscore.py`; `--force-stale`
+scores it anyway and says so on stderr.
 
 A bare `-u <unit>` is the **first measurement of a unit in one command**: it lists every symbol the
 unit owns with its official report score, worst first. It used to raise an IndexError traceback
@@ -35,7 +42,11 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
+_HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff (freshguard lives here)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
 import unitutil as uu
+import freshguard
 
 
 _TMPDIR = None
@@ -55,6 +66,24 @@ def session_tmpdir() -> str:
         _TMPDIR = tempfile.mkdtemp(prefix="symdiff-")
         atexit.register(shutil.rmtree, _TMPDIR, ignore_errors=True)
     return _TMPDIR
+
+
+def stale_reasons(unit, root: str | None = None) -> list[str]:
+    """Why scoring `unit`'s **prebuilt** object would report numbers that are not this build's.
+
+    `-u <unit>` in both shapes scores `build/RMHE08/src/<unit>.o` as it sits on disk - one
+    `report generate` (the listing) or one `report measure` (the per-symbol score). If a source or
+    header under the unit is newer than that object, the score describes a build that no longer exists:
+    a lane measured exactly that, twice, and reported two "improvements" that were never compiled. This
+    is the same rule `unitscore.py` enforces (`tools/objdiff/freshguard.py` holds the arithmetic), applied
+    to the tool that scores without one. `root` is the tree the include closure is resolved in (default
+    `unitutil.ROOT`); the selftest passes a fixture tree.
+    """
+    root = root or uu.ROOT
+    src = unit.src if os.path.isabs(unit.src) else os.path.join(root, unit.src)
+    reasons, _newest = freshguard.unit_reasons(src, unit.obj, root,
+                                              rel=lambda p: freshguard.rel_path(p, root))
+    return reasons
 
 
 def retry_transient(fn, attempts: int = 4):
@@ -197,7 +226,23 @@ def official_match(unit, name):
 
 
 def main():
+    argv = sys.argv[1:]
+    force = "--force-stale" in argv
+    if force:
+        sys.argv = [sys.argv[0]] + [a for a in argv if a != "--force-stale"]
     path, name, unit = cli()
+    if unit is not None:
+        reasons = stale_reasons(unit)
+        if reasons:
+            print("freshness  STALE%s" % (" (forced)" if force else ""), file=sys.stderr)
+            for reason in reasons:
+                print("             - " + reason, file=sys.stderr)
+            if not force:
+                print("refused    a stale object would print numbers that are not this build's; nothing "
+                      "shown.\n           rebuild (`ninja %s`) or pass --force-stale to score it anyway "
+                      "(the verdict stays)." % unit.name, file=sys.stderr)
+                return 1
+            print("freshness  (forced by --force-stale)", file=sys.stderr)
     if name is None and unit is not None:
         return list_symbols(unit)
     n = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else 30
@@ -234,4 +279,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # `sys.exit(main())`: the freshness refusal returns 1, and until this was added the process exited
+    # 0 regardless, so a refusal was visible only to a human reading stderr.
+    sys.exit(main())

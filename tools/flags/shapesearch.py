@@ -25,7 +25,16 @@ Usage:
     python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --gens switch,cond --depth 2
     python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --top 10 --jobs 8
     python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --emit <label>   # dump the winner
+    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --expr "return 0;" --expr "return 1;"
+    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --expr-file cands.txt
     python tools/flags/shapesearch.py --list-gens
+
+`--expr` / `--expr-file` are the **candidate-expression** mode: instead of the generated source shapes,
+each candidate is a body you write, compiled with the unit's real cflags and scored with the same
+machinery as the search, and each is printed with its score **and its first divergence**. A lane that
+hand-wrote twelve spellings into a scratch `.c` to attribute one residual did the same thing by hand; a
+file separates its candidates with a line of `---` (without one, each non-empty non-`#` line is one),
+and `--emit <label>` dumps a candidate's full source plus its body diff.
 
 Ranking is by the target function's official score; the table also shows the unit mean and the number of
 functions the variant regressed, so a shape that fixes the function by breaking its neighbours is not
@@ -319,7 +328,54 @@ def print_table(unit, res, run_id, top):
                              os.path.join(SCRATCH, run_id, "diff_best")))
 
 
-def main():
+def expr_candidates(exprs, path=None):
+    """`[(label, body)]` from repeated `--expr` and/or an `--expr-file`, in the order given.
+
+    Each candidate is a **function body** substituted exactly where a generator's output would go
+    (`apply_body`), so it is compiled with the unit's real cflags and scored by `run_batch` - no second
+    compile/score path. A file separates candidates with a line of three or more dashes; without one,
+    each non-empty line that is not a `#` comment is a candidate. Candidates are deduped by
+    `shapes.norm_code` (comment/whitespace), the same key `build_level` uses, so a body written twice is
+    compiled once.
+    """
+    out = [("expr#%d" % i, e) for i, e in enumerate(exprs or [], 1)]
+    if path:
+        try:
+            text = open(path, encoding="utf-8", errors="surrogateescape").read()
+        except OSError as exc:
+            raise SystemExit("cannot read --expr-file %s: %s" % (path, exc))
+        if re.search(r"(?m)^\s*-{3,}\s*$", text):
+            parts = re.split(r"(?m)^\s*-{3,}\s*$", text)
+            out += [("file#%d" % i, part) for i, part in enumerate(parts, 1) if part.strip()]
+        else:
+            lines = [ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+            out += [("file#%d" % i, ln) for i, ln in enumerate(lines, 1)]
+    seen, deduped = set(), []
+    for label, body in out:
+        key = sh.norm_code(body)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((label, body))
+    return deduped
+
+
+def divergence_line(rows):
+    """One line naming a probe's first differing row, or the MATCH answer, from `probe_rows` output."""
+    fd = first_divergence(rows)
+    if fd is None:
+        return "MATCH (no differing row)"
+    i, kind, lf, rf = fd
+    return "first divergence at row %d (%s): target `%s` | ours `%s`" % (i, kind, lf, rf)
+
+
+def divergence_of(target, obj, symbol, unit_name, tmpdir):
+    """`divergence_line` for one compiled probe object (one `objdiff diff`, never a score)."""
+    return divergence_line(probe_rows(target, obj, symbol, unit_name, tmpdir))
+
+
+def build_parser():
+    """The CLI. Split out of `main` so the selftest can assert a flag is wired (`--expr` was not)."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("-u", "--unit", help="unit spec (default: the only unit with source)")
     ap.add_argument("-f", "--function", help="source name of the function (default: the worst one)")
@@ -332,9 +388,74 @@ def main():
     ap.add_argument("--top", type=int, default=12, help="rows to print (default 12)")
     ap.add_argument("--scan", type=int, metavar="N",
                     help="search the N worst functions and print one summary line each")
+    ap.add_argument("--expr", action="append", default=[], metavar="BODY",
+                    help="a candidate function body (repeatable): compile, score and show its first "
+                         "divergence, instead of generating shapes")
+    ap.add_argument("--expr-file", metavar="PATH",
+                    help="candidate bodies from a file (separated by a line of ---, else one per line)")
     ap.add_argument("--emit", metavar="LABEL", help="write that candidate's full source + diff, then exit")
     ap.add_argument("--list-gens", action="store_true")
+    ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
+    return ap
+
+
+def expr_mode(unit, tokens, src, ext, sym, exprs, base_scores, run_id, jobs, emit):
+    """Compile+score each hand-written candidate body, then print its score and first divergence."""
+    edir = os.path.join(run_id, "expr_" + re.sub(r"\W", "_", sym))
+    print("expr mode: %d candidate body(ies) for %s, baseline %.5f%%\n"
+          % (len(exprs), sym, base_scores[sym]))
+    results, _elapsed = run_batch(unit, tokens, exprs, sym, base_scores, edir, jobs, verbose=True)
+    cand = list(zip(exprs, results))
+    # a compiled candidate whose body matched nothing carries NO `fuzzy_match_percent` key (objdiff
+    # omits it when nothing paired) - that is 0 %, not a candidate to drop, so it is shown and flagged
+    ok = [c for c in cand if "error" not in c[1]]
+    errs = [c for c in cand if "error" in c[1]]
+    ok.sort(key=lambda c: (c[1].get("func_pct") or 0.0, c[1].get("unit_mean") or 0.0), reverse=True)
+
+    def pct_of(r):
+        p = r.get("func_pct")
+        return 0.0 if p is None else p
+
+    print("%-4s %-11s %-10s %-10s %-4s %-4s %-6s %s"
+          % ("rank", "func%", "delta", "unit%", "reg", "imp", "size", "candidate"))
+    for n, ((label, _body), r) in enumerate(ok, 1):
+        flag = "  (no score reported - no instruction matched)" if r.get("func_pct") is None else ""
+        print("%-4d %-11.5f %+-10.5f %-10.5f %-4d %-4d %-6s %s%s"
+              % (n, pct_of(r), pct_of(r) - base_scores[sym], r.get("unit_mean") or 0.0,
+                 r["regressed"], r["improved"], r.get("size"), label, flag))
+    for (label, _body), r in errs:
+        print("%-4s %s" % ("err", "%s: %s" % (label, (r.get("error") or "?").splitlines()[0])))
+    print("\ncandidate                              func%       first divergence")
+    for (label, body), r in ok:
+        div = divergence_of(unit.target, r["obj"], sym, unit.name,
+                            os.path.join(SCRATCH, run_id, "expr_diff", re.sub(r"\W", "_", label)))
+        print("%-38s %-11.5f %s" % (label, pct_of(r), div))
+    if errs:
+        print("\n%d candidate(s) failed to compile; their code is not a shape question yet" % len(errs))
+    print("\n%d candidate body(ies) scored, %d distinct object(s)"
+          % (len(ok), len({r["objhash"] for _c, r in ok})))
+    if emit:
+        sel = [(label, body, r) for (label, body), r in ok if label == emit]
+        if not sel:
+            raise SystemExit("no candidate labelled %r (labels: %s)"
+                             % (emit, ", ".join(l for (_l, _b), _r in cand)))
+        label, body, _r = sel[0]
+        func = sh.find_definition(src, sym)
+        out = os.path.join(SCRATCH, edir, "expr_%s%s" % (re.sub(r"\W", "_", label), ext))
+        with open(out, "w", encoding="utf-8", errors="surrogateescape", newline="") as fh:
+            fh.write(apply_body(src, func, body))
+        print("\n%s\n" % out)
+        print(unified_body_diff(src[func[1] + 1:func[2]], body, label))
+    return 0
+
+
+def main():
+    ap = build_parser()
     args = ap.parse_args()
+
+    if args.selftest:
+        import shapesearch_selftest
+        return shapesearch_selftest.selftest()
 
     if args.list_gens:
         for g in sh.DEFAULT_ORDER:
@@ -366,6 +487,17 @@ def main():
 
     print("unit %s   functions %d   unit mean %.3f%%   scratch %s"
           % (unit.name, len(base_scores), base_mean, os.path.relpath(os.path.join(SCRATCH, run_id), uu.ROOT)))
+
+    exprs = expr_candidates(args.expr, args.expr_file)
+    if exprs:
+        symbol = args.function or worst_function(unit, base_scores)
+        if symbol is None:
+            raise SystemExit("every function in %s already scores 100%% - name one with -f" % unit.name)
+        if symbol not in base_scores:
+            raise SystemExit("symbol %r is not in the target object's report (renamed? wrong unit?)"
+                             % symbol)
+        return expr_mode(unit, tokens, src, ext, symbol, exprs, base_scores, run_id, args.jobs,
+                         args.emit)
 
     if args.scan:
         worst = sorted((v, k) for k, v in base_scores.items() if v < 100.0)[:args.scan]
@@ -442,4 +574,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # `sys.exit(main())`: `--selftest` returns non-zero on a failed check, which `--help`-only used to hide.
+    sys.exit(main())

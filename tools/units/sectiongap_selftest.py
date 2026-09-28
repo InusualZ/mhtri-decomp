@@ -48,11 +48,12 @@ def build_elf(content, symbols, relocs=()) -> bytes:
     content : [(section name, bytes)]                PROGBITS sections, in shndx order
     symbols : [(name, shndx, size)]                  the null symbol is implicit at index 0, so these
                                                      start at index 1; `shndx` is a 1-based section index
-    relocs  : [(target section name, offset, type, symbol index)]
+    relocs  : [(target section name, offset, type, symbol index[, addend])]
     """
     n = len(content)
     target_names = []
-    for tgt, _off, _typ, _sym in relocs:
+    for entry in relocs:
+        tgt = entry[0]
         if tgt not in target_names:
             target_names.append(tgt)
     shstr = bytearray(b"\0")
@@ -87,9 +88,14 @@ def build_elf(content, symbols, relocs=()) -> bytes:
     section_index = {name: i + 1 for i, (name, _data) in enumerate(content)}
     rela: dict[str, bytes] = {}
     for tgt in target_names:
-        rows = b"".join(struct.pack(">IIi", off, (sym << 8) | typ, 0)
-                        for t, off, typ, sym in relocs if t == tgt)
-        rela[tgt] = rows
+        rows = bytearray()
+        for entry in relocs:
+            if entry[0] != tgt:
+                continue
+            _t, off, typ, sym = entry[:4]
+            addend = entry[4] if len(entry) > 4 else 0
+            rows.extend(struct.pack(">IIi", off, (sym << 8) | typ, addend))
+        rela[tgt] = bytes(rows)
 
     entries = [(name, SHT_PROGBITS, data, 0, 0, 0, 4) for name, data in content]
     entries.append((".symtab", SHT_SYMTAB, bytes(symtab), strtab_idx, 0, 16, 4))

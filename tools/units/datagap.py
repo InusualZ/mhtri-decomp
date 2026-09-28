@@ -132,6 +132,30 @@ def scan(rows, mode="ours-extra", all_sections=False, min_fuzzy=0.0):
         yield name, extra, missing
 
 
+def summary_lines(listed: int, data_rows: int, scanned: int, mode: str,
+                  flip_blockers: bool, min_fuzzy: float) -> list[str]:
+    """The closing lines, honest about the **direction** a zero is a zero *of*.
+
+    The default `--mode ours-extra` lists only the ours-extra direction, so `0 unit(s) listed` means "no
+    unit has ours-extra bytes", never "no unit has a data object" - a lane read it as the latter once.
+    The zero case therefore names the direction that was **not** scanned and how to scan it.
+    """
+    what = ("data-only gap at or above %g %% code" % min_fuzzy) if flip_blockers else ("%s gap" % mode)
+    lines = ["%d unit(s) listed, %d of them with a real %s, out of %d scanned"
+             % (listed, data_rows, what, scanned)]
+    if listed == 0:
+        if flip_blockers:
+            lines.append("no unit among the %d scanned has a data-only gap at or above %g %% code "
+                         "(code not matching, or no data difference) - not \"no data object\""
+                         % (scanned, min_fuzzy))
+        else:
+            other = {"ours-extra": "target-extra", "target-extra": "ours-extra"}.get(mode, "both")
+            lines.append("no unit among the %d scanned has %s bytes - this is \"no %s\", NOT \"no data "
+                         "object\". The %s direction was not scanned; use --mode both (or --mode %s) "
+                         "to look there." % (scanned, mode, mode, other, other))
+    return lines
+
+
 def selftest() -> int:
     checks = 0
 
@@ -159,6 +183,19 @@ def selftest() -> int:
     eq(compare_sections({".text": 10, ".data": 8}, {".text": 10, ".data": 4}), ([], [(".data", 8, 4)]),
        "smaller ours is target-extra")
     eq(compare_sections({".text": 10}, {".text": 10}), ([], []), "identical sections are silent")
+
+    # the summary must not read a zero in one direction as "no data object"
+    ok = summary_lines(0, 0, 3, "ours-extra", False, 99.0)
+    eq(len(ok), 2, "a zero in one direction adds an honest second line")
+    eq("0 unit(s) listed" in ok[0], True, "... while keeping the count line")
+    eq("target-extra" in ok[1] and "no data object" in ok[1], True,
+       "... and names the direction that was not scanned")
+    eq(summary_lines(2, 2, 5, "ours-extra", False, 99.0), [summary_lines(2, 2, 5, "ours-extra",
+                                                                        False, 99.0)[0]],
+       "a non-zero listing is one line")
+    flip = summary_lines(0, 0, 3, "ours-extra", True, 99.0)
+    eq(len(flip), 2, "a flip-blocker zero is explained too")
+    eq("data-only gap" in flip[1], True, "... as a data-only gap, not a missing object")
 
     # pure-function property: sorted, never both lists for one section
     for name, t, o in [(".data", 0, 120), (".data", 120, 0), (".data", 1, 1)]:
@@ -210,8 +247,9 @@ def main(argv=None) -> int:
             bits.append("target-extra " + ", ".join(f"{s} {t}B (ours {o}B)" for s, t, o in missing))
         print(f"{name}: " + "; ".join(bits))
     data_rows = sum(1 for _n, e, m in rows if m or any(s != ".text" for s, _o, _t in e))
-    what = f"data-only gap at or above {args.min_fuzzy:g} % code" if args.flip_blockers else f"{args.mode} gap"
-    print(f"\n{len(rows)} unit(s) listed, {data_rows} of them with a real {what}, out of {len(pairs)} scanned")
+    for line in [""] + summary_lines(len(rows), data_rows, len(pairs), args.mode,
+                                      args.flip_blockers, args.min_fuzzy):
+        print(line)
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
