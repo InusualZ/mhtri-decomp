@@ -286,7 +286,7 @@ extern "C" void item_page_draw_page_arrow(u16* table, u32 id, s32 flag, _mh_ivec
     draw_sprite_anim_idx(table[0], part, pos);
     fn_802E0AD4((_SPR_DATA_*)&spr, table[1], part, NULL);
     fn_802D9EA8();
-    spr.colour_0x1C = (spr.colour_0x1C & 0xFF) | (fn_802E270C(spr.colour_0x1C, 0xFFD246FF) & 0xFFFFFF00);
+    spr.colour_0x1C = (spr.colour_0x1C & 0xFF) | (color_lerp(spr.colour_0x1C, 0xFFD246FF) & 0xFFFFFF00);
     draw_sprite(*(_SPR_DATA_*)&spr, pos);
 }
 

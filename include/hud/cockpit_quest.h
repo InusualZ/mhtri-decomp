@@ -154,7 +154,7 @@ u8 fn_8028EF30(u8 index);                       /* 0x8028EF30 */
 void fn_802E9070(f32* a, f32* b, u16 t);        /* 0x802E9070 this unit's own body */
 f32 fn_802E8FBC(CockpitWork* work, const f32* pos); /* 0x802E8FBC this unit's own body */
 const QuestScreen* fn_802B0230(void);           /* 0x802B0230 the screen projection */
-s32 fn_802E270C(s32 a, s32 b, f32 t);           /* 0x802E270C */
+s32 color_lerp(s32 a, s32 b, f32 t);           /* 0x802E270C */
 u8 fn_802EA7DC(CockpitWork* work, QuestTarget* target, s32 flags); /* 0x802EA7DC */
 s32 fn_802E8D7C(CockpitWork* work);             /* 0x802E8D7C */
 s8 fn_802EA5F4(_PLW* plw);                      /* 0x802EA5F4 */

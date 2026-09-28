@@ -1,11 +1,13 @@
 /* hud/layout.cpp - the HUD's 2D element library (the 88-function `layout.cpp` translation unit,
  * `.text` 0x802E0740..0x802E4978 / 0x4238 B).
  *
- * Naming note: the symbol map has only fn_XXXXXXXX for most of this range (checked with
- * tools/symbols/symedit.py --section .text range 0x802E0740 0x802E4978: 68 of the 88 rows are bare
- * `fn_` stems; the other 20 carry real names the runtime dump confirms, e.g. draw_sprite,
- * draw_font_idx, put_button_icon_tex, color_mult, and those are written as real functions here).
- * The dump labels the rest `zz_02exxxx_`.
+ * Naming note: the symbol map had only fn_XXXXXXXX for most of this range; this run named every row it
+ * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
+ * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
+ * `fn_802E198C`, `fn_802E0A24`, `fn_802E0B54`, `fn_802E0C80`, `fn_802E0CE4`, `fn_802E0DA8`,
+ * `fn_802E08E8`, `fn_802E099C`, `fn_802E0AD4`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
+ * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
+ * own evidence and the two that are called from outside this unit are cross-unit sweeps.
  *
  * Home, name and seam, from evidence (docs/plan.md 12, brief section 2):
  *   - class 1, a `__FILE__` string.  `.data` 0x805D5800, 0xB = "layout.cpp", is referenced by
@@ -45,29 +47,106 @@
  *     and both `__FILE__` referrers are inside the range), but with 41 of 88 bodies written the claim
  *     buys nothing yet.  Re-claim `.data` and `.sdata` (10 B), and `.sdata2` once the sizes agree.
  *
+ * flipcheck: **NOT READY**. Three of its reasons are references that use the plain spelling where the
+ * map carries the mangling - `get_lsp_data` (`get_lsp_data__FUsP10_mh_ivec2_`), `get_rare_color`
+ * (`get_rare_color__FUc`) and `get_wide_offset` (`get_wide_offset__FUc`), the cockpit-side getters the
+ * block of `include/hud/layout.h` declares - so a flip's link answers `undefined: 'get_lsp_data'`.
+ * Pre-existing and unchanged by this run: the base tree returns the same three names, and the note-box
+ * bodies add two more *sites*, not a new name.  Not a source defect to fix here (the names are the ones
+ * the map and the target object use); the fix is the owner pass that gives the cockpit band
+ * (0x802D9EB4..0x802E0740) its own unit, which moves the three declarations to that unit's header.  The
+ * remaining lines flipcheck prints - `.text` 0x2458 of the 0x4238 claimed, extab/extabindex short,
+ * 14697 of 16952 bytes differing from the target - are what a 46-of-88-body unit must show.
+ *
  * Playbook 29: the pool words and label tables this range references are **declared** here and never
  * defined - that is what keeps the extab/.text claims linkable and lets the unclaimed data go to its
  * own unit.  Playbook 55: our object's `.sdata2` starts 4-mod-8 (its own 16-byte pool), so a claim of
  * the run needs `sh_addralign` lowered to 4 before a flip - `tools/elf/objalign.py` does that from the
  * claim, and `objalign.py`/`flipcheck.py` are the two checks to run then.
  *
- * Flags: `cflags_main` (Wii/1.3, `-O3`, `-inline noauto`, `-Cpp_exceptions on`) - the range keeps
- * `bl`s to its own tiny helpers (`fn_802E0DA8` -> `fn_802E0CE4`), which is `-inline noauto`, and it
- * carries the 74 extab records `-Cpp_exceptions on` emits.
+ * Flags: `cflags_hud` (Wii/1.3, `-O3`, `-inline noauto`, `-Cpp_exceptions on`, `-opt nopeephole`) - the
+ * range keeps `bl`s to its own tiny helpers (`fn_802E0DA8` -> `fn_802E0CE4`), which is `-inline noauto`,
+ * and it carries the 74 extab records `-Cpp_exceptions on` emits; the `nopeephole` half is the lib's
+ * (this file's own `fmuls`+`fadds` pairs are the `#pragma fp_contract off` below, not a lib flag).
  *
- * Score at this commit: 31.5462 % fuzzy (3796/16952 B of `.text`), 41 of the 88 bodies at or above the
- * 80 % bar and 33 of them byte-identical; the 47 functions not written yet score 0 and dominate the unit
- * percentage.  Measured with `build/tools/objdiff-cli.exe report generate -p .` on this worktree's own
- * objects (`units[name = "main/hud/layout"]`); `python tools/units/recompile.py hud/layout.cpp --measure
- * <symbol>` gives the same number per symbol.  Residuals: `fn_802E0B54` 61.5 % (the kind switch),
- * `fn_802E0F78` 91.0 %, `fn_802E0A24` 93.9 %, `put_button_icon_tex` 97.9 %, `fn_802E099C` 98.1 %,
- * `fn_802E0C80` 99.4 %, `draw_sprite` 99.96 % (retail materialises the 0x4330 conversion high word twice;
- * MWCC CSEs ours, 4 bytes short).
+ * Score at this commit: 53.8504 % fuzzy (5444/16952 B of `.text`), 46 of the 88 rows at 100 % and 42
+ * still open (26 of them with no body at all).  Measured with `python tools/objdiff/unitscore.py
+ * hud/layout --measure` on this worktree's own objects (`units[name = "main/hud/layout"]`).
+ *
+ * Written this run: the decimal-digit family (`draw_number_digits_ary`, `draw_number_anim_ary`,
+ * `draw_number_2digit_ary`, `draw_number_2digit_anim_ary`, `draw_font`, `draw_font_idx`), the
+ * colour helpers (`color_lerp`, `color_mult`, `color_scale`), three of the five animation steps
+ * (`anim_step_tex_id`, `anim_step_uv`, `anim_step_color`), `anim_frame_wrap` and the six note-box
+ * layout entries - all byte-identical but `note_box_size` (91.67 %, 52 vs 48 B: MWCC re-narrows the
+ * negated `s16` before the `sth`; the store's `extsh` is the one extra instruction, and four source
+ * shapes that keep it out of the target - a cast, a named `s16` local, an assign-back, a `(u16)`
+ * cast - all reproduce it).
+ *
+ * Two corrections the target's own extractions forced, both measured:
+ *   - `_SPR_ANIM_` is **not** a bitfield pair.  The step kind is the low 12 bits of the halfword
+ *     (`fn_802E099C`/`fn_802E0B54` both read it as `clrlwi r0,r0,20`) and the "wrap the frame at the
+ *     table's last key" flag is bit 15 (`rlwinm r0,r0,0,16,16`) - MSB-first bitfields gave
+ *     `extrwi 12,16` / `extrwi 1,28`, which is a *different* field.  As a plain `u16 flags` with the
+ *     two masks: `fn_802E099C` 98.12 -> 99.88 %, `fn_802E0B54` 61.49 -> 62.29 %.
+ *   - the unit needs `#pragma fp_contract off` (scoped to this file): retail keeps every `a*b + c` as
+ *     its own `fmuls` + `fadds`, and with the default `-fp_contract on` `anim_step_uv` measured
+ *     85.38 % and `color_lerp` 87.17 % against 98.91 % / 95.99 % with it off.
+ *
+ * Renames this run (rule 7; every referrer swept in the same change, all four verified by
+ * `symedit.py rename-batch`'s reference scan): `fn_802E1BF4` -> `draw_number_anim`,
+ * `fn_802E1D8C`/`fn_802E1E4C`/`fn_802E1F18`/`fn_802E1FC4` -> the `draw_number_*_ary` family,
+ * `fn_802E26EC` -> `anim_frame_wrap`, `fn_802E270C` -> `color_lerp` (9 referrer lines across
+ * `hud/cockpit_quest.cpp`, `menu/fn_802E4978.cpp`, `menu/menu_item_page.cpp` and their three
+ * headers), `fn_802E28B0` -> `color_scale`, `fn_802E2C08`/`fn_802E2F54`/`fn_802E326C` -> the
+ * `anim_step_*` family, and the six note-box rows.  `include/g3d/g3d_anmchr.h` gained the two
+ * string helpers this range owns (`flfntStrLen`, `utf82unicode2`) - the owner's header is their
+ * home - and `strcpy` comes from `include/unsplit/Runtime.PPCEABI.H.h` (0x8045F554 is owned by no
+ * registered range, so the band header is its home).
+ *
+ * Still blocked on a **cross-unit rename** (filed, not half-done - each is another registered
+ * unit's symbol, so the sweep is theirs to take): `fn_802E1C74` and `fn_802E29F4` call
+ * `fn_800526F8` (`fn_8004CAD8.cpp`, 16 referrer lines in 5 files, 66 call sites in the DOL);
+ * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
+ * entries call `fn_802A9508`/`fn_802A9630`/`fn_802A9558` (`menu/fn_802A6624.cpp`, 11 call sites) and
+ * `fn_802E21C0` also `fn_8005C8F0` (`g3d/g3d_anmchr.cpp`, 4 call sites); `fn_802E23D0` calls
+ * `fn_802E0AD4` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
+ * `fn_802E2524`, `fn_802E4798`/`fn_802E4828`, the four 0x802E33B4-family layout entries and
+ * `fn_802E4850` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`
+ * and panic strings), i.e. on the `.data`/`.sdata` claim below.
+ *
+ * Residuals of the rows that are written: `fn_802E0B54` 62.3 % (the kind switch's arm order),
+ * `note_box_size` 91.67 %, `color_lerp` 95.99 % (the four channel extractions' declaration order and
+ * the pack's OR order), `color_scale` 97.04 % (the pack's OR order), `anim_step_tex_id` 97.37 %
+ * (`cur`/`prev` land in the opposite register pair), `anim_step_uv` 98.91 %, `anim_step_color`
+ * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `fn_802E198C` 89.98 %, `fn_802E0F78` 91.05 %,
+ * `fn_802E0A24` 93.86 %, `fn_802E1D30` 97.39 %, `put_button_icon_tex` 97.9 %,
+ * `fn_802E099C` 99.88 % (the switch's arm order), `fn_802E0C80` 99.4 % and `draw_sprite` 99.96 %
+ * (retail materialises the 0x4330 conversion high word twice; MWCC CSEs ours, 4 bytes short).
+ *
+ * Data: `datagap.py --unit hud/layout` reports `ours-extra .sdata2 20B` - the compiler's own pool
+ * (the two 2^52 conversion doubles plus the `1.0f` `color_lerp` subtracts).  It grew by 4 B this run
+ * because a new body cannot reference the `lbl_8079A8D8` word without a rule-7 finding of its own;
+ * the pool claim stays blocked until every word of the 28-byte run is written, per the note above.
  */
 
 #include "types.h"
 #include "hud/layout.h"
 #include "menu/menu_item.h"
+#include "g3d/g3d_anmchr.h"
+#include "unsplit/Runtime.PPCEABI.H.h"
+
+/* Retail keeps every `a*b + c` as its own `fmuls` + `fadds`: the animation-step interpolation and
+ * the colour blends below are the witnesses (`fn_802E2F54`'s four interpolated halves).  The unit's
+ * `cflags` do not carry the switch, so it is scoped to this file - the whole file needs it, and no
+ * body here has a fused pair retail does not. */
+#pragma fp_contract off
+
+/* `color_lerp` (0x802E270C) is declared here rather than in `hud/layout.h`: three consumer headers
+ * declare the same name with their own signatures, so the owner's header would be a C++ overload
+ * clash for every consumer that includes two of them (see the note in the header).  The declaration
+ * is this TU's own - it owns the address - and `extern "C"` is what gives the definition the
+ * unmangled name the map and objdiff pair by. */
+extern "C" u32 color_lerp(u32 a, u32 b, f32 t);
 
 /* Retail keeps the unfused peephole pairs (`clrlwi`+`cmpwi`, `clrlwi`+`beq`) that the peephole pass
  * fuses into the record form (`clrlwi.`): `fn_802E0CE4`'s colour gate is the smallest witness
@@ -156,21 +235,21 @@ void draw_sprite_ary(const u16* ids, const _mh_ivec2_* pos)
 
 /* 0x802E099C (0x88) - the animation-step dispatcher: the step record's low 12 bits select which
  * sub-record of `rec` the frame is drawn from, and the call is a tail call into the matching
- * `fn_802E29F4`/`fn_802E2C08`/`fn_802E2D84`/`fn_802E2F54`/`fn_802E326C` family member.  Returns 0
+ * `fn_802E29F4`/`anim_step_tex_id`/`fn_802E2D84`/`anim_step_uv`/`anim_step_color` family member.  Returns 0
  * for a kind it does not know. */
 u32 fn_802E099C(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame)
 {
-    switch (anim->kind) {
+    switch (anim->flags & SPR_ANIM_KIND_MASK) {
     case 0:
         return fn_802E29F4(rec, anim, frame);
     case 1:
-        return fn_802E2C08(&rec->tex_id, anim, frame);
+        return anim_step_tex_id(&rec->tex_id, anim, frame);
     case 2:
         return fn_802E2D84(&rec->u_scale, anim, frame);
     case 3:
-        return fn_802E2F54(&rec->uv0, &rec->uv1, anim, frame);
+        return anim_step_uv(&rec->uv0, &rec->uv1, anim, frame);
     case 4:
-        return fn_802E326C(&rec->color, anim, frame);
+        return anim_step_color(&rec->color, anim, frame);
     }
     return 0;
 }
@@ -228,7 +307,7 @@ u16 fn_802E0B54(u16 id)
         if (anim->count <= 0) {
             break;
         }
-        switch (anim->kind) {
+        switch (anim->flags & SPR_ANIM_KIND_MASK) {
         case 0:
         case 2:
         case 4:
@@ -585,7 +664,7 @@ void draw_number_idx(u16 id, u8 frame, u32 color, const _mh_ivec2_* pos)
 }
 
 /* 0x802E1BF4 (0x80) - the same on an animation-built record. */
-u32 fn_802E1BF4(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos)
+u32 draw_number_anim(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work;
     u32 drawn = fn_802E0AD4(&work, id, part, 0);
@@ -598,4 +677,375 @@ u32 fn_802E1BF4(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos)
 void fn_802E1D30(u16 id, u8 frame, u32 color, const _mh_ivec2_* pos)
 {
     fn_802E1C74(get_lsp_data(id, 0), frame, color, pos);
+}
+
+/* 0x802E1D8C (0xC0) - the same over the 0xFFFF-terminated id run, one digit per id, least
+ * significant first, stopping when the value has no digits left. */
+void draw_number_digits_ary(const u16* ids, s32 number, u32 color, const _mh_ivec2_* pos)
+{
+    draw_number_idx(*ids, number % 10, color, pos);
+    for (;;) {
+        ids++;
+        if (*ids == 0xFFFF) {
+            break;
+        }
+        number /= 10;
+        if (number <= 0) {
+            break;
+        }
+        draw_number_idx(*ids, number % 10, color, pos);
+    }
+}
+
+/* 0x802E1E4C (0xCC) - the same on animation-built records. */
+void draw_number_anim_ary(const u16* ids, u16 part, s32 number, u32 color, const _mh_ivec2_* pos)
+{
+    draw_number_anim(*ids, part, number % 10, color, pos);
+    for (;;) {
+        ids++;
+        if (*ids == 0xFFFF) {
+            break;
+        }
+        number /= 10;
+        if (number <= 0) {
+            break;
+        }
+        draw_number_anim(*ids, part, number % 10, color, pos);
+    }
+}
+
+/* 0x802E1F18 (0xAC) - the fixed two-slot form: a value below ten uses the run's first id alone,
+ * anything wider puts the tens on the second id and the units on the third. */
+void draw_number_2digit_ary(const u16* ids, u8 value, u32 color, const _mh_ivec2_* pos)
+{
+    if (value < 10) {
+        draw_number_idx(ids[0], value, color, pos);
+    } else {
+        draw_number_idx(ids[1], value / 10, color, pos);
+        draw_number_idx(ids[2], value % 10, color, pos);
+    }
+}
+
+/* 0x802E1FC4 (0xDC) - the two-slot form on animation-built records, reporting whether either
+ * slot drew. */
+u32 draw_number_2digit_anim_ary(const u16* ids, u16 part, u8 value, u32 color, const _mh_ivec2_* pos)
+{
+    if (value < 10) {
+        return draw_number_anim(ids[0], part, value, color, pos);
+    }
+    u32 drawn0 = draw_number_anim(ids[1], part, value / 10, color, pos);
+    u32 drawn1 = draw_number_anim(ids[2], part, value % 10, color, pos);
+
+    return drawn0 || drawn1;
+}
+
+/* 0x802E22E0 (0x1C) - draw `str` over the record's own anchor, width, height and colour. */
+void draw_font(const _SPR_DATA_& spr, s8* str, u32 flags, const _mh_ivec2_* pos)
+{
+    draw_font_order(&spr.pos, spr.width, spr.height, spr.color, str, flags, pos);
+}
+
+/* 0x802E22FC (0x5C) - the same for a sprite id. */
+void draw_font_idx(u16 id, s8* str, u32 flags, const _mh_ivec2_* pos)
+{
+    draw_font(*get_lsp_data(id, 0), str, flags, pos);
+}
+
+/* 0x802E26EC (0x20) - the frame a step's table value wraps `frame` into: the table's last entry is
+ * the number of frames the step holds, so the wrap period is that value plus one. */
+u16 anim_frame_wrap(u16 period, u16 frame)
+{
+    return frame % (period + 1);
+}
+
+/* 0x802E270C (0x130) - the per-channel blend `a`*(1-t) + `b`*t of two colour words, repacked in
+ * the record's own channel order (low byte, then 0x08, then 0x18, then 0x10). */
+u32 color_lerp(u32 a, u32 b, f32 t)
+{
+    f32 u = 1.0f - t;
+    f32 c3 = (f32)(a >> 24) * u + (f32)(b >> 24) * t;
+    f32 c2 = (f32)((a >> 16) & 0xFF) * u + (f32)((b >> 16) & 0xFF) * t;
+    f32 c1 = (f32)((a >> 8) & 0xFF) * u + (f32)((b >> 8) & 0xFF) * t;
+    f32 c0 = (f32)(a & 0xFF) * u + (f32)(b & 0xFF) * t;
+
+    return (u8)c0 | ((u8)c1 << 8) | ((u8)c3 << 24) | ((u8)c2 << 16);
+}
+
+/* 0x802E283C (0x74) - the per-channel product of two ARGB colour words, each channel scaled by
+ * 1/255. */
+u32 color_mult(u32 a, u32 b)
+{
+    u32 lo = ((a & 0xFF) * (b & 0xFF)) / 255
+           | ((((a >> 8) & 0xFF) * ((b >> 8) & 0xFF)) / 255) << 8;
+    u32 hi = ((((a >> 24) & 0xFF) * ((b >> 24) & 0xFF)) / 255) << 24
+           | ((((a >> 16) & 0xFF) * ((b >> 16) & 0xFF)) / 255) << 16;
+
+    return lo | hi;
+}
+
+/* 0x802E28B0 (0x144) - the colour word with three of its channels scaled by `scale` and the low
+ * one by `low_scale`, every channel clamped at 255. */
+u32 color_scale(u32 color, f32 scale, f32 low_scale)
+{
+    u32 c3 = (u32)((f32)(color >> 24) * scale);
+    u32 c2 = (u32)((f32)((color >> 16) & 0xFF) * scale);
+    u32 c1 = (u32)((f32)((color >> 8) & 0xFF) * scale);
+    u32 c0 = (u32)((f32)(color & 0xFF) * low_scale);
+
+    if (c3 > 255) {
+        c3 = 255;
+    }
+    if (c2 > 255) {
+        c2 = 255;
+    }
+    if (c1 > 255) {
+        c1 = 255;
+    }
+    if (c0 > 255) {
+        c0 = 255;
+    }
+    return c0 | (c1 << 8) | (c3 << 24) | (c2 << 16);
+}
+
+/* The animation-step walk every `anim_step_*` entry shares: the step's `count` frames are a table
+ * of `frame`/`interp`-tagged keys, and the walk finds the two keys `frame` falls between, then
+ * interpolates their payloads.  Returns 1 when a payload was written and 0 when the frame ran past
+ * the step's last key. */
+
+/* 0x802E2C08 (0x17C) - the texture-id step (kind 1, a 6-byte key). */
+u32 anim_step_tex_id(u16* out, const _SPR_ANIM_* anim, u16 frame)
+{
+    const _SPR_KEY_TEX_* cur = (const _SPR_KEY_TEX_*)anim->frames;
+    const _SPR_KEY_TEX_* prev = cur;
+    s16 count = anim->count;
+
+    if ((anim->flags & SPR_ANIM_WRAP_LAST) != 0) {
+        frame = anim_frame_wrap(cur[count - 1].frame, frame);
+    }
+    if (frame == 0) {
+        *out = cur->tex_id;
+        return 1;
+    }
+    for (;;) {
+        if (cur->frame == frame) {
+            *out = cur->tex_id;
+            return 1;
+        }
+        if (cur->frame > frame) {
+            break;
+        }
+        count--;
+        if (count <= 0) {
+            *out = cur->tex_id;
+            return 0;
+        }
+        prev = cur;
+        cur++;
+    }
+    if (prev->interp == 0) {
+        *out = prev->tex_id;
+    } else {
+        f32 rate = (f32)(frame - prev->frame) / (f32)(cur->frame - prev->frame);
+        u16 from = prev->tex_id;
+        s16 delta = cur->tex_id - prev->tex_id;
+
+        *out = from + (s16)(rate * (f32)delta);
+    }
+    return 1;
+}
+
+/* 0x802E2F54 (0x318) - the texture-coordinate step (kind 3, a 12-byte key holding the first pair
+ * and the second pair's offset from it). */
+u32 anim_step_uv(_mh_tex_uv_* uv0, _mh_tex_uv_* uv1, const _SPR_ANIM_* anim, u16 frame)
+{
+    const _SPR_KEY_UV_* cur = (const _SPR_KEY_UV_*)anim->frames;
+    const _SPR_KEY_UV_* prev = cur;
+    s16 count = anim->count;
+
+    if ((anim->flags & SPR_ANIM_WRAP_LAST) != 0) {
+        frame = anim_frame_wrap(cur[count - 1].frame, frame);
+    }
+    if (frame == 0) {
+        uv0->u = cur->uv.u;
+        uv0->v = cur->uv.v;
+        uv1->u = cur->uv.u + cur->size.u;
+        uv1->v = cur->uv.v + cur->size.v;
+        return 1;
+    }
+    for (;;) {
+        if (cur->frame == frame) {
+            uv0->u = cur->uv.u;
+            uv0->v = cur->uv.v;
+            uv1->u = cur->uv.u + cur->size.u;
+            uv1->v = cur->uv.v + cur->size.v;
+            return 1;
+        }
+        if (cur->frame > frame) {
+            break;
+        }
+        count--;
+        if (count <= 0) {
+            uv0->u = cur->uv.u;
+            uv0->v = cur->uv.v;
+            uv1->u = cur->uv.u + cur->size.u;
+            uv1->v = cur->uv.v + cur->size.v;
+            return 0;
+        }
+        prev = cur;
+        cur++;
+    }
+    if (prev->interp == 0) {
+        uv0->u = prev->uv.u;
+        uv0->v = prev->uv.v;
+        uv1->u = prev->uv.u + prev->size.u;
+        uv1->v = prev->uv.v + prev->size.v;
+    } else {
+        f32 rate = (f32)(frame - prev->frame) / (f32)(cur->frame - prev->frame);
+
+        uv0->u = (s16)((f32)prev->uv.u + rate * (f32)(cur->uv.u - prev->uv.u));
+        uv0->v = (s16)((f32)prev->uv.v + rate * (f32)(cur->uv.v - prev->uv.v));
+        uv1->u = uv0->u + (s16)((f32)prev->size.u + rate * (f32)(cur->size.u - prev->size.u));
+        uv1->v = uv0->v + (s16)((f32)prev->size.v + rate * (f32)(cur->size.v - prev->size.v));
+    }
+    return 1;
+}
+
+/* 0x802E326C (0x148) - the colour step (kind 4, an 8-byte key holding a colour word). */
+u32 anim_step_color(u32* out, const _SPR_ANIM_* anim, u16 frame)
+{
+    const _SPR_KEY_COLOR_* cur = (const _SPR_KEY_COLOR_*)anim->frames;
+    const _SPR_KEY_COLOR_* prev = cur;
+    s16 count = anim->count;
+
+    if ((anim->flags & SPR_ANIM_WRAP_LAST) != 0) {
+        frame = anim_frame_wrap(cur[count - 1].frame, frame);
+    }
+    if (frame == 0) {
+        *out = cur->color;
+        return 1;
+    }
+    for (;;) {
+        if (cur->frame == frame) {
+            *out = cur->color;
+            return 1;
+        }
+        if (cur->frame > frame) {
+            break;
+        }
+        count--;
+        if (count <= 0) {
+            *out = cur->color;
+            return 0;
+        }
+        prev = cur;
+        cur++;
+    }
+    if (prev->interp == 0) {
+        *out = prev->color;
+    } else {
+        f32 rate = (f32)(frame - prev->frame) / (f32)(cur->frame - prev->frame);
+
+        *out = color_lerp(prev->color, cur->color, rate);
+    }
+    return 1;
+}
+
+/* The note box the cockpit's message window is laid out from: `note_text_max_len` measures its widest
+ * line, the two anchor entries hand the box's position to the lobby, and the three extent helpers
+ * offset a row by the line count the box is showing.  Names are derived from the behaviour (the
+ * only caller-side evidence is `note_box_draw` in `enemy/fn_80382310.cpp`) - GUESS. */
+
+/* 0x802E4270 (0xD0) - the length of the widest line of `str`, where a line ends at the first '\n'.
+ * `size` is what the callers pass as the font size and is unused here (the font's own width
+ * function accounts for it). */
+s16 note_text_max_len(u32 size, char* str)
+{
+    char text[128];
+    char rest[128];
+    char* p;
+    s32 wrapped;
+    s32 first;
+    s32 second;
+
+    text[0] = 0;
+    rest[0] = 0;
+    strcpy(text, str);
+    p = text;
+    wrapped = 0;
+    for (;;) {
+        s32 len = utf82unicode2((u8*)p);
+
+        if (len == 1) {
+            if (p[0] == 0) {
+                break;
+            }
+            if (p[0] == '\n') {
+                wrapped = 1;
+                break;
+            }
+        }
+        p += len;
+    }
+    if (wrapped == 0) {
+        return (s16)flfntStrLen(text);
+    }
+    *p = 0;
+    strcpy(rest, p + 1);
+    first = flfntStrLen(text);
+    second = flfntStrLen(rest);
+    if (second > first) {
+        first = second;
+    }
+    return (s16)first;
+}
+
+/* 0x802E44A8 (0x44) - the upper note-box anchor. */
+void note_box_anchor_upper(_mh_ivec2_* pos)
+{
+    pos->x = (s16)(get_wide_offset(2) + 30);
+    pos->y = 360;
+}
+
+/* 0x802E44EC (0x44) - the lower note-box anchor. */
+void note_box_anchor_lower(_mh_ivec2_* pos)
+{
+    pos->x = (s16)(get_wide_offset(2) + 30);
+    pos->y = 386;
+}
+
+/* 0x802E45D4 (0x30) - the note box's own extent for `lines` rows: nothing until the fifth row,
+ * then a negative height that grows by 16 per row. */
+void note_box_size(_mh_ivec2_* extent, s16 lines)
+{
+    extent->x = 0;
+    extent->y = 0;
+    if (lines > 4) {
+        s16 height = (s16)((lines - 4) * 16);
+
+        extent->y = -height;
+    }
+}
+
+/* 0x802E4604 (0x7C) - a note-box row's position: the 2953 sprite's own position is handed back
+ * through `pos`, shifted by the row's own inset, and the box's height is added for the rows past
+ * the fourth. */
+void note_box_pos_upper(_mh_ivec2_* pos, s16 lines)
+{
+    get_lsp_data(2953, pos);
+    pos->x += 18;
+    pos->y -= 8;
+    if (lines > 4) {
+        pos->y -= (s16)((lines - 4) * 16);
+    }
+}
+
+/* 0x802E4680 (0x7C) - the same for the rows below it. */
+void note_box_pos_lower(_mh_ivec2_* pos, s16 lines)
+{
+    get_lsp_data(2953, pos);
+    pos->x += 18;
+    pos->y += 18;
+    if (lines > 4) {
+        pos->y -= (s16)((lines - 4) * 16);
+    }
 }
