@@ -8,35 +8,48 @@ anything but the **Status.** line (that line is carried across regenerations).
 
 Status is `open` (not built), `done` (built), or `parked` (decided against). Set it with `python tools/units/tooling.py --set-status <key> <status>` or edit the **Status.** line directly; the key is the `tooling-key` comment above it.
 
-_719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
+_749 sources (316 outboxes, 433 notes), 31 requests, 204 votes._
 
 | # | request | votes | cost | status |
 | --- | --- | --- | --- | --- |
-| 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 68 | ~29 min | done |
-| 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
+| 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 69 | ~29 min | done |
+| 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 35 | - | done |
 | 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 31 | - | done |
 | 4 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 10 | - | done |
 | 5 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 10 | - | done |
 | 6 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 9 | - | done |
 | 7 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
 | 8 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 6 | ~29 min | done |
-| 9 | **A patch-one-function sweep wrapper is missing (`tools/flags/shapesweep.py`).** The source-shape loop is the whole matching game and is 0.3 s per iteration ... | 2 | ~15 min | open |
-| 10 | **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ... | 2 | - | open |
+| 9 | **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ... | 2 | - | open |
+| 10 | **A patch-one-function sweep wrapper was filed as missing and IS NOT - corrected after a reviewer proved it.** `tools/flags/shapesearch.py -u <unit> -f ... | 2 | - | open |
 | 11 | `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split. | 2 | - | done |
 | 12 | `tools/mwcc-debugger/` is the one tool in this repository that can answer "which optimizer pass did that?" instead of guessing, and its value grows every time ... | 2 | - | open |
 | 13 | datagap.py / flipcheck.py do not know about the linker's own .init rows: a claim ending at the next symbol's start absorbs the linker's *fill* (8 B of the 768 ... | 1 | ~40 min | open |
 | 14 | A 'callers of' query. tools/units/callees.py answers 'callees of' only; I built a 30-line whole-DOL caller index over build/RMHE08/asm (parse '# 0xADDR..' + ... | 1 | ~7 s | open |
 | 15 | build/RMHE08/asm is stale relative to symbols.txt: a renamed callee still prints its OLD label, so grep-ing the asm for a new name silently returns nothing ... | 1 | - | open |
 | 16 | flipcheck.py reports READY for a unit whose flip cannot link: it checks the claim against our own object and the target object's bytes, but never asks whether ... | 1 | - | open |
-| 17 | The same reader settles 'is this range a TU's or the linker's?' - a first-class rule-12 question - in one command: mwlink_debugger.py trace <unit that ... | 1 | - | open |
-| 18 | There is no supported way for a lane to patch a build input the way this fix needs (a post-compile symbol rename/globalise on the MWCC object), so the ... | 1 | - | open |
+| 17 | GAP - no tool reads a vtable out of the DOL and lists its slots with their owners. vtableaudit answers only owned-but-unemitted, so the 114-slot census and ... | 1 | - | open |
+| 18 | MEASUREMENT: `tools/objdiff/symdiff.py -u <unit> <symbol>` is the fast loop (per-row before/after without regenerating the whole report), but the unit-level ... | 1 | - | open |
+| 19 | MERGE LANE (second main move) - the cheap discriminator that answers 'is this landing mine to merge or main's own content?' is the include closure, not the ... | 1 | - | open |
+| 20 | MERGE LANE - main advanced DURING the merge, and the first commit message mis-attributes it (correction here, because a merge commit cannot be amended). At ... | 1 | - | open |
+| 21 | RENAMES: 38 rows renamed through tools/symbols/symedit.py with the referrer sweep done by a script over src/ + include/. The sweep must NOT be a blind token ... | 1 | - | open |
+| 22 | STYLELINT: `--diff` compares per-(rule,file) FINDING COUNTS, so a lane that writes bodies pays for every `fn_` identifier it defines or calls (each definition ... | 1 | - | open |
+| 23 | The same reader settles 'is this range a TU's or the linker's?' - a first-class rule-12 question - in one command: mwlink_debugger.py trace <unit that ... | 1 | - | open |
+| 24 | the schema row itself invited the second defect: the brief renders CONFIG_REQUEST_SCHEMA, and there is no kind for 'another unit's unrenamed symbol blocks ... | 1 | - | open |
+| 25 | There is no supported way for a lane to patch a build input the way this fix needs (a post-compile symbol rename/globalise on the MWCC object), so the ... | 1 | - | open |
+| 26 | this outbox uses `filed`/`what`/`blocks`, which NO tool reads: tools/units/backlog.py builds the register from `config_requests` (kind `range` needs ... | 1 | - | open |
+| 27 | TOOL BUG - tools/objdiff/unitscore.py crashes on a unit the report gives no `matched_code` (`summary_line`: TypeError: unsupported operand type(s) for * ... | 1 | - | open |
+| 28 | TOOL BUG - vtableaudit --diff has no rename mapping, so a unit rename reads as an ADDED rule-10 violation: key `run:<unit>:<section>:<address>` ... | 1 | - | open |
+| 29 | TOOL HALF - a request whose kind is not a schema kind is triaged as a file that does not exist. This outbox used to carry a `kind: naming` entry ... | 1 | - | open |
+| 30 | TOOL HALF - this outbox's own two requests were registered CONTENT-FREE, and one swallowed another lane's finding. tools/units/backlog.py `_add_request`'s ... | 1 | - | open |
+| 31 | tools/units/recompile.py refuses `.c`/`.cpp` mismatches for this unit, so every measurement here is `ninja build/RMHE08/src/quest/quest_entry.o` + ... | 1 | - | open |
 
 ---
 
 ## 1. Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites.
 
 <!-- tooling-key: scratch-measurer -->
-**Votes.** 68  |  **Cost.** ~29 min (58 measurements)
+**Votes.** 69  |  **Cost.** ~29 min (58 measurements)
 
 **Status.** done
 
@@ -101,6 +114,7 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 * `decompiler-80366618-fn-80366618-a8a1` - python build/tmp/m.py ef/eft053.cpp --measure <symbol> (recompile.py with its `absolutize` repaired - see the tooling note)
 * `initnetworksessionstable-d599` - python tools/units/recompile.py Network/initNetworkSessionStable --measure initNetworkSessionStable (100.0, fresh object) + a direct-compile probe harness for the flag matrix (build/tmp/tryflag.py, the unit's real command line + one extra flag) + ninja build/RMHE08/report.json (main/Network/initNetworkSessionStable ...
 * `merger for worker/menu-item-8b55 (fold of worker/802a5444-fn-802a5444-7041 into the landed 0x8029F3C8 half)` - "kind": "done-in-this-fold", "why": "new owner header for fn_8027D738 (the branch's include/ content, taken with the measured u32 spelling). Its consumer path forced three declaration views to their owner's spelling." } ], "finished_at": "2026-09-26T05:05:00", "flags_probed": [
+* `network-pat-abstraction` - about an unowned table. Ownership first (`splits.txt` parse), then emission. --- ## (d) Proposed playbook row + `decompiler.md` paragraph ### Proposed row for `.agents/skills/mwcc-unit-matching/references/playbook.md` Highest existing row is **75**, so this is **76**. `markdo
 * `pipeline-experiment-report` - (`recompile.py --measure` compiles one unit from any worktree — its ~15-minute scratch harness was pure waste).
 * `pipeline-phase2-initnet` - My own scratch harness (batch files under `.pi/tmp/rv/`) cost ~15 minutes and two bugs (pragma-state labels inverted; a size difference I first blamed on `-MMD`). `tools/units/recompile.py --measure <unit>` exists and compiles one unit from any worktree without ninja — the profile should point reviewers at it instead ...; cost: 15 minutes
 * `pl-act-09c6` - (`build/tmp/pl.py table`); the unit number comes from `objdiff-cli report generate -p .`, which is the scale the campaign's `report.json` uses. `functionRelocDiffs=none` is required to reproduce the brief's per-symbol
@@ -114,7 +128,7 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 ## 2. Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN.
 
 <!-- tooling-key: seed-worktree -->
-**Votes.** 34  |  **Cost.** -
+**Votes.** 35  |  **Cost.** -
 
 **Status.** done
 
@@ -152,6 +166,7 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 * `8055c894-fn-8055c894-0851` - `orig/RMHE08/sys/main.dol` had to be copied into the worktree for `tudiscover` - it is
 * `805632bc-fn-805632bc-74c1` - (`orig/RMHE08/sys/main.dol` had to be copied into the worktree for `tudiscover` - it is
 * `decompiler-802f140c-fn-802f140c-1b09` - MAIN's orig/RMHE08/sys/main.dol and orig/RMHE08/files/ were emptied at ~08:04-08:05 during this session (MAIN/orig/RMHE08/files is 4 KB). A pristine copy survives in mhtri-dtk.ws-802e4978-fn-802e4978-506b (main.dol sha1 bf4850739478caaedfe675949eb7c28595a7fde9, files 2.6 GB) - it must not be torn down before MAIN is ...
+* `quest-quest-entry-2a09` - the fastest shape-search loop found this session: a standalone probe TU compiled with the unit's own flags through a 4-line shell script (`build/compilers/Wii/1.3/mwcceppc.exe` + the cflags copied out of `build.ninja`), several candidate functions in one file, then one objdump. 12 candidates in one compile instead of ...
 * `worker-800a99b4-fn-800a99b4-8785` - The worker worktree has no orig/RMHE08/sys/main.dol, so `python configure.py` there writes only the top-level rules and `ninja -t commands build/RMHE08/src/ef/ef_emitterform.o` still answers 'unknown target'. Measurement was therefore run through a scratch wrapper (build/tmp/m.py) that reuses recompile.py's own code ...
 * `worker-800d45ac-fn-800d45ac-3f8b` - python tools/units/recompile.py nw_resource --main <worktree> --measure <symbol>, and build/tmp/nwmeasure.py (one compile, one objdiff report over all 111 symbols). The default recompile.py invocation uses MAIN as the toolchain+target root, but MAIN has no ninja rule or target object for a proposal unit, so --main ...
 
@@ -288,19 +303,7 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 * `score-with-one-report` - > Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements > (one report gives all of them, ~40 s).; cost: 40 s
 * `worker-800ef7d8-fn-800ef7d8-4d79` - python build/tmp/unitreport.py sound/fn_800EF7D8.cpp (one compile + one objdiff report generate, the official metric); python tools/units/recompile.py sound/fn_800EF7D8.cpp --main <worktree> --measure <symbol> for a single symbol
 
-## 9. **A patch-one-function sweep wrapper is missing (`tools/flags/shapesweep.py`).** The source-shape loop is the whole matching game and is 0.3 s per iteration ...
-
-<!-- tooling-key: novel-a-patch-one-function-sweep-wrapper-is-missing-to -->
-**Votes.** 2  |  **Cost.** ~15 min (15 min)
-
-**Status.** open
-
-**Evidence.**
-
-* `orchestrator-tooling` - **A patch-one-function sweep wrapper is missing (`tools/flags/shapesweep.py`).** The source-shape loop is the whole matching game and is 0.3 s per iteration, but nothing in `tools/` does "patch one function, rebuild, print that row's score, repeat" - the NHTTP lane wrote the same ~40-line throwaway three times in ...; cost: 0.3 s
-* `worker/net-nhttp-da39` - *`tools/units/recompile.py` is unusable in this tree from git-bash**: for a `.c` unit it resolves the source as `.cpp` and dies with "Specified file '...NHTTP_bgnend.cpp' not found", and passing `src/NHTTP/NHTTP_bgnend.c` produces a doubled `src\src\...` path. Cost ~15 min (fall back to `ninja ...; cost: 15 min
-
-## 10. **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ...
+## 9. **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ...
 
 <!-- tooling-key: novel-tools-units-recompile-py-measure-reads-the-targe -->
 **Votes.** 2  |  **Cost.** -
@@ -311,6 +314,18 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 
 * `constructnetworkwiimediator-15cb` - **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** (`C:\...\mhtri-dtk\build\RMHE08\obj\Network\constructNetworkWiiMediator.o`) even when run inside a worktree that has its own identical copy. It cost me a double-take and a `sha1sum` comparison before I trusted the 100.0 %; a ...
 * `initnetworksessionstable-d599` - **`recompile.py --measure` reads the *target* object out of MAIN's `build/`** even inside a worktree with its own copy (its own output line names `C:\...\mhtri-dtk\build\RMHE08\obj\...`). It cost a double-take before trusting the 100.0 %; already filed by the mediate lane — third vote.
+
+## 10. **A patch-one-function sweep wrapper was filed as missing and IS NOT - corrected after a reviewer proved it.** `tools/flags/shapesearch.py -u <unit> -f ...
+
+<!-- tooling-key: novel-a-patch-one-function-sweep-wrapper-was-filed-as- -->
+**Votes.** 2  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `orchestrator-tooling` - **A patch-one-function sweep wrapper was filed as missing and IS NOT - corrected after a reviewer proved it.** `tools/flags/shapesearch.py -u <unit> -f <function>` already generates variants, compiles each with the unit's real ninja command line and ranks them; `tryvar.py` is the flag-side twin. The NHTTP lane wrote ...
+* `review-net-nhttp` - **The per-function sweep wrapper the lane asked for exists.** `tools/flags/shapesearch.py -u <unit> -f <function>` is exactly "generate variants, compile each with the unit's real ninja command line, score and rank" (its docstring says so), and `tools/flags/tryvar.py` is the flag-side twin; both are already in the ...
 
 ## 11. `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split.
 
@@ -380,7 +395,73 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 
 * `resfile-flip` - flipcheck.py reports READY for a unit whose flip cannot link: it checks the claim against our own object and the target object's bytes, but never asks whether any OTHER linked object references a symbol only the target object defines. Measured: g3d/g3d_resfile READY (3 sections match, no row-36 risk) and `ninja ...
 
-## 17. The same reader settles 'is this range a TU's or the linker's?' - a first-class rule-12 question - in one command: mwlink_debugger.py trace <unit that ...
+## 17. GAP - no tool reads a vtable out of the DOL and lists its slots with their owners. vtableaudit answers only owned-but-unemitted, so the 114-slot census and ...
+
+<!-- tooling-key: tooling-gap -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/network-pat-class-4f7c` - GAP - no tool reads a vtable out of the DOL and lists its slots with their owners. vtableaudit answers only owned-but-unemitted, so the 114-slot census and the 62-slot work list were produced by a hand-written .data relocation diff twice in two sessions; a `vtableaudit --at <addr>` would answer the whole of priority ...
+
+## 18. MEASUREMENT: `tools/objdiff/symdiff.py -u <unit> <symbol>` is the fast loop (per-row before/after without regenerating the whole report), but the unit-level ...
+
+<!-- tooling-key: tooling-symdiff-py -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-cockpit-quest-8c20` - MEASUREMENT: `tools/objdiff/symdiff.py -u <unit> <symbol>` is the fast loop (per-row before/after without regenerating the whole report), but the unit-level number only exists in `build/RMHE08/report.json`, so the official metric costs a full report regeneration. A `symdiff`-style one-shot unit total would remove ...
+
+## 19. MERGE LANE (second main move) - the cheap discriminator that answers 'is this landing mine to merge or main's own content?' is the include closure, not the ...
+
+<!-- tooling-key: tooling-merge-lane-second-main -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-hud-layout-b64e` - MERGE LANE (second main move) - the cheap discriminator that answers 'is this landing mine to merge or main's own content?' is the include closure, not the score: this landing changed six files and only symbols.txt overlapped, and the row-count assertion (65693 == main's) plus the rename-pair set check (33 applied, 0 ...
+
+## 20. MERGE LANE - main advanced DURING the merge, and the first commit message mis-attributes it (correction here, because a merge commit cannot be amended). At ...
+
+<!-- tooling-key: tooling-agents-md -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-hud-layout-b64e` - MERGE LANE - main advanced DURING the merge, and the first commit message mis-attributes it (correction here, because a merge commit cannot be amended). At `git merge main` time main's tip was d99bf76d7, whose committed AGENTS.md / docs/matching.md / references/playbook.md legitimately did NOT yet carry playbook ...
+
+## 21. RENAMES: 38 rows renamed through tools/symbols/symedit.py with the referrer sweep done by a script over src/ + include/. The sweep must NOT be a blind token ...
+
+<!-- tooling-key: tooling-symedit-py -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-cockpit-quest-8c20` - RENAMES: 38 rows renamed through tools/symbols/symedit.py with the referrer sweep done by a script over src/ + include/. The sweep must NOT be a blind token replace: `fn_802EBED8` is ALSO a FILE name (`src/hud/fn_802EBED8.cpp`, `include/hud/fn_802EBED8.h`), so the first pass rewrote 24 `#include ...
+
+## 22. STYLELINT: `--diff` compares per-(rule,file) FINDING COUNTS, so a lane that writes bodies pays for every `fn_` identifier it defines or calls (each definition ...
+
+<!-- tooling-key: tooling-stylelint -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-cockpit-quest-8c20` - STYLELINT: `--diff` compares per-(rule,file) FINDING COUNTS, so a lane that writes bodies pays for every `fn_` identifier it defines or calls (each definition and each call site is a finding). Nothing in the tool reports which of the added findings are new *symbols* rather than new call sites of already-counted ...
+
+## 23. The same reader settles 'is this range a TU's or the linker's?' - a first-class rule-12 question - in one command: mwlink_debugger.py trace <unit that ...
 
 <!-- tooling-key: tooling-mwlink-debugger-py -->
 **Votes.** 1  |  **Cost.** -
@@ -391,7 +472,18 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 
 * `worker-init-section-e5b4` - The same reader settles 'is this range a TU's or the linker's?' - a first-class rule-12 question - in one command: mwlink_debugger.py trace <unit that references it> names the input file per symbol (`Linker Generated Symbol File` here, as it does for _stack_addr/_SDA_BASE_). Worth one line in the rule-12/Data ...
 
-## 18. There is no supported way for a lane to patch a build input the way this fix needs (a post-compile symbol rename/globalise on the MWCC object), so the ...
+## 24. the schema row itself invited the second defect: the brief renders CONFIG_REQUEST_SCHEMA, and there is no kind for 'another unit's unrenamed symbol blocks ...
+
+<!-- tooling-key: tooling-the-schema-row-itself -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-hud-layout-b64e` - the schema row itself invited the second defect: the brief renders CONFIG_REQUEST_SCHEMA, and there is no kind for 'another unit's unrenamed symbol blocks me'. The conformant shape is a `shared-file` item naming the owner's source file (what the register keys on), which is what this outbox now carries - worth stating ...
+
+## 25. There is no supported way for a lane to patch a build input the way this fix needs (a post-compile symbol rename/globalise on the MWCC object), so the ...
 
 <!-- tooling-key: tooling-objsym-py -->
 **Votes.** 1  |  **Cost.** -
@@ -401,3 +493,69 @@ _719 sources (306 outboxes, 413 notes), 18 requests, 189 votes._
 **Evidence.**
 
 * `resfile-flip` - There is no supported way for a lane to patch a build input the way this fix needs (a post-compile symbol rename/globalise on the MWCC object), so the measurement could only be produced by hand: objcopy --redefine-sym + a byte edit of the .symtab st_info, then a manual mwldeppc invocation against ...
+
+## 26. this outbox uses `filed`/`what`/`blocks`, which NO tool reads: tools/units/backlog.py builds the register from `config_requests` (kind `range` needs ...
+
+<!-- tooling-key: tooling-backlog-py -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `quest-quest-entry-2a09` - this outbox uses `filed`/`what`/`blocks`, which NO tool reads: tools/units/backlog.py builds the register from `config_requests` (kind `range` needs section+start+end, and tools/units/handoff.py holds the one schema) and 305 of 314 outboxes use it. So the .data item filed here never reached the backlog register - it ...
+
+## 27. TOOL BUG - tools/objdiff/unitscore.py crashes on a unit the report gives no `matched_code` (`summary_line`: TypeError: unsupported operand type(s) for * ...
+
+<!-- tooling-key: tooling-unitscore-py -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/network-pat-class-4f7c` - TOOL BUG - tools/objdiff/unitscore.py crashes on a unit the report gives no `matched_code` (`summary_line`: TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'), which is exactly this unit's shape (one 93 % fuzzy function). `or 0` beside matched_code, as total_code already has, fixes it.
+
+## 28. TOOL BUG - vtableaudit --diff has no rename mapping, so a unit rename reads as an ADDED rule-10 violation: key `run:<unit>:<section>:<address>` ...
+
+<!-- tooling-key: tooling-vtableaudit-py -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/network-pat-class-4f7c` - TOOL BUG - vtableaudit --diff has no rename mapping, so a unit rename reads as an ADDED rule-10 violation: key `run:<unit>:<section>:<address>` (tools/units/vtableaudit.py:928, `violation_keys`). Seven ADDED keys for one rename, same addresses; the lint handles the same rename via `git diff -M`. It blocks this ...
+
+## 29. TOOL HALF - a request whose kind is not a schema kind is triaged as a file that does not exist. This outbox used to carry a `kind: naming` entry ...
+
+<!-- tooling-key: tooling-backlog-py-3 -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-hud-layout-b64e` - TOOL HALF - a request whose kind is not a schema kind is triaged as a file that does not exist. This outbox used to carry a `kind: naming` entry; `_add_request`'s else branch does `target = norm_file(file or target or what or kind)`, so the bare kind name `naming` becomes the target, and `backlog.py triage` then ...
+
+## 30. TOOL HALF - this outbox's own two requests were registered CONTENT-FREE, and one swallowed another lane's finding. tools/units/backlog.py `_add_request`'s ...
+
+<!-- tooling-key: tooling-backlog-py-2 -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `worker/ui-hud-layout-b64e` - TOOL HALF - this outbox's own two requests were registered CONTENT-FREE, and one swallowed another lane's finding. tools/units/backlog.py `_add_request`'s `range` branch reads only section/start/end/evidence, so a request filed as a `range` with its content in `why` becomes the item `range-redraw-dcf4ab` in ...
+
+## 31. tools/units/recompile.py refuses `.c`/`.cpp` mismatches for this unit, so every measurement here is `ninja build/RMHE08/src/quest/quest_entry.o` + ...
+
+<!-- tooling-key: tooling-recompile-py -->
+**Votes.** 1  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `quest-quest-entry-2a09` - tools/units/recompile.py refuses `.c`/`.cpp` mismatches for this unit, so every measurement here is `ninja build/RMHE08/src/quest/quest_entry.o` + `tools/objdiff/symdiff.py -u quest/quest_entry <symbol>`. The 17.32505 figure is the report row from `ninja build/RMHE08/report.json`.
