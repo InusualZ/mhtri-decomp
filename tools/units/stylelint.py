@@ -16,7 +16,7 @@ Rules checked (each finding is `file:line`):
 | # | rule | how it is decided |
 | --- | --- | --- |
 | 1 | a shared type lives in one header | the same `struct`/`class`/`union` name defined with a body in more than one `src/` file: one finding per (type, extra file), naming both files |
-| 2 | an extern lives with the TU that owns it | an `extern` declaration of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of a symbol with **no registered owner** at all (an unsplit address), which belongs in a band header under `include/unsplit/`; and, in `include/unsplit/*.h` itself, any declaration of a symbol a registered unit owns (that header is a fallback, not the owner) |
+| 2 | an extern lives with the TU that owns it | a declaration (the `extern` keyword or a plain function prototype) of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of a symbol with **no registered owner** at all (an unsplit address), which belongs in a band header under `include/unsplit/`; an ordinary `include/<module>/*.h` header is judged too (a foreign declaration there is a finding); and, in `include/unsplit/*.h` itself, any declaration of a symbol a registered unit owns (that header is a fallback, not the owner) |
 | 3 | a reconstructed `struct`/`class` states its size | a `size: 0xNN` comment within four lines of the definition (or two lines after its closing brace) |
 | 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
 | 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
@@ -28,14 +28,22 @@ Rules checked (each finding is `file:line`):
 | 11 | no `void *` parameter or return type | a `void` `*` in a function declaration's parameter list or return type (a declaration, never a cast). Erasing the type hides what a heterogeneous call site is actually passing; the only exemption is a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a byte range, an opaque handle passed through, or a caller-owned payload |
 
 Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt`
-(each registered unit's ranges): an `extern` a file declares for a symbol another registered unit owns is a
-finding - move it to that unit's header and `#include` it. A symbol with **no registered owner** (the map
-resolves it to an unsplit address) is a finding too: the local `extern` is the defect and the declaration
-belongs in a band header under `include/unsplit/`. When the registered bands interleave across modules (a
-`sound` unit sits inside the `ef` band) so no module is sound, the finding names the band directory only
-rather than guess a `<module>.h`, and the local `extern` is still wrong in the `src/` file. A symbol missing
-from the map, a duplicate map row, and an address the map gives no section stay counted gaps
-(`Ownership.gaps`) - the map cannot judge them, so they are not guessed. The band is checked as well -
+(each registered unit's ranges) and reads **both** declaration shapes a file can make: the `extern` keyword
+and a plain function prototype (`void foo(void);` - the `extern`-only scanner could not see the latter, so
+`src/Network/fn_8041A87C.cpp`'s local `memset`/`memcpy` and `src/DWCi/fn_805113B0.c`'s `DWCi_GetStringLength`
+were invisible while four real sites existed in the Network scope). A declaration a file makes for a symbol
+another registered unit owns is a finding - move it to that unit's header and `#include` it. A symbol with
+**no registered owner** (the map resolves it to an unsplit address) is a finding too: the local declaration
+is the defect and it belongs in a band header under `include/unsplit/`. When the registered bands interleave
+across modules (a `sound` unit sits inside the `ef` band) so no module is sound, the finding names the band
+directory only rather than guess a `<module>.h`, and the local declaration is still wrong in the `src/` file.
+A symbol missing from the map, a duplicate map row, and an address the map gives no section stay counted gaps
+(`Ownership.gaps`) - the map cannot judge them, so they are not guessed. The owning unit's own public header
+is not a finding: `_owns` recognises `include/<module>/<stem>.h` as the owner's header (before that fix the
+own header read as foreign, so extending rule 2 to headers would have reported ~30 owners' own headers in the
+Network scope alone). An ordinary `include/<module>/*.h` header is judged by this rule (a foreign declaration
+there is a finding; an unowned symbol stays, because the module header carries public names the splits map
+has not registered and the band is the detector for those). The band is checked as well -
 `include/unsplit/*.h` is a file a batch may change, and a declaration there of a
 symbol a registered unit owns is a finding, because the owner's typed definition collides with it
 (`(10197) illegal function overloading`); an unowned symbol stays, which is the band's purpose. A
@@ -558,6 +566,12 @@ def is_unsplit_header(rel: str) -> bool:
     return rel.startswith(UNSPLIT + "/") and rel.endswith(SUFFIXES)
 
 
+def is_shared_header(rel: str) -> bool:
+    """Whether `rel` is a shared header under `include/` (the unsplit band included)."""
+    rel = rel.replace("\\", "/")
+    return rel.startswith(HEADERS + "/") and rel.endswith(HEADER_SUFFIXES)
+
+
 EXTERN_RE = re.compile(r"\bextern\b")
 
 
@@ -606,28 +620,45 @@ def extern_declarations(src: Source) -> list[tuple[str, int, int]]:
 
 
 def _owns(rel: str, unit: str) -> bool:
-    """Whether the `src/` file `rel` is the registered unit `unit` (its source file or its header)."""
+    """Whether `rel` is `unit`'s own source file or its own header.
+
+    Three spellings: the translation unit itself (`src/<unit>`), a private header beside it
+    (`src/<stem>.h`), and the unit's **public** header under `include/` (`include/**/<stem>.h`, any depth,
+    where `<stem>` is the unit's module-qualified stem).  The public-header case is the one the original
+    test missed: `_owns('include/NHTTP/NHTTP_bgnend.h', 'NHTTP/NHTTP_bgnend.c')` was False, so an owner's
+    own header read as a foreign declaration and rule 2 could not be extended to headers without reporting
+    ~30 owners' own headers in the Network scope alone (2026-09-28).  The match is by the module-qualified
+    stem suffix, not the bare basename, so a same-named header in another module stays foreign.
+    """
     rel = rel.replace("\\", "/")
     if rel == SRC + "/" + unit:
         return True
     stem = os.path.splitext(unit)[0]
-    return any(rel == SRC + "/" + stem + ext for ext in (".h", ".hpp", ".hh"))
+    if any(rel == SRC + "/" + stem + ext for ext in (".h", ".hpp", ".hh")):
+        return True
+    # the unit's public header under `include/`: its path carries the unit's module-qualified stem
+    # (`include/Network/network_state.h` for `Network/network_state.cpp`, `include/NHTTP/NHTTP_bgnend.h`
+    # for `NHTTP/NHTTP_bgnend.c`). The suffix match keeps a same-basename header in another module
+    # (`include/other/network_state.h`) out of the owner's set, which a bare-basename match would admit.
+    return (rel.startswith(HEADERS + "/")
+            and any(rel.endswith("/" + stem + ext) for ext in HEADER_SUFFIXES))
 
 
 _LINKAGE_OPEN_RE = re.compile(r"\bextern\s*$")
 _TYPE_ONLY_RE = re.compile(r"^\s*(?:typedef\s+)?(?:struct|class|union|enum)\b")
 
 
-def header_declarations(src: Source) -> list[tuple[str, int]]:
-    """`(name, line)` for every declaration a header makes at file scope.
+def _file_scope_declarations(src: Source) -> list[tuple[str, str, int]]:
+    """`(name, segment, segment_start)` for every file-scope statement that introduces a name.
 
-    An unsplit-band prototype sits inside `extern "C" { ... }`; `strip` blanks the `"C"`, so the
-    linkage block is just a brace opened by an `extern`, and it is *transparent*: its contents are file
-    scope, which is where the band's declarations live. A file-scope statement ending in `;` that
-    introduces a name is returned; a type forward declaration (`struct Foo;`) introduces no symbol from
-    the map and is skipped; a function body's `{` is a real scope, so a definition is never returned.
+    The walk `header_declarations` and `prototype_declarations` share.  An unsplit-band prototype sits
+    inside `extern "C" { ... }`; `strip` blanks the `"C"`, so the linkage block is just a brace opened by
+    an `extern`, and it is *transparent*: its contents are file scope, which is where declarations live.
+    A file-scope statement ending in `;` that introduces a name is returned; a type forward declaration
+    (`struct Foo;`) introduces no symbol from the map and is skipped; a function body's `{` is a real
+    scope, so a definition is never returned.
     """
-    out: list[tuple[str, int]] = []
+    out: list[tuple[str, str, int]] = []
     code = src.code
     depth = 0
     transparent: list[bool] = []
@@ -653,8 +684,53 @@ def header_declarations(src: Source) -> list[tuple[str, int]]:
             name = _declared_name(seg)
             if name is None:
                 continue
-            m = re.search(r"\b%s\b" % re.escape(name), seg)
-            out.append((name, src.line_of(seg_start + (m.start() if m else 0))))
+            out.append((name, seg, seg_start))
+    return out
+
+
+def _seg_line(src: Source, name: str, seg: str, seg_start: int) -> int:
+    """The line of `name` inside `seg`, falling back to the statement's first line."""
+    m = re.search(r"\b%s\b" % re.escape(name), seg)
+    return src.line_of(seg_start + (m.start() if m else 0))
+
+
+def header_declarations(src: Source) -> list[tuple[str, int]]:
+    """`(name, line)` for every declaration a header makes at file scope.
+
+    See `_file_scope_declarations` for the walk.  A declaration here needs no `extern` keyword - an
+    ordinary `void foo(void);` is the header's normal shape.
+    """
+    return [(name, _seg_line(src, name, seg, seg_start))
+            for name, seg, seg_start in _file_scope_declarations(src)]
+
+
+def prototype_declarations(src: Source) -> list[tuple[str, int, int]]:
+    """`(name, pos, line)` for every plain function prototype at file scope (no `extern` keyword).
+
+    The `extern`-keyword form is `extern_declarations`' job; this is the shape that scanner could not
+    see - a plain prototype in a `.cpp`/`.c` (`void foo(void);`), which is how the Network scope's
+    `memset`/`memcpy`/`DWCi_GetStringLength` sites are written.  A statement with no `(` introduces a
+    variable, not a callable, and is left to the other rules; a statement that carries the `extern`
+    keyword is excluded so the two scanners never report one site twice.
+    """
+    out = []
+    for name, seg, seg_start in _file_scope_declarations(src):
+        if "(" not in seg or EXTERN_RE.search(seg):
+            continue
+        out.append((name, seg_start, _seg_line(src, name, seg, seg_start)))
+    return out
+
+
+def declaration_sites(src: Source) -> list[tuple[str, int, int]]:
+    """`(name, pos, line)` for every declaration rule 2 judges in a `src/` file: the union of the
+    `extern`-keyword form and the plain function prototype, with one site never counted twice."""
+    seen: set[tuple[str, int]] = set()
+    out = []
+    for name, pos, line in list(extern_declarations(src)) + prototype_declarations(src):
+        if (name, pos) in seen:
+            continue
+        seen.add((name, pos))
+        out.append((name, pos, line))
     return out
 
 
@@ -678,16 +754,17 @@ def rule2_band_findings(src: Source, ownership: "Ownership") -> list[dict]:
 
 
 def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
-    """Every `extern` declaration the file makes for a symbol it does not own.
+    """Every declaration the file makes for a symbol it does not own.
 
-    Three outcomes: `owned` by this file (no finding), owned by another registered unit (move the
-    declaration to that unit's header and `#include` it), or `unsplit` (the symbol has no registered
+    Both declaration shapes are judged (`declaration_sites`): the `extern` keyword and the plain function
+    prototype.  Three outcomes: `owned` by this file (no finding), owned by another registered unit (move
+    the declaration to that unit's header and `#include` it), or `unsplit` (the symbol has no registered
     owner: move the declaration to `include/unsplit/<module>.h`, or - when the bracketing bands name
     different modules so no module is sound - to a header under `include/unsplit/`). A name not in the
     map and a name with duplicate map rows are left as counted gaps rather than guessed.
     """
     out = []
-    for name, _pos, line in extern_declarations(src):
+    for name, _pos, line in declaration_sites(src):
         r = ownership.resolve(name)
         if r is None:
             ownership.gaps["not in symbols.txt"] += 1
@@ -721,6 +798,32 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
             out.append(_finding(src, 2, line,
                                 "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
                                 % (name, module)))
+    return out
+
+
+def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
+    """Declarations in an ordinary `include/` header for a symbol another registered unit owns.
+
+    A header is not a unit - it is the public face of the unit(s) in its module - so a declaration there
+    is clean only when `_owns` recognises the file as the owner's own header (`include/<module>/<stem>.h`,
+    which the `_owns` fix made it do).  A declaration of a symbol another unit owns is a finding: the
+    declaration belongs in that unit's header.
+
+    A symbol with no registered owner is left alone here (unlike the `src/` reading): the detector for
+    those is the unsplit band, and a module header carries many public names whose addresses the splits
+    map has not registered yet - reporting them would bury the real foreign declarations.
+    """
+    out = []
+    for name, line in header_declarations(src):
+        r = ownership.resolve(name)
+        if r is None or r["kind"] != "owned":
+            continue
+        if _owns(src.rel, r["unit"]):
+            continue
+        ownership.foreign_units[r["unit"]] += 1
+        out.append(_finding(src, 2, line,
+                            "`%s` is owned by `src/%s` - declare it in that unit's header and "
+                            "#include it" % (name, r["unit"])))
     return out
 
 
@@ -1100,6 +1203,14 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
             out.extend(rule2_band_findings(src, ownership))
         out.sort(key=lambda f: (f["rule"], f["line"]))
         return out
+    if is_shared_header(src.rel):
+        # an ordinary `include/` header: rule 2 is the only section-6.5 rule it carries. Rules 3-9 are
+        # body/`src/` rules, and rules 10/11 for headers are reported by `header_pragma_findings` and
+        # `header_rule11_findings` rather than here (2026-09-28).
+        if ownership is not None:
+            out.extend(rule2_header_findings(src, ownership))
+        out.sort(key=lambda f: (f["rule"], f["line"]))
+        return out
     defs = struct_defs(src)
     sized = struct_has_size(src, defs)
 
@@ -1266,6 +1377,28 @@ def header_rule11_findings(root: str) -> list[dict]:
     return out
 
 
+def header_rule2_findings(root: str, ownership: "Ownership | None" = None) -> list[dict]:
+    """Rule 2 over the shared-header tree (`include/`) - the non-unsplit headers.
+
+    The unsplit band has its own reading (`rule2_band_findings`) and is reached through `lint_source`; this
+    is the extension the `extern`-keyword, `src/`-only rule could not see: a foreign declaration in
+    `include/<module>/*.h` (`include/Network/network_state.h`'s `setMediatorState68A` pair).  The map
+    being absent leaves rule 2 unreported, exactly as it does for `src/`.
+    """
+    if ownership is None:
+        ownership = load_ownership(root)
+    if ownership is None:
+        return []
+    out = []
+    for path in header_files(root):
+        rel = rel_of(root, path)
+        if is_unsplit_header(rel):
+            continue
+        out.extend(rule2_header_findings(Source(path, rel, read_text(path)), ownership))
+    out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
+    return out
+
+
 def header_rule11_counts_at_ref(root: str, ref: str) -> dict:
     """Rule-11 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
     out: dict = {}
@@ -1318,6 +1451,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
         out.extend(lint_source(src, ownership))
     out.extend(rule1_findings(sources))
     out.extend(header_pragma_findings(root))
+    out.extend(header_rule2_findings(root, ownership))
     out.extend(header_rule11_findings(root))
     out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out
@@ -1395,15 +1529,16 @@ def git_bytes(root: str, *args: str) -> bytes:
 
 
 def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
-    """`(path_at_ref, path_now)` for every `src/` file and unsplit-band header the tree changed against `ref`.
+    """`(path_at_ref, path_now)` for every `src/` file and shared header the tree changed against `ref`.
 
     A rename is one entry carrying both names, so the file's violations are compared against its old
-    copy rather than counting as new. The band is included because rule 2 applies to it too - it is the
-    file a batch adds an owned symbol's declaration to when it treats the band as a fallback.
+    copy rather than counting as new. The whole `include/` tree is included: rule 2 applies to an ordinary
+    header too (a foreign declaration in `include/<module>/*.h`), so a batch that edits one must be judged
+    against it - and the unsplit band is included because rule 2 applies to it as the fallback file.
     """
     out: list[tuple[str | None, str]] = []
     for line in git(root, "diff", "--name-status", "-M", "--diff-filter=d", ref, "--",
-                    SRC, UNSPLIT).splitlines():
+                    SRC, HEADERS).splitlines():
         parts = line.split("\t")
         if len(parts) < 2:
             continue
@@ -1421,7 +1556,7 @@ def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
     # checked against the wrong set - and a new unit's violations are all additions, so it is the one file
     # guaranteed to matter. This blind spot refused two units on 2026-09-25 whose own lint run had reported
     # "no new section 6.5 violation" (it had compared two headers main changed and not the unit at all).
-    for path in git(root, "ls-files", "--others", "--exclude-standard", "--", SRC, UNSPLIT).splitlines():
+    for path in git(root, "ls-files", "--others", "--exclude-standard", "--", SRC, HEADERS).splitlines():
         if path and path.endswith(SUFFIXES):
             out.append((None, path))
     return out
@@ -1902,6 +2037,59 @@ def selftest() -> int:
           [n for n, _p, _l in extern_declarations(Source("x", "x.c",
               "extern void (*f(int))(void);\n"))], ["f"])
 
+    # --- rule 2 extended: plain prototypes in `src/` and foreign declarations in a module header -----
+    # The `extern`-keyword-only scanner could not see a plain prototype (the Network scope's real sites),
+    # and rule 2 never ran on a non-unsplit header at all.  Both are judged now.
+    check("rule2 prototype: a plain prototype for another unit's symbol is a finding",
+          lines_of("void foo(void);\n", 2, "src/other/c.c", idx), [1])
+    check("rule2 prototype: the detail names the owner and the fix",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "void foo(void);\n"), idx)
+           if f["rule"] == 2],
+          ["`foo` is owned by `src/mod/a.c` - declare it in that unit's header and #include it"])
+    check("rule2 prototype: a prototype for a symbol the file owns is clean",
+          lines_of("void foo(void);\n", 2, "src/mod/a.c", idx), [])
+    check("rule2 prototype: a prototype inside a body is not a file-scope declaration",
+          lines_of("void f(void) {\n    void (*fp)(void);\n}\n", 2, "src/other/c.c", idx), [])
+    check("rule2 prototype: a variable statement is not a prototype",
+          lines_of("u32 g_var;\n", 2, "src/other/c.c", idx), [])
+    check("rule2 prototype: `static` does not exempt the site",
+          lines_of("static void foo(void);\n", 2, "src/other/c.c", idx), [1])
+    check("rule2 prototype: the extern scanner and the prototype scanner never report one site twice",
+          sorted(n for n, _p, _l in declaration_sites(Source("x", "x.c",
+              "extern void foo(void);\n"))), ["foo"])
+
+    # `_owns` must accept the owner's *public* header, or extending rule 2 to headers reports the owner's
+    # own declarations - ~30 false rows in the Network scope alone (the review note).
+    check("_owns: the unit's source", _owns("src/mod/a.c", "mod/a.c"), True)
+    check("_owns: the unit's private header", _owns("src/mod/a.h", "mod/a.c"), True)
+    check("_owns: the unit's public header", _owns("include/mod/a.h", "mod/a.c"), True)
+    check("_owns: a header in a deeper include path", _owns("include/sub/mod/a.h", "mod/a.c"), True)
+    check("_owns: another unit's header is not owned", _owns("include/other/a.h", "mod/a.c"), False)
+    check("_owns: the proof from the review note",
+          _owns("include/NHTTP/NHTTP_bgnend.h", "NHTTP/NHTTP_bgnend.c"), True)
+
+    # an ordinary `include/<module>/*.h` header: a foreign declaration is a finding, the owner's own
+    # header and an unowned symbol are not (the module header carries public names the map has not split).
+    mhdr = "include/mod/user.h"
+    check("rule2 header: another unit's owned symbol is a finding",
+          lines_of("void foo(void);\n", 2, mhdr, idx), [1])
+    check("rule2 header: the detail names the owner and the fix",
+          [f["detail"] for f in lint_source(Source("x", mhdr, "void foo(void);\n"), idx)
+           if f["rule"] == 2],
+          ["`foo` is owned by `src/mod/a.c` - declare it in that unit's header and #include it"])
+    check("rule2 header: the owner's own header is clean",
+          lines_of("void foo(void);\n", 2, "include/mod/a.h", idx), [])
+    check("rule2 header: an `extern` declaration is judged too",
+          lines_of("extern u16 bar[2];\n", 2, mhdr, idx), [1])
+    check("rule2 header: an unowned symbol is left to the band, not reported here",
+          lines_of("void mid(void);\n", 2, mhdr, mid), [])
+    check("rule2 header: a definition is not a declaration",
+          lines_of("void foo(void) {\n}\n", 2, mhdr, idx), [])
+    check("rule2 header: a type forward declaration is not a symbol declaration",
+          lines_of("struct Vec;\n", 2, mhdr, idx), [])
+    check("rule2 header: only rule 2 applies, so a fn_ prototype is not rule 7",
+          rules_of("void fn_80040598(void);\n", mhdr, idx), [])
+
     # --- rule 2 in the unsplit band: an owned symbol must not be declared there --------------------
     band = "include/unsplit/mod.h"
     check("rule2 band: another unit's owned symbol declared in the band is a finding",
@@ -1928,8 +2116,8 @@ def selftest() -> int:
           lines_of("struct Vec;\n", 2, band, idx), [])
     check("rule2 band: only rule 2 applies, so a fn_ prototype is not rule 7",
           rules_of("void fn_80040598(void);\n", band, idx), [])
-    check("rule2 band: a plain prototype in a src/ file is still not rule 2's",
-          lines_of("void foo(void);\n", 2, "src/other/c.c", idx), [])
+    check("rule2 band: a plain prototype in a src/ file is now rule 2's too",
+          lines_of("void foo(void);\n", 2, "src/other/c.c", idx), [1])
 
     # the real map: the ownership lookup resolves a symbol we name, from the tree's own data
     if os.path.exists(os.path.join(".", "config", "RMHE08", "symbols.txt")):
@@ -1976,6 +2164,16 @@ def selftest() -> int:
           diff_deltas({(5, "x"): 3}, {(5, "x"): 1}), [])
     check("diff: a fixed rule still fails for a different one",
           [(x["rule"]) for x in diff_deltas({(5, "x"): 1, (8, "x"): 0}, {(5, "x"): 1, (8, "x"): 1})], [8])
+    # the grandfather, proved on a *header* rule-2 count (the behaviour that had to survive the extension):
+    # an existing finding never blocks, an added one refuses.
+    hdr_before = {(2, "include/mod/a.h"): 2}
+    check("diff grandfather: a header's pre-existing rule-2 findings are not additions when untouched",
+          diff_deltas(hdr_before, hdr_before), [])
+    check("... even when the file is rewritten but the count does not rise",
+          diff_deltas(hdr_before, {(2, "include/mod/a.h"): 2}), [])
+    check("... and one added rule-2 finding in that header refuses",
+          [(x["rule"], x["file"], x["added"]) for x in
+           diff_deltas(hdr_before, {(2, "include/mod/a.h"): 3})], [(2, "include/mod/a.h", 1)])
 
     # --- rule 10: a codegen pragma belongs to a TU, not to a shared header ------------------------
     hdr = "include/stage/fn_802B2AA0.h"

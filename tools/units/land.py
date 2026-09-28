@@ -33,8 +33,12 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
 * checks every command's exit code, `configure.py`'s included - a failed `configure.py` leaves a stale
   `build.ninja` and every later number is a fiction;
 * **refuses a batch that moves the ground truth, that moved `main` since the batch base, that touches a file
-  outside the batch's expected set, or whose outbox entry does not validate**; a foreign path **already in the
-  tree** is reported - with a likely cause when it looks like lane scratch (`.tmp-*`, `.ws-*`, an `upstream/`
+  outside the batch's expected set, or whose outbox entry does not validate**; only the batch's unit-shaped
+  entries are looked up in the outbox (`unit_rows`) - a `--units` entry that names a staged *path* (a header,
+  `LICENSE`, `docs`) has no outbox of its own and must not be validated as if it were a unit
+  (2026-09-28, a header named in `--units` was demanded `residual`/`flags_probed` and bounced the whole
+  landing); a foreign path **already in the tree** is reported - with a likely cause when it looks like lane
+  scratch (`.tmp-*`, `.ws-*`, an `upstream/`
   clone) - **before** the expensive gate runs (`preflight_foreign`), not only as the refusal afterwards, so a
   mis-launched lane's leftovers cost a second, not a 5-minute build;
 * **checks rule 10 like every other rule** (`vtableaudit.py`): a table of code pointers inside a unit's own
@@ -601,6 +605,19 @@ def is_batch_path(main: str, entry: str) -> bool:
     if os.path.splitext(entry)[1]:
         return True
     return os.path.exists(os.path.join(main, entry))
+
+
+def unit_rows(main: str, units: list[str]) -> list[str]:
+    """The unit-shaped subset of a `--units` list: translation units, not paths the batch stages.
+
+    `is_batch_path` draws the line for every unit-shaped gate row (outbox, branch, registration, compile,
+    target drift), so this is the one place that decision is made.  The outbox row used to run over the raw
+    `--units` list instead, so a batch whose `--units` named a HEADER
+    (`include/Network/network_state.h`) had `outbox_units` look for that path as if it were a unit and demand
+    `residual`/`flags_probed` from a non-unit record - a BOOKKEEPING refusal while every real gate row passed
+    (2026-09-28, cost one round-trip and was landed with `--no-outbox`).
+    """
+    return [u for u in units if not is_batch_path(main, u)]
 
 
 def unit_owned_paths(units: list[str]) -> set[str]:
@@ -2094,13 +2111,13 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # whichever the orchestrator typed.
     units = [claims.norm_unit(u.strip("/")) for u in units]
     # A `--units` entry is a batch PATH rather than a unit when it is a file the batch stages rather than a
-    # translation unit - see `is_batch_path`: it carries a file extension, or the tree has something at that
-    # exact path (`.gitignore`, `LICENSE`, `docs`).  A path has no `Object(...)` line, no splits.txt block
-    # and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows below (outbox, branch, registration,
+    # translation unit - see `is_batch_path` and `unit_rows`: it carries a file extension, or the tree has
+    # something at that exact path (`.gitignore`, `LICENSE`, `docs`).  A path has no `Object(...)` line, no splits.txt
+    # block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows below (outbox, branch, registration,
     # compile, target drift) must not assert unit properties about it. It stays in `units` for the staging and
     # ledger rows, which is how the path is committed. (2026-09-27: a tool-only batch could not land at all
     # before the extension signal - the registration row refused every `tools/` path.)
-    unit_units = [u for u in units if not is_batch_path(main, u)]
+    unit_units = unit_rows(main, units)
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str, str, str, str]] = []
 
@@ -2153,7 +2170,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     if unit_units and check_outbox:
         # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
         # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
-        ok_units, outbox_problems = outbox_units(main, units, branch=branch)
+        ok_units, outbox_problems = outbox_units(main, unit_units, branch=branch)
         check("every unit's outbox validates", not outbox_problems, "; ".join(outbox_problems[:4]),
               kind=KIND_BOOKKEEPING,
               remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
@@ -3690,6 +3707,29 @@ def selftest() -> int:
               outbox_units(tmp, ["Camellia/camellia"])[0] == outbox_units(tmp, ["Camellia/camellia.c"])[0], True)
         check("the outbox path ignores the spelling",
               claims.outbox_path(tmp, "Camellia/camellia.c"), claims.outbox_path(tmp, "Camellia/camellia"))
+
+    # a batch whose `--units` names a HEADER: the path carries a file extension, so `is_batch_path` marks it and
+    # `unit_rows` drops it from every unit-shaped row. The outbox row used to run over the raw `--units` list,
+    # so the header was validated as a unit and demanded `residual`/`flags_probed` - a BOOKKEEPING refusal while
+    # every real gate row passed (2026-09-28, landed with `--no-outbox`). The fixture gives the header a
+    # non-unit outbox deliberately: if the row ever runs on it again, this check fails.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "include", "Network"))
+        open(os.path.join(tmp, "include", "Network", "network_state.h"), "w").write("/* h */\n")
+        os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
+        header = "include/Network/network_state.h"
+        json.dump({"unit": header, "worker": "a", "finished_at": "2026-01-01T00:00:00",
+                   "unit_percent": 1.0, "symbols": [{"name": "x", "percent": 1.0}],
+                   "measured_with": "n/a", "config_requests": [], "blockers": []},
+                  open(claims.outbox_path(tmp, header), "w"))
+        json.dump(entry, open(claims.outbox_path(tmp, "Pl/pl_act"), "w"))
+        check("a header is a batch path, not a unit", is_batch_path(tmp, header), True)
+        _ok, raw_problems = outbox_units(tmp, [header, "Pl/pl_act"])
+        check("validating the raw list treats the header as a unit (the bug)", bool(raw_problems), True)
+        check("unit_rows drops the header from the unit-shaped rows", unit_rows(tmp, [header, "Pl/pl_act"]),
+              ["Pl/pl_act"])
+        check("the outbox row then validates only the unit",
+              outbox_units(tmp, unit_rows(tmp, [header, "Pl/pl_act"])), (["Pl/pl_act"], []))
 
     # the teardown step (owner's rule): a green gate releases the batch's claims, a failed one leaves them
     green = [("ground truth", True, "", ""), ("ok", True, "", "")]
