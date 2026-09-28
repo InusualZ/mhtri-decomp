@@ -160,6 +160,42 @@ def selftest() -> int:
     check("a done-in-this-fold entry is done",
           [i.status for i in items if i.kind == "done-in-this-fold"], ["done"])
 
+    # --- the schema and this intake agree about what a filing is (2026-09-28) --------------------------
+    # A span-less `range` filed with its content in `why`/`request` used to register content-free (ask "",
+    # target " -") and key on that shared target, so a second lane's finding collapsed into it and
+    # disappeared. The intake now reads the free-text field and keys a span-less case on a fingerprint.
+    sdir = tempfile.mkdtemp(prefix="backlog-spanless-")
+    sobx = os.path.join(sdir, "outbox")
+    os.makedirs(sobx)
+    os.makedirs(os.path.join(sdir, "notes"))
+
+    def spanless(name, worker, kind, **fields):
+        req = dict({"kind": kind}, **fields)
+        d = {"unit": "u", "worker": worker, "finished_at": "2026-09-27T17:18:28", "unit_percent": 1.0,
+             "symbols": [], "residual": "none", "config_requests": [req]}
+        with open(os.path.join(sobx, name), "w", encoding="utf-8") as fh:
+            json.dump(d, fh)
+
+    spanless("a.json", "lane-a", "range", subject="seam A",
+             request="the right seam A is the weak closure edge")
+    spanless("b.json", "lane-b", "range", why="the left seam B is unproven")
+    spanless("c.json", "lane-c", "shared-file", file="include/x.h", request="two problems: move both")
+    spanless("d.json", "lane-d", "naming", why="fn_XXXXXXXX names are still here")
+    sitems = bl.build_items(sobx, os.path.join(sdir, "notes"), os.path.join(sdir, "none.md"), {})
+    sranges = [i for i in sitems if i.kind == "range"]
+    check("two span-less ranges with different evidence are two items, not one", len(sranges), 2)
+    check("... each carrying its own content (no empty ask)", all(i.ask for i in sranges), True)
+    check("... and each keyed on a fingerprint of its evidence, not a shared empty target",
+          sorted(i.target for i in sranges),
+          sorted("range@%s" % bl.fingerprint(t) for t in
+                 ("the right seam A is the weak closure edge", "the left seam B is unproven")))
+    check("a shared-file with its content in `request` (not `why`) is read",
+          [(i.kind, i.ask) for i in sitems if i.kind == "shared-file"],
+          [("shared-file", "two problems: move both")])
+    check("an out-of-schema `naming` kind is carried, not dropped",
+          [(i.kind, i.ask) for i in sitems if i.kind == "naming"],
+          [("naming", "fn_XXXXXXXX names are still here")])
+
     # ranking: the two-filer open item leads
     check("the most-filed open item ranks first", items[0].filer_count, 2)
     check("... and it is the shared-file defect", items[0].target, "include/enemy/fn_801251d0.h")
@@ -484,6 +520,14 @@ def selftest() -> int:
           bl._check_lint(ldir, bl.Item(kind="naming", target="src/mod/gone.c", defect="rule 7",
                                        status="open", default_status="open", ask="x"),
                          {"splits": {}})[0], "stale")
+    # A `naming` filed in an outbox `config_requests` uses the bare kind as its target (`norm_file(... or
+    # kind)`): it has no file to re-lint, so it must stay open - calling it `stale` would `park` a real
+    # request on the next `triage --apply`.
+    bare = bl.Item(kind="naming", target="naming", defect="rule 7", status="open", default_status="open",
+                   ask="the file's names are unrenamed")
+    bare_dec, bare_ev = bl._check_lint(ldir, bare, {"splits": {}})
+    check("a bare-kind `naming` target is not a missing file", bare_dec, "open")
+    check_true("... and says it names no file to re-lint", "no file" in (bare_ev or ""))
     # rule 11's triage reads `rule11_findings` (no ownership dependency), so an untyped item stays open
     # while its `void *` parameters are there and resolves once every declaration is marked. The band case
     # matters: `lint_source` returns early for `include/unsplit/`, so reading it here would falsely resolve.
