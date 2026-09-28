@@ -134,6 +134,14 @@ them before you form an opinion, and cite the rule number rather than your taste
     `flipcheck.py` names the class now - it prints the differing-byte count, and `the section is a permutation`
     when the sizes match and every symbol's bytes match at its own address - so a permutation no longer reads
     like a three-instruction residual, and the fix is forward declarations plus source order = address order.
+    Read the numbers on the first line that names it: **more than half of the differing bytes sitting outside
+    the symbols' own addresses** is the layout's doing, and the line counts them, so a residual inside the
+    symbols is not mistaken for a reorder. The same defect got measured once with a moved symbol carrying a
+    word of its own too (`NetworkPat`'s three `delete*` functions score 99.7 %, not 100 % - a `lwz` whose base
+    register the compiler picked differently), which the byte-exact test cannot see: that shape prints
+    `the section's layout is a permutation` with how many of how many symbols are mislaid - and it is only
+    printed when the mislaid symbols cover more than half the section, so a two-of-thirty-nine footnote next
+    to a real residual (`ef/ef_effect`) is not called a reorder.
   * **row 36 by name**: an exported symbol our object does not force active is deadstripped by a flip (the
     target's `.comment` marks it force-active `0x08`). The fix is `__declspec(export)` per symbol; the census is
     broad (`Network/NetworkWiiMediator` alone carries 14), so read `flipcheck.py`'s row-36 lines rather than
