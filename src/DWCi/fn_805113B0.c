@@ -8,8 +8,10 @@
  * cut there (.sdata run jumps DWCi_addressFormatPort -> DWCi_emptyString and DWCi_emptyString -> 0x80794370
  * intersect at the single cut 18642), so a TU begins at 0x80512490 and the 0x64 overlap with the
  * NHTTP-side probe is exactly `DWCi_GetStringLength`.  That function's definition moved to the new
- * `DWCi/DWCi_NatNeg.c` (0x80512490..0x805145B8); the forward declaration below stays because the
- * bodies here still call it.  Re-measured before/after: 91.1543 % / 21 functions / 472 B matched
+ * `DWCi/DWCi_NatNeg.c` (0x80512490..0x805145B8), which owns it; the bodies here reach it through
+ * that unit's header (`include/DWCi/DWCi_NatNeg.h`, rule 2 - the local `extern` this file used to
+ * carry was removed in the 2026-09-27 networking pass and the row re-measured unchanged).
+ * Re-measured before/after: 91.1543 % / 21 functions / 472 B matched
  * (before) -> 90.9439 % / 20 functions / 372 B matched (after) - the 100 B loss is exactly the
  * 100 %-matched `DWCi_GetStringLength` leaving the unit, not a regression in any remaining body.
  *
@@ -90,6 +92,7 @@
  */
 
 #include "types.h"
+#include "DWCi/DWCi_NatNeg.h"            /* DWCi_GetStringLength: the owner's header (rule 2) */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers (rule 2) */
@@ -243,7 +246,6 @@ void DWCi_connectionShutdown(DWCiConn* conn);
 u16 DWCi_htons(u16 port);
 char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort);
-void DWCi_GetStringLength(void** buf, int* len);
 
 /* 0x805113B0 - the handshake write: { 0x0003 } when the connection is in mode 2, then the shared
  * 0xFEFE constant and the 0x68 terminator, handed to the send path. */
