@@ -10,6 +10,11 @@ section both yield suggestions; two workers phrasing the same wall differently b
 count of 2; two novel phrasings of one request are clustered by similarity; a duplicate outbox from one
 worker does not double-vote; the ranking is votes-descending then cost-descending; and a `**Status.**` line
 survives regeneration (the register's only hand-edited field).
+
+One more, and it is the reason this file was touched (2026-09-28): a **structured `tooling` list** is one
+row per bullet, keyed by the target it names - `.init` filed two bullets and the register carried one, so
+neither bullet may be agglomerated with the other, the identical bullet from a second lane is a second
+*vote*, and a bullet that was skipped (too short, or already owned by a curated topic) is reported.
 """
 from __future__ import annotations
 
@@ -56,6 +61,21 @@ def selftest() -> int:
     check("novel register is tracked, not .pi", ".pi" not in tg.REGISTER and tg.REGISTER.endswith("tooling-requests.md"),
           True)
     check("jaccard disjoint", tg.jaccard(tg.tokens("alpha beta"), tg.tokens("gamma delta")), 0.0)
+    # `target_of` keys a structured bullet on its FIRST tool: bullets naming the same tool pool their votes
+    # (keying on the first two produced `...-datagap-py-flipcheck-py` *and* `...-flipcheck-py` for bullets
+    # naming flipcheck.py, so the row the register exists to build was split in two)
+    check("target_of keys a bullet on its first tool",
+          tg.target_of("`datagap.py` / `flipcheck.py` do not know about the .init rows"), "datagap.py")
+    check("... and the same for a single-tool bullet",
+          tg.target_of("`flipcheck.py` reports READY for a unit whose flip cannot link"), "flipcheck.py")
+    check("... so two bullets naming that tool share their key",
+          tg.target_of("`flipcheck.py` reports READY") == tg.target_of("flipcheck.py mislabels the claim"),
+          True)
+    check("... while a bullet naming no tool falls back to its leading words",
+          tg.target_of("build/RMHE08/asm is stale relative to symbols.txt"),
+          "build/RMHE08/asm is stale relative")
+    check("an explicit `target` field wins over the bullet",
+          tg.target_of("`a.py` and `b.py`", {"target": "objalign.py"}), "objalign.py")
 
     # --- fixtures ----------------------------------------------------------------------------------
     tmp = tempfile.mkdtemp(prefix="tooling-selftest-")
@@ -119,6 +139,51 @@ def selftest() -> int:
     check("two novel phrasings cluster into one 2-vote entry", len(novel), 1)
     check_true("the novel ask is about the claims/worktree wall",
                "reclaim" in novel[0].ask.lower() or "worktree" in novel[0].ask.lower())
+
+    # --- structured `tooling` LISTS: one row per bullet, keyed by target ---------------------------
+    # A lane that files two bullets used to get one row (or none): the bullets were flattened into the
+    # novel pool and agglomerated by token overlap with everything else.  `.init` (2026-09-28) filed two
+    # and the register carried one - so every element is now its own item, keyed by the target it names.
+    obx2 = os.path.join(tmp, "outbox2")
+    os.makedirs(obx2)
+    bullet_1 = ("datagap.py / flipcheck.py do not know about the linker's own .init rows: a claim ending "
+                "at the next symbol's start absorbs the linker's *fill*, so datagap reports `target-extra` "
+                "and flipcheck reports NOT READY. Cost ~40 min.")
+    bullet_2 = ("The same reader settles 'is this range a TU's or the linker's?' in one command: "
+                "mwlink_debugger.py trace <unit> names the input file per symbol. Worth one line in the "
+                "rule-12 write-up.")
+    bullet_3 = ("callees.py cannot resolve a callee declared only in an unsplit band header: it reports "
+                "the edge as external. Cost: 5 minutes.")
+    bullet_short = "mwcc too slow"
+    seed_bullet = ("A fresh worktree ships with no `orig/` payload and no `build/compilers`, so a split "
+                   "needs them copied in from MAIN first. Cost: 10 minutes.")
+    fixtures2 = {
+        "init.json": outbox("init/section", "w-init", tooling=[bullet_1, bullet_2]),
+        "again.json": outbox("init/again", "w-two", tooling=[bullet_2]),
+        "flip.json": outbox("res/file", "w-flip", tools_wanted=[bullet_3, bullet_short, seed_bullet]),
+    }
+    for name, d in fixtures2.items():
+        with open(os.path.join(obx2, name), "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(d, fh)
+    _text2, report2, entries2 = tg.scan(obx2, notes, {})
+    by_key2 = {e.key: e for e in entries2}
+    check("two bullets in one `tooling` list become two DISTINCT rows",
+          sorted(k for k in by_key2 if k.startswith("tooling-")),
+          ["tooling-callees-py", "tooling-datagap-py", "tooling-mwlink-debugger-py"])
+    check("... the key names the FIRST tool the bullet is about",
+          any(k == "tooling-datagap-py" for k in by_key2), True)
+    check("... and the slot a second mention would have taken is not a second row",
+          all("flipcheck" not in k for k in by_key2)
+          and "flipcheck.py" in by_key2["tooling-datagap-py"].ask, True)
+    check("... the identical bullet from a second lane is a VOTE, not a row",
+          by_key2["tooling-mwlink-debugger-py"].votes, 2)
+    check("a `tools_wanted` list is ingested the same way", "tooling-callees-py" in by_key2, True)
+    check("a bullet a curated topic already owns is FOLDED, and reported",
+          sorted(s["why"] for s in report2["skipped_tooling"]),
+          ["folded into a curated topic row", "too short to be a request"])
+    check("... the too-short bullet is named",
+          any("mwcc too slow" in s["text"] for s in report2["skipped_tooling"]), True)
+    check_true("the JSON carries the skipped bullets", "skipped_tooling" in report2)
 
     # --- ranking -----------------------------------------------------------------------------------
     order = [e.key for e in entries]

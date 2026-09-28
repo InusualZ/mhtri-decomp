@@ -243,9 +243,14 @@ class Row:
 
 
 def spec_of(unit_spec: str, report: str | None = None, tree: str | None = None) -> Spec:
-    """Resolve a unit spec through `unitutil`, plus its include closure and the tree's report path."""
+    """Resolve a unit spec through `unitutil`, plus its include closure and the tree's report path.
+
+    `tree` names the tree to read and is passed straight to `unitutil.resolve_unit(root=...)`, so the
+    unit's own paths land under it - a fixture that is not a git worktree resolves there instead of
+    silently reading `unitutil.ROOT` (the real tree).
+    """
     root = tree or uu.ROOT
-    unit = uu.resolve_unit(unit_spec)
+    unit = uu.resolve_unit(unit_spec, root=root)
     src = unit.src if os.path.isabs(unit.src) else os.path.join(root, unit.src)
     return Spec(unit=vu.unit_stem(unit.name), unit_name=unit.name, obj=unit.obj, target=unit.target,
                 src=src, tree=root, report=os.path.abspath(report) if report else os.path.join(root, REPORT_REL),

@@ -1310,7 +1310,7 @@ def _slots():
 
 
 def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | None = None,
-          slots_mode: bool | None = None, slot: int | None = None) -> dict:
+          slots_mode: bool | None = None, slot: int | None = None, kind: str = "unit") -> dict:
     """Reserve `unit`: a claim is a worktree and a branch, and the branch is the lock.
 
     With a slot pool present (`tools/units/slots.py init`) the claim takes a **reusable slot** instead of
@@ -1318,6 +1318,12 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
     MAIN's tip and verifies the kept build tree before this records the claim.  A slot holds a *directory*,
     never a branch, so one claim is still one branch - landable and auditable on its own.  Without a pool, or
     with `slots_mode=False` (the `--no-slots` flag), the original per-claim construction path runs unchanged.
+
+    `kind` is the lane kind.  The agent profile is **not** chosen here - it comes from
+    `slots.profile_for_kind(kind)`, the project's one mapping, and is recorded on the slot's lock and in the
+    registry so a claim describes what it is (a tooling lane is `worker`, not `decompiler`, which drags the
+    section 6.5 unit policy and a no-subagents rule into a job with no unit).  An unknown kind is refused by
+    the mapping, with the valid list.
     """
     unit = norm_unit(unit.strip("/"))
     place = claim_place_error(main, cwd)
@@ -1325,6 +1331,7 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
         raise SystemExit("REFUSED claim %s | %s: run the claim from MAIN, on main" % (unit, place))
     branch = branch_for(unit)
     sm = _slots()
+    agent = sm.profile_for_kind(kind)          # refuses an unknown kind, with the valid list
     use_slots = slot is not None or (slots_mode if slots_mode is not None else sm.enabled(main))
     if use_slots and not sm.enabled(main):
         raise SystemExit("REFUSED: the slot pool is requested but not initialised - run "
@@ -1341,6 +1348,7 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
         cmd = ["worktree", "add", "-b", branch, path, base]
         if dry_run:
             return {"unit": unit, "branch": branch, "worktree": path, "base": base,
+                    "kind": kind, "agent": agent,
                     "command": "git " + " ".join(cmd), "dry_run": True}
         git(cmd, main)
         seed_note = seed_worktree_build(main, path)
@@ -1348,9 +1356,16 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
         if dry_run:
             info = sm.preview(main, unit, branch, slot)
             return {"unit": unit, "branch": branch, "worktree": info["dir"], "base": info["base"],
-                    "slot": info["slot"], "command": info["command"], "dry_run": True}
+                    "slot": info["slot"], "kind": kind, "agent": agent,
+                    "command": info["command"], "dry_run": True}
         info = sm.acquire(main, unit, branch=branch, worker=worker, slot=slot)
         path, base, seed_note, slot_id = info["dir"], info["base"], info["seeded"], info["slot"]
+        # record the kind on the slot's lock, exactly as `slots.spawn` does, so `status` and any later
+        # reader see the profile the lane was launched with and not only the branch it happens to hold.
+        lock = sm.read_lock(main, slot_id)
+        if lock:
+            lock["kind"], lock["agent"] = kind, agent
+            sm.write_lock(main, slot_id, lock)
     # the worker writes its outbox and notes here (docs/plan.md 5.3); create them with the claim so the
     # paths in the brief exist before the worker tries to write to them
     for sub in ("outbox", "notes"):
@@ -1358,10 +1373,11 @@ def claim(unit: str, main: str, worker: str | None, dry_run: bool, cwd: str | No
     registry = load_registry(main)
     registry[unit] = {"branch": branch, "worktree": path, "worker": worker or os.environ.get("USERNAME")
                       or os.environ.get("USER") or "unknown", "base": base,
-                      "claimed_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "slot": slot_id}
+                      "claimed_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "slot": slot_id,
+                      "kind": kind, "agent": agent}
     save_registry(main, registry)
     return {"unit": unit, "branch": branch, "worktree": path, "base": base, "seeded": seed_note,
-            "slot": slot_id}
+            "slot": slot_id, "kind": kind, "agent": agent}
 
 
 def registry_key(registry: dict, unit: str) -> str | None:
@@ -1776,6 +1792,13 @@ def selftest() -> int:
         if got != want:
             fails.append("%s: got %r want %r" % (name, got, want))
 
+    def _raises(fn) -> bool:
+        try:
+            fn()
+            return False
+        except SystemExit:
+            return True
+
     check("slug: simple", slug("Pl/pl_act").startswith("pl-act-"), True)
     check("slug: separators collapse", slug("Pl/pl_act")[:7], "pl-act-")
     check("slug: basename only", slug("Pl/pl_act").startswith("pl-act"), True)
@@ -2173,6 +2196,19 @@ def selftest() -> int:
         open(os.path.join(seed_main, "orig", "RMHE08", "sys", "main.dol"), "wb").write(b"dol")
         out = claim("Pl/seeded", seed_main, "w", False, cwd=seed_main)
         seed_wt = out["worktree"]
+        check("the claim records the lane kind and its agent profile",
+              (out["kind"], out["agent"]), ("unit", "decompiler"))
+        check("... in the registry too",
+              load_registry(seed_main)["Pl/seeded"].get("agent"), "decompiler")
+        # the profile comes from `slots.profile_for_kind`, the ONE mapping: a tooling claim is a `worker`,
+        # not a `decompiler` (unit policy + a no-subagents rule in a job with no unit)
+        tooling = claim("Pl/tooled", seed_main, "w", True, cwd=seed_main, kind="tooling")
+        check("a tooling claim's agent is `worker`, not `decompiler`",
+              (tooling["kind"], tooling["agent"]), ("tooling", "worker"))
+        check("... and a dry-run claim records it without cutting a worktree", tooling["dry_run"], True)
+        check("an unknown kind is refused",
+              _raises(lambda: claim("Pl/bad", seed_main, "w", True, cwd=seed_main, kind="not-a-kind")),
+              True)
         check("claim seeds the toolchain into a fresh worktree",
               os.path.exists(os.path.join(seed_wt, "build", "tools", "dtk.exe")), True)
         check("claim seeds build/compilers as a copy, not a junction (#5)",
@@ -2577,6 +2613,10 @@ def main() -> int:
     c.add_argument("--no-slots", action="store_true",
                    help="construct a throwaway worktree instead of taking a slot (the pre-pool path)")
     c.add_argument("--slot", type=int, default=None, help="take this slot instead of the first free one")
+    c.add_argument("--kind", default="unit",
+                   help="the lane kind; the agent profile comes from it via `slots.profile_for_kind` "
+                        "(unit->decompiler, fix->fixer, merge->merger, tooling/docs->worker, ...). "
+                        "Recorded on the slot's lock and in the registry (default: unit)")
     l = sub.add_parser("list", help="every claim git knows about")
     l.add_argument("--json", action="store_true")
     r = sub.add_parser("release", help="remove the worktree and the branch (idempotent, total)")
@@ -2619,7 +2659,7 @@ def main() -> int:
     main_wt = rc.main_root(rc.worktree_root())
     if args.cmd == "claim":
         out = claim(args.unit, main_wt, args.worker, args.dry_run,
-                    slots_mode=(False if args.no_slots else None), slot=args.slot)
+                    slots_mode=(False if args.no_slots else None), slot=args.slot, kind=args.kind)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
@@ -2654,7 +2694,8 @@ def main() -> int:
         # landing was refused over it, so the cwd is printed here rather than left to the orchestrator.
         try:
             from units import queue as queue_mod
-            sp = queue_mod.spawn_line(main_wt, out["unit"], claim_slug, out["worktree"], brief_path)
+            sp = queue_mod.spawn_line(main_wt, out["unit"], claim_slug, out["worktree"], brief_path,
+                                      kind=args.kind)
         except SystemExit as exc:
             print("\nspawn line REFUSED: %s" % exc)
             return 0

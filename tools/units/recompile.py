@@ -56,6 +56,14 @@ the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[
 tree it came from**, so a measurement is never ambiguous about which tree it came from. The score is still
 `report generate`'s `fuzzy_match_percent`.
 
+**`--measure` prints the provenance of the number it reports.** The tree the invocation resolved in (its
+cwd), the target object it compared against (**path and mtime**), the object it compiled (**path and
+mtime**), and the map - then a `WARNING` when the target is MAIN's while the cwd is a worktree, because
+that score is MAIN's and a reader must not have to infer it from an absolute path. `--json` carries the same
+facts under `provenance`. This is the half a reader can check *after* the fact; `split_staleness` is the half
+that refuses before it. It re-derives nothing: `compile_unit` already deletes the object before compiling
+and asserts it reappears, so the printed `compiled_mtime` is a provably fresh file.
+
 **A stale split is refused, not silently measured (F40).** Preferring this tree's object is only safe while
 this tree's split actually reflects its own `symbols.txt`/`splits.txt`/DOL. A lane that edits its `splits.txt`
 (a seam re-draw, a new registration) and has **not** re-split still has the previous build's object on disk,
@@ -444,6 +452,64 @@ def source_path(wt: str, unit: str) -> str:
 def _stamp(seconds: float) -> str:
     """A local wall-clock stamp for a file's mtime - the form the refusal messages name."""
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(seconds))
+
+
+def object_stamp(path: str) -> str:
+    """A file's mtime as the wall-clock stamp the provenance block prints, or `MISSING`."""
+    try:
+        return _stamp(os.path.getmtime(path))
+    except OSError:
+        return "MISSING"
+
+
+def provenance(wt: str, main: str, result: dict) -> dict:
+    """The facts a `--measure` number rests on: the tree it was resolved in and the two objects behind it.
+
+    A score is only as good as the tree it came from and the objects it compared.  The failure this closes
+    cost a lane hours: standing in a slot, `--measure` still returned a number read from **MAIN's** object
+    (before `2c10d0473`); the number looked like a measurement and was not one, and nothing in the output
+    said which tree it came from.  `target_tree` was the first half of that fix; this is the half a reader
+    can check *after the fact* - the absolute invocation tree, the target's path **and mtime**, and the
+    object this run compiled, **and its mtime**.
+
+    This deliberately re-derives nothing.  `compile_unit` already deletes the object before compiling and
+    asserts it reappears, so `compiled_mtime` describes a provably fresh file; `split_staleness` already
+    refuses a split older than this tree's own edited map/splits; `resolve_target` already prefers this
+    tree's object.  Provenance only *prints* those outcomes so they can be quoted with the score.
+    """
+    return {
+        # `worktree_root()` resolves from the cwd (`git rev-parse --show-toplevel`), so this IS the tree the
+        # invocation is in - printing it is what makes "the number is this tree's" checkable.
+        "invoked_tree": wt,
+        "main": main,
+        "target_tree": result.get("target_tree"),
+        "compiled_object": result.get("object"),
+        "compiled_mtime": object_stamp(result.get("object") or ""),
+        "target_object": result.get("target"),
+        "target_mtime": object_stamp(result.get("target") or ""),
+        "symbol_map": result.get("symbol_map"),
+        "symbol_map_tree": result.get("symbol_map_kind"),
+    }
+
+
+def provenance_lines(prov: dict) -> list[str]:
+    """The paste-able provenance block - every value measured here, none promised.
+
+    The `WARNING` line is the one that matters: when the invocation is a worktree but the target object is
+    MAIN's, the score is MAIN's, and the reader must not have to infer that from an absolute path.
+    """
+    where = {"worktree": "this tree", "main": "MAIN"}.get(prov.get("target_tree"), prov.get("target_tree"))
+    lines = ["  provenance (the tree, and the two objects this number came from)"]
+    lines.append("    invoked    %s   (this invocation's cwd; MAIN is %s)"
+                 % (prov["invoked_tree"], prov["main"]))
+    lines.append("    compiled   %s   (mtime %s)" % (prov["compiled_object"], prov["compiled_mtime"]))
+    lines.append("    target     %s   (mtime %s%s)" % (prov["target_object"], prov["target_mtime"],
+                                                        "; %s" % where if where else ""))
+    lines.append("    map        %s   [%s]" % (prov["symbol_map"], prov["symbol_map_tree"]))
+    if prov.get("target_tree") == "main" and os.path.normcase(prov["invoked_tree"]) != os.path.normcase(prov["main"]):
+        lines.append("    WARNING: the target object is MAIN's, not this tree's - the score is MAIN's; "
+                     "re-split this tree (`ninja build/RMHE08/config.json`) to score your own")
+    return lines
 
 
 def object_is_fresh(object_path: str, source: str) -> tuple[bool, str]:
@@ -1039,6 +1105,11 @@ def main() -> int:
                                      os.path.basename(target)))
                 result.pop("match_percent", None)
 
+    if args.measure:
+        # the provenance of the number (tree + the two objects + mtimes); recorded for `--json` too, so a
+        # caller that quotes a score quotes what it was measured against.
+        result["provenance"] = provenance(wt, main_wt, result)
+
     if args.json:
         print(json.dumps(result, indent=2))
         return 0
@@ -1063,6 +1134,11 @@ def main() -> int:
     # the map the address lookup used - without this line a measurement is ambiguous about its map, which
     # is the second half of F43 (the object's tree was already printed above)
     print("  map     %s  [%s]" % (result["symbol_map"], result["symbol_map_kind"]))
+    if args.measure:
+        # only `--measure` sets this key; printing it unconditionally crashed a plain recompile (exit 1,
+        # the code a failed compile also returns) *after* the object had been written
+        for line in provenance_lines(result["provenance"]):
+            print(line)
     if kind == "auto-fallback":
         print("  [fallback] MAIN has no split object for %s yet; the score is the one the registered unit"
               " will report (same original bytes)" % result["unit"])
