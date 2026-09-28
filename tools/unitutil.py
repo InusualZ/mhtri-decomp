@@ -361,6 +361,12 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
 
     A symbol argument is required for symbol/instruction level output in the pinned objdiff-cli.
 
+    `out` defaults to this process's unique `session_tmpdir()` - the same helper `report_functions`/
+    `report_measure` use. It used to be the shared per-file `build/tmp/<lib>_<file>_diff.json`, so two
+    concurrent lanes measuring the same unit wrote and read the *same* file: the loser quoted the other
+    run's rows (or hit a `PermissionError` while the file was held). A per-process directory cannot
+    collide, and it lives in the system temp, not under the tree the selftest's dirty-guard watches.
+
     `-c functionRelocDiffs=none` is passed explicitly: `report generate`'s default is `none` while
     `diff`'s is `data_value`, so without it the rows a tool sees disagree with the official
     classification (relocation-only differences show up as `DIFF_ARG_MISMATCH`).
@@ -369,8 +375,7 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
     metric - it is neither the reloc-independent numbers nor the report's normalisation. Use
     `report_measure()` / `report_functions()` for a score, and this only for row detail.
     """
-    out = out or os.path.join(ROOT, "build", "tmp", "%s_%s_diff.json"
-                              % (unit.lib, unit.file))
+    out = out or os.path.join(session_tmpdir(), "%s_%s_diff.json" % (unit.lib, unit.file))
     os.makedirs(os.path.dirname(out), exist_ok=True)
     p = runner([OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
                 "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
@@ -406,6 +411,8 @@ def session_tmpdir() -> str:
     `unitutil_report.json`, and the loser saw a report the *other* run had just written (or a
     `PermissionError [WinError 5]` while the file was held) - the same collision that cost `symdiff.py` a
     measurement round (see `tools/objdiff/symdiff.py`) and was fixed there with a per-invocation directory.
+    `objdiff()`'s per-file `build/tmp/<lib>_<file>_diff.json` was the same shape of race and now routes
+    through this helper too.
 
     One directory per process (not per call) keeps `report_measure`'s returned `report_json` path equal to
     the file `report_functions` just wrote, while two processes never share one. It lives in the system

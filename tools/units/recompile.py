@@ -56,6 +56,14 @@ the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[
 measurement is never ambiguous about which tree it came from. The score is still `report generate`'s
 `fuzzy_match_percent`.
 
+**The map follows the invocation too (F43).** The fallback locates the retired `auto_*text.o` by *address*,
+and the address comes from `config/RMHE08/symbols.txt`. Reading MAIN's copy alone made the tool refuse a
+branch that had renamed a symbol - "a symbol this branch renamed has no entry there" - because MAIN has
+never carried the new spelling. `resolve_map` applies `resolve_target`'s discipline to the map: the
+invocation tree's copy first, MAIN's as the fallback, and the address lookup merges both (the branch
+supplies the new name, MAIN the old one that the retired object is named after). The CLI prints the map it
+read with its kind, so a measurement is unambiguous about the map as well as the object.
+
 `<unit>` is the path from the repository root, e.g. `Pl/pl_act`, `main.cpp`, `auto/80040598_fn_80040598`.
 """
 
@@ -593,18 +601,47 @@ def absolutize(tokens: list[str], main: str) -> list[str]:
 # it is what each stuck worker re-derived by hand.
 
 SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
+SPLITS_REL = os.path.join("config", "RMHE08", "splits.txt")
 SYMBOL_LINE_RE = re.compile(r"^(\S+)\s*=\s*(.*)$")
 SYMBOL_TEXT_RE = re.compile(r"^\.text:(0x[0-9A-Fa-f]+)$")
 AUTO_RUN_RE = re.compile(r"^auto_\d+_([0-9A-Fa-f]{8})_text$")
 
 
-def text_symbol_addresses(main: str) -> dict:
-    """{name: address} for every `.text` symbol in MAIN's map - the only section `report generate` scores."""
+def same_tree(a: str, b: str) -> bool:
+    """Whether two paths name the same tree (normcase/abspath, so Windows case and slashes agree)."""
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def resolve_map(wt: str, main: str, rel: str = SYMBOLS_REL):
+    """(absolute path, kind) of a config map resolved from **this invocation's** tree outward.
+
+    `kind` is `worktree-map`, `main-map` or `missing`. This is `resolve_target`'s discipline applied to the
+    *map* (F43): a branch that renamed its own symbols has edited *its* `config/RMHE08/symbols.txt`, and a
+    lookup pinned to MAIN's copy cannot see a name MAIN never carried - the filed refusal "a symbol this
+    branch renamed has no entry there". The invocation tree comes first, MAIN is the fallback (a fresh
+    worktree may have no `config/` of its own yet), and never MAIN-only. The caller prints the result:
+    which map was read is part of what makes a measurement unambiguous.
+
+    `rel` is a parameter so the *same* order serves `splits.txt` (`SPLITS_REL`): nothing here is
+    symbols-specific.
+    """
+    p_wt, p_main = os.path.join(wt, rel), os.path.join(main, rel)
+    if not same_tree(wt, main) and os.path.exists(p_wt):
+        return os.path.abspath(p_wt), "worktree-map"
+    if os.path.exists(p_main):
+        return os.path.abspath(p_main), "main-map"
+    if os.path.exists(p_wt):
+        return os.path.abspath(p_wt), "worktree-map"
+    return os.path.abspath(p_main), "missing"
+
+
+def text_symbol_addresses(map_path: str) -> dict:
+    """{name: address} for every `.text` symbol in a symbols.txt - the only section `report generate`
+    scores. `map_path` is the resolved map itself (`resolve_map`), not a tree root."""
     out: dict = {}
-    path = os.path.join(main, SYMBOLS_REL)
-    if not os.path.exists(path):
+    if not os.path.exists(map_path):
         return out
-    for line in open(path, encoding="utf-8", errors="replace"):
+    for line in open(map_path, encoding="utf-8", errors="replace"):
         m = SYMBOL_LINE_RE.match(line.rstrip("\n"))
         if not m:
             continue
@@ -639,38 +676,69 @@ def auto_text_runs(main: str) -> list:
     return out
 
 
-def proposal_target(main: str, symbol: str):
+def symbol_addresses(wt: str, main: str):
+    """({name: address}, map path, map kind) merged from this invocation's map first, MAIN's second.
+
+    Merging both is what makes a **rename** measurable (F43): the branch's map carries the new name at the
+    address while MAIN's still carries the old one - and MAIN's retired `auto_<name>_text.o` is named after
+    the *old* spelling, so the by-name step needs both maps. The invocation's map wins whenever the same
+    name appears in both, because it is the tree being edited.
+    """
+    path, kind = resolve_map(wt, main)
+    out: dict = {}
+    main_map = os.path.abspath(os.path.join(main, SYMBOLS_REL))
+    if not same_tree(wt, main) and os.path.exists(main_map) \
+            and os.path.normcase(main_map) != os.path.normcase(path):
+        out.update(text_symbol_addresses(main_map))     # the older spelling first ...
+    out.update(text_symbol_addresses(path))             # ... the invocation's name wins
+    return out, path, kind
+
+
+def retired_object_dirs(wt: str, main: str) -> list[str]:
+    """The `obj/` directories a retired `auto_*_text.o` can live in: MAIN's first, then this tree's."""
+    dirs = [os.path.join(main, "build", "RMHE08", "obj")]
+    if not same_tree(wt, main):
+        dirs.append(os.path.join(wt, "build", "RMHE08", "obj"))
+    return dirs
+
+
+def proposal_target(wt: str, main: str, symbol: str):
     """(target object path, note) for `symbol` in a proposal unit, or (None, why not).
 
-    Resolution is by **address**, so a branch that renamed the symbol still finds the object: MAIN's map
-    gives the one name it knows at that address. Two shapes of retired object:
+    Resolution is by **address**, and the address comes from the map this invocation resolves
+    (`symbol_addresses` - the branch's own map first, MAIN's second), so a branch that renamed the symbol
+    still finds the object: its map knows the new name, MAIN knows the old one. Two shapes of retired
+    object:
 
     * the single-symbol object dtk named after the symbol - `auto_<name[:20]>_text.o`. The truncation is
-      dtk's; the existence test plus the name at the address is the test, not a spelling guess;
+      dtk's; the existence test plus the name at the address is the test, not a spelling guess - and every
+      name either map places at that address is tried, so a rename does not lose the object;
     * the run that covers the address - `auto_<nn>_<start>_text.o`, `start <= addr < start + code_size`.
     """
-    addresses = text_symbol_addresses(main)
+    addresses, map_path, map_kind = symbol_addresses(wt, main)
     addr = addresses.get(symbol)
     if addr is None:
-        return None, ("%s is not a `.text` symbol in MAIN's %s, and the fallback locates the retired split "
-                      "object by address - a symbol this branch renamed has no entry there"
-                      % (symbol, SYMBOLS_REL))
-    objdir = os.path.join(main, "build", "RMHE08", "obj")
-    # 1. a single-symbol object named (by dtk, truncated to 20 chars) after the symbol at this address
-    for name in [symbol] + [n for n, a in addresses.items() if a == addr and n != symbol]:
-        cand = os.path.join(objdir, "auto_%s_text.o" % name[:20])
-        if os.path.exists(cand):
-            return cand, ("retired single-symbol split object %s (%s at 0x%X)"
-                          % (os.path.basename(cand), name, addr))
+        return None, ("%s is not a `.text` symbol in the map this tree resolves (%s [%s]) or in MAIN's "
+                      "copy, and the fallback locates the retired split object by address"
+                      % (symbol, map_path, map_kind))
+    names = [symbol] + sorted(n for n, a in addresses.items() if a == addr and n != symbol)
+    # 1. a single-symbol object named (by dtk, truncated to 20 chars) after a name at this address
+    for objdir in retired_object_dirs(wt, main):
+        for name in names:
+            cand = os.path.join(objdir, "auto_%s_text.o" % name[:20])
+            if os.path.exists(cand):
+                return cand, ("retired single-symbol split object %s (%s at 0x%X)"
+                              % (os.path.basename(cand), name, addr))
     # 2. the run whose range covers the address
-    for start, size, rel in auto_text_runs(main):
-        if start <= addr < start + size:
-            path = os.path.join(main, *rel.replace("\\", "/").split("/"))
-            if os.path.exists(path):
-                return path, ("retired split object %s covers 0x%X-0x%X - the run that owns %s"
-                              % (os.path.basename(rel), start, start + size, symbol))
-    return None, ("0x%X (%s) is not inside any retired `auto_*_text` object in MAIN - it belongs to a "
-                  "already-registered unit or a gap, so MAIN has no original object for it"
+    for tree in ([main] if same_tree(wt, main) else [main, wt]):
+        for start, size, rel in auto_text_runs(tree):
+            if start <= addr < start + size:
+                path = os.path.join(tree, *rel.replace("\\", "/").split("/"))
+                if os.path.exists(path):
+                    return path, ("retired split object %s covers 0x%X-0x%X - the run that owns %s"
+                                  % (os.path.basename(rel), start, start + size, symbol))
+    return None, ("0x%X (%s) is not inside any retired `auto_*_text` object in this tree or MAIN - it "
+                  "belongs to an already-registered unit or a gap, so there is no original object for it"
                   % (addr, symbol))
 
 
@@ -693,11 +761,6 @@ def target_rel(unit: str) -> str:
     return os.path.splitext(head)[0] + ".o"
 
 
-def same_tree(a: str, b: str) -> bool:
-    """Whether two paths name the same tree (normcase/abspath, so Windows case and slashes agree)."""
-    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
-
-
 def resolve_target(wt: str, main: str, unit: str, symbol: str):
     """(target object, kind, note) for `--measure`, resolved from THIS invocation's tree outward.
 
@@ -709,12 +772,14 @@ def resolve_target(wt: str, main: str, unit: str, symbol: str):
        worker has already split here - the *real* new bytes, which MAIN cannot have first);
     2. MAIN's registered split object (`registered` - the path a registered unit has always measured
        against, unchanged);
-    3. MAIN's retired `auto_*_text` object that owns the symbol's address, then the worktree's - the
-       proposal path before its registration lands on MAIN;
+    3. the retired `auto_*_text` object that owns the symbol's address, looked up through the map this
+       invocation resolves (the branch's own `symbols.txt` first, MAIN's second) and found in MAIN's
+       `obj/` or this tree's - the proposal path before its registration lands on MAIN;
     4. `missing`, so the caller refuses to invent a number.
 
     The returned path is absolute, and the CLI prints it, so a measurement is never ambiguous about which
-    tree it came from.
+    tree it came from; `resolve_map` and the printed map line do the same for the map the address came
+    from.
     """
     rel = target_rel(unit)
     same = same_tree(wt, main)
@@ -723,16 +788,14 @@ def resolve_target(wt: str, main: str, unit: str, symbol: str):
         return p_wt, "worktree-split", ""
     if os.path.exists(p_main):
         return p_main, "registered", ""
-    found, note = proposal_target(main, symbol)
+    found, note = proposal_target(wt, main, symbol)
     if found:
         return found, "auto-fallback", note
-    if not same:
-        found, note = proposal_target(wt, symbol)
-        if found:
-            return found, "auto-fallback", note
+    map_path, map_kind = resolve_map(wt, main)
     return p_main, "missing", (
         "no original object for %s: no split object at %s in this tree or MAIN, and no retired "
-        "`auto_*_text` object covers the address of %s" % (unit, rel, symbol))
+        "`auto_*_text` object covers the address of %s (map: %s [%s])"
+        % (unit, rel, symbol, map_path, map_kind))
 
 
 # the name this shipped under before item B (`resolve_target` follows the invocation; this searched MAIN
@@ -791,9 +854,11 @@ def main() -> int:
     wt = worktree_root()
     main_wt = args.main or main_root(wt)
     unit = args.unit.strip("/")
+    map_path, map_kind = resolve_map(wt, main_wt)
     tokens, cmd_source = unit_tokens(main_wt, wt, unit)
     result = compile_unit(unit, main_wt, wt, dry_run=args.dry_run, tokens=tokens)
-    result.update({"unit": unit, "worktree": wt, "main": main_wt})
+    result.update({"unit": unit, "worktree": wt, "main": main_wt,
+                   "symbol_map": map_path, "symbol_map_kind": map_kind})
     if cmd_source != "main":
         # the registered path must read exactly as it did before; a proposal says where its flags came from
         result["command_source"] = cmd_source
@@ -841,6 +906,9 @@ def main() -> int:
     print("  target  %s%s" % (result["target"], "  [%s]" % kind if kind else ""))
     if result.get("target_note"):
         print("          %s" % result["target_note"])
+    # the map the address lookup used - without this line a measurement is ambiguous about its map, which
+    # is the second half of F43 (the object's tree was already printed above)
+    print("  map     %s  [%s]" % (result["symbol_map"], result["symbol_map_kind"]))
     if kind == "auto-fallback":
         print("  [fallback] MAIN has no split object for %s yet; the score is the one the registered unit"
               " will report (same original bytes)" % result["unit"])

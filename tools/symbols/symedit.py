@@ -44,13 +44,23 @@ import sys
 from pathlib import Path
 
 DEFAULT_FILE = "config/RMHE08/symbols.txt"
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _UNITS = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "units")
 _UNITS = os.path.normpath(_UNITS)
-if _UNITS not in sys.path:
-    sys.path.insert(0, _UNITS)
+# `unitutil.py` (the invocation-tree resolver) lives one level up, beside `units/`
+_TOOLS = os.path.normpath(os.path.join(_UNITS, os.pardir))
+for _p in (_UNITS, _TOOLS):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import sharedfiles as sf  # noqa: E402  the one writer for shared files - docs/plan.md 7.12
+import unitutil as _uu  # noqa: E402  the invocation-tree resolver (`repo_root`)
+
+# The tree a relative `--file` resolves against. `symedit` **writes** the map (rename/rename-batch), so a
+# MAIN-hardcoded root means a lane that invoked MAIN's copy from its own worktree renamed symbols *in MAIN*
+# - or, reading, refused to find a name the branch had just introduced. `unitutil.repo_root` is the
+# invocation-first resolver the other tools use (`git rev-parse --show-toplevel`, falling back to this
+# file's tree outside a worktree), so the map is the caller's tree's map.
+REPO = _uu.repo_root()
 LINE_RE = re.compile(r"^(?P<name>[^\s=]+)\s*=\s*(?P<loc>[^;]+);\s*(?://\s*(?P<comment>.*))?$")
 ADDR_RE = re.compile(r"^(?P<section>[.\w]+):(?:0x)?(?P<addr>[0-9a-fA-F]+)$")
 
@@ -1083,6 +1093,28 @@ def selftest() -> int:
     check("group: code is the rewrite list", [h[0] for h in grouped["code"]], ["b.c"])
     check("group: a path is listed separately", [h[0] for h in grouped["path"]], ["a.h"])
     check("group: a mention is neither", [h[0] for h in grouped["mention"]], ["c.c"])
+
+    # --- the map resolves against the TREE the command was run in ------------------------------------
+    # `symedit` *writes* the map, so a MAIN-hardcoded root meant a lane that invoked MAIN's copy from its
+    # own worktree renamed symbols in MAIN (and, reading, refused to find a name the branch had just
+    # introduced). The default `--file` now resolves through `unitutil.repo_root` - the caller's git
+    # worktree. This runs the real CLI from a throwaway git tree whose map is the only one that knows the
+    # marker, so a file-location root cannot pass it.
+    import subprocess
+    marker = "zz_selftest_marker"
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "fake-wt"
+        (repo / "config" / "RMHE08").mkdir(parents=True)
+        (repo / "configure.py").write_text("# a repo\n", encoding="utf-8")
+        (repo / "config" / "RMHE08" / "symbols.txt").write_text(
+            map_text("\n", [(marker, ".text:0x80001000", "type:function size:0x4")]),
+            encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=repo, capture_output=True)
+        p = subprocess.run([sys.executable, os.path.abspath(__file__), "show", marker],
+                           cwd=repo, capture_output=True, text=True, errors="replace")
+        check("the default map is the invocation tree's (its marker is found)", marker in (p.stdout or ""),
+              True)
+        check("... and the command succeeds there", p.returncode, 0)
 
     if fails:
         print("FAIL (%d)" % len(fails))
