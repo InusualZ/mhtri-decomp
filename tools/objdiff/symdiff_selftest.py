@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Self-test for `symdiff.py`'s scratch handling: one unique temp directory per invocation, cleaned up.
+"""Self-test for `symdiff.py`: one unique temp directory per invocation, and the stale-object refusal.
 
     python tools/objdiff/symdiff_selftest.py
 
-The incident this closes: the shared `build/tmp/unitutil/unitutil_report.json` raised
+The first incident this closes: the shared `build/tmp/unitutil/unitutil_report.json` raised
 `PermissionError [WinError 5]` while another process held it, twice, costing a measurement round
 (2026-09-28). `session_tmpdir()` gives each invocation its own directory; `retry_transient` covers the
 residual one-shot lock `os.remove`/`open` can still raise.
+
+The second: `-u <unit>` scores the unit's **prebuilt** object, and the stale-object incident is that a
+lane read it twice without the source having been rebuilt. `stale_reasons` (through
+`tools/objdiff/freshguard.py`) must name the newer file, cover a header in the include closure, and
+`main()` must refuse (exit 1, no score printed) rather than report a build that no longer exists.
 """
 from __future__ import annotations
 
@@ -16,9 +21,11 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SYMDIFF = os.path.join(ROOT, "tools", "objdiff", "symdiff.py")
+CHECKS = 0
 
 
 def _load():
@@ -35,6 +42,8 @@ class _FakeUnit:
 
 
 def check(name, got, want, fails):
+    global CHECKS
+    CHECKS += 1
     if got == want:
         print("ok    " + name)
         return 0
@@ -124,10 +133,63 @@ def main() -> int:
 
     fails = check("retry_transient returns at once on success", symdiff.retry_transient(fine), "ok", fails)
 
+    # 5. the freshness guard: `-u <unit>` scores a **prebuilt** object, and refuses when a source under
+    #    the unit is newer than it (the stale-object incident). Fixture tree, no repository state.
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src", "demo"))
+        src = os.path.join(tmp, "src", "demo", "unit.cpp")
+        hdr = os.path.join(tmp, "include", "demo")
+        os.makedirs(hdr)
+        header = os.path.join(hdr, "unit.h")
+        obj = os.path.join(tmp, "build", "RMHE08", "src", "demo", "unit.o")
+        os.makedirs(os.path.dirname(obj))
+        with open(src, "w", encoding="utf-8") as fh:
+            fh.write('#include "demo/unit.h"\nint fn(void) { return 0; }\n')
+        with open(header, "w", encoding="utf-8") as fh:
+            fh.write("\n")
+        with open(obj, "wb") as fh:
+            fh.write(b"\x7fELF")
+
+        class _Fixture:
+            name = "demo/unit"
+
+        fx = _Fixture()
+        fx.src = src
+        fx.obj = obj
+        base = 1_000_000.0
+        os.utime(header, (base, base))
+        os.utime(src, (base, base))
+        os.utime(obj, (base + 10, base + 10))          # object newer than every source: current
+        fails = check("a fresh object is not stale", symdiff.stale_reasons(fx, root=tmp), [], fails)
+        os.utime(src, (base + 20, base + 20))          # the source moved, the object did not
+        reasons = symdiff.stale_reasons(fx, root=tmp)
+        fails = check("a source newer than the object is stale", bool(reasons), True, fails)
+        fails = check("... naming the newer source",
+                      bool(reasons) and "unit.cpp" in reasons[0], True, fails)
+        # a **header** in the include closure dates the object too (the unit's inputs, not its .cpp)
+        os.utime(src, (base, base))
+        os.utime(header, (base + 30, base + 30))
+        reasons = symdiff.stale_reasons(fx, root=tmp)
+        fails = check("a header newer than the object is stale",
+                      bool(reasons) and "unit.h" in reasons[0], True, fails)
+
+        # and `main()` refuses loudly (exit 1, nothing on stdout) instead of printing stale numbers
+        real_cli, real_root = symdiff.cli, uu.ROOT
+        try:
+            symdiff.cli = lambda: (None, None, fx)
+            uu.ROOT = tmp                              # `main()` resolves the unit's tree from uu.ROOT
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc = symdiff.main()
+            fails = check("main() refuses a stale object", rc, 1, fails)
+            fails = check("... printing no score", out.getvalue().strip(), "", fails)
+        finally:
+            symdiff.cli, uu.ROOT = real_cli, real_root
+
     if fails:
         print("FAIL (%d)" % fails)
         return 1
-    print("ok - 12 checks")
+    print("ok - %d checks" % CHECKS)
     return 0
 
 
