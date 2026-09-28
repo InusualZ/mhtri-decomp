@@ -439,13 +439,13 @@ extern "C" void fn_8041B194(void)
     s32 i;
 
     SIGNAL_LOG(3, lbl_806031B0);
-    if (fn_803D6A98() == NULL) {
+    if (getGameSpyInterfaceThread() == NULL) {
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
     for (i = 0; i < 3; i++) {
         if (lbl_806D3650[i] != 0) {
-            ((GameSpyInterfaceThread*)fn_803D6A98())->failRequest(-0x2DB0, 1, 0, (u8)i, -1);
+            ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->failRequest(-0x2DB0, 1, 0, (u8)i, -1);
             lbl_806D3650[i] = 0;
         }
     }
@@ -510,12 +510,12 @@ extern "C" void fn_8041B334(s32 result, s32 unused, const GameSpyAddress* src, G
         error = -0x2DA9;
         break;
     }
-    if (fn_803D6A98() == NULL) {
+    if (getGameSpyInterfaceThread() == NULL) {
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
     if (info->connected_00 == 0) {
-        ((GameSpyInterfaceThread*)fn_803D6A98())->setError(0x80000007, 0x5F, -error);
+        ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->setError(0x80000007, 0x5F, -error);
     }
 }
 #pragma peephole off
@@ -538,14 +538,14 @@ extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s
     u32 info[6];
 
     SIGNAL_LOG(3, lbl_80603254);
-    if (fn_803D6A98() == NULL) {
+    if (getGameSpyInterfaceThread() == NULL) {
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
-    peerId = ((GameSpyInterfaceThread*)fn_803D6A98())->getPeerId();
-    if (((GameSpyInterfaceThread*)fn_803D6A98())->checkPeerProfile(profile, size) == 0) {
+    peerId = ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->getPeerId();
+    if (((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->checkPeerProfile(profile, size) == 0) {
         fn_8050DF90(socket, lbl_80793990, 2);
-        ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(-0x2DA0, 0xFF, peerId);
+        ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->publishRequest(-0x2DA0, 0xFF, peerId);
         return;
     }
     if (fn_8050DF80(socket, lbl_806031A0) != 0) {
@@ -553,7 +553,7 @@ extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s
         for (i = 0; i < 3; i++) {
             if (lbl_806D3650[i] == 0) {
                 lbl_806D3650[i] = socket;
-                ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(0, (u8)i, peerId);
+                ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->publishRequest(0, (u8)i, peerId);
                 break;
             }
         }
@@ -573,7 +573,7 @@ extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s
             ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
         }
     } else {
-        ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(-0x2DAE, 0xFF, peerId);
+        ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->publishRequest(-0x2DAE, 0xFF, peerId);
     }
 }
 
@@ -585,7 +585,7 @@ extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
     s32 error;
 
     SIGNAL_LOG(3, lbl_80603298, result);
-    if (fn_803D6A98() == NULL) {
+    if (getGameSpyInterfaceThread() == NULL) {
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
@@ -593,7 +593,7 @@ extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
         for (i = 0; i < 3; i++) {
             if (lbl_806D3650[i] == 0) {
                 lbl_806D3650[i] = socket;
-                ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(0, (u8)i, 0);
+                ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->publishRequest(0, (u8)i, 0);
                 break;
             }
         }
@@ -614,7 +614,7 @@ extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
         }
     } else {
         error = timeout > 0 ? -0x2DA0 : -0x2DAD;
-        ((GameSpyInterfaceThread*)fn_803D6A98())->publishRequest(error, 0xFF, 0);
+        ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->publishRequest(error, 0xFF, 0);
     }
 }
 
@@ -627,13 +627,13 @@ extern "C" void fn_8041B894(u32 socket, s32 address, s32 size)
         SIGNAL_LOG(3, lbl_806032C0);
         return;
     }
-    if (fn_803D6A98() == NULL) {
+    if (getGameSpyInterfaceThread() == NULL) {
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
     for (i = 0; i < 3; i++) {
         if (socket == lbl_806D3650[i]) {
-            ((GameSpyInterfaceThread*)fn_803D6A98())->dispatchReceiver((u8)i, address, size);
+            ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->dispatchReceiver((u8)i, address, size);
             return;
         }
     }
@@ -646,7 +646,7 @@ extern "C" void fn_8041B984(u32 socket, s32 result)
     s32 i;
 
     SIGNAL_LOG(3, lbl_806032E0, result);
-    if (fn_803D6A98() == NULL) {
+    if (getGameSpyInterfaceThread() == NULL) {
         SIGNAL_LOG(3, lbl_806031D0);
         return;
     }
@@ -666,7 +666,7 @@ extern "C" void fn_8041B984(u32 socket, s32 result)
     }
     for (i = 0; i < 3; i++) {
         if (socket == lbl_806D3650[i]) {
-            ((GameSpyInterfaceThread*)fn_803D6A98())->failRequest(error, 0, 0, (u8)i, -1);
+            ((GameSpyInterfaceThread*)getGameSpyInterfaceThread())->failRequest(error, 0, 0, (u8)i, -1);
             lbl_806D3650[i] = 0;
             return;
         }
@@ -1093,8 +1093,10 @@ void GameSpyInterfaceThread::resetSlots()
     }
 }
 
-/* Constructs the interface thread and starts its worker thread. */
-void* GameSpyInterfaceThread::create()
+/* Stores the thread's vtable, publishes the singleton, resets the tables and starts its worker
+ * thread.  The map row at 0x8041C66C is the mangled constructor name, and callers only reach it as
+ * `new GameSpyInterfaceThread()`. */
+GameSpyInterfaceThread::GameSpyInterfaceThread()
 {
     vtable_00 = lbl_806036A0;
     lbl_80794CE4 = this;
@@ -1117,7 +1119,6 @@ void* GameSpyInterfaceThread::create()
     memset(lbl_806D3650, 0, 0x10);
     lbl_80794CE0 = 0;
     sessionOpen_4484 = 0;
-    return this;
 }
 
 /* Deleting destructor: restores the base vtable, empties the singleton and frees on request. */

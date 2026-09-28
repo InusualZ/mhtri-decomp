@@ -5,8 +5,8 @@
  * instructions address) plus the string pool at `.data` 0x80603000..0x806036xx, which names the two
  * classes: `NetworkGameSpyInterface::` and `NetworkPeerGameSpy::`.  The declarations of the
  * neighbouring `fn_`/SDK helpers the band calls have no registered owner and live in
- * `include/unsplit/Network.h`; `fn_803D6A98` is declared there as `void*` because its result is this
- * unit's own thread object, so the casts stay at the call sites.
+ * `include/unsplit/Network.h`; `getGameSpyInterfaceThread` is declared there as `void*` because its
+ * result is this unit's own thread object, so the casts stay at the call sites.
  *
  * The four object types own member functions, and the three foreign objects the target *dispatches
  * through* are modelled as classes with real virtuals: that is the only shape MWCC emits as
@@ -158,8 +158,10 @@ public:
     /* +0x4484 */ u8  sessionOpen_4484;
     /* +0x4485 */ u8  profile_4485[0x14];
 
-    /* constructs the thread object, resets its tables and spawns the worker thread */
-    void* create();
+    /* the constructor: stores the vtable, publishes the singleton, resets the tables and calls the
+     * thread init.  Callers reach it only as `new GameSpyInterfaceThread()`, so the map row at
+     * 0x8041C66C carries the mangled spelling (`__ct__22GameSpyInterfaceThreadFv`) */
+    GameSpyInterfaceThread();
     /* the deleting destructor: restores the base vtable, empties the singleton, frees on request */
     void* destroy(s16 flags);
     /* resets the per-request tables and the pending-request flags */
@@ -407,7 +409,7 @@ typedef union GameSpyEventMsg {
 extern "C" {
 
 /* owner: src/Network/fn_803D3CE8.cpp - returns this unit's thread object, so it stays `void*` here */
-void* fn_803D6A98(void);
+void* getGameSpyInterfaceThread(void);
 
 /* owner: src/DWCi/fn_805113B0.c */
 u16 DWCi_htons(u16 port);

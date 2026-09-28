@@ -44,7 +44,7 @@
  * registered unit owns answered only `fn_XXXXXXXX` in the map, so they were renamed through `symedit.py`
  * in this pass and every one of those names is a GUESS: `fn_803FE388` -> `setPatRange`, `fn_803FE744` ->
  * `setPatReflectField30`, `fn_8041241C` -> `getNetworkWiiMediator`, `fn_8041A1C4` ->
- * `constructReflectService`, `fn_80413BF8` -> `getReflectEventId` and so on - each named for the
+ * the reflect service's constructor, `fn_80413BF8` -> `getReflectEventId` and so on - each named for the
  * singleton (`PatInterface`) or the service (`NetworkReflectService`) it belongs to and the field or slot
  * it works on.  Within this file, `getReflectField30/34/38` and `getAccountQuery1..5` are positional (the
  * dump has no name and no caller reveals the field's meaning); `queryOpeningFlagNNN` and
@@ -91,20 +91,26 @@
  * that copy away.  It appears when the allocation is a real **`new` expression whose constructor is
  * called** - with `#pragma exceptions on` (this unit's setting) the new-expression's value must survive
  * the constructor for the unwind path, so MWCC keeps it in a callee-saved register and emits the copy.
- * The constructor may be inlined: `NetworkReflectService`'s inline ctor calls the free
- * `constructReflectService(this)` (0x8041A1C4, dump-unnamed), which is exactly the `bl` retail makes.
- * Both classes therefore carry a declared ctor plus a padding member that makes `sizeof` the size the
- * allocation passes to `operator new` (0xD640 / 0x816C / 0x44A0), and the three allocation sites are
- * `new PatInterface();` / `new NetworkReflectService();` / `new GameSpyInterfaceThread();`.
+ * The three classes therefore each carry a declared (out-of-line) ctor plus a padding member that makes
+ * `sizeof` the size the allocation passes to `operator new` (0xD640 / 0x816C / 0x44A0), and the three
+ * allocation sites are `new PatInterface();` / `new NetworkReflectService();` /
+ * `new GameSpyInterfaceThread();`.
  *
- * CONSEQUENCE FOR THE MAP.  Those three constructors are still called through `fn_`/guessed map rows:
- * `fn_803FCC34` (0x803FCC34, dump `constructor1`, unowned band) is `__ct__12PatInterfaceFv`;
- * `constructReflectService` (0x8041A1C4, dump-unnamed, unowned band) is `__ct__21NetworkReflectServiceFv`;
- * `create__22GameSpyInterfaceThreadFv` (0x8041C66C, dump `constructor1`) is
- * `__ct__22GameSpyInterfaceThreadFv` but is **owned by `Network/fn_8041A87C.cpp`**, which defines
- * `GameSpyInterfaceThread::create()` at that address - renaming it needs that unit's source too and is
- * left to the orchestrator (outbox rename requests carry the evidence).  objdiff scores the three `bl`s
- * 100 % regardless of the spelling, so nothing here depends on the rename.
+ * LINK INPUTS (cleared this pass - the unit could not link before it).  `objdiff` scores a `bl` by its
+ * instruction whatever name it carries, which is why the report said 100 % for these sites while the
+ * linker had nothing to resolve them against: the three `new` sites and the thread accessor referenced
+ * four names **no map row and no link input carried** - `__ct__12PatInterfaceFv`,
+ * `__ct__21NetworkReflectServiceFv`, `__ct__22GameSpyInterfaceThreadFv` and
+ * `getGameSpyInterfaceThread`, all four `*UND*` with an empty provider set - so a flip would have failed
+ * with `undefined:`.  The map now carries the compiler's own spellings, each defined by a link input:
+ * `fn_803FCC34` -> `__ct__12PatInterfaceFv` (0x803FCC34) and `constructReflectService` ->
+ * `__ct__21NetworkReflectServiceFv` (0x8041A1C4), both unowned bands whose symbols the `new` sites
+ * already spelled that way; `create__22GameSpyInterfaceThreadFv` -> `__ct__22GameSpyInterfaceThreadFv`
+ * (0x8041C66C), whose owner `Network/fn_8041A87C.cpp` turned its `create()` into the class's
+ * constructor in the same change; and `fn_803D6A98` -> `getGameSpyInterfaceThread` (0x803D6A98,
+ * `Network/fn_803D3CE8.cpp`), with the referrers in `include/Network/fn_8041A87C.h` and
+ * `src/Network/fn_8041A87C.cpp`.  Re-measured: every `.text` row and the whole-project progress are
+ * unchanged, and `flipcheck.py` reports exactly the four complaints it did before, no new one.
  *
  * .data.  The three jump tables are `jumptable_806024B8` (0x2C4, 177 entries), `jumptable_8060277C`
  * (0x28, 10) and `jumptable_806027A4` (0x80, 32); they tile exactly 0x806024B8..0x80602824 in the same
@@ -233,11 +239,10 @@ void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
 void resetMediatorState(NetworkWiiMediatorFields* self);
 void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
-/* The two callees the opening's init reaches.  Neither answer a real name in the runtime dump
- * (`getInstance` / `constructor1` are placeholders) and both map rows still carry a `fn_` stem, so
- * this file may not spell them (rule 7): the map rows are renamed to these spellings in this lane's
- * outbox, together with the source half in `src/Network/fn_8041A87C.cpp` and its header. */
-PatInterface* constructPatInterface(PatInterface* self);
+/* The thread accessor the opening's init reaches.  Its body sits in the `Network/fn_803D3CE8.cpp` band
+ * and returns that band's own thread object, so it stays `void*` in the owner's declaration and this
+ * file declares the typed call; the map row keeps the descriptive name (the runtime dump answers only
+ * the placeholder `getInstance` for it). */
 GameSpyInterfaceThread* getGameSpyInterfaceThread(void);
 u32   getMediatorField24(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
