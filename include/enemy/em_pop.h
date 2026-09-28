@@ -116,6 +116,14 @@ void em_roster_record_copy(EmPopRec* dst, const EmPopRec* src);
 void em_roster_record_unlink(EmPopRec* rec);
 u32 em_roster_record_result_get(const EmPopRec* rec);
 
+/* The quest-condition predicates that live at 0x803B4BEC..0x803B5120 - inside this unit's own range,
+ * so this header is their owner's home (rule 2).  Each one takes the result record (NULL selects the
+ * work's own through `quest_record_get`) and reports one condition bit of `rec->0x310`; the bits are
+ * this header's own reading of the eight call sites, all in the quest board and the result screens.
+ * Added with `quest/quest_entry.cpp`, whose entry predicate is the 0x800000 one. */
+struct QuestRecord;
+u32 quest_flag_800000_ck(struct QuestRecord* rec);
+
 #ifdef __cplusplus
 }
 #endif

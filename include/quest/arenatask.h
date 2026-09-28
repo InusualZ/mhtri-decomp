@@ -22,6 +22,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"      /* nw4r::math::VEC3, the two `.bss` vector arrays */
+#include "gx.h"             /* _GXColor, the ambient/direct-light colour record */
 #include "unsplit/arena.h"  /* the band's record types (rule 1: one definition, included) */
 
 #ifdef __cplusplus
@@ -70,6 +71,18 @@ extern const f32 arena_20f;               /* .sdata2 0x8079C988, 20.0f */
 extern const f32 arena_n30f;              /* .sdata2 0x8079C98C, -30.0f */
 extern const f32 arena_n20f;              /* .sdata2 0x8079C990, -20.0f */
 extern const f32 arena_100f;              /* .sdata2 0x8079C994, 100.0f */
+
+/* The `.data`/`.sdata2` colour pair `arena_light_init` hands to the light unit: the four direct-light
+ * colours (`lbl_806073E0` until this pass) and the single ambient colour (`lbl_8079C970`).  They are
+ * spelled as the 4-byte words the target itself copies (`lwz`/`stw`, not the four `lbz`/`stb` a
+ * struct-of-bytes member copy emits), and the caller reinterprets each word as the `_GXColor` the two
+ * setters take. */
+extern u32 arena_light_colors[4];         /* .data 0x806073E0 */
+extern const u32 arena_ambient_color;     /* .sdata2 0x8079C970 */
+
+/* 0x80446B8C - installs the arena scene's ambient light and the four direct lights (its body is in
+ * `src/quest/arenatask.cpp`). */
+void arena_light_init(void);
 
 #ifdef __cplusplus
 }

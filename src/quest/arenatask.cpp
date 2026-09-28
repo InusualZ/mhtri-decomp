@@ -104,8 +104,17 @@
  * (`arena_camera_vec`, `arena_light_vec`) are GUESSES from the bodies that write them - the dump names
  * the block (`arena_work`, `arena_draw_func`) but not the vectors.
  *
- * RESIDUAL: 6 of the 19 bodies are written (740 B of 10784, see the outbox for the measured
- * percentages); the other 13 are unwritten, 12 of them *blocked by naming* - each calls an unrenamed
+ * THIS PASS added `arena_light_init` (0x80446B8C, 168 B) at 99.88 %: 7 of the 19 bodies are written, unit
+ * 8.42 % fuzzy.  Its three load-bearing shapes, all measured: the light-colour pair is spelled as the
+ * 4-byte words the target itself copies (`lwz`/`stw`; a `_GXColor` local costs four `lbz`/`stb`, which
+ * took the function to 42.5 %), `make_dir_light2`'s third parameter is `_GXColor` **by value** and not
+ * `_GXColor*` (the map names the by-value mangling and MWCC passes the copy's address), and the colour
+ * table's base must be assigned to a `u32*` local *after* the ambient call (a declaration initialiser
+ * hoists it and costs the match).  The one residual row is that base's materialisation: the target emits
+ * `lis`/`addi` then `lwz r0,0(r30)`, ours folds the `@l` into the load.
+ *
+ * RESIDUAL: 7 of the 19 bodies are written (908 B of 10784, see the outbox for the measured
+ * percentages); the other 12 are unwritten, 12 of them *blocked by naming* - each calls an unrenamed
  * neighbour (`fn_803B1EAC`, `fn_8027EFB4`/`fn_8027E7BC`/`fn_8027E72C`/`fn_8004C4F0`,
  * `fn_8004A240`, `fn_8030B790`, `fn_8042C844`/`fn_8042C850`/`fn_802D9EA4`, twelve nw4r `ResFile`
  * helpers, `_savegpr_23`'s siblings) whose rename is a cross-unit sweep this lane must not perform.
@@ -140,6 +149,7 @@
 #include "ef/fn_800CDB2C.h"     /* `my_player_no` (the owner's header, rule 2) */
 #include "mh3_pad/vec3.h"       /* `setVec3` (the owner header, rule 2) */
 #include "menu/get_pop_dat_ptr.h"  /* `get_arena_cfg` (the owner header, rule 2) */
+#include "light/light.h"        /* `set_amblight`/`make_dir_light2` (the owner header, rule 2) */
 
 /* The arena eq-data record pair this band's three writers walk (0x80446C34/0x80446D40/0x80446DDC).
  * Declared here: the owner of `arena_eqdata_apply` is this TU, so its prototype lives with it. */
@@ -231,6 +241,28 @@ extern "C" void arena_eqdata_setup(ArenaEqParams* params, u8 mode) {
         break;
     default:
         break;
+    }
+}
+
+/* ---- the arena scene's light setup (0x80446B8C) ---- */
+
+/* Installs the arena scene's ambient colour, then one direct light per entry of the arena's own
+ * four-colour table (the first one twice: index 0 before the loop and again as the loop's first
+ * entry), each with the matching `arena_light_vec` position. */
+extern "C" void arena_light_init(void) {
+    u32* colors;
+    u32 color;
+    s32 i;
+
+    color = arena_ambient_color;
+    set_amblight(0, *(_GXColor*)&color);
+
+    colors = arena_light_colors;
+    color = colors[0];
+    make_dir_light2(0, &arena_light_vec[0], *(_GXColor*)&color, 0);
+    for (i = 0; i < 4; i++) {
+        color = colors[i];
+        make_dir_light2(i + 5, &arena_light_vec[i], *(_GXColor*)&color, 0);
     }
 }
 

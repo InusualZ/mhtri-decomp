@@ -24,7 +24,7 @@ struct Q_ItemPair {
 /* The same 4-byte slot as the item-slot search reads it: the count is a signed byte. */
 struct Q_ItemCount {
     /* +0x0 */ u16 id;
-    /* +0x2 */ u8 num;
+    /* +0x2 */ s8 num;
     /* +0x3 */ u8 unused_0x3;
 };  /* size: 0x4 */
 
@@ -35,13 +35,45 @@ struct Q_CountSet {
     /* +0x48 */ u16 total[4];
 };  /* size: 0x50 */
 
-/* The item work (`get_move_work_adrs(0)->0xDC`), seen only as the two count blocks this unit reads. */
+/* One 4-byte entry of the weighted lot tables the pick helpers walk (`u16` key, one payload byte and
+ * one weight byte); an entry whose key is 0 ends the table. */
+struct Q_LotEntry {
+    /* +0x0 */ u16 id;
+    /* +0x2 */ u8 value;
+    /* +0x3 */ u8 weight;
+};  /* size: 0x4 */
+
+/* One 8-byte slot pair of the result rows: the id a pick is matched against, the 0x30-byte group it
+ * indexes, and the two counts the pick helper walks. */
+struct Q_SlotPair {
+    /* +0x0 */ u8 id_0x00;
+    /* +0x1 */ u8 group_0x01;
+    /* +0x2 */ u8 kind_0x02;
+    /* +0x3 */ u8 count_0x03;
+    /* +0x4 */ u8 pad_0x04;
+    /* +0x5 */ u8 pad_0x05;
+    /* +0x6 */ u8 pad_0x06;
+    /* +0x7 */ u8 pad_0x07;
+};  /* size: 0x8 */
+
+/* The item work (`get_move_work_adrs(0)->0xDC`), the same block `quest_work_ptr` points at; only the
+ * offsets this unit names are here (the lot tables' run at +0x9C is one region, addressed but not
+ * walked by name). */
 struct Q_ItemWork {
-    /* +0x000 */ u8 pad_0x000[0x490];
-    /* +0x490 */ Q_CountSet set_c;
-    /* +0x4E0 */ u8 pad_0x4E0[0x2];
-    /* +0x4E2 */ Q_CountSet set_d;
-};  /* size: 0x532 (approximate: the highest offset this unit reads + 2) */
+    /* +0x0000 */ u8 pad_0x0000[0x9C];
+    /* +0x009C */ union {
+        /* +0x009C */ Q_LotEntry lot_0x9C[0xFD];  /* the first weighted lot table */
+        /* +0x009C */ u8 pad_0x009C[0x3F4];
+    };
+    /* +0x0490 */ Q_CountSet set_c;
+    /* +0x04E0 */ u8 pad_0x04E0[0x2];
+    /* +0x04E2 */ Q_CountSet set_d;
+    /* +0x0532 */ u8 pad_0x0532[0x6A2A - 0x532];
+    /* +0x6A2A */ s8 count_0x6A2A;         /* entries in the arena item table below */
+    /* +0x6A2B */ u8 pad_0x6A2B[0xF];       /* the item table's own bytes */
+    /* +0x6A3A */ u8 entry_send_0x6A3A[7];  /* the quest entry-send header block */
+    /* +0x6A41 */ u8 pad_0x6A41[0x6AB8 - 0x6A41];
+};  /* size: 0x6AB8 */
 
 /* The game's save/user block, seen only as the four count blocks this unit reads. */
 struct Q_UserData {
@@ -59,7 +91,11 @@ struct Q_UserData {
 struct Q_MoveWork {
     /* +0x0000 */ u8 pad_0x0000[0xDC];
     /* +0x00DC */ Q_ItemWork* item_work;   /* the item work `move_work_item_work_get` returns */
-    /* +0x00E0 */ u8 pad_0x00E0[0x2D];
+    /* +0x00E0 */ u8 pad_0x00E0[0x9];
+    /* +0x00E9 */ u8 phase_0xE9;           /* the quest phase byte `quest_phase_get` returns */
+    /* +0x00EA */ u8 pad_0x00EA[0xFA - 0xEA];
+    /* +0x00FA */ u8 sub_0xFA;              /* the sub-state `quest_move_sub_state_ck` tests */
+    /* +0x00FB */ u8 pad_0x00FB[0x10D - 0xFB];
     /* +0x010D */ u8 pad_0x010D[0x6];
     /* +0x0113 */ u8 state_0x113;           /* 1 while the slot is in its entry state */
     /* +0x0114 */ u8 pad_0x0114[0x22D4 - 0x114];
@@ -80,8 +116,6 @@ struct Q_UserData* get_userdata(void);
 
 /* The item work of the local slot, or NULL when the slot has none. */
 Q_ItemWork* move_work_item_work_get(void);
-/* Whether the slot's entry-state byte is 1. */
-u32 move_work_state_ck(void);
 /* The low byte of a slot work's +0x36C word; slot 0 means the local one. */
 u8 quest_slot_progress_get(s32 slot);
 
@@ -98,12 +132,107 @@ s32 quest_record_b_count_get_wide(s32 kind);
 void quest_item_pair_copy_block(Q_ItemPair* dst, u16 id, u8 kind);
 void quest_item_pair_copy_row(Q_ItemPair* dst, u16 id, s8 row, u8 kind);
 void quest_item_pair_copy_cell(Q_ItemPair* dst, u16 id, s8 col);
-s8 quest_item_slot_find(Q_ItemCount* slots, u16 id);
+/* The five-slot list's entry for `id`, sign-extended; the callers compare it against 0. */
+s16 quest_item_slot_find(Q_ItemCount* slots, u16 id);
+/* Adds `count` of `id` to the list; the result byte is what the menu switches on. */
+s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count);
 /* The local slot's item work handed to the band below (0x803AA060) with `idx` and 1.  Body unwritten. */
 u32 quest_item_work_notify(s32 idx);
 
+/* The quest-phase and per-slot state getters (0x803AD8F4, 0x803AAE7C, 0x803AB15C, 0x803AE934,
+ * 0x803B0D5C, 0x803AFB90). */
+u8  quest_phase_get(void);
+u32 quest_move_flag_ck(void);
+u32 quest_play_state_ck(void);
+u32 quest_item_work_flag_ck(void);
+u32 quest_move_sub_state_ck(void);
+u32 quest_work_busy_ck(void);
+/* The band's two quest-work predicates (0x803B0CD4, 0x803B0CFC). */
+u32 quest_entry_active_ck(void);
+u32 quest_entry_ready_ck(void);
+/* The item-id range test the pair tables are selected with (0x803AAF1C). */
+u32 quest_item_id_low_ck(u16 id);
+/* The record's own +0x8B state byte (0x803ADF48). */
+u8  quest_record_state_get(u8* rec);
+
+/* The 8-byte slot pair `quest_pair_copy` moves and the 0x20-byte key block `quest_element_copy`
+ * moves; both are the target's own byte-by-byte copies. */
+struct Q_PairBlock {
+    /* +0x00 */ u8 byte_0x00;
+    /* +0x01 */ u8 byte_0x01;
+    /* +0x02 */ u8 byte_0x02;
+    /* +0x03 */ u8 byte_0x03;
+    /* +0x04 */ u8 byte_0x04;
+    /* +0x05 */ u8 byte_0x05;
+    /* +0x06 */ u8 byte_0x06;
+    /* +0x07 */ u8 byte_0x07;
+};  /* size: 0x8 */
+
+struct Q_ElementBlock {
+    /* +0x00 */ u8 byte_0x00;
+    /* +0x01 */ u8 byte_0x01;
+    /* +0x02 */ u8 byte_0x02;
+    /* +0x03 */ u8 byte_0x03;
+    /* +0x04 */ u8 byte_0x04;
+    /* +0x05 */ u8 byte_0x05;
+    /* +0x06 */ u8 byte_0x06;
+    /* +0x07 */ u8 byte_0x07;
+    /* +0x08 */ u32 word_0x08;
+    /* +0x0C */ u32 word_0x0C;
+    /* +0x10 */ u32 word_0x10;
+    /* +0x14 */ u32 word_0x14;
+    /* +0x18 */ u32 word_0x18;
+    /* +0x1C */ u32 word_0x1C;
+};  /* size: 0x20 */
+
+/* One 4-byte pair the pick helpers append to their output: the table entry's u16 key and its
+ * sign-extended payload byte. */
+struct Q_PickPair {
+    /* +0x0 */ u16 id;
+    /* +0x2 */ s16 value;
+};  /* size: 0x4 */
+
+/* The arena element record `quest_element_build` fills and the pick's output lands in: the 0x40-byte
+ * payload the builder clears, and the sub-flag byte just past it that its caller arms.  Only the two
+ * offsets this band touches are named. */
+struct Q_ArenaElement {
+    /* +0x000 */ u8 pad_0x000[0x3F4];
+    /* +0x3F4 */ Q_PickPair payload_0x3F4[0x10];  /* 0x40 B, the pick's own output region */
+    /* +0x434 */ u8 flag_0x434;
+};  /* size: 0x435 (approximate: the highest offset this band reads + 1) */
+
+/* The arena element builder (0x803AD008): clears the element's payload, then fills it from the item
+ * work's own weighted lot table.  Its first parameter is the caller's context, which the target never
+ * reads (`r3` is clobbered by the first statement). */
+/* untyped: caller-owned context payload the target never reads */
+void quest_element_build(void* owner, u32 kind, Q_ArenaElement* element);
+
+void quest_pair_copy(Q_SlotPair* dst, const Q_SlotPair* src);
+void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src);
+
+/* The lot-table pick helpers (0x803AB614, 0x803AB728, 0x803AB80C): `pick` walks a weighted table and
+ * appends one entry per iteration, `pick_first` additionally forces the first iteration's roll to 0,
+ * and `pick_last` is the form `quest_monster_setup` drives its own table with.  All three take the
+ * caller's chance byte-table first, as the target's own register use shows (`pick` does not read it). */
+s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total);
+s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total);
+s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total);
+
 #ifdef __cplusplus
 }  /* extern "C" */
+#endif
+
+#ifdef __cplusplus
+/* The move-work accessor this unit reaches every per-slot record through.  Its owner is
+ * `ef/fn_800CDB2C.cpp`; that unit's own header cannot carry it (three other headers spell the same
+ * mangling with a different return type, so a declaration there breaks ten units on
+ * `illegal overloading`), so this is the one place the declaration is reachable from here.  Added
+ * with the body pass, which nets the file's rule-2 set out by moving `move_work_state_ck` to its
+ * owner's header.  At C++ scope, not inside the `extern "C"` block: the map's row is the mangling
+ * `get_move_work_adrs__FUc`, and the four 100 %-scoring getters' `bl` carries the C++ spelling (the
+ * C scope spelling is what makes `flipcheck.py` answer `undefined: 'get_move_work_adrs'`). */
+/* untyped: opaque work-area handle passed through - the record's type depends on the slot index */
+void* get_move_work_adrs(u8 index);
 #endif
 
 #endif /* MHTRI_QUEST_QUEST_ENTRY_H */
