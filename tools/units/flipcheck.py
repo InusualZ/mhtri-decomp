@@ -19,7 +19,11 @@ rewritten. Three of them carry a class a lane has to tell apart:
   its *own* address - names the section a **permutation**: the object's layout is the source's definition
   order, not the address order. That class (`Network/NetworkPat`: 577 of 720 `.text` bytes mislaid, every
   per-symbol score at 100 %) is invisible to the first-byte line, which reads the same as a three-instruction
-  residual.
+  residual. The same defect got measured with a moved symbol carrying a word of its own too (`NetworkPat`'s
+  three `delete*` functions score 99.7 %, not 100 %), which no lane can act on either, so a fourth line names
+  the weaker case as `the section's layout is a permutation` when the sizes agree, every shared symbol has the
+  same size on both sides, at least one sits at a different address and the mislaid layout accounts for more
+  of the differing bytes than the symbols' own content does.
 * Referenced symbol(s) our object relocates that a flip would leave **undefined**: not defined by our object,
   no row in `symbols.txt`, no link input other than the target object providing them, and the target object
   not defining them either (`Network/NetworkWiiMediator`: four constructor names, `undefined: '<name>'` on a
@@ -39,9 +43,18 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 
 MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OBJDUMP = os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objdump.exe")
+OBJCOPY = os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objcopy.exe")
+# where `raw_section` extracts a section to. `MAIN/.pi` is the main checkout's scratch dir and a
+# `git worktree` - every lane's tree - does not carry it, and probing a path under a directory that is not
+# there made objcopy fail, `raw_section` return None for *both* sides and every byte check (the
+# first-difference line, the differing-byte count and the permutation) silently skip: a section with 577 of
+# 720 bytes mislaid read READY. The probe falls back to the system temp dir, and the per-process file name
+# keeps two lanes in one tree from reading each other's extraction.
+SCRATCH = os.path.join(MAIN, ".pi")
 SPLITS = os.path.join(MAIN, "config", "RMHE08", "splits.txt")
 SRC = os.path.join(MAIN, "build", "RMHE08", "src")
 # the link's input list - the only objects a link-wide symbol/reference check may read (see `link_inputs`)
@@ -131,13 +144,18 @@ def unit_name_for(path: str) -> str:
     return os.path.relpath(path, SRC).replace("\\", "/")[:-2]
 
 
+def scratch_file() -> str:
+    """A writable file name for the objcopy extraction: under `MAIN/.pi` when that dir exists, temp otherwise."""
+    return os.path.join(SCRATCH if os.path.isdir(SCRATCH) else tempfile.gettempdir(),
+                        "_flipcheck_%d.bin" % os.getpid())
+
+
 def raw_section(path: str, name: str) -> bytes | None:
     """The raw bytes of one section, via objcopy (None when the section is absent)."""
     if not os.path.exists(path):
         return None
-    tmp = os.path.join(MAIN, ".pi", "_flipcheck.bin")
-    r = subprocess.run([os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objcopy.exe"),
-                        "-O", "binary", "--only-section=" + name, path, tmp],
+    tmp = scratch_file()
+    r = subprocess.run([OBJCOPY, "-O", "binary", "--only-section=" + name, path, tmp],
                        capture_output=True)
     if r.returncode != 0 or not os.path.exists(tmp):
         return None
@@ -207,6 +225,55 @@ def mislaid_layout(mine: bytes, tgt: bytes, ours_path: str, obj_path: str, name:
     return compared, differing_bytes(mine, tgt)
 
 
+def mislaid_order(mine: bytes, tgt: bytes, ours_path: str, obj_path: str, name: str):
+    """(moved symbols, symbols compared, bytes the layout explains, bytes left over) when the layout is mislaid.
+
+    `mislaid_layout` above wants *every* shared symbol byte-identical at its own address. The measured case
+    behind the strict line - `Network/NetworkPat`: 99.83 %, 577 of 720 `.text` bytes mislaid - is the same
+    defect with three of its twelve moved symbols carrying a word of their own too (a `lwz` whose base MWCC
+    encodes as the saved `this` register instead of `r3`, which the project's per-symbol scores report as
+    99.7 % and no source lane can act on), so the strict test says nothing and the section reads exactly like
+    a three-instruction residual again. This is the weaker class that defect produces, and it has to be named:
+    every per-symbol score the project has is blind to it.
+
+    Returns None unless this is it: equal section sizes, at least two shared symbols, every shared symbol the
+    *same size* on both sides (a size change is what displaces symbols - that is a byte residual, not a
+    layout one), the mislaid symbols covering **more than half of the section** and more of the differing
+    bytes sitting outside the shared symbols' own addresses (the layout's doing) than inside them (the
+    symbols' own content, which the per-symbol rows already carry). The coverage condition is what keeps a
+    section whose story is a residual honest: `ef/ef_effect` has two of its thirty-nine symbols mislaid
+    (204 of 5564 bytes) and 129 bytes differing inside eight other symbols - a reorder there is not what
+    the section needs, and naming it one would mislead. A section whose difference sits in place (a pad, a
+    changed instruction in an unmoved symbol) keeps the first-difference and count lines and gains nothing
+    here either.
+    """
+    if len(mine) != len(tgt) or not mine:
+        return None
+    ours = section_symbols(ours_path, name)
+    theirs = section_symbols(obj_path, name)
+    compared, moved, moved_bytes, own_diff = 0, 0, 0, 0
+    for sym in sorted(set(ours) & set(theirs)):
+        o_off, o_size = ours[sym]
+        t_off, t_size = theirs[sym]
+        if o_size != t_size:
+            return None                    # a differently-sized symbol is what moved the section, not the order
+        if o_size == 0:
+            continue                       # a 0-size label has no bytes to compare
+        if o_off + o_size > len(mine) or t_off + t_size > len(tgt):
+            return None
+        compared += 1
+        if o_off != t_off:
+            moved += 1
+            moved_bytes += o_size
+        # what the symbols themselves account for: their own bytes against the target's bytes at their own
+        # address. Everything else that differs is mislaid layout.
+        own_diff += sum(1 for i in range(o_size) if mine[o_off + i] != tgt[t_off + i])
+    total = differing_bytes(mine, tgt)
+    if compared < 2 or not moved or moved_bytes * 2 <= len(mine) or total - own_diff <= own_diff:
+        return None
+    return moved, compared, total - own_diff, own_diff
+
+
 def section_byte_problems(name: str, mine: bytes, tgt: bytes, ours_path: str,
                           obj_path: str) -> list[str]:
     """The byte-level refusal lines for one section: the first difference, the count, the permutation."""
@@ -224,6 +291,15 @@ def section_byte_problems(name: str, mine: bytes, tgt: bytes, ours_path: str,
                         "is the source's definition order, not the address order; order (or forward-declare) "
                         "the source so the layout matches (%d of %d bytes mislaid)"
                         % (name, perm[0], perm[1], span))
+        return problems
+    order = mislaid_order(mine, tgt, ours_path, obj_path, name)
+    if order is not None:
+        problems.append("%s: the section's layout is a permutation - %d of the %d symbol(s) defined in it sit "
+                        "at a different address than the target's and every shared symbol keeps its size, and "
+                        "%d of the %d differing bytes sit outside the symbols' own addresses (only %d differ "
+                        "inside them), so the object's layout is the source's definition order, not the "
+                        "address order; order (or forward-declare) the source so the layout matches"
+                        % (name, order[0], order[1], order[2], differing_bytes(mine, tgt), order[3]))
     return problems
 
 
