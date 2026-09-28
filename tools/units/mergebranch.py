@@ -27,14 +27,17 @@ conflict but from the two failure modes this tool is built against:
 | conflicted path | rule |
 |---|---|
 | `config/**/symbols.txt` | main's file, then the branch's own rename pairs re-applied as **exact row replacements** - a symbol map is address-ordered, so a textual union reorders it and renames nothing |
-| `src/**` | whichever side already carries the other side's work (the branch's edit there is usually a rename sweep, and main's file may already hold it). If neither does, **refuse** and name what is missing |
+| `src/**` | whichever side already carries the other side's work (the branch's edit there is usually a rename sweep, and main's file may already hold it). If neither does, a **comment-only** delta (identical code after `stylelint.strip`) keeps main's block and records the branch's dropped paragraph; otherwise **refuse** and name what is missing |
 | an unsplit band header (`include/unsplit/*`) | a three-way union, then the **rule-2 address sweep**: a declaration whose address is inside a registered `.text` range belongs to that unit's header, and where it should move is reported |
 | anything else | a three-way union |
 
 Every resolution is then checked before the commit: no conflict markers, each conflicted path's branch
-side present, every `fn_XXXXXXXX`/`lbl_XXXXXXXX` the branch still names still in the map, and - when the
-tooling is importable - `land.py`'s own pre-flight rows (rule 7 growth, band ownership, registration) plus
-the affected units' compile, which is the only check that sees a `NonMatching` unit's object.
+side present (the **code** for a comment-only resolution), every `fn_XXXXXXXX`/`lbl_XXXXXXXX` the branch
+sources still *call* still in the map (a name that is part of a unit file's **path**, or one the map cannot
+resolve at its address, is not a symbol reference - both false positives cost a hand merge on 2026-09-28),
+and - when the tooling is importable - `land.py`'s own pre-flight rows (rule 7 growth, band ownership,
+registration) plus the affected units' compile, which is the only check that sees a `NonMatching` unit's
+object.
 """
 from __future__ import annotations
 
@@ -48,9 +51,19 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_TOOLS = os.path.dirname(HERE)                       # tools/
+# `stylelint.strip` is the one comment/literal stripper in the repository: import it rather than write a
+# second one (a second stripper drifts and the two then disagree about what a comment is).  A comment-only
+# `src/**` conflict is resolved by comparing the stripped *code*.
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+from stylelint import strip  # noqa: E402
 STATE = ".pi/merge-state.json"
 MARKERS = ("<<<<<<<", "|||||||", ">>>>>>>")
 RENAME = re.compile(r"\b(fn|lbl|loc)_([0-9A-Fa-f]{8})\b")
+# A generated name followed by a file extension is a file name, not a symbol: `fn_805113B0.c` / `.o`.
+PATH_EXT = re.compile(r"\.(?:c|cpp|cc|cp|h|hpp|hh|o|obj|d|s|asm|txt|json|map|md)\b")
+# A `symbols.txt` row: the name, its section (`.text`, `@`-prefixed extab, ...) and its address.
+MAP_ROW = re.compile(r"^\s*([^\s=]+)\s*=\s*([^:\s]+):(0x[0-9A-Fa-f]+)", re.M)
 ADDR_COMMENT = re.compile(r"/\*\s*0x([0-9A-Fa-f]{8})")
 DECL_HEAD = re.compile(r"^\s*(?:extern\s+\"C\"\s+)?(?:const\s+)?[A-Za-z_][\w:<> \*&]*?\b\w+\s*\(")
 SPLITS_UNIT = re.compile(r"^(\S+):\s*$")
@@ -261,6 +274,55 @@ def missing_from(candidate: list[str], wanted: list[str]) -> list[str]:
     return [l for l in wanted if l not in candidate]
 
 
+def map_symbols(map_text: str) -> tuple[set[str], dict[int, str]]:
+    """`(every row's name, address -> name)` for a `symbols.txt`: the map a generated name must resolve through."""
+    live: set[str] = set()
+    addresses: dict[int, str] = {}
+    for m in MAP_ROW.finditer(map_text):
+        live.add(m.group(1))
+        addresses[int(m.group(3), 16)] = m.group(1)
+    return live, addresses
+
+
+def stale_generated_names(text: str, live: set[str], addresses: dict[int, str]) -> list[str]:
+    """Every generated name in `text` a rename has made stale - and only a real *symbol* reference.
+
+    Two false positives cost a hand merge on 2026-09-28, and both are closed here:
+
+    * a **path** is not a symbol.  A comment naming `src/DWCi/fn_805113B0.c` is the *file name* of a unit
+      whose map row is `DWCi_sendControlFrame`; the old scan read it as five stale symbols and blocked the
+      merge.  A match preceded by a path separator, or followed by a file extension (`fn_…c` / `fn_…o`),
+      is a path component, not a use.
+    * a name the map cannot resolve at its address is not a stale symbol - it is prose (or an old file
+      name).  A genuinely stale reference (the branch still *calls* a `fn_XXXXXXXX` the map renamed)
+      resolves to a map row at that address, so it is still reported.
+    """
+    out: list[str] = []
+    for m in RENAME.finditer(text):
+        ident = m.group(0)
+        if m.start() > 0 and text[m.start() - 1] in "/\\":
+            continue                                    # a path component: `DWCi/fn_805113B0.c`
+        if PATH_EXT.match(text, m.end()):
+            continue                                    # a file name: `fn_805113B0.c` / `fn_805113B0.o`
+        if ident in live:
+            continue
+        if int(m.group(2), 16) not in addresses:
+            continue                                    # no map row at this address: not a symbol use
+        out.append(ident)
+    return out
+
+
+def stripped_code(text: str) -> str:
+    """The file's **code**, with comments and string/char literals blanked by `stylelint.strip`.
+
+    Whitespace is collapsed because `strip` preserves *positions*: two comments of different lengths leave
+    different numbers of spaces, and a comment-only rewrite of a paragraph would otherwise read as a code
+    change.  Collapsing also folds string-literal content (the shared stripper blanks it), which is the
+    tool's existing notion of `code` - a string-only change is not what this comparison is for.
+    """
+    return re.sub(r"\s+", "", strip(text)[0])
+
+
 # ---------------------------------------------------------------------------------------------------
 # the resolution
 # ---------------------------------------------------------------------------------------------------
@@ -394,12 +456,27 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
                     restore(root, path, lines_of(theirs), newline_of(theirs))
                     action["note"] = "the branch's file carries main's edits too; took it"
                 else:
-                    miss = missing_from(lines_of(ours), want)
-                    blockers.append("%s: neither side is a superset - main's file lacks %d of the branch's "
-                                    "line(s) (e.g. %r) and the branch's lacks %d of main's. Resolve this one "
-                                    "by hand (`git merge-file -p --diff3` three-ways it)."
-                                    % (path, len(miss), miss[0][:70], len(ours_missing)))
-                    continue
+                    ours_code = stripped_code(ours.decode("utf-8", "replace"))
+                    theirs_code = stripped_code(theirs.decode("utf-8", "replace"))
+                    if ours_code == theirs_code:
+                        # A comment block that BOTH sides rewrote is the one `src/**` conflict with no
+                        # superset on either side (2026-09-28: the branch's ".text only" sentence vs
+                        # main's "DATA CLAIMED" paragraph).  The *code* is identical, so the delta is
+                        # prose: keep main's block - the shared truth the branch's fork predates - and
+                        # record the branch's dropped paragraph, never a silent loss.
+                        restore(root, path, lines_of(ours), newline_of(ours))
+                        dropped = [l.strip() for l in lines_of(theirs) if l.strip() and l not in lines_of(ours)]
+                        action["comment_only"] = True
+                        action["note"] = ("code is identical after stripping comments - kept main's comment "
+                                          "block and dropped the branch's (e.g. %r)" %
+                                          (dropped[0][:60] if dropped else ""))
+                    else:
+                        miss = missing_from(lines_of(ours), want)
+                        blockers.append("%s: neither side is a superset - main's file lacks %d of the "
+                                        "branch's line(s) (e.g. %r) and the branch's lacks %d of main's. "
+                                        "Resolve this one by hand (`git merge-file -p --diff3` three-ways "
+                                        "it)." % (path, len(miss), miss[0][:70], len(ours_missing)))
+                        continue
         else:
             text, conflicts = merge_file(root, ours, base_b, theirs)
             merged, unioned = union_markers(text)
@@ -414,6 +491,7 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
         actions.append(action)
 
     # --- the proof, before anything is committed -----------------------------------------------------
+    comment_only = {a["path"] for a in actions if a.get("comment_only")}
     for path in todo:
         if not os.path.isfile(os.path.join(root, path)):
             continue
@@ -425,25 +503,30 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
         kind = classification(path)
         theirs, base_b = blob(root, "HEAD", path), blob(root, base, path)
         if kind == "source" and theirs and base_b:
-            want = branch_only_additions(lines_of(base_b), lines_of(theirs))
-            gone = missing_from(lines, want)
-            if gone:
-                blockers.append("%s: the branch's own line(s) are missing from the resolution: %s"
-                                % (path, "; ".join(repr(g[:60]) for g in gone[:3])))
+            if path in comment_only:
+                # the code is what has to match the branch; the paragraph the resolution kept is named in
+                # its action.  Fail closed if the code moved under us since the resolve above.
+                if stripped_code("\n".join(lines)) != stripped_code(theirs.decode("utf-8", "replace")):
+                    blockers.append("%s: resolved as comment-only but the code no longer matches the "
+                                    "branch's" % path)
+            else:
+                want = branch_only_additions(lines_of(base_b), lines_of(theirs))
+                gone = missing_from(lines, want)
+                if gone:
+                    blockers.append("%s: the branch's own line(s) are missing from the resolution: %s"
+                                    % (path, "; ".join(repr(g[:60]) for g in gone[:3])))
 
-    # a rename is TWO edits and a merge resolves only the map half: if the branch's files still name a
-    # `fn_XXXXXXXX` the map no longer has, the link fails later with `undefined: 'fn_…'`
+    # a rename is TWO edits and a merge resolves only the map half: if the branch's files still *call* a
+    # `fn_XXXXXXXX` the map has renamed, the link fails later with `undefined: 'fn_…'`.  Only a real symbol
+    # reference counts: a comment naming a unit file's *path* is not one (`stale_generated_names`).
     map_text = (blob(root, "main", "config/RMHE08/symbols.txt") or b"").decode("utf-8", "replace")
-    live = set(re.findall(r"^\s*(\w+)\s*=", map_text, re.M))
+    live, addresses = map_symbols(map_text)
     stale: list[tuple[str, str]] = []
     for path in todo:
         if not path.startswith("src/") or not os.path.isfile(os.path.join(root, path)):
             continue
         text = "\n".join(read_lines(root, path) or [])
-        for kind_, addr in RENAME.findall(text):
-            ident = "%s_%s" % (kind_, addr)
-            if ident not in live and ident in text:
-                stale.append((path, ident))
+        stale.extend((path, ident) for ident in stale_generated_names(text, live, addresses))
     if stale:
         blockers.append("the map renamed %d generated name(s) the branch's sources still use (the merge "
                         "resolved the map half only) - e.g. %s in %s. The address's current map name is the "
@@ -625,6 +708,36 @@ def selftest() -> int:
     check("branch additions ignore blank lines", branch_only_additions(["a", ""], ["a", "", "b"]), ["b"])
     check("missing lines are reported in order", missing_from(["a"], ["a", "b", "c"]), ["b", "c"])
 
+    # --- the stale-generated-name scan must read a *symbol reference*, not a unit file's path ---------
+    # 2026-09-28: a comment naming `src/DWCi/fn_805113B0.c` was read as five stale symbols and blocked a
+    # merge whose map row at that address is `DWCi_sendControlFrame` (the file name, not a map row).
+    live, addresses = map_symbols("DWCi_sendControlFrame = .text:0x805113B0; // type:function size:0xB8\n"
+                                  "some_real_name = .text:0x80004320; // type:function size:0x10\n")
+    check("the map's names and addresses parse",
+          ("DWCi_sendControlFrame" in live, addresses.get(0x805113B0)),
+          (True, "DWCi_sendControlFrame"))
+    check("a path in a comment is not a stale symbol",
+          stale_generated_names("* see `src/DWCi/fn_805113B0.c` and this unit.", live, addresses), [])
+    check("... the bare `/fn_XXXXXXXX.c` form too",
+          stale_generated_names("from `DWCi/fn_805113B0.c`", live, addresses), [])
+    check("... and an object-file mention (`fn_XXXXXXXX.o`)",
+          stale_generated_names("in fn_805113B0.o's relocations", live, addresses), [])
+    check("a genuinely stale CALL is still reported",
+          stale_generated_names("void f(void) { fn_80004320(); }\n", live, addresses), ["fn_80004320"])
+    check("... even when a comment also names its file",
+          stale_generated_names("/* fn_80004320.c */\nvoid f(void) { fn_80004320(); }\n",
+                                live, addresses), ["fn_80004320"])
+    check("a name the map cannot resolve is not reported",
+          stale_generated_names("fn_DEADBEEF()", live, addresses), [])
+    check("a name still live in the map is not stale",
+          stale_generated_names("void f(void) { fn_80004320(); }\n",
+                                live | {"fn_80004320"}, addresses), [])
+    check("the shared stripper compares code, not comment length",
+          stripped_code("/* a longer rewritten paragraph */\nint a;\n") ==
+          stripped_code("/* short */\nint a;\n"), True)
+    check("... and a real code change is not hidden by it",
+          stripped_code("int a_lane;\n") == stripped_code("int a_main;\n"), False)
+
     # the failure mode this tool exists for, on a real repository: a conflicted file left as main's copy
     with tempfile.TemporaryDirectory() as tmp:
         def qgit(*args: str) -> None:
@@ -716,6 +829,54 @@ def selftest() -> int:
     check("... while the map conflict still resolved (the branch's rename was kept)",
           "lane_renamed = .text:0x80001080" in merged2, True)
     check("... and main's row was kept as well", "main_added = .text:0x80001060" in merged2, True)
+
+    # a comment-only `src/**` conflict: both sides rewrote the same header paragraph, the *code* is
+    # identical, so neither raw file is a superset. 2026-09-28: this blocked a merge that had to be done
+    # by hand.  It must resolve, keep main's block (the claim's current truth), and record the dropped one.
+    def e2e_comment() -> tuple[int, str, str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            def qgit(*args: str) -> None:
+                subprocess.run(["git", "-c", "user.email=t@e.invalid", "-c", "user.name=t",
+                                "-c", "commit.gpgsign=false", *args], cwd=tmp, capture_output=True,
+                               check=True)
+
+            def put(rel: str, text: str) -> None:
+                p = os.path.join(tmp, rel)
+                os.makedirs(os.path.dirname(p), exist_ok=True)
+                with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(text)
+
+            rows = ["fn_80001000 = .text:0x80001000; // type:function size:0x40",
+                    "fn_80001040 = .text:0x80001040; // type:function size:0x40"]
+            body = "int a;\nint pad1;\nint b;\n"
+            qgit("init", "-q")
+            qgit("checkout", "-q", "-b", "main")
+            put("config/RMHE08/symbols.txt", "\n".join(rows) + "\n")
+            put("config/RMHE08/splits.txt", "src/f.c:\n\t.text       start:0x80001000 end:0x80001100\n")
+            put("src/f.c", "/* the unit note. */\n" + body)
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "base")
+            qgit("checkout", "-q", "-b", "lane")
+            put("src/f.c", "/* the branch's `.text`-only sentence. */\n" + body)
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "the branch rewrote the note")
+            qgit("checkout", "-q", "main")
+            put("src/f.c", "/* DATA CLAIMED - this unit's range is its own. */\n" + body)
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "main rewrote the note")
+            qgit("checkout", "-q", "lane")
+            code = resolve(tmp, "lane", dry_run=True, as_json=False)
+            return code, "\n".join(read_lines(tmp, "src/f.c") or []), git(tmp, "log", "--oneline", "-2")
+
+    code3, source3, _log3 = e2e_comment()
+    check("a comment-only source conflict resolves instead of blocking", code3, 0)
+    check("... keeping main's comment block", "DATA CLAIMED" in source3, True)
+    check("... and dropping the branch's obsolete paragraph", "`.text`-only sentence" not in source3, True)
+    check("... while the code is untouched", "int a;\nint pad1;\nint b;" in source3, True)
+
+    # the guard that must NOT be weakened: a full body rewrite on the same line still refuses
+    code4, _merged4, _source4, _log4 = e2e(src_same_line=True)
+    check("a real code conflict still blocks after the comment-only fix", code4, 1)
 
     if fails:
         print("FAIL (%d)" % len(fails))
