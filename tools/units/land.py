@@ -561,6 +561,32 @@ def changed_paths(main: str) -> list[str]:
     return [path for _code, path in changed_status(main)]
 
 
+def conflict_marker_files(main: str, paths: list[str]) -> list[tuple[str, int, str]]:
+    """The batch's own files that carry a git conflict marker, as `(path, line, marker)`.
+
+    A committed conflict marker is the cheapest defect to catch and one of the more expensive ones to find
+    late: the build reports it as a syntax error in whichever file carries it, so a full compile buys one
+    line's worth of news, and the marker survives review because it looks like ordinary text.  Only the two
+    markers a conflict writes are looked for - `=======` on its own is a legal banner comment, so a file
+    full of those is not evidence of anything.
+    """
+    found: list[tuple[str, int, str]] = []
+    for rel in paths:
+        path = os.path.join(main, rel)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                for number, line in enumerate(fh, 1):
+                    head = line.lstrip()
+                    for marker in ("<<<<<<<", ">>>>>>>"):
+                        if head.startswith(marker + " ") or head.rstrip() == marker:
+                            found.append((rel, number, marker))
+        except OSError:
+            continue
+    return found
+
+
 def is_batch_path(main: str, entry: str) -> bool:
     """True when a `--units` entry names a repo PATH the batch stages, not a translation unit.
 
@@ -2114,6 +2140,16 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         print(tolerate_scratch(main, scratch, act=not dry_run), file=sys.stderr)
     check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad),
           info=("tool scratch tolerated (not staged): %s" % ", ".join(scratch)) if scratch else "")
+    # 3b. the cheapest defect to catch early: a committed conflict marker. The build reports it as a syntax
+    # error in whichever file carries it, so a full compile buys one line's worth of news, and a marker
+    # survives review because it looks like ordinary text. Scoped to the batch's own files - another
+    # stream's dirty file is not this batch's to fix - and to the two markers a conflict writes.
+    markers = conflict_marker_files(main, land_stageable(units, changed_status(main),
+                                                        base_dirty_paths(main)))
+    check("no batch file carries a git conflict marker", not markers,
+          "; ".join("%s:%d %s" % (p, n, m) for p, n, m in markers[:6]),
+          remedy="resolve the conflict in that file and re-commit it - a marker is not source, and the build "
+                 "only reports it as a syntax error, in a file that need not be the one the merge touched")
     if unit_units and check_outbox:
         # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
         # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
@@ -2626,6 +2662,22 @@ def selftest() -> int:
               is_batch_path(tmp, "src/menu/arena_result"), False)
         check("... and a deeper unit path is still a unit",
               is_batch_path(tmp, "Network/initNetworkSessionStable"), False)
+
+        # a committed conflict marker: the build only reports it as a syntax error, so it is worth a row of
+        # its own. `=======` alone is a banner, not evidence.
+        open(os.path.join(tmp, "conflicted.c"), "w").write(
+            "int a;\n<<<<<<< HEAD\nint b;\n=======\nint c;\n>>>>>>> other\n")
+        open(os.path.join(tmp, "banner.c"), "w").write("/* ======= */\nint d;\n")
+        open(os.path.join(tmp, "clean.c"), "w").write("int e;\n")
+        check("a conflict marker is found, with its line and spelling",
+              conflict_marker_files(tmp, ["conflicted.c"]),
+              [("conflicted.c", 2, "<<<<<<<"), ("conflicted.c", 6, ">>>>>>>")])
+        check("a banner of `=======` alone is not a marker", conflict_marker_files(tmp, ["banner.c"]), [])
+        check("a clean file has none", conflict_marker_files(tmp, ["clean.c"]), [])
+        check("a path that is not a file is skipped, not an error",
+              conflict_marker_files(tmp, ["gone.c", "docs"]), [])
+        check("... and the scan covers the batch's files together",
+              len(conflict_marker_files(tmp, ["clean.c", "conflicted.c", "banner.c"])), 2)
 
     # the pre-flight names the likely cause of a foreign path whose name looks like lane scratch (the
     # `.tmp-mwcc/upstream` incident); an ordinary foreign file gets no invented cause
