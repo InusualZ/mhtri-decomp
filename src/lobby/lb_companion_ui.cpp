@@ -766,7 +766,8 @@ void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
 }
 
 /* Act 22: keeps the companion work's high score and hands the row on.
- * Name: act 22: keeps `companion->best_0x8F` and hands the row on (`fn_803AA774`, `fn_8035B5FC`) */
+ * Name: act 22: keeps `companion->best_0x8F` and hands the row on (`quest_item_pair_copy_row`,
+ * `fn_8035B5FC`) */
 void lb_act_best_keep(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -781,8 +782,9 @@ void lb_act_best_keep(u8 unused, LbActReq* req) {
                 companion->best_0x8F = value;
                 companion->value_0x8B = req->sel_0x04.bytes_0x00.d_0x03;
             }
-            fn_803AA774(companion->pairs_0x5E2, req->sel_0x04.bytes_0x00.a_0x00,
-                        (s8)companion->best_0x8F, req->mask_0x08.byte_0x00);
+            quest_item_pair_copy_row((Q_ItemPair*)companion->pairs_0x5E2,
+                                     req->sel_0x04.half_0x00,
+                                     (s8)companion->best_0x8F, req->mask_0x08.byte_0x00);
             fn_8035B5FC(1, fn_803B33B0(0x14));
         }
     }

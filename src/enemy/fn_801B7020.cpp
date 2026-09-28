@@ -265,7 +265,7 @@ extern "C" s32 fn_801B7118(u16 id) {
     s32 roll;
 
     fn_80125F54(&rec);
-    if (fn_800CF280() == 0) {
+    if (move_work_state_ck() == 0) {
         return 0;
     }
     if (fn_801421E4((u16)id, &rec) == 0) {

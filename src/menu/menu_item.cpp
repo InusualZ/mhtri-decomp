@@ -1300,10 +1300,10 @@ extern "C" u32 fn_802A008C(MenuSlot* slot)
     return 1;
 }
 
-/* 0x802A0148: whether the menu is in the state `fn_800CF280` reports or a single area is loaded. */
+/* 0x802A0148: whether the menu is in the state `move_work_state_ck` reports or a single area is loaded. */
 extern "C" u32 fn_802A0148(void)
 {
-    if (fn_800CF280() != 0) {
+    if (move_work_state_ck() != 0) {
         return 1;
     }
     return fn_803AAEC0() == 1;

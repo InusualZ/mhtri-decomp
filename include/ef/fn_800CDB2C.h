@@ -27,7 +27,7 @@ u32 my_player_no(void);
  * is C linkage; the owner's own definition (`src/ef/fn_800CDB2C.cpp:247`) is still C++ linkage. */
 void fn_800CF394(s8 value);
 u8  fn_800CF208(void);
-u32 fn_800CF280(void);
+u32 move_work_state_ck(void);
 
 s32 fn_800CED10(char* path, u32 dma, u32 size);
 /* Builds the nw4r::ef::EffectSystem the effect manager keeps at `eft_control` +0x04. */

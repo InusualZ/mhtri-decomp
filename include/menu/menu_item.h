@@ -411,7 +411,7 @@ u32 fn_8027E120(_PLW* worker);
 s32 fn_80047058(void);
 void fn_8004082C(void);
 u8 fn_800CF208(void);
-u32 fn_800CF280(void);
+u32 move_work_state_ck(void);
 u32 game_ready_ck(void);
 u32 fn_803AAEC0(void);
 u32 fn_802FBA60(void);

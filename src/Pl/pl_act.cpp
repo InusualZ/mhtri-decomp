@@ -2011,7 +2011,7 @@ extern "C" void fn_80278D1C(_PLW* self)
 extern "C" s32 fn_8026A6F4(_PLW*, s32);
 void sysSE_req(s32);
 extern "C" u32 fn_803B521C(s32);
-extern "C" u32 fn_803AB190(s32);
+extern "C" u32 quest_item_work_notify(s32);
 
 /* 0x8027B918: steps the actor's clutch state machine from the pad edge events the move work reports. */
 extern "C" void fn_8027B918(_PLW* self)
@@ -2059,7 +2059,7 @@ extern "C" void fn_8027B918(_PLW* self)
             case 1:
                 if ((u32)fn_8027BC48(0) != 1) {
                     if ((u32)fn_803B521C(0) == 1) {
-                        if (fn_803AB190(1) == 1 || fn_803AB190(2) == 1) {
+                        if (quest_item_work_notify(1) == 1 || quest_item_work_notify(2) == 1) {
                             (*(u8*)((u8*)self + 0x5C0))++;
                             *(u8*)(q + 0x68D) = 1;
                             sysSE_req(0);
