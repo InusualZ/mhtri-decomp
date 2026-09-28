@@ -2422,3 +2422,64 @@ for (s32 i = 0; i < listCount(w); i++)          /* cmpw; a u32 i gives cmplw */
 
 void DWCi_initRuntime(a, b, c, d, e, f);        /* SIX parameters - the call site proves the count */
 ```
+
+## 73. A data range dtk calls link PADDING needs a `type:function` symbol over the claim
+
+**Problem.** `Runtime.PPCEABI.H/TRK_interrupt_vectors` - the 8,000 B TRK interrupt-vector image in `.init` -
+matched byte-for-byte and **could not land**: `dtk dol split` classifies the range as link padding (the
+analyzer finds no function prologue in the stubs, which begin with `mtsprg`), so its target object carries
+dtk's own symbol `pad_00_80004380_init`. With the map's `gTRKInterruptVectorTable` left as a sizeless `label`,
+the claim links and the object is identical, but the report's row keeps dtk's name and nothing can re-measure
+it by name; giving that label an extent instead made the **split fail**, with `Symbol
+gTRKInterruptVectorTable (0x80004380..0x80004514) overlaps with symbol pad_00_80004380_init`.
+
+**Why try it.** `dtk/src/util/split.rs:873-945` (`add_padding_symbols`) emits `pad_{NN}_{ADDR}_{section}` for
+any split or gap start that has no symbol whose **kind** matches (`kind_at_section_address`,
+`src/obj/symbols.rs:380`), and `type:label` maps to `ObjSymbolKind::Unknown` (`config.rs:377`) - so a label
+can never satisfy a Function pad, and an `object`-kind symbol does not either (hence the overlap error: dtk
+had already created the pad). A **`type:function`** symbol of exactly the claimed extent satisfies it, the pad
+symbol is never created, and the row becomes ours. Precedent found by surveying ten dtk-based projects:
+`mitsevox/tw2004` does exactly this -
+`TRK_exception_vectors = .init:0x80003534; // type:function size:0x1F34 scope:global` - and its own comment
+says the function-typed name "lets objdiff compare it". (`doldecomp/melee`, `zeldaret/tww` and others instead
+check in the vector table as assembly, or accept dtk's pad name; `doldecomp/ogws` leaves it unclaimed
+entirely. Full survey: `.pi/notes/other-wii-init.md`.)
+
+**Result.** The two rows of the TRK claim landed as `Object(Matching)` units, 100.00000 % each, with
+`grep -c pad_00_80004380_init build/RMHE08/report.json` = **0**, the DOL sha1 unchanged, and the ledger
++2 units / +2 closed rows (`4673def1b`). Two facts the same attempt established, both worth knowing before
+the next data claim:
+
+* **MWCC pads every object in `.init` to 8 bytes** - probe: two 5-byte `u8` arrays land at +0x0 and +0x8, and
+  `__declspec(align(4))` is rejected with a usage warning. An interior label therefore cannot live inside one
+  array object: split the claim **at the referenced address** and let `tools/elf/objalign.py` lower the second
+  claim's alignment (row 55). Ours is two units, 404 B + 7,596 B, because a `.data` word relocates to the
+  boundary between them.
+* **A claim over the LINKER's own tables is inert by design.** `_rom_copy_info` (0x84) and `_bss_init_info`
+  (0x20) are emitted by `mwldeppc`; dtk strips `_eti_init_info|_rom_copy_info|_bss_init_info|_ctors$99|
+  _dtors$99` from splits on purpose (`is_linker_generated_object()`), no split target object exists for the
+  range, our object never appears in `ldscript.lcf`, and a deliberately corrupted word in our copy leaves the
+  DOL byte-identical. No project in the ecosystem defines them - only `extern`s and non-mwld link stubs. Leave
+  `__start.c`'s `extern`s alone.
+
+## 74. `complete_code_percent` is a FLAG we set, not a measurement
+
+**Problem.** `tools/project.py` writes `metadata.complete: true` into `objdiff.json` for every
+`Object(Matching, ...)`, and the report's unit row then reads `complete_code: 404, complete_code_percent: 100.0`
+**whatever the bytes are**. So "the report says 100 %" is a restatement of a flag we set ourselves, not
+evidence that anything matches - which matters because a flip is exactly the moment the claim becomes load
+bearing, and because the ledger's progress totals inherit it.
+
+**What is actually suppressed.** Not the diff. Measured on a `Matching` unit with one byte of its banner
+changed: `fuzzy_match_percent` moved **100.0 -> 99.95049** while `complete_code_percent` stayed **100.0**, and
+`ninja build/RMHE08/ok` FAILED with the DOL sha1 moving `bf4850739478caaedfe675949eb7c28595a7fde9 ->
+abc3729830d69a412d6a5a112e735d628dbc3f31`. objdiff still diffs the unit and still reports the difference;
+what the flag suppresses is the unit's contribution to the *completion* totals. This is the long-documented
+trap (`complete_code_percent: 100.0` beside `fuzzy_match_percent: 1.77`) with its mechanism attached.
+
+**Result.** The rule: **never cite `complete_code_percent`, the `complete` flag, or "the report says 100 %" as
+evidence for a `Matching` unit.** For a row, cite `fuzzy_match_percent`; for the *unit*, cite the byte-level
+comparison and `ninja build/RMHE08/ok`'s DOL hash - the two things a flipped unit cannot fake.
+`tools/units/verifyunit.py` now performs that byte comparison as a landing-gate row, address-aware so a
+dtk-`pad_`-named row still resolves, and it still refuses a corrupted byte. `flipcheck.py` READY remains
+necessary and not sufficient.
