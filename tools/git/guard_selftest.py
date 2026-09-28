@@ -9,6 +9,7 @@ This is the one gate whose failure mode is silent and total - a rewritten `build
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, "tools", "git"))
 
 import prepcommit as pc  # noqa: E402
+import guard  # noqa: E402
 
 FAIL: list[str] = []
 CHECKS = 0
@@ -88,6 +90,159 @@ check("a flat ledger is not improved",
                          {"closed": 10, "matched": 5, "bytes": "100"}), False)
 check("missing sides are not improved", pc.ledger_improved({}, {}), False)
 check("improved_since_base returns a bool", isinstance(pc.improved_since_base(), bool), True)
+
+# --- localonly_case(): the marker must be a whole line, or rule 8's own prose matches it --------------------
+check("localonly_case: no AGENTS.md staged", guard.localonly_case(["src/x.c"]), "nothing")
+check("localonly_case: a real marker line",
+      guard.localonly_case(["AGENTS.md"], "head\n<!-- LOCAL-ONLY-BEGIN -->\nbody\n"),
+      "pull the block, re-stage AGENTS.md")
+check("localonly_case: rule 8's prose quoting the marker is not a marker line",
+      guard.localonly_case(["AGENTS.md"], "run `grep -c '^<!-- LOCAL-ONLY'` to check\n"), "nothing")
+check("localonly_case: a marker mentioned mid-line does not match",
+      guard.localonly_case(["AGENTS.md"], "the `<!-- LOCAL-ONLY-BEGIN` marker is quoted here\n"), "nothing")
+
+
+# --- the new guard behaviours, end to end through a real hook in a throwaway repo ----------------------
+
+BLOCK = ("<!-- LOCAL-ONLY-BEGIN: stripped before every commit, see Non-negotiables rule 8 -->\n"
+         "live agent working state\n"
+         "<!-- LOCAL-ONLY-END -->\n")
+
+
+def temp_repo() -> str:
+    """A throwaway repo with its own copy of the hooks and tools, so the hook runs there and not here."""
+    tmp = tempfile.mkdtemp(prefix="guard-selftest-")
+    for rel in ("tools/git/guard.py", "tools/git/hooks/pre-commit", "tools/git/hooks/post-commit",
+                "tools/agents/localonly.py"):
+        dst = os.path.join(tmp, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy(os.path.join(ROOT, rel), dst)
+        os.chmod(dst, 0o755)
+    for args in (("init", "-q"),
+                 ("config", "core.hooksPath", "tools/git/hooks"),
+                 ("config", "core.autocrlf", "false"),
+                 ("config", "user.email", "guard@selftest"),
+                 ("config", "user.name", "guard selftest")):
+        subprocess.run(["git", *args], cwd=tmp, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    return tmp
+
+
+def run(repo: str, *args: str):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+
+
+def blob(repo: str, spec: str) -> bytes:
+    return subprocess.run(["git", "-C", repo, "cat-file", "-p", spec], capture_output=True).stdout
+
+
+# 1. auto-pull: a staged AGENTS.md that carries the block is fixed, committed and restored, not refused.
+repo = temp_repo()
+try:
+    with open(os.path.join(repo, "AGENTS.md"), "w", encoding="utf-8", newline="") as fh:
+        fh.write("head\n" + BLOCK + "tail\n")
+    run(repo, "add", "AGENTS.md")
+    check("auto-pull: the staged blob really carries the block",
+          b"LOCAL-ONLY-BEGIN" in blob(repo, ":AGENTS.md"), True)
+    result = run(repo, "commit", "-m", "t")
+    out = result.stdout + result.stderr
+    check("auto-pull: the commit succeeds", result.returncode, 0)
+    check("auto-pull: the hook says it pulled and re-staged", "pulled the block and re-staged" in out, True)
+    check("auto-pull: the committed AGENTS.md has no marker", b"LOCAL-ONLY" in blob(repo, "HEAD:AGENTS.md"), False)
+    with open(os.path.join(repo, "AGENTS.md"), "rb") as fh:
+        worktree = fh.read()
+    check("auto-pull: post-commit restored the block to the worktree", b"LOCAL-ONLY-BEGIN" in worktree, True)
+    check("auto-pull: post-commit removed its marker",
+          os.path.exists(os.path.join(repo, ".git", "localonly-pending")), False)
+    check("auto-pull: post-commit consumed the state file",
+          os.path.exists(os.path.join(repo, ".pi", "local-only.state.json")), False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+# 2. CRLF normalise: a staged text blob with CRs is rewritten to LF on disk and in the index.
+repo = temp_repo()
+try:
+    os.makedirs(os.path.join(repo, "src"))
+    path = os.path.join(repo, "src", "note.txt")
+    with open(path, "wb") as fh:
+        fh.write(b"alpha\r\nbeta\r\ngamma\r\n")
+    run(repo, "add", "src/note.txt")
+    check("crlf: the staged blob really has CRs", b"\r" in blob(repo, ":src/note.txt"), True)
+    result = run(repo, "commit", "-m", "t")
+    out = result.stdout + result.stderr
+    check("crlf: the commit succeeds", result.returncode, 0)
+    check("crlf: the hook says it normalised the file", "normalised" in out and "re-staged" in out, True)
+    check("crlf: the committed blob is LF", b"\r" in blob(repo, "HEAD:src/note.txt"), False)
+    with open(path, "rb") as fh:
+        check("crlf: the worktree file is LF too", b"\r" in fh.read(), False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+# 3. binary refusal: a staged blob with a NUL byte and a CR is refused, never rewritten.
+repo = temp_repo()
+try:
+    path = os.path.join(repo, "blob.bin")
+    with open(path, "wb") as fh:
+        fh.write(b"\x00\x01\r\x02\x00")
+    run(repo, "add", "blob.bin")
+    check("binary: the staged blob has a CR", b"\r" in blob(repo, ":blob.bin"), True)
+    result = run(repo, "commit", "-m", "t")
+    out = result.stdout + result.stderr
+    check("binary: the commit is refused", result.returncode != 0, True)
+    check("binary: the refusal names the file", "blob.bin" in out, True)
+    check("binary: the refusal says why", "binary" in out, True)
+    check("binary: no commit was made", run(repo, "rev-parse", "--verify", "HEAD").returncode != 0, True)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+# 4. autocrlf: a warning, never a refusal (it is a clone-local setting).
+repo = temp_repo()
+try:
+    run(repo, "config", "core.autocrlf", "true")
+    with open(os.path.join(repo, "plain.txt"), "w", encoding="utf-8") as fh:
+        fh.write("hello\n")
+    run(repo, "add", "plain.txt")
+    result = run(repo, "commit", "-m", "t")
+    out = result.stdout + result.stderr
+    check("autocrlf: the commit still succeeds", result.returncode, 0)
+    check("autocrlf: the hook warns", "core.autocrlf=true" in out, True)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+# 5. localonly EOL cycle: the fixture's EOL changes between pull and push; push must still place the block.
+repo = temp_repo()
+try:
+    agents = os.path.join(repo, "AGENTS.md")
+    crlf_block = BLOCK.replace("\n", "\r\n").encode()
+    with open(agents, "wb") as fh:
+        fh.write(b"# AGENTS\r\n\r\nbefore the block\r\n" + crlf_block + b"after the block\r\n")
+    lonly = [sys.executable, os.path.join(repo, "tools", "agents", "localonly.py")]
+    pull = subprocess.run(lonly + ["pull"], cwd=repo, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+    state = os.path.join(repo, ".pi", "local-only.state.json")
+    check("localonly eol: pull succeeds", pull.returncode, 0)
+    check("localonly eol: pull stored the block", os.path.exists(state), True)
+    with open(agents, "rb") as fh:
+        data = fh.read()
+    with open(agents, "wb") as fh:
+        fh.write(data.replace(b"\r\n", b"\n"))  # the EOL change between pull and push
+    push = subprocess.run(lonly + ["push"], cwd=repo, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+    restored = open(agents, "rb").read()
+    check("localonly eol: push succeeds after the EOL change", push.returncode, 0)
+    check("localonly eol: the block is back exactly once", restored.count(b"<!-- LOCAL-ONLY-BEGIN"), 1)
+    check("localonly eol: the block went back as LF", b"\r" in restored, False)
+    check("localonly eol: the state file is consumed", os.path.exists(state), False)
+    run(repo, "add", "AGENTS.md")
+    committed = run(repo, "commit", "-m", "t")
+    check("localonly eol: the block commits stripped", committed.returncode, 0)
+    verify = subprocess.run(lonly + ["verify", "--rev", "HEAD"], cwd=repo, capture_output=True,
+                            text=True, encoding="utf-8", errors="replace")
+    check("localonly eol: verify passes on the committed file", verify.returncode, 0)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
 
 # --- the hook: present, executable in the index where git records modes, and covering the four refusals -------
 hook = os.path.join(ROOT, "tools", "git", "hooks", "pre-commit")
