@@ -311,6 +311,7 @@ that section's own problem sentence, truncated at 220 characters - so this index
 | 76 | A class hierarchy is traced from MANGLINGS, the CTOR's vtable store and SHARED SLOT OFFSETS - and a by-index accessor family is usually a container | Our source modelled four `Network` entities (`NetworkSessionManagerPat`, `NetworkPatSlot04`, `NetworkCommunityPat`, `NetworkLayerPat`) as four classes behind a family of `void*` accessors (`getXPat(self, index)`,... |
 | 77 | `rlwinm x,x,0,MB,ME` keeps an inclusive BIT RANGE - so `MB=ME` is a single-bit test, never an extend | `quest_move_state_ck` measured **94.16666 %** and the lane's residual said "front-end artefact": the target reads `lbz r0,0x22D4(r3)` then `rlwinm r3,r0,0,24,24` where our build emits a bare `lbz`. Twelve spellings... |
 | 78 | A data claim must cover the run the unit actually TOUCHES, not the extent the symbol happens to name | `NHTTP/d_nhttp`'s `.sbss` claim covered **4 B** (`0x80795880`, the list head) while the unit's own rows relocate three words of a **16-byte run** at `0x80795878-0x80795888`: two lazy-init flags (`li r0,1` / `stw`,... |
+| 79 | A reconstruction is not deferred for a low match score | Twice in one session a measured call was made to leave something out because its bytes would score badly: a `.data` run a unit's own rows read (`arena_stage_config`, 0x24E0 B, whose three readers were rename-blocked)... |
 <!-- PLAYBOOK-INDEX-END -->
 
 The two tables below hold ideas with **no section of their own**: tried in one unit's context and failed,
