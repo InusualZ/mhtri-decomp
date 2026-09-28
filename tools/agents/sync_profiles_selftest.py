@@ -8,7 +8,7 @@ The point of the tool is that the profiles' section 6.5 text cannot drift from `
 The test pins that in three ways:
 
 * on fixtures - the block carries every table row (a new rule appears without a code change, rule 11's
-  `/* untyped: <reason> */` marker included), the enforcement paragraph is filtered to its enforcement
+  `/* untyped: <reason> */` marker and rule 12's claim-the-unowned-range row included), the enforcement paragraph is filtered to its enforcement
   sentences (the audit table and the "apply immediately" sentence stay out), the markers are refused when
   duplicated or reversed, and a deliberately stale profile is reported stale and then in sync;
 * on the real tree - both profiles are in sync with the real plan, and neither still teaches the deleted
@@ -28,10 +28,11 @@ if os.path.join(ROOT, "tools", "agents") not in sys.path:
 import sync_profiles as sp  # noqa: E402  (imported through the sys.path shim above)
 
 # A miniature section 6.5 with the shape the real one has: the table, the enforcement paragraph, and the
-# audit table that follows it. Rule 11 stands in for the in-flight `void *` rule.
+# audit table that follows it. Rule 11 stands in for the `void *` rule and rule 12 for the owner's
+# claim-the-unowned-range ruling (2026-09-28) - a row added long after the block was first generated.
 FIXTURE = """### 6.5 Type and naming discipline - mandatory in phases B and C
 
-Eleven rules.
+Twelve rules.
 
 | # | rule | what it means concretely |
 | --- | --- | --- |
@@ -46,6 +47,7 @@ Eleven rules.
 | 9 | **A mangled symbol is called through its owner** | declare the class or namespace and call it |
 | 10 | **A vtable we own is compiler output** | let MWCC emit it from a class that declares its `virtual` methods |
 | 11 | **`void *` is banned** | an untyped pointer is a hole in the reconstruction; a declaration that genuinely needs one carries a `/* untyped: <reason> */` marker |
+| 12 | **Data a unit uses and nobody owns is the unit's to claim and match** | the local `extern` of a data symbol no registered range covers is the finding; the unit claims the range in its own `splits.txt` and matches it. Declare-never-define stays right when the range is ALREADY the unit's own |
 
 **Enforcement is a tool, not a promise.** `stylelint.py` reports each rule `file:line` and `land.py verify` refuses a batch that adds a violation. The rules apply to new work immediately and existing units are brought into conformance as they are touched. Rule 11 has no deferral either. The **only** grandfather is the gate's `--diff`.
 
@@ -79,16 +81,19 @@ def selftest() -> int:
 
     # --- the table is parsed and every row reaches the block -------------------------------------------
     rows = sp.parse_rules(FIXTURE)
-    check("parse_rules reads all 11 rows", [n for n, _t, _m in rows], list(range(1, 12)))
+    check("parse_rules reads all 12 rows", [n for n, _t, _m in rows], list(range(1, 13)))
     check("parse_rules keeps the title verbatim", rows[0][1], "**A shared type lives in one header**")
     check("parse_rules keeps the meaning verbatim", rows[6][2],
           "`fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` are findings in `src/`, whoever owns "
           "the symbol. There is no exemption and no deferral")
     block = sp.build_block(FIXTURE)
     check("the block names the canonical table", "docs/plan.md section 6.5" in block, True)
-    check("the block states the rule count", "rules 1-11" in block, True)
+    check("the block states the rule count", "rules 1-12" in block, True)
     check("a new rule (11) is picked up with no code change", "11. **`void *` is banned**" in block, True)
     check("rule 11 keeps its marker", "/* untyped: <reason> */" in block, True)
+    check("a new rule (12) is picked up with no code change",
+          "12. **Data a unit uses and nobody owns is the unit's to claim and match**" in block, True)
+    check("rule 12 keeps the declare-never-define carve-out", "declare-never-define stays right" in block.lower(), True)
     check("rule 7 keeps 'no exemption and no deferral'", "There is no exemption and no deferral" in block, True)
     check("rule 2 keeps the unowned-extern band header", "include/unsplit/" in block, True)
     numbered = [line for line in block.split("\n") if line[:1].isdigit() and "." in line[:4]]
@@ -160,6 +165,10 @@ def selftest() -> int:
               "defers the `fn_` half only" in text, False)
     check("the real plan's rule 7 has no deferral",
           "no exemption and no deferral" in real_block, True)
+    check("the real plan's rule 12 is in the block",
+          "12. **Data a unit uses and nobody owns is the unit's to claim and match**" in real_block, True)
+    check("the real plan's rule 12 keeps the already-yours carve-out",
+          "ALREADY the unit's own" in real_block, True)
 
     # --- the brief and the profiles read the same bytes -------------------------------------------------
     sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
