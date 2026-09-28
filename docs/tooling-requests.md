@@ -8,7 +8,7 @@ anything but the **Status.** line (that line is carried across regenerations).
 
 Status is `open` (not built), `done` (built), or `parked` (decided against). Set it with `python tools/units/tooling.py --set-status <key> <status>` or edit the **Status.** line directly; the key is the `tooling-key` comment above it.
 
-_694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
+_695 sources (299 outboxes, 396 notes), 11 requests, 179 votes._
 
 | # | request | votes | cost | status |
 | --- | --- | --- | --- | --- |
@@ -16,8 +16,8 @@ _694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 | 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
 | 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 31 | - | done |
 | 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 10 | - | done |
-| 5 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 8 | - | done |
-| 6 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 7 | - | done |
+| 5 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 9 | - | done |
+| 6 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 8 | - | done |
 | 7 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
 | 8 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 6 | ~29 min | done |
 | 9 | **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ... | 2 | - | open |
@@ -212,7 +212,7 @@ _694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 ## 5. Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code.
 
 <!-- tooling-key: objdiff-size-gap -->
-**Votes.** 8  |  **Cost.** -
+**Votes.** 9  |  **Cost.** -
 
 **Status.** done
 
@@ -225,12 +225,13 @@ _694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 * `loop-6` - "RELOCATION: DWCi_natNegTickIdleSockets - MWCC auto-inlined the 4-byte thunk, so ours emitted `bl DWCi_natNegPollReplies`; `#pragma dont_inline on`/`off` scoped to that one function restores the target's `bl DWCi_natNegPollRepliesOnce` (playbook 61, unit flags untouched). A/B measured: without the pragma the reloc is ...
 * `net-stack-7efe` - d functions, 2 NHTTP_os_RVL, 4 d_nhttp callees, 5 NHTTP literals, 12 NWC24 rows, 2 NWC24 io rows) so every written body pairs with its target row. References checked with symedit.py: none of them had an in-repo reference at rename time.", "include/unsplit/NHTTP.h: the four `.data`
 * `net-style-review` - elfsect.py`: section sizes, raw bytes, relocation *names* (ours vs the target's), symbol address order. * `python tools/objdiff/symdiff.py -u <unit>`, `build/RMHE08/report.json`: per-symbol scores. * `python tools/units/stylelint.py` (full) and `--json`: rules 1-11 for the scope; per-fi
+* `tooling-wave-2026-09-28` - **The top item's premise was wrong.** objdiff does NOT decline a pair on size. A row with **no `fuzzy_match_percent` key is 0 %** (12 777 of 20 507 rows; zero carry an explicit `0.0`), and the value is matched / target instructions - so 125 of the tree's 146 >50 %-gap pairs carry exactly ONE matched instruction ...
 * `verifyunit-land-gate` - / §4.5 symbol present on one side only is a mismatch / `size_gap_problems` names every symbol present on both sides that objdiff declines to pair (a >50 % size gap), i.e. the row that reads as untouched /
 
 ## 6. `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy.
 
 <!-- tooling-key: include-order-shadow -->
-**Votes.** 7  |  **Cost.** -
+**Votes.** 8  |  **Cost.** -
 
 **Status.** done
 
@@ -243,6 +244,7 @@ _694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 * `net-nwc24` - ape is left in either unit (`land.rule7_defer_growth()` -> `[]`); the units now define and reference only real names. `include/unsplit/OS.h` was added (declaration-only glue for `OSRegisterVersion` / `OSDisableInterrupts` / `OSRestoreInterrupts`, which `nwc24_msg.c` calls and no regist
 * `net-stack-7efe` - irs with its target row. References checked with symedit.py: none of them had an in-repo reference at rename time.", "include/unsplit/NHTTP.h: the four `.data` literal groups, `.rodata` 0x80574CE8 and the NHTTP_os_RVL assert group declared extern (no owner).", "include/unsplit/NWC24
 * `recompile-include-order` - `recompile.py`'s include order — the worktree's headers now win Worker fix, 2026-09-23. Found by `.pi/notes/800ff8d4-fn-800ff8d4-a0bf.md` ("Tooling" section). ## The bu
+* `tooling-wave-2026-09-28` - bjdiff-size-gap` (8, the top open item) / `tools/objdiff/pairgap.py` (877 lines) + 51-check selftest / / `2c10d0473` / `recompile.py --measure` reads MAIN's target object (2 + 1) / `tools/units/recompile.py` + selftest 110 -> 145 / / `49486a501` / the reviewer's per-unit pointer / `.agent
 
 ## 7. Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction.
 
