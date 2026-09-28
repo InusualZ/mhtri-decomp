@@ -929,7 +929,10 @@ environment. Everything else is the campaign's own business, recorded rather tha
 
 1. `memcpy.c` and `memset.c` stay separate (one file would let MWCC inline `__fill_mem` into `memset` and cost a
    100 % symbol).
-2. The TRK interrupt-vector table (0x80004380–0x800062B4) stays unowned (zero relocations, not expressible in C
+2. The TRK interrupt-vector table (0x80004380–0x800062B4) was claimed and matched on 2026-09-28 as two
+units (404 B + 7,596 B, both 100 %, DOL unchanged) - the owner asked for the last unclaimed `.init` bytes to
+be completed.  This entry is kept as the record of the *old* decision and of why it looked final (zero
+relocations, not expressible in C
    without hand-written assembly) — under §1's completion test it is simply a proposal no worker ever takes, not
    a blocker.
 3. `-func_align 4` for `Runtime.PPCEABI.H` — **landed** (`cflags_ppceabi`), three independent witnesses.

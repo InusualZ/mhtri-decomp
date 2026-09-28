@@ -30,9 +30,11 @@ and the report shift together and hide exactly the parser regression this suite 
 private reader is the second opinion, `report()` is the thing on trial.
 
 FIXED rows (a small, deliberate residue). Two hard-coded symbols, chosen because they cannot move:
-`gTRKInterruptVectorTable` (`.init:0x80004380`), which docs/plan.md keeps permanently unowned (zero
-relocations, not expressible in C), and `memmove` (`.text:0x8045B598`), a C-runtime name no unit here will
-ever own. They are a regression guard on the derivation itself: if the private reader or the candidate
+`_rom_copy_info` (`.init:0x80006624`), the linker's own fragment - a claim over it never reaches
+ldscript.lcf and a deliberately corrupted copy leaves the DOL byte-identical, so it cannot move - and
+`memmove` (`.text:0x8045B598`), a C-runtime name no unit here will ever own.  The TRK interrupt-vector table
+used to be the first of these; it was claimed and matched on 2026-09-28, which is what moved this
+expectation onto a symbol that cannot follow it. They are a regression guard on the derivation itself: if the private reader or the candidate
 search broke, the derived rows could still pass and only these two would notice. (The old `memset` /
 `memcpy` / `RSOLink` style rows are *not* kept: each has already moved once, which is the disease.)
 
@@ -412,8 +414,8 @@ def derived_rows(repo: dict) -> tuple[list[dict], list[str]]:
 
     # fixed: the two symbols that cannot move (see the module docstring)
     rows.append({
-        "label": "fixed kind 2 (TRK vector table)", "target": "gTRKInterruptVectorTable", "reason": None,
-        "expected": {"name": "gTRKInterruptVectorTable", "address": "0x80004380", "kind": 2,
+        "label": "fixed kind 2 (linker .init fragment)", "target": "_rom_copy_info", "reason": None,
+        "expected": {"name": "_rom_copy_info", "address": "0x80006624", "kind": 2,
                      "severity": "proceed", "owner": None},
     })
     rows.append({
@@ -421,7 +423,7 @@ def derived_rows(repo: dict) -> tuple[list[dict], list[str]]:
         "expected": {"name": "memmove", "address": "0x8045B598", "kind": 2, "severity": "proceed",
                      "owner": None},
     })
-    notes.append("fixed    gTRKInterruptVectorTable @ 0x80004380, memmove @ 0x8045B598 (docs/plan.md)")
+    notes.append("fixed    _rom_copy_info @ 0x80006624, memmove @ 0x8045B598 (docs/plan.md)")
     return rows, notes
 
 

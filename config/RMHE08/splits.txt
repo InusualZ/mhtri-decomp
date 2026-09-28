@@ -1481,6 +1481,12 @@ Runtime.PPCEABI.H/memcpy.c:
 Runtime.PPCEABI.H/memset.c:
 	.init       start:0x80004350 end:0x80004380
 
+Runtime.PPCEABI.H/TRK_interrupt_vectors.c:
+	.init       start:0x80004380 end:0x80004514
+
+Runtime.PPCEABI.H/TRK_interrupt_vector_stubs.c:
+	.init       start:0x80004514 end:0x800062C0
+
 Runtime.PPCEABI.H/__start.c:
 	.init       start:0x800062C0 end:0x800065C0
 
