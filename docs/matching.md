@@ -1305,6 +1305,27 @@ whose size differs, then work out which `.ctors$NN` input fragment the linker di
 this tree: the linked ELF's `.ctors` is 0x16C at 0x8056F2C0, `.dtors` is 0xC; six `.ctors` words are claimed
 by registered units (`ef/ef_emform` 0x8056F2E8-0x8056F2EC, `sound/fn_800E46E8` 0x8056F2F4-0x8056F300,
 `ef/fn_80114E34` 0x8056F310-0x8056F314, `Runtime.PPCEABI.H/__init_cpp_exceptions` 0x8056F2C0-0x8056F2C4).
+
+**Refined (2026-09-28) - the slot follows the entry SYMBOL, not the section name.** `tools/mwlink_debugger.py`
+can now trace one object through a real link (`trace`, with the build's own link line via `trace --link`,
+verified byte-identical to `main.elf`) and derive the linker's phase table from its PE resource catalogue
+(`phases`; the anchor is the `call [LoadStringA]` whose `uID` argument is not a constant, RVA 0x3d0b0, 1248 of
+them). Three same-length string-surgery experiments on the real link settled this row:
+
+* renaming a **plain** `.ctors` to `.ctors$10` **moves the word** into the `$10` slot - for an *anonymous*
+  fragment the section name really does pick the class;
+* renaming an MWCC-emitted `.ctors$10` to `.ctors`, `.ctors$55`, `.ctors$01`, `.ctors$99`, or even `.dtors$10`
+  leaves the output `.ctors` **byte-identical** - the word stays in the `$10` slot and only the map's credit
+  line changes;
+* renaming the **symbols** (`__init_cpp_exceptions_reference`, `__fini_cpp_exceptions_reference`,
+  `__destroy_global_chain_reference`) makes the link **fail**, with catalogue id 205: *"runtime sources
+  'global_destructor_chain.c' and '__init_cpp_exceptions.cpp' both need to be updated to latest version."*
+
+So the fixed class *order* is real (`.ctors$00`, `.ctors$10`, `.ctors`, `.ctors$99`, the `$00`/`$99` ends being
+the linker's own sentinels) but an MWCC entry's **slot is chosen from its symbol, not its section**. Ruled
+out by evidence: the `.comment` `CodeWarrior` block (zeroing its size changes nothing), the reloc section's
+name, and link order for the `$NN` classes. **A section-name comparison cannot see any of it** - which is the
+trap for a flip-check tool that compares sections; `trace` prints the section *and* the symbol per fragment.
 ## 47. Automate the shape search: generate, compile, score and rank source variants
 
 **Problem.** Every near-match residual in this project has been *codegen* - an allocator web order, a
