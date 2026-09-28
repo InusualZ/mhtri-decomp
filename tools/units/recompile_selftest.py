@@ -22,6 +22,8 @@ Three layers:
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -869,6 +871,65 @@ def target_label_rows() -> int:
     return failures
 
 
+def provenance_rows() -> int:
+    """`--measure` must print where its number came from: the tree, the target, and the compiled object.
+
+    The failure this closes cost a lane hours: standing in a slot, `--measure` returned MAIN's number and
+    nothing in the output said so. `2c10d0473` made the resolution prefer this tree; provenance is the other
+    half - the tree the invocation resolved in (its cwd), the target object (path **and mtime**), the object
+    compiled (path **and mtime**) and the map, printed together, and a `WARNING` when the target is MAIN's
+    while the cwd is a worktree (that score is MAIN's, and the reader must not have to infer it).
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = os.path.join(tmp, "mhtri-dtk")
+        wt = os.path.join(tmp, "mhtri-dtk.slot1")
+        compiled = os.path.join(wt, "build", "RMHE08", "src", "x.o")
+        target = os.path.join(wt, "build", "RMHE08", "obj", "x.o")
+        for p in (compiled, target):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            open(p, "wb").write(b"\x7fELF")
+        when = time.time() - 120
+        os.utime(compiled, (when, when))
+        os.utime(target, (when, when))
+        res = {"object": compiled, "target": target, "target_tree": "worktree",
+               "symbol_map": os.path.join(wt, "config", "RMHE08", "symbols.txt"),
+               "symbol_map_kind": "worktree"}
+        prov = rc.provenance(wt, main, res)
+        failures = _ok("provenance records the invocation tree", prov["invoked_tree"], wt, failures)
+        failures = _ok("... the target object", prov["target_object"], target, failures)
+        failures = _ok("... the compiled object", prov["compiled_object"], compiled, failures)
+        failures = _ok("... the target's mtime", prov["target_mtime"], rc._stamp(when), failures)
+        failures = _ok("... the compiled object's mtime", prov["compiled_mtime"], rc._stamp(when),
+                       failures)
+        blob = "\n".join(rc.provenance_lines(prov))
+        failures = _ok("the block names the invocation tree", wt in blob, True, failures)
+        failures = _ok("... the target path AND its mtime", target in blob and rc._stamp(when) in blob,
+                       True, failures)
+        failures = _ok("... and the compiled object", compiled in blob, True, failures)
+        failures = _ok("this tree's own target needs no warning", "WARNING" in blob, False, failures)
+
+        # the filed double-take: cwd is a slot, but the resolved target is MAIN's -> the score is MAIN's
+        main_target = os.path.join(main, "build", "RMHE08", "obj", "x.o")
+        os.makedirs(os.path.dirname(main_target), exist_ok=True)
+        open(main_target, "wb").write(b"\x7fELF")
+        blob_main = "\n".join(rc.provenance_lines(rc.provenance(
+            wt, main, dict(res, target=main_target, target_tree="main"))))
+        failures = _ok("a MAIN target while the cwd is a slot WARNS", "WARNING" in blob_main, True,
+                       failures)
+        failures = _ok("... and says the score is MAIN's", "the score is MAIN's" in blob_main, True,
+                       failures)
+
+        # run from MAIN, a MAIN target is the normal shape and must not warn
+        blob_from_main = "\n".join(rc.provenance_lines(rc.provenance(
+            main, main, dict(res, target=main_target, target_tree="main"))))
+        failures = _ok("run from MAIN a MAIN target does not warn", "WARNING" in blob_from_main, False,
+                       failures)
+        failures = _ok("a missing object prints MISSING, never a stale time",
+                       rc.object_stamp(os.path.join(tmp, "nope.o")), "MISSING", failures)
+    return failures
+
+
 def _raises(fn) -> bool:
     try:
         fn()
@@ -1014,8 +1075,53 @@ def main_root_rows() -> int:
     return failures
 
 
+def cli_rows() -> int:
+    """`python recompile.py <unit>` with no `--measure` - the documented plain recompile, driven through
+    `main()` itself.
+
+    The CLI's print path had **no coverage at all** (the rows below exercise the helpers under it), so a
+    `--measure`-only key leaked into the unconditional print and a plain recompile crashed with
+    `KeyError: 'provenance'` *after* the object was written - returning exit 1, the code a failed compile
+    also returns, so a lane scripting on the exit code read a successful compile as a failure.  Every
+    git/ninja/compiler dependency is stubbed, so this is the real argv -> parse -> print -> exit path with
+    no build and nothing written.
+    """
+    failures = 0
+    names = ("worktree_root", "main_root", "unit_tokens", "resolve_map", "compile_unit")
+    saved = {n: getattr(rc, n) for n in names}
+    argv = sys.argv
+    out, err = io.StringIO(), io.StringIO()
+    try:
+        rc.worktree_root = lambda *a, **k: "WT"
+        rc.main_root = lambda *a, **k: "MAIN"
+        rc.unit_tokens = lambda main, wt, unit, runner=None: (["mwcceppc.exe", "-c", "src/prop/unit.cpp"],
+                                                             "main")
+        rc.resolve_map = lambda wt, main, rel=rc.SYMBOLS_REL: (os.path.join(wt, rel), "worktree-map")
+        rc.compile_unit = lambda unit, main, wt, **kw: {
+            "object": os.path.join(wt, "build", "RMHE08", "src", "prop", "unit.o"),
+            "compiled": True, "fresh": True, "bytes": 1234, "sections": {".text": 4}}
+        sys.argv = ["recompile.py", "prop/unit"]
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                code, raised = rc.main(), ""
+            except BaseException as exc:      # the crash this row exists to catch, reported as a FAIL
+                code, raised = 1, "%s: %s" % (type(exc).__name__, exc)
+        text = out.getvalue()
+        failures = _ok("recompile.py <unit> without --measure returns 0", code, 0, failures)
+        failures = _ok("... raising nothing", raised, "", failures)
+        failures = _ok("... printing the compile it did", "compiled prop/unit" in text, True, failures)
+        failures = _ok("... and no provenance block (that is `--measure`'s only)",
+                       "provenance" in text, False, failures)
+    finally:
+        sys.argv = argv
+        for n, fn in saved.items():
+            setattr(rc, n, fn)
+    return failures
+
+
 def main() -> int:
-    failures = wire_rows()
+    failures = cli_rows()
+    failures += wire_rows()
     failures += include_order_rows()
     failures += chained_objalign_rows()
     failures += switch_rows()
@@ -1025,6 +1131,7 @@ def main() -> int:
     failures += resolve_invocation_rows()
     failures += split_staleness_rows()
     failures += target_label_rows()
+    failures += provenance_rows()
     failures += main_root_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")

@@ -11,6 +11,12 @@ MAIN, in a fresh worktree and in a slot. The fake tree is created outside the re
 directory inside it is inside a git worktree, and `unitutil.repo_root()` would then resolve the real tree
 and read the real report instead of the fixture.
 
+The fixture is deliberately **not** a git worktree, and does not need to be. `unitutil.repo_root()` roots a
+run at the *invocation's* tree - its git worktree when there is one, else the `cwd` when the `cwd` is a tree
+at all - so a run with `cwd=<fixture>` resolves the fixture even though `git rev-parse` answers nothing. It
+used to fall back to the tool's own directory and silently score the real build; the fix is
+`unitutil.repo_root(start=)` / `resolve_unit(spec, root=)` and the `cwd`-that-is-a-tree rule.
+
 The checks that matter are the two incidents the item exists for: a report older than the unit's source must
 be **refused** (exit 1, no numbers), and a report older than the unit's **object** must be refused too.
 `--force-stale` has to override the refusal while keeping the verdict visible, report mode must issue
@@ -74,16 +80,6 @@ class Fixture:
         self.now = time.time() - 10 * DAY
         self.write_report()
         self.set_times(report=0, obj=-DAY, source=-2 * DAY)
-
-    def git_init(self):
-        """Make the fixture a git worktree, which is what `unitutil.repo_root()` roots a run at.
-
-        Without a repository `repo_root()` falls back to the walk up from the *tool's own file*, i.e. the
-        real tree, and the fixture would be scored against the real build.  A real lane is always inside a
-        worktree, so `git init` is the faithful fixture, not a trick.
-        """
-        subprocess.run(["git", "init", "-q", "-b", "main", self.dir], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", env=ENV)
 
     # -- the fixture's own knobs -------------------------------------------------------------------
     def write_report(self, unit_name="main/demo/unit", measures=None, functions=None):
@@ -158,7 +154,6 @@ def selftest() -> int:
     us = _load()
 
     fx = Fixture()
-    fx.git_init()
     try:
         # 1. a fresh report: every row, worst first, exit 0, no objdiff involved
         p = fx.run("demo/unit")

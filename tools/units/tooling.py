@@ -18,8 +18,11 @@ tool collects them from the same two sources `tools/units/playbook.py` reads - `
 
 How a suggestion is found (all optional - the report schemas drift between rounds):
 
-* an outbox key whose name contains `tooling` or `environment` (string, list or object) - the structured
-  channel the harness will start populating;
+* an outbox key whose name contains `tool` or `environment` (string, list or object) - the structured
+  channel the harness populates (`tooling`, `tools_wanted`, ...).  A **list** value is the structured channel proper: every
+  element is one request the lane filed and becomes **its own row**, keyed by the tool/path it names
+  (`target_of`), and the rows it did not become are reported (`skipped_tooling`, printed by `--print`/
+  `--json`).  A lane that files two bullets gets two rows; they are never agglomerated with each other.
 * a `.pi/notes/*.md` section whose heading names tooling/environment/worktree/setup/reproduction (the
   section variants workers actually wrote: `## Tooling notes for the next worker`, `## Environment note`,
   `## Worktree setup`, `## How to reproduce a measurement`, `## Tooling worth keeping`, ...);
@@ -35,6 +38,8 @@ key on wording:
   a whole *source*, and every distinct worker that mentions the wall is one vote;
 * everything else is agglomerated by token overlap (Jaccard, with an overlap-coefficient escape hatch for a
   short phrasing of a longer one), so two novel phrasings of one request become **one entry with two votes**.
+  A **structured** `tooling` list element is exempt from this: it is one filed request, so it never merges
+  with another bullet (only the identical bullet from another lane is a second vote).
 
 A `**Status.**` line per entry (`open` / `done` / `parked`) is carried across regenerations - the only
 hand-editable part of the file - so the list stays honest as things get fixed.
@@ -239,6 +244,43 @@ def slug(s: str) -> str:
     return re.sub(r"-+", "-", s)[:60] or "request"
 
 
+# A `*.py`/`*.md`/`*.exe` tool, or a `tools/...` path - what a structured tooling entry's key names.
+TOOL_TOKEN_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:py|md|exe|sh|cpp|h)\b|tools/[A-Za-z0-9_./-]+")
+
+
+def target_of(text: str, entry=None) -> str:
+    """What a structured tooling entry is *about* - the register key's stem ("key derived from the target").
+
+    A `tooling` list element is a request the lane filed; the key names the tool the request is about, so
+    two lanes asking about the **same first tool** land on one row (their votes pool) while two asks about
+    different tools do not.  An explicit `target` (or `tool`/`path`/`subject`) field wins; else the **first**
+    tool-ish token of the bullet (`datagap.py / flipcheck.py ...` -> `datagap.py`) - the further mentions
+    stay in the ask text, where a pairing is part of the request rather than a second row; else the leading
+    words before the first separator, for a bullet that names no tool at all.
+
+    Keying on the first token is deliberate: with the first *two* the live scan produced both
+    `tooling-datagap-py-flipcheck-py` and `tooling-flipcheck-py` for bullets naming the same tool, which is
+    exactly the pooling this key exists to do (review, tooling.py 2026-09-28).
+    """
+    if isinstance(entry, dict):
+        for k in ("target", "tool", "path", "subject"):
+            v = entry.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+    found = TOOL_TOKEN_RE.findall(text or "")
+    if found:
+        seen, out = set(), []
+        for t in found:
+            base = t.replace("\\", "/").rstrip(".")
+            name = base.split("/")[-1]
+            if name not in seen:
+                seen.add(name)
+                out.append(name)
+        return " ".join(out[:1])
+    head = re.split(r"[:;\u2014]\s|\s-\s", text or "", 1)[0]
+    return " ".join((head or text or "").split()[:4])
+
+
 def one_line(s: str, limit: int = 160) -> str:
     """Collapse a snippet to a single readable line, dropping markdown bullet/heading noise."""
     s = re.sub(r"^\s*(?:#{1,6}|[*+\-]|\d+\.)\s*", "", (s or "").strip())
@@ -314,7 +356,8 @@ class Cand:
     source: "Source"
     text: str
     heading: str = ""
-    scope: str = "section"  # section / line
+    scope: str = "section"  # section / line / tooling (a structured `tooling` list element)
+    entry: object = None     # the original element, when it was structured (a dict may name its `target`)
 
 
 def _flatten(value, out: list[str]) -> None:
@@ -385,8 +428,25 @@ def candidates_for(source: Source) -> list[Cand]:
             d = {}
         blobs: list[str] = []
         for key, value in (d.items() if isinstance(d, dict) else []):
-            if re.search(r"tooling|environment", str(key), re.I):
-                _flatten(value, blobs)
+            if not re.search(r"tool|environment", str(key), re.I):
+                continue
+            if isinstance(value, list):
+                # A STRUCTURED list of tooling entries: each element is a request the lane filed, and each
+                # becomes its OWN register item (`build_entries`).  They used to be flattened into one blob
+                # and agglomerated by token overlap with everything else, so a lane that filed two bullets
+                # got one item (the `.init` lane, 2026-09-28) or none, and its second ask was read by
+                # nobody.  No friction/env filter here: the lane said "tooling", which is the signal.
+                for el in value:
+                    if isinstance(el, str):
+                        text = " ".join(el.split())
+                    else:
+                        parts: list[str] = []
+                        _flatten(el, parts)
+                        text = " ".join(" ".join(parts).split())
+                    if text:
+                        out.append(Cand(source, text, str(key), "tooling", el))
+                continue
+            _flatten(value, blobs)
         for blob in blobs:
             for h, body in _sections(blob):
                 if TOOL_HEAD.search(h):
@@ -690,8 +750,64 @@ def build_entries(sources: list[Source], statuses: dict[str, str]) -> tuple[list
                                    status=statuses.get(key, "open"), evidence=uniq))
     entries.extend(novel_entries)
 
+    # --- Structured tooling entries: every element of an outbox's `tooling`/`environment` LIST -----------
+    # One request per bullet, each its own register item keyed by the target it names.  These used to be
+    # flattened into the generic novel pool and agglomerated by token overlap with every other candidate,
+    # so a lane that filed two bullets got one row (the `.init` lane, 2026-09-28: two `tooling` bullets,
+    # one row) or none, and the `residual` prose that carried the rest was read by nobody.  A lane's two
+    # asks are two asks: nothing is clustered ACROSS bullets here.  Real demand only - a bullet one lane
+    # filed is a request, because the lane said "tooling" - and a bullet a curated topic already owns is
+    # folded, not duplicated; both the folds and the skips are reported.
+    groups: dict[str, list[Cand]] = {}
+    order: list[str] = []
+    skipped: list[dict] = []
+    for s in sources:
+        for c in s.candidates:
+            if c.scope != "tooling":
+                continue
+            label = s.worker or s.unit or s.path
+            norm = re.sub(r"\s+", " ", c.text).strip().lower()
+            if not norm or len(norm) <= 30:
+                skipped.append({"voter": s.voter, "label": label, "text": one_line(c.text, 200),
+                                "why": "too short to be a request"})
+                continue
+            if norm in claimed:
+                skipped.append({"voter": s.voter, "label": label, "text": one_line(c.text, 200),
+                                "why": "folded into a curated topic row"})
+                continue
+            if norm not in groups:
+                groups[norm] = []
+                order.append(norm)
+            groups[norm].append(c)
+    used: set[str] = set()
+    for norm in order:
+        cands = groups[norm]
+        target = target_of(cands[0].text, cands[0].entry)
+        base_key = "tooling-" + slug(target)[:48]
+        key, n = base_key, 2
+        while key in used:
+            key, n = "%s-%d" % (base_key, n), n + 1
+        used.add(key)
+        ev = []
+        for c in cands:
+            minutes, note = cost_of(c.text)
+            ev.append(Evidence(voter=c.source.voter, label=c.source.worker or c.source.unit or c.source.path,
+                               snippet=one_line(c.text, 320), cost=minutes, cost_note=note))
+        ev.sort(key=lambda e: (e.label.lower(), e.snippet))
+        uniq: list[Evidence] = []
+        seen: set[str] = set()
+        for e in ev:
+            if e.voter in seen:
+                continue
+            seen.add(e.voter)
+            uniq.append(e)
+        cost = max((e.cost for e in uniq), default=0.0)
+        note = next((e.cost_note for e in uniq if e.cost == cost and e.cost_note), "")
+        entries.append(Entry(key=key, ask=one_line(cands[0].text), votes=len(uniq), cost=cost,
+                             cost_note=note, status=statuses.get(key, "open"), evidence=uniq))
+
     entries.sort(key=lambda e: (-e.votes, -e.cost, e.ask.lower()))
-    return entries, []
+    return entries, skipped
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -757,13 +873,15 @@ def render(entries: list[Entry], outboxes: int, notes: int, sources: int) -> str
     return "\n".join(lines).rstrip() + "\n"
 
 
-def entries_to_json(entries: list[Entry], outboxes: int, notes: int, sources: int) -> dict:
+def entries_to_json(entries: list[Entry], outboxes: int, notes: int, sources: int,
+                    skipped: list[dict] | None = None) -> dict:
     return {
         "sources": sources,
         "outboxes": outboxes,
         "notes": notes,
         "requests": len(entries),
         "votes": sum(e.votes for e in entries),
+        "skipped_tooling": skipped or [],
         "entries": [
             {
                 "rank": i,
@@ -791,9 +909,9 @@ def scan(outbox_dir: str, notes_dir: str, statuses: dict[str, str]) -> tuple[str
     sources = load_sources(outbox_dir, notes_dir)
     outboxes = sum(1 for s in sources if s.kind == "outbox")
     notes = sum(1 for s in sources if s.kind == "note")
-    entries, _ = build_entries(sources, statuses)
+    entries, skipped = build_entries(sources, statuses)
     text = render(entries, outboxes, notes, len(sources))
-    report = entries_to_json(entries, outboxes, notes, len(sources))
+    report = entries_to_json(entries, outboxes, notes, len(sources), skipped)
     return text, report, entries
 
 
@@ -802,6 +920,11 @@ def print_report(report: dict) -> None:
           % (report["sources"], report["outboxes"], report["notes"], report["requests"], report["votes"]))
     for e in report["entries"]:
         print("  %2d. %-5d votes  %-8s %s" % (e["rank"], e["votes"], e["status"], one_line(e["ask"], 90)))
+    skipped = report.get("skipped_tooling") or []
+    if skipped:
+        print("tooling bullets not made into a row: %d" % len(skipped))
+        for s in skipped:
+            print("  - %s [%s]: %s" % (s["label"], s["why"], one_line(s["text"], 90)))
 
 
 def main() -> int:

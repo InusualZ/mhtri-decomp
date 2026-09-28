@@ -80,6 +80,15 @@ checking it out and without writing anything. The comparison itself is `--diff`'
 the map it was written against - and `--diff`'s behaviour and its "REF is not an ancestor" warning are
 untouched.
 
+**A `--ref` that measures nothing exits non-zero, never "clean".** `--ref <branch>` is safe to run from the
+branch's own worktree (a review lane is launched exactly there), but there `_resolve_diff_ref` returns the
+branch itself - it *is* HEAD, an ancestor of itself - so a naive comparison judges a branch against itself
+and prints `adds no section 6.5 violation over 0 changed file(s)` with exit 0. That was a **false green for
+every review's lint row** (2026-09-28). When the resolved base equals the branch, the comparison uses the
+fork point against `main` instead; and if it still finds no changed file, `--ref` refuses with exit 2 and a
+message naming the reason (`--ref <branch> judged 0 changed file(s) - <branch> is HEAD here; run it from
+MAIN or use --diff <merge-base>`).
+
 **Rule 11 has no per-file key either.** A `void *` parameter or return type is a finding by default, and
 the exemption is a **per-declaration** marker comment - `/* untyped: <reason> */` on the declaration or the
 line above it (a marker on the line above must stand alone, so a trailing marker on one declaration never
@@ -2932,6 +2941,33 @@ def selftest() -> int:
               sorted((a["rule"], a["file"], a["added"]) for a in diff_data["added"]),
               sorted((a["rule"], a["file"], a["added"]) for a in ref_data["added"]))
         check("... and the exit codes agree", (rc_ref_json, rc_diff), (1, 1))
+        # RUN FROM THE BRANCH'S OWN WORKTREE: the review lane is launched exactly here, and `--ref held`
+        # used to compare the branch with itself - `_resolve_diff_ref` saw held as an ancestor of HEAD (it
+        # IS HEAD) and returned it - printing "adds no violation over 0 changed file(s)" and exiting 0.
+        # That is a false green for every review's lint row (2026-09-28). It must judge the real rows.
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc_self = ref_comparison(tmp, "held", own, as_json=False)
+        self_text = out.getvalue()
+        check("--ref from the branch's own worktree judges the branch, not itself", rc_self, 1)
+        check("... and never reports 0 changed files as clean", "over 0 changed file(s)" in self_text, False)
+        check("... naming the fork point it used instead", "fork point" in err.getvalue(), True)
+        check("... with the same rule-2 row as from MAIN", "rule 2" in self_text, True)
+        # an EMPTY branch measures nothing too: refuse, never print "clean"
+        rgit("checkout", "-q", "-b", "empty", "main")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc_empty = ref_comparison(tmp, "empty", own, as_json=False)
+        check("--ref on a branch with nothing to compare REFUSES (exit 2, not a false clean)", rc_empty, 2)
+        check("... saying it judged 0 changed file(s)", "0 changed file(s)" in out.getvalue(), True)
+        check("... and pointing at MAIN or --diff",
+              ("from MAIN" in out.getvalue() or "--diff" in out.getvalue()), True)
+        # here the branch IS HEAD, so `self_ref` is true while the resolved base is the fork point: the
+        # reason must come from the base the comparison actually ran against, not from `self_ref` - the
+        # old wording contradicted the "judging against the fork point" line printed a moment before
+        check("... and the reason comes from the RESOLVED base, not from `self_ref`",
+              ("no source file changed between" in out.getvalue()
+               and "nothing to compare it against" not in out.getvalue()), True)
         rgit("checkout", "-q", "main")
 
     if fails:
@@ -2946,6 +2982,28 @@ def selftest() -> int:
 # --------------------------------------------------------------------------------------------------
 # cli
 # --------------------------------------------------------------------------------------------------
+def _same_commit(root: str, a: str, b: str) -> bool:
+    """Whether two revisions name the same commit - the `--ref <branch>` self-comparison test."""
+    try:
+        return git(root, "rev-parse", a).strip() == git(root, "rev-parse", b).strip()
+    except RuntimeError:
+        return False
+
+
+def _fork_point(root: str, branch: str) -> str | None:
+    """`branch`'s fork point against `main` - the base `--diff main` would resolve to from MAIN, or None.
+
+    The fallback for `--ref <branch>` run **from the branch's own worktree**: there the branch is an
+    ancestor of HEAD by construction (it *is* HEAD), so `_resolve_diff_ref` returns the branch and the
+    comparison would judge it against itself.
+    """
+    p = subprocess.run(["git", "merge-base", "main", branch], cwd=root, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    if p.returncode != 0:
+        return None
+    return (p.stdout or "").strip() or None
+
+
 def _resolve_diff_ref(root: str, ref: str) -> str:
     """The ref `--diff` actually compares against: REF when it is an ancestor of HEAD, else its merge base.
 
@@ -2980,10 +3038,41 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
     `_resolve_diff_ref(root, B)` (the merge base, resolved exactly as `--diff` resolves a non-ancestor REF)
     is the `before`.  Nothing is checked out and nothing is written; each side is judged by the map it was
     written against, exactly as `--diff` judges them.
+
+    **It can be run from the branch's own worktree, and a self-comparison is repaired or refused.**
+    `_resolve_diff_ref(root, branch)` returns the branch itself when the branch is an ancestor of HEAD -
+    trivially true when HEAD *is* the branch, which is exactly where a review lane runs (`--ref <the branch
+    it is reviewing>`).  The old behaviour then compared the branch with itself and printed "adds no
+    section 6.5 violation over 0 changed file(s)" with exit 0: a check that measured nothing, reported as
+    clean - a **false green for every review's lint row** (2026-09-28).  When the resolved base equals the
+    branch the fork point against `main` is used instead; and if the comparison still finds no changed
+    file, it **refuses** with a non-zero exit rather than printing "clean".  The refusal's reason names the
+    **resolved** base (never the branch), so it cannot contradict the stderr line that resolved it, and
+    **exit 2 keeps meaning "nothing was measured"** - 3 is left unclaimed should a git failure ever need a
+    code of its own.
     """
     base = _resolve_diff_ref(root, branch)
+    self_ref = _same_commit(root, base, branch)
+    if self_ref:
+        fork = _fork_point(root, branch)
+        if fork:
+            print("stylelint: --ref %s resolved to the branch itself (it is HEAD here or an ancestor of "
+                  "it); judging against the fork point with main, %s, instead"
+                  % (branch, fork[:12]), file=sys.stderr)
+            base = fork
     pairs = changed_src_files_between(root, base, branch)
     rels = [after for _before, after in pairs]
+    if not rels:
+        # A CHECK THAT MEASURES NOTHING MUST NEVER PRINT "CLEAN": that is how the self-comparison above
+        # passed a review lane's lint row.  Refuse loudly instead of exiting 0.  The **reason comes from the
+        # resolved base**, not from `self_ref`: when the fork point was resolved the comparison *did* run
+        # against it, so "there is nothing to compare it against" would contradict the stderr line above.
+        why = ("no source file changed between %s and %s" % (base[:12], branch) if base != branch else
+               "%s is HEAD here (or an ancestor of it), so there is nothing to compare it against" % branch)
+        print("REFUSED: --ref %s judged 0 changed file(s) - %s.\n"
+              "  run it from MAIN, or pass the base explicitly: --diff <merge-base %s main>"
+              % (branch, why, branch))
+        return 2
     base_ownership = load_ownership_at_ref(root, base) or ownership
     after_ownership = load_ownership_at_ref(root, branch) or ownership
     base_findings = findings_at_ref(root, base, pairs, base_ownership)

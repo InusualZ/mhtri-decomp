@@ -29,6 +29,7 @@ on (docs/plan.md 5.1).
     python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
     python tools/units/slots.py status [--json]
     python tools/units/slots.py verify [--slot N] [--json]
+    python tools/units/slots.py shadow <slot> <dir> [--seed-build] [--force]
     python tools/units/slots.py --selftest
 
 **One lane per slot, enforced at both ends.**  A slot's claim was released while another lane was still
@@ -68,8 +69,17 @@ costing a full `rm -rf build/RMHE08` rebuild):
   `checkout -B worker/<slug> <main-tip>`.
 * **validate** the kept build tree against MAIN's current map/DOL with the same staleness guard
   `seed_worktree_build` already uses (`claims._build_is_current` - `config.json` vs
-  `symbols.txt`/`splits.txt`/`main.dol`) plus a byte comparison of `build/RMHE08/report.json`.  **If it
-  cannot be proven current, re-seed; never proceed on a doubt.**
+  `symbols.txt`/`splits.txt`/`main.dol`), a byte comparison of `build/RMHE08/report.json`, AND the
+  **compile-output set** the official scorer opens (`objdiff.json`'s `target_path`/`base_path`, existence -
+  `compile_outputs`).  A slot can pass the first two while its `obj/`/`src/` objects are gone; that tree
+  cannot run `objdiff report generate`, so it is refused too.  **If it cannot be proven current, re-seed;
+  never proceed on a doubt.**
+* **claim-time currency**: a freshly seeded slot is *always* a few `ninja` steps behind by construction (the
+  seed copies MAIN's `build/` with MAIN's mtimes while `git worktree add` stamps the slot's own sources at
+  checkout time), so "no work to do" is the wrong test for a handover.  `acquire` runs `ninja -n`, **finishes
+  the pending steps in the slot** (`claim_currency`, bounded - measured 3: one MWCC unit, REPORT, PROGRESS),
+  re-counts, and prints the proof the lane can see: `report.json` byte-identical, the compile-output set, the
+  pending count.  A ninja that cannot run is reported as *unknown*, never silently as 0.
 * **release** returns the slot to main's tip, keeps the warm trees, deletes the branch (rescue-ref first, as
   `claims.release` does) and refreshes the build tree so the next acquire is instant.
 """
@@ -77,10 +87,14 @@ costing a full `rm -rf build/RMHE08` rebuild):
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 
@@ -96,6 +110,10 @@ LOCK_SUBDIR = ("slots",)
 # by the forced `checkout`.  `tools/m2c` is a tracked submodule and must survive (see `clean_slot`).
 SLOT_KEEP = (".ninja_deps", ".ninja_log", "build.ninja", "objdiff.json", "compile_commands.json",
              "build", "orig", os.path.join("tools", "m2c"), ".used")
+
+# The ninja-invocation seam.  `None` means `subprocess.run`; the selftest swaps it so the claim-time
+# currency checks are hermetic (they exercise the pending>0 -> complete -> 0 path without a real build).
+NINJA_RUNNER = None
 
 # A slot's **sentinel**: `.used` in the worktree root.  `acquire` creates it (atomically, `O_EXCL`) and
 # `release` removes it; `status` reads it and reports `used` / `free`.  It is gitignored, and `clean_slot`
@@ -117,6 +135,11 @@ KIND_PROFILE = {
     "scout": "scout",          # read-only
     "plan": "planner",         # read-only
 }
+
+# Every agent profile a lane can be launched with - the values of the one table above.  A caller that takes
+# a profile as an *override* (`queue next --profile`) validates against this, so the override cannot name a
+# profile the harness does not have; the list is derived, never a second copy of KIND_PROFILE.
+PROFILES = tuple(sorted(set(KIND_PROFILE.values())))
 
 
 def marker_path(slot: str) -> str:
@@ -711,31 +734,216 @@ def report_matches(main: str, slot: str) -> bool:
         return False
 
 
+def _manifest_outputs(root: str) -> list[str] | None:
+    """The compile-output paths `root`'s `objdiff.json` names, or `None` if it is absent/unreadable.
+
+    The official scorer (`objdiff report generate`) opens exactly these: `target_path` is the split object
+    and `base_path` the object ninja compiles from `src/`.  Paths are returned in the manifest's spelling,
+    with `/` normalised to the host separator so they join onto a root directly.
+    """
+    try:
+        data = json.loads(open(os.path.join(root, "objdiff.json"), encoding="utf-8").read())
+        units = data["units"]
+        if not isinstance(units, list):
+            return None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    out: list[str] = []
+    for u in units:
+        if not isinstance(u, dict):
+            continue
+        for key in ("target_path", "base_path"):
+            p = u.get(key)
+            if isinstance(p, str) and p:
+                out.append(p.replace("/", os.sep))
+    return out
+
+
+def compile_outputs(main: str, slot: str) -> tuple[list[str], int, bool]:
+    """`(missing, checked, manifest_ok)` - the official scorer's compile outputs absent from `slot`.
+
+    `_build_is_current` and `report_matches` both pass on a slot whose `build/RMHE08/obj/` or
+    `build/RMHE08/src/` objects were dropped: `config.json`'s mtime and `report.json`'s bytes say nothing
+    about the objects the report was computed from, so a lane could be handed a tree that cannot run the
+    official scorer at all - exactly the doubt `verify` exists to catch.
+
+    The candidate set is the union of the two trees' manifests (`this tree's` and MAIN's), and a path is
+    **missing** only when the slot lacks it while MAIN holds it: the slot is seeded from MAIN, so MAIN's
+    copy is the arbiter, and a gap in MAIN's own tree can never wedge the pool.  Existence is the test, not
+    bytes - a stale-but-present object is `_build_is_current`'s job, a missing one is here.  `manifest_ok`
+    is False when MAIN has a manifest but the slot's is gone: the scorer reads the slot's copy, so its
+    absence is a doubt even if every object is present.  This is the cheap set assertion the docstring
+    offers in place of a full `ninja -n`, which needs the toolchain and rebuilds the dependency graph.
+    """
+    slot_units = _manifest_outputs(slot)
+    main_units = _manifest_outputs(main)
+    manifest_ok = slot_units is not None or main_units is None
+    expected: list[str] = []
+    for group in (main_units or [], slot_units or []):
+        expected.extend(group)
+    missing: list[str] = []
+    seen: set[str] = set()
+    for rel in expected:
+        if rel in seen:
+            continue
+        seen.add(rel)
+        if os.path.isfile(os.path.join(slot, rel)) and os.path.getsize(os.path.join(slot, rel)) > 0:
+            continue
+        if os.path.isfile(os.path.join(main, rel)):   # the slot failed to carry over a MAIN output
+            missing.append(rel)
+    return missing, len(seen), manifest_ok
+
+
 def verify(main: str, n: int) -> dict:
     """Whether slot `n`'s kept build tree can be **proven** current against MAIN's map/DOL - fail closed.
 
     Reuses `claims._build_is_current` (the guard `seed_worktree_build` already has) with the slot as the
-    build root and MAIN as the input root, and additionally byte-compares `report.json` so a stale report
-    (a landing that moved a body but not the map) cannot be handed over as current.
+    build root and MAIN as the input root, byte-compares `report.json` so a stale report (a landing that
+    moved a body but not the map) cannot be handed over as current, and asserts the **compile-output set**
+    the official scorer opens (`objdiff.json`'s `target_path`/`base_path`, see `compile_outputs`) so a slot
+    whose `obj/`/`src/` objects were dropped is refused rather than handed to a lane that cannot score.
     """
     claims = _claims()
     d = slot_dir(main, n)
     reasons: list[str] = []
     if not os.path.isdir(d):
         return {"slot": n, "dir": d, "ok": False, "main_build_current": False, "build_current": False,
-                "report_matches": False, "reasons": ["slot directory missing: %s" % d]}
+                "report_matches": False, "compile_outputs": False, "compile_outputs_checked": 0,
+                "compile_outputs_missing": 0, "reasons": ["slot directory missing: %s" % d]}
     main_current = claims._main_build_is_current(main)
     build_current = claims._build_is_current(d, main)
     report_ok = report_matches(main, d)
+    missing, checked, manifest_ok = compile_outputs(main, d)
+    compile_ok = bool(manifest_ok and not missing)
     if not main_current:
         reasons.append("MAIN's own build tree is stale (its config.json predates the map/DOL) - `ninja` in MAIN")
     if not build_current:
         reasons.append("slot build/RMHE08/config.json predates MAIN's current map/DOL - the split is stale")
     if not report_ok:
         reasons.append("slot build/RMHE08/report.json differs from MAIN's current report")
-    return {"slot": n, "dir": d, "ok": bool(main_current and build_current and report_ok),
+    if not manifest_ok:
+        reasons.append("slot objdiff.json is missing or unreadable - the official scorer reads it")
+    if missing:
+        shown = ", ".join(missing[:3])
+        more = "" if len(missing) <= 3 else " (+%d more)" % (len(missing) - 3)
+        reasons.append("slot is missing %d of the %d compile outputs the official scorer reads (e.g. %s%s) - "
+                       "`ninja` here or re-seed" % (len(missing), checked, shown, more))
+    return {"slot": n, "dir": d, "ok": bool(main_current and build_current and report_ok and compile_ok),
             "main_build_current": main_current, "build_current": build_current, "report_matches": report_ok,
-            "reasons": reasons}
+            "compile_outputs": compile_ok, "compile_outputs_checked": checked,
+            "compile_outputs_missing": len(missing), "reasons": reasons}
+
+
+# --- claim-time currency: the proof a lane's tree is ready to work in ---------------------------------
+
+# ninja prints one `[N/M]` progress line per pending step in dry-run mode (`[1/3] MWCC ...`, `[3/3]
+# PROGRESS`); M is the total, and zero lines is "ninja: no work to do.".
+_NINJA_STEP = re.compile(r"^\[\d+/\d+\]", re.M)
+
+
+def ninja_pending(slot: str, runner=None) -> tuple[int | None, str]:
+    """`(steps, note)` - what `ninja -n` would still run in `slot`; `steps` is None when it cannot say.
+
+    A freshly seeded slot is **always** a few steps behind by construction: the seed copies MAIN's `build/`
+    with MAIN's mtimes while `git worktree add` stamps the slot's own sources at checkout time, so the
+    slot's `src/` edges look newer than the objects seeded from MAIN.  That makes "no work to do" the wrong
+    test for a claim handover - a fresh slot measured `[1/3] MWCC`, `[2/3] REPORT`, `[3/3] PROGRESS`.  The
+    honest answer is the count, and a completed claim is 0.  `None` means ninja could not answer (`note`
+    says why) - reported as *unknown*, never rounded down to a confident 0.
+    """
+    runner = runner or NINJA_RUNNER or subprocess.run
+    try:
+        p = runner(["ninja", "-n"], cwd=slot, capture_output=True, text=True, encoding="utf-8",
+                   errors="replace")
+    except OSError as exc:
+        return None, "ninja unavailable (%s)" % exc
+    if p.returncode != 0:
+        tail = [ln for ln in ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines() if ln.strip()]
+        return None, "ninja -n failed: %s" % (tail[-1] if tail else "exit %d" % p.returncode)
+    return len(_NINJA_STEP.findall(p.stdout or "")), ""
+
+
+def claim_currency(main: str, n: int, v: dict | None = None, complete: bool = True, runner=None) -> dict:
+    """The proof printed at handover, and the pending work finished here rather than left to the lane.
+
+    Three things a caller (and the lane) can see: MAIN's `report.json` is byte-identical in the slot, the
+    official scorer's compile-output set is complete, and `ninja` has **no pending work**.  The last is the
+    one a fresh slot never has by construction, so it is *run*, not asserted: `complete=True` executes
+    `ninja` in the slot - bounded and small (the seed leaves ~3 steps) - and re-counts, so the number
+    printed is what is left, not what was.  `complete=False` only counts.  A ninja that cannot run is
+    reported as unknown in `pending_note`, never silently as 0.
+    """
+    runner = runner or NINJA_RUNNER or subprocess.run
+    d = slot_dir(main, n)
+    if v is None:
+        v = verify(main, n)
+    steps, note = ninja_pending(d, runner=runner)
+    completed = None
+    if complete and steps:
+        try:
+            p = runner(["ninja"], cwd=d, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        except OSError as exc:
+            p, note = None, "ninja unavailable (%s)" % exc
+        if p is not None:
+            completed = p.returncode == 0
+            if not completed:
+                tail = [ln for ln in ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines()
+                        if ln.strip()]
+                note = "ninja failed: %s" % (tail[-1] if tail else "exit %d" % p.returncode)
+            steps, note2 = ninja_pending(d, runner=runner)
+            if completed:
+                note = note2
+                # ninja rewrote the build tree; the proof must describe what is on disk NOW, not before
+                v = verify(main, n)
+    return {"report_matches": v["report_matches"], "compile_outputs": v["compile_outputs"],
+            "objects_present": v["compile_outputs_checked"] - v["compile_outputs_missing"],
+            "objects_checked": v["compile_outputs_checked"], "pending": steps, "pending_note": note,
+            "completed": completed, "verify": v,
+            # `steps` is None when ninja cannot answer, and `not None` is True - so the unknown case must be
+            # compared, not negated, or this field passes on the one reading that proves nothing
+            "ok": bool(v["ok"] and steps == 0)}
+
+
+def currency_lines(cur: dict) -> list[str]:
+    """The load-bearing one-liner the handover prints: the proof, in the lane's own words.
+
+    A lane should never have to guess whether its tree is current.  Every value is a measurement taken here
+    (never a promise): the report bytes, the object count, and the pending count after completion.  The
+    "proven current" header is printed **only when the check passed** (`cur["ok"]`, which is False for an
+    unknown pending count): otherwise the same measured values are printed with the doubt named, because a
+    header that asserts success over an unmeasured value is the lie this line exists to prevent.
+    """
+    objects = "%d/%d" % (cur["objects_present"], cur["objects_checked"])
+    report = "byte-identical to MAIN's" if cur["report_matches"] else "DIFFERS from MAIN's"
+    if cur["pending"] is None:
+        pending = "unknown (%s)" % (cur["pending_note"] or "ninja could not run")
+    elif cur["pending"] == 0:
+        pending = "0"
+    else:
+        pending = "%d still pending%s" % (cur["pending"],
+                                            " (%s)" % cur["pending_note"] if cur["pending_note"] else "")
+    measured = ("`report.json` is %s; the official scorer's compile outputs are complete (%s objects "
+                "present); `ninja -n` pending steps: %s." % (report, objects, pending))
+    doubts = []
+    if not cur["report_matches"]:
+        doubts.append("`report.json` differs from MAIN's")
+    if not cur["compile_outputs"]:
+        doubts.append("the official scorer's compile outputs are incomplete")
+    if cur["pending"] is None:
+        doubts.append("ninja could not count the pending steps")
+    elif cur["pending"]:
+        doubts.append("%d ninja step(s) are still pending" % cur["pending"])
+    if cur.get("completed") is False:
+        doubts.append("the ninja run that was meant to finish them failed")
+    if cur.get("ok"):
+        lines = ["**Your build tree is proven current at handover.** " + measured]
+    else:
+        lines = ["**Build tree currency: NOT PROVEN at handover.** " + measured +
+                 " Doubt: %s." % "; ".join(doubts or ["the currency check did not pass"])]
+    if cur["completed"]:
+        lines.append("The pending steps were run **in this slot** at acquire time; nothing outside it was "
+                     "touched.")
+    return lines
 
 
 # --- reset ---------------------------------------------------------------------------------------
@@ -801,6 +1009,98 @@ def init(main: str, count: int = DEFAULT_COUNT, force: bool = False, seed: bool 
             "notes": notes, "slots": [slot_dir(main, n) for n in range(1, count + 1)]}
 
 
+# --- shadow ---------------------------------------------------------------------------------------
+
+def _rmtree_force(path: str) -> None:
+    """`shutil.rmtree` that also clears git's read-only objects (Windows denies unlink on them)."""
+    def _onexc(func, p, exc):
+        os.chmod(p, 0o700)
+        func(p)
+
+    try:
+        shutil.rmtree(path, onexc=_onexc)
+    except TypeError:                              # Python < 3.12 spells it `onerror`
+        shutil.rmtree(path, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+
+
+def shadow(main: str, slot: int, dest: str, seed_build: bool = False, force: bool = False) -> dict:
+    """Materialise a **lane-shaped tree inside a slot** for fixture tests - without `git worktree add`.
+
+    A fixture needs a tree that behaves like a lane: a real git repository (so `git rev-parse
+    --show-toplevel`, `unitutil.repo_root()` and every branch helper resolve it) with the lane's directory
+    layout.  `git worktree add` is the obvious way and the **wrong** one here: it writes metadata into the
+    *common* git dir (`<MAIN>/.git/worktrees/...`), which is outside the slot - and a slot must contain
+    everything it owns (a release `clean -ffdx`es the slot; a teardown must never reach a neighbour or
+    MAIN).  `shadow` instead materialises the slot's own committed tree (`git archive HEAD`) into
+    `<slot>/<dir>` and `git init`s it **there**, so every byte - `.git/` included - is inside the slot and
+    no worktree is registered anywhere.
+
+    `seed_build=True` also copies the warm build/input trees (`build/RMHE08`, `build/tools`, the compiler
+    and binutils, `orig/RMHE08`, `tools/m2c`) so the shadow can compile and score; the default is
+    source-only, which is what a fixture usually needs and is far smaller than the whole warm tree.
+
+    Refuses (fail closed) when the destination is not **inside** the slot (a resolved-path comparison, so a
+    symlink or junction cannot walk out), when it exists and is non-empty (unless `force`), and when the
+    slot is **not free** (unless `force`) - nothing consults the `.used` marker on the way in, so a shadow
+    written into a live lane's tree would show up in that lane's `git status` and its landing would refuse
+    on a dirty tree.  The shadow is scratch: the next reset's `clean -ffdx` discards it, and a caller should
+    remove it.
+    """
+    d = os.path.abspath(slot_dir(main, slot))
+    if not os.path.exists(os.path.join(d, ".git")):
+        raise SystemExit("REFUSED shadow: slot %d is not a worktree (%s)" % (slot, d))
+    dest_abs = os.path.abspath(dest if os.path.isabs(dest) else os.path.join(d, dest))
+    # realpath on BOTH sides: a prefix test on the lexical path is walked by a symlink/junction, and it
+    # refused a destination reached through one (the review's finding 5, slots.py 2026-09-28)
+    real_d = os.path.normcase(os.path.realpath(d))
+    real_dest = os.path.normcase(os.path.realpath(dest_abs))
+    if real_dest == real_d or not real_dest.startswith(real_d + os.sep):
+        raise SystemExit("REFUSED shadow: %s is not INSIDE slot %d (%s) - a shadow lives in its slot, "
+                         "never in MAIN or a sibling slot" % (dest_abs, slot, d))
+    state = slot_state(main, slot)
+    if not state["free"] and not force:
+        raise SystemExit("REFUSED shadow: slot %d is not free (%s) - a shadow inside a lane's tree shows up "
+                         "in ITS `git status` and refuses the lane's landing; pass --force only for a slot "
+                         "you hold" % (slot, state["why"]))
+    if os.path.exists(dest_abs):
+        if os.listdir(dest_abs) and not force:
+            raise SystemExit("REFUSED shadow: %s exists and is not empty (--force to replace it)" % dest_abs)
+        if force:
+            _rmtree_force(dest_abs)
+    p = subprocess.run(["git", "-C", d, "archive", "--format=tar", "HEAD"], capture_output=True)
+    if p.returncode != 0:
+        raise SystemExit("REFUSED shadow: cannot read slot %d's tree: %s"
+                         % (slot, (p.stderr or b"").decode("utf-8", "replace").strip()))
+    os.makedirs(dest_abs, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(p.stdout)) as tf:
+        try:
+            tf.extractall(dest_abs, filter="data")
+        except TypeError:                      # Python < 3.12 has no `filter`
+            tf.extractall(dest_abs)
+        files = sum(1 for m in tf.getmembers() if m.isfile())
+    seeded: list[str] = []
+    if seed_build:
+        claims = _claims()
+        for rel in (claims.RMHE08_REL, os.path.join("build", "tools"), os.path.join("build", "compilers"),
+                    os.path.join("build", "binutils"), claims.ORIG_REL, os.path.join("tools", "m2c")):
+            src, dst = os.path.join(d, rel), os.path.join(dest_abs, rel)
+            if os.path.exists(dst):
+                continue
+            if os.path.isdir(src):
+                shutil.copytree(src, dst)
+                seeded.append(rel.replace(os.sep, "/"))
+            elif os.path.isfile(src):
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(src, dst)
+                seeded.append(rel.replace(os.sep, "/"))
+    git(["init", "-q", "-b", "main"], dest_abs)
+    git(["add", "-A"], dest_abs)
+    git(["-c", "user.email=shadow@example.invalid", "-c", "user.name=shadow", "-c", "commit.gpgsign=false",
+         "commit", "-q", "-m", "shadow of slot %d" % slot], dest_abs)
+    return {"slot": slot, "dir": dest_abs, "files": files, "seeded": seeded,
+            "head": git(["rev-parse", "HEAD"], dest_abs)}
+
+
 # --- acquire -------------------------------------------------------------------------------------
 
 def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
@@ -862,7 +1162,7 @@ def preview(main: str, unit: str, branch: str | None = None, slot: int | None = 
 
 
 def acquire(main: str, unit: str, branch: str | None = None, worker: str | None = None,
-            slot: int | None = None, force: bool = False) -> dict:
+            slot: int | None = None, force: bool = False, ninja_runner=None) -> dict:
     """Take a slot for `unit`: mark it `.used`, reset it, cut a **fresh** branch off main's tip, verify, lock.
 
     Refuses, before touching anything, when the unit's branch already exists (the claim is taken), when an
@@ -876,6 +1176,11 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
     removes it, and a crash leaves a marker the worktree reading reclaims.  The kept build tree is verified
     against MAIN's current map/DOL; if it cannot be proven current it is re-seeded, and if it still cannot,
     the acquire fails closed rather than handing the lane a stale tree.
+
+    **Claim-time currency.**  A fresh slot is always a few ninja steps behind by construction, so acquire
+    finishes them here (`claim_currency`) and records the proof - report bytes, the compile-output set, the
+    pending count - in the lock and the returned `currency`, which `spawn` and the CLI print.  The lane is
+    never handed a tree whose pending work is unknown.  `ninja_runner` is the injection point (selftest).
     """
     claims = _claims()
     unit = claims.norm_unit(unit.strip("/"))
@@ -945,16 +1250,30 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
                     raise SystemExit("REFUSED slot %d: slot build/RMHE08/report.json differs from MAIN's - "
                                      "a stale report is how a lane measures the wrong build (%s)"
                                      % (n, "; ".join(v["reasons"])))
+                if not v["compile_outputs"]:
+                    # A third hard doubt, with the same shape as the report: `report.json` can be
+                    # byte-identical while the objects it was computed from are gone, and a lane handed
+                    # that tree cannot run the official scorer.  The re-seed above already refilled every
+                    # output MAIN holds, so one still missing is a real gap, not config.json's mtime.
+                    raise SystemExit("REFUSED slot %d: the slot is missing compile outputs the official "
+                                     "scorer reads (%s)\n  re-seed it (release then acquire) before a lane "
+                                     "lands" % (n, "; ".join(v["reasons"])))
                 print("slot %d: MAIN's tree is current and report.json is byte-identical to MAIN's, so the only "
                       "remaining doubt is config.json's mtime (%s) - accepting; a stale build would have failed "
                       "report_matches" % (n, "; ".join(v["reasons"])))
                 v = dict(v, ok=True, accepted_mtime_note=True)
+        # Finish (or at least measure) the pending ninja work here, and record the proof.  The count is
+        # taken after the verify/repair above, so it describes the tree the lane is actually handed.
+        cur = claim_currency(main, n, v=v, runner=ninja_runner)
+        v = cur["verify"]
         write_lock(main, n, {"slot": n, "dir": d, "unit": unit, "branch": branch,
                              "worker": worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
                              "base": tip, "acquired_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                             "verified": v["ok"], "report_matches": v["report_matches"]})
+                             "verified": v["ok"], "report_matches": v["report_matches"],
+                             "compile_outputs": v["compile_outputs"], "pending": cur["pending"]})
         return {"slot": n, "dir": d, "worktree": d, "branch": branch, "base": tip, "unit": unit,
-                "seeded": seed_note, "refreshed": refreshed, "verify": v, "reclaimed": reclaimed}
+                "seeded": seed_note, "refreshed": refreshed, "verify": v, "currency": cur,
+                "reclaimed": reclaimed}
     except BaseException:
         # a failed acquire must not leave the slot marked: the marker is the occupancy signal the next search
         # reads, so clearing it here is what keeps a refused acquire from wedging the slot.
@@ -1061,7 +1380,9 @@ def profile_for_kind(kind: str) -> str:
     try:
         return KIND_PROFILE[kind]
     except KeyError:
-        raise SystemExit("REFUSED spawn: unknown kind %r - valid kinds are: %s"
+        # no `spawn:` here: the same refusal is now raised from `claims.py claim --kind` and
+        # `queue.py next --kind`, neither of which spawns anything
+        raise SystemExit("REFUSED: unknown kind %r - valid kinds are: %s"
                          % (kind, ", ".join(KIND_PROFILE)))
 
 
@@ -1130,7 +1451,9 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
                      "message is the result the orchestrator receives.")
     call = ("subagent(agent=%s, cwd=%s, task=%s)"
             % (json.dumps(profile), json.dumps(path.replace("\\", "/")), json.dumps(task_text)))
-    block = tree_block(main, path)
+    # The claim-time proof goes INTO the lane's block, because the lane is who must not have to guess
+    # whether its tree is current - the acquire-time completion happened before this line was rendered.
+    block = "\n\n".join([tree_block(main, path)] + currency_lines(info["currency"]))
     return {"slot": info["slot"], "path": path, "agent": profile, "kind": kind,
             "branch": info["branch"], "unit": unit, "spawnLine": "%s\n\n%s" % (call, block)}
 
@@ -1159,9 +1482,67 @@ def selftest() -> int:
         if got != want:
             fails.append("%s: got %r want %r" % (name, got, want))
 
+    def _raises(fn) -> bool:
+        try:
+            fn()
+            return False
+        except SystemExit:
+            return True
+
     import shutil
     import tempfile
     claims = _claims()
+
+    # --- the ninja seam: deterministic and hermetic, and it exercises the pending>0 -> complete -> 0 path --
+    global NINJA_RUNNER
+    saved_ninja = NINJA_RUNNER
+
+    def fake_ninja(pending=()):
+        """A ninja runner: `-n` reports the next count in `pending` (then 0); a real run succeeds.
+
+        `pending` is a queue of *pending-step counts*: `[3]` means the first `ninja -n` saw 3 steps and,
+        once `ninja` ran, the re-count saw 0 - the exact fresh-slot shape.  `["error"]` / `["missing"]`
+        simulate ninja failing to answer.
+        """
+        counts = list(pending) if pending else [0]
+        calls = []
+
+        class Done:
+            pass
+
+        def run(argv, cwd=None, **kw):
+            calls.append(list(argv))
+            p = Done()
+            p.stdout, p.stderr = "", ""
+            if list(argv) == ["ninja", "-n"]:
+                n = counts.pop(0) if counts else 0
+                if n == "error":
+                    p.returncode, p.stderr = 1, "ninja: fatal: build.ninja, line 1: unknown rule"
+                elif n == "missing":
+                    raise FileNotFoundError("ninja")
+                else:
+                    p.returncode = 0
+                    p.stdout = ("".join("[%d/%d] step\n" % (i + 1, n) for i in range(n))
+                                if n else "ninja: no work to do.\n")
+            else:
+                p.returncode, p.stdout, p.stderr = 0, "", ""
+            return p
+
+        run.calls = calls
+        return run
+
+    # every acquire/spawn below reads the currency seam; a hermetic 0-pending answer stands in for ninja
+    NINJA_RUNNER = fake_ninja()
+
+    # the counting itself, before any fixture: dry-run lines -> the pending count; failure/absence -> unknown
+    check("ninja -n output is counted", ninja_pending("/nonexistent", runner=fake_ninja([3]))[0], 3)
+    check("... and 'no work to do' is 0", ninja_pending("/nonexistent", runner=fake_ninja([0]))[0], 0)
+    check("... a failing ninja is UNKNOWN, not 0", ninja_pending("/nonexistent", runner=fake_ninja(["error"]))[0],
+          None)
+    check("... and it says why", "ninja -n failed" in ninja_pending("/nonexistent",
+                                                                     runner=fake_ninja(["error"]))[1], True)
+    check("... an absent ninja is UNKNOWN, not 0", ninja_pending("/nonexistent",
+                                                                runner=fake_ninja(["missing"]))[0], None)
 
     def g(path, *args, check=True):
         p = subprocess.run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t",
@@ -1209,13 +1590,19 @@ def selftest() -> int:
         open(os.path.join(repo, "build", "compilers", "mwcc.exe"), "wb").write(b"cc\n")
         open(os.path.join(repo, "build", "binutils", "as.exe"), "wb").write(b"as\n")
         open(os.path.join(repo, "build", "RMHE08", "obj", "auto", "stub.o"), "wb").write(b"OBJ-V1\n")
+        os.makedirs(os.path.join(repo, "build", "RMHE08", "src", "auto"))
+        open(os.path.join(repo, "build", "RMHE08", "src", "auto", "stub.o"), "wb").write(b"SRC-OBJ-V1\n")
         open(os.path.join(repo, "build", "RMHE08", "config.json"), "w").write('{"libs": []}\n')
         open(os.path.join(repo, "build", "RMHE08", "report.json"), "w").write('{"units": {"auto/stub": 1.0}}\n')
         open(os.path.join(repo, "build.ninja"), "w").write("# ninja\n")
         open(os.path.join(repo, ".ninja_deps"), "wb").write(claims._ninja_deps_serialize(4, [
             ("path", os.path.abspath(repo).replace("\\", "/").encode() + b"/include/types.h")]))
         open(os.path.join(repo, ".ninja_log"), "w").write("# ninja log v5\n")
-        open(os.path.join(repo, "objdiff.json"), "w").write("{}\n")
+        # The manifest the official scorer opens: `target_path` is the split object, `base_path` the src
+        # compile output.  A real one (both objects exist) so `compile_outputs` has something to assert.
+        open(os.path.join(repo, "objdiff.json"), "w").write(json.dumps({"units": [
+            {"name": "main/auto/stub", "target_path": "build/RMHE08/obj/auto/stub.o",
+             "base_path": "build/RMHE08/src/auto/stub.o"}]}, indent=1) + "\n")
         open(os.path.join(repo, "compile_commands.json"), "w").write("[]\n")
         g(repo, "init", "-q")
         g(repo, "checkout", "-q", "-b", "main")
@@ -1225,7 +1612,8 @@ def selftest() -> int:
         for p, t in (("config/RMHE08/symbols.txt", 1_000_000), ("config/RMHE08/splits.txt", 1_000_000),
                      ("orig/RMHE08/sys/main.dol", 1_000_000), ("orig/RMHE08/files/mh3.sel", 1_000_000),
                      ("configure.py", 1_000_000), ("build/RMHE08/config.json", 2_000_000),
-                     ("build/RMHE08/obj/auto/stub.o", 2_000_000), ("build/RMHE08/report.json", 2_000_000),
+                     ("build/RMHE08/obj/auto/stub.o", 2_000_000),
+                     ("build/RMHE08/src/auto/stub.o", 2_000_000), ("build/RMHE08/report.json", 2_000_000),
                      ("build.ninja", 2_000_000)):
             os.utime(os.path.join(repo, p), (t, t))
         return repo
@@ -1250,9 +1638,111 @@ def selftest() -> int:
               os.path.abspath(repo).replace("\\", "/").encode() + b"/include/types.h"
               not in open(os.path.join(slot_dir(repo, 1), ".ninja_deps"), "rb").read(), True)
         check("a freshly seeded slot verifies current", verify(repo, 1)["ok"], True)
+
+        # (0) THE COMPILE-OUTPUT SET: `config.json`'s mtime and `report.json`'s bytes can both pass while
+        # the objects the report was computed from are gone - and that tree cannot run the official scorer.
+        # `objdiff.json` names the scorer's inputs (`target_path` = the split object, `base_path` = the
+        # `src/` compile output); `verify` asserts every one of them is on disk.
+        v0 = verify(repo, 1)
+        check("verify asserts the scorer's compile outputs", v0["compile_outputs"], True)
+        check("... counting the split and the src object", v0["compile_outputs_checked"], 2)
+        gone = os.path.join(slot_dir(repo, 1), "build", "RMHE08", "src", "auto", "stub.o")
+        os.remove(gone)
+        v0 = verify(repo, 1)
+        check("a slot missing a src/ compile output is REFUSED", v0["ok"], False)
+        check("... naming the missing object",
+              any("compile outputs" in r and "src" in r for r in v0["reasons"]), True)
+        check("... while report.json still matches MAIN (the old check would have passed it)",
+              v0["report_matches"], True)
+        check("... and the missing count is reported", v0["compile_outputs_missing"], 1)
+        # a re-seed refills it from MAIN (the arbiter) - verify is green again, so this is repair, not a wedge
+        claims.seed_worktree_build(repo, slot_dir(repo, 1), copy_orig=True, overwrite=False)
+        check("re-seeding refills the dropped output, and verify is green", verify(repo, 1)["ok"], True)
+        # the slot's own manifest is a doubt too: the scorer reads the slot's copy, not MAIN's
+        mf = os.path.join(slot_dir(repo, 1), "objdiff.json")
+        os.remove(mf)
+        v0 = verify(repo, 1)
+        check("a slot missing its objdiff.json is refused even with every object present", v0["ok"], False)
+        check("... naming the manifest",
+              any("objdiff.json" in r for r in v0["reasons"]), True)
+        claims.seed_worktree_build(repo, slot_dir(repo, 1), copy_orig=True, overwrite=False)
+        check("... and re-seeding restores it", verify(repo, 1)["ok"], True)
+        # claim-time currency: the pending steps a fresh slot ALWAYS has by construction are run here, then
+        # re-counted - so the number the lane is shown is what is left, not what was
+        nrun = fake_ninja([3])
+        cur = claim_currency(repo, 1, complete=True, runner=nrun)
+        check("claim_currency runs the pending ninja steps", ["ninja"] in nrun.calls, True)
+        check("... and re-counts to 0", cur["pending"], 0)
+        check("... recording that it completed them", cur["completed"], True)
+        check("... and re-verifying the tree it just touched", cur["verify"]["ok"], True)
+        check("... while proving the report and the object set",
+              (cur["report_matches"], cur["compile_outputs"], cur["objects_present"]), (True, True, 2))
+        # count-only leaves the work to the caller and says it did not do it
+        cur2 = claim_currency(repo, 1, complete=False, runner=fake_ninja([2]))
+        check("claim_currency(count-only) reports the pending count", cur2["pending"], 2)
+        check("... and does not claim to have completed them", cur2["completed"], None)
+        # the handover line carries the proof; an unknown is never rounded down to a confident 0
+        proof = "\n".join(currency_lines(cur))
+        check("the handover proof names report.json", "byte-identical to MAIN's" in proof, True)
+        check("... the object count", "(2/2 objects present)" in proof, True)
+        check("... and 0 pending steps", "pending steps: 0" in proof, True)
+        unknown = "\n".join(currency_lines({"report_matches": True, "compile_outputs": True,
+                                            "objects_present": 2, "objects_checked": 2,
+                                            "pending": None, "pending_note": "ninja unavailable",
+                                            "completed": None}))
+        check("an unknown pending count is reported as unknown, not 0",
+              "pending steps: unknown" in unknown, True)
+        # `ok` is the field a future caller trusts, and the UNKNOWN pending count must not pass it:
+        # `not None` was True, so the currency check passed on the one reading that proves nothing
+        check("pending work is not `ok`", cur2["ok"], False)
+        cur3 = claim_currency(repo, 1, complete=True, runner=fake_ninja(["error"]))
+        check("... and neither is an UNKNOWN pending count", cur3["ok"], False)
+        check("... reported as None, never rounded to 0", cur3["pending"], None)
+        doubtful = "\n".join(currency_lines(cur3))
+        check("... so the handover block never claims currency",
+              "proven current at handover" in doubtful, False)
+        check("... naming the doubt and the measured values instead",
+              "NOT PROVEN" in doubtful and "pending steps: unknown" in doubtful, True)
+        check("... while the proven case still says it", "proven current at handover" in proof, True)
         # idempotent
         again = init(repo, count=2)
         check("init is idempotent", (again["created"], sorted(again["present"])), ([], [1, 2]))
+
+        # (0b) A SHADOW: a lane-shaped tree INSIDE the slot, for fixture tests.  `git worktree add` is the
+        # obvious way and the wrong one - it writes metadata into MAIN's `.git/worktrees`, outside the slot.
+        wts_before = [line for line in g(repo, "worktree", "list", "--porcelain").splitlines()
+                      if line.startswith("worktree ")]
+        shd = shadow(repo, 1, "fixture")
+        check("shadow materialises INSIDE the slot", os.path.normcase(shd["dir"]),
+              os.path.normcase(os.path.join(slot_dir(repo, 1), "fixture")))
+        check("... as a lane-shaped tree (configure.py + src/)",
+              os.path.exists(os.path.join(shd["dir"], "configure.py"))
+              and os.path.isdir(os.path.join(shd["dir"], "src")), True)
+        check("... with its OWN repository inside the slot", os.path.isdir(os.path.join(shd["dir"], ".git")),
+              True)
+        check("... resolving like a lane (rev-parse --show-toplevel)",
+              os.path.normcase(g(shd["dir"], "rev-parse", "--show-toplevel")),
+              os.path.normcase(shd["dir"]))
+        check("... and MAIN registered NO new worktree (nothing outside the slot was touched)",
+              [line for line in g(repo, "worktree", "list", "--porcelain").splitlines()
+               if line.startswith("worktree ")], wts_before)
+        check("shadow refuses a destination OUTSIDE the slot",
+              _raises(lambda: shadow(repo, 1, os.path.join(tmp, "outside"))), True)
+        check("shadow refuses a non-empty destination", _raises(lambda: shadow(repo, 1, "fixture")), True)
+        check("... unless --force replaces it", shadow(repo, 1, "fixture", force=True)["files"] > 0, True)
+        _rmtree_force(os.path.join(slot_dir(repo, 1), "fixture"))
+        # the containment test compares RESOLVED paths: a lexical prefix test refuses a destination reached
+        # through a symlink (and cannot see one that walks out).  Windows needs a privilege for `symlink`,
+        # so this row is skipped where the platform refuses it.
+        link = os.path.join(tmp, "slot-link")
+        try:
+            os.symlink(slot_dir(repo, 1), link, target_is_directory=True)
+        except (OSError, NotImplementedError, AttributeError):
+            link = None
+        if link:
+            check("shadow accepts a destination inside the slot through a symlinked path",
+                  shadow(repo, 1, os.path.join(link, "fixture"))["files"] > 0, True)
+            _rmtree_force(os.path.join(slot_dir(repo, 1), "fixture"))
 
         # (1) THE GOOD CASE: acquire -> branch off main's tip, report matches, no src diff, clean status
         tip = g(repo, "rev-parse", "HEAD")
@@ -1264,11 +1754,28 @@ def selftest() -> int:
         check("the slot is locked", read_lock(repo, 1).get("unit"), "auto/stub")
         check("the handed tree verifies current", info["verify"]["ok"], True)
         check("the slot's report matches MAIN exactly", report_matches(repo, d1), True)
+        check("acquire finishes the claim-time pending work", info["currency"]["pending"], 0)
+        check("... and records the currency proof on the lock",
+              (read_lock(repo, 1).get("pending"), read_lock(repo, 1).get("compile_outputs")), (0, True))
         check("no src diff against main", g(d1, "diff", "--name-only", "main", "--", "src"), "")
         check("git status in the slot is clean", g(d1, "status", "--porcelain"), "")
         check("acquire creates the `.used` marker", marker_present(d1), True)
         check("... and the marker is gitignored (the tree stays clean)",
               g(d1, "status", "--porcelain", "-uall"), "")
+        # A SHADOW INTO A LANE'S SLOT IS REFUSED: nothing consulted the `.used` marker, so a fixture could
+        # be written into a live lane's tree - that lane's `git status` then shows an untracked directory
+        # and its landing refuses on a dirty tree.  `--force` is the deliberate override.
+        try:
+            shadow(repo, 1, "fixture")
+            check("shadow refuses a slot a lane holds", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("shadow refuses a slot a lane holds", "not free" in str(exc), True)
+            check("... naming the claim that holds it",
+                  "auto/stub" in str(exc) and "w-good" in str(exc), True)
+        check("... while --force overrides the occupancy check",
+              shadow(repo, 1, "forced", force=True)["files"] > 0, True)
+        _rmtree_force(os.path.join(d1, "forced"))
+        check("... leaving the lane's tree clean again", g(d1, "status", "--porcelain", "-uall"), "")
 
         # (2) THE HOSTILE CASE: poison the build tree, then release and re-acquire - it must repair, not lie
         open(os.path.join(d1, "build", "RMHE08", "report.json"), "w").write('{"units": {}}\n')
@@ -1648,6 +2155,8 @@ def selftest() -> int:
         check("the kind mapping is the whole table", KIND_PROFILE,
               {"unit": "decompiler", "fix": "fixer", "merge": "merger", "tooling": "worker",
                "docs": "worker", "review": "codereviewer", "scout": "scout", "plan": "planner"})
+        check("PROFILES is the table's values, not a second copy", PROFILES,
+              tuple(sorted(set(KIND_PROFILE.values()))))
         for _kind, _profile in sorted(KIND_PROFILE.items()):
             check("kind %s -> %s" % (_kind, _profile), profile_for_kind(_kind), _profile)
         try:
@@ -1656,6 +2165,9 @@ def selftest() -> int:
         except SystemExit as exc:
             check("an unknown kind is refused (never guessed)", "unknown kind" in str(exc), True)
             check("... listing every valid kind", all(k in str(exc) for k in KIND_PROFILE), True)
+            # the same refusal is raised from `claims.py claim --kind` and `queue.py next --kind`, neither of
+            # which spawns anything, so it must not say it is a spawn refusal
+            check("... and not claiming to be a spawn", "REFUSED spawn" in str(exc), False)
 
         # (a) BY NUMBER: takes THAT slot, and the line's cwd is it and its agent is the mapped profile
         sp = spawn(repo, "tooling", slot=1, unit="lane/spawn-tooling", task="Wire up the tool.")
@@ -1676,6 +2188,9 @@ def selftest() -> int:
               "nothing" in sp["spawnLine"].lower() and "outside it" in sp["spawnLine"].lower(), True)
         check("... and the claims.py release prohibition", "claims.py release" in sp["spawnLine"], True)
         check("... and the do-not-land rule", "Do not land" in sp["spawnLine"], True)
+        check("... and the claim-time currency proof the lane can see",
+              "proven current at handover" in sp["spawnLine"]
+              and "pending steps: 0" in sp["spawnLine"], True)
         check("... the kind/profile are recorded in the slot's lock",
               (read_lock(repo, 1).get("kind"), read_lock(repo, 1).get("agent")), ("tooling", "worker"))
 
@@ -1720,6 +2235,7 @@ def selftest() -> int:
         release(repo, slot=tfs["slot"], unit="lane/spawn-taskfile", rescue=False)
         check("the pool is left as it was found (both slots free)", free_count(repo), 2)
 
+    NINJA_RUNNER = saved_ninja
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1781,6 +2297,13 @@ def main() -> int:
     v = sub.add_parser("verify", help="validate each slot's build tree against MAIN's current map/DOL")
     v.add_argument("--slot", type=int, default=None)
     v.add_argument("--json", action="store_true")
+    sh = sub.add_parser("shadow", help="materialise a lane-shaped tree INSIDE a slot (for fixture tests)")
+    sh.add_argument("slot", type=int)
+    sh.add_argument("dir", help="where inside the slot: relative to the slot, or an absolute path inside it")
+    sh.add_argument("--seed-build", action="store_true",
+                    help="also copy the warm build/input trees, so the shadow can compile and score")
+    sh.add_argument("--force", action="store_true", help="replace a non-empty destination directory")
+    sh.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
@@ -1816,6 +2339,8 @@ def main() -> int:
                  "current" if info["verify"]["ok"] else "; ".join(info["verify"]["reasons"])))
         if info.get("refreshed"):
             print("  refreshed %s" % info["refreshed"])
+        for line in currency_lines(info["currency"]):
+            print("  " + line.replace("**", ""))
         print("  owner   %s (in `.used`)" % marker_owner(info["dir"]))
         return 0
     if args.cmd == "release":
@@ -1846,6 +2371,16 @@ def main() -> int:
               % (out["slot"], out["branch"], out["kind"], out["agent"], out["path"]),
               file=sys.stderr)
         print(out["spawnLine"])
+        return 0
+    if args.cmd == "shadow":
+        out = shadow(main_wt, args.slot, args.dir, seed_build=args.seed_build, force=args.force)
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        print("shadowed slot %d -> %s (%d file(s)%s)"
+              % (out["slot"], out["dir"], out["files"],
+                 ", seeded " + ", ".join(out["seeded"]) if out["seeded"] else ""))
+        print("  head %s (its OWN repository, inside the slot; nothing outside it was touched)" % out["head"])
         return 0
     if args.cmd == "status":
         rows = status(main_wt)

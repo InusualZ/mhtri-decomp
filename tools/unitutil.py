@@ -50,8 +50,17 @@ def caller_worktree(start=None):
     return (p.stdout or "").strip() or None if p.returncode == 0 else None
 
 
+def _cwd_tree() -> str | None:
+    """`cwd` when it is itself a tree (has `configure.py`), else None - the non-git invocation case."""
+    try:
+        cwd = os.getcwd()
+    except OSError:
+        return None
+    return cwd if os.path.exists(os.path.join(cwd, "configure.py")) else None
+
+
 def repo_root(start=None):
-    """The tree the tools should read: the **caller's** git worktree, else the tree this file lives in.
+    """The tree the tools should read: the **caller's** tree, else the tree this file lives in.
 
     This used to be only the file's location, which silently read MAIN from inside a lane's worktree: a
     tool invoked as `python <MAIN>/tools/objdiff/symdiff.py -u <unit>` with cwd in a worktree scored
@@ -61,18 +70,27 @@ def repo_root(start=None):
     take their source, `-o` and `-i` order from. When there is no git worktree (a temp dir, a packaged
     copy) the walk up to `configure.py` is unchanged, and an explicit `start` still roots the walk (the
     lane/teardown helpers pass one) so a caller can name a tree unambiguously.
+
+    **A tree that is not a git worktree is named with `start`, or with `cwd`.**  A *fixture* (a fake
+    repository under the system temp, the shape every `*_selftest.py` here uses) is not a git worktree,
+    so `git rev-parse` answers nothing; before this, the walk then began at *this file's* directory and
+    silently resolved the real repository - the fixture was scored against the real build, which is why
+    `unitscore_selftest` had to `git init` its tree. Without `start`, the invocation's own tree is tried
+    first (its git worktree, else `cwd` **when `cwd` is a tree at all**), and only a cwd that is not a
+    tree falls back to this file's directory, so the packaged-copy case is unchanged. With `start`, the
+    walk begins there and never reaches this file's directory.
     """
-    if start is None:
-        top = caller_worktree()
-        if top and os.path.exists(os.path.join(top, "configure.py")):
-            return top
-    d = os.path.abspath(start or os.path.dirname(os.path.abspath(__file__)))
+    if start is not None:
+        d = os.path.abspath(start)
+    else:
+        top = caller_worktree() or _cwd_tree()
+        d = top or os.path.dirname(os.path.abspath(__file__))
     while True:
         if os.path.exists(os.path.join(d, "configure.py")):
             return d
         parent = os.path.dirname(d)
         if parent == d:
-            raise SystemExit("repo root (configure.py) not found above %s" % start)
+            raise SystemExit("repo root (configure.py) not found above %s" % (start or d))
         d = parent
 
 
@@ -107,47 +125,56 @@ class Unit:
     target: str      # absolute path of the original (split) object
 
 
-def _versions():
-    build = os.path.join(ROOT, "build")
+def _versions(root=None):
+    build = os.path.join(root or ROOT, "build")
     return sorted(d for d in os.listdir(build)
                   if os.path.isdir(os.path.join(build, d, "obj"))) if os.path.isdir(build) else []
 
 
-def _find_src(lib, file):
+def _find_src(lib, file, root=None):
     for ext in SOURCE_EXT:
-        p = os.path.join(ROOT, "src", lib, file + ext)
+        p = os.path.join(root or ROOT, "src", lib, file + ext)
         if os.path.exists(p):
             return p
     return None
 
 
-def _make(lib, file, version):
-    src = _find_src(lib, file)
+def _make(lib, file, version, root=None):
+    root = root or ROOT
+    src = _find_src(lib, file, root)
     if src is None:
         raise SystemExit("no source for unit %s/%s under src/" % (lib, file))
     return Unit(name="main/%s/%s" % (lib, file), lib=lib, file=file, version=version, src=src,
-                obj_dir=os.path.join(ROOT, "build", version, "src", lib),
-                obj=os.path.join(ROOT, "build", version, "src", lib, file + ".o"),
-                target=os.path.join(ROOT, "build", version, "obj", lib, file + ".o"))
+                obj_dir=os.path.join(root, "build", version, "src", lib),
+                obj=os.path.join(root, "build", version, "src", lib, file + ".o"),
+                target=os.path.join(root, "build", version, "obj", lib, file + ".o"))
 
 
-def list_units():
-    """Every configured unit that has source in src/ (so the flag tools can work on it)."""
+def list_units(root=None):
+    """Every configured unit that has source in `root`'s `src/` (`root` defaults to `ROOT`)."""
+    root = root or ROOT
     out = []
-    for version in _versions():
-        for lib in sorted(os.listdir(os.path.join(ROOT, "src"))):
-            d = os.path.join(ROOT, "src", lib)
+    for version in _versions(root):
+        for lib in sorted(os.listdir(os.path.join(root, "src"))):
+            d = os.path.join(root, "src", lib)
             if not os.path.isdir(d):
                 continue
             for entry in sorted(os.listdir(d)):
                 if entry.endswith(SOURCE_EXT):
-                    out.append(_make(lib, os.path.splitext(entry)[0], version))
+                    out.append(_make(lib, os.path.splitext(entry)[0], version, root))
     return out
 
 
-def resolve_unit(spec=None):
-    """Resolve a unit spec (see the module docstring). With no spec, use the only unit there is."""
-    units = list_units()
+def resolve_unit(spec=None, root=None):
+    """Resolve a unit spec (see the module docstring). With no spec, use the only unit there is.
+
+    `root` names the tree to resolve against and defaults to `ROOT` (the invocation's tree).  Passing it
+    is the same rule `repo_root(start=)` documents - the caller names the tree it means - and it is the
+    only way to resolve a unit in a tree that is **not a git worktree**, i.e. a fixture: without it the
+    fixture silently reads this module's own `ROOT` and refuses (or, worse, resolves the real unit).  The
+    returned `Unit`'s `src`/`obj`/`target` are therefore absolute paths *under that root*.
+    """
+    units = list_units(root)
     if spec is None:
         if len(units) == 1:
             return units[0]
@@ -160,7 +187,7 @@ def resolve_unit(spec=None):
     parts = [p for p in s.split("/") if p not in ("", ".")]
     if parts and parts[0] == "main":
         parts = parts[1:]
-    if len(parts) >= 3 and parts[0] in _versions():      # build/<ver>/{src,obj}/<lib>/<file>.o
+    if len(parts) >= 3 and parts[0] in _versions(root):      # build/<ver>/{src,obj}/<lib>/<file>.o
         parts = parts[2:]
     if not parts:
         raise SystemExit("cannot parse unit spec %r" % spec)
@@ -174,7 +201,7 @@ def resolve_unit(spec=None):
     for u in units:
         if u.lib == lib and u.file == file:
             return u
-    return _make(lib, file, units[0].version if units else _versions()[0])
+    return _make(lib, file, units[0].version if units else _versions(root)[0], root)
 
 
 def compile_command(unit):

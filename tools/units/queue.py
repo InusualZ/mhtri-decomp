@@ -312,13 +312,36 @@ def _same_path(a: str, b: str) -> bool:
     return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
+def _profile_for_kind(kind: str) -> str:
+    """The agent profile for a lane `kind` - `slots.profile_for_kind`, the project's **one** mapping.
+
+    `queue.py` used to carry its own `profile="decompiler"` default, so a lane taken through the queue
+    was launched as a unit lane whatever it actually was - the same wrong-profile failure `slots.spawn`
+    was built to end (three tooling lanes launched as `decompiler`, dragging the section 6.5 unit policy
+    and a no-subagents rule into a job with no unit). An unknown kind is refused there, with the list.
+    """
+    return claims._slots().profile_for_kind(kind)
+
+
+def _profiles() -> list[str]:
+    """`--profile`'s valid values - `slots.PROFILES`, the values of the **one** kind table.
+
+    `--profile` overrides the kind's mapping, and the override used to be unvalidated (main carried
+    `choices=[...]`; the branch replaced it with a bare `default=None`), so `--profile decompilerr` printed a
+    spawn line naming an agent that does not exist.
+    """
+    return list(claims._slots().PROFILES)
+
+
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
-               profile: str = "decompiler") -> dict:
+               kind: str = "unit", profile: str | None = None) -> dict:
     """The paste-ready spawn: agent, cwd and task text for the orchestrator.
 
-    `profile` is the agent profile the lane is launched with. A registration-and-reconstruction lane is
-    unit work, which is the project's `decompiler` profile (`.agents/agents/decompiler.md`); `worker` stays
-    the generic fallback and `fixer`/`merger` are for a refused gate and a refused apply.
+    `kind` is the lane kind and the agent profile comes from `slots.profile_for_kind(kind)` - the one
+    mapping `slots.spawn` also uses, so a queue spawn and a `slots.py spawn` for the same kind can never
+    disagree. `profile` is the deliberate override for a caller that needs an explicit one; the default is
+    `unit` -> `decompiler` (a registration-and-reconstruction lane is unit work, the project's
+    `.agents/agents/decompiler.md`), and `fix`/`merge`/`tooling`/`docs`/... come from the same table.
 
     The task names the brief by its absolute MAIN path: the brief is written into MAIN *after* the worktree
     was created, so the worktree's own checkout does not contain it. The call is the default `subagent`
@@ -330,6 +353,7 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
     over the foreign path - collateral damage to a different lane's batch.  So the wrong thing is impossible
     rather than discouraged: a spawn line whose cwd resolves to MAIN is a refusal, not a line to paste.
     """
+    profile = profile or _profile_for_kind(kind)
     if _same_path(wt, main):
         raise SystemExit("REFUSED spawn %s: cwd resolves to MAIN (%s) - a lane runs in its own worktree, "
                          "never the orchestrator's tree; take the claim first so the slot is the cwd."
@@ -339,7 +363,7 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
             "You may fan out subagents. End your turn with your report: "
             "your final message is the result the orchestrator receives."
             % (brief_path.replace("\\", "/"), unit, profile, slug))
-    return {"agent": profile, "name": "%s-%s" % (profile, slug), "cwd": wt, "task": task,
+    return {"kind": kind, "agent": profile, "name": "%s-%s" % (profile, slug), "cwd": wt, "task": task,
             "call": "subagent(agent=\"%s\", cwd=\"%s\", task=%s, timeoutMs=%d)"
                     % (profile, wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
 
@@ -469,7 +493,8 @@ def no_ready(main: str) -> str:
 
 
 def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn,
-                profile: str = "decompiler", slots_mode: bool | None = None) -> dict:
+                kind: str = "unit", profile: str | None = None,
+                slots_mode: bool | None = None) -> dict:
     """Claim one *selected* entry, promote its brief, and return its spawn.
 
     `next` and a wave differ only in selection, so this is the one claim path both take: the unit is
@@ -477,6 +502,9 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
     outbox path that does not exist. `claim_fn` is injectable so the selftest can exercise the whole flow
     without a git worktree. The worktree is read from the claim's own result, never re-derived from the
     unit path - a slot claim's worktree is the slot directory, and the spawn's `cwd` must be that.
+
+    `kind` is passed to both halves: the claim records it on the slot (via `claims.claim`), and the spawn
+    renders its profile from `slots.profile_for_kind(kind)` - so the slot's lock and the spawn line agree.
     """
     unit = entry["unit"]
     slug = claims.slug(unit)
@@ -494,7 +522,7 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
         claim_slug = slug
         brief_path = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
     else:
-        info = claim_fn(unit, main, worker, False)
+        info = claim_fn(unit, main, worker, False, kind=kind)
         wt = info.get("worktree") or claims.worktree_for(unit, main)
         claim_slug = claims.claim_slug(main, unit) or slug
         # "the wrong thing is impossible": a slot claim MUST hand out the slot's cwd.  If the claim names a
@@ -508,7 +536,7 @@ def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim
         brief_path = promote(main, unit, claim_slug, wt)
     return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
             "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
-            "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, profile)}
+            "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, kind, profile)}
 
 
 def _claim_record(out: dict, worker: str | None, ratio: int) -> dict:
@@ -531,7 +559,8 @@ def slot_cap(main: str, slots_mode: bool | None = None) -> str | None:
 
 
 def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
-               profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False,
+               kind: str = "unit", profile: str | None = None, allow_unlanded=None,
+               ignore_backlog: bool = False,
                ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
     """Claim the next ready unit, promote its brief, and return the spawn.
 
@@ -562,14 +591,15 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(no_ready(main))
-    out = claim_entry(main, entry, worker, dry_run, claim_fn, profile, slots_mode)
+    out = claim_entry(main, entry, worker, dry_run, claim_fn, kind, profile, slots_mode)
     if not dry_run and not ignore_backlog:
         backlog.record_claims(main, [_claim_record(out, worker, ratio)], ratio=ratio)
     return out
 
 
 def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
-                profile: str = "decompiler", allow_unlanded=None, ignore_backlog: bool = False,
+                kind: str = "unit", profile: str | None = None, allow_unlanded=None,
+                ignore_backlog: bool = False,
                 ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
     """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
 
@@ -610,7 +640,7 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
         backlog_msg = backlog.refusal(main, ratio=ratio, wants=len(chosen))
         if backlog_msg:
             raise SystemExit("REFUSED queue next | %s" % backlog_msg)
-    out = [claim_entry(main, entry, worker, dry_run, claim_fn, profile, slots_mode) for entry in chosen]
+    out = [claim_entry(main, entry, worker, dry_run, claim_fn, kind, profile, slots_mode) for entry in chosen]
     if not dry_run and not ignore_backlog:
         backlog.record_claims(main, [_claim_record(c, worker, ratio) for c in out], ratio=ratio)
     return {"requested": requested, "claimed": len(out), "shortfall": requested - len(out),
@@ -641,6 +671,13 @@ def selftest() -> int:
         checks += 1
         if got != want:
             fails.append("%s: got %r want %r" % (name, got, want))
+
+    def _raises(fn) -> bool:
+        try:
+            fn()
+            return False
+        except SystemExit:
+            return True
 
     import tempfile
     # the unlanded-branch guard's rule, tested without a repository: only a strict superset blocks
@@ -711,20 +748,52 @@ def selftest() -> int:
               dry["spawn"]["call"].startswith("subagent(agent=\"decompiler\""), True)
         check("... and a proposal lane defaults to the decompiler profile",
               dry["spawn"]["agent"] == "decompiler", True)
-        check("... which the orchestrator can override (a refused gate is a fixer lane)",
-              spawn_line(tmp, "auto/x", "s", "/w", "/b", "fixer")["call"]
+        check("... recording the kind it was taken as", dry["spawn"]["kind"], "unit")
+        # the profile comes from the ONE mapping (`slots.profile_for_kind`), so a queue spawn and a
+        # `slots.py spawn` for the same kind cannot disagree - and a tooling lane is NOT a decompiler lane
+        check("the kind decides the profile: fix -> fixer",
+              spawn_line(tmp, "auto/x", "s", "/w", "/b", "fix")["call"]
               .startswith("subagent(agent=\"fixer\""), True)
+        check("the kind decides the profile: tooling -> worker (not decompiler)",
+              spawn_line(tmp, "auto/x", "s", "/w", "/b", "tooling")["agent"], "worker")
+        check("the kind decides the profile: review -> codereviewer",
+              spawn_line(tmp, "auto/x", "s", "/w", "/b", "review")["agent"], "codereviewer")
+        check("... an unknown kind is refused, with the valid list",
+              _raises(lambda: spawn_line(tmp, "auto/x", "s", "/w", "/b", "not-a-kind")), True)
+        check("... and an explicit profile still overrides the mapping",
+              spawn_line(tmp, "auto/x", "s", "/w", "/b", "unit", "fixer")["agent"], "fixer")
+        # `--profile` is an override, so it is validated against the ONE table as well: main carried
+        # `choices=[...]`, the branch dropped it, and `--profile decompilerr` printed a spawn line naming an
+        # agent the harness does not have (review, queue.py:1229).
+        check("--profile's valid values are the kind table's profiles",
+              _profiles(), sorted(set(claims._slots().KIND_PROFILE.values())))
+        import contextlib
+        import io
+        saved_argv, err = sys.argv, io.StringIO()
+        try:
+            sys.argv = ["queue.py", "next", "--profile", "decompilerr", "--dry-run"]
+            with contextlib.redirect_stderr(err):
+                try:
+                    main()
+                    check("an unknown `--profile` is refused", "no error", "SystemExit")
+                except SystemExit as exc:
+                    check("an unknown `--profile` is refused", exc.code, 2)
+        finally:
+            sys.argv = saved_argv
+        check("... by argparse, listing the real profiles",
+              "choose from" in err.getvalue() and "decompiler" in err.getvalue(), True)
         check("the spawn omits the `name` the default tool has no parameter for",
               "name=" not in dry["spawn"]["call"], True)
         check("the spawn asks for a final-message handoff, not a tool",
               "final message" in dry["spawn"]["task"] and "subagent_done" not in dry["spawn"]["task"], True)
 
         # the real flow with an injected claim (no git worktree): promote, then remove the pool brief
-        def fake_claim(unit, main, worker, dry_run):
+        def fake_claim(unit, main, worker, dry_run, **kw):
             claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
-                                               "worktree": claims.worktree_for(unit, main)}})
+                                               "worktree": claims.worktree_for(unit, main),
+                                               "kind": kw.get("kind"), "agent": kw.get("agent")}})
             return {"unit": unit, "branch": claims.branch_for(unit),
-                    "worktree": claims.worktree_for(unit, main)}
+                    "worktree": claims.worktree_for(unit, main), "kind": kw.get("kind")}
 
         pooled_text = open(by_unit["auto/stubB"]["path"], encoding="utf-8").read()
         real = next_brief(tmp, "w-demo", dry_run=False, claim_fn=fake_claim)
@@ -904,7 +973,7 @@ def selftest() -> int:
         check("fewer than N ready claims what exists", (len(short), adjacent(short)), (2, False))
         check("... and it is the ready pair, not the claimed neighbours", short, [0, 2])
 
-        def fake_claim(unit, main, worker, dry_run):
+        def fake_claim(unit, main, worker, dry_run, **kw):
             claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
                                                "worktree": claims.worktree_for(unit, main)}})
             return {"unit": unit, "branch": claims.branch_for(unit),
@@ -968,7 +1037,7 @@ def selftest() -> int:
                                                 "tu": {"verdict": "one-tu", "sources": ["eft029.cpp"],
                                                        "partial_source": None, "open_seams": []}}]}, fh)
 
-        def fake_claim(unit, main, worker, dry_run):
+        def fake_claim(unit, main, worker, dry_run, **kw):
             claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
                                                "worktree": claims.worktree_for(unit, main)}})
             return {"unit": unit, "branch": claims.branch_for(unit),
@@ -1102,7 +1171,7 @@ def selftest() -> int:
                                             "why": "the header's `s32 fn_80215C98(...)` has the wrong "
                                                    "arity - every call site passes five arguments."}]}, fh)
 
-        def fake_claim(unit, main, worker, dry_run):
+        def fake_claim(unit, main, worker, dry_run, **kw):
             claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
                                                "worktree": claims.worktree_for(unit, main)}})
             return {"unit": unit, "branch": claims.branch_for(unit),
@@ -1182,10 +1251,15 @@ def main() -> int:
                    help="claim a wave of N proposals spread with a stride of N through the address order"
                         " (default 1 - the single next proposal)")
     n.add_argument("--worker", default=None)
-    n.add_argument("--profile", default="decompiler",
-                   choices=["decompiler", "worker", "fixer", "merger"],
-                   help="the agent profile the lane is launched with (default: decompiler - a proposal "
-                        "lane registers and reconstructs a unit, which is unit work)")
+    n.add_argument("--kind", default="unit",
+                   help="the lane kind; the agent profile comes from it via `slots.profile_for_kind` - "
+                        "`unit`->decompiler (a proposal lane registers and reconstructs a unit), "
+                        "`fix`->fixer, `merge`->merger, `tooling`/`docs`->worker, `review`->codereviewer, "
+                        "`scout`/`plan` read-only. An unknown kind is refused with the list (default: unit)")
+    n.add_argument("--profile", default=None, choices=_profiles(),
+                   help="override the agent profile the lane is launched with (default: derived from "
+                        "--kind, so a tooling lane is launched as `worker` and not as `decompiler`; an "
+                        "unknown profile is refused with the list of real ones)")
     n.add_argument("--dry-run", action="store_true")
     n.add_argument("--allow-unlanded", action="append", default=[], metavar="BRANCH",
                    help="name a branch that is parked on purpose, so the unlanded-branch guard lets it "
@@ -1245,7 +1319,8 @@ def main() -> int:
 
     if args.cmd == "next":
         if args.count != 1:
-            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, profile=args.profile,
+            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, kind=args.kind,
+                              profile=args.profile,
                               allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
                               ratio=args.ratio, slots_mode=(False if args.no_slots else None))
             if args.json:
@@ -1275,7 +1350,7 @@ def main() -> int:
                       " next to a claim already in this wave; `python tools/units/brief.py --pool`"
                       " replenishes it" % (out["claimed"], out["requested"]))
             return 0
-        out = next_brief(main_wt, args.worker, args.dry_run, profile=args.profile,
+        out = next_brief(main_wt, args.worker, args.dry_run, kind=args.kind, profile=args.profile,
                          allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
                          ratio=args.ratio, slots_mode=(False if args.no_slots else None))
         if args.json:
