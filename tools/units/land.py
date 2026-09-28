@@ -2396,7 +2396,10 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
           info="; ".join(ind_warn[:3]) if ind_warn else "",
           remedy="a symbol's report score is not reproducible from the objects (a stale report.json, "
                  "a measuring-tool lie, or a 100% claim whose bytes differ) - rebuild and re-read, or "
-                 "fix the symbol, before landing")
+                 "fix the symbol, before landing. A row dtk named itself (`pad_*`/`auto_*`, a range "
+                 "with no function prologue) is resolved to our symbol at the same section+offset "
+                 "and judged by its bytes, because objdiff cannot pair such a row by name at all - "
+                 "so a dtk-generated row name is never the reason on its own")
     # the regression scan reads build/RMHE08/report_changes.json, which only `ninja changes` writes: without
     # this the scan reads the PREVIOUS batch's file and passes for the wrong reason (the first real run did
     # exactly that, while the ledger showed matched 231 -> 228).

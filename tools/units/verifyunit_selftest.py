@@ -13,16 +13,22 @@ failure the check exists for is reproducible rather than described:
 * a function with no `fuzzy_match_percent` key must be read as 0 %, and the unit arithmetic that proves
   it must refuse when the two readings disagree;
 * a split target object that moved for a unit the batch does not name must refuse (a neighbour the
-  `splits.txt` change re-ranged), while the batch's own unit may move.
+  `splits.txt` change re-ranged), while the batch's own unit may move;
+* a row whose name is dtk's own (`pad_*`, for a range with no function prologue) resolves to our
+  symbol at the same section and offset, passes when the bytes match, and still refuses when they do
+  not - the two directions the `worker/trk-init-vectors-2226` refusal turned on.
 
-Two layers need the real build tree (a pair of objects and `objdiff-cli`) and are skipped, not failed,
-without it: the live cross-check of a registered unit, and the doctored-report fixture that must refuse.
+Three layers need `objdiff-cli` (and a pair of objects) and are skipped, not failed, without it: the
+live cross-check of a registered unit, the doctored-report fixture that must refuse, and the
+`pad_*`-named row's end-to-end re-measure. The `pad_*` fixtures' *objects* are synthesized in this
+file - the shape is dtk's own, so no branch's build tree can supply it.
 """
 from __future__ import annotations
 
 import json
 import os
 import shutil
+import struct
 import sys
 import tempfile
 
@@ -252,6 +258,215 @@ def size_gap_rows() -> int:
 
 
 # --------------------------------------------------------------------------------------------------
+# the pad-named row: resolved by ADDRESS, judged by its bytes (both directions)
+# --------------------------------------------------------------------------------------------------
+
+SHT_PROGBITS, SHT_SYMTAB, SHT_STRTAB = 1, 2, 3
+SHF_ALLOC, SHF_EXECINSTR = 2, 4
+STB_GLOBAL, STT_OBJECT, STT_FUNC = 0, 1, 2
+
+
+def _align(n: int, a: int = 4) -> int:
+    return (n + a - 1) // a * a
+
+
+def build_object(sections, symbols) -> bytes:
+    """A minimal ELF32 big-endian object - the fixture shape `symbol_locations` reads.
+
+    sections : [(name, data, flags)]                in shndx order
+    symbols  : [(name, section, size, value, info)] the null symbol is implicit at index 0
+
+    `raw_symbol_rows`/`symbol_locations` go through `unitutil.read_elf`, so the fixture needs exactly
+    what that reads: the ELF header's `shoff`/`shentsize`/`shnum`/`shstrndx`, `>IIIIIIIIII` section
+    headers, the first `SHT_SYMTAB` as the symbol table, its `link` as the string table, and
+    `>IIIBBH` symbol entries.
+    """
+    sec_names = [""] + [n for n, _d, _f in sections] + [".symtab", ".strtab", ".shstrtab"]
+    index = {n: i for i, n in enumerate(sec_names)}
+    strtab = bytearray(b"\0")
+    name_off = {}
+    for name, _sec, _size, _val, _info in symbols:
+        name_off[name] = len(strtab)
+        strtab += name.encode() + b"\0"
+    symtab = bytearray(struct.pack(">IIIBBH", 0, 0, 0, 0, 0, 0))
+    for name, sec, size, val, info in symbols:
+        symtab += struct.pack(">IIIBBH", name_off[name], val, size, info, 0, index[sec])
+    shstr = bytearray(b"\0")
+    sh_name = {}
+    for n in sec_names:
+        sh_name[n] = len(shstr)
+        shstr += n.encode() + b"\0"
+    data = {n: d for n, d, _f in sections}
+    flags = {n: f for n, _d, f in sections}
+    data[".symtab"], data[".strtab"], data[".shstrtab"] = bytes(symtab), bytes(strtab), bytes(shstr)
+    placed, off = [], 52
+    for n in sec_names:
+        if not n:
+            placed.append((n, 0, 0))
+            continue
+        off = _align(off)
+        placed.append((n, off, len(data[n])))
+        off += len(data[n])
+    shoff = _align(off)
+    buf = bytearray(shoff + 40 * len(sec_names))
+    struct.pack_into(">4sBBBBB7s", buf, 0, b"\x7fELF", 1, 2, 1, 0, 0, b"\0" * 7)
+    struct.pack_into(">HHIIIIIHHHHHH", buf, 0x10, 1, 20, 1, 0, 0, shoff, 0, 52, 0, 0, 40,
+                     len(sec_names), len(sec_names) - 1)
+    for n, o, size in placed:
+        if n:
+            buf[o:o + size] = data[n]
+    for i, (n, o, size) in enumerate(placed):
+        if not n:
+            continue
+        typ = SHT_SYMTAB if n == ".symtab" else SHT_STRTAB if n in (".strtab", ".shstrtab") \
+            else SHT_PROGBITS
+        struct.pack_into(">IIIIIIIIII", buf, shoff + i * 40, sh_name[n], typ, flags.get(n, 0), 0, o,
+                         size, index[".strtab"] if n == ".symtab" else 0, 0, 4,
+                         16 if typ == SHT_SYMTAB else 0)
+    return bytes(buf)
+
+
+PAD_UNIT = "Runtime.PPCEABI.H/TRK_interrupt_vectors"
+PAD_BYTES = bytes(range(16))
+FUNC = (STB_GLOBAL << 4) | STT_FUNC
+OBJ = (STB_GLOBAL << 4) | STT_OBJECT
+
+
+def _pad_objects(corrupt=False, candidate_size=16, candidate_offset=0):
+    """The `worker/trk-init-vectors-2226` shape: dtk names the range, the map names the same bytes.
+
+    The TRK interrupt vectors carry no function prologue, so `dtk dol split` names the range
+    `pad_00_80004380_init` (a FUNC of the claimed size) and leaves the map's label sizeless at the same
+    offset - giving the label an extent makes the split fail on the overlap, so the name cannot win.
+    `corrupt` flips one byte in the CANDIDATE's `.init` only (the target stays the truth), and
+    `candidate_size`/`candidate_offset` are what the lie variants move.
+    """
+    ours = bytearray(PAD_BYTES)
+    if corrupt:
+        ours[8] ^= 0xFF
+    target = build_object([(".init", PAD_BYTES, SHF_ALLOC | SHF_EXECINSTR)],
+                          [("pad_00_80004380_init", ".init", 16, 0, FUNC),
+                           ("gTRKInterruptVectorTable", ".init", 0, 0, OBJ)])
+    candidate = build_object([(".init", bytes(ours), SHF_ALLOC | SHF_EXECINSTR)],
+                             [("gTRKInterruptVectorTable", ".init", candidate_size,
+                               candidate_offset, OBJ),
+                              # a zero-size section symbol at the same offset: never the one chosen,
+                              # because it carries no bytes to compare
+                              (".init", ".init", 0, 0, (STB_GLOBAL << 4) | 3)])
+    return target, candidate
+
+
+def _write(tmp, name, obj):
+    path = os.path.join(tmp, name)
+    open(path, "wb").write(obj)
+    return path
+
+
+def pad_name_rows() -> int:
+    """A row dtk named itself is resolved by ADDRESS: byte-identical passes, a lie still refuses.
+
+    Both directions of the 2026-09-28 refusal: the TRK `.init` claim must land, and a corrupted byte
+    in that range must not.
+    """
+    failures = 0
+    report = {"fuzzy_match_percent": 100.0, "size": "16"}      # report.json's row for the pad symbol
+    fresh = {"size": "16"}                                     # what a fresh generate can pair: nothing
+
+    with tempfile.TemporaryDirectory() as tmp:
+        target, candidate = _pad_objects()
+        t = _write(tmp, "target.o", target)
+        c = _write(tmp, "candidate.o", candidate)
+        raw = vu.raw_symbol_rows(t, c)
+        pad = raw["pad_00_80004380_init"]
+        failures = _ok("a pad-named row is resolved by address", pad["resolved_by"], "address", failures)
+        failures = _ok("... to the symbol our object carries there", pad["candidate_name"],
+                       "gTRKInterruptVectorTable", failures)
+        failures = _ok("... and is present on both sides with equal sizes",
+                       (pad["in_candidate"], pad["target_size"], pad["candidate_size"]),
+                       (True, 16, 16), failures)
+        failures = _ok("... with identical bytes", pad["identical"], True, failures)
+        failures = _ok("a size-0 symbol at the address is not chosen", pad["candidate_name"] != ".init",
+                       True, failures)
+        # ... and with ONLY a size-0 symbol there, there is nothing to resolve to at all
+        t0 = _write(tmp, "t_zero.o", build_object([(".init", PAD_BYTES, SHF_ALLOC | SHF_EXECINSTR)],
+                                                  [("pad_00_80004380_init", ".init", 16, 0, FUNC)]))
+        c0 = _write(tmp, "c_zero.o", build_object([(".init", PAD_BYTES, SHF_ALLOC | SHF_EXECINSTR)],
+                                                  [("gTRKInterruptVectorTable", ".init", 0, 0, OBJ)]))
+        zeros = vu.raw_symbol_rows(t0, c0)["pad_00_80004380_init"]
+        failures = _ok("... and a range with no real symbol there does not resolve",
+                       (zeros["in_candidate"], zeros["resolved_by"]), (False, None), failures)
+        hard, soft = vu.symbol_problems({"pad_00_80004380_init": report},
+                                        {"pad_00_80004380_init": fresh}, raw)
+        failures = _ok("the pad-named row PASSES (dtk's name is not a refusal)", (hard, soft),
+                       ([], []), failures)
+
+        # direction (b): the claim is a lie - one corrupted byte in the same range
+        target_c, candidate_c = _pad_objects(corrupt=True)
+        raw_bad = vu.raw_symbol_rows(_write(tmp, "t_bad.o", target_c),
+                                     _write(tmp, "c_bad.o", candidate_c))
+        failures = _ok("a corrupted byte is not identical", raw_bad["pad_00_80004380_init"]["identical"],
+                       False, failures)
+        hard, _soft = vu.symbol_problems({"pad_00_80004380_init": report},
+                                         {"pad_00_80004380_init": fresh}, raw_bad)
+        failures = _ok("the corrupted range REFUSES", any("not identical" in p for p in hard), True,
+                       failures)
+        failures = _ok("... and the refusal names the symbol it compared",
+                       any("gTRKInterruptVectorTable" in p for p in hard), True, failures)
+
+        # a truncated / moved symbol at that address is not a resolution, it is a mismatch
+        target_s, candidate_s = _pad_objects(candidate_size=8, candidate_offset=8)
+        raw_short = vu.raw_symbol_rows(_write(tmp, "t_short.o", target_s),
+                                       _write(tmp, "c_short.o", candidate_s))
+        failures = _ok("a symbol that starts elsewhere does not resolve by address",
+                       raw_short["pad_00_80004380_init"]["in_candidate"], False, failures)
+        hard, _soft = vu.symbol_problems({"pad_00_80004380_init": report},
+                                         {"pad_00_80004380_init": fresh}, raw_short)
+        failures = _ok("an unwritten pad range still REFUSES", hard != [], True, failures)
+        target_t, candidate_t = _pad_objects(candidate_size=8)
+        raw_trunc = vu.raw_symbol_rows(_write(tmp, "t_tr.o", target_t),
+                                       _write(tmp, "c_tr.o", candidate_t))
+        hard, _soft = vu.symbol_problems({"pad_00_80004380_init": report},
+                                         {"pad_00_80004380_init": fresh}, raw_trunc)
+        failures = _ok("a truncated symbol at the address still REFUSES",
+                       any("sizes differ" in p for p in hard), True, failures)
+
+    failures += _pad_row_end_to_end()
+    return failures
+
+
+def _pad_row_end_to_end() -> int:
+    """The gate ROW itself (`verify_units`) on the pad shape. Skipped without `objdiff-cli`."""
+    objdiff = os.path.join(ROOT, "build", "tools", "objdiff-cli.exe")
+    if not os.path.exists(objdiff):
+        print("skip  pad-row re-measure (no objdiff-cli)")
+        return 0
+    failures = 0
+    for label, corrupt, want in (("intact", False, True), ("one corrupted byte", True, False)):
+        with tempfile.TemporaryDirectory() as tmp:
+            for rel in (vu.target_object_rel(PAD_UNIT), vu.src_object_rel(PAD_UNIT)):
+                os.makedirs(os.path.dirname(os.path.join(tmp, rel)), exist_ok=True)
+            target, candidate = _pad_objects(corrupt=corrupt)
+            _write(tmp, os.path.join("build", "RMHE08", "obj", "Runtime.PPCEABI.H",
+                                     "TRK_interrupt_vectors.o"), target)
+            _write(tmp, os.path.join("build", "RMHE08", "src", "Runtime.PPCEABI.H",
+                                     "TRK_interrupt_vectors.o"), candidate)
+            json.dump({"units": [{"name": vu.report_unit_name(PAD_UNIT),
+                                   "measures": {"total_code": "16", "fuzzy_match_percent": 100.0},
+                                   "functions": [{"name": "pad_00_80004380_init", "size": "16",
+                                                  "fuzzy_match_percent": 100.0}]}]},
+                      open(os.path.join(tmp, "build", "RMHE08", "report.json"), "w"))
+            ok, detail, _adv = vu.verify_units(tmp, [PAD_UNIT], objdiff=objdiff)
+            failures = _ok("verify_units %s pad-named row -> %s" % (label, "passes" if want
+                                                                   else "refuses"), ok, want,
+                           failures)
+            if not want:
+                failures = _ok("... and the refusal says which bytes",
+                               "pad_00_80004380_init" in detail and "not identical" in detail, True,
+                               failures)
+    return failures
+
+
+# --------------------------------------------------------------------------------------------------
 # layers that need the real build tree (skipped, not failed, without it)
 # --------------------------------------------------------------------------------------------------
 
@@ -331,6 +546,7 @@ def main() -> int:
     failures += arithmetic_rows()
     failures += symbol_rows()
     failures += size_gap_rows()
+    failures += pad_name_rows()
     failures += live_rows()
     failures += doctored_report_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")
