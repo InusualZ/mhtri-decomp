@@ -23,8 +23,7 @@ extern "C" {
  * and the request/response buffers the ioctls are handed.  Only the modelled prefix is addressed by
  * this band's bodies. size: 0x80 */
 typedef struct NWC24RequestWork {
-    /* +0x00 */ OSMutex mutex_0x00;  /* the schedmode setter takes this one */
-    /* +0x18 */ OSMutex mutex_0x18;  /* the scheduler pair takes this one */
+    /* +0x00 */ OSMutex mutex[2];    /* +0x00 the script-mode setter's, +0x18 the scheduler pair's */
     /* +0x30 */ u8 pad_0x30[0x10];
     /* +0x40 */ u32 inBuffer[8];     /* 32 B, memset by the initialiser, the command input */
     /* +0x60 */ u32 outBuffer[8];    /* 32 B, memset by the initialiser, the command result */

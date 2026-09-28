@@ -18,8 +18,12 @@
  *     (`DWCi_FreeList`, `DWCi_SetResult`, `DWCi_AdvanceStatus`) and by no other registered unit, so
  *     the definer test - a store, not a load (`DWCi_runtime` 57 loads, 2 stores; `DWCi_state` 28
  *     stores) - picks this unit.  0x807957F8 (not this unit's) is the first symbol past the run.
- *   .sdata 0x80794200..0x80794210 - the two all-zero name strings the session opener is handed plus
- *     their two 4-byte neighbours, all four read only here.
+ *   .sdata 0x80794200..0x80794210 - the word `fn_80508A70` loads and hands to its
+ *     `NANDPrivateOpenAsync`/`NANDPrivateDeleteAsync` calls as the session's path, then the two
+ *     all-zero name strings the opener is handed (0x80794204/0x80794208) and the 3-byte "//" at
+ *     0x8079420C.  The four object bytes at 0x80794200 read zero only because the word is a
+ *     *relocation*: the target object's single `.rela.sdata` entry is an `R_PPC_ADDR32` to
+ *     `lbl_80630020`, the "/shared2/DWC_AUTHDATA" path string.  All four words are read only here.
  * Both boundaries are symbol-aligned and 8-byte aligned, which `dtk dol split` requires of a claim
  * (an 8-misaligned boundary makes it die with `Invalid alignment for split`).  One run per section:
  * a second run whose gap no registered unit owns makes the split die with a link-order cycle
