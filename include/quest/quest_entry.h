@@ -84,7 +84,12 @@ struct Q_ItemWork {
     /* +0x6A41 */ u8 pad_0x6A41[0x6AB8 - 0x6A41];
 };  /* size: 0x6AB8 */
 
-/* The game's save/user block, seen only as the four count blocks this unit reads. */
+/* The game's save/user block, seen only as the four count blocks this unit reads.  It is the arena
+ * buffer `get_userdata` hands out (`*(void**)(&system_w + 0x95C)`, set by `ef/fn_800CDB2C.cpp`'s
+ * `fn_800CF3E4`), and 0x6000 is the whole extent `fn_80047398.cpp`'s `fn_800497B4`/`fn_800498EC`
+ * clear with `memset(get_userdata(), 0, 0x6000)`.  Nothing reads at or past it: of the 344 functions
+ * that reach the block the furthest is `menu/get_pop_dat_ptr.cpp`'s `fn_803C0F3C`, at `+0x5364` for
+ * sixteen 2-byte entries, so the run past the count sets stays unnamed filler. */
 struct Q_UserData {
     /* +0x0000 */ u8 pad_0x0000[0x490];
     /* +0x0490 */ Q_CountSet set_c;
@@ -94,7 +99,8 @@ struct Q_UserData {
     /* +0x39C0 */ Q_CountSet set_a;
     /* +0x3A10 */ u8 pad_0x3A10[0xB0];
     /* +0x3AC0 */ Q_CountSet set_b;
-};  /* size: 0x3B10 (approximate: the highest offset this unit reads + 0x50) */
+    /* +0x3B10 */ u8 pad_0x3B10[0x6000 - 0x3B10];
+};  /* size: 0x6000 */
 
 /* The per-slot "move work" `get_move_work_adrs` indexes; only the fields this unit names are here. */
 struct Q_MoveWork {
