@@ -548,6 +548,111 @@ def selftest() -> int:
                          {"splits": bl._splits_ranges(ldir)})[0], "open")
     check("a tree with no src/ contributes no lint items", bl.collect_lint_items(tmp), [])
 
+    # --- the fourth source: undefined references, one item per unit, ranked by reference count ------
+    # The rule is `undefrefs.unresolved_names` (reached through `undefrefs.census`); this source reads it,
+    # never re-implements it. The fixture is a real ELF32 object - `undefrefs_selftest.build_obj` is reused
+    # rather than copied - so "the rule stops firing" is proved by re-running the rule, not by a mock.
+    import undefrefs_selftest as urs   # noqa: E402
+
+    def undef_obj(name):
+        return urs.build_obj([(".text", b"\0" * 8)],
+                             [("body", 8, ".text", urs.FUNC, 0), (name, 0, None, urs.UNDEF)],
+                             relocs=[(".text", 4, name)])
+
+    def undef_tree(prefix):
+        d = tempfile.mkdtemp(prefix=prefix)
+        for sub in ("build/RMHE08/src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
+            os.makedirs(os.path.join(d, sub))
+        with open(os.path.join(d, "configure.py"), "w", encoding="utf-8") as fh:
+            fh.write("config.libs = [\n]\n")
+        return d
+
+    check("the undefrefs kind is declared once", bl.UNDEFREF_KIND, "undefrefs")
+    check("the undefrefs kind is in the carried kinds", "undefrefs" in bl.NEW_KINDS, True)
+    missing = "em_action_finish__FP11_ENEMY_WORK"
+    adir = undef_tree("backlog-undefref-")
+    aobx = os.path.join(adir, ".pi", "outbox")
+    anotes = os.path.join(adir, ".pi", "notes")
+    anone = os.path.join(adir, "none.md")
+    areg = os.path.join(adir, ".pi", "backlog.json")
+    urs.write(adir, "build/RMHE08/src/mod/x.o", undef_obj(missing))
+    uitems = bl.collect_undefref_items(adir)
+    check("undefrefs: one item per debt-carrying unit",
+          [(i.kind, i.target, i.status, i.default_status) for i in uitems],
+          [("undefrefs", "mod/x", "open", "open")])
+    check("undefrefs: the reference count is the item's weight", uitems[0].weight, 1)
+    check("undefrefs: the ask names the unit and the rule",
+          ("mod/x" in uitems[0].ask and "no link input can define" in uitems[0].ask), True)
+    ukeys = [i.key for i in uitems]
+    bl.write_register(adir, uitems, "", {"open": 1, "done": 0, "parked": 0, "total": 1},
+                      {"claims": [], "ratio": 1}, areg)
+    check("undefrefs: the item is carried forward while the debt remains",
+          [i.key for i in bl.collect_undefref_items(adir, areg)], ukeys)
+
+    # (b) parking buys no claim: only `done` earns a credit, for this source as for every other
+    parked_u = bl.build_items(aobx, anotes, anone, {uitems[0].key: "parked"},
+                              undefref_items=bl.collect_undefref_items(adir, areg))
+    check("undefrefs: a parked item earns no credit", bl.ledger_earned(parked_u), 0)
+    done_u = bl.build_items(aobx, anotes, anone, {uitems[0].key: "done"},
+                            undefref_items=bl.collect_undefref_items(adir, areg))
+    check("undefrefs: the same item resolved `done` earns one credit", bl.ledger_earned(done_u), 1)
+    check("undefrefs: parking leaves the balance exactly where it was",
+          bl.ledger_summary(parked_u, [])["balance"], 1)
+
+    # triage is evidence, never a guess: open while the rule still fires, naming the live reference
+    dec_open, ev_open = bl._check_undefrefs(adir, uitems[0], {})
+    check("undefrefs: triage keeps the item open while the rule still fires", dec_open, "open")
+    check_true("undefrefs: ... and names the live reference", missing in (ev_open or ""))
+
+    # (a) the rule stops firing: a map row now defines the name, so the item becomes done
+    with open(os.path.join(adir, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8") as fh:
+        fh.write("%s = .text:0x80004000;\n" % missing)
+    carried = bl.collect_undefref_items(adir, areg)
+    check("undefrefs: a fixed unit's item is carried forward, not dropped", [i.key for i in carried], ukeys)
+    check("undefrefs: ... and its live count is now zero", [i.weight for i in carried], [0])
+    dec_done, ev_done = bl._check_undefrefs(adir, uitems[0], {})
+    check("undefrefs: triage resolves it once the rule no longer fires", dec_done, "resolved")
+    check_true("undefrefs: ... and says it re-ran the rule",
+               "re-ran undefrefs.unresolved_names" in (ev_done or ""))
+    udecs, _ = bl.triage(adir, outbox=aobx, notes=anotes, tooling_register=anone, register=areg)
+    check("undefrefs: triage classifies the carried item resolved",
+          [d for it, d, _ in udecs if it.key == uitems[0].key], ["resolved"])
+    uout = bl.apply_triage(adir, udecs, register=areg, outbox=aobx, notes=anotes, tooling_register=anone)
+    check("undefrefs: triage --apply marks it done", uout["changed"]["done"], 1)
+    check("undefrefs: ... and the resolution earns one credit", uout["summary"]["earned"], 1)
+    check("undefrefs: the register now reports the new source's resolution",
+          (uout["counts"]["done"] >= 1), True)
+
+    # a unit whose object is gone has no evidence to re-run -> stays open, never guessed
+    check("undefrefs: a unit with no compiled object stays open (no evidence)",
+          bl._check_undefrefs(adir, bl.Item(kind="undefrefs", target="mod/gone", defect="unresolved",
+                                            status="open", default_status="open", ask="x"), {})[0],
+          "open")
+
+    # (c) the register totals change by exactly the number of items the source adds
+    cdir = undef_tree("backlog-undefref-count-")
+    cobx = os.path.join(cdir, ".pi", "outbox")
+    cnotes = os.path.join(cdir, ".pi", "notes")
+    cnone = os.path.join(cdir, "none.md")
+    creg = os.path.join(cdir, ".pi", "backlog.json")
+    c0 = bl.build(cdir, outbox=cobx, notes=cnotes, tooling_register=cnone, register=creg)[1]["counts"]
+    urs.write(cdir, "build/RMHE08/src/mod/a.o", undef_obj("missing_a"))
+    c1 = bl.build(cdir, outbox=cobx, notes=cnotes, tooling_register=cnone, register=creg)[1]["counts"]
+    urs.write(cdir, "build/RMHE08/src/mod/b.o", undef_obj("missing_b"))
+    c2 = bl.build(cdir, outbox=cobx, notes=cnotes, tooling_register=cnone, register=creg)[1]["counts"]
+    check("undefrefs: an empty compiled tree adds no item", (c0["open"], c0["total"]), (0, 0))
+    check("undefrefs: one debt-carrying unit adds exactly one item",
+          (c1["open"] - c0["open"], c1["total"] - c0["total"]), (1, 1))
+    check("undefrefs: a second adds exactly one more",
+          (c2["open"] - c1["open"], c2["total"] - c1["total"]), (1, 1))
+    check("undefrefs: a tree with no compiled objects contributes no items",
+          bl.collect_undefref_items(tmp), [])
+
+    # an undefrefs item gets a fixer lane, like the lint debt
+    check("an undefrefs item gets a fixer lane",
+          bl.lane_task(adir, bl.Item(kind="undefrefs", target="mod/x", defect="unresolved", status="open",
+                                     default_status="open", ask="x"))["agent"], "fixer")
+
     # --- --check semantics -------------------------------------------------------------------------
     import contextlib
     import io
