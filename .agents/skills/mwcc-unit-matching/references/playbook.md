@@ -37,7 +37,11 @@ becomes a section here in the same style.
 All of them are unit-agnostic: pass `-u <unit>` (or omit it when the repo has exactly one unit with
 source), where `<unit>` is any of `Lib/file`, `main/Lib/file`, `src/Lib/file.c` or the object path.
 `tools/unitutil.py` is the shared layer - unit resolution, the real ninja command line, flag overriding,
-the ELF reader - and `tools/unitutil.py` with no arguments lists the units it can work on.
+the ELF reader - and `tools/unitutil.py` with no arguments lists the units it can work on. **The last four rows
+are the analysis tier** and take a unit *name* - or, for `callers.py`, an address or a symbol: they answer the
+questions the flag and shape tools cannot, and each is introduced where a lane reaches for it (`flipcheck.py`
+before any flip, the compiler debugger when a residual is down to one instruction, `mwlink_debugger.py` when a
+flip moves the DOL hash, `callers.py` for who-calls / who-reads).
 
 | tool | what it gives you |
 | --- | --- |
@@ -51,6 +55,10 @@ the ELF reader - and `tools/unitutil.py` with no arguments lists the units it ca
 | `tools/elf/dwarfmap.py <obj> <func>` | local-variable -> stack-slot map from `-gdwarf-2` debug info |
 | `build/tools/objdiff-cli.exe diff -p . -u <unit> <symbol> ...` | the raw instrument; needs the `<symbol>` argument for symbol-level data |
 | `build/tmp/ref/mwcc_help.txt` | the compiler's own `-help` output (option semantics) |
+| `tools/units/flipcheck.py <unit>` | is this object **flip-ready**: per-section sizes and bytes against the target object, undefined/foreign symbols, the row-36 trim risk, and the `.comment` per-symbol active flags |
+| `tools/units/callers.py <address\|name>` | who **calls** this function / who **reads** this data, from a whole-DOL **address-keyed** index (`call`/`branch`/`addr`/`read`/`write` sites, `--pointers` for `.4byte` entries: a function-pointer table, a vtable, an `@eti_`) - the asm dump is stale, so names resolve per run |
+| `tools/mwcc-debugger/` (`locate/verify_pcode.py <dump> <object.o>`) | the **compiler's own IR**: the PCode stream after each optimizer pass and the register allocator's decisions, with the dump health-checked against *your* object first (`MATCH` final / `PASS-DELTA` + the attributed pass early) |
+| `tools/mwlink_debugger.py trace <unit>` | the **link's own view** of one unit: was it kept, where every section landed, how its symbols resolved, which relocations were applied - `verify` health-checks the map/ELF (`--identity`), `diagnose` prints the failing link's phase stream with catalogue ids, `align --unit` the rows a claimed start cannot honour |
 
 ## 1. Use a per-unit instrument, not the project-wide check
 
@@ -945,6 +953,29 @@ order, `.note.split`, local symbol names, and all 21 Wii/GC compilers.
 belongs in `flipcheck.py`: compare the `.comment` per-symbol `active_flags` (offset 0x2C + 8*index, byte 5) between
 `obj/<unit>.o` and `src/<unit>.o` - a mismatch means the link will trim.
 
+**Refined (2026-09-28) - the flag is settled, and `flipcheck.py`'s census is a SUPERSET.**
+`tools/mwlink_debugger.py` proved the mechanism with **four controlled relinks**, each replacing
+`build/RMHE08/obj/main.o` in the response file with a copy (all four redirect into `build/scratch/`, so
+`main.elf` is untouched):
+
+| copy of `main.o` | `.comment` magic | the 8 risk symbols' flag byte | `.text` | risk symbols still in the map |
+| --- | --- | --- | --- | --- |
+| `keep` (control) | valid | 0x08 on all 8 | `0x1278` | all 8 |
+| `single` | valid | 0x08 except `fn_8003F200` = 0x00 | `0x126c` | 7 (`fn_8003F200`, 0xc bytes, gone) |
+| `clear` | valid | 0x00 on all 8 | `0x1238` | 2 (`fn_8003FC64`, `fn_80040360`) |
+| `badmagic` | broken | 0x00 on all 8 | `0x1278` | all 8 |
+
+The `single` run drops **exactly one** symbol and its `.text` shrinks by exactly that symbol's size - so the
+flag is **per-symbol**, not per object; and `badmagic` clears the same bytes but breaks the `CodeWarrior`
+magic and drops **nothing**, so the decision is driven by the parsed `.comment`, not by the ELF symbol table.
+The flag is **byte 5 of each 8-byte entry** (`0x2c + 8*index + 5`) and the bit is **0x08** (force
+active/export, the same bit `docs/comment_section.md` documents). Two symbols (`fn_8003FC64`,
+`fn_80040360`) survive even with it clear, so the census `flipcheck.py` reports is a **superset**: it names 8
+candidates and the link really trims 6 - a `trim risk` row is a candidate to check, not a verdict. **Which
+phase** does the strip is still not derived and is a filed gap: no message is printed for that step, so no
+phase anchor can name it, and a read watchpoint on the flag byte lands on the `rep movsd` that copies
+`.comment` into a heap buffer whose address moves between runs.
+
 ## 35. A dead copy chain steers the allocator's web priority
 
 **Problem.** The residual is two live ranges sharing one register pair - retail colours them one way, we colour them
@@ -1215,6 +1246,27 @@ whose size differs, then work out which `.ctors$NN` input fragment the linker di
 this tree: the linked ELF's `.ctors` is 0x16C at 0x8056F2C0, `.dtors` is 0xC; six `.ctors` words are claimed
 by registered units (`ef/ef_emform` 0x8056F2E8-0x8056F2EC, `sound/fn_800E46E8` 0x8056F2F4-0x8056F300,
 `ef/fn_80114E34` 0x8056F310-0x8056F314, `Runtime.PPCEABI.H/__init_cpp_exceptions` 0x8056F2C0-0x8056F2C4).
+
+**Refined (2026-09-28) - the slot follows the entry SYMBOL, not the section name.** `tools/mwlink_debugger.py`
+can now trace one object through a real link (`trace`, with the build's own link line via `trace --link`,
+verified byte-identical to `main.elf`) and derive the linker's phase table from its PE resource catalogue
+(`phases`; the anchor is the `call [LoadStringA]` whose `uID` argument is not a constant, RVA 0x3d0b0, 1248 of
+them). Three same-length string-surgery experiments on the real link settled this row:
+
+* renaming a **plain** `.ctors` to `.ctors$10` **moves the word** into the `$10` slot - for an *anonymous*
+  fragment the section name really does pick the class;
+* renaming an MWCC-emitted `.ctors$10` to `.ctors`, `.ctors$55`, `.ctors$01`, `.ctors$99`, or even `.dtors$10`
+  leaves the output `.ctors` **byte-identical** - the word stays in the `$10` slot and only the map's credit
+  line changes;
+* renaming the **symbols** (`__init_cpp_exceptions_reference`, `__fini_cpp_exceptions_reference`,
+  `__destroy_global_chain_reference`) makes the link **fail**, with catalogue id 205: *"runtime sources
+  'global_destructor_chain.c' and '__init_cpp_exceptions.cpp' both need to be updated to latest version."*
+
+So the fixed class *order* is real (`.ctors$00`, `.ctors$10`, `.ctors`, `.ctors$99`, the `$00`/`$99` ends being
+the linker's own sentinels) but an MWCC entry's **slot is chosen from its symbol, not its section**. Ruled
+out by evidence: the `.comment` `CodeWarrior` block (zeroing its size changes nothing), the reloc section's
+name, and link order for the `$NN` classes. **A section-name comparison cannot see any of it** - which is the
+trap for a flip-check tool that compares sections; `trace` prints the section *and* the symbol per fragment.
 ## 47. Automate the shape search: generate, compile, score and rank source variants
 
 **Problem.** Every near-match residual in this project has been *codegen* - an allocator web order, a
@@ -1431,6 +1483,21 @@ struct Effect { /* size: 0x10 */ /* +0x00 */ u32 flags; };
 obj->move(0);                        // not move__6MHcharFUs(obj, 0)
 nw4r::db::Panic(file, line, fmt);    // not Panic__Q24nw4r2dbFPCciPCce(file, line, fmt)
 ```
+
+**Refined (2026-09-28) - rule 2 is not `extern`-only, so the numbers above read the rule too narrowly.**
+`stylelint.py`'s scan was extended: rule 2 now judges every **declaration** - the `extern` keyword *or* a
+plain function prototype (`void foo(void);`) - and it judges it in **two file classes**, a `src/` file and an
+ordinary `include/<module>/*.h` header. `_owns` was extended to accept an owner's own public header
+(`include/<module>/<stem>.h`) first, without which every owner's header would have reported itself; and under
+`include/unsplit/*.h` the reading **inverts** - a declaration there of a symbol a registered unit owns is the
+finding, because the band is a fallback, not the owner. Measured whole-tree on this branch: **7 482** rule-2
+findings over **5 949** distinct symbols, **4 287** of them unsplit-address sites across 7 band names (`ef`
+1 658, `<band unresolved>` 2 550, `Network` 59, `OS` 11, `Runtime.PPCEABI.H` 6, `menu` 2, `enemy` 1), plus
+**647** names the map does not contain - those stay **gaps**, because the map cannot judge them. That is ~60x
+the `extern`-only count above, and it is the same semantics the `extern` shape already had: the plain
+prototype is simply how the foreign declarations were actually written (e.g. `include/Network/fn_8041A87C.h`'s
+`u16 DWCi_htons(u16 port);`, owned by `src/DWCi/fn_805113B0.c`). The breadth is deliberate; what is no longer
+true is the earlier implication that a `src/`-file `extern` is the only shape rule 2 sees.
 ## 48. Never append `, ...` to a definition to dodge an argument-count mismatch
 
 **Problem.** A retired object calls a function through a declaration with more arguments than the source
@@ -1651,6 +1718,29 @@ at 0x805C34D4). Setting that one field to 4 in a scratch copy relinked `main.dol
 in place the flip links green, and `Pl/fn_80230FBC` with it. `Pl/fn_802373AC`, `Pl/fn_802430E8` and
 `enemy/fn_80165FC8` have the same odd start but real `.text` residuals, so their alignment is already right and
 their code is not - one measurement tells the two apart, and `flipcheck.py` still refuses them for the code.
+
+**Refined (2026-09-28) - the alignment question is NOT a refusal, and `objalign.py` is about matching the
+layout.** `tools/mwlink_debugger.py` reads the linker's own round-up site (RVA 0x57451 loads the input
+section's `sh_addralign`, 0x57466/0x5747d do `(addr + align - 1) & ~(align - 1)`, and 0x57492 pushes the
+`*fill*` literal) and the differential is conclusive: take `build/RMHE08/src/Pl/fn_8023C2D0.o` (whose `.data`
+claims `0x805C34D4`, 4 mod 8), copy it, set the allocatable sections' `sh_addralign` to 8 in one copy and
+relink both:
+
+| copy | `.data` row | residue |
+| --- | --- | --- |
+| `align 4` (what `objalign.py` leaves) | off `+0x46cb4`, addr `0x805c34d4` | none |
+| `align 8` (what MWCC emits) | off `+0x46cb8`, addr `0x805c34d8` | a 4-byte `*fill*` at `0x805c34b8`...`0x805c34d8` |
+| `extab` row | `0x80011cb4` -> `0x80011cb8` | moved 4 with it |
+
+**No diagnostic, no error, exit 0 both times** - which is exactly why it reads as a link-order mystery. So
+mwld never refuses: it silently aligns a fragment's address up to **the input section's own**
+`sh_addralign` and prints a `*fill*` row for the residue. The check over the whole link (the 2296 input
+objects, every allocatable section whose name is unique in its object and whose start `splits.txt` claims)
+compares **798 sections and finds 0 that cannot be honoured** - the one ambiguity is
+`build/RMHE08/obj/fn_80429B94.o`, which carries 7 sections called `.data`, and `align` says so rather than
+comparing them all against one address. So the row is not "the claim cannot be linked": every claim is
+honourable once the object's `sh_addralign` agrees with the address `lowbit(claimed start)` allows, and
+`align --unit <unit>` reports the condition from the linker's side.
 
 ## 56. Two lanes' views of one work record are merged by tiling, not by choosing a side
 
@@ -1931,3 +2021,202 @@ candidate even where the sections already match.
 
 **Example.** `Network/NetworkWiiMediator.cpp`: `initializeNetworkMediator` 1.887 -> 100.00, `reflectInit` 88.345 ->
 100.00, unit 95.09 -> 98.89 % in one commit.
+
+
+**Complement (2026-09-27): the same mistake, with the opposite tell.** `Network/constructNetworkWiiMediator`
+was the mirror image of this row and it hid better. Its landed body spelled the allocation as
+`operator new(0x1408)` plus a null check - and *that* spelling lowers to the **same 16 instructions**, so
+`.text` measured **100.00 %** and every objdiff row was green. What differed was the object, not the code:
+the target's `extab` record is 24 bytes and ours was an 8-byte header, because the cleanup MWCC attaches to
+the ctor-call region of a real `new` expression has nothing to attach to in the manual form. `flipcheck.py`
+caught it in one command (*"splits.txt claims extab (0x18) but the object emits no such section"*), and a
+blind flip would have dropped 36 bytes and shifted everything after it. So the row cuts both ways: the
+manual form is either a register off in `.text` (above) or a missing unwind record with `.text` perfect -
+and only the second case survives a `.text`-only measurement. Two other facts from that measurement: the
+lane compiled **three** spellings that were byte-identical in `.text`, `extab` *and* `extabindex`, so the
+deciding evidence was the call site's **relocation** (the real callee, not a synthesized `__ct__…`); and
+the `Network` library sets `-Cpp_exceptions off`, so a file-scoped `#pragma exceptions on` is *required* -
+without it MWCC emits no `extab` section at all. The flip landed (`e2f4ab40c`), the 33rd.
+## 63. A local's DECLARATION ORDER colours registers - locals are coloured before parameters
+
+**Problem.** `NHTTP/NHTTP_bgnend`'s `NHTTPi_Startup` measured **0 %** with an instruction stream that was
+otherwise byte-equivalent: the message-group address was materialised late (`lis r31`) where retail
+materialises it first (`lis r30`, with the parameter getting `r31`), and that single swap shifts every use
+after it. The residual reads as allocator luck, and no shape *inside* a statement moves it.
+
+**Why try it.** MWCC's allocator colours the **local** webs before the **parameter** webs, so the order the
+locals are declared in is the order their webs enter the colouring - a local that must live in `r31` has to
+be written **before** its siblings. A parameter can never be moved to the front (proved: copying the
+parameter to a local first did not do it), because its web is coloured after every local's however it is
+written. This is row 18 with a mechanism: there "declaration order" meant the operands of one expression;
+here it means the order of the declarations above the body.
+
+**Result.** Two independent filers, which is the register's own promotion rule:
+
+* `NHTTPi_Startup` **0 -> 57.16 -> 93.85 %** with `const char* messages = NHTTPi_startupMessages;` declared
+  **first** (unit 75.19 -> 89.36); `NWC24SuspendScheduler` / `NWC24ResumeScheduler` to **98.85 / 95.67 %**
+  with `NWC24RequestWork* work = &sNwc24Work;` first;
+* `Network/fn_8041A87C`'s `ConnectToAnybody` **99.40 -> 100** on `s32 phase; s32 state;` (retail `r31`/`r30`)
+  after two other shapes measured byte-identical.
+
+**Example.** The whole change is where the first line sits:
+
+```c
+s32 NHTTPi_Startup(u32 group)                 /* retail: `lis r30` for the table, parameter in r31 */
+{
+    const char* messages = NHTTPi_startupMessages;   /* FIRST - its web is coloured before the parameter's */
+    u32 i;
+    ...
+}
+```
+
+## 64. An unknown-size `extern` array is addressed absolutely - give it its size for the SDA form
+
+**Problem.** A band declares `extern const char lbl_80793998[];` and the caller materialises the address with
+`lis r5, sym@ha` + `addi r5, r5, sym@l`, where the target has a single `li r5, sym@sda21`. The extra
+instruction shifts every later register and offset, so the function reads as a scheduling or source-order
+residual.
+
+**Why try it.** MWCC cannot place an array of **unknown size** in the small-data area - its extent is not
+known at compile time - so it falls back to the absolute `ha`/`lo` pair; a **scalar** `extern` is `sda21`
+either way, so the unknown *size* is what forces the pair. The target object's relocations say which shape
+each of the band's externs wants: `R_PPC_EMB_SDA21` is the SDA form, `ADDR16_HA`/`ADDR16_LO` the absolute one
+(`powerpc-eabi-readelf -r build/RMHE08/obj/<unit>.o`). One header legitimately holds both.
+
+**Result.** `fn_8041B538` **98.61 -> 99.92**, `ConnectToAnybody` **96.90 -> 100**. Probed with the unit's own
+command line over `[]`, `[4]`, `[3]`, `char` vs `const char` and `u8`: only a known-size spelling gives the
+SDA form. `lbl_80794380` is `ADDR16_HA`/`LO` in the *same* object as the SDA pair, so the fix is per-symbol,
+not per-header.
+
+**Example.**
+
+```c
+extern const char lbl_80793998[];      /* lis + addi  - absolute */
+extern const char lbl_80793998[4];     /* li sym@sda21 - retail   */
+```
+
+## 65. A 32-bit member at an ODD offset needs `#pragma pack(1)`, and the whole unit must be re-measured
+
+**Problem.** `Network/fn_8041A87C`'s `profile_4485` is five `u32` starting at an **odd** offset
+(`stw r0, 0x4485(r31)`, then `0x4489`, ...). Declared without a pragma the member silently aligns to `0x4488`
+and every later field moves; declaring the region as bytes instead makes the same source emit `stb` where
+retail has `stw`.
+
+**Why try it.** An odd 32-bit offset is direct evidence the original was compiled with `#pragma pack(1)`, and
+the pack is the conformant spelling (rule 6 forbids reaching the field through pointer arithmetic). It is a
+*layout* lever, so it moves the whole record at once - measure the unit, not the function.
+
+**Result.** `startNegotiation` **93.39 -> 98.23**, and re-measuring the unit showed the pack score-neutral
+everywhere else. The follow-on is the trap: a `field + 4` that used to be a byte offset becomes **+16 bytes**,
+so `checkPeerProfile` needed `(const u8*)profile_4485 + 4`. Pack first, then re-measure **every** function of
+the unit - a field that moved is a regression the one moved function cannot show.
+
+**Example.**
+
+```c
+#pragma pack(1)                     /* the target's layout: u32 at 0x4485, not 0x4488 */
+struct NetworkProfile {
+    /* +0x4485 */ u32 flags;        /* stw r0, 0x4485(r31) */
+    /* +0x4489 */ u32 state;
+};
+```
+
+## 66. A narrow RETURN TYPE is visible at the caller
+
+**Problem.** The caller is one instruction off at the `bl`: the target stores the result with a raw `sth`,
+ours masks it first - a `clrlwi`/`extsh` retail does not have - and every later instruction shifts with it.
+It reads as caller-side scheduling, where a mask cannot come from.
+
+**Why try it.** MWCC converts a value to the **callee's declared** width, so a mask at the call site is
+evidence about the *callee's signature*, not about the caller's source. This is row 57 in the return
+position: there the callee's parameter was declared wider than the value; here its return type is declared
+narrower than the value the caller wants.
+
+**Result.** `NetworkLogger::flag_48` is `u16`, not `s32`: with the `u16` return the target's raw `sth` comes
+back (`receive` **92.30 -> 94.99**, `send` +0.03). Same class in the other direction: `registerReceiver` is
+declared `s32` while its call sites cast to `u8` - retail's early returns are `li r3, -1` (a wide -1, not
+`li r3, 0xff`) and the tail masks the `u8` it returns.
+
+**Example.**
+
+```c
+u16 flag_48(void);                  /* the caller stores it raw:  sth r3, ... */
+s32 flag_48(void);                  /* ... and this spelling masks at the store */
+```
+
+## 67. A band's `.data` LOG STRINGS name their own emitters
+
+**Problem.** A band arrives as a hundred `fn_XXXXXXXX` and the naming evidence is the runtime dump
+(playbook 25), a `__FILE__` string (54) or the neighbours' scheme - all of which can be absent at
+registration. The band's own `.data` log strings were being read past, even though they are loaded by the
+code under reconstruction.
+
+**Why try it.** A log string is materialised (`lis`/`addi` of its address, or `@sda21`) by the function that
+logs it, and each string is loaded by **exactly one** function in the range - so the emitter's name is
+*evidenced* by the string's own text, not guessed. It is a naming-evidence class for rule 7, and it needs no
+runtime dump: `tools/units/callers.py <address>` answers "who loads this label" from the whole-DOL
+address-keyed index in one query.
+
+**Result.** Five strings named five functions of `Network/fn_803D3CE8`:
+`NetworkSessionStable::downPerformance` (0x805FA550/0x805FA590), `::upPerformance` (0x805FA5D4/0x805FA610),
+`NetworkSessionStable::move` (0x805FA64C), `NetworkSessionManager::move` (0x805FA788, the old `slot_18`) and
+`NetworkSessionManagerPat::final` (0x805FAB08). The band was renamed off those names and 22 bodies written
+against real signatures.
+
+**Example.** The query is the whole search:
+
+```sh
+python tools/units/callers.py 0x805FAB08     # -> the one function that loads "NetworkSessionManagerPat::final"
+```
+
+## 68. A derived class's VTABLE is emitted where its KEY FUNCTION is defined
+
+**Problem.** The unit reconstructs a derived class that must store the base's vtable pointer
+(`__vt__24NetworkSessionManagerPat`) without emitting a table of its own - the target's `.data` is the base
+table alone, 0x1C8 bytes. Declaring the class normally makes MWCC emit the derived vtable into our object
+and the unit's `.data` grows (rule 10's own "extra bytes" trap, from the other side).
+
+**Why try it.** MWCC follows the C++ key-function rule: the vtable is emitted in the translation unit that
+**defines the class's first declared non-inline virtual member**. Declare that member - the key function -
+**first**, and give it its body somewhere else (the next band), and MWCC emits the constructor's vtable
+**store** but no table into this object. That is the way to reconstruct a class that stores a vtable without
+owning it, and it is decidably different from the ordinary case: a class whose first declared virtual is the
+destructor (as with the base here) *does* emit.
+
+**Result.** `NetworkSessionManagerPat` declares `virtual void move();` FIRST - its body is in the next band
+(0x803D70B8) - and only then the ctor/dtor/init/clear/release. MWCC emits the
+`__vt__24NetworkSessionManagerPat` store into the constructor and **no** Pat vtable, which is exactly what
+the target shows: `.data` is the base table alone at 0x1C8 bytes.
+
+**Example.**
+
+```cpp
+class NetworkSessionManagerPat : public NetworkSessionManager {
+public:
+    virtual void move();            /* key function FIRST, body in the next band: store yes, table no */
+    NetworkSessionManagerPat(...);
+    virtual ~NetworkSessionManagerPat();
+};
+```
+
+## 69. A POLYMORPHIC MEMBER CLASS makes MWCC initialise the vptr of every array element
+
+**Problem.** Declaring the four `Pat` record types as **classes** with a `NetworkSmallObject` member blew
+`NetworkSessionManagerPat`'s constructor from **252 to 544 bytes**: the arrays are built with
+`__construct_array`, and MWCC emits a vptr store loop for every element.
+
+**Why try it.** The target's constructor only has vptr stores where the array element is actually dispatched
+through; a member that is itself polymorphic turns every element into a polymorphic object, and the
+constructor grows with the element count. The discriminator is the target's vptr-store count inside the
+array-building loop, not the class *names*.
+
+**Result.** The records are **structs whose member is a struct with a vtable member** - the table belongs to
+another owner and is only *read* through it (rule 10 Case 2) - and only the object at `+0x3CC` is dispatched
+through. The constructor came back to 252 bytes and the unit's 22 bodies matched against real signatures.
+
+**Example.** The shape that 252-byte constructor wants:
+
+```cpp
+struct NetworkSmallObject { void** __vt; /* +0x00 */ };   /* another owner's table, only read */
+struct PatRecord { NetworkSmallObject object; /* +0x00 */ u32 state; /* +0x04 */ };
+```

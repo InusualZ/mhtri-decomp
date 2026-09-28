@@ -177,6 +177,15 @@ lanes reported "no new violation" on 2026-09-25 while the gate found real findin
 The DOL must hash to `BF4850739478CAAEDFE675949EB7C28595A7FDE9`. If a full build is impossible in your
 worktree, say so explicitly in your report - do not imply you verified it.
 
+**When the hash moves, capture the linker's own words before you guess** - this is the git-level twin of "run
+`verify_pcode` before believing a compiler dump". A broken flip is the *linker* speaking, and it is evidence
+only if you keep it verbatim: run `ninja diff`, and take the `undefined: '<symbol>'` line, the shifted symbol
+with both of its addresses, and the section/size delta out of it unchanged. Then hand that output to
+`tools/mwlink_debugger.py` - `trace <unit>` for where the object and its relocations went, `diagnose` for the
+phase and catalogue id that spoke, `align --unit <unit>` for a claimed start the linker rounded up - instead of
+re-guessing the source. A link verdict with no capture behind it is a guess, not a measurement; the [linker
+section](#the-linkers-own-run-toolsmwlink_debuggerpy) below has the health check that makes the trace evidence.
+
 ## Style rules (section 6.5 - the canonical table is `docs/plan.md`; `stylelint.py` reports each rule as `file:line` and **`land.py verify` refuses a batch that adds a violation**)
 
 The rules apply to new work immediately; existing units are brought into conformance as they are touched. The
@@ -188,7 +197,7 @@ authority. `--check` exits non-zero when a profile is stale.
 The canonical table for rules 1-11 is `docs/plan.md` section 6.5; this block is generated from it - do not edit it by hand, run `tools/agents/sync_profiles.py`.
 
 1. **A shared type lives in one header** - a type more than one unit uses is defined **once** (under `include/`, or beside its owner and included) and *included* where needed — never copied. The existing convention applies: a declaration moves to `include/` the *second* time a unit needs it, never the first
-2. **An extern lives with the TU that owns the symbol** - a function or variable declared `extern` belongs in the source or header of the translation unit that **defines** it, and consumers include that. Re-declaring someone else's symbol in your own file "to save an include" is forbidden. A symbol **no registered unit owns** (the map resolves it to an unsplit address) belongs in a band header under `include/unsplit/`, never a local `extern`
+2. **An extern lives with the TU that owns the symbol** - a **declaration** of a function or variable belongs in the source or header of the translation unit that **defines** it, and consumers include that. Re-declaring someone else's symbol in your own file "to save an include" is forbidden, and the finding is not the `extern` keyword: a plain prototype (`void foo(void);`) is the same defect, which is how the foreign declarations were actually written. The rule is read in two file classes - a `src/` file and an ordinary `include/<module>/*.h` header (an owner's own `include/<module>/<stem>.h` is clean, which `_owns` must recognise or every owner's header reports itself) - and in `include/unsplit/*.h` the reading inverts: a declaration there of a symbol a registered unit **owns** is the finding, because the band is a fallback, not the owner. A symbol **no registered unit owns** (the map resolves it to an unsplit address) belongs in a band header under `include/unsplit/`, never a local `extern`
 3. **A reconstructed class/struct states its size** - every reconstructed type carries `/* size: 0xNN */`, traced from the evidence (allocations, `memset`/`memcpy` lengths, the object's `.data`/`.rel` records, the runtime dump). An approximation is allowed **only** if it is marked as one
 4. **Every field carries its offset** - `/* +0x1C */` on the field, in ascending order, so the layout is readable at a glance and a reviewer can check it against the disassembly
 5. **Every field has a name from its context** - what is stored, compared against, passed on. The **only** exception is a padding or unused field — present in the original object but untouched by the functions we match — which gets `pad_0xNN` / `unused_0xNN` **and keeps its offset**
@@ -352,6 +361,79 @@ real command line: the PCode stream after each pass, and the register allocator'
     nothing, a dump that contradicts the object it claims to describe - that is the most valuable report in
     this whole channel: it means the verifier must be fixed before anyone trusts it again. Report it even if
     you have no unit to show for it.
+
+## The linker's own run: `tools/mwlink_debugger.py`
+
+When the residual is no longer in the source's reach - a flip that moves the DOL hash, a link that refuses,
+"where did this object's section land" - the question has left the compiler, and the thing to ask is the
+**linker**. `tools/mwlink_debugger.py` is the linker-side sibling of `tools/mwcc-debugger/`: it drives **the
+build's own `mwldeppc.exe`** and, because the linker ships no CodeView blob to name its functions (all 31
+under `build/compilers/{Wii,GC}/*` have an empty PE debug directory - `info` proves it), it *derives* every
+table from the binary itself: the RT_STRING message catalogue behind `LoadStringA`, the 1248 phase anchors,
+the input-file record's stride and fields, the `*fill*` alignment site, and the `.ctors`/`.dtors` priority list.
+
+* **Reach for it when**: a flip's **DOL hash moves** (`ninja build/RMHE08/ok` fails, or `ninja diff` names a
+  shifted symbol) - `trace` says whether the unit was kept, where each of its sections landed, how its symbols
+  resolved and which relocations were applied; an **`undefined:` at link time** - `diagnose` runs the build's
+  own link with `-v` and prints the phase stream and every diagnostic with its catalogue id and phase; a
+  **`.ctors`/`.dtors` ordering question** (row 46) - `order` prints the linker's fixed priority list and
+  `trace` the slot the unit's fragments actually took; an **alignment question** (row 55) - `align --unit
+  <unit>` reports whether the start `splits.txt` claims can be honoured; a **trailing function the link drops**
+  (row 36) - `trace` shows what the map kept; or any **"where did this object's section land"**.
+* **The exact invocation that works in this repository** - a **unit name**, not a path, from the repository
+  root in git-bash:
+
+  ```bash
+  python tools/mwlink_debugger.py trace Network/NetworkWiiMediator
+  ```
+
+  All four shapes work (`Network/NetworkWiiMediator`, `NetworkWiiMediator`, an object path, a path); the first
+  two resolve through the link's own input list, and `# resolved as:` always says which happened - a **flipped**
+  unit resolves to `build/RMHE08/src/<unit>.o`, an unflipped one to `build/RMHE08/obj/<unit>.o`, so picking by
+  name alone traces the wrong object. The build writes no map of its own, so it links one into `--out` (default
+  `build/scratch/mwlink-debug/`) first, rewriting `-o` and `-map` even when you pass your own `--args`. **The
+  link step's `mw_version` is Wii/1.0, not Wii/1.3**: `build.ninja`'s global `mw_version = Wii\1.0` is what the
+  `link` rule expands, while the per-object `mwcc` rules override it with Wii/1.3 **for the compiler only**. A
+  lane that assumes the linker is 1.3 has assumed the wrong binary. `build/RMHE08/main.elf` is **never written**.
+* **Health-check the trace before you believe it** - exactly as `verify_pcode` is the health check for a
+  compiler dump. A trace is validated against `main.MAP`/`main.elf`, or it is **not evidence**:
+
+  ```bash
+  python tools/mwlink_debugger.py verify \
+      build/scratch/mwlink-debug/trace.MAP build/scratch/mwlink-debug/trace.elf \
+      --identity build/RMHE08/main.elf
+  # MATCH: 13 section(s) - the map is this ELF
+  # identity: build/RMHE08/main.elf byte-identical
+  ```
+
+  `trace` reads each section's bytes back out of the output ELF and compares them; a relocation type whose
+  semantics are not derived prints `not checked`, never a guess. Exit status is the verdict - 0 for a report
+  that found nothing wrong, 1 for a `FAIL`/failed link/`UNPROVEN` run, 2 for a usage or capability error (no
+  capstone, no gdb, unknown unit) - and it is never a traceback.
+* **What it does not do yet** - reported, not faked; do not spend a budget here: the linker's own section-table
+  and symbol-table records (so it can read the map, not say why it says that); **which phase dead-strips an
+  unreferenced symbol** (row 36's flag is settled - byte 5 of the 8-byte `.comment` entry, bit `0x08`, per
+  symbol - but no message is printed for that step, so no phase anchor can name it); relocation types other
+  than 1/6/10/109; `phases --prove` beyond the 6 of 1248 anchors that fire on a healthy link; and non-Wii
+  linker builds (derivations only - `GC/2.7`'s record stride is even `0x38`). `--prove` needs a native Windows
+  gdb and a hand-assembled `--args` link line, and without capstone `anchors`/`phases`/`records`/`align` cannot
+  run - `trace`, `verify`, `order`, `messages` and `info` can. No gdb is not a blocker: `python
+  tools/mwcc-debugger/fetch_gdb.py --dest C:/Users/InusualZ/tools/mwcc-dbg` installs one in ~2 min.
+* **The feedback loop is part of the job and it is mechanical.** A linker gap you hit is a register row, not a
+  paragraph:
+  * read `.pi/notes/mwlink-debugger-gaps.md` first - if your gap is already there, say so in your report (a
+    repeat is the **vote**, not a new row: a novel row needs **two** distinct filers to rank, which is how one
+    annoyance stays noise and a real wall gets built);
+  * if it is new, **add a bullet to that note** (a capability, with what you tried and what it cost) - the note
+    is one of `tools/units/tooling.py`'s own sources, so no second register and no separate list;
+  * and put one line in your report's tooling section either way.
+  * **A trace that was *not* describing the artifact you asked about is the most valuable report in this whole
+    channel** - a `MATCH` on the wrong object, a section credited to the wrong input, a phase named that did
+    not speak. Report it even if you have no unit to show for it: the verifier must be fixed before anyone
+    trusts it again.
+
+The exact invocation, the support matrix, the derivation evidence and the tool's own "what works / what does
+not work yet" table are in `tools/mwlink-debugger/README.md` and `tools/mwlink-debugger/locate/README.md`.
 
 ## Converge
 
