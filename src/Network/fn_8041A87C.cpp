@@ -81,7 +81,7 @@
  * constant first and copies in the other arm).  `ConnectToAnybody(s32 arg)` takes the thread argument
  * even though its body ignores it - retail's caller sets r4 - so the map row is `...Fl`.
  *
- * RESIDUALS.  Unit 98.47 % fuzzy, 51/71 functions byte-identical, `.text` 13968 B against 13972 B,
+ * RESIDUALS.  Unit 98.48 % fuzzy, 53/71 functions byte-identical, `.text` 13968 B against 13972 B,
  * mean 99.09 %, every function >= 80 %.  isQueued 83.89: retail keeps the *unfused* `extsb`+`cmpwi`
  * and branches to the clamp; with the peephole on ours fuses to `extsb.` and inverts, with it off it
  * is unfused but still inverts and puts the slot in r4 - both measure below the fused shape, so it
@@ -96,12 +96,18 @@
  * polarity - retail `bne return`, ours `beq body` + `b return`), tGameSpyInterface 98.48,
  * checkPeerProfile 98.38, fn_8041B334 98.52, applyEvent 94.42 (the record pairs land as two 24-byte
  * arrays where retail packs five 12-byte objects, and the `ticks * 17` 64-bit multiply materialises
- * a fresh `li r0, 0x0` where retail reuses its zero) and the two `fn_8041B5xx` callbacks 99.92/99.89
- * are register colourings of statements that measure byte-identical on their own.  Every postError
- * site keeps the vtable pointer in a scratch register (r5) where retail's virtual expansion uses
- * r12 - the front-end's shape for a table view, not the declaration (the sibling
- * `Network/network_state.cpp` records the same); declaring 162 virtuals to get the real expansion is
- * not worth it.  `runThread` and the thread body it calls are emitted in the reverse of the target's
+ * a fresh `li r0, 0x0` where retail reuses its zero) and the two `fn_8041B5xx` callbacks are
+ * register colourings of statements that measure byte-identical on their own.
+ *
+ * POSTERROR.  The four `postError` sites dispatch through `NetworkInstanceDispatch`
+ * (`include/unsplit/Network.h`), the singleton read as the polymorphic class it is: declaring its
+ * 161 slots makes the call retail's `lwz r12, 0x0(r3)` / `lwz r12, 0x288(r12)`, where the data-slot
+ * view this file used to carry loaded the table into a scratch register (`lwz r5, 0x0(r3)`).  With
+ * it `fn_8041B538` and `fn_8041B720` are 100 % (was 99.92/99.89) and `applyEvent` gains 0.1; the
+ * sibling `Network/network_state.cpp` keeps its own view because its record is passed **by value**
+ * there, which is a different call shape (measured: the pointer form costs that row 2.4 points).
+ *
+ * `runThread` and the thread body it calls are emitted in the reverse of the target's
  * address order (the map has `runThread` at 0x8041D31C and the body at 0x8041D344): a source-order
  * defect that costs no row.  Data: `extabindex` 540/540 exact, `.rela.text` 5616/5616, `extab` 360
  * against 380 and `.relaextab` 12 B short - the target's last extab entry is the 20-byte cleanup
@@ -131,16 +137,6 @@
 #define SIGNAL_LOG(...) do { NetworkLogger* lm = fn_803C9974(); lm->signal_0C(__VA_ARGS__); } while (0)
 #define WARN_LOG(...)   do { NetworkLogger* lm = fn_803C9974(); lm->warn_10(__VA_ARGS__); } while (0)
 #define INFO_LOG(...)   do { NetworkLogger* lm = fn_803C9974(); lm->log_14(__VA_ARGS__); } while (0)
-
-/* The singleton's error dispatch read as a *data* slot.  `include/unsplit/Network.h` models the same
- * table with a member function, whose codegen puts the vtable pointer in r3 and shifts the instance
- * into r4 and the record into r5; retail passes the instance in r3 and the record in r4 with both
- * loads through r12 (`lwz r12, 0x0(r3)` / `lwz r12, 0x288(r12)`), which is what loading a data slot
- * into the indirect-call register produces.  The header fix is in this lane's outbox. */
-typedef struct NetworkInstanceVtableData {
-    /* +0x000 */ u8 pad_00[0x288];
-    /* +0x288 */ void (*postError)(NetworkInstance* self, NetworkErrorInfo* info);
-} NetworkInstanceVtableData;   /* size: 0x28C */
 
 extern "C" {
 
@@ -411,7 +407,7 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
             info[1] = 0;
             info[2] = 0;
             inst = getInstance_();
-            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
+            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
             break;
         }
         peerId_1C = msg->channelView.peerId_04;
@@ -452,7 +448,7 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
             info[1] = 0;
             info[2] = 0;
             inst = getInstance_();
-            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
+            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
             break;
         }
         size = msg->dataView.size_08;
@@ -610,7 +606,7 @@ extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s
             info[1] = type;
             info[2] = detail;
             inst = getInstance_();
-            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
+            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
         }
     } else {
         ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->publishRequest(-0x2DAE, 0xFF, peerId);
@@ -650,7 +646,7 @@ extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
             info[2] = detail;
             NetworkInstance* inst = getInstance_();
 
-            ((NetworkInstanceVtableData*)inst->vtable)->postError(inst, (NetworkErrorInfo*)info);
+            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
         }
     } else {
         error = timeout > 0 ? -0x2DA0 : -0x2DAD;
