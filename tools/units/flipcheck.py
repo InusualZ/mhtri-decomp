@@ -90,7 +90,7 @@ def sections(path: str) -> dict[str, tuple[int, int]]:
     """{section name: (size, align exponent)} for a compiled object."""
     if not os.path.exists(path):
         return {}
-    out = subprocess.run([OBJDUMP, "-h", path], capture_output=True, text=True).stdout
+    out = subprocess.run([OBJDUMP, "-h", path], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
     res = {}
     for line in out.splitlines():
         m = SEC_RE.match(line)

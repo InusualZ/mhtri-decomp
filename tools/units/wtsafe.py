@@ -48,7 +48,7 @@ def main_worktree(start: str | None = None) -> str:
     cwd = start or os.path.dirname(os.path.abspath(__file__))
     try:
         p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=cwd,
-                           capture_output=True, text=True, errors="replace")
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError:
         return REPO
     if p.returncode == 0:
@@ -169,7 +169,7 @@ def _make_junction(link: str, target: str) -> bool:
     if os.name != "nt":
         return False
     r = subprocess.run(["cmd", "/c", "mklink", "/J", os.path.abspath(link), os.path.abspath(target)],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode == 0 and os.path.exists(link)
 
 

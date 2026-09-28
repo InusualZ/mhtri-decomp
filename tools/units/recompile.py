@@ -86,7 +86,7 @@ SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, errors="replace")
+    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and out.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, out.stderr.strip()))
     return out.stdout
@@ -150,7 +150,7 @@ def _ninja_compile_lines(main: str, unit: str, runner=subprocess.run):
     worker's worktree, so MAIN's build.ninja has no edge for `build/RMHE08/src/<unit>.o` yet.
     """
     target = "build/RMHE08/src/" + os.path.splitext(unit_source(unit))[0] + ".o"
-    p = runner(["ninja", "-t", "commands", target], cwd=main, capture_output=True, text=True,
+    p = runner(["ninja", "-t", "commands", target], cwd=main, capture_output=True, text=True, encoding="utf-8",
                errors="replace")
     return target, [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l], p
 
@@ -517,7 +517,7 @@ def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
     os.makedirs(tmpdir, exist_ok=True)
     p = runner([objdiff, "diff", "-1", target, "-2", base, symbol,
                 "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-               capture_output=True, text=True, errors="replace")
+               capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return {"symbol": symbol, "error": (p.stdout or "") + (p.stderr or "")}
     data = json.loads(open(out, encoding="utf-8").read())
@@ -818,7 +818,7 @@ def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=su
     if existed:
         os.remove(obj)
     started = time.time_ns()
-    p = runner(cmd, cwd=main, capture_output=True, text=True, errors="replace")
+    p = runner(cmd, cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
     log = (p.stdout or "") + (p.stderr or "")
     if p.returncode != 0:
         return {"object": obj, "compiled": False, "error": log}

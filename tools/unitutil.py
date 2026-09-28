@@ -44,7 +44,7 @@ def caller_worktree(start=None):
     """The git worktree the *caller* is in, or None when git cannot say."""
     try:
         p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=start or os.getcwd(),
-                           capture_output=True, text=True, errors="replace")
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError:
         return None
     return (p.stdout or "").strip() or None if p.returncode == 0 else None
@@ -182,7 +182,7 @@ def compile_command(unit):
     warn_if_foreign_worktree()
     target = os.path.relpath(unit.obj, ROOT)
     p = subprocess.run(["ninja", "-t", "commands", target], cwd=ROOT,
-                       capture_output=True, text=True, errors="replace")
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     lines = [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l]
     if not lines:
         raise SystemExit("could not get the compile command for %s from ninja:\n%s%s"
@@ -280,7 +280,7 @@ def run_compile(tokens, expect=None, scratch_dir=None, src=None, verbose=False):
     # The filesystem reports whole-second mtimes and objdiff caches on (mtime, size): make sure this
     # compile lands in a later second than the previous one.
     time.sleep(1.05)
-    p = subprocess.run(tokens, cwd=ROOT, capture_output=True, text=True, errors="replace")
+    p = subprocess.run(tokens, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = (p.stdout or "") + (p.stderr or "")
     if verbose:
         print("$ " + " ".join(tokens))
@@ -379,7 +379,7 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     p = runner([OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
                 "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-               cwd=ROOT, capture_output=True, text=True, errors="replace")
+               cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return (out if p.returncode == 0 else None), (p.stdout or "") + (p.stderr or "")
 
 
@@ -457,7 +457,7 @@ def report_functions(target, base, unit_name=None, tmpdir=None, runner=subproces
     if os.path.exists(out):
         os.remove(out)
     p = runner([OBJDIFF, "report", "generate", "-p", proj, "-o", out],
-               cwd=ROOT, capture_output=True, text=True, errors="replace")
+               cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return {"_error": "objdiff report generate failed: " + (p.stdout or "") + (p.stderr or "")}
     data = json.load(open(out, encoding="utf-8"))

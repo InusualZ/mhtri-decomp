@@ -62,7 +62,7 @@ def main() -> int:
             "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
             "print(m.session_tmpdir())" % SYMDIFF)
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    child = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+    child = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", errors="replace",
                            cwd=ROOT, env=env)
     d2 = child.stdout.strip().splitlines()[-1] if child.returncode == 0 else ""
     fails = check("a second invocation gets a different directory",

@@ -482,7 +482,7 @@ def invocation_root_rows() -> int:
         shutil.copyfile(objdiff, os.path.join(wt, "build", "tools", "objdiff-cli.exe"))
         cmd = [sys.executable, os.path.join(tools, "objdiff", "symdiff.py"),
                "-u", "Camellia/camellia"]
-        p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, errors="replace")
+        p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, encoding="utf-8", errors="replace")
         out = p.stdout
         line = next((l for l in out.splitlines() if "camellia_setup256" in l), "")
         failures = _ok("the worktree's own tree is scored, not MAIN's", "100.00000" in line, True,
@@ -504,7 +504,7 @@ def _main_root() -> str:
     """MAIN resolved the same way `recompile.main_root` does, without importing recompile here."""
     try:
         p = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                           cwd=ROOT, capture_output=True, text=True, errors="replace")
+                           cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         common = (p.stdout or "").strip()
         if common and os.path.basename(common.replace("\\", "/")) == ".git":
             return os.path.dirname(os.path.abspath(common))

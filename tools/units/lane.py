@@ -54,7 +54,7 @@ BASE = "main"
 
 def git(args: list[str], cwd: str | None = None, check: bool = True) -> str:
     p = subprocess.run(["git"] + args, cwd=cwd or unitutil.repo_root(),
-                       capture_output=True, text=True, errors="replace")
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and p.returncode != 0:
         raise SystemExit("git %s failed:\n%s%s" % (" ".join(args), p.stdout, p.stderr))
     return (p.stdout or "").strip()
@@ -205,7 +205,7 @@ def selftest() -> int:
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         def run(*a):
-            return subprocess.run(["git"] + list(a), cwd=tmp, capture_output=True, text=True,
+            return subprocess.run(["git"] + list(a), cwd=tmp, capture_output=True, text=True, encoding="utf-8",
                                   errors="replace")
         run("init", "-q", "-b", "main")
         run("config", "user.email", "t@example.com")
@@ -313,7 +313,7 @@ def _lanes_missing_ref(tmp: str) -> bool:
     real_root = unitutil.repo_root
     unitutil.repo_root = lambda *a, **k: tmp
     try:
-        run = lambda *a: subprocess.run(["git"] + list(a), cwd=tmp, capture_output=True, text=True)
+        run = lambda *a: subprocess.run(["git"] + list(a), cwd=tmp, capture_output=True, text=True, encoding="utf-8", errors="replace")
         run("checkout", "-q", "-b", "experiment/lane-y")
         open(os.path.join(tmp, "c.txt"), "w").write("c\n")
         run("add", "c.txt")

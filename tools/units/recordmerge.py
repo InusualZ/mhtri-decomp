@@ -438,7 +438,7 @@ def read_source(spec: str) -> tuple[str, str]:
     if ":" in spec and not Path(spec).exists():
         rev, path = spec.split(":", 1)
         r = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=ROOT,
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise SystemExit(f"git show {spec} failed: {r.stderr.strip()}")
         return r.stdout, spec

@@ -1049,7 +1049,7 @@ def prove_anchors(pe, anchors, args):
     )
     argv = [gdb, "-batch", "-nx", "-x", str(script)]
     print(f"# gdb {script}")
-    proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace")
     counts, sections = {}, {}
     for line in proc.stdout.splitlines():
         m = re.match(r"^MWLINK-HIT ([0-9a-f]{8})(?: sec='([^']*)')?", line.strip())
@@ -1091,7 +1091,7 @@ def cmd_timeline(args):
     if "-v" not in argv and "-verbose" not in argv:
         argv.append("-v")
     print("# " + " ".join(argv))
-    proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace")
     text = proc.stdout + proc.stderr
     for kind, line in parse_timeline(text, phase_kinds(cat)):
         if kind in ("Compiling", "Importing", "Lib Import"):
@@ -2126,7 +2126,7 @@ def prove_phases(pe, der, args):
         "end\nrun\nprintf \"MWLINK-DONE\\n\"\nquit\n")
     argv = [gdb, "-batch", "-nx", "-x", str(script)]
     print(f"# gdb {script}")
-    proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace")
     stream, counts = [], {}
     last = [None]
     for line in proc.stdout.splitlines():
@@ -2379,7 +2379,7 @@ def run_link(args, out_base="trace", verbose=False):
     if got is None:
         return None
     argv, elf_out, map_out, _work, _rsp = got
-    proc = subprocess.run(argv, capture_output=True, text=True,
+    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
                           errors="replace", cwd=str(ROOT))
     return proc.returncode, argv, proc.stdout, proc.stderr, elf_out, map_out
 
@@ -2883,7 +2883,7 @@ def prove_records(pe, der, args):
         encoding="utf-8")
     argv = [gdb, "-batch", "-nx", "-x", str(script)]
     print(f"# gdb {script}")
-    proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace")
     rows = []
     base = None
     for line_ in proc.stdout.splitlines():

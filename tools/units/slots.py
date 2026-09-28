@@ -24,11 +24,26 @@ per claim, named for the unit, landable and auditable on its own: the invariant 
 on (docs/plan.md 5.1).
 
     python tools/units/slots.py init [--count 6] [--force]
-    python tools/units/slots.py acquire <unit> [--slot N] [--worker NAME] [--dry-run]
-    python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--dry-run]
+    python tools/units/slots.py acquire <unit> [--slot N] [--worker NAME] [--force] [--dry-run]
+    python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
     python tools/units/slots.py status [--json]
     python tools/units/slots.py verify [--slot N] [--json]
     python tools/units/slots.py --selftest
+
+**One lane per slot, enforced at both ends.**  A slot's claim was released while another lane was still
+working in it, and the release detached HEAD under a live process; the same hole let a second lane acquire
+a slot that still held the first lane's branch.  The sentinel and the release path are now the two ends of
+one rule:
+
+* the `.used` sentinel records its **OWNER label** (`mark_used`, `marker_info`), and `status` prints it, so
+  "someone holds this" is never the only thing a reader can know;
+* `acquire` refuses a slot whose sentinel **names a different owner** instead of silently reclaiming it
+  (`--force` is the deliberate override);
+* `release` **fails closed** on three signals - a RUNNING subagent run whose cwd resolves into the slot,
+  a dirty tree, and commits on HEAD that no branch reaches - printing every reason and offering `--force`.
+  The run registry under the temp dir is the *only* live-lane signal available: a lock file records what
+  *this tool* did, and a lane is a process the tool never launched, so `release_blockers` reads the
+  harness' own run records rather than inferring liveness from anything it wrote itself.
 
 The reset is **verified and fail closed** - a reused slot carries the previous round's build state, and a
 stale build tree is the most expensive failure this campaign has hit (a refused landing's split objects
@@ -65,6 +80,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -95,12 +111,17 @@ def marker_present(slot: str) -> bool:
     return os.path.exists(marker_path(slot))
 
 
-def mark_used(slot: str, unit: str = "", branch: str = "") -> bool:
+def mark_used(slot: str, unit: str = "", branch: str = "", owner: str = "") -> bool:
     """Claim the slot by creating its `.used` marker **atomically**.  -> False when one already exists.
 
     `O_CREAT | O_EXCL` is the atomicity: two racing `acquire`s cannot both create the file, so the loser
     falls through to the next free slot (`_pick_free`).  That is the whole mechanism - no lock daemon, no
     platform shim, and a crashed acquire leaves a marker the worktree reading reclaims.
+
+    The marker records **who** holds the slot - its OWNER label (`owner`), the unit, the branch and the
+    pid - not merely that someone does.  The label is what a human reads in `slots.py status` and what
+    `acquire` checks the claim it is about to launch against (`marker_claim_conflict`), so a sentinel left
+    by a *different* claim is visible instead of indistinguishable from one's own.
     """
     path = marker_path(slot)
     try:
@@ -110,12 +131,67 @@ def mark_used(slot: str, unit: str = "", branch: str = "") -> bool:
     except OSError:
         return False
     try:
-        os.write(fd, ("%d %s %s\n" % (os.getpid(), unit, branch)).encode("utf-8", "replace"))
+        os.write(fd, marker_text(owner, unit, branch).encode("utf-8", "replace"))
     except OSError:
         pass
     finally:
         os.close(fd)
     return True
+
+
+def marker_text(owner: str, unit: str = "", branch: str = "") -> str:
+    """The `.used` sentinel's body: one `key=value` per line, the owner label first.
+
+    Key=value rather than the older positional `<pid> <unit> <branch>` line because the owner label is the
+    fact the launch check reads, and a positional line quietly means something else the next time a field
+    is added.  A legacy line has no `owner=` and so reads as an **unknown** owner (`marker_info`), which is
+    not a match for any claim - `marker_claim_conflict` says what that means rather than guessing.
+    """
+    return ("owner=%s\nunit=%s\nbranch=%s\npid=%d\nat=%s\n"
+            % (owner, unit, branch, os.getpid(), time.strftime("%Y-%m-%dT%H:%M:%S")))
+
+
+def marker_info(slot: str) -> dict:
+    """The sentinel's contents, or `{}` when the slot has none.
+
+    `legacy` marks a body that is not this format: the old positional `<pid> <unit> <branch>` line is
+    parsed best-effort (no `owner`), and anything else unreadable still reports `legacy` so no caller
+    mistakes a marker it could not read for a marker that names nobody.
+    """
+    try:
+        with open(marker_path(slot), encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return {}
+    out: dict = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key.strip():
+            out[key.strip()] = value.strip()
+    if "owner" in out:
+        out["legacy"] = False
+        return out
+    parts = text.split()
+    if len(parts) >= 3 and os.path.isdir(slot):
+        out.update({"pid": parts[0], "unit": parts[1], "branch": parts[2]})
+    out["legacy"] = True
+    return out
+
+
+def marker_owner(slot: str) -> str:
+    """The sentinel's OWNER label - "" for an ownerless (legacy or half-written) marker."""
+    return marker_info(slot).get("owner") or ""
+
+
+def owner_label(unit: str, branch: str | None, worker: str | None = None) -> str:
+    """The label a claim records in its sentinel: the worker label, else the branch slug, else the unit.
+
+    A label rather than a slot number because the slot is what is *being taken*: the owner has to name the
+    claim itself for two claims in the same slot to be tellable apart (which is the whole point of E1),
+    and a branch slug is stable across rounds where a worker label is not given.
+    """
+    claims = _claims()
+    return worker or (claims.slug_of_branch(branch) if branch else "") or unit
 
 
 def clear_marker(slot: str) -> bool:
@@ -133,8 +209,132 @@ def _claims():
     return claims
 
 
+def _land():
+    """`land` imported late for the same reason as `_claims`: land imports claims, which imports slots.
+
+    Only `agents_md_real_change` is used, and only to keep the *one* implementation of "is AGENTS.md
+    really changed, or is that the LOCAL-ONLY block?" - a slot's AGENTS.md carries live working state by
+    rule 8, so a second copy of that cut here would be the bug, not the reuse.
+    """
+    from units import land
+    return land
+
+
+# --- the live-lane signal: the harness' async run registry -----------------------------------------
+
+#: The directory a `pi` harness keeps its async subagent runs under: `<temp>/pi-subagents-*/async-subagent-runs`.
+RUNS_DIRNAME = "async-subagent-runs"
+
+
+def run_registries(temp: str | None = None) -> list[str]:
+    """Every async-subagent run registry under the temp dir: `<temp>/pi-subagents-*/async-subagent-runs`.
+
+    **This registry is the only live-lane signal available to this tool, so it is read, never inferred.**
+    A lock of any kind - the `.used` sentinel, the JSON claim record - only records what *this tool* did,
+    and a lane is a process the tool never launched: the project proved that the day a lane worked in MAIN
+    and left no slot file at all (roadmap 7.31), and again on 2026-09-28, when a slot's claim was released
+    while another lane was still working in it and the release detached HEAD under the live process.  The
+    harness records every run it launches - id, `cwd`, `state` - and that record is what
+    `release_blockers` reads.
+
+    A host with no registry (no harness, or a different one) yields **no signal at all**: this returns an
+    empty list, and the dirty-tree and unreachable-commit guards are then the only backstops.  That is
+    stated rather than papered over - "no registry" is not "no lane".
+    """
+    temp = temp or tempfile.gettempdir()
+    try:
+        names = sorted(os.listdir(temp))
+    except OSError:
+        return []
+    out = []
+    for name in names:
+        if not name.startswith("pi-subagents-"):
+            continue
+        d = os.path.join(temp, name, RUNS_DIRNAME)
+        if os.path.isdir(d):
+            out.append(d)
+    return out
+
+
+def _read_json(path: str) -> dict:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _live_run_record(record: dict, run_id: str, registry: str) -> dict:
+    """One run record, flattened to the fields a lane guard needs."""
+    steps = record.get("steps") or []
+    first = steps[0] if steps and isinstance(steps[0], dict) else {}
+    return {"run_id": record.get("runId") or run_id,
+            "cwd": record.get("cwd") or first.get("cwd") or "",
+            "state": record.get("state") or first.get("status") or "",
+            "agent": first.get("agent") or "",
+            "session": first.get("sessionName") or "",
+            "pid": record.get("pid"),
+            "registry": registry}
+
+
+def live_runs(registry: str | None = None, temp: str | None = None) -> list[dict]:
+    """Every **RUNNING** subagent run, from `status.json` in each run directory.
+
+    `<registry>/<run-id>/status.json` is the live record (`state: running`, `cwd`, `steps[0].agent` /
+    `.sessionName`); `.terminal-runs/<id>` is the harness' own finish marker, and a run named there is
+    finished **whatever a stale `status.json` says** - that ordering is what makes "the same record marked
+    finished must proceed" true rather than hopeful.  A record this function cannot read is skipped, not
+    guessed at: an unreadable registry is reported as no signal (`run_registries`), never as "no lane".
+    """
+    runs = []
+    for root in ([registry] if registry else run_registries(temp)):
+        terminal = set(os.listdir(os.path.join(root, ".terminal-runs"))
+                       if os.path.isdir(os.path.join(root, ".terminal-runs")) else [])
+        try:
+            names = sorted(os.listdir(root))
+        except OSError:
+            continue
+        for name in names:
+            if name.startswith("."):
+                continue
+            d = os.path.join(root, name)
+            if not os.path.isdir(d) or name in terminal:
+                continue
+            record = _read_json(os.path.join(d, "status.json"))
+            if not record:
+                continue
+            run = _live_run_record(record, name, root)
+            if run["state"] == "running":
+                runs.append(run)
+    return runs
+
+
+def _same_tree(a: str, b: str) -> bool:
+    """Whether path `a` is `b` or sits inside it (case-insensitively on Windows, separator-agnostic)."""
+    if not a or not b:
+        return False
+    x, y = os.path.normcase(os.path.abspath(a)), os.path.normcase(os.path.abspath(b))
+    return x == y or x.startswith(y.rstrip(os.sep) + os.sep)
+
+
+def runs_in_slot(slot: str, registry: str | None = None, temp: str | None = None) -> list[dict]:
+    """Every RUNNING subagent run whose `cwd` resolves into `slot` - the slot is its working directory.
+
+    A lane launched with its cwd at a subdirectory of the slot is in the slot too, so the test is
+    "inside", not "equal".
+    """
+    return [run for run in live_runs(registry, temp) if _same_tree(run.get("cwd"), slot)]
+
+
+def run_label(run: dict) -> str:
+    """`<run id> (<session name>)` - how a refusal names the run it is protecting."""
+    name = (run.get("session") or "").strip()
+    return "%s%s" % (run.get("run_id") or "?", " (%s)" % name[:60] if name else "")
+
+
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, errors="replace")
+    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and p.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, p.stderr.strip()))
     return (p.stdout or "").strip()
@@ -210,8 +410,8 @@ def clear_lock(main: str, n: int) -> None:
 
 def slot_attached_branch(slot: str) -> str | None:
     """The branch the slot has checked out, or `None` when the slot is (correctly) detached."""
-    p = subprocess.run(["git", "-C", slot, "symbolic-ref", "-q", "HEAD"], capture_output=True, text=True,
-                       errors="replace")
+    p = subprocess.run(["git", "-C", slot, "symbolic-ref", "-q", "HEAD"], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
     ref = (p.stdout or "").strip()
     if p.returncode == 0 and ref.startswith("refs/heads/"):
         return ref[len("refs/heads/"):]
@@ -220,8 +420,145 @@ def slot_attached_branch(slot: str) -> str | None:
 
 def slot_head(slot: str) -> str | None:
     p = subprocess.run(["git", "-C", slot, "rev-parse", "HEAD"], capture_output=True, text=True,
-                       errors="replace")
+                       encoding="utf-8", errors="replace")
     return (p.stdout or "").strip() if p.returncode == 0 else None
+
+
+def slot_dirty(slot: str) -> list[str]:
+    """The slot tree's rows a release would destroy: `[" M src/x.cpp", "?? notes.md"]`.
+
+    `git status --porcelain -uall` is the definition - tracked edits and untracked non-ignored files (the
+    slot's `build/`, `orig/`, `.pi/` and `.used` are ignored, so the warm trees never show up here).  One
+    row is deliberately not dirt: an `AGENTS.md` whose only difference is its LOCAL-ONLY block, which is
+    live working state by rule 8 and is dirty in every real slot - `land.agents_md_real_change` owns that
+    judgement, and a release that called it dirt would refuse every ordinary teardown.
+
+    The porcelain output is read **raw**: `git()` strips its stdout, which eats the leading space of the
+    first row and shifts every field by one (` M AGENTS.md` -> `M AGENTS.md`, so the path parses as
+    `GENTS.md`).  `clean_slot` reads `git clean`'s output the same way, for the same reason.
+    """
+    p = subprocess.run(["git", "-C", slot, "status", "--porcelain", "-uall"], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
+    if p.returncode != 0:
+        raise SystemExit("git status failed in %s: %s" % (slot, (p.stderr or "").strip()))
+    out = []
+    for row in (p.stdout or "").splitlines():
+        if not row.strip():
+            continue
+        code, path = row[:2], row[3:].strip().strip('"')
+        if path == "AGENTS.md" and code.strip() in ("M", "MM"):
+            if not _land().agents_md_real_change(slot):
+                continue
+        out.append(row.rstrip())
+    return out
+
+
+def orphaned_commits(slot: str) -> list[str]:
+    """Commits on the slot's HEAD that no branch or remote-tracking ref reaches.
+
+    `release` detaches the slot and deletes its branch, so a commit only this HEAD holds would survive
+    nowhere but the reflog.  A detached slot sitting on main's tip (the state every release leaves, and the
+    state every acquire starts from) has none, and a lane's own branch reaches its own commits, so this
+    fires exactly on the pathological case: detached work, or a branch whose commits were already deleted
+    from under it.  `--force` overrides, and the refusal names where the commits *do* live (a rescue ref is
+    usually the answer).
+    """
+    head = slot_head(slot)
+    if not head:
+        return []
+    return [ln.strip() for ln in git(["rev-list", head, "--not", "--branches", "--remotes"],
+                                     slot).splitlines() if ln.strip()]
+
+
+def refs_containing(slot: str) -> list[str]:
+    """Every ref whose history contains the slot's HEAD - where work would otherwise be hiding."""
+    head = slot_head(slot)
+    if not head:
+        return []
+    return [ln.strip() for ln in git(["for-each-ref", "--contains", head, "--format=%(refname)"],
+                                     slot).splitlines() if ln.strip()]
+
+
+def release_blockers(main: str, n: int, d: str, allow_dirty: bool = False,
+                     registry: str | None = None, temp: str | None = None) -> list[tuple[str, str]]:
+    """Everything that makes releasing slot `n` unsafe: `[(one-line summary, detail)]`, `[]` if safe.
+
+    Three signals, least to most precise:
+
+    * **a RUNNING subagent run whose cwd resolves into the slot** - read from the harness' run registry
+      (`run_registries`), because that is the only place a live lane is visible at all: the `.used`
+      sentinel and the JSON lock record say what *this tool* did, and the lane is a process the tool never
+      launched.  This is the guard the 2026-09-28 release-while-running would have hit, and it names the
+      run;
+    * **a dirty tree** (`slot_dirty`) - the release runs `checkout -f --detach` + `clean -ffdx` and would
+      discard uncommitted work.  Skipped when `allow_dirty`, which is for a caller that has already proven
+      the work is recorded elsewhere (`claims.release` refuses un-merged, un-recorded work before it ever
+      reaches the slot);
+    * **commits no branch reaches** (`orphaned_commits`) - the release detaches HEAD and deletes the
+      branch, which is exactly how unlanded work is orphaned.
+
+    Each blocker is a (summary, detail) pair rather than one string so the refusal's **first line** names
+    every reason compactly: `claims.release` records only that first line in its teardown step
+    (`_run_teardown`), and a step that said "slot 1 return failed" without naming the run would be the same
+    "the reason is invisible" problem the landing gate spent a session fixing.
+    """
+    out: list[tuple[str, str]] = []
+    runs = runs_in_slot(d, registry, temp)
+    if runs:
+        out.append(("a RUNNING subagent run is still working in it: "
+                    + ", ".join(run_label(r) for r in runs),
+                    "cwd %s - the run registry under the temp dir is the only live-lane signal there is, "
+                    "because a lock cannot see a lane" % d))
+    if not allow_dirty:
+        dirty = slot_dirty(d)
+        if dirty:
+            out.append(("the slot's tree is dirty (%d path(s), e.g. %s)"
+                        % (len(dirty), dirty[0].strip()),
+                        "a release would discard:\n      " + "\n      ".join(dirty[:8])
+                        + ("\n      (+%d more)" % (len(dirty) - 8) if len(dirty) > 8 else "")))
+    orphans = orphaned_commits(d)
+    if orphans:
+        refs = refs_containing(d)
+        out.append(("HEAD holds %d commit(s) no branch reaches (%s)"
+                    % (len(orphans), ", ".join(c[:8] for c in orphans[:4])),
+                    "a release would detach and orphan them"
+                    + ("; they do live in %s" % ", ".join(refs[:4]) if refs else "")))
+    return out
+
+
+def release_refusal(main: str, n: int, d: str, blockers: list[tuple[str, str]]) -> str:
+    """The refusal `release` raises - every reason on the first line, the detail under it, then `--force`."""
+    lines = ["REFUSED release slot %d (%s): %s" % (n, d, "; ".join(s for s, _ in blockers)),
+             "  releasing would detach the slot and delete its branch while that is still live:"]
+    for summary, detail in blockers:
+        lines.append("  - %s: %s" % (summary, detail))
+    lines.append("  if that is what you mean, say so deliberately: "
+                 "python tools/units/slots.py release --slot %d --force" % n)
+    return "\n".join(lines)
+
+
+def marker_claim_conflict(slot: str, owner: str, n: int | None = None) -> str | None:
+    """The refusal when the slot's sentinel names a claim other than `owner`, else None.
+
+    `acquire` used to treat *any* marker it found on a detached worktree as reclaimable, so a sentinel
+    left by a different claim was indistinguishable from one of its own and the next acquire reset the
+    tree under that claim's lane.  The sentinel names its owner for exactly this check.  An **ownerless**
+    marker (a legacy body, or a crash before the owner was written) is not a conflict - reclaiming it is
+    the documented behaviour that keeps a crashed acquire from wedging a slot - and a marker naming this
+    same label is simply this claim's own.
+    """
+    found = marker_info(slot)
+    if not found or not found.get("owner"):
+        return None
+    if found.get("owner") == owner:
+        return None
+    how = ("--slot %d --force" % n) if n is not None else "--force"
+    return ("REFUSED slot %s: its `.used` sentinel belongs to another claim - owner %r (unit %r, branch "
+            "%r).\n  one lane per slot: reusing a slot under a live owner is how a lane's HEAD got "
+            "detached mid-run.\n  if that owner is gone, say so deliberately: `python tools/units/slots.py "
+            "acquire <unit> %s` (or release that slot first)"
+            % (os.path.basename(slot), found.get("owner"), found.get("unit") or "?",
+               found.get("branch") or "?", how))
 
 
 def lock_stale(main: str, n: int, lock: dict | None = None) -> bool:
@@ -244,7 +581,7 @@ def lock_stale(main: str, n: int, lock: dict | None = None) -> bool:
     return slot_attached_branch(slot_dir(main, n)) != branch
 
 
-def slot_state(main: str, n: int) -> dict:
+def slot_state(main: str, n: int, runs: list | None = None) -> dict:
     """One slot's row: whether it exists, what it has checked out, its `.used` marker and whether it is free.
 
     **`free`/`used` is read from two sources of the same fact, and both must agree that the slot is empty.**
@@ -254,8 +591,19 @@ def slot_state(main: str, n: int) -> dict:
     `free` while its worktree held `worker/rule10-fix-14f8`), and that disagreement *was* the bug, so both
     readings are kept.
 
+    A **third** reading rides along and is the only one that can see a lane rather than a claim: `run`, the
+    RUNNING subagent run whose cwd is this slot (`runs_in_slot`).  A lane holds the slot even when the
+    sentinel, the lock and the worktree all say otherwise - the sentinel can be cleared and the worktree
+    detached by a release while the lane keeps working - so `status` reports it and `release_blockers`
+    refuses on it.
+
     A `.used` marker on a *detached* worktree with no live lock record is a crash remnant, not a live claim -
-    it is named reclaimable and the slot is free, so a crashed acquire can never wedge a slot.
+    it is named reclaimable and the slot is free, so a crashed acquire can never wedge a slot.  It still
+    reports its OWNER label: a reclamable marker that names somebody is exactly what `acquire` refuses
+    (`marker_claim_conflict`) unless the takeover is meant.
+
+    `runs` is the already-resolved live-run list, so `all_slots` reads the registry once instead of once per
+    slot.
     """
     d = slot_dir(main, n)
     exists = os.path.isdir(d) and os.path.exists(os.path.join(d, ".git"))
@@ -264,30 +612,43 @@ def slot_state(main: str, n: int) -> dict:
     live_lock = bool(lock and not stale)
     attached = slot_attached_branch(d) if exists else None
     marked = marker_present(d) if exists else False
+    marker = marker_info(d) if marked else {}
     marker_stale = marked and not attached and not live_lock
     used = bool(attached) or (marked and not marker_stale)
     free = exists and not used
+    run = None
+    if exists:
+        runs = runs_in_slot(d) if runs is None else [r for r in runs if _same_tree(r.get("cwd"), d)]
+        run = runs[0] if runs else None
+    owner = marker.get("owner") or (lock.get("worker") if lock else "") or ""
     if not exists:
         why = "no such slot directory"
+    elif run:
+        why = "in use by a RUNNING subagent run %s" % run_label(run)
     elif live_lock:
         why = "in use by %s (%s)" % (lock.get("unit") or "?", lock.get("worker") or "?")
     elif attached:
-        why = "in use - holds branch %s (its `.used` marker is %s); release it first" % (
-            attached, "present" if marked else "MISSING")
+        why = "in use - holds branch %s (its `.used` marker is %s%s); release it first" % (
+            attached, "present" if marked else "MISSING",
+            ", owner %s" % owner if owner else "")
     elif marked and not marker_stale:
-        why = "used (`.used` marker present, worktree detached)"
+        why = "used (`.used` marker present, worktree detached%s)" % (", owner %s" % owner if owner else "")
     elif marker_stale:
-        why = "stale `.used` marker on a detached worktree with no live lock - reclaimable"
+        why = "stale `.used` marker on a detached worktree with no live lock - reclaimable%s" % (
+            "; it names owner %s" % owner if owner else "")
     elif lock and stale:
         why = "stale lock (%s) - reclaimable" % (lock.get("unit") or "?")
     else:
         why = "free"
     return {"slot": n, "dir": d, "exists": exists, "attached": attached, "lock": lock, "stale": stale,
-            "marked": marked, "marker_stale": marker_stale, "used": used, "free": free, "why": why}
+            "marked": marked, "marker": marker, "owner": owner, "marker_stale": marker_stale,
+            "used": used, "free": free, "run": run, "why": why}
 
 
-def all_slots(main: str) -> list[dict]:
-    return [slot_state(main, n) for n in range(1, slot_count(main) + 1)]
+def all_slots(main: str, runs: list | None = None) -> list[dict]:
+    """Every slot's row.  The registry is read **once** and handed to each row (`runs`)."""
+    live = live_runs() if runs is None else runs
+    return [slot_state(main, n, runs=live) for n in range(1, slot_count(main) + 1)]
 
 
 def free_slots(main: str) -> list[dict]:
@@ -375,7 +736,7 @@ def clean_slot(slot: str) -> list[str]:
     args = ["clean", "-ffdx", "-q"]
     for keep in SLOT_KEEP:
         args += ["-e", keep]
-    p = subprocess.run(["git", "-C", slot, *args], capture_output=True, text=True, errors="replace")
+    p = subprocess.run(["git", "-C", slot, *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise SystemExit("git clean failed in %s: %s" % (slot, (p.stderr or "").strip()))
     return [line.split(" ", 1)[1] for line in p.stdout.splitlines() if line.startswith("Removing ")]
@@ -414,7 +775,7 @@ def init(main: str, count: int = DEFAULT_COUNT, force: bool = False, seed: bool 
             if os.path.isdir(d):
                 # a stale registration, or a directory we are forcing: clear both before re-adding
                 subprocess.run(["git", "worktree", "remove", "--force", "--force", d], cwd=main,
-                               capture_output=True, text=True, errors="replace")
+                               capture_output=True, text=True, encoding="utf-8", errors="replace")
             git(["worktree", "prune"], main)
             git(["worktree", "add", "--detach", d, tip], main)
             created.append(n)
@@ -431,7 +792,9 @@ def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
 
     `free` is the worktree truth (`slot_state`), so an occupied slot is **skipped**, never failed on.  With
     `claim`, each candidate is *atomically* marked (`.used`, `O_EXCL`) before it is returned - so two racing
-    acquires cannot both take the same slot, and a slot a racing acquire just marked is skipped too.
+    acquires cannot both take the same slot, and a slot a racing acquire just marked is skipped too.  The
+    `claim` callback is also where `acquire` refuses a sentinel that names another owner
+    (`marker_claim_conflict`), i.e. *before* the mark, so a foreign claim is never silently absorbed.
 
     A slot explicitly targeted with `slot=N` is a search *by name*, not a search: it refuses when occupied -
     the "a slot holds a directory, never a branch" rule - or when the mark cannot be taken.
@@ -462,27 +825,41 @@ def _pick_free(main: str, slot: int | None = None, claim=None) -> dict:
     raise SystemExit("REFUSED: %s" % capacity_error(main))
 
 
-def preview(main: str, unit: str, branch: str | None = None, slot: int | None = None) -> dict:
-    """What `acquire` would do, touching nothing (for a dry run). -> the slot row and the command."""
+def preview(main: str, unit: str, branch: str | None = None, slot: int | None = None,
+            worker: str | None = None, force: bool = False) -> dict:
+    """What `acquire` would do, touching nothing (for a dry run). -> the slot row and the command.
+
+    The candidate slot's sentinel is checked here too, so a dry run surfaces the same
+    "that `.used` belongs to another claim" refusal the real acquire would give.
+    """
     claims = _claims()
+    unit = claims.norm_unit(unit.strip("/"))
     branch = branch or claims.branch_for(unit)
     row = _pick_free(main, slot)
+    conflict = marker_claim_conflict(row["dir"], owner_label(unit, branch, worker), row["slot"])
+    if conflict and not force:
+        raise SystemExit(conflict.split("\n")[0] + "\n  (a dry run reports the same refusal `acquire` gives)")
     tip = git(["rev-parse", "HEAD"], main)
     return {"slot": row["slot"], "dir": row["dir"], "branch": branch, "base": tip,
+            "owner": owner_label(unit, branch, worker),
             "command": "git -C %s checkout -B %s %s" % (row["dir"], branch, tip)}
 
 
 def acquire(main: str, unit: str, branch: str | None = None, worker: str | None = None,
-            slot: int | None = None) -> dict:
+            slot: int | None = None, force: bool = False) -> dict:
     """Take a slot for `unit`: mark it `.used`, reset it, cut a **fresh** branch off main's tip, verify, lock.
 
-    Refuses, before touching anything, when the unit's branch already exists (the claim is taken) and when an
+    Refuses, before touching anything, when the unit's branch already exists (the claim is taken), when an
     explicitly named slot is occupied - a slot whose previous branch has not landed is surfaced loudly, never
-    silently reused.  The slot is **marked `.used` atomically before the reset**, so a racing acquire falls
-    through to the next free slot instead of colliding; a failure after the mark removes it, and a crash
-    leaves a marker the worktree reading reclaims.  The kept build tree is verified against MAIN's current
-    map/DOL; if it cannot be proven current it is re-seeded, and if it still cannot, the acquire fails closed
-    rather than handing the lane a stale tree.
+    silently reused - and when the slot's `.used` sentinel **names a different owner**
+    (`marker_claim_conflict`): that is another claim's sentinel, and taking the slot under it is how a lane's
+    HEAD got detached mid-run.  `force` is the deliberate override for a sentinel whose owner is gone.
+
+    The slot is **marked `.used` atomically before the reset**, with this claim's OWNER label in the marker,
+    so a racing acquire falls through to the next free slot instead of colliding; a failure after the mark
+    removes it, and a crash leaves a marker the worktree reading reclaims.  The kept build tree is verified
+    against MAIN's current map/DOL; if it cannot be proven current it is re-seeded, and if it still cannot,
+    the acquire fails closed rather than handing the lane a stale tree.
     """
     claims = _claims()
     unit = claims.norm_unit(unit.strip("/"))
@@ -490,12 +867,16 @@ def acquire(main: str, unit: str, branch: str | None = None, worker: str | None 
     if claims.branch_exists(main, branch):
         raise SystemExit("REFUSED: branch %s already exists - the unit is claimed (or was never released).\n"
                          "  see: python tools/units/claims.py list" % branch)
+    owner = owner_label(unit, branch, worker)
 
     def claim(row: dict) -> bool:
+        conflict = marker_claim_conflict(row["dir"], owner, row["slot"])
+        if conflict and not force:
+            raise SystemExit(conflict)
         # reclaim a crash remnant (a marker on a detached worktree) before marking, or it would never free
         if row.get("marker_stale"):
             clear_marker(row["dir"])
-        return mark_used(row["dir"], unit, branch)
+        return mark_used(row["dir"], unit, branch, owner)
 
     row = _pick_free(main, slot, claim=claim)
     n, d = row["slot"], row["dir"]
@@ -591,12 +972,22 @@ def _resolve_slot(main: str, slot: int | None, unit: str | None, branch: str | N
 
 def release(main: str, slot: int | None = None, unit: str | None = None, branch: str | None = None,
             delete_branch: bool = True, rescue: bool = True, refresh: bool = True,
-            dry_run: bool = False) -> dict:
+            dry_run: bool = False, force: bool = False, allow_dirty: bool = False,
+            registry: str | None = None) -> dict:
     """Return a slot to main's tip: detach, clean, delete its branch (rescue-ref first), refresh, unlock.
 
     Keeps the warm trees and leaves the slot pre-warmed so the next `acquire` is a validation, not a build.
     The branch is deleted because a *directory* never holds one; its commits are rescued first exactly as
     `claims.release` does, so a release can never be the only place unlanded work lived.
+
+    **It fails closed.**  A release detaches HEAD, runs `clean -ffdx` and deletes the branch, so everything
+    `release_blockers` can see - a RUNNING subagent run whose cwd is the slot (read from the harness' run
+    registry: a lock cannot see a lane), a dirty tree, commits no branch reaches - refuses it, naming every
+    reason, and `force` is the deliberate override that also states what it overrode.  On 2026-09-28 a
+    release ran while another lane was still working in that slot: it detached HEAD under the live process
+    and the lane's work was destroyed.  `allow_dirty` is for a caller that has *already* proven the work is
+    recorded elsewhere (`claims.release` refuses un-merged, un-recorded work before it gets here); it never
+    covers the live-run or orphaned-commit guards.
     """
     claims = _claims()
     n, lock = _resolve_slot(main, slot, unit, branch)
@@ -605,9 +996,14 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
     unit = unit or lock.get("unit") or (claims.slug_of_branch(branch) if branch else None)
     result = {"slot": n, "dir": d, "branch": branch, "unit": unit, "detached": False, "cleaned": [],
               "branch_deleted": False, "rescue_ref": None, "refreshed": None, "lock_cleared": False,
-              "marker_cleared": False, "dry_run": dry_run}
+              "marker_cleared": False, "dry_run": dry_run, "forced": bool(force), "overridden": []}
     if not os.path.exists(os.path.join(d, ".git")):
         raise SystemExit("REFUSED release slot %d: %s is not a worktree" % (n, d))
+    # read before anything is touched: what is in the slot is the only thing that can say "not yet"
+    blockers = release_blockers(main, n, d, allow_dirty=allow_dirty, registry=registry)
+    if blockers and not force:
+        raise SystemExit(release_refusal(main, n, d, blockers))
+    result["overridden"] = [summary for summary, _detail in blockers]
     tip = git(["rev-parse", "HEAD"], main)
     if dry_run:
         result["detached"] = True
@@ -638,9 +1034,11 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
 
 # --- status --------------------------------------------------------------------------------------
 
-def status(main: str) -> list[dict]:
+def status(main: str, registry: str | None = None) -> list[dict]:
+    """Every slot's row, plus its build tree's verdict, its HEAD and any live run in it."""
     rows = []
-    for s in all_slots(main):
+    live = live_runs(registry)
+    for s in all_slots(main, runs=live):
         v = verify(main, s["slot"]) if s["exists"] else {"ok": False, "reasons": ["missing"]}
         rows.append({**s, "build_ok": v["ok"], "build_reasons": v["reasons"],
                      "head": slot_head(s["dir"]) if s["exists"] else None})
@@ -664,7 +1062,7 @@ def selftest() -> int:
 
     def g(path, *args, check=True):
         p = subprocess.run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t",
-                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True)
+                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if check and p.returncode != 0:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()
@@ -687,6 +1085,13 @@ def selftest() -> int:
         os.makedirs(os.path.join(repo, "build", "binutils"))
         os.makedirs(os.path.join(repo, "build", "tools"))
         open(os.path.join(repo, "configure.py"), "w").write("config.libs = []\n")
+        # AGENTS.md is committed with a real **em dash** in its prose, because a slot's AGENTS.md is dirty by
+        # design (the LOCAL-ONLY block is live working state, rule 8) and `slot_dirty` has to tell that dirt
+        # apart from real dirt.  The non-ASCII byte is what makes the comparison load-bearing: a decode that
+        # used the host locale codec (`cp1252` here) would call every slot dirty (F34's failure, one file
+        # over).  Written as UTF-8 explicitly - the fixture must not inherit the trap it guards against.
+        with open(os.path.join(repo, "AGENTS.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("# repo notes\n\nprose with an em dash \u2014 in it\n")
         open(os.path.join(repo, ".gitignore"), "w").write(
             "build/\norig/\n.ninja_*\nbuild.ninja\nobjdiff.json\ncompile_commands.json\n__pycache__/\n.used\n")
         open(os.path.join(repo, "src", "auto", "stub.c"), "w").write("/* header only */\n")
@@ -867,14 +1272,28 @@ def selftest() -> int:
         release(repo, slot=2, unit="auto/cap-2", rescue=False)
         check("releasing frees a slot", len(free_slots(repo)), 2)
 
-        # a slot reset discards scratch and stale source edits, keeps the warm trees
+        # a slot reset discards scratch and stale source edits, keeps the warm trees - but ONLY when the
+        # release is deliberate: the dirty tree is exactly what fails the release closed (E2).
         info2 = acquire(repo, "auto/dirty", slot=1)
         dd = info2["dir"]
         open(os.path.join(dd, "src", "auto", "stub.c"), "w").write("/* dirty edit */\n")
         open(os.path.join(dd, "scratch.txt"), "w").write("junk\n")
         os.makedirs(os.path.join(dd, "out", "scratch"), exist_ok=True)
         open(os.path.join(dd, "out", "scratch", "junk.bin"), "wb").write(b"x")
-        release(repo, slot=1, unit="auto/dirty", rescue=False)
+        try:
+            release(repo, slot=1, unit="auto/dirty", rescue=False)
+            check("a dirty tree refuses the release", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("a dirty tree refuses the release", "REFUSED release slot 1" in str(exc), True)
+            check("... naming the tracked edit it would discard", "src/auto/stub.c" in str(exc), True)
+            check("... and the untracked scratch", "scratch.txt" in str(exc), True)
+            check("... and offering the deliberate override", "--force" in str(exc), True)
+        check("... and nothing was touched by the refusal",
+              "dirty edit" in open(os.path.join(dd, "src", "auto", "stub.c")).read(), True)
+        forced = release(repo, slot=1, unit="auto/dirty", rescue=False, force=True)
+        check("--force releases anyway", forced["detached"], True)
+        check("... and records what it overrode",
+              any("dirty" in line for line in forced["overridden"]), True)
         check("a dirty src/ is reset to main", "dirty edit" not in open(
             os.path.join(dd, "src", "auto", "stub.c")).read(), True)
         check("stray scratch is discarded", os.path.exists(os.path.join(dd, "scratch.txt")), False)
@@ -916,6 +1335,210 @@ def selftest() -> int:
         check("status keeps `used` and the worktree branch as separate readings",
               all("used" in r and "attached" in r and "marked" in r for r in rows), True)
 
+        # --- E1: the `.used` sentinel records its OWNER, and `status` shows it -------------------------
+        check("the owner label is the worker label when there is one",
+              owner_label("auto/own", "worker/own-9f2a", "w-own"), "w-own")
+        check("... else the branch slug (stable across rounds)",
+              owner_label("auto/own", "worker/own-9f2a"), "own-9f2a")
+        check("... else the unit", owner_label("auto/own", None), "auto/own")
+        own = acquire(repo, "auto/own", worker="w-own")
+        d_own = own["dir"]
+        sentinel = marker_info(d_own)
+        check("the sentinel records the owner label", sentinel.get("owner"), "w-own")
+        check("... the unit", sentinel.get("unit"), "auto/own")
+        check("... the branch", sentinel.get("branch"), claims.branch_for("auto/own"))
+        check("... and the pid that wrote it", str(sentinel.get("pid") or "").isdigit(), True)
+        check("... as key=value with the owner first",
+              open(marker_path(d_own), encoding="utf-8").read().splitlines()[0], "owner=w-own")
+        check("the sentinel is not reported as legacy", sentinel.get("legacy"), False)
+        check("marker_owner reads it back", marker_owner(d_own), "w-own")
+        check("slot_state reports the owner", slot_state(repo, own["slot"])["owner"], "w-own")
+        own_row = next(r for r in status(repo) if r["slot"] == own["slot"])
+        check("`status` reports the owner", own_row["owner"], "w-own")
+        check("... and shows no live run when the registry names none here", own_row["run"], None)
+        # a legacy positional body still parses, and is explicitly *not* an owner
+        with open(marker_path(d_own), "w", encoding="utf-8") as fh:
+            fh.write("%d auto/own worker/own-9f2a\n" % os.getpid())
+        legacy = marker_info(d_own)
+        check("a legacy positional body reads as legacy", legacy.get("legacy"), True)
+        check("... with its unit parsed best-effort", legacy.get("unit"), "auto/own")
+        check("... and no owner, so no conflict", marker_claim_conflict(d_own, "x", 1), None)
+        check("an ownerless sentinel is not a conflict either",
+              marker_info(d_own) and marker_claim_conflict(d_own, "someone-else", own["slot"]), None)
+        clear_marker(d_own)
+        mark_used(d_own, "auto/own", claims.branch_for("auto/own"), "")
+        check("... a marker written with no owner label names nobody",
+              marker_claim_conflict(d_own, "someone-else", own["slot"]), None)
+        clear_marker(d_own)
+        mark_used(d_own, "auto/own", claims.branch_for("auto/own"), "w-own")
+        release(repo, slot=own["slot"], unit="auto/own")
+
+        # --- E1/E3: a sentinel that names ANOTHER claim is refused at launch -------------------------
+        free = acquire(repo, "auto/free", slot=1)
+        d_free = free["dir"]
+        release(repo, slot=1, unit="auto/free")            # detached, unlocked, marker gone: acquirable
+        check("the slot is genuinely free before the foreign marker",
+              slot_state(repo, 1)["free"], True)
+        check("a foreign marker can be planted on a free slot",
+              mark_used(d_free, "auto/other", "worker/other-9f2a", "w-other"), True)
+        conflict = marker_claim_conflict(d_free, "auto/mine", 1)
+        check("the sentinel is read back as the other claim's", marker_owner(d_free), "w-other")
+        check("... and `slot_state` says so", slot_state(repo, 1)["owner"], "w-other")
+        check("... including that it is a stale remnant", slot_state(repo, 1)["marker_stale"], True)
+        check("the conflict names the owner", "w-other" in (conflict or ""), True)
+        check("... and the override to use", "--force" in (conflict or ""), True)
+        try:
+            acquire(repo, "auto/mine")
+            check("acquire REFUSES a sentinel owned by another claim", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("acquire REFUSES a sentinel owned by another claim", "w-other" in str(exc), True)
+            check("... and says why (HEAD detached mid-run)", "detached mid-run" in str(exc), True)
+        check("... the refusal touched nothing (the other claim's marker survives",
+              marker_owner(d_free), "w-other")
+        taken = acquire(repo, "auto/mine", force=True)
+        check("--force takes the slot deliberately", taken["slot"], 1)
+        check("... and the sentinel is rewritten with the new owner",
+              marker_owner(d_free) != "w-other", True)
+        check("... naming the new claim", marker_owner(d_free), owner_label("auto/mine", taken["branch"]))
+        release(repo, slot=1, unit="auto/mine")
+
+        # --- E2/E3: the run registry is the live-lane signal -----------------------------------------
+        live_slot = acquire(repo, "auto/live", slot=1)
+        d_live = live_slot["dir"]
+        reg_root = os.path.join(tmp, "pi-subagents-selftest", RUNS_DIRNAME)
+        os.makedirs(reg_root)
+        check("the harness' registry directory is discovered under the temp dir",
+              run_registries(tmp), [reg_root])
+        run_id = "11111111-2222-3333-4444-555555555555"
+
+        def write_run(state="running", cwd=None):
+            os.makedirs(os.path.join(reg_root, run_id), exist_ok=True)
+            with open(os.path.join(reg_root, run_id, "status.json"), "w", encoding="utf-8") as fh:
+                json.dump({"runId": run_id, "state": state, "cwd": cwd or d_live, "pid": os.getpid(),
+                           "steps": [{"agent": "worker", "sessionName": "worker: fix the thing",
+                                      "status": state}]}, fh)
+
+        write_run()
+        check("a RUNNING record is a live run", [r["run_id"] for r in live_runs(reg_root)], [run_id])
+        check("... discovered through the temp dir too",
+              [r["run_id"] for r in live_runs(temp=tmp)], [run_id])
+        check("... carrying its cwd and session name",
+              (live_runs(reg_root)[0]["cwd"], live_runs(reg_root)[0]["session"]),
+              (d_live, "worker: fix the thing"))
+        check("a run whose cwd is the slot is IN the slot",
+              [r["run_id"] for r in runs_in_slot(d_live, reg_root)], [run_id])
+        check("... and one working in another slot is not",
+              runs_in_slot(slot_dir(repo, 2), reg_root), [])
+        write_run(cwd=os.path.join(d_live, "src"))
+        check("... a lane launched in a SUBdirectory is in the slot too",
+              [r["run_id"] for r in runs_in_slot(d_live, reg_root)], [run_id])
+        write_run()
+        live_row = next(r for r in status(repo, registry=reg_root) if r["slot"] == 1)
+        check("`status` reports the live run", (live_row["run"] or {}).get("run_id"), run_id)
+        check("... and says a run holds the slot", "RUNNING subagent run" in live_row["why"], True)
+        try:
+            release(repo, slot=1, unit="auto/live", registry=reg_root)
+            check("release REFUSES while a run is working in the slot", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("release REFUSES while a run is working in the slot",
+                  "REFUSED release slot 1" in str(exc), True)
+            check("... NAMING the run", run_id in str(exc), True)
+            check("... and its session", "worker: fix the thing" in str(exc), True)
+            check("... and saying a lock cannot see a lane", "a lock cannot see a lane" in str(exc), True)
+            check("... and offering --force", "--force" in str(exc), True)
+        check("... and HEAD was not detached by the refusal",
+              slot_attached_branch(d_live), claims.branch_for("auto/live"))
+        # the harness' own finish marker: the same record is finished and the release proceeds
+        os.makedirs(os.path.join(reg_root, ".terminal-runs"), exist_ok=True)
+        open(os.path.join(reg_root, ".terminal-runs", run_id), "w").close()
+        check("a terminal-run marker retires the record", live_runs(reg_root), [])
+        check("the finished run is no longer in the slot", runs_in_slot(d_live, reg_root), [])
+        os.remove(os.path.join(reg_root, ".terminal-runs", run_id))
+        write_run(state="finished")
+        check("a finished state is not a live lane either", runs_in_slot(d_live, reg_root), [])
+        write_run()
+        forced_live = release(repo, slot=1, unit="auto/live", registry=reg_root, force=True)
+        check("--force releases under a live run", forced_live["detached"], True)
+        check("... recording the live run it overrode",
+              any(run_id in line for line in forced_live["overridden"]), True)
+        check("... and naming the lane in the recorded reason",
+              any("still working" in line for line in forced_live["overridden"]), True)
+
+        # --- E2/E3: commits no branch reaches refuse the release --------------------------------------
+        held = acquire(repo, "auto/orphan", slot=1)
+        d_orph = held["dir"]
+        commit(d_orph, "a commit on the claim's branch")
+        check("a commit the claim's branch reaches is not orphaned", orphaned_commits(d_orph), [])
+        check("... so the release proceeds", release_blockers(repo, 1, d_orph), [])
+        g(d_orph, "checkout", "-q", "--detach")          # the 2026-09-28 shape: detached, still working
+        detached_head = slot_head(d_orph)
+        commit(d_orph, "a commit no branch reaches")
+        check("a detached commit is orphaned", len(orphaned_commits(d_orph)), 1)
+        try:
+            release(repo, slot=1, unit="auto/orphan")
+            check("release REFUSES to orphan commits", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("release REFUSES to orphan commits", "no branch reaches" in str(exc), True)
+            check("... naming the commit", orphaned_commits(d_orph)[0][:8] in str(exc), True)
+        check("... and the refusal left HEAD where the lane put it",
+              slot_head(d_orph) != detached_head, True)
+        check("... i.e. still detached on the orphan", slot_attached_branch(d_orph), None)
+        orphan_forced = release(repo, slot=1, unit="auto/orphan", force=True)
+        check("--force releases an orphaned HEAD", orphan_forced["detached"], True)
+        check("... recording what it overrode",
+              any("no branch reaches" in line for line in orphan_forced["overridden"]), True)
+
+        # --- E2/E3: the slot's own live state (AGENTS.md's LOCAL-ONLY block) is not dirt ---------------
+        blocky = acquire(repo, "auto/blocky", slot=1)
+        d_blocky = blocky["dir"]
+        check("a freshly acquired slot has a clean tree", slot_dirty(d_blocky), [])
+        with open(os.path.join(d_blocky, "AGENTS.md"), "r", encoding="utf-8", newline="") as fh:
+            base = fh.read()
+        with open(os.path.join(d_blocky, "AGENTS.md"), "w", encoding="utf-8", newline="") as fh:
+            fh.write(base + "<!-- LOCAL-ONLY-BEGIN: stripped before every commit, see Non-negotiables "
+                     "rule 8 -->\nlive state, and an em dash \u2014\n<!-- LOCAL-ONLY-END -->\n")
+        check("an AGENTS.md carrying only its LOCAL-ONLY block is not dirt", slot_dirty(d_blocky), [])
+        check("... so a release needs no override", release_blockers(repo, 1, d_blocky), [])
+        with open(os.path.join(d_blocky, "AGENTS.md"), "a", encoding="utf-8", newline="") as fh:
+            fh.write("a real edit below the block \u2014\n")
+        check("a real AGENTS.md edit IS dirt", any("AGENTS.md" in r for r in slot_dirty(d_blocky)), True)
+        release(repo, slot=1, unit="auto/blocky", force=True)
+        check("... and the reset puts the committed AGENTS.md back",
+              open(os.path.join(d_blocky, "AGENTS.md"), encoding="utf-8").read().count("LOCAL-ONLY"), 0)
+
+        # --- E2/E3: the SEAM - the claim path's teardown is the release that caused the incident --------
+        # 2026-09-28's release was `claims.py release`, not a bare `slots.py release`, so the guard has to
+        # hold through that path too: the slot step fails, the slot is left exactly where the live lane put
+        # it, and `--force` is what tears it down.
+        claims.save_registry(repo, {})
+        seam = claims.claim("auto/seam", repo, "w-seam", False, cwd=repo)
+        d_seam = seam["worktree"]
+        check("claims.claim took a slot for the seam fixture", seam.get("slot") in (1, 2), True)
+        write_run(cwd=d_seam)
+        no_pane = lambda _row: {"pane": None, "known": True, "alive": False, "active": False,
+                                "status": None, "revision": None}
+        rel_seam = claims.release("auto/seam", repo, force=False, dry_run=False, probe=no_pane,
+                                 lister=lambda: None, run_registry=reg_root)
+        check("claims.release refuses while a run works in the slot", rel_seam["complete"], False)
+        step_text = json.dumps([(s["label"], s["status"], s["why"]) for s in rel_seam["steps"]])
+        check("... naming the run in the failed step", run_id in step_text, True)
+        check("... and saying the run is still working in it", "still working" in step_text, True)
+        check("... and the teardown stops before it clears the claim (registry entry kept)",
+              any(s["label"].startswith("registry entry") and s["status"] == "skipped"
+                  and "did not complete" in s["why"] for s in rel_seam["steps"]), True)
+        check("... and the slot is still on its branch, exactly as the lane left it",
+              slot_attached_branch(d_seam), claims.branch_for("auto/seam"))
+        check("... so the claim's branch survives",
+              claims.branch_exists(repo, claims.branch_for("auto/seam")), True)
+        rel_forced = claims.release("auto/seam", repo, force=True, dry_run=False, probe=no_pane,
+                                   lister=lambda: None, run_registry=reg_root)
+        check("claims.release --force tears it down anyway", rel_forced["complete"], True)
+        check("... clearing the claim as well",
+              any(s["label"].startswith("registry entry") and s["status"] == "done"
+                  for s in rel_forced["steps"]), True)
+        check("... and the slot is detached and unlocked",
+              (slot_attached_branch(d_seam), read_lock(repo, seam["slot"])), (None, {}))
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -946,6 +1569,8 @@ def main() -> int:
     a.add_argument("--slot", type=int, default=None)
     a.add_argument("--worker", default=None)
     a.add_argument("--branch", default=None)
+    a.add_argument("--force", action="store_true",
+                   help="take a slot whose `.used` sentinel names a claim whose owner is gone")
     a.add_argument("--dry-run", action="store_true")
     a.add_argument("--json", action="store_true")
     r = sub.add_parser("release", help="return a slot to main's tip (keeps the warm trees)")
@@ -953,6 +1578,9 @@ def main() -> int:
     r.add_argument("--unit", default=None)
     r.add_argument("--branch", default=None)
     r.add_argument("--keep-branch", action="store_true", help="do not delete the claim's branch")
+    r.add_argument("--force", action="store_true",
+                   help="release even though a run is live in the slot / its tree is dirty / its HEAD "
+                        "holds commits no branch reaches")
     r.add_argument("--dry-run", action="store_true")
     r.add_argument("--json", action="store_true")
     s = sub.add_parser("status", help="every slot, its lock and whether its build tree is current")
@@ -982,10 +1610,11 @@ def main() -> int:
         return 0
     if args.cmd == "acquire":
         if args.dry_run:
-            out = preview(main_wt, args.unit, args.branch, args.slot)
-            print("would acquire slot %d: %s" % (out["slot"], out["command"]))
+            out = preview(main_wt, args.unit, args.branch, args.slot, args.worker, args.force)
+            print("would acquire slot %d for %s (owner %s): %s"
+                  % (out["slot"], args.unit, out["owner"], out["command"]))
             return 0
-        info = acquire(main_wt, args.unit, args.branch, args.worker, args.slot)
+        info = acquire(main_wt, args.unit, args.branch, args.worker, args.slot, args.force)
         if args.json:
             print(json.dumps(info, indent=2))
             return 0
@@ -994,10 +1623,11 @@ def main() -> int:
                  "current" if info["verify"]["ok"] else "; ".join(info["verify"]["reasons"])))
         if info.get("refreshed"):
             print("  refreshed %s" % info["refreshed"])
+        print("  owner   %s (in `.used`)" % marker_owner(info["dir"]))
         return 0
     if args.cmd == "release":
         out = release(main_wt, args.slot, args.unit, args.branch, delete_branch=not args.keep_branch,
-                      dry_run=args.dry_run)
+                      dry_run=args.dry_run, force=args.force)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
@@ -1006,6 +1636,8 @@ def main() -> int:
                                        "" if out["branch_deleted"] or not out["branch"] else
                                        " - branch %s kept" % out["branch"],
                                        "" if not out["refreshed"] else "\n  %s" % out["refreshed"]))
+        if out.get("overridden"):
+            print("  --force overrode:\n  - %s" % "\n  - ".join(out["overridden"]))
         return 0
     if args.cmd == "status":
         rows = status(main_wt)
@@ -1015,19 +1647,23 @@ def main() -> int:
         if not rows:
             print("no slot pool - run `python tools/units/slots.py init`")
             return 0
-        print("%-5s %-10s %-24s %-20s %-7s %s" % ("slot", "state", "unit", "branch", ".used", "build tree"))
+        print("%-5s %-9s %-16s %-20s %-20s %-7s %-9s %s"
+              % ("slot", "state", "owner", "unit", "branch", ".used", "run", "build tree"))
         for row in rows:
             lock = row.get("lock") or {}
             if row["free"]:
                 state = "free"
+            elif row.get("run"):
+                state = "LIVE"
             elif row["attached"]:
                 state = "in use"
             else:
                 state = "used"
             marker = "stale" if row.get("marker_stale") else ("yes" if row["marked"] else "-")
-            print("%-5d %-10s %-24s %-20s %-7s %s" % (
-                row["slot"], state, (lock.get("unit") or "-")[:24],
-                (row["attached"] or "detached")[:20], marker,
+            run = (row["run"]["run_id"][:8] if row.get("run") else "-")
+            print("%-5d %-9s %-16s %-20s %-20s %-7s %-9s %s" % (
+                row["slot"], state, (row.get("owner") or "-")[:16], (lock.get("unit") or "-")[:20],
+                (row["attached"] or "detached")[:20], marker, run,
                 "current" if row["build_ok"] else "; ".join(row["build_reasons"])))
         return 0
     if args.cmd == "verify":

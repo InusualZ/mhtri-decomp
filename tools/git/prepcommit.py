@@ -45,7 +45,7 @@ ORIGINAL_DOL = "orig/RMHE08/sys/main.dol"
 
 
 def git(*args: str, check: bool = True) -> str:
-    out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+    out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and out.returncode != 0:
         sys.exit(f"git {' '.join(args)} failed: {out.stderr.strip()}")
     return out.stdout
@@ -275,7 +275,7 @@ def localonly(action: str) -> None:
     script = os.path.join(ROOT, "tools", "agents", "localonly.py")
     if not os.path.exists(script):
         return
-    subprocess.run([sys.executable, script, action], cwd=ROOT, capture_output=True, text=True)
+    subprocess.run([sys.executable, script, action], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def main() -> int:

@@ -495,7 +495,7 @@ def symedit_refs(name: str) -> str | None:
     script = os.path.join(HERE, "symedit.py")
     try:
         proc = subprocess.run([sys.executable, script, "refs", name, "--limit", "10"],
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     except (OSError, subprocess.SubprocessError) as exc:  # pragma: no cover - environment dependent
         return "(refs failed: %s)" % exc
     return proc.stdout.strip() or "(no output)"

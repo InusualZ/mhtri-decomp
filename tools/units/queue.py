@@ -376,7 +376,7 @@ def branch_error(main: str) -> str | None:
     in temp dirs that are not repositories).
     """
     p = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=main,
-                       capture_output=True, text=True, errors="replace")
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     branch = p.stdout.strip()
     if p.returncode != 0 or not branch:
         return None
@@ -405,7 +405,7 @@ def strictly_newer(main_lines, branch_lines):
 def _file_lines(main: str, ref: str, path: str) -> list[str]:
     """One file's lines at `ref`, or [] when that ref has no such file (a branch's new file)."""
     p = subprocess.run(["git", "show", "%s:%s" % (ref, path)], cwd=main,
-                       capture_output=True, text=True, errors="replace")
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.stdout.splitlines() if p.returncode == 0 else []
 
 
@@ -419,7 +419,7 @@ def unlanded_branches(main: str, ignore: set[str] | None = None) -> list[tuple[s
     """
     ignore = set(ignore or ())
     p = subprocess.run(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads"], cwd=main,
-                       capture_output=True, text=True, errors="replace")
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         return []
     out = []
@@ -427,7 +427,7 @@ def unlanded_branches(main: str, ignore: set[str] | None = None) -> list[tuple[s
         if not branch or branch == "main" or branch in ignore:
             continue
         d = subprocess.run(["git", "diff", "--name-only", "main...%s" % branch], cwd=main,
-                           capture_output=True, text=True, errors="replace")
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         if d.returncode != 0:
             continue
         hits = []
@@ -1009,7 +1009,7 @@ def selftest() -> int:
     def qgit(path, *args):
         p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
                             "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
-                           cwd=path, capture_output=True, text=True)
+                           cwd=path, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if p.returncode != 0:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()
