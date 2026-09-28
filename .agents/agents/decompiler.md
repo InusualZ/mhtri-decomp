@@ -309,29 +309,49 @@ The full list is `docs/matching.md`, indexed in `AGENTS.md`. The recurring wins:
 
 ## The compiler's own IR: `tools/mwcc-debugger/`
 
-When a residual is one instruction and neither a source shape nor a flag explains it, ask the compiler directly.
-`tools/mwcc-debugger/` drives **our own `mwcceppc.exe`** under gdb and dumps the optimizer's IR for a real
-command line: the PCode stream after each pass, and the register allocator's decisions.
+When a residual is one instruction and neither a source shape nor a flag explains it, stop guessing and ask the
+compiler. `tools/mwcc-debugger/` drives **our own `mwcceppc.exe`** under gdb and dumps the optimizer's IR for a
+real command line: the PCode stream after each pass, and the register allocator's decisions.
 
 * The exact invocation, the `-o` redirection that keeps real objects untouched, and the support matrix are in
-  `tools/mwcc-debugger/README.md`. Short form: hand it the unit's real command line with `-o build/mwcc-debug`,
-  then read the dumps.
-* **Health-check a dump before you trust it**: `python tools/mwcc-debugger/locate/verify_pcode.py <backend
-dump> <object.o>` compares the dump against `objdump` of the object the same command line produces, and it
-  classifies the dump first: the **last** dump (`after-code-labels`) is `MATCH` or `FAIL` - and it does fail
-  when the final code disagrees, so a vacuous comparison cannot pass - while an **earlier** one reports a
-  `PASS-DELTA`: the instruction-count delta, the concrete instruction change, and the pass that first made
-  the object's stream. So run it on an early dump to have a residual attributed to a pass; its delta is not
-  a failure.
-* What it answers, in the form you actually need: which pass fused `add`+`addi`+`lbz` into `lbzu`; which virtual
-  register became r31; whether the optimizer reordered a chain before the allocator ever saw it. That is the
-  difference between searching source shapes and knowing.
-* **What it does not do yet** (reported, not faked): AST/frontend dumps, `variables.txt`, block
-  successors/predecessors/labels, per-instruction line numbers, and operand rendering for fixups and branch
-  targets. The GC rows are carried-over data that cannot be exercised on this host.
-* **Feedback is part of the job.** If the tool misled you, lacked a record you needed, or the README's
-  invocation did not work as written, say so in your report under "tooling" - one lane's annoyance is the next
-  lane's fix, and a tool nobody reports on rots.
+  `tools/mwcc-debugger/README.md`. No gdb on the host is **not** a blocker: `python
+  tools/mwcc-debugger/fetch_gdb.py --dest C:/Users/InusualZ/tools/mwcc-dbg` installs one in ~2 min (its
+  DEPENDS warnings are noise).
+* **Health-check the dump before you believe it.** `verify_pcode.py` classifies the dump first, and that
+  classification is what makes a dump evidence rather than a plausible file:
+  * the **final** dump (`after-code-labels`) must report `MATCH` against the object the same command line
+    produced. A `FAIL` there is a real disagreement and it names the first divergent instruction - it is never
+    a formality, and a dump that is not your object fails it;
+  * an **earlier** dump reports a `PASS-DELTA`: the instruction-count delta, the concrete instruction
+    change, and **the pass that first reaches the object's stream**. That is the attribution you came for, so a
+    delta on an early dump is the *answer*, not a failure.
+* **The procedure, in order** - this is the difference between searching shapes and knowing:
+  1. run the tool on the unit's real command line (never a hand-edited one);
+  2. `verify_pcode` the **last** dump against `build/RMHE08/src/<unit>.o`; if it does not `MATCH`, the dump is
+     not describing your object and nothing else it says may be trusted;
+  3. `verify_pcode` the dump *before* the divergence - a `-O3` function makes ~35 of them - and take the named
+     pass;
+  4. **write that pass into the unit header's residual line**, with the instruction pair. A residual that names
+     its pass is worth ten that say "the allocator differs", and it is the thing that stops the next reader
+     paying for the same search: the shape is then known not to be reachable from the source side.
+* It answers, in the form you actually need: which pass fused `add`+`addi`+`lbz` into `lbzu`
+  (`after-peephole`); which virtual register became `r31`; whether the optimizer reordered a chain before the
+  allocator ever saw it.
+* **What it does not answer yet** - do not spend a budget here, these are documented gaps: AST/frontend dumps,
+  `variables.txt`, block successors/predecessors/labels, per-instruction line numbers, and operand rendering
+  for fixups and branch targets. The GC rows are carried-over data that cannot be exercised on this host.
+* **The feedback loop is part of the job and it is mechanical.** A debugger gap you hit is a register row, not
+  a paragraph:
+  * read `.pi/notes/mwcc-debugger-gaps.md` first - if your gap is already there, say so in your report (that
+    is the vote that promotes it; a row needs **two** filers to rank, which is how a single annoyance stays
+    noise and a real wall gets built);
+  * if it is new, **add a bullet to that note** (a capability, with what it cost you) - the note is one of
+    `tools/units/tooling.py`'s own sources, so no second register and no separate list;
+  * and put one line in your report's tooling section either way.
+  * **If the tool *misled* you** - a `MATCH` on a dump that was not your object, a pass named that changed
+    nothing, a dump that contradicts the object it claims to describe - that is the most valuable report in
+    this whole channel: it means the verifier must be fixed before anyone trusts it again. Report it even if
+    you have no unit to show for it.
 
 ## Converge
 
