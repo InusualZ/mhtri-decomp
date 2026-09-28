@@ -24,6 +24,13 @@ extern "C" {
 /* untyped: caller-owned payload */
 s32 NCDGetCurrentIpConfig(void* config);
 
+/* 0x8051C554 - fill the caller's interface-configuration block; non-zero on failure (the DWCi
+ * runtime initialiser prints its own " NCDGetCurrentIfConfig failed.[%d]\n" with the answer and
+ * hands it the `+0x4000` region of its runtime block).  The name is read off that call site's own
+ * message: this band is unregistered, so this header is the symbol's home until `ncdsystem.c`
+ * registers, and that unit's own header will be the real one then. */
+s32 NCDGetCurrentIfConfig(u8* config);
+
 #ifdef __cplusplus
 }
 #endif

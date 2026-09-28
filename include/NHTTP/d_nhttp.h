@@ -142,6 +142,13 @@ NHTTPConnection* NHTTPi_Request2Connection(void* connection, s32 request); /* un
 s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 length, s32 arg);
 void NHTTPi_destroyRequestObject(void* connection, s32 request); /* untyped: opaque handle */
 
+/* 0x8051A4E8 - bring the HTTP layer up with the caller's two command callbacks and one command id:
+ * the body registers this library's version once and hands all three on to `NHTTPi_Startup`,
+ * answering 0 when it comes up and -1 when it does not.  The DWCi runtime initialiser calls it that
+ * way (its command callbacks plus command 17), and that call site is where the name came from - a
+ * GUESS the NHTTP lane may refine when it writes the body. */
+s32 NHTTPi_RegisterCallbacks(void (*commandCallback)(u32), void (*commandCallbackEx)(u32), u32 command);
+
 #ifdef __cplusplus
 }
 #endif
