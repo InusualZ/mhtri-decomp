@@ -4514,7 +4514,7 @@ def main() -> int:
         if args.branch:
             units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
             set_allow_rule10(args.allow_rule10)
-    return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
+            return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
                                check_outbox=not args.no_outbox, release_claims=not args.no_release,
                                subject=args.message, no_selftests=args.no_selftests)
