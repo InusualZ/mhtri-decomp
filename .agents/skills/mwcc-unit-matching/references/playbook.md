@@ -2423,7 +2423,7 @@ for (s32 i = 0; i < listCount(w); i++)          /* cmpw; a u32 i gives cmplw */
 void DWCi_initRuntime(a, b, c, d, e, f);        /* SIX parameters - the call site proves the count */
 ```
 
-## 73. A data range dtk calls link PADDING needs a `type:function` symbol over the claim
+## 74. A data range dtk calls link PADDING needs a `type:function` symbol over the claim
 
 **Problem.** `Runtime.PPCEABI.H/TRK_interrupt_vectors` - the 8,000 B TRK interrupt-vector image in `.init` -
 matched byte-for-byte and **could not land**: `dtk dol split` classifies the range as link padding (the
@@ -2462,7 +2462,7 @@ the next data claim:
   DOL byte-identical. No project in the ecosystem defines them - only `extern`s and non-mwld link stubs. Leave
   `__start.c`'s `extern`s alone.
 
-## 74. `complete_code_percent` is a FLAG we set, not a measurement
+## 75. `complete_code_percent` is a FLAG we set, not a measurement
 
 **Problem.** `tools/project.py` writes `metadata.complete: true` into `objdiff.json` for every
 `Object(Matching, ...)`, and the report's unit row then reads `complete_code: 404, complete_code_percent: 100.0`
