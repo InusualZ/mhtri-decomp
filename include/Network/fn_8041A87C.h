@@ -5,8 +5,8 @@
  * instructions address) plus the string pool at `.data` 0x80603000..0x806036xx, which names the two
  * classes: `NetworkGameSpyInterface::` and `NetworkPeerGameSpy::`.  The declarations of the
  * neighbouring `fn_`/SDK helpers the band calls have no registered owner and live in
- * `include/unsplit/Network.h`; `getGameSpyInterfaceThread` is declared there as `void*` because its
- * result is this unit's own thread object, so the casts stay at the call sites.
+ * `include/unsplit/Network.h`; `GameSpyInterfaceThread_getInstance` is declared below as `void*`
+ * because its result is this unit's own thread object, so the casts stay at the call sites.
  *
  * The four object types own member functions, and the three foreign objects the target *dispatches
  * through* are modelled as classes with real virtuals: that is the only shape MWCC emits as
@@ -403,16 +403,32 @@ typedef union GameSpyEventMsg {
 } GameSpyEventMsg;   /* size: 0x14 */
 
 /* --------------------------------------------------------------------------------------------- */
-/* Declarations of symbols a *registered* unit owns.  They sit here, not in that unit's header,
- * because the owners' headers do not carry them yet - the shared-file edit that would move them
- * (`include/Network/fn_803D3CE8.h`, a new `include/DWCi/fn_805113B0.h`, `include/sound/fn_800E46E8.h`)
- * is recorded in this lane's outbox.  The spellings are the owners' own definitions.
+/* The unit's own claimed `.sbss` pair.  `splits.txt` gives this unit 0x80794CE0..0x80794CE8: the
+ * interface's three-slot socket global and the live worker thread the constructor publishes (`+0x00`
+ * of the class's own records) and `destroy` clears.  Both were declared in `include/unsplit/Network.h`
+ * while the range was unowned; it is this unit's now, so the declarations sit in the owner's own
+ * header and the band no longer spells them (rule 2).  They stay under `extern "C"` exactly as the
+ * band declared them, so the symbol names the object reports are unchanged. */
+extern "C" {
+extern u32   lbl_80794CE0;               /* 0x80794CE0 (.sbss) - the socket-table global */
+extern void* sGameSpyInterfaceThread;    /* 0x80794CE4 (.sbss) - the live GameSpyInterfaceThread */
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* Declarations of symbols *other* registered units own.  They sit here because the owners' headers do
+ * not all carry them yet: `include/DWCi/fn_805113B0.h` does not exist, and
+ * `include/sound/fn_800E46E8.h` declares only its own `fn_*` entry points, not `getInstance`.  The
+ * `Network/` owner's header (`include/Network/fn_803D3CE8.h`) *does* carry this block's one such
+ * declaration, and the spelling here matches it.  The spellings are the map rows too, which is the
+ * point: `objdiff` scores a `bl` by its instruction whatever name it carries, so a referrer that
+ * spells a name no map row carries scores 100 % and links to nothing - that is the `flipcheck.py`
+ * complaint, and the reason a rename is the map row **and** its referrers.
  * --------------------------------------------------------------------------------------------- */
 
 extern "C" {
 
 /* owner: src/Network/fn_803D3CE8.cpp - returns this unit's thread object, so it stays `void*` here */
-void* getGameSpyInterfaceThread(void);
+void* GameSpyInterfaceThread_getInstance(void);
 
 /* owner: src/DWCi/fn_805113B0.c */
 u16 DWCi_htons(u16 port);

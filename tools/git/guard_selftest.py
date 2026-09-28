@@ -98,7 +98,7 @@ for needle in ("orig/", "build/", "build\\.sha1", "config\\.yml", "LOCAL-ONLY"):
 check("hook is a shell script", body.startswith("#!/bin/sh"), True)
 
 tracked = subprocess.run(["git", "ls-files", "-s", "--", "tools/git/hooks/pre-commit"], cwd=ROOT,
-                         capture_output=True, text=True).stdout.split()
+                         capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
 if tracked:
     check("hook mode in the index is 100755", tracked[0], "100755")
     check("hook has no CRLF", "\r" in body, False)

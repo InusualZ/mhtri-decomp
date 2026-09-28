@@ -440,6 +440,10 @@ class Ownership:
     cached per mtime by `load_ownership`, as `brief.py` caches the map. `gaps`, `unsplit_modules` and
     `foreign_units` accumulate what the lookup can and cannot judge, so the report states the classes it
     leaves alone instead of guessing them.
+
+    Two views of the same rows.  `resolve(name)` answers "what does this *name* mean"; `resolution_at`
+    answers "what did this *address* mean, whatever the row was called" - the view a rename needs, because
+    a rename keeps the address and changes the name (`owed_rename_completion`).
     """
 
     def __init__(self, symbols: dict, ranges: dict):
@@ -449,6 +453,31 @@ class Ownership:
         self.unsplit_modules: "collections.Counter" = collections.Counter()
         self.unsplit_symbols: dict[str, set] = {}
         self.foreign_units: "collections.Counter" = collections.Counter()
+        self._at_address: "dict | None" = None
+
+    def name_at(self, section: str, address: int) -> "str | None":
+        """The map's row name for an address, or None when the map has no row there at all.
+
+        Built lazily as one inverted index over the rows (no range scan per query); a name with duplicate
+        rows is skipped, exactly as `resolve` refuses to guess it.
+        """
+        if self._at_address is None:
+            index: dict = {}
+            for name, entries in self.symbols.items():
+                if len(entries) == 1:
+                    index.setdefault((entries[0][0], entries[0][1]), name)
+            self._at_address = index
+        return self._at_address.get((section, address))
+
+    def resolution_at(self, section: str, address: int) -> "dict | None":
+        """`resolve` of whatever row sits at `(section, address)`, or `None` when the map has none.
+
+        The **address** view: a rename changes the name a file spells, not the address it lands on, so this
+        is what tells "the batch renamed a referrer to a row the base already had" from "the batch made a
+        declaration foreign" (an address with no row at base, or one owned by somebody else).
+        """
+        name = self.name_at(section, address)
+        return self.resolve(name) if name else None
 
     def resolve(self, name: str) -> "dict | None":
         """`None` when the name is not in the map; else a dict with `kind` owned/unsplit/dup."""
@@ -762,9 +791,9 @@ def rule2_band_findings(src: Source, ownership: "Ownership") -> list[dict]:
         r = ownership.resolve(name)
         if r is None or r["kind"] != "owned":
             continue
-        out.append(_finding(src, 2, line,
-                            "`%s` is owned by `src/%s` - declare it in that unit's header and "
-                            "#include it" % (name, r["unit"])))
+        out.append(_rule2_finding(src, line, name,
+                                  "`%s` is owned by `src/%s` - declare it in that unit's header and "
+                                  "#include it" % (name, r["unit"])))
     return out
 
 
@@ -791,9 +820,9 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
             if _owns(src.rel, r["unit"]):
                 continue
             ownership.foreign_units[r["unit"]] += 1
-            out.append(_finding(src, 2, line,
-                                "`%s` is owned by `src/%s` - declare it in that unit's header and "
-                                "#include it" % (name, r["unit"])))
+            out.append(_rule2_finding(src, line, name,
+                                      "`%s` is owned by `src/%s` - declare it in that unit's header and "
+                                      "#include it" % (name, r["unit"])))
             continue
         module = r["module"]
         if module is None:
@@ -806,13 +835,13 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
         ownership.unsplit_modules[module] += 1
         ownership.unsplit_symbols.setdefault(module, set()).add(name)
         if module == UNSPLIT_UNRESOLVED:
-            out.append(_finding(src, 2, line,
-                                "`%s` has no registered owner - declare it in a header under "
-                                "`include/unsplit/`" % name))
+            out.append(_rule2_finding(src, line, name,
+                                      "`%s` has no registered owner - declare it in a header under "
+                                      "`include/unsplit/`" % name))
         else:
-            out.append(_finding(src, 2, line,
-                                "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
-                                % (name, module)))
+            out.append(_rule2_finding(src, line, name,
+                                      "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
+                                      % (name, module)))
     return out
 
 
@@ -836,9 +865,9 @@ def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
         if _owns(src.rel, r["unit"]):
             continue
         ownership.foreign_units[r["unit"]] += 1
-        out.append(_finding(src, 2, line,
-                            "`%s` is owned by `src/%s` - declare it in that unit's header and "
-                            "#include it" % (name, r["unit"])))
+        out.append(_rule2_finding(src, line, name,
+                                  "`%s` is owned by `src/%s` - declare it in that unit's header and "
+                                  "#include it" % (name, r["unit"])))
     return out
 
 
@@ -870,6 +899,164 @@ def rule12_findings(src: Source, ownership: "Ownership | None") -> list[dict]:
                             "uses it claims the range in its own `splits.txt` and matches the bytes "
                             "(rule 12)" % (name, r["section"], r["address"])))
     return out
+
+
+# --------------------------------------------------------------------------------------------------
+# `--diff`: an owed rename is not ownership the batch created
+# --------------------------------------------------------------------------------------------------
+
+def unresolved_declarations(src: Source, ownership: "Ownership") -> set[str]:
+    """The declaration names in `src` that the map cannot resolve - the file's rule-2 **gaps**.
+
+    Rule 2 reports *nothing* for these (`rule2_findings` counts them in `Ownership.gaps` and refuses to
+    guess at a name with no row), so a file's gap names are invisible in the findings list - and they are
+    exactly the signal `--diff` needs.  A file that stops spelling an unmapped name has **completed** a
+    rename the base map had already made (the old spelling was the referrer half); a file that only ever
+    adds declarations gives up no gap at all.  That is what keeps a credit from excusing a new violation.
+    """
+    out: set[str] = set()
+    for name, _line in header_declarations(src):
+        resolved = ownership.resolve(name)
+        if resolved is None or resolved["kind"] == "dup":
+            out.add(name)
+    return out
+
+
+def unresolved_declarations_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
+                                   ownership: "Ownership") -> dict[str, set]:
+    """`{path now: gap names}` for the **ref's** copies of the changed files (the `before` side)."""
+    out: dict[str, set] = {}
+    for before, after in pairs:
+        if before is None:
+            continue
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, before)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        out[after] = unresolved_declarations(Source(before, after, text), ownership)
+    return out
+
+
+def owed_rename_completion(finding: dict, base: "Ownership | None", working: "Ownership") -> bool:
+    """Whether this rule-2 finding is the **referrer half of a rename the base map already made**.
+
+    The incident (2026-09-28).  `cb7d49aaa` renamed four map rows (`getGameSpyInterfaceThread` ->
+    `GameSpyInterfaceThread_getInstance`, `clearPatInterface` -> `PatInterface_clear`,
+    `isPatInterfaceReady` -> `PatInterface_isReady`, `lbl_80794CE4` -> `sGameSpyInterfaceThread`) and
+    landed the map alone; the referrers kept spelling the old names.  Completing that rename is the *only*
+    way the two units can ever link - but `--diff` judges each side by the map it was written against, and
+    the base copy's *old* spelling resolves to nothing at all, so the corrected spelling read as an
+    addition: `+1 rule 2 include/Network/fn_8041A87C.h (3 -> 4)`, `+3 ... NetworkWiiMediator.cpp (39 ->
+    42)` - a pure artefact, the same class as the `+62` rename artefact `load_ownership_at_ref` fixed.
+
+    The judgement is therefore by the **ownership of the address**, not by the spelling of the name: a
+    working-side declaration whose symbol resolves to an address that the **base map already carried, with
+    the same owner** is not an addition - it is the other half of a rename the base made.  Three things
+    still refuse, and they are the reason this is a narrow rule rather than a blanket one:
+
+    * the address has **no row in the base map** - the batch newly registered the range (or added the row),
+      so the ownership *is* the batch's, which is exactly what `--diff` exists to charge;
+    * the base row at that address is owned by a **different** unit (or is in a different module) - the
+      declaration is foreign for a reason the base did not have;
+    * the name resolves to nothing in the working map either (a genuine gap, `Ownership.gaps`) - there is no
+      address to compare, so the finding stands.
+    """
+    if base is None:
+        return False
+    name = finding.get("symbol")
+    if not name:
+        return False
+    working_r = working.resolve(name)
+    if working_r is None or working_r["kind"] not in ("owned", "unsplit"):
+        return False
+    section, address = working_r.get("section"), working_r.get("address")
+    if section is None or address is None:
+        return False
+    base_r = base.resolution_at(section, address)
+    if base_r is None or base_r["kind"] != working_r["kind"]:
+        return False
+    if working_r["kind"] == "owned":
+        return base_r.get("unit") == working_r.get("unit")
+    return base_r.get("module") == working_r.get("module")
+
+
+def rename_credits(findings: list[dict], base: "Ownership | None", working: "Ownership",
+                   base_symbols: "dict[str, set] | None" = None,
+                   freed: "dict[str, int] | None" = None) -> dict[tuple[int, str], int]:
+    """`(rule, file) -> how many of that pair's findings are an owed rename's referrer half.
+
+    Three conditions, each of which a genuinely new declaration fails:
+
+    * `base_symbols` - the BASE copy's rule-2 symbols per file: a symbol the file already declared is part
+      of `before`, not one of this batch's findings, so it can never be credited;
+    * `owed_rename_completion` - the symbol must resolve to an address the base map owned, for the same
+      owner (or the same unsplit module);
+    * `freed` - how many unmapped names the file **stopped spelling** (`unresolved_declarations`): each
+      credit costs one, so a file that adds a foreign declaration while giving up no gap is refused.
+    """
+    credits: dict[tuple[int, str], int] = {}
+    if base is None:
+        return credits
+    known = base_symbols or {}
+    for f in findings:
+        if f.get("rule") != 2 or not owed_rename_completion(f, base, working):
+            continue
+        if f.get("symbol") in known.get(f["file"], ()):
+            continue
+        key = (2, f["file"])
+        if credits.get(key, 0) >= (freed or {}).get(f["file"], 0):
+            continue
+        credits[key] = credits.get(key, 0) + 1
+    return credits
+
+
+def apply_rename_credits(added: list[dict], findings: list[dict], base: "Ownership | None",
+                         working: "Ownership",
+                         base_symbols: "dict[str, set] | None" = None,
+                         freed: "dict[str, int] | None" = None) -> tuple[list[dict], dict]:
+    """`(added, credits)`: subtract the owed-rename credits from `added`, dropping pairs that reach zero.
+
+    Only rule 2 is credited (`rename_credits`), so no other rule's growth is ever excused; the credit can
+    never exceed what the count comparison reported as added (a subtraction from a positive delta); and a
+    pair is kept, with its reduced count, as soon as one genuine finding remains - a file that completes an
+    owed rename *and* adds a foreign declaration still refuses, and the refusal names the file.
+    """
+    credits = rename_credits(findings, base, working, base_symbols, freed)
+    if not credits:
+        return added, {}
+    out, used = [], {}
+    for a in added:
+        key = (a["rule"], a["file"])
+        c = credits.get(key, 0)
+        if c:
+            # report only what was actually subtracted: a file whose credit found no addition to cancel
+            # (its count fell, or never rose) must not appear in the credit lines
+            used[key] = min(c, a["added"])
+        left = a["added"] - c
+        if left > 0:
+            out.append(dict(a, added=left))
+    return out, used
+
+
+def rename_credit_lines(credits: dict[tuple[int, str], int],
+                        freed: "dict[str, set] | None" = None) -> list[str]:
+    """The credited findings as printable lines - a credit is **said**, never a silent tolerance.
+
+    The line names the unmapped names the file stopped spelling, so a reader can check the judgement
+    instead of trusting it: those names are the base's half of the rename.
+    """
+    lines = []
+    for (rule, path), n in sorted(credits.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        gave_up = sorted((freed or {}).get(path, ()))[:3]
+        more = ""
+        gone = ""
+        if gave_up:
+            gone = "; stopped spelling %s%s" % (", ".join(gave_up),
+                                                 " (+%d more)" % (len((freed or {})[path]) - 3)
+                                                 if len((freed or {})[path]) > 3 else "")
+        lines.append("  ~%d rule %d  %s  (completing a rename the base map already made: same address, "
+                     "same owner at base%s)" % (n, rule, path, gone))
+    return lines
 
 
 # --------------------------------------------------------------------------------------------------
@@ -969,6 +1156,15 @@ def enclosing_call(code: str, pos: int) -> str | None:
 def _finding(src: Source, rule: int, line: int, detail: str) -> dict:
     return {"rule": rule, "file": src.rel, "line": line,
             "text": src.line_text(line).strip()[:160], "detail": detail}
+
+
+def _rule2_finding(src: Source, line: int, name: str, detail: str) -> dict:
+    """A rule-2 finding, carrying the declared **symbol** as data and not only inside the message.
+
+    `--diff` judges an added rule-2 finding by the *address* its symbol resolves to, so the name has to
+    survive as a field (the `detail` string is prose meant for a human); `owed_rename_completion` reads it.
+    """
+    return dict(_finding(src, 2, line, detail), symbol=name)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1606,7 +1802,7 @@ def diff_deltas(before: dict[tuple[int, str], int], after: dict[tuple[int, str],
 
 
 def git(root: str, *args: str) -> str:
-    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise RuntimeError("git %s failed: %s" % (" ".join(args), (p.stderr or "").strip()))
     return p.stdout
@@ -1654,12 +1850,16 @@ def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
 
 
 def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
-                    ownership: "Ownership | None" = None) -> dict[tuple[int, str], int]:
-    """Rule counts for the ref's copy of each file, keyed by the file's path *now*.
+                    ownership: "Ownership | None" = None) -> list[dict]:
+    """The ref's copies of the changed files, linted, judged by the **ref's** rule-2 index.
 
-    A file absent at the ref (`before is None`) counts as zero: it is new, so every violation in it is an
-    addition. Keying a rename by its new path keeps the two sides comparable. `ownership` is the rule-2
-    index (the working tree's, which is what the batch lands against).
+    A file absent at the ref (`before is None`) contributes nothing: it is new, so every violation in it is
+    an addition.  A rename is keyed by its new path (`Source(before, after, text)`), which keeps the two
+    sides comparable.  `ownership` is the map that side was written against (`load_ownership_at_ref`), and
+    the findings keep the paths they have now, so a caller can line them up with the working side's.
+
+    The findings themselves are returned rather than their counts because a `--diff` credit is a judgement
+    about a *finding*: `rename_credits` reads the `symbol` rule 2 attaches and the address it resolves to.
     """
     findings = []
     for before, after in pairs:
@@ -1670,7 +1870,7 @@ def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
         except RuntimeError:
             continue
         findings.extend(lint_source(Source(before, after, text), ownership))
-    return rule_counts(findings)
+    return findings
 
 
 def merge_counts(*counts: dict) -> dict:
@@ -2307,6 +2507,103 @@ def selftest() -> int:
           [(x["rule"], x["file"], x["added"]) for x in
            diff_deltas(hdr_before, {(2, "include/mod/a.h"): 3})], [(2, "include/mod/a.h", 1)])
 
+    # --- `--diff`: the OWNERSHIP OF THE ADDRESS, not the spelling of the name -----------------------
+    # The 2026-09-28 incident.  `cb7d49aaa` renamed four map rows and landed the map alone; completing the
+    # rename in the referrers then read as "+4 added rule-2 violations", because the base copy's *old*
+    # spelling resolves to nothing at all while the corrected one resolves (owned or unsplit).  A credit is
+    # granted only for the other half of a rename the **base map already made**, and three conditions bound
+    # it: the name is new to the file, the address was owned at base for the same owner (or the same unsplit
+    # module), and the file gave up an unmapped name to pay for it.
+
+    ADDR = 0x803D6A98
+    site = "include/Network/fn_8041A87C.h"
+    finding = {"rule": 2, "file": site, "line": 419,
+               "text": "void* GameSpyInterfaceThread_getInstance(void);", "detail": "(detail)",
+               "symbol": "GameSpyInterfaceThread_getInstance"}
+    new_map = Ownership({"GameSpyInterfaceThread_getInstance": [(".text", ADDR, "function")]},
+                        {".text": [(0x803D0000, 0x803D8000, "Network/fn_803D3CE8.cpp")]})
+    old_map = Ownership({"getGameSpyInterfaceThread": [(".text", ADDR, "function")]},
+                        {".text": [(0x803D0000, 0x803D8000, "Network/fn_803D3CE8.cpp")]})
+    no_row = Ownership({}, {".text": [(0x803D0000, 0x803D8000, "Network/fn_803D3CE8.cpp")]})
+    not_yet_registered = Ownership({"GameSpyInterfaceThread_getInstance": [(".text", ADDR, "function")]},
+                                   {})
+    someone_else = Ownership({"patched_at_this_address": [(".text", ADDR, "function")]},
+                             {".text": [(0x803D0000, 0x803D8000, "Network/other.cpp")]})
+    check("address view: the map resolves an address to the row's owner, by address",
+          new_map.resolution_at(".text", ADDR)["unit"], "Network/fn_803D3CE8.cpp")
+    check("... and answers None for an address it carries no row at",
+          new_map.resolution_at(".text", 0x803D7000), None)
+
+    # (a) completing an owed rename -> PASS
+    check("rename credit: a completion resolves to an address the base map already owned",
+          owed_rename_completion(finding, new_map, new_map), True)
+    check("... and the base map's row NAME is irrelevant - the address is the identity",
+          owed_rename_completion(finding, old_map, new_map), True)
+    added_row = {"rule": 2, "file": site, "added": 1, "before": 3, "after": 4}
+    check("... so the addition is credited",
+          apply_rename_credits([added_row], [finding], new_map, new_map, {site: {"DWCi_htons"}}, {site: 1}),
+          ([], {(2, site): 1}))
+    check("... and the same holds when the map rename rode the same batch",
+          apply_rename_credits([added_row], [finding], old_map, new_map, {site: {"DWCi_htons"}}, {site: 1}),
+          ([], {(2, site): 1}))
+    check("... reported, never silent",
+          rename_credit_lines({(2, site): 1}, {site: {"getGameSpyInterfaceThread"}}),
+          ["  ~1 rule 2  %s  (completing a rename the base map already made: same address, same owner at "
+           "base; stopped spelling getGameSpyInterfaceThread)" % site])
+
+    # (b) a genuinely new foreign declaration at an address UNOWNED at base -> still REFUSE
+    check("rename credit: no row at that address in the base map is not a completion",
+          owed_rename_completion(finding, no_row, new_map), False)
+    check("... nor is a row whose range the base had not registered (unsplit there)",
+          owed_rename_completion(finding, not_yet_registered, new_map), False)
+    check("... so the batch still adds a violation",
+          apply_rename_credits([added_row], [finding], no_row, new_map, {site: {"DWCi_htons"}},
+                               {site: 1}),
+          ([added_row], {}))
+
+    # (c) the same address owned at base by a DIFFERENT owner -> still REFUSE
+    check("rename credit: an address the base map owned for somebody else is not a completion",
+          owed_rename_completion(finding, someone_else, new_map), False)
+    check("... so the batch still adds a violation",
+          apply_rename_credits([added_row], [finding], someone_else, new_map, {site: {"DWCi_htons"}},
+                               {site: 1}),
+          ([added_row], {}))
+
+    # (d) both spellings were map rows at each side: the count does not rise, and nothing is credited
+    check("rename credit: a count that does not rise is untouched",
+          diff_deltas({(2, site): 1}, {(2, site): 1}), [])
+    check("... and a credit with nothing to subtract is not reported",
+          apply_rename_credits([], [finding], old_map, new_map, {}, {site: 1}), ([], {}))
+
+    # the three bounds, each of which a genuinely new declaration fails
+    check("rename credit: a symbol the base copy of the file already declared is never credited",
+          rename_credits([finding], old_map, new_map, {site: {finding["symbol"]}}, {site: 1}), {})
+    check("... nor is one when the file gave up no unmapped name",
+          rename_credits([finding], old_map, new_map, {}, {site: 0}), {})
+    two = [finding, dict(finding, symbol="PatInterface_clear")]
+    check("... and each credit costs one freed gap",
+          rename_credits(two, old_map, new_map, {}, {site: 1}), {(2, site): 1})
+    check("... an unrelated rule is never credited",
+          apply_rename_credits([{"rule": 7, "file": site, "added": 1, "before": 0, "after": 1}],
+                               [dict(finding, rule=7)], old_map, new_map, {}, {site: 1}),
+          ([{"rule": 7, "file": site, "added": 1, "before": 0, "after": 1}], {}))
+    check("... and a file that also adds a foreign declaration still refuses, by name",
+          apply_rename_credits([dict(added_row, added=2, after=5)], [finding], old_map, new_map,
+                               {site: {"DWCi_htons"}}, {site: 1}),
+          ([dict(added_row, added=1, after=5)], {(2, site): 1}))
+    # the gap a credit is paid with is a name the map cannot resolve, read from the file itself
+    check("rename credit: an unmapped declaration is a gap",
+          unresolved_declarations(Source("x", site, "void getGameSpyInterfaceThread(void);\n"), new_map),
+          {"getGameSpyInterfaceThread"})
+    check("... and a resolved one is not",
+          unresolved_declarations(Source("x", site, "void GameSpyInterfaceThread_getInstance(void);\n"),
+                                  new_map), set())
+    check("... so completing the rename frees exactly one",
+          len(unresolved_declarations(Source("x", site, "void getGameSpyInterfaceThread(void);\n"), new_map)
+              - unresolved_declarations(Source("x", site,
+                                               "void GameSpyInterfaceThread_getInstance(void);\n"),
+                                        new_map)), 1)
+
     # --- rule 10: a codegen pragma belongs to a TU, not to a shared header ------------------------
     hdr = "include/stage/fn_802B2AA0.h"
 
@@ -2452,7 +2749,7 @@ def selftest() -> int:
 
         def rev(where: str = "HEAD") -> str:
             return subprocess.run(["git", "rev-parse", where], cwd=tmp, capture_output=True,
-                                  text=True).stdout.strip()
+                                  text=True, encoding="utf-8", errors="replace").stdout.strip()
 
         sgit("init", "-q")
         sgit("checkout", "-q", "-b", "main")
@@ -2508,7 +2805,7 @@ def _resolve_diff_ref(root: str, ref: str) -> str:
                       cwd=root, capture_output=True).returncode == 0:
         return ref
     base = subprocess.run(["git", "merge-base", ref, "HEAD"], cwd=root,
-                          capture_output=True, text=True).stdout.strip()
+                          capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     if not base:
         print("stylelint: warning: %s is not an ancestor of HEAD and has no merge base with it - comparing "
               "against %s itself" % (ref, ref), file=sys.stderr)
@@ -2530,7 +2827,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.selftest:
         return selftest()
 
-    root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     root = root.stdout.strip() if root.returncode == 0 else os.getcwd()
     ownership = load_ownership(root)
 
@@ -2541,33 +2838,63 @@ def main(argv: list[str] | None = None) -> int:
             rels = [after for _before, after in pairs]
             # Each side against its own map: the working tree's index cannot resolve a name this batch
             # renamed, so using it here turned every rename into a batch of phantom rule-2 additions.
+            base_ownership = load_ownership_at_ref(root, args.diff) or ownership
+            base_findings = findings_at_ref(root, args.diff, pairs, base_ownership)
             before = merge_counts(
-                findings_at_ref(root, args.diff, pairs,
-                                load_ownership_at_ref(root, args.diff) or ownership),
+                rule_counts(base_findings),
                 rule1_counts_at_ref(root, args.diff, pairs),
                 header_pragma_counts_at_ref(root, args.diff),
                 header_rule11_counts_at_ref(root, args.diff),
                 header_rule12_counts_at_ref(root, args.diff,
                                             load_ownership_at_ref(root, args.diff) or ownership))
+            # the base copy's rule-2 symbols, so a credit can only ever touch a name that is *new* to the
+            # file: one it already declared is part of `before`, never one of the batch's additions
+            base_symbols: dict = {}
+            for f in base_findings:
+                if f.get("rule") == 2 and f.get("symbol"):
+                    base_symbols.setdefault(f["file"], set()).add(f["symbol"])
+            base_gaps = unresolved_declarations_at_ref(root, args.diff, pairs, base_ownership)
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
             return 2
+        # `lint_tree` covers the changed files only, which is exactly what a credit may consider: a finding
+        # in a file the batch did not touch can never be one of its additions.  Kept as a list (not just
+        # its counts) because a credit is a judgement about a *finding* - its symbol and its resolution -
+        # and `diff_deltas` alone cannot tell a completed rename from a newly foreign declaration.
+        touched = lint_tree(root, [os.path.join(root, a) for _b, a in pairs], ownership)
+        # the gaps each file gave up: the old spelling of a renamed row is an *unmapped* name, so a file that
+        # completed a rename has strictly fewer of them.  One credit costs one freed gap (see `rename_credits`).
+        # The sources are rebuilt the way `lint_tree` builds them, so `rel` (the key both sides are compared
+        # by) is spelled identically.
+        after_sources = [Source(os.path.join(root, a), rel_of(root, os.path.join(root, a)),
+                                read_text(os.path.join(root, a))) for _b, a in pairs]
+        freed_gaps = {src.rel: base_gaps.get(src.rel, set()) - unresolved_declarations(src, ownership)
+                      for src in after_sources}
         after = merge_counts(
-            rule_counts(lint_tree(root, [os.path.join(root, a) for _b, a in pairs], ownership)),
+            rule_counts(touched),
             rule_counts(rule1_findings(all_sources(root))),
             rule_counts(header_pragma_findings(root)),
             rule_counts(header_rule11_findings(root)),
             rule_counts(header_rule12_findings(root, ownership)))
-        added = diff_deltas(before, after)
+        added, credits = apply_rename_credits(diff_deltas(before, after), touched, base_ownership,
+                                             ownership, base_symbols,
+                                             {p: len(names) for p, names in freed_gaps.items()})
+        credit_lines = rename_credit_lines(credits, freed_gaps)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
+                              "rename_credits": [{"rule": r, "file": p, "count": n,
+                                                  "stopped_spelling": sorted(freed_gaps.get(p, ()))}
+                                                 for (r, p), n in sorted(credits.items())],
                               "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
                               "exempt": exemptions()}, indent=2))
         elif added:
             print("stylelint: the batch adds %d section 6.5 violation(s) over %d changed file(s):"
                   % (sum(a["added"] for a in added), len(rels)))
             for a in added:
-                print("  +%d rule %d  %s  (%d -> %d)" % (a["added"], a["rule"], a["file"], a["before"], a["after"]))
+                print("  +%d rule %d  %s  (%d -> %d)" % (a["added"], a["rule"], a["file"], a["before"],
+                                                          a["after"]))
+            for line in credit_lines:
+                print(line)
             for num, what in UNCHECKED:
                 print("  not checked (cross-file): rule %d - %s" % (num, what))
             for rule, prefix, why in EXEMPT:
@@ -2578,8 +2905,10 @@ def main(argv: list[str] | None = None) -> int:
             print("stylelint: no new section 6.5 violation over %d changed file(s) "
                   "(rule 2 resolves every extern to an owner or the unsplit band; rule 7 fires on every "
                   "auto-generated name; rule 11 fires on every unmarked `void *` parameter/return type; "
-                  "rule 12 fires on every `extern` of unowned data; only pre-existing findings are "
-                  "grandfathered)" % len(rels))
+                  "rule 12 fires on every `extern` of unowned data; only pre-existing findings and a "
+                  "rename's referrer half are grandfathered)" % len(rels))
+            for line in credit_lines:
+                print(line)
         return 1 if added else 0
 
     findings = lint_all(root, ownership)

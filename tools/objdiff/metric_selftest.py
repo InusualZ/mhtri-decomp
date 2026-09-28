@@ -239,7 +239,7 @@ def _project_report():
     """The freshly generated whole-project report, or None."""
     out = os.path.join(ROOT, "build", "tmp", "metric_selftest_report.json")
     p = subprocess.run([uu.OBJDIFF, "report", "generate", "-p", ROOT, "-o", out],
-                       cwd=ROOT, capture_output=True, text=True, errors="replace")
+                       cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return None
     data = json.load(open(out, encoding="utf-8"))
@@ -274,7 +274,7 @@ def integration(unit, official_all) -> int:
 
     # 2. symdiff prints the official number (and says so)
     p = subprocess.run([sys.executable, SYMDIFF, "-u", unit.name, sym, "1"],
-                       cwd=ROOT, capture_output=True, text=True, errors="replace")
+                       cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     head = (p.stdout or "").splitlines()[0] if p.stdout else ""
     failures = _truthy("symdiff prints the report metric for %s" % sym,
                        ("match %s" % official[sym]) in head and "report metric" in head, failures)
@@ -323,7 +323,7 @@ def _slotmap_rows(diff_json, symbol, index, unit=None):
     else:
         cmd += [diff_json, symbol]
     cmd += ["--around", "%d,%d" % (index, index + 1)]
-    p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, errors="replace")
+    p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     rows = {}
     for line in (p.stdout or "").splitlines():
         if "|" not in line:

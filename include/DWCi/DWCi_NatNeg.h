@@ -114,6 +114,11 @@ extern u32 DWCi_natNegServerToken;
 extern u32 DWCi_natNegLastPollTick;
 extern void (*DWCi_natNegPollCallback)(u32, struct DWCiNatNegSession*);
 
+/* 0x80794380 is declared **once**, above, as `natNegMessageMagic`, and unsized on purpose: an unknown-
+ * size array is the shape that gets the `lis`/`addi` (ADDR16_HA/LO) pair the target's relocation asks for,
+ * so sizing it would move `Network/fn_8041A87C.cpp`'s codegen.  It moved here from
+ * `include/unsplit/Network.h`, which had declared it while the range was unowned; the band reaches it by
+ * including this header (rule 2). */
 #ifdef __cplusplus
 }
 #endif

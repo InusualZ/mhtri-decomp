@@ -419,7 +419,7 @@ def disassemble(obj, tool=None):
     os.remove(tmp)
     try:
         p = subprocess.run([tool, "elf", "disasm", obj, tmp], cwd=ROOT,
-                           capture_output=True, text=True, errors="replace")
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         if p.returncode != 0 or not os.path.exists(tmp):
             return None, "dtk elf disasm failed: " + ((p.stdout or "") + (p.stderr or "")).strip()[:200]
         with open(tmp, "r", encoding="utf-8", errors="replace") as fh:

@@ -203,7 +203,7 @@ def disassemble(objdump: str, obj: str) -> str:
     out = subprocess.run(
         [objdump, "-M", DISASM_CPU, "-dr", "--no-show-raw-insn", obj],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8",
         errors="replace",
     )
     if out.returncode != 0:
@@ -212,7 +212,7 @@ def disassemble(objdump: str, obj: str) -> str:
         out = subprocess.run(
             [objdump, "-dr", "--no-show-raw-insn", obj],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8",
             errors="replace",
         )
         if out.returncode != 0:

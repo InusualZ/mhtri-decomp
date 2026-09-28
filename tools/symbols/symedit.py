@@ -1111,7 +1111,7 @@ def selftest() -> int:
             encoding="utf-8")
         subprocess.run(["git", "init", "-q"], cwd=repo, capture_output=True)
         p = subprocess.run([sys.executable, os.path.abspath(__file__), "show", marker],
-                           cwd=repo, capture_output=True, text=True, errors="replace")
+                           cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
         check("the default map is the invocation tree's (its marker is found)", marker in (p.stdout or ""),
               True)
         check("... and the command succeeds there", p.returncode, 0)

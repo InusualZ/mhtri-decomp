@@ -159,7 +159,7 @@ def integration_rows() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         full = os.path.join(tmp, "full.json")
         p = subprocess.run([objdiff, "report", "generate", "-p", ROOT, "-o", full],
-                           cwd=ROOT, capture_output=True, text=True, errors="replace")
+                           cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if p.returncode != 0 or not os.path.exists(full):
             print("skip  integration cross-check (report generate failed: %s)" % (p.stderr or p.stdout)[:120])
             return 0

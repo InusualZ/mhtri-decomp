@@ -487,7 +487,7 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
     msg = ["merge main into the branch (resolved by class: %s)" % ", ".join(sorted({a["class"] for a in actions}))
            if actions else "merge main into the branch"]
     subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
-    p = subprocess.run(["git", "commit", "-q", "-m", msg[0]], cwd=root, capture_output=True, text=True)
+    p = subprocess.run(["git", "commit", "-q", "-m", msg[0]], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         return bail("the merge commit failed: %s" % (p.stderr or p.stdout).strip()[:200])
     try:

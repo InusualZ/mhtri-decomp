@@ -745,7 +745,7 @@ def _symbol_address(name: str, symbols_by_name: dict):
 def _git(root: str, *args: str) -> str:
     """`git <args>` stdout, or `""` - a missing ref or a file absent at it is a fact, not a crash."""
     try:
-        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8",
                            errors="replace")
     except OSError:
         return ""

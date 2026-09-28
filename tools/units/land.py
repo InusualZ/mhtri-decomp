@@ -174,6 +174,9 @@ import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+#: The repository the tools layer lives in.  `land` always works on MAIN (`rc.main_root`, walked from
+#: wherever the caller stands); this is the *source* tree, and only the selftest's own lint reads it.
+SELF_REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, os.path.dirname(HERE) + os.sep + "git")
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "agents"))
@@ -189,6 +192,9 @@ from units import recompile as rc  # noqa: E402
 # `header_declarations` scanner the band rule uses); the new range-boundary check reuses it rather than
 # growing a second copy of the map parser and a second declaration scanner.
 from units import stylelint as sl  # noqa: E402
+# `subproc` owns the one rule for reading a subprocess' text (pin UTF-8, never inherit the locale codec).
+# `land.run` was the site that broke it - see the F34 fixture in the selftest and `subproc.py`'s docstring.
+from units import subproc as sp  # noqa: E402
 # unionguard decides whether a conflicted registration is the safe append class; unionresolve is the
 # resolver + invariant assertions moved in from the untracked `.pi/bin/union.py`. `land` calls both
 # directly, so the land path no longer depends on a script a fresh clone cannot see.
@@ -285,7 +291,7 @@ def failure_summary(checks: list, prefix: str = "REFUSING to build or stage anyt
 
 
 def run(args: list[str], cwd: str) -> subprocess.CompletedProcess:
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, errors="replace")
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
@@ -846,7 +852,7 @@ def _union_conflicts(tree: str, branch: str, base: str | None = None, paths: lis
     if commit:
         p = runner(["git", "commit", "-q", "-m",
                     "resolve: union the registration append-conflict on %s" % branch], cwd=tree,
-                   capture_output=True, text=True, errors="replace")
+                   capture_output=True, text=True, encoding="utf-8", errors="replace")
         if p.returncode != 0:
             tail = ((p.stdout or "") + (p.stderr or "")).strip().splitlines()
             return _resolve_result(False, "the union is sound but the commit failed: %s"
@@ -892,7 +898,7 @@ def scratch_resolve(main_tree: str, branch: str, base: str | None = None, commit
         suffix += 1
         scratch_branch = "land/resolve-%s-%d-%d" % (slug, os.getpid(), suffix)
     p = runner(["git", "worktree", "add", "-b", scratch_branch, tmp, branch], cwd=main_tree,
-               capture_output=True, text=True, errors="replace")
+               capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         return _resolve_result(False, "git worktree add failed: %s"
                                % ((p.stderr or p.stdout or "").strip().splitlines() or [""])[-1])
@@ -902,7 +908,7 @@ def scratch_resolve(main_tree: str, branch: str, base: str | None = None, commit
         runner(["git", "branch", "-D", scratch_branch], cwd=main_tree, capture_output=True)
         return _resolve_result(False, reason, **extra)
 
-    merge = runner(["git", "merge", "--no-commit", "main"], cwd=tmp, capture_output=True, text=True,
+    merge = runner(["git", "merge", "--no-commit", "main"], cwd=tmp, capture_output=True, text=True, encoding="utf-8",
                    errors="replace")
     if merge.returncode == 0 and not ug.unmerged(tmp):
         return discard("the branch merges `main` cleanly - no registration conflict to resolve")
@@ -1039,14 +1045,24 @@ def require_clean_tree(main: str) -> str | None:
     dirty by design and is not a real change (`agents_md_real_change`).
     """
     rows = changed_status(main)
+    # What counts as dirt: every row, except an AGENTS.md whose LOCAL-ONLY block is its only difference.
+    # The LOCAL-ONLY block is live working state (rule 8) and is dirty in every tree, so it is judged once
+    # per call, not once per row.
+    agents_clean = "AGENTS.md" in [p for _c, p in rows] and not agents_md_real_change(main)
     dirty: list[str] = []
+    kept: list[str] = []
     for code, path in rows:
-        if path == "AGENTS.md" and not agents_md_real_change(main):
+        if path == "AGENTS.md" and agents_clean:
             continue
         dirty.append("%s %s" % (code or "??", path))
+        kept.append(path)
     if not dirty:
         return None
-    paths = " ".join(p for _c, p in rows)
+    # the paths in the suggested command are the *dirty* ones, not every row: an AGENTS.md that was just
+    # excluded (live state) must not be offered for stashing - the reader is being told what to clean, and
+    # stashing live working state is not that.  (`paths` used to be built from `rows`, so the command named
+    # AGENTS.md in exactly the case where it had just been ruled clean.)
+    paths = " ".join(kept)
     return ("main's tree is not clean: %s\n  a dirty tree is recorded as foreign work at `record-base` "
             "and aborts the pick, so clean it first, e.g.:\n"
             "    git -C %s stash push --include-untracked -- %s\n"
@@ -3074,7 +3090,7 @@ def selftest() -> int:
 
     def repo_git(path, *args):
         p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
-                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True)
+                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if p.returncode != 0:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()
@@ -3960,7 +3976,7 @@ def selftest() -> int:
         wt = os.path.join(tmp, name)
         repo_git(tmp, "worktree", "add", "-b", name, wt, branch)
         subprocess.run(["git", "merge", "--no-commit", "main"], cwd=wt,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
         return wt
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -4101,6 +4117,16 @@ def selftest() -> int:
         open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8").write(
             "base\n" + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
         check("clean-tree: a LOCAL-ONLY-only AGENTS.md is not dirty", require_clean_tree(tmp), None)
+        # ... and when something ELSE is dirty, the suggested stash command names only that something: an
+        # AGENTS.md that was just ruled clean is not offered for stashing (its block is live state).
+        with open(os.path.join(tmp, "src", "a.cpp"), "w", encoding="utf-8") as fh:
+            fh.write("real dirt\n")
+        message = require_clean_tree(tmp) or ""
+        check("clean-tree: the dirt is refused", "main's tree is not clean: M src/a.cpp" in message, True)
+        check("... and the stash command names it", "stash push --include-untracked -- src/a.cpp" in message,
+              True)
+        check("... but not the AGENTS.md it just ruled clean", "AGENTS.md" not in message, True)
+        repo_git(tmp, "checkout", "--", "src/a.cpp")
 
     def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
                         check_outbox=True, release_claims=True, problems=None, branch=None,
@@ -4249,6 +4275,43 @@ def selftest() -> int:
                 code = main()
         check("land --branch runs through main()", code, 0)
         check("... and prints the one answer line", buf.getvalue().startswith("LANDED"), True)
+
+    # --- F34: the gate's own decode, and the lint that keeps it that way ---------------------------------
+    # `land.run` used `text=True` with no codec, so git's UTF-8 stdout was decoded with the host's locale
+    # codec (`cp1252` here) while `agents_md_real_change` compared it against AGENTS.md read as UTF-8.  One
+    # em dash in AGENTS.md's prose made the two spellings differ, the comparison never matched, and the
+    # landing gate refused *every* landing with "main's tree is not clean: M AGENTS.md" - a false refusal
+    # (the file is byte-equal to HEAD once the LOCAL-ONLY block is cut, and `PYTHONUTF8=1` flipped the same
+    # call to False).  The fixture is that em dash at byte level: a check that decodes through the locale is
+    # exactly the failure it is here to catch, so it must not itself be host-dependent.
+    dash = "\u2014"
+    probe = run([sys.executable, "-c", "import sys; sys.stdout.buffer.write(bytes.fromhex('%s'))"
+                 % dash.encode("utf-8").hex()], SELF_REPO)
+    check("F34: `run` decodes a subprocess' UTF-8 stdout as UTF-8", probe.stdout, dash)
+    with tempfile.TemporaryDirectory() as tmp:
+        repo_git(tmp, "init", "-q")
+        repo_git(tmp, "checkout", "-q", "-b", "main")
+        prose = "prose with an em dash %s in it\n" % dash
+        _write_tree(tmp, {"AGENTS.md": prose})            # committed: rule 8 keeps the block out of HEAD
+        head_text = run(["git", "show", "HEAD:AGENTS.md"], tmp).stdout
+        head_bytes = subprocess.run(["git", "show", "HEAD:AGENTS.md"], cwd=tmp,
+                                    capture_output=True).stdout
+        check("F34: `run` returns HEAD's em dash, not its cp1252 spelling", dash in head_text, True)
+        check("... where a locale decode of those same bytes would not have matched",
+              dash in head_bytes.decode("cp1252", "replace"), False)
+        with open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8", newline="") as fh:
+            fh.write(prose + localonly.BEGIN + "\nlive working state\n" + localonly.END + "\n")
+        check("F34: non-ASCII prose plus a LOCAL-ONLY block is not a real change",
+              agents_md_real_change(tmp), False)
+        check("... so the clean-tree gate lets the landing through", require_clean_tree(tmp), None)
+        with open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8", newline="") as fh:
+            fh.write("prose with an em dash %s and an EDIT\n" % dash
+                     + localonly.BEGIN + "\nlive working state\n" + localonly.END + "\n")
+        check("... while a real edit outside the block still refuses", agents_md_real_change(tmp), True)
+        check("... naming AGENTS.md", "AGENTS.md" in (require_clean_tree(tmp) or ""), True)
+
+    strays = sp.trap_sites(SELF_REPO)
+    check("every text-mode subprocess call in tools/ pins its codec (F34's rule)", strays, [])
 
     if fails:
         print("FAIL (%d)" % len(fails))

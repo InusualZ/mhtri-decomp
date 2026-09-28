@@ -79,7 +79,7 @@ _SRC_EXTS = (".c", ".cpp", ".cp", ".cxx", ".cc", ".c++", ".C")
 # --------------------------------------------------------------------------------------------------
 
 def _run(repo: str, args: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, errors="replace")
+    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def git(repo: str, args: list[str], check: bool = True) -> str:
@@ -323,12 +323,12 @@ def render(report: dict) -> str:
 
 def _selftest_commit(repo: str, message: str) -> str:
     subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
-                    "add", "-A"], cwd=repo, capture_output=True, text=True)
+                    "add", "-A"], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
     p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
-                        "commit", "-q", "-m", message], cwd=repo, capture_output=True, text=True)
+                        "commit", "-q", "-m", message], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise SystemExit("selftest commit failed: %s" % (p.stderr or p.stdout))
-    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
 
 
 def _write(repo: str, rel: str, text: str) -> None:
@@ -379,7 +379,7 @@ def selftest() -> int:
 
     with tempfile.TemporaryDirectory() as repo:
         def g(*args):
-            return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True).stdout
+            return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
 
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, capture_output=True)
         _write(repo, CONFIGURE, _registration(["mainunit"]))

@@ -63,7 +63,7 @@ def diff_unit(unit, label, symbol):
     out = os.path.join(OUTDIR, label.replace("/", "_") + ".json")
     cmd = [OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
            "-c", "functionRelocDiffs=none", "--format", "json", "-o", out]
-    p = subprocess.run(cmd, cwd=uu.ROOT, capture_output=True, text=True)
+    p = subprocess.run(cmd, cwd=uu.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         return None, (p.stdout or "") + (p.stderr or "")
     return out, ""

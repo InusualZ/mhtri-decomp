@@ -101,16 +101,26 @@
  * linker had nothing to resolve them against: the three `new` sites and the thread accessor referenced
  * four names **no map row and no link input carried** - `__ct__12PatInterfaceFv`,
  * `__ct__21NetworkReflectServiceFv`, `__ct__22GameSpyInterfaceThreadFv` and
- * `getGameSpyInterfaceThread`, all four `*UND*` with an empty provider set - so a flip would have failed
- * with `undefined:`.  The map now carries the compiler's own spellings, each defined by a link input:
- * `fn_803FCC34` -> `__ct__12PatInterfaceFv` (0x803FCC34) and `constructReflectService` ->
+ * `getGameSpyInterfaceThread`, all four `*UND*` with an empty provider set - so a flip would have
+ * failed with `undefined:`.  The map now carries the compiler's own spellings, each defined by a link
+ * input: `fn_803FCC34` -> `__ct__12PatInterfaceFv` (0x803FCC34) and `constructReflectService` ->
  * `__ct__21NetworkReflectServiceFv` (0x8041A1C4), both unowned bands whose symbols the `new` sites
  * already spelled that way; `create__22GameSpyInterfaceThreadFv` -> `__ct__22GameSpyInterfaceThreadFv`
  * (0x8041C66C), whose owner `Network/fn_8041A87C.cpp` turned its `create()` into the class's
- * constructor in the same change; and `fn_803D6A98` -> `getGameSpyInterfaceThread` (0x803D6A98,
- * `Network/fn_803D3CE8.cpp`), with the referrers in `include/Network/fn_8041A87C.h` and
+ * constructor in the same change; and `fn_803D6A98` -> `GameSpyInterfaceThread_getInstance`
+ * (0x803D6A98, `Network/fn_803D3CE8.cpp`), with the referrers in `include/Network/fn_8041A87C.h` and
  * `src/Network/fn_8041A87C.cpp`.  Re-measured: every `.text` row and the whole-project progress are
  * unchanged, and `flipcheck.py` reports exactly the four complaints it did before, no new one.
+ *
+ * Those four rows were **renamed again** by `worker/fn-803d3ce8-2477`, to the owners' own definition
+ * spellings (the map rows at 36030, 36676, 36678 and 57701), and the referrers this file and
+ * `src/Network/fn_8041A87C.cpp` carried were left on the old ones - `flipcheck.py` then reported "3
+ * referenced symbol(s) are defined by nothing a flip can use - clearPatInterface,
+ * getGameSpyInterfaceThread, isPatInterfaceReady" for this unit.  They are spelled
+ * `GameSpyInterfaceThread_getInstance`, `PatInterface_clear` and `PatInterface_isReady` here now, and
+ * each referrer's **signature** is unchanged: the target passes the pointer in r3 (`bl getInstance_`
+ * followed by `bl PatInterface_clear` and `bl PatInterface_isReady`), so the argument stays and only
+ * the name moved.
  *
  * .data.  The three jump tables are `jumptable_806024B8` (0x2C4, 177 entries), `jumptable_8060277C`
  * (0x28, 10) and `jumptable_806027A4` (0x80, 32); they tile exactly 0x806024B8..0x80602824 in the same
@@ -240,9 +250,9 @@ void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
 /* The thread accessor the opening's init reaches.  Its body sits in the `Network/fn_803D3CE8.cpp` band
  * and returns that band's own thread object, so it stays `void*` in the owner's declaration and this
- * file declares the typed call; the map row keeps the descriptive name (the runtime dump answers only
- * the placeholder `getInstance` for it). */
-GameSpyInterfaceThread* getGameSpyInterfaceThread(void);
+ * file declares the typed call; the map row is the owner's spelling of the dump's placeholder
+ * `getInstance`, qualified by the class. */
+GameSpyInterfaceThread* GameSpyInterfaceThread_getInstance(void);
 u32   getMediatorField24(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
@@ -313,8 +323,8 @@ s32   isOpeningMaintenanceTerms(PatInterface* self);
 s32   isOpeningMaintenanceServer(PatInterface* self);
 s32   isOpeningAnnounce(PatInterface* self);
 void  updatePatInterface(PatInterface* self, u32 a, u32 b, u32 c);
-void  clearPatInterface(PatInterface* self);
-s32   isPatInterfaceReady(PatInterface* self);
+void  PatInterface_clear(PatInterface* self);
+s32   PatInterface_isReady(PatInterface* self);
 void  setPatBuffer(PatInterface* self, u32 index, char* buffer, u32 size);
 void  setPatRange(PatInterface* self, u32 index, u32 address, u32 size);
 u32   getPatServerTime(PatInterface* self);
@@ -676,7 +686,7 @@ void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value)
     if (getInstance_() == NULL) {
         new PatInterface();
     }
-    if (getGameSpyInterfaceThread() == NULL) {
+    if (GameSpyInterfaceThread_getInstance() == NULL) {
         new GameSpyInterfaceThread();
     }
     setTermVersion(getInstance_(), 0);
@@ -712,8 +722,8 @@ void loadPatInterfaceBuffers()
     setPatBuffer(getInstance_(), 1, NULL, 0);
     setPatRange(getInstance_(), 1, 0, 0);
     setPatRange(getInstance_(), 2, 0, 0);
-    clearPatInterface(getInstance_());
-    if (isPatInterfaceReady(getInstance_()) != 0) {
+    PatInterface_clear(getInstance_());
+    if (PatInterface_isReady(getInstance_()) != 0) {
         return;
     }
     PatInterface* instance = getInstance_();

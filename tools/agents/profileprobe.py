@@ -74,7 +74,7 @@ def main(argv):
     # T0 freshness: a probe of a stale profile measures the wrong prompt. The section 6.5 block in every profile
     # is generated from docs/plan.md section 6.5, so refuse to probe until it matches the plan.
     stale = subprocess.run([sys.executable, os.path.join("tools", "agents", "sync_profiles.py"), "--check"],
-                           cwd=main_dir, capture_output=True, text=True)
+                           cwd=main_dir, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if stale.returncode != 0:
         sys.stderr.write(stale.stderr)
         print("refusing to probe: a profile is stale - run `python tools/agents/sync_profiles.py` first")

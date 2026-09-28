@@ -301,7 +301,7 @@ def report(cwd: str, base: str | None, branch: str | None, paths: list[str],
 # --------------------------------------------------------------------------------------------------
 
 def _run(cwd: str, *args: str):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, errors="replace")
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def _init(cwd: str) -> None:

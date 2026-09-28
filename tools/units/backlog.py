@@ -1417,7 +1417,7 @@ def default_main() -> str:
     import subprocess
     try:
         p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=os.getcwd(),
-                           capture_output=True, text=True, errors="replace")
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         for line in p.stdout.splitlines():
             if line.startswith("worktree "):
                 return line.split(" ", 1)[1]

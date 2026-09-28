@@ -71,7 +71,7 @@ def _run_one(job):
         toks = list(tokens)
         toks[toks.index("-c") + 1] = probe_src
         toks[toks.index("-o") + 1] = probe_dir
-        p = subprocess.run(toks, cwd=uu.ROOT, capture_output=True, text=True, errors="replace")
+        p = subprocess.run(toks, cwd=uu.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         obj = os.path.join(probe_dir, "shapes_probe.o")
         if p.returncode != 0 or not os.path.exists(obj):
             return {"idx": idx, "error": uu.quiet((p.stdout or "") + (p.stderr or ""))[:300]}
@@ -181,7 +181,7 @@ def probe_rows(target, obj, symbol, unit_name, tmpdir):
     out = os.path.join(tmpdir, "shapes_diff.json")
     p = subprocess.run([uu.OBJDIFF, "diff", "-p", proj, "-u", unit_name or "measure", symbol,
                         "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-                       cwd=uu.ROOT, capture_output=True, text=True, errors="replace")
+                       cwd=uu.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return None
     d = json.load(open(out, encoding="utf-8"))

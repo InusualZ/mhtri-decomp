@@ -82,7 +82,7 @@ PANE_READ_LINES = 40
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, errors="replace")
+    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and out.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, out.stderr.strip()))
     return out.stdout
@@ -101,7 +101,7 @@ def herdr_panes(runner=subprocess.run) -> dict[str, dict] | None:
     safety net, not a new single point of failure.
     """
     try:
-        out = runner([herdr_exe(), "pane", "list"], capture_output=True, text=True,
+        out = runner([herdr_exe(), "pane", "list"], capture_output=True, text=True, encoding="utf-8",
                      errors="replace", timeout=15)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -121,7 +121,7 @@ def herdr_read(pane_id: str, runner=subprocess.run) -> str | None:
     """A pane's own output - `None` when it cannot be read (usually because the pane is gone)."""
     try:
         out = runner([herdr_exe(), "pane", "read", pane_id, "--lines", str(PANE_READ_LINES),
-                      "--format", "text"], capture_output=True, text=True, errors="replace", timeout=15)
+                      "--format", "text"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
     except (OSError, subprocess.SubprocessError):
         return None
     return out.stdout if out.returncode == 0 else None
@@ -135,7 +135,7 @@ def herdr_close(pane_id: str, runner=subprocess.run, lister=None) -> tuple[bool,
     directory), which is exactly how `Pl/pl_master`'s worktree got detached on 2026-09-23.
     """
     try:
-        out = runner([herdr_exe(), "pane", "close", pane_id], capture_output=True, text=True,
+        out = runner([herdr_exe(), "pane", "close", pane_id], capture_output=True, text=True, encoding="utf-8",
                      errors="replace", timeout=15)
     except (OSError, subprocess.SubprocessError) as exc:
         return False, str(exc)
@@ -345,7 +345,7 @@ def _make_junction(link: str, target: str) -> bool:
     link, target = os.path.abspath(link), os.path.abspath(target)
     if os.name == "nt":
         r = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
-                           capture_output=True, text=True, errors="replace")
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         return r.returncode == 0 and os.path.exists(link)
     try:
         os.symlink(target, link, target_is_directory=True)
@@ -639,7 +639,7 @@ def _main_build_is_current(main: str) -> bool:
 def _tracked_files(wt: str) -> list[str]:
     """Every tracked path in the worktree (for aging the checkout behind the seeded build outputs)."""
     try:
-        p = subprocess.run(["git", "-C", wt, "ls-files", "-z"], capture_output=True, text=True,
+        p = subprocess.run(["git", "-C", wt, "ls-files", "-z"], capture_output=True, text=True, encoding="utf-8",
                            errors="replace")
     except OSError:
         return []
@@ -725,7 +725,7 @@ def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None, overw
     # .git/modules (no network needed).  Same class as `build/binutils` seeding as 0 files.
     if os.path.isdir(os.path.join(wt, "tools")) and not os.path.exists(os.path.join(wt, "tools", "m2c", "m2c.py")):
         subprocess.run(["git", "-C", wt, "submodule", "update", "--init", "tools/m2c"],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
         if os.path.exists(os.path.join(wt, "tools", "m2c", "m2c.py")):
             seeded = True
             parts.append("tools/m2c: submodule initialised")
@@ -836,7 +836,7 @@ def worker_branches(main: str) -> set[str]:
     entry would spawn git per unit. A tree that is not a repository (a selftest's temp dir) has none.
     """
     out = subprocess.run(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/" + BRANCH_PREFIX],
-                         cwd=main, capture_output=True, text=True, errors="replace")
+                         cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if out.returncode != 0:
         return set()
     return {line.strip() for line in out.stdout.splitlines() if line.strip()}
@@ -860,7 +860,7 @@ def lock_held(main: str, unit: str, branches: set[str] | None = None) -> bool:
 
 def merged_into_main(main: str, branch: str) -> bool:
     """True when every commit of `branch` is already reachable from main - merged *or* cherry-picked."""
-    out = subprocess.run(["git", "cherry", "main", branch], cwd=main, capture_output=True, text=True)
+    out = subprocess.run(["git", "cherry", "main", branch], cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if out.returncode != 0:
         return False
     return not [l for l in out.stdout.splitlines() if l.startswith("+")]
@@ -998,7 +998,7 @@ def load_ack(main: str, unit: str) -> dict:
 
 def _git_quiet(args: list[str], cwd: str) -> str | None:
     """`git <args>`'s stripped stdout, or `None` when git fails (a temp dir in the selftests, no repo)."""
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, errors="replace")
+    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.stdout.strip() if p.returncode == 0 else None
 
 
@@ -1113,7 +1113,7 @@ def claim_status(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
         commits = 0
         if row.get("branch") and row.get("base"):
             out = subprocess.run(["git", "rev-list", "--count", "%s..%s" % (row["base"], row["branch"])],
-                                 cwd=main, capture_output=True, text=True)
+                                 cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
             if out.returncode == 0 and out.stdout.strip().isdigit():
                 commits = int(out.stdout.strip())
         if row["outbox"]:
@@ -1386,13 +1386,13 @@ def commits_ahead(main: str, branch: str) -> int:
     if not branch or not branch_exists(main, branch):
         return 0
     p = subprocess.run(["git", "rev-list", "--count", "main..%s" % branch],
-                       cwd=main, capture_output=True, text=True, errors="replace")
+                       cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return int(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip().isdigit() else 0
 
 
 def registered_worktree_paths(main: str) -> list[str] | None:
     """Every path `git worktree list` knows, or `None` when git could not be asked."""
-    p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=main, capture_output=True, text=True,
+    p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=main, capture_output=True, text=True, encoding="utf-8",
                        errors="replace")
     if p.returncode != 0:
         return None
@@ -1472,7 +1472,7 @@ def _run_teardown(steps: list[dict]) -> bool:
 
 
 def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=None,
-            lister=None, branch: str | None = None) -> dict:
+            lister=None, branch: str | None = None, run_registry: str | None = None) -> dict:
     """The one-shot teardown of a claim: rescue ref, pane close, worktree, branch, prune, registry, ack.
 
     Idempotent and total (docs/plan.md, "Teardown is part of landing"): every step reports what it did or why
@@ -1494,7 +1494,11 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
 
     Every pane the claim owns is closed, not just the worker's own: a subagent's pane has no other owner and
     outlives its parent (`panes_for_claim`). `probe`, `close` and `lister` exist for the selftests; all three
-    default to the real herdr layer.
+    default to the real herdr layer. `run_registry` is the same kind of seam for the slot guard: it names
+    the harness' async run registry the teardown reads (`slots.release_blockers`), and the default discovers
+    it under the temp dir.  It is deliberately **not** called `registry` - this function has a local
+    `registry` (the claims JSON, a dict), and a shadowed parameter of the same name forwards the dict where
+    a path is expected.
 
     `branch` names the claim by its branch instead of by its unit (see the comment in the body): the two agree
     for a claim `claim` made itself, and differ exactly when a unit has been claimed twice.
@@ -1606,8 +1610,16 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, close=
         # A slot is a persistent directory: teardown *returns* it to main's tip and keeps its warm trees;
         # it is never removed.  The branch (the lock) still goes - a slot holds a directory, never a
         # branch - after the rescue ref above, and the whole thing is one step so an error fails closed.
+        #
+        # `slots.release` fails closed on a RUNNING subagent run in the slot (read from the harness' async
+        # run registry - a lock cannot see a lane) and on commits no branch reaches; both stay in force
+        # here.  `allow_dirty` is passed because this function has *already* refused un-merged, un-recorded
+        # work above (`not force and not (merged or outbox)`): whatever is left in the tree at this point is
+        # post-landing scratch, and calling it dirty would refuse every ordinary teardown.  `force` is
+        # forwarded, so `claims.py release --force` is still the one deliberate override.
         def _return_slot(sid=slot_id):
-            _slots().release(main, slot=sid, unit=unit, branch=branch, rescue=False, refresh=True)
+            _slots().release(main, slot=sid, unit=unit, branch=branch, rescue=False, refresh=True,
+                             force=force, allow_dirty=True, registry=run_registry)
             return "returned to main's tip, branch deleted, build tree refreshed"
         if os.path.isdir(path):
             steps.append(_done_step("slot %d return (%s)" % (slot_id, path), _return_slot))
@@ -1683,7 +1695,7 @@ def worktree_dirty(path: str) -> bool | None:
     """
     if not os.path.isdir(path):
         return None
-    p = subprocess.run(["git", "-C", path, "status", "--porcelain"], capture_output=True, text=True,
+    p = subprocess.run(["git", "-C", path, "status", "--porcelain"], capture_output=True, text=True, encoding="utf-8",
                        errors="replace")
     return bool(p.stdout.strip()) if p.returncode == 0 else None
 
@@ -2108,7 +2120,7 @@ def selftest() -> int:
 
     def repo_git(path, *args):
         p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
-                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True)
+                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if p.returncode != 0:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()

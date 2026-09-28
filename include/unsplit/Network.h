@@ -138,10 +138,8 @@ void OSSleepTicks(u64 ticks);
 extern u32 lbl_806036A0[];
 extern u32 lbl_80603740[];
 
-/* the three-slot socket table, the peer thread's result record and the global socket */
+/* the three-slot socket table and the peer thread's reply marker, lookup key and address format */
 extern u32 lbl_806D3650[3];
-extern u32 lbl_80794CE0;
-extern void* lbl_80794CE4;
 extern const char lbl_80793990[3];
 extern u32 lbl_80793994;
 extern const char lbl_80793998[4];
@@ -151,6 +149,15 @@ extern const char lbl_80793998[4];
  * is the *unsized* spelling this unit needs.  It addresses the symbol with `lis`/`addi`
  * (ADDR16_HA/LO, the target's relocation kind), while the owner's own source re-declares it sized
  * for the SDA21 form its ten sites use (playbook row 12 - the reloc kind is a codegen input). */
+
+/* Three declarations that used to stand here are owned now, so each lives in its OWNER's header and is
+ * reached through this band by including it (section 6.5 rule 2, 2026-09-28): `lbl_80794CE0` and
+ * `sGameSpyInterfaceThread` by `Network/fn_8041A87C.cpp`, whose `splits.txt` claims
+ * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `include/Network/fn_8041A87C.h`, the header of
+ * the unit that defines them - and `natNegMessageMagic` by `DWCi/DWCi_NatNeg.c`, whose `.sdata` run
+ * 0x80794368..0x807943A0 covers it (declared in `include/DWCi/DWCi_NatNeg.h`, included at the top of
+ * this band).  A band header that still declared them would collide with the owners' definitions.
+ */
 
 /* the range's own string pool */
 extern const char lbl_80603154[];
