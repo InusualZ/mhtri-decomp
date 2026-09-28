@@ -211,6 +211,11 @@ from units import verifyunit as vu  # noqa: E402
 # `self->vtable = &NetworkSessionManagerVTable;` writes survived a landing through it (2026-09-27). The
 # gate row below is that habit, as a check.
 from units import vtableaudit as vta  # noqa: E402
+# `undefrefs` owns the relocation-name row: a `bl`/pointer under a *different relocation name* scores the
+# same, so a 100 % row can call a symbol no link input defines and no score-reading gate can see it
+# (`quest/arenatask`'s wrong struct tag, `hud/cockpit_quest`'s C-linkage spelling). The row is the
+# actionable half - does our object relocate a name nothing can provide - not a relocation diff.
+from units import undefrefs as uref  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".agents/")
 ALLOWED_FILES = ("configure.py", "AGENTS.md", ".gitignore",
@@ -328,7 +333,7 @@ def agents_md_real_change(main: str) -> bool:
     return stripped.replace("\r\n", "\n") != head.replace("\r\n", "\n")
 
 
-def record_base(main: str) -> dict:
+def record_base(main: str, units: list[str] | None = None) -> dict:
     head = git(["rev-parse", "HEAD"], main).strip()
     # HEAD == base here, so `changed_paths` is exactly "what was already dirty when the batch opened":
     # tracked edits and untracked files alike. `land_stageable` reads it back as the foreign-path guard.
@@ -340,6 +345,16 @@ def record_base(main: str) -> dict:
             "subject": git(["log", "-1", "--format=%s"], main).strip(),
             "ledger": ledger_numbers(main), "report": report_snapshot(main),
             "dirty_at_base": dirty}
+    # The add-only row's set: the base tree's own unresolved references, so the gate refuses only the names
+    # a batch ADDS and reports the rest as debt. The batch's units are compiled first (a handful, seconds)
+    # so the snapshot is the base's own objects, not a stale build; `units is None` snapshots every object
+    # already present (the manual `record-base` flow, which does not name its units).
+    norm = [claims.norm_unit(u.strip("/")) for u in (units or []) if u.strip()]
+    if norm and os.path.exists(os.path.join(main, "build.ninja")):
+        targets = compile_targets(norm)
+        if targets:
+            run(["ninja"] + targets, main)       # best effort: a failed compile leaves the object missing
+    data["undefrefs"] = uref.snapshot_base(main, norm or None)
     os.makedirs(os.path.join(main, ".pi"), exist_ok=True)
     with open(os.path.join(main, BASE_FILE), "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1)
@@ -1167,7 +1182,7 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
     # Read the resolve-helper state now, while `branch` still exists: the landing below may release and
     # delete it, and the containment proof is against `branch`'s pre-land tip.
     helper_redundant, helper_refused = resolve_helper_state(main, branch)
-    record_base(main)                      # on the clean tree, BEFORE the pick
+    record_base(main, norm)                # on the clean tree, BEFORE the pick; snapshots the base refs
     head_before = git(["rev-parse", "HEAD"], main).strip()
     ok, why, applied_base = apply_branch(main, branch, base=merge_base)
     if not ok:
@@ -2360,6 +2375,33 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         check("every batch unit compiles (compile gate)", ok_compile, compile_detail,
               remedy="make the batch unit's source compile (`ninja -k 0` names the error above); "
                      "`ninja build/RMHE08/ok` cannot see this because a `NonMatching` unit is never linked")
+        # the relocation-name row (2026-09-28): the object is built, so its relocations can be read. A
+        # different relocation *name* scores the same, so refuse a unit that ADDS a call to a symbol no
+        # link input defines - the flip would answer `undefined: '<name>'` even at 100 %. Add-only, like
+        # the style lint's `--diff`: 61 landed units already carry such a reference, and refusing that
+        # pre-existing debt would block a batch for what it did not create. The base's own unresolved set
+        # was snapshotted at `record-base`; the pre-existing remainder is reported, never refused. Cheap:
+        # the batch's own objects plus a cached link-symbol index (`undefrefs.link_symbol_index`).
+        result = uref.check_units(main, unit_units, base_snapshot=recorded.get("undefrefs") or {},
+                                  base=want_base)
+        check("every batch unit's relocations resolve against the link (no new undefined reference)",
+              not result["problems"], "; ".join(result["problems"][:4]),
+              info=("; ".join(result["pre_existing"][:3]) if result["pre_existing"]
+                    else "no batch unit adds a name the link cannot provide"),
+              remedy="our object ADDS a relocation to a name no `symbols.txt` row and no other link input "
+                     "defines, so a flip would answer `undefined: '<name>'` even when the row reads 100 %. "
+                     "The refusal names the target's own spelling where it records a different one - match "
+                     "that spelling and its map row; `python tools/units/undefrefs.py <unit>` prints the "
+                     "detail. A pre-existing wrong reference is reported, not refused (the `--census` "
+                     "register is where it is worked down)")
+        for line in result["pre_existing"]:
+            print("note: %s" % line, file=sys.stderr)
+        if result["missing"]:
+            check("the batch base carries an unresolved-reference snapshot for every unit", False,
+                  "record-base did not snapshot: %s" % ", ".join(result["missing"][:4]),
+                  kind=KIND_BOOKKEEPING,
+                  remedy="re-run `python tools/units/land.py record-base --units <batch units>` at the base "
+                         "(it compiles the base objects and caches their unresolved references)")
     built = gate("ninja", ["ninja"]) and built
     gate("report.json", ["ninja", "build/RMHE08/report.json"])
     # rule 10 (vtable ownership), the row: a table of code pointers inside a unit's own ranges must be
@@ -4361,6 +4403,8 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd")
     rb = sub.add_parser("record-base", help="record main's HEAD as the batch base")
     rb.add_argument("--json", action="store_true")
+    rb.add_argument("--units", default=None,
+                    help="comma-separated batch units to compile and snapshot (the add-only row's base)")
     v = sub.add_parser("verify", help="run the batch checklist (never commits; use `land` for that)")
     v.add_argument("--base", default=None, help="expected main HEAD (default: the recorded base)")
     v.add_argument("--units", default=None, help="comma-separated units in this batch")
@@ -4421,7 +4465,8 @@ def main() -> int:
         if bad_branch:
             print("REFUSED record-base | %s" % bad_branch)
             return 1
-        data = record_base(main)
+        units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
+        data = record_base(main, units)
         print(json.dumps(data, indent=2) if args.json else "base %s (%s)" % (data["base"], data["subject"]))
         return 0
     if args.cmd == "verify":
