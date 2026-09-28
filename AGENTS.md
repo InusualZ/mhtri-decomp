@@ -168,6 +168,18 @@ The steady loop, per unit:
    the rest. Then `land.py record-base` -> `land.py land --units <claim>` -> `claims.py release`.
 4. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
 
+**The loop closes with a review: `decomp -> review -> decomp`.** A committed branch is reviewed **before** it
+lands, by a read-only review lane (`.agents/agents/codereviewer.md`, launched with `python
+tools/units/slots.py spawn --kind review`), against the branch's own diff: `git diff main...<branch>`,
+`python tools/units/stylelint.py --ref <branch>` (it judges a branch's committed tree without checking it out)
+and per-function objdiff. The reviewer judges the dimensions its profile lists - honesty of the match claim
+(a `.text` match is not a claim about the *object*), naming, placement, types, comments, codegen hygiene -
+and it is a real second pair of eyes, not a re-run of the gate: it reads the source a human would read. Its
+findings come back **itemised**, and they are then cleared **on the same branch** by a follow-up decompilation
+pass (a `fixer` lane, or the decompiler lane that wrote it). Only then does the landing gate run. A review
+that finds nothing says so explicitly - for a well-measured unit that is the common answer, and it is what
+makes the loop worth its cost.
+
 Two tool behaviours the loop leans on, both fixed this session: `queue.py` never offers a proposal whose range
 a registered unit already covers, so re-attributing a region cannot re-hand landed work; and
 `attribute.py queue <start> <end>` **rewrites** the queue file with only that region's proposals rather than

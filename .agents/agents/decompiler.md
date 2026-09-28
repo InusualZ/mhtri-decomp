@@ -484,6 +484,14 @@ Budget discipline is part of the job. After a few measured variants on one row, 
 write the residual in the unit's file header, and move on. Do not start new experiments after your
 checklist is otherwise done. Report what you measured, not what you hoped.
 
+**Expect a review pass.** Your branch is reviewed read-only by a `codereviewer` lane before it lands, and its
+findings come back to you (or to a fixer) as a second pass on the same branch - the loop is
+`decomp -> review -> decomp`. The reviewer judges the branch's own diff (`stylelint.py --ref <your-branch>`,
+per-function objdiff) on the honesty of the match claim, naming, placement, types, comments and codegen
+hygiene. So write the report as evidence a reviewer can check: what you measured, what the residual is and
+where the uncertainty is. A finding that comes back is not a failure - it is the loop working - and clearing
+it is part of the unit's cost, not a new unit.
+
 ## Report (your final message is the result the orchestrator receives)
 
     ## Completed
