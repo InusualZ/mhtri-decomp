@@ -307,6 +307,28 @@ The full list is `docs/matching.md`, indexed in `AGENTS.md`. The recurring wins:
 * Pragma *pairs*, and whole-function `-opt` levers only as a last resort: a unit is compiled once, so a
   function that needs different flags from its siblings is usually a source, boundary or stale-target problem.
 
+## The compiler's own IR: `tools/mwcc-debugger/`
+
+When a residual is one instruction and neither a source shape nor a flag explains it, ask the compiler directly.
+`tools/mwcc-debugger/` drives **our own `mwcceppc.exe`** under gdb and dumps the optimizer's IR for a real
+command line: the PCode stream after each pass, and the register allocator's decisions.
+
+* The exact invocation, the `-o` redirection that keeps real objects untouched, and the support matrix are in
+  `tools/mwcc-debugger/README.md`. Short form: hand it the unit's real command line with `-o build/mwcc-debug`,
+  then read the dumps.
+* **Health-check a dump before you trust it**: `python tools/mwcc-debugger/locate/verify_pcode.py <last backend
+dump> <object.o>` compares the dump against `objdump` of the object the same command line produces, and it
+  *fails* on the pre-optimization dump - so a vacuous comparison cannot pass.
+* What it answers, in the form you actually need: which pass fused `add`+`addi`+`lbz` into `lbzu`; which virtual
+  register became r31; whether the optimizer reordered a chain before the allocator ever saw it. That is the
+  difference between searching source shapes and knowing.
+* **What it does not do yet** (reported, not faked): AST/frontend dumps, `variables.txt`, block
+  successors/predecessors/labels, per-instruction line numbers, and operand rendering for fixups and branch
+  targets. The GC rows are carried-over data that cannot be exercised on this host.
+* **Feedback is part of the job.** If the tool misled you, lacked a record you needed, or the README's
+  invocation did not work as written, say so in your report under "tooling" - one lane's annoyance is the next
+  lane's fix, and a tool nobody reports on rots.
+
 ## Converge
 
 Budget discipline is part of the job. After a few measured variants on one row, keep the best-scoring shape,
