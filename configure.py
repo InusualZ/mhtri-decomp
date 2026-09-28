@@ -2209,8 +2209,9 @@ config.libs = [
         "host": False,
         "objects": [
             # Registered once, at its final home (docs/plan.md 12), the Capcom `Network` reconnaissance
-            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` is the first
-            # to flip (see its entry below), the other four are `Object(NonMatching, ...)`:
+            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` and
+            # `initNetworkSessionStable` have flipped (see their entries below), the other three are
+            # `Object(NonMatching, ...)`.
             #   Network/initNetworkSessionStable.cpp     .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
             #   Network/network_state.cpp              .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
             #   Network/NetworkWiiMediator.cpp         .text 0x80413C64..0x804155D4 (6490 B, 79 fn)
@@ -2229,9 +2230,18 @@ config.libs = [
             # the two `li` before the saves), and the FMP/request switch tails are laid out
             # unsorted.  Measured over the same source: `Network/network_state.cpp` 69.42 % at
             # `-O4,p` -> 81.93 % at `-O3` (five more functions at 100 %),
-            # `Network/initNetworkSessionStable.cpp` 63.26 % -> 92.88 %.  `-func_align 4` is kept
+            # `Network/initNetworkSessionStable.cpp` 81.39 % -> 100.00 % (re-measured on the landed
+            # source; the numbers as first landed were 63.26 % -> 92.88 %).  `-func_align 4` is kept
             # from `cflags_network` (the range packs on 4-byte boundaries).
-            Object(NonMatching, "Network/initNetworkSessionStable.cpp",
+            # Matching: the 264-byte `.text`, `extab` 0x18 and `extabindex` 0xC are all byte-identical
+            # to the target object and all ten relocations name the same symbols at the same offsets
+            # (`__nw__FUl` at .text+0x34, `constructNetworkSessionObject` at +0x44,
+            # `networkSessionReflectCallback` at +0x66/+0x6A, the three float constants at
+            # +0x8C/+0xA4/+0xBC; `__dl__FPv` at extab+0x14; `initNetworkSessionStable` and
+            # `@etb_8001A630` in extabindex).  The extab record and the last `.text` byte are source
+            # shapes, not flags - the `new` expression and the file-scope `#pragma peephole off`, both
+            # with their measured evidence in the unit header.
+            Object(Matching, "Network/initNetworkSessionStable.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/network_state.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
