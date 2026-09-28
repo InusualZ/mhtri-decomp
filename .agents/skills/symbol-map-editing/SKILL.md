@@ -39,8 +39,12 @@ flood the context.
 1. **A rename is two edits in one change**: the map (it names the *target* object) and the source that
    defines or references the symbol. Rename only the map and objdiff stops matching the symbol by name and
    reports it as 0 %.
-2. **Find the other half first**: `refs <name>` lists every in-repo mention (source, docs, tools), **classified**
-   into `code` / `path` / `mention`. `rename` runs the same scan and prints it after writing. **Use
+2. **Find the other half first**: `refs <name>` lists every in-repo mention, **classified** into `code` /
+   `path` / `mention` - under **`src/` and `include/` by default**; `docs/` and anything under `tools/`
+   only when named in `--roots`. So a rename does **not** sweep build-tool data:
+   `tools/units/attribution-queue.json` (a regenerable cache keyed by `symbols_sha1`) keeps its own name
+   strings, and the map plus `--roots` is the authority there, not the rows in it. `rename` runs the same
+   scan and prints it after writing. **Use
    `--code-only` for any scripted rewrite.** The classification is load-bearing because a map name is also a
    *file* name whenever a unit is registered under a generated path, and the scan matches with `\b`, so `/`
    and `.` are word boundaries: `#include "DWCi/fn_805113B0.h"` is reported as a reference to `fn_805113B0`.

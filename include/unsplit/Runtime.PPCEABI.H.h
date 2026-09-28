@@ -41,6 +41,7 @@ int sprintf(char* dst, const char* fmt, ...); /* 0x8045DECC */
 char* strchr(const char* s, int c);           /* 0x8045F7E0 */
 int atoi(const char* s);                      /* 0x804616B4 */
 char* strcpy(char* dst, const char* src);     /* 0x8045F554, added with `menu/arena_result.cpp` */
+char* strncpy(char* dst, const char* src, u32 n); /* 0x8045F614, added with `DWCi/DWCi_Np_CPUCopyFast.c` */
 char* strcat(char* dst, const char* src);     /* 0x8045F658, likewise */
 int printf(const char* fmt, ...);          /* 0x8045EDBC, added with `NHTTP/NHTTP_bgnend.c` */
 

@@ -69,7 +69,9 @@
  * `NetworkLogger::flag_48` returns `u16` (`include/unsplit/Network.h`): retail stores the result with
  * a raw `sth` and masks it only where it is widened.  An extern whose size is unknown is addressed
  * absolutely - `lbl_80793990[3]`/`lbl_80793998[4]` give retail's `li r5, sym@sda21` where `char[]`
- * gave `lis`/`addi`; `lbl_80794380` stays unsized because the target relocates it ADDR16_HA/LO.  The
+ * gave `lis`/`addi`; `natNegMessageMagic` - the shared NATNEG signature, declared in the unit that
+ * owns the bytes (`include/DWCi/DWCi_NatNeg.h`) - stays unsized because the target relocates it
+ * ADDR16_HA/LO.  The
  * error record a caller builds is three constants stored twice (retail's five 12-byte frame objects
  * at 0x08..0x43): the by-value dispatch is emulated with a per-site `u32 info[6]` whose `[3],[4],[5]`
  * half is written first (`fn_8041B720` 74.25 -> 99.89, `fn_8041B538` 93.77 -> 99.92, `applyEvent`'s
@@ -506,7 +508,7 @@ extern "C" s32 fn_8041B270(NetworkInstance* self, u32 peer, u16 value, const voi
     header.code_1 = 2;
     header.value_4 = peer;
     header.peer_2 = SOHtoNs(value);
-    if (memcmp(data, lbl_80794380, 6) == 0) {
+    if (memcmp(data, natNegMessageMagic, 6) == 0) {
         DWCi_NatNegSendPacket((void*)data, size, &header);
         return 1;
     }

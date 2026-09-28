@@ -663,8 +663,8 @@ def classify(labels, refs_of, ordered, addr, size, span_max, dup):
 
     `span_max` is in *bytes* of .text: every referrer of a private pooled constant is inside the one
     TU that owns it, so the referrer span is bounded by that TU's size.  A label whose referrers sit
-    megabytes apart (`lbl_80794380`, an 8-byte `.sdata` object called from two distant clusters) is an
-    ordinary cross-TU global however duplicated its value is.
+    megabytes apart (`natNegMessageMagic`, an 8-byte `.sdata` object called from two distant clusters)
+    is an ordinary cross-TU global however duplicated its value is.
     """
     out = {}
     for name, lab in labels.items():

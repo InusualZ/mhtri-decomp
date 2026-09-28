@@ -4,16 +4,21 @@
  * The Nintendo Wi-Fi Connection (DWCi) band's transport/GameSpy half lives in
  * 0x80507C40..0x805145B8 (the registered units `DWCi/DWCi_Np_CPUCopyFast.c`, `DWCi/fn_805113B0.c`
  * and `DWCi/DWCi_NatNeg.c`), but the helpers those units call - the 0x8050A..-0x8050E.. socket /
- * list / address layer, `DWCi_freeNode`, the `.sdata` strings and the `.bss`/`.sbss` work blocks -
- * sit in bands no registered unit covers.  stylelint's rule 2 resolves the 0x8050xxxx functions
- * here (the nearest registered ranges below and above both name `DWCi`), and the `.bss`/`.sbss`/
- * `.sdata`/`.data` objects come from the same band; none has an owner's header to move to, so this
- * is their home.  Declared, never defined (playbook 29).
+ * list / address layer, `DWCi_freeNode` and the `.data` digit-class table - sit in bands no
+ * registered unit covers.  stylelint's rule 2 resolves the 0x8050xxxx functions here (the nearest
+ * registered ranges below and above both name `DWCi`), and the remaining `.sdata`/`.bss`/`.sbss`
+ * objects come from the same band; none has an owner's header to move to, so this is their home.
+ * Declared, never defined (playbook 29).
+ *
+ * The band's *owned* data is not here: the data pass of 2026-09-28 claimed the runs the two units
+ * store into, so those declarations moved to their owners' headers and this header includes them -
+ * `include/DWCi/DWCi_NatNeg.h` (`.sdata` 0x80794368..0x807943A0, `.sbss` 0x80795828..0x80795878,
+ * `.bss` 0x807614D8..0x80762A20) and `include/DWCi/DWCi_Np_CPUCopyFast.h` (`.sdata`
+ * 0x80794200..0x80794210, `.sbss` 0x807957D0..0x807957F8).  Rule 2 put them there, not here.
  *
  * The types the declarations reach are the units' own views, so only forward declarations are here
  * (`struct DWCiConn` / `struct DWCiReq` / `struct DWCiAddrKey` / `struct DWCiCType` are completed by
- * `src/DWCi/fn_805113B0.c`, `struct DWCiRuntime` / `struct DWCiListNode` by
- * `src/DWCi/DWCi_Np_CPUCopyFast.c`).
+ * `src/DWCi/fn_805113B0.c`).
  *
  * Added with the networking conformance pass: `src/DWCi/fn_805113B0.c` declared 52 of these
  * locally, `DWCi_Np_CPUCopyFast.c` six and `DWCi_NatNeg.c` one.
@@ -22,47 +27,41 @@
 #define MHTRI_UNSPLIT_DWCI_H
 
 #include "types.h"
+#include "DWCi/DWCi_NatNeg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
+#include "DWCi/DWCi_Np_CPUCopyFast.h"    /* the Np unit's own data (rule 2) */
 
 struct DWCiConn;
 struct DWCiReq;
 struct DWCiAddrKey;
 struct DWCiHostEntry;
 struct DWCiCType;
-struct DWCiRuntime;
-struct DWCiListNode;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* ---- the band's data (`.sdata`, `.sbss`, `.bss`, `.data`) ------------------------------------ */
+/* ---- the band's unowned data (`.sdata`, `.bss`, `.data`) -------------------------------------- */
 
 /* 0x80794348 - the 2-byte 0xFEFE protocol constant; 0x80794358/0x80794360/0x80794364 are the
- * "%s:%d", "%s" and ":%d" format strings the address helpers sprintf through; 0x80794368 is the
- * empty string `DWCi_GetStringLength` defaults a NULL buffer to. */
+ * "%s:%d", "%s" and ":%d" format strings the address helpers sprintf through. */
 extern u16 DWCi_protocolMagic;
 extern char DWCi_addressFormat[6];
 extern char DWCi_addressFormatHost[3];
 extern char DWCi_addressFormatPort[4];
-extern u8 DWCi_emptyString[8];
 
 /* 0x8060EDB0 - the character-class record `DWCi_parseAddress` validates port digits against (a header
  * whose +0x38 pointer reaches the per-character u16 flags, bit 3 marking a decimal digit). */
 extern struct DWCiCType DWCi_digitClassTable;
 
 /* 0x80795820 - the index of the two-buffer address-string ring `DWCi_formatAddress` writes into the
- * 0x807625C0 buffers. */
+ * 0x807625C0 buffers (`DWCi_addressRing`, declared by the NATNEG unit's header - the word falls
+ * inside its `.bss` run). */
 extern u32 DWCi_addressRingIndex;
-extern u8 DWCi_addressRing[];
 
 /* 0x80760F00 - the DWCi state block (0x1D0 B, first word a status) and 0x807610D0 the 0x190-byte
- * work buffer; 0x807957E0 the free-list head and 0x807957F0 the runtime/result block the state
- * machine publishes into; 0x807957F4 the state-ladder word (retail reloads it, hence volatile). */
+ * work buffer. */
 extern u32 DWCi_stateBlock[];
 extern u8 DWCi_workBuffer[];
-extern struct DWCiListNode* DWCi_freeListHead;
-extern struct DWCiRuntime* DWCi_runtime;
-extern volatile s32 DWCi_state;
 
 /* ---- the transport / socket helpers --------------------------------------------------------- */
 
@@ -91,6 +90,14 @@ void DWCi_platformCleanup(void);
 u32 DWCi_getTick(void);
 void* DWCi_malloc(u32 size);
 void DWCi_free(void* p);
+/* 0x80520658 / 0x80520664 - the peer-id word at `msg+8` and the negotiator socket token a record's
+ * +0x08 holds.  Retail's body for both is a bare `blr`: the argument comes back unchanged, so this
+ * build has them as two 4-byte SO-band entries that do no conversion, and their names are taken from
+ * how their call sites use the result (`DWCi_socketTokenFromPeer(token)`, the peer word read out of
+ * a received `msg+8`, compared against a record's token; `DWCi_peerTokenFromSocket(rec->token)`,
+ * written into `msg+8` of an outgoing one). */
+s32 DWCi_socketTokenFromPeer(u32 peerId);
+s32 DWCi_peerTokenFromSocket(s32 sock);
 int DWCi_bufferAlloc(u8** dst, u32 size);
 int DWCi_bufferFrame(u8** dst, u32 a, u32 b);
 int DWCi_socketConnect(struct DWCiConn* conn);
@@ -104,8 +111,9 @@ int DWCi_requestReconnect(struct DWCiConn* conn, u32 addr, u16 port);
 int DWCi_requestRetry(struct DWCiConn* conn, u32 addr, u16 port, u32 flag);
 int DWCi_requestBlockState(struct DWCiReq* req, u32 a, u32 b, u32* out);
 int DWCi_requestFlush(struct DWCiReq* req);
-/* 0x805076F0 - the middle band's node pump `DWCi_FreeList` drains (its unit is unregistered, so it
- * keeps the map's `fn_` placeholder; `src/DWCi/DWCi_Np_CPUCopyFast.c` records the rule 7 deferral). */
+/* 0x805076F0 - the middle band's node pump `DWCi_FreeList` drains (its unit is unregistered, so the
+ * map row is a rename of `fn_805076F0` and `src/DWCi/DWCi_Np_CPUCopyFast.c` names it from that call
+ * site). */
 void DWCi_freeNode(u32 kind, void* node, u32 arg);
 
 #ifdef __cplusplus
