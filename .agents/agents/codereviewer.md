@@ -58,6 +58,29 @@ them before you form an opinion, and cite the rule number rather than your taste
    finding - do not flag it. What *is* a finding: a residual that is not recorded, a residual recorded in a
    per-function comment instead of the unit header, a header that claims a match it does not have, or a
    `Matching` flag whose unit does not verify.
+  * **A `.text` match is not a claim about the object - this is the class that hides best, and the one
+    this dimension exists to catch.** A unit can measure 100.00 % on `.text` and still be a defect,
+    because `splits.txt` claims sections the object does not emit, or emits differently. The measured
+    case (2026-09-27, `Network/constructNetworkWiiMediator`): the body spelled `operator new(0x1408)`
+    plus a null check instead of a real `new` expression. It lowers to the **same 16 instructions**, so
+    `.text` scored 100.00 % - and the object emitted an 8-byte `extab` header where the target has a
+    24-byte unwind record, so `flipcheck.py` refused it (*"splits.txt claims extab (0x18) but the object"*
+    *"emits no such section - flipping drops 24 bytes and shifts everything after it"*) and a blind flip
+    would have broken the DOL. Check, in this order:
+    * **`python tools/units/flipcheck.py <unit>`** - one command, and it names the section that does not
+      match;
+    * **sections against the claim**: the `extab`/`extabindex`/`.ctors`/`.dtors`/`.data` ranges in
+      `splits.txt` versus what the object actually emits (`tools/elf/elfsect.py`, or objdiff's section
+      rows);
+    * **relocations, not just bytes**: a flip is bytes **and** relocs, and the two can disagree. That same
+      finding measured three spellings byte-identical in `.text`, `extab` and `extabindex` - the decision
+      came from the call site's **relocation** (the real callee against a synthesized `__ct__…`);
+    * **the source smells**: a hand-written `operator new` + null check where a `new` expression belongs
+      (playbook 62), a hand-rolled allocation/destruction sequence, a `(void *)` cast at an allocation, or a
+      constructor called explicitly where the class has a real one.
+    This is always `defect`, never `taste`: the unit is `NonMatching` for a reason, and this is usually it.
+    The mistake has a second telling - when the manual form *does* change `.text`, it is playbook 62's
+    original evidence, a register and a frame size off from the very top of the function.
 2. **Naming (rule 7).** No `fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` may survive in `src/` - there is **no
    exemption and no deferral key**, and a `rule 7 deferred:` comment is inert text that lies (it must be gone).
    A name is a defect when it is generated, when it does not fit the surrounding symbols' scheme, when it
@@ -81,6 +104,10 @@ them before you form an opinion, and cite the rule number rather than your taste
    project (playbook 60), so a "tidy-up" include is a finding, not a fix. A flag change belongs in
    `configure.py`, per library, with its evidence in a comment beside it - and never a `mw_version` fudge
    (non-negotiable 3).
+   One pragma is **required rather than stylistic**: a library built with `-Cpp_exceptions off` needs a
+   file-scoped `#pragma exceptions on` for a C++ unit whose target carries `extab` - without it MWCC emits
+   no unwind table at all (measured), which is dimension 1 seen from the other end, so its absence there is
+   a finding and not a preference.
 7. **Language and vendor conventions.** A C++ unit's map name may be unmangled on purpose; a vendor file keeps
    its vendor style and header (the Camellia source). `.c` vs `.cpp` is an evidence question, not a preference.
 8. **Debt that is already scheduled.** The repository has deliberate, register-tracked debt (grandfathered
