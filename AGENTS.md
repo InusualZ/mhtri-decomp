@@ -57,7 +57,10 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    the commit and `push` in a `finally`, and it tells the block apart from a real edit
    (`agents_md_real_change`). So **never run `localonly.py pull` + `git checkout -- AGENTS.md` by hand** -
    that checkout silently reverts the real AGENTS.md edit you are landing; land the batch and let the tool
-   do it. Use the tool directly (`python tools/agents/localonly.py pull|push`, skill: `agents-md-local-only`)
+   do it. **A plain `git commit` is safe too** (2026-09-28): the pre-commit hook pulls the block out and
+   re-stages AGENTS.md, and `post-commit` pushes it back (both in `tools/git/hooks/`, and the pending state
+   is `.git/localonly-pending`); if the commit fails, the hook prints the one command that restores the
+   block. Use the tool directly (`python tools/agents/localonly.py pull|push`, skill: `agents-md-local-only`)
    only for a manual AGENTS.md commit, and verify a revision with
    `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` → `0`. (This rule's own prose mentions the
    markers, so anchor the match at line start; the tool matches whole marker lines for the same reason.)
@@ -615,8 +618,13 @@ regression if the hash goes red.
     enforces those twelve rules at the campaign's land gate (the table is `docs/plan.md` section 6.5;
     regenerate the profiles with `tools/agents/sync_profiles.py` after a rule change).
 * **Style:** match the file you're editing (vendor sources mirror upstream formatting; new project code
-  follows the surrounding 4-space-indent C style). Files are UTF-8, LF endings (`.gitattributes`
-  enforces the checkout).
+  follows the surrounding 4-space-indent C style). Files are UTF-8 and **LF - in the repository and in the
+  working tree**: `.gitattributes` carries `* text=auto eol=lf`, and a clone must **not** set
+  `core.autocrlf=true`, because `eol=lf` alone does *not* override it (measured 2026-09-28: the attribute
+  was in effect and the checkout was still CRLF - every blob was already LF, only the working tree was
+  not). The pre-commit hook normalises a staged CRLF *text* blob and warns when `core.autocrlf` is on; it
+  refuses only a *binary* blob that carries a CR. The hook itself is per clone: `git config core.hooksPath
+  tools/git/hooks`.
 * **Documentation:** `docs/` is the home for all documentation — put new knowledge there instead of
   leaving it in chat, commit messages or code comments. Write straight to the point: setup steps, recipes
   and findings as short bullets, not dense prose or oversized files. Split into one file per topic rather
