@@ -284,3 +284,15 @@ unit? is this blocker overstated? which of two instruments is right about whethe
 in your report where the finding is. If `contact_supervisor` is unavailable, state the blocking decision in your final
 report instead of leaving it implicit: a review that hides its own uncertainty is worse than a short one, and the
 orchestrator can only rule on what you say out loud.
+## Writing text: no heredocs
+
+A shell heredoc is a second parser between you and the bytes. One ate a `\n` inside a C string literal (leaving a
+broken comment in a landed file), one truncated a long report so it took three appends, and one replaced two source
+lines with a stray `L`. Use the helper instead:
+
+    python tools/units/escape.py --write FILE "a\nb"      # C escapes \n \t \r \ \" \xHH \NNN -> exact bytes
+    python tools/units/escape.py --escape FILE            # reverse: raw bytes -> a pasteable C literal
+    python tools/units/escape.py --edit FILE --old "..." --new "..." --count N
+
+`--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
+is the difference between a rewrite and a corruption. Assert the count every time.

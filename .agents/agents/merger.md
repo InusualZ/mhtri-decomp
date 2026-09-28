@@ -258,3 +258,15 @@ disagree, a header where one side's layout is the other side's padding, a confli
 rulings, not text merges. Bring both sides' evidence - the field lists, the offsets, the callers - and the resolution you
 propose, and say which side you would keep and why. If the ruling is to take one side, record whose and why in the file, so
 the next reader knows the other view was seen and rejected rather than missed.
+## Writing text: no heredocs
+
+A shell heredoc is a second parser between you and the bytes. One ate a `\n` inside a C string literal (leaving a
+broken comment in a landed file), one truncated a long report so it took three appends, and one replaced two source
+lines with a stray `L`. Use the helper instead:
+
+    python tools/units/escape.py --write FILE "a\nb"      # C escapes \n \t \r \ \" \xHH \NNN -> exact bytes
+    python tools/units/escape.py --escape FILE            # reverse: raw bytes -> a pasteable C literal
+    python tools/units/escape.py --edit FILE --old "..." --new "..." --count N
+
+`--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
+is the difference between a rewrite and a corruption. Assert the count every time.
