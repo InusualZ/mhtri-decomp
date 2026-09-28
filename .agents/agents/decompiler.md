@@ -611,3 +611,15 @@ place, a data run your own rows touch that the symbol's extent does not cover (a
 `.sdata` pointer words), a range that would swallow a neighbour's bytes - that is exactly the request above. Include the
 **unit list your change re-ranges**, because the landing gate names those units in `--units` and a missing one costs a
 refusal. The rule-7 names of the map rows inside a range you are claiming move with the claim, in the same change.
+## Writing text: no heredocs
+
+A shell heredoc is a second parser between you and the bytes. One ate a `\n` inside a C string literal (leaving a
+broken comment in a landed file), one truncated a long report so it took three appends, and one replaced two source
+lines with a stray `L`. Use the helper instead:
+
+    python tools/units/escape.py --write FILE "a\nb"      # C escapes \n \t \r \ \" \xHH \NNN -> exact bytes
+    python tools/units/escape.py --escape FILE            # reverse: raw bytes -> a pasteable C literal
+    python tools/units/escape.py --edit FILE --old "..." --new "..." --count N
+
+`--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
+is the difference between a rewrite and a corruption. Assert the count every time.

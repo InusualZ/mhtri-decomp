@@ -205,3 +205,15 @@ range, a `splits.txt` edit - ask first with the ruling request above rather than
 not silently drop the finding either: if you do not ask, report it as blocked, with the reason and the smallest change that
 would clear it. A fix that also satisfies an out-of-scope improvement is not the same as a scope widening, provided the
 refusal's own row is what you were asked to clear.
+## Writing text: no heredocs
+
+A shell heredoc is a second parser between you and the bytes. One ate a `\n` inside a C string literal (leaving a
+broken comment in a landed file), one truncated a long report so it took three appends, and one replaced two source
+lines with a stray `L`. Use the helper instead:
+
+    python tools/units/escape.py --write FILE "a\nb"      # C escapes \n \t \r \ \" \xHH \NNN -> exact bytes
+    python tools/units/escape.py --escape FILE            # reverse: raw bytes -> a pasteable C literal
+    python tools/units/escape.py --edit FILE --old "..." --new "..." --count N
+
+`--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
+is the difference between a rewrite and a corruption. Assert the count every time.
