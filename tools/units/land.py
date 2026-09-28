@@ -561,6 +561,22 @@ def changed_paths(main: str) -> list[str]:
     return [path for _code, path in changed_status(main)]
 
 
+def is_batch_path(main: str, entry: str) -> bool:
+    """True when a `--units` entry names a repo PATH the batch stages, not a translation unit.
+
+    A unit is named at an extensionless path (`<module>/<name>`, or `src/<module>/<name>` - `norm_unit`
+    strips the source extension) whose source file is `<name>.c`/`.cpp`, so the bare name is **not** a file
+    in the tree.  Two signals therefore say "path": the entry still carries a file extension, or the tree
+    has something at that exact path - which `.gitignore`, `LICENSE`, `Makefile` and a directory like `docs`
+    do, and a unit never does.  Only the extension signal existed first, so an extension-less path was still
+    read as a unit and the registration row refused the batch with a message about a source file that is
+    registered in name only (2026-09-27, after the tool-batch fix).
+    """
+    if os.path.splitext(entry)[1]:
+        return True
+    return os.path.exists(os.path.join(main, entry))
+
+
 def unit_owned_paths(units: list[str]) -> set[str]:
     """The source paths a batch's units own: `src/<unit>.<ext>` and any path the unit names directly."""
     owned: set[str] = set()
@@ -2051,13 +2067,14 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # `Camellia/camellia.c` are one batch, and the gate must key its outbox, branch and splits the same way
     # whichever the orchestrator typed.
     units = [claims.norm_unit(u.strip("/")) for u in units]
-    # A `--units` entry that still carries a file extension after `norm_unit` (which strips only the source
-    # extensions) is a batch PATH - a tool script, an agent prompt - and not a unit: it has no `Object(...)`
-    # line, no splits.txt block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows below
-    # (outbox, branch, registration, compile, target drift) must not assert unit properties about it. It stays
-    # in `units` for the staging and ledger rows, which is how the path is committed. (2026-09-27: a tool-only
-    # batch could not land at all before this - the registration row refused every `tools/` path.)
-    unit_units = [u for u in units if not os.path.splitext(u)[1]]
+    # A `--units` entry is a batch PATH rather than a unit when it is a file the batch stages rather than a
+    # translation unit - see `is_batch_path`: it carries a file extension, or the tree has something at that
+    # exact path (`.gitignore`, `LICENSE`, `docs`).  A path has no `Object(...)` line, no splits.txt block
+    # and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows below (outbox, branch, registration,
+    # compile, target drift) must not assert unit properties about it. It stays in `units` for the staging and
+    # ledger rows, which is how the path is committed. (2026-09-27: a tool-only batch could not land at all
+    # before the extension signal - the registration row refused every `tools/` path.)
+    unit_units = [u for u in units if not is_batch_path(main, u)]
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str, str, str, str]] = []
 
@@ -2588,6 +2605,27 @@ def selftest() -> int:
     check("outside the batch: ground truth", outside_batch(["config/RMHE08/build.sha1"]),
           ["config/RMHE08/build.sha1"])
     check("outside the batch: the local-only state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
+
+    # a `--units` entry that names a repo PATH is not a unit: it has no `Object(...)` line, no splits.txt
+    # block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows must skip it. The extension
+    # signal alone missed the extension-less ones - a batch naming `.gitignore` or `LICENSE` was refused by
+    # the registration row with a message about a source file registered in name only (2026-09-27).
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, ".gitignore"), "w").write("build/\n")
+        open(os.path.join(tmp, "LICENSE"), "w").write("CC0\n")
+        open(os.path.join(tmp, "Makefile"), "w").write("all:\n")
+        os.makedirs(os.path.join(tmp, "docs"))
+        check("a hidden file is a batch path, not a unit", is_batch_path(tmp, ".gitignore"), True)
+        check("an extension-less file at the root is a batch path", is_batch_path(tmp, "LICENSE"), True)
+        check("a Makefile is a batch path", is_batch_path(tmp, "Makefile"), True)
+        check("a directory the batch stages is a batch path", is_batch_path(tmp, "docs"), True)
+        check("a tool script is a batch path", is_batch_path(tmp, "tools/units/land.py"), True)
+        check("a unit is not a path - the bare name is not a file in the tree",
+              is_batch_path(tmp, "menu/arena_result"), False)
+        check("... with or without the `src/` prefix",
+              is_batch_path(tmp, "src/menu/arena_result"), False)
+        check("... and a deeper unit path is still a unit",
+              is_batch_path(tmp, "Network/initNetworkSessionStable"), False)
 
     # the pre-flight names the likely cause of a foreign path whose name looks like lane scratch (the
     # `.tmp-mwcc/upstream` incident); an ordinary foreign file gets no invented cause
