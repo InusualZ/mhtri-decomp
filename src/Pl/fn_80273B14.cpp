@@ -36,7 +36,13 @@
  * `python tools/symbols/symedit.py range 0x80273B14 0x80276B58` - 66 of the 68 stems are `fn_`,
  * and the remaining two, `Pl_critical_get__FP4_PLW` and `Pl_decide_mot_get__FPUsPUs`, are the
  * manglings of the two real C++ declarations this file defines).  `dumpmap.py lookup` answers only
- * `zz_0273b14_` placeholders for the whole band and no `__FILE__` string covers it.
+ * `zz_0273b14_` placeholders for the whole band and no `__FILE__` string covers it.  `fn_802752C8`
+ * is renamed `Pl_item_id_usable_ck` (0x802752C8, 0xCC B, 96.47 %): `menu/arena_result.cpp` calls
+ * it, and a call to a `fn_XXXXXXXX` stem from another unit's new source is a rule-7 finding.  Its
+ * second parameter is dead in retail - the body never reads r4 - but every call site passes one
+ * (0, 1 and 2), so both the declaration and the definition carry it; re-measuring the whole unit
+ * after that change moved no row.  The parameter's name `mode` is a GUESS (the three sites' 0/1/2
+ * against the body's own 1/2/0x10 masks) and is marked as one at the declaration.
  */
 #include "types.h"
 #include "pl.h"
@@ -52,7 +58,7 @@
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"
 #include "Pl/fn_80273B14.h"
-#include "menu/menu_item.h"   /* `fn_8029F73C` (owner: `menu/menu_item.cpp`, rule 2) */
+#include "menu/menu_item.h"   /* `item_category_ck` (owner: `menu/menu_item.cpp`, rule 2) */
 #include "ef/eft001.h"
 #include "stage/stg_w.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -976,16 +982,17 @@ f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
     return value / lbl_8079A044;
 }
 
-/* True when the act id is one the player may still enter. */
-s32 fn_802752C8(u16 id)
+/* True when the item/act id is one the player may still use.  `mode` is dead in retail - every call
+ * site sets r4, the body never reads it (see the owner's header, which marks the name a GUESS). */
+s32 Pl_item_id_usable_ck(u16 id, s32 mode)
 {
-    if (fn_8029F73C(id, 1) != 0) {
+    if (item_category_ck(id, 1) != 0) {
         return 0;
     }
-    if (fn_8029F73C(id, 2) != 0) {
+    if (item_category_ck(id, 2) != 0) {
         return 0;
     }
-    if (fn_8029F73C(id, 0x10) != 0) {
+    if (item_category_ck(id, 0x10) != 0) {
         return 0;
     }
     if (fn_8027403C(id) != 0) {

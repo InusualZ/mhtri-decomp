@@ -205,13 +205,13 @@ s16 fn_802EECA0(_PLW* plw)
 }
 
 /* 0x802EEC24 (0x7C).  A slot is "live" when its value is positive, it holds an item, the item
- * passes `fn_8029F73C`'s flag test and its record's first byte is not 1. */
+ * passes `item_category_ck`'s flag test and its record's first byte is not 1. */
 s32 fn_802EEC24(_PLW* plw, u16 idx)
 {
     _SLOTENT* slot = &plw->slot_id[idx];
     if (slot->value > 0) {
         if (slot->item_id != 0) {
-            if (fn_8029F73C(slot->item_id, 8) != 0) {
+            if (item_category_ck(slot->item_id, 8) != 0) {
                 if (GetItemData(slot->item_id)->kind_0x00 != 1) {
                     return 1;
                 }

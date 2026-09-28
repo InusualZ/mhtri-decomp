@@ -75,5 +75,18 @@ void font_set_size(s16 x, s16 y);
 void font_flush(void);
 void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
 
+/* The font cluster's own text helpers, added with `menu/arena_result.cpp` (rule 2: this range owns
+ * the three addresses).  All three keep the owner's own spelling and are declared at C++ scope so a
+ * consumer's call mangles to what the target objects' relocations carry (`__FPc`, `__FPcPc`,
+ * `__FPcl`): 0x8005B874 `flfntStrLen` (a `b` tail call into the decoding walker, so its length is
+ * the walker's), 0x8005C9A8 `msg_str_gen` and 0x8005B878 `flKnjMsgNumPtr` (the pointer to the
+ * `index`-th character of `s`, which the result screen truncates a long name at). */
+s32 flfntStrLen(char* s);
+void msg_str_gen(char* src, char* dst);
+char* flKnjMsgNumPtr(char* s, s32 index);
+/* 0x8005C7E0 - the substring search the font helpers share (a thin `strchr`); the owner defines it
+ * at C linkage, as does `include/menu/menu_item_page.h`, which declares the same signature. */
+extern "C" char* flfntStrChr(char* s, s32 c);
+
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */
 

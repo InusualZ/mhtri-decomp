@@ -106,7 +106,7 @@ u32 fn_8004B0A4(u16 id, void* userdata);
 u32 fn_8004B70C(u16 id, void* a, u16 b);
 u8 fn_8004E634(u8 a, u16 b);
 MenuRowData* fn_8004EA24(void);
-s8* fn_8005C7E0(s8* text, s32 c);
+char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
 void fn_800CEE74(u8 a, u16 b, f32* out);
 u32 fn_8026FE44(s32 worker);
 s32 fn_802731B4(s32 worker, u16 id);

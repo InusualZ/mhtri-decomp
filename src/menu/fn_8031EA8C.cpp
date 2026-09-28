@@ -58,7 +58,7 @@ void  fn_802DA1B0(void);
 void* memset(void* dst, int value, u32 size);
 s32   fn_802087D4(void);
 void  fn_800DBC84(s32 value);
-void* fn_803B43B0(MenuQuestWork* self, s32 index);
+char* quest_result_field_text_get(MenuQuestWork* self, s32 index);
 s32   fn_803223B0(MenuQuestWork* self, u8 value);
 void  fn_80323204(MenuQuestWork* self, u16 a, s16 b);
 u32   game_ready_ck(void);
@@ -380,9 +380,9 @@ extern "C" void fn_80322C68(MenuQuestWork* self) {
 
     get_lsp_data(0x15F0, &pos);
     draw_sprite_ary(lbl_805DD744, &pos);
-    text = (char*)fn_803B43B0(self, 7);
+    text = quest_result_field_text_get(self, 7);
     draw_font_idx(0x15F8, (s8*)text, 1, &pos);
-    text = (char*)fn_803B43B0(self, 8);
+    text = quest_result_field_text_get(self, 8);
     draw_font_idx(0x15FA, (s8*)text, 0, &pos);
 }
 

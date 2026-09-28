@@ -90,7 +90,7 @@ struct ItemDataRecord {
             /* +0x001 */ u8 level_0x01;  /* the same test, against 3 */
         };
     };
-    /* +0x002 */ u8 field_0x002;      /* the mask `fn_8029F73C` ANDs its second argument with */
+    /* +0x002 */ u8 field_0x002;      /* the mask `item_category_ck` ANDs its second argument with */
     /* +0x003 */ u8 max_num_0x003;    /* the cap a slot's count is clamped to (`quest/quest_entry.cpp`'s
                                        * `quest_item_slot_add` compares a slot's own count against it
                                        * as a signed byte, and clamps both on overflow and on a negative
@@ -368,7 +368,7 @@ u32 fn_8029F60C(void);
 void fn_8029F680(u16 id);
 ItemSpeciesRecord* fn_8029F6B4(u16 id);
 u32 fn_8029F704(u16 id);
-s32 fn_8029F73C(u16 id, s32 index);
+s32 item_category_ck(u16 id, s32 index);
 u32 fn_8029F774(u16 id);
 u32 fn_8029F788(u16 kind);
 u32 fn_8029F7C4(u16 idx);

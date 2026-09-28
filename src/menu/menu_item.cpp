@@ -78,7 +78,7 @@
  * 2724 / 29276 `.text` bytes matched - 13.872065 % / 2568 / 24700 before the fold.
  *
  * The fold moved **no row**: all 91 rows of the landed half measure exactly what `main`'s
- * `build/RMHE08/report.json` measures for them (50 at 100.0, `fn_8029F73C` 99.29, `fn_8029FA74`
+ * `build/RMHE08/report.json` measures for them (50 at 100.0, `item_category_ck` 99.29, `fn_8029FA74`
  * 99.43, `fn_8029FB00` 99.61, `fn_802A0304` 98.50), and the 8 folded rows are the branch's own
  * values (3 byte-identical).  Two whole-project notes from the same comparison: the folded unit's
  * own `menu` lib flag `-opt nopeephole` reproduces every folded row with the `#pragma peephole off`
@@ -127,7 +127,7 @@
  *   fn_802A5320 (292 B);
  *
  * Residuals, by measurement.
- *   * `fn_8029F73C` 99.29 - the `and` of the item record's +0x02 byte with the caller's mask; retail
+ *   * `item_category_ck` 99.29 - the `and` of the item record's +0x02 byte with the caller's mask; retail
  *     orders the operands `and r3,r<byte>,r<mask>`, ours `and r3,r<mask>,r<byte>` (both source
  *     spellings tried).
  *   * `fn_8029FA74` 99.43 - the two selection calls: retail loads the byte straight into the argument
@@ -1176,7 +1176,7 @@ extern "C" u32 fn_8029F704(u16 id)
 }
 
 /* 0x8029F73C: the item record's +0x02 byte masked by the caller's value. */
-extern "C" s32 fn_8029F73C(u16 id, s32 index)
+extern "C" s32 item_category_ck(u16 id, s32 index)
 {
     return index & GetItemData(id)->field_0x002;
 }
