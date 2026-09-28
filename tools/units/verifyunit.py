@@ -53,9 +53,10 @@ The gate (through this module) now covers these documented checks; they no longe
   the overlap). objdiff pairs by name, so such a row is never paired and *no* report can score it -
   the row is matched to our symbol at the same section+offset and judged by its bytes, which is what
   it actually claims. Related, and the reason that byte rule is load-bearing rather than decorative:
-  `Object(Matching, ...)` sets `metadata.complete` in `objdiff.json`, and objdiff-cli then reports a
-  pins the unit's completion percent at 100 (measured 2026-09-28: a corrupted `.init` object
-  still reads 100 %), so `report.json`'s score for a Matching unit is a claim the objects must back.
+  `Object(Matching, ...)` sets `metadata.complete` in `objdiff.json`, and objdiff-cli then pins that
+  unit's completion percent at 100 **while still running its per-symbol diff** (measured 2026-09-28: a
+  corrupted `.init` object keeps `complete_code_percent` at 100.0 while its fuzzy percentage falls), so
+  the completion field of a Matching unit's report row is a claim the objects themselves must back.
 * **§7 a report number that disagrees with an object diff is a stale report** - `verify_units`'
   symbol-for-symbol comparison of a *fresh* `report generate` against the committed `report.json`.
 * **the merger's regression proof (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md`)** - per-symbol
