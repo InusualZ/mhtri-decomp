@@ -41,41 +41,60 @@
  * calls to the base's `clear`/`init`/`release` and to the record destructors as the target's `bl`s
  * (without them MWCC inlines 220 of `clear`'s 276 bytes).
  *
- * STATUS / RESIDUALS (90.96 % fuzzy; 98 of 101 symbols scored, 20 at 100 %; `.text` 12888 vs 13264 B).
+ * PEEPHOLE.  The 21 `request*` rows (364, and the contiguous 368..444 block) need the peephole pass
+ * off, scoped by two `#pragma peephole off`/`on` pairs.  With it on, MWCC fuses the descriptor address
+ * materialisation into the first word's load (`addi r5,r4,@l` + `lwz r4,0(r5)` becomes
+ * `lwzu r4,@l(r5)`), which is 4 B shorter than the target's 120/136/152/168 B; the pass is the
+ * lever and not the flag (playbook 39/41: the command line's `-opt nopeephole` is accepted and
+ * changes nothing).  All 21 rows are 100 % with the pragma.  `NetworkRequest_begin` and
+ * `hasBuffer` sit inside/next to the region and do not move.
+ *
+ * RULE 10 - the two dispatches.  `.data` 0x805FA908..0x805FAAD0 (456 B, the base
+ * `NetworkSessionManager` table, 51 relocations) is claimed and byte-identical; `NetworkBuffer`
+ * (table at 0x805F9150) and `NetworkSessionStable` (0x805FA6E8) are another band's and are
+ * *declared* classes with no virtual defined here, so MWCC emits no table for them (the
+ * `NetworkBuffer` conversion took 11 rows to 100 % and 9 more up - measured, no row down).  The
+ * four record classes stay structs with a vtable member: a class makes MWCC initialise the vptr of
+ * every element of the `__construct_array`-built arrays (Pat constructor 252 -> 544 B).
+ *
+ * OTHER LAYOUT FACTS.  `NetworkSessionSlot` is 0x924 B, the stride the target's `mulli` uses (the
+ * declaration only named fields to +0xDC, so the array stride was wrong); `NetworkStreamWriter` is
+ * 0x20 B, not 0x24 (`send8`'s retail frame is 0x30 with the writer at +0x10, so one writer is 0x20 B;
+ * 0x24 also forced our local to +0x0C - the frames themselves do not move with the size).
+ *
+ * STATUS / RESIDUALS (92.15 % fuzzy, 51 of 101 symbols at 100 %; `.text` 12980 vs 13264 B).
  *  - `NetworkRequest_copyRecord` 15.73 % (target 148 B, ours 52 B): the target copies the 96-byte
  *    record as two words then eleven word pairs; `*dst = *src` makes MWCC emit `lmw`/`stmw` instead
  *    (measured: `-use_lmw_stmw off` for this unit changes nothing).  The shape is not reachable from
  *    the source side; the function is referenced only from this object's own `extab`.
- *  - `slot_144` 45.85 % and `sendBatch_138`/`slot_13C`/`slot_140` 83-84 %: the target's buffer
- *    dispatch is the canonical `lwz r12,0(r3)` / `lwz r12,<slot>(r12)`, ours stages the table through
- *    one more register (`lwz r4,0(r3)`).  Same residual in `flush`, `putTerminatorA/C`, `getInt`,
- *    `getFloat` and the `release` tail: the buffer class belongs to another band and is modelled as a
- *    vtable member here.  `NetworkRequest_begin` 91.38 % is the same one-register difference plus its
- *    `__va_start`.
- *  - `NetworkRequest_begin` 91.38 %: the target inlines the three-word `va_list` setup, ours calls the
- *    `__va_start` intrinsic, because the pinned toolchain ships no `<stdarg.h>` and the CodeWarrior
- *    macro form is not reachable (`__builtin_va_start` does not exist).  `tools/units/flipcheck.py`
- *    reports `__va_start` as a flip blocker for this reason (16 B of the `.text` shortfall).
+ *  - `slot_144` 46.10 % and `sendBatch_138`/`slot_13C`/`slot_140` 83.8-84.6 %: the buffer dispatch
+ *    is now the canonical one; what is left is the staging order of the mapped byte array plus the
+ *    `clrlwi` the target gives the `u8` flags argument at the call (ours passes it unmasked - the
+ *    byte-for-byte `mr`/`clrlwi` pair is not reachable from any source spelling tried).
  *  - `networkSessionReflectCallback` 54.58 %: the target saves all six incoming argument registers
  *    before building the callee's, ours does the minimal four-move rotation; the two are equivalent
  *    and the naive form is not reachable from the source side (48 B).
- *  - `__dt__24NetworkSessionManagerPatFv` 63.53 % and `clear__24NetworkSessionManagerPatFv` 96.00 %:
- *    one extra `lfs` of the shared float and the `+0x3CC` dispatch's staging register.
  *  - `NetworkSessionStable_getUsableSlot`/`updateRate`/`downPerformance`/`upPerformance`/`move`
- *    81-83 %: the `-O3` register colouring of the slot pointer (identical instruction multiset, one
- *    different callee-saved register pair throughout).
- *  - `.text` is 376 B short of the claim, so `.text`/`extab` cannot flip yet: `copyRecord` (-96 B) plus
- *    the six functions whose bodies compress.  `flipcheck` reports `.text` 0x3258 vs 0x33D0 and
+ *    81-95 %: the `-O3` colouring of the slot pointer and of the two `f32` rates (identical
+ *    instruction multiset, `fmuls f2,f2,f0` against `fmuls f0,f2,f0`, and one `extsb.` retail keeps
+ *    unfolded), plus `updateRate`'s other dispatch, `self->vtable->getFloat_8C` (the one
+ *    `NetworkSessionStable` call site left as a vtable-member read).
+ *  - `NetworkRequest_begin` 91.38 %: the target inlines the three-word `va_list` setup, ours calls
+ *    the `__va_start` intrinsic, because the pinned toolchain ships no `<stdarg.h>` and the
+ *    CodeWarrior macro form is not reachable (`__builtin_va_start` does not exist).
+ *    `tools/units/flipcheck.py` reports `__va_start` as a flip blocker for this reason.
+ *  - `.text` is 284 B short of the claim, so `.text`/`extab` cannot flip yet: `copyRecord` (-96 B)
+ *    plus the functions whose bodies compress.  `flipcheck` reports `.text` 0x32B4 vs 0x33D0 and
  *    `extab` 0x2E4 vs 0x4EC.
  *  - GUESS names: `NetworkSessionSlotInfo_*`, `NetworkSessionCircleInfo_*`, `NetworkSessionCircleList_*`
  *    and `NetworkSessionPlayerRecord_*` come from their container offsets and `net_va_arg`/`memset`
  *    use; `networkSessionReflectCallbackEx` and the `network<span>*` accessor names are derived from
  *    the callee each forwards to.  The `slot_14C`..`slot_168` wrappers are named for their vtable slot
  *    (offset-derived, the buffer class owner's names are unknown).
- *  - `.sdata2` is now EMPTY (was 20 B over the target): every literal the range loaded is the map's
+ *  - `.sdata2` is EMPTY (was 20 B over the target): every literal the range loaded is the map's
  *    named constant.
- *  - `extab` 0x2E4 vs 0x4EC and `extabindex` vs the target are short because 376 B of `.text` is still
- *    compressed away.
+ *  - `extab` 0x2E4 vs 0x4EC and `extabindex` vs the target are short because 284 B of `.text` is
+ *    still compressed away.
  */
 
 #include "types.h"
@@ -582,10 +601,10 @@ void NetworkSessionManager::release()
 
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->end_14(buf);
+        buf->end();
         buf = this->buffer;
         if (buf != 0) {
-            buf->vtable->destroy_08(buf, 1);
+            buf->destroy(1);
             this->buffer = 0;
         }
     }
@@ -608,7 +627,7 @@ void NetworkSessionManager::move()
 
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->end_14(buf);
+        buf->end();
     }
     for (i = 0; i < 21; i++) {
         req = this->requests_10[i];
@@ -690,6 +709,7 @@ extern "C" void zz_03d5084_ptmf_scall(NetworkRequest* self)
     }
 }
 
+#pragma peephole off
 void NetworkSessionManager::request364()
 {
     NetworkRequest* req;
@@ -702,6 +722,7 @@ void NetworkSessionManager::request364()
         }
     }
 }
+#pragma peephole on
 
 extern "C" void NetworkRequest_begin(NetworkRequest* req, NetworkSessionManager* owner,
                             NetworkRequestDesc desc, u32 count, ...)
@@ -730,6 +751,7 @@ extern "C" void NetworkRequest_begin(NetworkRequest* req, NetworkSessionManager*
 /* NetworkSessionManager - the lazy request allocators                                        */
 /* ----------------------------------------------------------------------------------------- */
 
+#pragma peephole off
 void NetworkSessionManager::request368()
 {
     NetworkRequest* req;
@@ -994,6 +1016,7 @@ void NetworkSessionManager::request428(u32 a)
         }
     }
 }
+#pragma peephole on
 
 /* ----------------------------------------------------------------------------------------- */
 /* NetworkSessionManager - accessors / small virtuals                                         */
@@ -1049,7 +1072,7 @@ s32 NetworkSessionManager::getInt(s8 value)
     if (this->buffer == 0) {
         return 0;
     }
-    return this->buffer->vtable->getInt_90(this->buffer, mapId_1C0(value));
+    return this->buffer->getInt(mapId_1C0(value));
 }
 
 f32 NetworkSessionManager::getFloat(s8 value)
@@ -1057,7 +1080,7 @@ f32 NetworkSessionManager::getFloat(s8 value)
     if (this->buffer == 0) {
         return networkRequestZero;
     }
-    return this->buffer->vtable->getFloat_8C(this->buffer, mapId_1C0(value));
+    return this->buffer->getFloat(mapId_1C0(value));
 }
 
 void NetworkSessionManager::broadcastPlayerSlots(u32 a, u32 b)
@@ -1079,7 +1102,7 @@ void NetworkSessionManager::putTerminatorA(u32 a, u32 b, u8 c)
     data = -1;
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->put_38(buf, a, b, 1, 1, &data, c);
+        buf->put(a, b, 1, 1, &data, c);
     }
 }
 
@@ -1091,7 +1114,7 @@ void NetworkSessionManager::putTerminatorB(u32 a, u32 b)
     data = -2;
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->put_38(buf, a, b, 0, 1, &data, 0xFF);
+        buf->put(a, b, 0, 1, &data, 0xFF);
     }
 }
 
@@ -1103,7 +1126,7 @@ void NetworkSessionManager::putTerminatorC(u32 a, u32 b, u8 c)
     data = -2;
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->put_38(buf, a, b, 1, 1, &data, c);
+        buf->put(a, b, 1, 1, &data, c);
     }
 }
 
@@ -1122,7 +1145,7 @@ void NetworkSessionManager::sendBatch_138(u32 a, u32 b, s32 count, const s8* dat
         }
     }
     if (this->buffer != 0) {
-        this->buffer->vtable->put_38(this->buffer, a, b, 0, n, mapped, 0xFF);
+        this->buffer->put(a, b, 0, n, mapped, 0xFF);
     }
 }
 
@@ -1141,7 +1164,7 @@ void NetworkSessionManager::slot_13C(u32 a, u32 b, s32 count, const s8* data, u8
         }
     }
     if (this->buffer != 0) {
-        this->buffer->vtable->put_38(this->buffer, a, b, 1, n, mapped, flags);
+        this->buffer->put(a, b, 1, n, mapped, flags);
     }
 }
 
@@ -1157,7 +1180,7 @@ void NetworkSessionManager::slot_140(u32 a, u32 b, s8 idx)
     }
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->put_38(buf, a, b, 0, 1, &data, 0xFF);
+        buf->put(a, b, 0, 1, &data, 0xFF);
     }
 }
 
@@ -1173,70 +1196,70 @@ void NetworkSessionManager::slot_144(u32 a, u32 b, s8 idx, u8 flags)
     }
     buf = this->buffer;
     if (buf != 0) {
-        buf->vtable->put_38(buf, a, b, 1, 1, &data, flags);
+        buf->put(a, b, 1, 1, &data, flags);
     }
 }
 
 void NetworkSessionManager::flush()
 {
     if (this->buffer != 0 && canSend_28() != 0) {
-        this->buffer->vtable->flush_44(this->buffer);
+        this->buffer->flush();
     }
 }
 
 void NetworkSessionManager::slot_14C()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_30(this->buffer);
+        this->buffer->slot_30();
     }
 }
 
 void NetworkSessionManager::slot_150()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_34(this->buffer);
+        this->buffer->slot_34();
     }
 }
 
 void NetworkSessionManager::slot_154()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_50(this->buffer);
+        this->buffer->slot_50();
     }
 }
 
 void NetworkSessionManager::slot_158()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_54(this->buffer);
+        this->buffer->slot_54();
     }
 }
 
 void NetworkSessionManager::slot_15C()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_60(this->buffer);
+        this->buffer->slot_60();
     }
 }
 
 void NetworkSessionManager::slot_160()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_64(this->buffer);
+        this->buffer->slot_64();
     }
 }
 
 void NetworkSessionManager::slot_164()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_68(this->buffer);
+        this->buffer->slot_68();
     }
 }
 
 void NetworkSessionManager::slot_168()
 {
     if (this->buffer != 0) {
-        this->buffer->vtable->slot_5C(this->buffer);
+        this->buffer->slot_5C();
     }
 }
 

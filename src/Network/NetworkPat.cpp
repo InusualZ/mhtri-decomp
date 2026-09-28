@@ -40,13 +40,20 @@
  * (playbook 30): without the pragma our object emits neither section and `datagap` reports both as
  * `target-extra`; with it both sizes match the target exactly and no `.text` byte moves.
  *
- * RESIDUAL.  The three `deleteNetwork*Pat` helpers are 99.71429 %: the target loads the entry's
- * vptr through r3, the register it was just moved into for the call (`mr r3,r31; lwz r12,0(r3)`),
- * where MWCC 1.3/1.5/1.6/1.7 and GC 3.0a3/a5 all load it through the home register r31.  Ruled out
- * in turn: the source shape (a pointer local, a reference, `(*p).m()`, a cast at the call site, an
- * untyped local, an explicit vtable-struct view, a dead copy - all give r31), the compiler version
- * (ten releases measure identically) and `-opt nopeephole`/`noscheduling`/`nofusion`.  Nothing else
- * in the range differs.
+ * PEEPHOLE.  The three `deleteNetwork*Pat` helpers need the peephole pass **off**, scoped to each
+ * one by a `#pragma peephole off`/`on` pair: with it on MWCC copies the entry into r3 for the
+ * vcall's `this` and then loads the vptr through the home register r31 (`lwz r12,0(r31)`), while the
+ * target loads it back through r3 (`mr r3,r31; lwz r12,0(r3)`) - 99.71429 % on all three rows.  The
+ * pass is the lever, not the flag (playbook 39/41): `-opt nopeephole` on the command line is
+ * silently accepted and changes nothing, which is how this residual was first recorded as
+ * unreachable from the source side.  With the pragma every row is 100 %.  The pairs are per-function -
+ * the `on` half opens after each delete, so the setters/getters between them keep the pass (which is
+ * how their own 100 % rows are measured); one region spanning the three deletes would put the pass off
+ * over them as well.
+ *
+ * ORDER.  The definitions are laid out in address order (an object's `.text` follows the source's
+ * definition order, not the map's addresses); `flipcheck` refuses the unit otherwise, even with
+ * every row at 100 %.
  *
  * BODIES.  All twelve functions are reconstructed from the disassembly.  The three `0x8C`-byte
  * `deleteNetwork*Pat` helpers share one shape: with `index == 0`, take the entry from the slot
@@ -113,40 +120,6 @@ void* getNetworkSessionManagerPat(NetworkPat* self, s32 index)
     return NULL;
 }
 
-void* getNetworkCommunityPat(NetworkPat* self, s32 index)
-{
-    if (index == 0) {
-        return (&self->community_08)[index];
-    }
-    return NULL;
-}
-
-void* getNetworkLayerPat(NetworkPat* self, s32 index)
-{
-    if (index == 0) {
-        return (&self->layer_0C)[index];
-    }
-    return NULL;
-}
-
-s32 setNetworkCommunityPat(NetworkPat* self, void* value)
-{
-    if (self->community_08 == NULL) {
-        self->community_08 = value;
-        return 0;
-    }
-    return -1;
-}
-
-s32 setNetworkLayerPat(NetworkPat* self, void* value)
-{
-    if (self->layer_0C == NULL) {
-        self->layer_0C = value;
-        return 0;
-    }
-    return -1;
-}
-
 s32 clearNetworkSessionManagerPat(NetworkPat* self, void* value)
 {
     if (self->sessionManager_00 == value) {
@@ -156,33 +129,7 @@ s32 clearNetworkSessionManagerPat(NetworkPat* self, void* value)
     return -1;
 }
 
-s32 clearNetworkPatSlot04(NetworkPat* self, void* value)
-{
-    if (self->unused_04 == value) {
-        self->unused_04 = NULL;
-        return 0;
-    }
-    return -1;
-}
-
-s32 clearNetworkCommunityPat(NetworkPat* self, void* value)
-{
-    if (self->community_08 == value) {
-        self->community_08 = NULL;
-        return 0;
-    }
-    return -1;
-}
-
-s32 clearNetworkLayerPat(NetworkPat* self, void* value)
-{
-    if (self->layer_0C == value) {
-        self->layer_0C = NULL;
-        return 0;
-    }
-    return -1;
-}
-
+#pragma peephole off
 void deleteNetworkPatSlot04(NetworkPat* self, s32 index)
 {
     if (index == 0) {
@@ -196,7 +143,18 @@ void deleteNetworkPatSlot04(NetworkPat* self, s32 index)
         }
     }
 }
+#pragma peephole on
 
+s32 clearNetworkPatSlot04(NetworkPat* self, void* value)
+{
+    if (self->unused_04 == value) {
+        self->unused_04 = NULL;
+        return 0;
+    }
+    return -1;
+}
+
+#pragma peephole off
 void deleteNetworkCommunityPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
@@ -210,7 +168,35 @@ void deleteNetworkCommunityPat(NetworkPat* self, s32 index)
         }
     }
 }
+#pragma peephole on
 
+s32 setNetworkCommunityPat(NetworkPat* self, void* value)
+{
+    if (self->community_08 == NULL) {
+        self->community_08 = value;
+        return 0;
+    }
+    return -1;
+}
+
+void* getNetworkCommunityPat(NetworkPat* self, s32 index)
+{
+    if (index == 0) {
+        return (&self->community_08)[index];
+    }
+    return NULL;
+}
+
+s32 clearNetworkCommunityPat(NetworkPat* self, void* value)
+{
+    if (self->community_08 == value) {
+        self->community_08 = NULL;
+        return 0;
+    }
+    return -1;
+}
+
+#pragma peephole off
 void deleteNetworkLayerPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
@@ -223,4 +209,31 @@ void deleteNetworkLayerPat(NetworkPat* self, s32 index)
             }
         }
     }
+}
+#pragma peephole on
+
+s32 setNetworkLayerPat(NetworkPat* self, void* value)
+{
+    if (self->layer_0C == NULL) {
+        self->layer_0C = value;
+        return 0;
+    }
+    return -1;
+}
+
+void* getNetworkLayerPat(NetworkPat* self, s32 index)
+{
+    if (index == 0) {
+        return (&self->layer_0C)[index];
+    }
+    return NULL;
+}
+
+s32 clearNetworkLayerPat(NetworkPat* self, void* value)
+{
+    if (self->layer_0C == value) {
+        self->layer_0C = NULL;
+        return 0;
+    }
+    return -1;
 }

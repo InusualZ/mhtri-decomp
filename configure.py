@@ -2317,7 +2317,7 @@ config.libs = [
             # reproduces both exactly without moving a `.text` byte.  The unit's `.text` right edge is
             # 0x8041A194, not the pre-fix 0x8041A170: the map's `clearNetworkLayerPat` starts at
             # 0x8041A170 (+0x24), so the old edge orphaned that function into an `auto_*` unit.
-            Object(NonMatching, "Network/NetworkPat.cpp",
+            Object(Matching, "Network/NetworkPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803D3CE8_fn_803D3CE8.cpp` (`.text` 0x803D3CE8..0x803D70B8, 101 functions / 13264 B) -

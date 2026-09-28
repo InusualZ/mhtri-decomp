@@ -18,12 +18,13 @@
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
-/* Only the sizes are evidenced: `NetworkStreamWriter` is the 0x24-byte local every op-code sender
-   in this range reserves, `NetworkStreamWriterDefault` the one `NetworkSessionStable_move`
-   reserves.  Their members belong to the writer's own band. */
+/* Only the sizes are evidenced: `NetworkStreamWriter` is the 0x20-byte local every op-code sender in
+   this range reserves (retail's `send8` frame is 0x30 with the writer at +0x10), and
+   `NetworkStreamWriterDefault` the one `NetworkSessionStable_move` reserves.  Their members belong to
+   the writer's own band. */
 typedef struct NetworkStreamWriter {
-    u8 bytes_00[0x24];   /* +0x00..+0x23 */
-} NetworkStreamWriter;   /* size: 0x24 */
+    u8 bytes_00[0x20];   /* +0x00..+0x1F */
+} NetworkStreamWriter;   /* size: 0x20 */
 
 typedef struct NetworkStreamWriterDefault {
     u8 bytes_00[0x1C];   /* +0x00..+0x1B */
@@ -31,41 +32,51 @@ typedef struct NetworkStreamWriterDefault {
 
 /* ---------------- bit-stream writer (owned by the network-serialization band) -------------- */
 
-typedef struct NetworkBuffer NetworkBuffer;
-
-typedef struct NetworkBufferVtable {
-    void* rtti_00;
-    void* rtti_04;
-    u32 (*destroy_08)(void* self, u32 flags);                    /* +0x08 */
-    u32 (*signal_0C)(void* self, u32 a, const char* fmt, ...);   /* +0x0C */
-    u32 (*begin_10)(void* self);                                 /* +0x10 */
-    u32 (*end_14)(void* self);                                   /* +0x14 */
-    u8 pad18[0x08];
-    u32 (*available_20)(void* self);                                   /* +0x20 */
-    u8 pad24[0x0C];
-    void (*slot_30)(NetworkBuffer* self);                        /* +0x30 (GUESS: offset-derived, the name is the buffer class owner's) */
-    void (*slot_34)(NetworkBuffer* self);                        /* +0x34 (GUESS) */
-    u16 (*put_38)(void* self, u32 a, u32 b, u32 c, u32 d, const void* data, u32 e); /* +0x38 */
-    u8 pad3C[0x08];
-    void (*flush_44)(void* self);                                  /* +0x44 */
-    u8 pad48[0x08];
-    void (*slot_50)(NetworkBuffer* self);                        /* +0x50 (GUESS) */
-    void (*slot_54)(NetworkBuffer* self);                        /* +0x54 (GUESS) */
-    u8 pad58[0x04];
-    void (*slot_5C)(NetworkBuffer* self);                        /* +0x5C (GUESS) */
-    void (*slot_60)(NetworkBuffer* self);                        /* +0x60 (GUESS) */
-    void (*slot_64)(NetworkBuffer* self);                        /* +0x64 (GUESS) */
-    void (*slot_68)(NetworkBuffer* self);                        /* +0x68 (GUESS) */
-    u8 pad6C[0x20];
-    f32 (*getFloat_8C)(void* self, s32 idx);                     /* +0x8C */
-    s32 (*getInt_90)(void* self, s32 idx);                       /* +0x90 */
-} NetworkBufferVtable;
-
-typedef struct NetworkBuffer {
-    NetworkBufferVtable* vtable;   /* +0x00 */
-    u8 pad04[0x08];
-    u8 payload_0C[];               /* +0x0C */
-} NetworkBuffer;
+/* The stream buffer every op-code writer puts its packet on.  A polymorphic class (rule 10): its
+   table lives at 0x805F9150 in the serialization band, which this unit does not own, so the class
+   only *declares* its virtuals - none is defined here, so MWCC emits no table of ours - and the
+   slots are the offsets the target's calls address (a declared virtual at index i is at +8+4*i).
+   The three never-called groups are the dispatch holes between the called slots: the entry points
+   this unit reaches are named from what the call passes, the eight `slot_NN` slots from their offset
+   alone (GUESS - the buffer class's own names are unknown). */
+class NetworkBuffer {
+public:
+    /* +0x08 */ virtual u32 destroy(u32 flags);
+    /* +0x0C */ virtual u32 signal(u32 a, const char* fmt, ...);
+    /* +0x10 */ virtual u32 begin();
+    /* +0x14 */ virtual u32 end();
+    /* +0x18 */ virtual void pad_18();
+    /* +0x1C */ virtual void pad_1C();
+    /* +0x20 */ virtual u32 available();
+    /* +0x24 */ virtual void pad_24();
+    /* +0x28 */ virtual void pad_28();
+    /* +0x2C */ virtual void pad_2C();
+    /* +0x30 (GUESS: offset-derived) */ virtual void slot_30();
+    /* +0x34 (GUESS: offset-derived) */ virtual void slot_34();
+    /* +0x38 */ virtual u16 put(u32 a, u32 b, u32 c, u32 d, const void* data, u8 e);  /* untyped: byte range (the packet's data bytes) */
+    /* +0x3C */ virtual void pad_3C();
+    /* +0x40 */ virtual void pad_40();
+    /* +0x44 */ virtual void flush();
+    /* +0x48 */ virtual void pad_48();
+    /* +0x4C */ virtual void pad_4C();
+    /* +0x50 (GUESS: offset-derived) */ virtual void slot_50();
+    /* +0x54 (GUESS: offset-derived) */ virtual void slot_54();
+    /* +0x58 */ virtual void pad_58();
+    /* +0x5C (GUESS: offset-derived) */ virtual void slot_5C();
+    /* +0x60 (GUESS: offset-derived) */ virtual void slot_60();
+    /* +0x64 (GUESS: offset-derived) */ virtual void slot_64();
+    /* +0x68 (GUESS: offset-derived) */ virtual void slot_68();
+    /* +0x6C */ virtual void pad_6C();
+    /* +0x70 */ virtual void pad_70();
+    /* +0x74 */ virtual void pad_74();
+    /* +0x78 */ virtual void pad_78();
+    /* +0x7C */ virtual void pad_7C();
+    /* +0x80 */ virtual void pad_80();
+    /* +0x84 */ virtual void pad_84();
+    /* +0x88 */ virtual void pad_88();
+    /* +0x8C */ virtual f32 getFloat(s32 idx);
+    /* +0x90 */ virtual s32 getInt(s32 idx);
+};   /* size: 0x04 - only ever reached through a pointer in this unit */
 
 /* ---------------- the manager's logger (its accessor is another band's) ------------------- */
 
@@ -449,6 +460,8 @@ typedef struct NetworkSessionSlot {
     u8  padD1[0x03];
     f32 accel_D4;              /* +0xD4 */
     f32 limit2_D8;              /* +0xD8 */
+    u8  pad_DC[0x848];         /* +0xDC..+0x923 - the element tail; the target's multiply for
+                                  a variable index is 0x924, so one array element is that size */
 } NetworkSessionSlot;       /* size: 0x924 */
 
 typedef struct NetworkSessionStable {
@@ -497,7 +510,7 @@ extern NetworkRequestDesc networkRequestDesc400;
 extern NetworkRequestDesc networkRequestDesc428;
 
 /* bit-stream writer API (another band).  The two writer classes are reconstructions from the frame
-   each constructor is given: `NetworkStreamWriter` is the 0x24-byte local every op-code sender
+   each constructor is given: `NetworkStreamWriter` is the 0x20-byte local every op-code sender
    reserves, `NetworkStreamWriterDefault` the one `NetworkSessionStable_move` reserves. */
 void fn_803CB9B4(NetworkStreamWriter* self);
 void dtor_803CB958(NetworkStreamWriter* self, s32 flags);
