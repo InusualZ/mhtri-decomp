@@ -10,9 +10,23 @@
  * - 0x80507C40 is taken because it is the named symbol's own (16-aligned) start.  The function
  * `0x805078F0` immediately below it ends at 0x80507C38.
  *
- * SECTION.  `.text` only.  The unit's data references (the `.data` jumptable at 0x8062FF90, the
- * `.bss`/`.sbss`/`.sdata` objects) are declared, never defined, so nothing is claimed here - dtk names
- * an unclaimed relocation target from the map, and playbook 23 measures a claim before and after.
+ * SECTIONS.  `.text` plus two of the band's data objects, claimed 2026-09-28 so that the range the
+ * unit's own code stores into is the unit's (rule 12; the declarations lived in
+ * `include/unsplit/DWCi.h`, which is rule 12's finding):
+ *   .sbss 0x807957D0..0x807957F8 - the state machine's words: the free-list head, the runtime/result
+ *     block and the state-ladder word.  Every symbol in the run is stored by *this* object
+ *     (`DWCi_FreeList`, `DWCi_SetResult`, `DWCi_AdvanceStatus`) and by no other registered unit, so
+ *     the definer test - a store, not a load (`DWCi_runtime` 57 loads, 2 stores; `DWCi_state` 28
+ *     stores) - picks this unit.  0x807957F8 (not this unit's) is the first symbol past the run.
+ *   .sdata 0x80794200..0x80794210 - the two all-zero name strings the session opener is handed plus
+ *     their two 4-byte neighbours, all four read only here.
+ * Both boundaries are symbol-aligned and 8-byte aligned, which `dtk dol split` requires of a claim
+ * (an 8-misaligned boundary makes it die with `Invalid alignment for split`).  One run per section:
+ * a second run whose gap no registered unit owns makes the split die with a link-order cycle
+ * (playbook 53), so nothing else here is claimed.  Still unowned and declared in the band header:
+ * the `.data` jumptable at 0x8062FF90, `DWCi_protocolMagic`, `DWCi_addressFormat*`, the digit class
+ * table, `DWCi_addressRing*`, `DWCi_stateBlock` and `DWCi_workBuffer` - all read here but stored
+ * elsewhere or nowhere.
  *
  * FLAGS (open question, reported).  The whole 0x80507C40..0x80512490 band has every function start
  * 16-byte aligned (152/152) with 4/8/12-byte zero `gap_*` runs between neighbours, which is the
