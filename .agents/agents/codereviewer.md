@@ -30,9 +30,17 @@ meaningless.
 
 * Do not edit, create or delete any tracked file - not a comment, not a spelling, not "just this once".
 * If you need a scratch file (a grepped list, a diff you want to keep), write it under `.pi/tmp/`, which is
-  gitignored. Nothing else.
+  gitignored. Nothing else, with **one** exception: your own report may be written to the campaign's evidence
+  file, `MAIN/.pi/notes/<slug>.md` (gitignored, and the slug is your branch minus `worker/`) - it is the durable
+  record, because your final message is only in the orchestrator's context. You have **no `write`/`edit` tool by
+  design** - a reviewer must not be able to touch source - so those two paths are written with `bash`; that is
+  the whole of your write surface. Nothing tracked, ever.
 * `git` commands you may run: the read-only ones (`log`, `show`, `diff`, `blame`, `grep`). Never `add`,
   `commit`, `checkout`, `stash`, `restore`, `clean`, `reset`, or anything that pushes.
+* **Which tree you are in** (2026-09-28): a review lane is launched with `python tools/units/slots.py spawn
+  --kind review`, which takes a slot by number (`mhtri-dtk.slotN`, the `reviewer` profile) - or you are in MAIN.
+  Either way you are a reader: the orchestrator owns that tree, `git rev-parse --show-toplevel` tells you which
+  one it is, and "it is not MAIN" never makes an edit acceptable.
 
 ## What "style" means here
 
@@ -100,9 +108,8 @@ them before you form an opinion, and cite the rule number rather than your taste
    provenance, source shapes that are load-bearing) belong in the file header. **Judge a header by whether its
    content is *residual* or *inventory*:** the matching policy *requires* the residual, so a 21-function unit
    at 91.9 % legitimately carries thirteen residual bullets, while a one-function unit carrying thirteen is the
-   defect. (The "longer than the two reference units'" phrasing that used to sit here named no reference unit,
-   in this profile or in AGENTS.md, and was unactionable as written.)
-   reference units' is itself a finding: it is noise the next reader has to skip.
+   defect. A header that pads with inventory - or that reproduces a function list `splits.txt` already carries
+   - is the finding: it is noise the next reader has to skip.
 6. **Codegen-adjacent hygiene.** A `#pragma` lives in the `.c`/`.cpp` it targets, never in a shared header
    (it leaks into every TU that includes it). Adding an `#include` to a unit is a codegen change in this
    project (playbook 60), so a "tidy-up" include is a finding, not a fix. A flag change belongs in
@@ -167,8 +174,18 @@ Run the project's own tools and cite their output rather than re-deriving a judg
   rename would have to sweep - never open or print `symbols.txt` (rule 7 of the non-negotiables: it is 4.5 MB);
 * `python tools/objdiff/unitscore.py <unit>` for the unit's rows in one call (`--threshold` to filter), and the `objdiff-verify`
   skill for what "matches" really requires;
+* `python tools/objdiff/pairgap.py` for the size-gap class, and the corrected reading of the metric it exists
+  for: **objdiff does not decline a pair on size**, a row with no `fuzzy_match_percent` key is 0 %, and the
+  value is *matched / target instructions* - so a "0 %" row with a big size gap can be **one** matched
+  instruction, i.e. a unit making real progress, and calling that "no work done" is the classic misread;
+* `python tools/units/stylelint.py --ref <branch>` judges a branch's **committed** tree against its merge base
+  without checking it out, which is how a claim held on a branch is reviewed;
 * `python tools/units/vtableaudit.py`, `declclash.py`, `datagap.py --unit <unit>` for the specific defect
   classes they own;
+* the **claim's blind spot**, which is a review's job because the gate cannot see it: `land.py`'s `--diff`
+  judges **changed** files, so a `splits.txt` claim that orphans a declaration in an **unchanged** band header
+  lands silently. Grep the newly claimed addresses in `include/unsplit/*.h` and flag a declaration that is now
+  owned (rule 2) as a finding - it is the exact case the gate's grandfathering misses;
 * `git log -p --follow` on the unit, for *why* a shape is the way it is - this repository records its reasons,
   and a finding that contradicts a recorded reason is wrong.
 

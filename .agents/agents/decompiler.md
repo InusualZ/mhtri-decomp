@@ -55,6 +55,17 @@ sibling worktree named `mhtri-dtk.ws-<claim>` (its branch is `worker/<claim>`; `
 prints it). If you find yourself in MAIN: do no work, write nothing, and report it - that is the correct answer,
 not a guess at which tree was meant.
 
+**Your tree is chosen for you, and the profile follows the kind of work** (2026-09-28): lanes are launched
+with `python tools/units/slots.py spawn --kind KIND [--slot N]`, which takes a pooled slot by number - a fresh
+branch off main's tip at claim time - or falls through to the next genuinely free one, and maps the kind to the
+profile **in the tool**: `unit`->`decompiler`, `fix`->`fixer`, `merge`->`merger`, `review`->`reviewer`,
+**`tooling`/`docs`->`worker`**. So your tree is `mhtri-dtk.slotN` (or the older `mhtri-dtk.ws-<claim>`), and a
+slot is **reused** - "it built here before" is not evidence about this round. If the task you were given has
+**no translation unit** (a tool, a doc, a fixture), this profile is the wrong prompt for it: say so instead of
+applying unit policy - a registration, a 6.5 sweep - to a job that has no unit. Either way: never run
+`claims.py release` (teardown is the orchestrator's - a lane that ran it from inside its own worktree wiped it)
+and never land.
+
 ## Order of work
 
 1. **Ack** your claim: `python tools/units/claims.py ack <claim> --agent <your-slug>`, and call it again with
@@ -122,6 +133,22 @@ Traps that have cost this project days:
 * `ninja build/RMHE08/ok` is order-only and can print `main.dol: OK` **even when a compile failed**. Check the
   `FAILED` count first; treat that as the primary signal.
 
+**Two tools replace hand-rolled measurement** (2026-09-28):
+
+* `python tools/objdiff/unitscore.py <unit>` - every row of a unit, from one `report.json`, in one call
+  (`--threshold <pct>` filters; `--measure` covers a fresh-mtime object). Read the whole row set instead of N
+  `symdiff.py -u` calls, and it **refuses a stale report** rather than reporting yesterday's numbers.
+* `python tools/objdiff/pairgap.py` - the size-gap class. **objdiff does not decline a pair on size**: a row
+  with no `fuzzy_match_percent` key is 0 % (0 matched of N), and the value is *matched / target instructions* -
+  so a "0 %" row with a large size gap is usually **one** matched instruction, and the real work is the size
+  difference (`fn_80075DD8`: 192 B vs 400 B while the report says 0 %).
+
+The measurer itself is no longer the fragile part: `recompile.py --measure` **works from git-bash** (the old
+`cmd /c` path-rewrite trap is fixed - do not hand-roll a scorer on the belief that it is broken), and it now
+**refuses a stale read** - an object older than its source, or a split input that is an **uncommitted edit in
+this tree** (the signal that matters in a fresh worktree: "newer than the seeded `config.json`" is true of
+everything there by construction). If it refuses, re-split; do not work around it.
+
 ## Data (match it *with* the code, not after it)
 
 A unit is not finished when its `.text` matches - the object has to be the target's object, and the data
@@ -144,6 +171,15 @@ is not measured), so measure it yourself before you report.
   entry is exactly what the claim is for, and it is what lets you flip the unit; a *shared* entry can be
   neither claimed nor named in source - write the measured blocker in the unit header, report it, claim nothing.
 * **Never spell out a symbol another unit owns** (rule 2): declare it in that unit's header and `#include` it.
+* **A claim moves ownership for every symbol in the range - including declarations in a band header.**
+  Measured 2026-09-28: `include/unsplit/Network.h` declared `lbl_80794CE4`, a generated name with no map row,
+  so **no** rule fired (rule 12 reads the map's ownership); the moment a lane claimed the range and the map row
+  was renamed, that same declaration resolved to an **owned** address and became a **rule 2** finding - a band
+  header declaring a symbol a registered unit owns. There is no lint exception to reach for (`EXEMPT` is
+  asserted empty, there is no `--allow-lint`, and the band header **is** judged), so the remedy is mechanical:
+  move those declarations into the **owner's own header** (`include/<module>/<stem>.h`), include it where they
+  are used, and drop them from the band in the same change. Before claiming a range, list what the band headers
+  declare from it (`grep -n` the addresses in `include/unsplit/*.h`) and plan that sweep with the claim.
 * **Required - not "once the code is at 100 %"**: the data a unit's own functions reference and own - its
   private pool entries, its jump tables, its `__FILE__` strings, its tables - is claimed **in the registration
   commit** and emitted by its source, in the same change that writes the bodies. An `extern` for data your unit
@@ -173,6 +209,12 @@ The lint compares the tree against a ref. It now includes **untracked** files, b
 to mention the new unit you just wrote, that is the blind spot this line exists for: `git diff` cannot see
 an untracked file, so `git add` the unit (or lint after the commit) before trusting a clean verdict. Two
 lanes reported "no new violation" on 2026-09-25 while the gate found real findings in their new units.
+
+Its mirror image is the claim's own blind spot, and `--diff` cannot see it: the lint judges **changed** files,
+so a `splits.txt` claim (changed) that orphans a declaration in an **unchanged** band header reports nothing.
+When your change claims ranges, sweep the band yourself before you report - `grep -n` the claimed addresses in
+`include/unsplit/*.h`, and move what is now owned into its owner's header. A tooling item is filed to add a
+rule-2-only pass over both sides of `--diff`; until it lands, this is your check, not the gate's.
 
 The DOL must hash to `BF4850739478CAAEDFE675949EB7C28595A7FDE9`. If a full build is impossible in your
 worktree, say so explicitly in your report - do not imply you verified it.

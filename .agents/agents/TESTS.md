@@ -309,3 +309,61 @@ and `--check`/`install.sh` fail until `python tools/agents/sync_profiles.py` is 
 regenerate, and nothing else needs editing.
 
 T1/T2/T3 are re-run after this edit; T2's probe questions were corrected with it.
+
+### Profile edit - the 2026-09-28 findings, where they change what a lane must do (2026-09-28)
+
+**What was annotated, and into which profile.** Only the findings that change a *lane's* behaviour - the
+orchestrator-side facts stay in AGENTS.md and the notes. Into all four: the launch/slot mechanism and the
+profile mapping (`python tools/units/slots.py spawn --kind KIND [--slot N]`, with `tooling`/`docs`->`worker`),
+the slot-reuse warning ("it built here before" is not evidence about this round), and "never run
+`claims.py release`". Into `decompiler`: `unitscore.py` and `pairgap.py` plus the corrected metric reading (a
+row with no `fuzzy_match_percent` key is 0 %, and the value is *matched / target instructions*, so a "0 %" row
+with a big size gap is usually **one** matched instruction); `recompile.py --measure` works from git-bash (the
+old `cmd /c` trap is fixed) and now refuses a stale object/split; the **claim -> rule 2** mechanism (a claim
+moves ownership for every symbol in the range, so a band header's declaration becomes an owned-symbol finding
+and the declarations move into the owner's header); and the `--diff` blind spot that makes that the lane's own
+check. Into `fixer`: whole-row measurement via `unitscore.py`, the same staleness rule, `selftest.py --changed
+main` (plain `--changed` selects nothing on a committed clean tree) and `stylelint.py --ref <branch>`. Into
+`merger`: the two `mergebranch.py` false refusals it now resolves (a comment that names a
+`src/<module>/fn_XXXXXXXX.c` **path** is not a symbol reference; a comment-only `src/**` difference resolves to
+main's comment block plus the branch's code) with the genuine cases that must still block, and its residual
+risks. Into `codereviewer`: `pairgap.py` and the metric reading, `stylelint.py --ref <branch>`, and the claim's
+blind spot as a review target - the case the gate's grandfathering cannot see.
+
+**Three defects the T2 probe found while verifying the edit - all fixed in the same batch.**
+
+* **`merger.md` carried no generated section-6.5 block at all**, while citing rules 2/6/7/10 by number in its own
+  prose (its M6 *is* rule 2; `vtableaudit.py --diff main` *is* rule 10). Measured, not assumed: the first merger
+  probe answered *"there is no prose for project-wide rule 2/6/7/10/11 in my context - only their names"*.
+  `sync_profiles.py`'s `PROFILES` tuple excluded it deliberately ("it keeps its own hand-written prose") -
+  which is exactly the drift that tool exists to prevent, because a hand-typed merged header is where rules 3-5
+  are broken. It is now generated like the others: the block is identical in all four, and the tool's own
+  selftest went **45 -> 48 checks with no test edited** (the profile list is data-driven, so the count is the
+  evidence that the new profile is really covered).
+* **`codereviewer.md` dimension 5 carried an orphaned sentence fragment.** An earlier edit replaced the middle
+  of a sentence and left *"reference units' is itself a finding: it is noise the next reader has to skip."*
+  dangling under a parenthetical. The probe reported it as *"the two 'reference units' ... are named nowhere,
+  so dimension 5 is unenforceable as written"* - a prompt defect that reads as garbage and had survived review.
+  The sentence is now whole.
+* **A contradiction in the note this very batch added**: it told a reviewer to write its report to
+  `.pi/notes/<slug>.md`, while a reviewer has **no `write`/`edit` tool by design** - and the codereviewer probe
+  caught it ("the scratch/notes write my instructions promise is impossible"). The profile now states the
+  reason and names `bash` as the whole of the reviewer's write surface.
+
+**Checks (2026-09-28).** T0: `--check` **0**, all four profiles in sync with `docs/plan.md` section 6.5
+(rules 1-12); `python tools/agents/sync_profiles_selftest.py` **48 checks, green**. T1: `subagent list` shows
+all four as project agents with the expected grants (`codereviewer` read-only: read/grep/find/ls/bash).
+T2: run twice - four children, then two after the fixes. Every child recalled its job, the write limit **and
+the repo-root tell**, rules 1-12 with the right numbers, its report sections, and the **new** annotations: the
+decompiler child repeated `mhtri-dtk.slotN` (or `.ws-<claim>`), the fixer and merger children both repeated
+`selftest.py --changed main`, the merger child quoted M7's new comment clause verbatim in meaning, and the
+codereviewer listed `pairgap.py`. The second-round merger child answered the section-6.5 block as *"confident,
+from the generated block"* - the exact gap round one had found. All four children correctly observed that they
+were launched in MAIN and said they would stop and report; that is T2 exercising the tell, not a defect.
+
+**Residual gaps the probes named (recorded, not fixed here).** (1) AGENTS.md's playbook index has a
+**duplicate row number** - 48 appears twice (the variadic-definition row and the `extern "C"` row) and 52
+follows 57 - so "playbook 48" is ambiguous in a finding's evidence line; renumbering touches the table plus
+every citation in `docs/matching.md`, the profiles and TESTS.md, so it wants its own batch. (2) The profiles
+carry the playbook *index*, never `docs/matching.md`, so a lane can cite a row but not read it. (3) A
+`rename`-class finding has no `backlog.py` kind, so a reviewer's rename request is picked up by nothing.
