@@ -849,7 +849,7 @@ struct _PLW {
         /* +0x410 */ u8 unk410[0x414 - 0x410];
         struct {
             /* +0x410 */ u8 pad_0x410[0x2];
-            /* +0x412 */ s16 field_0x412;  /* the hold-gauge re-arm word `fn_8027681C` tests */
+            /* +0x412 */ s16 field_0x412;  /* the hold-gauge re-arm word `Pl_act_state_ck` tests */
         };
     };
     /* +0x414 */ s16 unk414;
@@ -914,7 +914,7 @@ struct _PLW {
             /* +0x460 */ s16 field_0x460;  /* > 0 is the whole of `fn_8027DFD0` */
             /* +0x462 */ u8 pad_0x462[0x464 - 0x462];
             /* +0x464 */ s16 field_0x464;  /* the cockpit-quest bar's recompute gate:
-                                            * `fn_802E7408` (`hud/cockpit_quest.cpp`) reads it
+                                            * `quest_bar_a_next_id` (`hud/cockpit_quest.cpp`) reads it
                                             * as `lha` and leaves the bar's blend parameter alone
                                             * while it is non-zero (playbook 56 splice: 2 B out of
                                             * the filler, no member moved) */
@@ -925,7 +925,7 @@ struct _PLW {
         struct {   /* MAIN's view verbatim - `Pl/pl_act.cpp` keeps the name it reads */
             /* +0x466 */ s16 unk466;
         };
-        struct {   /* this band's name: `fn_802E7548` reads it as `lha` and stops recomputing the
+        struct {   /* this band's name: `quest_bar_b_next_id` reads it as `lha` and stops recomputing the
                     * second quest bar while it is non-zero */
             /* +0x466 */ s16 field_0x466;
         };
@@ -1110,7 +1110,10 @@ struct _PLW {
     /* +0x5B8 */ s16 field_0x5B8;  /* the guard timer `fn_80274918` gates the table row on (>= 0xA0) */
     /* +0x5BA */ u8 field_0x5BA;
     /* +0x5BB */ u8 unk5BB;
-    /* +0x5BC */ u8 unk5BC[0x5C4 - 0x5BC];
+    /* +0x5BC */ u8 field_0x5BC;   /* `hud/cockpit_quest.cpp`'s `quest_mark_visible_ck` gates the quest
+                                  * mark on this byte being 0; meaning not yet derived (GUESS, was
+                                  * `unk5BC` - both are one byte, so no offset moves) */
+    /* +0x5BD */ u8 pad_0x5BD[0x5C4 - 0x5BD];
     /* +0x5C4 */ union { /* MAIN's arm first; the second arm is this branch's view of
                           * the same 36 bytes, so `Pl/fn_8025F088.cpp` keeps the names
                           * it reads (rule 5: one member per offset) */

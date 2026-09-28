@@ -41,7 +41,7 @@ s32 item_take(s16 a, void* b, s32 c, s32 d, s32 e);
 void* fn_8004D134(void);
 s32 fn_8004D27C(s32 a);
 s32 fn_8004D334(s32 a);
-void fn_800526F8(_mh_ivec2_* dst, const _mh_ivec2_* src);
+void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
 u16 fn_800CEF18(u16 id);
 u32 game_ready_ck(void);
 s32 fn_800DBC84(s32 id);
@@ -690,18 +690,18 @@ void fn_801E89B4(LbMenuWork* self)
     draw_sprite_ary((const u16*)lbl_805BAA20, &pos);
     found = 0;
     fn_801E6850((s16*)&p0, (s16*)get_lsp_data(0x1307U, NULL));
-    fn_800526F8(&a, &p0);
+    uv_pair_copy(&a, &p0);
     off = 0;
     for (i = 0; i < 0x1E; i++) {
         fn_80222848(i, (s16*)&m);
         fn_801E6850((s16*)&p2, (s16*)get_lsp_data(0x12F9U, NULL));
-        fn_800526F8(&p2, &m);
+        uv_pair_copy(&p2, &m);
         p0.x = m.x + a.x;
         p0.y = m.y + a.y;
         draw_sprite((const _SPR_DATA_&)p2, &pos);
         if (self->stage_0x0E == i) {
             found = 1;
-            fn_800526F8(&p1, &m);
+            uv_pair_copy(&p1, &m);
         }
         if ((u8)(self->state_0x00 + 0xFF) <= 1U && chk_pointer() == 0 && self->count_0x10 == i) {
             fn_801E6850((s16*)&p2, (s16*)get_lsp_data(0x1304U, NULL));

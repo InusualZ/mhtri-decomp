@@ -79,11 +79,11 @@
  *
  * The fold moved **no row**: all 91 rows of the landed half measure exactly what `main`'s
  * `build/RMHE08/report.json` measures for them (50 at 100.0, `item_category_ck` 99.29, `fn_8029FA74`
- * 99.43, `fn_8029FB00` 99.61, `fn_802A0304` 98.50), and the 8 folded rows are the branch's own
+ * 99.43, `fn_8029FB00` 99.61, `menu_item_frame_update` 98.50), and the 8 folded rows are the branch's own
  * values (3 byte-identical).  Two whole-project notes from the same comparison: the folded unit's
  * own `menu` lib flag `-opt nopeephole` reproduces every folded row with the `#pragma peephole off`
  * removed (measured: the probe re-adds it and the unit's 99 rows are bit-identical), and
- * `fn_802A0304` 98.50 is unchanged by the `fn_800CF208` declaration this fold aligned with its
+ * `menu_item_frame_update` 98.50 is unchanged by the `fn_800CF208` declaration this fold aligned with its
  * owner (`u8`, the owner's own spelling - the `u32` call-site view main carried is the
  * `(10505) illegal overloading` that `Pl/fn_80273B14.cpp` trips once it includes this header).
  *
@@ -135,7 +135,7 @@
  *   * `fn_8029FB00` 99.61 - the same r0-vs-argument-register shape on the trailing `fn_802A0040`
  *     call; passing the field through an `s8` local (which fixes nothing else here) is what closed
  *     the rest of that function.
- *   * `fn_802A0304` 98.50 - the `fn_800CF208` arm.  Its declaration in this unit's header is the
+ *   * `menu_item_frame_update` 98.50 - the `fn_800CF208` arm.  Its declaration in this unit's header is the
  *     owner's own `u8 fn_800CF208(void)` (the landed registration's `u32` call-site view is the
  *     `(10505) illegal overloading` this fold's rule-2 move tripped in `Pl/fn_80273B14.cpp`, which
  *     now includes this header), and the residual rows are that widening, not an instruction count.
@@ -1326,7 +1326,7 @@ extern "C" u32 fn_802A02D4(u8 idx)
 
 /* 0x802A0304: the same predicate for the slot the frame work selects, which is the current game
  * mode's own slot. */
-extern "C" u32 fn_802A0304(MenuFrameWork* self)
+extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
 {
     MenuSlot* slot = &lbl_806AC8C8.slot[0];
     u32 idx = 0;
@@ -1366,7 +1366,7 @@ extern "C" u32 fn_802A03A4(void)
 /* 0x802A0404: the frame work's own predicate - the slot it selects, or its own two flags. */
 extern "C" u32 fn_802A0404(MenuFrameWork* self)
 {
-    if (fn_802A0304(self) == 1) {
+    if (menu_item_frame_update(self) == 1) {
         return 1;
     }
     if (self->field_0x5BC != 0) {

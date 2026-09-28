@@ -32,7 +32,7 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *m
 
 /* nw4r math / resource helpers owned by unsplit units.  `fn_80082F18` comes from
  * `include/unsplit/g3d.h` (rule 2). */
-extern f32 fn_800501E4(u16 value);
+extern f32 anim_tick_angle(u16 value);
 extern f32 fn_800610AC(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
 extern f32 fn_80463F34(f32 *out, f32 frame);
@@ -100,7 +100,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
         return pLast->value;
     }
     delta = frame - pData->keys[0].frame;
-    pos = fn_80082F18(delta * fn_800501E4(pData->count) * pData->rate);
+    pos = fn_80082F18(delta * anim_tick_angle(pData->count) * pData->rate);
     if (pos > pData->count - 1) {
         Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 135,
             "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.",

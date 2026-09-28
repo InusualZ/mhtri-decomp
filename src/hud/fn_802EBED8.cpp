@@ -17,7 +17,7 @@
  *     and the quest-window record (`lbl_806BDCC8`, `get_lsp_data`, `draw_sprite_*`), and its
  *     neighbours `layout.cpp` (0x802E0740..0x802E4978) and `cockpit_quest.cpp`
  *     (0x802E7408..0x802EBED8) are both registered in the `hud` lib.
- *   - the seam is unproven.  `tudiscover.py at 0x802EBED8` must-links `fn_802EBED8`/`fn_802EC200`
+ *   - the seam is unproven.  `tudiscover.py at 0x802EBED8` must-links `quest_marker_draw`/`fn_802EC200`
  *     and offers strong left cuts at 0x802EBBD0, 0x802EBE2C and 0x802EBED8 (all on the `.sdata2`
  *     run jump `lbl_8079A980 -> lbl_8079A988`); this unit claims the brief's cut 0x802EBED8, which
  *     is a clean function boundary (the band below ends at 0x802EBE2C's tail).  The sibling
@@ -65,7 +65,7 @@
  *    retail does not).
  *
  * Not written (41, in address order): the rest of the band.  The largest are `fn_802F09C4` (0x8E0),
- * `fn_802EDCE4` (0x5A4), `fn_802F02EC` (0x4F8), `fn_802ECE28` (0x3E4), `fn_802EBED8` (0x328),
+ * `fn_802EDCE4` (0x5A4), `fn_802F02EC` (0x4F8), `fn_802ECE28` (0x3E4), `quest_marker_draw` (0x328),
  * `fn_802EC200` (0x2F0), `fn_802EE3AC` (0x2B0), `fn_802EE97C` (0x2A8), `fn_802ED20C` (0x274); all of
  * them drive the same `lbl_806BDCC8` / `_PLW` records this unit's written bodies view.  Their m2c
  * shape oracle is kept for the next lane in `build/tmp/m2c/` (throwaway, gitignored).
@@ -250,11 +250,11 @@ void fn_802EF0A0(_PLW* plw, void* out)
     fn_802EEDE4(&pos);
 }
 
-/* 0x802EF62C (0x84).  The quest HUD's gate: off while `fn_802A0304(0)` or `fn_802BE39C()` hold,
+/* 0x802EF62C (0x84).  The quest HUD's gate: off while `menu_item_frame_update(0)` or `fn_802BE39C()` hold,
  * on only in area 1 with the act's state byte at 0 or 0xE. */
 s32 fn_802EF62C(_PLW* plw)
 {
-    if (fn_802A0304(0) != 0) {
+    if (menu_item_frame_update(0) != 0) {
         return 0;
     }
     if (fn_802BE39C() == 1) {

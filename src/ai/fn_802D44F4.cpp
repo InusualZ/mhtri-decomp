@@ -127,7 +127,7 @@ void fn_802D2A00(struct _AINPC_W* self, s32 a, s32 b, s32 c);
 /* 0x802D6534 - arms the "hold item" timer when the player is within the AI NPC's reach: the gate
  * byte at +0x43D is latched once, and the timer at +0x43E gets the long or the short value from
  * the distance test. */
-void fn_802D6534(void)
+void ai_npc_hold_item_arm(void)
 {
     if (quest_move_state_valid_ck() == 0) {
         return;

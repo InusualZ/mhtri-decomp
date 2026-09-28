@@ -97,7 +97,7 @@ s32 fn_80273228(struct _PLW* self, u16 item_id, s16 value);
 /* `fn_8027D4F0` is declared by its owner, `include/Pl/pl_act.h` (`extern "C" void`), which this
  * unit includes - the `u32` copy that stood here clashed with it the moment the owner registered
  * its declaration ((10505) illegal overloading); the call site discards the result (rule 2). */
-u32 fn_802B0598(struct _PLW* self);
+u32 pl_act_kind_get(struct _PLW* self);
 
 /* ---- library callees (the owners' headers do not declare these) ---- */
  /* 0x80041E40 - copies a 0xC-byte record and

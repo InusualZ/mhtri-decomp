@@ -43,7 +43,7 @@
 #include "unsplit/g3d.h"         /* fn_8007100C, fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* fn_800610AC, fn_800618BC, fn_800628C8 (rule 2) */
 #include "g3d/fn_80063888.h"     /* fn_8006497C (rule 2) */
-#include "fn_8004CAD8.h"         /* fn_800501E4, fn_800504D4, fn_80050BC0 (rule 2) */
+#include "fn_8004CAD8.h"         /* anim_tick_angle, fn_800504D4, fn_80050BC0 (rule 2) */
 #include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
 
 /* fp_contract stays ON (cflags_g3d): the target's `fn_8008AED0` uses fused fmadds/fmsubs, so this unit
@@ -201,7 +201,7 @@ f32 fn_8008B650(u32* iter);
 f32 fn_8008BF08(u32* iter, const f32* self);
 f32 fn_8008DF64(f32 a, f32 b);
 f32 fn_8008F6C4(u32 self, s32 index);
-f32 fn_800501E4(u16 count);
+f32 anim_tick_angle(u16 count);
 f32 fn_80050BC0(f32 value);
 s16 fn_8008B700(f32 value);
 u8 fn_8008BE88(f32 value);
@@ -901,7 +901,7 @@ f32 fn_8008AA8C(u32 self, f32 frame)
         return fn_8008AFEC(&last, self);
     }
     delta = frame - fn_8008AFF8(&first);
-    pos = fn_80082F18(ch->rate * (delta * fn_800501E4(ch->count)));
+    pos = fn_80082F18(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
         nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
     }
@@ -996,7 +996,7 @@ f32 fn_8008B200(u32 self, f32 frame)
         return fn_8008B71C(&last, (const f32*)self);
     }
     delta = frame - fn_8008B784(&first);
-    pos = fn_80082F18(ch->rate * (delta * fn_800501E4(ch->count)));
+    pos = fn_80082F18(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
         nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
     }
@@ -1076,7 +1076,7 @@ f32 fn_8008B95C(u32 self, f32 frame)
         return fn_8008BF08(&last, (const f32*)self);
     }
     delta = frame - fn_8008BF5C(&first);
-    pos = fn_80082F18(ch->rate * (delta * fn_800501E4(ch->count)));
+    pos = fn_80082F18(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
         nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
     }

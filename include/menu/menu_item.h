@@ -274,12 +274,12 @@ struct MenuEntryState {
     /* +0x00C */ u16 field_0x00C;
 };
 
-/* The frame work this unit's per-frame entry points (`fn_802A0304`, `fn_802A0404`) carry; only the
+/* The frame work this unit's per-frame entry points (`menu_item_frame_update`, `fn_802A0404`) carry; only the
  * three bytes they read are named.
  * size: 0x5C0 (approximate: max touched offset + 1) */
 struct MenuFrameWork {
     /* +0x000 */ u8 unused_0x000[0x008];
-    /* +0x008 */ u8 slot_index;       /* the `MenuSlot` index `fn_802A0304` selects */
+    /* +0x008 */ u8 slot_index;       /* the `MenuSlot` index `menu_item_frame_update` selects */
     /* +0x009 */ u8 unused_0x009[0x5BC - 0x009];
     /* +0x5BC */ u8 field_0x5BC;
     /* +0x5BD */ u8 unused_0x5BD;
@@ -383,7 +383,7 @@ u32 fn_802A008C(MenuSlot* slot);
 u32 fn_802A0148(void);
 u32 menu_busy_ck(void);
 u32 fn_802A02D4(u8 idx);
-u32 fn_802A0304(MenuFrameWork* self);
+u32 menu_item_frame_update(MenuFrameWork* self);
 u32 fn_802A03A4(void);
 u32 fn_802A0404(MenuFrameWork* self);
 u32 fn_802A0464(void);

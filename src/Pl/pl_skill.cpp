@@ -19,7 +19,7 @@
  *   -inline noauto: fn_80270CA4 must keep its five real `bl fn_80270C64` calls; `auto` inlines them and the
  *        function grows 684 -> 828 B. `-opt noautoinline` is NOT the spelling that works, `-inline noauto` is.
  *   -sdata 0: the target addresses `lobby_w` with lis/addi (ABS16), not `@sda21`. As a flag it now *hurts*:
- *        it fixes Pl_Skill_ck 98.7 -> 100 and fn_802715A0 97.0 -> 100, but breaks fn_802738B8 100 -> 72.5
+ *        it fixes Pl_Skill_ck 98.7 -> 100 and Pl_Skill_slot_item_get 97.0 -> 100, but breaks fn_802738B8 100 -> 72.5
  *        and fn_802738D8 100 -> 45.0 (the `lbl_80792140`/`lbl_80792148` byte tables *are* small data in the
  *        target), net -0.12 pt. The two functions are closed in the source instead, by declaring `lobby_w`
  *        as an unsized array (`lobby_w[0]`) so MWCC stops putting it in the small-data area: +0.085 pt,
@@ -735,7 +735,7 @@ extern "C" u32 fn_802714F0(_PLW* plw, u16 skill) {
 }
 
 /* The level of the skill in one slot: the live set in the lobby menu, the base set otherwise. */
-extern "C" u32 fn_802715A0(_PLW* plw, u32 slot) {
+extern "C" u32 Pl_Skill_slot_item_get(_PLW* plw, u32 slot) {
     int i;
 
     if (fn_800CF208() == 2 && lobby_w[0] == 6) {

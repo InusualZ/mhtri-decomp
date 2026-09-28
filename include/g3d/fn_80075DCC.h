@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-/* 0x80075DCC - a one-line thunk: `fn_80500EF4(lbl_80795DFC * angle)`.  The callers pass a sin/cos
+/* 0x80075DCC - a one-line thunk: `math_sincos_idx(lbl_80795DFC * angle)`.  The callers pass a sin/cos
  * out-pair plus an angle; the shipped body reads only the angle. */
 void fn_80075DCC(f32* pOutSin, f32* pOutCos, f32 angle);
 /* 0x80075DD8 - sets up the camera projection for `p`. */

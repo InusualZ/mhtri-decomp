@@ -235,8 +235,8 @@ void fn_80053960(u32, s32, s32, u32);   /* 0x80053960 fn_8004CAD8.cpp */
 void fn_80054178(s16*);                  /* 0x80054178 fn_8004CAD8.cpp */
 void fn_802E796C(void*, s32);           /* 0x802E796C hud/cockpit_quest.cpp */
 void fn_802E7FA0(void);                 /* 0x802E7FA0 hud/cockpit_quest.cpp */
-void fn_802E8C8C(void*);                /* 0x802E8C8C hud/cockpit_quest.cpp */
-void fn_802E8E64(void);                 /* 0x802E8E64 hud/cockpit_quest.cpp */
+void quest_targets_update_b(void*);                /* 0x802E8C8C hud/cockpit_quest.cpp */
+void quest_marker_arm(void);                 /* 0x802E8E64 hud/cockpit_quest.cpp */
 void fn_802EA33C(void*);                /* 0x802EA33C hud/cockpit_quest.cpp */
 void fn_802EC4F0(void*);                /* 0x802EC4F0 hud/fn_802EBED8.cpp */
 s32 fn_802EC6C4(void*);                 /* 0x802EC6C4 hud/fn_802EBED8.cpp */

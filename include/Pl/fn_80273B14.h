@@ -91,7 +91,7 @@ void fn_802767B4(struct _PLW* plw, s16 amount);
 
 /* 0x80276800 / 0x8027681C - the two act-state predicates. */
 u32 fn_80276800(struct _PLW* self, s32 v);
-u32 fn_8027681C(struct _PLW* plw);
+u32 Pl_act_state_ck(struct _PLW* plw);
 
 /* 0x80276868 / 0x802768F8 / 0x80276A3C - the stagger-budget setters. */
 void fn_80276868(struct _PLW* plw, s16 amount);
