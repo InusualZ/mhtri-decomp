@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Deterministic self-test for the link-wide checks in tools/units/flipcheck.py (the `.comment`
-active-flags row-36 check and the extab/extabindex map-symbol link check).
+"""Deterministic self-test for the link-wide and byte-level checks in tools/units/flipcheck.py (the
+`.comment` active-flags row-36 check, the extab/extabindex map-symbol link check, the section-byte count
+and permutation naming, and the general undefined-reference check).
 
     python tools/units/flipcheck_selftest.py
     python tools/units/flipcheck.py --selftest
@@ -13,6 +14,13 @@ The map-symbol check is pinned on the same means: a `@etb_`/`@eti_` symbol only 
 *another* linked object references (and no input, ours included, provides) is reported - now as an
 informational note, because `tools/elf/objextab.py` names those symbols in the build (a current object
 provides them, and then the check is silent).
+
+The three classes a refusal has to tell apart are pinned here too, on fixtures: an object that exists but
+emits none of the compared sections is *not* "no compiled object" (the wording is asserted verbatim, as is
+the first-difference line the lanes parse); a same-size section whose symbols all carry their bytes at their
+own address is named a permutation, and a size/layout/pad/single-symbol difference is not; and a referenced
+name nothing a flip can use defines is reported while the pinned exemptions (defined here, a map row,
+another provider, the target's own unresolved reference, the linker script's own symbols) stay silent.
 """
 from __future__ import annotations
 
@@ -40,14 +48,16 @@ def _align(n: int, a: int = 4) -> int:
 def build_obj(sections, symbols, relocs=(), flags=None, version=0x0E, with_comment=True) -> bytes:
     """A minimal ELF32 big-endian object with a `.comment` table.
 
-    sections : [(name, data)]                  PROGBITS sections, in shndx order
-    symbols  : [(name, size, section, info)]   the null symbol is implicit at index 0
-    relocs   : [(target_section, offset, name)] become `.rela<target>` (SHT_RELA) sections
-    flags    : {symbol_name: active_flags}      drives the `.comment` symbol table
+    sections : [(name, data)]                       PROGBITS sections, in shndx order
+    symbols  : [(name, size, section, info, value)] the null symbol is implicit at index 0; the optional
+                                                    fifth element is `st_value` (the offset inside its
+                                                    section; default 0), which the byte-order checks read
+    relocs   : [(target_section, offset, name)]     become `.rela<target>` (SHT_RELA) sections
+    flags    : {symbol_name: active_flags}           drives the `.comment` symbol table
     """
-    syms = [(None, 0, None, 0)] + list(symbols)
+    syms = [(None, 0, None, 0, 0)] + [(s[0], s[1], s[2], s[3], s[4] if len(s) > 4 else 0) for s in symbols]
     comment = bytearray(b"CodeWarrior" + bytes([version]) + b"\0" * (fc.COMMENT_HEADER - 12))
-    for name, _size, _section, _info in syms:
+    for name, _size, _section, _info, _value in syms:
         comment += struct.pack(">I", 4) + bytes([0, (flags or {}).get(name, 0) & 0xFF, 0, 0])
 
     rela_targets = []
@@ -61,15 +71,15 @@ def build_obj(sections, symbols, relocs=(), flags=None, version=0x0E, with_comme
 
     strtab = bytearray(b"\0")
     name_off = {None: 0}
-    for name, _size, _section, _info in syms:
+    for name, _size, _section, _info, _value in syms:
         if name is not None:
             name_off[name] = len(strtab)
             strtab += name.encode() + b"\0"
 
     sym_index = {s[0]: i for i, s in enumerate(syms)}
     symtab = bytearray()
-    for name, size, section, info in syms:
-        symtab += struct.pack(">IIIBBH", name_off.get(name, 0), 0, size, info, 0,
+    for name, size, section, info, value in syms:
+        symtab += struct.pack(">IIIBBH", name_off.get(name, 0), value, size, info, 0,
                               index.get(section, 0) if section else 0)
 
     rela_data = {t: bytearray() for t in rela_targets}
@@ -294,6 +304,119 @@ def selftest() -> int:
         plain = write(tmp, "plain_tgt.o", target_with_flags({"fn_A": (0x20, ".text", 0x12)}, {}))
         expect("plain symbol ignored",
                fc.external_map_symbol_notes("U", plain, ours_clear, set(), {"fn_A": 1}, {}), [])
+
+        # 16. A section-empty object is not a missing one. `sections()` returns {} for both, but the
+        #     object exists and `ninja -n` answers "no work to do" (`NHTTP/NHTTP_os_RVL`: `.comment` and
+        #     nothing else), so the refusal has to say what the claim needs instead of "compile it first".
+        bodyless = write(tmp, "bodyless.o", build_obj([], []))
+        bare_claim = {".text": (0x764, 2)}
+        empty_msg = fc.missing_or_empty_object("NHTTP/NHTTP_os_RVL", bodyless, bare_claim)
+        expect("section-empty object is not 'no compiled object'",
+               [m.startswith("no compiled object") for m in empty_msg], [False])
+        expect("section-empty object names the claim and what it does emit",
+               ("0x764" in empty_msg[0], ".text" in empty_msg[0], ".comment" in empty_msg[0]),
+               (True, True, True))
+        expect("missing object keeps its exact wording",
+               fc.missing_or_empty_object("U", os.path.join(tmp, "absent.o"), bare_claim),
+               ["no compiled object (build/RMHE08/src/U.o) - compile it first"])
+
+        # 17. The differing-byte count, and the permutation class: equal sizes, every symbol's bytes match
+        #     at its own address, and the section still differs (`Network/NetworkPat`: 577 of 720 `.text`).
+        fn_a, fn_b = b"\x11\x12\x13\x14", b"\x21\x22\x23\x24"
+        perm_ours = write(tmp, "perm_ours.o", build_obj(
+            [(".text", fn_b + fn_a)],
+            [("fn_A", 4, ".text", 0x12, 4), ("fn_B", 4, ".text", 0x12, 0)]))
+        perm_tgt = write(tmp, "perm_tgt.o", build_obj(
+            [(".text", fn_a + fn_b)],
+            [("fn_A", 4, ".text", 0x12, 0), ("fn_B", 4, ".text", 0x12, 4)]))
+        lines = fc.section_byte_problems(".text", fn_b + fn_a, fn_a + fn_b, perm_ours, perm_tgt)
+        expect("the first-difference line is unchanged", lines[0],
+               ".text: bytes differ from the target object at +0x0 (ours 21, target 11) - "
+               "the object is not the original's code")
+        expect("the differing-byte count is printed", lines[1],
+               ".text: 8 of 8 bytes differ from the target object")
+        expect("the permutation is named", ("permutation" in lines[2], "2 symbol" in lines[2]), (True, True))
+        expect("differing_bytes counts content and length",
+               (fc.differing_bytes(b"\x01\x02", b"\x01\x05"), fc.differing_bytes(b"\x01", b"\x01\x02")),
+               (1, 1))
+        expect("section_symbols reads each symbol's own address",
+               fc.section_symbols(perm_tgt, ".text"), {"fn_A": (0, 4), "fn_B": (4, 4)})
+        expect("identical sections are not a permutation",
+               fc.mislaid_layout(fn_a + fn_b, fn_a + fn_b, perm_ours, perm_tgt, ".text"), None)
+        expect("sizes that differ are not a permutation",
+               fc.mislaid_layout(fn_b + fn_a, fn_a, perm_ours, perm_tgt, ".text"), None)
+        pad_ours = write(tmp, "pad_ours.o", build_obj(
+            [(".text", fn_a + fn_b + b"\xAA\x00")],
+            [("fn_A", 4, ".text", 0x12, 0), ("fn_B", 4, ".text", 0x12, 4)]))
+        expect("unmoved symbols (a pad difference) are not a permutation",
+               fc.mislaid_layout(fn_a + fn_b + b"\xAA\x00", fn_a + fn_b + b"\x00\x00",
+                                 pad_ours, perm_tgt, ".text"), None)
+        bad_ours = write(tmp, "bad_ours.o", build_obj(
+            [(".text", fn_a + b"\x99\x22\x23\x24")],
+            [("fn_A", 4, ".text", 0x12, 0), ("fn_B", 4, ".text", 0x12, 4)]))
+        expect("a symbol whose own bytes differ is not a permutation",
+               fc.mislaid_layout(fn_a + b"\x99\x22\x23\x24", fn_a + fn_b, bad_ours, perm_tgt, ".text"), None)
+        one_ours = write(tmp, "one_ours.o", build_obj([(".text", fn_b)], [("fn_A", 4, ".text", 0x12, 0)]))
+        expect("fewer than two shared symbols is not a permutation",
+               fc.mislaid_layout(fn_b, fn_a, one_ours, perm_tgt, ".text"), None)
+
+        # 18. The general relocation check: every name our object references must be defined by our object,
+        #     a `symbols.txt` row, or a link input other than the target object (`Network/NetworkWiiMediator`
+        #     is the measured refusal: four constructor names nothing else can supply).
+        tgt_rel = os.path.join("build", "RMHE08", "obj", "U.o")
+        other_rel = os.path.join("build", "RMHE08", "obj", "other.o")
+        ref_ours = write(tmp, "ref_ours.o", build_obj(
+            [(".text", b"\0" * 0x20)],
+            [("fn_A", 0x20, ".text", 0x12, 0), ("defined_here", 4, ".text", 0x12, 0x1C),
+             ("gone", 0, None, 0x10), ("target_only", 0, None, 0x10),
+             ("provided_elsewhere", 0, None, 0x10), ("mapped_name", 0, None, 0x10),
+             ("relay_only", 0, None, 0x10), ("already_referenced", 0, None, 0x10),
+             ("misspelled", 0, None, 0x10)],
+            relocs=[(".text", 0, "gone"), (".text", 4, "defined_here"),
+                    (".text", 8, "target_only"), (".text", 0xC, "provided_elsewhere"),
+                    (".text", 0x10, "mapped_name"), (".text", 0x14, "relay_only"),
+                    (".text", 0x18, "already_referenced"), (".text", 0x1C, "misspelled")]))
+        ref_tgt = write(tmp, "ref_tgt.o", build_obj(
+            [(".text", b"\0" * 0x20)],
+            [("fn_A", 0x20, ".text", 0x12, 0), ("target_only", 4, ".text", 0x12, 0x10),
+             ("relay_only", 0, None, 0x10), ("misspelled__Fv", 0, None, 0x10)]))
+        ctx = {"refs": {tgt_rel: {"relay_only", "misspelled__Fv"},
+                        other_rel: {"already_referenced"}},
+               "ref_count": {"gone": 0, "target_only": 0, "provided_elsewhere": 1,
+                             "relay_only": 1, "misspelled__Fv": 1, "already_referenced": 1},
+               "providers": {"target_only": {tgt_rel}, "provided_elsewhere": {other_rel}}}
+        found = fc.undefined_reference_problems("U", tgt_rel, ref_tgt, ref_ours, ctx, {"mapped_name"})
+        expect("undefined references are one line naming the names", len(found), 1)
+        expect("the reported names are the undefined ones",
+               ("gone" in found[0], "target_only" in found[0], "misspelled" in found[0]), (True, True, True))
+        expect("a defined, mapped, provided or already-referenced name is silent",
+               tuple(n in found[0] for n in ("defined_here", "provided_elsewhere", "mapped_name",
+                                             "relay_only", "already_referenced")),
+               (False, False, False, False, False))
+        expect("the spelling hint names the target's variant", "misspelled__Fv" in found[0], True)
+        expect("the refusal names the count and the undefined line",
+               ("3 referenced symbol(s)" in found[0], "`undefined: 'gone'`" in found[0]), (True, True))
+
+        # 19. The linker's own symbols are not a flip's to define: an lcf assignment (`_stack_addr`) and the
+        #     EABI small-data bases (`_SDA_BASE_`, referenced by `Runtime.PPCEABI.H/__start`).
+        lcf = write(tmp, "flipcheck.lcf", b"SECTIONS\n{\n    _stack_addr = 0x80004000;\n}\n")
+        saved_lcf = fc.LDSCRIPT
+        fc.LDSCRIPT = lcf
+        try:
+            lcf_ours = write(tmp, "lcf_ours.o", build_obj(
+                [(".text", b"\0" * 8)],
+                [("fn_A", 8, ".text", 0x12, 0), ("_stack_addr", 0, None, 0x10), ("_SDA_BASE_", 0, None, 0x10)],
+                relocs=[(".text", 0, "_stack_addr"), (".text", 4, "_SDA_BASE_")]))
+            no_providers = {"refs": {tgt_rel: set()}, "ref_count": {}, "providers": {}}
+            expect("linker-provided names are not undefined references",
+                   fc.undefined_reference_problems("U", tgt_rel, ref_tgt, lcf_ours, no_providers, set()), [])
+        finally:
+            fc.LDSCRIPT = saved_lcf
+        expect("map_symbols reads the map's rows", fc.map_symbols(
+            write(tmp, "symbols.txt", b"foo = .text:0x80004000; // type:function size:0x10\n"
+                                       b"// comment\n\nbar = .text:0x80004010;\n")), {"foo", "bar"})
+        expect("linker_assigned reads the script's assignments", fc.linker_assigned(lcf), {"_stack_addr"})
+        expect("map_symbols without a file", fc.map_symbols(os.path.join(tmp, "nope.txt")), set())
 
     if FAILURES:
         print("\n%d check(s) FAILED" % len(FAILURES))

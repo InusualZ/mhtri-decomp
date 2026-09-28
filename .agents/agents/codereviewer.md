@@ -120,20 +120,20 @@ them before you form an opinion, and cite the rule number rather than your taste
    kind vocabulary (`naming`, `band-header`, `untyped`, `range`, `shared-file`, `flag`) so it can be filed.
   * **the relocation half is a check you can run**: every symbol name our object references must be defined by
     our object, or be a row in `symbols.txt`, or be provided by a link input **other than the target object**.
-    `flipcheck.py` covers only the `@etb_`/`@eti_` fragment class; the general question is
-    `flipcheck.object_symbols()` + `flipcheck.link_reference_context()` over the link inputs (~15 lines), and it
-    is what found `Network/NetworkWiiMediator`'s four undefined constructors - a flip would have answered
-    `undefined: '__ct__12PatInterfaceFv'`. Also diff the relocation **names** our object emits against
-    `symbols.txt`: a source calling a name no map row carries is a flip blocker no per-symbol score shows.
+    `flipcheck.py` runs exactly this check now (`undefined_reference_problems`, reading
+    `flipcheck.object_symbols()` + `flipcheck.link_reference_context()` over the link inputs) and prints the
+    names as a refusal; the manual probe it replaced is what found `Network/NetworkWiiMediator`'s four
+    undefined constructors - a flip would have answered `undefined: '__ct__12PatInterfaceFv'`. Also diff the
+    relocation **names** our object emits against `symbols.txt`: a source calling a name no map row carries is
+    a flip blocker no per-symbol score shows.
   * **a permutation - the section is the right size, every symbol is at 100 %, and the bytes are in the wrong
     place.** `Network/NetworkPat` measured 99.83 % with twelve symbols at 100 %, `extab`/`extabindex`
     byte-identical and equal section sizes - and **577 of 720 `.text` bytes mislaid**, because the object's
     layout is the source's definition order and ours was not the address order. The project writes the rule
-    down (`src/Pl/pl_act.cpp:227`, `src/g3d/g3d_resnode.cpp:113`, `src/menu/menu_item_page.cpp:37`) and no tool
-    checks it. When sizes match and symbols score ~100 % but `flipcheck` still reports a section byte difference,
-    compare our symbol address order to the target's (`objdump -t | sort`): its "first differing byte" message
-    reads the same as a three-instruction residual, and the fix is forward declarations plus source order =
-    address order.
+    down (`src/Pl/pl_act.cpp:227`, `src/g3d/g3d_resnode.cpp:113`, `src/menu/menu_item_page.cpp:37`).
+    `flipcheck.py` names the class now - it prints the differing-byte count, and `the section is a permutation`
+    when the sizes match and every symbol's bytes match at its own address - so a permutation no longer reads
+    like a three-instruction residual, and the fix is forward declarations plus source order = address order.
   * **row 36 by name**: an exported symbol our object does not force active is deadstripped by a flip (the
     target's `.comment` marks it force-active `0x08`). The fix is `__declspec(export)` per symbol; the census is
     broad (`Network/NetworkWiiMediator` alone carries 14), so read `flipcheck.py`'s row-36 lines rather than
