@@ -20,9 +20,8 @@
  * (86 x 8 B, one record per framed function), extabindex 0x80034074..0x8003447C (86 x 12 B).  Both
  * unwind runs are claimed; the data runs are not (see the residual list below).
  *
- * Flags: the `lobby` lib's `cflags_lobby` (`-O3`, `-inline noauto`), plus `#pragma exceptions on`
- * because `cflags_lobby` turns exceptions off and every lobby target object carries the unwind records
- * (the same per-file pragma `src/lobby/fn_801F9CD4.cpp` and `fn_802029B4.cpp` use), plus
+ * Flags: the `lobby` lib's `cflags_lobby` (`-O3`, `-inline noauto`), whose `-Cpp_exceptions on`
+ * (flags-audit 2026-09-28) emits the unwind records every lobby target object carries, plus
  * `#pragma peephole off`, which is what makes `fn_802FB3B0` and `fn_802FB948` byte-identical: retail
  * keeps `slwi` after `clrlwi` where the pass folds them into one `rlwinm`, and keeps `srwi`+`clrlwi`
  * separate where it folds them into `rlwinm r,27,24,31`.  Measured over the whole file both ways.
@@ -58,7 +57,6 @@
 #include "ef/eft_res.h"
 #include "enemy/fn_8012EC74.h"
 
-#pragma exceptions on
 #pragma peephole off
 
 extern "C" {

@@ -53,10 +53,9 @@
  * `jumptable_805F1020`) sit inside an unclaimed `.data` band - claiming it would take other units'
  * bytes with it (playbook 53/55).
  *
- * FLAGS.  The `lobby` lib's `cflags_lobby` (`-O3 -inline noauto`, `wii/1.3`), plus the per-file
- * `#pragma exceptions on` the other lobby units use to emit their unwind records (`cflags_lobby`
- * derives from `cflags_base`, which turns C++ exceptions off, and the range's 52 extab records are
- * the target's own).
+ * FLAGS.  The `lobby` lib's `cflags_lobby` (`-O3 -inline noauto`, `wii/1.3`), whose `-Cpp_exceptions on`
+ * (flags-audit 2026-09-28, replacing the per-file pragma) emits the unwind records: the range's 52
+ * extab records are the target's own.
  *
  * RULE 2 BOUNDARY ARTEFACT (reported, not resolved here).  Two of the switch arms of
  * `lb_ui_detail_step` tail into 0x80394144 / 0x80394154, which the *next* band owns
@@ -99,8 +98,6 @@
 #include "enemy/fn_8011D448.h"
 #include "unsplit/enemy.h"
 #include "unsplit/lobby.h"
-
-#pragma exceptions on
 
 /* The screen's row work: the box the screen's entry point is handed.  Only the fields the
  * reconstructed bodies touch are named; the byte mass between them is untouched here and the size is

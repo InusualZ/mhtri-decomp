@@ -35,8 +35,8 @@
  * `NetworkGameSpyInterface::<method>`, and the header gives that name to the connect sub-machine's
  * object instead - recorded here rather than renamed, since the sub-machine's real name is unproven.
  *
- * LANGUAGE AND SECTIONS.  C++ (mangled `__dl__FPv` delete, vtables).  Per-file `#pragma exceptions on`
- * because the `Network` lib sets `-Cpp_exceptions off` while retail's object carries `extab` 380 B and
+ * LANGUAGE AND SECTIONS.  C++ (mangled `__dl__FPv` delete, vtables).  `-Cpp_exceptions on` now comes
+ * from `cflags_network` (flags-audit 2026-09-28) while retail's object carries `extab` 380 B and
  * `extabindex` 540 B (playbook 30's pragma pair).  Nothing in the range's `.data` is claimed: the
  * 0x80603xxx string pool is shared with the NetworkWiiMediator band above it (that band loads the
  * same literals), so per playbook 58 it can be neither claimed nor named here.  Our object keeps the
@@ -45,7 +45,7 @@
  * FLAGS.  The object deviates from the lib on three points, all in `configure.py` or in this file
  * with the evidence: `-O3` + `-inline noauto` in place of `-O4,p` + `-inline auto` (retail calls the
  * file-static helpers - the peer's `isQueued` is 72 B against our 64 B when the inliner folds them
- * in), the `#pragma exceptions on` above, and a file-wide `#pragma peephole off` (retail keeps the
+ * in), the lib's `-Cpp_exceptions on`, and a file-wide `#pragma peephole off` (retail keeps the
  * *unfused* folds across the band - `clrlwi`+`slwi` in place of `clrlslwi`, `extsh`+`cmpwi` in place
  * of a folded compare, `extsb`+`cmpwi` in place of `extsb.`), with the five functions whose retail
  * bodies DO carry the folded forms bracketed back on.
@@ -113,7 +113,6 @@
 
 /* The target object carries `extab`/`extabindex` (380/540 B) while the `Network` lib is built with
  * exceptions off, so the front-end is told per file (the pragma pair of playbook 30). */
-#pragma exceptions on
 
 /* The debug manager's virtual slots: the target re-runs `bl fn_803C9974` at *every* logging site
  * (never once per function), so each site expands to its own block that fetches the singleton and

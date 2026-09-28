@@ -32,9 +32,9 @@
  *     produces the 48-byte frame-pointer prologue (`mr r31,r1`), the out-of-line handler
  *     (`addi r3,r31,8` + `bl __unexpected` + a self-branch) and the back-chain epilogue. The extab and
  *     extabindex records it emits are byte-identical (0xa0/0x30 B, both sections at 100 %).
- *   * `#pragma exceptions on` is required *in the source*: the `main` lib's flags carry `-Cpp_exceptions off`
- *     (from `cflags_base`), under which `throw()` is accepted but silently ignored - no handler, no extab, and
- *     a 4-byte tail-`b` body. The pragma is the source-level spelling of that one flag and touches nothing
+ *   * `-Cpp_exceptions on`: `cflags_main` carries it, and flags-audit 2026-09-28 removed the now-redundant
+ *     per-file pragma. Under `-Cpp_exceptions off` `throw()` is accepted but silently ignored - no handler,
+ *     no extab, and a 4-byte tail-`b` body; the lib flag is what makes the records appear and touches nothing
  *     outside this file.
  *   * `#pragma peephole off` is required too, and for one instruction: with the peephole on, MWCC folds the
  *     epilogue's `lwz r31,44(r10)` base back to r31 (leaving the preceding `mr r10,r31` dead in our object);
@@ -62,7 +62,6 @@
  * generated - closes all four to 100 %.
  */
 
-#pragma exceptions on
 #pragma peephole off
 
 /* The allocator pair is owned by `main.cpp` (rule 2); its declarations live in include/main.h. */

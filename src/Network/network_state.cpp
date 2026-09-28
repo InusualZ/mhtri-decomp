@@ -19,9 +19,9 @@
  * FLAGS.  Per-unit `-O3` in `configure.py` (the lib default `-O4,p` hoists every emitters's constant
  * setup into the prologue's `mflr`->`stw` latency slot and lays the switch tails out unsorted): the
  * same source measures 69.42 % at `-O4,p` and 84.16 % at `-O3`.
- * `#pragma exceptions on` is required for the object's `extab` 0x88 / `extabindex` 0xCC - the splits
- * block claims both ranges, the target has them and the lib sets exceptions off; neither `.text` nor
- * any per-symbol score moves with it.  `#pragma dont_inline on` around `handleNetworkState1` keeps
+ * `-Cpp_exceptions on` (`cflags_network`, flags-audit 2026-09-28) is required for the object's `extab`
+ * 0x88 / `extabindex` 0xCC - the splits block claims both ranges and the target has them; neither
+ * `.text` nor any per-symbol score moves with it.  `#pragma dont_inline on` around `handleNetworkState1` keeps
  * retail's `bl resetNetworkState3` in case 255 (`-inline auto` folds the 56-byte callee in);
  * `#pragma peephole off`/`on` around `handleNetworkState2Binary` keeps retail's unfused
  * `extsb r0,r0` + `cmpwi r0,0` where the pass fuses them into `extsb.` (playbook 39).
@@ -188,7 +188,6 @@
 /* The target object carries `extab` 0x88 / `extabindex` 0xCC (the splits block claims both ranges), so
  * the original TU was built with C++ exceptions on; the lib sets them off.  The pragma adds exactly
  * those two sections and leaves `.text` (and every per-symbol score) unchanged - measured. */
-#pragma exceptions on
 
 extern "C" {
 

@@ -292,7 +292,13 @@ cflags_g3d = [
 # start up to the next 16-byte boundary: `dtk dol diff` reported fn_80413F3C expected at 0x80413F3C but found at
 # 0x80413F40, every following symbol shifted by 4, and main.dol stopped matching build.sha1. Section sizes were
 # already identical, so the alignment was the entire difference - the same finding as cflags_ppceabi above.
-cflags_network = [*cflags_base, "-func_align", "4"]
+cflags_network = [*cflags_base, "-func_align", "4", "-Cpp_exceptions", "on"]
+# `-Cpp_exceptions on` (flags-audit 2026-09-28): every one of the lib's 7 registered objects carries
+# extab/extabindex in the target (24 B .. 1260 B), and 7 of 7 spelled it out as a file-wide
+# `#pragma exceptions on`. Measured with the lib flag on and all 7 pragmas deleted: all 7 objects'
+# allocatable sections byte-identical, every unit score identical, main.dol still
+# BF4850739478CAAEDFE675949EB7C28595A7FDE9. The pragmas were the symptom of the lib default
+# (`cflags_base`'s `off`) disagreeing with the lib's own bytes; the flag is the fix.
 cflags_os = [*cflags_base, "-func_align", "4"]
 # DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
@@ -329,6 +335,16 @@ cflags_lobby = [
     # The same knob is what closed four main.cpp functions (cflags_main derives from this list); cflags_lobby
     # keeps `-O3` for the same reason main does.
     "-inline noauto",
+    # `-Cpp_exceptions on` (flags-audit 2026-09-28): 19 of the lib's 20 registered targets carry
+    # extab/extabindex (lobby_scene.c, a C file, is the one that does not - and the flag leaves its
+    # object byte-identical, measured), and 8 of them spelled it out as a file-wide
+    # `#pragma exceptions on`. With the lib flag on and all 8 pragmas deleted: all 20 objects'
+    # allocatable sections byte-identical (lobby_scene.c included), every unit score identical,
+    # main.dol still BF4850739478CAAEDFE675949EB7C28595A7FDE9. The 11 lobby targets that carry extab
+    # but had no pragma now emit it (extab 0 -> 56..216 B of their 480..752 B targets), which is the
+    # first time those units can score their extab at all.
+    "-Cpp_exceptions",
+    "on",
 ]
 
 # main flags (src/main.cpp). Evidence in the lib entry below: -O3, and the inline knob has to move off `auto`,
@@ -371,8 +387,10 @@ cflags_main = [
     "-inline noauto",
     # Evidence: the retail main.o carries extab 0x90 + extabindex 0xD8 (18 unwind-only records, one per
     # function with a frame) and our object emitted none, while every function's .text is unaffected by the
-    # flag - the same finding as Pl, g3d and camellia. sys_mem.cpp in this lib already turns exceptions on
-    # with a per-file pragma, so this only adds what that pragma would have (analysis: .pi/notes/extab-gap.md).
+    # flag - the same finding as Pl, g3d and camellia. sys_mem.cpp in this lib spelled the same thing
+    # out with a per-file `#pragma exceptions on` before this group existed; flags-audit 2026-09-28
+    # measured that pragma (and fn_80040598.cpp's) byte-identical without it once the lib carries the
+    # flag, and removed both (analysis: .pi/notes/extab-gap.md).
     "-Cpp_exceptions on",
 ]
 

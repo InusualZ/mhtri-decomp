@@ -47,8 +47,6 @@
  * names the original source file.  Rename it the moment there is evidence.
  */
 
-#pragma exceptions on
-
 #include "types.h"
 
 /* The touched tail of the model object `res_eft_UV_model_create_name` returns.  `scale` is set to 1,1,1

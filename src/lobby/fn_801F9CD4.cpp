@@ -15,8 +15,8 @@
  *   - `#pragma peephole off`: retail keeps the unfused `clrlwi`+`slwi` index scale and the separate
  *     `slwi`/`or` steps of the ARGB pack where the default peephole fuses them into `rlwinm`/`rlwimi`
  *     (`get_change_hair_color` 84.23 -> 100.00, `get_change_inner_color` the same).
- *   - `#pragma exceptions on`: the target object carries extab/extabindex and `cflags_lobby`
- *     (`-Cpp_exceptions off`) emits none.  With the pragma the `.text` is unchanged (all nine written
+ *   - `-Cpp_exceptions on` (`cflags_lobby`, flags-audit 2026-09-28): the target object carries
+ *     extab/extabindex and the old `-Cpp_exceptions off` default emitted none.  With the pragma the `.text` is unchanged (all nine written
  *     functions keep their scores) and the unwind sections appear - one 8-byte record and one 12-byte
  *     index entry per written function, 0x38/0x54 against the target's 0x60/0x90 for the twelve the
  *     range will have.
@@ -58,7 +58,6 @@
 #include "unsplit/lobby.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 
-#pragma exceptions on
 #pragma peephole off
 
 /* ---------------------------------------------------------------------------------------------------

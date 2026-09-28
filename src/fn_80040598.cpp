@@ -71,8 +71,6 @@
  * names the original source file.  Rename it the moment there is evidence.
  */
 
-#pragma exceptions on
-
 #include "types.h"
 #include "unsplit/unknown.h" /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
 

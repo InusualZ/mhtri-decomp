@@ -35,7 +35,8 @@
  * vptr of every element of the `__construct_array`-built arrays (measured: the Pat constructor
  * 252 -> 544 B).  See `tools/units/vtableaudit.py`.
  *
- * LANGUAGE AND SECTIONS.  C++ (`__nw__FUl` / `__dl__FPv` / `__ptmf_scall`); `#pragma exceptions on` for
+ * LANGUAGE AND SECTIONS.  C++ (`__nw__FUl` / `__dl__FPv` / `__ptmf_scall`); `cflags_network`'s
+ * `-Cpp_exceptions on` for
  * the target's `extab`/`extabindex`.  `#pragma dont_inline on` scopes keep the four Pat methods'
  * calls to the base's `clear`/`init`/`release` and to the record destructors as the target's `bl`s
  * (without them MWCC inlines 220 of `clear`'s 276 bytes).
@@ -95,7 +96,6 @@
 /* EXCEPTIONS.  The lib builds with `-Cpp_exceptions off` while this range's target object carries
    `extab` 1260 B and `extabindex` 912 B (the C++ unwind records of the class below); the pragma turns the
    front-end's exceptions back on and moves no `.text` byte. */
-#pragma exceptions on
 
 /* ---- this unit's own forward declarations ---- */
 extern "C" {
