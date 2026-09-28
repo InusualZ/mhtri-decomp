@@ -77,8 +77,9 @@
  * what the code stores there (`DWCi_natNegSocketList`, `DWCi_natNegType1Seen`/`2`/`3`,
  * `DWCi_natNegSlot0Ready`..`Slot3Ready`, ...).  Criterion, stated once for both DWCi units: no
  * auto-generated name is spelled in source, and a row that no written body reaches keeps its stem -
- * this unit has exactly one, `fn_80512E90` (the other three, `fn_80508630`, `fn_80508A70` and
- * `fn_80509270`, sit in `DWCi_Np_CPUCopyFast.c`'s range, which states the same criterion).  All
+ * this unit has exactly one, `fn_80512E90` (the other three, `DWCi_GetConsoleFriendCode`,
+ * `DWCi_authDataTask` and `fn_80509270`, sit in `DWCi_Np_CPUCopyFast.c`'s range, which states the same
+ * criterion).  All
  * names are GUESSes where the image gives no real spelling - the runtime dump answers `zz_0512xxx_`
  * for every row - and a later pass may refine them.
  *

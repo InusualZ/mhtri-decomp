@@ -53,6 +53,12 @@ void* memmove(void* dst, const void* src, u32 n);        /* 0x8045B598; untyped:
 int memcmp(const void* a, const void* b, u32 n);         /* 0x8045B6BC; untyped: byte range */
 int snprintf(char* dst, u32 size, const char* fmt, ...); /* 0x8045DDD8 - bounded formatter */
 
+/* 0x80463B58 - the wide-string copy, the same MSL band as `strncpy` above and added with the same
+ * unit (`DWCi/DWCi_Np_CPUCopyFast.c`'s runtime initialiser copies the 26-element player name with
+ * it).  The elements this image's wide strings use are 2 bytes: the runtime block's name buffer is
+ * 52 bytes and the friend-code buffer starts right after it. */
+u16* wcsncpy(u16* dst, const u16* src, u32 n);
+
 #ifdef __cplusplus
 }
 #endif
