@@ -24,9 +24,11 @@ has since moved, so `python tools/units/backlog.py triage` classifies every open
 proved from the repository stays `open (no check)` - a triage that guesses is worse than the pile it is
 triaging. A lint-derived item follows the same rule: a `naming` / `band-header` item is `resolved` when the
 file no longer carries that rule's findings (re-linted, not remembered), `stale` when the file is gone, and
-`open` with the live count otherwise.
+`open` with the live count otherwise. An `undefrefs` item is `resolved` only when the one rule no longer
+fires for its unit (re-run over the unit's object, not remembered); with no compiled object to judge it
+stays `open` rather than guess.
 
-Three sources, one register:
+Four sources, one register:
 
 * **`config_requests`** in `.pi/outbox/*.json`. A `range` (a seam re-draw, or a data run to claim) is open
   until a proposal pass re-draws it; a `shared-file` (a defect in a header a worker may not touch) is open
@@ -47,6 +49,12 @@ Three sources, one register:
   debt slowly" half of the owner's naming ruling (2026-09-27): hundreds of such open items against the
   campaign's balance keep naming and typing work interleaved with new claims through the ratio, with no
   special-casing.
+* **`tools/units/undefrefs.py`**'s pre-existing-debt register (`--census`): one `undefrefs` item per unit
+  whose object relocates a name no link input can define - the flip blocker a score cannot see. The unit's
+  reference count is the item's rank weight, so the worst unit leads. Like a lint item it is an ordinary
+  open item, so the credit ratio rations new claims against it exactly as against the rest, with no
+  special-casing; its key is the unit, and it is carried forward from the published register so `triage`
+  can re-run the one rule (`undefrefs.unresolved_names`) and close it once no undefined reference remains.
 
 This is also the owner's "do not revoke committed progress - put the mounted naming debt in a backlog and
 work on it slowly" half: the stylelint items are ordinary open items, so the credit ratio rations new
@@ -76,7 +84,8 @@ each change.
     python tools/units/backlog.py --selftest
 
 Ranking is by what predicts value: the number of independent filers, then an item's weight (a
-`naming`/`band-header` item's live finding count, so the high-traffic file leads), then recency, then
+`naming`/`band-header` item's live finding count, or an `undefrefs` unit's reference count, so the
+high-traffic file or worst unit leads), then recency, then
 `tooling.py`'s votes. An item also shows how long it has been open; an item filed in an early phase may be
 stale because the code moved on, and that is exactly what the register is for - it is surfaced, never
 silently dropped, and a human or lane parks it.
@@ -103,7 +112,8 @@ from units import tooling as tg  # noqa: E402  (the second source: its register 
 from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)
 
 STATUSES = ("open", "done", "parked")
-NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped")
+NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped",
+            "undefrefs")
 # default open; a `rename` is never carried
 # The lint-derived kinds: `naming` is one item per file carrying rule-7 findings, `band-header` one per file
 # carrying rule-2 findings, `untyped` one per file carrying rule-11 findings (`build_items` /
@@ -111,6 +121,11 @@ NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-
 # no special-casing.
 LINT_KINDS = ("naming", "band-header", "untyped")
 LINT_RULES = {"naming": 7, "band-header": 2, "untyped": 11}
+# The undefined-reference source: one item per unit whose object relocates a name no link input can define.
+# `undefrefs.py` owns the one rule for "a name nothing defines" (`unresolved_names`); this source reads it,
+# never re-implements it, and - like every other kind - it is an ordinary open item the ratio rations
+# against with no special-casing.
+UNDEFREF_KIND = "undefrefs"
 
 # -----------------------------------------------------------------------------------------------------------
 # Text helpers
@@ -344,12 +359,15 @@ def _merge(items: dict, key: tuple, item: Item) -> None:
 def build_items(outbox_dir: str, notes_dir: str, tooling_register: str = "",
                 statuses: dict[str, str] | None = None,
                 tooling_statuses: dict[str, str] | None = None,
-                lint_items: list[Item] | None = None) -> list[Item]:
-    """Aggregate all three sources into one de-duplicated register, then apply persisted statuses.
+                lint_items: list[Item] | None = None,
+                undefref_items: list[Item] | None = None) -> list[Item]:
+    """Aggregate all four sources into one de-duplicated register, then apply persisted statuses.
 
     `tooling_register` is the tracked `docs/tooling-requests.md`; its statuses are read from it when
     `tooling_statuses` is not supplied. `lint_items` is the stylelint source (one item per file with
     rule-7/rule-2 findings), built by `collect_lint_items`; it is `None` when a caller has no tree to lint.
+    `undefref_items` is the undefined-reference source (one item per unit with pre-existing unresolved
+    references), built by `collect_undefref_items`; it is `None` when a caller has no compiled tree.
     """
     statuses = statuses or {}
     if tooling_statuses is None:
@@ -388,6 +406,10 @@ def build_items(outbox_dir: str, notes_dir: str, tooling_register: str = "",
 
     # The stylelint source: an already-built item per (kind, file), open until its findings are gone.
     for it in (lint_items or []):
+        _merge(grouped, (it.kind, it.target, it.defect), it)
+
+    # The undefined-reference source: an already-built item per unit, open until the rule stops firing.
+    for it in (undefref_items or []):
         _merge(grouped, (it.kind, it.target, it.defect), it)
 
     items = list(grouped.values())
@@ -547,6 +569,64 @@ def collect_lint_items(main: str, register: str | None = None) -> list[Item]:
         items.append(Item(kind=kind, target=target, defect="rule %d" % rule, status="open",
                           default_status="open", ask=ask, weight=live,
                           filings=[Filing(source="stylelint", lane="stylelint", when="", detail=ask)]))
+    return items
+
+
+def _prior_undefref_items(register: dict) -> dict:
+    """The `unit` undefrefs items the published register already carries, keyed for carry-forward.
+
+    Like a lint item, an `undefrefs` item must survive the regeneration that follows its fix: the rule no
+    longer fires, but the item is still the `triage` subject and the ledger's unit of credit. The published
+    payload's `items` list is the only place that remembers it between runs.
+    """
+    out: dict = {}
+    for it in (register or {}).get("items", []):
+        if isinstance(it, dict) and it.get("kind") == UNDEFREF_KIND:
+            out[it.get("target", "")] = it
+    return out
+
+
+def undefref_counts(main: str) -> dict:
+    """`{unit: unresolved-reference count}` from `undefrefs.census` - the one rule, never a second.
+
+    `undefrefs.census` is exactly `unresolved_names` run over every compiled unit; reading it here means
+    the backlog and the gate can never disagree about what "undefined" means. A tree with no compiled
+    objects contributes nothing, and a read failure is an empty cell rather than a crashed run.
+    """
+    if not os.path.isdir(os.path.join(main, "build", "RMHE08", "src")):
+        return {}
+    try:
+        from units import undefrefs as ur
+        rows = ur.census(main)
+    except Exception:                              # additive source: never take the register down
+        return {}
+    counts: dict = {}
+    for unit, _name, _spelling, _how in rows:
+        counts[unit] = counts.get(unit, 0) + 1
+    return counts
+
+
+def collect_undefref_items(main: str, register: str | None = None) -> list[Item]:
+    """The fourth source: `undefrefs.py`'s pre-existing unresolved references, one item per unit.
+
+    The count is the item's `weight` (the mechanism `naming`/`band-header` already use), so the unit with
+    the most undefined references leads. The item is an ordinary open item - the credit ratio rations new
+    claims against it exactly as against the rest, with no special-casing. A unit whose debt is gone is
+    carried forward from the published register (weight 0) so `triage` can re-run the one rule, prove it
+    and earn the credit; the rule itself is `undefrefs.unresolved_names`, read here and never re-implemented.
+    """
+    counts = undefref_counts(main)
+    prior = _prior_undefref_items(load_register(main, register))
+    items: list[Item] = []
+    for unit in sorted(set(counts) | set(prior)):
+        live = counts.get(unit, 0)
+        last = int((prior.get(unit) or {}).get("weight") or 0)
+        ask = ("`%s` still makes %d reference(s) no link input can define - fix each to the spelling the "
+               "target records (or add the name the map should carry) until the rule stops firing"
+               % (unit, live or last))
+        items.append(Item(kind=UNDEFREF_KIND, target=unit, defect="unresolved", status="open",
+                          default_status="open", ask=ask, weight=live,
+                          filings=[Filing(source="undefrefs", lane="undefrefs", when="", detail=ask)]))
     return items
 
 
@@ -741,7 +821,8 @@ def build(main: str, outbox: str | None = None, notes: str | None = None,
     statuses = load_statuses(main, register)
     ledger = load_ledger(main, register)
     items = build_items(outbox, notes, tooling_register, statuses,
-                        lint_items=collect_lint_items(main, register))
+                        lint_items=collect_lint_items(main, register),
+                        undefref_items=collect_undefref_items(main, register))
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
@@ -790,6 +871,7 @@ def lane_task(main: str, item: Item) -> dict:
     """A ready-to-paste lane for a backlog item - mirroring how `queue.py next` prints its spawn line."""
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
                "naming": "fixer", "band-header": "fixer", "untyped": "fixer",
+               "undefrefs": "fixer",
                "tooling": "worker"}.get(item.kind, "worker")
     task = ("Work the campaign backlog item `%s` (%s %s): %s. "
             "This is on the backlog, so `queue.py next` spends a credit on a new proposal claim until it is "
@@ -1217,6 +1299,47 @@ def _check_lint(main: str, item: Item, ctx: dict):
             % (rule, item.target))
 
 
+def _undefref_census(main: str, ctx: dict):
+    """The one rule, re-run once per triage: `undefrefs.census` (which is `unresolved_names` over the tree).
+
+    Cached in `ctx` so a run with many `undefrefs` items pays for the census once, not once per item - the
+    same economy `_check_lint`'s per-file re-lint gets from being source-local. `None` when the rule cannot
+    run at all (the module or the tree is unreadable), which is `no check`, never a guess.
+    """
+    if "undefref_census" not in ctx:
+        try:
+            from units import undefrefs as ur
+            ctx["undefref_census"] = ur.census(main)
+            ctx["undefref_src"] = ur.SRC_REL
+        except Exception as exc:               # a malformed fixture must stay open, never crash the run
+            ctx["undefref_census"] = None
+            ctx["undefref_error"] = str(exc)
+    return ctx["undefref_census"]
+
+
+def _check_undefrefs(main: str, item: Item, ctx: dict):
+    """Whether a unit's undefined references are gone - the ONE rule re-run now, never remembered.
+
+    `resolved` only when the unit still has a compiled object to judge and the rule names no reference
+    for it; `open` otherwise, naming the live count. A unit with no compiled object has no
+    evidence to re-run, so it stays `open` rather than guess. The rule is `undefrefs.unresolved_names`,
+    reached through `undefrefs.census` - there is no second definition of "undefined" here.
+    """
+    rows = _undefref_census(main, ctx)
+    if rows is None:
+        return ("open", "no check: the undefined-reference rule is not runnable here (%s)"
+                % one_line(ctx.get("undefref_error", "?"), 60))
+    src = ctx.get("undefref_src") or os.path.join("build", "RMHE08", "src")
+    if not os.path.exists(os.path.join(main, src, item.target + ".o")):
+        return ("open", "no check: no compiled object for %s to re-run the rule" % item.target)
+    hits = [name for unit, name, _spelling, _how in rows if unit == item.target]
+    if not hits:
+        return ("resolved", "the rule no longer fires for %s (re-ran undefrefs.unresolved_names over its "
+                            "object; no reference is undefined)" % item.target)
+    return ("open", "%s still references %d name(s) no link input can define: %s"
+            % (item.target, len(hits), ", ".join(hits[:3]) + (" ..." if len(hits) > 3 else "")))
+
+
 def triage_item(main: str, item: Item, ctx: dict):
     if item.kind == "range":
         return _span_decision(ctx["splits"], item.target)
@@ -1228,6 +1351,8 @@ def triage_item(main: str, item: Item, ctx: dict):
         return _check_shared(main, item, ctx)
     if item.kind in LINT_KINDS:
         return _check_lint(main, item, ctx)
+    if item.kind == UNDEFREF_KIND:
+        return _check_undefrefs(main, item, ctx)
     return _check_tooling(main, item, ctx)
 
 
@@ -1272,7 +1397,8 @@ def apply_triage(main: str, decisions: list, register: str | None = None, **kw) 
     notes = kw.get("notes") or notes_dir(main)
     tooling_register = kw.get("tooling_register") or tooling_register_path(main)
     items = build_items(outbox, notes, tooling_register, statuses,
-                        lint_items=collect_lint_items(main, register))
+                        lint_items=collect_lint_items(main, register),
+                        undefref_items=collect_undefref_items(main, register))
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
               "parked": sum(1 for i in items if i.status == "parked"),
@@ -1374,13 +1500,15 @@ def main() -> int:
     statuses = load_statuses(main_wt, register)
     ledger = load_ledger(main_wt, register)
     lint = collect_lint_items(main_wt, register)   # the third source: one item per (file, rule)
+    undefref = collect_undefref_items(main_wt, register)  # the fourth source: one item per debt-carrying unit
     if args.set_status:
         key, status = args.set_status
         status = status.lower()
         if status not in STATUSES:
             print("status must be one of: %s" % ", ".join(STATUSES), file=sys.stderr)
             return 2
-        known = {it.key for it in build_items(outbox, notes, tooling_register, statuses, lint_items=lint)}
+        known = {it.key for it in build_items(outbox, notes, tooling_register, statuses, lint_items=lint,
+                                              undefref_items=undefref)}
         if key not in known:
             print("unknown backlog key %r - see `python tools/units/backlog.py --print`" % key, file=sys.stderr)
             return 2
@@ -1390,7 +1518,8 @@ def main() -> int:
         decisions, _ = triage(main_wt, outbox=outbox, notes=notes,
                               tooling_register=tooling_register, register=register)
         rep = triage_report(decisions)
-        all_items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint)
+        all_items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint,
+                                undefref_items=undefref)
         balance = ledger_summary(all_items, ledger["claims"], args.ratio)
         if args.json:
             print(json.dumps({"triage": rep, "credits": balance,
@@ -1413,7 +1542,8 @@ def main() -> int:
             print("dry run: nothing written (pass --apply to mark resolved/stale)")
         return 0
 
-    items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint)
+    items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint,
+                        undefref_items=undefref)
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
