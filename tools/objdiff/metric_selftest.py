@@ -142,6 +142,47 @@ def wire_report() -> int:
     return failures
 
 
+def wire_tmpdir() -> int:
+    """The default scratch must be per-invocation, not the shared `build/tmp/unitutil`.
+
+    `tryvar`/`slotmap`/`recompile`'s single-symbol path call `report_functions`/`report_measure` with no
+    `tmpdir`, so their project and `unitutil_report.json` all landed in one shared directory. Two
+    concurrent invocations raced on that file - the loser read the other run's report (or raised
+    `PermissionError [WinError 5]` while it was held), the same collision `symdiff.py` was fixed for with
+    a per-invocation directory. This pins the fix at the function that owns the default.
+    """
+    failures = 0
+    shared = os.path.join(ROOT, "build", "tmp", "unitutil")
+    first = uu.session_tmpdir()
+    failures = _truthy("the default scratch exists", os.path.isdir(first), failures)
+    failures = _truthy("it is not the shared build/tmp/unitutil",
+                       os.path.normcase(os.path.abspath(first))
+                       != os.path.normcase(os.path.abspath(shared)), failures)
+    failures = _ok("one directory per process keeps report_measure's path correct",
+                   uu.session_tmpdir(), first, failures)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        target = os.path.join(tmp, "target.o")
+        base = os.path.join(tmp, "base.o")
+        for p in (target, base):
+            open(p, "wb").write(b"\x7fELF")
+
+        def runner(argv, **kwargs):
+            out = argv[argv.index("-o") + 1]
+            json.dump({"units": [{"name": "u", "functions": [
+                {"name": "fn_1", "size": "4", "fuzzy_match_percent": 100.0}]}]},
+                open(out, "w", encoding="utf-8"))
+            return _completed(argv)
+
+        m = uu.report_measure(target, base, "fn_1", unit_name="u", runner=runner)
+        failures = _ok("report_measure official number with the default dir",
+                       m.get("match_percent"), 100.0, failures)
+        failures = _ok("and its report_json is in that dir",
+                       os.path.normcase(os.path.abspath(os.path.dirname(m.get("report_json") or ""))),
+                       os.path.normcase(os.path.abspath(first)), failures)
+    return failures
+
+
 def _in_order(mapping, names, failures):
     got = [n for n in mapping if n != "_error"]
     if got == names:
@@ -355,6 +396,7 @@ def regression_metric_gap() -> int:
 def main() -> int:
     failures = wire_objdiff()
     failures += wire_report()
+    failures += wire_tmpdir()
 
     unit = _pick_unit()
     official_all = _project_report()

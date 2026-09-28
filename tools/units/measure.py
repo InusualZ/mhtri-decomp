@@ -103,36 +103,11 @@ def objdiff_path(wt: str, main: str) -> str:
     return unitutil.OBJDIFF
 
 
-def target_rel(unit: str) -> str:
-    """The registered split object's path relative to a tree root, from the unit spelling."""
-    head = os.path.join("build", "RMHE08", "obj", *rc.unit_source(unit).split("/"))
-    return os.path.splitext(head)[0] + ".o"
-
-
-def resolve_target(wt: str, main: str, unit: str, symbol: str):
-    """(target object, kind, note). `kind` is `worktree-split`, `registered`, `auto-fallback` or `missing`.
-
-    `recompile.measure_target` searches MAIN only; a proposal unit the worker has already split in its own
-    tree has the *real* new object, so this one prefers it, then MAIN's registered object, then MAIN's
-    retired object for the symbol's address. A registered unit in MAIN is unchanged (`registered`).
-    """
-    rel = target_rel(unit)
-    same = os.path.normcase(os.path.abspath(wt)) == os.path.normcase(os.path.abspath(main))
-    p_wt, p_main = os.path.join(wt, rel), os.path.join(main, rel)
-    if not same and os.path.exists(p_wt):
-        return p_wt, "worktree-split", ""
-    if os.path.exists(p_main):
-        return p_main, "registered", ""
-    found, note = rc.proposal_target(main, symbol)
-    if found:
-        return found, "auto-fallback", note
-    if not same:
-        found, note = rc.proposal_target(wt, symbol)
-        if found:
-            return found, "auto-fallback", note
-    return p_main, "missing", (
-        "no original object for %s: no split object at %s in this tree or MAIN, and no retired "
-        "`auto_*_text` object covers the address of %s" % (unit, rel, symbol))
+# Resolution lives in `recompile` so `recompile.py --measure` and this tool cannot disagree about which
+# tree's object is the target (the filed trap: a worktree with its own split object was scored against
+# MAIN's copy). These are the same function objects, not copies; the docstring is `recompile.resolve_target`.
+target_rel = rc.target_rel
+resolve_target = rc.resolve_target
 
 
 def candidate_functions(obj: str):

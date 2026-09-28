@@ -16,12 +16,15 @@ A *unit spec* is any of these spellings:
 The compile command is taken from ninja (`ninja -t commands <obj>`), i.e. it is the *exact* command
 line the build would run, including whatever `configure.py` put in that unit's `cflags`.
 """
+import atexit
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 
@@ -391,6 +394,30 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
 MIN_PROJECT_VERSION = "2.0.0-beta.5"
 
 
+_TMPDIR = None
+
+
+def session_tmpdir() -> str:
+    """A **unique** scratch directory for this process, removed at exit.
+
+    The default used to be the shared `build/tmp/unitutil`, and every tool that did not pass `tmpdir`
+    (`tryvar.py`, `slotmap.py`, `recompile.py`'s single-symbol path, `report_measure` called with no
+    tmpdir) wrote its project/report there. Two concurrent invocations raced on
+    `unitutil_report.json`, and the loser saw a report the *other* run had just written (or a
+    `PermissionError [WinError 5]` while the file was held) - the same collision that cost `symdiff.py` a
+    measurement round (see `tools/objdiff/symdiff.py`) and was fixed there with a per-invocation directory.
+
+    One directory per process (not per call) keeps `report_measure`'s returned `report_json` path equal to
+    the file `report_functions` just wrote, while two processes never share one. It lives in the system
+    temp, not under the repo, so a measurement cannot dirty the tree the selftest's dirty-guard watches.
+    """
+    global _TMPDIR
+    if _TMPDIR is None:
+        _TMPDIR = tempfile.mkdtemp(prefix="unitutil-")
+        atexit.register(shutil.rmtree, _TMPDIR, ignore_errors=True)
+    return _TMPDIR
+
+
 def measure_project(target, base, unit_name, tmpdir):
     """Write a one-unit objdiff project for (`target`, `base`); return its directory.
 
@@ -413,9 +440,10 @@ def report_functions(target, base, unit_name=None, tmpdir=None, runner=subproces
 
     Each entry carries `fuzzy_match_percent` and `size` exactly as `build/RMHE08/report.json` does, so
     a consumer that wants the official score reads `[name]["fuzzy_match_percent"]`. An error is returned
-    as `{"_error": <text>}` (never as a 0.0 score); the one-unit project's report is left in `tmpdir`.
+    as `{"_error": <text>}` (never as a 0.0 score); the one-unit project's report is left in `tmpdir`,
+    which defaults to this process's unique `session_tmpdir()` so concurrent tools cannot collide.
     """
-    tmpdir = tmpdir or os.path.join(ROOT, "build", "tmp", "unitutil")
+    tmpdir = tmpdir or session_tmpdir()
     os.makedirs(tmpdir, exist_ok=True)
     proj = measure_project(target, base, unit_name, tmpdir)
     out = os.path.join(tmpdir, "unitutil_report.json")
@@ -436,8 +464,9 @@ def report_measure(target, base, symbol, unit_name=None, tmpdir=None, runner=sub
     Returns `{"symbol", "match_percent", "target_size", "report_json"}` or `{"error": ...}`.
     `match_percent` is deliberately the **report** metric so that any consumer reading it gets the
     number that closes a symbol; the positional objdiff value is not exposed here (use `objdiff()` if
-    row detail is what is wanted).
+    row detail is what is wanted). `tmpdir` defaults to this process's unique `session_tmpdir()`.
     """
+    tmpdir = tmpdir or session_tmpdir()
     entries = report_functions(target, base, unit_name=unit_name, tmpdir=tmpdir, runner=runner)
     if "_error" in entries:
         return {"symbol": symbol, "error": entries["_error"]}
@@ -445,8 +474,7 @@ def report_measure(target, base, symbol, unit_name=None, tmpdir=None, runner=sub
     if fn is None:
         return {"symbol": symbol,
                 "error": "symbol is not in the target object (renamed? not in this unit?)"}
-    report_json = os.path.join(tmpdir or os.path.join(ROOT, "build", "tmp", "unitutil"),
-                               "unitutil_report.json")
+    report_json = os.path.join(tmpdir, "unitutil_report.json")
     return {"symbol": symbol, "match_percent": fn.get("fuzzy_match_percent"),
             "target_size": fn.get("size"), "report_json": report_json}
 

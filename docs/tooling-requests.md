@@ -144,7 +144,7 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 <!-- tooling-key: recompile-worktree-target -->
 **Votes.** 30  |  **Cost.** -
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
