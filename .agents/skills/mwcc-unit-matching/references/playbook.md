@@ -2520,3 +2520,51 @@ fabricated. Also worth knowing: the Pat vtable 0x805FB0F0, its key function and 
 **unclaimed** ranges, so `vtableaudit.py` is silent about them (it audits owned ranges only) - the audit
 passing is not evidence that this band is modelled. Full trace, the dead ends, and the seven concrete source
 defects: `.pi/notes/network-pat-abstraction.md`.
+## 77. `rlwinm x,x,0,MB,ME` keeps an inclusive BIT RANGE - so `MB=ME` is a single-bit test, never an extend
+
+**Problem.** `quest_move_state_ck` measured **94.16666 %** and the lane's residual said "front-end artefact": the
+target reads `lbz r0,0x22D4(r3)` then `rlwinm r3,r0,0,24,24` where our build emits a bare `lbz`. Twelve spellings
+(u8/u32 locals, `(u8)`, `& 0xFF`, `> 0`, `!!x`, `x ? 1 : 0`, an 8-bit bitfield, a `u8*` view) were compiled with the
+unit's own flags and all folded to the same short form, so the search was "exhausted" and the row was written off.
+It was not a codegen residual: the body was **semantically wrong**, and the 94 % hid it.
+
+**Why try it.** `rlwinm rA,rS,SH,MB,ME` *keeps bits MB..ME inclusive* of the value, so `MB=ME=24` is the question
+"is bit 24 set?" - mask **0x00000080** - not a widening. The tell is in the encodings, not the score, and the tree
+already contained the answer twice at 100 %: `src/Pl/fn_8027D684.cpp:139` writes `(self->field_0x655 & 0x80) == 0`
+and compiles with the peephole **on**, and `src/camera/fn_802B5C58.cpp:544` emits the target's entire tail. Two
+further consequences of reading the pair correctly: a plain boolean test folds to `lbz` + booleanize (which is why
+every `!= 0`-shaped spelling was doomed - none of them *is* a mask), and the `& 0x80` reading is forced by the
+sibling `quest_move_state_get` at 100 %, which masks the same byte with `0x7F` because bit 7 is "a state follows"
+and the low seven bits are the state itself.
+
+**Result.** `(work->state_0x22D4 & 0x80) != 0` took the row to **100.00000 %** - byte- *and* relocation-identical,
+no pragma needed. The fix also forced the row's **name** to change (`quest_move_state_ck` ->
+`quest_move_state_valid_ck`, map row plus 11 call sites), because the old name came from the disproven body. The
+rule for the next residual of this shape: read `MB`/`ME` first - `MB == ME` is a single-bit test, `MB=0,ME=31` is a
+plain copy, and `ME-MB+1 < 8` is a field extraction. "Several spellings fold to the same short form" is evidence
+about the *spellings*, never about what the retained instruction means.
+
+## 78. A data claim must cover the run the unit actually TOUCHES, not the extent the symbol happens to name
+
+**Problem.** `NHTTP/d_nhttp`'s `.sbss` claim covered **4 B** (`0x80795880`, the list head) while the unit's own rows
+relocate three words of a **16-byte run** at `0x80795878-0x80795888`: two lazy-init flags (`li r0,1` / `stw`,
+inside `NHTTPi_RegisterCallbacks` and `fn_8051A8A4`) and the list head, with `NHTTPi_systemInfoP` as the fourth
+word - and `powerpc-eabi-objdump -t` shows all four as **one object** in `auto_10_80795878_sbss.o`. So the 4 B claim
+left rows this unit owns still unowned, the blocked total was 796 B rather than the 524 B recorded, and the same
+pass separately recorded `.bss 0x80762C20` at its *used* extent (0x24) where the map, the split and the target
+symbol all say 0x40.
+
+**Why try it.** A claim is a statement about **what our object emits**, so its boundaries must match the object that
+owns the bytes - the map row and the target symbol - not the part of them this unit currently reads. The *used*
+extent is an observation about our progress; the *object* extent is the fact. Getting it wrong has a specific cost
+that is easy to underestimate: rule 12 refuses an `extern` for the range from anywhere (band header included), so
+every row that touches the unowned words stays blocked, and the next pass re-derives the same claim from scratch.
+
+**Result.** The amendment to the 16-byte run (authorised under the claim-amendment protocol, with the `splits.txt`
+lines in the file's own format and `NHTTPi_systemInfoP` moved out of the band header into the unit, per rule 2's
+inversion) makes writable the two rows that only need `.sbss` - `NHTTPi_RegisterCallbacks` (140 B) and
+`fn_8051A8A4` (132 B) - and, with `.bss 0x80762C20` at its symbol's own 0x40, the three list rows (272 + 32 + 96).
+Two habits follow. **Take claims in increments**: the `.sdata`/`.data` half of that run is a separate measured step
+because a `.data` claim can drop the target's `R_PPC_NONE` pool relocations (row 23). And when a claim is amended,
+**move the map rows and band declarations inside it in the same change** - rule 7's names and rule 2's inversion are
+part of the claim, not a follow-up.
