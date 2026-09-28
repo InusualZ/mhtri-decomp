@@ -39,17 +39,19 @@ typedef struct _mh_tex_uv_ {
     /* +0x02 */ s16 v;
 } _mh_tex_uv_;
 
-/* One 8-byte animation step: the low 12 bits are the step kind (which sub-record of `_SPR_DATA_`
- * the frame comes from and how wide its frame table is), bit 15 says the last frame's value is
- * itself an index (`fn_802E29F4` and its four siblings test it), `count` is the number of frames
- * and `frames` the table they are read from.  size: 0x8 */
+/* One 8-byte animation step.  The halfword at +0x00 packs the step's kind into its low 12 bits and
+ * one flag into bit 15: when that bit is set the caller's frame index is first wrapped by the
+ * table's own last key, which is what the cyclic steps need.  `count` is the number of keys
+ * `frames` holds.  size: 0x8 */
 typedef struct _SPR_ANIM_ {
-    /* +0x00 */ u16 kind : 12;
-                u16 last : 1;
-                u16 pad_0x0 : 3;
+    /* +0x00 */ u16 flags;
     /* +0x02 */ s16 count;
     /* +0x04 */ const u16* frames;
 } _SPR_ANIM_;
+
+/* `_SPR_ANIM_.flags`: the step kind, and the "wrap the frame at the last key" bit. */
+#define SPR_ANIM_KIND_MASK 0x0FFF
+#define SPR_ANIM_WRAP_LAST 0x8000
 
 /* The sprite-data record every `draw_*` entry takes by reference - `get_lsp_data` hands one back
  * and `draw_sprite` blits it.  Every offset below is one the disassembly reads, and the 0x24-byte
@@ -71,6 +73,46 @@ typedef struct _SPR_DATA_ {
     /* +0x1C */ u32 color;           /* its low byte gates the blit in `fn_802E0CE4` */
     /* +0x20 */ const _SPR_ANIM_* anim; /* the animation table `draw_sprite_anim_*` walks */
 } _SPR_DATA_;
+
+/* One animation key of a step's frame table: the frame the key starts at, whether its payload is
+ * interpolated towards the next key, and the payload itself.  The key's size is what selects the
+ * sub-record a step drives, so each step casts the table to its own key type.
+ * size: 0x8 */
+typedef struct _SPR_KEY_POS_ {
+    /* +0x00 */ u16 frame;
+    /* +0x02 */ u16 interp;
+    /* +0x04 */ _mh_ivec2_ pos;
+} _SPR_KEY_POS_;      /* kind 0, the record's anchor */
+
+/* size: 0x6 */
+typedef struct _SPR_KEY_TEX_ {
+    /* +0x00 */ u16 frame;
+    /* +0x02 */ u16 interp;
+    /* +0x04 */ u16 tex_id;
+} _SPR_KEY_TEX_;      /* kind 1, the record's texture id */
+
+/* size: 0x8 */
+typedef struct _SPR_KEY_SCALE_ {
+    /* +0x00 */ u16 frame;
+    /* +0x02 */ u16 interp;
+    /* +0x04 */ u16 u_scale;
+    /* +0x06 */ u16 v_scale;
+} _SPR_KEY_SCALE_;    /* kind 2, the record's uv scales */
+
+/* size: 0xC */
+typedef struct _SPR_KEY_UV_ {
+    /* +0x00 */ u16 frame;
+    /* +0x02 */ u16 interp;
+    /* +0x04 */ _mh_tex_uv_ uv;   /* the first coordinate pair */
+    /* +0x08 */ _mh_tex_uv_ size; /* the second pair's offset from the first */
+} _SPR_KEY_UV_;       /* kind 3, the record's texture coordinates */
+
+/* size: 0x8 */
+typedef struct _SPR_KEY_COLOR_ {
+    /* +0x00 */ u16 frame;
+    /* +0x02 */ u16 interp;
+    /* +0x04 */ u32 color;
+} _SPR_KEY_COLOR_;    /* kind 4, the record's colour word */
 
 #ifdef __cplusplus
 extern "C" {
@@ -96,7 +138,6 @@ _SPR_DATA_* get_lsp_data(u16 id, _mh_ivec2_* out);             /* 0x802E0550 */
 s32 get_wide_offset(u8 index);                                 /* 0x802E0490 */
 const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
 u32 get_rare_color(u8 index);                                  /* 0x802DB254 */
-u16 fn_802E26EC(u16 frame, u16 count);                         /* 0x802E26EC */
 
 /* This unit's own bodies, in address order. */
 void fn_802E08E8(u16 id, u32 color, const _mh_ivec2_* pos);
@@ -111,6 +152,7 @@ void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx);
 void fn_802E1024(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void fn_802E1134(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void fn_802E1190(u16 id, u16 item_id, const _mh_ivec2_* pos);
+void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void fn_802E1320(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos);
 void fn_802E1400(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare);
@@ -126,15 +168,35 @@ s8 fn_802E1978(u8 index);
 void fn_802E198C(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos);
 u32 fn_802E1A7C(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos);
 void fn_802E1AEC(_SPR_DATA_* rec, u8 frame, u32 color, const _mh_ivec2_* pos);
-u32 fn_802E1BF4(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos);
+u32 draw_number_anim(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos);
 void fn_802E1C74(_SPR_DATA_* rec, u8 frame, u32 color, const _mh_ivec2_* pos);
 void fn_802E1D30(u16 id, u8 frame, u32 color, const _mh_ivec2_* pos);
-void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
+void draw_number_digits_ary(const u16* ids, s32 number, u32 color, const _mh_ivec2_* pos);
+void draw_number_anim_ary(const u16* ids, u16 part, s32 number, u32 color, const _mh_ivec2_* pos);
+void draw_number_2digit_ary(const u16* ids, u8 value, u32 color, const _mh_ivec2_* pos);
+u32 draw_number_2digit_anim_ary(const u16* ids, u16 part, u8 value, u32 color, const _mh_ivec2_* pos);
+u16 anim_frame_wrap(u16 period, u16 frame);
+u32 color_scale(u32 color, f32 scale, f32 low_scale);
 u32 fn_802E29F4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
-u32 fn_802E2C08(u16* out, const _SPR_ANIM_* anim, u16 frame);
+u32 anim_step_tex_id(u16* out, const _SPR_ANIM_* anim, u16 frame);
 u32 fn_802E2D84(u16* out, const _SPR_ANIM_* anim, u16 frame);
-u32 fn_802E2F54(_mh_tex_uv_* uv0, _mh_tex_uv_* uv1, const _SPR_ANIM_* anim, u16 frame);
-u32 fn_802E326C(u32* out, const _SPR_ANIM_* anim, u16 frame);
+u32 anim_step_uv(_mh_tex_uv_* uv0, _mh_tex_uv_* uv1, const _SPR_ANIM_* anim, u16 frame);
+u32 anim_step_color(u32* out, const _SPR_ANIM_* anim, u16 frame);
+
+/* `color_lerp` (0x802E270C) is **not declared here** - `src/hud/layout.cpp` declares it
+ * `extern "C"` instead.  Three consumer headers already declare the same name with their own
+ * signatures (`include/hud/cockpit_quest.h` as `s32 color_lerp(s32, s32, f32)`,
+ * `include/menu/fn_802E4978.h` with five parameters and `include/menu/menu_item_page.h` with two)
+ * and their call sites pass that many arguments, so a declaration here is a C++ overload clash the
+ * moment a consumer includes both headers (measured: `(10197) illegal function overloading` in
+ * `hud/cockpit_quest.cpp` and `ef/eft050.cpp`).  Those three are pre-existing rule-2 debt; folding
+ * them into this header means fixing their call sites (2 and 5 arguments -> 3), filed, not done. */
+s16 note_text_max_len(u32 size, char* str);
+void note_box_anchor_upper(_mh_ivec2_* pos);
+void note_box_anchor_lower(_mh_ivec2_* pos);
+void note_box_size(_mh_ivec2_* extent, s16 lines);
+void note_box_pos_upper(_mh_ivec2_* pos, s16 lines);
+void note_box_pos_lower(_mh_ivec2_* pos, s16 lines);
 
 #ifdef __cplusplus
 }
@@ -146,6 +208,8 @@ u32 fn_802E326C(u32* out, const _SPR_ANIM_* anim, u16 frame);
 void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);
 void draw_font(const _SPR_DATA_& spr, s8* str, u32 flags, const _mh_ivec2_* pos);
 void draw_font_idx(u16 id, s8* str, u32 flags, const _mh_ivec2_* pos);
+void draw_font_order(const _mh_ivec2_* anchor, s16 width, s16 height, u32 color, s8* str, u32 flags,
+                     const _mh_ivec2_* pos);
 void draw_sprite_idx(u16 id, const _mh_ivec2_* pos);
 void draw_sprite_ary(const u16* ids, const _mh_ivec2_* pos);
 void draw_sprite_anim_idx(u16 id, u16 anim, const _mh_ivec2_* pos);

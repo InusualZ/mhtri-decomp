@@ -247,9 +247,9 @@ void fn_802E7690(HudBlend* out, const HudBlend* a, const HudBlend* b, u16 t) {
         if (f > lbl_8079A8FC) {
             f = lbl_8079A8FC;
         }
-        out->x = fn_802E270C(a->x, b->x, f);
-        out->y = fn_802E270C(a->y, b->y, f);
-        out->z = fn_802E270C(a->z, b->z, f);
+        out->x = color_lerp(a->x, b->x, f);
+        out->y = color_lerp(a->y, b->y, f);
+        out->z = color_lerp(a->z, b->z, f);
     }
     out->tag = a->tag;
 }

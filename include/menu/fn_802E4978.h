@@ -224,7 +224,7 @@ extern "C" {
 u32 fn_80046F0C(void*);                /* 0x80046F0C mh3_pad.cpp */
 s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/fn_802D0F34.cpp */
 s32 fn_802E0B54(u16);                   /* 0x802E0B54 hud/layout.cpp */
-u32 fn_802E270C(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
+u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
 /* 0x80050BC0 - `include/fn_8004CAD8.h` settles ONE float argument (from the callee's own body), and
  * that is the honest declaration; it cannot be used here yet: this unit's call site reproduces the
  * target's register allocation only with the 3-argument view, measured on `fn_802E5D68` at 95.675674

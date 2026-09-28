@@ -80,13 +80,22 @@ void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
  * consumer's call mangles to what the target objects' relocations carry (`__FPc`, `__FPcPc`,
  * `__FPcl`): 0x8005B874 `flfntStrLen` (a `b` tail call into the decoding walker, so its length is
  * the walker's), 0x8005C9A8 `msg_str_gen` and 0x8005B878 `flKnjMsgNumPtr` (the pointer to the
- * `index`-th character of `s`, which the result screen truncates a long name at). */
+ * `index`-th character of `s`, which the result screen truncates a long name at).  `flfntStrLen` is
+ * the one name both lanes declare (`hud/layout.cpp` needs it too) and the two spellings are the same
+ * declaration, so the merge keeps the landed line and declares it ONCE, with the owner's own
+ * parameter name (`g3d_anmchr.cpp:599` defines `s32 flfntStrLen(char* s)`) - a second, differently
+ * spelled copy on the same type is the `illegal function overloading` trap. */
 s32 flfntStrLen(char* s);
 void msg_str_gen(char* src, char* dst);
 char* flKnjMsgNumPtr(char* s, s32 index);
 /* 0x8005C7E0 - the substring search the font helpers share (a thin `strchr`); the owner defines it
  * at C linkage, as does `include/menu/menu_item_page.h`, which declares the same signature. */
 extern "C" char* flfntStrChr(char* s, s32 c);
+
+/* `utf82unicode2` (`0x8005BE40`) is the other string helper this range owns, added with
+ * `hud/layout.cpp`: it returns the byte count of the UTF-8 character at the pointer, which is what a
+ * scanner advances by.  Declared at C++ scope so the mangling matches the map's (`__FPUc`). */
+s32 utf82unicode2(u8* str);
 
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */
 

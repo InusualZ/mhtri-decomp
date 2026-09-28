@@ -586,7 +586,7 @@ void fn_802E6EB4(void) {
             u8 lo = move->field_0x3A5;
             u8 hi = move->field_0x3A4;
             f32 f2 = (f32)p->x * (f32)hi;
-            s32 col = fn_802E270C(0xC50A83FF, 0xD813BEFF, lo, (f32)hi * (lbl_8079A8FC / (f32)lo), f2);
+            s32 col = color_lerp(0xC50A83FF, 0xD813BEFF, lo, (f32)hi * (lbl_8079A8FC / (f32)lo), f2);
             drawshape_init(3, 0xFFFF);
             drawshape_set_vertex_rect((s16)(p->x + pos.x), (s16)(p->y + pos.y), (s16)(f2 / (f32)lo), p->y);
             fn_80053960(0xC50A83FF, col, col, 0xC50A83FF);
@@ -681,7 +681,7 @@ void fn_802E71C4(void) {
             } else {
                 f = (f32)((lbl_806BDCC8[0].field_0x190 & 0xF) << 0xC);
             }
-            colour = fn_802E270C(0xF50C23FF, 0xFF8C9BFF, (u8)fn_800AB658(0, lbl_8079A920 * f),
+            colour = color_lerp(0xF50C23FF, 0xFF8C9BFF, (u8)fn_800AB658(0, lbl_8079A920 * f),
                                  lbl_8079A8FC + 0.0f, 0.0f);
         }
         value = fn_803A8858();
