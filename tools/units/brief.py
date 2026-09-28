@@ -591,6 +591,20 @@ def _data_step(lines: list[str]) -> None:
                  "write the measured blocker in the unit header and report it.")
     lines.append("* Finish with the numbers: the unit's sections and bytes before/after, and whether "
                  "`python tools/units/datagap.py --flip-blockers` lists this unit.")
+    lines.append("")
+    lines.append("**A range you need but cannot claim: file it, do not dead-end.** When the rows your unit "
+                 "needs sit in data no split range covers, you may not add it to `splits.txt` and rule 12 "
+                 "refuses a bare `extern` - so file the request instead of leaving it in prose:")
+    lines.append("")
+    lines.append("```sh")
+    lines.append("python tools/units/dataqueue.py --request <your-unit> 0xADDR --size <n> \\")
+    lines.append("    --evidence '<who else references it; ideally no other unit>' \\")
+    lines.append("    --unblocks '<the rows/symbols it unblocks>'")
+    lines.append("```")
+    lines.append("")
+    lines.append("That writes `tools/units/data-requests.json` (deduplicated, byte-deterministic). It is only "
+                 "the **filing channel**: the ruling is the orchestrator's, so raise the request through the "
+                 "supervisor protocol - never edit `splits.txt` yourself.")
 
 
 def _precommit_lines(lines: list[str]) -> None:

@@ -41,7 +41,15 @@ across units or a claimed symbol sits inside it (`density < 0.5`), otherwise `pr
     python tools/units/dataqueue.py --dry-run       # report what would be written, write nothing
     python tools/units/dataqueue.py --limit 20      # a preview queue (deterministic prefix)
     python tools/units/dataqueue.py --json          # the queue on stdout, write nothing
+    python tools/units/dataqueue.py --request <unit> <addr> [--size N] [--evidence E] [--unblocks R]
     python tools/units/dataqueue.py --selftest
+
+**The data-claim request channel.** A lane that finds a genuinely unowned range *its own rows need* used
+to dead-end: rule 12 refuses a bare `extern`, and the brief says do not touch `splits.txt`. `--request`
+files it instead - address, size, the sole-referencer evidence and the rows it unblocks - into
+`tools/units/data-requests.json` (tracked, deduplicated, byte-deterministic). It is only the **filing
+channel**: the ruling is the orchestrator's and goes through the `contact_supervisor` protocol. The brief
+(`brief.py`, section 5d) names the command, so no lane has to guess it.
 
 Writing is atomic (temp file + `os.replace`) and idempotent: the same repository state renders the same
 bytes, so re-running cannot churn the file.
@@ -79,6 +87,7 @@ LINKER_GENERATED = ("_rom_copy_info", "_bss_init_info")
 TRK_VECTOR_TABLE = (0x80004380, 0x800062B4)
 
 QUEUE_REL = os.path.join("tools", "units", "data-queue.json")
+REQUESTS_REL = os.path.join("tools", "units", "data-requests.json")
 GRAPH_REL = os.path.join("build", "tmp", "tudiscover", "graph.json")
 
 
@@ -275,6 +284,135 @@ def write_queue(path: str, text: str) -> None:
         tx.cleanup()
 
 
+# -- the data-claim request channel (filing only; the ruling is the orchestrator's) -----------------------
+#
+# A lane that finds a genuinely unowned range its own rows need cannot claim it: rule 12 refuses a bare
+# `extern`, and the brief says do not touch `splits.txt`. Before this there was no channel at all, so two
+# lanes dead-ended. `--request` records the ask (address, size, sole-referencer evidence, the rows it
+# unblocks) in a tracked, deduplicated register; `brief.py` names the command in section 5d.
+
+def parse_addr(text: str) -> int:
+    """`0x8057C82C`, a bare 8-digit `8057C82C`, or a decimal."""
+    t = str(text).strip()
+    if t[:2].lower() == "0x":
+        return int(t, 16)
+    if re.fullmatch(r"[0-9A-Fa-f]{8}", t):
+        return int(t, 16)
+    return int(t, 10)
+
+
+def infer_section(symbols: list[dict], addr: int) -> str | None:
+    """The section an address lives in: the symbol that contains it, else the nearest symbol's section."""
+    best, best_d = None, None
+    for e in symbols:
+        size = max(int(e.get("size") or 0), 1)
+        if e["address"] <= addr < e["address"] + size:
+            return e["section"]
+        d = min(abs(addr - e["address"]), abs(addr - (e["address"] + size)))
+        if best_d is None or d < best_d:
+            best_d, best = d, e["section"]
+    return best
+
+
+def run_for(entries: list[dict], addr: int, section: str | None = None) -> dict | None:
+    """The queue run whose range covers `addr` (optionally in one section), or None."""
+    for e in entries:
+        if (section is None or e["section"] == section) and e["start"] <= addr < e["end"]:
+            return e
+    return None
+
+
+def owns(splits: list[dict], section: str, start: int, end: int) -> dict | None:
+    """The split range that covers or intersects `[start, end)` - a claim already exists, so refuse."""
+    for block in splits:
+        for rng in block.get("ranges", ()):
+            if rng["section"] == section and start < rng["end"] and rng["start"] < end:
+                return {"unit": block["unit"], **rng}
+    return None
+
+
+def build_request(unit: str, addr: int, size: int | None, section: str | None, evidence: str,
+                  unblocks: str, symbols: list[dict], splits: list[dict], entries: list[dict]) -> dict:
+    """One request dict - pure, so the selftest needs no repository.
+
+    `size` defaults to the queue run that covers the address (the span the lane would claim), and the
+    section to the symbol that contains the address. The evidence and the rows it unblocks are the two
+    fields the orchestrator reads to rule, so an empty one is a usage error, not a request.
+    """
+    unit = (unit or "").replace("\\", "/").strip("/")
+    if not unit:
+        raise SystemExit("--request needs a unit, e.g. `--request NHTTP/NHTTP_bgnend 0x80514800`")
+    if not evidence.strip():
+        raise SystemExit("--request needs the sole-referencer evidence: --evidence '<who else refers to it>'")
+    if not unblocks.strip():
+        raise SystemExit("--request needs the rows it unblocks: --unblocks '<symbol(s) / offset(s)>'")
+    if section is None:
+        section = infer_section(symbols, addr)
+    run = run_for(entries, addr, section)
+    if size is None:
+        size = (run["end"] - run["start"]) if run else 4
+    size = int(size)
+    if size <= 0:
+        raise SystemExit("--size must be positive")
+    return {"unit": unit, "section": section or "?", "start": addr, "end": addr + size,
+            "size": size, "evidence": evidence.strip(), "unblocks": unblocks.strip(),
+            "queue_verdict": (run or {}).get("verdict")}
+
+
+def load_requests(root: str) -> list[dict]:
+    """The register `tools/units/data-requests.json`; `[]` when absent or unreadable."""
+    path = os.path.join(root, REQUESTS_REL)
+    if not os.path.exists(path):
+        return []
+    try:
+        data = json.loads(open(path, encoding="utf-8").read())
+    except (ValueError, OSError):
+        return []
+    if isinstance(data, dict):
+        data = data.get("requests", [])
+    return [e for e in data if isinstance(e, dict)] if isinstance(data, list) else []
+
+
+def render_requests(requests: list[dict]) -> str:
+    """Deterministic text: same requests, same bytes, so a re-file cannot churn the register."""
+    ordered = sorted(requests, key=lambda e: (str(e.get("section")), int(e.get("start") or 0),
+                                              str(e.get("unit"))))
+    return json.dumps(ordered, indent=1, sort_keys=True) + "\n"
+
+
+def merge_request(requests: list[dict], entry: dict) -> tuple[list[dict], bool]:
+    """Append `entry`, replacing an identical (unit, section, start, end) row. Returns (list, changed).
+
+    An identical row is a re-file, not a change: the register is a set, so a lane that runs the command
+    twice cannot churn it. The same key with *different* evidence replaces the row (the lane learned
+    more), which is a real change.
+    """
+    def key_of(r):
+        return (r.get("unit"), r.get("section"), r.get("start"), r.get("end"))
+
+    key = (entry["unit"], entry["section"], entry["start"], entry["end"])
+    for r in requests:
+        if key_of(r) == key:
+            if r.get("evidence") == entry["evidence"] and r.get("unblocks") == entry["unblocks"]:
+                return requests, False
+            break
+    kept = [r for r in requests if key_of(r) != key]
+    kept.append(entry)
+    return kept, True
+
+
+def write_requests(path: str, text: str) -> None:
+    """Atomic write through the shared-file layer (the same primitive the queue uses)."""
+    tx = sf.Transaction()
+    try:
+        tx.write(Path(path), text)
+    except BaseException:
+        tx.rollback()
+        raise
+    finally:
+        tx.cleanup()
+
+
 # -- the impure edges: read the repository, print a summary --------------------------------------------------
 
 def read_graph_cache(root: str) -> tuple[dict, str]:
@@ -332,6 +470,51 @@ def summary(entries: list[dict], path: str, warning: str, registered: set[str] |
                                         sorted(units.items(), key=lambda kv: (-kv[1], kv[0]))[:8]),
              "  -> " + path]
     return "\n".join(lines)
+
+
+def cmd_request(root: str, unit: str, addr_text: str, size=None, section=None, evidence="",
+                unblocks="", as_json=False, dry_run=False) -> int:
+    """File (or report) one data-claim request in `tools/units/data-requests.json`. Reads only.
+
+    Refuses when a `splits.txt` range already covers the asked range - that is a claim, not a request -
+    and when the evidence or the unblocked rows are empty, because those two fields are what the
+    orchestrator rules on. Re-filing an identical request is a no-op (the register is a set).
+    """
+    addr = parse_addr(addr_text)
+    symbols, splits, funcs, cover, warning = load_inputs(root)
+    if warning:
+        print("WARNING: %s" % warning, file=sys.stderr)
+    entries = build_entries(symbols, splits, funcs, cover)
+    section_hint = section or infer_section(symbols, addr)
+    run = run_for(entries, addr, section_hint)
+    probe = int(size) if size else ((run["end"] - run["start"]) if run else 4)
+    owner = owns(splits, section_hint, addr, addr + probe)
+    if owner:
+        print("REFUSED: %s already owns %s 0x%X-0x%X, so there is nothing to request - it is a claim"
+              % (owner["unit"], owner["section"], owner["start"], owner["end"]))
+        return 1
+    entry = build_request(unit, addr, size, section, evidence, unblocks, symbols, splits, entries)
+    requests = load_requests(root)
+    merged, changed = merge_request(requests, entry)
+    path = os.path.join(root, REQUESTS_REL)
+    if as_json:
+        print(render_requests([entry] if changed else requests))
+        return 0
+    print("data request: %s  %s 0x%08X-0x%08X (%d B)%s"
+          % (entry["unit"], entry["section"], entry["start"], entry["end"], entry["size"],
+             "  [queue: %s]" % entry["queue_verdict"] if entry.get("queue_verdict") else ""))
+    print("  evidence: %s" % entry["evidence"])
+    print("  unblocks: %s" % entry["unblocks"])
+    if dry_run:
+        print("dry run: nothing written")
+        return 0
+    if not changed:
+        print("already filed in %s" % path)
+        return 0
+    write_requests(path, render_requests(merged))
+    print("filed in %s - the ruling is the orchestrator's (raise it through the supervisor protocol)"
+          % path)
+    return 0
 
 
 def selftest() -> int:
@@ -482,6 +665,81 @@ def selftest() -> int:
     check("a run with no covering object still names itself",
           region_name({"section": ".sbss", "start": 0x807953C8}), "auto/807953C8_sbss")
 
+    # --- the data-claim request channel (the filing half; the ruling is the orchestrator's) ---------
+    # The dead-end this closes: a lane found a range its own rows needed genuinely unowned and had no
+    # channel - rule 12 refuses a bare `extern`, and `splits.txt` is off-limits. `--request` files it.
+    def _raises(fn):
+        try:
+            fn()
+            return False
+        except SystemExit:
+            return True
+
+    req_syms = [sym("gFree", ".data", 0x900, 4), sym("gOwned", ".data", 0x100, 4)]
+    req_splits = [{"unit": "main.cpp", "ranges": [
+        {"section": ".data", "start": 0x100, "end": 0x108, "rename": None}]}]
+    req_entries = build_entries(req_syms, req_splits, {}, lambda s, a: None)
+    check("request: parse_addr accepts 0x, bare hex and decimal",
+          (parse_addr("0x10"), parse_addr("80500000"), parse_addr("16")), (0x10, 0x80500000, 16))
+    check("request: the section is inferred from the address", infer_section(req_syms, 0x900), ".data")
+    check("request: the queue run sizes the request when --size is absent",
+          build_request("u/unit", 0x900, None, None, "sole ref", "rows", req_syms, req_splits,
+                        req_entries)["size"], 4)
+    req = build_request("NHTTP/NHTTP_bgnend", 0x900, 8, None, "only NHTTP/NHTTP_bgnend refers to it",
+                        "fn_80001234 @0x900", req_syms, req_splits, req_entries)
+    check("request: the entry names the range", (req["section"], req["start"], req["end"]),
+          (".data", 0x900, 0x908))
+    check("request: the evidence and unblocked rows are carried", (req["evidence"], req["unblocks"]),
+          ("only NHTTP/NHTTP_bgnend refers to it", "fn_80001234 @0x900"))
+    check("request: an owned range is owned by the split",
+          bool(owns(req_splits, ".data", 0x100, 0x104)), True)
+    check("request: an unowned range is not", owns(req_splits, ".data", 0x900, 0x904), None)
+    check("request: missing evidence is refused", _raises(lambda: build_request(
+        "u", 0x900, None, None, "", "r", req_syms, req_splits, req_entries)), True)
+    check("request: missing unblocks is refused", _raises(lambda: build_request(
+        "u", 0x900, None, None, "e", "", req_syms, req_splits, req_entries)), True)
+    merged, changed = merge_request([], req)
+    check("request: the first filing changes the register", (len(merged), changed), (1, True))
+    merged2, changed2 = merge_request(merged, req)
+    check("request: re-filing an identical request is a no-op", (len(merged2), changed2), (1, False))
+    merged3, changed3 = merge_request(merged2, dict(req, unit="Other/unit"))
+    check("request: a second unit adds a row", (len(merged3), changed3), (2, True))
+    check("request: the register renders deterministically", render_requests(merged3),
+          render_requests(list(reversed(merged3))))
+    with tempfile.TemporaryDirectory() as tmp:
+        rpath = os.path.join(tmp, "tools", "units", "data-requests.json")
+        os.makedirs(os.path.dirname(rpath), exist_ok=True)
+        write_requests(rpath, render_requests(merged3))
+        check("request: the register round-trips", load_requests(tmp), merged3)
+        check("request: the register write is byte-stable", open(rpath, "rb").read(),
+              render_requests(merged3).encode("utf-8"))
+
+        # the CLI path with the ledger stubbed: an unowned address files, an owned one refuses
+        import contextlib
+        import io
+        g = globals()
+        saved = (g["load_inputs"], g["build_entries"])
+        g["load_inputs"] = lambda root: (req_syms, req_splits, {}, None, "")
+        g["build_entries"] = lambda symbols, splits, funcs, cover: req_entries
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_request(tmp, "NHTTP/NHTTP_bgnend", "0x900", evidence="sole ref",
+                                 unblocks="gFree")
+            check("request cli: an unowned address files", rc, 0)
+            check("request cli: the register holds the row",
+                  load_requests(tmp)[0]["unit"], "NHTTP/NHTTP_bgnend")
+            check("request cli: it names the register", "data-requests.json" in buf.getvalue(), True)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_request(tmp, "NHTTP/NHTTP_bgnend", "0x100", evidence="sole ref",
+                                 unblocks="gOwned")
+            check("request cli: an owned address refuses", rc, 1)
+            check("request cli: the refusal says it is a claim",
+                  "already owns" in buf.getvalue(), True)
+        finally:
+            g["load_inputs"], g["build_entries"] = saved
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for failure in fails:
@@ -498,6 +756,13 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="print the queue on stdout, write nothing")
     ap.add_argument("--out", default=None, help="output path (default: tools/units/data-queue.json)")
     ap.add_argument("--root", default=None, help="repository root (default: this checkout)")
+    ap.add_argument("--request", nargs=2, metavar=("UNIT", "ADDR"),
+                    help="file a data-claim request for an unowned range: --request <unit> <addr>")
+    ap.add_argument("--size", type=parse_addr, default=None,
+                    help="requested byte size (default: the covering queue run, else 4)")
+    ap.add_argument("--section", default=None, help="requested section (default: inferred from the address)")
+    ap.add_argument("--evidence", default="", help="sole-referencer evidence for the request")
+    ap.add_argument("--unblocks", default="", help="the rows/symbols this range unblocks")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -505,6 +770,10 @@ def main() -> int:
         return selftest()
 
     root = os.path.abspath(args.root) if args.root else os.path.dirname(os.path.dirname(HERE))
+    if args.request:
+        return cmd_request(root, args.request[0], args.request[1], size=args.size,
+                           section=args.section, evidence=args.evidence, unblocks=args.unblocks,
+                           as_json=args.json, dry_run=args.dry_run)
     symbols, splits, funcs, cover, warning = load_inputs(root)
     entries = build_entries(symbols, splits, funcs, cover)
     if args.limit:
