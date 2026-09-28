@@ -40,6 +40,10 @@ s32 fn_802E06B0(u16, void*, void*);     /* 0x802E06B0 */
  * range that defines them, `src/menu/get_pop_dat_ptr.cpp`, owns them and publishes both in
  * `include/menu/get_pop_dat_ptr.h`, which this header includes below (rule 2). */
 
+/* The quest-work accessors this band used to declare moved to `include/lobby/lb_quest_screen.h`
+ * for the same reason - that unit's registered range covers their addresses, and this header
+ * includes it above. */
+
 #ifdef __cplusplus
 }
 #endif
@@ -47,6 +51,8 @@ s32 fn_802E06B0(u16, void*, void*);     /* 0x802E06B0 */
 /* C++-linkage callees the band reads whose owning header is not this band's. */
 #ifdef __cplusplus
 struct _mh_tex_uv_;
+struct _mh_ivec2_;
+u8 get_arena_cfg(u8, u8);
 u8 get_now_areano(void);
 void set_zmode(u8, u8, u8);
 void set_blendmode(u8, u8, u8);
@@ -130,4 +136,146 @@ extern DemoWork demo_work;        /* .bss 0x806D2B20 */
  * declarations come from the owner's header (rule 2). */
 #include "menu/get_pop_dat_ptr.h"
 
+/* ---- the 0x803A/0x803B arena/quest-result band (proposal `803B0F98`) ----
+ *
+ * The records and globals `src/menu/arena_result.cpp` reads.  All of them belong to no registered
+ * unit: `quest_work` is the 0x6AB8-byte block `quest_init` (0x803AD47C) memsets and stores into
+ * `quest_work_ptr`, and the band's string tables sit in `.data`/`.sdata` next to it.
+ */
+/* One item slot of the result screen's per-player item list. size: 0x4 */
+typedef struct QuestItemSlot {
+    /* +0x000 */ u16 id;      /* the item id the count belongs to */
+    /* +0x002 */ s16 count;
+} QuestItemSlot;
+/* One 0x6-byte entry of the arena item table at `quest_work.arena_items_0x6A2C`: the item `id`, the
+ * `count` the caller matches on, and the `remaining` count `quest_element_item_apply` spends.
+ * size: 0x6 */
+typedef struct QuestArenaItem {
+    /* +0x000 */ u16 id;
+    /* +0x002 */ u16 count;
+    /* +0x004 */ u16 remaining;
+} QuestArenaItem;
+/* The record `quest_work.pad_0x03C` points at: one player's quest/arena result row.  Only the
+ * offsets this band reads are named, and the whole tail below +0x372 is not evidenced.
+ * size: 0x714 (lower bound) */
+typedef struct QuestRecord {
+    /* +0x000 */ u8 unused_0x000[0x02C];
+    /* +0x02C */ u16 field_0x02C;     /* the clear time in frames (compare against 0x2710/0x2328) */
+    /* +0x02E */ u8 unused_0x02E[0x05D];
+    /* +0x08B */ u8 field_0x08B;      /* index into string table 5 */
+    /* +0x08C */ u8 unused_0x08C[0x0AE];
+    /* +0x13A */ s16 field_0x13A;     /* formatted through string table 6's format 0 */
+    /* +0x13C */ u8 unused_0x13C[0x05C];
+    /* +0x198 */ u8 field_0x198;      /* index into string table 41 */
+    /* +0x199 */ u8 unused_0x199[0x173];
+    /* +0x30C */ s32 field_0x30C;
+    /* +0x310 */ u8 unused_0x310[0x038];
+    /* +0x348 */ s32 field_0x348;
+    /* +0x34C */ s32 field_0x34C;
+    /* +0x350 */ s32 field_0x350;
+    /* +0x354 */ s32 field_0x354;
+    /* +0x358 */ u8 unused_0x358[0x01A];
+    /* +0x372 */ u16 field_0x372;
+    /* +0x374 */ u8 unused_0x374[0x3A0];
+} QuestRecord;
+/* One 0x60-byte entry of the quest work block's element array at `quest_work` +0x94: `flags` gates
+ * the entry, `id` is the u16 the callers match on and `value` is the count/target they compare.
+ * `key_bytes` is the same +0x04..+0x06 pair as three bytes - `quest_players_state_get` reads the
+ * three bytes of entry 6. size: 0x60 */
+typedef struct QuestElement {
+    /* +0x00 */ u32 flags;
+    union {
+        struct {
+            /* +0x04 */ u16 id;
+            /* +0x06 */ s16 value;
+        };
+        /* +0x04 */ u8 key_bytes[3];
+    };
+    /* +0x07 */ u8 unused_0x07[0x59];
+} QuestElement;
+/* The quest/arena work block (`quest_work`, .bss 0x806C5858, 0x6AB8 B - the size `quest_init`
+ * memsets).  `quest_work_ptr` (.sbss 0x80794C40) is the same object's address.  Only the offsets
+ * the band reads are named, in ascending order. size: 0x6AB8 */
+typedef struct QuestWork {
+    /* +0x0000 */ u8 unused_0x0000[0x01C];
+    /* +0x001C */ s32 field_0x01C;              /* a clear-time-like pair with +0x020 */
+    /* +0x0020 */ s32 field_0x020;
+    /* +0x0024 */ s32 field_0x024;
+    /* +0x0028 */ u8 unused_0x0028[0x014];
+    /* +0x003C */ QuestRecord* record_0x03C;    /* the current result row, 0 when there is none */
+    /* +0x0040 */ u8 unused_0x0040[0x050];
+    /* +0x0090 */ s8 field_0x090;               /* the two bytes `sprintf` formats as the score */
+    /* +0x0091 */ s8 field_0x091;
+    /* +0x0092 */ u8 unused_0x0092[0x002];
+    /* +0x0094 */ QuestElement elements_0x0094[3];
+    /* +0x01B4 */ u8 unused_0x01B4[0x120];      /* entries 3.. of the same 0x60-stride array: the
+                                                 * callers that reach them use their absolute offsets
+                                                 * below (entry 6's +0x04..+0x06 is +0x2D4) */
+    /* +0x02D4 */ u8 player_state_0x2D4[3];     /* entry 6's three key bytes */
+    /* +0x02D7 */ u8 unused_0x02D7[0x011];
+    /* +0x02E8 */ s32 field_0x2E8;              /* clamped to 0 before it is formatted */
+    /* +0x02EC */ u8 unused_0x02EC[0x2EC];
+    /* +0x05D8 */ u16 field_0x5D8;              /* the run's point score */
+    /* +0x05DA */ u8 unused_0x05DA[0x60BE];
+    /* +0x6698 */ u16* slot_values_0x6698[8];   /* the eight u16 stacks `quest_slot_items_get` copies */
+    /* +0x66B8 */ s32 slot_counts_0x66B8[8];
+    /* +0x66D8 */ u8 unused_0x66D8[0x080];
+    /* +0x6758 */ s32 field_0x6758;             /* quest_init stores 0x19 here */
+    /* +0x675C */ u8 unused_0x675C[0x004];
+    /* +0x6760 */ u8 field_0x6760[8];
+    /* +0x6768 */ u8 unused_0x6768[0x20D];
+    /* +0x6975 */ u8 field_0x6975;             /* the screen's active flag */
+    /* +0x6976 */ u8 unused_0x6976[0x002];
+    /* +0x6978 */ u8 field_0x6978;             /* the screen phase the dispatchers switch on */
+    /* +0x6979 */ u8 unused_0x6979[0x003];
+    /* +0x697C */ s32 field_0x697C;
+    /* +0x6980 */ u8 unused_0x6980[0x0AA];
+    /* +0x6A2A */ s8 count_0x6A2A;             /* entries in the arena item table below */
+    /* +0x6A2B */ u8 unused_0x6A2B;
+    /* +0x6A2C */ QuestArenaItem arena_items_0x6A2C[3];
+    /* +0x6A3E */ u8 unused_0x6A3E[0x02C];
+    /* +0x6A6A */ QuestItemSlot player_items_0x6A6A[4][3];
+    /* +0x6A9A */ u8 unused_0x6A9A[0x01E];
+} QuestWork;
+extern QuestWork quest_work;              /* .bss 0x806C5858 */
+extern QuestWork* quest_work_ptr;         /* .sbss 0x80794C40, set by `quest_init` */
+extern char quest_text_buffer[0x100];     /* .bss 0x806CC310, the 100-byte text scratch */
+/* The band's three `quest_list_*` globals: an item array, its u16 key/value array and the count
+ * (`quest_work_word_get` walks them). */
+typedef struct QuestListItem {
+    /* +0x02C */ u16 field_0x02C;
+    /* +0x02E */ u8 unused_0x02E[0x002];
+} QuestListItem; /* size: 0x30 (lower bound) */
+extern QuestListItem** quest_list_items;   /* .sbss 0x80794C3C */
+extern u16* quest_list_values;             /* .sbss 0x80794C24 */
+extern s32 quest_list_count;               /* .sbss 0x80794C44 */
+/* The shared screen block `Screen_w` (.bss 0x8065903C, 0x54 B): +0x14 is the frame duration the
+ * clear-time formatters divide by and the frame scale the band's `draw_*` calls use.  Moved here
+ * from `src/menu/fn_802E4978.cpp`, which defined the same view locally - the second user is when a
+ * type moves into a header (rule 1). size: 0x54 */
+typedef struct ScreenGeomView {
+    /* +0x00 */ u8 unused_0x00[0x14];
+    /* +0x14 */ f32 field_0x14;
+    /* +0x18 */ u8 unused_0x18[0x54 - 0x18];
+} ScreenGeomView;
+extern "C" ScreenGeomView Screen_w;
+/* The band's own data tables. */
+extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] */
+extern u8 quest_byte_table[];      /* .data 0x805F78B4 */
+extern u8* arena_time_table[];     /* .data 0x805F7AF8, 12 pointers to u16 time tables */
+extern char* quest_grade_none_text_table[];   /* .data 0x8060DAD8, indexed by `system_w`'s map index */
+extern u16 multi_arena_clr_time[];     /* .data 0x805F7B28, 10 u16 pairs */
+/* Pooled float constants the target objects address as globals (playbook 29: declare, never
+ * define - a definition would make MWCC emit a second copy in `.sdata2`). */
+extern const f32 frames_per_second_60f;   /* .sdata2 0x8079C524 */
+extern const f32 percent_scale_100f;      /* .sdata2 0x8079C558 */
+extern const f32 quest_grade_ratio_10f;   /* .sdata2 0x8079C540 */
+extern const f32 quest_grade_ratio_30f;   /* .sdata2 0x8079C55C */
+extern const f32 quest_grade_ratio_50f;   /* .sdata2 0x8079C520 */
+/* The band's unowned callees (C++ linkage: the declaration reproduces the map's mangling, rule 9). */
+/* The band's unowned callees (C linkage: the map rows are plain names, so a fixed name here has to
+ * mangle to the same spelling).  Each is one small accessor of the quest work area `quest_element_*`
+ * (0x60-byte entries at `quest_work` +0x94) or of the result record's +0x310 flag word. */
+extern "C" {
+}
 #endif /* MHTRI_UNSPLIT_MENU_H */

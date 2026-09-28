@@ -1291,6 +1291,11 @@ quest/quest_entry.cpp:
 	.text       start:0x803AA4A4 end:0x803B0F98
 	.ctors      start:0x8056F3B0 end:0x8056F3B4
 
+menu/arena_result.cpp:
+	extab       start:0x80018C54 end:0x80018DC4
+	extabindex  start:0x800390E4 end:0x8003930C
+	.text       start:0x803B0F98 end:0x803B465C
+
 enemy/em_pop.cpp:
 	extab       start:0x80018DC4 end:0x80019164
 	extabindex  start:0x8003930C end:0x8003987C
