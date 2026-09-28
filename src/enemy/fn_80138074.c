@@ -287,9 +287,9 @@ extern void fn_802AD738(void* arg0, void* arg1);
 extern void fn_802B01AC(Vec3* out, const Vec3* v, u8 area);
 extern f32 fn_802B0430(u8 area);
 extern u8 fn_802B0668(u8 arg0);
-extern void fn_803B9994(s32 arg0);
-extern s32 fn_803B9A40(s32 arg0);
-extern s32 fn_803B9E50(void);
+extern void em_roster_record_release(s32 arg0);
+extern s32 em_roster_record_slot_id_get(s32 arg0);
+extern s32 em_roster_record_alive_ck(void);
 extern void fn_805012E8(Mtx34* out, const Mtx34* src);
 
 /* --------------------------------------------------------------------------------------------- */
@@ -686,16 +686,16 @@ void fn_8013823C(EnemyWork* self) {
             }
         }
         if (self->field_0x88C[i] != -1) {
-            if (fn_803B9E50() == 0) {
-                if (fn_803B9A40(self->field_0x88C[i]) > 0) {
+            if (em_roster_record_alive_ck() == 0) {
+                if (em_roster_record_slot_id_get(self->field_0x88C[i]) > 0) {
                     self->field_0x89E = (u8)(self->field_0x89E + 1);
                 }
                 self->field_0x88C[i] = -1;
             } else if (self->field_0x898[i] <= 0) {
-                if (fn_803B9A40(self->field_0x88C[i]) > 0) {
+                if (em_roster_record_slot_id_get(self->field_0x88C[i]) > 0) {
                     self->field_0x89E = (u8)(self->field_0x89E + 1);
                 }
-                fn_803B9994(self->field_0x88C[i]);
+                em_roster_record_release(self->field_0x88C[i]);
                 self->field_0x88C[i] = -1;
             }
         }

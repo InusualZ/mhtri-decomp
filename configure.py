@@ -810,6 +810,18 @@ config.libs = [
             # instructions and needs `-Cpp_exceptions on`, which every one of its 60 framed functions
             # shows in its own extab record).
             Object(NonMatching, "quest/quest_entry.cpp"),
+            # Registered once, at its final home, from proposal/803B465C_fn_803B465C.cpp: the field-side
+            # enemy population/roster manager (`.text` 0x803B465C..0x803BE30C, 139 functions / 40112 B;
+            # extab 0x80018DC4..0x80019164 and extabindex 0x8003930C..0x8003987C, both the exact gap
+            # between the bracketing auto objects).  Module `enemy` (evidence class 3+4, GUESS recorded
+            # in the unit header): no `__FILE__` string covers the range, the dump answers `zz_` for
+            # every symbol in it, and the bracketing registered units name different modules - but nine
+            # registered `src/enemy/*` units call into the range and it owns the 0x224-byte monster
+            # roster record whose string pool names the `em_set`/`_pop.dat` data it consumes.  Same
+            # `cflags_menu` as the address neighbour below it (`menu/multi_result.cpp`); the flag probe
+            # is recorded in the unit header.  This pass writes 12 of the 139 bodies; the rest keep
+            # their original bytes and measure 0 %.
+            Object(NonMatching, "enemy/em_pop.cpp"),
         ],
     },
 

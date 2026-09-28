@@ -1291,6 +1291,14 @@ quest/quest_entry.cpp:
 	.text       start:0x803AA4A4 end:0x803B0F98
 	.ctors      start:0x8056F3B0 end:0x8056F3B4
 
+enemy/em_pop.cpp:
+	extab       start:0x80018DC4 end:0x80019164
+	extabindex  start:0x8003930C end:0x8003987C
+	.text       start:0x803B465C end:0x803BE30C
+	.ctors      start:0x8056F3B4 end:0x8056F3B8
+	.bss        start:0x806D2A78 end:0x806D2AF8
+	.sbss       start:0x80794C58 end:0x80794C60
+
 menu/get_pop_dat_ptr.cpp:
 	extab       start:0x80019164 end:0x800193D4
 	extabindex  start:0x8003987C end:0x80039C24

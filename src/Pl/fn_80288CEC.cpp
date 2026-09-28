@@ -190,7 +190,7 @@ void fn_802BE568(void* self, u32 sub);
 u32 fn_803A7E1C(void);
 void fn_803ADA70(void);
 u32 fn_803B4B74(void);
-u32 fn_803B521C(void);
+u32 em_work_state_bit7_ck(void);
 void fn_803BA814(u8 idx);
 u32 fn_8042CB9C(void);
 void PSVECSubtract(void* dst, void* a, void* b);
@@ -530,7 +530,7 @@ u32 fn_8028F368(void) {
     if (mode == 0) {
         return 0;
     }
-    if (fn_803B521C() == 0) {
+    if (em_work_state_bit7_ck() == 0) {
         return 0;
     }
     mode[0x6A3E] = 4;
