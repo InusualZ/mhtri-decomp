@@ -149,9 +149,18 @@ def obj(path: str):
     return ur.load_object(path)
 
 
-def check(our, target, map_set, providers=None, ref_count=None, linker=None, target_rel=TARGET_REL):
+def check(our, target, map_set, providers=None, ref_count=None, linker=None, target_rel=TARGET_REL,
+          base_names=frozenset()):
     return ur.check_object("quest/arenatask", our, target, map_set=map_set, providers=providers or {},
-                           ref_count=ref_count or {}, target_rel=target_rel, linker_set=linker or set())
+                           ref_count=ref_count or {}, target_rel=target_rel, linker_set=linker or set(),
+                           base_names=base_names)[0]
+
+
+def check_pair(our, target, map_set, base_names=frozenset(), providers=None, ref_count=None,
+               linker=None, target_rel=TARGET_REL):
+    return ur.check_object("quest/arenatask", our, target, map_set=map_set, providers=providers or {},
+                           ref_count=ref_count or {}, target_rel=target_rel, linker_set=linker or set(),
+                           base_names=base_names)
 
 
 def selftest() -> int:
@@ -199,6 +208,31 @@ def selftest() -> int:
                (c_wrong in found2[0], c_right in found2[0]), (True, True))
         expect("C linkage: found by the stem", "same stem" in found2[0], True)
         expect("C linkage: the corrected spelling passes", check(obj(tgt2), obj(tgt2), {c_right}), [])
+
+        # 2a. ADD-ONLY (a): a unit whose ONLY wrong reference is pre-existing must PASS. This is the
+        #     regression test for the whole change - the C-linkage object above, with the base snapshot
+        #     carrying its wrong spelling, is debt the batch did not create.
+        problems_a, line_a = check_pair(obj(ours2), obj(tgt2), {c_right}, base_names={c_wrong})
+        expect("add-only (a): a pre-existing-only unit passes", problems_a, [])
+        expect("add-only (a): the debt is reported, naming the unit and the count",
+               (line_a is not None, "1 pre-existing" in (line_a or ""), c_wrong in (line_a or "")),
+               (True, True, True))
+
+        # 2b. ADD-ONLY (b): one pre-existing and one newly-wrong reference -> refuse, naming ONLY the new.
+        new_wrong = "brand_new_undefined"
+        ours2b = write(tmp, "clink_ours_b.o", build_obj(
+            [(".text", b"\0" * 0x40)],
+            [("cockpit_body", 0x30, ".text", FUNC, 0), (c_wrong, 0, None, UNDEF), (new_wrong, 0, None, UNDEF)],
+            relocs=[(".text", 0x20, c_wrong), (".text", 0x24, new_wrong)]))
+        problems_b, line_b = check_pair(obj(ours2b), obj(tgt2), {c_right}, base_names={c_wrong})
+        expect("add-only (b): one refusal", len(problems_b), 1)
+        expect("add-only (b): names the new one", new_wrong in problems_b[0], True)
+        expect("add-only (b): never names the pre-existing one in the refusal", c_wrong in problems_b[0], False)
+        expect("add-only (b): reports the pre-existing one separately",
+               (line_b is not None, c_wrong in (line_b or ""), "1 pre-existing" in (line_b or "")),
+               (True, True, True))
+        # (c) the existing wrong-tag and C-linkage fixtures above still refuse when the batch *introduces*
+        #     them: their `check` calls pass no base, so every reference is new.
 
         # 3. The negative fixture - the Pat vtable's shape. 62 wrong slots point at real functions that ARE
         #    `symbols.txt` rows; the bytes are identical and the relocation *names* are real, so this must
@@ -281,9 +315,22 @@ def selftest() -> int:
                b"    build\\RMHE08\\obj\\provided.o | $\n"
                b"    build\\RMHE08\\ldscript.lcf\n"))
         expect("check_units names the wrong-tag unit",
-               len(ur.check_units(tree, ["U"])), 1)
+               len(ur.check_units(tree, ["U"])["problems"]), 1)
         expect("check_units names the clean unit's absence",
-               ur.check_units(tree, ["V"]), [])
+               ur.check_units(tree, ["V"])["problems"], [])
+        # add-only end to end: with the wrong spelling in the base snapshot, the same tree is not refused,
+        # and the debt is reported.
+        pre = ur.check_units(tree, ["U"], base_snapshot={"U": {"refs": [wrong]}})
+        expect("check_units: a pre-existing-only unit passes", pre["problems"], [])
+        expect("check_units: ... and is reported as debt",
+               (len(pre["pre_existing"]), wrong in pre["pre_existing"][0]), (1, True))
+        # a base snapshot taken from the same tree makes the wrong tag pre-existing and the row silent
+        snap = ur.snapshot_base(tree, ["U"])
+        expect("snapshot_base records the tree's own unresolved set",
+               snap.get("U", {}).get("refs"), [wrong])
+        expect("snapshot_base keys the entry by the source sha", "source" in snap.get("U", {}), True)
+        expect("a snapshot of this tree makes the row silent",
+               ur.check_units(tree, ["U"], base_snapshot=snap)["problems"], [])
         cache = os.path.join(tree, "build", "tmp", "undefrefs", "link-symbols.json")
         expect("the link-symbol cache was written", os.path.exists(cache), True)
         index = ur.link_symbol_index(tree)
@@ -302,7 +349,7 @@ def selftest() -> int:
         saved_index = ur.link_symbol_index
         ur.link_symbol_index = lambda *a, **k: (_ for _ in ()).throw(AssertionError("index built"))
         try:
-            expect("no candidate -> no index, no problem", ur.check_units(mapped_only, ["X"]), [])
+            expect("no candidate -> no index, no problem", ur.check_units(mapped_only, ["X"])["problems"], [])
         finally:
             ur.link_symbol_index = saved_index
         expect("no cache written for a candidate-free batch",
