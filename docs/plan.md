@@ -67,8 +67,8 @@ The campaign is not one loop; it is four phases with different economics, and co
 | attributed | **295 functions in 19 registered units** (19 configured, 13 584 split objects) |
 | closed | **284 ≥ 80 %** (objdiff counts **217 matched**), 65 128 of 5 437 392 `.text` bytes (1.2 %) |
 | unclaimed (proposal backlog, §1) | **20 224 functions** |
-| per module | `Runtime.PPCEABI.H` 19 of 20 symbols at 100 % (`__register_fragment` 93.68 %); `Pl` 3 units, 150+ of 189 closed (`pl_master` 99.99 %, `pl_skill` 96.07 %, `pl_act` 93.75 %); `main.cpp` 47 functions, 37 at 100 %; `sys_mem.cpp` complete; `auto/80040598_fn_80040598` 97.19 %; `Camellia` 99.97 % and `RSO` 99.71 % (both with named residuals), `g3d`, `OS`, `Network` at 100 % |
-| flags landed | `cflags_main` (`-O3 -inline noauto`), `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`), `cflags_ppceabi` (`cflags_runtime` + `-func_align 4`) — each with its instruction-level evidence in `configure.py` |
+| per module | `Runtime.PPCEABI.H` 19 of 20 symbols at 100 % (`__register_fragment` 93.68 %); `Pl` 3 units, 150+ of 189 closed (`pl_master` 99.99 %, `pl_skill` 96.07 %, `pl_act` 93.75 %); `main.cpp` 47 functions, 37 at 100 %; `sys_mem.cpp` complete; the `auto/` unit `80040598_fn_80040598` 97.19 % (its home is now `src/fn_80040598.cpp`, §12); `Camellia` 99.97 % and `RSO` 99.71 % (both with named residuals), `g3d`, `OS`, `Network` at 100 % |
+| flags landed | `cflags_main` (`-O3 -inline noauto`), `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`), `cflags_ppceabi` (`cflags_runtime` + `-func_align 4`) — each with its instruction-level evidence in `configure.py`. **The flag *set* is under audit (2026-09-28) and this plan asserts no default set**: see §8.2 and `.pi/notes/flags-audit-645d.md` |
 | tooling that exists | `ledger.py`, `attribute.py` (+ selftest), `symbolpreflight.py`, `tudiscover.py`, `dump_asm.py`, `m2cinput.py` (+ selftest), `symedit.py`, `symdiff.py`, `mt.py`, `prepcommit.py`, `localonly.py`, `tools/m2c` (submodule) - plus the **analysis tier** a residual leads to: `tools/mwcc-debugger/` (the compiler's own IR - the PCode after each optimizer pass, gated by `locate/verify_pcode.py`), `tools/mwlink_debugger.py` (the linker's own run: `trace`/`diagnose`/`verify`/`align`/`order`, the link step is **Wii/1.0**), `tools/units/callers.py` (who calls this / who reads this, whole-DOL and address-keyed) and `tools/units/flipcheck.py` (is this object flip-ready) |
 
 Everything above is *derived*, never remembered: `python tools/units/ledger.py` reads `symbols.txt` (through
@@ -104,11 +104,14 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 2. **Cap a registration batch at 0.5 MB of `.text`** (owner's call) — it binds the *attribution* pass, where one
    command can claim a whole region. Until `attribute.py` grows `--max-total-bytes` (§7.14) the cap is enforced
    with `--limit N`, using the byte total `attribute.py plan` prints.
-3. **Twelve workers to one orchestrator** (owner's call, raised from four on 2026-09-23). What the cap bounds is
-   *coordination*, not CPU: the shared resource is the build tree, and only the orchestrator ever runs
-   `configure.py`/`ninja`/the link (§5.1), while a worker measures its own object with `recompile.py` (no ninja)
-   inside its own worktree. Twelve no-build workers therefore contend for nothing but the provider, which is why
-   the cap can be this high; a round that needs builds still serialises behind the orchestrator.
+3. **A round is the pool's six slots wide** (the 2026-09-23 decision raised the *coordination* cap from four
+   to twelve; the cap that binds today is the environment, and the environment is a slot). A lane's tree is a
+   reusable slot (§5.1), the pool has **six**, and `queue.py next` refuses while all six are taken - naming the
+   holders - instead of constructing a seventh. What that cap bounds is *coordination*, not CPU: the shared
+   resource is the build tree, and only the orchestrator ever runs `configure.py`/`ninja`/the link (§5.1),
+   while a worker measures its own object with `recompile.py` (no ninja) inside its own slot. No-build workers
+   therefore contend for nothing but the provider, which is why the cap can be this high; a round that needs
+   builds still serialises behind the orchestrator.
    what it lacks without §5 is an interface. My verification time, not the machine's, is the scarce resource.
 4. **Renames, phantom merges and range claims ride the same batch** as the source work, because each is a split
    dirty-check input. `symedit.py rename-batch <file>` collects renames; verify every renamed symbol *after* the
@@ -149,7 +152,8 @@ It is the *librarian* of the compounding asset (§9), not the fastest decompiler
 
 ## 5. The coordinator protocol (worktrees, branches, briefs, outbox)
 
-Workers are separate processes in a tmux window (max 4). They inherit nothing from my context and I inherit
+Workers are separate processes, each in an environment from the **six-slot pool** (`tools/units/slots.py`); the
+pool is the concurrency cap, not a tmux window's width (§5.1). They inherit nothing from my context and I inherit
 nothing from theirs, so **everything that used to be a prompt or a habit becomes a file with a format.**
 
 ### 5.1 The worktree layer — the branch *is* the claim
@@ -179,6 +183,10 @@ git commit --amend -am "Pl/pl_act: fn_8027C208 body"   # ONE commit per unit, on
 git cherry-pick --no-commit worker/pl-act-13   # or <merge-base>..worker/pl-act-13 if it left several
 python tools/units/land.py verify              # split + link + ok + regressions + ledger + delta
 git commit -F .git/land_msg.txt                # only after verify passes; --abort otherwise
+
+# ... or the same sequence as one command - record-base, apply the branch with the registration union,
+# gate, commit and release - which is the landing path when the branch is whole:
+python tools/units/land.py land --branch worker/pl-act-13
 
 # orchestrator: the teardown RETURNS the slot (it is never removed); the branch still goes
 python tools/units/claims.py release Pl/pl_act # slot back to main's tip, branch deleted, warm trees kept
@@ -382,7 +390,7 @@ information, late.
 | a merge conflict | `git cherry-pick` stops | protocol violation: resolve, re-measure, record |
 | a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never let a worker silently compile nothing |
 | the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse than `main` → drop the branch and re-brief; better → merge, record the residual in the header, mark the unit `partial` in the ledger |
-| `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
+| `main` moved while the worker ran | the cherry-pick conflicts, the worker's base is old, or `land.py` refuses to union the batch's header | the worker runs **`tools/units/mergebranch.py resolve` inside its own worktree** - main is merged into the held branch there, resolved by class, proven and committed, so the lane keeps working and one branch still lands - and the orchestrator re-measures after the apply regardless. The by-hand dance is no longer the path: `git apply --3way` refuses as soon as the working tree differs from the index, and inferring "already resolved" from the absence of markers once skipped a file left from main and silently dropped **157 header lines and a registration** |
 | a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live pane is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: `herdr pane close <pane>`, then `claims.py release <unit>` - and if that pane is the owner's, ask first, because a stale claim blocks the unit rather than losing anything. A **slot** claim never removes the directory anyway: release detaches the slot at main's tip, deletes the branch and clears the lock |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
@@ -395,13 +403,13 @@ them are **project** profiles, tracked in `.agents/agents/`; the rest are the gl
 | --- | --- | --- |
 | **`decompiler`** | unit work: register a proposal range at its final `src/<module>/<name>.<ext>` home, reconstruct its bodies, measure, commit on its branch | **the default lane** - a proposal or a body-completion lane. `queue.py next` emits `agent: "decompiler"` |
 | **`fixer`** | a *refused gate*: a measured regression, a lint failure, a claim or branch that must be repaired | a `land.py verify` refusal, a `ninja changes` regression, a stale claim |
-| **`merger`** | a *refused apply*: two lanes' divergent views of one record/type/header, a fold | `applybranch.sh` / `git apply` refusing a branch, the `recordmerge.py` class |
+| **`merger`** | a *refused apply*: two lanes' divergent views of one record/type/header, a fold | `tools/units/mergebranch.py resolve` when main has moved under a held branch (run it in the lane's own worktree - it resolves by class: the map by **row replacement**, `src/**` by whichever side carries the other's work, band headers by a union plus the rule-2 address sweep), `land.py land --branch <b>` when a branch is whole and ready to land, and the `recordmerge.py` class for the record shapes. By hand only when the tool refuses |
 | **`codereviewer`** | a *style/convention review* of decompiled code: the match claim's honesty, naming (rule 7), placement (rule 2), types (rules 3-6/9/11), comments, codegen-adjacent hygiene. Read-only by construction - its tool list has no `write`/`edit` - and it reports ranked, evidence-backed findings instead of diffs | after a module's pass, before a flip campaign, or when a band's debt needs a scope statement |
 | `worker` | the generic lane: anything that is none of the above | the fallback, and the only profile the older rounds used |
 | `scout`, `planner`, `reviewer` | read-only recon, planning, independent review | before a batch, or when a plan/review is the deliverable |
 
 ```sh
-python tools/units/queue.py next --count 8            # agent: "decompiler" for every proposal lane
+python tools/units/queue.py next --count 6            # the pool's size; agent: "decompiler" for every proposal lane
 python tools/units/queue.py next --profile fixer      # a repair lane
 ```
 
@@ -874,6 +882,20 @@ delete a map symbol unless nothing else depends on it. Never rewrite history, ne
 three units, independently measured). Evidence lives in a comment next to the flag in `configure.py`. Every flag
 change is re-measured across the whole lib (function alignment moves every symbol after the first).
 
+**A flags audit is in flight (2026-09-28), and this policy is what it measures - the plan asserts no default
+set.** The owner's hypothesis is that the per-file codegen pragmas in `src/` are a *symptom* of a mis-set lib
+default, so a standard default set should fall out of the units that already match; that is **being measured,
+not decided**. Its report is `.pi/notes/flags-audit-645d.md` (an unlanded lane when this was written): measured
+end-to-end on **`Network`** and **`lobby`**, whose lib default (`cflags_base`'s `-Cpp_exceptions off`)
+disagrees with 7/7 and 19/20 of their own targets; **probed and rejected** for `Runtime.PPCEABI.H`, whose probe
+moved `main.dol`; and `-Cpp_exceptions off` is *correct* for the SDK/runtime libs, whose matching units carry
+no `extab`. The honest reading today is that only **`#pragma exceptions`** is a candidate for a lib default:
+`#pragma peephole off` and `#pragma fp_contract off` are deliberate per-file levers with their own playbook
+rows (39 and 40), and their lib-wide alternatives are already registered backlog items. Census in this tree,
+measured 2026-09-28: **24** files carry `#pragma exceptions`, **148** `#pragma peephole`, **31**
+`#pragma fp_contract` (the audit's own starting census was 24 / 147 / 31). The default set is the audit's
+*output*, not this plan's premise.
+
 **8.3 Seam policy.** A boundary may be claimed only from `tudiscover`'s evidence kinds. Anything else — a shared
 static, a call pattern — is a *hint* for the unit header. An unproven seam is allowed (the extent settles as its
 functions match) and its header says so.
@@ -1217,8 +1239,11 @@ stub -> later promotion to a real name and location) touched every unit twice an
   brief pool follow the unit to its real path.
 * **The object must stay byte-identical** across a move or rename - a name and a path change no instructions, so
   any byte difference is a bug in the move, not a matching change. Verify it, do not assume it.
-* **The units already under `src/auto/` are migrated, not re-registered.** Each moves to its final home as it is
-  worked (one re-split per batch); §1 clause (1) counts it as a placeholder until it moves.
+* **There is no `src/auto/` left to migrate.** Measured 2026-09-28: the directory does not exist in the tree
+  (the 36-unit promotion landed), so §1 clause (1)'s "no `auto/*` placeholder unit remains" is already
+  satisfied and no bullet here has to schedule a move. A unit that still drifts under a placeholder path is a
+  defect to fix **in place** - rename, extension and `-lang` in one change, one re-split - never a second
+  registration.
 
 ### A branch is never the only copy of work (2026-09-23)
 

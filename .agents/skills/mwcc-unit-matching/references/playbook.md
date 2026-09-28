@@ -610,6 +610,29 @@ It is also *the* reason to force a re-split when testing a claim - `rm build/RMH
 claim edit that never re-runs the split links the old object and reports a false green (that cost two bisect
 rounds here: `ninja`'s "no work to do" was not proof the claim had been applied). Section 58 refines this for a compiler-synthesised pool entry: the claim links only while your unit is the sole referencer of the address.
 
+**Refinement (2026-09-28) - `.sdata2` is MERGED across objects, so a shared pool label is not an owner
+signal; and the asm dump is stale, so resolve by address.** Two corrections, both measured on the arena-task
+lane (`worker/arena-task-92fd`, `.pi/notes/arena-task-92fd.md`):
+
+* **MWLD merges identical `.sdata2` constants across objects.** Of **7245** `.sdata2` labels, **640 are cited
+  by more than one registered unit** - e.g. 0x8079C520 (`50.0f`), 0x8079C524 (`60.0f`) and 0x8079C528 (the
+  int->double magic `0x4330000080000000`) are each cited by `menu/arena_result` **and** `quest/quest_entry`
+  **and** `enemy/em_pop`, and 0x8079A3B8 (the same magic) by `Pl/fn_80295EF4` and `menu/menu_item`. So a
+  `.sdata2` **label pair is not evidence of a common TU or of one owner** - the tool's `.sdata2` evidence
+  class is invalid for this project (its only "strong" cuts in the arena band rest on exactly such a pair),
+  and the `.sdata2` referrer-run seam test needs the caveat. `.data`/`.sdata` sharing is *not* affected:
+  **12 of 2193** `.sdata` and **82 of 11208** `.data` labels are multi-cited, and all of those are plausible
+  genuine globals. And Dolphin's `.map` local-symbol prefixes (`_80444a34s_a_hou_back1_80607220`) are
+  **noise, not an owner signal**: the prefix is neither the referrer nor the owner
+  (`_802a22a4s_menu_item.cpp_805cdfc8` is referenced from `fn_802A5444`/`fn_802A579C`/`fn_802A64B0`).
+* **`build/RMHE08/asm/` is stale relative to the map.** A `bl` whose callee has since been renamed still
+  prints the *old* label, so `grep` for the new name finds nothing and a hand search over the 89 MB dump
+  answers wrongly. Resolve a callee by **address** (asm label -> address -> the current `symbols.txt` row),
+  and use **`tools/units/callers.py <address|name>`** for "who calls / who reads this" - it is
+  **address-keyed**, rebuilt from the current map, cached in `build/tmp/callers/graph.json`, ~1.3 s a query
+  over 245 258 references / 54 256 target addresses, with 117 selftest checks (roadmap 7.34). What it
+  replaces is exactly the hand grep this row's referrer test used to assume.
+
 
 ## 24. Merging a probe into the unit is its own step
 
@@ -1498,6 +1521,33 @@ the `extern`-only count above, and it is the same semantics the `extern` shape a
 prototype is simply how the foreign declarations were actually written (e.g. `include/Network/fn_8041A87C.h`'s
 `u16 DWCi_htons(u16 port);`, owned by `src/DWCi/fn_805113B0.c`). The breadth is deliberate; what is no longer
 true is the earlier implication that a `src/`-file `extern` is the only shape rule 2 sees.
+
+**Refined (2026-09-28) - one owner does not always mean one DECLARATION, and a rename's sweep has a third
+place.** Two additions from the DWCi band (`.pi/notes/dwci-band-9050.md`, `.pi/notes/loop-dwci-phase2.md`):
+
+* **A shared data symbol whose consumers relocate it differently cannot have one declaration - the sizedness
+  IS a codegen input.** `natNegMessageMagic` (`.sdata` 0x80794380, the six signature bytes `FD FC 1E 66 6A
+  B2`) is referenced from two objects and they disagree on the *form*: the negotiator's relocates it `SDA21`,
+  while `Network/fn_8041A87C.cpp`'s relocates it `ADDR16_HA`/`ADDR16_LO`. A declared size selects the SDA
+  form and an unknown size the absolute one (row 64), so **one declaration cannot serve both objects**. Each
+  band header therefore carries the spelling *its* object needs - sized in `include/DWCi/DWCi_NatNeg.h`,
+  unsized in `include/unsplit/Network.h` (which also carries a class, so a plain `.c` cannot include it) - and
+  **each calls out why the other spelling is wrong for it**. Rule 1 still wants one *definition* where there
+  is one; this is the declaration half, where "one owner" and "one spelling" are not the same statement
+  (row 60 is the general form: the declaration set is part of the codegen).
+* **A rename's sweep has a third place.** A rename is "map + every referrer", and `symedit.py refs` roots at
+  `src/` + `include/`. The DWCi band's renames left **44 stale names in `tools/units/attribution-queue.json`**
+  plus one stale example in `tools/splits/tudiscover.py:666` (measured: `git grep -w fn_805087A0` -> the
+  queue row only, 0 hits in `src/`/`include/`, and `symedit.py find` confirms the map rows are gone). The
+  queue is a **regenerable cache** whose own fingerprints already prove it stale on three of four inputs, so
+  a hand sweep would fix the strings and leave the fingerprints lying about freshness - the honest repair is
+  to **record the scope where the next rename reads it** (`.agents/skills/symbol-map-editing/SKILL.md` rule 2
+  now states the real roots and names the queue; its old "source, docs, tools" claim was false). Worth
+  stating too: **`rename` is not one of `backlog.py`'s kinds**, so a rename filed in an outbox is picked up
+  by nothing. Rule 2 judges each declaration by the **ownership of the address** it resolves to
+  (`Ownership.resolve`: name -> `symbols.txt` address -> the `splits.txt` range covering it), so a half-done
+  rename leaves both spellings visible to `--diff`, and finishing a rename the base already made moves the
+  finding rather than adding one.
 ## 48. Never append `, ...` to a definition to dodge an argument-count mismatch
 
 **Problem.** A retired object calls a function through a declaration with more arguments than the source
@@ -2304,3 +2354,71 @@ The `.sdata` half is safe (row 23); the `.sdata2` half is only safe while our ob
 own - if it does, the pool words stay declared `extern` and the run is left to its auto unit (row 58), and
 the header records why. Either way the finding is closed the same way: the declaration is no longer the
 answer, the claim is.
+
+## 71. The condition's POLARITY decides the exit - a ternary merges arms where `if/else` does not
+
+**Problem.** A function whose logic and instruction set are right still misses by a register shuffle and an
+exit: the two arms do not merge, an early return arrives as a `beq`+`b` pair where retail has one `bne`, or a
+`memcmp` test arrives as `cmpwi`/`bne` where retail materialises a boolean with `cntlzw`/`srwi.`. It reads as
+an allocator problem because every later register and offset shifts with the branch.
+
+**Why try it.** All four spellings are *condition-polarity* choices, each measured on the DWCi band
+(`.pi/notes/dwci-band-9050.md`, the lane's Header section):
+
+* a **ternary** is what makes MWCC merge two arms: `ok = cond ? f(...) : 0` produced retail's `cmpwi r3,0` /
+  `mr r30,r3` / `bne`, where the equivalent `if/else` produced a different merge;
+* **one `if (ok == 0) { ... }` block plus a trailing `return ok`** gives retail's single `bne` exit, where
+  `if (ok != 0) return ok;` gives a `beq`+`b` pair;
+* an **assigned boolean** - `s32 same = (memcmp(...) == 0); if (same)` - is the only spelling that yields the
+  target's boolean materialisation (`cntlzw`/`srwi.`); both `if (memcmp(...) == 0)` and `if (!memcmp(...))`
+  give `cmpwi`;
+* **argument arm order** is visible the same way: the host callback is `f(13, value, 0)`, not
+  `f(13, 0, value)`.
+
+**Result.** `DWCi_natNegTickIdleSockets` 87.89 -> **92.59** (the ternary alone), -> **96.55** with the
+`if (ok == 0)` + trailing-return spelling; `DWCi_npSetValueEx` 98.57 -> **100.00** from the argument order
+alone.
+
+**Example.**
+
+```c
+/* three spellings of one test, three different exits */
+ok = cond ? send(...) : 0;      /* cmpwi/mr/bne - the merged arm */
+if (ok == 0) { ... }            /* ... plus one trailing `return ok` -> a single bne exit */
+return ok;                      /* `if (ok != 0) return ok;` would give beq + b */
+
+s32 same = (memcmp(a, b, n) == 0);   /* cntlzw / srwi. */
+if (same) { ... }                    /* `if (memcmp(...) == 0)` gives cmpwi/bne */
+```
+
+## 72. The declared SHAPE is a codegen input: a struct's exact size, an index's signedness, and arity
+
+**Problem.** Three residuals no statement order and no flag moves: MWCC peels a word off a copy because a
+reconstructed struct's `sizeof` is not the size the target's copy used; a loop test reads `cmplw` where retail
+has `cmpw`; a call site's register shuffle is wrong although the callee's body matches.
+
+**Why try it.** Each is one declaration away from the target's own codegen, all measured on the DWCi band
+(`.pi/notes/dwci-band-9050.md`):
+
+* **A struct's exact size is codegen.** The session copy needs `sizeof == 0xD8`; with any other size MWCC
+  peels a word from the copy. Rule 3 asks for the size *annotation* - this is why the exact number matters
+  and why an approximation marked as one still costs rows.
+* **An `s32` loop index selects `cmpw`, not `cmplw`**, for `i < listCount(...)`. (Row 35's `s32` locals for
+  equality tests are the same lever at `cmpwi`.)
+* **Arity is visible at the call site.** `DWCi_initRuntime` takes **six** arguments, and only a six-argument
+  declaration reproduces retail's `mr r7,r4` / `mr r8,r5` shuffle. Rows 57 and 66 are the neighbouring cases;
+  this one names the callee's *count* rather than its width.
+
+**Result.** The `sizeof` fix took the session copy to **98.48**; the `s32` index took
+`DWCi_NatNegEndSession` 83.42 -> **84.70**; the arity took `DWCi_npSetup` 96.29 -> **99.68**. All three are
+one-line source changes, and none of them is reachable from the diff alone.
+
+**Example.**
+
+```c
+struct SessionCopy { /* size: 0xD8 */ ... };    /* not 0xD4: MWCC peels a word off the copy */
+
+for (s32 i = 0; i < listCount(w); i++)          /* cmpw; a u32 i gives cmplw */
+
+void DWCi_initRuntime(a, b, c, d, e, f);        /* SIX parameters - the call site proves the count */
+```
