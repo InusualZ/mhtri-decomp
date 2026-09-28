@@ -145,7 +145,12 @@ extern void* lbl_80794CE4;
 extern const char lbl_80793990[3];
 extern u32 lbl_80793994;
 extern const char lbl_80793998[4];
-extern const u8 lbl_80794380[];
+/* 0x80794380 `natNegMessageMagic` - the NATNEG message signature this unit compares the head of a
+ * received datagram against - is deliberately *not* declared here: the bytes belong to the NATNEG
+ * unit, so rule 2 puts the declaration in `include/DWCi/DWCi_NatNeg.h` (included above), and that
+ * is the *unsized* spelling this unit needs.  It addresses the symbol with `lis`/`addi`
+ * (ADDR16_HA/LO, the target's relocation kind), while the owner's own source re-declares it sized
+ * for the SDA21 form its ten sites use (playbook row 12 - the reloc kind is a codegen input). */
 
 /* the range's own string pool */
 extern const char lbl_80603154[];

@@ -29,7 +29,8 @@
  * helpers it *calls* that no registered unit owns (`DWCi_list*`, `DWCi_table*`, `DWCi_socket*`,
  * `DWCi_malloc`/`free`, `DWCi_buffer*`, `DWCi_request*`, `DWCi_platform*`, `DWCi_getTick`, and the
  * two SO address helpers) and the 7 band data objects are named from this file's own call sites and
- * are declared in `include/unsplit/DWCi.h` / `include/unsplit/SO.h`.  Every one of those is a GUESS
+ * are declared in `include/unsplit/DWCi.h` / `include/unsplit/SO.h` - except the address ring, which
+ * the NATNEG unit's header owns (`include/DWCi/DWCi_NatNeg.h`, rule 2).  Every one of those is a GUESS
  * and a marker for a later reconstruction to confirm - only the argument/return shapes at the call
  * sites, not a recovered SDK spelling, back them.
  *
@@ -106,15 +107,6 @@
 typedef struct DWCiConn DWCiConn; /* size: 0x4C */
 typedef struct DWCiReq DWCiReq;   /* size: 0xA0 */
 typedef struct DWCiXfer DWCiXfer; /* one transfer record handed to DWCi_appendTransfer */
-
-/* The address record the transport hands to the socket wrappers: one length byte, one family byte,
- * the network-order port and the network-order address (the same 8 bytes `bind`/`connect` take). */
-typedef struct DWCiSockAddrIn {
-    /* +0x00 */ u8 len;
-    /* +0x01 */ u8 family;
-    /* +0x02 */ u16 port;
-    /* +0x04 */ u32 addr;
-} DWCiSockAddrIn; /* size: 0x08 */
 
 /* The `{ addr, port }` key the connection's request table hashes and compares on.  The table API
  * takes the key *indirectly* (a `DWCiAddrKey**`): DWCi_requestTableHash/DWCi_requestTableCompare dereference their first
@@ -196,8 +188,9 @@ struct DWCiXfer {
 /* --------------------------------------------------------------------------------------------- */
 /* The band data this unit loads.  It is owned by nobody and the registered ranges bracketing it   */
 /* name different modules, so it is declared in `include/unsplit/DWCi.h` (rule 2) and never        */
-/* defined here (playbook 29).  The private records those declarations reach stay below, next to   */
-/* the code that uses them.                                                                       */
+/* defined here (playbook 29) - apart from `DWCi_addressRing`, which the NATNEG unit's `.bss` run   */
+/* covers and whose declaration therefore lives in `include/DWCi/DWCi_NatNeg.h`.  The private       */
+/* records those declarations reach stay below, next to the code that uses them.                   */
 /* --------------------------------------------------------------------------------------------- */
 
 /* The character-class record DWCi_parseAddress validates the port digits against: a header whose +0x38
