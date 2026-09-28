@@ -26,6 +26,7 @@ import difflib
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -35,6 +36,7 @@ END = "<!-- LOCAL-ONLY-END -->"
 DEFAULT_FILE = "AGENTS.md"
 DEFAULT_STATE = ".pi/local-only.state.json"
 ANCHOR = 240
+BACKUP_KEEP = 5
 
 
 def sha1(data):
@@ -51,6 +53,64 @@ def write(path, text):
     with open(tmp, "w", encoding="utf-8", newline="") as fh:
         fh.write(text)
     os.replace(tmp, path)
+
+
+def backup_path(state, when=None):
+    """The timestamped backup path for a state file.
+
+    The stamp is the pull's own clock, formatted so a plain name sort is a time sort - which is what
+    `newest_backup` and `prune_backups` rely on instead of stat calls.
+    """
+    when = when or datetime.datetime.now()
+    return "%s.bak-%s" % (state, when.strftime("%Y%m%d-%H%M%S"))
+
+
+def list_backups(state):
+    """Every backup of `state`, oldest first.  The state file itself is not a backup."""
+    directory = os.path.dirname(state) or "."
+    if not os.path.isdir(directory):
+        return []
+    prefix = os.path.basename(state) + ".bak-"
+    return sorted(os.path.join(directory, n) for n in os.listdir(directory) if n.startswith(prefix))
+
+
+def newest_backup(state):
+    backups = list_backups(state)
+    return backups[-1] if backups else None
+
+
+def prune_backups(state, keep=BACKUP_KEEP):
+    """Drop all but the newest `keep` backups and return the paths removed.
+
+    A pull is the moment the block's only copy moves into the state file, so the snapshot it leaves
+    has to survive a mistake - but an unbounded pile of 100 KB snapshots is its own problem.
+    """
+    backups = list_backups(state)
+    removed = []
+    for path in (backups[:-keep] if keep else backups):
+        try:
+            os.remove(path)
+            removed.append(path)
+        except OSError:
+            pass
+    return removed
+
+
+def no_state_message(state):
+    """The refusal `push` gives when the state file is gone: name the newest backup, with its age.
+
+    A backup is a *snapshot*, not the live block, so the message says when it was taken and tells the
+    reader to check it - restoring a stale block silently would be worse than the missing file.
+    """
+    newest = newest_backup(state)
+    if not newest:
+        return ("refusing: no state file at %s - nothing to push back, and no backup of it either"
+                % state)
+    taken = datetime.datetime.fromtimestamp(os.path.getmtime(newest)).isoformat(timespec="seconds")
+    return ("refusing: no state file at %s - nothing to push back.  The newest backup is %s (%s); "
+            "restore it with `python tools/agents/localonly.py --state %s push` - but read it first, "
+            "a backup is a snapshot and may predate your latest edits to the section."
+            % (state, newest, taken, newest))
 
 
 def find_block(text):
@@ -130,10 +190,15 @@ def cmd_pull(a):
     os.makedirs(os.path.dirname(a.state), exist_ok=True)
     with open(a.state, "w", encoding="utf-8") as fh:
         json.dump(state, fh, indent=1)
+    backup = backup_path(a.state)
+    shutil.copyfile(a.state, backup)
+    pruned = prune_backups(a.state)
     write(path, text[:i] + text[k:])
     notice_framing(a.file, text[:i] + text[k:])
     print("pulled %d lines (%d bytes) out of %s" % (state["block"].count("\n"), len(state["block"]), a.file))
     print("stored in %s" % os.path.relpath(a.state, REPO))
+    print("backed up to %s%s" % (os.path.relpath(backup, REPO),
+                                  " (%d older backup(s) pruned)" % len(pruned) if pruned else ""))
     print("now: git add %s && git commit ... && %s push" % (a.file, os.path.basename(__file__)))
     return 0
 
@@ -141,7 +206,7 @@ def cmd_pull(a):
 def cmd_push(a):
     path = os.path.join(REPO, a.file)
     if not os.path.exists(a.state):
-        raise SystemExit("refusing: no state file at %s - nothing to push back" % a.state)
+        raise SystemExit(no_state_message(a.state))
     with open(a.state, "r", encoding="utf-8") as fh:
         state = json.load(fh)
     text = read(path)
@@ -184,6 +249,13 @@ def cmd_status(a):
               % (os.path.relpath(a.state, REPO), state["block"].count("\n"), state.get("pulled_at", "?")))
     else:
         print("%s: nothing pulled" % os.path.relpath(a.state, REPO))
+    backups = list_backups(a.state)
+    if backups:
+        taken = datetime.datetime.fromtimestamp(os.path.getmtime(backups[-1])).isoformat(timespec="seconds")
+        print("%d backup(s) of the state file, newest %s (%s) - rule 8's only other copy of the section"
+              % (len(backups), os.path.relpath(backups[-1], REPO), taken))
+    else:
+        print("no backup of the state file - a pull will write one")
     return 0
 
 
@@ -200,12 +272,69 @@ def cmd_verify(a):
     return 0
 
 
+def selftest() -> int:
+    """Check the backup helpers on a temp directory.
+
+    Only the pure helpers are exercised: `pull`/`push` are bound to the real repository, and running
+    either here would strip the live section out of AGENTS.md.  The runner's tree-dirty guard is the
+    backstop for that, not this test.
+    """
+    import tempfile
+    fails, checks = [], 0
+
+    def check(name, got, want):
+        nonlocal checks
+        checks += 1
+        if got != want:
+            fails.append("%s: got %r want %r" % (name, got, want))
+
+    t0 = datetime.datetime(2026, 9, 27, 3, 4, 5)
+    with tempfile.TemporaryDirectory() as tmp:
+        state = os.path.join(tmp, "local-only.state.json")
+        check("no backups yet", list_backups(state), [])
+        check("no newest backup", newest_backup(state), None)
+        check("pruning with no backups is safe", prune_backups(state), [])
+        check("the backup name is the state path plus a sortable stamp",
+              os.path.basename(backup_path(state, t0)), "local-only.state.json.bak-20260927-030405")
+        for i in range(7):
+            open(backup_path(state, t0 + datetime.timedelta(seconds=i)), "w").write(str(i))
+        check("every backup is listed", len(list_backups(state)), 7)
+        check("the list is oldest first", os.path.basename(list_backups(state)[0]),
+              "local-only.state.json.bak-20260927-030405")
+        check("the newest backup is the latest stamp", os.path.basename(newest_backup(state)),
+              "local-only.state.json.bak-20260927-030411")
+        removed = prune_backups(state, keep=3)
+        check("pruning keeps the newest N", len(list_backups(state)), 3)
+        check("... and removes the oldest first", [os.path.basename(p) for p in removed],
+              ["local-only.state.json.bak-20260927-03040%d" % i for i in range(5, 9)])
+        check("... so the survivor is still the newest", os.path.basename(newest_backup(state)),
+              "local-only.state.json.bak-20260927-030411")
+        check("the state file itself is never listed as a backup",
+              open(state, "w").write("x") and len(list_backups(state)), 3)
+        check("prune keeps everything when nothing is over the limit", prune_backups(state, keep=9), [])
+        message = no_state_message(state)
+        check("the refusal names the newest backup", os.path.basename(newest_backup(state)) in message, True)
+        check("... and how to restore it", "--state" in message and "push" in message, True)
+        check("... and warns it is a snapshot", "snapshot" in message, True)
+    with tempfile.TemporaryDirectory() as tmp:
+        check("no backup at all is said plainly",
+              "no backup" in no_state_message(os.path.join(tmp, "gone.json")), True)
+    if fails:
+        print("FAIL (%d)" % len(fails))
+        for f in fails:
+            print("  " + f)
+        return 1
+    print("ok - %d checks" % checks)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--file", default=DEFAULT_FILE, help="file to edit (default %s)" % DEFAULT_FILE)
     ap.add_argument("--state", default=os.path.join(REPO, DEFAULT_STATE),
                     help="state file (default %s)" % DEFAULT_STATE)
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    ap.add_argument("--selftest", action="store_true", help="check this tool's own helpers")
+    sub = ap.add_subparsers(dest="cmd")
 
     p = sub.add_parser("pull", help="remove the section and store it")
     p.add_argument("--dry-run", action="store_true")
@@ -224,6 +353,11 @@ def main():
     p.set_defaults(func=cmd_verify)
 
     a = ap.parse_args()
+    if a.selftest:
+        sys.exit(selftest())
+    if not a.cmd:
+        ap.print_help()
+        sys.exit(0)
     sys.exit(a.func(a) or 0)
 
 

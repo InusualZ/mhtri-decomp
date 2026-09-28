@@ -2109,6 +2109,49 @@ def selftest() -> int:
           working is None or working.resolve("zzz_selftest_symbol"), None)
     check("an absent ref map falls back rather than dying", load_ownership_at_ref(".", ""), working)
 
+    # --- `--diff REF`: the ref the comparison actually uses ----------------------------------------
+    # `--diff main` in a branch whose main has moved must measure *this batch*, so a ref that is not an
+    # ancestor resolves to the merge base and says so. 2026-09-27: a lane diagnosed another lane's landing
+    # this way, and the orchestrator had to pass the merge base by hand three times in one night.
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as tmp:
+        def sgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=tmp, capture_output=True, check=True)
+
+        def rev(where: str = "HEAD") -> str:
+            return subprocess.run(["git", "rev-parse", where], cwd=tmp, capture_output=True,
+                                  text=True).stdout.strip()
+
+        sgit("init", "-q")
+        sgit("checkout", "-q", "-b", "main")
+        open(os.path.join(tmp, "a.txt"), "w").write("1\n")
+        sgit("add", "-A")
+        sgit("commit", "-q", "-m", "base")
+        cut = rev()
+        sgit("checkout", "-q", "-b", "lane")
+        open(os.path.join(tmp, "b.txt"), "w").write("2\n")
+        sgit("add", "-A")
+        sgit("commit", "-q", "-m", "the batch's own work")
+        sgit("checkout", "-q", "main")
+        open(os.path.join(tmp, "c.txt"), "w").write("3\n")
+        sgit("add", "-A")
+        sgit("commit", "-q", "-m", "another lane landed")
+        moved_main = rev()
+        sgit("checkout", "-q", "lane")
+        check("an ancestor ref is used exactly as given", _resolve_diff_ref(tmp, cut), cut)
+        check("... and so is HEAD", _resolve_diff_ref(tmp, "HEAD"), "HEAD")
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            resolved = _resolve_diff_ref(tmp, "main")
+        check("a ref that is not an ancestor resolves to the merge base", resolved, cut)
+        check("... not to the ref itself", resolved == moved_main, False)
+        check("... and the run says which base it used",
+              "merge base" in buf.getvalue() and cut[:12] in buf.getvalue(), True)
+        check("... so the gate's own ancestor base is silent",
+              _resolve_diff_ref(tmp, cut) == cut and buf.getvalue().count("merge base"), 1)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -2121,20 +2164,28 @@ def selftest() -> int:
 # --------------------------------------------------------------------------------------------------
 # cli
 # --------------------------------------------------------------------------------------------------
-def _warn_if_ref_not_ancestor(root: str, ref: str) -> None:
-    """`--diff REF` compares the working tree with REF, so when REF is not an ancestor of HEAD the diff also
+def _resolve_diff_ref(root: str, ref: str) -> str:
+    """The ref `--diff` actually compares against: REF when it is an ancestor of HEAD, else its merge base.
+
+    `--diff REF` compares the working tree with REF, so when REF is not an ancestor of HEAD the diff also
     contains whatever landed on REF after this branch was cut - which reads as *this* batch's regression.
-    Measured 2026-09-27: a lane spent a diagnosis on another lane's landing exactly this way. Warn without
-    changing the comparison: the land gate's semantics must stay "relative to the batch base".
+    Measured 2026-09-27: a lane spent a diagnosis on another lane's landing exactly this way, and the same
+    night the orchestrator had to be told `--diff <merge-base>` by hand three times. The merge base is the
+    only base that measures *this* batch, so it is selected automatically and named on stderr. The land gate
+    passes the batch base, which is an ancestor by construction, so its comparison is untouched.
     """
-    rc = subprocess.run(["git", "merge-base", "--is-ancestor", ref, "HEAD"],
-                        cwd=root, capture_output=True).returncode
-    if rc != 0:
-        base = subprocess.run(["git", "merge-base", ref, "HEAD"], cwd=root,
-                              capture_output=True, text=True).stdout.strip()
-        print("stylelint: warning: %s is not an ancestor of HEAD, so this diff includes changes that landed "
-              "after the branch was cut - they are not this batch's. If that is not what you meant, compare "
-              "against the merge base instead: --diff %s" % (ref, base[:12] or "HEAD"), file=sys.stderr)
+    if subprocess.run(["git", "merge-base", "--is-ancestor", ref, "HEAD"],
+                      cwd=root, capture_output=True).returncode == 0:
+        return ref
+    base = subprocess.run(["git", "merge-base", ref, "HEAD"], cwd=root,
+                          capture_output=True, text=True).stdout.strip()
+    if not base:
+        print("stylelint: warning: %s is not an ancestor of HEAD and has no merge base with it - comparing "
+              "against %s itself" % (ref, ref), file=sys.stderr)
+        return ref
+    print("stylelint: %s is not an ancestor of HEAD, so the comparison uses the merge base %s - only that "
+          "base measures this batch" % (ref, base[:12]), file=sys.stderr)
+    return base
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2154,7 +2205,7 @@ def main(argv: list[str] | None = None) -> int:
     ownership = load_ownership(root)
 
     if args.diff is not None:
-        _warn_if_ref_not_ancestor(root, args.diff)
+        args.diff = _resolve_diff_ref(root, args.diff)
         try:
             pairs = changed_src_files(root, args.diff)
             rels = [after for _before, after in pairs]
