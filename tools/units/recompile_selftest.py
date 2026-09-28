@@ -560,6 +560,62 @@ def proposal_rows() -> int:
     return failures
 
 
+def resolve_invocation_rows() -> int:
+    """The target must come from the tree the command was **run in**, not from MAIN - item B.
+
+    The filed double-take: a lane in a worktree that had re-split its range saw `--measure` read MAIN's
+    `build/RMHE08/obj/<unit>.o` (an older build the lane was not editing) and print a score it could not
+    trust. `rc.measure_target` searched MAIN only. `rc.resolve_target` now prefers the invocation's split
+    object, then MAIN's, then the retired `auto_*_text` fallback in main and then the worktree, and the
+    CLI prints `${target}  [kind]` so the tree is never ambiguous.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = _fake_main(tmp)
+        wt = os.path.join(tmp, "wt")
+        wt_obj = os.path.join(wt, "build", "RMHE08", "obj", "prop", "unit.o")
+        main_obj = os.path.join(main, "build", "RMHE08", "obj", "prop", "unit.o")
+        os.makedirs(os.path.dirname(wt_obj), exist_ok=True)
+        open(wt_obj, "wb").write(b"\x7fELF wt")            # a distinct copy of the same unit
+
+        path, kind, _note = rc.resolve_target(wt, main, "prop/unit", "fn_80002000")
+        failures = _ok("the worktree's own split object wins", os.path.normcase(path),
+                       os.path.normcase(wt_obj), failures)
+        failures = _ok("... and is labelled `worktree-split`", kind, "worktree-split", failures)
+        failures = _ok("... and is not MAIN's copy", os.path.normcase(path) != os.path.normcase(main_obj),
+                       True, failures)
+
+        path, kind, _note = rc.resolve_target(main, main, "prop/unit", "fn_80002000")
+        failures = _ok("run from MAIN the registered path is unchanged", os.path.normcase(path),
+                       os.path.normcase(main_obj), failures)
+        failures = _ok("... and is labelled `registered`", kind, "registered", failures)
+
+        # a proposal with no registered object falls back to the retired auto object
+        path, kind, _note = rc.resolve_target(wt, main, "prop/other", "fn_80002000")
+        failures = _ok("an unregistered unit falls back to `auto-fallback`", kind, "auto-fallback",
+                       failures)
+        failures = _ok("... to MAIN's retired single-symbol object", os.path.basename(path),
+                       "auto_fn_80002000_text.o", failures)
+
+        # MAIN without the retired object: the fallback must use the *invocation* tree's own copy
+        for rel in (("config", "RMHE08", "symbols.txt"), ("build", "RMHE08", "config.json")):
+            os.makedirs(os.path.join(wt, *rel[:-1]), exist_ok=True)
+            open(os.path.join(wt, *rel), "w", encoding="utf-8").write(
+                open(os.path.join(main, *rel), encoding="utf-8").read())
+        os.remove(os.path.join(main, "build", "RMHE08", "obj", "auto_fn_80002000_text.o"))
+        wt_auto = os.path.join(wt, "build", "RMHE08", "obj", "auto_fn_80002000_text.o")
+        os.makedirs(os.path.dirname(wt_auto), exist_ok=True)
+        open(wt_auto, "wb").write(b"\x7fELF wt-auto")
+        path, kind, _note = rc.resolve_target(wt, main, "prop/other", "fn_80002000")
+        failures = _ok("the worktree's retired object is used when MAIN has none",
+                       (os.path.normcase(path), kind), (os.path.normcase(wt_auto), "auto-fallback"),
+                       failures)
+
+        failures = _ok("target_rel is the same layout in both trees", rc.target_rel("prop/unit"),
+                       os.path.join("build", "RMHE08", "obj", "prop", "unit.o"), failures)
+    return failures
+
+
 def _raises(fn) -> bool:
     try:
         fn()
@@ -712,6 +768,7 @@ def main() -> int:
     failures += switch_rows()
     failures += staleness_rows()
     failures += proposal_rows()
+    failures += resolve_invocation_rows()
     failures += main_root_rows()
     failures += integration_rows()
     print(f"{'FAILED' if failures else 'passed'}: {failures} failure(s)")

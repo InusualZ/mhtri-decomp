@@ -22,7 +22,7 @@ What it does instead:
   path the official report uses** (`report generate` on a one-unit project), so the number equals
   `build/RMHE08/report.json`'s `fuzzy_match_percent` for the same object.
 
-    python tools/units/recompile.py <unit> [--measure <symbol>] [--json] [--dry-run] [--print-command]
+    python tools/units/recompile.py <unit> [--measure <symbol>] [--json] [--dry-run] [--selftest]
 
 The measurement trap this closes (`--measure` used to lie by ~0.36 points on `RSO/runtime`, which sent a
 worker chasing a regression that did not exist): objdiff-cli's explicit `diff` mode is **not** the
@@ -30,7 +30,9 @@ report's metric. Two differences compound - `diff` defaults `functionRelocDiffs`
 `report generate` defaults to `none` (so relocation-only differences count as mismatches), and even at the
 same setting the diff JSON's per-symbol `match_percent` is a different normalisation from the report's
 `fuzzy_match_percent`. `report generate` over a one-unit project is the only path that is the report by
-construction, and it costs ~0.04 s.
+construction, and it costs ~0.04 s. `--measure` calls the *same* `unitutil.report_measure` primitive
+`tools/units/measure.py` scores a whole unit with, so there is one implementation of the metric and the
+two fronts cannot drift.
 
 **A proposal unit measures too** (AGENTS.md, "the proposal-unit measurement gap"). A worker registers a
 fresh proposal in its own worktree first (`configure.py` + `splits.txt`, per the brief) and MAIN has
@@ -43,13 +45,16 @@ and neither MAIN's config nor the worktree is written:
 generated one), or - last - a registered sibling in the *same `config.libs` block* of the worktree's
 `configure.py`, with only the source, the `-o` directory and the `-lang` token pointed at this unit.
 Those are the flags `project.py` emits for that lib, not a hand-rolled approximation;
-* the **target object** is MAIN's retired `auto_*_text.o` that owns the symbol's address - the same
-original bytes the split will put in the registered object (`auto_<symbol[:20]>_text.o` for a single
-symbol, else the `auto_<nn>_<address>_text` run that covers it).
+* the **target object** is resolved from the invocation's own tree outward (`resolve_target`): the
+worktree's split object first, then MAIN's, then the retired `auto_*_text.o` that owns the symbol's address
+in whichever tree has it - the same original bytes the split will put in the registered object
+(`auto_<symbol[:20]>_text.o` for a single symbol, else the `auto_<nn>_<address>_text` run that covers it).
 
-The score is still `report generate`'s `fuzzy_match_percent`, and the output names the target object and
-says `[fallback]`, so a worker can tell a real measurement from one against the retired split. A
-*registered* unit takes exactly the path it took before (MAIN's rule, MAIN's object, same output).
+A registered unit run from MAIN takes exactly the path it took before (MAIN's rule, MAIN's object). A unit
+run from a worktree that has its own copy - the filed double-take - takes **that** copy, and the CLI prints
+the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[auto-fallback]`), so a
+measurement is never ambiguous about which tree it came from. The score is still `report generate`'s
+`fuzzy_match_percent`.
 
 `<unit>` is the path from the repository root, e.g. `Pl/pl_act`, `main.cpp`, `auto/80040598_fn_80040598`.
 """
@@ -451,56 +456,44 @@ def section_sizes(obj: str) -> dict:
     return {s["sname"]: s["size"] for s in secs if s.get("sname") and s.get("size")}
 
 
-MIN_PROJECT_VERSION = "2.0.0-beta.5"
+MIN_PROJECT_VERSION = unitutil.MIN_PROJECT_VERSION
 
 
-def measure_project(target: str, base: str, unit: str, tmpdir: str) -> tuple[str, str]:
-    """Write a one-unit objdiff project pointing at the two objects; return (project dir, config path).
+def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
+            unit: str = None, runner=subprocess.run) -> dict:
+    """The official score for one symbol, plus the instruction-level rows behind it.
 
-    `report generate` resolves `target_path`/`base_path` against the project directory, and on Windows it
-    only treats a **backslash**-rooted path as absolute (`C:/...` is joined and mangled into `C:...`), so
-    the paths are absolutised with `os.path.abspath` - which yields exactly that shape on Windows and a
-    plain absolute path elsewhere.
+    The score comes from `unitutil.report_measure`, i.e. `report generate` over a one-unit project - the
+    SAME primitive `measure.py` scores a whole unit with (`unitutil.report_functions`) and the number
+    `build/RMHE08/report.json`, `ledger.py` and `land.py` carry. There used to be a second copy of that
+    project/report code here; deleting it is what makes `--measure` a single way to measure rather than a
+    parallel implementation that can drift (the drift that once printed ~0.36 pt low on `RSO/runtime`).
+
+    `match_percent` is deliberately the **report** metric (`fuzzy_match_percent`), so any existing consumer
+    that reads `measure().match_percent` gets the number that closes a symbol. The positional objdiff value
+    is kept as `diff_match_percent`; it is diagnostic only.
     """
-    proj = os.path.join(tmpdir, "measure_project")
-    os.makedirs(proj, exist_ok=True)
-    cfg_path = os.path.join(proj, "objdiff.json")
-    config = {
-        "min_version": MIN_PROJECT_VERSION,
-        "units": [{
-            "name": unit or "measure",
-            "target_path": os.path.abspath(target),
-            "base_path": os.path.abspath(base),
-        }],
-    }
-    with open(cfg_path, "w", encoding="utf-8") as fh:
-        json.dump(config, fh, indent=2)
-    return proj, cfg_path
-
-
-def report_measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
-                   unit: str = None, runner=subprocess.run) -> dict:
-    """Score one symbol with `report generate` - the exact path behind build/RMHE08/report.json.
-
-    The returned `fuzzy_match_percent` is the official metric: `ledger.py`, `brief.py` and `land.py` all
-    read it from the project report, so a worker must not be handed anything else.
-    """
-    os.makedirs(tmpdir, exist_ok=True)
-    proj, _cfg = measure_project(target, base, unit, tmpdir)
-    out = os.path.join(tmpdir, "recompile_report_%s.json" % re.sub(r"\W", "_", symbol))
-    p = runner([objdiff, "report", "generate", "-p", proj, "-o", out],
-               capture_output=True, text=True, errors="replace")
-    if p.returncode != 0 or not os.path.exists(out):
-        return {"symbol": symbol, "error": (p.stdout or "") + (p.stderr or "")}
-    data = json.loads(open(out, encoding="utf-8").read())
-    units = data.get("units") or []
-    functions = (units[0].get("functions") if units else []) or []
-    fn = next((f for f in functions if f.get("name") == symbol), None)
-    if fn is None:
-        return {"symbol": symbol,
-                "error": "symbol is not in the target object (renamed? not in this unit?)"}
-    return {"symbol": symbol, "fuzzy_match_percent": fn.get("fuzzy_match_percent"),
-            "target_size": fn.get("size"), "report_json": out}
+    previous = unitutil.OBJDIFF
+    unitutil.OBJDIFF = objdiff
+    try:
+        result = unitutil.report_measure(target, base, symbol, unit_name=unit, tmpdir=tmpdir,
+                                         runner=runner)
+    finally:
+        unitutil.OBJDIFF = previous
+    if "error" in result:
+        return result
+    rows = diff_rows(target, base, symbol, objdiff, tmpdir, runner=runner)
+    if "error" in rows:
+        # the score stands on its own; only the row detail is unavailable
+        result["rows_error"] = rows["error"]
+        return result
+    result["diff_match_percent"] = rows.get("diff_match_percent")
+    if result.get("target_size") is None:
+        result["target_size"] = rows.get("target_size")
+    result["candidate_size"] = rows.get("candidate_size")
+    result["paired"] = rows.get("paired")
+    result["json"] = rows.get("json")
+    return result
 
 
 def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
@@ -544,32 +537,6 @@ def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
         "paired": tgt is not None and cand is not None,
         "json": out,
     }
-
-
-def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
-            unit: str = None, runner=subprocess.run) -> dict:
-    """The official score for one symbol, plus the instruction-level rows behind it.
-
-    `match_percent` is deliberately the **report** metric (`fuzzy_match_percent`), so any existing consumer
-    that reads `measure().match_percent` gets the number that closes a symbol. The positional objdiff value
-    is kept as `diff_match_percent`; it is diagnostic only.
-    """
-    result = report_measure(target, base, symbol, objdiff, tmpdir, unit=unit, runner=runner)
-    if "error" in result:
-        return result
-    result["match_percent"] = result.pop("fuzzy_match_percent")
-    rows = diff_rows(target, base, symbol, objdiff, tmpdir, runner=runner)
-    if "error" in rows:
-        # the score stands on its own; only the row detail is unavailable
-        result["rows_error"] = rows["error"]
-        return result
-    result["diff_match_percent"] = rows.get("diff_match_percent")
-    if result.get("target_size") is None:
-        result["target_size"] = rows.get("target_size")
-    result["candidate_size"] = rows.get("candidate_size")
-    result["paired"] = rows.get("paired")
-    result["json"] = rows.get("json")
-    return result
 
 
 # Tokens that are switches, not paths. `cmd /c` is the one that bit: `os.path.join(main, "/c")` is
@@ -717,20 +684,61 @@ def object_has_symbol(obj: str, symbol: str) -> bool:
     return any(s[0] == symbol for s in syms)
 
 
-def measure_target(main: str, unit: str, symbol: str):
-    """(target object, kind, note) for `--measure`. `kind` is `registered`, `auto-fallback` or `missing`.
+def target_rel(unit: str) -> str:
+    """The registered split object's path relative to a tree root, from the unit spelling.
 
-    `registered` is the path a registered unit has always measured against and is decided first, so that
-    path cannot change.
+    This is the worktree *and* MAIN layout: `<root>/build/RMHE08/obj/<unit>.o`.
     """
-    head = os.path.join(main, "build", "RMHE08", "obj", *unit_source(unit).split("/"))
-    registered = os.path.splitext(head)[0] + ".o"
-    if os.path.exists(registered):
-        return registered, "registered", ""
+    head = os.path.join("build", "RMHE08", "obj", *unit_source(unit).split("/"))
+    return os.path.splitext(head)[0] + ".o"
+
+
+def same_tree(a: str, b: str) -> bool:
+    """Whether two paths name the same tree (normcase/abspath, so Windows case and slashes agree)."""
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def resolve_target(wt: str, main: str, unit: str, symbol: str):
+    """(target object, kind, note) for `--measure`, resolved from THIS invocation's tree outward.
+
+    `kind` is `worktree-split`, `registered`, `auto-fallback` or `missing`. The order is the one
+    `measure.py` uses, and it is the fix for the filed trap of reading MAIN's object inside a worktree
+    that has its own copy:
+
+    1. the **worktree's** split object, when this tree is not MAIN and the object exists (a proposal the
+       worker has already split here - the *real* new bytes, which MAIN cannot have first);
+    2. MAIN's registered split object (`registered` - the path a registered unit has always measured
+       against, unchanged);
+    3. MAIN's retired `auto_*_text` object that owns the symbol's address, then the worktree's - the
+       proposal path before its registration lands on MAIN;
+    4. `missing`, so the caller refuses to invent a number.
+
+    The returned path is absolute, and the CLI prints it, so a measurement is never ambiguous about which
+    tree it came from.
+    """
+    rel = target_rel(unit)
+    same = same_tree(wt, main)
+    p_wt, p_main = os.path.join(wt, rel), os.path.join(main, rel)
+    if not same and os.path.exists(p_wt):
+        return p_wt, "worktree-split", ""
+    if os.path.exists(p_main):
+        return p_main, "registered", ""
     found, note = proposal_target(main, symbol)
-    if found is None:
-        return registered, "missing", note
-    return found, "auto-fallback", note
+    if found:
+        return found, "auto-fallback", note
+    if not same:
+        found, note = proposal_target(wt, symbol)
+        if found:
+            return found, "auto-fallback", note
+    return p_main, "missing", (
+        "no original object for %s: no split object at %s in this tree or MAIN, and no retired "
+        "`auto_*_text` object covers the address of %s" % (unit, rel, symbol))
+
+
+# the name this shipped under before item B (`resolve_target` follows the invocation; this searched MAIN
+# only); kept so an out-of-tree caller does not break, and so the selftest can pin the old contract.
+def measure_target(main: str, unit: str, symbol: str):
+    return resolve_target(main, main, unit, symbol)
 
 
 def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=subprocess.run,
@@ -767,12 +775,18 @@ def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=su
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("unit", help="unit path from the repository root, e.g. Pl/pl_act")
+    ap.add_argument("unit", nargs="?", help="unit path from the repository root, e.g. Pl/pl_act")
     ap.add_argument("--main", default=None, help="main worktree (default: resolved with git)")
     ap.add_argument("--measure", default=None, help="symbol to diff against the target object afterwards")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="print the command, compile nothing")
+    ap.add_argument("--selftest", action="store_true", help="run the self-test and exit")
     args = ap.parse_args()
+    if args.selftest:
+        import recompile_selftest
+        return recompile_selftest.main()
+    if not args.unit:
+        ap.error("a unit is required (or --selftest)")
 
     wt = worktree_root()
     main_wt = args.main or main_root(wt)
@@ -783,31 +797,29 @@ def main() -> int:
     if cmd_source != "main":
         # the registered path must read exactly as it did before; a proposal says where its flags came from
         result["command_source"] = cmd_source
-    target = os.path.join(main_wt, "build", "RMHE08", "obj", *unit_source(unit).split("/"))
-    target = os.path.splitext(target)[0] + ".o"
-    result["target"] = target
+    result["target"] = os.path.join(main_wt, target_rel(unit))
 
     if args.measure and result.get("compiled"):
-        target, target_kind, target_note = measure_target(main_wt, unit, args.measure)
+        # resolution follows THIS invocation's tree first, then MAIN; `measure.py` calls the same function
+        target, target_kind, target_note = resolve_target(wt, main_wt, unit, args.measure)
         result["target"] = target
-        if target_kind != "registered":
-            result["target_kind"] = target_kind
-            result["target_note"] = target_note
+        result["target_kind"] = target_kind
+        result["target_note"] = target_note
         if target_kind == "missing":
             result["measure"] = {"symbol": args.measure, "error": target_note}
         else:
             result["measure"] = measure(target, result["object"], args.measure, unitutil.OBJDIFF,
-                                        os.path.join(wt, "build", "tmp"), unit=unit)
+                                        unitutil.session_tmpdir(), unit=unit)
             m = result["measure"]
             if target_kind == "auto-fallback" and "error" not in m and m.get("match_percent") is None:
                 # report pairs by name and answers a null (not an error) when pairing fails; say which of
                 # the two causes it is, because the message is what tells the worker where to look
                 if not object_has_symbol(result["object"], args.measure):
-                    m["error"] = ("%s does not define %s (nothing to pair) - MAIN's retired object defines it "
+                    m["error"] = ("%s does not define %s (nothing to pair) - the retired object defines it "
                                   "at that address, so the unit's own source is what is short"
                                   % (os.path.basename(result["object"]), args.measure))
                 else:
-                    m["error"] = ("no pairing: %s defines %s, but MAIN's %s spells that address differently - "
+                    m["error"] = ("no pairing: %s defines %s, but %s spells that address differently - "
                                   "the report pairs symbols by name, which a renamed symbol breaks"
                                   % (os.path.basename(result["object"]), args.measure,
                                      os.path.basename(target)))
@@ -825,14 +837,17 @@ def main() -> int:
         return 1
     print("compiled %s" % result["unit"])
     print("  object  %s  (%d bytes, fresh=%s)" % (result["object"], result["bytes"], result["fresh"]))
-    print("  target  %s" % result["target"])
-    if result.get("target_kind") == "auto-fallback":
-        print("  [fallback] MAIN has no split object for %s yet; %s\n             same original bytes, so the"
-              " score is the one the registered unit will report" % (result["unit"], result["target_note"]))
-    elif result.get("target_kind") == "missing":
+    kind = result.get("target_kind")
+    print("  target  %s%s" % (result["target"], "  [%s]" % kind if kind else ""))
+    if result.get("target_note"):
+        print("          %s" % result["target_note"])
+    if kind == "auto-fallback":
+        print("  [fallback] MAIN has no split object for %s yet; the score is the one the registered unit"
+              " will report (same original bytes)" % result["unit"])
+    elif kind == "missing":
         print("  [no target] %s" % result["target_note"])
     if result.get("command_source"):
-        print("  command %s - real flags from MAIN's ninja" % result["command_source"])
+        print("  command  %s" % result["command_source"])
     for name, size in sorted((result.get("sections") or {}).items()):
         print("  %-12s 0x%X" % (name, size))
     if "measure" in result:
