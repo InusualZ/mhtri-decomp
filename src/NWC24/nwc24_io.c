@@ -46,20 +46,41 @@
  * `0x80794440` (span 400 B) binds NWC24iPrepareShutdown to NWC24iRequestShutdown at the band's top;
  * the split position and its window are documented in the sibling's header.
  *
- * BODY.  Seven of the twelve functions are reconstructed and measured: `NWC24iOpenFd` (100 %),
- * `NWC24iCloseFd`, `NWC24iIoctl`, `NWC24iIoctlAsync`, `NWC24iIsAsyncIoctlBusy` (100 %),
- * `NWC24iAsyncIoctlCallback` and `NWC24iSetRtcCounter`.  The unit measures 23.23 % fuzzy over its
- * 2044 B; `.sbss` 0x807958C0 is claimed and emitted, the device-path literals (`.data`
- * 0x806311C0-0x8063122A) and the work block (`.bss` 0x80766B00) belong to no registered unit and are
- * declared `extern` in `include/unsplit/NWC24.h` (playbook 29/58).
+ * BODY (third pass 2026-09-28).  Eight of the twelve functions are reconstructed and FIVE are
+ * byte-identical: `NWC24iOpenFd`, `NWC24iIsAsyncIoctlBusy`, `NWC24iCloseFd`, `NWC24iIoctl` and
+ * `NWC24iCheckUserIdCRC` (the last three added by the second pass, the file-wide `#pragma dont_inline
+ * on` by the third).  The unit measures 39.66 % fuzzy over its 2044 B (31.35 % without the pragma,
+ * 23.23 % at registration; 128 -> 404 B matched).  The definitions run in ADDRESS order (flip
+ * requirement), so a body written later slots into its own address, not at the end.  `.sbss` 0x807958C0
+ * is claimed and emitted; the device-path literals (`.data` 0x806311C0-0x8063122A) and the work block
+ * (`.bss` 0x80766B00) belong to no registered unit and are declared `extern` in
+ * `include/unsplit/NWC24.h` (playbook 29/58).
+ *
+ * LOAD-BEARING SHAPES (second pass, each measured):
+ *   - `NWC24iCheckUserIdCRC`: `for (i = 0; i < 43; i++) if ((id >> (53 - (i + 1))) & 1) id ^=
+ *     0x635ULL << (42 - i);` over `getUnScrambleId()`'s u64 (the declaration's return type had to
+ *     become `u64` - the object returns r3:r4 and the shifts lower to `__shr2u`/`__shl2i`), answering
+ *     -37 when anything is left.  The `53 - (i + 1)` spelling is load-bearing: the folded `52 - i`
+ *     loses the `addi r0,r29,0x1` the target carries and measures 97.08 % instead of 100 %.
+ *   - `NWC24iCloseFd` / `NWC24iIoctl`: retail keeps the branch (`cmpwi`/`bge` + two `li r3`), so the
+ *     bodies assign a `result` local under `if (error < 0)` and return it; the two-early-return shape
+ *     the file used before was if-converted to `srwi`/`subi`/`andc` and measured 74.92 % / 81.89 %.
+ *   - `NWC24iGetUserId`'s siblings in `nwc24_msg.c` also drive `NWC24iCheckUserIdCRC`, so the two
+ *     files are one dependency pair of this lib.
+ *   - file-wide `#pragma dont_inline on`: retail's `NWC24iSetRtcCounter` keeps three `bl`s
+ *     (`NWC24iOpenFd` at target `.text` +0x3DC, `NWC24iIoctl` +0x410, `NWC24iCloseFd` +0x430 - the
+ *     target object's own relocations) where `-inline auto` folds all three wrappers into it; the
+ *     pragma reclaims them and lifts the row 40.50 -> 92.24.  A scoped pair around
+ *     `NWC24iSetRtcCounter` measures exactly the same (92.24390 / unit 39.65558), and the file-wide
+ *     form was kept: the pragma is a TU-wide setting (playbook 33) and its sibling `nwc24_msg.c`
+ *     carries the same line for the same reason.
  *
  * NOT reconstructed, with the reason:
- *   - `getUnScrambleId` (0x8051E0F8, 644 B) and `NWC24iCheckUserIdCRC` (0x8051E068, 152 B): a 64-bit
- *     obfuscation transform and the 43-round CRC loop over its result.  The loop is recoverable from
- *     the object (`id >> (52 - i)` bit 52 downwards, `crc ^= 1589ULL << (42 - i)`, `-37` when the
- *     result is non-zero), but `getUnScrambleId` itself is 644 B of `rlwimi`/`rotlwi` with no source
- *     shape to anchor on and no reference implementation in the image, so writing it blind would bake
- *     a wrong body into the unit.
+ *   - `getUnScrambleId` (0x8051E100, 644 B): the 64-bit obfuscation transform `NWC24iCheckUserIdCRC`
+ *     runs on.  It is 416 B of `rlwimi`/`rotlwi`/`clrlslwi`/`extrwi` over four `lbzx` S-box lookups
+ *     into `.rodata` 0x80574E00 - a hand-scheduled bit permutation with no loop and no source shape to
+ *     anchor on, and no reference implementation in the image, so writing it blind would bake a wrong
+ *     body into the unit.  Recoverable only from the DWC/NWC24 SDK source.
  *   - `NWC24iPrepareShutdown` / `NWC24iRequestShutdown`: they build an `OSShutdownFunctionInfo` in
  *     `.bss` 0x80766BE0 and drive the async ioctl slot plus `SCCheckStatus`/`SCGetIdleMode`/
  *     `OSGetAppType`/`OSRegisterShutdownFunction`; the shutdown-info layout and the SC entry points
@@ -67,9 +88,16 @@
  *   - `NWC24iSynchronizeRtcCounter`: needs `SCCheckStatus`, `OSGetTime`, `__div2i` and the
  *     `fn_804DCC60` tick source, whose 64-bit return convention the object shows but whose owner is
  *     outside this band.
- * `NWC24iSetRtcCounter`'s own residual: retail keeps five values live (r27-r31) where ours keeps four,
- * so every register is one off (`mr r29,r4` where retail has `mr r28,r4`) and the frame is 0x20 against
- * retail's 0x30; the statement order, the one `NWC24iOpenFd` call and the ioctl argument list match.
+ * `NWC24iSetRtcCounter`'s own residual (92.24 %, frame 0x30 both sides, all three `bl`s kept): retail's
+ * thread guard is an if-assignment into `error` that is re-tested (`li r3,-1` / `li r3,0` /
+ * `cmpwi r3,0` / `bge <body>` / `b <epilogue>`), four instructions ours does not carry because ours
+ * returns -1 straight to the epilogue; the faithful spelling of that shape -
+ * `error = OSGetCurrentThread() == 0 ? -1 : 0;` plus `if (error >= 0) { ...body... } return error;` -
+ * measured 87.55 % and was rejected (the body restructure costs more than the seam is worth).  What is
+ * left besides it is register colouring (retail keeps the disabled-interrupts level in r31 and the
+ * open/fd error in r28 where ours uses r29: `mr r31,r3` vs `mr r29,r3`, `stw r28,0x4(r6)` vs
+ * `stw r28,0xa4(r30)`) and one scheduling swap (retail materialises the in-buffer base `addi r6,r30,0xa0`
+ * before the `stw r27,0xa0(r30)`; ours after).
  */
 
 #include "types.h"
@@ -80,80 +108,30 @@
 #include "unsplit/OS.h"       /* OSDisable(Interrupts) / OSRestoreInterrupts / OSInitMutex */
 #include "Runtime.PPCEABI.H/memset.h"
 
+#pragma dont_inline on
+
 /* The in-flight async command slot (`.sbss` 0x807958C0, inside the unit's own `.sbss` range).  The
    map sizes the object at 8 B with no label at +0x4, so it is a two-word slot; the band's code only
    ever touches word 0.  NAME (a GUESS, see the header): the async wrapper sets it, the completion
    callback clears it, and `NWC24iIsAsyncIoctlBusy` reads it. */
 static u32 sAsyncIoctlSlot[2];
 
-int NWC24iOpenFd(u32 unused, const char* path, s32* fd, u32 mode)
+/* 0x8051E068 (0x98): validate the cached user id - unscramble it and fold bit `52 - i` of the
+ * running value back into it 42 + i positions up, 43 times; anything left over is the -37 answer. */
+int NWC24iCheckUserIdCRC(void)
 {
-    s32 error;
+    u64 id = getUnScrambleId();
+    int i;
 
-    if (fd == 0) {
-        return -3;
+    for (i = 0; i < 43; i++) {
+        if ((id >> (53 - (i + 1))) & 1) {
+            id ^= 0x635ULL << (42 - i);
+        }
     }
-    error = IOS_Open(path, mode);
-    *fd = error;
-    if (error < 0) {
-        if (error == -6) {
-            return -0x1D;
-        }
-        if (error == -8) {
-            return -0x1A;
-        }
-        return -0x2A;
+    if (id != 0) {
+        return -37;
     }
     return 0;
-}
-
-int NWC24iCloseFd(u32 unused, s32 fd)
-{
-    s32 error = IOS_Close(fd);
-
-    if (error >= 0) {
-        return 0;
-    }
-    return -0x2A;
-}
-
-int NWC24iIoctl(u32 unused, s32 fd, u32 command, u32* in, u32 inLen, u32* out, u32 outLen)
-{
-    s32 error = IOS_Ioctl(fd, command, in, inLen, out, outLen);
-
-    if (error >= 0) {
-        return 0;
-    }
-    return -0x2A;
-}
-
-int NWC24iIoctlAsync(u32 unused, s32 fd, u32 command, u32* in, u32 inLen, u32* out,
-                     u32 outLen, u32* userData)
-{
-    s32 error = IOS_IoctlAsync(fd, command, in, inLen, out, outLen,
-                              (void (*)(u32, u32*))NWC24iAsyncIoctlCallback, userData);
-
-    if (error < 0) {
-        return -0x2A;
-    }
-    sAsyncIoctlSlot[0] = 1;
-    return 0;
-}
-
-u32 NWC24iIsAsyncIoctlBusy(void)
-{
-    return sAsyncIoctlSlot[0];
-}
-
-int NWC24iAsyncIoctlCallback(u32 value, u32* out)
-{
-    int result = 0;
-
-    if (out != 0) {
-        *out = value;
-    }
-    sAsyncIoctlSlot[0] = 0;
-    return result;
 }
 
 /* 0x8051E384 (0x148): write the RTC counter through the time device - the value pair travels in the
@@ -197,4 +175,76 @@ int NWC24iSetRtcCounter(u32 value, u32 flag)
     }
     OSUnlockMutex(&work->mutex);
     return error;
+}
+
+int NWC24iOpenFd(u32 unused, const char* path, s32* fd, u32 mode)
+{
+    s32 error;
+
+    if (fd == 0) {
+        return -3;
+    }
+    error = IOS_Open(path, mode);
+    *fd = error;
+    if (error < 0) {
+        if (error == -6) {
+            return -0x1D;
+        }
+        if (error == -8) {
+            return -0x1A;
+        }
+        return -0x2A;
+    }
+    return 0;
+}
+
+int NWC24iCloseFd(u32 unused, s32 fd)
+{
+    s32 error = IOS_Close(fd);
+    s32 result = 0;
+
+    if (error < 0) {
+        result = -0x2A;
+    }
+    return result;
+}
+
+int NWC24iIoctl(u32 unused, s32 fd, u32 command, u32* in, u32 inLen, u32* out, u32 outLen)
+{
+    s32 error = IOS_Ioctl(fd, command, in, inLen, out, outLen);
+    s32 result = 0;
+
+    if (error < 0) {
+        result = -0x2A;
+    }
+    return result;
+}
+
+int NWC24iIoctlAsync(u32 unused, s32 fd, u32 command, u32* in, u32 inLen, u32* out,
+                     u32 outLen, u32* userData)
+{
+    s32 error = IOS_IoctlAsync(fd, command, in, inLen, out, outLen,
+                              (void (*)(u32, u32*))NWC24iAsyncIoctlCallback, userData);
+
+    if (error < 0) {
+        return -0x2A;
+    }
+    sAsyncIoctlSlot[0] = 1;
+    return 0;
+}
+
+u32 NWC24iIsAsyncIoctlBusy(void)
+{
+    return sAsyncIoctlSlot[0];
+}
+
+int NWC24iAsyncIoctlCallback(u32 value, u32* out)
+{
+    int result = 0;
+
+    if (out != 0) {
+        *out = value;
+    }
+    sAsyncIoctlSlot[0] = 0;
+    return result;
 }

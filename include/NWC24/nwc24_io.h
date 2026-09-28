@@ -28,7 +28,7 @@ int NWC24iAsyncIoctlCallback(u32 value, u32* out);
 
 /* the user-id pair and the RTC pair */
 int NWC24iCheckUserIdCRC(void);
-u32 getUnScrambleId(void);
+u64 getUnScrambleId(void);
 int NWC24iSetRtcCounter(u32 value, u32 flag);
 int NWC24iSynchronizeRtcCounter(void);
 
