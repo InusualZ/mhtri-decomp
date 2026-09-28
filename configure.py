@@ -2209,7 +2209,8 @@ config.libs = [
         "host": False,
         "objects": [
             # Registered once, at its final home (docs/plan.md 12), the Capcom `Network` reconnaissance
-            # lane (branch worker/net-capcom).  Five units, all `Object(NonMatching, ...)`:
+            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` is the first
+            # to flip (see its entry below), the other four are `Object(NonMatching, ...)`:
             #   Network/initNetworkSessionStable.cpp     .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
             #   Network/network_state.cpp              .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
             #   Network/NetworkWiiMediator.cpp         .text 0x80413C64..0x804155D4 (6490 B, 79 fn)
@@ -2247,7 +2248,12 @@ config.libs = [
             # the two callee-save stores and the `cmpwi r3,0` after `mr r31,r3`; `-O4,p` hoists both
             # ahead of their producers (18/18 instructions, same multiset).  Measured: 75.00000 at
             # `-O4,p`, 100.00000 (64 B, byte-identical) at `-O3`.
-            Object(NonMatching, "Network/constructNetworkWiiMediator.cpp",
+            # Matching: `.text` 0x40, `extab` 0x18 and `extabindex` 0xC all byte-identical to the
+            # target object, and all nine relocation names equal (`__nw__FUl` at 0x14,
+            # `constructNetworkLibrary` at 0x24, `sNetworkWiiMediatorInstance` at 0x28; `__dl__FPv`
+            # at extab+0x14; `constructNetworkWiiMediator` and `@etb_8001CE34` in extabindex).  The
+            # extab record is the one a C++ `new` expression emits - see the unit header.
+            Object(Matching, "Network/constructNetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: the three
             # `deleteNetwork*Pat` helpers get the target's block order and the target's `bl` to the
