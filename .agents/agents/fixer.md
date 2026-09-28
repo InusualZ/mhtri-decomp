@@ -3,7 +3,7 @@ name: fixer
 description: Takes a branch the landing gate REFUSED and clears exactly the items it listed - stylelint rule findings, a compile clash, or a measured regression - without moving any score downward, then re-verifies and commits.
 advertise: true
 aliases: gate-fixer, fix-lane
-tools: read, bash, write, edit, grep, find, ls
+tools: read, bash, write, edit, grep, find, ls, contact_supervisor
 systemPromptMode: replace
 inheritProjectContext: true
 inheritGlobalContext: false
@@ -168,3 +168,15 @@ in the body when the fix is not obvious. One commit for the fix, on the branch.
 
     ## Unresidual
     Anything you deliberately did not do, and any residual you recorded in the unit header.
+
+
+## Asking the orchestrator (`contact_supervisor`)
+
+You can make a **blocking request to the orchestrator** with the `contact_supervisor` tool, and it is answered with a
+decision - it is exempt from the per-tool timeout, so a long tool call cannot kill it. Use it **when the decision is
+not yours**: a scope change (a symbol or a file outside your unit), a missing data claim you cannot take, an
+ambiguous name whose evidence you cannot settle, or a conflict between your brief and what the binary shows. Say
+what you need decided in one line, give the option you would take, and the smallest next step - then stop and wait
+rather than guessing. Do **not** ask routinely: a round trip costs the lane more than the answer usually saves, so
+ask only where a wrong guess would waste a whole unit-run. If the channel is unavailable, put the blocking decision
+in your final report instead of guessing silently.

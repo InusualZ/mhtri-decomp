@@ -3,7 +3,7 @@ name: merger
 description: Merges main into a held worker branch whose finished unit cannot land because main moved through a shared header it also touched - resolving by class, proving the shared header moved zero rows, and committing the merge.
 advertise: true
 aliases: merge-lane
-tools: read, bash, write, edit, grep, find, ls
+tools: read, bash, write, edit, grep, find, ls, contact_supervisor
 systemPromptMode: replace
 inheritProjectContext: true
 inheritGlobalContext: false
@@ -222,3 +222,15 @@ Commit the merge on the branch. One merge commit (plus resolution commits if you
     ## Unfinished
     Anything left, anything `main` moving again will invalidate, and any deviation from "the unit's source is
     untouched".
+
+
+## Asking the orchestrator (`contact_supervisor`)
+
+You can make a **blocking request to the orchestrator** with the `contact_supervisor` tool, and it is answered with a
+decision - it is exempt from the per-tool timeout, so a long tool call cannot kill it. Use it **when the decision is
+not yours**: a scope change (a symbol or a file outside your unit), a missing data claim you cannot take, an
+ambiguous name whose evidence you cannot settle, or a conflict between your brief and what the binary shows. Say
+what you need decided in one line, give the option you would take, and the smallest next step - then stop and wait
+rather than guessing. Do **not** ask routinely: a round trip costs the lane more than the answer usually saves, so
+ask only where a wrong guess would waste a whole unit-run. If the channel is unavailable, put the blocking decision
+in your final report instead of guessing silently.
