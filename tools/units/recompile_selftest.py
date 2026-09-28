@@ -565,6 +565,77 @@ def proposal_rows() -> int:
     return failures
 
 
+def unit_source_rows() -> int:
+    """A `.c` unit's source resolves to `.c` - the extension comes from the registration or the file.
+
+    The failure this pins cost four lanes: `unit_source` appended `.cpp` to every extensionless unit,
+    so `recompile.py NHTTP/NHTTP_bgnend` told MWCC to compile `src/NHTTP/NHTTP_bgnend.cpp` (which does
+    not exist) and failed with `Specified file '...NHTTP_bgnend.cpp' not found`, and passing the real
+    `src/...` path as the unit doubled the prefix into `src/src/...`. `resolve_unit_source` reads the
+    extension from `configure.py`'s registration first, then from the file that exists, and a `--source`
+    override names the file outright. A `.cpp` unit must resolve byte-for-byte as it did before.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        wt = os.path.join(tmp, "wt")
+        os.makedirs(os.path.join(wt, "src", "prop"))
+        for name in ("unit.c", "cxx_unit.cpp", "other.c"):
+            open(os.path.join(wt, "src", "prop", name), "w", encoding="utf-8").write("int f() { return 1; }\n")
+        open(os.path.join(wt, "configure.py"), "w", encoding="utf-8").write(
+            'config.libs = [\n\n    {\n        "lib": "prop",\n\n'
+            '        "mw_version": "Wii/1.3",\n        "cflags": cflags_main,\n        "objects": [\n'
+            '            Object(NonMatching, "prop/unit.c"),\n'
+            '            Object(NonMatching, "prop/registered_only.c"),\n'
+            '            Object(NonMatching, "prop/cxx_unit.cpp"),\n'
+            '        ],\n    },\n]\n')
+
+        # the filed bug: extensionless `.c` unit
+        failures = _ok("a `.c` unit resolves from the registration",
+                       rc.resolve_unit_source("prop/unit", wt, wt), "prop/unit.c", failures)
+        failures = _ok("a registered `.c` unit with no file still resolves to `.c`",
+                       rc.resolve_unit_source("prop/registered_only", wt, wt),
+                       "prop/registered_only.c", failures)
+        # the old behaviour for `.cpp`, byte-for-byte
+        failures = _ok("a `.cpp` unit resolves to `.cpp`",
+                       rc.resolve_unit_source("prop/cxx_unit", wt, wt), "prop/cxx_unit.cpp", failures)
+        failures = _ok("an explicit extension is left alone",
+                       rc.resolve_unit_source("prop/unit.c", wt, wt), "prop/unit.c", failures)
+        # unregistered: the file that exists, then the old `.cpp` default
+        failures = _ok("an unregistered `.cpp` file resolves to `.cpp`",
+                       rc.resolve_unit_source("prop/cxx_unit", None, None), "prop/cxx_unit.cpp",
+                       failures)
+        failures = _ok("a name with no file keeps the `.cpp` default",
+                       rc.resolve_unit_source("prop/nope", wt, wt), "prop/nope.cpp", failures)
+        # the `src/` prefix a lane pastes does not double
+        failures = _ok("a pasted `src/` prefix is stripped",
+                       rc.resolve_unit_source("src/prop/unit", wt, wt), "prop/unit.c", failures)
+        failures = _ok("normalize_unit strips src/ and ./",
+                       rc.normalize_unit("./src/prop/unit"), "prop/unit", failures)
+        failures = _ok("normalize_unit strips a build path",
+                       rc.normalize_unit("build/RMHE08/src/prop/unit"), "prop/unit", failures)
+        # the `--source` override, relative and absolute
+        failures = _ok("a relative --source names the file",
+                       rc.resolve_unit_source("prop/unit", wt, wt, source="src/prop/other.c"),
+                       "prop/other.c", failures)
+        failures = _ok("an absolute --source under src/ is made unit-relative",
+                       rc.resolve_unit_source("prop/unit", wt, wt,
+                                              source=os.path.join(wt, "src", "prop", "other.c")),
+                       "prop/other.c", failures)
+
+        # the resolved spelling is what the compile rewrite points at
+        tokens = ["sjiswrap.exe", "mwcceppc.exe", "-nodefaults", "-lang=c", "-c",
+                  "src/prop/unit.c", "-o", "build/RMHE08/src/prop"]
+        unit = rc.resolve_unit_source("prop/unit", wt, wt)
+        cmd, obj = rc.rewrite(tokens, unit, wt, wt)
+        failures = _ok("... and rewrite compiles the `.c` file",
+                       os.path.basename(cmd[cmd.index("-c") + 1]), "unit.c", failures)
+        failures = _ok("... into the same-named object",
+                       os.path.basename(obj), "unit.o", failures)
+        failures = _ok("the un-fixed spelling is still the `.cpp` one (the bug this pins)",
+                       rc.unit_source("prop/unit"), "prop/unit.cpp", failures)
+    return failures
+
+
 def map_invocation_rows() -> int:
     """F43: the **map** `--measure` reads follows the invocation tree, not MAIN.
 
@@ -1127,6 +1198,7 @@ def main() -> int:
     failures += switch_rows()
     failures += staleness_rows()
     failures += proposal_rows()
+    failures += unit_source_rows()
     failures += map_invocation_rows()
     failures += resolve_invocation_rows()
     failures += split_staleness_rows()

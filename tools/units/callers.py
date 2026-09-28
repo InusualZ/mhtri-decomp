@@ -89,6 +89,7 @@ for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols"), os.path.join(TOOLS, "
 import tudiscover as td  # noqa: E402  (GAME, ASM_DIR, and the dump's own stamp: one definition of stale)
 from units import stylelint as sl  # noqa: E402  (the Ownership index the rule-2 lint uses)
 from units import callees as cl  # noqa: E402  (decode_rw: the tree's one register read/write decode)
+from units import dossier as dossier_mod  # noqa: E402  (parse_elf: the tree's one relocation scan)
 
 SCHEMA = 1                      # bump on any change to what the graph stores
 GAME = td.GAME
@@ -494,6 +495,194 @@ def load_index(root=ROOT, rebuild=False, asm_dir=None, cache=None):
     elif rebuild:
         info["reason"] = "forced rebuild"
     index, stats = build_index(asm_dir, files)
+    index["signature"] = signature
+    index["stats"] = stats
+    info.update(rebuilt=True, index=index, stats=stats)
+    try:
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        tmp = cache + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(index, fh, separators=(",", ":"), sort_keys=True)
+        os.replace(tmp, cache)
+        info["cache_bytes"] = os.path.getsize(cache)
+    except OSError as exc:
+        info["cache_error"] = str(exc)
+    return attach_derived(index), info
+
+
+# --------------------------------------------------------------------------------------------------
+# the fallback: no asm dump -> the split objects' own relocations
+# --------------------------------------------------------------------------------------------------
+# `build/<game>/asm` is written only on demand (a `dol split`, ~3 min), so a tree that has built the
+# project but not dumped it has no dump and `callers.py` used to exit 2 with "no asm dump". The
+# objects it *does* have are the split pieces under `build/<game>/obj`, and their relocations are
+# exactly what the question needs: a `bl` is an `R_PPC_REL24` to the callee, a data access is an
+# `R_PPC_ADDR16_*`/`@sda21` relocation to the data symbol. This builds the same address-keyed graph
+# from them, so `query`/`print_report` are unchanged.
+def obj_dir_of(root=ROOT):
+    return os.path.join(root, "build", GAME, "obj")
+
+
+def all_object_files(root=ROOT):
+    """Every split object under `build/<game>/obj` (the target pieces dtk wrote), sorted."""
+    base = obj_dir_of(root)
+    out = []
+    for dirpath, _dirs, names in os.walk(base):
+        for n in names:
+            if n.endswith(".o"):
+                out.append(os.path.join(dirpath, n))
+    out.sort()
+    return out
+
+
+def object_signature(obj_dir, files):
+    """The fallback cache's key: every object's path, size and mtime."""
+    h = hashlib.sha1()
+    for path in files:
+        st = os.stat(path)
+        h.update(("%s\0%d\0%d\n" % (os.path.relpath(path, obj_dir).replace("\\", "/"),
+                                      st.st_size, st.st_mtime_ns)).encode("utf-8"))
+    return h.hexdigest()
+
+
+def build_elf_index(obj_dir, files, cmap):
+    """The address-keyed graph from the split objects' relocations - the no-dump fallback.
+
+    A split object is relocatable: its sections sit at 0 and every symbol value is an *offset*. Two
+    things recover absolute addresses without the dump: one anchor per section (a defined symbol the
+    map knows, whose `map_address - object_offset` is that section's base) and `dossier.parse_elf`'s
+    relocation scan. A reference's *kind* is coarser than the dump's - there is no instruction text to
+    tell a read from a write - so every non-call is `addr`; the caller, the site and the target are
+    exact, and the index says `source: elf` so a count is never read as the dump's.
+    """
+    t0 = time.time()
+    labels, funcs = {}, {}
+    # key -> {(site, kind, func, text): row}. The same site is dumped by two objects when a registered
+    # unit's piece and the retired `auto_*` piece cover the same bytes; the tuple is identical, so the
+    # dict keys the site once (the asm path's `key_of` dedupe, without the dump's `file_rank`).
+    by_target = collections.defaultdict(dict)
+    scanned, dropped = 0, 0
+    for path in files:
+        try:
+            with open(path, "rb") as fh:
+                _sections, symbols, relocs = dossier_mod.parse_elf(fh.read())
+        except (OSError, ValueError):
+            continue
+        scanned += 1
+        by_sec = collections.defaultdict(list)
+        for s in symbols:
+            if s["shndx"] and s["name"]:
+                by_sec[s["section"]].append(s)
+        base = {}
+        for sec, lst in by_sec.items():
+            for s in sorted(lst, key=lambda x: x["value"]):
+                row = cmap.symbols.get(s["name"])
+                if row:
+                    base[sec] = row[0][1] - s["value"]
+                    break
+            if sec in base:
+                for s in sorted(lst, key=lambda x: x["value"]):
+                    labels.setdefault(s["name"], (base[sec] + s["value"], s["size"] or 0, sec))
+                    if sec in CODE_SECTIONS and s["type"] == 2:
+                        funcs.setdefault(base[sec] + s["value"], s["name"])
+        ordered = {sec: sorted(lst, key=lambda x: x["value"]) for sec, lst in by_sec.items()}
+
+        def holder(sec, off):
+            best = None
+            for s in ordered.get(sec, ()):
+                if s["value"] <= off and (s["size"] == 0 or off < s["value"] + s["size"]):
+                    best = s
+                elif s["value"] > off:
+                    break
+            return best
+
+        for r in relocs:
+            name, site_sec = r.get("symbol"), r.get("target")
+            if not name or not site_sec or site_sec not in base or name.startswith("."):
+                continue
+            h = holder(site_sec, r["offset"])
+            site = base[site_sec] + r["offset"]
+            func_addr = base[site_sec] + h["value"] if h is not None else None
+            if func_addr is not None:
+                funcs.setdefault(func_addr, h["name"])
+            if site_sec in CODE_SECTIONS:
+                kind = "call" if r["type"] in cl.CALL_TYPES else "addr"
+                text = ("bl %s" % name) if kind == "call" else "%s %s" % (r["type_name"], name)
+            else:
+                kind = "pointer"
+                text = "%s %s" % (r["type_name"], name)
+            row_map = cmap.symbols.get(name)
+            key = ("0x%08X" % (row_map[0][1] + (r.get("addend") or 0))) if row_map else name
+            slot = (site, kind, func_addr, text)
+            if slot in by_target[key]:
+                dropped += 1
+            by_target[key][slot] = [site, kind, func_addr, text, ""]
+    index = {
+        "schema": SCHEMA,
+        "game": GAME,
+        "source": "elf",
+        "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "seconds": round(time.time() - t0, 1),
+        "files": scanned,
+        "bytes": sum(os.path.getsize(p) for p in files),
+        "labels": {n: list(v) for n, v in labels.items()},
+        "funcs": {str(a): n for a, n in sorted(funcs.items())},
+        "refs": {k: sorted(v.values(), key=lambda r: (r[0], r[1])) for k, v in by_target.items()},
+    }
+    stats = {
+        "refs": sum(len(v) for v in by_target.values()),
+        "targets": sum(1 for k in by_target if k.startswith("0x")),
+        "labels": len(labels),
+        "unresolved": sum(1 for k in by_target if not k.startswith("0x")),
+        "duplicates": dropped,
+        "label_conflicts": [],
+        "label_mismatch": 0,
+        "biggest": sorted(((len(v), k) for k, v in by_target.items() if k.startswith("0x")),
+                          reverse=True)[:3],
+    }
+    return index, stats
+
+
+def load_elf_index(root=ROOT, rebuild=False, cmap=None, cache=None):
+    """`load_index`'s fallback: the same index shape, built from the split objects, cached the same way.
+
+    `info["source"] == "elf"` and `info["reason"]`/`stats` carry exactly what `load_index` does, so
+    `--stats` and `--json` report which graph answered without a second code path.
+    """
+    obj_dir = obj_dir_of(root)
+    cache = cache or os.path.join(root, "build", "tmp", "callers", "elf-graph.json")
+    files = all_object_files(root)
+    info = {"asm_dir": obj_dir, "cache": cache, "files": len(files), "cached": False,
+            "rebuilt": False, "reason": "no cache", "stats": {}, "source": "elf"}
+    if not files:
+        info["reason"] = "no objects"
+        return None, info
+    cmap = cmap if cmap is not None else load_map(root)
+    signature = object_signature(obj_dir, files)
+    info["signature"] = signature
+    if not rebuild and os.path.exists(cache):
+        try:
+            with open(cache, "r", encoding="utf-8") as fh:
+                index = json.load(fh)
+        except (ValueError, OSError) as exc:
+            info["reason"] = "unreadable cache (%s)" % exc
+            index = None
+        else:
+            if index.get("schema") != SCHEMA:
+                info["reason"] = "cache schema %s, this tool writes %s" % (index.get("schema"),
+                                                                           SCHEMA)
+                index = None
+            elif index.get("signature") != signature or index.get("files") != len(files):
+                info["reason"] = "the objects changed since the index was built"
+                index = None
+            else:
+                info.update(cached=True, reason="cache hit", index=index,
+                            stats=index.get("stats", {}))
+                info["cache_bytes"] = os.path.getsize(cache)
+                return attach_derived(index), info
+    elif rebuild:
+        info["reason"] = "forced rebuild"
+    index, stats = build_elf_index(obj_dir, files, cmap)
     index["signature"] = signature
     index["stats"] = stats
     info.update(rebuilt=True, index=index, stats=stats)
@@ -926,13 +1115,25 @@ def main(argv=None, root=ROOT):
             ap.error("unknown kind(s): %s (known: %s)" % (", ".join(bad), ", ".join(KINDS)))
     asm_dir = asm_dir_of(root)
     files = all_asm_files(asm_dir)
-    if not files:
-        return _no_dump(asm_dir, root, args.json, args.query)
-    index, info = load_index(root=root, rebuild=args.rebuild, asm_dir=asm_dir)
-    if index is None:
-        return _no_dump(asm_dir, root, args.json, args.query)
-    state, msg, remedy = dump_state(asm_dir, files, root)
     cmap = load_map(root)
+    if files:
+        index, info = load_index(root=root, rebuild=args.rebuild, asm_dir=asm_dir)
+        if index is None:
+            return _no_dump(asm_dir, root, args.json, args.query)
+        state, msg, remedy = dump_state(asm_dir, files, root)
+    else:
+        # No dump (it is written only on demand): answer from the split objects' relocations instead
+        # of refusing. `--stats` and `--json` carry the same `info` shape, so the reader can see which
+        # graph answered (`source: elf`).
+        index, info = load_elf_index(root=root, rebuild=args.rebuild, cmap=cmap)
+        if index is None:
+            return _no_dump(asm_dir, root, args.json, args.query)
+        obj_dir = obj_dir_of(root)
+        state, msg = "elf fallback", (
+            "no asm dump under %s - the graph is the %d split object(s)' relocations (coarser kinds, "
+            "exact sites); run %s for the instruction-level dump" % (rel(asm_dir, root), info["files"],
+                                                                    DUMP_TOOL))
+        remedy, asm_dir = None, obj_dir
     if args.stats:
         return stats_report(index, info, cmap, state, msg, remedy, asm_dir, root, args.json)
     rep = query(args.query, index, cmap, kinds=kinds, limit=args.limit, pointers=args.pointers)
@@ -944,7 +1145,8 @@ def main(argv=None, root=ROOT):
             return 1
         out = dict(rep)
         out["dump"] = {"state": state, "message": msg, "remedy": remedy,
-                       "asm_dir": rel(asm_dir, root), "files": len(files)}
+                       "asm_dir": rel(asm_dir, root), "files": info.get("files", len(files)),
+                       "source": info.get("source", "asm")}
         out["index"] = {"path": rel(info["cache"], root), "cached": info["cached"],
                         "reason": info["reason"], "built": index["built_utc"],
                         "seconds": index["seconds"], "refs": info.get("stats", {}).get("refs", 0),
@@ -1379,6 +1581,59 @@ def selftest():
         check("cli: --stats exits 0", rc, 0)
         check_in("cli: --stats counts the targets", "target address(es)", out)
         check_in("cli: --stats names the index", "graph.json", out)
+
+        # --- the no-dump fallback: the same answer from the split objects' relocations ----------------
+        # `build/<game>/asm` is written only on demand, so a built-but-not-dumped tree has no dump and
+        # `callers.py` used to exit 2. The fallback builds the graph from `build/<game>/obj/**/*.o`'s
+        # relocations (`dossier.parse_elf`), which is what the question actually needs: a `bl` is a
+        # relocation to the callee. This tree is set up with objects and NO asm dir.
+        elf_tree = os.path.join(tmp, "elf-tree")
+        os.makedirs(os.path.join(elf_tree, "config", GAME), exist_ok=True)
+        os.makedirs(os.path.join(elf_tree, "build", GAME, "obj", "probe"), exist_ok=True)
+        with open(os.path.join(elf_tree, "config", GAME, "symbols.txt"), "w", encoding="utf-8",
+                  newline="") as fh:
+            fh.write("caller = .text:0x80001000; // type:function size:0x20 scope:global\n"
+                     "callee = .text:0x80002000; // type:function size:0x10 scope:global\n"
+                     "gData = .data:0x80500000; // type:object size:0x10 scope:global\n")
+        with open(os.path.join(elf_tree, "config", GAME, "splits.txt"), "w", encoding="utf-8",
+                  newline="") as fh:
+            fh.write("probe/unit.c:\n\t.text       start:0x80001000 end:0x80001020\n")
+        elf = cl._fixture_elf(b"\x48\x00\x00\x01" * 8,
+                              [("", 0, 0, 0, 0), ("caller", 0, 0x20, 0x12, 1),
+                               ("callee", 0, 0, 0x10, 0), ("gData", 0, 0, 0x12, 0)],
+                              [(0x08, 2, 10), (0x0C, 3, 6)])
+        with open(os.path.join(elf_tree, "build", GAME, "obj", "probe", "unit.o"), "wb") as fh:
+            fh.write(elf)
+        elf_cmap = load_map(elf_tree)
+        elf_index, elf_info = load_elf_index(root=elf_tree, rebuild=True, cmap=elf_cmap,
+                                             cache=os.path.join(elf_tree, "cache.json"))
+        check("elf: no dump but objects builds a graph", elf_info["source"], "elf")
+        check("elf: the call relocation lands on the callee's address",
+              any(r[1] == "call" for r in elf_index["refs"].get("0x80002000", [])), True)
+        check("elf: the call site is the anchored absolute address",
+              [r[0] for r in elf_index["refs"].get("0x80002000", [])], [0x80001008])
+        check("elf: the data relocation is an address reference",
+              [r[1] for r in elf_index["refs"].get("0x80500000", [])], ["addr"])
+        elf_rep = query("callee", elf_index, elf_cmap)
+        check("elf: query resolves the callee through the map",
+              elf_rep["resolved"]["address"], "0x80002000")
+        check("elf: query reports the call", elf_rep["counts"]["call"], 1)
+        check("elf: the caller is named from its own anchor",
+              [r["caller"]["name"] for r in elf_rep["references"]], ["caller"])
+        check("elf: the reference text names the target (no dump instruction text)",
+              [r["instruction"] for r in elf_rep["references"]], ["bl callee"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(["callee", "--code"], root=elf_tree)
+        out = buf.getvalue()
+        check("elf: the CLI answers without a dump", rc, 0)
+        check_in("elf: the CLI says which graph answered", "elf fallback", out)
+        check_in("elf: the call is listed", "bl callee", out)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(["--stats"], root=elf_tree)
+        check("elf: --stats exits 0", rc, 0)
+        check_in("elf: --stats names the objects", "elf-graph.json", buf.getvalue())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

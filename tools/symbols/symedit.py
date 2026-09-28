@@ -126,11 +126,42 @@ def cmd_show(a):
     return 0
 
 
+def infer_section(rows, want, section=None):
+    """The section an `at` address belongs to, when `--section` does not name one.
+
+    `at <data address>` used to default to `.text`: a data address above the whole `.text` range landed
+    at the *end* of `.text` and the tracer got the last text rows, not the data rows the address is in
+    (the filed bug). The section is inferred from the map's own extents - the section whose [min, max]
+    contains the address, else the one with the symbol nearest to it - and an explicit `--section` is
+    never second-guessed.
+    """
+    if section or not rows:
+        return section or ".text"
+    extents: dict = {}
+    for e in rows:
+        r = extents.get(e["section"])
+        if r is None:
+            extents[e["section"]] = [e["address"], e["address"]]
+        else:
+            r[0] = min(r[0], e["address"])
+            r[1] = max(r[1], e["address"])
+    containing = [s for s, (lo, hi) in extents.items() if lo <= want <= hi]
+    if containing:
+        # a section that contains the address wins; the narrowest on the odd chance two overlap
+        return min(containing, key=lambda s: extents[s][1] - extents[s][0])
+
+    def distance(s):
+        lo, hi = extents[s]
+        return min(abs(want - lo), abs(want - hi))
+
+    return min(extents, key=distance)
+
+
 def cmd_at(a):
     want = int(a.address, 0) if not re.fullmatch(r"[0-9a-fA-F]+", a.address) else int(a.address, 16)
-    sec = a.section or ".text"
-    all_e = sorted((e for e in entries(a.file) if e["section"] == sec),
-                   key=lambda e: e["address"])
+    rows = list(entries(a.file))
+    sec = infer_section(rows, want, a.section)
+    all_e = sorted((e for e in rows if e["section"] == sec), key=lambda e: e["address"])
     idx = [i for i, e in enumerate(all_e) if e["address"] <= want]
     centre = idx[-1] if idx else 0
     lo = max(0, centre - a.count)
@@ -1115,6 +1146,40 @@ def selftest() -> int:
         check("the default map is the invocation tree's (its marker is found)", marker in (p.stdout or ""),
               True)
         check("... and the command succeeds there", p.returncode, 0)
+
+    # --- `at` on a data address picks the data section, not `.text` -------------------------------
+    # The filed bug: `at 0x80500000` defaulted to `.text`, so a data address above the whole `.text`
+    # range landed at the END of `.text` and the tracer was handed the wrong rows. The section is
+    # inferred from the map's own extents; an explicit `--section` is still honoured.
+    at_rows = [("fn_80040598", ".text:0x80040598", "type:function size:0x10"),
+               ("fn_80040600", ".text:0x80040600", "type:function size:0x4"),
+               ("gData", ".data:0x80500000", "type:object size:0x10"),
+               ("gNext", ".data:0x80500020", "type:object size:0x4")]
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "symbols.txt"
+        p.write_bytes(map_text("\n", at_rows).encode("utf-8"))
+        parsed = list(entries(str(p)))
+        check("infer: a data address picks .data", infer_section(parsed, 0x80500000), ".data")
+        check("infer: a text address picks .text", infer_section(parsed, 0x80040598), ".text")
+        check("infer: an explicit section is not second-guessed",
+              infer_section(parsed, 0x80500000, ".text"), ".text")
+        check("infer: a gap address picks the nearest section",
+              infer_section(parsed, 0x80510000), ".data")
+        out = io.StringIO()
+        ns = argparse.Namespace(address="0x80500000", count=2, section=None, file=str(p), json=False)
+        with redirect_stdout(out):
+            rc_at = cmd_at(ns)
+        text = out.getvalue()
+        check("at: a data address exits 0", rc_at, 0)
+        check("at: the data row is shown", "gData" in text, True)
+        check("at: no text row leaks in", "fn_80040598" in text, False)
+        out = io.StringIO()
+        ns = argparse.Namespace(address="0x80500000", count=2, section=".text", file=str(p),
+                                json=False)
+        with redirect_stdout(out):
+            cmd_at(ns)
+        check("at: an explicit --section still shows its own rows",
+              "fn_80040598" in out.getvalue(), True)
 
     if fails:
         print("FAIL (%d)" % len(fails))

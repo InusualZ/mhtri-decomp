@@ -163,6 +163,78 @@ def unit_source(unit: str) -> str:
     return unit if unit.endswith(SRC_EXT) else unit + ".cpp"
 
 
+def normalize_unit(unit: str) -> str:
+    """Strip the prefixes a lane pastes (`src/`, `./`, `build/RMHE08/src/`) from a unit argument.
+
+    Passing the real path (`src/NHTTP/NHTTP_bgnend`) used to produce a doubled `src/src/...` in the
+    rewritten command; the unit argument is a path *from `src/`*, so the prefixes only ever hide it.
+    """
+    u = unit.replace("\\", "/").strip()
+    while u.startswith("./"):
+        u = u[2:]
+    changed = True
+    while changed:
+        changed = False
+        for pre in ("build/RMHE08/src/", "build/RMHE08/obj/", "src/"):
+            if u.startswith(pre):
+                u = u[len(pre):]
+                changed = True
+    return u.strip("/")
+
+
+def resolve_unit_source(unit: str, wt: str = None, main: str = None, source: str = None) -> str:
+    """The unit's source spelling **with its real extension** - the fix for the `.c` unit.
+
+    `unit_source` appends `.cpp` when no extension is given, which is right for the `.cpp` units that
+    make up most of the tree and wrong for every `.c` unit (`NHTTP/NHTTP_bgnend`, `RSP/runtime`, ...):
+    `recompile.py` then told MWCC to compile `src/NHTTP/NHTTP_bgnend.cpp`, which does not exist, and
+    four lanes fell back to `ninja build/RMHE08/src/<unit>.o` + `symdiff.py`. Resolution order:
+
+    1. a source the caller named with `--source` (the deliberate override);
+    2. `configure.py`'s own registration (`lib_block`) - the one authority for the spelling;
+    3. the file that actually exists under `src/` (`.cpp` first, so the old default is byte-for-byte);
+    4. `.cpp`, the pre-fix behaviour.
+
+    The result is a unit spelling (`Pl/pl_act.cpp`), not a path, so every downstream `unit_source` call
+    is the identity and the object directory / ninja target derivation is unchanged.
+    """
+    if source:
+        s = source.replace("\\", "/").strip()
+        for root in (wt, main):
+            if not root:
+                continue
+            base = os.path.join(os.path.abspath(root), "src").replace("\\", "/") + "/"
+            if os.path.normcase(s).startswith(os.path.normcase(base)):
+                s = s[len(base):]
+                break
+        for pre in ("build/RMHE08/src/", "src/", "./"):
+            if s.startswith(pre):
+                s = s[len(pre):]
+        return s.strip("/")
+    unit = normalize_unit(unit)
+    if unit.endswith(SRC_EXT):
+        return unit
+    stem = _unit_stem(unit)
+    for root in (wt, main):
+        if not root:
+            continue
+        try:
+            _lib, names = lib_block(root, unit)
+        except Exception:
+            names = []
+        for name in names:
+            if _unit_stem(name) == stem:
+                return normalize_unit(name)
+    for root in (wt, main):
+        if not root:
+            continue
+        base = os.path.join(root, "src", *unit.split("/"))
+        for ext in (".cpp", ".c", ".cp", ".cxx", ".cc"):
+            if os.path.isfile(base + ext):
+                return unit + ext
+    return unit + ".cpp"
+
+
 def _ninja_compile_lines(main: str, unit: str, runner=subprocess.run):
     """(target, mwcceppc lines, completed process) for a unit, without raising.
 
@@ -1047,6 +1119,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("unit", nargs="?", help="unit path from the repository root, e.g. Pl/pl_act")
     ap.add_argument("--main", default=None, help="main worktree (default: resolved with git)")
+    ap.add_argument("--source", default=None,
+                    help="override the unit's source path (repo-relative, e.g. src/NHTTP/NHTTP_bgnend.c)")
     ap.add_argument("--measure", default=None, help="symbol to diff against the target object afterwards")
     ap.add_argument(STALE_SPLIT_FLAG, action="store_true", dest="allow_stale_split",
                     help="measure even when this tree's split is older than its own edited map/splits")
@@ -1062,7 +1136,7 @@ def main() -> int:
 
     wt = worktree_root()
     main_wt = args.main or main_root(wt)
-    unit = args.unit.strip("/")
+    unit = resolve_unit_source(args.unit.strip("/"), wt, main_wt, args.source)
     if args.measure and not args.dry_run:
         # before the compile: a stale split is refused in ~0 s rather than after a wasted one.  Only a
         # real measurement needs it - a plain recompile does not read a target object, and `--dry-run`
