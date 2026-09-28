@@ -15,6 +15,10 @@
 #include "menu/menu_item.h"     /* GetItemData - owned by menu/menu_item.cpp (rule 2) */
 #include "fn_80047398.h"        /* item_pair_copy - owned by fn_80047398.cpp (rule 2) */
 
+/* The player work record `quest_item_work_merge`'s first argument points at (defined in `pl.h`);
+ * nothing here reads it, so the forward declaration is all this header needs. */
+struct _PLW;
+
 /* The 4-byte `(item id, count)` slot `item_pair_copy` moves - and the record the lot picks write
  * their output with: a u16 id and a u16 count (the pick stores a sign-extended byte payload). */
 struct Q_ItemPair {
@@ -61,7 +65,11 @@ struct Q_SlotPair {
  * offsets this unit names are here (the lot tables' run at +0x9C is one region, addressed but not
  * walked by name). */
 struct Q_ItemWork {
-    /* +0x0000 */ u8 pad_0x0000[0x9C];
+    /* +0x0000 */ u8 pad_0x0000[0x40];
+    /* +0x0040 */ Q_ItemCount slots_0x40[5];  /* the five delivered-item slots `quest_item_slot_add` merges into */
+    /* +0x0054 */ u8 rot_0x54;                /* the round-robin slot the next new id takes */
+    /* +0x0055 */ u8 flag_0x55;               /* set when a slot changed */
+    /* +0x0056 */ u8 pad_0x0056[0x9C - 0x56];
     /* +0x009C */ union {
         /* +0x009C */ Q_LotEntry lot_0x9C[0xFD];  /* the first weighted lot table */
         /* +0x009C */ u8 pad_0x009C[0x3F4];
@@ -96,11 +104,14 @@ struct Q_MoveWork {
     /* +0x00E9 */ u8 phase_0xE9;           /* the quest phase byte `quest_phase_get` returns */
     /* +0x00EA */ u8 pad_0x00EA[0xFA - 0xEA];
     /* +0x00FA */ u8 sub_0xFA;              /* the sub-state `quest_move_sub_state_ck` tests */
-    /* +0x00FB */ u8 pad_0x00FB[0x10D - 0xFB];
-    /* +0x010D */ u8 pad_0x010D[0x6];
+    /* +0x00FB */ u8 pad_0x00FB[0x10C - 0xFB];
+    /* +0x010C */ u16 item_id_0x10C;         /* the item `quest_item_work_merge` records */
+    /* +0x010E */ s16 item_value_0x10E;      /* its handed-over value */
+    /* +0x0110 */ u8 item_flag_0x110;        /* set while that record is live */
+    /* +0x0111 */ u8 pad_0x0111[0x113 - 0x111];
     /* +0x0113 */ u8 state_0x113;           /* 1 while the slot is in its entry state */
     /* +0x0114 */ u8 pad_0x0114[0x22D4 - 0x114];
-    /* +0x22D4 */ u8 flag_0x22D4;
+    /* +0x22D4 */ u8 state_0x22D4;          /* the state byte `quest_move_state_valid_ck`/`_get` read */
     /* +0x22D5 */ u8 pad_0x22D5[0x7];
     /* +0x22DC */ u8 flag_0x22DC;
 };  /* size: 0x22E0 (approximate) */
@@ -152,6 +163,11 @@ void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b);
 /* The local slot's item work handed to the band below (0x803AA060) with `idx` and 1.  Body unwritten. */
 u32 quest_item_work_notify(s32 idx);
 
+/* Records the item a caller hands over in the local slot's move work, then merges it into the item
+ * work's own five-slot list with the negated value (0x803AAB80).  The target never reads its first
+ * argument, which the only caller passes as the player work pointer. */
+void quest_item_work_merge(struct _PLW* owner, u16 id, s16 value);
+
 /* The quest-phase and per-slot state getters (0x803AD8F4, 0x803AAE7C, 0x803AB15C, 0x803AE934,
  * 0x803B0D5C, 0x803AFB90). */
 u8  quest_phase_get(void);
@@ -160,6 +176,18 @@ u32 quest_play_state_ck(void);
 u32 quest_item_work_flag_ck(void);
 u32 quest_move_sub_state_ck(void);
 u32 quest_work_busy_ck(void);
+/* The move work's own +0x22D4 state byte: 0x803AB028 tests its bit 7 (the "a state code follows"
+ * flag), 0x803AB070 returns its low 7 bits. */
+u32 quest_move_state_valid_ck(void);
+u32 quest_move_state_get(void);
+/* Whether the local slot has a quest selected (0x803AAEC0). */
+u32 quest_select_ready_ck(void);
+/* The three quest-id range probes the bands below gate on (0x803AAF3C, 0x803AAF88, 0x803AAFE0). */
+u32 quest_id_low_get(void);
+/* The index of the loaded element a quest id names (0x803ADF84), or -1. */
+s32 quest_element_find(u8 kind);
+u32 quest_id_head_ck(void);
+u32 quest_id_tail_ck(void);
 /* The band's two quest-work predicates (0x803B0CD4, 0x803B0CFC). */
 u32 quest_entry_active_ck(void);
 u32 quest_entry_ready_ck(void);

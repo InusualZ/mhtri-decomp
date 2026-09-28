@@ -108,7 +108,7 @@ void fn_80129744(struct _ENEMY_WORK* self);
 void fn_801252C0(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);
-u32 fn_80125F9C(u32 a, u32 b);
+u32 enemy_kind_same_ck(u32 a, u32 b);
 u32 fn_80125FF0(u32 a, u32 b);
 /* 0x8012A9E8 - r3 the `_ENEMY_WORK`, r4/r5/r6 three byte pointers the effect band's spawner hands
  * over.  Added with `ef/eft_slot.cpp` (rule 2: this unit owns the address). */

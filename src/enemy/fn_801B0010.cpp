@@ -143,7 +143,7 @@ struct EmItemRow {
 EmItemRow* GetItemData(u16 id);
 /* 0x803AAB80 - the not-yet-registered band between `hud/fn_80324F7C.c` and
  * `Network/NetworkWiiMediator.c` (named gap).  r3 the player work, r4 the id, r5 the value. */
-extern "C" void fn_803AAB80(_PLW* plw, u16 id, s32 value);
+extern "C" void quest_item_work_merge(_PLW* plw, u16 id, s32 value);
 /* 0x802D8414 - `ai_torch_ck(_AINPC_W*)`; the owner band sits between `ai/fn_802D0DCC.c` and
  * `ef/fn_803066F0.c` (named gap).  Declared at C++ scope with its real signature (rule 9). */
 struct _AINPC_W;
@@ -392,7 +392,7 @@ extern "C" void fn_801B0450(_ENEMY_WORK* work) {
     if (work->plw_0x32C == NULL) {
         return;
     }
-    fn_803AAB80(work->plw_0x32C, work->field_0x328, -1);
+    quest_item_work_merge(work->plw_0x32C, work->field_0x328, -1);
     work->field_0x328 = 0;
     work->plw_0x32C = NULL;
 }

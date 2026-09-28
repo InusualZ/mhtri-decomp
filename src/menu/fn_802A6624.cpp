@@ -72,7 +72,7 @@ char* strcpy(char* dst, const char* src);
  * a mangled map name (`get_move_work_adrs__FUc`) is declared as the function it spells.
  * --------------------------------------------------------------------------------------------------- */
 
-extern "C" u32 fn_803AB028(void);
+extern "C" u32 quest_move_state_valid_ck(void);
 extern "C" s32 fn_802A8DF4(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g);
 
 /* The 2D integer vector the HUD helpers exchange, complete in `include/unsplit/lobby.h`; only ever
@@ -119,7 +119,7 @@ extern "C" u8 fn_802A6624(MenuListWork* self)
     case 1:
         if (game_ready_ck() == 1) {
             result = 1;
-        } else if (fn_803AB028() == 1) {
+        } else if (quest_move_state_valid_ck() == 1) {
             result = 2;
         } else if (fn_800CF3C4() > 1) {
             result = 3;
@@ -143,7 +143,7 @@ extern "C" u8 fn_802A66BC(MenuListWork* self)
     default:
         return 0;
     case 1:
-        if (game_ready_ck() == 0 && fn_803AB028() == 0) {
+        if (game_ready_ck() == 0 && quest_move_state_valid_ck() == 0) {
             self->count_0x016--;
         }
         break;

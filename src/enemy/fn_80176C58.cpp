@@ -94,7 +94,7 @@ extern "C" u8 lbl_805AA900[];
 extern "C" u8 fn_802B0668(u8 id);
 extern "C" void fn_80182978(_ENEMY_WORK* self);
 extern "C" void fn_80128A8C(_ENEMY_WORK* self, u32 a, u32 b);
-extern "C" u32 fn_803A8D4C(void);
+extern "C" u32 quest_id_get(void);
 extern "C" void fn_8012A354(_ENEMY_WORK* self);
 extern "C" void fn_8012999C(_ENEMY_WORK* self);
 extern "C" void fn_801823A0(_ENEMY_WORK* self, u32 a);
@@ -167,7 +167,7 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
             break;
         }
     }
-    if ((u16)fn_803A8D4C() == 0x3EC) {
+    if ((u16)quest_id_get() == 0x3EC) {
         self->field_0x7B0 = 0.5f;
     }
     if (self->state_0x009 == 0) {

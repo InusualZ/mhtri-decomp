@@ -38,6 +38,11 @@ s32 fn_803A8858(void);
 s32 fn_803A9690(void);
 s32 fn_803AA41C(s32, f32);
 
+/* 0x803A8D4C - the current quest id: the option block's selected id while the local slot has a quest
+ * in progress, else the item work's own +0x10 key.  Read by `enemy/fn_80176C58.cpp` (its 0x3EC
+ * test) and by the quest selector band. */
+u32 quest_id_get(void);
+
 /* 0x803A9DEC - writes one 0x60-byte quest-work element's value.  The caller owns the payload,
  * so the record stays a forward declaration here and the value is untyped. */
 void quest_element_set(struct QuestWork* work, u8 index, void* value); /* untyped: caller-owned payload */

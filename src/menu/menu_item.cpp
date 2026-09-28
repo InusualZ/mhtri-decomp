@@ -343,7 +343,7 @@ void fn_802E2358(_SPR_DATA_* spr, s8* text, u32 length, const _mh_ivec2_* pos);
 void fn_802E4828(s16 x, s16 y, s32 flag);
 void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 s16 fn_802D72EC(u16 item_id);
-u32 fn_803AB028(void);
+u32 quest_move_state_valid_ck(void);
 char* strcpy(char* dst, const char* src);
 s32 fn_802A6434(_PLW* plw);
 u32 fn_802A6438(MENU_ITEM_W* self, s16 index);
@@ -977,7 +977,7 @@ extern "C" s32 fn_802A64B0(MENU_ITEM_W* self) {
         break;
 
     case 2:
-        if (fn_803AB028() == 0) {
+        if (quest_move_state_valid_ck() == 0) {
             return 0;
         }
         if ((s16)fn_802D72EC(item_id) == 0) {
@@ -1280,7 +1280,7 @@ extern "C" u32 fn_802A008C(MenuSlot* slot)
     _PLW* worker = slot->worker;
 
     if (slot->field_0x00F == 1) {
-        if (fn_803AAEC0() != 0 && (u8)fn_802FBA60() == 0) {
+        if (quest_select_ready_ck() != 0 && (u8)fn_802FBA60() == 0) {
             return 0;
         }
         if (fn_8027BC48(0) == 1) {
@@ -1306,7 +1306,7 @@ extern "C" u32 fn_802A0148(void)
     if (move_work_state_ck() != 0) {
         return 1;
     }
-    return fn_803AAEC0() == 1;
+    return quest_select_ready_ck() == 1;
 }
 
 /* 0x802A02CC: the slot-0 form of the predicate below. */
