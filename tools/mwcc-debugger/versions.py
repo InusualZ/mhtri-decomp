@@ -496,16 +496,25 @@ def known():
     return [name for name, _rva, _b in _PROBES]
 
 
+def row(name):
+    """The raw row for a build name - RVAs, not VAs, and no compiler binary.
+
+    `build()` starts from this and converts to VAs after checking the binary;
+    locate/verify_pcode.py needs the breakpoint table on its own, because it is
+    handed a dump and an object and has no executable to detect a build from.
+    """
+    if name == "Wii/1.3":
+        return dict(_WII13_ROW)
+    if name in _GC_ROWS:
+        merged = dict(_GC_ROWS[name])
+        merged.update(_LAYOUT_FLAGS[name])
+        return merged
+    raise KeyError(name)
+
+
 def build(name, exe):
     """Instantiate a row and convert its RVAs to absolute VAs."""
-    if name == "Wii/1.3":
-        row = dict(_WII13_ROW)
-    elif name in _GC_ROWS:
-        row = dict(_GC_ROWS[name])
-        row.update(_LAYOUT_FLAGS[name])
-    else:
-        raise KeyError(name)
-    version = MwccVersion(name=name, **row)
+    version = MwccVersion(name=name, **row(name))
     pe = Pe(exe)
     if version.image_base != pe.image_base:
         raise SystemExit(
