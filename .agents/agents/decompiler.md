@@ -68,6 +68,17 @@ and never land.
 
 ## Order of work
 
+0. **Before you measure anything, prove your tree is current (claim-time freshness).** A freshly claimed slot
+   is *always* `ninja`-dirty, and that is not a defect: the seed copies MAIN's `build/` with MAIN's mtimes
+   while the worktree's own sources are written at checkout time, so `ninja -n` reports a handful of pending
+   steps (measured in a fresh slot: the one object, `REPORT`, `PROGRESS`). It is a tree that has **not been
+   built yet**, not a stale one. So: run `ninja` once before your first measurement, record the baseline you
+   are starting from (your units' rows in `build/RMHE08/report.json`, or `ledger.py`'s totals), and only then
+   begin. `recompile.py` already refuses a stale split and deletes an object before compiling it, so a stale
+   *number* is hard to get by accident - but a number taken from the wrong **tree** (MAIN's `build/` read while
+   you stand in a slot) looks exactly like a measurement and is not one, so check which tree your tool
+   resolved before you believe a score.
+
 1. **Ack** your claim: `python tools/units/claims.py ack <claim> --agent <your-slug>`, and call it again with
    `--progress` after each meaningful step. It is the heartbeat the orchestrator reads.
 **Recon fast path - do not sweep the object directory.** `build/RMHE08/obj/` holds 6000+ objects and each
