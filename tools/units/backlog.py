@@ -100,6 +100,7 @@ if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
+from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)
 
 STATUSES = ("open", "done", "parked")
 NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped")
@@ -137,6 +138,19 @@ def one_line(s: str, limit: int = 200) -> str:
             cut = cut[: cut.rfind(" ")]
         s = cut.rstrip(" .,;:") + " ..."
     return s
+
+
+def free_text(r: dict, preferred: tuple = ()) -> str:
+    """A request's free-text content: the first non-empty field, `preferred` spellings first then the shared
+    `handoff.FREE_TEXT_FIELDS` list. `handoff.py` owns the schema and this intake reads the same list, so a
+    filing that puts its content under its lane's own spelling (`why`, `request`, `what`, `subject`, `note`)
+    is read here rather than registering content-free and being swallowed by a neighbour.
+    """
+    for field in tuple(preferred) + handoff_mod.FREE_TEXT_FIELDS:
+        value = asstr(r.get(field))
+        if value.strip():
+            return value
+    return ""
 
 
 def norm_file(x) -> str:
@@ -233,6 +247,16 @@ def norm_defect(text: str, target: str = "") -> str:
     cls = defect_class(text)
     sym = [s for s in symbols(text) if s not in (target or "").lower()]
     return cls + (":" + ",".join(sym) if sym else "")
+
+
+def fingerprint(text: str, size: int = 8) -> str:
+    """A short, stable content hash for a span-less filing.
+
+    A request filed before its address is known carries no span; two such findings must not collapse into one
+    content-free item (and one must not swallow the other's content), so the item keys on a fingerprint of
+    the free-text evidence instead of a shared empty target.
+    """
+    return hashlib.sha1(one_line(text).lower().encode("utf-8")).hexdigest()[:size]
 
 
 def range_flavour(evidence: str) -> tuple[str, str]:
@@ -384,7 +408,9 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
         return  # not backlog: the landing applies it, so it is done when the batch lands
     if kind == "shared-file":
         target = norm_file(r.get("file"))
-        for c in clauses(r.get("why", "")):
+        # The content may be under `why` (canonical) or a lane's own `request`/`evidence`/...: read the same
+        # free-text list the validator does, so a real shared-file request does not register empty.
+        for c in clauses(free_text(r, ("why",))):
             if not c:
                 continue
             st = classify_shared(c)
@@ -396,20 +422,25 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
     elif kind == "range":
         sec = asstr(r.get("section"))
         start, end = asstr(r.get("start")), asstr(r.get("end"))
-        target = "%s %s-%s" % (sec, start, end)
-        flavour, st = range_flavour(asstr(r.get("evidence")))
+        evidence = free_text(r, ("evidence", "why"))
+        # A range filed with its content in `why`/`request`/... still counts, and a range filed before the
+        # span was known keys on a fingerprint of its evidence (the `seam` branch does the same) so two
+        # span-less ranges cannot collapse into one empty-target item that swallows a lane's finding.
+        span = "-".join(x for x in (start, end) if x)
+        target = " ".join(x for x in (sec, span) if x).strip() or ("range@%s" % fingerprint(evidence))
+        flavour, st = range_flavour(evidence)
         key = ("range", target.lower(), flavour)
         _merge(grouped, key, Item(kind="range", target=target, defect=flavour, status=st,
-                                  default_status=st, ask=one_line(asstr(r.get("evidence"))),
+                                  default_status=st, ask=one_line(evidence),
                                   flavour=flavour,
-                                  filings=[Filing(source, lane, when, one_line(asstr(r.get("evidence")), 400))]))
+                                  filings=[Filing(source, lane, when, one_line(evidence, 400))]))
     elif kind == "seam":
         # A seam finding: a code span whose boundary is wrong, so the split needs re-drawing. Its own kind
         # rather than folded into `range`, because the ask is different - `range` claims a data run, this
         # says the cut is in the wrong place - and two lanes filed it independently before it existed.
         sec = asstr(r.get("section"))
         start, end = asstr(r.get("start")), asstr(r.get("end"))
-        evidence = asstr(r.get("evidence")) or asstr(r.get("why"))
+        evidence = free_text(r, ("evidence", "why"))
         # A seam filed before the kind existed carries no span; fall back to a fingerprint of its evidence so
         # two span-less findings do not collapse into one item with an empty target.
         span = "-".join(x for x in (start, end) if x)
@@ -421,18 +452,19 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
     elif kind == "flag":
         lib = norm_flag_target(r.get("lib"))
         change = norm_flag_defect(r.get("change"))
+        evidence = free_text(r, ("evidence", "why"))
         request = flag_is_request(r.get("change"))
         st = "open" if request else "done"
         key = ("flag", lib, change or "no-request")
-        ask = one_line(asstr(r.get("change")) or asstr(r.get("evidence"))) or (lib or "?")
+        ask = one_line(asstr(r.get("change")) or evidence) or (lib or "?")
         _merge(grouped, key, Item(kind="flag", target=lib or "?", defect=change or "no-request",
                                   status=st, default_status=st, ask=ask,
                                   filings=[Filing(source, lane, when,
-                                                  one_line(asstr(r.get("evidence")) or asstr(r.get("change")), 400))]))
+                                                  one_line(evidence or asstr(r.get("change")), 400))]))
     else:
         # `tooling` and anything else the schema drifts into: include it, default open, but never a rename.
         target = norm_file(r.get("file") or r.get("target") or r.get("what") or kind)
-        detail = asstr(r.get("why") or r.get("evidence") or r.get("change") or "")
+        detail = free_text(r, ("why", "evidence", "request", "change", "note"))
         st = "done" if kind == "done-in-this-fold" else "open"
         key = (kind, target, "other")
         _merge(grouped, key, Item(kind=kind, target=target, defect="other", status=st, default_status=st,
@@ -1153,6 +1185,11 @@ def _check_lint(main: str, item: Item, ctx: dict):
     symbols/splits map, so with the map absent it stays open rather than call itself resolved.
     """
     rule = LINT_RULES.get(item.kind)
+    # A lint kind filed as an outbox `config_requests` entry (`kind: naming`) with no file names the *kind* as
+    # its target (`norm_file(... or kind)`). It has no file to re-lint: it must stay open, not be called
+    # `stale` (which the next `triage --apply` would `park`, closing a real request).
+    if not _path_like(item.target):
+        return ("open", "no check: %r names no file to re-lint (a bare kind, not a lint finding)" % item.target)
     path = _resolve_repo_path(main, item.target)
     if not path:
         return ("stale", "the file no longer exists: %s" % item.target)
