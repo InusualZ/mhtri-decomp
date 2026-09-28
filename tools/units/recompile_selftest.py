@@ -486,19 +486,20 @@ def proposal_rows() -> int:
         # --- the target object: a run, a single-symbol object, and the errors
         run = os.path.join(main, "build", "RMHE08", "obj", "auto_03_80001000_text.o")
         one = os.path.join(main, "build", "RMHE08", "obj", "auto_fn_80002000_text.o")
-        failures = _ok("a run start resolves to the run object", rc.proposal_target(main, "fn_80001000")[0],
-                       run, failures)
+        failures = _ok("a run start resolves to the run object",
+                       rc.proposal_target(wt, main, "fn_80001000")[0], run, failures)
         failures = _ok("a symbol inside the run resolves to the same object",
-                       rc.proposal_target(main, "fn_80001020")[0], run, failures)
+                       rc.proposal_target(wt, main, "fn_80001020")[0], run, failures)
         failures = _ok("a single-symbol object is found by name",
-                       rc.proposal_target(main, "fn_80002000")[0], one, failures)
+                       rc.proposal_target(wt, main, "fn_80002000")[0], one, failures)
         failures = _ok("a data symbol is refused, not guessed",
-                       rc.proposal_target(main, "lbl_80000500")[0], None, failures)
-        failures = _ok("an unknown symbol is refused", rc.proposal_target(main, "no_such")[0], None, failures)
+                       rc.proposal_target(wt, main, "lbl_80000500")[0], None, failures)
+        failures = _ok("an unknown symbol is refused", rc.proposal_target(wt, main, "no_such")[0], None,
+                       failures)
         failures = _ok("an uncovered address is refused",
-                       rc.proposal_target(main, "fn_80004000")[0], None, failures)
+                       rc.proposal_target(wt, main, "fn_80004000")[0], None, failures)
         failures = _ok("the refusal names the address",
-                       "0x80004000" in rc.proposal_target(main, "fn_80004000")[1], True, failures)
+                       "0x80004000" in rc.proposal_target(wt, main, "fn_80004000")[1], True, failures)
 
         # --- the registered path is decided first, unchanged
         kind = rc.measure_target(main, "prop/unit", "fn_80002000")
@@ -557,6 +558,77 @@ def proposal_rows() -> int:
         failures = _ok("object_has_symbol is safe on a non-ELF",
                        rc.object_has_symbol(os.path.join(main, "build", "RMHE08", "obj", "main.o"),
                                             "anything"), False, failures)
+    return failures
+
+
+def map_invocation_rows() -> int:
+    """F43: the **map** `--measure` reads follows the invocation tree, not MAIN.
+
+    The filed refusal: a branch that renamed a symbol got "a symbol this branch renamed has no entry
+    there", because the address lookup read MAIN's `config/RMHE08/symbols.txt` - which has never carried
+    the branch's new spelling. `resolve_map`/`symbol_addresses` resolve the invocation tree's map first
+    and MAIN's second (the same discipline `resolve_target` applies to the object), and every name either
+    map places at the address is tried - MAIN named the retired `auto_*_text.o` after the *old* spelling,
+    so a rename must not lose the object either.
+    """
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = _fake_main(tmp)
+        wt = _fake_worktree(tmp)
+        wt_map = os.path.join(wt, "config", "RMHE08", "symbols.txt")
+        main_map = os.path.join(main, "config", "RMHE08", "symbols.txt")
+        os.makedirs(os.path.dirname(wt_map), exist_ok=True)
+        # the branch renamed fn_80002000 -> dispatch_event: only ITS map knows the new spelling
+        open(wt_map, "w", encoding="utf-8").write(
+            open(main_map, encoding="utf-8").read().replace("fn_80002000", "dispatch_event"))
+
+        path, kind = rc.resolve_map(wt, main)
+        failures = _ok("the map is the invocation tree's own copy", os.path.normcase(path),
+                       os.path.normcase(wt_map), failures)
+        failures = _ok("... labelled `worktree-map`", kind, "worktree-map", failures)
+        path, kind = rc.resolve_map(main, main)
+        failures = _ok("run from MAIN the map is MAIN's, unchanged", os.path.normcase(path),
+                       os.path.normcase(main_map), failures)
+        failures = _ok("... labelled `main-map`", kind, "main-map", failures)
+
+        # a renamed symbol must still find the retired object, which MAIN named after the OLD spelling
+        obj, kind, note = rc.resolve_target(wt, main, "prop/other", "dispatch_event")
+        failures = _ok("a symbol this branch renamed resolves the target", kind, "auto-fallback", failures)
+        failures = _ok("... to MAIN's retired single-symbol object", os.path.basename(obj),
+                       "auto_fn_80002000_text.o", failures)
+        failures = _ok("... found through the old name at the same address", "fn_80002000" in note, True,
+                       failures)
+
+        addresses, _map, _kind = rc.symbol_addresses(wt, main)
+        failures = _ok("the branch's name is in the merged map", addresses.get("dispatch_event"),
+                       0x80002000, failures)
+        failures = _ok("... and MAIN's old name at the same address too", addresses.get("fn_80002000"),
+                       0x80002000, failures)
+
+        # a worktree with no config of its own still reads MAIN's (the fallback half)
+        fresh = os.path.join(tmp, "fresh")
+        os.makedirs(fresh)
+        path, kind = rc.resolve_map(fresh, main)
+        failures = _ok("a worktree with no map falls back to MAIN's", os.path.normcase(path),
+                       os.path.normcase(main_map), failures)
+        failures = _ok("... labelled `main-map`", kind, "main-map", failures)
+        failures = _ok("and its lookup still works",
+                       rc.resolve_target(fresh, main, "prop/other", "fn_80002000")[1], "auto-fallback",
+                       failures)
+
+        # the refusal names the map it read, so "renamed" is never a guess
+        _p, kind, note = rc.resolve_target(wt, main, "prop/other", "not_a_symbol")
+        failures = _ok("an unknown symbol is still `missing`", kind, "missing", failures)
+        failures = _ok("... and the note names the map that was read", "worktree-map" in note, True,
+                       failures)
+
+        # the same order serves splits.txt - the helper is not symbols-specific
+        open(os.path.join(wt, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8").write(
+            "prop/unit.cpp:\n\t.text       start:0x80000000 end:0x80000100\n")
+        path, kind = rc.resolve_map(wt, main, rc.SPLITS_REL)
+        failures = _ok("the same order serves splits.txt", os.path.normcase(path),
+                       os.path.normcase(os.path.join(wt, "config", "RMHE08", "splits.txt")), failures)
+        failures = _ok("... and it is the worktree's", kind, "worktree-map", failures)
     return failures
 
 
@@ -768,6 +840,7 @@ def main() -> int:
     failures += switch_rows()
     failures += staleness_rows()
     failures += proposal_rows()
+    failures += map_invocation_rows()
     failures += resolve_invocation_rows()
     failures += main_root_rows()
     failures += integration_rows()

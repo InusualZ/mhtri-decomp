@@ -311,14 +311,18 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
     candidates = candidate_functions(obj)
     names = [name for name, _size in candidates]
 
-    # The fallback locates the target by address, so it needs a symbol even for a whole-unit run.
+    # The fallback locates the target by address, so it needs a symbol even for a whole-unit run - and the
+    # map that supplies the address is resolved from THIS tree outward (`rc.resolve_map`: a branch that
+    # renamed a symbol has its own `symbols.txt`). Both are reported, so the number is never ambiguous.
     probe = symbol or (names[0] if names else unit)
+    map_path, map_kind = rc.resolve_map(wt, main)
     target, kind, note = resolve_target(wt, main, unit, probe)
     result = {
         "unit": unit, "worktree": wt, "main": main, "object": obj, "compiled": True,
         "fresh": compiled.get("fresh"), "bytes": compiled.get("bytes"),
         "sections": compiled.get("sections") or {}, "command_source": command_source,
         "target": target, "target_kind": kind, "target_note": note,
+        "symbol_map": map_path, "symbol_map_kind": map_kind,
         "candidate": candidates,
     }
     if kind == "missing":
@@ -409,6 +413,10 @@ def format_report(r: dict, sort: str = "score", limit: int = None, quiet: bool =
         out.append("baseline  %s  (before = this saved report)" % r["baseline"])
     if r.get("target_note"):
         out.append("          %s" % r["target_note"])
+    if r.get("symbol_map"):
+        out.append("map       %s%s" % (r["symbol_map"],
+                                      "  [%s]" % r["symbol_map_kind"] if r.get("symbol_map_kind")
+                                      else ""))
     out.append("compiled  %s  (%s bytes, fresh=%s)" % (r["object"], r.get("bytes"),
                                                        r.get("fresh")))
     if r.get("score_error"):

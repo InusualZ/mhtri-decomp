@@ -26,6 +26,13 @@ gate's time, so a delegating pair is collapsed to its **tool** entry (the docume
 pair that does *not* delegate - `ledger.py --selftest` covers the per-0x10000 view, `ledger_selftest.py` the
 older views - keeps **both**, because neither is a duplicate of the other. `--no-dedupe` runs everything.
 
+**`--changed` maps sources, not only `tools/` (F37).** A batch that edits only docs can still break an
+invariant, and no `tools/**` selftest covers it: `docs/plan.md` is the source of the section-6.5 block
+generated into `.agents/agents/*.md` (`tools/agents/sync_profiles.py`), and `docs/matching.md` is the source
+of the skill's `references/` (`.agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check`). Both
+are selected when the diff touches those sources, so a docs batch verifies itself instead of reporting
+"GREEN, 0 selftests". The mapping is `SOURCE_ENTRIES`/`SOURCE_CHECKS` below.
+
 **Parallel, bounded, and never able to hang the gate.** Each selftest runs in a bounded worker pool with a
 per-test timeout; on timeout the whole process tree is killed (several tests shell out to `ninja` and the
 compiler, so a wedged child is a real risk, not a formality). The aggregate table names every tool, its check
@@ -69,6 +76,26 @@ COUNT_PATTERNS = (
     re.compile(r"(\d+)\s+checks?\b", re.I),
 )
 
+SR_REL = ".agents/skills/mwcc-unit-matching/scripts/sync_reference.py"
+
+# **A diff outside `tools/` still owns invariants (F37).** `--changed` used to map only `tools/**` diffs, so
+# a docs/profiles batch reported "GREEN, 0 selftests" while the invariant it can break was exactly the one
+# nobody ran: the *generated* copies of those docs drifting from the source. Two mappings, because the two
+# shapes differ - `docs/plan.md` is the source of the section-6.5 block generated into
+# `.agents/agents/*.md`, and `tools/agents/sync_profiles.py`'s own selftest checks the real tree for that
+# drift (`sync_profiles.check_profile`, i.e. what its `--check` does); `docs/matching.md` is the source of
+# the skill's `references/`, and `sync_reference.py` lives under `.agents/`, so `discover()` (which walks
+# `tools/`) never sees it and there is no entry to select - its `--check` runs as a synthetic entry.
+#
+# `SOURCE_ENTRIES`: source path -> selftest entry keys it must select.
+# `SOURCE_CHECKS`:  source path -> ((tool path relative to the root, extra argv), ...) to run as `--check`.
+SOURCE_ENTRIES = {
+    "docs/plan.md": ("tools/agents/sync_profiles",),
+}
+SOURCE_CHECKS = {
+    "docs/matching.md": ((SR_REL, ("--check",)),),
+}
+
 
 class Entry:
     """One tested tool. `key` is stable across whichever half of a wrapper pair is run."""
@@ -82,6 +109,21 @@ class Entry:
         # the target actually executed, and the mechanism
         self.target = tool or standalone
         self.kind = "tool" if tool else "standalone"
+        self.check_argv: list[str] | None = None   # set for a synthetic `--check` entry (F37)
+
+    def as_check(self, argv: list[str]) -> "Entry":
+        """Turn this entry into a `--check` run of a tool outside `tools/` (F37).
+
+        `target` becomes the tool path, so the table, the park list and the failure line all name a real
+        file; `argv` is the whole command, because a check has no `--selftest` flag to fall back on. The
+        check is added whatever the filesystem says: a check that cannot run is a failure to verify, not a
+        silent skip.
+        """
+        self.kind = "check"
+        self.check_argv = list(argv)
+        if len(argv) > 1:
+            self.target = argv[1]
+        return self
 
     @property
     def name(self) -> str:
@@ -89,6 +131,8 @@ class Entry:
 
     @property
     def argv(self) -> list[str]:
+        if self.check_argv is not None:
+            return self.check_argv
         if self.kind == "tool":
             return [sys.executable, self.target, "--selftest"]
         return [sys.executable, self.target]
@@ -274,8 +318,39 @@ def _park_matches(park: dict, entry: Entry) -> bool:
     return False
 
 
+def mapped_entries(changed: list[str]) -> list[str]:
+    """Selftest entry keys a diff's non-`tools/` sources select (F37), in table order.
+
+    Pure - no git, no filesystem - so `--selftest` can pin the mapping without a repository.
+    """
+    out: list[str] = []
+    for src in changed:
+        for key in SOURCE_ENTRIES.get(src.replace("\\", "/"), ()):
+            if key not in out:
+                out.append(key)
+    return out
+
+
+def mapped_checks(changed: list[str]) -> list[tuple[str, list[str]]]:
+    """`(entry name, argv tail)` for every non-`tools/` source that owns a `--check` (F37).
+
+    The name is what the table prints and the park list matches (`<tool> --check`); the argv tail is
+    relative to the root the run uses as cwd.
+    """
+    out, seen = [], set()
+    for src in changed:
+        for rel, extra in SOURCE_CHECKS.get(src.replace("\\", "/"), ()):
+            name = "%s %s" % (rel, " ".join(extra))
+            if name in seen:
+                continue
+            seen.add(name)
+            out.append((name, [rel, *extra]))
+    return out
+
+
 def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[list[Entry], list[str]]:
-    """The selftests of the tools a diff touches; also the paths no selftest claims."""
+    """The selftests of the tools a diff touches, plus the checks a non-`tools/` source owns (F37); also
+    the paths no selftest claims."""
     rng = ref or "HEAD"
     p = subprocess.run(["git", "diff", "--name-only", rng], cwd=root, capture_output=True,
                        text=True, encoding="utf-8", errors="replace")
@@ -310,6 +385,23 @@ def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[l
             if imports & changed_mods:
                 picked.append(entry)
                 claimed |= set(files)
+
+    # 3. a diff outside `tools/` whose generated copies this runner would otherwise never check (F37):
+    #    `docs/plan.md` selects the tool whose selftest validates the generated block against it, and a
+    #    source with no selftest entry of its own runs that tool's `--check` as a synthetic entry.
+    names = {e.name for e in picked}
+    by_key = {e.key: e for e in entries}
+    for key in mapped_entries(changed):
+        entry = by_key.get(key)
+        if entry is not None and entry.name not in names:
+            picked.append(entry)
+            names.add(entry.name)
+    for name, tail in mapped_checks(changed):
+        if name in names:
+            continue
+        picked.append(Entry(name, None, None).as_check([sys.executable, *tail]))
+        names.add(name)
+    picked.sort(key=lambda e: e.name)
     unclaimed = [c for c in changed if c not in claimed and c.endswith(".py")]
     return picked, unclaimed
 
@@ -326,11 +418,12 @@ def format_table(results: list[dict]) -> str:
 
 
 def selftest() -> int:
-    """The runner's own checks - discovery/dedupe, the count parser, park matching - on fixtures only.
+    """The runner's own checks - discovery/dedupe, the count parser, park matching, the `--changed`
+    mapping - on fixtures and this tree's inventory.
 
     `tools/selftest.py` exposes `--selftest`, so `discover` finds it and the suite runs these checks as one
-    more entry. They never touch git and never spawn a test: the discovery fixtures are a temp `tools/` tree
-    and the runner's own `--selftest` only exercises pure functions.
+    more entry. They never **run** git and never spawn a test: the discovery fixtures are a temp `tools/`
+    tree, the `--changed` composition replaces `subprocess.run`, and nothing here writes a file.
     """
     import tempfile
     fails, checks = [], 0
@@ -388,6 +481,43 @@ def selftest() -> int:
         check("a park on the tool matches", _park_matches({"target": "tools/units/alpha.py"}, alpha), True)
         check("a park on an unrelated target does not match",
               _park_matches({"target": "tools/units/zeta_selftest.py"}, alpha), False)
+
+    # --- F37: a diff outside `tools/` still has to select the check that owns its invariant --------------
+    check("docs/plan.md selects the sync_profiles selftest", mapped_entries(["docs/plan.md"]),
+          ["tools/agents/sync_profiles"])
+    check("a tools-only diff maps to no extra entry", mapped_entries(["tools/units/measure.py"]), [])
+    check("a Windows-style path maps identically", mapped_entries(["docs\\plan.md"]),
+          ["tools/agents/sync_profiles"])
+    md_checks = mapped_checks(["docs/matching.md"])
+    check("docs/matching.md selects the skill's sync_reference check",
+          [name for name, _tail in md_checks], [SR_REL + " --check"])
+    check("... and the argv runs that tool with --check",
+          md_checks[0][1] if md_checks else None, [SR_REL, "--check"])
+    check("a source with no mapped check maps to nothing", mapped_checks(["docs/plan.md"]), [])
+
+    # the composition, with git replaced: a `docs/*.md`-only diff must select a runnable entry each
+    entries, _ignore = discover(ROOT)
+    real_run = subprocess.run
+
+    def fake_git(changed):
+        def run(argv, **kwargs):
+            if list(argv[:3]) == ["git", "diff", "--name-only"]:
+                return subprocess.CompletedProcess(argv, 0, changed + "\n", "")
+            if list(argv[:2]) == ["git", "ls-files"]:
+                return subprocess.CompletedProcess(argv, 0, "", "")
+            return real_run(argv, **kwargs)
+        return run
+
+    try:
+        for source, want in (("docs/plan.md", [("tools/agents/sync_profiles", "tool", "--selftest")]),
+                             ("docs/matching.md", [(SR_REL + " --check", "check", "--check")])):
+            subprocess.run = fake_git(source)
+            picked, unclaimed = changed_entries(entries, "HEAD", ROOT)
+            check("a %s-only diff selects %s" % (source, want[0][0]),
+                  [(e.name, e.kind, e.argv[-1]) for e in picked], want)
+            check("... and claims it (nothing unclaimed)", unclaimed, [])
+    finally:
+        subprocess.run = real_run
 
     for f in fails:
         print("FAIL " + f)

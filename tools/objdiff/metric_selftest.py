@@ -180,6 +180,26 @@ def wire_tmpdir() -> int:
         failures = _ok("and its report_json is in that dir",
                        os.path.normcase(os.path.abspath(os.path.dirname(m.get("report_json") or ""))),
                        os.path.normcase(os.path.abspath(first)), failures)
+
+        # `objdiff()`'s default `out` is the last shared scratch path: a per-file
+        # `build/tmp/<lib>_<file>_diff.json`, so two concurrent lanes measuring the same unit wrote and
+        # read the same rows. It routes through the same per-invocation helper now.
+        unit = uu.Unit(name="main/Lib/file", lib="Lib", file="file", version="RMHE08",
+                       src=os.path.join(ROOT, "src", "Lib", "file.cpp"),
+                       obj_dir=os.path.join(tmp, "src", "Lib"),
+                       obj=os.path.join(tmp, "src", "Lib", "file.o"),
+                       target=os.path.join(tmp, "obj", "Lib", "file.o"))
+        default_out, _log = uu.objdiff(unit, "fn_1", runner=runner)
+        failures = _truthy("objdiff's default out is in the session scratch dir",
+                           os.path.normcase(os.path.abspath(os.path.dirname(default_out or "")))
+                           == os.path.normcase(os.path.abspath(first)), failures)
+        failures = _truthy("... and not the shared per-file build/tmp path",
+                           os.path.normcase(os.path.abspath(default_out or ""))
+                           != os.path.normcase(os.path.abspath(os.path.join(ROOT, "build", "tmp",
+                                                                           "Lib_file_diff.json"))),
+                           failures)
+        failures = _truthy("... and the file the runner wrote is there",
+                           bool(default_out) and os.path.exists(default_out), failures)
     return failures
 
 
