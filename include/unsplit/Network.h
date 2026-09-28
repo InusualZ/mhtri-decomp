@@ -14,11 +14,13 @@
 #include "types.h"
 
 typedef struct NetworkErrorInfo NetworkErrorInfo;
+/* the record's layout lives in `include/Network/fn_803D3CE8.h`, beside the GameSpy handshake that
+ * fills it: `NetworkInstance::postError` below only takes a pointer to it. */
 
 /* the DWC callbacks are installed as unprototyped pointers and the callee casts them back */
 typedef void (*NetworkCallback)();
 
-/* ---- the game's debug/log manager (`fn_803C9974` returns the singleton) ---------------------- */
+/* ---- the game's debug/log manager (`getNetworkLogger` returns the singleton) ---------------------- */
 
 /* The log manager is dispatched through, never constructed here, so it is a class with the real
  * virtuals and no vtable in our object: retail's `lwz r12, 0x0(r3)` / `lwz r12, 0xC(r12)` shape is
@@ -45,6 +47,11 @@ public:
     /* +0x44 */ virtual void pad_44();
     /* +0x48 */ virtual u16  flag_48(u16 value);
     /* +0x4C */ virtual u16  encode_4C(u32 value);
+    /* +0x50 */ virtual void pad_50();
+    /* +0x54 */ virtual void pad_54();
+    /* +0x58 */ virtual void pad_58();
+    /* +0x5C */ virtual void pad_5C();
+    /* +0x60 */ virtual f32  getTime_60();
 };   /* size: 0x04 (the object's leading vtable word) */
 
 /* ---- the network singleton `getInstance_` returns -------------------------------------------- */
@@ -235,7 +242,7 @@ public:
 extern "C" {
 
 /* debug manager */
-NetworkLogger* fn_803C9974(void);
+NetworkLogger* getNetworkLogger(void);
 
 /* network singleton and its callbacks.  `getInstance_` (0x803768F0) is owned by
  * `enemy/em020_ai.cpp` now that its range is registered - rule 2: the declaration moved to the

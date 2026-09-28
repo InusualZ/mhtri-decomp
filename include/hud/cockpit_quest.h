@@ -15,7 +15,7 @@
  *
  * The outbound callees whose owners are registered are declared in the owner's header and included
  * from the source (`pl.h`, `Pl/pl_skill.h`, `Pl/pl_act.h`, `Pl/pl_master.h`, `hud/layout.h`,
- * `main.h`, `fn_80429B94.h`).  The rest are unsplit (their band has no registered unit), so their
+ * `main.h`, `Network/network_pat_control.h`).  The rest are unsplit (their band has no registered unit), so their
  * declarations live here with the signature the target's call site shows (rule 2's unsplit case,
  * the same debt `include/hud/layout.h` records).
  */

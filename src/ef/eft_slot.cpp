@@ -193,7 +193,7 @@
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
 #include "fn_8004CAD8.h" /* the vector/geometry helpers the range calls */
-#include "fn_80429B94.h" /* fn_8042CC20 */
+#include "Network/network_pat_control.h" /* fn_8042CC20 */
 #include "camera/camera.h" /* get_camera_pos / get_camera_direction / fn_802BE088 */
 #include "ef/fn_800CDB2C.h" /* my_player_no (`fn_800CF384` before the hud/move_work_update landing named it) */
 #include "ef/eft_slot.h" /* fn_803386C4 - its owner (`hud/fn_80334568.cpp`) owns the address, its header is unreachable here */

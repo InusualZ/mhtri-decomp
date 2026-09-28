@@ -11,7 +11,7 @@
  * Rule-2 debt, recorded rather than guessed.  The callees whose owner is a registered unit are included
  * from the owner's header; only the ones no header carries at all (`fn_8027D5A4`, `fn_8028BD54`,
  * `fn_8042C9C8`, `fn_8042CB9C`, `fn_8042CC20`, `em_get_unique_work`, `lbl_805E1ED0`) are re-declared
- * below, and the fold into `Pl/pl_act.h`, `Pl/fn_80288CEC.h`, `fn_80429B94.h` and
+ * below, and the fold into `Pl/pl_act.h`, `Pl/fn_80288CEC.h`, `Network/network_pat_control.h` and
  * `include/unsplit/unknown.h` is a `shared-file` request in this unit's outbox, not this unit's edit.
  */
 #ifndef MHTRI_HUD_NET_CHAR_SYNC_H
@@ -237,9 +237,9 @@ s8 fn_80274808(struct _PLW* plw);                                    /* Pl/fn_80
 void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask);       /* Pl/fn_80273B14.cpp */
 void fn_8027D5A4(struct _PLW* self, s32 param);                                 /* Pl/pl_act.cpp */
 u32 fn_8028BD54(void);                                                          /* Pl/fn_80288CEC.cpp */
-void fn_8042C9C8(const void* msg, u32 size);                                    /* fn_80429B94.cpp */
-u32 fn_8042CB9C(void);                                                          /* fn_80429B94.cpp */
-u32 fn_8042CC20(void);                                                          /* fn_80429B94.cpp */
+void fn_8042C9C8(const void* msg, u32 size);                                    /* Network/network_pat_control.cpp */
+u32 fn_8042CB9C(void);                                                          /* Network/network_pat_control.cpp */
+u32 fn_8042CC20(void);                                                          /* Network/network_pat_control.cpp */
 extern u8 lbl_805E1ED0[];                                                       /* .data 0x805E1ED0 */
 
 #ifdef __cplusplus

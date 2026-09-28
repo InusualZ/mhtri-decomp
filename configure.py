@@ -2803,18 +2803,30 @@ config.libs = [
             # 0x80603750 / 0x806037F4 and the so/dwc alloc-failure strings at 0x80603888; no
             # `__FILE__` string and no runtime-dump source name cover the range (class 3/4 in the
             # brief), so the stem is the map's `fn_80423E74` with a rule-7 deferral.  Same game-root
-            # `main` lib and cflags_main as the link neighbour `fn_80429B94.cpp` below it (both
-            # dereference `net_ctrl_wk` and call `getPatsObject`/`getNetworkLayerPat`).
+            # `main` lib and cflags_main as the link neighbour `Network/network_pat_control.cpp`
+            # below it (both dereference `net_ctrl_wk` and call `getPatsObject`/`getNetworkLayerPat`).
             Object(NonMatching, "fn_80423E74.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80429B94_fn_80429B94` - the 0x80429B94-0x8043065C network/server-control band (114
+            # `80429B94_fn_80429B94` - the 0x80429B94-0x8043065C network pat-control band (114
             # functions, 27336 B) with extab 0x8001D368-0x8001D558 and extabindex 0x8003DE54-0x8003E0DC.
             # Game code that drives getPatsObject/getNetworkSessionManagerPat and reads the lobby
             # singleton `lobby_w`; no `__FILE__` string and no runtime-dump source name cover the
-            # range, so the stem is the map's `fn_80429B94` with a rule-7 deferral (classes 3/4).  It
-            # takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
+            # range, so the name is evidence class 3 - the band's own vocabulary (`getPatsObject`,
+            # `getNetworkSessionManagerPat`, `updatePatInterface180`, `setPatField854`) plus the
+            # module its four sibling units share - and the generated stem `fn_80429B94.cpp` is gone.
+            # It takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
             # -Cpp_exceptions on - the target object carries extab/extabindex).
-            Object(NonMatching, "fn_80429B94.cpp"),
+            Object(NonMatching, "Network/network_pat_control.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): the key function of
+            # `NetworkSessionManagerPat` - `move` (0x803D70B8, 572 B), the head of the queue's
+            # `803D70B8_fn_803D70B8` band.  MWCC emits a class's vtable in the TU that defines its key
+            # function, and the target's `__vt__24NetworkSessionManagerPat` (0x805FB0F0) sits in this
+            # band's own `.data` run (0x805FAAD0.., right after `Network/NetworkSessionManagerPat`'s
+            # base table), so the unit claims the key function's `.text` extent, the table's `.data`
+            # extent and the 1.0f circle-info interval at 0x8079C758.  Same game-root `main` lib and
+            # cflags_main as its link neighbours (the object carries extab/extabindex for the rest of
+            # the band, and C++ virtual dispatch).
+            Object(NonMatching, "Network/NetworkSessionManagerPat.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `805482CC_fn_805482CC` - the 0x805482CC-0x8054E894 game-UI band (71 functions /
             # 26056 B) between the registered `DWCi/fn_805113B0.c` and `homebutton/fn_80555374.cpp`.

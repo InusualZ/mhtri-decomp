@@ -1,44 +1,72 @@
 /*
- * fn_80429B94.cpp - the 0x80429B94-0x8043065C network/server-control band (114 functions, 27336 B).
+ * Network/network_pat_control.cpp - the 0x80429B94-0x8043065C network pat-control band
+ * (114 functions, 27336 B).
  *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py: every address in the range answers `zz_<addr>_` or a global name, never a
- * `__FILE__` emitter; the whole unit's `.data` pool carries the strings "so_alloc_fail",
- * "dwc_alloc_fail", "mh3uswii" and "mh.capcom.co.jp" and no bare source-file name).  The real names
+ * NAMING (the file name, and the unit's own subject).  The range carries no `__FILE__` string - its
+ * `.data` pool holds the alloc-failure strings, `mh3uswii`, `mh.capcom.co.jp`, `SPACE_STR` and no bare
+ * source-file name - and the runtime dump answers `zz_<addr>_` for every address in it; the real names
  * the map does spell out (`can_enter_server`, `get_server_type_name`, `get_server_type_desc`,
  * `get_server_big_data_offset_element`, `get_network_sub_error_msg`, `getOnlineSupportCode`,
- * `CalculateEvents`) are network/server-control entry points.
+ * `CalculateEvents`) describe one subject: the server select the band runs through the `net_ctrl_wk`
+ * work record.  What it drives is the **Pat** layer - its own vocabulary is `getPatsObject`,
+ * `getNetworkSessionManagerPat`, `getNetworkCommunityPat`, `getNetworkLayerPat`,
+ * `updatePatInterface180`, `loadPatInterfaceBuffers`, `setPatField854`/`setPatField860` - so the file
+ * takes that word: evidence class 3 (behaviour plus the sibling units' scheme), with the module
+ * `Network/`, which is where the four other units of this subsystem sit (`Network/NetworkPat.cpp`,
+ * `Network/network_state.cpp`, `Network/initNetworkSessionStable.cpp`, `Network/fn_803D3CE8.cpp`).
+ * The previous stem was the map's start address (`fn_80429B94.cpp`), which the landing gate refuses as
+ * a unit name.
  *
- * Home and lib, from evidence (brief section 2, classes 3/4): no `__FILE__` string and no runtime-dump
- * source name cover the range, so the file keeps the map's `fn_80429B94` stem.  The code is game code
- * (it drives `getPatsObject`/`getNetworkSessionManagerPat` and reads the lobby singleton `lobby_w`),
- * not SDK code, and the object carries extab/extabindex (C++ exceptions on) - so it takes the `main`
- * game-root lib's flags (`cflags_main`: `Wii/1.3`, `-O3`, `-inline noauto`, `-Cpp_exceptions on`),
- * like the other un-moduled game-root units beside `main.cpp`.  The module is genuinely un-evidenced;
- * the nearest registered units (Camellia below, Runtime.PPCEABI.H above) name different modules, so
- * the file sits at the repository root and this header records the gap.
+ * Home and lib, from evidence (brief section 2, classes 3/4): the code is game code (it drives
+ * `getPatsObject`/`getNetworkSessionManagerPat`, reads the lobby singleton and the `net_ctrl_wk` work
+ * record), not SDK code, and the object carries extab/extabindex (C++ exceptions on) - so it takes the
+ * game-root `main` lib's flags (`cflags_main`: `Wii/1.3`, `-O3`, `-inline noauto`, `-Cpp_exceptions
+ * on`), like the un-moduled game-root units it was registered beside.
  *
  * Sections this unit owns: .text 0x80429B94..0x8043065C, extab 0x8001D368..0x8001D558 (54 records,
  * 496 B), extabindex 0x8003DE54..0x8003E0DC (54 records).  The `.data` jump tables owned by functions
  * in the range are claimed separately (playbook 53); the hand-written labels between them are the
  * neighbouring proposals' and are filed as `range` config_requests, not claimed.
  *
- * Score at this commit and the residuals are below; re-measure with
- * `python tools/units/recompile.py fn_80429B94 --measure <symbol>`.
+ * TYPES.  The session manager this band dispatches through is the real class
+ * `NetworkSessionManagerPat` (`include/Network/fn_803D3CE8.h`, its owner's header): the slot +0x00 of
+ * the holder the accessors walk, the object `__ct__24NetworkSessionManagerPatFv` (0x803D68D0) builds,
+ * whose constructor stores the class's vtable 0x805FB0F0 at +0x00.  The two calls this band makes on
+ * it are the class's own virtuals - `broadcastPlayerSlots` (+0x128) and `flush` (+0x148) - not
+ * address-keyed slots of a hand-written table, so the virtual dispatch is MWCC's own
+ * (`lwz r12,0(r3)` / `lwz r12,<slot>(r12)`).
  *
- * Residuals: fn_80429B94 (the 0x2C68 B state machine, three jump tables), fn_8042D44C, fn_8042FB84
- * and fn_8042FFF0 are not reconstructed yet; every remaining function keeps its map name (rule 7
- * deferral above).
+ * NAMING GUESSES.  `updateNetworkPatControl` (0x80429B94, the range's namesake: the 0x2C68 B state
+ * machine with three jump tables) is **GUESSED** from its only caller, `fn_8042C7FC` ("focus the
+ * network-control work when it is idle") and from its own prologue, which gates on `net_ctrl_wk`'s
+ * state and flags before dispatching - i.e. the band's per-frame update.  It is not reconstructed yet.
+ *
+ * Score at this commit and the residuals are below; re-measure with
+ * `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`.
+ *
+ * Residuals: `updateNetworkPatControl` (the 0x2C68 B state machine, three jump tables), fn_8042D44C,
+ * fn_8042FB84 and fn_8042FFF0 are not reconstructed yet; the band's other functions that this file
+ * does not define keep their map names - pre-existing rule-7 debt (about 40 definitions) that a
+ * reconstruction pass retires with the bodies, the same way the rows written here were named.
  */
 
-#include "fn_80429B94.h"
+#include "Network/network_pat_control.h"
+#include "Network/fn_803D3CE8.h"   /* NetworkSessionManagerPat - the class the band dispatches through */
+#include "Runtime.PPCEABI.H/memset.h"            /* memset, owner Runtime.PPCEABI.H/memset.c (rule 2) */
+#include "unsplit/Runtime.PPCEABI.H.h"           /* strcpy - unowned MSL helper (rule 2's unsplit gap) */
+#include "g3d/g3d_anmchr.h"                      /* flfntStrLen, owner g3d/g3d_anmchr.cpp (rule 2) */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* The work-record singleton itself (`.sbss:0x80794CF8`, 4 B).  Its owner TU is unregistered and every
+ * function in this band dereferences it, so this unit claims the range (rule 12) and defines it here;
+ * `Network/fn_80423E74.cpp` reaches the same row through the header's `extern`. */
+NetCtrlWk* net_ctrl_wk;
+
 /* --- forward declarations of this unit's own entry points --- */
-void fn_80429B94(void);
+void updateNetworkPatControl(void);
 void fn_8042C7FC(void);
 BOOL fn_8042C814(void);
 u8 fn_8042C844(void);
@@ -53,16 +81,13 @@ u8 fn_8042CBB4(void);
 s32 fn_8042CCE4(u8* bytes);
 BOOL fn_8042CB6C(u32 index);
 
-char* strcpy(char* dst, const char* src);
-void* memset(void* dst, int value, u32 size);
-
 /*
  * Focus the network-control work when it is idle.
  */
 void fn_8042C7FC(void)
 {
     if (net_ctrl_wk->state_0x011 != 0) {
-        fn_80429B94();
+        updateNetworkPatControl();
     }
 }
 
@@ -120,7 +145,6 @@ BOOL fn_8042C8B0(void)
 {
     return fn_803DF1A8(getNetworkSessionManagerPat(getPatsObject(), 0));
 }
-
 /*
  * The lowest occupied server index, or 0 when none is.
  */
@@ -168,8 +192,9 @@ void fn_8042C9C8(u32 a, u32 b)
     NetCtrlWk* work = net_ctrl_wk;
 
     if (fn_8042C8B0() != 0 && work->state_0x011 == 7) {
-        void* manager = getNetworkSessionManagerPat(getPatsObject(), 0);
-        (*(NetSessionManagerVtbl**)manager)->fn_0x128(manager, a, b);
+        NetworkSessionManagerPat* manager = getNetworkSessionManagerPat(getPatsObject(), 0);
+
+        manager->broadcastPlayerSlots(a, b);
     }
 }
 
@@ -181,8 +206,9 @@ void fn_8042CA44(void)
     NetCtrlWk* work = net_ctrl_wk;
 
     if (fn_8042C8B0() != 0 && work->state_0x011 == 7) {
-        void* manager = getNetworkSessionManagerPat(getPatsObject(), 0);
-        (*(NetSessionManagerVtbl**)manager)->fn_0x148(manager);
+        NetworkSessionManagerPat* manager = getNetworkSessionManagerPat(getPatsObject(), 0);
+
+        manager->flush();
     }
 }
 

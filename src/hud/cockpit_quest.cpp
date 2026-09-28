@@ -165,7 +165,7 @@
 #include "hud/layout.h"
 #include "hud/cockpit_quest.h"
 #include "main.h"
-#include "fn_80429B94.h"
+#include "Network/network_pat_control.h"
 #include "menu/menu_item.h"
 #include "menu/get_pop_dat_ptr.h"
 #include "unsplit/unknown.h"
