@@ -394,6 +394,12 @@ extern u8 lbl_80791C40[2];
 extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
 extern u8 lbl_80794880[];
+/* The four 6-entry sprite/index tables `fn_803A4F7C`/`fn_803A5070` search, and the flat u16 run
+ * their search continues into (both terminated by a 0 entry).  The addresses are in the unclaimed
+ * `.data` run 0x805F2038..0x805F2A38 / `.sdata` run 0x80793530.., which no registered unit owns
+ * (rule 2: the band header carries them). */
+extern const u16* note_slot_table[4];
+extern const u16 note_slot_flat_table[];
 /* The `.data` pair/lookup tables the lobby list band reads: `lbl_805F0EC8[kind]` is a pointer to a
  * table of 6-byte-stride records whose first u16 is the key, terminated by an entry whose u16 is
  * 0xFFFF (`lb_ui_pair_lookup`, `lb_ui_pair_offset`).  The `.data` range 0x805F0EC8 is unclaimed, so

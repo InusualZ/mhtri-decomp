@@ -2597,6 +2597,20 @@ config.libs = [
             # `em009_prog_tbl` entry slots end) - both are in the unit header and the outbox.
             # Same `cflags_lobby` as its siblings with the per-file `#pragma exceptions on`.
             Object(NonMatching, "lobby/lb_quest_ui.cpp"),
+            # Registered once, at its final home from proposal/803A3A50_fn_803A3A50 (`.text`
+            # 0x803A3A50..0x803AA4A4, 95 functions / 27220 B; extab 0x8001882C..0x80018A6C and
+            # extabindex 0x80038AA8..0x80038E08, both exactly the gap the bracketing registered
+            # units leave; `.data` 0x805F2038..0x805F2090, the range's two private switch tables).
+            # Module `lobby` and the file name `lb_quest_screen.cpp` are a MARKED GUESS (see the
+            # unit header): no `__FILE__` string covers the range, the dump answers `zz_` for 92 of
+            # its 95 functions, and the range is a `--max-bytes` cap over five different bands.  The
+            # module comes from the range's globals and API (`lobby_w`, `lb_param_w`, `Screen_w`,
+            # `lbl_80794880`, `LbStr`, `lb_item_get_data`, `subTransSet`) and the nearest registered
+            # same-lib family (`lobby/lb_quest_ui.cpp`, `lobby/lb_quest_board.cpp`).  C++ with
+            # exceptions on (every framed function of the range owns an extab record).  Same
+            # `cflags_lobby` as its siblings; the seam is unproven and the unit header lists the
+            # five bands and the bodies still to write.
+            Object(NonMatching, "lobby/lb_quest_screen.cpp"),
         ],
     },
     {

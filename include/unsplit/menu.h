@@ -32,11 +32,10 @@ void draw_lsp_element(void*, u8, u8, u16);   /* 0x802E00A4 */
 void fn_802E03D4(void*, s32, void*);    /* 0x802E03D4 */
 void fn_802E0468(u8, s32);              /* 0x802E0468 */
 s32 fn_802E06B0(u16, void*, void*);     /* 0x802E06B0 */
-s32 fn_803A87E0(void);                  /* 0x803A87E0 */
-s32 fn_803A881C(void);                  /* 0x803A881C */
-s32 fn_803A8858(void);                  /* 0x803A8858 */
-s32 fn_803A9690(void);                  /* 0x803A9690 */
-s32 fn_803AA41C(s32, f32);              /* 0x803AA41C */
+/* The five symbols below moved to their owner's header when proposal `803A3A50_fn_803A3A50`
+ * registered `src/lobby/lb_quest_screen.cpp` over them (docs/plan.md 6.5 rule 2); this include
+ * re-exports them for the units that already take this header. */
+#include "lobby/lb_quest_screen.h"
 u32 fn_803AB190(s32);                   /* 0x803AB190 */
 u32 fn_803B521C(s32);                   /* 0x803B521C */
 void fn_803B6078(u16, u16*);            /* 0x803B6078 */
