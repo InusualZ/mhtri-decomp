@@ -643,14 +643,8 @@ void fn_802E646C(void) {
 void fn_802E6AAC(void) {
 }
 
-/* `Screen_w` (0x8065903C, .bss, unsplit): only the frame scale at +0x14, the one this band reads.
- * size: 0x54 */
-struct ScreenGeomView {
-    /* +0x00 */ u8 unused_0x00[0x14];
-    /* +0x14 */ f32 field_0x14;
-    /* +0x18 */ u8 unused_0x18[0x54 - 0x18];
-}; /* size: 0x54 */
-extern "C" ScreenGeomView Screen_w;
+/* `Screen_w` and its `ScreenGeomView` view come from `include/unsplit/menu.h` (rule 1: this unit
+ * was the first user, `menu/arena_result.cpp` the second). */
 
 struct SprDataView {
     /* +0x000 */ u8 unused_0x000[0x1C];

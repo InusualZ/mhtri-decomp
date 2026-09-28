@@ -17,6 +17,7 @@
 /* The record `note_pane_get_motion` takes, forward-declared so that this header stays a leaf: it is
  * included from `include/unsplit/menu.h`, which the whole menu band takes. */
 struct NoteWork;
+struct QuestWork;
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,10 @@ s32 fn_803A881C(void);
 s32 fn_803A8858(void);
 s32 fn_803A9690(void);
 s32 fn_803AA41C(s32, f32);
+
+/* 0x803A9DEC - writes one 0x60-byte quest-work element's value.  The caller owns the payload,
+ * so the record stays a forward declaration here and the value is untyped. */
+void quest_element_set(struct QuestWork* work, u8 index, void* value); /* untyped: caller-owned payload */
 
 
 #ifdef __cplusplus

@@ -796,6 +796,7 @@ config.libs = [
             # `.sdata2`/`.bss`/`.sbss` runs are claimed by the pass that writes the bodies emitting
             # them (docs/plan.md 8.4).  Same `cflags_menu` as its menu siblings.
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
+            Object(NonMatching, "menu/arena_result.cpp"),
             # Registered once, at its final home, from proposal/803AA4A4_fn_803AA4A4.cpp: the quest
             # entry/init band (`.text` 0x803AA4A4..0x803B0F98, 70 functions / 27380 B) with extab
             # 0x80018A6C..0x80018C54 (60 records) and extabindex 0x80038E08..0x800390E4 (60 x 12 B) -
