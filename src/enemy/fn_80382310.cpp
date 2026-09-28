@@ -56,7 +56,7 @@
  *   - **`fn_80385C64`/`fn_80385C70`/`fn_80385C80` (60/45/45 %).**  The three MHchar tail-call thunks
  *     differ in the argument-narrowing the compiler inserts before the `b` (12 B vs the target's 16 B
  *     for the two 3-argument forms).
- *   - **`fn_80385AD4` (60 %).**  The body is right but MWCC knows the u8 parameters are already narrow
+ *   - **`note_pane_set_anim_pair` (60 %).**  The body is right but MWCC knows the u8 parameters are already narrow
  *     and drops the two `clrlwi` the retail object carries (12 B vs 20 B).
  *   - **`fn_80384B34` (74.8 %), `fn_803857BC` (76.8 %), `fn_803852B8` (79.3 %), `fn_80382C00` (73.4 %),
  *     `fn_80382F94` (90.9 %).**  Sign/narrowing and load-order residuals inside otherwise-correct bodies.
@@ -75,6 +75,8 @@
 #include "enemy/fn_80147CE0.h"
 #include "sound/fn_800DD1F0.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "enemy/note_work.h" /* NoteWork and the pane/slot/layout types (rule 1) */
+#include "lobby/lb_quest_screen.h" /* note_pane_get_motion (rule 2: the owner's header) */
 
 /* --- the declarations this band's bodies need (the owners are not registered yet; the address of
  * each sits inside 0x80380000.., the band this unit opens) ------------------------------- */
@@ -101,99 +103,9 @@ struct NotePane {
     /* +0x19E */ u16 field_0x19E;
 };
 
-/* The +0x110 pointer the pane's scene-model teardown reads: it lives over the `MHchar`'s padding
- * (`MHchar` occupies +0x04..+0x168), so it is the model view's own field.
- * size: 0x164 */
-struct NoteModelView {
-    /* +0x000 */ u8 pad_0x000[0x10C];
-    /* +0x10C */ _g3d_work* g3d_0x110;
-    /* +0x110 */ u8 pad_0x110[0x164 - 0x110];
-};
-
-/* The note-pane object set (the 0x80385xxx half of the band).  Every body at 0x80385A54..0x80385CA0
- * works on ONE 0x1F8-byte record; `lbl_806C4A88` is the retail 5-record array of them and
- * `lbl_806C5460` a 3-record slot set.
- * size: 0x1F8 */
-struct NoteWork {
-    /* +0x000 */ u8 field_0x000;
-    /* +0x001 */ u8 field_0x001;
-    /* +0x002 */ u8 field_0x002;     /* the slot index `fn_803851D4` marks on a free record */
-    /* +0x003 */ u8 field_0x003;
-    /* +0x004 */ union {
-        MHchar model;                   /* size 0x164: the actor model the note pane poses */
-        NoteModelView view;             /* the same bytes, read as the +0x110 scene-model pointer */
-    };
-    /* +0x168 */ u8 field_0x168;
-    /* +0x169 */ u8 field_0x169;
-    /* +0x16A */ u8 field_0x16A;
-    /* +0x16B */ u8 field_0x16B;
-    /* +0x16C */ s32 field_0x16C;    /* the per-state countdown `fn_80386028`/`fn_80386160` tick */
-    /* +0x170 */ nw4r::math::VEC3 vec_0x170;
-    /* +0x17C */ nw4r::math::VEC3 vec_0x17C;
-    /* +0x188 */ u32 field_0x188;
-    /* +0x18C */ u32 field_0x18C;
-    /* +0x190 */ u32 field_0x190;
-    /* +0x194 */ u8 pad_0x194[0x195 - 0x194];
-    /* +0x195 */ u8 field_0x195;
-    /* +0x196 */ u8 pad_0x196[0x198 - 0x196];
-    /* +0x198 */ u32 field_0x198;   /* the note id `fn_8038541C` records */
-    /* +0x19C */ u8 field_0x19C;
-    /* +0x19D */ u8 field_0x19D;
-    /* +0x19E */ u8 field_0x19E;
-    /* +0x19F */ u8 field_0x19F;
-    /* +0x1A0 */ u8 field_0x1A0;
-    /* +0x1A1 */ u8 field_0x1A1;
-    /* +0x1A2 */ u8 pad_0x1A2[0x1B0 - 0x1A2];
-    /* +0x1B0 */ f32 field_0x1B0;   /* the per-state step `fn_80386028`/`fn_803863C8` set */
-    /* +0x1B4 */ u8 pad_0x1B4[0x1F4 - 0x1B4];
-    /* +0x1F4 */ s32 field_0x1F4;  /* the voice handle `fn_8038541C` stores */
-};
-
-/* One 0x0C-byte entry of the 3-slot seat set `lbl_806C5460`.
- * size: 0x0C */
-struct NoteSlot {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 pad_0x03;
-    /* +0x04 */ s32 handle_0x04;
-    /* +0x08 */ s32 handle_0x08;
-};
-
-/* The note screen's layout state at `.bss` 0x806C2418 (0x2670 bytes, `data:2byte`).
- * size: 0x2670 */
-struct NoteLayout {
-    /* +0x000 */ u16 cursor_x_0x00;
-    /* +0x002 */ u8 pad_0x002[0x003 - 0x002];
-    /* +0x003 */ u8 field_0x003;
-    /* +0x004 */ u8 field_0x004;
-    /* +0x005 */ u8 field_0x005;
-    /* +0x006 */ u8 field_0x006;
-    /* +0x007 */ u8 field_0x007;
-    /* +0x008 */ u8 field_0x008;
-    /* +0x009 */ u8 field_0x009;
-    /* +0x00A */ u8 pad_0x00A[0x2670 - 0x00A];
-};
-
-/* `Screen_w` (0x8065903C, .bss, unsplit): only the frame scale at +0x14, the field this band's
- * `fn_80384324` multiplies its string width by (the same field `enemy/fn_8012E968.cpp` names).
- * size: 0x54 */
-struct NoteScreenScale {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ f32 frame_scale;
-    /* +0x18 */ u8 pad_0x18[0x54 - 0x18];
-};
-
-/* The quest-NPC record `qn_get_motion_no` reads (the +0x54 halfword).  The name is the map's own
- * (`qn_get_motion_no__FP7_QNPC_W`), so the parameter type keeps it exact.
- * size: 0x1F8 */
-struct _QNPC_W {
-    /* +0x000 */ u8 pad_0x000[0x054];
-    /* +0x054 */ u16 motion_no_0x54;
-    /* +0x056 */ u8 pad_0x056[0x0F6 - 0x056];
-    /* +0x0F6 */ u8 field_0xF6;
-    /* +0x0F7 */ u8 pad_0x0F7[0x1F8 - 0x0F7];
-};
+/* The note record types this band shares with the band above it (0x803A3A50..) live in
+ * `include/enemy/note_work.h` (rule 1: one definition, included).
+ */
 
 /* The band's own data / unsplit globals (referenced, never defined - rule 2/10). */
 extern u8* lbl_80794880;         /* .sbss 0x80794880 - the 4-byte block pointer `fn_803836EC` reads */
@@ -236,14 +148,13 @@ void fn_8038530C(u8 idx);
 void fn_80385478(NoteWork* self);
 void fn_803857BC(NoteWork* self);
 void fn_80385AA8(NoteWork* self, u8 a, u8 b);
-void fn_80385AD4(NoteWork* self, u32 a, u32 b);
+void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b);
 void fn_803854E4(void);
 void fn_80385598(void);
 void fn_803852B8(void);
 void fn_80385EE0(NoteWork* self);
 void fn_803C7EAC(void);
 void fn_803C7F88(void);
-void fn_803A4E58(NoteWork* self);
 void fn_800D58B0(s32 handle);
 s32 fn_800D9804(u32 a, void* b, void* c);
 void fn_800E0560(MHchar* self);
@@ -522,7 +433,7 @@ extern "C" void fn_8038575C(void) {
 extern "C" void fn_80385A54(NoteWork* self) {
     switch (self->field_0x003) {
     case 1:
-        fn_803A4E58(self);
+        note_pane_get_motion(self);
         return;
     case 2:
         fn_803865B4(self);
@@ -556,13 +467,13 @@ extern "C" void fn_80385AA8(NoteWork* self, u8 a, u8 b) {
 }
 
 /* 0x80385AD4 */
-extern "C" void fn_80385AD4(NoteWork* self, u32 a, u32 b) {
+extern "C" void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b) {
     self->field_0x1A1 = 1;
     fn_80385AA8(self, (u8)a, (u8)b);
 }
 
 /* 0x80385AE8 */
-extern "C" u32 fn_80385AE8(NoteWork* self, u8 a, u8 b) {
+extern "C" u32 note_pane_anim_pair_ck(NoteWork* self, u8 a, u8 b) {
     if (self->field_0x19D == a && self->field_0x19F == b) {
         return 1;
     }
@@ -632,7 +543,7 @@ extern "C" NoteWork* fn_80385E9C(NoteWork* self) {
 
 /* 0x80385EE0 */
 extern "C" void fn_80385EE0(NoteWork* self) {
-    fn_80385AD4(self, 0, 0);
+    note_pane_set_anim_pair(self, 0, 0);
 }
 
 /* 0x80385EEC */
@@ -888,7 +799,7 @@ extern "C" void fn_803860B8(NoteWork* self) {
         fn_80385BF4(self, 3, 0, 0);
     } else if (v == 1) {
         if (fn_80385C64(self) == 1) {
-            fn_80385AD4(self, 1, 2);
+            note_pane_set_anim_pair(self, 1, 2);
         }
     }
 }
@@ -928,9 +839,9 @@ extern "C" void fn_803861F8(NoteWork* self) {
             fn_80385C98((_QNPC_W*)self, 90);
         } else {
             if (Pl_act_ck((_PLW*)work, 9, 1) == 1) {
-                fn_80385AD4(self, 0, 1);
+                note_pane_set_anim_pair(self, 0, 1);
             } else {
-                fn_80385AD4(self, 1, 2);
+                note_pane_set_anim_pair(self, 1, 2);
             }
         }
     }
@@ -947,7 +858,7 @@ extern "C" void fn_80386328(NoteWork* self) {
     } else if (v == 1) {
         self->field_0x18C = (u16)(self->field_0x18C + 688);
         if (--self->field_0x16C <= 0) {
-            fn_80385AD4(self, 1, 3);
+            note_pane_set_anim_pair(self, 1, 3);
         }
     }
 }
