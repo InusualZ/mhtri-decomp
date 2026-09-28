@@ -11,7 +11,7 @@ The test pins that in three ways:
   `/* untyped: <reason> */` marker and rule 12's claim-the-unowned-range row included), the enforcement paragraph is filtered to its enforcement
   sentences (the audit table and the "apply immediately" sentence stay out), the markers are refused when
   duplicated or reversed, and a deliberately stale profile is reported stale and then in sync;
-* on the real tree - both profiles are in sync with the real plan, and neither still teaches the deleted
+* on the real tree - every generated profile is in sync with the real plan, and none still teaches the deleted
   `rule 7 deferred` escape (that is the drift this tool exists to end);
 * against `brief.plan_section` - the brief and the profiles read section 6.5 through the same bytes.
 """

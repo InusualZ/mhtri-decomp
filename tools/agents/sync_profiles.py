@@ -29,7 +29,7 @@ change that forgets the profiles fails the check instead of silently leaving the
 
 The block is generated from the *table*, so a new rule (rule 12) and every exception clause (rule 2's
 unowned extern -> `include/unsplit/`; rule 7's "no exemption and no deferral"; rule 11's
-`/* untyped: <reason> */`) reach both profiles the moment the plan does. If the plan's section-6.5
+`/* untyped: <reason> */`) reach every generated profile the moment the plan does. If the plan's section-6.5
 shape changes enough that the table cannot be parsed, this tool refuses loudly instead of writing a
 stale or empty block - that refusal is the next rule change's tripwire. The block's title says
 `rules 1-N` from the table's row count (N = 12 today), so no rule count is written down here to drift.
@@ -67,10 +67,15 @@ PLAN_HEADING = "### 6.5 Type and naming discipline"
 PLAN_REL = os.path.join("docs", "plan.md")
 
 # The profiles whose section 6.5 text is generated (paths relative to the repository root). merger.md
-# does not carry the table, so it is not listed here; it keeps its own hand-written prose.
+# used to be excluded here ("it keeps its own hand-written prose"), and the 2026-09-28 profile probe
+# measured the cost: a merger child could name rules 2/6/7/10 but had none of their text, while its job -
+# hand-typing a merged header - is exactly where rules 3-5 are broken. It cites those rules by number, so
+# leaving them hand-written is the drift this tool exists to prevent. All four writer/reviewer profiles
+# are now generated.
 PROFILES = (
     os.path.join(".agents", "agents", "decompiler.md"),
     os.path.join(".agents", "agents", "fixer.md"),
+    os.path.join(".agents", "agents", "merger.md"),
     os.path.join(".agents", "agents", "codereviewer.md"),
 )
 

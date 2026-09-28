@@ -30,6 +30,13 @@ reads, and `.pi/` is gitignored, so they cannot corrupt the repo.
 Never modify `orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history. If your cwd is the repo
 root `mhtri-dtk` itself, you were launched in MAIN - do no work and report it.
 
+**Your tree and your profile** (2026-09-28): lanes are launched with `python tools/units/slots.py spawn --kind
+KIND [--slot N]`, which takes a pooled slot by number (`mhtri-dtk.slotN`, a fresh branch off main's tip) and
+maps the kind to the profile **in the tool** - `fix`->`fixer`, `unit`->`decompiler`, `merge`->`merger`,
+`tooling`/`docs`->`worker`. A slot is **reused**, so confirm `git rev-parse --show-toplevel` is the tree you
+were given. Never run `claims.py release` (teardown is the orchestrator's) and never land: your branch is the
+deliverable.
+
 **If you believe the refusal is wrong, do not work around the gate.** Report it with the evidence (the finding,
 the measurement, why you think the rule does not apply) and keep the claim. The gate has been right every time it
 has fired, and a batch that lands a rule violation breaks the DOL for everyone.
@@ -126,10 +133,20 @@ match**, as long as nothing regresses. So:
 * Do not chase a single row for long: after a few measured variants, keep the best shape, write the residual in
   the header, and move on.
 
+Measure the **whole row set**, not the one symbol you touched: `python tools/objdiff/unitscore.py <unit>` lists
+every row of the unit from one `report.json` in one call (`--threshold <pct>` filters), which is exactly what
+"no row may end lower" needs. `recompile.py --measure` works from git-bash (the old `cmd /c` trap is fixed)
+and now **refuses a stale read** - an object older than its source, or a split input that is an uncommitted
+edit in this tree - so a refusal means re-split and re-measure, never a workaround.
+
 ## Then the profile's verification: full `ninja` with `build/RMHE08/ok` deleted (zero FAILED - the FAILED count is
 the primary signal, `ok` prints OK off a stale DOL), `ninja build/RMHE08/ok` = `main.dol: OK`,
 `python tools/units/stylelint.py --diff main` clean, and commit on the branch. If your worktree has no
-`orig/RMHE08/sys/main.dol`, **copy** the ~5 MB file in from MAIN.
+`orig/RMHE08/sys/main.dol`, **copy** the ~5 MB file in from MAIN. If you changed a **tool**, add
+`python tools/selftest.py --changed main`
+(on a committed clean tree plain `--changed` selects nothing), and `python tools/units/stylelint.py --ref`
+proves the refused rows are cleared for a branch that is **not** checked out - it judges that branch's
+committed tree against its merge base, read-only.
 
 Commit message: an area-prefixed imperative subject, the same convention the units use - e.g.
 `enemy: clear the fn_8014A1BC declaration clash` or `Pl: name the _PLW fields the lint flagged` - and say *why*
