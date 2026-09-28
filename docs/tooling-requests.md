@@ -16,7 +16,7 @@ _694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 | 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
 | 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 31 | - | done |
 | 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 10 | - | done |
-| 5 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 8 | - | open |
+| 5 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 8 | - | done |
 | 6 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 7 | - | done |
 | 7 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
 | 8 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 6 | ~29 min | done |
@@ -214,18 +214,7 @@ _694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 <!-- tooling-key: objdiff-size-gap -->
 **Votes.** 8  |  **Cost.** -
 
-**Status.** open
-
-**Measured correction (2026-09-28, lane `objdiff-size-gap-f522`).** The premise above is wrong in both
-halves, and the tool now encodes the truth: objdiff does **not** decline a pair on size. What actually
-happens is (a) a row with **no `fuzzy_match_percent` key at all is 0 %** - 12 777 of the tree's 20 507
-report rows carry no key and **zero** carry an explicit `0.0`, so "no key" is how the report spells zero;
-and (b) `fuzzy_match_percent` is matched-instructions / target-instructions, so a body that is the wrong
-size instead scores exactly **one** matched instruction (of the 146 >50 %-gap pairs, **125** carry 1/N:
-`612 B` vs `4 B` -> `1/153` = 0.6535948 %). Nothing in the report distinguishes "0 % because unwritten"
-from "0 % because the body is the wrong size" - `tools/objdiff/pairgap.py` now does, and leads each class
-with the key-less rows. Whole tree: 146 size gaps (5 of them key-less), 7 360 missing-in-ours, 49
-extra-in-ours, 15 units involved, worst `main/g3d/fn_80075DCC` (40).
+**Status.** done
 
 **Evidence.**
 
