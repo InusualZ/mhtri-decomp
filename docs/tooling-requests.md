@@ -8,26 +8,28 @@ anything but the **Status.** line (that line is carried across regenerations).
 
 Status is `open` (not built), `done` (built), or `parked` (decided against). Set it with `python tools/units/tooling.py --set-status <key> <status>` or edit the **Status.** line directly; the key is the `tooling-key` comment above it.
 
-_548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
+_694 sources (299 outboxes, 395 notes), 11 requests, 177 votes._
 
 | # | request | votes | cost | status |
 | --- | --- | --- | --- | --- |
-| 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 61 | ~29 min | done |
+| 1 | Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites. | 68 | ~29 min | done |
 | 2 | Seed a fresh worktree with `orig/RMHE08/**` and `build/compilers`, so a split runs without hand-copying them from MAIN. | 34 | - | done |
-| 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 30 | - | open |
-| 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 9 | - | done |
-| 5 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
-| 6 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 5 | ~29 min | open |
-| 7 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 5 | - | done |
-| 8 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 4 | - | open |
-| 9 | `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split. | 2 | - | done |
+| 3 | Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`. | 31 | - | done |
+| 4 | Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable. | 10 | - | done |
+| 5 | Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code. | 8 | - | open |
+| 6 | `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy. | 7 | - | done |
+| 7 | Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction. | 7 | - | done |
+| 8 | Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s). | 6 | ~29 min | done |
+| 9 | **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ... | 2 | - | open |
+| 10 | `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split. | 2 | - | done |
+| 11 | `tools/mwcc-debugger/` is the one tool in this repository that can answer "which optimizer pass did that?" instead of guessing, and its value grows every time ... | 2 | - | open |
 
 ---
 
 ## 1. Ship the worktree's scratch compile-and-score measurer (`build/tmp/*.py`, `build/scratch/`) as a supported tool, instead of an uncommitted script every worker rewrites.
 
 <!-- tooling-key: scratch-measurer -->
-**Votes.** 61  |  **Cost.** ~29 min (58 measurements)
+**Votes.** 68  |  **Cost.** ~29 min (58 measurements)
 
 **Status.** done
 
@@ -82,11 +84,18 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 * `802f140c-fn-802f140c-1b09` - e 11 that are 100 % were already 100 % without it. It is a source pragma, so `configure.py`'s flags are untouched. ## Measured (per symbol, `recompile.py ef/eft035.cpp --main . --measure <symbol>`) / symbol / % / note / / --- / --- / --- / / fn_802F250C, fn_802F25BC, fn_802F288C, fn_
 * `803066f0-worker` - python tools/units/recompile.py auto/803066F0_fn_803066F0.c --measure fn_803066F0 (objdiff-cli explicit -1/-2 mode, real ninja command line, object compiled into this worktree) + a raw ELF section-by-section comparison (build/tmp/cmpsect.py) against MAIN's target object.
 * `8030681c-fn-8030681c-1cb2` - Scratch harness used here (gitignored, not committed): `build/tmp/scratch/dasm.py` (annotated disassembly with map-name call targets), `build/tmp/scratch/target.txt` (`objdump -dr` of the split target object), `build/tmp/scratch/score.py` (all 58 symbols' official `fuzzy_match_percent` in one `report generate` call — ...; cost: 58 measurements
+* `8032c920-fn-8032c920-d533` - 24 byte-identical**; unit 16.46 % fuzzy, 8.03 % matched code, `.text` 5132 B. * The ten non-identical rows and their measured residuals are in the unit's file header. * Two file-wide pragmas are load-bearing and measured: `#pragma peephole off` (retail keeps `and` + `cmpwi` unfused
+* `8034c1d0-fn-8034c1d0-9060` - (address -> registered unit + owner header), `.pi/scratch/scores.py` (per-function report dump).
+* `80366618-fn-80366618-a8a1` - `tools/units/recompile.py` cannot compile on this host: `absolutize()` turns the command's `cmd /c` token into `C:\c` (because `os.path.join(main, "/c")` resolves to the C: drive here), so `cmd` starts with no `/c` and returns 0 without writing an object. `build/tmp/m.py` and `build/tmp/mparts.py` are local copies ...
 * `80555374-fn-80555374-2d57` - `python build/tmp/score.py [all]` - one compile + one objdiff report: every function's official score, written count, 100 % count, mean.
 * `camellia-match-process` - s log (working doc, will become a skill) Goal: `Camellia/camellia.c` matches the original object exactly (per-function objdiff, instruction level), without touching flags to flatter a diff. This file is the running record of *how*, so it can be turned into a skill at the end. Scratch/e
 * `configure-py-perf` - s slow (read-only diagnosis) Date: diagnosis run on Python 3.12.2, Windows, repo on `D:`. No repo files were changed; `objdiff.json` / `build.ninja` were regenerated (gitignored build output). ## Measured wall time `python configure.py` (configure mode, `> /dev/null`): **1.24 – 1.68
-* `decomp-803250b0-fn-803250b0-2a24` - python tools/units/recompile.py hud/fn_803250B0.cpp --measure fn_803250B0; ninja build/RMHE08/report.json; python build/tmp/cmp.py (raw ELF section + relocation comparison)
+* `constructnetworkwiimediator-15cb` - Measured in a scratch TU with the unit's real command line (`.pi/scratch/t_new.cpp`, `-O3`, `#pragma exceptions on`): `T* p = new T();` produces the 24-byte record **byte-identically**,
+* `decompiler-80366618-fn-80366618-a8a1` - python build/tmp/m.py ef/eft053.cpp --measure <symbol> (recompile.py with its `absolutize` repaired - see the tooling note)
+* `initnetworksessionstable-d599` - python tools/units/recompile.py Network/initNetworkSessionStable --measure initNetworkSessionStable (100.0, fresh object) + a direct-compile probe harness for the flag matrix (build/tmp/tryflag.py, the unit's real command line + one extra flag) + ninja build/RMHE08/report.json (main/Network/initNetworkSessionStable ...
 * `merger for worker/menu-item-8b55 (fold of worker/802a5444-fn-802a5444-7041 into the landed 0x8029F3C8 half)` - "kind": "done-in-this-fold", "why": "new owner header for fn_8027D738 (the branch's include/ content, taken with the measured u32 spelling). Its consumer path forced three declaration views to their owner's spelling." } ], "finished_at": "2026-09-26T05:05:00", "flags_probed": [
+* `pipeline-experiment-report` - (`recompile.py --measure` compiles one unit from any worktree — its ~15-minute scratch harness was pure waste).
+* `pipeline-phase2-initnet` - My own scratch harness (batch files under `.pi/tmp/rv/`) cost ~15 minutes and two bugs (pragma-state labels inverted; a size difference I first blamed on `-MMD`). `tools/units/recompile.py --measure <unit>` exists and compiles one unit from any worktree without ninja — the profile should point reviewers at it instead ...; cost: 15 minutes
 * `pl-act-09c6` - (`build/tmp/pl.py table`); the unit number comes from `objdiff-cli report generate -p .`, which is the scale the campaign's `report.json` uses. `functionRelocDiffs=none` is required to reproduce the brief's per-symbol
 * `pl-act-09c6.round1` - Scratch harnesses used for the sweep (gitignored, in `build/tmp/`): `try.py` (apply a variant to a copy of the baseline, compile, measure), `m.py` (compile once, measure a symbol list + the unit), `dd.py` (instruction-level diff target vs ours), `unitmeasure.py`, plus `v_bc48*.py`, `v_gate*.py`, `v_a57c.py` and ...
 * `recompile-include-order` - measurer (`build/tmp/mw.py`) to work around it.
@@ -142,7 +151,7 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 ## 3. Make `recompile.py --measure` work for a proposal unit: MAIN has no ninja rule or target object for it, so every measurement needs `--main <worktree>`.
 
 <!-- tooling-key: recompile-worktree-target -->
-**Votes.** 30  |  **Cost.** -
+**Votes.** 31  |  **Cost.** -
 
 **Status.** done
 
@@ -165,6 +174,7 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 * `800f95a4-fn-800f95a4-7240` - al is the same report run against a combined target built with `powerpc-eabi-ld -r` over the 40 distinct gap objects. `recompile.py <unit> --measure` cannot run: MAIN has no target object and no ninja rule for a proposal unit. `python tools/units/stylelint.py --diff main` reports no new se
 * `80105314-fn-80105314-d472` - `recompile.py` resolves MAIN's ninja and target object; MAIN does not have this unit, so every measurement used `--main <worktree>` after `python configure.py && ninja build/RMHE08/src/ef/fn_80105314.o`. The worktree's `orig/RMHE08/{sys,files,disc}` junctions were created by hand (`mklink /J`).
 * `80170fa8-fn-80170fa8-6600` - tk.exe dol split --no-update -j 8 build/tmp/split-config.yml build/RMHE08 python configure.py python <MAIN>/tools/units/recompile.py enemy/fn_80170FA8.cpp \ --main <worktree> --measure <symbol> ` `--main <worktree>` is required: the default resolves the target object from MAIN, which
+* `land-registration-union` - land: the registration append-union + the `recompile.py --measure` chained-arg fix Task: teach `tools/units/land.py` to resolve the one conflict class blocking eight branches, bring the untracked resolver into the
 * `worker-80047398-fn-80047398-1d13` - python .pi/scratch/m.py all (worktree): reads MAIN's real compile command for the registered sibling main.cpp (same lib/flags), rewrites it onto this unit with tools/units/recompile.py's rewrite()/absolutize(), compiles, then scores every symbol with objdiff `report generate` (the official fuzzy_match_percent) ...
 * `worker-8004c9a0-fn-8004c9a0-3509` - python build/tmp/m.py <src> (worktree): reads MAIN's real cflags_main command line (ninja -t commands build/RMHE08/src/fn_80040598.o), rewrites it onto this unit with tools/units/recompile.py's rewrite()/absolutize(), compiles, then scores fn_8004C9A0 with objdiff `report generate` (the official fuzzy_match_percent) ...
 * `worker-8009b140-fn-8009b140-f978` - python tools/units/recompile.py g3d/g3d_gpu.cpp --measure <symbol> (worktree object, real g3d lib command line; target = MAIN build/RMHE08/obj/auto_fn_8009B140_text.o / auto_fn_8009B2CC_text.o, the retired per-symbol splits, since MAIN has no split object for the range yet). Cross-checked with the official report ...
@@ -182,7 +192,7 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 ## 4. Teach `m2c` (or filter) the Wii paired-single `psq_l`/`psq_st` saves: it renders them as `xxsel`/`vmrghb` garbage, so the first shape is unusable.
 
 <!-- tooling-key: m2c-paired-single -->
-**Votes.** 9  |  **Cost.** -
+**Votes.** 10  |  **Cost.** -
 
 **Status.** done
 
@@ -196,9 +206,56 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 * `80178378-fn-80178378-59b3` - The five M2C_ERROR drafts (`fn_801784D0`, `fn_80179070`, `fn_8017A0BC`, `fn_8017BDC4`, `fn_8017DF9C`) are the ones with paired-single (`vmrghb`/`ps_*`) in their tail — check them against the docs/matching.md paired-single stopping rule before spending a session on them. ## Merge of main (202
 * `802e4978-fn-802e4978-506b` - / `fn_802E5764` / 688 / 0 / VMX/paired-single body (`m2c` flags `xscmpgedp`/`xsmsubasp`/`xxsel`) / / `fn_802E5E90` / 1500 / 0 / VMX body (`xxsel`), 8-arm icon grid /
 * `m2c-paired-single` - The optional submodule alternative (if the submodule were ever forked) would be two lines in `m2c/arch_ppc.py`: add `"psq_lx"`/`"psq_stx"` to `instrs_load`/`instrs_store` (they already appear in `INSTRS_R0_AS_ZERO` and the `psq_imms` arg logic, so the parse expects them but the maps lack them). It is not needed for ...
+* `session-2026-09-26` - measure.py (61 votes - the driver 61 workers had each handwritten); worktree seeding with the DOL + toolchain (#2/#5, with the copy-vs-junction proof); the compile gate in land.py (#1 for the fixer's item); the rule-2 warning text; unionresolve.py moved into the repo + `land.py land --branch` (one command, refuses ...
 * `worker-800ff8d4-fn-800ff8d4-a0bf` - fn_80100088 (632 B) - paired-single/VMX body (m2c returns M2C_ERROR on xsmsubasp/xxsel/xscmpgtdp).
 
-## 5. Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction.
+## 5. Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code.
+
+<!-- tooling-key: objdiff-size-gap -->
+**Votes.** 8  |  **Cost.** -
+
+**Status.** open
+
+**Measured correction (2026-09-28, lane `objdiff-size-gap-f522`).** The premise above is wrong in both
+halves, and the tool now encodes the truth: objdiff does **not** decline a pair on size. What actually
+happens is (a) a row with **no `fuzzy_match_percent` key at all is 0 %** - 12 777 of the tree's 20 507
+report rows carry no key and **zero** carry an explicit `0.0`, so "no key" is how the report spells zero;
+and (b) `fuzzy_match_percent` is matched-instructions / target-instructions, so a body that is the wrong
+size instead scores exactly **one** matched instruction (of the 146 >50 %-gap pairs, **125** carry 1/N:
+`612 B` vs `4 B` -> `1/153` = 0.6535948 %). Nothing in the report distinguishes "0 % because unwritten"
+from "0 % because the body is the wrong size" - `tools/objdiff/pairgap.py` now does, and leads each class
+with the key-less rows. Whole tree: 146 size gaps (5 of them key-less), 7 360 missing-in-ours, 49
+extra-in-ours, 15 units involved, worst `main/g3d/fn_80075DCC` (40).
+
+**Evidence.**
+
+* `8009b374-fn-8009b374-de28` - (candidate size >50 % off), so those three were scored with objdiff's diff mode (0.0). The landed split object pairs by name and will give the report metric.
+* `800cd584-fn-800cd584-3fa5` - ate from `em`'s `+0xEC` sub-object (`fn_800A8A08`), maps it onto a circle (`0.66 ± 0.34·t`), builds a position/rotation pair (`fn_800A99B4`) and hands it to `pm`'s virtual method at vtable `+0x14` with the id `fn_800A9FB0` resolves. ## The one non-obvious source shape (the assert ma
+* `camellia-verification` - Camellia matching verification — 2026-09-20, objdiff-cli 2.7.1 ## Verdict **`Camellia/camellia.c` does NOT match.** The unit's code fuzzy match is **1.49 %**, and 6 of its 10 functions match **0 %**. The prior
+* `flipcheck-row36` - tb_...`/`@eti_...`. On `sys_mem`, target index 16 is `fn_8004054C` and ours is `fn_800404BC`. Index-based comparison pairs different symbols. The check therefore pairs by **symbol name** (and treats a name as exported if *any* of our entries with that name carries the flag). 2.
+* `loop-6` - "RELOCATION: DWCi_natNegTickIdleSockets - MWCC auto-inlined the 4-byte thunk, so ours emitted `bl DWCi_natNegPollReplies`; `#pragma dont_inline on`/`off` scoped to that one function restores the target's `bl DWCi_natNegPollRepliesOnce` (playbook 61, unit flags untouched). A/B measured: without the pragma the reloc is ...
+* `net-stack-7efe` - d functions, 2 NHTTP_os_RVL, 4 d_nhttp callees, 5 NHTTP literals, 12 NWC24 rows, 2 NWC24 io rows) so every written body pairs with its target row. References checked with symedit.py: none of them had an in-repo reference at rename time.", "include/unsplit/NHTTP.h: the four `.data`
+* `net-style-review` - elfsect.py`: section sizes, raw bytes, relocation *names* (ours vs the target's), symbol address order. * `python tools/objdiff/symdiff.py -u <unit>`, `build/RMHE08/report.json`: per-symbol scores. * `python tools/units/stylelint.py` (full) and `--json`: rules 1-11 for the scope; per-fi
+* `verifyunit-land-gate` - / §4.5 symbol present on one side only is a mismatch / `size_gap_problems` names every symbol present on both sides that objdiff declines to pair (a >50 % size gap), i.e. the row that reads as untouched /
+
+## 6. `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy.
+
+<!-- tooling-key: include-order-shadow -->
+**Votes.** 7  |  **Cost.** -
+
+**Status.** done
+
+**Evidence.**
+
+* `800ff8d4-fn-800ff8d4-a0bf` - `recompile.rewrite` appends the worktree's `-i` paths after MAIN's, and this MWCC searches `-i` in order, so a worktree edit to an existing header (`include/nw4r/math.h`) is shadowed by MAIN's copy. Worked around by prepending the worktree includes in the scratch measurer (`build/tmp/mw.py`, gitignored). A ...
+* `80103d28-fn-80103d28-616b` - paths *after* MAIN's `-i include`, so a shared-header edit in a worktree is shadowed by MAIN's copy and
+* `menu-item-8b55` - 57 framed functions; each run is exactly the gap between the bracketing auto objects). **Only the branch's `src/` and `include/` content was taken.** Its `configure.py` block and its second `Object(NonMatching, "menu/menu_item.cpp")` line are the duplicate registration and were droppe
+* `merger for worker/menu-item-8b55 (fold of worker/802a5444-fn-802a5444-7041 into the landed 0x8029F3C8 half)` - `for name in newly: base = name.split("__", 1)[0]` rebinds band_ownership_warnings' `base` parameter, so its direction-2 check then runs `git show <a symbol name>:include/unsplit/<band>.h`, gets nothing back and reports EVERY pre-existing declaration of a touched band header as newly added. This batch legitimately ...
+* `net-nwc24` - ape is left in either unit (`land.rule7_defer_growth()` -> `[]`); the units now define and reference only real names. `include/unsplit/OS.h` was added (declaration-only glue for `OSRegisterVersion` / `OSDisableInterrupts` / `OSRestoreInterrupts`, which `nwc24_msg.c` calls and no regist
+* `net-stack-7efe` - irs with its target row. References checked with symedit.py: none of them had an in-repo reference at rename time.", "include/unsplit/NHTTP.h: the four `.data` literal groups, `.rodata` 0x80574CE8 and the NHTTP_os_RVL assert group declared extern (no owner).", "include/unsplit/NWC24
+* `recompile-include-order` - `recompile.py`'s include order — the worktree's headers now win Worker fix, 2026-09-23. Found by `.pi/notes/800ff8d4-fn-800ff8d4-a0bf.md` ("Tooling" section). ## The bu
+
+## 7. Do not junction `build/compilers` (or another build input) into MAIN: ninja can write or re-download through the junction.
 
 <!-- tooling-key: junction-unsafe -->
 **Votes.** 7  |  **Cost.** -
@@ -215,12 +272,12 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 * `8056bbf0-fn-8056bbf0-8919` - the worktree was re-set up (copy `build/{compilers,binutils,tools}`, junction only the read-only
 * `worker-80182d5c-fn-80182d5c-1689` - Worktree made buildable with junctions to MAIN's read-only orig/RMHE08 and build/compilers (MAIN untouched; `ninja` in the worktree reported `build/RMHE08/main.dol: OK`, i.e. the SHA-1 check passed). The FULL ninja was run after the shared-header edits: the whole tree builds and links byte-identically, so the four ...
 
-## 6. Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s).
+## 8. Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements (one report gives all of them, ~40 s).
 
 <!-- tooling-key: score-with-one-report -->
-**Votes.** 5  |  **Cost.** ~29 min (58 measurements)
+**Votes.** 6  |  **Cost.** ~29 min (58 measurements)
 
-**Status.** open
+**Status.** done
 
 **Evidence.**
 
@@ -228,38 +285,22 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 * `800e46e8-fn-800e46e8-d0e3` - `python build/tmp/unitreport.py auto/800E46E8_fn_800E46E8` (one compile + one `objdiff report generate` over a one-unit project - the same code path as the official report):
 * `8027d684-fn-8027d684-bb95` - `recompile.compile_unit` and runs ONE `objdiff report generate` over a one-unit project whose target is the worktree's own split object (`build/RMHE08/obj/Pl/fn_8027D684.o`) - that scores all 138 symbols in one
 * `8030681c-fn-8030681c-1cb2` - Scratch harness used here (gitignored, not committed): `build/tmp/scratch/dasm.py` (annotated disassembly with map-name call targets), `build/tmp/scratch/target.txt` (`objdump -dr` of the split target object), `build/tmp/scratch/score.py` (all 58 symbols' official `fuzzy_match_percent` in one `report generate` call — ...; cost: 58 measurements
+* `score-with-one-report` - > Score a unit's symbols in one `objdiff report generate` call instead of N per-symbol measurements > (one report gives all of them, ~40 s).; cost: 40 s
 * `worker-800ef7d8-fn-800ef7d8-4d79` - python build/tmp/unitreport.py sound/fn_800EF7D8.cpp (one compile + one objdiff report generate, the official metric); python tools/units/recompile.py sound/fn_800EF7D8.cpp --main <worktree> --measure <symbol> for a single symbol
 
-## 7. `recompile.py` should put the worktree's `-i` includes before MAIN's, so a worktree header edit is not shadowed by MAIN's copy.
+## 9. **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** ...
 
-<!-- tooling-key: include-order-shadow -->
-**Votes.** 5  |  **Cost.** -
-
-**Status.** done
-
-**Evidence.**
-
-* `800ff8d4-fn-800ff8d4-a0bf` - `recompile.rewrite` appends the worktree's `-i` paths after MAIN's, and this MWCC searches `-i` in order, so a worktree edit to an existing header (`include/nw4r/math.h`) is shadowed by MAIN's copy. Worked around by prepending the worktree includes in the scratch measurer (`build/tmp/mw.py`, gitignored). A ...
-* `80103d28-fn-80103d28-616b` - paths *after* MAIN's `-i include`, so a shared-header edit in a worktree is shadowed by MAIN's copy and
-* `menu-item-8b55` - 57 framed functions; each run is exactly the gap between the bracketing auto objects). **Only the branch's `src/` and `include/` content was taken.** Its `configure.py` block and its second `Object(NonMatching, "menu/menu_item.cpp")` line are the duplicate registration and were droppe
-* `merger for worker/menu-item-8b55 (fold of worker/802a5444-fn-802a5444-7041 into the landed 0x8029F3C8 half)` - `for name in newly: base = name.split("__", 1)[0]` rebinds band_ownership_warnings' `base` parameter, so its direction-2 check then runs `git show <a symbol name>:include/unsplit/<band>.h`, gets nothing back and reports EVERY pre-existing declaration of a touched band header as newly added. This batch legitimately ...
-* `recompile-include-order` - `recompile.py`'s include order — the worktree's headers now win Worker fix, 2026-09-23. Found by `.pi/notes/800ff8d4-fn-800ff8d4-a0bf.md` ("Tooling" section). ## The bu
-
-## 8. Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they read as 0 % and hide real unpaired code.
-
-<!-- tooling-key: objdiff-size-gap -->
-**Votes.** 4  |  **Cost.** -
+<!-- tooling-key: novel-tools-units-recompile-py-measure-reads-the-targe -->
+**Votes.** 2  |  **Cost.** -
 
 **Status.** open
 
 **Evidence.**
 
-* `8009b374-fn-8009b374-de28` - (candidate size >50 % off), so those three were scored with objdiff's diff mode (0.0). The landed split object pairs by name and will give the report metric.
-* `800cd584-fn-800cd584-3fa5` - ate from `em`'s `+0xEC` sub-object (`fn_800A8A08`), maps it onto a circle (`0.66 ± 0.34·t`), builds a position/rotation pair (`fn_800A99B4`) and hands it to `pm`'s virtual method at vtable `+0x14` with the id `fn_800A9FB0` resolves. ## The one non-obvious source shape (the assert ma
-* `camellia-verification` - Camellia matching verification — 2026-09-20, objdiff-cli 2.7.1 ## Verdict **`Camellia/camellia.c` does NOT match.** The unit's code fuzzy match is **1.49 %**, and 6 of its 10 functions match **0 %**. The prior
-* `flipcheck-row36` - tb_...`/`@eti_...`. On `sys_mem`, target index 16 is `fn_8004054C` and ours is `fn_800404BC`. Index-based comparison pairs different symbols. The check therefore pairs by **symbol name** (and treats a name as exported if *any* of our entries with that name carries the flag). 2.
+* `constructnetworkwiimediator-15cb` - **`tools/units/recompile.py --measure` reads the *target* object out of MAIN's `build/`** (`C:\...\mhtri-dtk\build\RMHE08\obj\Network\constructNetworkWiiMediator.o`) even when run inside a worktree that has its own identical copy. It cost me a double-take and a `sha1sum` comparison before I trusted the 100.0 %; a ...
+* `initnetworksessionstable-d599` - **`recompile.py --measure` reads the *target* object out of MAIN's `build/`** even inside a worktree with its own copy (its own output line names `C:\...\mhtri-dtk\build\RMHE08\obj\...`). It cost a double-take before trusting the 100.0 %; already filed by the mediate lane — third vote.
 
-## 9. `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split.
+## 10. `configure.py` on a worktree without `orig/` emits a stub `build.ninja`; warn or fail loudly instead of building a tree that cannot split.
 
 <!-- tooling-key: configure-stub-ninja -->
 **Votes.** 2  |  **Cost.** -
@@ -270,3 +311,15 @@ _548 sources (240 outboxes, 308 notes), 9 requests, 157 votes._
 
 * `800a99b4-fn-800a99b4-8785` - The worktree has an empty `orig/`, so `python configure.py` there writes only the top-level rules and `ninja -t commands build/RMHE08/src/ef/ef_emitterform.o` still says "unknown target" (it needs the DOL to generate the per-unit rules). The measurement therefore ran through a scratch wrapper, `build/tmp/m.py` ...
 * `8010bde4-fn-8010bde4-5cd8` - The worktree had no `orig/` junction, so `configure.py` emitted a stub `build.ninja` (the source section is gated on `build/RMHE08/config.json`). I copied MAIN's `orig/RMHE08/sys/main.dol` and `orig/RMHE08/files/mh3.sel` into the worktree's `orig/` (gitignored) and ran `ninja build/RMHE08/config.json` to split there ...
+
+## 11. `tools/mwcc-debugger/` is the one tool in this repository that can answer "which optimizer pass did that?" instead of guessing, and its value grows every time ...
+
+<!-- tooling-key: novel-tools-mwcc-debugger-is-the-one-tool-in-this-repo -->
+**Votes.** 2  |  **Cost.** -
+
+**Status.** open
+
+**Evidence.**
+
+* `mwcc-debugger-gaps` - `tools/mwcc-debugger/` is the one tool in this repository that can answer "which optimizer pass did that?" instead of guessing, and its value grows every time a lane uses it and finds it short. **This file is that channel: one bullet per gap, and `python tools/units/tooling.py` ranks these rows against every other ...
+* `mwlink-debugger-gaps` - `tools/mwlink_debugger.py` is the one tool in this repository that can answer "why does the *link* say that?" instead of guessing - which unit was kept and where it landed, how its symbols resolved, whether the map really describes the ELF, which phase printed a diagnostic - and its value grows every time a lane uses ...
