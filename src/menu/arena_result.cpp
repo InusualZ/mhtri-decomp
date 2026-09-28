@@ -24,8 +24,8 @@
  * spelled `extern "C"` so the emitted name is the map's (playbook row 42) - the target objects' own
  * symbols are unmangled stems.
  *
- * RESIDUAL: 41 of the 56 functions are written - 5736 B of the range's 14020 B, 25 of them at
- * 100 %, 39 at 80 % or better (unit fuzzy 38.76 %).  The two rows below the 80 % bar are
+ * RESIDUAL: 43 of the 56 functions are written - 6528 B of the range's 14020 B, 27 of them at
+ * 100 %, 41 at 80 % or better (unit fuzzy 44.41 %).  The two rows below the 80 % bar are
  * `quest_work_word_get` (79.23 %): the target's loop is `mtctr`/`bdnz` over the list count while
  * ours re-reads the count, and the register pair (`items`/`count` in r3/r4 retail, r4/r5 ours) is
  * the allocator's (playbook 22); and `quest_arena_data_step` (75.40 %, 352 B ours vs 364 target):
@@ -45,6 +45,26 @@
  *    `sprintf(..., minutes, seconds, Screen_w.field_0x14)` form their call sites' float argument
  *    makes; `quest_arena_time_text_get`'s own call site passes two integers only (retail `crclr`
  *    cr1eq, no r7), which is why its text omits the third argument.
+ *  - `quest_item_slots_prune` (108 B, the row this pass added) is byte-identical; its shape needed
+ *    a named pointer local declared before the index (`s32 i; QuestItemSlot* slot = slots;` -
+ *    with `i` or `slots[i]` alone it is 91.41 %, the allocator's callee-saved pair mirrors,
+ *    playbook 63).  Its only callee was `fn_802752C8`, renamed `Pl_item_id_usable_ck`: retail
+ *    passes a second argument (`li r4,0` here, 1 in `em_pop`, 2 in `ai`) that the callee's body
+ *    never reads, so the **declaration** carries it (`include/Pl/fn_80273B14.h`); the Pl unit was
+ *    re-measured after the change and every row of it is unchanged (`Pl_item_id_usable_ck` keeps
+ *    its own 96.47 % residual - three `cmpwi`/`cmplwi` choices).
+ *  - `quest_result_field_text_get` (684 B, this pass's second row) is byte-identical too, and it
+ *    is the band's biggest single win: 44.41 % from 39.53 %.  Two shapes had to be read off the
+ *    target rather than guessed: the NULL-record guard returns straight to the epilogue while the
+ *    `switch` has NO explicit bounds check - its `default` is the `return quest_text_buffer` after
+ *    the switch, which is where MWCC puts the `cmplwi kind,31` + `bgt` - and MWCC emits the case
+ *    BODIES in source order, so the arms are written in the jump table's own order (0, 22, 1, 16,
+ *    17, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 12, 30, 31, 26, 27, 28).  Its five localized
+ *    strings and their pointer table are DEFINED here (the target's pool labels are map globals the
+ *    unit does not claim); the three accented characters are `\x` byte escapes so the file stays
+ *    ASCII and `sjiswrap` cannot re-encode them.  `QuestRecord`'s text runs (+0x000, +0x02E,
+ *    +0x08C, +0x0B5, +0x0DE, +0x13C, +0x19A, +0x1C9) are named in `include/unsplit/menu.h` now,
+ *    which is also where the field-kind numbering comes from.
  *  - the `QuestElement` size correction to the 0x60 its own target objects use (`addi r5,r5,96` in
  *    `quest_element_value_get`) moved **eight** rows up and none down: `quest_field2E8_text_get`
  *    99.96 -> 100 %, `quest_element_item_apply` 97.68 -> 97.86, `quest_element_value_set`
@@ -52,30 +72,71 @@
  *    85.38 -> 85.47, `quest_slot_items_get` 84.38 -> 84.48, `quest_element_item_count_get`
  *    83.79 -> 83.81, `quest_slot_count_get` 82.42 -> 82.50 - the header's union had pushed the
  *    struct to 0x64, shifting every field past +0x94 by 0xC.
+ *  - ORDERING, unrecorded until now: the 43 written bodies are in DEFINITION order, not the target's
+ *    address order - our `.text` opens with `quest_record_get` (target offset 0x23FC) where the
+ *    target opens with `fn_803B0F98` (0).  `flipcheck.py` cannot see it here (it names a permutation
+ *    only when the sizes agree; ours is 0x1980 B against the target's 0x36C4), so the source order
+ *    has to become the address order before a flip can be attempted (playbook 52's permutation
+ *    class, as `src/Pl/pl_act.cpp` and `src/g3d/g3d_resnode.cpp` record it).  Not reordered here:
+ *    with 13 rows unpaired nothing measures the move, so a reorder would have to prove itself
+ *    score-neutral first.
  *
- * The 15 functions still unwritten are blocked by *naming*, not by evidence: every one of them but
- * `quest_arena_summary_step` calls another band's starter name (`fn_8029F73C`, `fn_80272E30`,
- * `fn_8027BC48`, `fn_8005C7E0`, `fn_800CF280`, `fn_8042C850`/`CB9C`/`CC20`,
- * `fn_802D8ABC`..`fn_802D8EA8`, `fn_8035B5FC`, `fn_8033A920`, `fn_802AFC94`/`AFE08`, ...), and a
- * call to one in this new file is a rule-7 finding; `quest_arena_summary_step` (344 B) is blocked
+ * The 13 functions still unwritten are blocked by *naming*, not by evidence: every one of them but
+ * `quest_arena_summary_step` calls another band's starter name (`fn_80272E30`,
+ * `fn_8027BC48`, `fn_8042C850`/`CB9C`/`CC20`,
+ * `fn_802D8ABC`..`fn_802D8EA8`, `fn_8035B5FC`, `fn_8033A920`, `fn_802AFC94`/`AFE08`, ..., and the
+ * `fn_800CF280` this list used to carry is the already-named `move_work_state_ck`), and a call to
+ * one in this new file is a rule-7 finding; `quest_arena_summary_step` (344 B) is blocked
  * by *ownership* instead - its only foreign callee `quest_element_build` (0x803AD008) is already
  * named, but it is `quest/quest_entry.cpp`'s row, so its declaration belongs in that owner's
  * header.  Naming them means sweeping every reference site in the units that own them
  * (`fn_802B0668` alone is cited from 30 files of `enemy`, `Pl`, `sound` and `stage`), so the sweep
- * is the batch's `config_requests` entry and not this lane's diff.  The blocked rows are listed
- * with their sizes in the outbox; the two biggest are `fn_803B0F98` (2020 B) and `fn_803B177C`
- * (1596 B).
+ * belongs to the campaign's naming wall - registered in `.pi/notes/naming-backlog.md` (`| 14 | 30 |
+ * fn_802B0668 |`) and carried in this batch's outbox `blockers` (never in `config_requests`, which
+ * is all `tools/units/backlog.py` reads) - and not to this lane's diff.  The blocked rows are
+ * listed with their sizes in the outbox; the two biggest are `fn_803B0F98` (2020 B) and
+ * `fn_803B177C` (1596 B).
  *
  * `quest_element_set` (0x803A9DEC) is declared where rule 2 wants it - in its owner's header
  * `include/lobby/lb_quest_screen.h`, whose unit's registered `.text` 0x803A3A50-0x803AA4A4 covers
  * the address.  The owner's own source does not cite it yet (its row is unwritten); this file's two
  * call sites reach it through that header.
  *
- * Data (measured, `datagap.py --unit menu/arena_result`): the unit's own `.data` is the three jump
- * tables 0x805F7B78..0x805F7C68 (0xF0 B), claimed in `splits.txt`; the pool constants the band
+ * Data (measured, `datagap.py --unit menu/arena_result`).  Claimed and byte-identical: `.sdata`
+ * 0x8079367C..0x80793684 (8 B) - the " " and "..." string-pool entries
+ * `quest_result_field_text_get` is the sole referencer of.  UNCLAIMED, and the unit's open data
+ * debt: `.data` 288 B, which is TWO runs in retail, 27 KB apart - the three switch jump tables
+ * 0x805F7B78..0x805F7C68 (0xF0 B, cited by `fn_803B0F98`, `fn_803B177C` and this file's
+ * `quest_result_field_text_get` respectively) and the five localized "(Quest Name Unavailable)"
+ * strings plus their 6-pointer table 0x8060E800..0x8060E8A0 (0xA0 B).  Measured: claiming BOTH
+ * `.data` runs dies in `dtk dol split` with `Cyclic dependency encountered while resolving link
+ * order: menu/arena_result.cpp -> ... -> quest/arenatask.cpp -> auto_07_806073F0_data`, and the
+ * 0x8060E800 run *alone* dies the same way (it sits strictly inside `auto_07_806073F0_data`, so the
+ * auto unit's remainder would have to be both before and after this unit).  The 0x805F7B78 run
+ * *alone* splits fine but is the wrong claim for this object: our `.data` is one 288 B section, so
+ * the linker would place it at 0x805F7B78 and the strings would land in the jump tables' range.
+ * Both runs are therefore left to their auto units and our object carries them as `ours-extra
+ * .data 288 B` (+ `.rela.data`): a claim-shape gap, not a source defect - the five strings and
+ * their padding are byte-identical to the DOL's 0x8060E800..0x8060E888 (checked against the auto
+ * data object).  It needs dtk to express several runs of one section, or a data-only unit for the
+ * strings run, before this unit can flip; filed as a tooling item.  `quest_name_unavailable_text`
+ * is therefore defined TWICE in the link inputs: here (`src/menu/arena_result.o`, `.data` +0x88,
+ * 0x18 B, global) and in `obj/auto_07_806073F0_data.o` (`.data` +0x7498, 0x18 B, global) - a
+ * duplicate strong symbol that is invisible only because a `NonMatching` object is never linked,
+ * and fatal the moment this unit can flip.  The faithful shape is what the target object carries -
+ * a DECLARATION (its own `quest_name_unavailable_text` is UND) - and it is measured
+ * codegen-neutral: the extern variant's `.text` is byte-identical to this one and its `.text`
+ * relocation set identical bar the local pool-label numbering, with `ours-extra .data` shrinking
+ * 288 B -> 128 B and `.rela.data` 456 B -> 384 B.  It is nonetheless not landable today:
+ * `stylelint.py --diff` counts the declaration as an ADDED finding whichever way it is spelled - in
+ * this file as rule 2 + rule 12 (there is no owner's header for it, and no registered range covers
+ * 0x8060E888) and in the band header `include/unsplit/menu.h` as two rule-12 findings - because the
+ * claim rule 12 asks for is exactly the cycle above.  So the definition stays and the clash is
+ * handed to the same tooling item: it disappears with the claim (multi-run support or a data-only
+ * unit for the strings run).  The pool constants the band
  * addresses (`frames_per_second_60f`, `percent_scale_100f`, `quest_grade_ratio_*`) are declared
  * `extern` in `include/unsplit/menu.h` and never defined here, so no `.sdata2` is emitted for them.
- * The one remaining data row is `ours-extra .sdata2 16 B`: MWCC's implicit int->float magic
+ * The other data row is `ours-extra .sdata2 16 B`: MWCC's implicit int->float magic
  * (`0x4330000080000000` unsigned / `0x4330000000000000` signed), which the compiler pools per TU and
  * `quest_grade_get`/`quest_grade_rank_get`/`quest_grade_text_cur_get` are the band's first users of.
  * The target's copies are `lbl_8079C528`/`lbl_8079C550`, inside the band's unclaimed `.sdata2` run
@@ -112,8 +173,34 @@
 #include "unsplit/Runtime.PPCEABI.H.h"    /* sprintf / strcpy */
 #include "unsplit/ef.h"                   /* get_move_work_adrs */
 #include "ef/fn_800CDB2C.h"               /* my_player_no */
+#include "g3d/g3d_anmchr.h"               /* msg_str_gen / flfntStrLen / flKnjMsgNumPtr (rule 2) */
+/* `include/Pl/fn_80273B14.h` and `include/unsplit/lobby.h` both declare the two pad/parameter
+ * blocks with different types (`Psw`: `struct PswBlock` vs `LbPswBlock[4]`; `lb_param_w`:
+ * `struct LbParamBlock` vs `LbParamWork`) - the same clash `src/menu/menu_item.cpp` documents -
+ * so the Pl header is included under the same local renames, only `fn_802752C8` being needed. */
+#define Psw mhtri_pl_fn_80273B14_Psw
+#define lb_param_w mhtri_pl_fn_80273B14_lb_param_w
+#include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
+#undef Psw
+#undef lb_param_w
 
 extern "C" {
+
+/* The result screen's localized "(Quest Name Unavailable)" rows, indexed by the message-language
+ * index `system_w.field_0x09`; the first two entries are the same English row, so `-str reuse`
+ * pools one literal for both.  These five strings and the table are this band's `.data`
+ * (0x8060E800..0x8060E8A0), UNCLAIMED and left to its auto unit - which is also the second
+ * definition of this name, the clash the file header's data paragraph records - emitted here
+ * because `quest_result_field_text_get` is their only referencer.  The three accented characters
+ * are written as byte escapes: the source has to stay pure ASCII or `sjiswrap` re-encodes it. */
+const char* quest_name_unavailable_text[6] = {
+    "(Quest Name Unavailable)",
+    "(Quest Name Unavailable)",
+    "(Nom de qu\xC3\xAAte indispo.)",
+    "(Questname nicht verf\xC3\xBCgb.)",
+    "(Nome missione non disp.)",
+    "(Misi\xC3\xB3n no disponible)",
+};
 
 /* Prototypes for the definitions below that an earlier function calls (`quest_item_count_sum` is
  * defined at the address its own body lives at, after its two callers). */
@@ -634,6 +721,19 @@ void quest_slot_items_get(u8 index, u16* out) {
     }
 }
 
+/* Clears both halves of every entry of the run's 35-slot item list whose id is not a usable one. */
+void quest_item_slots_prune(QuestItemSlot* slots) {
+    s32 i;
+    QuestItemSlot* slot = slots;
+
+    for (i = 0; i < 35; i++, slot++) {
+        if (Pl_item_id_usable_ck(slot->id, 0) == 0) {
+            slot->id = 0;
+            slot->count = 0;
+        }
+    }
+}
+
 /* The u16 the `quest_list_items` entry whose +0x2C key is `key` pairs with (0 when there is none). */
 u16 quest_work_word_get(u16 key) {
     QuestListItem** items = quest_list_items;
@@ -816,6 +916,110 @@ void quest_arena_data_step(u8 player, u16 id, s16 value) {
             quest_element_reset((u8)i);
         }
     }
+}
+
+/* The text a result-screen field kind shows: kinds 0..31 pick one of the record's own text runs or
+ * one of this band's text getters, and a null record falls back to the "name unavailable" table. */
+char* quest_result_field_text_get(QuestRecord* rec, u8 kind) {
+    char buf[256];
+    char* brk;
+
+    buf[0] = 0;
+    quest_text_buffer[0] = 0;
+    if (rec == NULL) {
+        if (kind == 0) {
+            strcpy(quest_text_buffer, quest_name_unavailable_text[system_w.field_0x09]);
+        } else {
+            sprintf(quest_text_buffer, " ");
+        }
+        return quest_text_buffer;
+    }
+    switch (kind) {
+    case 0:
+        msg_str_gen(rec->field_0x000, quest_text_buffer);
+        break;
+    case 22:
+        msg_str_gen(rec->field_0x000, buf);
+        if ((u32)flfntStrLen(buf) > 22) {
+            brk = flKnjMsgNumPtr(buf, 19);
+            if (brk != NULL) {
+                *brk = 0;
+                strcat(buf, "...");
+            }
+        }
+        strcpy(quest_text_buffer, buf);
+        break;
+    case 1:
+        msg_str_gen(rec->field_0x02E, quest_text_buffer);
+        break;
+    case 16:
+        msg_str_gen(rec->field_0x02E, quest_text_buffer);
+        brk = flfntStrChr(quest_text_buffer, 10);
+        if (brk != NULL) {
+            *brk = 0;
+        }
+        break;
+    case 17:
+        msg_str_gen(rec->field_0x02E, quest_text_buffer);
+        brk = flfntStrChr(quest_text_buffer, 10);
+        if (brk != NULL) {
+            strcpy(buf, brk + 1);
+            strcpy(quest_text_buffer, buf);
+        } else {
+            quest_text_buffer[0] = 0;
+        }
+        break;
+    case 2:
+        if (quest_flag_10000000_ck(rec) == 1) {
+            return quest_grade_text_get(0);
+        }
+        msg_str_gen(rec->field_0x08C, quest_text_buffer);
+        break;
+    case 3:
+        msg_str_gen(rec->field_0x0B5, quest_text_buffer);
+        break;
+    case 4:
+        msg_str_gen(rec->field_0x0DE, quest_text_buffer);
+        break;
+    case 5:
+        msg_str_gen(rec->field_0x13C, quest_text_buffer);
+        break;
+    case 6:
+        return quest_field198_text_get_of(rec);
+    case 7:
+        msg_str_gen(rec->field_0x19A, quest_text_buffer);
+        break;
+    case 8:
+        msg_str_gen(rec->field_0x1C9, quest_text_buffer);
+        break;
+    case 9:
+        return quest_name_text_get_of(rec);
+    case 10:
+        return quest_field13A_text_get_of(rec);
+    case 11:
+        return quest_time_text_get_of(rec, 0);
+    case 13:
+        return quest_time_text_get_of(rec, 1);
+    case 14:
+        return quest_time_text_get_of(rec, 2);
+    case 15:
+        return quest_time_text_get_of(rec, 3);
+    case 12:
+        return quest_field348_text_get_of(rec);
+    case 30:
+        return quest_monster_text_get(rec, 0);
+    case 31:
+        return quest_monster_text_get(rec, 1);
+    case 26:
+        return quest_arena_time_text_get(rec, 0);
+    case 27:
+        return quest_arena_time_text_get(rec, 1);
+    case 28:
+        return quest_arena_time_text_get(rec, 2);
+    default:
+        break;
+    }
+    return quest_text_buffer;
 }
 
 }  /* extern "C" */

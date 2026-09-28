@@ -521,7 +521,7 @@ extern "C" void item_page_draw_wrapped_text(u16 id, u16 part, s8* text, const _m
     fn_802E0AD4((_SPR_DATA_*)&spr, id, part, NULL);
     strcpy(buffer, text);
     for (;;) {
-        s8* brk = fn_8005C7E0(line, 10);
+        s8* brk = (s8*)flfntStrChr((char*)line, 10);
         if (brk == NULL) {
             draw_font(*(_SPR_DATA_*)&spr, line, 0, pos);
             break;

@@ -630,8 +630,8 @@ extern "C" void fn_8005C7F0(s16 index)
     fn_8005B7A0(index);
 }
 
-/* The substring search the string helpers call (`fn_8005C7E0` is a thin `strchr`). */
-extern "C" char* fn_8005C7E0(char* s, int c)
+/* The substring search the string helpers call (a thin `strchr`). */
+extern "C" char* flfntStrChr(char* s, int c)
 {
     return strchr(s, c);
 }

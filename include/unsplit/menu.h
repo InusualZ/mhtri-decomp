@@ -159,15 +159,20 @@ typedef struct QuestArenaItem {
  * offsets this band reads are named, and the whole tail below +0x372 is not evidenced.
  * size: 0x714 (lower bound) */
 typedef struct QuestRecord {
-    /* +0x000 */ u8 unused_0x000[0x02C];
+    /* +0x000 */ char field_0x000[0x02C];  /* the leading text run: the record's own name, which
+                                             * `quest_result_field_text_get`'s field kinds 0/22 copy */
     /* +0x02C */ u16 field_0x02C;     /* the clear time in frames (compare against 0x2710/0x2328) */
-    /* +0x02E */ u8 unused_0x02E[0x05D];
+    /* +0x02E */ char field_0x02E[0x05D];  /* the second text run, rendered by field kinds 1/16/17 */
     /* +0x08B */ u8 field_0x08B;      /* index into string table 5 */
-    /* +0x08C */ u8 unused_0x08C[0x0AE];
+    /* +0x08C */ char field_0x08C[0x029];  /* field kind 2's text run (when the flag test fails) */
+    /* +0x0B5 */ char field_0x0B5[0x029];  /* field kind 3's text run */
+    /* +0x0DE */ char field_0x0DE[0x05C];  /* field kind 4's text run */
     /* +0x13A */ s16 field_0x13A;     /* formatted through string table 6's format 0 */
-    /* +0x13C */ u8 unused_0x13C[0x05C];
+    /* +0x13C */ char field_0x13C[0x05C];  /* field kind 5's text run */
     /* +0x198 */ u8 field_0x198;      /* index into string table 41 */
-    /* +0x199 */ u8 unused_0x199[0x173];
+    /* +0x199 */ u8 unused_0x199[0x001];
+    /* +0x19A */ char field_0x19A[0x02F];  /* field kind 7's text run */
+    /* +0x1C9 */ char field_0x1C9[0x143];  /* field kind 8's text run */
     /* +0x30C */ u8 field_0x30C[2];  /* the two per-slot monster ids (bytes 0/1)
                                       * `quest_monster_text_get` renders through string table 33 */
     /* +0x30E */ u8 unused_0x30E[0x002];
