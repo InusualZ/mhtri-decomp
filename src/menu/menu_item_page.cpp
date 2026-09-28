@@ -560,8 +560,8 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x54), id, &pos);
         if (entry->selected != 0) {
             draw_sprite_anim_ary((const u16*)((u32*)get_menu_lsp_tbl(0x55))[data->mode], id, &pos);
-            limit_a = fn_803AA588(data->kind);
-            limit_b = fn_803AA674(data->kind);
+            limit_a = quest_record_a_count_get_wide(data->kind);
+            limit_b = quest_record_b_count_get_wide(data->kind);
             u16* user = (u16*)get_userdata();
             u16 id_a = user[data->kind * 2 + 0x1DE1];
             u16 id_b = user[data->kind * 2 + 0x1DE0];

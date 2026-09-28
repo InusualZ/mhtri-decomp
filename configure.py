@@ -796,6 +796,20 @@ config.libs = [
             # `.sdata2`/`.bss`/`.sbss` runs are claimed by the pass that writes the bodies emitting
             # them (docs/plan.md 8.4).  Same `cflags_menu` as its menu siblings.
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
+            # Registered once, at its final home, from proposal/803AA4A4_fn_803AA4A4.cpp: the quest
+            # entry/init band (`.text` 0x803AA4A4..0x803B0F98, 70 functions / 27380 B) with extab
+            # 0x80018A6C..0x80018C54 (60 records) and extabindex 0x80038E08..0x800390E4 (60 x 12 B) -
+            # both runs are exactly the gap between the bracketing registrations.  Module `quest` from
+            # the runtime dump's own names for the band's globals (`q_result_msg_adrs`,
+            # `quest_ex_condition_tbl`, `em_bui_tbl`/`em_hokaku_rem_l,h`) plus the range's one real
+            # function name, `quest_init(unsigned char)` 0x803AD47C; the file name is a marked GUESS
+            # (no `__FILE__` string reaches the range - every `.data` reference of all 70 auto objects
+            # was relocated to check).  The seam is UNPROVEN (the discovery `--max-bytes` cap) and the
+            # run is plainly a sequence of objects; see the unit header.  Same lib and flags as its
+            # link neighbour `menu/multi_result.cpp` (cflags_menu: the band carries 0 record-form
+            # instructions and needs `-Cpp_exceptions on`, which every one of its 60 framed functions
+            # shows in its own extab record).
+            Object(NonMatching, "quest/quest_entry.cpp"),
         ],
     },
 

@@ -1225,7 +1225,7 @@ extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2)
 
     if (arg0 != 0x15 && arg0 != 0x16) {
         const u8* tbl;
-        if (fn_800CF280() == 1) {
+        if (move_work_state_ck() == 1) {
             id = arg0;
         } else {
             id = fn_803B3420(arg0, arg2);
@@ -1415,7 +1415,7 @@ void quest_bgm_load(u8 arg0, u8 arg1)
 
     lbl_80794A2C->bgm_loading_2 = 0;
     lbl_80794A2C->bgm_loading_1 = 0;
-    if (fn_800CF280() != 1) {
+    if (move_work_state_ck() != 1) {
         index = fn_803B3420(index, arg1);
     }
     fn_800E4D60(0);

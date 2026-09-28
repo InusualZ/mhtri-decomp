@@ -48,6 +48,7 @@ typedef struct LbActSelBytes {
 
 typedef union LbActSel {
     /* +0x00 */ u32 word_0x00;
+    /* +0x00 */ u16 half_0x00;   /* the 16-bit view `lb_act_best_keep` hands on (the target loads `lhz`) */
     /* +0x00 */ LbActSelBytes bytes_0x00;
 } LbActSel; /* size: 0x4 */
 
@@ -508,7 +509,10 @@ s8 fn_800CF384(void);
  * header declares yet; the sibling units declare it the same way). */
 s32 memcmp(const void* a, const void* b, u32 n);
 void* fn_803B33B0(u32 id);
-void fn_803AA774(LbCompanionPair* pairs, u8 index, s8 best, u8 value);
+/* `quest/quest_entry.cpp`'s item-record copy (owner: `quest/quest_entry.cpp`); only the pointer is
+ * needed here, so the type stays incomplete. */
+struct Q_ItemPair;
+void quest_item_pair_copy_row(Q_ItemPair* dst, u16 id, s8 row, u8 kind);
 void fn_8035B5FC(u32 a, void* p);
 void fn_803AFE4C(LbCompanionWork* work, u8 index);
 void fn_803AFF34(LbCompanionWork* work);

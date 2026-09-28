@@ -206,7 +206,7 @@ void fn_802E4AD4(void) {
     st->field_0x000 = 1;
     st->field_0x059 = 0;
     st->field_0x058 = 0;
-    if (fn_800CF280() != 0) {
+    if (move_work_state_ck() != 0) {
         st->field_0x05C = 0;
         st->field_0x05A = 0;
         st->field_0x070 = fn_803B8E1C();
@@ -415,7 +415,7 @@ void fn_802E555C(void) {
         fn_802EA33C(&lbl_806BDCC8[0]);
         fn_802E6EB4();
         note_box_draw();
-        if (fn_800CF280() != 0) {
+        if (move_work_state_ck() != 0) {
             fn_802EF424();
         }
         fn_802EF730();
@@ -482,7 +482,7 @@ void fn_802E5A14(void) {
 }
 
 u32 fn_802E73B4(void) {
-    return fn_800CF280();
+    return move_work_state_ck();
 }
 
 s32 fn_802E73B8(s32 arg0, s32 arg1) {
@@ -519,7 +519,7 @@ void fn_802E5284(void) {
         fn_802E5BB4();
         fn_802ED88C();
         fn_802A2620(0);
-        if (fn_800CF280() != 0) {
+        if (move_work_state_ck() != 0) {
             fn_802EF230();
         }
         fn_802EF6B0();

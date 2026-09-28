@@ -125,7 +125,7 @@ void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 fn_80050EF4(void* a, void* b);
 f32 fn_80050F80(void* a, void* b);
 void fn_800FA378(void* out);
-u32 fn_800CF280(void);
+u32 move_work_state_ck(void);
 s32 ran_suu(s32 a);
 void fn_800E2F40(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f);
 s32 fn_8028F558(void* a, void* b);
@@ -461,7 +461,7 @@ extern "C" s32 fn_801B4C54(u16 id) {
     s32 pct;
 
     fn_80125F54(&rec);
-    if (fn_800CF280() == 0) {
+    if (move_work_state_ck() == 0) {
         return 0;
     }
     if (fn_801421E4((u16)id, &rec) == 0) {

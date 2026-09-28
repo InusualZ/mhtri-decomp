@@ -132,8 +132,8 @@ typedef struct LbItemDb {
 extern LbItemDb* lbl_80794880;
 
 s32 item_page_option_item_id(u8 kind, u8 row);
-u16 fn_803AA588(u8 a);
-u16 fn_803AA674(u8 a);
+s32 quest_record_a_count_get_wide(s32 kind);
+s32 quest_record_b_count_get_wide(s32 kind);
 
 /* libc (the map carries the plain names). */
 s32 sprintf(s8* dst, const char* fmt, ...);
