@@ -89,6 +89,8 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_80288CEC.h" /* `PlBox`, shared with `Pl/fn_8028F66C.cpp` (rule 1) */
 #include "ef/fn_800CDB2C.h"
+#include "fn_80047398.h" /* `arena_userdata_apply` (rule 2) */
+#include "quest/arenatask.h" /* `arena_user_data_buf` (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ------------------------------------------------------------------------------------------------ *
@@ -174,7 +176,7 @@ u32 Pl_frame_check(_PLW* plw, u32 frame, f32 a, f32 b);
 void player_init_data_load(void);
 
 extern "C" {
-void fn_8004A240(void* table, void* key);
+/* `arena_userdata_apply` (0x8004A240) is `fn_80047398.cpp`'s and now comes from its owner header. */
 f32 fn_80050CA0(void* dst, void* a, void* b);
 f32 fn_80050EF4(void* a, void* b);
 void fn_80051378(void* dst, void* a, void* b);
@@ -204,7 +206,7 @@ void PSVECSubtract(void* dst, void* a, void* b);
  * on fn_8028F400). */
 extern u8 lbl_806AB830[];
 extern u8 lbl_806AB83C[];
-extern u8 lbl_806E3E10[];
+/* `arena_user_data_buf` (0x806E3E10) is `quest/arenatask.cpp`'s range and comes from its header. */
 
 /* ------------------------------------------------------------------------------------------------ *
  * Bodies, in address order.
@@ -470,9 +472,9 @@ PlRootEntry* fn_8028F0B4(u32 key, u32 index) {
     return 0;
 }
 
-/* 0x8028F1E8 - hand the caller's `+0x08` byte to the `lbl_806E3E10` table as a 256-byte stride. */
+/* 0x8028F1E8 - hand the caller's `+0x08` byte to the `arena_user_data_buf` table as a 256-byte stride. */
 void fn_8028F1E8(u8* self) {
-    fn_8004A240(lbl_806E3E10 + ((u32)self[8] << 8), self);
+    arena_userdata_apply(arena_user_data_buf + ((u32)self[8] << 8), self);
 }
 
 /* 0x8028F204 - the `+0x22D7` byte == 1 predicate. */

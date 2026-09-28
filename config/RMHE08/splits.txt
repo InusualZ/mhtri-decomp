@@ -1379,8 +1379,8 @@ quest/arenatask.cpp:
 	extabindex  start:0x8003EB20 end:0x8003EBEC
 	.text       start:0x804459E4 end:0x80448404
 	.ctors      start:0x8056F3D0 end:0x8056F3D4
-	.data       start:0x80607210 end:0x806073F0
-	.bss        start:0x806E4010 end:0x806E40C0
+	.data       start:0x80604D30 end:0x806073F0
+	.bss        start:0x806E3E10 end:0x806E40C0
 	.sdata      start:0x80793B28 end:0x80793B88
 	.sbss       start:0x80794D3C end:0x80794D50
 	.sdata2     start:0x8079C960 end:0x8079C998
