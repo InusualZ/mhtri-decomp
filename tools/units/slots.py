@@ -25,6 +25,7 @@ on (docs/plan.md 5.1).
 
     python tools/units/slots.py init [--count 6] [--force]
     python tools/units/slots.py acquire <unit> [--slot N] [--worker NAME] [--force] [--dry-run]
+    python tools/units/slots.py spawn --kind KIND [--slot N] [--unit U] [--task-file PATH] [--json]
     python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
     python tools/units/slots.py status [--json]
     python tools/units/slots.py verify [--slot N] [--json]
@@ -101,6 +102,21 @@ SLOT_KEEP = (".ninja_deps", ".ninja_log", "build.ninja", "objdiff.json", "compil
 # preserves it across a reset *because* the marker the acquire just created must survive the reset - a
 # stale marker from a crash is reclaimed by the worktree reading (see `slot_state`), not by the clean.
 SLOT_MARKER = ".used"
+
+#: How a lane's **kind of work** maps to the agent profile it is launched with.  This mapping is the fix
+#: `spawn` exists for: `queue.py`/`claims.py` left the profile to the lane (defaulting to `decompiler`), so
+#: three *tooling* lanes carried unit policy they could never satisfy and a general rule they must not
+#: break (AGENTS.md, "Operational mode").  The mapping is exhaustive - one kind per lane, never a guess.
+KIND_PROFILE = {
+    "unit": "decompiler",     # register a proposal at its final home and reconstruct its bodies
+    "fix": "fixer",           # a refused gate or a measured regression on a branch
+    "merge": "merger",        # a refused apply
+    "tooling": "worker",      # the fallback for a task that is none of the specific ones
+    "docs": "worker",
+    "review": "reviewer",      # read-only
+    "scout": "scout",          # read-only
+    "plan": "planner",         # read-only
+}
 
 
 def marker_path(slot: str) -> str:
@@ -1032,6 +1048,93 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
     return result
 
 
+# --- spawn ---------------------------------------------------------------------------------------
+
+def profile_for_kind(kind: str) -> str:
+    """The agent profile for a lane's kind of work, or a refusal **listing the valid kinds**.
+
+    `KIND_PROFILE` is the whole mapping - one kind per lane - and a kind it does not know is refused rather
+    than defaulted: guessing `decompiler` is exactly how a tooling lane was handed unit policy it could
+    never satisfy.  The refusal names the valid kinds so the caller can correct the one word it got wrong
+    without reading this file.
+    """
+    try:
+        return KIND_PROFILE[kind]
+    except KeyError:
+        raise SystemExit("REFUSED spawn: unknown kind %r - valid kinds are: %s"
+                         % (kind, ", ".join(KIND_PROFILE)))
+
+
+def tree_block(main: str, path: str) -> str:
+    """The standard "your tree" block every lane already gets - reused verbatim, never re-worded here.
+
+    `brief._your_tree_lines` owns the cwd, the "write nothing outside it" rule and the
+    `git rev-parse --show-toplevel` self-check ("STOP and report it instead of working");
+    `brief._teardown_lines` owns the `claims.py release` ban.  Both renderers the claim path uses call those
+    two helpers, so calling them here is the *one* copy of the paragraphs - a second variant pasted into
+    `spawn` would be the drift this is meant to prevent.  The one clause those helpers do not carry - do not
+    land - is added in the wording `brief.py`'s own §6 rules use.
+    """
+    from units import brief
+    lines: list[str] = []
+    brief._your_tree_lines(lines, {"worktree": path, "main": main})
+    brief._teardown_lines(lines)
+    lines.append("**Do not land.** A worker never runs `land.py` and never commits on `main` - landing is the")
+    lines.append("orchestrator's job, exactly as teardown is.")
+    return "\n".join(lines).strip("\n")
+
+
+def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None,
+          task: str | None = None, task_file: str | None = None, worker: str | None = None,
+          force: bool = False) -> dict:
+    """Take a slot for a lane of `kind` and return the paste-ready launch: the `subagent({...})` line
+    followed by the standard "your tree" block.
+
+    **The slot is an explicit launch parameter.**  `slot=N` takes that slot *by number* through `acquire` -
+    same fail-closed reset/seed, same refusal for a slot holding an unlanded branch, never a reimplementation
+    - and no `slot` takes the first genuinely free slot and **names which one it took**, so the orchestrator
+    chooses the slot and can see it instead of two racing lanes choosing the same one.
+
+    **`kind` is the mapping.**  It decides the agent profile (`profile_for_kind`) and is both printed and
+    recorded: printed in the returned header/JSON, recorded in the slot's lock (`kind`/`agent`) and in the
+    default claim name, so the lane's own branch says what it is.
+
+    `unit` names the claim (and therefore the branch); it defaults to a timestamped `lane/<kind>-<...>` so a
+    caller that knows only its slot and kind still gets a complete line.  `task`/`task_file` supply the text
+    the lane is handed; without one the line carries a visible placeholder rather than an empty task.
+    """
+    profile = profile_for_kind(kind)
+    if task is None and task_file:
+        try:
+            with open(task_file, encoding="utf-8") as fh:
+                task = fh.read().strip()
+        except OSError as exc:
+            raise SystemExit("REFUSED spawn: cannot read --task-file %s: %s" % (task_file, exc))
+    unit = unit or "lane/%s-%s" % (kind, time.strftime("%Y%m%d-%H%M%S"))
+    info = acquire(main, unit, worker=worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
+                   slot=slot, force=force)
+    path = info["dir"]
+    # record the mapping in the slot's lock, so `status` and a later reader see the profile the lane was
+    # launched with, not only the branch it happens to hold.
+    lock = read_lock(main, info["slot"])
+    if lock:
+        lock["kind"] = kind
+        lock["agent"] = profile
+        write_lock(main, info["slot"], lock)
+    if task:
+        task_text = ("%s\n\nYou may fan out subagents. End your turn with your report: "
+                     "your final message is the result the orchestrator receives." % task)
+    else:
+        task_text = ("No task text was given (`--task-file` was not passed). Replace this placeholder with "
+                     "the lane's task. You may fan out subagents. End your turn with your report: your final "
+                     "message is the result the orchestrator receives.")
+    call = ("subagent(agent=%s, cwd=%s, task=%s)"
+            % (json.dumps(profile), json.dumps(path.replace("\\", "/")), json.dumps(task_text)))
+    block = tree_block(main, path)
+    return {"slot": info["slot"], "path": path, "agent": profile, "kind": kind,
+            "branch": info["branch"], "unit": unit, "spawnLine": "%s\n\n%s" % (call, block)}
+
+
 # --- status --------------------------------------------------------------------------------------
 
 def status(main: str, registry: str | None = None) -> list[dict]:
@@ -1539,6 +1642,84 @@ def selftest() -> int:
         check("... and the slot is detached and unlocked",
               (slot_attached_branch(d_seam), read_lock(repo, seam["slot"])), (None, {}))
 
+        # --- SPAWN: the slot is an explicit launch parameter and the profile follows the kind ----------
+        # (the defect: the launcher left both choices to the lane, and three tooling lanes were told
+        # `decompiler` - unit policy they could never satisfy. `spawn` makes both explicit.)
+        check("the kind mapping is the whole table", KIND_PROFILE,
+              {"unit": "decompiler", "fix": "fixer", "merge": "merger", "tooling": "worker",
+               "docs": "worker", "review": "reviewer", "scout": "scout", "plan": "planner"})
+        for _kind, _profile in sorted(KIND_PROFILE.items()):
+            check("kind %s -> %s" % (_kind, _profile), profile_for_kind(_kind), _profile)
+        try:
+            profile_for_kind("bogus")
+            check("an unknown kind is refused (never guessed)", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("an unknown kind is refused (never guessed)", "unknown kind" in str(exc), True)
+            check("... listing every valid kind", all(k in str(exc) for k in KIND_PROFILE), True)
+
+        # (a) BY NUMBER: takes THAT slot, and the line's cwd is it and its agent is the mapped profile
+        sp = spawn(repo, "tooling", slot=1, unit="lane/spawn-tooling", task="Wire up the tool.")
+        check("spawn takes the slot BY NUMBER", sp["slot"], 1)
+        check("... cwd is that slot", sp["path"].replace("\\", "/"),
+              slot_dir(repo, 1).replace("\\", "/"))
+        check("... the kind maps to `worker`", sp["agent"], "worker")
+        check("... the slot is on the claim's branch", slot_attached_branch(slot_dir(repo, 1)), sp["branch"])
+        check("... the line is a subagent call with that agent and cwd",
+              sp["spawnLine"].startswith('subagent(agent="worker", cwd="%s"'
+                                          % slot_dir(repo, 1).replace("\\", "/")), True)
+        check("... and carries task/slot/path/agent/kind/spawnLine",
+              all(k in sp for k in ("slot", "path", "agent", "kind", "spawnLine")), True)
+        check("... the block carries the `rev-parse --show-toplevel` self-check",
+              "git rev-parse --show-toplevel" in sp["spawnLine"], True)
+        check("... and the STOP-and-report rule", "STOP and report it" in sp["spawnLine"], True)
+        check("... and the write-nothing-outside rule",
+              "nothing" in sp["spawnLine"].lower() and "outside it" in sp["spawnLine"].lower(), True)
+        check("... and the claims.py release prohibition", "claims.py release" in sp["spawnLine"], True)
+        check("... and the do-not-land rule", "Do not land" in sp["spawnLine"], True)
+        check("... the kind/profile are recorded in the slot's lock",
+              (read_lock(repo, 1).get("kind"), read_lock(repo, 1).get("agent")), ("tooling", "worker"))
+
+        # (b) BY NUMBER, occupied: a slot holding an unlanded branch is refused
+        try:
+            spawn(repo, "unit", slot=1, unit="lane/spawn-intruder", task="x")
+            check("spawn BY NUMBER refuses a slot holding an unlanded branch", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("spawn BY NUMBER refuses a slot holding an unlanded branch",
+                  "never a branch" in str(exc), True)
+        check("... and the held branch is untouched", slot_attached_branch(slot_dir(repo, 1)), sp["branch"])
+        release(repo, slot=1, unit="lane/spawn-tooling", rescue=False)
+
+        # (c) an unknown kind is refused before any slot is touched
+        try:
+            spawn(repo, "not-a-kind", unit="lane/spawn-bad")
+            check("spawn refuses an unknown kind", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("spawn refuses an unknown kind", "unknown kind" in str(exc), True)
+        check("... without taking a slot", free_count(repo), 2)
+
+        # (d) NO --slot: skips the occupied slot and takes the FIRST genuinely free one, naming it
+        hold = spawn(repo, "tooling", slot=1, unit="lane/spawn-hold", task="hold")
+        freed = spawn(repo, "docs", unit="lane/spawn-first-free", task="write the doc")
+        check("spawn with no --slot takes the first genuinely free slot", freed["slot"], 2)
+        check("... naming it", freed["path"].replace("\\", "/"), slot_dir(repo, 2).replace("\\", "/"))
+        check("... and `docs` maps to the `worker` fallback", freed["agent"], "worker")
+        release(repo, slot=2, unit="lane/spawn-first-free", rescue=False)
+        unit_sp = spawn(repo, "unit", unit="lane/spawn-unit", task="Reconstruct the unit.")
+        check("... and `unit` maps to `decompiler`", unit_sp["agent"], "decompiler")
+        check("... on the first free slot again", unit_sp["slot"], 2)
+        release(repo, slot=2, unit="lane/spawn-unit", rescue=False)
+        release(repo, slot=1, unit="lane/spawn-hold", rescue=False)
+
+        # (e) --task-file: the printed line carries the file's text
+        tf = os.path.join(tmp, "spawn-task.txt")
+        with open(tf, "w", encoding="utf-8") as fh:
+            fh.write("Read this and do X.")
+        tfs = spawn(repo, "fix", unit="lane/spawn-taskfile", task_file=tf)
+        check("spawn reads the task text from --task-file", "Read this and do X." in tfs["spawnLine"], True)
+        check("... and `fix` maps to `fixer`", tfs["agent"], "fixer")
+        release(repo, slot=tfs["slot"], unit="lane/spawn-taskfile", rescue=False)
+        check("the pool is left as it was found (both slots free)", free_count(repo), 2)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1583,6 +1764,18 @@ def main() -> int:
                         "holds commits no branch reaches")
     r.add_argument("--dry-run", action="store_true")
     r.add_argument("--json", action="store_true")
+    sp = sub.add_parser("spawn", help="take a slot for a lane of a kind and print the paste-ready launch")
+    sp.add_argument("--kind", required=True,
+                    help="the kind of work -> agent profile: " + ", ".join(KIND_PROFILE))
+    sp.add_argument("--slot", type=int, default=None,
+                    help="take this slot by number (default: the first genuinely free slot)")
+    sp.add_argument("--unit", default=None,
+                    help="the claim/branch name (default: lane/<kind>-<timestamp>)")
+    sp.add_argument("--task-file", default=None, help="read the lane's task text from this file")
+    sp.add_argument("--worker", default=None)
+    sp.add_argument("--force", action="store_true",
+                    help="take a slot whose `.used` sentinel names a claim whose owner is gone")
+    sp.add_argument("--json", action="store_true")
     s = sub.add_parser("status", help="every slot, its lock and whether its build tree is current")
     s.add_argument("--json", action="store_true")
     v = sub.add_parser("verify", help="validate each slot's build tree against MAIN's current map/DOL")
@@ -1638,6 +1831,21 @@ def main() -> int:
                                        "" if not out["refreshed"] else "\n  %s" % out["refreshed"]))
         if out.get("overridden"):
             print("  --force overrode:\n  - %s" % "\n  - ".join(out["overridden"]))
+        return 0
+    if args.cmd == "spawn":
+        out = spawn(main_wt, args.kind, slot=args.slot, unit=args.unit, task_file=args.task_file,
+                    worker=args.worker, force=args.force)
+        if args.json:
+            # exactly the fields a caller needs; `spawnLine` is the whole paste-ready text (line + block)
+            print(json.dumps({k: out[k] for k in ("slot", "path", "agent", "kind", "spawnLine")},
+                             indent=2))
+            return 0
+        # stdout is exactly the paste-ready artifact (the subagent line + the block); the header names the
+        # slot that was taken on stderr, so a caller can capture stdout verbatim.
+        print("spawn slot %d (%s) for kind %s -> agent %s\n  path: %s"
+              % (out["slot"], out["branch"], out["kind"], out["agent"], out["path"]),
+              file=sys.stderr)
+        print(out["spawnLine"])
         return 0
     if args.cmd == "status":
         rows = status(main_wt)
