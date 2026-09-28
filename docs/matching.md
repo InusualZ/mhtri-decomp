@@ -2021,3 +2021,19 @@ candidate even where the sections already match.
 
 **Example.** `Network/NetworkWiiMediator.cpp`: `initializeNetworkMediator` 1.887 -> 100.00, `reflectInit` 88.345 ->
 100.00, unit 95.09 -> 98.89 % in one commit.
+
+
+**Complement (2026-09-27): the same mistake, with the opposite tell.** `Network/constructNetworkWiiMediator`
+was the mirror image of this row and it hid better. Its landed body spelled the allocation as
+`operator new(0x1408)` plus a null check - and *that* spelling lowers to the **same 16 instructions**, so
+`.text` measured **100.00 %** and every objdiff row was green. What differed was the object, not the code:
+the target's `extab` record is 24 bytes and ours was an 8-byte header, because the cleanup MWCC attaches to
+the ctor-call region of a real `new` expression has nothing to attach to in the manual form. `flipcheck.py`
+caught it in one command (*"splits.txt claims extab (0x18) but the object emits no such section"*), and a
+blind flip would have dropped 36 bytes and shifted everything after it. So the row cuts both ways: the
+manual form is either a register off in `.text` (above) or a missing unwind record with `.text` perfect -
+and only the second case survives a `.text`-only measurement. Two other facts from that measurement: the
+lane compiled **three** spellings that were byte-identical in `.text`, `extab` *and* `extabindex`, so the
+deciding evidence was the call site's **relocation** (the real callee, not a synthesized `__ct__…`); and
+the `Network` library sets `-Cpp_exceptions off`, so a file-scoped `#pragma exceptions on` is *required* -
+without it MWCC emits no `extab` section at all. The flip landed (`e2f4ab40c`), the 33rd.
