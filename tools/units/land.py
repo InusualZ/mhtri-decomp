@@ -2417,6 +2417,17 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
               info="vtableaudit could not read this tree - the row is skipped (see the note above)")
     else:
         grew, touched_rows = rule10_growth(rule10_before, rule10_after, unit_units)
+        # A sanctioned claim is accepted by an explicit, recorded allowance (`--allow-rule10 <key>`) - never
+        # by a key in a file, the same reasoning that removed `rule 7 deferred` - and the acceptance is
+        # printed here so the landing's own log carries the exception **and** the key it excused. An
+        # allowance that matches nothing is visible too: it stays out of `accepted` and the row still
+        # refuses, so a stale allowance cannot quietly keep excusing a key that no longer exists.
+        authorised = {a.strip() for a in (allow_rule10 or []) if a.strip()}
+        accepted = sorted(k for k in grew if k in authorised)
+        grew = sorted(k for k in grew if k not in authorised)
+        if accepted:
+            print("rule 10: %d authorised by --allow-rule10 (recorded, not a file-level exemption): %s"
+                  % (len(accepted), "; ".join(accepted)))
         check("rule 10 (vtable ownership) adds no violation", not grew,
               detail="%d added: %s" % (len(grew), "; ".join(grew[:4])),
               info=("rule 10 report for this batch: %s" % "; ".join(touched_rows)) if touched_rows
@@ -2558,7 +2569,7 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
          allow_regression: list[str] | None = None, check_outbox: bool = True,
          release_claims: bool = True, subject: str | None = None,
          already_applied: bool = False, branch: str | None = None,
-         no_selftests: bool = False) -> int:
+         no_selftests: bool = False, allow_rule10: list[str] | None = None) -> int:
     """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
 
     The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
@@ -4436,6 +4447,11 @@ def main() -> int:
                     help="commit without releasing the batch's claims")
     ld.add_argument("--allow-regression", action="append", default=[],
                     help="unit whose measured regression is authorised by a rule; repeatable")
+    ld.add_argument("--allow-rule10", action="append", default=[],
+                    help="rule-10 violation key a landing accepts deliberately, e.g. "
+                         "`run:.data:805FB0F8` for the Pat vtable the owner ruled stays claimed while "
+                         "its slots are written; repeatable, recorded in the landing log, never a key "
+                         "in a file")
     ld.add_argument("--no-selftests", action="store_true", dest="no_selftests",
                     help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
                          "--changed` is the narrower lane loop)")
@@ -4490,6 +4506,7 @@ def main() -> int:
             return 1
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         return land(main, units, args.base, args.no_build, args.allow_regression,
+                    allow_rule10=args.allow_rule10,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
                     subject=args.message, already_applied=args.already_applied,
                     no_selftests=args.no_selftests)
