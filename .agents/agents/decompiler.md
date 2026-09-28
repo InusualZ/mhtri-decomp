@@ -340,6 +340,22 @@ often an `owner_merge` artefact - verify it.
 
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 
+**Never hand-model a vtable.** A `struct` of function pointers written to stand in for a class's vtable is not a
+reconstruction and is not evidence of inheritance (row 52): the vtable must be **emitted by the compiler** from
+the class, which means the class itself has to be reconstructed - the constructor stores it at `+0x00` and the
+unit that defines the class's key function emits the table. Measured cost of getting this wrong: the table's
+bytes are ordinary `.data`, objdiff cannot pair a hand-written row against the compiler's, and `vtableaudit.py`
+reports an owned-but-unemitted run. If the vtable cannot be emitted yet, leave the range unowned and record it
+as the residual - do not type it in.
+
+**A by-index accessor family is the same defect in disguise.** `getXPat(self, index)` returning `void*`,
+`setXPat(self, void* value)`, `clearXPat(self, value)` and `deleteXPat(self, index)` describe an interface to a
+table: either a polymorphic object's vtable, or a container (`NetCtrlEntry`/`NetSlot`/`NetPoolEntry` shapes), or
+a pool. Settle which **before** writing them - the map's own symbols say whether the thing is a class
+(`__ct__24NetworkSessionManagerPatFv` / `__dt__…` are mangled C++ and prove a class with a ctor and dtor) - and
+give every parameter and return its real type. Rule 11 bans `void *` outright; a family of `void*` accessors
+over an untyped table is the rule's worst case, not its exception.
+
 **This is a C++ project, and a pointer field at `+0x00` that points at a table of function pointers means the
 original was a class with inheritance** - model the class and let MWCC emit the table and the store itself;
 never hand-wire `self->vtable = &SomeVTable;` (rule 10, checked by `tools/units/vtableaudit.py` at the gate).

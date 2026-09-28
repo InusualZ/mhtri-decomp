@@ -59,6 +59,12 @@ them before you form an opinion, and cite the rule number rather than your taste
   flag hunt.
 
 ## The review dimensions, in the order they bite
+
+* **A hand-modelled vtable, or an accessor family standing in for one.** A `struct XxxVtable` of function pointers,
+  or `getX(self, index)`/`setX(self, void* value)` returning untyped values over a table, is not a reconstruction:
+  the compiler emits a real class's vtable from the class, and the map's mangled rows (`__ct__…`, `__dt__…`) say
+  when a real class exists. Report it, name the evidence for the real shape, and say what the residual should be
+  (leave the range unowned) rather than accepting the invented one. Rule 11 covers the `void *` half.
 * **A `Matching` unit's completion percent is a flag we set.** `Object(Matching, ...)` writes
   `metadata.complete`, so `complete_code_percent` reads 100 whatever the bytes are (measured: a corrupted
   `Matching` unit kept 100.0 there while `fuzzy_match_percent` fell to 99.95049 and `ok` failed). Judge such a
