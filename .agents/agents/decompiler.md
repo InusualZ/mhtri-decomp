@@ -316,9 +316,13 @@ command line: the PCode stream after each pass, and the register allocator's dec
 * The exact invocation, the `-o` redirection that keeps real objects untouched, and the support matrix are in
   `tools/mwcc-debugger/README.md`. Short form: hand it the unit's real command line with `-o build/mwcc-debug`,
   then read the dumps.
-* **Health-check a dump before you trust it**: `python tools/mwcc-debugger/locate/verify_pcode.py <last backend
+* **Health-check a dump before you trust it**: `python tools/mwcc-debugger/locate/verify_pcode.py <backend
 dump> <object.o>` compares the dump against `objdump` of the object the same command line produces, and it
-  *fails* on the pre-optimization dump - so a vacuous comparison cannot pass.
+  classifies the dump first: the **last** dump (`after-code-labels`) is `MATCH` or `FAIL` - and it does fail
+  when the final code disagrees, so a vacuous comparison cannot pass - while an **earlier** one reports a
+  `PASS-DELTA`: the instruction-count delta, the concrete instruction change, and the pass that first made
+  the object's stream. So run it on an early dump to have a residual attributed to a pass; its delta is not
+  a failure.
 * What it answers, in the form you actually need: which pass fused `add`+`addi`+`lbz` into `lbzu`; which virtual
   register became r31; whether the optimizer reordered a chain before the allocator ever saw it. That is the
   difference between searching source shapes and knowing.

@@ -184,8 +184,12 @@ while $i != 0
 end
 ```
 
-4. `python locate/verify_pcode.py <last backend dump> <object>` to prove the
-   new layout against the object before trusting it.
+4. `python locate/verify_pcode.py <backend dump> <object>` to prove the new
+   layout against the object before trusting it.  It classifies the dump first,
+   so use the **last** dump of a run for the pass/fail proof (`MATCH`, or `FAIL`
+   with the first divergence) and any earlier one for a `PASS-DELTA` - the
+   changes from that pass forward, which is how a residual gets attributed to a
+   pass.  `locate/verify_pcode_selftest.py` pins both with fixtures.
 
 Note that the *other* Wii builds (1.5, 1.6, 1.7, 1.1, 1.0, 1.0RC1, 1.0a,
 0x4201_127) all carry the same kind of symbol blob, so this path generalises;

@@ -104,6 +104,15 @@ frontend-NN-ast-<pass>.txt       AST dumps (Wii/1.3: not yet, see below)
 variables.txt                    stack frame layout (GC/1.1 only)
 ```
 
+The `NN` is the order the dump points *fired*, not a pass number: `backend-00`
+is the frontend optimizer's output, the middle of the list is the -O3
+propagation/peephole pipeline, and the last file is the state just before
+assembly (for a -O3 unit: 35 dumps, ending `backend-34-after-code-labels.txt`).
+So the directory is a **timeline**, and the interesting thing about an early dump
+is the difference between it and the last one - that difference names the pass
+responsible for whatever the object does that the source does not.  See
+*Verification* for the tool that reads it that way.
+
 ## What works, and what does not
 
 **Works on Wii/1.3 (verified against the emitted object - see below):**
@@ -175,8 +184,53 @@ The port was checked end-to-end on `src/fn_8004C9A0.cpp`
   `r35 (equip) -> r7`, which are the registers that function's prologue and
   address computation actually use.
 
-`locate/verify_pcode.py` runs that comparison (it needs
-`build/binutils/powerpc-eabi-objdump.exe`, which the repository already has).
+`locate/verify_pcode.py` compares a dump against
+`powerpc-eabi-objdump -d` of the object the same command line emits (it needs
+`build/binutils/powerpc-eabi-objdump.exe`, which the repository already has):
+
+```
+python tools/mwcc-debugger/locate/verify_pcode.py <backend-NN-....txt> <file.o>
+```
+
+It **classifies the dump first**, because only one dump in the run claims to be
+the final code:
+
+| the dump | what the checker tells you |
+|---|---|
+| the final pass (`after-code-labels`; derived from the breakpoint table, see `locate/verify_pcode.py:final_pass_name`) | `MATCH` when every mnemonic, register and compared immediate agrees, otherwise `FAIL` with the first divergence - this is the non-vacuous check, and it stays loud |
+| any earlier pass | `PASS-DELTA`: the instruction-count delta and the concrete instruction changes from that pass forward, plus - with the sibling dumps still in the directory - the pass that *first* reaches the object's stream and the change that pass made |
+| a file name it cannot classify | a `PASS-DELTA` and a note saying why; `--final` forces the strict comparison |
+
+Exit status is 0 for `MATCH` and `PASS-DELTA`, 1 for `FAIL`, 2 for an error;
+`--strict` makes a `PASS-DELTA` exit 1 as well, and `--json` prints one JSON
+object instead of the report.
+
+**The one-line health check** - the last dump of the run must reproduce the
+object, and nothing else does:
+
+```
+python tools/mwcc-debugger/locate/verify_pcode.py \
+    build/mwcc-debug/dumps/backend-34-after-code-labels.txt \
+    build/RMHE08/src/fn_8004C9A0.o
+# MATCH: every mnemonic, register and compared immediate agrees
+```
+
+On the same run, `backend-30-after-prologue-epilogue.txt` (one pass earlier)
+reports the residual the unit's header documents:
+
+```
+instructions: dump 78, object 77 (-1)
+PASS-DELTA: this dump is not the final code ('after-code-labels' is); ...
+  attribution: the object's stream is first reached at dump 31 'after-peephole'
+    that pass changed 1 instruction group(s):
+      [3->2] add r6,r3,r0 / addi r7,r6,0xe00 / lbz r0,r7,0  ->  add r7,r3,r0 / lbzu r0,r7,0xe00
+```
+
+That is the `add`/`addi`/`lbz` -> `lbzu` fusion the source file's residual comment
+describes, attributed to the pass that made it.  `locate/verify_pcode_selftest.py`
+(`python tools/selftest.py --changed`) pins the classification with fixtures -
+including that the final-dump comparison still fails - so the contract is
+checked, not just the happy path.
 
 ## Layout
 
