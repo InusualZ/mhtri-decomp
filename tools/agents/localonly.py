@@ -17,8 +17,17 @@ Do not do this with sed/grep by hand: the markers are also *mentioned as text* i
 down the file, so any pattern that is not anchored at the start of a line matches four times, and a
 range-based edit silently eats the wrong region.
 
-Other commands: `status` (is the section present / is a state file pending) and `verify` (run rule 8's
-check against a committed revision: `git show <rev>:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` must be 0).
+Matching and insertion are **line-ending agnostic**: the anchor is compared with `\r` stripped and the
+block is written with the file's own dominant newline.  This is not cosmetic - a pull done while the tree
+was CRLF and a push onto the same file after it was normalised to LF used to fail with "the anchor before
+the section matches 0 times", stranding the block in the state file.  The state file also records a
+normalised pre-pull hash, so an EOL-only round trip is reported as such; if a real match failure
+does happen, `push` names the state file and the `block` key and offers `dump` as a one-command
+recovery, so the block can never be stranded as the only copy again.
+
+Other commands: `status` (is the section present / is a state file pending), `dump` (write the stored
+block to `--out`, or stdout, for a manual restore) and `verify` (run rule 8's check against a committed
+revision: `git show <rev>:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` must be 0).
 """
 import argparse
 import datetime
@@ -94,6 +103,74 @@ def prune_backups(state, keep=BACKUP_KEEP):
         except OSError:
             pass
     return removed
+
+
+def normalize_eol(text):
+    """CRLF and lone CR both become LF - the canonical form matching is done in."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def dominant_newline(text):
+    """The newline the file itself uses: CRLF only when it has more CRLFs than bare LFs."""
+    crlf = text.count("\r\n")
+    return "\r\n" if crlf > (text.count("\n") - crlf) else "\n"
+
+
+def convert_newlines(text, newline):
+    """Re-express `text` in `newline`, whichever EOLs it currently has."""
+    text = normalize_eol(text)
+    return text if newline == "\n" else text.replace("\n", "\r\n")
+
+
+def _norm_offset(text, end_norm):
+    """The offset in `text` that corresponds to (exclusive) index `end_norm` of `normalize_eol(text)`."""
+    positions = []
+    i = 0
+    while i < len(text):
+        if text[i] == "\r" and i + 1 < len(text) and text[i + 1] == "\n":
+            positions.append(i + 1)  # the \n of a CRLF is the normalized character
+            i += 2
+        else:
+            positions.append(i)
+            i += 1
+    if end_norm == 0:
+        return 0
+    return positions[end_norm - 1] + 1
+
+
+def locate_insertion(text, before, after):
+    """Where to put the stored block so it lands between the same text, EOL-agnostic.
+
+    -> the offset in `text`, or None when the anchor before the section does not match exactly once (or the
+text after the cut does not follow it).  Both sides are compared with `\r` stripped, so a pull done on a
+CRLF file and a push onto the same file after it became LF still finds its anchor.
+    """
+    ntext = normalize_eol(text)
+    nbefore = normalize_eol(before)
+    if nbefore:
+        if ntext.count(nbefore) != 1:
+            return None
+        end = ntext.index(nbefore) + len(nbefore)
+    else:
+        end = 0
+    nafter = normalize_eol(after)
+    if nafter and not ntext[end:].startswith(nafter):
+        return None
+    return _norm_offset(text, end)
+
+
+def anchor_failure_message(a, state):
+    """The refusal `push` gives when the anchor cannot be located - honest, and pointing at the one copy.
+
+    The block is not lost: it is in the state file under `block`.  `dump` is the one command that gets it
+    out again, so a future stranding is recoverable without knowing the JSON by heart.
+    """
+    return ("refusing: could not find the anchor for the stored LOCAL-ONLY section in %s - the text around "
+            "the cut changed too much since the pull.\n"
+            "  the block is NOT lost: it is in %s under the JSON key \"block\".\n"
+            "  recover it in one command: python tools/agents/localonly.py --state %s dump --out %s.localonly-block\n"
+            "  then paste it back between the markers and delete the state file."
+            % (a.file, a.state, a.state, a.file))
 
 
 def no_state_message(state):
@@ -182,6 +259,7 @@ def cmd_pull(a):
         "before": text[max(0, i - ANCHOR):i],
         "after": text[k:k + ANCHOR],
         "sha1_before_pull": sha1(text),
+        "sha1_before_pull_normalized": sha1(normalize_eol(text)),
         "pulled_at": datetime.datetime.now().isoformat(timespec="seconds"),
     }
     if a.dry_run:
@@ -212,24 +290,43 @@ def cmd_push(a):
     text = read(path)
     if find_block(text):
         raise SystemExit("refusing: %s already contains a LOCAL-ONLY section" % a.file)
-    anchor = state["before"]
-    if text.count(anchor) != 1:
-        raise SystemExit("refusing: the anchor before the section matches %d times - the file changed too "
-                         "much since the pull; insert the stored block by hand" % text.count(anchor))
-    at = text.index(anchor) + len(anchor)
-    if state["after"] and not text[at:].startswith(state["after"]):
-        raise SystemExit("refusing: the text after the cut does not match the state file - the file changed "
-                         "since the pull; insert the stored block by hand")
+    at = locate_insertion(text, state.get("before", ""), state.get("after", ""))
+    if at is None:
+        raise SystemExit(anchor_failure_message(a, state))
     if a.dry_run:
         print("would push %d lines (%d bytes) back into %s" % (state["block"].count("\n"), len(state["block"]), a.file))
         return 0
-    write(path, text[:at] + state["block"] + text[at:])
-    now = sha1(read(path))
-    same = "identical to the pre-pull file" if now == state["sha1_before_pull"] else \
-           "the rest of the file changed while pulled (expected if you kept editing it)"
+    # Insert with the file's own newline: a block pulled from a CRLF tree goes back as LF once the tree is
+    # LF, so the push does not reintroduce the CRLF the guard just removed.
+    block = convert_newlines(state["block"], dominant_newline(text))
+    write(path, text[:at] + block + text[at:])
+    now_text = read(path)
+    now = sha1(now_text)
+    if now == state["sha1_before_pull"]:
+        same = "identical to the pre-pull file"
+    elif sha1(normalize_eol(now_text)) == state.get("sha1_before_pull_normalized"):
+        same = "identical to the pre-pull file except for line endings (the tree was re-normalised)"
+    else:
+        same = "the rest of the file changed while pulled (expected if you kept editing it)"
     print("pushed %d lines back into %s - %s" % (state["block"].count("\n"), a.file, same))
     os.remove(a.state)
     print("removed %s" % os.path.relpath(a.state, REPO))
+    return 0
+
+
+def cmd_dump(a):
+    """Write the stored block to `--out` (else stdout) - the recovery path when `push` cannot place it."""
+    if not os.path.exists(a.state):
+        raise SystemExit(no_state_message(a.state))
+    with open(a.state, "r", encoding="utf-8") as fh:
+        state = json.load(fh)
+    block = state.get("block", "")
+    if a.out:
+        write(a.out, block)
+        print("wrote the stored LOCAL-ONLY block (%d lines, %d bytes) to %s"
+              % (block.count("\n"), len(block), a.out))
+    else:
+        sys.stdout.write(block)
     return 0
 
 
@@ -289,6 +386,19 @@ def selftest() -> int:
             fails.append("%s: got %r want %r" % (name, got, want))
 
     t0 = datetime.datetime(2026, 9, 27, 3, 4, 5)
+    check("normalize_eol folds CRLF and lone CR", normalize_eol("a\r\nb\rc\n"), "a\nb\nc\n")
+    check("dominant_newline: LF file", dominant_newline("a\nb\nc\n"), "\n")
+    check("dominant_newline: CRLF file", dominant_newline("a\r\nb\r\n"), "\r\n")
+    check("convert_newlines to LF", convert_newlines("a\r\nb", "\n"), "a\nb")
+    check("convert_newlines to CRLF", convert_newlines("a\nb", "\r\n"), "a\r\nb")
+    check("locate_insertion finds a CRLF anchor in a CRLF file",
+          locate_insertion("head\r\nTAIL\r\n", "head\r\n", "TAIL\r\n"), 6)
+    # _norm_offset maps the normalized anchor end back onto the original bytes: with the tree converted to
+    # LF, "head\n" ends at offset 5.
+    check("locate_insertion tolerates the EOL change",
+          locate_insertion("head\nTAIL\n", "head\r\n", "TAIL\r\n"), 5)
+    check("locate_insertion refuses a moved anchor",
+          locate_insertion("gone\nTAIL\n", "head\r\n", "TAIL\r\n"), None)
     with tempfile.TemporaryDirectory() as tmp:
         state = os.path.join(tmp, "local-only.state.json")
         check("no backups yet", list_backups(state), [])
@@ -344,6 +454,10 @@ def main():
     p = sub.add_parser("push", help="restore the stored section")
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(func=cmd_push)
+
+    p = sub.add_parser("dump", help="write the stored block to --out (or stdout) for a manual restore")
+    p.add_argument("--out", default=None, help="file to write the block to (default: stdout)")
+    p.set_defaults(func=cmd_dump)
 
     p = sub.add_parser("status", help="what is in the file and in the state file")
     p.set_defaults(func=cmd_status)

@@ -1,12 +1,18 @@
 #!/bin/sh
 # Pre-commit guard (docs/plan.md 7.18). Refuses a commit that carries any of the four things this repository
 # must never commit, whichever path the commit takes - a worker's plain `git commit` on its branch included,
-# which is exactly the case prepcommit.py cannot see.
+# which is exactly the case prepcommit.py cannot see. The LOCAL-ONLY case no longer refuses: it pulls the
+# block out of a staged AGENTS.md and re-stages it, so a landing that merely touched the file goes through.
 #
 # Enable once per clone/worktree:
 #     git config core.hooksPath tools/git/hooks
 # It is belt-and-braces, not the enforcement: prepcommit.py refuses the same paths (and cross-checks the DOL
 # hash) without depending on a hook being active. See docs/plan.md section 7.18.
+#
+# The decisions and the fixes live in tools/git/guard.py so they are callable and testable without a shell:
+#   * `eol`        - normalise a textish staged blob's CRs and re-stage it; refuse a binary staged blob
+#   * `localonly`  - pull the LOCAL-ONLY block out of a staged AGENTS.md and re-stage it
+#   * `autocrlf`   - warn (never refuse) when core.autocrlf=true silently defeats eol=lf
 
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 
@@ -20,17 +26,26 @@ if [ -n "$bad" ]; then
     exit 1
 fi
 
-# The LOCAL-ONLY working-state block is never committed (non-negotiable 8). prepcommit.py pulls it before
-# staging; this catches a hand-run `git add AGENTS.md && git commit` instead.
-if printf '%s\n' "$staged" | grep -q '^AGENTS\.md$'; then
-    # Anchor the match at line start, like `localonly.find_block`: the rule's own prose quotes the marker
-    # (this file did, and so does a rule-8 edit that shows the verify command), and `^+.*` matched that
-    # text as if it were the block, refusing three landings of a refactored AGENTS.md on 2026-09-28.
-    if git diff --cached -U0 -- AGENTS.md | grep -q '^+<!-- LOCAL-ONLY'; then
-        echo "pre-commit: refusing AGENTS.md - the staged version contains the LOCAL-ONLY working-state block." >&2
-        echo "  Run 'python tools/agents/localonly.py pull' before staging it (non-negotiable 8)." >&2
-        exit 1
-    fi
+root=$(git rev-parse --show-toplevel)
+guard="$root/tools/git/guard.py"
+if [ ! -f "$guard" ]; then
+    echo "pre-commit: warning - $guard is missing, so the EOL and LOCAL-ONLY guards did not run." >&2
+    exit 0
+fi
+
+python "$guard" autocrlf || true
+
+# A staged blob with CRs would commit CRLF (docs/plan.md 7.18); normalise the textish ones, refuse the
+# binary ones rather than guess.
+if ! python "$guard" eol; then
+    exit 1
+fi
+
+# The LOCAL-ONLY working-state block is never committed (non-negotiable 8): pull it and re-stage AGENTS.md.
+# post-commit pushes the block back; if this commit fails the block waits in the state file and the
+# printed `localonly.py push` is the one command that restores it.
+if ! python "$guard" localonly; then
+    exit 1
 fi
 
 exit 0
