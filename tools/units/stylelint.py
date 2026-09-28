@@ -7,7 +7,8 @@ only thing keeping them is the reviewer's attention. This tool turns the mechani
 violation is refused before it is committed.
 
     python tools/units/stylelint.py --budget          # the per-unit backlog over src/
-    python tools/units/stylelint.py --diff <ref>      # exit 0 = the batch adds no violation
+    python tools/units/stylelint.py --diff <ref>      # exit 0 = the working tree adds no violation
+    python tools/units/stylelint.py --ref <branch>    # read-only: judge a held branch's committed tree
     python tools/units/stylelint.py --json            # machine-readable findings + budget
     python tools/units/stylelint.py --selftest
 
@@ -71,6 +72,13 @@ allowed (an existing finding never blocks a landing), while adding one is refuse
 "do not revoke committed progress" - the mounted debt is worked slowly through the backlog register
 (`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as
 before.**
+
+`--ref <branch>` is the **read-only** sibling of `--diff`: it judges a *held branch's committed tree*
+against the merge base `--diff` would resolve (the branch's tip for the `after` side, exactly as if the
+branch were checked out), so a lane can prove a `splits.txt` claim cleared a held branch's rows without
+checking it out and without writing anything. The comparison itself is `--diff`'s - each side judged by
+the map it was written against - and `--diff`'s behaviour and its "REF is not an ancestor" warning are
+untouched.
 
 **Rule 11 has no per-file key either.** A `void *` parameter or return type is a finding by default, and
 the exemption is a **per-declaration** marker comment - `/* untyped: <reason> */` on the declaration or the
@@ -1873,6 +1881,74 @@ def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
     return findings
 
 
+def changed_src_files_between(root: str, base: str, ref: str) -> list[tuple[str | None, str]]:
+    """`(path_at_base, path_at_ref)` for every `src/`/`include/` file `ref` changed against `base`.
+
+    The read-only counterpart of `changed_src_files`: both sides come from git objects, so a **held branch**
+    can be judged without checking it out and without touching the working tree.  There is no untracked-file
+    pass here - a commit has no untracked files.
+    """
+    out: list[tuple[str | None, str]] = []
+    for line in git(root, "diff", "--name-status", "-M", "--diff-filter=d", base, ref, "--",
+                    SRC, HEADERS).splitlines():
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        status, paths = parts[0], parts[1:]
+        after = paths[-1]
+        if status.startswith("R"):
+            before = paths[0]
+        elif status.startswith("A"):
+            before = None
+        else:
+            before = after
+        if after.endswith(SUFFIXES):
+            out.append((before, after))
+    return out
+
+
+def findings_of_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
+                    ownership: "Ownership | None" = None) -> list[dict]:
+    """The ref's copies of the changed files, linted - the `after` side of a comparison against a ref tree.
+
+    Unlike `findings_at_ref` (the `before` side, where a file the base did not carry contributes nothing),
+    every `after` path exists at `ref`, including one the comparison added.
+    """
+    findings = []
+    for _before, after in pairs:
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, after)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        findings.extend(lint_source(Source(after, after, text), ownership))
+    return findings
+
+
+def unresolved_declarations_of_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
+                                   ownership: "Ownership") -> dict[str, set]:
+    """`{path: gap names}` for the **ref's** copies of the changed files (the `after` side)."""
+    out: dict[str, set] = {}
+    for _before, after in pairs:
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, after)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        out[after] = unresolved_declarations(Source(after, after, text), ownership)
+    return out
+
+
+def sources_of_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> list["Source"]:
+    """The ref's copies of the changed files as `Source`s (for the rename-credit gap comparison)."""
+    out = []
+    for _before, after in pairs:
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, after)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        out.append(Source(after, after, text))
+    return out
+
+
 def merge_counts(*counts: dict) -> dict:
     """Sum several `rule_counts` dicts (each `{(rule, file): n}`) into one."""
     out: dict = {}
@@ -2779,6 +2855,85 @@ def selftest() -> int:
         check("... so the gate's own ancestor base is silent",
               _resolve_diff_ref(tmp, cut) == cut and buf.getvalue().count("merge base"), 1)
 
+    # --- `--ref BRANCH`: judge a held branch in read-only mode ---------------------------------------
+    # 2026-09-28: a claim lane re-implemented the tool's before/after merge in ~40 lines of scratch to
+    # prove a `splits.txt` claim cleared a held branch's rows, and the reproduction was only approximately
+    # trusted.  `--ref` reads both sides from git, so the branch is never checked out and the working tree
+    # is never touched.  The rows must be the rows `--diff` would print with the branch checked out.
+    with tempfile.TemporaryDirectory() as tmp:
+        def rgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=tmp, capture_output=True, check=True)
+
+        def rput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def rrev(where: str = "HEAD") -> str:
+            return subprocess.run(["git", "rev-parse", where], cwd=tmp, capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace").stdout.strip()
+
+        rgit("init", "-q")
+        rgit("checkout", "-q", "-b", "main")
+        rput("config/RMHE08/symbols.txt",
+             "owned_fn = .text:0x80002000; // type:function size:0x10\n"
+             "unowned_data = .data:0x80003000; // type:object size:0x10\n")
+        rput("config/RMHE08/splits.txt", "other/other_unit.c:\n\t.text       start:0x80002000 end:0x80002010\n")
+        rput("src/other/other_unit.c", "void owned_fn(void) {}\n")
+        rgit("add", "-A")
+        rgit("commit", "-q", "-m", "base")
+        base_sha = rrev()
+        # the held branch adds two declarations that are findings only there
+        rgit("checkout", "-q", "-b", "held")
+        rput("src/held/held_unit.c", "extern void owned_fn(void);\nextern u8 unowned_data[];\n")
+        rgit("add", "-A")
+        rgit("commit", "-q", "-m", "held branch adds the declarations")
+        # main moves on, so `held` is nobody's ancestor and the merge base is `base_sha`
+        rgit("checkout", "-q", "main")
+        rput("src/main_moved.c", "int main_moved;\n")
+        rgit("add", "-A")
+        rgit("commit", "-q", "-m", "main moved on")
+        head_before, tree_before = rrev(), sorted(os.listdir(os.path.join(tmp, "src")))
+        own = load_ownership(tmp)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc_ref = ref_comparison(tmp, "held", own, as_json=False)
+        text_out = out.getvalue()
+        check("--ref judges a held branch and fails on a real addition", (rc_ref, "rule 2" in text_out), (1, True))
+        check("--ref reports the rule-12 row too", "rule 12" in text_out, True)
+        check("--ref names the branch it judged", "held" in text_out, True)
+        check("--ref is read-only: HEAD did not move", rrev(), head_before)
+        check("... and the working tree is untouched", sorted(os.listdir(os.path.join(tmp, "src"))), tree_before)
+        check("... the branch's file was never materialised",
+              os.path.exists(os.path.join(tmp, "src/held/held_unit.c")), False)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc_ref_json = ref_comparison(tmp, "held", own, as_json=True)
+        ref_data = json.loads(out.getvalue())
+        check("--ref --json names the branch and its merge base",
+              (ref_data["ref"], ref_data["base"]), ("held", base_sha))
+        check("... and lists the added rows exactly",
+              sorted((a["rule"], a["file"], a["added"]) for a in ref_data["added"]),
+              [(2, "src/held/held_unit.c", 2), (12, "src/held/held_unit.c", 1)])
+        # reproduce the rows `--diff <base>` prints with the branch CHECKED OUT - the strongest proof
+        rgit("checkout", "-q", "held")
+        old_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_diff = main(["--diff", base_sha, "--json"])
+            diff_data = json.loads(out.getvalue())
+        finally:
+            os.chdir(old_cwd)
+        check("--ref reproduces --diff's rows for the branch",
+              sorted((a["rule"], a["file"], a["added"]) for a in diff_data["added"]),
+              sorted((a["rule"], a["file"], a["added"]) for a in ref_data["added"]))
+        check("... and the exit codes agree", (rc_ref_json, rc_diff), (1, 1))
+        rgit("checkout", "-q", "main")
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -2815,10 +2970,85 @@ def _resolve_diff_ref(root: str, ref: str) -> str:
     return base
 
 
+def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_json: bool) -> int:
+    """Judge a **held branch** read-only: its committed tree against the merge base `--diff` would use.
+
+    `--diff REF` compares the *working tree* with REF, so it cannot judge a branch that is not checked out -
+    the `after` side would be whatever the worktree happens to hold, and a lane had to re-implement this
+    comparison in ~40 lines of scratch (2026-09-28) to prove a `splits.txt` claim cleared a held branch's
+    rows.  `--ref B` reads **both** sides from git objects: `B` is the `after` tree and
+    `_resolve_diff_ref(root, B)` (the merge base, resolved exactly as `--diff` resolves a non-ancestor REF)
+    is the `before`.  Nothing is checked out and nothing is written; each side is judged by the map it was
+    written against, exactly as `--diff` judges them.
+    """
+    base = _resolve_diff_ref(root, branch)
+    pairs = changed_src_files_between(root, base, branch)
+    rels = [after for _before, after in pairs]
+    base_ownership = load_ownership_at_ref(root, base) or ownership
+    after_ownership = load_ownership_at_ref(root, branch) or ownership
+    base_findings = findings_at_ref(root, base, pairs, base_ownership)
+    # the base copy's rule-2 symbols, so a rename credit can only ever touch a name *new* to the file
+    base_symbols: dict = {}
+    for f in base_findings:
+        if f.get("rule") == 2 and f.get("symbol"):
+            base_symbols.setdefault(f["file"], set()).add(f["symbol"])
+    base_gaps = unresolved_declarations_at_ref(root, base, pairs, base_ownership)
+    before = merge_counts(
+        rule_counts(base_findings),
+        rule1_counts_at_ref(root, base, pairs),
+        header_pragma_counts_at_ref(root, base),
+        header_rule11_counts_at_ref(root, base),
+        header_rule12_counts_at_ref(root, base, base_ownership))
+    touched = findings_of_ref(root, branch, pairs, after_ownership)
+    after_sources = sources_of_ref(root, branch, pairs)
+    freed_gaps = {src.rel: base_gaps.get(src.rel, set()) - unresolved_declarations(src, after_ownership)
+                  for src in after_sources}
+    after = merge_counts(
+        rule_counts(touched),
+        rule1_counts_at_ref(root, branch, []),
+        header_pragma_counts_at_ref(root, branch),
+        header_rule11_counts_at_ref(root, branch),
+        header_rule12_counts_at_ref(root, branch, after_ownership))
+    added, credits = apply_rename_credits(diff_deltas(before, after), touched, base_ownership,
+                                         after_ownership, base_symbols,
+                                         {p: len(names) for p, names in freed_gaps.items()})
+    credit_lines = rename_credit_lines(credits, freed_gaps)
+    if as_json:
+        print(json.dumps({"ref": branch, "base": base, "added": added, "changed": rels,
+                          "rename_credits": [{"rule": r, "file": p, "count": n,
+                                              "stopped_spelling": sorted(freed_gaps.get(p, ()))}
+                                             for (r, p), n in sorted(credits.items())],
+                          "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
+                          "exempt": exemptions()}, indent=2))
+    elif added:
+        print("stylelint: %s adds %d section 6.5 violation(s) over %d changed file(s):"
+              % (branch, sum(a["added"] for a in added), len(rels)))
+        for a in added:
+            print("  +%d rule %d  %s  (%d -> %d)" % (a["added"], a["rule"], a["file"], a["before"],
+                                                      a["after"]))
+        for line in credit_lines:
+            print(line)
+        for num, what in UNCHECKED:
+            print("  not checked (cross-file): rule %d - %s" % (num, what))
+        for rule, prefix, why in EXEMPT:
+            print("  not enforced: rule %d under %s (%s)" % (rule, prefix, why))
+        for cond, why in RULE7_NOTES:
+            print("  not enforced: rule 7 for %s (%s)" % (cond, why))
+    else:
+        print("stylelint: %s adds no section 6.5 violation over %d changed file(s) (read-only: judged "
+              "against %s, nothing checked out)" % (branch, len(rels), base[:12]))
+        for line in credit_lines:
+            print(line)
+    return 1 if added else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Lint src/ against docs/plan.md 6.5 (roadmap 7.21).")
     ap.add_argument("--diff", metavar="REF",
                     help="fail only if the working tree adds a violation relative to REF")
+    ap.add_argument("--ref", metavar="BRANCH",
+                    help="read-only: judge the named branch's committed tree against its merge base, so a "
+                         "held branch can be checked without checking it out (same comparison as --diff)")
     ap.add_argument("--budget", action="store_true", help="report the backlog per unit over src/")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--selftest", action="store_true")
@@ -2827,9 +3057,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.selftest:
         return selftest()
 
+    if args.ref is not None and args.diff is not None:
+        ap.error("--ref and --diff are two different comparisons; pass one")
+
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     root = root.stdout.strip() if root.returncode == 0 else os.getcwd()
     ownership = load_ownership(root)
+
+    if args.ref is not None:
+        return ref_comparison(root, args.ref, ownership, args.json)
 
     if args.diff is not None:
         args.diff = _resolve_diff_ref(root, args.diff)
