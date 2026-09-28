@@ -1290,6 +1290,7 @@ quest/quest_entry.cpp:
 	extabindex  start:0x80038E08 end:0x800390E4
 	.text       start:0x803AA4A4 end:0x803B0F98
 	.ctors      start:0x8056F3B0 end:0x8056F3B4
+	.bss        start:0x806C5558 end:0x806C5858
 
 menu/arena_result.cpp:
 	extab       start:0x80018C54 end:0x80018DC4

@@ -15,7 +15,8 @@
 #include "menu/menu_item.h"     /* GetItemData - owned by menu/menu_item.cpp (rule 2) */
 #include "fn_80047398.h"        /* item_pair_copy - owned by fn_80047398.cpp (rule 2) */
 
-/* The 4-byte `(item id, count)` slot `item_pair_copy` moves: a u16 id and a u16 count. */
+/* The 4-byte `(item id, count)` slot `item_pair_copy` moves - and the record the lot picks write
+ * their output with: a u16 id and a u16 count (the pick stores a sign-extended byte payload). */
 struct Q_ItemPair {
     /* +0x0 */ u16 id;
     /* +0x2 */ u16 num;
@@ -124,6 +125,16 @@ u8 quest_slot_progress_get(s32 slot);
 extern Q_ItemPair* const q_item_pair_tbl_low[];
 extern Q_ItemPair* const q_item_pair_tbl_high[];
 
+/* This unit's own `.bss` (claimed and DEFINED by `src/quest/quest_entry.cpp`, `.bss`
+ * 0x806C5558..0x806C5858): the band's four 0xC0-byte picked-pair tables.  The quest lot picks write
+ * them (`quest_element_clear` refills `_a` from the item work's lot table, `fn_803AB914` fills `_a` at
+ * four offsets), and `quest_item_pair_tbl_copy` moves `_a`/`_b` into a result row's two adjacent 0xC0
+ * buffers. */
+extern Q_ItemPair quest_item_pair_tbl_a[0x30];
+extern Q_ItemPair quest_item_pair_tbl_b[0x30];
+extern Q_ItemPair quest_item_pair_tbl_c[0x30];
+extern Q_ItemPair quest_item_pair_tbl_d[0x30];
+
 /* This unit's own symbols (map half renamed in the same change). */
 s32 quest_record_a_count_get(u32 kind);
 s32 quest_record_a_count_get_wide(s32 kind);
@@ -136,6 +147,8 @@ void quest_item_pair_copy_cell(Q_ItemPair* dst, u16 id, s8 col);
 s16 quest_item_slot_find(Q_ItemCount* slots, u16 id);
 /* Adds `count` of `id` to the list; the result byte is what the menu switches on. */
 s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count);
+/* Moves the two first picked-pair tables into a result record's two adjacent 0xC0 buffers (0x803AB3BC). */
+void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b);
 /* The local slot's item work handed to the band below (0x803AA060) with `idx` and 1.  Body unwritten. */
 u32 quest_item_work_notify(s32 idx);
 
@@ -185,19 +198,12 @@ struct Q_ElementBlock {
     /* +0x1C */ u32 word_0x1C;
 };  /* size: 0x20 */
 
-/* One 4-byte pair the pick helpers append to their output: the table entry's u16 key and its
- * sign-extended payload byte. */
-struct Q_PickPair {
-    /* +0x0 */ u16 id;
-    /* +0x2 */ s16 value;
-};  /* size: 0x4 */
-
 /* The arena element record `quest_element_build` fills and the pick's output lands in: the 0x40-byte
  * payload the builder clears, and the sub-flag byte just past it that its caller arms.  Only the two
  * offsets this band touches are named. */
 struct Q_ArenaElement {
     /* +0x000 */ u8 pad_0x000[0x3F4];
-    /* +0x3F4 */ Q_PickPair payload_0x3F4[0x10];  /* 0x40 B, the pick's own output region */
+    /* +0x3F4 */ Q_ItemPair payload_0x3F4[0x10];  /* 0x40 B, the pick's own output region */
     /* +0x434 */ u8 flag_0x434;
 };  /* size: 0x435 (approximate: the highest offset this band reads + 1) */
 
@@ -207,6 +213,11 @@ struct Q_ArenaElement {
 /* untyped: caller-owned context payload the target never reads */
 void quest_element_build(void* owner, u32 kind, Q_ArenaElement* element);
 
+/* The same build for the band's persisted pair tables (0x803ACE90): zeroes all four, then refills
+ * `quest_item_pair_tbl_a` with 3, 5 or 8 picks from the item work's lot table. */
+/* untyped: caller-owned context payload the target never reads */
+void quest_element_clear(void* owner, u32 kind, Q_ArenaElement* element);
+
 void quest_pair_copy(Q_SlotPair* dst, const Q_SlotPair* src);
 void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src);
 
@@ -214,9 +225,9 @@ void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src);
  * appends one entry per iteration, `pick_first` additionally forces the first iteration's roll to 0,
  * and `pick_last` is the form `quest_monster_setup` drives its own table with.  All three take the
  * caller's chance byte-table first, as the target's own register use shows (`pick` does not read it). */
-s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total);
-s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total);
-s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total);
+s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total);
+s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total);
+s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total);
 
 #ifdef __cplusplus
 }  /* extern "C" */

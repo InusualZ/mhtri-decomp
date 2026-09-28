@@ -22,15 +22,22 @@
  * The rename's reference half was swept with it: `fn_803B0CD4` -> `quest_entry_active_ck` in
  * `src/enemy/fn_8012EC74.cpp` (2 sites), the only reference site outside this file.
  *
- * DATA / RULE 12.  Two of the picked candidates were deliberately NOT written because the only thing
- * they need is unowned data, and declaring it would be a new rule-12 finding:
- *   * `quest_item_pair_tbl_copy` (0x803AB3BC, 124 B) walks the two 0xC0-byte `.bss` arrays at 0x806C5558
- *     and 0x806C5618 (`fn_803AB3BC`'s loop count 48 = 0xC0/4 proves the stride).  Nothing claims them, so
- *     the function lands with the `.bss` claim 0x806C5558..0x806C5858 (the four 0xC0 arrays
- *     `lbl_806C5558`/`lbl_806C5618`/`lbl_806C56D8`/`lbl_806C5798`, all of them this unit's) reconstructed as
- *     this unit's own object.
- *   * `quest_pair_apply` (0x803AE990, 376 B) additionally needs `fn_803ADF84` (an unnamed neighbour) and
- *     `lbl_805F76A0`.
+ * DATA / RULE 12 - the `.bss` claim (this pass).  This unit owns `.bss` 0x806C5558..0x806C5858 in
+ * `config/RMHE08/splits.txt`: the band's four 0xC0-byte picked-pair tables `quest_item_pair_tbl_a/b/c/d`
+ * (0x806C5558/0x806C5618/0x806C56D8/0x806C5798, 48 four-byte pairs each).  Evidence: the four rows tile
+ * the run exactly, `q_result_msg_adrs` (0x806C5528, read by `menu/menu_result.cpp`) ends at its start and
+ * `quest_work` (0x806C5858) begins at its end, and every address-taken site of all four is in this file
+ * (`callers.py`: 16/8/8/8 sites, in `quest_item_pair_tbl_copy`, `fn_803AB914`/`fn_803ABB74`/
+ * `fn_803ABCDC`/`fn_803ABE44`/`fn_803AC6B0`, `quest_monster_setup` and `quest_element_clear`).  The two
+ * rows still spelled `lbl_806C56D8`/`lbl_806C5798` were renamed `quest_item_pair_tbl_c`/`_d` in the same
+ * change and all four are DEFINED in this file (rule 12: an `extern` for data the unit owns would leave
+ * `matched_data` at zero), so `datagap.py --unit quest/quest_entry` has no `target-extra` for the run.
+ *
+ * The picked candidates that are still NOT written, and the one thing each waits for:
+ *   * `quest_pair_apply` (0x803AE990, 376 B) needs `lbl_805F76A0` (`.data` 0x805F76A0, 0xA4) - unowned
+ *     but NOT this unit's to claim: `menu/arena_result.cpp`'s `fn_803B0F98`/`fn_803B177C` and
+ *     `enemy/enemy_control.cpp`'s `fn_8014246C` also take its address (playbook 58: claimable only while
+ *     the unit is the sole referencer), so it waits for an owner header.
  *
  * RESIDUAL / KNOWN DEBT.
  *   * `quest_item_pair_copy_cell` / `_block` / `_row` stop at 89-94 %: the residual is the callee-saved
@@ -80,8 +87,9 @@
  *     declared only inside `src/menu/arena_result.cpp`, and that unit is another lane's this wave, so the
  *     declaration waits for its owner header.
  *   * Small functions still blocked by a *foreign* name in another lane's registered range (writing them
- *     would add a rule-7 finding to this file): `quest_pair_apply`, `quest_element_build`,
- *     `quest_monster_setup`, `quest_list_load_hunt`/`_arena`, `quest_grade_set`.
+ *     would add a rule-7 finding to this file): `quest_monster_setup`, `quest_list_load_hunt`/`_arena`,
+ *     `quest_grade_set`.  (`quest_element_build` was one until it was written; `quest_pair_apply`'s own
+ *     blocker is the unowned-and-shared `lbl_805F76A0`, below.)
  *   * The `Q_UserData`/`Q_ItemWork`/`Q_MoveWork` views are partial: only the offsets this unit reads are
  *     named, everything between them is padding, and the sizes are marked approximate.
  *   * `menu/menu_item_page.h` and `lobby/lb_companion_ui.h` still declare this unit's symbols themselves
@@ -96,6 +104,23 @@
  *     (`Pl_Skill_ck`, `Pl_cat_skill_ck`, `ran_suu`) is declared: its 16-element byte fix-up loop is
  *     unrolled by 8 and the target keeps a live counter the source shape for is not obvious
  *     (`addi r4,r4,7` per iteration, so the counter is not the element index).
+ *   * The `.ctors` word (0x8056F3B0, 4 B) this unit's block claims has no emitter here - pre-existing
+ *     (the register records its target as `fn_803AB1F0`'s static initializer), and the fix rides that
+ *     body's pass.
+ *
+ * THE `.bss` PASS wrote two bodies and moved the four tables' definitions to the foot of the file:
+ *   * `quest_item_pair_tbl_copy` (0x803AB3BC) 100 %, `quest_element_clear` (0x803ACE90) 100 % - unit
+ *     12.31 -> 14.14 %, 14 -> 16 functions at 100 %.
+ *   * WHERE the tables are DEFINED is load-bearing: with the definitions above the bodies MWCC folds
+ *     the four `.bss` addresses of `quest_element_clear`'s four `memset`s into one section base plus
+ *     three `addi` displacements (372 B, 91.20 %), where the target - and our object, with the
+ *     definitions at the foot - emits a `lis`/`addi` pair per symbol (376 B, 100 %).  The target's own
+ *     `.rela.text` carries per-symbol `R_PPC_ADDR16_HA/LO` for all four, so its compiler saw them as
+ *     `extern` at the use sites too: the bytes are this unit's object's (rule 12) but their definitions
+ *     sit where the original's codegen says they did.
+ *   * `quest_item_pair_tbl_copy`'s own shape is that same lever one level down: its counter's `li` is
+ *     emitted first while MWCC colours locals in declaration order, so `a`/`b` are declared (empty)
+ *     before `i` and assigned after it.
  */
 
 #include "quest/quest_entry.h"
@@ -174,6 +199,25 @@ s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count) {
         }
     }
     return result;
+}
+
+/* ---- the picked-pair table copy (0x803AB3BC) ---- */
+
+/* Copies both of the band's first two picked-pair tables into a result record's own two adjacent
+ * 0xC0 buffers, one four-byte pair at a time. */
+void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b) {
+    const Q_ItemPair* a;
+    const Q_ItemPair* b;
+    s32 i = 0;
+
+    a = quest_item_pair_tbl_a;
+    b = quest_item_pair_tbl_b;
+    for (; i < 0x30; i++) {
+        item_pair_copy(dst_a++, a);
+        item_pair_copy(dst_b++, b);
+        a++;
+        b++;
+    }
 }
 
 /* ---- the band's small state getters ---- */
@@ -286,7 +330,7 @@ void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src) {
 /* Walks `count` rows of `chance`, and for each row whose chance byte admits it rolls a `total`-wide
  * number into the weighted table and appends the entry the roll lands on.  The first row always
  * rolls 0, so it always takes the table's first non-empty entry. */
-s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total) {
+s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
     s32 picked = 0;
     s32 i;
 
@@ -318,7 +362,7 @@ s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->value = (s8)entry->value;
+            out->num = (s8)entry->value;
             out++;
             picked++;
         }
@@ -327,7 +371,7 @@ s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s
 }
 
 /* The same walk without the first-roll override: every row rolls its own number. */
-s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total) {
+s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
     s32 picked = 0;
     s32 i;
     const Q_LotEntry* entry;
@@ -354,7 +398,7 @@ s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 cou
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->value = (s8)entry->value;
+            out->num = (s8)entry->value;
             out++;
             picked++;
         }
@@ -410,8 +454,66 @@ void quest_element_build(void* owner, u32 kind, Q_ArenaElement* element) {
     }
 }
 
+/* ---- the persisted pair-table builder (0x803ACE90) ---- */
+
+/* The same build for the band's persisted pair tables: zeroes all four, then refills the first from
+ * the item work's own weighted lot table - 3, 5 or 8 rows, chosen by the element's sub-flag. */
+/* untyped: caller-owned context payload the target never reads */
+void quest_element_clear(void* owner, u32 kind, Q_ArenaElement* element) {
+    u8 chance[8];
+    u16 total;
+    Q_LotEntry* entry;
+    s32 rows;
+
+    memset(quest_item_pair_tbl_a, 0, sizeof(quest_item_pair_tbl_a));
+    memset(quest_item_pair_tbl_b, 0, sizeof(quest_item_pair_tbl_b));
+    memset(quest_item_pair_tbl_c, 0, sizeof(quest_item_pair_tbl_c));
+    memset(quest_item_pair_tbl_d, 0, sizeof(quest_item_pair_tbl_d));
+    if ((u8)kind != 4) {
+        return;
+    }
+    {
+        Q_ItemWork* item = move_work_item_work_get();
+
+        memset(chance, 0, sizeof(chance));
+        if (element->flag_0x434 == 0) {
+            chance[0] = 32;
+            chance[1] = 22;
+            chance[2] = 12;
+            rows = 3;
+        } else if (element->flag_0x434 == 1) {
+            chance[0] = 32;
+            chance[1] = 22;
+            chance[2] = 22;
+            chance[3] = 12;
+            chance[4] = 12;
+            rows = 5;
+        } else {
+            chance[0] = 32;
+            chance[1] = 32;
+            chance[2] = 22;
+            chance[3] = 22;
+            chance[4] = 22;
+            chance[5] = 12;
+            chance[6] = 12;
+            chance[7] = 12;
+            rows = 8;
+        }
+        entry = item->lot_0x9C;
+        total = 0;
+        while (entry->id != 0) {
+            total += entry->weight;
+            entry++;
+        }
+        if (total == 0) {
+            return;
+        }
+        quest_lot_pick_first(chance, item->lot_0x9C, quest_item_pair_tbl_a, rows, total);
+    }
+}
+
 /* The same walk for the band that gates on the row's own chance byte only. */
-s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s32 count, u16 total) {
+s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
     s32 picked = 0;
     s32 i;
 
@@ -440,7 +542,7 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_PickPair* out, s3
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->value = (s8)entry->value;
+            out->num = (s8)entry->value;
             out++;
             picked++;
         }
@@ -635,3 +737,12 @@ s16 quest_item_slot_find(Q_ItemCount* slots, u16 id) {
     }
     return 0;
 }
+
+/* This unit's own `.bss` (`config/RMHE08/splits.txt`, `.bss 0x806C5558..0x806C5858`): the band's four
+ * picked-pair tables, 48 four-byte pairs each.  The lot picks write them and the result rows are built
+ * from them - `quest_item_pair_tbl_copy` moves `_a`/`_b` into two adjacent 0xC0 buffers of a result
+ * record, `quest_element_clear` zeroes all four and refills `_a` from the item work's own lot table. */
+Q_ItemPair quest_item_pair_tbl_a[0x30];
+Q_ItemPair quest_item_pair_tbl_b[0x30];
+Q_ItemPair quest_item_pair_tbl_c[0x30];
+Q_ItemPair quest_item_pair_tbl_d[0x30];
