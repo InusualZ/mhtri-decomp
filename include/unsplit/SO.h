@@ -33,6 +33,10 @@ u16 SOAddressToHostPort(u16 port);
 /* 0x80520668 - host-to-network 16-bit byte swap. */
 u16 SOHtoNs(u16 port);
 
+/* 0x8051FAC0 - close the socket whose descriptor is inside the SO band's connection record; the
+ * NHTTP library's async cleanup closes the one `NHTTPi_Startup` opened (`-1` when there is none). */
+s32 SOClose(s32 fd);
+
 #ifdef __cplusplus
 }
 #endif

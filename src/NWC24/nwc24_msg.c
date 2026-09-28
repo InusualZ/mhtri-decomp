@@ -73,16 +73,33 @@
  *     leak-free data run.  A future re-split may refine the position inside that window - it is the one
  *     open question in this register.
  *
- * Bodies: the small state predicates, the version registration, `NWC24BlockOpenMsgLib` and the six
- * command thunks are reconstructed and measured below.  The remainder - `NWC24iGetUserId` (the library
- * entry that reads the RTC shadow at 0x800031C0, checks the user-id CRC and generates a user id),
- * `NWC24iSetScriptMode`, `NWC24iRequestGenerateUserId` and `NWC24iRequestIoctl` (the engine every thunk
- * tail-calls) - still have forward declarations only; their pools (`.data` 0x80631178-0x806311BC,
- * `.bss` 0x80766980) are NOT claimed until their bodies emit them (playbook 23).
+ * BODY (this pass).  All 17 functions are reconstructed and measured (10 byte-identical, unit 85.71 %
+ * fuzzy over the 2392 B of `.text`, 2388 B ours); the unit's own pool
+ * (`.data` 0x80631128-0x80631178, `.sdata` 0x80794438, `.sbss` 0x807958A0) is claimed and emitted, and
+ * everything the bodies reference outside those ranges - the work block `.bss` 0x80766980, the
+ * scheduler flags `.sbss` 0x807958A8-0x807958B4, the user-work pointer `.sbss` 0x80795898 and the
+ * device-path literals `.data` 0x80631178+ - belongs to no registered unit and is declared `extern`
+ * in `include/unsplit/NWC24.h` (playbook 29/58: declare, never define).
+ *
+ * Residuals:
+ *   - the four device-request entry points (`NWC24iGetUserId`, `NWC24iSetScriptMode`,
+ *     `NWC24iRequestGenerateUserId`, `NWC24iRequestIoctl`) repeat the same one-time work-block
+ *     initialiser verbatim, because retail's object carries four inlined copies of it (the original
+ *     source used a macro or a textually repeated block; a helper function would emit a `bl`).
+ *   - `datagap.py` reports `target-extra .data 80 B (ours 74 B)`: the claimed range
+ *     0x80631128-0x80631178 is the version string (74 B) plus the 6 bytes dtk's range boundary rounds
+ *     it out to, i.e. `.data` alignment padding the source cannot emit as a definition (the bytes
+ *     themselves are identical).  `.text` is 4 B short of the claim.
+ *   - the user-id / error constants in `NWC24iGetUserId` (0x002386F2 / 0x6FC0FFFF) are transcribed as
+ *     the raw immediate pairs the object carries; their meaning is not recoverable from this image.
  */
 
 #include "types.h"
-#include "unsplit/OS.h"   /* OSRegisterVersion / OSDisable(Interrupts) / OSRestoreInterrupts (rule 2 band) */
+#include "NWC24/nwc24_msg.h"
+#include "NWC24/nwc24_io.h"   /* NWC24iOpenFd / NWC24iIoctl / NWC24iCloseFd / NWC24iCheckUserIdCRC */
+#include "unsplit/OS.h"       /* OSRegisterVersion / OSDisableInterrupts / OSGetCurrentThread */
+#include "unsplit/NWC24.h"    /* the band's unowned data (rule 2) / memset */
+#include "Runtime.PPCEABI.H/memset.h"
 
 /* The library's state (`.sbss` 0x807958A0/0x807958A4, inside the unit's own `.sbss` range).  Both
    names are GUESSes - the original spellings are not in the image - and are derived from what the
@@ -105,8 +122,78 @@ static NWC24VersionTag sVersionTag = {
     0,
 };
 
-/* owned by this unit; declared here until its body lands */
-int NWC24iRequestIoctl(u32 handle, u32 command, u32 argument);
+/* The RTC shadow's user-id slot: the game keeps the id at the top of main memory and the NWC24
+   library both reads and refreshes it there (a 32-byte DCStoreRange covers the two words). */
+#define NWC24_RTC_USER_ID_SHADOW 0x800031C0
+
+/* 0x8051D710 (0x168): the user-id read.  With the message library open it answers the cached id the
+ * work structure holds; otherwise it takes the RTC shadow's copy, validates it with the CRC check
+ * and, when that fails, suspends the scheduler, blocks the open, generates a fresh id, writes it
+ * back through the cache flush and resumes the scheduler. */
+int NWC24iGetUserId(u32* userId) {
+    s32 error = 0;
+
+    if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
+        u32* work = sNwc24UserWork;
+
+        userId[0] = work[2];
+        userId[1] = work[3];
+        return error;
+    }
+    userId[0] = NWC24_RTC_USER_ID;
+    userId[1] = NWC24_RTC_USER_ID_HI;
+    if ((userId[0] | userId[1]) == 0) {
+        error = -5;
+    } else if (NWC24iCheckUserIdCRC() == 0) {
+        return 0;
+    }
+    error = NWC24SuspendScheduler();
+    if (error < 0) {
+        return error;
+    }
+    error = NWC24BlockOpenMsgLib(1);
+    if (error >= 0) {
+        u32 ticket = 0;
+
+        if (userId == 0) {
+            error = -3;
+        } else {
+            userId[0] = 0x002386F2;
+            userId[1] = 0x6FC0FFFF;
+            error = NWC24iRequestGenerateUserId(userId, &ticket);
+            NWC24_RTC_USER_ID = userId[0];
+            NWC24_RTC_USER_ID_HI = userId[1];
+            DCStoreRange((void*)NWC24_RTC_USER_ID_SHADOW, 32);
+        }
+        {
+            s32 openError = NWC24BlockOpenMsgLib(0);
+
+            if (error >= 0) {
+                error = openError;
+            }
+        }
+    }
+    if ((u32)(error + 36) <= 1) {
+        error = 0;
+    }
+    {
+        s32 resumeError = NWC24ResumeScheduler();
+
+        if (resumeError < 0 && error == 0) {
+            error = resumeError;
+        }
+    }
+    return error;
+}
+
+/* 0x8051D878 (0x3C): register the library's version string once. */
+void NWC24iRegisterVersion(void)
+{
+    if (sVersionRegistered == 0) {
+        OSRegisterVersion(sVersionTag.version_00);
+        sVersionRegistered = 1;
+    }
+}
 
 int NWC24IsMsgLibOpened(void)
 {
@@ -121,14 +208,6 @@ int NWC24IsMsgLibOpenedByTool(void)
 int NWC24iIsMsgLibOpenBlocked(void)
 {
     return sMsgLibOpenState == 3;
-}
-
-void NWC24iRegisterVersion(void)
-{
-    if (sVersionRegistered == 0) {
-        OSRegisterVersion(sVersionTag.version_00);
-        sVersionRegistered = 1;
-    }
 }
 
 int NWC24BlockOpenMsgLib(int block)
@@ -159,14 +238,182 @@ int NWC24BlockOpenMsgLib(int block)
     return error;
 }
 
-int NWC24iRequestCommand6(u32 argument)
+/* 0x8051D98C (0xF0): raise the suspension depth and ask the device to suspend the scheduler. */
+int NWC24SuspendScheduler(void)
 {
-    return NWC24iRequestIoctl(0, 6, argument);
+    NWC24RequestWork* work = &sNwc24Work;
+    s32 error;
+
+    if ((sNwc24WorkInit & 1) == 0) {
+        BOOL level = OSDisableInterrupts();
+
+        if ((sNwc24WorkInit & 1) == 0) {
+            OSInitMutex(&work->mutex_0x00);
+            OSInitMutex(&work->mutex_0x18);
+            memset(work->inBuffer, 0, 32);
+            memset(work->outBuffer, 0, 32);
+            sNwc24WorkInit |= 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+    OSLockMutex(&work->mutex_0x18);
+    error = NWC24iRequestCommand1();
+    if (error >= 0) {
+        sNwc24SuspendCount++;
+        error = error - sNwc24ResumeLimit;
+    }
+    OSUnlockMutex(&work->mutex_0x18);
+    return error;
 }
 
-int NWC24iRequestCommand7(u32 argument)
+/* 0x8051DA5C (0xE8): lower the suspension depth and resume the scheduler, unless there is nothing
+ * suspended and the resume limit has not been reached. */
+int NWC24ResumeScheduler(void)
 {
-    return NWC24iRequestIoctl(0, 7, argument);
+    NWC24RequestWork* work = &sNwc24Work;
+    s32 error;
+
+    if ((sNwc24WorkInit & 1) == 0) {
+        BOOL level = OSDisableInterrupts();
+
+        if ((sNwc24WorkInit & 1) == 0) {
+            OSInitMutex(&work->mutex_0x00);
+            OSInitMutex(&work->mutex_0x18);
+            memset(work->inBuffer, 0, 32);
+            memset(work->outBuffer, 0, 32);
+            sNwc24WorkInit |= 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+    OSLockMutex(&work->mutex_0x18);
+    if (sNwc24ResumeLimit > 0 && sNwc24SuspendCount == 0) {
+        error = 0;
+    } else {
+        error = NWC24iRequestCommand3();
+        if (sNwc24SuspendCount > 0) {
+            sNwc24SuspendCount--;
+            error = error - sNwc24ResumeLimit;
+        }
+    }
+    OSUnlockMutex(&work->mutex_0x18);
+    return error;
+}
+
+/* 0x8051DB4C (0x1A0): set the library's script mode through the request device.  The mode word and
+ * the device's answer travel in the work block's two 32-byte buffers. */
+int NWC24iSetScriptMode(u32 mode)
+{
+    s32 error = 0;
+    s32 fd;
+
+    if (OSGetCurrentThread() == 0) {
+        error = -1;
+    } else if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
+        error = -10;
+    } else if (NWC24iIsMsgLibOpenBlocked()) {
+        error = -26;
+    }
+    if (error < 0) {
+        return error;
+    }
+    if ((sNwc24WorkInit & 1) == 0) {
+        BOOL level = OSDisableInterrupts();
+
+        if ((sNwc24WorkInit & 1) == 0) {
+            OSInitMutex(&sNwc24Work.mutex_0x00);
+            OSInitMutex(&sNwc24Work.mutex_0x18);
+            memset(sNwc24Work.inBuffer, 0, 32);
+            memset(sNwc24Work.outBuffer, 0, 32);
+            sNwc24WorkInit |= 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+    OSLockMutex(&sNwc24Work.mutex_0x00);
+    memset(sNwc24Work.inBuffer, 0, 32);
+    error = NWC24iOpenFd((u32)Nwc24SetScriptModeName, Nwc24RequestPath, &fd, 0);
+    if (error >= 0) {
+        sNwc24Work.inBuffer[0] = mode;
+        error = NWC24iIoctl((u32)Nwc24SetScriptModeName, fd, 34, sNwc24Work.inBuffer, 32,
+                            sNwc24Work.outBuffer, 32);
+        if (error >= 0) {
+            error = (s32)sNwc24Work.outBuffer[0];
+        }
+        {
+            s32 closeError = NWC24iCloseFd((u32)Nwc24SetScriptModeName, fd);
+
+            if (error >= 0) {
+                error = closeError;
+            }
+        }
+    }
+    OSUnlockMutex(&sNwc24Work.mutex_0x00);
+    return error;
+}
+
+/* 0x8051DCEC (0x1BC): ask the device to generate a user id; the id lands in the work block's
+ * output buffer and is copied out with the ticket word that follows it. */
+int NWC24iRequestGenerateUserId(u32* userId, u32* ticket)
+{
+    s32 error = 0;
+    s32 fd;
+
+    if (OSGetCurrentThread() == 0) {
+        error = -1;
+    } else if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
+        error = -10;
+    }
+    if (error < 0) {
+        return error;
+    }
+    if ((sNwc24WorkInit & 1) == 0) {
+        BOOL level = OSDisableInterrupts();
+
+        if ((sNwc24WorkInit & 1) == 0) {
+            OSInitMutex(&sNwc24Work.mutex_0x00);
+            OSInitMutex(&sNwc24Work.mutex_0x18);
+            memset(sNwc24Work.inBuffer, 0, 32);
+            memset(sNwc24Work.outBuffer, 0, 32);
+            sNwc24WorkInit |= 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+    OSLockMutex(&sNwc24Work.mutex_0x00);
+    error = NWC24iOpenFd((u32)Nwc24GenerateUserIdName, Nwc24RequestPath, &fd, 0);
+    if (error >= 0) {
+        error = NWC24iIoctl((u32)Nwc24GenerateUserIdName, fd, 15, 0, 0, sNwc24Work.outBuffer, 32);
+        if (error >= 0) {
+            error = (s32)sNwc24Work.outBuffer[0];
+            if (error == 0 || error == -35 || error == -36) {
+                if (userId != 0) {
+                    userId[0] = sNwc24Work.outBuffer[1];
+                    userId[1] = sNwc24Work.outBuffer[2];
+                }
+                if (ticket != 0) {
+                    *ticket = sNwc24Work.outBuffer[3];
+                }
+            }
+        }
+        {
+            s32 closeError =
+                NWC24iCloseFd((u32)Nwc24GenerateUserIdName, fd);
+
+            if (error >= 0) {
+                error = closeError;
+            }
+        }
+    }
+    OSUnlockMutex(&sNwc24Work.mutex_0x00);
+    return error;
+}
+
+int NWC24iRequestCommand6(u32* out)
+{
+    return NWC24iRequestIoctl(0, 6, out);
+}
+
+int NWC24iRequestCommand7(u32* out)
+{
+    return NWC24iRequestIoctl(0, 7, out);
 }
 
 int NWC24iLockSocket(void)
@@ -187,4 +434,49 @@ int NWC24iRequestCommand1(void)
 int NWC24iRequestCommand3(void)
 {
     return NWC24iRequestIoctl(0, 3, 0);
+}
+
+/* 0x8051DF08 (0x160): the command engine every thunk tail-calls.  It opens the request device under
+ * the work mutex, sends the caller's command with no input, and hands back the device's answer -
+ * plus, for the two "retry" answers (-2 and -33), the word that follows it. */
+int NWC24iRequestIoctl(u32 handle, u32 command, u32* argument)
+{
+    s32 error;
+    s32 fd;
+
+    if (OSGetCurrentThread() == 0) {
+        return -1;
+    }
+    if ((sNwc24WorkInit & 1) == 0) {
+        BOOL level = OSDisableInterrupts();
+
+        if ((sNwc24WorkInit & 1) == 0) {
+            OSInitMutex(&sNwc24Work.mutex_0x00);
+            OSInitMutex(&sNwc24Work.mutex_0x18);
+            memset(sNwc24Work.inBuffer, 0, 32);
+            memset(sNwc24Work.outBuffer, 0, 32);
+            sNwc24WorkInit |= 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+    OSLockMutex(&sNwc24Work.mutex_0x00);
+    error = NWC24iOpenFd(handle, Nwc24RequestPath, &fd, 0);
+    if (error >= 0) {
+        error = NWC24iIoctl(handle, fd, command, 0, 0, sNwc24Work.outBuffer, 32);
+        if (error >= 0) {
+            error = (s32)sNwc24Work.outBuffer[0];
+            if ((error == -2 || error == -33) && argument != 0) {
+                *argument = sNwc24Work.outBuffer[1];
+            }
+        }
+        {
+            s32 closeError = NWC24iCloseFd(handle, fd);
+
+            if (closeError < 0) {
+                error = closeError;
+            }
+        }
+    }
+    OSUnlockMutex(&sNwc24Work.mutex_0x00);
+    return error;
 }

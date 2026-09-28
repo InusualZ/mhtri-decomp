@@ -46,28 +46,45 @@
  * `0x80794440` (span 400 B) binds NWC24iPrepareShutdown to NWC24iRequestShutdown at the band's top;
  * the split position and its window are documented in the sibling's header.
  *
- * Bodies written and measured: `NWC24iOpenFd`, `NWC24iCloseFd`, `NWC24iIoctl`, `NWC24iIoctlAsync`,
- * `NWC24iIsAsyncIoctlBusy`, `NWC24iAsyncIoctlCallback`.  Still forward declarations only:
- * `NWC24iCheckUserIdCRC`/`getUnScrambleId` (with the 16-byte table at `.rodata` 0x80574E00),
- * `NWC24iSetRtcCounter`/`NWC24iSynchronizeRtcCounter`, `NWC24iPrepareShutdown`/`NWC24iRequestShutdown` -
- * their pools (`.data` 0x806311C0-0x8063122A, `.bss` 0x80766B00-0x80766C40) stay unclaimed until those
- * bodies emit them (playbook 23).
+ * BODY.  Seven of the twelve functions are reconstructed and measured: `NWC24iOpenFd` (100 %),
+ * `NWC24iCloseFd`, `NWC24iIoctl`, `NWC24iIoctlAsync`, `NWC24iIsAsyncIoctlBusy` (100 %),
+ * `NWC24iAsyncIoctlCallback` and `NWC24iSetRtcCounter`.  The unit measures 23.23 % fuzzy over its
+ * 2044 B; `.sbss` 0x807958C0 is claimed and emitted, the device-path literals (`.data`
+ * 0x806311C0-0x8063122A) and the work block (`.bss` 0x80766B00) belong to no registered unit and are
+ * declared `extern` in `include/unsplit/NWC24.h` (playbook 29/58).
+ *
+ * NOT reconstructed, with the reason:
+ *   - `getUnScrambleId` (0x8051E0F8, 644 B) and `NWC24iCheckUserIdCRC` (0x8051E068, 152 B): a 64-bit
+ *     obfuscation transform and the 43-round CRC loop over its result.  The loop is recoverable from
+ *     the object (`id >> (52 - i)` bit 52 downwards, `crc ^= 1589ULL << (42 - i)`, `-37` when the
+ *     result is non-zero), but `getUnScrambleId` itself is 644 B of `rlwimi`/`rotlwi` with no source
+ *     shape to anchor on and no reference implementation in the image, so writing it blind would bake
+ *     a wrong body into the unit.
+ *   - `NWC24iPrepareShutdown` / `NWC24iRequestShutdown`: they build an `OSShutdownFunctionInfo` in
+ *     `.bss` 0x80766BE0 and drive the async ioctl slot plus `SCCheckStatus`/`SCGetIdleMode`/
+ *     `OSGetAppType`/`OSRegisterShutdownFunction`; the shutdown-info layout and the SC entry points
+ *     have no owner in this tree yet.
+ *   - `NWC24iSynchronizeRtcCounter`: needs `SCCheckStatus`, `OSGetTime`, `__div2i` and the
+ *     `fn_804DCC60` tick source, whose 64-bit return convention the object shows but whose owner is
+ *     outside this band.
+ * `NWC24iSetRtcCounter`'s own residual: retail keeps five values live (r27-r31) where ours keeps four,
+ * so every register is one off (`mr r29,r4` where retail has `mr r28,r4`) and the frame is 0x20 against
+ * retail's 0x30; the statement order, the one `NWC24iOpenFd` call and the ioctl argument list match.
  */
 
 #include "types.h"
-#include "unsplit/IOS.h"   /* IOS_Open / IOS_Close / IOS_Ioctl / IOS_IoctlAsync (rule 2 band) */
+#include "NWC24/nwc24_io.h"   /* this unit's own API (rule 2) */
+#include "NWC24/nwc24_msg.h"  /* NWC24iSetScriptMode / NWC24iRegisterVersion (rule 2) */
+#include "unsplit/IOS.h"      /* IOS_Open / IOS_Close / IOS_Ioctl / IOS_IoctlAsync (rule 2 band) */
+#include "unsplit/NWC24.h"    /* the band's unowned work blocks and literals (rule 2) */
+#include "unsplit/OS.h"       /* OSDisable(Interrupts) / OSRestoreInterrupts / OSInitMutex */
+#include "Runtime.PPCEABI.H/memset.h"
 
 /* The in-flight async command slot (`.sbss` 0x807958C0, inside the unit's own `.sbss` range).  The
    map sizes the object at 8 B with no label at +0x4, so it is a two-word slot; the band's code only
    ever touches word 0.  NAME (a GUESS, see the header): the async wrapper sets it, the completion
    callback clears it, and `NWC24iIsAsyncIoctlBusy` reads it. */
 static u32 sAsyncIoctlSlot[2];
-
-/* owned by this unit; declared here until their bodies land */
-int NWC24iSetRtcCounter(u32 value, u32 flag);
-u32 getUnScrambleId(void);
-int NWC24iCheckUserIdCRC(void);
-int NWC24iAsyncIoctlCallback(u32 value, u32* out);
 
 int NWC24iOpenFd(u32 unused, const char* path, s32* fd, u32 mode)
 {
@@ -100,7 +117,7 @@ int NWC24iCloseFd(u32 unused, s32 fd)
     return -0x2A;
 }
 
-int NWC24iIoctl(u32 unused, s32 fd, u32 command, void* in, u32 inLen, void* out, u32 outLen)
+int NWC24iIoctl(u32 unused, s32 fd, u32 command, u32* in, u32 inLen, u32* out, u32 outLen)
 {
     s32 error = IOS_Ioctl(fd, command, in, inLen, out, outLen);
 
@@ -110,8 +127,8 @@ int NWC24iIoctl(u32 unused, s32 fd, u32 command, void* in, u32 inLen, void* out,
     return -0x2A;
 }
 
-int NWC24iIoctlAsync(u32 unused, s32 fd, u32 command, void* in, u32 inLen, void* out, u32 outLen,
-                     void* userData)
+int NWC24iIoctlAsync(u32 unused, s32 fd, u32 command, u32* in, u32 inLen, u32* out,
+                     u32 outLen, u32* userData)
 {
     s32 error = IOS_IoctlAsync(fd, command, in, inLen, out, outLen,
                               (void (*)(u32, u32*))NWC24iAsyncIoctlCallback, userData);
@@ -137,4 +154,47 @@ int NWC24iAsyncIoctlCallback(u32 value, u32* out)
     }
     sAsyncIoctlSlot[0] = 0;
     return result;
+}
+
+/* 0x8051E384 (0x148): write the RTC counter through the time device - the value pair travels in the
+ * work block's 32-byte input buffer and the device's answer comes back in the output one. */
+int NWC24iSetRtcCounter(u32 value, u32 flag)
+{
+    NWC24RtcWork* work = &sNwc24RtcWork;
+    s32 fd;
+    s32 error;
+
+    if (OSGetCurrentThread() == 0) {
+        return -1;
+    }
+    if (sNwc24RtcWorkInit == 0) {
+        BOOL level = OSDisableInterrupts();
+
+        if (sNwc24RtcWorkInit == 0) {
+            OSInitMutex(&work->mutex);
+            memset(work->inBuffer, 0, 32);
+            memset(work->outBuffer, 0, 32);
+            sNwc24RtcWorkInit = 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+    OSLockMutex(&work->mutex);
+    error = NWC24iOpenFd((u32)Nwc24SetRtcName, Nwc24TimePath, &fd, 0);
+    if (error >= 0) {
+        work->inBuffer[0] = value;
+        work->inBuffer[1] = flag;
+        error = NWC24iIoctl((u32)Nwc24SetRtcName, fd, 23, work->inBuffer, 32, work->outBuffer, 32);
+        if (error >= 0) {
+            error = (s32)work->outBuffer[0];
+        }
+        {
+            s32 closeError = NWC24iCloseFd((u32)Nwc24SetRtcName, fd);
+
+            if (error >= 0) {
+                error = closeError;
+            }
+        }
+    }
+    OSUnlockMutex(&work->mutex);
+    return error;
 }
