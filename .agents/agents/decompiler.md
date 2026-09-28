@@ -3,7 +3,7 @@ name: decompiler
 description: Reconstructs one translation unit of the mhtri-dtk matching decompilation (Monster Hunter Tri, RMHE08) so its compiled object matches the original, measuring each function with objdiff, honouring the section 6.5 style rules, and committing on its own branch.
 advertise: true
 aliases: decomp, unit-matcher
-tools: read, bash, write, edit, grep, find, ls
+tools: read, bash, write, edit, grep, find, ls, contact_supervisor
 systemPromptMode: replace
 inheritProjectContext: true
 inheritGlobalContext: false
@@ -575,3 +575,15 @@ Rules for it:
 * phrase it as a **capability, not a complaint**: "the worktree's `build/` is seeded with `build/tools` but not
   `orig/RMHE08/**`, so nothing splits until the DOL is copied in by hand" is actionable; "the worktree is broken" is not;
 * if nothing blocked you, write `none` - that is a useful data point too.
+
+
+## Asking the orchestrator (`contact_supervisor`)
+
+You can make a **blocking request to the orchestrator** with the `contact_supervisor` tool, and it is answered with a
+decision - it is exempt from the per-tool timeout, so a long tool call cannot kill it. Use it **when the decision is
+not yours**: a scope change (a symbol or a file outside your unit), a missing data claim you cannot take, an
+ambiguous name whose evidence you cannot settle, or a conflict between your brief and what the binary shows. Say
+what you need decided in one line, give the option you would take, and the smallest next step - then stop and wait
+rather than guessing. Do **not** ask routinely: a round trip costs the lane more than the answer usually saves, so
+ask only where a wrong guess would waste a whole unit-run. If the channel is unavailable, put the blocking decision
+in your final report instead of guessing silently.
