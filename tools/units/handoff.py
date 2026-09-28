@@ -12,13 +12,19 @@ handoff is data: `MAIN/.pi/outbox/<slug>.json`, and this tool both emits the ske
 What `--check` enforces (each is something the orchestrator would otherwise have to notice by hand):
 
 * the required fields exist and have the right types;
-* every symbol it reports is a symbol the unit actually owns (a typo or a stale name would silently score 0);
+* every symbol it reports is a symbol the unit actually owns (a typo or a stale name would silently score 0),
+  for the unit a single-unit outbox names *and* for every unit a batch outbox declares (`unit`, `units`,
+  `also_changed_units`, `per_unit`) - a batch that registers or touches several units writes one outbox, and
+  the ownership check has to read all of them;
 * `unit_percent` and each `percent` are in 0-100;
 * `measured_with` names the command, so a number can be reproduced and a hand-written compile spotted;
 * `config_requests` entries carry the evidence the plan's §8 requires. The accepted kinds and their required
   fields are `CONFIG_REQUEST_SCHEMA` below - the one definition, which `brief.py` renders into the worker's
-  brief (part 6), so the brief asks for exactly what this validator accepts. `flags_probed` is a list of
-  `{flags, effect, verdict}` objects.
+  brief (part 6). A kind outside the table (`tooling`, `naming`, ...) or a known kind whose structured fields
+  are absent is still accepted when it carries its content under a free-text field (`FREE_TEXT_FIELDS`), so a
+  real filing is never refused for spelling its field the way its lane does. `flags_probed` is a list of
+  `{flags, effect, verdict}` objects, but a prose string or a probe filed under a lane's own keys
+  (`flag`/`result`) is accepted as content rather than refused.
 """
 
 from __future__ import annotations
@@ -65,12 +71,77 @@ CONFIG_REQUEST_SCHEMA = (
 CONFIG_KINDS = tuple(row["kind"] for row in CONFIG_REQUEST_SCHEMA)
 CONFIG_NEEDS = {row["kind"]: row["needs"] for row in CONFIG_REQUEST_SCHEMA}
 FLAG_PROBE_FIELDS = ("flags", "effect", "verdict")
-FLAG_PROBE_VERDICTS = ("reject", "adopt", "inconclusive")
+FLAG_PROBE_VERDICTS = ("reject", "adopt", "inconclusive", "kept")
+
+# The free-text fields a lane files its content under when it does not use - or the schema does not name -
+# the kind's structured fields. The schema and `backlog.py`'s intake have to agree about what a filing *is*:
+# a request with its content in `why`/`request`/`what`/`subject`/`note`/`evidence` is a real filing, and
+# neither the validator nor `_add_request` may drop it for spelling its field differently. This is the one
+# list both sides read (backlog imports it), so the two cannot drift.
+FREE_TEXT_FIELDS = ("evidence", "why", "request", "what", "subject", "note")
 
 
 def config_schema_rows() -> list[dict]:
     """The schema table `brief.py` renders - the one definition both tools read."""
     return [dict(row) for row in CONFIG_REQUEST_SCHEMA]
+
+
+def request_content(req: dict) -> str:
+    """A request's free-text content: the first non-empty `FREE_TEXT_FIELDS` value (`""` when none)."""
+    for field in FREE_TEXT_FIELDS:
+        value = req.get(field)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
+
+
+def symbol_like(name: str) -> bool:
+    """Whether `name` is one symbol and not a summary row (`"80 more symbols"`, `"a / b / c"`).
+
+    The ownership check can only speak about a name the map could hold; a prose line in `symbols` is a human
+    summary, and flagging it "not owned" is a false positive that would refuse a real batch.
+    """
+    s = (name or "").strip()
+    return bool(s) and " " not in s and "/" not in s
+
+
+def units_declared(entry: dict) -> list[str]:
+    """The unit spelling(s) an outbox declares: `unit`, plus a batch's `units`/`also_changed_units`/`per_unit`.
+
+    A batch that registers or touches several units writes one outbox (the branch's) and names them here. The
+    ownership check has to read all of them, or every symbol of the second unit is "not owned by this unit"
+    and the batch can never satisfy the gate - which is how an outbox check gets skipped with `--no-outbox`
+    and a filed request goes missing. Only the explicit list structure is read: the `unit` field is sometimes
+    a prose summary (`"A + B (2 units; ...)"`) whose `+`-tokens are not reliably the batch's units, and
+    splitting it would turn a previously-skipped ownership check on for records whose "symbols" are prose.
+    """
+    out: list[str] = []
+
+    def add(value) -> None:
+        if isinstance(value, str) and value.strip():
+            out.append(value.strip())
+
+    add(entry.get("unit"))
+    for key in ("units", "also_changed_units", "changed_units"):
+        value = entry.get(key)
+        if isinstance(value, list):
+            for item in value:
+                add((item.get("unit") or item.get("name")) if isinstance(item, dict) else item)
+    for item in (entry.get("per_unit") or []):
+        if isinstance(item, dict):
+            add(item.get("unit") or item.get("name"))
+    return list(dict.fromkeys(out))
+
+
+def owned_symbols(main: str, units: list[str]) -> set[str]:
+    """The symbols the given units own, unioned - the ownership check's reference set for a whole batch."""
+    owned: set[str] = set()
+    for spelling in units:
+        unit = claims.norm_unit(spelling.strip("/"))
+        rng = brief_mod.splits_range(main, unit)
+        if rng.get(".text"):
+            owned |= {s["name"] for s in brief_mod.symbols_in_range(main, rng[".text"][0], rng[".text"][1])}
+    return owned
 
 
 def outbox_path(main: str, unit: str) -> str:
@@ -120,7 +191,7 @@ def validate(entry: dict, owned: set[str]) -> tuple[list[str], list[str]]:
                 errors.append("symbols[%d] (%s) has no numeric percent" % (i, s["name"]))
             elif not 0 <= value <= 100:
                 errors.append("symbols[%d] (%s) percent out of range: %r" % (i, s["name"], value))
-            if owned and s["name"] not in owned:
+            if owned and symbol_like(s["name"]) and s["name"] not in owned:
                 errors.append("symbols[%d] `%s` is not owned by this unit" % (i, s["name"]))
     if not isinstance(entry.get("residual"), str) or not entry.get("residual", "").strip():
         errors.append("residual must be a non-empty string ('none' is a valid answer)")
@@ -132,21 +203,42 @@ def validate(entry: dict, owned: set[str]) -> tuple[list[str], list[str]]:
             errors.append("config_requests[%d] is not an object" % i)
             continue
         kind = req.get("kind")
+        content = request_content(req)
         if kind not in CONFIG_NEEDS:
-            errors.append("config_requests[%d] has kind %r, expected one of %s" % (i, kind, list(CONFIG_KINDS)))
+            # An out-of-schema kind (`tooling`, `naming`, `done-in-this-fold`) is a real filing the schema has
+            # not caught up with: accept it when it carries free-text content and refuse it only when empty,
+            # so a lane's own kind name cannot cost it a landing (or its request).
+            if not content:
+                errors.append("config_requests[%d] has kind %r (not one of %s) and no free-text content (%s)"
+                              % (i, kind, list(CONFIG_KINDS), ", ".join(FREE_TEXT_FIELDS)))
             continue
         missing = [f for f in CONFIG_NEEDS[kind] if f not in req or req.get(f) in (None, "")]
-        if missing:
-            errors.append("config_requests[%d] (%s) needs %s" % (i, kind, ", ".join(missing)))
+        if missing and not content:
+            errors.append("config_requests[%d] (%s) needs %s (or content under one of %s)"
+                          % (i, kind, ", ".join(missing), ", ".join(FREE_TEXT_FIELDS)))
     for i, probe in enumerate(entry.get("flags_probed") or []):
-        if not isinstance(probe, dict):
-            errors.append("flags_probed[%d] is not an object (it needs flags, effect, verdict)" % i)
+        if isinstance(probe, str):
+            if not probe.strip():
+                errors.append("flags_probed[%d] is an empty string" % i)
             continue
-        if not all(k in probe for k in FLAG_PROBE_FIELDS):
-            errors.append("flags_probed[%d] needs %s" % (i, ", ".join(FLAG_PROBE_FIELDS)))
-        elif probe["verdict"] not in FLAG_PROBE_VERDICTS:
+        if not isinstance(probe, dict):
+            errors.append("flags_probed[%d] is not an object or a string (it needs flags, effect, verdict)" % i)
+            continue
+        flags = str(probe.get("flags") or probe.get("flag") or "").strip()
+        effect = str(probe.get("effect") or probe.get("result") or probe.get("evidence") or "").strip()
+        verdict = str(probe.get("verdict") or "").strip()
+        if not (flags or effect or verdict):
+            errors.append("flags_probed[%d] carries no flags/effect/verdict content" % i)
+            continue
+        missing = [name for name, value in (("flags", flags), ("effect", effect), ("verdict", verdict))
+                   if not value]
+        if missing:
+            # A probe filed under a lane's own keys (`flag`/`result`) or without a verdict is still content;
+            # the gate refuses a *bad verdict*, never a probe that spells its fields differently.
+            warnings.append("flags_probed[%d] does not name %s" % (i, ", ".join(missing)))
+        elif not any(verdict.lower().startswith(v) for v in FLAG_PROBE_VERDICTS):
             errors.append("flags_probed[%d] verdict %r is not one of %s"
-                          % (i, probe["verdict"], "/".join(FLAG_PROBE_VERDICTS)))
+                          % (i, probe.get("verdict"), "/".join(FLAG_PROBE_VERDICTS)))
     if entry.get("claim_state") not in (None, "released", "open"):
         warnings.append("claim_state %r is not open or released" % entry["claim_state"])
     if not (entry.get("blockers") or []):
@@ -199,6 +291,21 @@ def selftest() -> int:
     for row in config_schema_rows():
         check("a %s without its required fields is rejected" % row["kind"],
               bool(validate(dict(good, config_requests=[{"kind": row["kind"]}]), {"fn_1"})[0]), True)
+    # A range/seam filed with its content in a free-text field rather than section/start/end is a real filing.
+    check("a span-less range with its content in `why` is accepted",
+          validate(dict(good, config_requests=[{"kind": "range", "why": "the right seam is unproven"}]),
+                   {"fn_1"})[0], [])
+    check("a range with content under `request` is accepted",
+          validate(dict(good, config_requests=[{"kind": "range", "subject": "a", "request": "settle it"}]),
+                   {"fn_1"})[0], [])
+    check("a shared-file with its content in `request` (not `why`) is accepted",
+          validate(dict(good, config_requests=[{"kind": "shared-file", "subject": "x.h",
+                                               "request": "move the declaration"}]), {"fn_1"})[0], [])
+    check("an out-of-schema kind with free-text content is accepted (a lane's own spelling)",
+          validate(dict(good, config_requests=[{"kind": "tooling", "file": "tools/x.py",
+                                                "why": "--target would help"}]), {"fn_1"})[0], [])
+    check("an out-of-schema kind with no content is still rejected",
+          bool(validate(dict(good, config_requests=[{"kind": "tooling"}]), {"fn_1"})[0]), True)
     check("residual 'none' is allowed", validate(dict(good, residual="none"), {"fn_1"})[0], [])
 
     # the outbox a worker writes by following the brief's schema table must validate clean: this is the
@@ -212,8 +319,23 @@ def selftest() -> int:
     brief_shaped["flags_probed"].append({"flags": "<flags>", "effect": "<symbol: before -> after>",
                                           "verdict": "reject"})
     check("a brief-shaped outbox validates clean", validate(brief_shaped, {"fn_1"})[0], [])
-    check("a flags_probed string is rejected (it must be a list of objects)",
-          bool(validate(dict(good, flags_probed=["-O4,p"]), {"fn_1"})[0]), True)
+    # Real lanes file probes as prose strings, under `flag`/`result`, or with a parenthetical verdict; each is
+    # content, not a defect (the 2026-09-28 `Network` outboxes failed on exactly these).
+    check("a flags_probed prose string is accepted",
+          validate(dict(good, flags_probed=["-O2: unit 89.58 %, rejected"]), {"fn_1"})[0], [])
+    check("an empty flags_probed string is rejected",
+          bool(validate(dict(good, flags_probed=["  "]), {"fn_1"})[0]), True)
+    check("a probe under a lane's own `flag`/`result` keys is accepted",
+          validate(dict(good, flags_probed=[{"flag": "-use_lmw_stmw off", "result": "no change"}]),
+                   {"fn_1"})[0], [])
+    check("a probe with a parenthetical verdict is accepted",
+          validate(dict(good, flags_probed=[{"flags": "-O3", "effect": "+9%",
+                                             "verdict": "adopt (none needed for codegen)"}]), {"fn_1"})[0], [])
+    check("the `kept` verdict is accepted",
+          validate(dict(good, flags_probed=[{"flags": "cflags_menu", "effect": "no change",
+                                             "verdict": "kept"}]), {"fn_1"})[0], [])
+    check("a probe that names no field at all is rejected",
+          bool(validate(dict(good, flags_probed=[{}]), {"fn_1"})[0]), True)
     check("a template passes structurally",
           validate(template("auto/x") | {"symbols": [{"name": "fn_1", "percent": 0.0}], "unit_percent": 0.0,
                                          "residual": "none"}, {"fn_1"})[0], [])
@@ -231,6 +353,38 @@ def selftest() -> int:
               outbox_path(tmp, "Pl/pl_act"), claims.outbox_path(tmp, "Pl/pl_act"))
         check("an unclaimed unit still names a path to look at",
               os.path.basename(outbox_path(tmp, "RSO/runtime")), claims.slug("RSO/runtime") + ".json")
+
+    # A batch outbox names several units; the ownership check must read every declared spelling, so a symbol
+    # owned by the second unit is not "not owned by this unit" (which forced multi-unit batches to
+    # `--no-outbox`, losing the outbox check entirely).
+    check("units_declared reads `unit` + a batch's `units`/`also_changed_units`/`per_unit`",
+          units_declared({"unit": "A/a.c", "units": [{"name": "A/a"}, "B/b"],
+                          "also_changed_units": ["C/c"], "per_unit": [{"unit": "D/d"}]}),
+          ["A/a.c", "A/a", "B/b", "C/c", "D/d"])
+    check("units_declared does not split a prose `unit` (its `+`-tokens are not reliably units)",
+          units_declared({"unit": "A/a.c + B/b.c (2 units; ...)"}), ["A/a.c + B/b.c (2 units; ...)"])
+    check("units_declared is empty for an outbox that names no unit", units_declared({}), [])
+    check("a summary row (`80 more symbols`) is not ownership-checked",
+          symbol_like("80 more symbols"), False)
+    check("a real symbol is ownership-checked", symbol_like("fn_80128A8C"), True)
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = os.path.join(tmp, "config", "RMHE08")
+        os.makedirs(cfg)
+        with open(os.path.join(cfg, "splits.txt"), "w", encoding="utf-8") as fh:
+            fh.write("A/a.c:\n    .text start:0x100 end:0x200\nB/b.c:\n    .text start:0x200 end:0x300\n")
+        with open(os.path.join(cfg, "symbols.txt"), "w", encoding="utf-8") as fh:
+            fh.write("fn_a = .text:0x100; // type:function size:0x10\n"
+                     "fn_b = .text:0x200; // type:function size:0x10\n")
+        check("owned_symbols unions a batch's units",
+              owned_symbols(tmp, ["A/a", "B/b"]), {"fn_a", "fn_b"})
+        check("owned_symbols of one unit is just that unit", owned_symbols(tmp, ["A/a"]), {"fn_a"})
+        entry = dict(good, unit="A/a.c + B/b.c", units=["A/a", "B/b"],
+                     symbols=[{"name": "fn_a", "percent": 50.0}, {"name": "fn_b", "percent": 50.0}])
+        errors, _ = validate(entry, owned_symbols(tmp, units_declared(entry)))
+        check("a multi-unit outbox validates against the batch's whole owned set", errors, [])
+        single, _ = validate(entry, owned_symbols(tmp, ["A/a"]))
+        check("... validating against one unit alone would flag the other's symbol",
+              bool(single), True)
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -257,11 +411,13 @@ def main() -> int:
 
     if args.check:
         entry = json.loads(open(args.check, encoding="utf-8").read())
-        unit = claims.norm_unit((entry.get("unit") or (args.unit or "")).strip("/"))
-        owned: set[str] = set()
-        rng = brief_mod.splits_range(main, unit) if unit else {}
-        if rng.get(".text"):
-            owned = {s["name"] for s in brief_mod.symbols_in_range(main, rng[".text"][0], rng[".text"][1])}
+        # The ownership check reads every unit the outbox declares (a batch names several in one file), not
+        # just `unit` - otherwise the second unit's symbols are all "not owned" and the batch cannot validate.
+        declared = units_declared(entry)
+        if not declared:
+            fallback = claims.norm_unit((args.unit or "").strip("/"))
+            declared = [fallback] if fallback else []
+        owned = owned_symbols(main, declared)
         errors, warnings = validate(entry, owned)
         if args.json:
             print(json.dumps({"errors": errors, "warnings": warnings}, indent=2))
