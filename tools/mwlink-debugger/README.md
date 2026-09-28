@@ -1,375 +1,259 @@
-# mwlink-debugger: how the derived facts were established
+# mwlink-debugger
 
-`tools/mwlink_debugger.py` is the linker-side sibling of `tools/mwcc-debugger/`.
-This note is its evidence trail: what the linker does and does not expose, how
-each table the tool prints was *derived* rather than transcribed, which of its
-dumps were checked against the artifact, and what the tool could not prove.
-`tools/mwcc-debugger/locate/README.md` is the model.
+Interrogate the Metrowerks linker (`mwldeppc.exe`) about a real link: which phase
+is running and what it printed, how one **unit** of the project was placed and
+relocated, the linker's own input-file records, where it enforces a section's
+alignment, and - the production case - what it said when the link failed.
 
-Commands, in the order this note explains them:
+It is the linker-side sibling of [`tools/mwcc-debugger/`](../mwcc-debugger/README.md).
+That tool answers "which optimizer pass did that?" for the *compiler* by driving
+`mwcceppc.exe` under gdb; the compiler is tractable because every Wii
+`mwcceppc.exe` ships a CodeView symbol blob naming its own functions.  **The
+linker has no such blob.**  `info` proves it: all 31 `mwldeppc.exe` under
+`build/compilers/{Wii,GC}/*` have an empty PE debug directory.  What it *does*
+have, and what this tool uses instead, is its own diagnostics (`-v`, `-map`), a
+message catalogue in its PE resources (RT_STRING, UTF-16 - that is why `strings`
+finds no `Linking:` in the binary), and an import of `LoadStringA` that turns a
+message id into the engine's text.
 
-```
-python tools/mwlink_debugger.py info|messages|order|anchors|timeline|verify ...
-python tools/mwlink_debugger.py phases [--prove]
-python tools/mwlink_debugger.py trace <object> [--link]
-```
+## Supported linker builds
 
-## The lever the compiler had is absent here
+**Wii/1.0 is what this repository links with**, and it is the row that is verified
+against a real link.  `build.ninja`'s global `mw_version = Wii\1.0` is what the
+`link` rule expands (`ninja -t commands build/RMHE08/main.elf`); the per-object
+`mwcc` rules override it with **Wii/1.3** for the *compiler* only.  A lane that
+assumes the linker is 1.3 has assumed the wrong binary: `default_linker()` reads
+that variable, so every command here uses Wii/1.0 unless you pass another binary.
 
-Every Wii `mwcceppc.exe` ships a CodeView `NB11` symbol blob (Metrowerks appends
-it after the last PE section and points the debug directory at it), which is why
-compiler support is tractable: `locate/dissect.py syms` names ~5800 functions.
+| linker | status |
+|---|---|
+| `Wii/1.0` | **verified here** - every derivation below, plus `trace`/`verify`/`records --prove`/`phases --prove` against this repository's own link (byte-identical to `build/RMHE08/main.elf`) |
+| `Wii/1.0a`, `1.0RC1`, `1.1`, `1.3`, `1.5`, `1.6`, `1.7`, `0x4201_127` | the same derivations succeed (message catalogue 211/212 messages, `LoadStringA` loader found, record stride `0x2c`, the alignment site found) - **not link-verified here** |
+| `GC/2.7` | derivations succeed but the **input-file record stride is `0x38`**, not `0x2c`: the record field table in `records` does not apply |
+| `GC/3.0a3`, `3.0a3.2`, `3.0a3.3`, `3.0a3.4`, `3.0a3p1`, `3.0a5` | derivations succeed (`0x2c` record family) - not link-verified here |
+| `GC/1.0` .. `GC/2.6` | **unsupported, and reported as such**: these linkers do not import `LoadStringA` and carry no RT_STRING catalogue, so `messages` is empty and `phases` has nothing to hang on. `phases` says so instead of printing a traceback |
 
-The linker does not.  All 31 `mwldeppc.exe` under `build/compilers/{Wii,GC}/*`
-have an **empty** debug directory:
+## Requirements
 
-```
-$ python tools/mwlink_debugger.py info build/compilers/Wii/1.0/mwldeppc.exe
-debug directory: 0 entries  <- no CodeView blob; the compiler's symbol lever is absent
-```
+* **capstone** (`pip install capstone`) for `anchors`, `phases`, `records` and
+  `align` - they disassemble the linker.  `trace`, `verify`, `order`, `messages`
+  and `info` do not need it.
+* a **native Windows gdb** only for the `--prove` flags and `records --prove`:
+  `python tools/mwcc-debugger/fetch_gdb.py` installs one, or pass `--gdb`.  The
+  tool looks in `build/tools/gdb.exe`, `~/tools/mwcc-dbg/mingw64/bin/gdb.exe`
+  and `PATH`, and prints that advice instead of a traceback when it finds none.
+* nothing else: the PE/ELF/MAP readers are stdlib-only.
 
-This was re-verified for every Wii build (`1.0 1.0a 1.0RC1 1.1 1.3 1.5 1.6 1.7
-0x4201_127`) and for the whole GC row - `Pe.debug_entries()` returns `[]`
-everywhere.  The compiler's `-sym on` / `debug_blob()` path simply does not exist
-for the linker.
-
-The **build actually links with Wii/1.0**, not Wii/1.3: `build.ninja`'s global
-`mw_version = Wii\1.0` is what the `link` rule expands
-(`ninja -t commands | grep mwld`), while the per-object `mwcc` rules override it
-with Wii/1.3.  `default_linker()` reads that variable, so the tool defaults to
-the binary the build depends on.
-
-## What the linker has instead
-
-1. **Its own diagnostics.**  `-v` / `-progress` print a phase timeline and
-   `-map` writes the link map.  The tool's `timeline` and `verify` use those;
-   `trace` reads the map.
-2. **A message catalog in the PE resources.**  The engine's messages - every
-   phase name included - are the RT_STRING (type 6) resource, stored as
-   `uint16 length + length UTF-16LE WCHARs`, 16 slots per block.  That is why an
-   ASCII `strings` pass over `mwldeppc.exe` finds no `Linking:`, no `Layout:`,
-   no `Optimizing:`: they are UTF-16.  `messages` decodes the catalog.
-3. **USER32's `LoadStringA`.**  The linker's own message loader calls it, and
-   that import is the hook the `phases` command hangs the phase table on
-   (below).
-
-### The catalogue's id numbering - corrected against a real link
-
-The id of a message is **the id `LoadStringA` is asked for**, and that is not the
-index of the string in the table: the first RT_STRING block is named 1 and holds
-ids 0..15, so `msgid = (block_name - 1) * 16 + slot`.
-
-That formula is measured, not assumed.  Breaking at the linker's own message
-loader on a real link (`phases --prove`) prints the `(id, string)` pairs the
-linker really asks for, and they are exactly `27 = Linking: '%c'`,
-`29 = Writing: '%c'`, `41 = Optimizing: '%c'`, `42 = Layout: '%c' (%c)`,
-`36 = Writing: '%c' (%c)` - 50 of 50 observed messages agree with the catalogue's
-`id -> text`.  An earlier revision of this tool numbered from `block_name * 16`
-(16 too high: it printed `msgid=43 Linking: '%c'`), which is a *table index*,
-not an id the linker ever uses.  `phases --prove` re-checks this every run and
-stays loud when a message's id and text disagree.
-
-## The derived tables
-
-### The ctor/dtor order (Row 46)
-
-`order` finds the ctor/dtor name pool (`.ctors`, `.ctors$00`, `.ctors$10`,
-`.ctors$99`, `.dtors`, `.dtors$00`, `.dtors$10`, `.dtors$15`, `.dtors$99`) by
-scanning `.rdata`/`.data` for null-terminated literals matching the name shape,
-then finds every pointer into that pool and keeps the longest stride-consistent
-run.  The record order in `.data` **is** the priority order:
+## Usage
 
 ```
-$ python tools/mwlink_debugger.py order build/compilers/Wii/1.0/mwldeppc.exe
-stride:  0x2e  cells: 0xcae58, 0xcae86, 0xcaeb4, 0xcaee2, 0xcaf10, 0xcaf3e, 0xcaf6c, 0xcaf9a, 0xcafc8
-the linker's fixed ctor/dtor order (record order in .data):
-  0: .ctors$00   1: .ctors$10   2: .ctors      3: .ctors$99
-  4: .dtors$00   5: .dtors$10   6: .dtors$15   7: .dtors     8: .dtors$99
+python tools/mwlink_debugger.py <command> [options]
 ```
 
-Two details matter and neither was obvious:
+| command | what it answers |
+|---|---|
+| `trace <unit\|object>` | follow one **unit** through a real link: was it kept, where did each section land, how did its symbols resolve, which relocations were applied, where did its ctor/dtor fragment go |
+| `diagnose` | run the build's own link with `-v`; print the phase stream and every diagnostic with its catalogue id and phase |
+| `verify <map> <elf>` | health check: is this map the artifact `elf2dol` consumes (`--identity` byte-compares it) |
+| `records` | the linker's internal input-file record: stride, array, fields - and `--prove` to read it out of a running link and cross-check it |
+| `align [--unit U]` | where the linker aligns a fragment, what it compares, and which of a unit's claimed starts it cannot honour |
+| `anchors` | `{code address: string}` sites derived from `.text` (`--prove` breaks on them in a real link) |
+| `phases` | the message loader and the 1248 phase anchors (`--prove` observes the `(id, text)` stream) |
+| `order` | the linker's fixed `.ctors`/`.dtors` priority list (Row 46) |
+| `timeline` | run the linker's own `-v` diagnostics and name each line's catalogue id |
+| `messages` | decode the RT_STRING message catalogue (`--grep`) |
+| `info` | PE recon: sections, directories, the "no CodeView blob" check |
 
-* the stride is **0x2e**, not a multiple of 4, so every second record's pointer
-  field is only 2-byte aligned.  A 4-byte-stepped scan finds 5 of the 9 entries
-  and silently reports a wrong table (this is a real bug the tool had to be
-  fixed for).
-* the order is a **fixed list**, not a sort: `.ctors` (the plain name) sorts
-  *between* `.ctors$10` and `.ctors$99`, which no lexicographic or `$NN`-numeric
-  comparison produces.
+`trace` and `diagnose` never write `build/RMHE08/main.elf`: a link they start is
+redirected into `--out` (default `build/scratch/mwlink-debug/`, with `-o` and
+`-map` rewritten even when you pass your own `--args`).
 
-The real link map uses exactly that list, in that order:
+### The exact invocation that works in this repository
 
-```
-.ctors section layout
-  00000000 000000 8056f2c0  1 .ctors$00  Linker Generated Symbol File
-  00000000 000004 8056f2c0  1 .ctors$10  __init_cpp_exceptions.o
-  00000004 000004 8056f2c4  1 .ctors     mh3_pad.o
-  ...  74 more plain-`.ctors` fragments, in link order ...
-  0000016c 000004 8056f42c  1 .ctors$99  Linker Generated Symbol File
-```
+From the repository root, in git-bash:
 
-`.ctors$00` and `.ctors$99` are the linker's own **sentinels** - it synthesizes
-those two fragments (they carry `_ctors` and `_ctors$99`, which is how
-`_rom_copy_info` and `__start` find the table's ends) and credits them to
-"Linker Generated Symbol File".  The plain `.ctors` class is filled in **link
-order**; the `$NN` classes are fixed slots.
-
-### What actually decides a `.ctors$NN` slot (Row 46, re-derived)
-
-The statement above ("the linker collects `$NN` fragments in a fixed name
-order") is what the map *looks* like it says, and it is only half right.  The
-slot is not chosen from the input section's name.  Three experiments on a real
-link (all of them relinks into `build/scratch/`, never `build/RMHE08/main.elf`):
-
-1. `mh3_pad.o`'s plain `.ctors` renamed to `.ctors$10` (a same-length rename in
-   `.shstrtab`, with `sh_name` repointed) - **the word moves**: the map's `$10`
-   slot gains `pad_r10.o` and the plain class starts after it.  So for a
-   fragment with *no* named ctor entry, the section name does pick the class.
-2. `__init_cpp_exceptions.o`'s `.ctors$10` renamed to `.ctors`, `.ctors$55`,
-   `.ctors$01`, `.ctors$99` and even `.dtors$10` - **the output `.ctors` is
-   byte-identical every time**, the word stays in the `$10` slot, and the map
-   only re-credits that slot's fragment to "Linker Generated Symbol File".
-   The fragment's column name in the map is then the *class*, not the section.
-3. Renaming the *symbols* `__init_cpp_exceptions_reference`,
-   `__fini_cpp_exceptions_reference` or `__destroy_global_chain_reference`
-   (same length, nothing else touched) makes the link **fail** with the linker's
-   own diagnostic:
-
-   ```
-   ### mwldeppc.exe Linker Error:
-   #   runtime sources 'global_destructor_chain.c' and
-   #   '__init_cpp_exceptions.cpp' both need to be updated to latest version.
-   #   Please contact Freescale support.
-   ```
-
-   That is catalogue **msgid 205**, and it is the answer: the linker
-   *validates those three symbol names*, because its C++ ctor/dtor support is
-   keyed on them.  They are the names next to the class-name pool in the image
-   (`__init_cpp_exceptions` 0x4cb416, `__init_cpp_exceptions_reference`
-   0x4cb42e, `__init_cpp_exceptions.o` 0x4cb44e, `__fini_cpp_exceptions`
-   0x4cb466, `__destroy_global_chain_reference` 0x4cb47e,
-   `global_destructor_chain.o` 0x4cb4a2, `__fini_cpp_exceptions_reference`
-   0x4cb4d6), and they are immediate operands of the section-name selector at
-   RVA 0x42e15..0x42f80.
-
-So: the slot for an MWCC-emitted ctor/dtor entry is decided by the **entry
-symbol's name** (`..._reference`), not by the section's name; a tool that
-compares only section names cannot see a difference here, and a tool that
-renames sections has no effect on it.  `trace` prints both, per unit.
-
-`order --map` cross-checks the derived order list against a real link map's
-`.ctors`/`.dtors` layout and stays loud when the layout disagrees.
-
-### The anchors
-
-`anchors` scans `.text` for instructions whose immediate operand is the VA of a
-known string (`{anchor RVA: string}`), the analogue of
-`locate/pass_points.py` deriving return addresses of `call <pass>`.  The
-ctor/dtor name compares are flagged `section-name`:
-
-```
-$ python tools/mwlink_debugger.py anchors
-anchor     kind          compare  string
-0x042e39   section-name  10 bytes .ctors$10
-0x042fd9   section-name  7 bytes  .dtors
-0x0430b0   section-name  10 bytes .dtors$10
-0x043259   section-name  10 bytes .dtors$15
-...
+```bash
+python tools/mwlink_debugger.py trace Network/NetworkWiiMediator
 ```
 
-Each is proven by its shape (`mov edi, <va>; mov ecx, <len>; repe cmpsb`, so the
-compare is exact) **and** by a gdb run: `anchors --prove` sets a breakpoint on
-every derived anchor, runs a real link, and reports FIRED or UNPROVEN per
-anchor.  A breakpoint that never fires is reported as unproven, never claimed.
-12 of 27 fire on the project's own link, and the `section-name` ones fire with
-the section name the linker is looking at (`0x42e39 ... matched '.ctors$10'`).
-
-### The phases: the message machinery, derived
-
-The open item this closes: the engine's phase messages are referenced by
-resource *id*, so no immediate operand names them - but the loader that turns an
-id into a string is findable, because it calls the imported `LoadStringA`:
-
-* the IAT slot of `LoadStringA` comes from the import directory
-  (RVA 0x11238c here); `call dword ptr [slot]` in `.text` has exactly two sites;
-* **the message loader is the one whose `uID` argument is not a constant** - the
-  other site pushes `0x65` and loads one fixed string of its own.  The loader is
-  RVA 0x3d0b0 (12 callers), the one-off RVA 0x56f0-ish (16 callers, constant
-  101).  That single rule is what keeps this derivation from picking the wrong
-  function;
-* the loader's **callers are the engine's message formatters**, one per message.
-  Each pushes its id as *arg3* (the loader reads arg3 at `[esp+0x18]` after its
-  own two pushes - arg1 is the buffer it keeps in EBX - and hands it to
-  `LoadStringA` as `uID`).  12 of them, with ids 16, 17, 18, 21, 26 and some
-  computed at run time;
-* the function entries are found from the layout (`nop`/`int3` runs between
-  functions) and the derivation **checks itself**: an entry nothing calls is
-  reported as unproven;
-* `phases` then lists every `return address of call <formatter>` as a **phase
-  anchor** (1248 of them here).
-
-`phases --prove` breaks on all of them *and* on the loader's observation anchor
-(the instruction after the `LoadStringA` call - its stack layout was measured:
-the uID is at `[esp+0x10]`, the buffer pointer is still in EBX), and attributes
-each observed message to the most recent anchor.  On the project's own link:
+That is the whole thing - a **unit name**, not a path.  The tool resolves it to
+the object the build's *own* link statement consumes (from `build.ninja`), and
+because the build writes no map of its own it links one into `build/scratch/`
+first.  Real output:
 
 ```
-# breakpoints: 1248 phase anchor(s), 1249 total
-the link's phase stream, as the linker's own message loader printed it:
-  (no anchor seen) id=27   Linking: '%c'  [catalogue agrees]
-  anchor 537c9   id=41   Optimizing: '%c'  [catalogue agrees]
-  anchor 4ece5   id=29   Writing: '%c'  [catalogue agrees]
-  anchor 53847   id=42   Layout: '%c' (%c)  [catalogue agrees]
-  anchor 59bcb   id=42   Layout: '%c' (%c)  [catalogue agrees]   (x13)
-  ...
-# catalogue cross-check: 50 of 50 observed messages match the catalogue's id -> text
-phase anchors: 6/1248 fired in this link
-```
-
-Six anchors are *proven* by this link; the other 1242 are candidates that only
-fire for diagnostics this link does not print, and they are reported as
-unproven rather than claimed.  The phase order (Linking -> Optimizing ->
-Writing -> Layout xN -> Writing) is the same timeline `-v` prints, but now with
-the code address that printed each line.
-
-### The health check
-
-`verify <map> <elf>` ties the map to the ELF `elf2dol` consumes.  The invariant
-that holds is **not** "sum the fragment sizes": a map lists both the input
-fragments *and* the symbols inside them, so summing double-counts every section
-(measured: 2.00x on `.init`, `.text`, `.bss`, `.data`).  The size is the largest
-`offset + size`; the start is the first row's address, and every row must satisfy
-`addr == start + offset` (`*fill*` rows excepted).  On a real link all 13 output
-sections agree, and `--identity` byte-compares the ELF with `build/RMHE08/main.elf`.
-
-## Tracing one input object: `trace`
-
-`trace <object>` answers the question this lane exists for - **how does one
-input object get linked with the rest of the units?** - and every claim it makes
-is a comparison against the artifact:
-
-* **did the link keep it, and where did each of its sections land** - the object
-  is parsed as the linker parses it (ELF32 **big-endian** PowerPC, RELA
-  relocations, `st_info`/`st_shndx`), and each allocatable section is matched
-  with the map row that names it *as its source*.  The landing address is then
-  read back: the object's own bytes must be in the output ELF at that address,
-  **except** the 4-byte words a relocation lands on (the linker wrote those).
-  A section the map lists per entry instead of per fragment (`extab`,
-  `extabindex`, whose rows are named `@etb_<VA>`/`@eti_<VA>`) is landing-checked
-  at its first row's address and says so.
-* **how its symbols resolved** - definitions are checked against the map *and*
-  against the output ELF's own `.symtab` (two independent witnesses); undefined
-  symbols name the unit that defines them, which is the answer to "why was that
-  other object kept at all".
-* **which relocations were applied** - for every RELA in the object, the symbol
-  is resolved, and the field the linker wrote is decoded out of the output ELF
-  and compared with what the ABI says it must be: `ADDR32` (word), branch24
-  (`(S+A-P)` in bits 2..25, LK/AA preserved), `ADDR16_HA/LO/HI` (which halfword
-  is *reported*, not assumed), the small-data form (`type 109`:
-  `(S - _SDA_BASE_) & 0xFFFF`, with `_SDA_BASE_` taken from the artifact), and
-  a type whose semantics are not derived is reported `not checked` rather than
-  guessed at.
-* **where its ctor/dtor fragment went** - the class rank from the derived order
-  list, the slot it occupies in the merged section, the whole neighbour list,
-  and - since Row 46 above - whether the unit defines one of the three runtime
-  entry symbols the linker keys the class on.
-
-`trace --link` runs the build's **own** link first, into `build/scratch/`: the
-argument list comes from `build.ninja`'s `ldflags` (including the per-build
-`-lcf`), and the response file is derived from the `build ...: link ...`
-statement's input list (ninja deletes the `.rsp` it writes).  Never
-`build/RMHE08/main.elf`.
-
-### The trace that was produced
-
-`build/RMHE08/src/Runtime.PPCEABI.H/__init_cpp_exceptions.o` (a flipped unit's
-object - the one that owns the `.ctors$10` word), traced through a link this
-tool ran itself (`trace --link`, whose output ELF is byte-identical to the one
-`ninja` built):
-
-```
-object:   build/RMHE08/src/Runtime.PPCEABI.H/__init_cpp_exceptions.o
-KEPT:     YES - 11 map row(s) name this object
+# unit Network/NetworkWiiMediator: .../build/RMHE08/obj/Network/NetworkWiiMediator.o
+#   resolved as: the object the build's link names (1 entry/entries)
+# no link map at .../build/RMHE08/main.MAP (the build does not write one); linking into build/scratch/mwlink-debug/ instead
+# .../build/compilers/Wii/1.0/mwldeppc.exe -fp hardware -nodefaults -lcf build\RMHE08\ldscript.lcf -o .../build/scratch/mwlink-debug/trace.elf -map .../build/scratch/mwlink-debug/trace.MAP @.../build/scratch/mwlink-debug/trace.rsp
+# linked .../build/scratch/mwlink-debug/trace.elf (8898024 bytes)
+object:   .../build/RMHE08/obj/Network/NetworkWiiMediator.o
+KEPT:     YES - 179 map row(s) name this object
           in the link's input list: True
 
 where each of its sections landed (map address, read back from the ELF):
   section          output          address     size  align  bytes
-  .text            .text        0x80457420     0x70      4  identical
-  .sdata           .sdata       0x80793cc8      0x4      8  identical
-  .ctors$10        .ctors       0x8056f2c0      0x4      4  identical
-  .dtors$10        .dtors       0x8056f440      0x4      4  identical
-  .dtors$15        .dtors       0x8056f444      0x4      4  identical
-
-how its symbols resolved:
-  D fragmentID                       .sdata+0x0 = 0x80793cc8  [__init_cpp_exceptions.o]  ELF 0x80793cc8
-  U _eti_init_info                   -> Linker Generated Symbol File at 0x8003f1c8
-  U __register_fragment              -> Gecko_ExceptionPPC.o at 0x80457490
-  D __init_cpp_exceptions            .text+0x0 = 0x80457420  [__init_cpp_exceptions.o]  ELF 0x80457420
-  U __unregister_fragment            -> Gecko_ExceptionPPC.o at 0x804574dc
-  D __fini_cpp_exceptions            .text+0x3c = 0x8045745c  [__init_cpp_exceptions.o]  ELF 0x8045745c
-  D __init_cpp_exceptions_reference  .ctors$10+0x0 = 0x8056f2c0  [__init_cpp_exceptions.o]  ELF 0x8056f2c0
-  D __destroy_global_chain_reference .dtors$10+0x0 = 0x8056f440  [__init_cpp_exceptions.o]  ELF 0x8056f440
-  U __destroy_global_chain           -> global_destructor_chain.o at 0x804566bc
-  D __fini_cpp_exceptions_reference  .dtors$15+0x0 = 0x8056f444  [__init_cpp_exceptions.o]  ELF 0x8056f444
-
-relocations applied to it (value decoded out of the output ELF):
-  .text+0x00c type 109     'fragmentID' S=0x80793cc8 A=0x0 -> 0xaea8 (sda disp at +2)  APPLIED
-  .text+0x01a ADDR16_HA    '_eti_init_info' S=0x8003f1c8 A=0x0 -> 0x8004 (high half at +0)  APPLIED
-  .text+0x022 ADDR16_LO    '_eti_init_info' S=0x8003f1c8 A=0x0 -> 0xf1c8 (low half at +2)  APPLIED
-  .text+0x024 REL24        '__register_fragment' S=0x80457490 A=0x0 -> 0x4c (branch24)  APPLIED
-  .text+0x028 type 109     'fragmentID' S=0x80793cc8 A=0x0 -> 0xaea8 (sda disp at +2)  APPLIED
-  .text+0x048 type 109     'fragmentID' S=0x80793cc8 A=0x0 -> 0xaea8 (sda disp at +2)  APPLIED
-  .text+0x054 REL24        '__unregister_fragment' S=0x804574dc A=0x0 -> 0x68 (branch24)  APPLIED
-  .text+0x05c type 109     'fragmentID' S=0x80793cc8 A=0x0 -> 0xaea8 (sda disp at +2)  APPLIED
-  .ctors$10+0x000 ADDR32   '__init_cpp_exceptions' S=0x80457420 A=0x0 -> 0x80457420 (word)  APPLIED
-  .dtors$10+0x000 ADDR32   '__destroy_global_chain' S=0x804566bc A=0x0 -> 0x804566bc (word)  APPLIED
-  .dtors$15+0x000 ADDR32   '__fini_cpp_exceptions' S=0x8045745c A=0x0 -> 0x8045745c (word)  APPLIED
-
-its ctor/dtor fragment (the Row 46 question):
-  .ctors$10    size 0x4  fixed-order rank 1  -> .ctors slot 1
-      row 0x8056f2c0 size 0x4 credited to __init_cpp_exceptions.o
-      -> [0] 0x8056f2c0 .ctors$00    Linker Generated Symbol File
-      -> [1] 0x8056f2c0 .ctors$10    __init_cpp_exceptions.o
-         [2] 0x8056f2c4 .ctors       mh3_pad.o
-         ...
-      runtime symbol '__init_cpp_exceptions_reference' -> .ctors$10 (the linker keys this class on the symbol name)
+  extab            extab        0x8001ca4c    0x1a8      4  identical
+  extabindex       extabindex   0x8003d2f0    0x234      4  identical
+  .text            .text        0x80413c64   0x1970      4  identical
+  .data            .data        0x806024b8    0x36c      8  identical
+...
+VERDICT: MATCH
 ```
 
-A second unit, the plain `.ctors` case (the unit Row 46's audit was about):
+Notes on that invocation:
+
+* all four shapes work: `trace Network/NetworkWiiMediator`,
+  `trace NetworkWiiMediator`, `trace build/RMHE08/src/Network/...o`, and
+  `trace <path>` - the first two resolve through the link's own input list, the
+  last two are taken as given.  `# resolved as: ...` always says which happened.
+* a unit that links as a *flipped* object resolves to
+  `build/RMHE08/src/<unit>.o`; one that links as the split target object resolves
+  to `build/RMHE08/obj/<unit>.o`.  Picking by name alone would trace the wrong
+  object, which is why the link's input list decides.
+* `--link` forces a fresh link even if a map is already there; `--map/--elf` use
+  someone else's artifacts; `--rsp` supplies the response file explicitly.
+
+The health check, on the artifacts that invocation produced:
+
+```bash
+python tools/mwlink_debugger.py verify \
+    build/scratch/mwlink-debug/trace.MAP build/scratch/mwlink-debug/trace.elf \
+    --identity build/RMHE08/main.elf
+# MATCH: 13 section(s) - the map is this ELF
+# identity: build/RMHE08/main.elf byte-identical
+```
+
+And when a link fails, the same unit name plus `diagnose`:
+
+```bash
+python tools/mwlink_debugger.py diagnose
+# link: rc=0  (8898024 bytes)
+# phase stream:
+#   Linking      #   Linking: 'diagnose.elf'
+#   Optimizing   #   Optimizing: 'diagnose.elf'
+#   Writing      #   Writing: 'diagnose.elf'
+#   Layout       #   Layout: 'diagnose.elf' (.text)
+#   ...
+```
+
+### Output
+
+Every command prints a text report; `--json` is available where it makes sense
+(`info`, `trace`, `phases`, `records`, `align`, `diagnose`).  Exit status is 0
+for a report that found nothing wrong, 1 for a `FAIL`/failed link/`UNPROVEN`
+run, and 2 for a usage or capability error (no capstone, no gdb, unknown unit) -
+never a traceback.  `trace`'s `--json` object and the human report carry the same
+claims.
+
+## What works, and what does not
+
+**Works (each checked against this repository's own link):**
+
+* `trace` - the unit resolution above, per-section landing verified by reading
+  the object's bytes back out of the output ELF, symbol resolution against the
+  map *and* the output ELF's symbol table, and every relocation's field decoded
+  out of the artifact and compared with the ABI (`ADDR32`, `REL24`,
+  `ADDR16_HA/LO`, SDA type 109 - relative to `_SDA_BASE_` for `.sdata`/`.sbss`
+  and `_SDA2_BASE_` for `.sdata2`/`.sbss2`).  A type whose semantics are not
+  derived is reported `not checked`, not guessed.  A sweep of 260 of the link's
+  inputs (all `src/` objects, every 10th `obj/`) is 260/260 `MATCH` against the
+  real map and the real ELF, including `main`.
+* `verify` - 13/13 output sections of the real map agree with the real ELF
+  (`MATCH`), and `--identity` byte-compares it with `build/RMHE08/main.elf`.
+* `diagnose` - the phase stream and the diagnostics of a failing link, with
+  catalogue ids (msgid 189/14 observed on real failures) and the phase that
+  preceded them.
+* `records --prove` - the linker's input-file record array read out of a running
+  link and cross-checked: **2296/2296** names against the response file,
+  **2296/2296** `.comment` versions and **2296/2296** `e_shnum` values against
+  the objects themselves.
+* `align` - the round-up site (RVA 0x57451 loads `sh_addralign`, 0x57466/0x5747d
+  do `(addr + align - 1) & ~(align - 1)`, 0x57492 pushes the `*fill*` literal),
+  plus a per-section "can this claimed start be honoured" report for a unit - on
+  this tree, **798 sections compared and 0 unhonoured** (which is
+  `tools/elf/objalign.py` doing its job), with the one ambiguous object
+  (`fn_80429B94.o` has 7 `.data` sections) reported as ambiguous rather than
+  compared against a single claimed address.
+* `order`, `anchors`, `phases`, `messages`, `info`, `timeline`.
+
+**Does not work yet - deliberately reported, not faked:**
+
+| gap | what the tool says |
+|---|---|
+| the section table and symbol table records inside the linker | not documented at all; `records` prints only the input-file record it can derive |
+| which **phase** dead-strips an unreferenced symbol (Row 36) | the *flag* is settled (byte 5 of the 8-byte `.comment` entry, bit 0x08 - four relinks), the phase is not: no message is printed for that step, and `records`/`phases` cannot name it |
+| the exact instruction that reads the `.comment` active flag | not derived: the `.comment` is copied into a heap buffer first (a read watchpoint lands on the `rep movsd` at RVA 0x3a58), and that buffer moves between runs |
+| relocation types other than 1/6/10/109 | `not checked (<name>)` in the trace, with the raw word printed |
+| non-Wii linker builds | derivations only; not link-verified (see the matrix) |
+| `GC/1.0`..`2.6` | `phases`: "no message loader - this build does not import LoadStringA" |
+| `--prove` flags | need a gdb and a linker argument list (`--args`), i.e. they are slow and host-dependent by nature |
+
+## If this tool misled you
+
+**If this tool misled you, lacked a record you needed, or its invocation did not
+work as written, add a bullet to `.pi/notes/mwlink-debugger-gaps.md` and say so
+in your report's tooling section** - a trace or a `MATCH` that was not describing
+the artifact you asked about is the most valuable report of all.  That note is
+this tool's sibling of `.pi/notes/mwcc-debugger-gaps.md` and one of the sources
+of `tools/units/tooling.py`'s ranked register, so one bullet per gap (phrased as
+a capability, with what you tried and what it cost) is literally a filed request:
+the row is promoted once two or more distinct filers ask for the same thing.
+
+## How it works
+
+`mwlink_debugger.py` has two roles in one file.  As a CLI it derives tables from
+the linker binary and runs links; sourced by gdb (the `--prove` flags write a
+gdb script) it sets breakpoints on the derived addresses and reports what fired.
+A breakpoint that never fires is **unproven**, never an anchor.
+
+Everything build-specific is *derived*, not transcribed:
+
+* the phase anchors come from the one `call [LoadStringA]` site whose `uID`
+  argument is not a constant - that is the message loader - and from its
+  callers, one per message formatter;
+* the input-file record's stride, array and flag setters come from the function
+  that memcmps `.comment` against `CodeWarrior`;
+* the alignment round-up comes from the function that prints the map's `*fill*`
+  row;
+* the `.ctors`/`.dtors` priority list comes from the pointer array in `.data`;
+* the linker the build uses comes from `build.ninja`'s `mw_version`.
+
+`locate/README.md` is the evidence trail: how each table was derived, what was
+measured, and what could not be established.  It is the model of
+`tools/mwcc-debugger/locate/README.md`.
+
+## Verification
+
+* `python tools/mwlink_debugger.py --selftest` - 76 fixture/pure checks, no gdb
+  and no link is *run* (it is discovered by `python tools/selftest.py --changed`).
+  The derivation checks read the real linker binary when capstone is present, and
+  say so instead of failing when it is not.
+* a sweep of 260 of the link's input objects (all 33 `src/` ones, every 10th
+  `obj/` one) traces `MATCH` against the real map and the real ELF - 260/260 -
+  which is the check that found the four `trace` bugs listed in
+  `locate/README.md`;
+* a scratch link from `build.ninja`'s own command line produced
+  `sha256 5a64aec3af5ae73d5e33f0b289aaa6d04324eefa8665fb640b50c90d938be758`,
+  byte-identical to the `build/RMHE08/main.elf` `ninja` built - and
+  `verify --identity` re-checks that on every run;
+* `records --prove` cross-checks 2296 records three ways (above);
+* `phases --prove` cross-checks every observed message id against the catalogue
+  (50/50 on a real link) and reports 6/1248 phase anchors fired - the other 1242
+  are candidates for diagnostics this link does not print, and are reported
+  unproven;
+* the failure paths are exercised on real failures: a missing object
+  (`msgid=? (not in the catalogue)`), a dangling symbol (`msgid=16 undefined:
+  '%s'`), and a renamed runtime entry symbol (`msgid=189`), each with its phase
+  attribution.
+
+`build/RMHE08/main.elf` is never written by this tool: links are redirected into
+`build/scratch/`, including explicit `--args` link lines.
+
+## Layout
 
 ```
-object:   build/RMHE08/obj/ef/ef_emform.o
-KEPT:     YES - 31 map row(s) name this object
-  extab            extab        0x8000a584     0x48      4  identical
-  extabindex       extabindex   0x80023bec     0x6c      4  identical
-  .text            .text        0x800cccf8    0x2b8      4  identical
-  .ctors           .ctors       0x8056f2e8      0x4      4  identical
-its ctor/dtor fragment:
-  .ctors       size 0x4  fixed-order rank 2  -> .ctors slot 11
-      ... -> [11] 0x8056f2e8 .ctors       ef_emform.o
+mwlink_debugger.py            the tool (stdlib-only except capstone + gdb)
+locate/README.md              how every derived fact was established
+../mwcc-debugger/             the compiler sibling (and the gdb installer)
 ```
-
-## Verification performed
-
-* `python tools/mwlink_debugger.py --selftest` - 35 fixture checks, no gdb, no
-  compiler, no linker (`python tools/selftest.py --changed`).
-* A real link driven by the derived anchors produced
-  `sha256 19d942277ffbb288ab3754df469a8d8e43e984d4b93a9a98d941dc1a1005dbfc`,
-  byte-identical to the `build/RMHE08/main.elf` `ninja` built; `trace --link`
-  reproduces that hash from `build.ninja`'s own command line.
-* `verify` against a *partial* link (`-r`, six objects) reports `FAIL` with the
-  first divergence - the loudness contract, on a real artifact.
-* `phases --prove` and `anchors --prove` are gdb runs on real links; every
-  UNPROVEN line is a live negative, not a formality.
-
-## Not attempted
-
-* The linker's internal **records** (input-file list, section table, symbol
-  table, placement).  The map is the artifact that *reports* them and `trace`
-  reads the map, so no field of those structures is documented here - better an
-  honest gap than an invented offset.
-* Which phase drops a dead-stripped object (Row 36), and the alignment refusal
-  `tools/elf/objalign.py` works around: `trace` can show that a unit is missing
-  or misaligned in the artifact, but not yet the branch that decides it.  The
-  phase anchors are the way in: break on the ones that fire and read the flags
-  of the unit being considered.

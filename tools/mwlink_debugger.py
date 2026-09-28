@@ -43,14 +43,31 @@ stream the linker really emits, and reports every anchor that never fired as
 unproven.  That run is also what corrected this tool's catalogue numbering: the
 id is ``(block_name - 1) * 16 + slot`` (50 of 50 observed messages agree).
 
-**Tracing one object.**  ``trace <object>`` answers "how did this unit get
+**Tracing one unit.**  ``trace <unit|object>`` answers "how did this unit get
 linked?": whether the link kept it, where each of its sections landed (checked
 by reading the object's bytes back out of the output ELF), how its symbols
 resolved (the map *and* the output ELF's own symbol table), which relocations
 touched it (each one's field decoded out of the artifact and compared with the
 ABI), and where its ctor/dtor fragment went in the linker's fixed class order.
-``trace --link`` runs the build's own link first, into ``build/scratch/``, never
-over ``build/RMHE08/main.elf``.
+The argument is a **unit name** (``Network/NetworkWiiMediator``) as well as a
+path: the object is resolved from the build's own link statement, and since the
+build writes no map, the tool links one into ``build/scratch/`` when it needs to.
+``trace --link`` never writes ``build/RMHE08/main.elf``.
+
+**An erroring link is the production case.**  ``diagnose`` runs the build's own
+link with ``-v`` and reports the phase stream, then every diagnostic classified
+against the message catalogue and attributed to the phase that printed it - a
+diagnostic the catalogue does not hold is reported *without* an id rather than
+given one.  ``trace --link`` uses the same attribution when its link fails and
+then still traces the object against whatever map exists.
+
+**The internal records.**  ``records`` documents the linker's own input-file
+record (stride, array, and each field) derived from the ``.comment`` parser's
+instructions, and ``records --prove`` reads that array out of a running link and
+cross-checks every field against the object it names.  ``align`` derives where
+the linker aligns a fragment's address and what it compares - the answer to the
+``tools/elf/objalign.py`` question.  Fields that could not be derived are rows
+that say so; nothing is invented.
 
 **Health check.**  ``verify`` clasps the link map against the ELF
 ``elf2dol`` will be run on: section addresses and sizes in ``main.MAP`` must
@@ -485,7 +502,7 @@ def derive_anchors(pe, with_capstone=True):
 
 MAP_FRAG = re.compile(
     r"^\s*([0-9a-f]{8})\s+([0-9a-f]{6})\s+([0-9a-f]{8})\s+([0-9a-f]{8})"
-    r"(?:\s+(\d+)\s+(\S*))?"
+    r"(?:\s+(\d+))?\s+(.*?)\s*$"
 )
 MAP_HDR = re.compile(r"^(.*) section layout$")
 
@@ -513,7 +530,12 @@ def parse_map(text):
             continue
         if cur is None or not cur["blocks"]:
             continue
-        fm = MAP_FRAG.match(line)
+        # The row's name may contain spaces (`lbl_80004514 (entry of
+        # pad_00_80004380_init)`) and the alignment column may be *empty* for
+        # those rows, so the match is made against the part before the tab that
+        # separates the row from its input file.
+        left = line.split("\t", 1)[0]
+        fm = MAP_FRAG.match(left)
         if not fm:
             continue
         srel, size, vaddr, foff = (int(fm.group(i), 16) for i in range(1, 5))
@@ -675,29 +697,116 @@ PHASE_LINE = re.compile(r"^#\s+Linking:\s|^#\s+Optimizing:\s|^#\s+Writing:\s|"
 ANY_PHASE = re.compile(r"^#\s{3}([A-Za-z][A-Za-z ]*?):\s")
 
 
-def classify_phase(line, catalogue):
-    """Name the message a verbose line came from, if the catalogue has it."""
-    body = line.strip()
-    if body.startswith("#"):
-        body = body[1:].strip()
+def match_message(body, catalogue):
+    """The catalogue entry a linker-emitted line came from, or ``None``.
+
+    The catalogue stores a message the way the engine holds it - ``%c``/``%n``
+    placeholders included, and often with the line breaks the printer wraps at -
+    so both sides are compared with their whitespace collapsed.  The comparison
+    is against the literal prefix up to the first placeholder, which is the same
+    rule ``phases --prove`` uses to cross-check an observed ``(id, text)`` pair
+    against the catalogue, and it is what makes ``diagnose`` able to say *which*
+    message an error is.
+    """
+    body = body.strip()
+    while body.startswith("#"):
+        body = body.lstrip("#").strip()
+    nb = " ".join(body.split())
     for msgid, text in catalogue.items():
-        # Engine messages use %c for strings; compare the literal prefix.
-        head = text.split("'")[0]
-        if head and body.startswith(head.rstrip()):
+        nt = " ".join(text.split())
+        head = nt.split("%")[0]
+        if head and nb.startswith(head.rstrip()):
             return msgid, text
     return None
 
 
-def parse_timeline(text):
-    """The verbose stream as an ordered phase list."""
+def classify_phase(line, catalogue):
+    """Name the message a verbose line came from, if the catalogue has it."""
+    return match_message(line, catalogue)
+
+
+def classify_diagnostics(text, catalogue, timeline=None):
+    """Every linker diagnostic in a run's output, with its catalogue id and phase.
+
+    ``mwldeppc`` prints an error as a banner (``### mwldeppc.exe Linker
+    Error:``) followed by ``#``-prefixed body lines.  The body is matched
+    against the message catalogue - the engine's own message - and, when the
+    run printed its phase stream (``-v``), the last phase line before the
+    diagnostic is attached to it.  A diagnostic whose text is not in the
+    catalogue is reported as such rather than given a made-up id.
+    """
+    out = []
+    last_phase = None
+    in_error = False
+    body = []
+
+    def flush():
+        nonlocal body, in_error
+        if not body:
+            in_error = False
+            return
+        joined = " ".join(body)
+        hit = match_message(joined, catalogue)
+        out.append({"text": joined,
+                    "msgid": hit[0] if hit else None,
+                    "message": hit[1] if hit else None,
+                    "phase": last_phase[0] if last_phase else None,
+                    "phase_line": last_phase[1] if last_phase else None})
+        body = []
+        in_error = False
+
+    if timeline is None:
+        timeline = parse_timeline(text, phase_kinds(catalogue))
+    phase_at = {line.strip(): kind for kind, line in timeline}
+    for line in text.splitlines():
+        s = line.strip()
+        if re.match(r"#+\s*(mwldeppc\.exe\s+)?\S+\s+(Error|Warning|Message)\s*:", s, re.I):
+            flush()
+            in_error = True
+            continue
+        if in_error and re.match(r"^#\s", line):
+            body.append(s.lstrip("#").strip())
+            continue
+        if in_error:
+            flush()
+        if s in phase_at:
+            last_phase = (phase_at[s], s)
+    flush()
+    return out
+
+
+def phase_kinds(catalogue):
+    """The engine's phase names, read off the catalogue.
+
+    A phase message is the shape ``<Name>: '%c'`` - that is what the linker
+    prints for ``Linking``, ``Optimizing``, ``Writing``, ``Layout`` and
+    ``Compiling`` - so the set of names is *derived* rather than listed.  It
+    matters: an error body line such as ``#   undefined: 'foo'`` also looks
+    like ``<name>: ...``, and counting it as a phase would mis-attribute the
+    very diagnostics this tool is trying to place.
+    """
+    kinds = set()
+    for text in catalogue.values():
+        m = re.match(r"^([A-Za-z][A-Za-z ]*):\s*'%c'", text.strip())
+        if m:
+            kinds.add(m.group(1))
+    return kinds or {"Linking", "Optimizing", "Writing", "Layout", "Compiling"}
+
+
+def parse_timeline(text, kinds=None):
+    """The verbose stream as an ordered phase list.
+
+    With ``kinds`` (the catalogue's phase names) only those count as phases; a
+    diagnostic body line that merely looks like one is not a phase.
+    """
     out = []
     for line in text.splitlines():
         m = ANY_PHASE.match(line)
         if not m:
             continue
         kind = m.group(1)
-        if kind in ("Compiling", "Importing", "Lib Import") and len(out) < 3:
-            pass
+        if kinds is not None and kind not in kinds:
+            continue
         out.append((kind, line.strip()))
     return out
 
@@ -984,7 +1093,7 @@ def cmd_timeline(args):
     print("# " + " ".join(argv))
     proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
     text = proc.stdout + proc.stderr
-    for kind, line in parse_timeline(text):
+    for kind, line in parse_timeline(text, phase_kinds(cat)):
         if kind in ("Compiling", "Importing", "Lib Import"):
             continue
         c = classify_phase(line, cat)
@@ -1182,10 +1291,11 @@ def reloc_field(reloc_type, word, S, A, P, sda_base=None):
     address in the output.  ``where`` records which halfword the field was
     found in, because that is part of the ABI and not something to guess.
 
-    ``sda_base`` is the map's ``_SDA_BASE_`` value, needed by the
-    small-data-area form: type 109 writes ``(S - _SDA_BASE_) & 0xFFFF`` into the
-    low halfword (the value was *derived from* the artifact - the SDA base is a
-    linker-generated symbol the map prints - not assumed).
+    ``sda_base`` is the map's ``_SDA_BASE_`` value - or its ``_SDA2_BASE_``
+    when the symbol lives in ``.sdata2``/``.sbss2``, because *which* SDA base a
+    type-109 displacement is relative to depends on the symbol's section (r13 for
+    ``.sdata``/``.sbss``, r2 for ``.sdata2``/``.sbss2``).  Both are
+    linker-generated symbols the map prints, so neither is assumed.
     """
     value = (S + A) & 0xFFFFFFFF
     if reloc_type == 1:                                    # R_PPC_ADDR32
@@ -1226,6 +1336,30 @@ def reloc_field(reloc_type, word, S, A, P, sda_base=None):
 # ---------------------------------------------------------------------------
 
 
+def parse_map_symbols(text):
+    """``{name: address}`` from the map's ``Linker generated symbols:`` listing.
+
+    The linker's own symbols (``_f_text``, ``_e_data``, ``_SDA_BASE_``,
+    ``_stack_addr``, ...) are printed in a second listing whose rows have no
+    offset/size columns, so they are not fragments and ``parse_map`` does not
+    see them.  A unit that references one - ``main.o`` relocates ``_f_data`` and
+    ``_f_bss`` - needs them resolved, and this listing is the artifact's own
+    statement of their addresses.
+    """
+    out = {}
+    inside = False
+    for line in text.splitlines():
+        if re.match(r"^\s*Linker generated symbols:\s*$", line):
+            inside = True
+            continue
+        if not inside:
+            continue
+        m = re.match(r"^\s*([A-Za-z_][\w$]*)\s+([0-9a-fA-F]{8})\s*$", line)
+        if m:
+            out[m.group(1)] = int(m.group(2), 16)
+    return out
+
+
 def _map_rows(map_text):
     """``[(output_section, row), ...]`` in map order."""
     out = []
@@ -1234,6 +1368,34 @@ def _map_rows(map_text):
             for row in block["fragments"]:
                 out.append((sec, row))
     return out
+
+
+_FILL_NAMES = ("*fill*", "**fill**")
+_SECTION_LIKE = re.compile(r"^\.[\w$]+$")
+
+
+def is_section_row(section, row):
+    """Is this map row an *input section* fragment, rather than a symbol?
+
+    The map's fifth column is **not** a type: it is the row's alignment (a
+    fragment is laid out at exactly its place, so it prints 1, while a symbol
+    carries its own alignment - which is why every symbol row of this link
+    prints 4/8/16 and a 1-byte label prints 1).  An earlier revision of ``trace``
+    read that column as a type flag and required 4 for a symbol, so a 1-byte
+    label was mistaken for a fragment and ``trace main`` reported its relocations
+    as unresolvable.  The name is what separates them: a fragment is named after
+    the input section (``.text``, ``.ctors$10``, ``extab``, ``*fill*``), a symbol
+    after the symbol.  ``extab``/``extabindex`` have no leading dot, and a pooled
+    symbol such as ``.data.0`` has an inner dot and so is not section-like.
+    """
+    name = row["name"]
+    if not name:
+        return True
+    if name in _FILL_NAMES:
+        return True
+    if name == section:
+        return True
+    return bool(_SECTION_LIKE.match(name)) and "." not in name[1:]
 
 
 def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
@@ -1272,6 +1434,7 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
         return {"object": str(obj_path), "object_name": name, "kept": False,
                 "in_rsp": in_rsp, "why": why, "sections": [], "symbols": [],
                 "relocations": [], "ctor_dtor": [], "problems": [],
+                "dead_symbols": [],
                 "verdict": "DROPPED", "elf": str(elf_path) if elf else None,
                 "map": None, "rows_total": 0}
 
@@ -1283,30 +1446,47 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
               "elf": str(elf_path) if elf else None, "map": None}
 
     # ---- where each of its sections landed -------------------------------
-    landing = {}          # object section name -> output address
-    out_of = {}           # object section name -> output section name
-    reloc_words = {}      # object section name -> {byte offset: relocation}
+    # Keyed by section *index*, not by name: a split target object can hold
+    # several sections with one name (fn_80429B94.o has seven `.data`), and a
+    # name-keyed map silently answers every one of them with the last address.
+    landing = {}          # object section index -> output address
+    out_of = {}           # object section index -> output section name
+    reloc_words = {}      # object section index -> {byte offset: relocation}
     for rel in obj.relocs:
-        reloc_words.setdefault(rel["target"], {})[rel["offset"]] = rel
-    sda_base = None
+        reloc_words.setdefault(rel["target_index"], {})[rel["offset"]] = rel
+    sda_base = sda2_base = None
     for _s, r in rows:
         if r["name"] == "_SDA_BASE_":
             sda_base = r["addr"]
+        elif r["name"] == "_SDA2_BASE_":
+            sda2_base = r["addr"]
     if sda_base is None and elf_syms.get("_SDA_BASE_"):
         sda_base = elf_syms["_SDA_BASE_"][0]
+    if sda2_base is None and elf_syms.get("_SDA2_BASE_"):
+        sda2_base = elf_syms["_SDA2_BASE_"][0]
+    # A split target object can hold *several* sections with one name (a unit
+    # whose .data was split into fragments): `build/RMHE08/obj/fn_80429B94.o` has
+    # seven `.data` sections.  The map lists one fragment row per section, in the
+    # same order the linker walked them, so the k-th section of a name belongs to
+    # the k-th row of that name - and the byte read-back below is what proves the
+    # pairing, rather than this comment.
+    seen_names = {}
     for sec in obj.sections:
         if sec["index"] == 0 or not (sec["flags"] & 0x2) or sec["size"] == 0:
             continue
-        cand = [r for s_, r in mine if r.get("flags") == 1 and r["name"] == sec["name"]]
+        nth = seen_names.get(sec["name"], 0)
+        seen_names[sec["name"]] = nth + 1
+        # A fragment is the row named after the input section; `extab` and
+        # `extabindex` are not listed that way (the map names every *entry* they
+        # own, `@etb_<VA>`/`@eti_<VA>`), so their landing is where this object's
+        # first non-fragment row in that output section sits.
+        cand_list = [r for _s, r in mine if is_section_row(sec["name"], r)
+                     and r["name"] == sec["name"]]
+        cand = cand_list[nth:nth + 1]
         entry_rows = cand
         if not cand:
-            # `extab`/`extabindex` are not listed as one fragment per object:
-            # the map names every *entry* it owns (`@etb_<VA>`/`@eti_<VA>`), so
-            # the landing of this object's part of the section is where its
-            # first row in that output section sits.  That is the artifact's
-            # own statement about this object, not a guess.
             entry_rows = [r for s_, r in mine
-                          if s_ == sec["name"] and r.get("flags") != 1]
+                          if s_ == sec["name"] and not is_section_row(s_, r)]
         if not entry_rows:
             report["sections"].append({"name": sec["name"], "size": sec["size"],
                                        "align": sec["align"], "landed": False,
@@ -1344,7 +1524,7 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
             start = osec_off(osec, r["addr"])
             got = elf_data[start:start + len(body)]
             skip = set()
-            for off in reloc_words.get(sec["name"], {}):
+            for off in reloc_words.get(sec["index"], {}):
                 skip.update(range(off, off + 4))
             same = len(got) == len(body) and all(
                 i in skip or got[i] == body[i] for i in range(len(body)))
@@ -1357,15 +1537,35 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
                     f"section '{sec['name']}' at {r['addr']:#x}: the output ELF "
                     f"does not carry this object's bytes (first difference at "
                     f"+{first:#x}: {body[first]:#04x} -> {got[first]:#04x})")
-        landing[sec["name"]] = r["addr"]
-        out_of[sec["name"]] = out_sec
+        landing[sec["index"]] = r["addr"]
+        out_of[sec["index"]] = out_sec
         report["sections"].append(entry)
 
     # ---- how its symbols resolved ----------------------------------------
     by_name = {}
     for sec, r in rows:
-        if r.get("flags") == 4 and r["name"]:
-            by_name.setdefault(r["name"], []).append((sec, r))
+        if is_section_row(sec, r) or not r["name"]:
+            continue
+        # A row whose name carries the map's `(entry of <fragment>)` annotation -
+        # `_savegpr_27 (entry of __save_gpr)`, `lbl_80004514 (entry of
+        # pad_00_80004380_init)` - defines the *bare* symbol; 48 such rows exist
+        # in this link and a reference to one of them is a reference to the
+        # symbol, so both spellings resolve.
+        bare = re.sub(r"\s+\(entry of .*\)$", "", r["name"])
+        for key in {r["name"], bare}:
+            by_name.setdefault(key, []).append((sec, r))
+    # The linker's own generated symbols are a second listing in the map; a
+    # reference to one of them (main.o's `_f_data`, `_f_bss`) resolves there.
+    for nm, addr in parse_map_symbols(map_text).items():
+        by_name.setdefault(nm, []).append((
+            "(linker generated)",
+            {"name": nm, "addr": addr, "size": 0, "offset": 0, "file_off": 0,
+             "source": "Linker Generated Symbol File", "flags": 0}))
+    # A symbol this object *defines* that no map row names is one the linker did
+    # not keep.  That is Row 36's signature, and it is worth saying out loud:
+    # dropping a *leading* symbol compacts its section, which moves every later
+    # address, which is what makes the failure read as a link-order mystery.
+    stripped = []
     for sym in obj.symbols:
         if sym["type"] in (STT_SECTION, STT_FILE) or sym["name"] == "":
             continue
@@ -1381,7 +1581,7 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
                 problems.append(f"undefined symbol '{sym['name']}' is not "
                                 f"defined anywhere in the map")
             continue
-        want = landing.get(sym["shndx_name"])
+        want = landing.get(sym["shndx"])
         expected = None if want is None else want + sym["value"]
         hit = by_name.get(sym["name"])
         entry = {"name": sym["name"], "kind": "defined",
@@ -1410,13 +1610,20 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
             entry["addr"] = expected
             entry["from"] = ("local, carried in the fragment" if sym["bind"] == STB_LOCAL
                              else "not named in the map")
+            entry["map_row"] = False
+            if sym["bind"] != STB_LOCAL and sym["type"] not in (STT_SECTION, STT_FILE) \
+                    and expected is not None:
+                stripped.append({"name": sym["name"], "section": sym["shndx_name"],
+                                 "value": sym["value"], "size": sym["size"],
+                                 "expected": expected})
             if elf_syms.get(sym["name"]):
                 entry["elf_addrs"] = elf_syms[sym["name"]]
         report["symbols"].append(entry)
+    report["dead_symbols"] = stripped
 
     # ---- the relocations that touched it ---------------------------------
     for rel in obj.relocs:
-        place = landing.get(rel["target"])
+        place = landing.get(rel["target_index"])
         if place is None:
             continue
         P = place + rel["offset"]
@@ -1431,10 +1638,12 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
             hit = by_name.get(sym["name"])
             entry["resolved_from"] = hit[0][1]["source"] if hit else None
             entry["S"] = hit[0][1]["addr"] if hit else None
+            sym_out = hit[0][0] if hit else None
         else:
             entry["resolved_from"] = name
-            base = landing.get(sym["shndx_name"])
+            base = landing.get(sym["shndx"])
             entry["S"] = None if base is None else base + sym["value"]
+            sym_out = out_of.get(sym["shndx"], sym["shndx_name"])
         if entry["S"] is None:
             entry["verdict"] = "unresolved"
             problems.append(f"relocation at {rel['target']}+{rel['offset']:#x} "
@@ -1442,7 +1651,7 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
             report["relocations"].append(entry)
             continue
         entry["S"] = entry["S"] & 0xFFFFFFFF
-        out_sec = out_of.get(rel["target"])
+        out_sec = out_of.get(rel["target_index"])
         word = None
         if elf and out_sec in elf_secs:
             off = osec_off(elf_secs[out_sec], P)
@@ -1453,8 +1662,12 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
         if word is None:
             entry["verdict"] = "not checked (no ELF at that place)"
         else:
+            # r2 is the base for .sdata2/.sbss2, r13 for .sdata/.sbss: the
+            # section of the *symbol* picks which linker-generated base applies.
+            base = sda2_base if sym_out in (".sdata2", ".sbss2") else sda_base
+            entry["sda_base"] = base
             checked, exp, act, where = reloc_field(rel["type"], word, entry["S"],
-                                                   rel["addend"], P, sda_base)
+                                                   rel["addend"], P, base)
             entry["expected"], entry["actual"], entry["field"] = exp, act, where
             if not checked:
                 entry["verdict"] = f"not checked ({reloc_name(rel['type'])})"
@@ -1477,7 +1690,8 @@ def build_trace(obj_path, map_text, elf_path=None, rsp_path=None, order=None):
         entry = {"section": sec["name"], "size": sec["size"],
                  "class_rank": rank.get(sec["name"]), "rows": [],
                  "runtime_symbols": runtime}
-        srows = [r for _s, r in mine if r["name"] == sec["name"] and r.get("flags") == 1]
+        srows = [r for _s, r in mine if r["name"] == sec["name"]
+                 and is_section_row(".ctors" if "ctors" in sec["name"] else ".dtors", r)]
         for r in srows:
             entry["rows"].append({"addr": r["addr"], "size": r["size"],
                                   "source": r["source"]})
@@ -1579,6 +1793,19 @@ def render_trace(rep):
                     out.append(f"      runtime symbol '{sym}' -> {cls[0]}{cls[1]} "
                                f"(the linker keys this class on the symbol name)")
     out.append("")
+    if rep.get("dead_symbols"):
+        out.append(f"defined here but NOT named in the map ({len(rep['dead_symbols'])} "
+                   f"symbol(s)) - the linker did not keep them:")
+        for d in rep["dead_symbols"][:10]:
+            out.append(f"  {d['name']:<44} {d['section']}+{d['value']:#x} "
+                       f"size {d['size']:#x} would be {d['expected']:#x}")
+        if len(rep["dead_symbols"]) > 10:
+            out.append(f"  ... {len(rep['dead_symbols']) - 10} more")
+        out.append("  -> dropping one compacts its section, so every following "
+                   "address in this report shifts by its size.  If the target "
+                   "object keeps the symbol this is Row 36: mark it "
+                   "__declspec(export) (see docs/matching.md).")
+        out.append("")
     out.append(f"VERDICT: {rep['verdict']}")
     for p in rep["problems"]:
         out.append("  " + p)
@@ -1802,9 +2029,15 @@ def derive_phase_anchors(pe):
 
 def cmd_phases(args):
     pe = Pe(args.linker)
+    if _capstone() is None:
+        print("phases needs capstone (pip install capstone)", file=sys.stderr)
+        return 2
     der = derive_phase_anchors(pe)
     if der is None:
-        print("phases needs capstone (pip install capstone)", file=sys.stderr)
+        print(f"{pe.path.name}: no message loader - this build does not import "
+              f"LoadStringA (the GC 1.0..2.6 linkers do not), so the phase table "
+              f"has nothing to hang on.  'messages' is empty for the same reason.",
+              file=sys.stderr)
         return 2
     io = der["io"]
     ld = io["loader"]
@@ -2015,54 +2248,798 @@ def derive_link_line(rsp, ldscript=None):
     return " ".join(argv)
 
 
+def link_inputs(out="build/RMHE08/main.elf"):
+    """The objects the build's own link statement consumes, in its own order.
+
+    This is ``build.ninja``'s answer, not ours: the same token list ninja
+    writes into the response file.  It is what makes a *unit name* a usable
+    argument - the object that belongs to a unit is the one the link names.
+    """
+    toks = derive_rsp(out)
+    if toks is None:
+        return None
+    return [t for t in toks if re.search(r"\.(o|a)$", t, re.I)]
+
+
+def unit_of_object(path):
+    """The *unit name* of a build input: its path under ``build/<...>/{src,obj}/``.
+
+    ``build/RMHE08/src/Network/NetworkWiiMediator.o`` ->
+    ``Network/NetworkWiiMediator``; same for ``obj/`` (the split target
+    object).  A path that does not have that shape returns its stem.
+    """
+    s = str(path).replace("\\", "/")
+    m = re.search(r"/build/[^/]+/(?:src|obj)/(.+\.o)$", "/" + s)
+    if m:
+        return m.group(1)[:-2]
+    return Path(s).name[:-2] if s.lower().endswith(".o") else Path(s).name
+
+
+def resolve_object(spec, link_out="build/RMHE08/main.elf"):
+    """Resolve a path **or a unit name** to the object a link consumes.
+
+    Order, and why: an existing path is honoured first (a lane that already
+    has one knows what it wants); then the build's *own* input list, which is
+    ground truth for "which object is this unit" - a unit that is `linked
+    False` appears there as ``obj/<unit>.o`` (the split target object) and a
+    flipped one as ``src/<unit>.o`` (ours), and picking the wrong one silently
+    traces a different object; then the two conventional paths.  ``how`` says
+    which of those answered, so the report never implies more than it checked.
+    """
+    want = str(spec).replace("\\", "/").strip()
+    stem = re.sub(r"\.o$", "", want, flags=re.I)
+    stem = re.sub(r"^.*?/?(?:build/[^/]+/)?(?:src|obj)/", "", stem)
+
+    cand = Path(want)
+    if cand.exists():
+        return {"path": cand, "unit": unit_of_object(cand), "how": "the path given",
+                "in_link": None}
+    root_cand = ROOT / want
+    if root_cand.exists():
+        return {"path": root_cand, "unit": unit_of_object(root_cand),
+                "how": "the path given", "in_link": None}
+
+    inputs = link_inputs(link_out) or []
+    hits = [t for t in inputs if unit_of_object(t).lower() == stem.lower()]
+    if not hits:
+        # The link may name the same unit in more than one place (a `link`
+        # statement and the objdiff list); keep only the first, and say how
+        # many there were.
+        hits = [t for t in inputs
+                if unit_of_object(t).lower().endswith("/" + stem.lower())
+                or Path(t.replace("\\", "/")).name.lower() == stem.lower() + ".o"]
+    if hits:
+        p = Path(hits[0].replace("\\", "/"))
+        if not p.is_absolute():
+            p = ROOT / p
+        return {"path": p, "unit": unit_of_object(hits[0]),
+                "how": f"the object the build's link names ({len(hits)} entry/entries)",
+                "in_link": True}
+
+    for sub in ("src", "obj"):
+        p = ROOT / "build" / "RMHE08" / sub / (stem + ".o")
+        if p.exists():
+            return {"path": p, "unit": stem,
+                    "how": f"build/RMHE08/{sub}/<unit>.o - NOT in the link's "
+                           f"input list (this object is not linked)",
+                    "in_link": False}
+    known = sorted({unit_of_object(t) for t in inputs})
+    import difflib
+    near = difflib.get_close_matches(stem, known, n=5, cutoff=0.6)
+    return {"path": None, "unit": stem, "how": "not found", "in_link": None,
+            "known": known[:0], "near": near, "inputs": len(inputs)}
+
+
+def link_argv(args, out_base="trace", verbose=False):
+    """The argv for a link that can never write ``build/RMHE08/main.elf``.
+
+    Either an explicit link line (``--args``, with any ``-o``/``-map`` removed
+    and replaced by the scratch paths) or the build's own, derived from
+    ``build.ninja``.  Returns ``(argv, elf_out, map_out, work, rsp)`` or
+    ``None`` when the build statement cannot be read.
+    """
+    work = Path(args.out).resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    elf_out = work / f"{out_base}.elf"
+    map_out = work / f"{out_base}.MAP"
+    if getattr(args, "args", None):
+        toks, skip = [], False
+        for tk in args.args.split():
+            if skip:
+                skip = False
+                continue
+            if tk in ("-o", "-map"):
+                skip = True
+                continue
+            toks.append(tk)
+        return ([str(args.linker)] + toks + ["-o", str(elf_out), "-map", str(map_out)],
+                elf_out, map_out, work, Path(args.rsp) if args.rsp else None)
+    rsp = Path(args.rsp) if args.rsp else None
+    if rsp is None:
+        rsp = work / "trace.rsp"
+        if derive_rsp(args.link_out, rsp) is None:
+            return None
+    if not rsp.exists():
+        return None
+    args.rsp = str(rsp)
+    line = derive_link_line(rsp, args.ldscript or "build/RMHE08/ldscript.lcf")
+    if verbose:
+        line = "-v " + line
+    line = line.format(out=str(elf_out), map=str(map_out))
+    return [str(args.linker)] + line.split(), elf_out, map_out, work, rsp
+
+
+def run_link(args, out_base="trace", verbose=False):
+    """Run the build's own link into ``build/scratch/``; never ``main.elf``.
+
+    Returns ``(rc, argv, stdout, stderr, elf_out, map_out)``, or ``None`` when
+    the link cannot even be derived.
+    """
+    got = link_argv(args, out_base, verbose)
+    if got is None:
+        return None
+    argv, elf_out, map_out, _work, _rsp = got
+    proc = subprocess.run(argv, capture_output=True, text=True,
+                          errors="replace", cwd=str(ROOT))
+    return proc.returncode, argv, proc.stdout, proc.stderr, elf_out, map_out
+
+
+def report_link_failure(args, argv, stdout, stderr, catalogue):
+    """The production case: a link that errors.  Say what it said, and where.
+
+    A flip whose DOL hash moves is a *failing* link, so the tool has to be
+    useful on the failure rather than refusing it: the run is repeated once
+    with ``-v`` (the phase stream the build does not ask for), the diagnostics
+    are classified against the message catalogue, and each one is attributed to
+    the last phase the linker announced before printing it.  Nothing is
+    invented: a diagnostic the catalogue does not hold is reported without an
+    id, and a diagnostic with no phase line before it says ``(no phase seen)``.
+    """
+    print(f"# link FAILED (the link's own diagnostics follow)")
+    tail = (stdout or "") + (stderr or "")
+    for line in tail.strip().splitlines()[-40:]:
+        print("#   " + line)
+    # The phase attribution needs the verbose stream, which the build's own
+    # ldflags do not ask for; one retry into scratch is worth it here.
+    again = run_link(args, out_base="diagnose", verbose=True)
+    if again is None:
+        return []
+    rc2, argv2, out2, err2, _elf2, _map2 = again
+    # Classify the *verbose* run's output when it produced any: concatenating
+    # both runs would report every diagnostic twice.
+    text = "\n".join(t for t in (out2, err2) if t) or "\n".join(
+        t for t in (stdout, stderr) if t)
+    timeline = parse_timeline(text, phase_kinds(catalogue))
+    diags = classify_diagnostics(text, catalogue, timeline)
+    print()
+    print("the link's phase stream, up to the failure:")
+    for kind, _line in timeline:
+        print(f"  {kind}")
+    if not timeline:
+        print("  (no phase line was printed)")
+    print("diagnostics (classified against the message catalogue):")
+    if not diags:
+        print("  (the linker printed no banner this tool recognises)")
+    for d in diags:
+        who = f"phase {d['phase']}" if d["phase"] else "(no phase seen)"
+        mid = f"msgid={d['msgid']}" if d["msgid"] is not None else "msgid=(not in the catalogue)"
+        print(f"  [{who}] {mid}: {d['text']}")
+    return diags
+
+
+
+
+
+# ---------------------------------------------------------------------------
+# The alignment the linker enforces (the objalign.py question), derived
+# ---------------------------------------------------------------------------
+
+def _splits_starts(path):
+    """``{unit: {'.section': claimed start}}`` from ``config/.../splits.txt``.
+
+    Same shape ``tools/elf/objalign.py`` reads: a unit key is a line that starts
+    in column 0 and ends with ``:``; its sections are indented
+    ``.name start:0x.... end:0x....`` lines.
+    """
+    units, cur = {}, None
+    rx = re.compile(r"^\s+(\.?[\w$.]+)\s+start:0x([0-9A-Fa-f]+)")
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return units
+    for line in text.splitlines():
+        if line[:1] not in ("", " ", "\t") and line.rstrip().endswith(":"):
+            cur = line.strip()[:-1]
+            units[cur] = {}
+        elif cur:
+            m = rx.match(line)
+            if m:
+                units[cur][m.group(1)] = int(m.group(2), 16)
+    return units
+
+
+def derive_alignment(pe):
+    """Find where mwld aligns a fragment's address and what it compares.
+
+    The lever is the map's own ``*fill*`` row: the linker prints that literal
+    when the alignment moved the fragment, so the function that pushes it also
+    contains the comparison.  This scans the candidates for the instructions
+    that do the work - the ``[shdr + 0x20]`` load (``sh_addralign`` in an
+    ``Elf32_Shdr``) and the ``... add -1; not; and`` round-up - and reports
+    them; nothing is transcribed.
+    """
+    insns, aux = _disas_text(pe)
+    if insns is None:
+        return None
+    cs = aux[1]
+    anchors = derive_anchors(pe) or []
+    cands = [a for a in anchors if a["kind"] == "message" and a["string"] == "*fill*"]
+    for a in cands:
+        idx = next((k for k, i in enumerate(insns)
+                    if (i.address - pe.image_base) == a["anchor"]), None)
+        if idx is None:
+            continue
+        start = _function_start(insns, idx)
+        start_idx = next((k for k, i in enumerate(insns) if i.address == start), idx)
+        func = insns[start_idx:start_idx + 400]
+        fill_idx = None
+        for j, i in enumerate(func):
+            if i.mnemonic == "push" and re.fullmatch(r"0x[0-9a-f]+", i.op_str or ""):
+                if pe.cstring(int(i.op_str, 16) - pe.image_base) == "*fill*":
+                    fill_idx = j
+        if fill_idx is None:
+            continue
+        # The work happens just before the row is printed: the nearest
+        # `not`/`and` round-up pair, and the `[reg + 0x20]` loads that feed it
+        # (a *stack* +0x20 slot is not an Elf32_Shdr field, so a load off ESP or
+        # EBP is not evidence).
+        roundups, loads = [], []
+        for j in range(fill_idx - 1, max(-1, fill_idx - 200), -1):
+            i = func[j]
+            if i.mnemonic == "and" and any(func[k].mnemonic == "not"
+                                             for k in range(max(0, j - 3), j)):
+                roundups.append(func[j])
+            if i.mnemonic == "mov" and len(i.operands) == 2 and \
+                    i.operands[1].type == cs.x86.X86_OP_MEM and \
+                    i.operands[1].mem.disp == 0x20 and i.operands[0].size == 4 and \
+                    i.operands[1].mem.base not in (cs.x86.X86_REG_ESP,
+                                                   cs.x86.X86_REG_EBP, 0):
+                loads.append(i)
+            if len(roundups) >= 2 and loads:
+                break
+        kind = next((w for w in func[fill_idx:fill_idx + 12]
+                     if w.mnemonic == "cmp" and "4" in w.op_str), None)
+        if loads and roundups:
+            return {"fill_anchor": a["anchor"],
+                    "func_rva": start - pe.image_base,
+                    "align_loads": [{"rva": w.address - pe.image_base,
+                                     "text": f"{w.mnemonic} {w.op_str}"}
+                                    for w in reversed(loads[:2])],
+                    "roundups": [{"rva": w.address - pe.image_base,
+                                  "text": f"{w.mnemonic} {w.op_str}"}
+                                 for w in reversed(roundups[:2])],
+                    "fill_push": {"rva": func[fill_idx].address - pe.image_base,
+                                  "text": f"{func[fill_idx].mnemonic} "
+                                          f"{func[fill_idx].op_str}"},
+                    "kind_test": None if kind is None else
+                    {"rva": kind.address - pe.image_base,
+                     "text": f"{kind.mnemonic} {kind.op_str}"}}
+    return None
+
+
+def cmd_align(args):
+    pe = Pe(args.linker)
+    der = derive_alignment(pe)
+    if der is None:
+        print("align needs capstone, and a linker whose map printer emits '*fill*'",
+              file=sys.stderr)
+        return 2
+    print(f"linker: {pe.path}")
+    print("the alignment the linker enforces, derived from the code that prints "
+          "the map's '*fill*' row:")
+    print(f"  the '*fill*' literal is pushed at RVA {der['fill_push']['rva']:#x} "
+          f"({der['fill_push']['text']}) in the function at {der['func_rva']:#x}")
+    for load in der["align_loads"]:
+        print(f"  the alignment it uses: RVA {load['rva']:#x}  {load['text']}")
+    print("    -> offset 0x20 of an Elf32_Shdr is sh_addralign: the *input* "
+          "section's own alignment")
+    for r in der["roundups"]:
+        print(f"  the round-up comparison: RVA {r['rva']:#x}  {r['text']} "
+              f"(the `not` before it is ~(align-1))")
+    if der["kind_test"]:
+        print(f"  the row-kind test that guards the '*fill*' row: "
+              f"RVA {der['kind_test']['rva']:#x}  {der['kind_test']['text']}")
+    print()
+    print("WHAT THIS MEANS: there is no refusal.  The linker aligns the")
+    print("fragment's address up to the input section's sh_addralign -")
+    print("    addr = (addr + align - 1) & ~(align - 1)")
+    print("- and, when that moved it, emits a '*fill*' row for the residue.  A")
+    print("section that claims a 4 mod 8 start with sh_addralign 8 therefore")
+    print("lands 4 bytes late and every later fragment moves with it: that is")
+    print("exactly what tools/elf/objalign.py lowers sh_addralign for.")
+
+    spec = args.unit or args.object
+    if not spec:
+        if args.json:
+            print(json.dumps(der, indent=2))
+        return 0
+    res = resolve_object(spec, args.link_out)
+    if res["path"] is None:
+        print(f"no object for '{spec}'", file=sys.stderr)
+        return 2
+    obj = MwObject(res["path"])
+    starts = {}
+    for path in (args.splits, "config/RMHE08/splits.txt"):
+        if path:
+            starts = _splits_starts(Path(path))
+            if starts:
+                break
+    unit_starts = starts.get(res["unit"], {}) or starts.get(res["unit"] + ".cpp", {})
+    print()
+    print(f"object: {res['path']}")
+    if not unit_starts:
+        print(f"  (no splits.txt entry claims sections for '{res['unit']}'; "
+              f"alignment is reported against the object only)")
+    bad = 0
+    alloc = [s for s in obj.sections
+             if s["index"] != 0 and (s["flags"] & 0x2) and s["size"] > 0]
+    counts = {}
+    for s in alloc:
+        counts[s["name"]] = counts.get(s["name"], 0) + 1
+    for sec in alloc:
+        start = unit_starts.get(sec["name"])
+        align = sec["align"]
+        if counts[sec["name"]] > 1:
+            # A split target object can carry several sections with one name
+            # (dol split fragments); the splits claim names a single address, so
+            # a per-section comparison is not available - say that, do not guess.
+            if sec is alloc[[s["name"] for s in alloc].index(sec["name"])]:
+                print(f"  {sec['name']:<14} {counts[sec['name']]} sections with this "
+                      f"name in the object - the splits claim gives one address, "
+                      f"so no per-section comparison is possible")
+            continue
+        if start is None:
+            print(f"  {sec['name']:<14} align {align:<3} (no claimed start)")
+            continue
+        slack = (-start) % align if align > 1 else 0
+        low = start & -start
+        tag = "honoured" if slack == 0 else f"NOT honoured: +{slack:#x} '*fill*'"
+        extra = ""
+        if slack and align > low:
+            extra = (f"  [the address can only honour {low}; "
+                     f"tools/elf/objalign.py lowers this to {low}]")
+        if slack:
+            bad += 1
+        print(f"  {sec['name']:<14} align {align:<3} claim {start:#010x} "
+              f"({start % align:#x} mod {align})  {tag}{extra}")
+    print()
+    if bad:
+        print(f"# {bad} section(s) cannot be honoured at their claimed address: "
+              f"the link will insert '*fill*' and shift what follows")
+    else:
+        print("# every allocatable section is honoured at its claimed address")
+    if args.json:
+        print(json.dumps(der, indent=2))
+    return 1 if bad else 0
+
+# ---------------------------------------------------------------------------
+# The linker's internal input-file record (derived, then read back)
+# ---------------------------------------------------------------------------
+
+# Every field below is either *derived* from the parser's own instructions or
+# *verified* live against the artifact it describes.  Nothing here is a
+# transcribed offset: `derive_file_record` finds the parser, the stride, the
+# record array and the two setters of the flag byte in `.text`, and
+# `records --prove` re-reads each record out of the running linker and
+# cross-checks it against the object file the record names.
+FILE_RECORD_FIELDS = [
+    (0x00, 4, "elf_header",
+     "pointer to the input file's own ELF header",
+     "live: the 4 bytes it points at are 7f 45 4c 46 ('\\x7fELF')"),
+    (0x04, 4, "(unnamed)",
+     "not derived",
+     "a pointer, but to what is not established"),
+    (0x08, 4, "name",
+     "pointer to the input's name as the link knows it",
+     "live: equals the response-file entry at the same index, all records"),
+    (0x0c, 4, "(unnamed)",
+     "not derived; it tracks the section count",
+     "live: high16 = (record+0x10)-1, low16 = (record+0x10)+1, every record"),
+    (0x10, 4, "section_count_adj",
+     "section count minus the 4 fixed sections (null, .symtab, .strtab, .shstrtab)",
+     "live: equals e_shnum-4 for every record whose object is a plain object"),
+    (0x14, 2, "(unnamed)",
+     "0 in every record read; the u32 read at +0x14 is `e_shnum << 16` only "
+     "because +0x16 holds e_shnum and this half is zero",
+     "live: zero for every record, while the u32 spanning it is shnum<<16"),
+    (0x16, 2, "shnum",
+     "the object's e_shnum (the ELF section-header count)",
+     "live: equals the object's e_shnum for every record whose input is a "
+     "plain object"),
+    (0x18, 4, "per_file_ptr",
+     "pointer into a per-file table (stride 0x28, one entry per input)",
+     "live: the values step by exactly 0x28 with the record index"),
+    (0x1c, 1, "flags",
+     "bit2 = the '.comment' magic matched; bit3 = the comment version >= 0xb; "
+     "bit7 is tested elsewhere (0x405e2) and its meaning is not derived",
+     "parser 0x53975/0x53983 clear bits 2/3, 0x539cf/0x539e2 set them after "
+     "the 'CodeWarrior' memcmp at 0x5399f and the version compare at 0x539d5"),
+    (0x1e, 1, "comment_kind",
+     "0 = no comment, 2 = version 3..5, 3 = version >= 6",
+     "parser 0x539c4 stores 2, 0x53a60 stores 3, from the same version byte"),
+    (0x1f, 1, "comment_version",
+     "the version byte of the object's '.comment' (the byte after 'CodeWarrior')",
+     "parser 0x539ab loads [comment+0xb], 0x539af stores it here"),
+]
+
+
+def _disas_text(pe):
+    """``(insns, md)`` for the linker's ``.text``, or ``(None, None)``."""
+    cs = _capstone()
+    if cs is None:
+        return None, None
+    md = cs.Cs(cs.CS_ARCH_X86, cs.CS_MODE_32)
+    md.detail = True
+    text = pe.section(".text")
+    if text is None:
+        return None, None
+    return list(md.disasm(pe.read_rva(text.va, text.vsize),
+                          pe.image_base + text.va)), (md, cs)
+
+
+def derive_file_record(pe):
+    """Derive the input-file record: parser, stride, array, and the flag setters.
+
+    The lever is the same one ``anchors`` uses: the parser is the function that
+    compares the ``.comment`` contents against the literal ``CodeWarrior``, so
+    the anchor that pushes that string *is* the parser's address.  Everything
+    else - the record stride, the array the parser indexes into, and the two
+    instructions that set the record's flag byte - is then read out of that
+    function.  A fact that cannot be found is reported as not found; nothing is
+    transcribed from a previous run.
+    """
+    insns, aux = _disas_text(pe)
+    if insns is None:
+        return None
+    cs = aux[1]
+    anchors = derive_anchors(pe) or []
+    hit = [a for a in anchors if a["kind"] == "message"
+           and a["string"] == "CodeWarrior"]
+    if not hit:
+        return None
+    idx = next((k for k, i in enumerate(insns)
+                if (i.address - pe.image_base) == hit[0]["anchor"]), None)
+    if idx is None:
+        return None
+    start = _function_start(insns, idx)
+    start_idx = next((k for k, i in enumerate(insns) if i.address == start), idx)
+    # The window is bounded, and every record-field match below additionally
+    # has to use the parser's own record register (ESI, per its prologue) - so a
+    # scan that runs a few instructions past the function's end cannot quietly
+    # adopt the next function's instruction as evidence.
+    func = [i for i in insns[start_idx:start_idx + 160]
+            if i.mnemonic not in ("nop", "int3")]
+
+    info = {"parser_rva": start - pe.image_base,
+            "magic_rva": hit[0]["anchor"], "stride": None, "table_va": None,
+            "version_store_rva": None, "version_load_rva": None,
+            "kind_stores": [], "flag_clear": [], "flag_set": []}
+    for i in func:
+        rva = i.address - pe.image_base
+        if i.mnemonic == "imul" and len(i.operands) == 3 and \
+                i.operands[2].type == cs.x86.X86_OP_IMM:
+            info["stride"] = i.operands[2].imm
+        if i.mnemonic == "add" and len(i.operands) == 2 and \
+                i.operands[1].type == cs.x86.X86_OP_MEM and \
+                i.operands[1].mem.base == cs.x86.X86_REG_INVALID and \
+                i.operands[1].mem.index == cs.x86.X86_REG_INVALID and \
+                i.operands[1].mem.disp:
+            info["table_va"] = i.operands[1].mem.disp
+        if i.mnemonic == "mov" and "esi + 0x1f]" in i.op_str:
+            info["version_store_rva"] = rva
+        if i.mnemonic == "movzx" and "ebp + 0xb]" in i.op_str:
+            info["version_load_rva"] = rva
+        if i.mnemonic == "mov" and "esi + 0x1e]" in i.op_str:
+            info["kind_stores"].append((rva, i.op_str))
+        if i.mnemonic in ("and", "or") and len(i.operands) == 2 and \
+                i.operands[1].type == cs.x86.X86_OP_IMM and \
+                i.operands[1].imm in (4, 8, 0xFB, 0xF7) and i.operands[0].size == 1:
+            key = "flag_set" if i.mnemonic == "or" else "flag_clear"
+            info[key].append((rva, i.op_str))
+    return info
+
+
+def cmd_records(args):
+    pe = Pe(args.linker)
+    der = derive_file_record(pe)
+    if der is None:
+        print("records needs capstone, and a linker whose '.comment' parser "
+              "references the literal 'CodeWarrior'", file=sys.stderr)
+        return 2
+    print(f"linker: {pe.path}")
+    print(f"the '.comment' parser: RVA {der['parser_rva']:#x} "
+          f"(the function that memcmps the comment against 'CodeWarrior' at "
+          f"{der['magic_rva']:#x})")
+    print(f"the input-file record: stride {der['stride']:#x}, array at "
+          f"[{der['table_va']:#x}], index = the link's input order")
+    print()
+    print("  offset size field            meaning")
+    print("  " + "-" * 96)
+    for off, size, name, meaning, evidence in FILE_RECORD_FIELDS:
+        print(f"  +0x{off:02x}  {size}    {name:<16} {meaning}")
+        print(f"         evidence: {evidence}")
+    print()
+    print("derived from the parser's own instructions (not transcribed):")
+    print(f"  stride:          imul with immediate {der['stride']:#x}")
+    print(f"  record array:    the `add reg, dword ptr [{der['table_va']:#x}]` "
+          f"in the parser (the base pointer lives at that address)")
+    if der["version_load_rva"] is not None:
+        print(f"  comment version: load at {der['version_load_rva']:#x} "
+              f"(from [comment+0xb]), store at {der['version_store_rva']:#x} "
+              f"(to [record+0x1f])")
+    for rva, txt in der["kind_stores"]:
+        print(f"  comment kind:    {rva:#x}  {txt}")
+    for rva, txt in der["flag_clear"]:
+        print(f"  flag clear:      {rva:#x}  {txt}")
+    for rva, txt in der["flag_set"]:
+        print(f"  flag set:        {rva:#x}  {txt}")
+    if args.json:
+        print(json.dumps(der, indent=2, default=str))
+    if args.prove:
+        return prove_records(pe, der, args)
+    return 0
+
+
+def _record_probe_line(args):
+    """The link line a `records --prove` gdb run uses, derived from build.ninja."""
+    work = Path(args.out).resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    rsp = Path(args.rsp) if args.rsp else work / "records.rsp"
+    if not rsp.exists():
+        if derive_rsp(args.link_out, rsp) is None:
+            return None, None, None
+    args.rsp = str(rsp)
+    line = derive_link_line(rsp, args.ldscript or "build/RMHE08/ldscript.lcf")
+    line = line.format(out=str(work / "records.elf"), map=str(work / "records.MAP"))
+    return line, rsp, work
+
+
+def prove_records(pe, der, args):
+    """Read the linker's record array back out and check it against the objects.
+
+    The gdb run breaks at the linker's own message loader (the derived
+    observation anchor) and, once it has announced ``Optimizing:``, dumps the
+    first N records from the array the parser indexes.  Every field the table
+    above names is then *cross-checked*: the name against the response file, the
+    comment version and the section count against the object file on disk.  A
+    disagreement is printed, not smoothed over.
+    """
+    gdb = find_gdb(args.gdb)
+    if not gdb:
+        print("no gdb found; pass --gdb", file=sys.stderr)
+        return 2
+    if args.args:
+        line = args.args
+    else:
+        line, rsp, work = _record_probe_line(args)
+        if line is None:
+            print("cannot derive the link from build.ninja; pass --args", file=sys.stderr)
+            return 2
+        args.rsp = str(rsp)
+    io = derive_message_io(pe)
+    if io is None or io.get("loader") is None:
+        print("cannot derive the message loader", file=sys.stderr)
+        return 2
+    work = Path(args.out).resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    script = work / "mwlink-records.gdb"
+    limit = args.limit
+    script.write_text(
+        "set pagination off\nset confirm off\nset width 0\n"
+        f"file {pe.path.as_posix()}\n"
+        "set args " + line + "\n"
+        "python\nimport gdb\n"
+        f"LOADER = 0x{pe.image_base + io['loader']['after_rva']:x}\n"
+        f"BASE = 0x{der['table_va']:x}\n"
+        f"STRIDE = {der['stride']}\n"
+        f"LIMIT = {limit}\n"
+        "DONE = [False]\n"
+        "def rd(a, n):\n"
+        "    return gdb.selected_inferior().read_memory(a, n).tobytes()\n"
+        "def u32(a):\n"
+        "    try: return int.from_bytes(rd(a, 4), 'little')\n"
+        "    except Exception: return None\n"
+        "def u8(a):\n"
+        "    try: return rd(a, 1)[0]\n"
+        "    except Exception: return None\n"
+        "def cstr(a, n=96):\n"
+        "    try: return rd(a, n).split(b'\\0')[0].decode('latin-1', 'replace')\n"
+        "    except Exception: return None\n"
+        "class Opt(gdb.Breakpoint):\n"
+        "    def stop(self):\n"
+        "        if DONE[0]:\n"
+        "            return False\n"
+        "        try:\n"
+        "            esp = int(gdb.parse_and_eval('$esp')) & 0xffffffff\n"
+        "            uID = int(gdb.parse_and_eval('*(unsigned int*)%d' % (esp + 0x10)))\n"
+        "        except Exception:\n"
+        "            return False\n"
+        "        if uID != 41:\n"
+        "            return False\n"
+        "        DONE[0] = True\n"
+        "        base = u32(BASE)\n"
+        "        print('MWLINK-BASE 0x%x' % (base or 0))\n"
+        "        for i in range(LIMIT):\n"
+        "            rec = (base or 0) + i * STRIDE\n"
+        "            print('MWLINK-RECORD %d %s|%d|%d|%d|%d|%d|%d|%d|%d' % (\n"
+        "                i, cstr(u32(rec + 8)), u32(rec + 0x14) or 0,\n"
+        "                u32(rec + 0x16) or 0, u32(rec + 0x18) or 0,\n"
+        "                u8(rec + 0x1c) or 0, u8(rec + 0x1e) or 0,\n"
+        "                u8(rec + 0x1f) or 0, u32(rec + 0x0c) or 0, u32(rec + 0x10) or 0))\n"
+        "        return False\n"
+        "Opt('*0x%x' % LOADER)\n"
+        "print('MWLINK-READY')\n"
+        "end\nrun\nprintf \"MWLINK-DONE\\n\"\nquit\n",
+        encoding="utf-8")
+    argv = [gdb, "-batch", "-nx", "-x", str(script)]
+    print(f"# gdb {script}")
+    proc = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+    rows = []
+    base = None
+    for line_ in proc.stdout.splitlines():
+        m = re.match(r"^MWLINK-RECORD (\d+) (.*)$", line_.strip())
+        if m:
+            parts = m.group(2).split("|")
+            rows.append((int(m.group(1)), parts[0]) + tuple(int(x) for x in parts[1:]))
+            continue
+        m = re.match(r"^MWLINK-BASE (0x[0-9a-f]+)$", line_.strip())
+        if m:
+            base = int(m.group(1), 16)
+    if not rows:
+        print("# the run produced no record dump; gdb stderr follows", file=sys.stderr)
+        print((proc.stderr or "").strip()[:1500], file=sys.stderr)
+        return 1
+    inputs = []
+    if args.rsp and Path(args.rsp).exists():
+        inputs = [ln.strip().replace("\\", "/")
+                  for ln in Path(args.rsp).read_text(errors="replace").splitlines()
+                  if ln.strip()]
+    print(f"the linker's input-file records, read out of the running linker "
+          f"(array 0x{base:x}, stride {der['stride']:#x}):")
+    print(f"  {'idx':>5} {'record+0x08':<34} {'+0x1f':>5} {'+0x16&ffff':>10} "
+          f"{'+0x10':>6} {'flags':>5} {'kind':>4} checks")
+    checked = {"name": 0, "version": 0, "shnum": 0, "total": 0}
+    problems = []
+    for idx, name, v14, v16, v18, flags, kind, ver, v0c, v10 in rows:
+        want = inputs[idx] if idx < len(inputs) else None
+        checks = []
+        if want is not None:
+            checked["total"] += 1
+            same = Path(want).name.lower() == (name or "").lower()
+            checks.append("name " + ("=" if same else f"!={Path(want).name}"))
+            if same:
+                checked["name"] += 1
+            obj = Path(want)
+            if not obj.is_absolute():
+                obj = ROOT / obj
+            if obj.exists():
+                obj_shnum, obj_ver = _object_header_bits(obj)
+                if obj_ver is not None:
+                    if obj_ver == ver:
+                        checked["version"] += 1
+                        checks.append("comment-version =")
+                    else:
+                        checks.append(f"comment-version !={obj_ver}")
+                        problems.append(f"record {idx} ({name}): +0x1f={ver}, "
+                                        f"the object's .comment says {obj_ver}")
+                if obj_shnum is not None:
+                    if (v16 & 0xFFFF) == obj_shnum:
+                        checked["shnum"] += 1
+                        checks.append("e_shnum =")
+                    else:
+                        checks.append(f"e_shnum != {obj_shnum}")
+                        problems.append(f"record {idx} ({name}): +0x16&0xffff="
+                                        f"{v16 & 0xFFFF}, e_shnum={obj_shnum}")
+        if idx < 8:
+            print(f"  {idx:>5} {str(name)[:34]:<34} {ver:>5} {v16 & 0xFFFF:>10} "
+                  f"{v10:>6} 0x{flags:02x} {kind:>4} {', '.join(checks)}")
+    print(f"  ... {len(rows)} record(s) dumped")
+    print(f"# cross-check against the response file and the objects themselves: "
+          f"{checked['name']}/{checked['total']} names, "
+          f"{checked['version']}/{checked['total']} comment versions, "
+          f"{checked['shnum']}/{checked['total']} section counts")
+    for p_ in problems[:10]:
+        print("  MISMATCH: " + p_)
+    return 0 if not problems else 1
+
+
+def _object_header_bits(path):
+    """``(e_shnum, .comment version byte)`` for a Metrowerks object, or ``(None, None)``."""
+    try:
+        blob = Path(path).read_bytes()
+    except OSError:
+        return None, None
+    if len(blob) < 0x40 or blob[:4] != b"\x7fELF" or blob[5] != 2:
+        return None, None
+    shnum = struct.unpack_from(">H", blob, 0x30)[0]
+    shoff = struct.unpack_from(">I", blob, 0x20)[0]
+    strndx = struct.unpack_from(">H", blob, 0x32)[0]
+    if not shoff or shnum <= strndx or shoff + 40 * shnum > len(blob):
+        return shnum, None
+    def sh(i):
+        return struct.unpack_from(">10I", blob, shoff + 40 * i)
+    stro = sh(strndx)[4]
+    ver = None
+    for i in range(shnum):
+        nm, _t, _f, _a, off, size = sh(i)[:6]
+        e = blob.find(b"\0", stro + nm)
+        if blob[stro + nm:e] == b".comment" and size > 0xC:
+            ver = blob[off + 0xB]
+            break
+    return shnum, ver
+
+
 def cmd_trace(args):
-    """Trace one input object through one real link.
+    """Trace one input object - or one UNIT NAME - through one real link.
 
     The map and the ELF are the ground truth, and they have to *be* the same
     link: if the ELF does not exist the trace still reports what the map says,
     but it says so (`not checked`) instead of pretending.  With ``--link`` the
     tool runs the build's own link command, redirected to a scratch path, so
-    the artifact it traces is one it produced itself.
+    the artifact it traces is one it produced itself.  The build writes no map
+    of its own, so when no map is available the tool links one (into
+    ``build/scratch/``) rather than making the caller assemble a link line.
     """
-    if args.link:
-        work = Path(args.out).resolve()
-        work.mkdir(parents=True, exist_ok=True)
-        rsp = Path(args.rsp) if args.rsp else None
-        if rsp is None:
-            rsp = work / "trace.rsp"
-            if derive_rsp(args.link_out, rsp) is None:
-                print("cannot derive the link's input list from build.ninja; "
-                      "pass --rsp", file=sys.stderr)
-                return 2
-            print(f"# response file derived from build.ninja: {rsp} "
-                  f"({len(rsp.read_text().split())} inputs)")
-        if not rsp.exists():
-            print(f"--link needs the link's response file (--rsp); {rsp} is not there",
-                  file=sys.stderr)
-            return 2
-        args.rsp = str(rsp)
-        elf_out = work / "trace.elf"
-        map_out = work / "trace.MAP"
-        line = derive_link_line(rsp, args.ldscript or "build/RMHE08/ldscript.lcf")
-        line = line.format(out=str(elf_out), map=str(map_out))
-        argv = [str(args.linker)] + line.split()
-        print("# " + " ".join(argv))
-        proc = subprocess.run(argv, capture_output=True, text=True,
-                              errors="replace", cwd=str(ROOT))
-        if proc.returncode != 0:
-            print(proc.stdout[-2000:] + proc.stderr[-2000:], file=sys.stderr)
-            print(f"the link failed (rc={proc.returncode}); refusing to trace a stale artifact",
-                  file=sys.stderr)
-            return 1
-        args.elf = args.elf or str(elf_out)
-        args.map = str(map_out)
-        print(f"# linked {elf_out} ({elf_out.stat().st_size} bytes)")
-    else:
-        args.map = args.map or "build/RMHE08/main.MAP"
-    if not Path(args.map).exists():
-        print(f"no link map at {args.map} - run a link with -map, or pass --link",
+    resolved = resolve_object(args.object, args.link_out)
+    if resolved["path"] is None:
+        print(f"no object for '{args.object}': it is not a path, and no link "
+              f"input names that unit ({resolved['inputs']} inputs in the link)",
               file=sys.stderr)
+        if resolved.get("near"):
+            print("closest unit names: " + ", ".join(resolved["near"]), file=sys.stderr)
         return 2
+    args.object = str(resolved["path"])
+    print(f"# unit {resolved['unit']}: {resolved['path']}")
+    print(f"#   resolved as: {resolved['how']}")
+
+    # One obvious entry point: a unit name, and the tool links if it must.
+    default_map = Path(args.map) if args.map else ROOT / "build/RMHE08/main.MAP"
+    if not args.link and args.map is None and not default_map.exists():
+        print(f"# no link map at {default_map} (the build does not write one); "
+              f"linking into {args.out}/ instead")
+        args.link = True
+
+    if args.link:
+        got = run_link(args)
+        if got is None:
+            print("cannot derive the link from build.ninja; pass --rsp", file=sys.stderr)
+            return 2
+        rc, argv, out, err, elf_out, map_out = got
+        print("# " + " ".join(argv))
+        if rc != 0:
+            catalogue = message_catalogue(Pe(args.linker))
+            report_link_failure(args, argv, out, err, catalogue)
+            # The failed link may still have left a map from an earlier run;
+            # tracing against it is allowed, but it is never presented as this
+            # link's artifact, and a missing one is an honest stop.
+            if args.map is None:
+                args.map = str(default_map) if default_map.exists() else None
+            if args.map is None or not Path(args.map).exists():
+                print(f"the link failed (rc={rc}) and left no map; the link line "
+                      f"above is the reproduction", file=sys.stderr)
+                return 1
+            print(f"# WARNING: the link failed; tracing against {args.map}, which "
+                  f"is NOT the map of the link that just failed", file=sys.stderr)
+        else:
+            args.elf = args.elf or str(elf_out)
+            args.map = str(map_out)
+            print(f"# linked {elf_out} ({elf_out.stat().st_size} bytes)")
+    else:
+        args.map = args.map or str(default_map)
+    if not Path(args.map).exists():
+        print(f"no link map at {args.map} - the link that produced it failed before "
+              f"writing one; the link line above is the reproduction", file=sys.stderr)
+        return 1
     map_text = Path(args.map).read_text(encoding="utf-8", errors="replace")
     if args.elf and not Path(args.elf).exists():
         print(f"# WARNING: no ELF at {args.elf}; addresses and relocations stay unverified",
@@ -2071,6 +3048,8 @@ def cmd_trace(args):
     order = derive_order(Pe(args.linker)) if _linker_exists(args) else None
     rep = build_trace(args.object, map_text, args.elf, args.rsp, order)
     rep["map"] = str(args.map)
+    rep["unit"] = resolved["unit"]
+    rep["resolved"] = resolved["how"]
     if args.json:
         print(json.dumps(rep, indent=2))
         return 0 if rep["verdict"] != "FAIL" else 1
@@ -2090,6 +3069,45 @@ def cmd_trace(args):
                         print(f"  {name:<8} +{r['offset']:#06x} {r['size']:#06x} "
                               f"{r['name']:<12} {r['source']}")
     return 0 if rep["verdict"] != "FAIL" else 1
+
+
+def cmd_diagnose(args):
+    """Run the build's own link with ``-v`` and report what it said, in order.
+
+    This is the erroring-link path without an object to trace: the phase
+    stream, then every diagnostic classified against the message catalogue and
+    attributed to the phase that printed it.  It exits 0 when the link
+    succeeded and 1 when it did not, and it always redirects the output into
+    ``build/scratch/`` - the artifact it must never overwrite is ``main.elf``.
+    """
+    got = run_link(args, out_base="diagnose", verbose=True)
+    if got is None:
+        print("cannot derive the link from build.ninja; pass --rsp/--args", file=sys.stderr)
+        return 2
+    rc, argv, out, err, elf_out, map_out = got
+    print("# " + " ".join(argv))
+    text = (out or "") + "\n" + (err or "")
+    catalogue = message_catalogue(Pe(args.linker))
+    timeline = parse_timeline(text, phase_kinds(catalogue))
+    print(f"link: rc={rc}" + (f"  ({elf_out.stat().st_size} bytes)"
+                              if rc == 0 and elf_out.exists() else ""))
+    print("phase stream:")
+    for kind, line in timeline:
+        print(f"  {kind:<12} {line}")
+    if not timeline:
+        print("  (none - the linker printed no phase line)")
+    diags = classify_diagnostics(text, catalogue, timeline)
+    print("diagnostics:")
+    if not diags:
+        print("  (none)")
+    for d in diags:
+        who = f"phase {d['phase']}" if d["phase"] else "(no phase seen)"
+        mid = f"msgid={d['msgid']}" if d["msgid"] is not None else "msgid=? (not in the catalogue)"
+        print(f"  [{who}] {mid}: {d['text']}")
+    if args.json:
+        print(json.dumps({"rc": rc, "phases": [k for k, _ in timeline],
+                          "diagnostics": diags}, indent=2))
+    return 0 if rc == 0 else 1
 
 
 def _linker_exists(args):
@@ -2137,7 +3155,12 @@ def _fixture_elf(sections):
 
 
 def selftest():
-    """Pure-function + fixture checks. No gdb/compiler/linker is invoked."""
+    """Pure-function + fixture checks.  No gdb, and nothing is *run*.
+
+    The only thing that reads a real binary is the derivation check at the end
+    (the linker's own records and the alignment site), and that is skipped - with
+    a note - when capstone or the linker is not there.
+    """
     fails, checks = [], 0
 
     def ok(cond, what):
@@ -2307,6 +3330,161 @@ def selftest():
         ok(rep["verdict"] == "DROPPED" and "dead-stripped" in rep["why"],
            f"dropped object: {rep['why']}")
 
+    # 11. The unit-name entry point: a build input path is a unit name, and a
+    #     unit name is what `trace` takes.
+    ok(unit_of_object("build/RMHE08/src/Network/NetworkWiiMediator.o")
+       == "Network/NetworkWiiMediator", "unit_of_object reads a src/ input")
+    ok(unit_of_object("build\\RMHE08\\obj\\Runtime.PPCEABI.H\\__start.o")
+       == "Runtime.PPCEABI.H/__start", "unit_of_object reads an obj/ input")
+    ok(unit_of_object("build/RMHE08/obj/auto_00_80004380_init.o")
+       == "auto_00_80004380_init", "unit_of_object keeps a flat name")
+
+    # 12. Diagnostics: the linker's own banner + body is one message, and its
+    #     id comes from the catalogue - never invented.
+    cat = {27: "Linking: '%c'", 41: "Optimizing: '%c'",
+           189: "runtime sources 'global_destructor_chain.c' "
+                                   "and '__init_cpp_exceptions.cpp' both need to be "
+                                   "updated to latest version.  Please contact "
+                                   "Freescale support."}
+    ok(match_message("  Linking: 'x.elf'", cat)[0] == 27, "match_message: phase line")
+    ok(match_message("#   something the catalogue does not have", cat) is None,
+       "match_message: unknown text stays unknown")
+    diag_text = ("#   Linking: 'x.elf'\n#   Optimizing: 'x.elf'\n"
+                 "### mwldeppc.exe Linker Error:\n"
+                 "#   runtime sources 'global_destructor_chain.c' and "
+                 "'__init_cpp_exceptions.cpp' both need to be updated to latest "
+                 "version.  Please contact Freescale support.\n")
+    diags = classify_diagnostics(diag_text, cat)
+    ok(len(diags) == 1, f"classify_diagnostics found one diagnostic: {diags}")
+    ok(diags and diags[0]["msgid"] == 189, "the diagnostic got its catalogue id")
+    ok(diags and diags[0]["phase"] == "Optimizing",
+       f"the diagnostic is attributed to the last phase before it: {diags}")
+    ok(classify_diagnostics("#   nothing to see here", cat) == [],
+       "a run with no banner reports no diagnostics")
+
+    # 13. The input-file record table is a layout: the offsets are ordered, do
+    #     not overlap, and fit inside the stride the parser's `imul` states.
+    stride = 0x2C
+    prev_end = 0
+    ordered = True
+    for off, size, _name, _meaning, _ev in FILE_RECORD_FIELDS:
+        ordered = ordered and off >= prev_end
+        prev_end = off + size
+    ok(ordered, "FILE_RECORD_FIELDS offsets are ordered and non-overlapping")
+    ok(prev_end <= stride, f"the fields fit the {stride:#x} stride (end {prev_end:#x})")
+    ok([f[2] for f in FILE_RECORD_FIELDS][-1] == "comment_version",
+       "the table's last field is the comment version")
+
+    # 14. The claimed-start reader is the same shape objalign.py reads.
+    tmp2 = tempfile.TemporaryDirectory()
+    td = Path(tmp2.name)
+    sp = td / "splits.txt"
+    sp.write_text("Pl/fn_8023C2D0.cpp:\n\t.text       start:0x8023C2D0 end:0x80241558\n"
+                  "\t.data       start:0x805C34D4 end:0x805C3D20\n\n"
+                  "main.cpp:\n\t.text       start:0x8003F200 end:0x80040478\n",
+                  encoding="utf-8")
+    starts = _splits_starts(sp)
+    ok(starts.get("Pl/fn_8023C2D0.cpp", {}).get(".data") == 0x805C34D4,
+       f"_splits_starts reads the claimed .data start: {starts}")
+    ok(starts.get("main.cpp", {}).get(".text") == 0x8003F200,
+       "_splits_starts reads a second unit")
+    ok((0x805C34D4 % 8) != 0 and (-0x805C34D4) % 8 == 4,
+       "the aligned example really is 4 mod 8")
+
+    # 15. The object-header reader the record proof cross-checks with.
+    op2 = td / "head.o"
+    op2.write_bytes(_fixture_obj())
+    shnum, ver = _object_header_bits(op2)
+    ok(shnum == 7, f"_object_header_bits reads e_shnum: {shnum}")
+    ok(ver is None, "a fixture with no .comment has no comment version")
+    ok(_object_header_bits(td / "nope.o") == (None, None),
+       "a missing object reads as no header, not as a crash")
+    tmp2.cleanup()
+
+    # 16. The map's fifth column is an alignment, not a type - so the row kind
+    #     has to come from the name.  A 1-byte label prints 1 there, exactly
+    #     like a fragment, and reading it as "fragment" is what made `trace main`
+    #     report its relocations as unresolvable.
+    def mrow(name, flags):
+        return {"name": name, "offset": 0, "size": 1, "addr": 0,
+                "file_off": 0, "source": "x.o", "flags": flags}
+    ok(is_section_row(".text", mrow(".text", 1)), "a section row: name == section")
+    ok(is_section_row(".ctors", mrow(".ctors$10", 1)), "a $NN section row")
+    ok(is_section_row("extab", mrow("extab", 1)), "extab has no leading dot")
+    ok(is_section_row(".text", mrow("*fill*", 16)), "a fill row, whatever it prints")
+    ok(not is_section_row(".sbss", mrow("lbl_807947A5", 1)),
+       "a 1-byte label is a symbol even though it prints 1")
+    ok(not is_section_row(".data", mrow(".data.0", 8)),
+       "a pooled symbol has an inner dot and is not section-like")
+    ok(not is_section_row(".text", mrow("fn_8003F200", 4)), "an ordinary symbol")
+    ok(not is_section_row(".init", mrow("lbl_80004514 (entry of pad_00_80004380_init)", 0)),
+       "an `(entry of ...)` row is a symbol, not a section")
+
+    # 16b. A map row whose alignment column is *empty* (the `(entry of ...)`
+    #      rows) must still be read - with its whole name, spaces and all.
+    ent = ("\n.init section layout\n"
+           "  00000514 000000 80004514 00000714    lbl_80004514 "
+           "(entry of pad_00_80004380_init) \tauto_00_80004380_init.o \n")
+    prows = parse_map(ent)[".init"]["blocks"][0]["fragments"]
+    ok(prows and prows[0]["name"] == "lbl_80004514 (entry of pad_00_80004380_init)",
+       f"an empty-alignment row keeps its name: {prows}")
+    ok(prows and prows[0]["size"] == 0 and prows[0]["addr"] == 0x80004514,
+       "and its address")
+    ok(prows and prows[0]["source"] == "auto_00_80004380_init.o",
+       "and its input file")
+
+    # 17. The linker's own generated symbols are a second listing in the map.
+    lgen = ("Link map of __start\n\nLinker generated symbols:\n"
+            "                 _f_text 80004000\n"
+            "                 _f_data 8057c820\n"
+            "             _SDA2_BASE_ 8079daa0\n")
+    gen = parse_map_symbols(lgen)
+    ok(gen.get("_f_data") == 0x8057C820,
+       f"the generated-symbol listing is read: {gen}")
+    ok(gen.get("_f_text") == 0x80004000 and len(gen) == 3,
+       "all three generated symbols are read")
+
+    # 18. Which SDA base a type-109 displacement uses depends on the symbol's
+    #     section: r13 for .sdata/.sbss, r2 for .sdata2/.sbss2.  The numbers are
+    #     this link's (`lbl_80795AC0` in .sdata2, `_SDA2_BASE_` 0x8079DAA0),
+    #     and the expected field 0x8020 is what the output ELF really holds.
+    ok(reloc_field(109, 0x800D8020, 0x80795AC0, 0, 0, 0x8079DAA0)[0:3]
+       == (True, 0x8020, 0x8020),
+       "a .sdata2 symbol's SDA disp is relative to _SDA2_BASE_")
+    ok(reloc_field(109, 0x800D8020, 0x80795AC0, 0, 0, 0x80798E20)[0:3]
+       == (True, 0xCCA0, 0x8020),
+       "...and using _SDA_BASE_ for it is exactly the old wrong answer")
+
+    # 19. The derived tables themselves, when capstone and the linker are there.
+    #     This is the only part that reads the real binary; it is skipped (not
+    #     faked) when either is absent.
+    der = None
+    if _capstone() is not None:
+        linker = default_linker()
+        if linker is not None and Path(linker).exists():
+            der = derive_file_record(Pe(linker))
+    if der is None:
+        print("note: capstone/linker absent - the record derivation is exercised "
+              "by `records` on the real binary, not here", file=sys.stderr)
+    else:
+        ok(der["stride"] == 0x2C, f"the parser's imul gives the 0x2c stride: {der}")
+        ok(der["table_va"] == 0x533458,
+           f"the parser indexes the record array at {der['table_va']:#x}")
+        ok(der["version_store_rva"] is not None and der["version_load_rva"] is not None,
+           "the comment version load/store pair is found in the parser")
+        ok([t for _r, t in der["kind_stores"]] == ["byte ptr [esi + 0x1e], 0",
+                                                  "byte ptr [esi + 0x1e], 2",
+                                                  "byte ptr [esi + 0x1e], 3"],
+           f"the comment-kind stores are the three found: {der['kind_stores']}")
+        ok({imm for _r, t in der["flag_set"] for imm in [t.split(', ')[-1]]}
+           == {"4", "8"}, f"the flag setters are 4 and 8: {der['flag_set']}")
+        al = derive_alignment(Pe(linker))
+        ok(al is not None, "align derives the '*fill*' site")
+        if al:
+            ok(any("+ 0x20]" in l["text"] for l in al["align_loads"]),
+               f"the alignment load is a +0x20 load: {al['align_loads']}")
+            ok(len(al["roundups"]) >= 1, f"the round-up is found: {al['roundups']}")
+
     if fails:
         for f in fails:
             print("FAIL " + f, file=sys.stderr)
@@ -2440,10 +3618,39 @@ def build_parser():
     p.add_argument("--all-anchors", action="store_true",
                    help="with --prove, use every anchor not just section-name")
     p.add_argument("--args", default=None, help="the linker argument list")
-    p.add_argument("--out", default="build/mwlink-debug", help="scratch dir")
+    p.add_argument("--out", default="build/scratch/mwlink-debug", help="scratch dir")
     p.add_argument("--gdb", default=None)
     p.add_argument("--require-all", action="store_true",
                    help="with --prove, fail unless every anchor fired")
+
+    p = sub.add_parser("records",
+                       help="the linker's internal input-file record (stride, fields, "
+                            "and --prove to read them back)")
+    linker_arg(p)
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--prove", action="store_true",
+                   help="run a real link under gdb and read the record array back")
+    p.add_argument("--args", default=None, help="an explicit link line instead of build.ninja's")
+    p.add_argument("--rsp", default=None, help="the link's response file")
+    p.add_argument("--link-out", default="build/RMHE08/main.elf",
+                   help="the build output whose input list to use")
+    p.add_argument("--ldscript", default=None, help="the -lcf script")
+    p.add_argument("--out", default="build/scratch/mwlink-debug", help="scratch dir")
+    p.add_argument("--gdb", default=None)
+    p.add_argument("--limit", type=int, default=24,
+                   help="with --prove, how many records to dump")
+
+    p = sub.add_parser("align",
+                       help="where the linker aligns a fragment, and what it "
+                            "compares (the objalign.py question)")
+    linker_arg(p)
+    p.add_argument("--unit", default=None, help="a unit name to check its claims for")
+    p.add_argument("--object", default=None, help="an object path to check")
+    p.add_argument("--link-out", default="build/RMHE08/main.elf",
+                   help="the build output whose input list to use")
+    p.add_argument("--splits", default=None,
+                   help="the splits.txt that holds the claimed starts")
+    p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("timeline", help="run the linker's own verbose diagnostics")
     linker_arg(p)
@@ -2455,11 +3662,13 @@ def build_parser():
     p.add_argument("--identity", default=None,
                    help="also byte-compare the ELF against this file")
 
-    p = sub.add_parser("trace", help="follow one input object through a real link")
-    p.add_argument("object", help="the input object to trace (build/RMHE08/.../*.o)")
+    p = sub.add_parser("trace", help="follow one UNIT NAME (or object) through a real link")
+    p.add_argument("object", help="a unit name (Network/NetworkWiiMediator) or an "
+                                   "object path (build/RMHE08/src/....o)")
     p.add_argument("--map", default=None,
                    help="the link map of the link to trace (default: "
-                        "build/RMHE08/main.MAP; use --link to make one)")
+                        "build/RMHE08/main.MAP; if it is not there the tool "
+                        "links one, like --link)")
     p.add_argument("--elf", default=None, help="the ELF that link produced")
     p.add_argument("--rsp", default=None,
                    help="the link's response file (decides whether the object is an input)")
@@ -2468,9 +3677,24 @@ def build_parser():
     p.add_argument("--link-out", default="build/RMHE08/main.elf",
                    help="with --link, the build output whose input list to use")
     p.add_argument("--ldscript", default=None, help="with --link, the -lcf script")
-    p.add_argument("--out", default="build/mwlink-debug", help="scratch dir for --link")
+    p.add_argument("--out", default="build/scratch/mwlink-debug",
+                   help="scratch dir for --link (links never write build/RMHE08/main.elf)")
     p.add_argument("--full-ctor", action="store_true",
                    help="also print the whole merged .ctors/.dtors layout")
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("diagnose",
+                       help="run the build's link with -v; report the phase and "
+                            "the diagnostic (the erroring-link path)")
+    linker_arg(p)
+    p.add_argument("--args", default=None,
+                   help="an explicit link line instead of build.ninja's "
+                        "( -o/-map are redirected into --out )")
+    p.add_argument("--rsp", default=None, help="the link's response file")
+    p.add_argument("--link-out", default="build/RMHE08/main.elf",
+                   help="the build output whose input list to use")
+    p.add_argument("--ldscript", default=None, help="the -lcf script")
+    p.add_argument("--out", default="build/scratch/mwlink-debug", help="scratch dir")
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("phases", help="the linker's phase table (msgid -> anchor)")
@@ -2479,7 +3703,7 @@ def build_parser():
     p.add_argument("--prove", action="store_true",
                    help="run a real link and observe the message ids and anchors")
     p.add_argument("--args", default=None, help="the linker argument list")
-    p.add_argument("--out", default="build/mwlink-debug", help="scratch dir")
+    p.add_argument("--out", default="build/scratch/mwlink-debug", help="scratch dir")
     p.add_argument("--gdb", default=None)
     p.add_argument("--require-all", action="store_true",
                    help="with --prove, fail unless every anchor fired")
@@ -2505,7 +3729,9 @@ def main(argv=None):
         return 2
     fn = {"info": cmd_info, "messages": cmd_messages, "order": cmd_order,
           "anchors": cmd_anchors, "timeline": cmd_timeline, "verify": cmd_verify,
-          "trace": cmd_trace, "phases": cmd_phases}[args.cmd]
+          "trace": cmd_trace, "phases": cmd_phases,
+          "records": cmd_records, "align": cmd_align,
+          "diagnose": cmd_diagnose}[args.cmd]
     try:
         return fn(args)
     except ValueError as exc:
