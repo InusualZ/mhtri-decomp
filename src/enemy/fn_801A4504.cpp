@@ -45,6 +45,7 @@
 #include "unsplit/enemy.h"
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
+#include "enemy/em_pop.h"
 #include "fn_8004CAD8.h"
 #include "mh3_pad.h"
 #include "enemy/fn_801993E0.h" /* fn_8019E960/fn_8019E9AC/fn_8019EA04/fn_8019EC38 */
@@ -1404,7 +1405,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                     get_joint_wmat_em(self, e->joint, &mtx);
                     copyVec3(&v2C, (const nw4r::math::VEC3*)fn_80143174(&rec8, &e->vec, 0));
                     mulVecMatAddTrans(&v2C, &mtx);
-                    fn_803B993C(self->handles_0x328[i], &v2C, self->area_no);
+                    em_roster_record_pos_set(self->handles_0x328[i], &v2C, self->area_no);
                 }
             }
             i++;
@@ -1474,7 +1475,7 @@ int fn_801A9384(_ENEMY_WORK* self, u32 kind) {
         }
         return self->pos.x > lbl_807986B8;
     case 4:
-        return fn_803B50A8() == 1;
+        return em_work_state_bit21_ck() == 1;
     case 5:
         return self->field_0x358 != 0;
     default:

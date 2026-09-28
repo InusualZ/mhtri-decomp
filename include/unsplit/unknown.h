@@ -206,15 +206,10 @@ u8 fn_802B0668(u8 kind);
  * owner's header declares it and this one includes it (rule 2). */
 void fn_80304510(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, s32 d, f32 s);
 void fn_80306A98(struct _ENEMY_WORK* self, u32 a);
-u32 fn_803B50A8(void);
-/* r3 the work record, r4 the slot index (a u16 in the caller's view), r5 the slot pointer, r6/r7
- * two scalars: the per-slot effect/joint binding the range's entry points walk. */
-void fn_803B9588(struct _ENEMY_WORK* self, u16 index, s32* slot, s32 a, s32 b);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4) are declared in their owner's
  * header, `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them -
  * a declaration here of a symbol a registered unit owns is rule 2's finding.  Their consumers
  * include that header. */
-void fn_803B993C(s32 handle, Vec3* v, u8 area);
 
 /* 0x802D884C / 0x802DE578 / 0x8042CB9C - helpers `Pl/fn_802489D4.cpp`
  * (0x802489D4-0x8024F200) calls whose address bands have no registered range at all, so no

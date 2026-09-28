@@ -36,9 +36,6 @@ s32 fn_802E06B0(u16, void*, void*);     /* 0x802E06B0 */
  * registered `src/lobby/lb_quest_screen.cpp` over them (docs/plan.md 6.5 rule 2); this include
  * re-exports them for the units that already take this header. */
 #include "lobby/lb_quest_screen.h"
-u32 fn_803B521C(s32);                   /* 0x803B521C */
-void fn_803B6078(u16, u16*);            /* 0x803B6078 */
-s32 fn_803B8E1C(void);                  /* 0x803B8E1C */
 /* `fn_803BECA0` (0x803BECA0) and `get_arena_cfg` (0x803BEBF0) are no longer declared here: the
  * range that defines them, `src/menu/get_pop_dat_ptr.cpp`, owns them and publishes both in
  * `include/menu/get_pop_dat_ptr.h`, which this header includes below (rule 2). */

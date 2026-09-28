@@ -64,6 +64,7 @@
 #include "unsplit/lobby.h"
 #include "unsplit/Pl.h"
 #include "unsplit/menu.h"
+#include "enemy/em_pop.h"
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
 #include "fn_80047398.h"
@@ -209,7 +210,7 @@ void fn_802E4AD4(void) {
     if (move_work_state_ck() != 0) {
         st->field_0x05C = 0;
         st->field_0x05A = 0;
-        st->field_0x070 = fn_803B8E1C();
+        st->field_0x070 = em_set_work_state_get();
     } else {
         st->field_0x05C = 0;
         st->field_0x05A = 0;

@@ -96,6 +96,7 @@
 #include "sys_mem.h"
 #include "enemy/fn_80138074.h"
 #include "unsplit/unknown.h"
+#include "enemy/em_pop.h"
 
 /* The pooled `.sdata2` floats this range reads (each is a bare marker symbol in the map; the values
  * drive the comparisons/floats below).  Declared, never defined here: the pool belongs to the data
@@ -166,7 +167,7 @@ extern "C" {
 void lb_area_change_send(u8 a, s32 b);
 
 /* r3 the work record; the per-action entry: resets the joint-effect slots on the request, ticks the
- * motion, and walks the two live slots through `fn_803B9588`. */
+ * motion, and walks the two live slots through `em_roster_slot_effect_set`. */
 void fn_801A9540(struct _ENEMY_WORK* self) {
     s32* slots = self->handles_0x328;
 
@@ -181,7 +182,7 @@ void fn_801A9540(struct _ENEMY_WORK* self) {
         self->field_0x7B0 = lbl_807988F4;
     }
     fn_8019EA04(self);
-    fn_803B9588(self, 3, slots, 0, 0);
+    em_roster_slot_effect_set(self, 3, slots, 0, 0);
     if (slots[0] != -1) {
         self->states_0x338[0] = 8;
     }
@@ -248,7 +249,7 @@ void fn_801A9DF4(struct _ENEMY_WORK* self) {
 
     fn_8019EA04(self);
     for (i = 0; i < 2; i++) {
-        fn_803B9588(self, i, slot + i, 5, 0);
+        em_roster_slot_effect_set(self, i, slot + i, 5, 0);
     }
 }
 

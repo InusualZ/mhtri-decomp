@@ -146,9 +146,9 @@ extern f32 lbl_8079852C;
 u32 fn_802B0668(u32 kind);
 /* 0x803B50A8 - r3 (a selector, 0 at every call site here) and no other argument; returns a status
  * compared against 1. */
-u32 fn_803B50A8(u32 a);
+u32 em_work_state_bit21_ck(u32 a);
 /* 0x803B9994 - releases one handle of the enemy-control slot set (r3 = the handle). */
-void fn_803B9994(s32 handle);
+void em_roster_record_release(s32 handle);
 /* 0x803A8EE4 - the RSO-side random source; `fn_8019EA80` masks its low 16 bits. */
 u32 fn_803A8EE4(void);
 
@@ -541,7 +541,7 @@ u32 fn_8019E70C(struct _ENEMY_WORK* self) {
     if (self->area_no != 1) {
         return 255;
     }
-    if (fn_803B50A8(0) == 1) {
+    if (em_work_state_bit21_ck(0) == 1) {
         return 255;
     }
     if (fn_8019E670(self, 3, 0, 3)) {
@@ -568,7 +568,7 @@ u32 fn_8019E840(struct _ENEMY_WORK* self) {
         if (self->team == 25) {
             if (fn_802B0668(self->field_0x1E0) == 6) {
                 if (self->area_no == 1) {
-                    if (fn_803B50A8(0) != 1) {
+                    if (em_work_state_bit21_ck(0) != 1) {
                         if (fn_8019E670(self, 3, 30, 59) == 1) {
                             return 1;
                         }
@@ -633,7 +633,7 @@ void fn_8019ECD4(struct _ENEMY_WORK* self) {
 void fn_8019EA04(struct _ENEMY_WORK* self) {
     for (u16 i = 0; i < 4; i++) {
         if (self->handles_0x328[i] != -1) {
-            fn_803B9994(self->handles_0x328[i]);
+            em_roster_record_release(self->handles_0x328[i]);
             self->handles_0x328[i] = -1;
         }
         self->states_0x338[i] = 255;

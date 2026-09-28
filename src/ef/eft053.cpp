@@ -74,7 +74,7 @@
  *     are necessary (with one shared arm MWCC if-converts them and the function is 16 instructions
  *     short).  Needs `#pragma peephole off` around it: retail keeps `extsb` + `cmpwi`, `-O3` fuses
  *     them into `extsb.`.
- *   * `eft053_model_list_get` 97.16 - two `li r3,0` argument setups are missing at the `fn_803B50A8`
+ *   * `eft053_model_list_get` 97.16 - two `li r3,0` argument setups are missing at the `em_work_state_bit21_ck`
  *     calls: the target's declaration of that helper takes a parameter, while
  *     `include/unsplit/unknown.h` declares it `(void)` for `ef/fn_801A4504.cpp`.  A shared-file
  *     change (that header) closes the 12 bytes; requested in this unit's outbox, not smuggled in.
@@ -113,7 +113,8 @@
 #include "enemy/fn_8012BDF4.h" /* em_act_ck, em_work_die_ck */
 #include "fn_8004CAD8.h"       /* setVector3, mulVecMatAddTrans, rotVecY, VEC3_ctor, MTX34_ctor */
 #include "ef/eft053.h"         /* this unit's header (the helpers whose owner header cannot carry them) */
-#include "unsplit/unknown.h"   /* the band's unnamed callees */
+#include "unsplit/unknown.h"
+#include "enemy/em_pop.h"   /* the band's unnamed callees */
 #include "ef/eft_res.h"        /* fn_800F8788/fn_800F8914/fn_800F8A44 (the effect pool) */
 #include "ef/effect.h"         /* fn_800F9DF4 (the effect's two state bytes) */
 #include "ef/eft019.h"         /* eft019_set_core (the family's shared placement entry) */
@@ -341,7 +342,7 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
     case 17:
         switch (get_now_areano()) {
         case 1:
-            if (fn_803B50A8() != 0) {
+            if (em_work_state_bit21_ck() != 0) {
                 *out_count = 6;
             } else {
                 *out_count = 8;
@@ -349,7 +350,7 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
             *out_kind = 0;
             return 1;
         case 2:
-            if (fn_803B50A8() != 0) {
+            if (em_work_state_bit21_ck() != 0) {
                 *out_count = 6;
             } else {
                 *out_count = 8;

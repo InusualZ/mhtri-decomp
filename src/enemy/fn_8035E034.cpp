@@ -83,7 +83,7 @@ void fn_8012CEB4(_ENEMY_WORK* self, s16 a, u32 b);
 
 /* The monster-roster helpers at 0x803BDF0C.. (the run 0x803B465C..0x803BE30C, unclaimed).  They
  * index a global 0x224-byte-stride record array; `fn_803BDFF4` returns the record's +0x1D0 aim
- * position, `fn_803BDECC` the record itself. */
+ * position, `em_roster_record_get` the record itself. */
 struct EmRosterRec {
     /* +0x000 */ u8 pad_0x000[0x1F0];
     /* +0x1F0 */ f32 field_0x1F0;   /* the approach radius `fn_8035EB80` compares against */
@@ -104,7 +104,7 @@ struct EmAimSource {
 u8 fn_803BDF0C(u8 area, u8* out, u32 max);
 s32 fn_803BE08C(u8 id, u8 area);
 VEC3* fn_803BDFF4(u8 id, u8 area);
-EmRosterRec* fn_803BDECC(u8 id);
+EmRosterRec* em_roster_record_get(u8 id);
 
 u32 fn_802B0998(u8 index);
 
@@ -304,7 +304,7 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
                         VEC3 v3;
                         fn_80050CA0(&v3, &v1, p);
                         copyVec3(&v2, &v3);
-                        if (fn_80050F24((const f32*)&v2) > fn_803BDECC(id)->field_0x1F0) {
+                        if (fn_80050F24((const f32*)&v2) > em_roster_record_get(id)->field_0x1F0) {
                             ok = 0;
                         }
                     }
@@ -484,7 +484,7 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
         if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
             fn_80050CA0(&v3, &v1, p);
             copyVec3(&v2, &v3);
-            if (fn_80050F24((const f32*)&v2) > fn_803BDECC(self->field_0x33B)->field_0x1F0) {
+            if (fn_80050F24((const f32*)&v2) > em_roster_record_get(self->field_0x33B)->field_0x1F0) {
                 keep = 0;
             }
         }

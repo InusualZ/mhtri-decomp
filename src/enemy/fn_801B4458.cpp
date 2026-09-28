@@ -135,8 +135,8 @@ void fn_801048B4(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scal
 void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
                  f32 scale);
 void fn_800FC0D4(void* dst, void* src);
-s32 fn_803B9A40(s32 handle);
-void fn_803B9994(s32 handle);
+s32 em_roster_record_slot_id_get(s32 handle);
+void em_roster_record_release(s32 handle);
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 
 /* the mangled callees, at their real signatures (rule 9). */
@@ -521,7 +521,7 @@ extern "C" void fn_801B4E38(void) {}
 extern "C" void fn_801B4E3C(_ENEMY_WORK* self) {
     if (em_act_ck(self, 0x0A, 0x7D) == 0 && em_act_ck(self, 0x0B, 0x25) == 0 &&
         self->field_0x888 != -1) {
-        fn_803B9994(self->field_0x888);
+        em_roster_record_release(self->field_0x888);
         self->field_0x888 = -1;
     }
 }
@@ -1552,7 +1552,7 @@ extern "C" void fn_801B6B94(_ENEMY_WORK* self) {
 /* 0x801B6C38 (0x4C).  Whether the latch kind is clear and the +0x888 handle can be re-armed (the
  * Haskell side reports none live). */
 extern "C" s32 fn_801B6C38(_ENEMY_WORK* self, u8 flag) {
-    if (flag == 0 && self->field_0x888 != -1 && fn_803B9A40(self->field_0x888) <= 0) {
+    if (flag == 0 && self->field_0x888 != -1 && em_roster_record_slot_id_get(self->field_0x888) <= 0) {
         return 1;
     }
     return 0;
