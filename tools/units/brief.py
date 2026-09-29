@@ -654,11 +654,18 @@ def _dump_asm_hint(lines: list[str]) -> None:
     `python tools/splits/tudiscover.py at 0x...` reports **0 functions** and reads as a tool bug -
     measured 2026-09-27: it cost a lane its first turn. `python tools/splits/dump_asm.py` is one
     command and ~8 s (not the 200-400 s the older build docs quote), so the fix is named here.
+
+    The objdump path is named here for the same reason: two lanes lost minutes on 2026-09-28 to
+    `objdump: command not found`, because nothing is on `PATH` and the build's copy is under `build/`.
     """
     lines.append("**Recon prerequisite - the asm dump.** `build/RMHE08/asm/` is not built by default "
                  "(`write_asm: false`): run `python tools/splits/dump_asm.py` (~8 s) before any "
                  "`python tools/splits/tudiscover.py at 0x...`. Without it `tudiscover` reports "
                  "**0 functions** - that is the missing dump, not a bug in the tool.")
+    lines.append("")
+    lines.append("**To read one function's bytes, use the build's own binutils - nothing is on `PATH`:** "
+                 "`build/binutils/powerpc-eabi-objdump.exe -d build/RMHE08/obj/<Unit>.o` "
+                 "(`ninja tools` fetches it if absent).")
     lines.append("")
 
 
@@ -1789,6 +1796,9 @@ def selftest() -> int:
               and "refuses to print a stale report's numbers" in brief_text, True)
         check("the brief says tudiscover needs the on-demand asm dump",
               "python tools/splits/dump_asm.py" in brief_text and "0 functions" in brief_text, True)
+        check("the brief names the build's objdump (nothing is on PATH)",
+              "build/binutils/powerpc-eabi-objdump.exe" in brief_text
+              and "nothing is on `PATH`" in brief_text, True)
         check("the brief carries the git add hygiene",
               "`git add -A` with no path arguments" in brief_text and "`git show --stat`" in brief_text, True)
         check("the brief carries the your-tree block, naming the worktree and the self-check",
@@ -1860,6 +1870,8 @@ def selftest() -> int:
               and "refuses to print a stale report's numbers" in text, True)
         check("the proposal brief says tudiscover needs the on-demand asm dump",
               "python tools/splits/dump_asm.py" in text and "0 functions" in text, True)
+        check("the proposal brief names the build's objdump too",
+              "build/binutils/powerpc-eabi-objdump.exe" in text, True)
         check("the proposal brief carries the git add hygiene",
               "`git add -A` with no path arguments" in text and "`git show --stat`" in text, True)
         check("a proposal brief still says where the report goes",
