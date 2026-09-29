@@ -95,7 +95,7 @@ void fn_802E0AD4(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 0x802E0
 void fn_802E1A7C(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
 void fn_802E23D0(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
 u32 color_lerp(u32 value, u32 mask);
-u32 fn_802A9368(MenuScroll* scroll, u16 buttons, u16 sfx);  /* 0x802A9368, menu/fn_802A6624.cpp */
+u32 fn_802A9368(MenuScroll* scroll, u16 buttons, u16 sfx);  /* 0x802A9368, menu/menu_message.cpp */
 void fn_802A9F48(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
 u8 fn_800CF208(void);
 u16 fn_8004AE70(void* userdata);

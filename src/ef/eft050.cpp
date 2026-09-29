@@ -251,9 +251,9 @@ u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 const u8* fn_802D773C(u8 index);
 void fn_802D7754(u8 a, u8 b, u16* out);
 const u8* lb_entry_id_get(u8 index);
-s8* fn_802AA59C(u8 id);
-s8* fn_802AA5D8(u8 index);
-s8* fn_802AA650(u8 id);
+s8* get_item_name_str(u8 id);
+s8* get_player_name_str(u8 index);
+s8* get_digit_str(u8 id);
 void fn_80222BC4(void* work, u16 id, u32 arg);
 void fn_8035A7D8(u16 id, const void* tbl, const void* pos, u16 id2, u32 arg);
 void fn_8033F788(CockpitItemBlock* self);
@@ -374,7 +374,7 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
     u8 sel = lbl_80794880->player_slot_0x3E03 & 0x7F;
     const u8* rows = fn_802D773C(sel);
     const u8* slots = lb_entry_id_get(sel);
-    draw_font_idx(0x2043, fn_802AA5D8(sel), 1, pos);
+    draw_font_idx(0x2043, get_player_name_str(sel), 1, pos);
     fn_802152A4(0x2044, self->mode_0x14, 1, pos);
     if (rows[slots[0] + 4] == 0) {
         draw_font_idx(0x2046, LbStr(0, 0x1C1), 1, pos);
@@ -383,7 +383,7 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
             draw_sprite_idx(lbl_805E7450[i].icons_0x00[0], pos);
             draw_sprite_idx(lbl_805E7450[i].icons_0x00[1], pos);
             draw_sprite_idx(lbl_805E7450[i].icons_0x00[2], pos);
-            draw_font_idx(lbl_8079308C[i], fn_802AA59C(slots[i + 1]), 1, pos);
+            draw_font_idx(lbl_8079308C[i], get_item_name_str(slots[i + 1]), 1, pos);
         }
     }
 }
@@ -397,7 +397,7 @@ extern "C" void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos)
     u16 digits[4];
     fn_802D7754(lbl_80794880->clock_hour_0x51A4, lbl_80794880->clock_minute_0x51A5, digits);
     for (u16 i = 0; i < 4; i++) {
-        draw_font_idx(lbl_80793098[i], fn_802AA650((u8)digits[i]), 0, pos);
+        draw_font_idx(lbl_80793098[i], get_digit_str((u8)digits[i]), 0, pos);
     }
 }
 

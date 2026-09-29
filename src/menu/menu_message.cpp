@@ -8,11 +8,15 @@
  *
  * Module `menu`: the left neighbour is `menu/menu_item.cpp`, the range calls into it
  * (`GetItemData__FUs`, `get_menu_lsp_tbl__FUs`) and its own entry points are the menu's
- * (`put_message`, `put_frame_dialog`, `GetMenuFontColor`, `pull_shell_work`).  File name: the map's
- * stem - no `__FILE__` string covers the range (the only one in this `.data` run is
- * `menu_item.cpp` at 0x805CDFC8, referenced from 0x802A5444/0x802A579C/0x802A64B0, i.e. the range
- * before this one) and the runtime dump answers `zz_XXXXXXXX_` for every unnamed row here, so
- * evidence class 2 and 1 are both empty (brief section 2).
+ * (`put_message`, `put_frame_dialog`, `GetMenuFontColor`, `pull_shell_work`).  File name: derived
+ * (class 3 + class 4).  Class 1 and class 2 are both empty - no `__FILE__` string covers the range
+ * (the only one in this `.data` run is `menu_item.cpp` at 0x805CDFC8, referenced from
+ * 0x802A5444/0x802A579C/0x802A64B0, i.e. the range before this one) and the runtime dump answers
+ * `zz_XXXXXXXX_` for every unnamed row here - so the name comes from what the range does and is
+ * MARKED GUESS: the selection list and its cursor, and the message/frame dialog the window puts up.
+ * The unit was registered at the map's stem and re-homed to `menu/menu_message.cpp` +
+ * `include/menu/menu_message.h` on 2026-09-29 by `worker/menu-num-8725` (the gate refuses a unit
+ * registered at a generated file name).
  *
  * Seam: unproven.  Discovery's own warning says the edge is `--max-bytes`'s cap, not a TU boundary,
  * and the two neighbouring proposals (0x802A5444 and my start) are one run.  The band's first block
@@ -22,22 +26,87 @@
  * proposal's extent because a worker may not re-cut a claim, and reuses the offsets rather than
  * inventing a type (`include/menu/menu_message.h` says which).
  *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for 99 of this range's 139 symbols (checked
- * with `python tools/symbols/dumpmap.py lookup` over the inventory and `grep` on the map: the 40
+ * Second seam, unproven too, and stronger: the trailing block (`pull_shell_work`, 0x802AA764, to
+ * `fn_802AD9A8`) is **not the menu module**.  It is the player's gunner-shell pool and actor layer:
+ * `_SHELL_W` (the 0x10C record `include/ef.h` documents; `push_shell_work` `memset`s exactly 0x10C),
+ * pool `lbl_806AD698`, and `yure_move` is called from `Pl/fn_80288CEC.cpp`, `charmake_move` and
+ * `arena_game_task`.  12892 of the 29596 bytes (44 %, 70 of the 139 rows) may belong to another TU.
+ * No `__FILE__` string and no pooled literal covers the range, so the boundary cannot be settled from
+ * the data here - `tudiscover.py at 0x802AA764` reports only weak signals.  The evidence is in this
+ * header for the orchestrator; nothing in the block was written this pass.
+ *
+ * Naming note: the symbol map has only `fn_XXXXXXXX` for 99 of this range's 139 symbols (the 40
  * named rows are the `put_message`/`put_frame_dialog`/`GetMenuFontColor`/`shell_*`/`serial_*`/
- * `niku_*`/`yure_move` family the runtime dump carries, and every remaining row is a bare
- * `fn_XXXXXXXX` in `config/RMHE08/symbols.txt` that the dump answers `zz_XXXXXXXX_` for).
+ * `niku_*`/`yure_move` family the runtime dump carries).  2026-09-29: no `fn_XXXXXXXX` this file
+ * **defines** is left generated.  The list/cursor block became `menu_list_mode_get`,
+ * `menu_list_count_update`, `menu_list_fill`, `menu_list_names_set`, `menu_cursor_move`,
+ * `menu_cursor_seek`, `menu_cursor_column_step`; the frame/page draw block `menu_frame_entries_build`,
+ * `menu_frame_entries_build_row`, `menu_frame_draw_page`, `menu_frame_page_draw`,
+ * `menu_frame_row_draw`, `menu_frame_draw_blocks`; the item-row draw block `menu_item_row_draw`,
+ * `menu_item_row_draw_by_lsp`, `menu_item_row_draw_values`, `menu_item_row_draw_pages`,
+ * `menu_hold_row_draw_by_lsp`; the pad-driven walk `menu_cursor_wrap`,
+ * `menu_cursor_step_fixed_tail`/`_open_last`/`_forward` (an arity family that differs only in the
+ * tail arguments it fixes - MARKED GUESS), `toggle_word_step`, `toggle_word_step_dpad`.  The rows
+ * added with this pass's bodies are named from their callers: `get_item_name_str`,
+ * `get_player_name_str` and `get_digit_str` are the item / player-slot / digit-glyph groups
+ * `ef/eft050.cpp` indexes, while `get_group2_name_str`'s group is not pinned and keeps an index name
+ * (MARKED GUESS); `draw_dialog_piece` + `dialog_piece_uv_tbl` are the dialog's frame-piece draw and
+ * its uv table, and the bodies are pending the `.data` claim below.  `fn_802A8F14` (the `s16`
+ * ceiling divide) KEEPS its generated name on purpose - `include/Pl/pl_skill.h` +
+ * `src/Pl/pl_skill.cpp` call it and `Pl/` is outside this lane's write scope.
  *
- * Reconstructed: the menu list/cursor layer and the entry points around it - 19 of the 139 rows,
- * 3212 of 29596 bytes.  Twelve are byte-identical (`fn_802A6624`, `fn_802A66BC`, `fn_802A695C`,
- * `fn_802A6B6C`, `fn_802A6C1C`, `fn_802A6C28` is 80.03, `fn_802A6EF4`, `fn_802A7978`, `fn_802A7C04`,
- * `fn_802A8EC0`, `fn_802A8ED8`, `fn_802A8EEC`, `menu_cursor_step`), 18 are at or over the 80 % bar.
+ * Reconstructed: the menu list/cursor layer, the palette getters, the four string-table accessors
+ * and the system dialog's OK-button row - 19 of the 139 rows are byte-identical, 1596 of 29596
+ * `.text` bytes (5.39262 %), unit metric 12.13434 %.  Rows this pass added: `GetMenuFontColorRed`
+ * 0 -> 100, `GetMenuIconColor` 0 -> 100, `get_item_name_str`/`get_player_name_str`/
+ * `get_group2_name_str`/`get_digit_str` 0 -> 100 each, `put_message_sys_ok_button__Fv` 0 -> 100,
+ * `GetMenuFontColor` 0 -> 95.59.  Every pre-existing row measures exactly what it did before.
  *
- * Residuals, biggest first - the 120 unwritten bodies, by block:
+ * Residuals, biggest first.
+ *   * The `.data` blocker this pass found - `draw_dialog_piece` (132 B) and `put_frame_dialog`
+ *     (504 B) are derived but NOT in the source: their bodies read `dialog_piece_uv_tbl` at
+ *     0x805CE0A0, which no registered `splits.txt` range covers (only an analyzer `auto_*_data` unit
+ *     does), so an `extern` for it would be a rule-12 finding.  The fix is to claim the `.data` run
+ *     in this unit's own `splits.txt` and define the 0xC0 bytes - measured before and after, because
+ *     a `.data` claim can drop the target's pool relocations (playbook 23/78).  The same run holds
+ *     `lbl_805CE160`/`lbl_805CE180`/`lbl_805CE18C` (`fn_802A907C`, 304 B), `lbl_805CE090`
+ *     (`fn_802AA68C`, 28 B) and the 0x805CE040..0x805CE07C blobs those pointers name, so one claim
+ *     unblocks ~1.3 KB of bodies - it is the first follow-up.
+ *   * `GetMenuFontColor` 95.59259: the target keeps the inner `if (b == 1)` arm as a plain
+ *     `bne <else>` + `blr` where MWCC folds the same source into a conditional return, one
+ *     instruction shorter than the target.  Four shapes were measured (`if`/`else`, `if` + `return`,
+ *     a ternary, and the negated `if (b != 1)`) - all four fold; the negated one scores highest
+ *     (95.59) because it puts the two colour bodies in the target's order.  Flag-shaped or a
+ *     block-ordering pass, not reachable from the source side with this unit's flags so far.
+ *   * `put_message` (284 B) + `put_message_sys` (180 B) need the font cluster
+ *     (`font_print`/`font_locate`/`flfntSetColor`), whose band home `include/unsplit/menu.h` spells
+ *     `font_print(char*)` while the map's own name is the variadic `font_print__FPSce` and the target
+ *     call site carries `crclr 4*cr1+eq`.  That one declaration is consumed by every unit including
+ *     the band header, so fixing it is its own change (the relocation-name class).
+ *   * `toggle_word_step` (280 B) + `toggle_word_step_dpad` (20 B) are fully derived but unwritten:
+ *     `toggle_word_step`'s declaration reaches 49 call sites in `lobby/` units through
+ *     `include/unsplit/lobby.h`, and the retail call sites narrow three of its five parameters to
+ *     `u16` where the header spells them `s32` - writing it means re-measuring those units.
+ *   * rule-2 debt left: `src/lobby/fn_801EC9F8.cpp`, `include/lobby/fn_8020C588.h` and
+ *     `src/menu/menu_item.cpp` still declare `toggle_word_step`/`toggle_word_step_dpad` locally
+ *     rather than including this unit's header (swept to the new names, and given rule-11 markers for
+ *     the shared untyped state word).  `src/hud/layout.cpp` + `src/hud/move_work_update.cpp` name the
+ *     unit by its old path in prose; both are outside this lane's write scope.
+ *
+ * Declaration linkage (2026-09-29): every callee the written bodies call is declared the way the map
+ * spells it - `extern "C"` for a bare row (`strcpy`, `fn_802A9BB8`, `eft052_page_counts_get` and the
+ * two `menu_frame_*` writers, whose forward declarations must also carry the definition's parameter
+ * list) and global C++ scope for a mangled one (`PutPageArrow`, whose owner's signature
+ * `include/ai/fn_802D44F4.h` carries, and `get_lsp_data`/`get_wide_offset`, which moved out of
+ * `include/hud/layout.h`'s `extern "C"` block).  A declaration in that block emits the bare stem,
+ * which no link input defines; the object's relocations now spell the target's names name for name,
+ * and the change is codegen-neutral (0 of 2189 unit rows moved, DOL hash unchanged).
+ *
+ * The 120 unwritten bodies, by block:
  *   * `fn_802A6F64`-`fn_802A7CC8` (0x408/0x1B8/0x314/0x140/0x40/0x1C8/0x84/0x40/0x84/0x358 B): the
  *     frame/message page writers.  `fn_802A6F64` and `fn_802A7524` are half-written as declarations
- *     only - their bodies are the two biggest in the block and need the `_SPR_DATA_` record
- *     (`fn_802A7C44` is 8 bytes into `lbl_805CE0A0`, whose element layout is not pinned by this range).
+ *     only - their bodies are the two biggest in the block and need the `_SPR_DATA_` record (the
+ *     `draw_dialog_piece` + `.data` claim item above).
  *   * `put_frame_dialog`-`fn_802AA6A8` (0x1F8..0xBC B, 20 rows): the `put_message`/`put_frame_dialog`
  *     page layer.  Written call sites are needed first: their bodies build `_SPR_DATA_` copies and call
  *     the variadic `font_print_ex(s16, s16, s16, char*, ...)`, whose `crclr 4*cr1+eq` the target
@@ -46,10 +115,11 @@
  *     one of them takes `_SHELL_W` (include/ef.h's union view, whose +0x030..+0x10C run is one pad
  *     block); naming the fields they touch means extending that shared header, which is a separate
  *     change from this registration.  `fn_802AC484` (0x12B4 B) alone is 16 % of the range.
- *   * known non-byte-identical rows: `fn_802A674C` 82.76 (the two-block list fill - the retail loop is
- *     unrolled five-fold with constant displacements and our `for` over `rec[0x130 * j]` is not),
+ *   * known non-byte-identical rows: `menu_list_fill` 82.76 (the two-block list fill - the retail loop
+ *     is unrolled five-fold with constant displacements and our `for` over `rec[0x130 * j]` is not),
  *     `fn_802A8F14` 76.67 (the ceiling-divide helper: same instruction sequence, the allocator swaps
- *     the two parameters' registers), `fn_802A6A64` 97.58, `fn_802A736C` 97.57, `fn_802A7B80` 90.91.
+ *     the two parameters' registers), `menu_cursor_move` 97.58, `menu_frame_page_draw` 97.57,
+ *     `menu_frame_entries_build_row` 89.14, `menu_item_row_draw_pages` 90.91.
  *   * rule-2 note: `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h` declare
  *     `menu_cursor_step` as a C++ five-argument function; this range owns 0x802A8EFC and the target
  *     object's relocations spell it bare, so both declarations want moving to this unit's header
@@ -61,10 +131,13 @@
 #include "types.h"
 
 #include "Runtime.PPCEABI.H/memcpy.h"
+#include "Runtime.PPCEABI.H/memset.h"
 #include "ef/fn_800CDB2C.h"
 #include "menu/menu_message.h"
+#include "hud/layout.h"
+#include "menu/get_pop_dat_ptr.h"
 
-char* strcpy(char* dst, const char* src);
+extern "C" char* strcpy(char* dst, const char* src);
 
 /* ---------------------------------------------------------------------------------------------------
  * The range's own entry points and the callees its written bodies call.  A `fn_XXXXXXXX` stem is the
@@ -73,46 +146,44 @@ char* strcpy(char* dst, const char* src);
  * --------------------------------------------------------------------------------------------------- */
 
 extern "C" u32 quest_move_state_valid_ck(void);
-extern "C" s32 fn_802A8DF4(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g);
+extern "C" s32 menu_cursor_wrap(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g);
 
-/* The 2D integer vector the HUD helpers exchange, complete in `include/unsplit/lobby.h`; only ever
- * pointed at here, so the forward declaration is enough (and including that header would clash with
- * its `menu_cursor_step` declaration, which this range owns - see the unit header). */
-struct _mh_ivec2_;
+/* The HUD's 2D element library (`hud/layout.h`, its owner's header) supplies the `_mh_ivec2_` /
+ * `_SPR_DATA_` records and every `draw_*`/`put_*` entry this range calls, so none of them is
+ * re-declared here (docs/plan.md 6.5 rule 2).  This unit's own `MenuLspPos` is the same 4-byte
+ * record; the call sites cast to `_mh_ivec2_*`, which is a no-op. */
 
 void sysSE_req(long id);
 u8** get_str_tbl(long index);
-void* get_lsp_data(u16 index, struct _mh_ivec2_* out);
 u16* get_menu_lsp_tbl(u16 idx);
 u8* get_move_work_adrs(u8 kind);
 s32 get_move_work_max(u8 kind);
-void fn_802A9BB8(void* dst, const void* src);
-void fn_802A6F64(void* dst, void* src, s8 a, s8 b, u16 c, s32 d, struct _mh_ivec2_* e);
-void fn_802A736C(void* dst, void* src, s8 a, s8 b, u16 c, s32 d, u8 e);
+extern "C" void fn_802A9BB8(void* dst, const void* src);
+extern "C" void menu_frame_draw_blocks(void* dst, void* src, s8 a, s8 b, u16 c, s32 d, struct _mh_ivec2_* e);
+extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, s32 d, u8 e);
 
 /* The two source tables the list is built from (map symbols, unclaimed - playbook 29). */
 extern MenuSourceRecord lbl_806BE340[10];   /* 2 x 5 records: validity byte + two names */
 
-/* The draw helpers the page routine calls; all four sit in no registered range, so their
- * declarations are this unit's call sites' (rule 2's unsplit case - the address bands interleave, so
- * `include/unsplit/<module>.h` has no sound module to move them to). */
-void draw_sprite_anim_ary(const u16* table, u16 index, struct _mh_ivec2_* pos);
-void PutPageArrow(u16* table, s8 a, s8 b, u16 flags, struct _mh_ivec2_* pos, u8 mode);
+/* The two draw helpers that sit in no registered range, so the declaration is this unit's call
+ * sites' (rule 2's unsplit case - the address bands interleave, so `include/unsplit/<module>.h` has
+ * no sound module to move them to). */
+void PutPageArrow(u16* table, s16 a, s16 b, u16 flags, const struct _mh_ivec2_* pos, u8 mode);
 void font_flush(void);
 
 /* This unit's own bodies, in address order. */
-extern "C" void fn_802A7524(s32 select, u32* dst, void* entry, s32 flags, struct _mh_ivec2_* pos);
+extern "C" void menu_frame_row_draw(s32 select, u32* dst, void* entry, s32 flags, struct _mh_ivec2_* pos);
 extern "C" s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
 extern "C" s16 fn_802A8F14(s16 a, s16 b);
-extern "C" void fn_802A7838(u16* item, struct _mh_ivec2_* pos);
-extern "C" void fn_802A79B8(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
-void eft052_page_counts_get(u16 id, s32* a, s32* b, s32* c);
+extern "C" void menu_item_row_draw(u16* item, struct _mh_ivec2_* pos);
+extern "C" void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
+extern "C" void eft052_page_counts_get(u16 id, s32* a, s32* b, s32* c);
 
 /* The list length the active kind's table yields for the current selection: kind 1 walks the move
  * table's records, kind 2 the item-record table's two blocks of five.  An index of 0x80 is the "no
  * selection" case and copies the table's own label into both name buffers.  Returns how many list
  * ids were written. */
-extern "C" u8 fn_802A6624(MenuListWork* self)
+extern "C" u8 menu_list_mode_get(MenuListWork* self)
 {
     u8 result = 0;
     switch (self->kind_0x00F) {
@@ -136,7 +207,7 @@ extern "C" u8 fn_802A6624(MenuListWork* self)
 
 /* Clears the list count to its three-entry default, then subtracts the entries the finished
  * pad/task state has already consumed; an unknown kind reports 0 without touching the record. */
-extern "C" u8 fn_802A66BC(MenuListWork* self)
+extern "C" u8 menu_list_count_update(MenuListWork* self)
 {
     self->count_0x016 = 3;
     switch (self->kind_0x00F) {
@@ -159,7 +230,7 @@ extern "C" u8 fn_802A66BC(MenuListWork* self)
 /* Fills the list at +0x1BE from the active kind's table, skipping the currently selected index, and
  * stores the count.  Kind 2 walks two blocks of five records of the item table, kind 1 the move
  * table's variable-length block.  A negative index means "the current selection". */
-extern "C" u8 fn_802A674C(MenuListWork* self, s8 index_)
+extern "C" u8 menu_list_fill(MenuListWork* self, s8 index_)
 {
     s8* dst = self->list_0x1BE;
     s8 index = index_;
@@ -225,7 +296,7 @@ extern "C" u8 fn_802A674C(MenuListWork* self, s8 index_)
 /* Copies the active kind's record names into the two name buffers: the item table's record for the
  * index, or the move table's.  Index 0x80 is the "no selection" case, which copies the table's own
  * label over both.  Reports whether a record was found. */
-extern "C" s32 fn_802A695C(MenuListWork* self, u8 index)
+extern "C" s32 menu_list_names_set(MenuListWork* self, u8 index)
 {
     s32 found = 0;
 
@@ -258,7 +329,7 @@ extern "C" s32 fn_802A695C(MenuListWork* self, u8 index)
 
 /* Steps the cursor one row up/down (bits 2-3 of the input word) or one column left/right (bits 0-1),
  * wrapping at the page bounds, and plays the move SE only when the row actually changed. */
-extern "C" void fn_802A6A64(MenuListWork* self, s8 step)
+extern "C" void menu_cursor_move(MenuListWork* self, s8 step)
 {
     u16 input = self->input_0x000;
 
@@ -291,31 +362,31 @@ extern "C" void fn_802A6A64(MenuListWork* self, s8 step)
 
 /* Moves the cursor to a flat entry index: inside the current row it is a plain column step, past it
  * the row is advanced first and the column then set from the remainder. */
-extern "C" void fn_802A6B6C(MenuListWork* self, s8 index)
+extern "C" void menu_cursor_seek(MenuListWork* self, s8 index)
 {
     s8 columns = self->columns_0x007;
 
     if (index < (self->cursor_0x004 + 1) * columns) {
-        fn_802A6A64(self, (s8)(index % columns));
+        menu_cursor_move(self, (s8)(index % columns));
         return;
     }
-    fn_802A6A64(self, columns);
+    menu_cursor_move(self, columns);
     if (index < (self->cursor_0x004 + 1) * self->columns_0x007) {
         self->column_0x006 = (s8)(index % self->columns_0x007 - 1);
     }
 }
 
 /* Steps the cursor one column, i.e. wraps the flat index back into the current row. */
-extern "C" void fn_802A6C1C(MenuListWork* self)
+extern "C" void menu_cursor_column_step(MenuListWork* self)
 {
-    fn_802A6A64(self, self->columns_0x007);
+    menu_cursor_move(self, self->columns_0x007);
 }
 
 /* Builds the list of two 0x60-byte entry blocks the message frame draws from: copies the 0x60-byte
  * source into a work buffer, folds it through `fn_802A9BB8`, marks each of the eight entries with its
- * ordinal and whether its source slot is in use, then hands the lot to `fn_802A6F64` with the LSP
+ * ordinal and whether its source slot is in use, then hands the lot to `menu_frame_draw_blocks` with the LSP
  * position the `flags` word selects.  `mode` 1 adds the 0x800 bit to the draw flags. */
-extern "C" void fn_802A6C28(u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
+extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
 {
     s16 lsp[2];
     u16 mask[0x10];
@@ -374,13 +445,13 @@ extern "C" void fn_802A6C28(u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 m
         p += 8;
     }
     get_lsp_data(lsp_index, (struct _mh_ivec2_*)lsp);
-    fn_802A6F64(work, entries, 1, kind, 0, flags, (struct _mh_ivec2_*)lsp);
+    menu_frame_draw_blocks(work, entries, 1, kind, 0, flags, (struct _mh_ivec2_*)lsp);
 }
 
 /* The one-block form: fills a single block of four entries from the 0x60-byte source `src` and the
- * optional 0x20-byte mask, then hands it to the `fn_802A736C` draw path.  The ordinals are the
+ * optional 0x20-byte mask, then hands it to the `menu_frame_page_draw` draw path.  The ordinals are the
  * constants 0..3, so the block is the frame's own row. */
-extern "C" void fn_802A6DB4(void* unused, u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
+extern "C" void menu_frame_entries_build_row(void* unused, u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
 {
     s16 lsp[2];
     u16 mask[0x10];
@@ -424,23 +495,23 @@ extern "C" void fn_802A6DB4(void* unused, u16* src_a, u16* src_b, s8 kind, u16 l
         entries[3].present_0x02 = 0;
     }
     get_lsp_data(lsp_index, (struct _mh_ivec2_*)lsp);
-    fn_802A736C(work, entries, 0, kind, 0, 0x20, mode);
+    menu_frame_page_draw((u32*)work, entries, 0, kind, 0, 0x20, mode);
 }
 
 /* Reads the LSP position the constant id 628 names and forwards the call unchanged. */
-extern "C" void fn_802A6EF4(void* a, void* b, s8 c, s8 d, u16 e, s32 f)
+extern "C" void menu_frame_draw_page(void* a, void* b, s8 c, s8 d, u16 e, s32 f)
 {
     s16 lsp[2];
 
     get_lsp_data(628, (struct _mh_ivec2_*)lsp);
-    fn_802A6F64(a, b, c, d, e, f, (struct _mh_ivec2_*)lsp);
+    menu_frame_draw_blocks(a, b, c, d, e, f, (struct _mh_ivec2_*)lsp);
 }
 
-/* The menu's own LSP position rows.  `fn_802A736C` draws a four-row page: it takes the page's
+/* The menu's own LSP position rows.  `menu_frame_page_draw` draws a four-row page: it takes the page's
  * anchor position, the per-kind offset and a row stride of 26 pixels, then walks the four entries
- * of the block `fn_802A6C28`/`fn_802A6DB4` filled.  `mode` 0..2 selects the page style; anything
+ * of the block `menu_frame_entries_build`/`menu_frame_entries_build_row` filled.  `mode` 0..2 selects the page style; anything
  * else is a no-op. */
-extern "C" void fn_802A736C(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, s32 flags_in, u8 mode)
+extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, s32 flags_in, u8 mode)
 {
     MenuLspPos pos;
     MenuLspPos rows;
@@ -489,7 +560,7 @@ extern "C" void fn_802A736C(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c,
         flags_ |= 1024;
     }
     for (i = 0; i < 4; i++) {
-        fn_802A7524(select, &dst[entries[i].index_0x06], &entries[i], flags_,
+        menu_frame_row_draw(select, &dst[entries[i].index_0x06], &entries[i], flags_,
                     (struct _mh_ivec2_*)&rows);
         rows.y += 26;
     }
@@ -497,37 +568,37 @@ extern "C" void fn_802A736C(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c,
 }
 
 /* Reads the position the caller's LSP id names and draws one item row at it. */
-extern "C" void fn_802A7978(u16 id, u16* item)
+extern "C" void menu_item_row_draw_by_lsp(u16 id, u16* item)
 {
     MenuLspPos pos;
 
     get_lsp_data(id, (struct _mh_ivec2_*)&pos);
-    fn_802A7838(item, (struct _mh_ivec2_*)&pos);
+    menu_item_row_draw(item, (struct _mh_ivec2_*)&pos);
 }
 
-/* The four forwarders onto `fn_802A8DF4`'s cursor step, each supplying a different tail of the
+/* The four forwarders onto `menu_cursor_wrap`'s cursor step, each supplying a different tail of the
  * argument list; the wrapped index they report is what the menu's column cursor stores. */
-extern "C" s32 fn_802A8EC0(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f)
+extern "C" s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f)
 {
-    return fn_802A8DF4(a, b, c, d, e, 3, f);
+    return menu_cursor_wrap(a, b, c, d, e, 3, f);
 }
 
 /* Same step with the sixth argument zeroed. */
-extern "C" s32 fn_802A8ED8(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f)
+extern "C" s32 menu_cursor_step_open_last(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f)
 {
-    return fn_802A8DF4(a, b, c, d, e, f, 0);
+    return menu_cursor_wrap(a, b, c, d, e, f, 0);
 }
 
 /* Same step, both tail arguments passed through. */
-extern "C" s32 fn_802A8EEC(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g)
+extern "C" s32 menu_cursor_step_forward(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g)
 {
-    return fn_802A8DF4(a, b, c, d, e, f, g);
+    return menu_cursor_wrap(a, b, c, d, e, f, g);
 }
 
 /* Same step with the two fixed tail values 3 and 0 - the entry point the cursor call sites use. */
 extern "C" s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e)
 {
-    return fn_802A8DF4(a, b, c, d, e, 3, 0);
+    return menu_cursor_wrap(a, b, c, d, e, 3, 0);
 }
 
 /* Ceiling of `a / b`, with b == 0 reported as 1. */
@@ -546,9 +617,9 @@ extern "C" s16 fn_802A8F14(s16 a, s16 b)
 }
 
 /* The item row at the position the caller supplies: `eft052_page_counts_get` yields the row's two value words
- * (the second already summed), which the `fn_802A79B8` page routine draws.  A null or empty item is
+ * (the second already summed), which the `menu_item_row_draw_values` page routine draws.  A null or empty item is
  * skipped. */
-extern "C" void fn_802A7B80(u16* item, struct _mh_ivec2_* pos)
+extern "C" void menu_item_row_draw_pages(u16* item, struct _mh_ivec2_* pos)
 {
     s32 value = 0;
     s32 low;
@@ -563,15 +634,114 @@ extern "C" void fn_802A7B80(u16* item, struct _mh_ivec2_* pos)
             value = 0;
             sum = 0;
         }
-        fn_802A79B8(item, pos, value, sum);
+        menu_item_row_draw_values(item, pos, value, sum);
     }
 }
 
 /* Reads the position the caller's LSP id names and draws one item row at it. */
-extern "C" void fn_802A7C04(u16 id, u16* item)
+extern "C" void menu_hold_row_draw_by_lsp(u16 id, u16* item)
 {
     MenuLspPos pos;
 
     get_lsp_data(id, (struct _mh_ivec2_*)&pos);
-    fn_802A7B80(item, (struct _mh_ivec2_*)&pos);
+    menu_item_row_draw_pages(item, (struct _mh_ivec2_*)&pos);
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * The dialog/page draw layer and the palette getters (0x802A7C44, 0x802A8020, 0x802AA3EC..0x802AA4F4).
+ * --------------------------------------------------------------------------------------------------- */
+
+/* The palette the menu's own text is drawn in, as RGBA8888 words: `d == 1` is answered first, `a == 0`
+ * (the disabled case) second, then `c`/`b` select one of the four grey/amber shades.  The arms are
+ * written in the order the target branches on them. */
+s32 GetMenuFontColor(bool a, bool b, bool c, bool d)
+{
+    if (d == 1) {
+        return 0xF3D73EFF;
+    }
+    if (a == 0) {
+        return 0x646464FF;
+    }
+    if (c == 1) {
+        if (b != 1) {
+            return 0xC3C3C3FF;
+        }
+        return 0xF0F0F0FF;
+    }
+    if (b == 1) {
+        return 0x878787FF;
+    }
+    return 0xE8A40FFF;
+}
+
+/* The same palette's red variant: `a == 0` first, then the `c`/`(d | b)` pair and the last shade. */
+s32 GetMenuFontColorRed(bool a, bool b, bool c, bool d)
+{
+    if (a == 0) {
+        return 0x870F0FFF;
+    }
+    if (c == 1) {
+        if (d == 1 || b == 1) {
+            return 0xF53737FF;
+        }
+        return 0xDC2323FF;
+    }
+    return 0xAA1414FF;
+}
+
+/* The same palette's icon variant: same arm order as the red one, with white where the "selected"
+ * combination lands. */
+s32 GetMenuIconColor(bool a, bool b, bool c, bool d)
+{
+    if (a == 0) {
+        return 0x8A8A8AFF;
+    }
+    if (c == 1) {
+        if (d == 1 || b == 1) {
+            return 0xFFFFFFFF;
+        }
+        return 0xDFDFDFFF;
+    }
+    return 0xAAAAAAFF;
+}
+
+/* The string-table accessors the HUD/cockpit rows read their text from: each picks the `index`-th
+ * string of one of the master string table's first groups (`get_str_tbl(group)`).  Group 0 is the
+ * item-name group (`ef/eft050.cpp` indexes it by a hold slot's item id), group 1 the player-slot
+ * names, group 3 the digit glyphs.  MARKED GUESS: group 2's content is not pinned by this range (its
+ * only two call sites are `lobby/lb_companion_ui.cpp`'s), so it keeps an index-based name. */
+extern "C" s8* get_item_name_str(u8 index)
+{
+    return (s8*)get_str_tbl(0)[index];
+}
+
+/* The `index`-th name of the player-slot string group. */
+extern "C" s8* get_player_name_str(u8 index)
+{
+    return (s8*)get_str_tbl(1)[index];
+}
+
+/* The `index`-th name of string group 2. */
+extern "C" s8* get_group2_name_str(u8 index)
+{
+    return (s8*)get_str_tbl(2)[index];
+}
+
+/* The `index`-th name of the digit-glyph string group. */
+extern "C" s8* get_digit_str(u8 index)
+{
+    return (s8*)get_str_tbl(3)[index];
+}
+
+/* Draws the system dialog's OK button: the icon index is 2 when the option row 7 is set and 0 when it
+ * is not, at the dialog's own button x. */
+void put_message_sys_ok_button(void)
+{
+    s32 x = get_wide_offset(3) + 470;
+
+    if (get_option_cfg(7) != 0) {
+        put_button_icon(x, 268, 32, -1, 2, 0);
+    } else {
+        put_button_icon(x, 268, 32, -1, 0, 0);
+    }
 }

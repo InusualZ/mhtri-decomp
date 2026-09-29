@@ -234,7 +234,7 @@ s32 fn_801E790C(LbMenuWork* self)
         sysSE_req(1);
     } else if (fn_802121F4(0xC) != 0) {
         /* The string block goes through the owner's `s32` tail parameter; the cast emits nothing. */
-        value = fn_802A8EC0(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, (s32)self->str_0x24);
+        value = menu_cursor_step_fixed_tail(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, (s32)self->str_0x24);
         self->list_mode_0x0C = value;
         fn_801E7530(self, value);
     } else if (fn_802121F4(3) != 0) {
@@ -384,7 +384,7 @@ void fn_801E79E4(void)
                 sysSE_req(1);
             }
         } else if (fn_802121F4(0xC) != 0) {
-            self->list_mode_0x0C = fn_802A8ED8(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, 6);
+            self->list_mode_0x0C = menu_cursor_step_open_last(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, 6);
         }
         return;
     case 3:
@@ -784,7 +784,7 @@ void fn_801E8D5C(LbMenuWork* self)
             if ((s16)self->selected_0x08 == i) {
                 *(u16*)&pos.x = id;
                 pos.y = 0;
-                fn_802A7C04(0x1E35, (u16*)&pos);
+                menu_hold_row_draw_by_lsp(0x1E35, (u16*)&pos);
                 selected = 1;
             } else {
                 selected = 0;

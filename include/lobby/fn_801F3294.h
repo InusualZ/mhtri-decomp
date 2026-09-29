@@ -16,7 +16,7 @@
 #define MHTRI_LOBBY_FN_801F3294_H
 
 #include "types.h"
-/* The owner's header for `menu_cursor_step` (0x802A8EFC, the menu range `menu/fn_802A6624.cpp` owns): the
+/* The owner's header for `menu_cursor_step` (0x802A8EFC, the menu range `menu/menu_message.cpp` owns): the
  * declaration lives there now and this header re-exports it (docs/plan.md 6.5 rule 2). */
 #include "menu/menu_message.h"
 
@@ -181,7 +181,7 @@ void fn_8004C038(LbPage* page, LbWorldBlock* world);
 void fn_802DF7CC(s32 kind, const _mh_ivec2_* pos);
 /* `menu_cursor_step` (0x802A8EFC) stood here as `s32 (s16, s16, u16, s32, s32)` - the call site's narrow
  * view - while its band had no registered unit, and the two spellings could not both be visible
- * ((10505) illegal overloading).  `menu/fn_802A6624.cpp` owns the address and its header
+ * ((10505) illegal overloading).  `menu/menu_message.cpp` owns the address and its header
  * `include/menu/menu_message.h` (included below) declares the definition's `s32`/`u16` spelling
  * (docs/plan.md 6.5 rule 2). */
 

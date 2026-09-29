@@ -9,7 +9,7 @@
  *
  * Home and type, from evidence: the band's entry points are the menu/UI library's - it calls
  * `get_menu_lsp_tbl`, `put_menu_cursor`, `GetMenuFontColor`, `ItemName`, `GetItemData` and the
- * `draw_sprite`/`draw_font`/`drawshape_*` family - and the registered sibling `menu/fn_802A6624.cpp`
+ * `draw_sprite`/`draw_font`/`drawshape_*` family - and the registered sibling `menu/menu_message.cpp`
  * owns `GetMenuFontColor`, so the module is `menu`.  The file keeps the map's stem (brief section 2,
  * class 4: nothing in the object names the original source file).  Its own data is the two
  * 0x194-byte per-player cockpit work records at `lbl_806BDCC8` (2 entries) and the sub-screen state

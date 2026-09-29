@@ -179,12 +179,12 @@ extern "C" u16 fn_80212334(void) {
 
 /* Steps the caller's 4/8 sprite stepper over player 0's first mask. */
 extern "C" void fn_80212540(void* self) {
-    fn_802A9068(self, fn_802122E8(), 4, 8);
+    toggle_word_step_dpad(self, fn_802122E8(), 4, 8);
 }
 
 /* Steps the caller's 4/8 sprite stepper over the same mask, ignoring the screen guard. */
 extern "C" void fn_80212584(void* self) {
-    fn_802A9068(self, glplatTextureGetHeight(), 4, 8);
+    toggle_word_step_dpad(self, glplatTextureGetHeight(), 4, 8);
 }
 
 /* Toggles the item database's display byte and redraws the lobby when the pad loop is idle. */

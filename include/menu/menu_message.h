@@ -1,9 +1,11 @@
 /*
  * The unit's own view of the menu list work the first (0x802A6624-0x802A7CC8) block operates on,
- * plus the message/frame entry points' declarations.
+ * plus the window's message/frame/dialog entry points' declarations.  Re-homed here from
+ * `include/menu/fn_802A6624.h` on 2026-09-29 (the unit is `menu/menu_message.cpp` now; its file
+ * header carries the name's derivation, the two open seam questions and the residuals).
  *
- * The block is the menu's list/cursor layer: `fn_802A674C` fills the list at +0x1BE from one of two
- * source tables and `fn_802A6A64`/`fn_802A6B6C` step the cursor over it.  The record is the same
+ * The block is the menu's list/cursor layer: `menu_list_fill` fills the list at +0x1BE from one of two
+ * source tables and `menu_cursor_move`/`menu_cursor_seek` step the cursor over it.  The record is the same
  * object `menu/menu_item.h` views as `MenuSlot` (0x330 B): the kind byte at +0x0F and the count at
  * +0x16 are that struct's `field_0x00F`/`entry_count_a`, and the list/name fields here sit inside
  * `MenuSlot`'s untraced +0x19C..+0x23A run.  The two views are folded into one definition by a later
@@ -48,7 +50,7 @@ typedef struct MenuLspPos {
     /* +0x02 */ s16 y;
 } MenuLspPos;
 
-/* One 0x18-byte entry of the list block `fn_802A6C28`/`fn_802A6DB4` build before they hand it to the
+/* One 0x18-byte entry of the list block `menu_frame_entries_build`/`menu_frame_entries_build_row` build before they hand it to the
  * draw helpers: the entry's ordinal, a zeroed flag byte and the "the source slot is in use" byte.
  * The remaining bytes are not touched by this range.
  * size: 0x18 */
@@ -74,11 +76,11 @@ struct MenuListWork {
     /* +0x008 */ u8 unused_0x008[0x00F - 0x008];
     /* +0x00F */ u8 kind_0x00F;       /* 1: the move table, 2: the record table */
     /* +0x010 */ u8 unused_0x010[0x016 - 0x010];
-    /* +0x016 */ u8 count_0x016;      /* the list count `fn_802A66BC` recomputes */
+    /* +0x016 */ u8 count_0x016;      /* the list count `menu_list_count_update` recomputes */
     /* +0x017 */ u8 unused_0x017[0x1BB - 0x017];
-    /* +0x1BB */ u8 list_count_0x1BB; /* the count `fn_802A674C` fills in */
+    /* +0x1BB */ u8 list_count_0x1BB; /* the count `menu_list_fill` fills in */
     /* +0x1BC */ u8 unused_0x1BC[0x1BE - 0x1BC];
-    /* +0x1BE */ s8 list_0x1BE[0x0A]; /* the ten list ids `fn_802A674C` writes */
+    /* +0x1BE */ s8 list_0x1BE[0x0A]; /* the ten list ids `menu_list_fill` writes */
     /* +0x1C8 */ char short_name_0x1C8[0x0A];
     /* +0x1D2 */ char long_name_0x1D2[0x0E];
 };
@@ -88,16 +90,24 @@ struct MenuListWork {
  * owns 0x802A6624-0x802AD9C0, so the declarations live here and both headers include this one
  * (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
  * parameters are what the retail call sites need: a narrow argument must not be narrowed back to `s16`
- * for the call).  `fn_802A8F50` is unwritten - its callers spell it as below. */
+ * for the call).  `toggle_word_step` is unwritten - its callers spell it as below. */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void fn_802A7C04(u16 id, u16* item);
-s32 fn_802A8EC0(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
-s32 fn_802A8ED8(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
+void menu_hold_row_draw_by_lsp(u16 id, u16* item);
+void draw_dialog_piece(struct _SPR_DATA_* spr, s16 x, s16 y, s16 width, s16 height, u16 index,
+                         const struct _mh_ivec2_* pos);
+void put_frame_dialog(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color);
+
+s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
+s32 menu_cursor_step_open_last(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
 s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
-s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
+s32 toggle_word_step(void* state, u16 pad, s32 a, s32 b, s32 c);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
+s8* get_item_name_str(u8 index);
+s8* get_player_name_str(u8 index);
+s8* get_group2_name_str(u8 index);
+s8* get_digit_str(u8 index);
 
 #ifdef __cplusplus
 }
@@ -105,6 +115,11 @@ s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
 /* 0x802AA3EC - the `bool` row's colour, the front-end's spelling of the map's
  * `GetMenuFontColor__Fbbbb` (rule 9). */
 s32 GetMenuFontColor(bool a, bool b, bool c, bool d);
+s32 GetMenuFontColorRed(bool a, bool b, bool c, bool d);
+s32 GetMenuIconColor(bool a, bool b, bool c, bool d);
+
+/* 0x802A8D74 - the system dialog's OK-button row. */
+void put_message_sys_ok_button(void);
 #endif
 
 #endif /* MHTRI_MENU_MENU_MESSAGE_H */

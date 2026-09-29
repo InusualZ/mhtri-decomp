@@ -131,11 +131,6 @@ void fn_80055CC4(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055CC4 */
 void fn_80055DC8(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
 void fn_801E6850(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */
 
-/* The cockpit-side getters this library reads.  Their owners are the `cockpit.cpp` range above
- * (0x802D9EB4..0x802E0740), which `ai/fn_802D44F4.cpp` currently ends at 0x802DDC04 - rule 2 debt
- * until that range is re-cut (see this unit's file header). */
-_SPR_DATA_* get_lsp_data(u16 id, _mh_ivec2_* out);             /* 0x802E0550 */
-s32 get_wide_offset(u8 index);                                 /* 0x802E0490 */
 const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
 u32 get_rare_color(u8 index);                                  /* 0x802DB254 */
 
@@ -205,6 +200,15 @@ void note_box_pos_lower(_mh_ivec2_* pos, s16 lines);
 #ifdef __cplusplus
 /* The mangled map names are the compiler's spelling of these declarations (rule 9): the front-end
  * reproduces each map name exactly, and the call site writes the plain function. */
+
+/* The cockpit-side getters this library reads.  Their owners are the `cockpit.cpp` range above
+ * (0x802D9EB4..0x802E0740), which `ai/fn_802D44F4.cpp` currently ends at 0x802DDC04 - rule 2 debt
+ * until that range is re-cut (see this unit's file header).  They are declared here, at global C++
+ * scope, because their map names carry an argument list - a declaration inside the `extern "C"`
+ * block above relocates to the bare stem, which no link input defines. */
+_SPR_DATA_* get_lsp_data(u16 id, _mh_ivec2_* out);             /* 0x802E0550 */
+s32 get_wide_offset(u8 index);                                 /* 0x802E0490 */
+
 void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);
 void draw_font(const _SPR_DATA_& spr, s8* str, u32 flags, const _mh_ivec2_* pos);
 void draw_font_idx(u16 id, s8* str, u32 flags, const _mh_ivec2_* pos);

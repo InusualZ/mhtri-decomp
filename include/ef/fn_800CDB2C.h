@@ -49,9 +49,9 @@ u8* fn_800D0568(s32 index);
  * `Pl/fn_80224AC4.cpp` (rule 2). */
 u32 game_ready_ck(void);
 
-/* 0x800CF3C4 - the owner's own narrowed read, called by `menu/fn_802A6624.cpp`'s
- * `fn_802A6624`/`fn_802A674C` as a signed byte (the caller keeps an `extsb` on the widened
- * form and compares it with a signed `cmpwi`+`ble`).  Added with `menu/fn_802A6624.cpp`
+/* 0x800CF3C4 - the owner's own narrowed read, called by `menu/menu_message.cpp`'s
+ * `menu_list_mode_get`/`menu_list_fill` as a signed byte (the caller keeps an `extsb` on the widened
+ * form and compares it with a signed `cmpwi`+`ble`).  Added with `menu/menu_message.cpp`
  * (rule 2: this range owns the address). */
 s8 fn_800CF3C4(void);
 
