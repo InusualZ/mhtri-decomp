@@ -80,9 +80,23 @@ REPO_TOOLS = os.path.dirname(HERE)                       # tools/
 # `stylelint.strip` is the one comment/literal stripper in the repository: import it rather than write a
 # second one (a second stripper drifts and the two then disagree about what a comment is).  A comment-only
 # `src/**` conflict is resolved by comparing the stripped *code*.
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+# `unionprose` is the one union rule (code hunks union, prose hunks take the superset), shared with
+# `unionresolve`/`land.py`: both resolvers had the same prose-union defect, so the classification lives
+# once and both import it rather than drift apart.
+for _path in (REPO_TOOLS, HERE):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 from stylelint import strip  # noqa: E402
+from units import unionprose as up  # noqa: E402
+# The names this module's `resolve`, `addadd_choice` and selftest use stay here, but the implementations
+# live once in `unionprose`.
+prose_line = up.prose_line
+hunk_class = up.hunk_class
+union_side = up.union_side
+prose_superset = up.prose_superset
+union_markers = up.union_markers
+branch_only_additions = up.branch_only_additions
+missing_from = up.missing_from
 STATE = ".pi/merge-state.json"
 MARKERS = ("<<<<<<<", "|||||||", ">>>>>>>")
 RENAME = re.compile(r"\b(fn|lbl|loc)_([0-9A-Fa-f]{8})\b")
@@ -268,174 +282,6 @@ def markers_in(lines: list[str]) -> list[tuple[int, str]]:
     return found
 
 
-def prose_line(line: str, in_block: bool) -> tuple[bool, bool]:
-    """`(is_prose, still_in_block)` for one line of a conflict, given the incoming comment state.
-
-    The union rule has to tell an **additive declaration block** (one side's lines are additions to the
-    other's - union is correct) from a **comment paragraph both sides rewrote** (union duplicates the prose
-    and reintroduces the other side's old generated names).  A line is prose when it is blank, starts with
-    `//`, `/*` or `*`, or lies inside an open block comment (the "inside one" case: the paragraph's opening
-    `/*` is frequently *before* the conflict hunk, so the state is carried in).  This is deliberately
-    line-local, not a C tokenizer - it is exactly the shape that separates the two classes.
-    """
-    if not line.strip():
-        return True, in_block                     # a blank line never decides a class
-    if in_block:
-        return True, "*/" not in line             # any line inside a block comment is prose
-    head = line.lstrip()
-    if head.startswith("//"):
-        return True, False
-    if head.startswith("/*"):
-        return True, "*/" not in line
-    if head.startswith("*"):
-        return True, False                        # a ` * ...` continuation (or a `*/`)
-    return False, False
-
-
-def hunk_class(ours: list[str], theirs: list[str], in_block: bool) -> str:
-    """`"code"`, `"prose"` or `"mixed"` for one conflict hunk (blank lines are neutral).
-
-    Classified at the **region** level, not per side: a hunk where the two copies carry a comment line
-    *and* a code line is `mixed` (the caller prefers a superset for it and warns otherwise); a hunk with
-    no comment line is a declaration/body conflict - today's union target; a hunk with no code line is
-    prose, and union is exactly what must not happen to it.
-    """
-    has_prose = has_code = False
-    for side in (ours, theirs):
-        state = in_block                     # each side starts from the same incoming comment state
-        for line in side:
-            is_prose, state = prose_line(line, state)
-            if is_prose:
-                has_prose = True
-            else:
-                has_code = True
-    if not has_prose:
-        return "code"
-    return "mixed" if has_code else "prose"
-
-
-def union_side(ours: list[str], theirs: list[str]) -> list[str]:
-    """The append-union of one hunk: ours first, then theirs' lines ours does not already carry."""
-    merged = list(ours)
-    for line in theirs:
-        if line not in merged:
-            merged.append(line)
-    return merged
-
-
-def prose_superset(ours: list[str], base: list[str], theirs: list[str]) -> tuple[str | None, str]:
-    """Which side of a rewritten **prose** hunk carries the other's content: `(side|None, why)`.
-
-    A comment paragraph both sides rewrote must not be unioned (2026-09-29: a merger lane hit this twice in
-    one merge - `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h` - and `union_markers` appended
-    one side's lines to the other's, duplicating the paragraph mid-comment and reintroducing the old
-    generated names).  The correct side is the **superset**: the copy that already carries every non-blank
-    line the other side changed relative to the shared base - the same additions/superset rule
-    `addadd_choice` uses, applied to one hunk.  `ours` is the copy on `main` and `theirs` the copy on the
-    branch (the tool's convention throughout), and `why` always names the side taken and the evidence, so
-    the choice is auditable rather than inferred.  Neither side carrying the other is **not** a guess: it
-    is reported, never unioned.
-    """
-    ours_add = branch_only_additions(base, ours)
-    theirs_add = branch_only_additions(base, theirs)
-    theirs_has_ours = not missing_from(theirs, ours_add)
-    ours_has_theirs = not missing_from(ours, theirs_add)
-    if theirs_has_ours and ours_has_theirs:
-        return "ours", ("both copies carry the other's prose additions (%d main-side, %d branch-side) - "
-                        "kept main's copy" % (len(ours_add), len(theirs_add)))
-    if theirs_has_ours:
-        return "theirs", ("the branch's copy carries all %d line(s) main's side adds - the branch's copy "
-                          "is the superset" % len(ours_add))
-    if ours_has_theirs:
-        return "ours", ("main's copy carries all %d line(s) the branch's side adds - main's copy is the "
-                        "superset" % len(theirs_add))
-    return None, ("neither copy carries the other's prose additions (main's side lacks %d line(s), the "
-                  "branch's lacks %d) - no superset is derivable"
-                  % (len(missing_from(ours, theirs_add)), len(missing_from(theirs, ours_add))))
-
-
-def union_markers(text: str, path: str = "") -> tuple[str, int, list[dict]]:
-    """Union a `--diff3` merge result **by hunk class**: code hunks as before, prose hunks by superset.
-
-    Never applied to a `src/**` block blindly - a union of two *edits* duplicates both (an `if` block was
-    duplicated that way and cost an hour).  It stays right for an **additive declaration block** (a band
-    header's declarations, a block in if/else form) and that behaviour is pinned by the selftest.  It is
-    wrong for a **prose region both sides rewrote**: appending one side's lines to the other's duplicates
-    the paragraph mid-comment and reintroduces the older side's generated names (the 2026-09-29 merger
-    lane).  For a prose hunk the resolution is the **superset side**, and the decision is returned (and
-    reported by `resolve`) so which copy was taken, and why, is auditable.  A **mixed** hunk (comment and
-    code lines) prefers the superset when one is derivable and otherwise keeps the old union and returns a
-    warning naming the file.  A prose hunk with no superset is marked `blocked` - the caller refuses it,
-    it is never unioned.
-
-    Returns `(merged_text, conflict_hunks, decisions)`, one decision per hunk:
-    `{"hunk", "class", "took", "why", "blocked"?|"warning"?}`.
-    """
-    out: list[str] = []
-    source = text.splitlines(keepends=True)
-    i, conflicts = 0, 0
-    decisions: list[dict] = []
-    in_block = False
-    while i < len(source):
-        line = source[i]
-        if not line.startswith("<<<<<<<"):
-            out.append(line)
-            _, in_block = prose_line(line, in_block)
-            i += 1
-            continue
-        # --- one conflict hunk: split it into ours / base / theirs ------------------------------------
-        conflicts += 1
-        ours: list[str] = []
-        base: list[str] = []
-        theirs: list[str] = []
-        mode = "ours"
-        i += 1
-        while i < len(source) and not source[i].startswith(">>>>>>>"):
-            if source[i].startswith("|||||||"):
-                mode = "base"
-            elif source[i].startswith("======="):
-                mode = "theirs"
-            elif mode == "ours":
-                ours.append(source[i])
-            elif mode == "base":
-                base.append(source[i])
-            else:
-                theirs.append(source[i])
-            i += 1
-        if i < len(source):
-            i += 1                                       # consume the `>>>>>>>` line
-        # --- classify and resolve ---------------------------------------------------------------------
-        klass = hunk_class(ours, theirs, in_block)
-        decision: dict = {"hunk": conflicts, "class": klass, "took": None, "why": ""}
-        if klass == "code" or (klass == "prose" and not any(l.strip() for l in base)):
-            # An additive declaration block, or a prose insertion whose base has no lines (both sides only
-            # *added*): the union is safe by construction, and is the behaviour merges depend on.  A
-            # **mixed** hunk always goes through the superset check (and warns when there is none), because
-            # a comment line and a code line at the same anchor is exactly where a blind union is unsafe.
-            chosen = union_side(ours, theirs)
-            decision["why"] = ("additive declaration block - unioned (ours then theirs)" if klass == "code"
-                               else "prose insertion with no base lines - unioned")
-        else:
-            side, why = prose_superset(ours, base, theirs)
-            if side is not None:
-                chosen = ours if side == "ours" else theirs
-                decision.update(took=side, why=why)
-            elif klass == "mixed":
-                chosen = union_side(ours, theirs)
-                decision["why"] = why
-                decision["warning"] = ("%s: a conflict region mixes comment and code and no side carries "
-                                       "the other's content (%s) - unioned as before, check it by hand"
-                                       % (path or "<unknown file>", why))
-            else:
-                chosen = list(ours)                      # a placeholder; `resolve` refuses to commit it
-                decision.update(blocked=True, why=why)
-        out.extend(chosen)
-        for chosen_line in chosen:
-            _, in_block = prose_line(chosen_line, in_block)
-        decisions.append(decision)
-    return "".join(out), conflicts, decisions
-
-
 def text_ranges(splits: str) -> list[tuple[int, int, str]]:
     """`(start, end, unit)` for every `.text` range in a `splits.txt`."""
     ranges, cur = [], None
@@ -479,14 +325,6 @@ def classification(path: str) -> str:
         return "band"
     return "threeway"
 
-
-def branch_only_additions(base: list[str], branch: list[str]) -> list[str]:
-    """The non-blank lines the branch has and the base has not - its side of the merge, for the proof."""
-    return [l for l in branch if l.strip() and l not in base]
-
-
-def missing_from(candidate: list[str], wanted: list[str]) -> list[str]:
-    return [l for l in wanted if l not in candidate]
 
 
 def addadd_choice(base_lines: list[str], ours: list[str], theirs: list[str]) -> tuple[str | None, str]:
