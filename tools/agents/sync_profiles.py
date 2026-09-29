@@ -5,7 +5,7 @@ WHY THIS EXISTS (the drift it fixes, measured 2026-09-27):
 
 The campaign's brief is machine-generated - it reads `docs/plan.md` section 6.5 verbatim through
 `brief.plan_section` - so it cannot drift. The subagent profiles are hand-written prose, and
-`.agents/agents/decompiler.md` and `.agents/agents/fixer.md` each *duplicated* the rule text (the
+`.claude/agents/decompiler.md` and `.claude/agents/fixer.md` each *duplicated* the rule text (the
 decompiler inlined it across ~110 lines). Duplicated policy drifts, and nothing detected it: commit
 `4f3cb4ea1` deleted the `rule 7 deferred: <reason>` escape (rule 7 now fires on every `fn_` / `lbl_` /
 `loc_` / `unk` identifier in `src/`, whoever owns it - no exemption, no deferral; the land gate's
@@ -27,7 +27,7 @@ It is idempotent (`python tools/agents/sync_profiles.py` writes the block only w
 `--check` exits non-zero when a profile's block does not match what the plan says today - so a rule
 change that forgets the profiles fails the check instead of silently leaving the prompts stale.
 
-The same tripwire covers the profile *set*, not only its text: a file in `.agents/agents/` whose frontmatter
+The same tripwire covers the profile *set*, not only its text: a file in `.claude/agents/` whose frontmatter
 carries a `name:` (i.e. a profile, unlike `TESTS.md`, which is prose) that is **not** in `PROFILES` is an
 error that names the file. `surveyor.md` was added to the directory but not to `PROFILES`, and `--check`
 went on printing "all profiles in sync" while the new profile carried none of the rules - the exact failure
@@ -71,7 +71,7 @@ END = "<!-- SECTION-6.5-RULES-END -->"
 
 PLAN_HEADING = "### 6.5 Type and naming discipline"
 PLAN_REL = os.path.join("docs", "plan.md")
-AGENTS_REL = os.path.join(".agents", "agents")
+AGENTS_REL = os.path.join(".claude", "agents")
 
 # A leading YAML frontmatter block opens with `---` on line 1 and closes on the next `---` line. Only a
 # `name:` inside that block makes a file a profile; prose (`TESTS.md`) has no frontmatter and is skipped.
@@ -84,12 +84,12 @@ NAME_RE = re.compile(r"^name:\s*\S")
 # leaving them hand-written is the drift this tool exists to prevent. All four writer/reviewer profiles
 # are now generated.
 PROFILES = (
-    os.path.join(".agents", "agents", "decompiler.md"),
-    os.path.join(".agents", "agents", "fixer.md"),
-    os.path.join(".agents", "agents", "merger.md"),
-    os.path.join(".agents", "agents", "codereviewer.md"),
-    os.path.join(".agents", "agents", "surveyor.md"),
-    os.path.join(".agents", "agents", "worker.md"),
+    os.path.join(".claude", "agents", "decompiler.md"),
+    os.path.join(".claude", "agents", "fixer.md"),
+    os.path.join(".claude", "agents", "merger.md"),
+    os.path.join(".claude", "agents", "codereviewer.md"),
+    os.path.join(".claude", "agents", "surveyor.md"),
+    os.path.join(".claude", "agents", "worker.md"),
 )
 
 # A rule table row: `| 1 | **title** | meaning |`. The meaning cell is one physical line in the plan.
@@ -135,7 +135,7 @@ def frontmatter_name(text):
 
 
 def uncovered_profiles(root, profiles=None):
-    """Profile files in `.agents/agents/` that carry a frontmatter `name:` but are not in `profiles`.
+    """Profile files in `.claude/agents/` that carry a frontmatter `name:` but are not in `profiles`.
 
     This is the tripwire for the failure this tool exists to prevent, one level up: a profile added to the
     directory but not to `PROFILES` keeps whatever section 6.5 text it has, and `--check` still prints the

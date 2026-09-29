@@ -4,10 +4,10 @@
     python tools/units/playbook_selftest.py
     python tools/units/playbook.py --selftest
 
-No build, no `ninja` and no repository state: every outbox, note, AGENTS.md and matching.md is a fixture
+No build, no `ninja` and no repository state: every outbox, note, CLAUDE.md and matching.md is a fixture
 written into a temp directory, so the contract is pinned - a finding is classified against the registry, five
 identical adopt probes become one group, an already-landed idea is skipped by number, a finding with no
-numbers is refused, and `run()` writes the drafts without touching `docs/**` or `AGENTS.md`.
+numbers is refused, and `run()` writes the drafts without touching `docs/**` or `CLAUDE.md`.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ if os.path.join(ROOT, "tools", "units") not in sys.path:
 import playbook as pb  # noqa: E402
 
 AGENTS = """\
-# AGENTS.md
+# CLAUDE.md
 
 ## Matching playbook (index of `docs/matching.md`)
 
@@ -106,7 +106,7 @@ def selftest() -> int:
     drafts = os.path.join(tmp, "drafts")
     os.makedirs(obx)
     os.makedirs(notes)
-    agents_p = os.path.join(tmp, "AGENTS.md")
+    agents_p = os.path.join(tmp, "CLAUDE.md")
     matching_p = os.path.join(tmp, "matching.md")
     open(agents_p, "w", encoding="utf-8").write(AGENTS)
     open(matching_p, "w", encoding="utf-8").write(MATCHING)
@@ -142,7 +142,7 @@ def selftest() -> int:
                          config_requests=[
                              {"kind": "shared-file", "file": "docs/matching.md",
                               "why": "needs #pragma peephole off: fn_E 82.56 -> 100"},
-                             {"kind": "shared-file", "file": "AGENTS.md",
+                             {"kind": "shared-file", "file": "CLAUDE.md",
                               "why": "the table row for the same idea (a unit needing the peephole pass off)"},
                              {"kind": "flag", "lib": "rso", "change": "-str reuse,pool",
                               "evidence": "fn_E 84.0 -> 90.0; readonly .rodata 0xDA / .data 0x38 -> .data 0x112"},
@@ -225,7 +225,7 @@ def selftest() -> int:
     check("duplicates merged", report["duplicates_merged"], sum(len(g.findings) - 1 for g in ready))
     check("docs/matching.md untouched",
           hashlib.sha1(open(matching_p, "rb").read()).hexdigest(), m_before)
-    check("AGENTS.md untouched",
+    check("CLAUDE.md untouched",
           hashlib.sha1(open(agents_p, "rb").read()).hexdigest(), h_before)
     files = set(os.listdir(drafts))
     check_true("README written", "README.md" in files)

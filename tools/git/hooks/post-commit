@@ -1,6 +1,6 @@
 #!/bin/sh
 # Post-commit guard (docs/plan.md 7.18). The pre-commit hook pulled the LOCAL-ONLY block out of a staged
-# AGENTS.md to make the commit legal (non-negotiable 8); this puts it back into the working tree now that the
+# CLAUDE.md to make the commit legal (non-negotiable 8); this puts it back into the working tree now that the
 # commit exists.
 #
 # The marker pre-commit writes is the whole state machine: it survives a *failed* commit (post-commit never

@@ -2,7 +2,7 @@
  *
  * The window at 0xCC008000 is the Wii's GX FIFO; one union member per store width is exactly what the
  * SDK's `GXWGFifo` is, so a writer body reads as `GXWGFifo.u16 = value;`. The union is defined once
- * because more than one unit of the `auto` library owns a copy of the writer family (AGENTS.md ->
+ * because more than one unit of the `auto` library owns a copy of the writer family (CLAUDE.md ->
  * Conventions, rule 1: a shared type lives in one header).
  *
  * The colour is the SDK's `_GXColor` (`typedef struct _GXColor { ... } GXColor;`).  The tag is

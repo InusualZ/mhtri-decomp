@@ -477,7 +477,7 @@ def _ninja_runner(unit_line=None, sibling_line=None):
 def proposal_rows() -> int:
     """The proposal path: the target object and the command line, without MAIN's build graph.
 
-    This is the gap AGENTS.md records - a worker registers a unit in its worktree and then discovers MAIN
+    This is the gap CLAUDE.md records - a worker registers a unit in its worktree and then discovers MAIN
     has neither a ninja rule nor `build/RMHE08/obj/<unit>.o`. The three workers who hit it each hand-built
     a harness (borrow a sibling's command, score against MAIN's `auto_*_text.o`); these are the assertions
     that the tool now does it itself, and that a *registered* unit is decided first.

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Pull and push the LOCAL-ONLY working-state section of AGENTS.md.
+"""Pull and push the LOCAL-ONLY working-state section of CLAUDE.md.
 
 Non-negotiables rule 8: everything between the two LOCAL-ONLY markers is live agent working state and
-must never be committed, so before a commit that touches AGENTS.md the section has to come out of the
+must never be committed, so before a commit that touches CLAUDE.md the section has to come out of the
 file - and afterwards it has to go back exactly where it was.
 
     localonly.py pull     # remove the section, store it in a state file
-    git add AGENTS.md && git commit ...
+    git add CLAUDE.md && git commit ...
     localonly.py push     # put the stored section back where it belongs
 
 The state file (default `.pi/local-only.state.json`, gitignored) records the removed bytes plus the
@@ -27,7 +27,7 @@ recovery, so the block can never be stranded as the only copy again.
 
 Other commands: `status` (is the section present / is a state file pending), `dump` (write the stored
 block to `--out`, or stdout, for a manual restore) and `verify` (run rule 8's check against a committed
-revision: `git show <rev>:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` must be 0).
+revision: `git show <rev>:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'` must be 0).
 """
 import argparse
 import datetime
@@ -42,7 +42,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BEGIN = "<!-- LOCAL-ONLY-BEGIN: stripped before every commit, see Non-negotiables rule 8 -->"
 END = "<!-- LOCAL-ONLY-END -->"
-DEFAULT_FILE = "AGENTS.md"
+DEFAULT_FILE = "CLAUDE.md"
 DEFAULT_STATE = ".pi/local-only.state.json"
 ANCHOR = 240
 BACKUP_KEEP = 5
@@ -373,7 +373,7 @@ def selftest() -> int:
     """Check the backup helpers on a temp directory.
 
     Only the pure helpers are exercised: `pull`/`push` are bound to the real repository, and running
-    either here would strip the live section out of AGENTS.md.  The runner's tree-dirty guard is the
+    either here would strip the live section out of CLAUDE.md.  The runner's tree-dirty guard is the
     backstop for that, not this test.
     """
     import tempfile

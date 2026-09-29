@@ -1,4 +1,4 @@
-# AGENTS.md
+# CLAUDE.md
 
 Guidance for AI agents (and humans) working in this repository.
 
@@ -53,16 +53,16 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
 8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
    `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
-   content. **`land.py` handles it for you**: when AGENTS.md is in the batch it runs `localonly pull` before
+   content. **`land.py` handles it for you**: when CLAUDE.md is in the batch it runs `localonly pull` before
    the commit and `push` in a `finally`, and it tells the block apart from a real edit
-   (`agents_md_real_change`). So **never run `localonly.py pull` + `git checkout -- AGENTS.md` by hand** -
-   that checkout silently reverts the real AGENTS.md edit you are landing; land the batch and let the tool
+   (`agents_md_real_change`). So **never run `localonly.py pull` + `git checkout -- CLAUDE.md` by hand** -
+   that checkout silently reverts the real CLAUDE.md edit you are landing; land the batch and let the tool
    do it. **A plain `git commit` is safe too** (2026-09-28): the pre-commit hook pulls the block out and
-   re-stages AGENTS.md, and `post-commit` pushes it back (both in `tools/git/hooks/`, and the pending state
+   re-stages CLAUDE.md, and `post-commit` pushes it back (both in `tools/git/hooks/`, and the pending state
    is `.git/localonly-pending`); if the commit fails, the hook prints the one command that restores the
-   block. Use the tool directly (`python tools/agents/localonly.py pull|push`, skill: `agents-md-local-only`)
-   only for a manual AGENTS.md commit, and verify a revision with
-   `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` → `0`. (This rule's own prose mentions the
+   block. Use the tool directly (`python tools/agents/localonly.py pull|push`, skill: `claude-md-local-only`)
+   only for a manual CLAUDE.md commit, and verify a revision with
+   `git show HEAD:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'` → `0`. (This rule's own prose mentions the
    markers, so anchor the match at line start; the tool matches whole marker lines for the same reason.)
 
 ## Matching policy: flags and source variants
@@ -77,7 +77,7 @@ Two working rules that apply to **every** unit, agreed with the project owner:
    per-function comment - see "Commenting and naming" under Conventions for what a function comment is for.
    Never land a change that makes any function worse. Landing means the unit's own source or
    `configure.py` carries the change and the repository rebuilds better - the skill does it with
-   `python .agents/skills/mwcc-unit-matching/scripts/mt.py variants --apply <name>` followed by a forced
+   `python .claude/skills/mwcc-unit-matching/scripts/mt.py variants --apply <name>` followed by a forced
    rebuild; a probe-only winner is not progress.
 2. **Evidence-backed flags live in `configure.py` as soon as they are proven**, even while the unit is
    still short of 100 %, so the repo always reflects the best known state. They must be **per library**
@@ -128,7 +128,7 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step (see
   Non-negotiables).
 * **A lane is launched with the profile that matches its job - not with the generic `worker` (owner's
-  instruction, 2026-09-26).** The project defines **four** profiles in `.agents/agents/` (tracked):
+  instruction, 2026-09-26).** The project defines **four** profiles in `.claude/agents/` (tracked):
   **`decompiler`** is *unit work* - register a proposal at its final home and reconstruct its bodies;
   **`fixer`** is a refused gate or a measured regression on a branch; **`merger`** is a refused *apply* -
   two lanes' views of one record or type, and a fold (the `recordmerge.py` class); **`codereviewer`** is
@@ -144,7 +144,7 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
   guessed. So a tooling or docs lane is a `worker` lane - launching it as `decompiler` hands it unit policy
   it can never satisfy, and a review lane as a writer risks the tree it reviews.
 * **Land the orchestrator-side batch first: `land.py land --already-applied` stages what it finds in MAIN.**
-  Measured 2026-09-26: an uncommitted `AGENTS.md` + `docs/plan.md` pair rode the `OS/FindContainHeap_.c` unit
+  Measured 2026-09-26: an uncommitted `CLAUDE.md` + `docs/plan.md` pair rode the `OS/FindContainHeap_.c` unit
   commit (`4fad00522`), because the gate's commit-sweep guard protects a path only when the base's
   `dirty_at_base` snapshot recorded it *and* the batch does not name it - it is a guard, not a guarantee, and
   it does not stop a tracked file that is dirty at `record-base` time. Same class as the `docs/plan.md` edit
@@ -169,7 +169,7 @@ The steady loop, per unit:
 4. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
 
 **The loop closes with a review: `decomp -> review -> decomp`.** A committed branch is reviewed **before** it
-lands, by a read-only review lane (`.agents/agents/codereviewer.md`, launched with `python
+lands, by a read-only review lane (`.claude/agents/codereviewer.md`, launched with `python
 tools/units/slots.py spawn --kind review`), against the branch's own diff: `git diff main...<branch>`,
 `python tools/units/stylelint.py --ref <branch>` (it judges a branch's committed tree without checking it out)
 and per-function objdiff. The reviewer judges the dimensions its profile lists - honesty of the match claim
@@ -197,27 +197,27 @@ problem column is the opening of that section's own problem sentence (truncated 
 does not. Read the index as the map of what is already known when a unit is opened; the *work* of matching
 one unit is "The core loop" below.
 
-The same method is packaged as a project skill, `.agents/skills/mwcc-unit-matching/` (tracked - the
+The same method is packaged as a project skill, `.claude/skills/mwcc-unit-matching/` (tracked - the
 `.gitignore` excepts it), so an agent can load it on demand instead of reading the playbook every session: `SKILL.md` holds the loop and the idea list,
 `references/` is *generated* from `docs/matching.md` (never edit it - run
-`python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py`, or `--check` to detect staleness),
+`python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py`, or `--check` to detect staleness),
 and `scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`, `frames`, `matrix`, `sweep`,
 `variants`, `shapes`, `diff`, `slots`, `sections`, `dwarf`). The playbook - not this index - is the
 authority; the
 index is derived from it.
 
-All project **subagent profiles** live in `.agents/agents/` (tracked), discovered by the harness as *project*
+All project **subagent profiles** live in `.claude/agents/` (tracked), discovered by the harness as *project*
 agents. `decompiler.md` is the unit-work role: it inherits this file (`inheritProjectContext: true`), loads
 the matching/verify/registration skills (`skills:`), and carries the rules that used to be hand-typed into
 every launch. When a launch prompt and the profile disagree, **the profile wins** - so the rules live there,
 not in the prompt. Which profile a lane gets, and why it is not a cosmetic choice, is the rule in
 "Operational mode" below. A profile edit is not live until `tools/agents/install.sh` has copied
-`.agents/agents/*.md` to `~/.pi/agent/agents/` (it refuses when the section 6.5 block is stale), because the
+`.claude/agents/*.md` to `~/.claude/agents/` (it refuses when the section 6.5 block is stale), because the
 harness reads the installed copy - a worktree cut before the edit otherwise serves the old prompt.
 
-All project skills live in one tracked folder, `.agents/skills/`, so every harness sees the same set:
+All project skills live in one tracked folder, `.claude/skills/`, so every harness sees the same set:
 `mwcc-unit-matching/` (this playbook), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
-range and rename symbols without ever loading `symbols.txt` into context), `agents-md-local-only/`
+range and rename symbols without ever loading `symbols.txt` into context), `claude-md-local-only/`
 (`tools/agents/localonly.py` - pull the local-only section out of this file before a commit and push it
 back after), `objdiff-verify/` (proving a unit really matches), `tu-boundary-discovery/`
 (`tools/splits/tudiscover.py` - from one symbol address, work out which functions and data ranges form one
@@ -351,7 +351,7 @@ How to work the list:
    exists only in a chat message or a scratch report is lost at the next compaction, and the next unit
    re-derives it.
 3. The same commit brings the skill's copy with it: `python
-   .agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check` must come back clean, because
+   .claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check` must come back clean, because
    `references/` is what a fresh session and every subagent actually load. The index itself is checked by
    `python tools/agents/sync_playbook_index.py --check` (wired into `tools/selftest.py`).
 4. An idea that fails stays in the table below as `no`, with the evidence that killed it, so it is not
@@ -395,9 +395,9 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                             symbols/  symbol-map proxy (symedit.py): look up, list by range and rename
                                       symbols in config/RMHE08/symbols.txt without loading it into
                                       context - see the `symbol-map-editing` skill
-                            agents/   AGENTS.md housekeeping (localonly.py): pull the local-only
+                            agents/   CLAUDE.md housekeeping (localonly.py): pull the local-only
                                       working-state section out before a commit and push it back after
-                                      - see the `agents-md-local-only` skill; subagent-profile sync
+                                      - see the `claude-md-local-only` skill; subagent-profile sync
                                       (sync_profiles.py): generate each profile's section 6.5 rule
                                       block from docs/plan.md - `--check` exits non-zero when a
                                       profile is stale
@@ -465,6 +465,29 @@ Inside `build/RMHE08/`:
 
 objdiff compares the `src/` candidate against the `obj/` target. Keeping those two straight is essential.
 
+## Agent harness: Claude Code
+
+This repository was converted from the pi agent harness to Claude Code on 2026-09-29. What lives where:
+
+* **`CLAUDE.md`** (this file) is the project instructions file; it was `AGENTS.md`. The local-only block rule
+  (non-negotiable 8) is unchanged, and `tools/agents/localonly.py` and the git hooks address `CLAUDE.md`.
+* **`.claude/agents/*.md`** are the subagent profiles (frontmatter `name`, `description`, `tools`, `skills`).
+  `tools/agents/install.sh` copies them to `~/.claude/agents/`, so a worktree cut before a profile edit still
+  sees the current prompt. `codereviewer` has no `Write`/`Edit` in `tools:` - read-only by construction.
+* **`.claude/skills/*`** are the project skills (`SKILL.md` per folder), loaded on demand.
+* **A lane is a headless `claude --agent <profile> -p <task>` process with its cwd at a slot.** The Agent tool has
+  no `cwd` parameter and the slot design is one directory per lane, so `tools/units/lanecmd.py` builds the launch
+  line (`slots.py spawn`, `queue.py next` and `backlog.py` all print it). Its `--session-id` is what answers a
+  lane's question: `claude --resume <session-id> -p "<ruling>"` in the same cwd. `CLAUDE_BIN`,
+  `LANE_PERMISSION_MODE` and `LANE_ALLOWED_TOOLS` override the binary, the permission mode (default
+  `acceptEdits`) and the allowed tools (default `Bash`).
+* **A live lane is read from `~/.claude/sessions/<pid>.json`** (`slots.live_runs`): a record counts while its pid
+  is alive, and `release`/`reclaim` refuse a slot a live session is working in.
+* **`.pi/` is unchanged.** It is the campaign's own gitignored scratch (outbox, notes, claims, lane state), not
+  the old harness's directory, and lanes and tools still write there.
+* **A lane cannot block on a question.** The `contact_supervisor` channel is gone: a lane ends its turn with the
+  decision request as its final report and waits to be resumed.
+
 ## Build & verify
 
 Windows-friendly (this is the supported setup here): Python 3.12 + `ninja` on `PATH`. The toolchain
@@ -507,7 +530,7 @@ Notes:
 
 Verifying whether a unit, function or symbol matches is its own procedure — per-symbol objdiff plus raw ELF
 evidence, and a specific set of traps (`complete_code_percent` lies, `ninja build/RMHE08/ok` cannot isolate
-one unit, a function missing from the report is 0 %). Follow skill **`.agents/skills/objdiff-verify/SKILL.md`**
+one unit, a function missing from the report is 0 %). Follow skill **`.claude/skills/objdiff-verify/SKILL.md`**
 (everything under `.pi/` is gitignored - the tracker holds no path there).
 
 ## The core loop: adding / matching a translation unit
@@ -561,7 +584,7 @@ regression if the hash goes red.
   `Matching` unit's object is substituted in. A `Matching` flag on a wrong object is worse than no flag —
   and a failing `ninja build/RMHE08/ok` cannot tell you *which* unit is wrong.
 * **A `.comment` version-byte difference means a different compiler build.** Dump it with
-  `python tools/elf/elfsect.py <obj>` (also at `.agents/skills/objdiff-verify/scripts/elfsect.py`): the
+  `python tools/elf/elfsect.py <obj>` (also at `.claude/skills/objdiff-verify/scripts/elfsect.py`): the
   original Camellia object is `"CodeWarrior" 0e …`, our `Wii/1.3` build is `"CodeWarrior" 0f …`, and
   `config.yml`'s `mw_comment_version: 14` describes the original. Different version byte + `0 %`/size-very-
   different functions = suspect the compiler release, not the source.
@@ -580,7 +603,7 @@ regression if the hash goes red.
 * Local agent scratch directories (`.lavish/` and everything under `.pi/` - notes, prompts, scratch) are
   gitignored; keep them that way and never add their contents to commits. `.agents/` is ignored **except**
 `agents/` and
-  its skills folder, which is tracked in full (`.agents/skills/`) so every harness shares one set of skills.
+  its skills folder, which is tracked in full (`.claude/skills/`) so every harness shares one set of skills.
 
 ## Conventions
 
@@ -680,8 +703,8 @@ regression if the hash goes red.
 * [ ] For a single unit/symbol: the object compiled **and** its objdiff diff shows the claimed match level
       (per-symbol `match_percent`, equal section sizes) — see the `objdiff-verify` skill.
 * [ ] `git status --short` shows only intended files (no `build/`, no `orig/`, no scratch dirs). A lone
-      `M AGENTS.md` just means the local-only block differs, which is expected.
-* [ ] The committed `AGENTS.md` has no local-only block: `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'`
+      `M CLAUDE.md` just means the local-only block differs, which is expected.
+* [ ] The committed `CLAUDE.md` has no local-only block: `git show HEAD:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'`
       → `0`.
 * [ ] `symbols.txt` / `splits.txt` edits are byte-clean for the lines you didn't mean to touch
       (`git diff --stat` sanity check — these files are huge; a symbol rename goes through

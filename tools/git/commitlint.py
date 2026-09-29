@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Lint commit messages against the convention AGENTS.md defines ("Commit messages follow one convention").
+"""Lint commit messages against the convention CLAUDE.md defines ("Commit messages follow one convention").
 
-The convention is `<category>: <message>`, then an optional long description. AGENTS.md is the
+The convention is `<category>: <message>`, then an optional long description. CLAUDE.md is the
 specification; this tool checks only the part of it that is **mechanically** checkable:
 
 | # | check | how |
 | - | ----- | --- |
 | 1 | subject shape | the first line is `<category>: <message>` - a category token, a colon, a space, then the message |
 | 2 | category membership | the category names a place in the tree (`game/<module>`, `tools/<area>`, `agents/<profile|policy>`, `config/<what>`, `docs/<topic>`, `repo/<area>`) - see `derive_members` |
-| 3 | unknown member / family | a member not in a known family is an **error** (a typo or an invented module is exactly what that catches); an unknown **family** is a **warning** (the convention calls the list open, so a new family is added to AGENTS.md deliberately) |
+| 3 | unknown member / family | a member not in a known family is an **error** (a typo or an invented module is exactly what that catches); an unknown **family** is a **warning** (the convention calls the list open, so a new family is added to CLAUDE.md deliberately) |
 | 4 | message length | at most 120 characters, counted *after* `<category>: `, so the category and its separator are not charged against it |
 | 5 | subject line, not a wall | the first line is not empty or all whitespace, and a body is separated from it by a blank line |
 
@@ -27,7 +27,7 @@ drift from the tree it describes:
 * `tools/<area>` - a directory under `tools/` (the grouping: `tools/units`, `tools/git`, `tools/flags`),
   or the **stem of any script at any depth** (`tools/units/land.py` -> `tools/land`,
   `tools/units/stylelint.py` -> `tools/stylelint`).
-* `agents/<name>` - the profiles in `.agents/agents/*.md`, plus `policy` for AGENTS.md.
+* `agents/<name>` - the profiles in `.claude/agents/*.md`, plus `policy` for CLAUDE.md.
 * `config/{flags,symbols,splits}` - the three inputs the convention names (configure.py -> `flags`,
   symbols.txt -> `symbols`, splits.txt -> `splits`).
 * `docs/<topic>` - the documents under `docs/`.
@@ -133,7 +133,7 @@ def derive_members(root: str) -> dict:
     members["tools"] = tools
 
     agents = {"policy"}
-    adir = os.path.join(root, ".agents", "agents")
+    adir = os.path.join(root, ".claude", "agents")
     try:
         names = os.listdir(adir)
     except OSError:
@@ -186,7 +186,7 @@ def category_findings(category: str, members: dict) -> list:
         family, member = category, ""
     if family not in members:
         return [_finding("warning",
-                         "unknown family `%s` - the list is open, but add it to AGENTS.md deliberately"
+                         "unknown family `%s` - the list is open, but add it to CLAUDE.md deliberately"
                          % family)]
     if not member:
         return [_finding("error",
@@ -393,7 +393,7 @@ def install_hook(root: str, force: bool, out=sys.stdout) -> int:
 
 
 def main(argv: list | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Lint commit messages against AGENTS.md's convention.")
+    ap = argparse.ArgumentParser(description="Lint commit messages against CLAUDE.md's convention.")
     ap.add_argument("message_file", nargs="?",
                     help="the message file a `commit-msg` hook receives")
     ap.add_argument("--message", metavar="MSG", help="lint MSG (a subject, optionally with a body)")

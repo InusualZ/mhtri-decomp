@@ -8,7 +8,7 @@
  * (used by the C units of `ef/`, `enemy/`, `sound/`) and `Vec3` / `Mtx34` (used by the ef emitter units).
  * Those are typedefs of the namespace type, not second definitions: there is a single layout and the
  * spellings alias it, which is why a mangled callee declared with the C spelling still pairs with the
- * map.  AGENTS.md -> Conventions rule 1; docs/plan.md 6.5.
+ * map.  CLAUDE.md -> Conventions rule 1; docs/plan.md 6.5.
  *
  * This header is includable from C and C++ (the include counts in the tree put this file in both, once
  * the C units that carry their own `VEC3` copy include it in wave 2).

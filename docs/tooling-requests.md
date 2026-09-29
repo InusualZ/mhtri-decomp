@@ -114,7 +114,7 @@ _749 sources (316 outboxes, 433 notes), 31 requests, 204 votes._
 * `decompiler-80366618-fn-80366618-a8a1` - python build/tmp/m.py ef/eft053.cpp --measure <symbol> (recompile.py with its `absolutize` repaired - see the tooling note)
 * `initnetworksessionstable-d599` - python tools/units/recompile.py Network/initNetworkSessionStable --measure initNetworkSessionStable (100.0, fresh object) + a direct-compile probe harness for the flag matrix (build/tmp/tryflag.py, the unit's real command line + one extra flag) + ninja build/RMHE08/report.json (main/Network/initNetworkSessionStable ...
 * `merger for worker/menu-item-8b55 (fold of worker/802a5444-fn-802a5444-7041 into the landed 0x8029F3C8 half)` - "kind": "done-in-this-fold", "why": "new owner header for fn_8027D738 (the branch's include/ content, taken with the measured u32 spelling). Its consumer path forced three declaration views to their owner's spelling." } ], "finished_at": "2026-09-26T05:05:00", "flags_probed": [
-* `network-pat-abstraction` - about an unowned table. Ownership first (`splits.txt` parse), then emission. --- ## (d) Proposed playbook row + `decompiler.md` paragraph ### Proposed row for `.agents/skills/mwcc-unit-matching/references/playbook.md` Highest existing row is **75**, so this is **76**. `markdo
+* `network-pat-abstraction` - about an unowned table. Ownership first (`splits.txt` parse), then emission. --- ## (d) Proposed playbook row + `decompiler.md` paragraph ### Proposed row for `.claude/skills/mwcc-unit-matching/references/playbook.md` Highest existing row is **75**, so this is **76**. `markdo
 * `pipeline-experiment-report` - (`recompile.py --measure` compiles one unit from any worktree — its ~15-minute scratch harness was pure waste).
 * `pipeline-phase2-initnet` - My own scratch harness (batch files under `.pi/tmp/rv/`) cost ~15 minutes and two bugs (pragma-state labels inverted; a size difference I first blamed on `-MMD`). `tools/units/recompile.py --measure <unit>` exists and compiles one unit from any worktree without ninja — the profile should point reviewers at it instead ...; cost: 15 minutes
 * `pl-act-09c6` - (`build/tmp/pl.py table`); the unit number comes from `objdiff-cli report generate -p .`, which is the scale the campaign's `report.json` uses. `functionRelocDiffs=none` is required to reproduce the brief's per-symbol
@@ -437,7 +437,7 @@ _749 sources (316 outboxes, 433 notes), 31 requests, 204 votes._
 
 **Evidence.**
 
-* `worker/ui-hud-layout-b64e` - MERGE LANE - main advanced DURING the merge, and the first commit message mis-attributes it (correction here, because a merge commit cannot be amended). At `git merge main` time main's tip was d99bf76d7, whose committed AGENTS.md / docs/matching.md / references/playbook.md legitimately did NOT yet carry playbook ...
+* `worker/ui-hud-layout-b64e` - MERGE LANE - main advanced DURING the merge, and the first commit message mis-attributes it (correction here, because a merge commit cannot be amended). At `git merge main` time main's tip was d99bf76d7, whose committed CLAUDE.md / docs/matching.md / references/playbook.md legitimately did NOT yet carry playbook ...
 
 ## 21. RENAMES: 38 rows renamed through tools/symbols/symedit.py with the referrer sweep done by a script over src/ + include/. The sweep must NOT be a blind token ...
 

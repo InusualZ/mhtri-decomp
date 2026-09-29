@@ -15,7 +15,7 @@ The test pins that in three ways:
   `rule 7 deferred` escape (that is the drift this tool exists to end);
 * against `brief.plan_section` - the brief and the profiles read section 6.5 through the same bytes.
 
-It also pins the coverage tripwire: a file in `.agents/agents/` with a frontmatter `name:` that is not in
+It also pins the coverage tripwire: a file in `.claude/agents/` with a frontmatter `name:` that is not in
 `sync_profiles.PROFILES` is an error (a prose file without frontmatter is skipped, `TESTS.md` included), so a
 new profile cannot be added without being checked.
 """
@@ -138,7 +138,7 @@ def selftest() -> int:
 
     # --- the deliberate staleness: stale, then in sync --------------------------------------------------
     tmp = tempfile.mkdtemp(prefix="sync-profiles-selftest-")
-    rel = os.path.join(".agents", "agents", "probe.md")
+    rel = os.path.join(".claude", "agents", "probe.md")
     path = os.path.join(tmp, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
@@ -155,12 +155,12 @@ def selftest() -> int:
 
     # --- the coverage tripwire: a frontmatter profile not in PROFILES is an error --------------------
     cov = tempfile.mkdtemp(prefix="sync-profiles-coverage-")
-    agents_dir = os.path.join(cov, ".agents", "agents")
+    agents_dir = os.path.join(cov, ".claude", "agents")
     os.makedirs(agents_dir)
-    listed_rel = os.path.join(".agents", "agents", "listed.md")
-    orphan_rel = os.path.normpath(os.path.join(".agents", "agents", "orphan.md"))
-    prose_rel = os.path.normpath(os.path.join(".agents", "agents", "TESTS.md"))
-    noname_rel = os.path.normpath(os.path.join(".agents", "agents", "noname.md"))
+    listed_rel = os.path.join(".claude", "agents", "listed.md")
+    orphan_rel = os.path.normpath(os.path.join(".claude", "agents", "orphan.md"))
+    prose_rel = os.path.normpath(os.path.join(".claude", "agents", "TESTS.md"))
+    noname_rel = os.path.normpath(os.path.join(".claude", "agents", "noname.md"))
     with open(os.path.join(cov, "configure.py"), "w", encoding="utf-8") as fh:
         fh.write("")
     with open(os.path.join(cov, listed_rel), "w", encoding="utf-8", newline="\n") as fh:
@@ -176,7 +176,7 @@ def selftest() -> int:
     check("a listed profile is not reported", listed_rel in found, False)
     check("prose with no frontmatter is skipped", prose_rel in found, False)
     check("frontmatter without a name: is skipped", noname_rel in found, False)
-    check("an absent .agents/agents is no error",
+    check("an absent .claude/agents is no error",
           sp.uncovered_profiles(tempfile.mkdtemp(prefix="sync-profiles-nodir-")), [])
     check("the real tree has no unlisted profile", sp.uncovered_profiles(ROOT), [])
 

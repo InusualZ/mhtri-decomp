@@ -126,6 +126,7 @@ TOOLS = os.path.dirname(HERE)
 if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
+from units import lanecmd  # noqa: E402
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
 from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)
 
@@ -1051,7 +1052,8 @@ def debt_task(main: str, item: Item, cwd: str | None = None, brief: str | None =
     task += ("Commit on your own branch; end your turn with your report - your final message is the result "
              "the orchestrator receives.")
     return {"agent": "fixer", "name": "fixer-debt-%s" % item.key[:32], "cwd": root, "task": task,
-            "call": "subagent(agent=\"fixer\", cwd=\"%s\", task=%s)" % (root, json.dumps(task))}
+            "call": lanecmd.lane_call("fixer", root, task, name="fixer-debt-%s" % item.key[:32],
+                                      main=main, key="debt-%s" % item.key[:32])["call"]}
 
 
 def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None = None) -> dict:
@@ -1079,8 +1081,8 @@ def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None =
         task += " Your brief is %s." % brief.replace("\\", "/")
     return {"agent": profile, "name": "%s-backlog-%s" % (profile, item.key[:32]),
             "cwd": root, "task": task,
-            "call": "subagent(agent=\"%s\", cwd=\"%s\", task=%s)"
-                    % (profile, root, json.dumps(task))}
+            "call": lanecmd.lane_call(profile, root, task, name="%s-backlog-%s" % (profile, item.key[:32]),
+                                      main=main, key="backlog-%s" % item.key[:32])["call"]}
 
 
 def refusal(main: str, top: int = 3, ratio: int = RATIO_DEFAULT, wants: int = 1, **kw) -> str | None:

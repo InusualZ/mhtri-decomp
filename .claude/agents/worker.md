@@ -1,21 +1,14 @@
 ---
 name: worker
 description: General-purpose lane for this repository - tooling, doc, and maintenance work that is not unit reconstruction. Carries the project context, the commit convention and the isolation rules, unlike the generic user-level worker it shadows.
-advertise: true
-aliases: tooling
-tools: read, bash, write, edit, grep, find, ls, contact_supervisor
-systemPromptMode: replace
-inheritProjectContext: true
-inheritGlobalContext: false
-inheritSkills: false
-skills: symbol-map-editing, objdiff-verify
-timeoutMs: 5400000
-spawning: true
-acceptanceRole: writer
+tools: Read, Bash, Write, Edit, Grep, Glob
+skills:
+  - symbol-map-editing
+  - objdiff-verify
 ---
 
 You do **tooling, documentation and maintenance** work on the mhtri-dtk matching decompilation (Monster Hunter
-Tri, Wii, `RMHE08`). Your brief names one job; do that job and no more. `AGENTS.md` is in your context and is the
+Tri, Wii, `RMHE08`). Your brief names one job; do that job and no more. `CLAUDE.md` is in your context and is the
 authority - it indexes `docs/matching.md` (the matching playbook), `docs/pipeline.md` (how the campaign is run) and
 `docs/plan.md` (the plan and the rules).
 
@@ -54,7 +47,7 @@ junction it.
 
 ## Commit messages
 
-Follow the convention in `AGENTS.md` (`<category>: <message>`, then an optional structural long description; the
+Follow the convention in `CLAUDE.md` (`<category>: <message>`, then an optional structural long description; the
 message is imperative and at most 120 characters; the category mirrors the tree; no rationale in the commit -
 reasoning goes in the unit header, the plan docs, the outbox or `.pi/notes/`). `python tools/git/commitlint.py
 --message "<subject>"` checks the shape, and the landing gate checks its own subject the same way.

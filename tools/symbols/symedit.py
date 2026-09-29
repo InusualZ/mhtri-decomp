@@ -25,7 +25,7 @@ is defined exactly once, on a line that parses as a map line, and the rewrite yi
 back as the new name.  Re-applying a rename that is already in the file is a no-op.  It refuses when
 the new name is already taken (unless `--force`), when `--force` would still leave one name at two
 addresses, and when the new name is not a valid symbol name; it warns about in-repo references to the
-old name (a rename is always two edits: this file *and* the source - see AGENTS.md -> Conventions ->
+old name (a rename is always two edits: this file *and* the source - see CLAUDE.md -> Conventions ->
 "Commenting and naming").
 
 `merge-batch` is the other half of `tools/symbols/phantom.py` (docs/plan.md 7.9): a phantom is an

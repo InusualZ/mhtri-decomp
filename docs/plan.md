@@ -24,7 +24,7 @@ its final home, by the worker that works it, and attribution produces **proposal
 | a **symbol** | attributed to its unit, decompiled, measured ≥ 80 % per-symbol `fuzzy_match_percent`, committed |
 | a **unit** | every symbol it owns is closed or explicitly `partial` with its residual in the file header; its ranges measure no worse than before; its **object** is byte-identical if it is to be flipped |
 | a **batch** | every symbol it set out to close is closed (or recorded `partial`), the ranges it claimed measure no worse, its **knowledge delta** is written, `ninja build/RMHE08/ok` is green, and it is committed |
-| the **campaign** | (1) every **registered** unit sits at its final `src/<module>/<name>.<ext>` home and **no `auto/*` placeholder unit remains** - and `ledger.py`'s **unclaimed** lines are a *proposal backlog* (ranges attribution has offered, §6.1), not a defect; (2) every unit is named from evidence or is listed as a named exception in §10 with a reason; and (2b) **no unit's source has zero scored symbols** — a header-only stub is a note, not a unit, so `ledger.py` must show every unit contributing at least one measured function; (3) `rm -rf build/RMHE08 && python configure.py && ninja build/RMHE08/ok` passes **from a clean build tree**, so no stale split object can be carrying original bytes; (4) the DOL hash equals `config/RMHE08/build.sha1`, and that file's own sha1 still matches the value in `AGENTS.md` (it is ground truth and is never edited - §8.1) |
+| the **campaign** | (1) every **registered** unit sits at its final `src/<module>/<name>.<ext>` home and **no `auto/*` placeholder unit remains** - and `ledger.py`'s **unclaimed** lines are a *proposal backlog* (ranges attribution has offered, §6.1), not a defect; (2) every unit is named from evidence or is listed as a named exception in §10 with a reason; and (2b) **no unit's source has zero scored symbols** — a header-only stub is a note, not a unit, so `ledger.py` must show every unit contributing at least one measured function; (3) `rm -rf build/RMHE08 && python configure.py && ninja build/RMHE08/ok` passes **from a clean build tree**, so no stale split object can be carrying original bytes; (4) the DOL hash equals `config/RMHE08/build.sha1`, and that file's own sha1 still matches the value in `CLAUDE.md` (it is ground truth and is never edited - §8.1) |
 
 **Why clause (3) is not paranoia.** Today `ninja build/RMHE08/ok` is green while 65 128 of 5 437 392 bytes are matched, because the 13 565 `auto_*` objects carry the original DOL bytes. A green `ok` therefore proves *nothing* about our source until the tree is rebuilt from scratch - and that is exactly the check the campaign must end on.
 
@@ -126,7 +126,7 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 > `recordmerge.py` and `rescue.py` (7.27). The commands below are the ones actually run; 7 keeps the status of
 > anything still open.
 
-**The four shared files (`config/RMHE08/splits.txt`, `configure.py`, `config/RMHE08/symbols.txt`, `AGENTS.md`)
+**The four shared files (`config/RMHE08/splits.txt`, `configure.py`, `config/RMHE08/symbols.txt`, `CLAUDE.md`)
 have exactly one writer: the orchestrator.**
 
 | responsibility | orchestrator (me) | worker (external `pi` agent) | owner | tooling |
@@ -192,7 +192,7 @@ python tools/units/queue.py next                 # -> reset, checkout -B worker/
 #   --no-slots still constructs a throwaway worktree, so nothing in flight breaks
 # worker, inside its slot: source only, commits on its own branch
 tools/units/recompile.py main/Pl/pl_act        # direct compiler, no ninja, mtime asserted
-python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u main/Pl/pl_act fn_8027C208
+python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u main/Pl/pl_act fn_8027C208
 git commit --amend -am "Pl/pl_act: fn_8027C208 body"   # ONE commit per unit, on worker/pl-act-13
 # orchestrator, on main: integrate one unit at a time, then verify the whole batch
 git cherry-pick --no-commit worker/pl-act-13   # or <merge-base>..worker/pl-act-13 if it left several
@@ -225,13 +225,14 @@ reclaimable rather than a permanent wedge. The JSON record at `MAIN/.pi/slots/<n
 time) is still written and a stale one is reclaimed.
 **`release` fails closed, and the live lane is read from the harness, not inferred.** A release detaches the
 slot, runs `clean -ffdx` and deletes the branch, so it refuses (printing every reason and offering `--force`)
-when a **RUNNING subagent run's `cwd` resolves into the slot**, when the tree is dirty (`git status
---porcelain`, minus an `AGENTS.md` whose only difference is its LOCAL-ONLY block), or when HEAD holds
+when a **live Claude session's `cwd` resolves into the slot**, when the tree is dirty (`git status
+--porcelain`, minus an `CLAUDE.md` whose only difference is its LOCAL-ONLY block), or when HEAD holds
 **commits no branch reaches**. The run record is the only live-lane signal there is: a lock cannot see a lane
 (the project proved it twice - the lane that worked in MAIN and left no slot file, and the 2026-09-28 release
 that ran while another lane was still working in the slot and detached HEAD under the live process), so
-`release` reads the harness' run registry under the temp dir (`pi-subagents-*/async-subagent-runs`, where each
-run's `status.json` carries its `cwd` and state) and names the run it is protecting. A host without a registry
+`release` reads Claude Code's session registry (`~/.claude/sessions/<pid>.json`, or `$CLAUDE_CONFIG_DIR`; each
+record carries `pid`, `sessionId`, `cwd` and `status`, and counts only while its pid is alive) and names the
+session it is protecting. A host without a registry
 gets no signal from it at all - the dirty tree and the orphaned commits are then the backstops, and the
 docstring says so rather than reading "no registry" as "no lane". `claims.release` forwards `--force` and
 waives only the *dirty* guard, because it has already refused un-merged, un-recorded work before it gets
@@ -273,13 +274,12 @@ a mis-launched lane detects it in its first turn.
   outlives the worktree. **`<slug>` is the claim's branch minus `worker/`** (`claims.slug_of_branch`), the one rule
   `brief.py`, `handoff.py`, `land.py` and `claims.py` all read: a unit's *path* is not its *name* (`Pl/pl_act` vs
   `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
-* **The handoff is the worker's final message.** A worker spawned through the default `subagent` tool
-  (`~/.pi/agent/extensions/subagent`) is a `pi --mode json` child the tool waits for: when it exits, its last
-  assistant message is returned to the orchestrator as the tool result. A pane-launched worker (the manual
-  route below) delivers the same last message into its pane, plus its outbox, and the orchestrator wakes on the
-  pane going idle. Either way there is no completion *tool* to call - the `subagent_done` sidecar and its
-  `agent_end`/`agent_settled` grace timer belonged to `pi-herdr-subagents`, which is no longer installed, so a
-  brief that asked for that tool would name a tool the worker does not have. `brief.py` emits the final-message
+* **The handoff is the worker's final message.** A worker is a headless `claude --agent <profile> -p` process
+  run with its cwd at the slot (`tools/units/lanecmd.py` builds the command): when it exits, its last assistant
+  message is what the orchestrator reads from the run's output. A pane-launched worker (the manual route below)
+  delivers the same last message into its pane, plus its outbox, and the orchestrator wakes on the pane going
+  idle. Either way there is no completion *tool* to call, so a brief that asked for one would name a tool the
+  worker does not have. `brief.py` emits the final-message
   instruction in part 4, and a hand-written brief must carry it too.
 * **`tools/m2c` is a submodule, and a slot keeps it initialised.** A slot is never removed, so the `git
   worktree remove` refusal around a checked-out submodule ("working trees containing submodules cannot be moved
@@ -301,40 +301,42 @@ a mis-launched lane detects it in its first turn.
 * **Absolute paths:** the compiler and source paths in `build.ninja` are relative, but the file does name the
   Python interpreter absolutely (`C:\…\Python312\python.exe`) — which is why `MAIN` resolution matters and why
   `configure.py` is re-run only in `MAIN`.
-**Spawning a worker.** `queue.py next` claims the unit and prints the paste-ready call for the default
-`subagent` tool - single mode, with `cwd` set to the worker's worktree:
-```python
-subagent(agent="worker", cwd="<the worker's worktree>", task="Read <brief> in MAIN and do exactly what it
-says. Ack first: python tools/units/claims.py ack <unit> --agent worker-<slug>. You may fan out subagents.
-End your turn with your report: your final message is the result the orchestrator receives.")
-The tool runs the worker as a `pi` child process with its own context window and **blocks until it exits**,
-returning the worker's final message to the orchestrator. `cwd` is what makes the rest work: the worker's
-`recompile.py` resolves that worktree from its cwd and MAIN's toolchain and target object from git - no
-junction, no environment variable. The tool takes no `name` parameter, so the printed slug is only a label.
+**Spawning a worker.** `queue.py next` claims the unit and prints the paste-ready command - a headless Claude
+Code session whose cwd is the worker's worktree (the Agent tool has no `cwd` parameter, so a lane is its own
+process, not an in-session subagent). Run it in the background and capture the output:
+```bash
+cd <the worker's worktree> && claude --agent worker --name worker-<slug> --session-id <uuid> \
+  --permission-mode acceptEdits --allowedTools Bash -p 'Read <brief> in MAIN and do exactly what it says. Ack \
+  first: python tools/units/claims.py ack <unit> --agent worker-<slug>. End your turn with your report: your \
+  final message is the result the orchestrator receives.'
+The worker has its own context window and its final message is the run's output. `cwd` is what makes the rest
+work: the worker's `recompile.py` resolves that worktree from its cwd and MAIN's toolchain and target object
+from git - no junction, no environment variable. The printed `--session-id` is how a lane's question is
+answered: `claude --resume <session-id> -p "<ruling>"` in the same cwd (`lanecmd.resume_call`).
 **The manual route (herdr panes).** A worker the orchestrator launches by hand in a herdr pane never reports
 through the tool, so the orchestrator wakes on the pane going idle (`herdr agent wait <name> --until idle
 --until blocked`) and reads the outbox. Keep such workers out of the orchestrator's own pane - a split of it
 drops agents into the middle of its work - and use the session's **Worker tab**:
 herdr tab list                                     # the tab labelled Worker, e.g. w1:t2
 herdr pane split <a pane inside that tab> --cwd <the worker's worktree> --direction down
-herdr agent start <name> --kind pi --pane <the new pane id>
-herdr agent prompt <name> "<read your brief; ack first; you may fan out; then end with your report>"
+herdr agent start <name> --kind claude --pane <the new pane id>   # check `herdr agent start --help` for the kind name
+herdr agent prompt <name> "<read your brief; ack first; then end with your report>"
 herdr agent wait <name> --until idle --until blocked
 **Teardown is part of the round.** After the handoff and after the integration: close the worker's pane
 (`herdr pane close <pane id>`), **then** `claims.py release <unit>`. A live pane holds its worktree as its cwd
 and Windows refuses to delete a directory a process is sitting in ("Device or resource busy", or
 `git worktree remove` failing with "Permission denied"), so releasing first fails and leaves a directory that
 nothing can remove until that pane goes away. If a worktree cannot be removed, ask who is sitting in it - it may
-be the owner's own pane. **A tool-spawned worker has no pane**, so this step is skipped for it and
+be the owner's own pane. **A headless worker has no pane**, so this step is skipped for it and
 `claims.py release <unit>` returns the slot to main's tip (keeping the warm trees), deletes the branch and
 clears the slot lock; for a **throwaway** worktree (`--no-slots`) it removes the worktree instead. Nothing
 in a round constructs a worktree by hand.
 ### 5.2 The worker's input — one generated file, nothing else
 **A brief ends by requiring the report as the final message.** The orchestrator is handed a tool-spawned
-worker's result by the `subagent` tool when the worker's `pi` process exits, and reads a pane-launched
+worker's result from the headless `claude` process's output when it exits, and reads a pane-launched
 worker's pane and outbox once it is idle. Neither path needs a completion tool, and neither survives the worker
 ending on a tool call or saying nothing - so the brief's part 4 makes the ≤ 15-line digest the last thing the
-worker writes. (The old `subagent_done` instruction belonged to `pi-herdr-subagents`; it is gone.) `brief.py`
+worker writes. `brief.py`
 emits the instruction, and a hand-written brief must carry it too.
 `tools/units/brief.py <unit>` writes `tools/units/briefs/<unit>.md`, containing:
 1. the **unit**: path, lib, `mw_version`, the real cflags, object and target paths, the `.text` range;
@@ -393,7 +395,7 @@ information, late.
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 ### 5.4.1 The agent profiles
 The campaign runs each lane under the profile that matches its job (owner's instruction, 2026-09-26). Four of
-them are **project** profiles, tracked in `.agents/agents/`; the rest are the global set.
+them are **project** profiles, tracked in `.claude/agents/`; the rest are the global set.
 | profile | job | launched when |
 | **`decompiler`** | unit work: register a proposal range at its final `src/<module>/<name>.<ext>` home, reconstruct its bodies, measure, commit on its branch | **the default lane** - a proposal or a body-completion lane. `queue.py next` emits `agent: "decompiler"` |
 | **`fixer`** | a *refused gate*: a measured regression, a lint failure, a claim or branch that must be repaired | a `land.py verify` refusal, a `ninja changes` regression, a stale claim |
@@ -405,19 +407,12 @@ python tools/units/queue.py next --count 8            # agent: "decompiler" for 
 python tools/units/queue.py next --profile fixer      # a repair lane
 The profile decides which rules the lane is held to (its isolation, its evidence file, the style rules it
 knows), so this is not a cosmetic choice - and the orchestrator, not the worker, chooses it.
-### 5.5 A worker may fan out subagents - under the same rules
-A unit is often several independent functions, so a worker is expected to spawn its own subagents for parallel
-work where that helps. Three rules make it safe, and they are part of the brief:
-* **the subagents work in the worker's worktree, on the worker's branch** - one branch, **one commit**, made by
-  the worker. A subagent never commits;
-* **the worker assigns disjoint files or functions** (the one-writer-per-file rule applies inside a worker too)
-  and is **accountable for everything its subagents produce**: it re-measures every claim they make, exactly as
-  the orchestrator re-measures the worker's;
-* **every subagent is handed §6.5 and §8 verbatim** (the brief's part 6). A subagent that has not read them
-  will name a field `unk4`, reach it with a pointer cast and use a `goto` - and those are repair work for the
-  next pass, charged to the worker that spawned it.
-The worker's handoff covers its subagents' work as its own: `measured_with` says how the numbers were obtained,
-and `residual` covers whatever they left unfinished.
+### 5.5 A worker does not fan out subagents
+A lane is one agent in one worktree: **no profile carries the `Agent` tool**, so a worker cannot spawn
+subagents, and a brief must not tell it to. A unit that is too big for one lane is split by the orchestrator
+into more claims (more slots), each with its own branch, brief and commit - never inside a lane. That keeps the
+one-branch, one-commit, one-writer-per-file rules true by construction, and keeps every score in the handoff
+the lane's own measurement rather than a claim it would have to re-verify.
 ### 5.6 Acknowledgement, heartbeats and timeouts
 A terminal multiplexer cannot tell "finished" from "never started": both read as *idle*. In the first round with
 four external workers that ambiguity cost forty minutes - one agent sat idle while the other ground through its
@@ -510,7 +505,7 @@ per-function inventory and never percentages.
 
 ```sh
 python tools/units/recompile.py <unit>              # compile alone, no ninja, mtime asserted
-python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u <unit> <symbol>
+python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u <unit> <symbol>
 python tools/units/land.py verify                   # the batch gate: split, link, ok, regressions, ledger
 ```
 
@@ -533,13 +528,13 @@ symbol the batch claims, and compare against the numbers in the worker's outbox 
 never averaged.
 
 Below 80 %: land it only if it measurably improves the unit and regresses nothing, mark it `partial`, and put
-the residual in the header — the `AGENTS.md` playbook rows are that second pass's todo list.
+the residual in the header — the `CLAUDE.md` playbook rows are that second pass's todo list.
 
 ### 6.4 Commit
 
 One commit per unit (or per batch registered together), area-prefixed and imperative, carrying the sources, the
 registration, the flags it proved and the knowledge delta. `prepcommit.py` stages explicit paths only, refuses
-build/original/scratch output, verifies the DOL SHA-1, and handles the `AGENTS.md` LOCAL-ONLY block
+build/original/scratch output, verifies the DOL SHA-1, and handles the `CLAUDE.md` LOCAL-ONLY block
 (non-negotiable 8). The local-only `## Current task / plan` block is updated **in the same commit**. History is
 never rewritten; nothing is ever pushed.
 
@@ -723,8 +718,8 @@ construction: a tool can waste time, it cannot break the link.
 | 7.21 | `tools/units/stylelint.py` - the rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b` and an unmarked `void *` parameter or return), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
 | 7.22 | **done** - `tools/units/datagap.py` compares a unit's **target object's section sizes with ours** (`build/RMHE08/obj/*.o` vs `build/RMHE08/src/*.o`) | a unit can read 100 % fuzzy and still emit data its original TU never had: our source defines a pooled constant or table where retail referenced a map symbol (the finding, 2026-09-26: the gap is **ours-extra** - `.sdata2 8B` on `Pl/fn_8026FFBC`, `.data 120B`/`548B` on `ef/eft002`/`ef/fn_800FD864`); the unit score hides it, so a flip looks blocked for no visible reason | `--flip-blockers` lists the units whose code already matches (>= 99 %) and whose only defect is data: **21** of 223 on 2026-09-26; the fix is playbook 29 (reference the map's symbol, never define it), since the target object has no such section to claim; 10 selftest checks | ~60 |
 | 7.23 | **done** - `queue.py`'s **unlanded-branch guard**: `next` refuses to claim while any local branch holds content `main` lacks | the 2026-09-26 branch audit found a whole registered unit (`menu/fn_802E4978.cpp`, 511 + 186 + 115 lines) that no landing had ever taken, sitting on a worker branch while new lanes were being launched; finished work must not queue behind a new unit | `strictly_newer` (main's copy a strict subset - narrow on purpose, so the stale pads and comment wording a landed branch leaves behind do not block), `unlanded_branches`/`unlanded_error` wired into both spawn paths, `list` reports the state, `--allow-unlanded <branch>` parks one on purpose; 8 selftest checks | ~70 |
-| 7.24 | **done** - a `decompiler` lane matches **data** as well as code: `.agents/agents/decompiler.md` gains a Data section and every brief gains 5d, and the old propose-do-not-claim line is inverted | objdiff's unit score does not count a wrong data section, so a lane could hand over a unit whose code matched and whose `.data`/`.sdata2` was ours-extra - the whole 20-unit flip-blocker list came from that blind spot, and no lane was ever asked about it | the lane measures with `datagap.py --unit`, claims what its object emits (private pool entries, unclaimed `.data`/`.ctors` ranges; never a shared entry - playbook 58), drops definitions it should only declare (playbook 29), and reports sections and bytes before/after; a code-complete unit with a claimable data gap is finished in the same lane and flipped | ~40 |
-| 7.25 | **done** - the C++ **class shape** rule: `.agents/agents/decompiler.md` and every brief (section 5c) say a range the evidence calls a class is written as a class with member functions and real virtuals, not as a C struct plus free functions taking `self` | the owner caught a landed unit reconstructing a class that way - 403 `self->` uses in `Network/fn_8041A87C.cpp` while its own header records the target's string pool spelling `NetworkGameSpyInterface::`/`NetworkPeerGameSpy::`; MWCC only emits retail's canonical `lwz r12,0(r3)`/`lwz r12,<slot>` dispatch for a genuine `virtual`, so the shape is part of the match | both renderers carry 5c; a `fixer` lane reconverts the landed unit and records any function where the struct form measured better; 153 + 117 selftest checks green | ~40 |
+| 7.24 | **done** - a `decompiler` lane matches **data** as well as code: `.claude/agents/decompiler.md` gains a Data section and every brief gains 5d, and the old propose-do-not-claim line is inverted | objdiff's unit score does not count a wrong data section, so a lane could hand over a unit whose code matched and whose `.data`/`.sdata2` was ours-extra - the whole 20-unit flip-blocker list came from that blind spot, and no lane was ever asked about it | the lane measures with `datagap.py --unit`, claims what its object emits (private pool entries, unclaimed `.data`/`.ctors` ranges; never a shared entry - playbook 58), drops definitions it should only declare (playbook 29), and reports sections and bytes before/after; a code-complete unit with a claimable data gap is finished in the same lane and flipped | ~40 |
+| 7.25 | **done** - the C++ **class shape** rule: `.claude/agents/decompiler.md` and every brief (section 5c) say a range the evidence calls a class is written as a class with member functions and real virtuals, not as a C struct plus free functions taking `self` | the owner caught a landed unit reconstructing a class that way - 403 `self->` uses in `Network/fn_8041A87C.cpp` while its own header records the target's string pool spelling `NetworkGameSpyInterface::`/`NetworkPeerGameSpy::`; MWCC only emits retail's canonical `lwz r12,0(r3)`/`lwz r12,<slot>` dispatch for a genuine `virtual`, so the shape is part of the match | both renderers carry 5c; a `fixer` lane reconverts the landed unit and records any function where the struct form measured better; 153 + 117 selftest checks green | ~40 |
 | 7.26 | **done** - `tools/units/slots.py`: a fixed pool of reusable lane directories at stable paths, one lock each, a verified-and-fail-closed reset, wired into the claim path | per-claim construction costs per lane, its teardown cannot remove a worktree holding the `tools/m2c` submodule (the careless 2026-09-24 teardown destroyed a lane's branch), and the seeder rewrites `.ninja_deps`' absolute paths every time because each path is new; a reused slot also carries the previous round's build state, and a stale tree cost a full `rm -rf build/RMHE08` rebuild | `init`/`acquire`/`release`/`status`/`verify`; a slot holds a directory, never a branch (`acquire` cuts a fresh `checkout -B worker/<slug> <tip>`); a free slot is the concurrency cap (`queue.py next` refuses at six); the kept build tree is validated against MAIN's current map/DOL with the seeder's own guard plus a `report.json` comparison and re-seeded if it cannot be proven current; one lock per slot at `MAIN/.pi/slots/<n>.json`, stale locks reclaimed; 62 selftest checks | ~340 |
 | 7.27 | **done** - `tools/units/rescue.py audit`: the `refs/rescue/*` safety net gets an audit, and `land.py resolve`'s `land/resolve-*` helper branch gets a teardown | 193 rescue refs had accumulated and nothing had ever looked at them; `land.py resolve` also left its helper branch (and its scratch worktree) behind, so a `land/*` ref outlived the batch it was made for (two were found from 2026-09-26) | every ref reports its date/subject, the unit(s) it registers (**the registration diff against the merge-base with `main`** - a whole-file name match against `main` matches every unit in the file), whether each is registered on `main` today and how the touched paths differ; verdicts `redundant`/`landed-with-drift`/`unlanded`/`unknown`; `--prune` deletes only `redundant` (printing each), is strictly read-only without it, and never touches drift/unlanded/unknown; a landing deletes its own resolve helper, visibly, only when the tip is contained by the branch or `main`, and refuses loudly otherwise; `claims.py release` runs the same classification on the ref it parks at teardown - `redundant` pruned and printed, `landed-with-drift` reported, `unlanded`/`unknown` surfaced with the ref, its unit(s) and its date and kept, never a gate; 28 checks in `rescue.py` + 36 in `claims.py` | ~180 |
 | 7.28 | **done** - the per-lane measurement loop is fixed: `recompile.py`/`measure.py` run from git-bash, and no score can come from a stale object or the wrong tree | `absolutize()` rewrote cmd's `/c` to `C:\c` (`os.path.join(main, "/c")` is `C:/c`, and that drive-root artifact exists on this host), so the child was an *interactive* `cmd`, no object was written, and 31 lanes filed "make this work" in the register. Two siblings of the same failure: a hand-built scorer measured a STALE object twice when a compile failed and two invented "improvements" were reported as real, and the measuring tools rooted at their own file location / the first `git worktree list` entry, so a score run from a slot could print MAIN's number (`NetworkWiiMediator/dispatchReflectEvent` 0.91743 vs 100.0) | `absolutize()` never rewrites a `-`/`/` switch; every measurement path deletes the object before compiling and `object_is_fresh()` refuses an object older than its source; both chained post-processors (`objalign.py`, `objextab.py`) are retargeted to this tree's object; `unitutil.repo_root()` resolves the caller's `git rev-parse --show-toplevel` and `recompile.main_root()` the git common dir (the gate still runs from MAIN, unchanged); the hostile selftests break a source and assert `FAILED` with no score, and score a throwaway worktree and assert its number (100.00000, not MAIN's 99.80576) | ~80 |
@@ -902,7 +897,7 @@ Every batch owes a delta, and it has exactly four homes:
 
 | what was learned | where it goes | who reads it next |
 | --- | --- | --- |
-| a matching idea (code shape, flag, allocator rule) | a section in `docs/matching.md` **and** its row in the `AGENTS.md` playbook table | every future session and the `mwcc-unit-matching` skill |
+| a matching idea (code shape, flag, allocator rule) | a section in `docs/matching.md` **and** its row in the `CLAUDE.md` playbook table | every future session and the `mwcc-unit-matching` skill |
 | a workflow/tool fact (a gate, an order, a trap) | the skill that owns that step | every agent running that step, workers included |
 | a unit's residual | that unit's file header | whoever touches that unit next |
 | a campaign mechanic (registration, batching, orchestration) | this file | the next batch's orchestrator |
@@ -922,7 +917,7 @@ document changed, and `land.py verify` runs the same check before the commit mes
 the registrations, the flags, the queue and the commits, and does not ask per item. It interrupts the owner only
 for a **pressing** issue: (1) the linked DOL is at risk outside the `NonMatching`-safe path; (2) loss or
 destruction — deleting work, rewriting history, pushing, an unrevertible bulk edit; (3) information only the
-owner has; (4) a premise change (the bar, the scope, the vendor files, an `AGENTS.md` rule); (5) the
+owner has; (4) a premise change (the bar, the scope, the vendor files, an `CLAUDE.md` rule); (5) the
 environment. Everything else is the campaign's own business, recorded rather than asked about.
 
 **Decided queue — do not re-litigate:**
@@ -944,7 +939,7 @@ relocations, not expressible in C
 6. `pl_master`'s `fn_8026F908` (9 bytes) is an allocator colouring tie-break — recorded, not chased.
 7. Artifacts for the owner are **light-theme** (owner preference, 2026-09-22).
 
-`AGENTS.md`'s local-only block is a **pointer to this file**, not a second queue: where the two disagree, this
+`CLAUDE.md`'s local-only block is a **pointer to this file**, not a second queue: where the two disagree, this
 file wins and the block is corrected in the same commit.
 
 **Escalation queue (open):** a re-attribution the `preflight` verdict calls `approve`; a `never touch` owner; a
@@ -1004,7 +999,7 @@ Measured cost 2026-09-27: **~29 s wall** (8 workers) on a current build tree, do
 and `land.py verify --no-selftests` skips it outright if a landing must be fast.
 
 **Handover.** Before a compaction or the end of a session: the local-only block says which batch is open, the
-ledger is the state, and anything worth keeping is in `docs/`, a skill, `AGENTS.md` or a unit header. A finding
+ledger is the state, and anything worth keeping is in `docs/`, a skill, `CLAUDE.md` or a unit header. A finding
 that lives in a reply is lost — that has already happened once here.
 
 **Stop conditions** — the orchestrator does not stop because a batch ended. It stops when (1) the campaign target
@@ -1110,13 +1105,13 @@ wrong agent and an impossible closing instruction. Adding hints to a pasted task
 The project defines three agents for this campaign, and the orchestrator must spawn the *matching* one - the difference is
 the prompt, the skills the harness loads, and the acceptance role, not just a label:
 
-* **`decompiler`** (aliases `decomp`, `unit-matcher`) - reconstructs one translation unit so its object matches, measuring
+* **`decompiler`** - reconstructs one translation unit so its object matches, measuring
   each function with objdiff, honouring the section 6.5 rules, and committing. **This is the agent for every unit
-  round**, and it is what `queue.py` emits: `subagent(agent="decompiler", ...)`, asserted in its selftest.
-* **`fixer`** (aliases `gate-fixer`, `fix-lane`) - takes a branch the landing gate **REFUSED** and clears exactly the
+  round**, and it is what `queue.py` emits: `claude --agent decompiler ...` (see `tools/units/lanecmd.py`), asserted in its selftest.
+* **`fixer`** - takes a branch the landing gate **REFUSED** and clears exactly the
   items it listed (stylelint findings, a compile clash, a measured regression) without moving any score down, then
   re-verifies and commits.
-* **`merger`** (aliases `merge-lane`) - merges main into a held branch whose unit cannot land because main moved through
+* **`merger`** - merges main into a held branch whose unit cannot land because main moved through
   a shared header it also touched, resolving by class and proving the shared header moved zero rows.
 
 A `worker` is the *general-purpose* agent and is right for tooling, probes and investigations - it is **not** the right

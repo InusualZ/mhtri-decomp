@@ -41,7 +41,7 @@ for path in ("config/RMHE08/build.sha1", "config/RMHE08/config.yml", "orig/RMHE0
 check("ground truth reason", "ground truth" in pc.classify("config/RMHE08/build.sha1")[1], True)
 
 # --- classify(): real work is still staged -------------------------------------------------------------------
-for path in ("src/Pl/pl_act.cpp", "tools/units/ledger.py", "docs/plan.md", "configure.py", "AGENTS.md",
+for path in ("src/Pl/pl_act.cpp", "tools/units/ledger.py", "docs/plan.md", "configure.py", "CLAUDE.md",
              "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt", "include/types.h"):
     check(f"stage {path}", pc.classify(path)[0], "stage")
 
@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory() as tmp:
 check("improved + src header: no warning", pc.knowledge_delta_warning(["src/Mod/unit.c"], True), None)
 check("improved + a .cp header: no warning", pc.knowledge_delta_warning(["src/Gecko/Gecko_ExceptionPPC.cp"], True), None)
 check("improved + docs: no warning", pc.knowledge_delta_warning(["docs/plan.md"], True), None)
-check("improved + AGENTS.md: no warning", pc.knowledge_delta_warning(["AGENTS.md"], True), None)
+check("improved + CLAUDE.md: no warning", pc.knowledge_delta_warning(["CLAUDE.md"], True), None)
 check("improved + configure.py: no warning", pc.knowledge_delta_warning(["configure.py"], True), None)
 delta = pc.knowledge_delta_warning(["config/RMHE08/splits.txt"], True)
 check("improved with no knowledge: warns", delta is not None, True)
@@ -92,14 +92,14 @@ check("missing sides are not improved", pc.ledger_improved({}, {}), False)
 check("improved_since_base returns a bool", isinstance(pc.improved_since_base(), bool), True)
 
 # --- localonly_case(): the marker must be a whole line, or rule 8's own prose matches it --------------------
-check("localonly_case: no AGENTS.md staged", guard.localonly_case(["src/x.c"]), "nothing")
+check("localonly_case: no CLAUDE.md staged", guard.localonly_case(["src/x.c"]), "nothing")
 check("localonly_case: a real marker line",
-      guard.localonly_case(["AGENTS.md"], "head\n<!-- LOCAL-ONLY-BEGIN -->\nbody\n"),
-      "pull the block, re-stage AGENTS.md")
+      guard.localonly_case(["CLAUDE.md"], "head\n<!-- LOCAL-ONLY-BEGIN -->\nbody\n"),
+      "pull the block, re-stage CLAUDE.md")
 check("localonly_case: rule 8's prose quoting the marker is not a marker line",
-      guard.localonly_case(["AGENTS.md"], "run `grep -c '^<!-- LOCAL-ONLY'` to check\n"), "nothing")
+      guard.localonly_case(["CLAUDE.md"], "run `grep -c '^<!-- LOCAL-ONLY'` to check\n"), "nothing")
 check("localonly_case: a marker mentioned mid-line does not match",
-      guard.localonly_case(["AGENTS.md"], "the `<!-- LOCAL-ONLY-BEGIN` marker is quoted here\n"), "nothing")
+      guard.localonly_case(["CLAUDE.md"], "the `<!-- LOCAL-ONLY-BEGIN` marker is quoted here\n"), "nothing")
 
 
 # --- the new guard behaviours, end to end through a real hook in a throwaway repo ----------------------
@@ -137,20 +137,20 @@ def blob(repo: str, spec: str) -> bytes:
     return subprocess.run(["git", "-C", repo, "cat-file", "-p", spec], capture_output=True).stdout
 
 
-# 1. auto-pull: a staged AGENTS.md that carries the block is fixed, committed and restored, not refused.
+# 1. auto-pull: a staged CLAUDE.md that carries the block is fixed, committed and restored, not refused.
 repo = temp_repo()
 try:
-    with open(os.path.join(repo, "AGENTS.md"), "w", encoding="utf-8", newline="") as fh:
+    with open(os.path.join(repo, "CLAUDE.md"), "w", encoding="utf-8", newline="") as fh:
         fh.write("head\n" + BLOCK + "tail\n")
-    run(repo, "add", "AGENTS.md")
+    run(repo, "add", "CLAUDE.md")
     check("auto-pull: the staged blob really carries the block",
-          b"LOCAL-ONLY-BEGIN" in blob(repo, ":AGENTS.md"), True)
+          b"LOCAL-ONLY-BEGIN" in blob(repo, ":CLAUDE.md"), True)
     result = run(repo, "commit", "-m", "t")
     out = result.stdout + result.stderr
     check("auto-pull: the commit succeeds", result.returncode, 0)
     check("auto-pull: the hook says it pulled and re-staged", "pulled the block and re-staged" in out, True)
-    check("auto-pull: the committed AGENTS.md has no marker", b"LOCAL-ONLY" in blob(repo, "HEAD:AGENTS.md"), False)
-    with open(os.path.join(repo, "AGENTS.md"), "rb") as fh:
+    check("auto-pull: the committed CLAUDE.md has no marker", b"LOCAL-ONLY" in blob(repo, "HEAD:CLAUDE.md"), False)
+    with open(os.path.join(repo, "CLAUDE.md"), "rb") as fh:
         worktree = fh.read()
     check("auto-pull: post-commit restored the block to the worktree", b"LOCAL-ONLY-BEGIN" in worktree, True)
     check("auto-pull: post-commit removed its marker",
@@ -213,7 +213,7 @@ finally:
 # 5. localonly EOL cycle: the fixture's EOL changes between pull and push; push must still place the block.
 repo = temp_repo()
 try:
-    agents = os.path.join(repo, "AGENTS.md")
+    agents = os.path.join(repo, "CLAUDE.md")
     crlf_block = BLOCK.replace("\n", "\r\n").encode()
     with open(agents, "wb") as fh:
         fh.write(b"# AGENTS\r\n\r\nbefore the block\r\n" + crlf_block + b"after the block\r\n")
@@ -234,7 +234,7 @@ try:
     check("localonly eol: the block is back exactly once", restored.count(b"<!-- LOCAL-ONLY-BEGIN"), 1)
     check("localonly eol: the block went back as LF", b"\r" in restored, False)
     check("localonly eol: the state file is consumed", os.path.exists(state), False)
-    run(repo, "add", "AGENTS.md")
+    run(repo, "add", "CLAUDE.md")
     committed = run(repo, "commit", "-m", "t")
     check("localonly eol: the block commits stripped", committed.returncode, 0)
     verify = subprocess.run(lonly + ["verify", "--rev", "HEAD"], cwd=repo, capture_output=True,

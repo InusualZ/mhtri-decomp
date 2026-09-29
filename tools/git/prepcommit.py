@@ -9,7 +9,7 @@ the parts that go wrong are mechanical:
 * `git add -A` would sweep up another agent's in-flight file (this repo has three agents in it),
 * build output, `orig/`, `.lavish/`, `.pi/` and scratch must never be staged, and a stray file in the tree
   (a `.stackdump`, a `__pycache__`) is an accident worth refusing rather than committing,
-* `AGENTS.md` carries a LOCAL-ONLY block that non-negotiable 8 forbids committing: it has to be pulled out
+* `CLAUDE.md` carries a LOCAL-ONLY block that non-negotiable 8 forbids committing: it has to be pulled out
   before staging and pushed back afterwards, in that order, and the working tree must end up reviewable,
 * the commit message is supposed to carry the *results*, and those numbers already exist in
   `build/RMHE08/report.json`.
@@ -32,8 +32,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 STATE_FILE = os.path.join(ROOT, ".pi", "local-only.state.json")
 BEGIN_MARKER = "<!-- LOCAL-ONLY-BEGIN"
 
-STAGE_PREFIXES = ("src/", "include/", "tools/", "docs/", ".agents/skills/", "config/")
-STAGE_FILES = ("configure.py", "AGENTS.md", ".gitignore")
+STAGE_PREFIXES = ("src/", "include/", "tools/", "docs/", ".claude/skills/", "config/")
+STAGE_FILES = ("configure.py", "CLAUDE.md", ".gitignore")
 REFUSE_PREFIXES = ("build/", "orig/", ".lavish/", ".pi/", ".vscode/", ".idea/", "__pycache__/")
 REFUSE_FILES = ("objdiff.json", "compile_commands.json", "build.ninja")
 REFUSE_SUFFIXES = (".o", ".elf", ".dol", ".rel", ".map", ".MAP", ".exe", ".stackdump", ".pyc")
@@ -59,7 +59,7 @@ def msg_path() -> str:
 
 
 def localonly_markers() -> int:
-    path = os.path.join(ROOT, "AGENTS.md")
+    path = os.path.join(ROOT, "CLAUDE.md")
     if not os.path.exists(path):
         return 0
     return sum(1 for line in open(path, "r", encoding="utf-8") if line.startswith(BEGIN_MARKER))
@@ -184,7 +184,7 @@ def knowledge_delta_warning(paths: list[str], improved: bool) -> str | None:
     """
     if not improved:
         return None
-    if any(path.startswith("docs/") or path == "AGENTS.md" for path in paths):
+    if any(path.startswith("docs/") or path == "CLAUDE.md" for path in paths):
         return None
     if any(path == "configure.py" for path in paths):
         return None
@@ -227,7 +227,7 @@ def verify(paths: list[str] | None = None) -> tuple[str, list[str]]:
 def message_for(paths: list[str], subject: str | None, notes: str = "", warnings: list[str] | None = None) -> str:
     warnings = warnings or []
     source = [p for p in paths if p.startswith("src/") and p.endswith((".c", ".cpp"))]
-    skill_tools = [p for p in paths if p.startswith((".agents/skills/", "tools/"))]
+    skill_tools = [p for p in paths if p.startswith((".claude/skills/", "tools/"))]
     docs = [p for p in paths if p.startswith("docs/")]
     areas = sorted({p.split("/")[0] if "/" in p else p for p in paths})
     if subject is None:
@@ -264,9 +264,9 @@ def message_for(paths: list[str], subject: str | None, notes: str = "", warnings
 def split_plan(paths: list[str]) -> list[tuple[str, list[str]]]:
     groups = [
         ("units", [p for p in paths if p.startswith(("src/", "config/")) or p == "configure.py"]),
-        (".agents/skills or tools", [p for p in paths if p.startswith((".agents/skills/", "tools/"))]),
+        (".claude/skills or tools", [p for p in paths if p.startswith((".claude/skills/", "tools/"))]),
         ("docs", [p for p in paths if p.startswith("docs/")]),
-        ("agents playbook", [p for p in paths if p == "AGENTS.md"]),
+        ("agents playbook", [p for p in paths if p == "CLAUDE.md"]),
     ]
     return [(name, group) for name, group in groups if group]
 
@@ -330,12 +330,12 @@ def main() -> int:
         print("\n--- message (not written, nothing staged) ---\n" + message)
         return 0
 
-    agents_md = "AGENTS.md" in paths
+    agents_md = "CLAUDE.md" in paths
     if agents_md:
         localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
         if not os.path.exists(STATE_FILE):
             sys.exit(
-                "refusing to stage AGENTS.md: pulling the LOCAL-ONLY block left no state file to restore from.\n"
+                "refusing to stage CLAUDE.md: pulling the LOCAL-ONLY block left no state file to restore from.\n"
                 "Its live section has to be recoverable before the file is staged - restore it by hand first."
             )
 
@@ -350,9 +350,9 @@ def main() -> int:
             localonly("push")  # working tree keeps its live section, the index keeps the stripped blob
             if localonly_markers() == 0:
                 print(
-                    "WARNING: the AGENTS.md LOCAL-ONLY section did not come back into the working tree.\n"
+                    "WARNING: the CLAUDE.md LOCAL-ONLY section did not come back into the working tree.\n"
                     f"         The staged blob is correct (no block); restore the live section yourself - the\n"
-                    f"         most recent copy is the last commit or a sibling worktree's AGENTS.md."
+                    f"         most recent copy is the last commit or a sibling worktree's CLAUDE.md."
                 )
 
     print(f"\nstaged {len(paths)} path(s); message written to {os.path.relpath(msg_file, ROOT)}\n")

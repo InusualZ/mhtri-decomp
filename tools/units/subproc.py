@@ -3,15 +3,15 @@
 
 **The incident this closes (F34).** `land.run` did `subprocess.run(..., text=True, errors="replace")`
 with no `encoding=`.  `text=True` without an explicit codec decodes with `locale.getpreferredencoding(False)`
-- `cp1252` on this host - while the file it was compared against is read as UTF-8.  `AGENTS.md`'s prose
-carries an em dash, so `git show HEAD:AGENTS.md` decoded as cp1252 spelled `â€"` where the file said `—`,
+- `cp1252` on this host - while the file it was compared against is read as UTF-8.  `CLAUDE.md`'s prose
+carries an em dash, so `git show HEAD:CLAUDE.md` decoded as cp1252 spelled `â€"` where the file said `—`,
 `agents_md_real_change` never matched, and the landing gate refused every landing with "main's tree is not
-clean: M AGENTS.md".  The refusal was *false*: the file is byte-equal to HEAD once the LOCAL-ONLY block is
+clean: M CLAUDE.md".  The refusal was *false*: the file is byte-equal to HEAD once the LOCAL-ONLY block is
 cut.  `PYTHONUTF8=1 agents_md_real_change(MAIN)` returned False while the default returned True - one
 non-ASCII byte in the compared text was the whole difference.
 
 The trap is silent and host-dependent: the same code is correct on a UTF-8 locale (Linux CI) and wrong on
-this one, and it only bites when the compared text is non-ASCII.  A fixture whose AGENTS.md is pure ASCII
+this one, and it only bites when the compared text is non-ASCII.  A fixture whose CLAUDE.md is pure ASCII
 passes either way, which is how `require_clean_tree`'s existing test missed it.
 
 So the rule is mechanical and this module is where it is written down:
@@ -148,7 +148,7 @@ def selftest() -> int:
 
     check("the F34 spelling is a trap",
           len(traps('import subprocess\n'
-                    'subprocess.run(["git", "show", "HEAD:AGENTS.md"], cwd=".",\n'
+                    'subprocess.run(["git", "show", "HEAD:CLAUDE.md"], cwd=".",\n'
                     '               capture_output=True, text=True, errors="replace")\n')), 1)
     check("the fixed spelling is not",
           traps('import subprocess\n'

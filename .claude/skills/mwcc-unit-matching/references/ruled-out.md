@@ -1,6 +1,6 @@
 <!-- GENERATED FILE - do not edit.
      Source: docs/matching.md
-     Regenerate: python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py
+     Regenerate: python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py
 -->
 
 ## Ruled out - do not re-run these

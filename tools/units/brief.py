@@ -866,7 +866,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append(lc.brief_paragraph(b.get("language")))
     sh = b.get("shared_headers") or []
     lines.append("")
-    lines.append("**Shared headers this unit should reuse** (`docs/plan.md` \u00a76.5 rule 1, AGENTS.md -> "
+    lines.append("**Shared headers this unit should reuse** (`docs/plan.md` \u00a76.5 rule 1, CLAUDE.md -> "
                  "Repository layout): a type or helper another unit already declares belongs under `include/` - "
                  "include it, never copy it. `include/**` is read-only for you: a change there goes in the outbox's "
                  "`config_requests`, not in your branch.")
@@ -943,8 +943,8 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("* a ≤ 15-line digest in your reply")
     lines.append("")
     lines.append("**End your turn with your report as the final message.** The orchestrator runs you through the "
-                 "`subagent` tool, which returns to it when your process exits, so your last assistant message "
-                 "*is* the handoff; a pane-launched worker delivers the same message plus its outbox, and the "
+                 "headless `claude --agent ... -p` session, which returns to it when your process exits, so your last "
+                 "assistant message *is* the handoff; a pane-launched worker delivers the same message plus its outbox, and the "
                  "orchestrator reads them once the pane is idle. There is no completion tool to call - ending on a "
                  "tool call (or saying nothing) hands back an empty result, so make the digest the last thing you "
                  "write.")
@@ -1004,16 +1004,13 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("")
     lines.append("`infer.py` reads the target bytes and names the flags (it is 100 % correct on 36 confident claims and abstains rather than guess); `shapesearch.py` writes variants of your source, compiles each with the real command line into a scratch copy and ranks them by the official metric - it took two functions to 100 % on `Pl/pl_act` in 30 seconds. A shapesearch *miss* is informative: zero differing rows with a 99.9 % score means relocation naming, so the data claim is the fix, not a shape.")
     _measure_lines(lines, b["unit"])
-    lines.append("A worker **registers its own unit** (`splits.txt` + `configure.py`, part 2) and builds freely **in its own worktree** - including the full `ninja` - but never runs the **split**, the **link**, `land.py` or `claims.py release`, never edits `symbols.txt` or `AGENTS.md`, and never commits on `main`. Everything else you need changed goes into the outbox's `config_requests`.")
+    lines.append("A worker **registers its own unit** (`splits.txt` + `configure.py`, part 2) and builds freely **in its own worktree** - including the full `ninja` - but never runs the **split**, the **link**, `land.py` or `claims.py release`, never edits `symbols.txt` or `CLAUDE.md`, and never commits on `main`. Everything else you need changed goes into the outbox's `config_requests`.")
     _teardown_lines(lines)
     lines.extend(config_schema_lines())
     lines.append("")
-    lines.append("**You may fan out subagents** for parallel work. They run in *your* worktree, on *your* branch; "
-                 "they never commit (you make the one commit); you assign them disjoint files or functions; and you "
-                 "are accountable for what they produce - **re-measure every claim they make**, exactly as the "
-                 "orchestrator re-measures yours. Hand each of them this whole part verbatim: a subagent that has "
-                 "not read it will name a field `unk4`, reach it with a pointer cast, or use a `goto`, and that "
-                 "becomes repair work charged to you.")
+    lines.append("**Do not fan out subagents.** You work alone in *your* worktree, on *your* branch, and make the "
+                 "one commit; you have no tool to spawn agents. If the unit is too big for one lane, say so in "
+                 "your report and the orchestrator will split it into more claims.")
     lines.append("")
     lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
     lines.append("")
@@ -1283,7 +1280,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("```")
     lines.append("")
     lines.append("**This is the one exception to the shared-file rule.** Everywhere else a worker never touches")
-    lines.append("`splits.txt`, `configure.py`, `symbols.txt` or `AGENTS.md`. Here you must, because measurement needs")
+    lines.append("`splits.txt`, `configure.py`, `symbols.txt` or `CLAUDE.md`. Here you must, because measurement needs")
     lines.append("the unit in the graph - but **only in your own worktree**. The orchestrator applies your")
     lines.append("registration on `main` with the rest of the batch, one re-split for all of them. Do not add a")
     lines.append("second `config.libs` block: extend the block your neighbours are in.")
@@ -1396,12 +1393,9 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     _teardown_lines(lines)
     lines.extend(config_schema_lines())
     lines.append("")
-    lines.append("**You may fan out subagents** - use the **`decompiler`** agent for them (the project agents "
-                 "`fixer` and `merger` exist for the two repair cases: a branch the landing gate refused, and a "
-                 "held branch that main moved past). "
-                 "**You may fan out subagents** for parallel work, in *your* worktree, on *your* branch. They never")
-    lines.append("commit; you assign them disjoint functions; you re-measure every claim they make. Hand each of them")
-    lines.append("this whole part verbatim.")
+    lines.append("**Do not fan out subagents.** You work alone in *your* worktree, on *your* branch, and make the "
+                 "one commit; you have no tool to spawn agents. If the unit is too big for one lane, say so in "
+                 "your report and the orchestrator will split it into more claims.")
     lines.append("")
     lines.append(plan_section(main, "### 6.5 Type and naming discipline"))
     lines.append("")
@@ -2107,8 +2101,8 @@ def selftest() -> int:
     check("§6.5 now carries the goto rule", "`goto` is forbidden" in plan_section(".", "### 6.5 Type and naming discipline"), True)
     check("the plan has the acknowledgement section",
           "Acknowledgement" in plan_section(".", "### 5.6 Acknowledgement"), True)
-    check("the subagent contract is in §5.5",
-          "fan out subagents" in plan_section(".", "### 5.5 A worker may fan out subagents"), True)
+    check("the no-fan-out rule is in §5.5",
+          "no profile carries the `Agent` tool" in plan_section(".", "### 5.5 A worker does not fan out subagents"), True)
     check("plan_section finds §8", "Invariants" in plan_section(".", "## 8. Invariants"), True)
     check("plan_section is empty for nonsense", plan_section(".", "### 99 nope"), "")
     # A section that MOVED out of docs/plan.md must still be found: the pipeline doc took section 5 to
@@ -2121,9 +2115,9 @@ def selftest() -> int:
     open(os.path.join(moved, "docs", "plan.md"), "w", encoding="utf-8").write(
         "# plan\n\n## 5. The protocol\n\nMoved to pipeline.md 10.\n\n## 6. Next\n\nafter\n")
     open(os.path.join(moved, "docs", "pipeline.md"), "w", encoding="utf-8").write(
-        "# pipeline\n\n## 10. The protocol\n\n### 10.6 A worker may fan out subagents\n\nbody-10-6\n\n"
+        "# pipeline\n\n## 10. The protocol\n\n### 10.6 A worker does not fan out subagents\n\nbody-10-6\n\n"
         "### 10.7 Acknowledgement, heartbeats and timeouts\n\nbody-10-7\n")
-    sec = plan_section(moved, "### 5.5 A worker may fan out subagents")
+    sec = plan_section(moved, "### 5.5 A worker does not fan out subagents")
     check("plan_section follows a section that moved (old number, new file)", "body-10-6" in sec, True)
     check("a moved section stops at its own next heading", "body-10-7" not in sec, True)
     check("plan_section still reads the section that stayed in plan.md",

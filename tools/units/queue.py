@@ -62,12 +62,8 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 from units import brief  # noqa: E402
 
-# A unit that reconstructs a whole 100+-function range legitimately outruns the 30-minute
-# single-run backstop: three rounds died mid-work on 2026-09-24 and one lost an uncommitted
-# registration.  The spawn line carries the budget explicitly so it cannot silently regress, and
-# the runner steers a checkpoint 5 minutes before it (see the pi-subagents config).
-TIMEOUT_MS = 5400000
 from units import claims  # noqa: E402
+from units import lanecmd  # noqa: E402
 from units import recompile as rc  # noqa: E402
 from units import backlog  # noqa: E402
 
@@ -347,12 +343,12 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
     mapping `slots.spawn` also uses, so a queue spawn and a `slots.py spawn` for the same kind can never
     disagree. `profile` is the deliberate override for a caller that needs an explicit one; the default is
     `unit` -> `surveyor` (a registration-and-reconstruction lane is unit work, the project's
-    `.agents/agents/decompiler.md`), and `fix`/`merge`/`tooling`/`docs`/... come from the same table. A `unit` claim runs four legs: `surveyor` (the claim survey), `decompiler` (the bodies), a read-only `codereviewer` pass, then the decompiler resumes.
+    `.claude/agents/decompiler.md`), and `fix`/`merge`/`tooling`/`docs`/... come from the same table. A `unit` claim runs four legs: `surveyor` (the claim survey), `decompiler` (the bodies), a read-only `codereviewer` pass, then the decompiler resumes.
 
     The task names the brief by its absolute MAIN path: the brief is written into MAIN *after* the worktree
-    was created, so the worktree's own checkout does not contain it. The call is the default `subagent`
-    tool's single mode (`agent`/`task`/`cwd`); it has no `name` parameter, so the slug is a label only, and
-    it blocks and returns the worker's final message to the orchestrator when the child process exits.
+    was created, so the worktree's own checkout does not contain it. The call is a headless
+    `claude --agent <profile> -p <task>` run with its cwd at the worktree (`lanecmd.lane_call`); its final
+    message is the lane's report, and its session id is printed so a question can be answered by resuming it.
 
     **`cwd` is the claim's own worktree, and MAIN is refused outright.**  A lane launched with its cwd set to
     MAIN cloned its upstream *inside the repository root* (`.tmp-mwcc/`), and the next landing was refused
@@ -366,12 +362,12 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
                          % (unit, wt))
     task = ("Read %s (in MAIN) and do exactly what it says. "
             "Ack first: python tools/units/claims.py ack %s --agent %s-%s. "
-            "You may fan out subagents. End your turn with your report: "
-            "your final message is the result the orchestrator receives."
+            "End your turn with your report: your final message is the result the orchestrator receives."
             % (brief_path.replace("\\", "/"), unit, profile, slug))
-    return {"kind": kind, "agent": profile, "name": "%s-%s" % (profile, slug), "cwd": wt, "task": task,
-            "call": "subagent(agent=\"%s\", cwd=\"%s\", task=%s, timeoutMs=%d)"
-                    % (profile, wt.replace("\\", "/"), json.dumps(task), TIMEOUT_MS)}
+    name = "%s-%s" % (profile, slug)
+    launch = lanecmd.lane_call(profile, wt, task, name=name, main=main, key=slug)
+    return {"kind": kind, "agent": profile, "name": name, "cwd": wt, "task": task,
+            "sessionId": launch["session_id"], "call": launch["call"]}
 
 
 def promote(main: str, unit: str, claim_slug: str, wt: str | None = None) -> str:
@@ -854,7 +850,7 @@ def selftest() -> int:
         check("dry-run's spawn task names the brief", dry["brief"].replace("\\", "/") in dry["spawn"]["task"], True)
         check("dry-run's spawn task names the unit", "auto/stubB" in dry["spawn"]["task"], True)
         check("dry-run's spawn is a subagent call",
-              dry["spawn"]["call"].startswith("subagent(agent=\"surveyor\""), True)
+              " claude --agent surveyor " in dry["spawn"]["call"], True)
         check("... and a proposal lane defaults to the surveyor profile",
               dry["spawn"]["agent"] == "surveyor", True)
         check("... recording the kind it was taken as", dry["spawn"]["kind"], "unit")
@@ -862,7 +858,7 @@ def selftest() -> int:
         # `slots.py spawn` for the same kind cannot disagree - and a tooling lane is NOT a decompiler lane
         check("the kind decides the profile: fix -> fixer",
               spawn_line(tmp, "auto/x", "s", "/w", "/b", "fix")["call"]
-              .startswith("subagent(agent=\"fixer\""), True)
+              .find(" claude --agent fixer ") > 0, True)
         check("the kind decides the profile: tooling -> worker (not decompiler)",
               spawn_line(tmp, "auto/x", "s", "/w", "/b", "tooling")["agent"], "worker")
         check("the kind decides the profile: review -> codereviewer",
@@ -1094,7 +1090,7 @@ def selftest() -> int:
         check("... every claim carries its own spawn",
               [c["unit"] for c in out["claims"]], [units[0], units[2]])
         check("... and every spawn is a subagent call",
-              all(c["spawn"]["call"].startswith("subagent(agent=\"surveyor\"")
+              all(" claude --agent surveyor " in c["spawn"]["call"]
                   for c in out["claims"]), True)
         check("... claimed through the same path as a single pick",
               units[2] in claims.load_registry(tmp), True)
@@ -1308,7 +1304,7 @@ def selftest() -> int:
             check("... shows the balance and its derivation",
                   "balance is 0" in msg and "earns 1 credit" in msg, True)
             check("... names the top backlog item", "include/unsplit/lobby.h" in msg, True)
-            check("... carries a paste-ready lane", "subagent(" in msg, True)
+            check("... carries a paste-ready lane", "claude --agent" in msg, True)
             check("... and says parked earns no credit", "`parked` earns no credit" in msg, True)
         # PATH 3: --ignore-backlog -> handed out WITHOUT spending (release the unit PATH 1 claimed)
         claims.save_registry(tmp, {})

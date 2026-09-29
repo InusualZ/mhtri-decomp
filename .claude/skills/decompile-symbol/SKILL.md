@@ -97,7 +97,7 @@ A stop of kind 1 is not "report and give up": check whether the owning unit's so
 6. **If the Ghidra instance or program is unreachable: stop and ask the user.** Do not substitute guesses
    from a stale `symbols.txt`.
 
-Then read the target: `python .agents/skills/mwcc-unit-matching/scripts/mt.py units` for what exists, and
+Then read the target: `python .claude/skills/mwcc-unit-matching/scripts/mt.py units` for what exists, and
 the disassembly of the function you are writing (`mt.py diff -u <unit> <symbol>` once it compiles).
 
 ## 3. Write the source
@@ -177,8 +177,8 @@ python configure.py && ninja build/RMHE08/src/<Dir>/<file>.o    # compiles the u
 ninja build/RMHE08/ok                                          # the link must stay green
 rm build/RMHE08/report.json && ninja build/RMHE08/report.json   # the report is what the bar reads
 ninja changes                                                  # this unit up, nothing else down
-python .agents/skills/mwcc-unit-matching/scripts/mt.py info   -u <unit>
-python .agents/skills/mwcc-unit-matching/scripts/mt.py diff   -u <unit> <symbol>
+python .claude/skills/mwcc-unit-matching/scripts/mt.py info   -u <unit>
+python .claude/skills/mwcc-unit-matching/scripts/mt.py diff   -u <unit> <symbol>
 ```
 
 The `ok` target does **not** build a `NonMatching` object — those bytes are not linked, so always name the
@@ -207,15 +207,15 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
   residual region, and what was tried.
 * `docs/matching.md`: a section in house style (Problem / Why try it / Result / Example) the moment an idea
   actually works — a win that only lives in chat is lost at the next compaction. Then regenerate the skill's
-  copy in the same commit: `python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check` has to
+  copy in the same commit: `python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check` has to
   come back clean, because `references/` is what a fresh session and **every subagent** load — when this rule
   was written it was 55 lines behind the playbook, so the knowledge existed and no agent would have seen it.
   Report in the handover what the run taught *and* what it tried that did not work: a `no` result saves the
   next session the same detour, and a unit-specific fact belongs in the unit's file header comment.
-* `AGENTS.md`: **write it** when the change is a meaningful improvement to the system (a playbook row, a new
+* `CLAUDE.md`: **write it** when the change is a meaningful improvement to the system (a playbook row, a new
   idea, a corrected rule) and report the write in the handover. Keep the local-only block rules:
   `python tools/agents/localonly.py pull` before staging and `push` after a commit
-  (skill: `agents-md-local-only`). It is not a free-for-all: another agent edits that file too, so only
+  (skill: `claude-md-local-only`). It is not a free-for-all: another agent edits that file too, so only
   meaningful improvements, and never an unevidenced flag. A **name** is not in that category: a symbol gets the
   best name its context supports (a guess is licensed, and marked in the unit header so a later pass can refine
   it), because a generated `fn_`/`lbl_`/`unk` left in `src/` is a defect.
@@ -232,14 +232,14 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
   writes the message with the measured results into the worktree's **private git dir**
   (`git rev-parse --git-path prepcommit_msg.txt`) - in a linked worktree `.git` is a *file*, so never
   hard-code `.git/...`.
-  For `AGENTS.md` it pulls the LOCAL-ONLY block out before staging and pushes it straight back, so the working
+  For `CLAUDE.md` it pulls the LOCAL-ONLY block out before staging and pushes it straight back, so the working
   tree keeps its live section while the *index* holds the stripped blob (non-negotiable 8); it **refuses to
   stage the file** when the pull left no state to restore from, and warns when the block did not come back -
   both were real failures before the guard existed. **It never commits:** the user reviews
   `git diff --cached` and runs `git commit -F <that path>`. `--commit` executes it and is only for when they
   explicitly ask.
 * **Apply each finding in the same session, uncommitted.** The user reviews the working tree: an idea that
-  worked gets its `docs/matching.md` section *and* its `AGENTS.md` playbook row, a unit-specific residual goes
+  worked gets its `docs/matching.md` section *and* its `CLAUDE.md` playbook row, a unit-specific residual goes
   into the unit's file header comment, a process or tooling fact goes into the affected skill or `docs/` page
   (e.g. the re-split cost in `docs/splits.md`, the stale-report rule in `objdiff-verify`). A finding that only
   lives in the reply is lost at the next compaction.

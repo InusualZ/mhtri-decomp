@@ -1,7 +1,7 @@
 /* nw4r::ef draw-strategy records shared by the draw-strategy units.
  *
  * These three records were first reconstructed privately in `ef/ef_drawstripestrategy.cpp`; this unit
- * (`ef/ef_drawpointstrategy.cpp`) is the second consumer, so per AGENTS.md -> Conventions rule 1 the
+ * (`ef/ef_drawpointstrategy.cpp`) is the second consumer, so per CLAUDE.md -> Conventions rule 1 the
  * declarations move to a header and both units include it.  The sibling's private copies are left for the
  * next pass that touches it (they are single-file and harmless until then).
  *

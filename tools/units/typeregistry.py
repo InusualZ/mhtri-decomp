@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The registry of shared types and helpers - what already exists, and who copied it.
 
-The project's rule (AGENTS.md -> Conventions; docs/plan.md section 6.5 rule 1) is that a type more than
+The project's rule (CLAUDE.md -> Conventions; docs/plan.md section 6.5 rule 1) is that a type more than
 one unit needs is declared **once**, under `include/`, and included where needed - a declaration moves
 there the *second* time a unit needs it. Nothing told a worker what already existed, so two units created
 `include/ef.h` and `include/nw4r/math.h` independently while three others each defined the same
@@ -64,7 +64,7 @@ SOURCE_SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
 # advice (they would drown the real finding); only a *redefinition* is debt.
 BASE_HEADERS = ("include/types.h",)
 
-# Deliberate duplicates: AGENTS.md / types.h's own header says these copies must stay.
+# Deliberate duplicates: CLAUDE.md / types.h's own header says these copies must stay.
 EXCEPTIONS = {
     "src/Camellia/camellia.c": "vendor file mirrors upstream and keeps its own typedefs (include/types.h)",
 }
