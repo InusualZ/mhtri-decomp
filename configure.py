@@ -2519,6 +2519,27 @@ config.libs = [
             # unclaimed run, so it lands as one unit.  Claims .text only; the size/coefficient tables it
             # reads (lbl_80612980 / lbl_80612A40) are an unclaimed auto .data range for the data pass.
             Object(NonMatching, "AX/AXFXReverbHi.c"),
+            # Registered by the BTE-region survey (`worker/bte-survey-846f`, notes
+            # `.pi/notes/bte-survey-846f.md`): `OS/PPCArch.c` (`.text` 0x804770E0..0x804772F0,
+            # 22 functions / 528 B, plus its `.data` string at 0x80612CE0).  Module `OS`, lib `OS`:
+            # the range is the SDK's PPCArch.c verbatim - every symbol already carries its real SDK
+            # name and the roster matches the SDK file's order, so rule 7 needs no invention.  It is
+            # one interior TU of the 238 KB unclaimed run 0x80475E24..0x804B17D0, whose left edge
+            # (AXFXGetHooks, 0x804770D4 + 12 B pad) and right edge (fn_804772F0, not an SPR
+            # accessor) are both non-PPCArch code.  Same lib block as the SDK bands above; the
+            # source restores -O4,p's 16-byte function alignment with `#pragma function_align 16`
+            # (every start in the range is 16-aligned).
+            Object(NonMatching, "OS/PPCArch.c"),
+            # Registered by the BTE-region survey (`worker/bte-survey-846f`): `EXI/EXIBios.c`
+            # (`.text` 0x804AFED0..0x804B17D0, 20 functions / 6400 B).  Module `EXI`, lib `OS`, same
+            # block as EXI/ProbeBarnacle.c.  The range is the SDK's EXIBios.c verbatim (every symbol
+            # already carries its real SDK name, in the SDK file's own order), its right edge is
+            # *proven* - the registered EXI/ProbeBarnacle.c starts at exactly 0x804B17D0 - and its
+            # left edge is roster-proven (WriteUARTN, the UART layer above it, calls into the range,
+            # so it consumes EXIBios and is not part of it).  Claims its own `.data` Ecb, `.sdata`
+            # __EXIVersion and `.sbss` IDSerialPort1; `__OSInIPL` is left unclaimed on purpose (OS
+            # shared global, 16 readers in DVD + EXI - see the unit header).
+            Object(NonMatching, "EXI/EXIBios.c"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `804B17D0_ProbeBarnacle.c` (`.text` 0x804B17D0..0x804B8020, 118 functions / 26704 B).  Module
             # `EXI` from the range's head (the dump names ProbeBarnacle / __OSEnableBarnacle / EXIWriteReg,
