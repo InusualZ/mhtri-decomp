@@ -17,6 +17,7 @@
 
 #include "types.h"
 #include "Network/network_transport.h"
+#include "Network/network_shared_data.h"
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
@@ -706,22 +707,9 @@ u32 networkStreamWriter_size(const void* sub);
    `NetworkLogger` that the logging band uses).  A consumer that wants the older
    `NetworkSessionManagerLogger` view of the same object casts. */
 
-/* the band's float constants and singleton slots (unowned addresses - playbook 29: declared, never
-   defined).  Each value is read off the DOL; the name is derived from the use the range makes of it. */
-extern f32 networkMillisecondsPerSecond;   /* 0x8079C6EC = 1000.0f */
-extern f32 networkRateScale;               /* 0x8079C6F0 = 2.0f */
-extern f32 networkRateMax;                 /* 0x8079C6F8 = 1.0f */
-extern f32 networkRateMin;                 /* 0x8079C708 = 0.1f */
-extern f32 networkRateUpStep;              /* 0x8079C718 = 0.017f */
-extern f32 networkRateUpLerp;              /* 0x8079C730 = 0.5f */
-extern f32 networkRateDownStep;            /* 0x8079C734 = 0.008f */
-extern f32 networkRateDecay;               /* 0x8079C738 = 0.002f */
-extern f32 networkRateDownLerp;            /* 0x8079C73C = 0.25f */
-extern f32 networkRateFloor;               /* 0x8079392C = 0.032f (.sdata) */
-extern f32 networkRequestZero;             /* 0x8079C740 = 0.0f */
-extern f32 networkRequestTimerIdle;        /* 0x8079C748 = 0.0f */
-extern f32 networkRequestTimerReset;       /* 0x8079C750 = 0.0f */
-extern f32 networkSessionPatTimeOrigin;    /* 0x8079C754 = -3600.0f */
+/* the band's float constants and singleton slots live in the shared pool owned by the data-only unit
+   `Network/network_shared_data.cpp`; its header (included at the top of this file) declares them, so
+   they are not re-declared here (rule 2). */
 extern void* sGameSpyInterfaceThread;      /* 0x80794CE4 (.sbss) */
 extern const char NetworkSessionStable_downPerformancePackMessage[];
 extern const char NetworkSessionStable_downPerformanceByteMessage[];
