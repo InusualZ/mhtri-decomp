@@ -2384,6 +2384,18 @@ config.libs = [
             # measured before/after in the unit header.
             Object(NonMatching, "Network/network_transport.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # A **data-only** unit: the Network band's shared small-data pool, `.sdata2`
+            # 0x8079C690-0x8079C758 (200 B) and `.sdata` 0x80793900-0x80793930 (48 B), whose source
+            # defines nothing (playbook 23/53 route 2, playbook 54; the model is
+            # `Pl/pl_frame_data.cpp`).  Both runs are read by more than one party -
+            # `Network/network_transport.cpp` and `Network/fn_803D3CE8.cpp` share
+            # 0x8079C6EC..0x8079C754, and unsplit (Network) code reads 0x8079C690 and 0x8079C750 -
+            # so no consumer may claim them without taking rows only the other consumer reads.
+            # One owner is what lets every consumer include `Network/network_shared_data.h`
+            # instead of declaring the words into its own file, which is the rule-12 finding those
+            # 14 declarations were in `include/Network/fn_803D3CE8.h`.  Registered once, at its
+            # final home; the `-O3` override above does not apply (no code in this unit).
+            Object(NonMatching, "Network/network_shared_data.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `8041A87C_fn_8041A87C.cpp` (`.text` 0x8041A87C..0x8041DF10, 71 functions / 13972 B).
             # Per-object flags (brief 8.2), instruction-level evidence: retail *calls* the small

@@ -1305,6 +1305,10 @@ menu/arena_result.cpp:
 	.text       start:0x803B0F98 end:0x803B465C
 	.sdata      start:0x8079367C end:0x80793684
 
+Network/network_shared_data.cpp:
+	.sdata      start:0x80793900 end:0x80793930
+	.sdata2     start:0x8079C690 end:0x8079C758
+
 enemy/em_pop.cpp:
 	extab       start:0x80018DC4 end:0x80019164
 	extabindex  start:0x8003930C end:0x8003987C
@@ -1323,6 +1327,9 @@ Network/network_transport.cpp:
 	extab       start:0x800198C8 end:0x80019E5C
 	extabindex  start:0x8003A0BC end:0x8003A524
 	.text       start:0x803CCDF8 end:0x803D3CE8
+	.data       start:0x805F9A40 end:0x805FA4EC
+	.bss        start:0x806D2C60 end:0x806D3650
+	.sbss       start:0x80794C98 end:0x80794CA0
 
 Network/fn_803D3CE8.cpp:
 	extab       start:0x80019E5C end:0x8001A348
