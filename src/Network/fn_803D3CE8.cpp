@@ -510,7 +510,7 @@ NetworkSessionManager::NetworkSessionManager()
 
 extern "C" void NetworkRequest_reset(NetworkRequest* self)
 {
-    self->unused_00 = 0;
+    self->state_00 = 0;
     self->interval_4C = networkRequestZero;
     self->timeout_50 = networkRequestZero;
     self->requestId_70 = 0;
@@ -1490,7 +1490,7 @@ extern "C" void NetworkRequestPat_clear(NetworkRequest* self)
 
 extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
 {
-    self->unused_00 = 0;
+    self->state_00 = 0;
     self->interval_4C = networkRequestTimerReset;
     self->timeout_50 = networkRequestTimerReset;
     self->requestId_70 = 0;

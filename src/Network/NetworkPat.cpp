@@ -179,7 +179,7 @@ void deleteNetworkLayerPat(NetworkPat* self, s32 index)
         NetworkPatSlotProtocol* entry = (NetworkPatSlotProtocol*)(&self->layer_0C)[index];
         if (entry != NULL) {
             entry->release_14();
-            clearNetworkLayerPat(self, (NetworkLayer*)entry);
+            clearNetworkLayerPat(self, (NetworkLayerPat*)entry);
             if (entry != NULL) {
                 entry->destroy_08(1);
             }
@@ -188,7 +188,7 @@ void deleteNetworkLayerPat(NetworkPat* self, s32 index)
 }
 #pragma peephole on
 
-s32 setNetworkLayerPat(NetworkPat* self, NetworkLayer* value)
+s32 setNetworkLayerPat(NetworkPat* self, NetworkLayerPat* value)
 {
     if (self->layer_0C == NULL) {
         self->layer_0C = value;
@@ -197,7 +197,7 @@ s32 setNetworkLayerPat(NetworkPat* self, NetworkLayer* value)
     return -1;
 }
 
-NetworkLayer* getNetworkLayerPat(NetworkPat* self, s32 index)
+NetworkLayerPat* getNetworkLayerPat(NetworkPat* self, s32 index)
 {
     if (index == 0) {
         return (&self->layer_0C)[index];
@@ -205,7 +205,7 @@ NetworkLayer* getNetworkLayerPat(NetworkPat* self, s32 index)
     return NULL;
 }
 
-s32 clearNetworkLayerPat(NetworkPat* self, NetworkLayer* value)
+s32 clearNetworkLayerPat(NetworkPat* self, NetworkLayerPat* value)
 {
     if (self->layer_0C == value) {
         self->layer_0C = NULL;
