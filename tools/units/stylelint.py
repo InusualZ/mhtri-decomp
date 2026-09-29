@@ -7,6 +7,7 @@ only thing keeping them is the reviewer's attention. This tool turns the mechani
 violation is refused before it is committed.
 
     python tools/units/stylelint.py --budget          # the per-unit backlog over src/
+    python tools/units/stylelint.py --budget --headers  # ... plus the include/unsplit band's rule-2 rows
     python tools/units/stylelint.py --diff <ref>      # exit 0 = the working tree adds no violation
     python tools/units/stylelint.py --diff <ref> --list-added  # ... and name each added finding
     python tools/units/stylelint.py --ref <branch>    # read-only: judge a held branch's committed tree
@@ -1716,6 +1717,48 @@ def header_rule2_findings(root: str, ownership: "Ownership | None" = None) -> li
     return out
 
 
+def band_rule2_findings(sources: list["Source"], ownership: "Ownership | None") -> list[dict]:
+    """Rule 2 over a set of unsplit-band sources - the reading `header_rule2_findings` deliberately skips.
+
+    `all_sources` walks only `src/`, and `header_rule2_findings` skips `include/unsplit/` (that is
+    `rule2_band_findings`' territory), so the band's rule-2 findings appear in no `--budget` column even
+    though `--diff` counts them. The declaration of a symbol a registered unit owns must not sit in the
+    band; this is the function `--budget --headers` adds that missing column from. Pure in `sources`, so
+    the aggregation is testable without the tree.
+    """
+    out: list[dict] = []
+    if ownership is None:
+        return out
+    for src in sources:
+        out.extend(rule2_band_findings(src, ownership))
+    out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
+    return out
+
+
+def unsplit_header_files(root: str) -> list[str]:
+    """Every header in the `include/unsplit/` band, in path order."""
+    out = []
+    for path in header_files(root):
+        if is_unsplit_header(rel_of(root, path)):
+            out.append(path)
+    return out
+
+
+def header_rule2_band_findings(root: str, ownership: "Ownership | None" = None) -> list[dict]:
+    """`rule2_band_findings` over the whole `include/unsplit/` band, read from `root`.
+
+    `--budget --headers` adds this to the per-file table. The map being absent leaves rule 2 unreported,
+    exactly as it does for `src/`.
+    """
+    if ownership is None:
+        ownership = load_ownership(root)
+    if ownership is None:
+        return []
+    return band_rule2_findings(
+        [Source(path, rel_of(root, path), read_text(path)) for path in unsplit_header_files(root)],
+        ownership)
+
+
 def header_rule11_findings_at_ref(root: str, ref: str, rename: dict | None = None) -> list[dict]:
     """Rule-11 findings for `include/` as it was at `ref`, keyed `(rule, path_now)` - the back side.
 
@@ -2835,6 +2878,24 @@ def selftest() -> int:
         {"rule": 7, "detail": "bare `unk1` identifier"},
     ])["unk_fields"], 1)
 
+    # --- the band's rule-2 column (`--budget --headers`) -------------------------------------------
+    # `lint_all`/`header_rule2_findings` skip `include/unsplit/`, so a band header's owned-declaration
+    # findings are in no budget column; `header_rule2_band_findings` is that missing column's source.
+    band_src = Source("x", "include/unsplit/mod.h", "void foo(void);\nvoid mid(void);\n")
+    band_findings = band_rule2_findings([band_src], idx)
+    check("budget band: an owned declaration in the band is a finding",
+          [f["rule"] for f in band_findings], [2])
+    check("budget band: an unowned name is left alone",
+          [f["line"] for f in band_findings], [1])
+    check("budget band: a symbol not in the map is left alone",
+          band_rule2_findings([Source("x", "include/unsplit/mod.h", "void not_in_map(void);\n")], idx), [])
+    shown = budget(band_findings)
+    check("budget band: the band header is its own row",
+          [r["file"] for r in shown["units"]], ["include/unsplit/mod.h"])
+    check("budget band: the r2 column carries the band reading", shown["totals"]["2"], 1)
+    check("budget band: without --headers nothing changes",
+          [r["file"] for r in budget(f1 + f2)["units"]], ["src/A/a.c", "src/B/b.c"])
+
     # --- diff comparison --------------------------------------------------------------------------
     before = rule_counts(f1)
     after = rule_counts(f1 + f2)
@@ -3818,6 +3879,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="read-only: judge the named branch's committed tree against its merge base, so a "
                          "held branch can be checked without checking it out (same comparison as --diff)")
     ap.add_argument("--budget", action="store_true", help="report the backlog per unit over src/")
+    ap.add_argument("--headers", action="store_true",
+                    help="with --budget: add the include/unsplit band's rule-2 reading to the table (the "
+                         "declarations of a symbol a registered unit already owns). Additive: without it "
+                         "the table is byte-identical to before")
     ap.add_argument("--list-added", action="store_true",
                     help="with --diff/--ref: also name each added finding (rule, file, line and the "
                          "identifier/token), grouped by rule then file, biggest file first")
@@ -3938,7 +4003,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(line)
         return 1 if added else 0
 
+    if args.headers and not args.budget:
+        ap.error("--headers describes the --budget table; pass --budget")
     findings = lint_all(root, ownership)
+    if args.headers:
+        # the band's rule-2 column, which `lint_all` cannot see (see `band_rule2_findings`). Only the
+        # rule-2 reading is added: the band's rule 12 is already in `lint_all` via `header_rule12_findings`.
+        findings = findings + header_rule2_band_findings(root, ownership)
+        findings.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     if args.json:
         print(json.dumps({"budget": budget(findings),
                           "rule11_locals": rule11_local_total(root),
