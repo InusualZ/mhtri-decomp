@@ -66,6 +66,7 @@
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
+#include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 frame-window pool (rule 2) */
 
 /* The unit's own unwritten siblings, in address order: their callers below need the signature the
  * target's call sites set up.  Each is declared here (the owner's file, docs/plan.md 6.5 rule 2) and

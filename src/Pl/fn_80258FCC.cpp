@@ -62,6 +62,7 @@
 #include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the Pl_chr_set_attr_default/33C/644/3A8 group */
 #include "fn_8004CAD8.h"
 #include "unsplit/Pl.h"
+#include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 frame-window pool (rule 2) */
 
 /* Drives one tick of the player's act state: it ages the shell timer the act belongs to, and
  * picks the next action code from the motion/act predicates when the timer runs out. */
@@ -225,7 +226,7 @@ extern "C" void fn_8025948C(_PLW* self)
         fn_8027D4F0(self);
         Pl_chr_set_attr_default(self, 307, 6, 0);
         pl_act_clear_flag5bb(self);
-        self->field_0x354 = lbl_80799EB0;
+        self->field_0x354 = pl_float_1_7;
         break;
     case 1:
         if (Pl_motion_end_ck(self) == 1) {

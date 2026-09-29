@@ -6,7 +6,7 @@
  *
  * Registration (docs/plan.md 12, evidence class 3 + 4):
  *   - no `__FILE__` string covers the range: the only strings its data touches are the `.sdata2`
- *     float pool 0x80799E00-0x80799FD8 and `.bss` `lbl_806AB848`, and no source-name string is
+ *     float pool 0x80799E00-0x80799FDC and `.bss` `lbl_806AB848`, and no source-name string is
  *     referenced from the range at all (class 1 out);
  *   - `dumpmap.py lookup` answers only `zz_` placeholders for all 17 symbols (class 2 out);
  *   - the code is the `Pl` module: every actor parameter is a `_PLW` (`Pl_master_ck`, `Pl_act_ck`,
@@ -46,6 +46,7 @@
 #include "unsplit/Pl.h"
 #include "ef/fn_800CDB2C.h"
 #include "fn_8004CAD8.h"
+#include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 pool 0x80799E00-0x80799F98 (rule 2) */
 
 /* The per-chunk move-work table the player's motion layer reads: `lbl_806AB848` is 0x420 B of
  * 24-byte entries, 264 B (11 entries) per `_PLW::chunk_ofs` chunk.  Only the fields this unit reads
@@ -585,7 +586,7 @@ s32 fn_8025F588(_PLW* self) {
         fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
         self->field_0x064 = value;
         self->field_0x074 = 1;
-        if (self->vec_0x03C.y >= lbl_80799E9C + value) {
+        if (self->vec_0x03C.y >= pl_frame_window_200 + value) {
             self->field_0x075 = 0;
             self->kind_0x09 = 2;
             if ((self->field_0x5C4 & 0xF) != 0) {

@@ -20,6 +20,21 @@
  *
  * Measured when the claim moved here from `Pl/pl_act_step.cpp`: the whole-project report is unchanged
  * row for row (the 408 B of `total_data` simply changes unit) and `ninja build/RMHE08/ok` stays green.
+ *
+ * Consumer conversion (this pass): the four units that still declared the run's words themselves -
+ * `Pl/fn_802430E8.cpp`, `Pl/fn_802489D4.cpp`, `Pl/fn_80258FCC.cpp`, `Pl/fn_8025F088.cpp` - now include
+ * this owner's header, and the duplicates in `include/unsplit/Pl.h` (a band header may not declare a
+ * symbol a registered unit owns, rule 2) and in `include/Pl/fn_8025F088.h` are gone.  Eight of the
+ * words they spelled had only `lbl_80799Exx` rows and were named from their values, the same scheme as
+ * the rest of the run (`lbl_80799E48` -> `pl_float_neg8`, `lbl_80799E84` -> `pl_frame_window_80`, ...,
+ * `lbl_80799EC4` -> `pl_float_0_66`); the map rows and every reference moved in the same change.
+ *
+ * Residual: the `.sdata2` run that follows this one, 0x80799F98-0x80799FDC (17 words: the 8
+ * `lbl_80799Fxx` declarations in `Pl/fn_8025F088.h` plus `lbl_806AB848`, the unit's `.bss` chunk
+ * table), is *not* ours and has no owner - `dataclaim.py --unit Pl/fn_8025F088` still answers
+ * `named-owner-unit` for it, and its declarations are rule 12's open item there.  It sits at the head
+ * of dtk's tail bulk unit `auto_11_80799F98_sdata2` (0x80799F98-0x8079B740, 6056 B), so owning it is
+ * the same claim operation this unit's own registration was.
  */
 
 #include "types.h"

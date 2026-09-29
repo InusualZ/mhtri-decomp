@@ -12,7 +12,15 @@
  * units' own pools (one address is read by several objects), so no single consumer can emit it; the
  * owner is the model for "the pool is one run, and it has one owner" (playbook 23/53 route 2).
  *
- * The values in the comments are read out of `orig/RMHE08/sys/main.dol` at each address.
+ * The values in the comments are read out of `orig/RMHE08/sys/main.dol` at each address, and the names
+ * are derived from them in the band's scheme: an integral frame count is `pl_frame_window_<n>`, any
+ * other constant is `pl_float_<value>` (`pl_float_neg8` for -8, `pl_float_0_66` for 0.66).  The words the
+ * consumers above actually spell are named that way here; the run's remaining interior words keep their
+ * `lbl_` rows and are named as the bodies that read them are written.
+ *
+ * The unit owns this run only.  The `.sdata2` run that follows it, 0x80799F98-0x80799FDC (17 words, read
+ * by `Pl/fn_8025F088.cpp` and `Pl/fn_80258FCC.cpp`), still has no owner: its declarations stay in
+ * `include/Pl/fn_8025F088.h` and it is rule 12's open item for those two units.
  */
 #ifndef MHTRI_PL_FRAME_DATA_H
 #define MHTRI_PL_FRAME_DATA_H
@@ -40,8 +48,10 @@ extern const f32 pl_frame_window_30;	/* 0x80799E38: 30 */
 
 extern const f32 pl_frame_window_44;	/* 0x80799E40: 44 */
 extern const f32 pl_frame_window_28;	/* 0x80799E44: 28 */
+extern const f32 pl_float_neg8;	/* 0x80799E48: -8 */
 
 extern const f32 pl_frame_window_20;	/* 0x80799E4C: 20 */
+extern const f32 pl_float_neg1;	/* 0x80799E50: -1 */
 
 extern const f32 pl_frame_window_8;	/* 0x80799E54: 8 */
 extern const f32 pl_float_neg10;	/* 0x80799E58: -10 */
@@ -54,13 +64,21 @@ extern const f32 pl_float_0_03125;	/* 0x80799E74: 0.03125 */
 extern const f32 pl_frame_window_360;	/* 0x80799E78: 360 */
 extern const f32 pl_float_neg4;	/* 0x80799E7C: -4 */
 extern const f32 pl_frame_window_100;	/* 0x80799E80: 100 */
+extern const f32 pl_frame_window_80;	/* 0x80799E84: 80 */
+extern const f64 pl_double_u32_to_f32_magic;	/* 0x80799E88: the 2^52 double MWCC's u32->f32
+                                                 * conversion loads (8 B, 8-aligned) */
 
 extern const f32 pl_float_1_1;	/* 0x80799E94: 1.1 */
 extern const f32 pl_float_1_4;	/* 0x80799E98: 1.4 */
+extern const f32 pl_frame_window_200;	/* 0x80799E9C: 200 */
 
 extern const f32 pl_frame_window_60;	/* 0x80799EA8: 60 */
+extern const f32 pl_frame_window_208;	/* 0x80799EAC: 208 */
+extern const f32 pl_float_1_7;	/* 0x80799EB0: 1.7 */
+extern const f32 pl_float_1_8;	/* 0x80799EB4: 1.8 */
 
 extern const f32 pl_float_1_5;	/* 0x80799EC0: 1.5 */
+extern const f32 pl_float_0_66;	/* 0x80799EC4: 0.66 */
 
 extern const f32 pl_frame_window_96;	/* 0x80799ECC: 96 */
 extern const f32 pl_frame_window_142;	/* 0x80799ED0: 142 */

@@ -123,16 +123,10 @@ u32 Pl_suimen_ck(struct _PLW* self); /* -> Pl_suimen_ck__FP4_PLW */
 extern "C" {
 #endif
 
-/* The unit's read-only pool constants (playbook 29: declared, never defined). */
-extern const f32 pl_float_zero;
-extern const f32 pl_frame_window_1;
-extern const f32 pl_frame_window_10;
-extern const f32 pl_frame_window_2;
-extern const f32 pl_frame_window_30;
-extern const f32 lbl_80799E50;
-extern const f32 pl_frame_window_100;
-extern const f32 lbl_80799E88;
-extern const f32 lbl_80799E9C;
+/* This unit's read of the Pl band's `.sdata2` pools (playbook 29: declared, never defined).  The words
+ * inside `Pl/pl_frame_data.cpp`'s run (0x80799E00-0x80799F98) are declared in that owner's header and
+ * included where they are used - `Pl/fn_8025F088.cpp` includes `Pl/pl_frame_data.h` (rule 2).  What is
+ * left here is the *second* run, 0x80799F98-0x80799FDC, which still has no registered owner. */
 extern const f32 lbl_80799F98;
 extern const f32 lbl_80799FC0;
 extern const f32 lbl_80799FC4;
