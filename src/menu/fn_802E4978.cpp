@@ -56,7 +56,7 @@
 #include "types.h"
 #include "menu/fn_802E4978.h"
 #include "menu/menu_item.h"
-#include "menu/fn_802A6624.h"
+#include "menu/menu_message.h"
 #include "ef/fn_800CDB2C.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "ai/fn_802D44F4.h"

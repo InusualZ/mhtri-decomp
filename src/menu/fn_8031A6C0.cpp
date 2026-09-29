@@ -40,7 +40,7 @@
 #include "types.h"
 #include "menu/fn_8031A6C0.h"
 #include "menu/menu_item.h"
-#include "menu/fn_802A6624.h"
+#include "menu/menu_message.h"
 #include "sound/fn_800D7F54.h"
 
 /* The band's unowned callees (no registered unit owns these addresses; rule 2's unsplit case). */

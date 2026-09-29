@@ -986,7 +986,7 @@ menu/menu_item.cpp:
 	extabindex  start:0x80030F90 end:0x8003123C
 	.text       start:0x8029F3C8 end:0x802A6624
 
-menu/fn_802A6624.cpp:
+menu/menu_message.cpp:
 	extab       start:0x800137D4 end:0x80013B0C
 	extabindex  start:0x8003123C end:0x80031710
 	.text       start:0x802A6624 end:0x802AD9C0

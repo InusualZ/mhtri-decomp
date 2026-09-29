@@ -134,7 +134,7 @@
 #include "pl.h"
 #include "hud/layout.h"
 #include "menu/menu_item.h"
-#include "menu/fn_802A6624.h"
+#include "menu/menu_message.h"
 #include "menu/menu_infomation.h"
 #include "Pl/pl_skill.h"
 #include "Pl/fn_8027D684.h"

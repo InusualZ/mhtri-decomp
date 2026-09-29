@@ -123,7 +123,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "stage/stg_w.h"
 #include "sound/fn_800DD1F0.h"
-#include "menu/fn_802A6624.h"
+#include "menu/menu_message.h"
 #include "pl.h"
 #include "fn_8004CAD8.h"
 #include "Pl/fn_8028F66C.h"

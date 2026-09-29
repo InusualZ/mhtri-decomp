@@ -10,8 +10,8 @@
  * pass, not here (the same rule-1 residual `menu_item.h` records for `_HIT_W`), because the sibling
  * unit's header is the natural home and this range only needs the offsets it reads.
  */
-#ifndef MHTRI_MENU_FN_802A6624_H
-#define MHTRI_MENU_FN_802A6624_H
+#ifndef MHTRI_MENU_MENU_MESSAGE_H
+#define MHTRI_MENU_MENU_MESSAGE_H
 
 #include "types.h"
 
@@ -107,4 +107,4 @@ s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
 s32 GetMenuFontColor(bool a, bool b, bool c, bool d);
 #endif
 
-#endif /* MHTRI_MENU_FN_802A6624_H */
+#endif /* MHTRI_MENU_MENU_MESSAGE_H */

@@ -1,5 +1,5 @@
 /*
- * menu/fn_802A6624.cpp - the menu band's list/cursor layer and its message helpers.
+ * menu/menu_message.cpp - the menu band's list/cursor layer and its message helpers.
  *
  * `.text` 0x802A6624-0x802AD9C0 (139 functions, 29596 B), extab 0x800137D4-0x80013B0C (103 8-byte
  * records) and extabindex 0x8003123C-0x80031710 (103 12-byte records, one per framed function), from
@@ -20,7 +20,7 @@
  * and the `.bss` table `lbl_806BE340` is referenced from both this range and 0x802A5E64 in the
  * proposal before it - so the cut is very likely through one translation unit.  This unit keeps the
  * proposal's extent because a worker may not re-cut a claim, and reuses the offsets rather than
- * inventing a type (`include/menu/fn_802A6624.h` says which).
+ * inventing a type (`include/menu/menu_message.h` says which).
  *
  * Naming note: the symbol map has only `fn_XXXXXXXX` for 99 of this range's 139 symbols (checked
  * with `python tools/symbols/dumpmap.py lookup` over the inventory and `grep` on the map: the 40
@@ -55,14 +55,14 @@
  *     object's relocations spell it bare, so both declarations want moving to this unit's header
  *     (they cannot be included here - `(10597) illegal function overloading`).
  *
- * Inventory and evidence: `python tools/units/ledger.py unit menu/fn_802A6624.cpp`.
+ * Inventory and evidence: `python tools/units/ledger.py unit menu/menu_message.cpp`.
  */
 
 #include "types.h"
 
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "ef/fn_800CDB2C.h"
-#include "menu/fn_802A6624.h"
+#include "menu/menu_message.h"
 
 char* strcpy(char* dst, const char* src);
 
