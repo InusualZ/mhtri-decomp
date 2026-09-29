@@ -2615,7 +2615,7 @@ def main() -> int:
     c.add_argument("--slot", type=int, default=None, help="take this slot instead of the first free one")
     c.add_argument("--kind", default="unit",
                    help="the lane kind; the agent profile comes from it via `slots.profile_for_kind` "
-                        "(unit->decompiler, fix->fixer, merge->merger, tooling/docs->worker, ...). "
+                        "(unit->surveyor, fix->fixer, merge->merger, tooling/docs->worker, ...). "
                         "Recorded on the slot's lock and in the registry (default: unit)")
     l = sub.add_parser("list", help="every claim git knows about")
     l.add_argument("--json", action="store_true")
