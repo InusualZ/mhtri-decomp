@@ -3,6 +3,8 @@
 
     python tools/units/callers.py <address|name> [--json] [--code|--data] [--kind K[,...]]
                                   [--pointers] [--limit N] [--rebuild]
+    python tools/units/callers.py --range 0x80799F98 0x80799FDC [--step 4] [--each] [--json]
+                                  # the per-address referrer runs over a range (the .sdata2 seam)
     python tools/units/callers.py --stats          # what the index is, and how old the answer is
     python tools/units/callers.py --selftest       # this file + callers_selftest.py (fixtures only)
 
@@ -1026,6 +1028,120 @@ def print_report(rep, info=None, state=None, msg=None, remedy=None, root=ROOT, a
     return 0
 
 
+# --------------------------------------------------------------------------------------------------
+# the per-address referrer census, and its runs over a range - the `.sdata2`/`.data` seam evidence
+# --------------------------------------------------------------------------------------------------
+# A data pool's edges are not chosen, they are measured: two objects' pools are merged by MWLD, so the
+# run one unit owns is exactly the maximal span of addresses whose *reader set* is constant, and the
+# address where that set changes is the seam. The pool lanes pinned both edges with a separate
+# `callers.py <address>` invocation per address (~1-2 s each off the cached graph); this is the same
+# census in one load, grouped, so the edges fall out of one command.
+def norm_reader(label):
+    """A census owner label -> a unit name, or None for the labels that are not units.
+
+    `Pl/pl_act_step.cpp` -> `Pl/pl_act_step`; an `unsplit address` or `unsplit (ef)` label is not a
+    unit; a label is normalised so a reader set joins `splits.txt` and `dataclaim.py`'s sharer list.
+    """
+    if not label:
+        return None
+    label = label.strip()
+    if label in ("unsplit address", "unsplit") or label.startswith("unsplit ("):
+        return None
+    if label.endswith(" (no source yet)"):
+        label = label[: -len(" (no source yet)")]
+    if label.endswith((".c", ".cpp", ".cp")):
+        label = os.path.splitext(label)[0]
+    return label
+
+
+def reader_units(rep):
+    """`{unit: site count}` for one query report - who references an address, in the unit vocabulary."""
+    counts = {}
+    for ref in rep.get("references", ()):
+        unit = norm_reader((ref.get("caller") or {}).get("owner"))
+        if unit:
+            counts[unit] = counts.get(unit, 0) + 1
+    return counts
+
+
+def readers_of(index, cmap):
+    """`readers_of(address) -> {unit: sites}` - the sharing census, built from this index and nothing else.
+
+    A cached wrapper around the one `query` this tool already has, so the `--range` runs and
+    `dataclaim.py`'s sharer census cannot disagree about who reads an address.
+    """
+    cache: dict[int, dict] = {}
+
+    def readers(address):
+        if address not in cache:
+            cache[address] = reader_units(query("0x%08X" % address, index, cmap, limit=0))
+        return cache[address]
+
+    return readers
+
+
+def range_report(index, cmap, lo, hi, step=4):
+    """The per-address referrer runs over `[lo, hi]` (both ends inclusive), stepping `step` bytes.
+
+    Every address's reader set comes from `readers_of`; contiguous addresses whose sets are equal
+    collapse into one run, and the first address of every run but the first is a **seam** - the
+    boundary a lane otherwise measures one `callers.py` invocation at a time.
+    """
+    census = readers_of(index, cmap)
+    addresses = []
+    address = lo
+    while address <= hi:
+        readers = census(address)
+        addresses.append({"address": address, "readers": sorted(readers),
+                          "sites": sum(readers.values())})
+        address += step
+    runs, seams = [], []
+    for row in addresses:
+        if runs and runs[-1]["readers"] == row["readers"]:
+            runs[-1]["end"] = row["address"]
+            runs[-1]["count"] += 1
+            runs[-1]["sites"] += row["sites"]
+        else:
+            if runs:
+                seams.append(row["address"])
+            runs.append({"start": row["address"], "end": row["address"], "count": 1,
+                         "readers": row["readers"], "sites": row["sites"]})
+    return {"range": {"lo": lo, "hi": hi, "step": step, "addresses": len(addresses)},
+            "addresses": addresses, "runs": runs, "seams": seams}
+
+
+def print_range(payload, root=ROOT, asm_dir=None, state=None, each=False):
+    """The human answer: one row per run, its readers, and the seams between them."""
+    rng = payload["range"]
+    print("== per-address referrer runs  %s..%s  (step 0x%X, %d address(es), %d run(s))" % (
+        fmt_addr(rng["lo"]), fmt_addr(rng["hi"]), rng["step"], rng["addresses"],
+        len(payload["runs"])))
+    if asm_dir is not None:
+        print("   dump   %s - %s" % (rel(asm_dir, root), state))
+    print()
+    header = "   %-21s %9s  %s" % ("run", "addresses", "readers")
+    print(header)
+    print("   " + "-" * (len(header) - 3))
+    for run in payload["runs"]:
+        lo, hi = fmt_addr(run["start"]), fmt_addr(run["end"])
+        span = lo if run["start"] == run["end"] else "%s-%s" % (lo, hi)
+        readers = ", ".join(run["readers"]) or "(no reader in the index)"
+        print("   %-21s %9d  %s" % (span, run["count"], readers))
+    print()
+    if payload["seams"]:
+        print("   seams (%d): %s" % (len(payload["seams"]),
+                                    ", ".join(fmt_addr(a) for a in payload["seams"])))
+    else:
+        print("   seams: none - the reader set is constant across the range")
+    if each:
+        print()
+        print("   %-12s %s" % ("address", "readers"))
+        for row in payload["addresses"]:
+            print("   %-12s %s" % (fmt_addr(row["address"]),
+                                    ", ".join(row["readers"]) or "-"))
+    return 0
+
+
 def _no_dump(asm_dir, root, as_json, query=None):
     """The missing-dump answer, printed by both the human and the `--json` path; returns exit 2."""
     rel_asm = rel(asm_dir, root)
@@ -1086,6 +1202,13 @@ def main(argv=None, root=ROOT):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("query", nargs="?", help="an address (0x803AD47C) or a symbol name (quest_init)")
+    ap.add_argument("--range", nargs=2, metavar=("LO", "HI"),
+                    help="the per-address referrer runs across LO..HI (both inclusive), stepping "
+                         "--step - the `.sdata2`/`.data` seam evidence, in one load")
+    ap.add_argument("--step", type=lambda s: int(s, 16), default=4,
+                    help="the address stride for --range (hex accepted; default 4)")
+    ap.add_argument("--each", action="store_true",
+                    help="with --range, list every address as well as the runs")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--code", action="store_true", help="only caller sites (bl / branch)")
     ap.add_argument("--data", action="store_true",
@@ -1101,8 +1224,20 @@ def main(argv=None, root=ROOT):
         return selftest()
     if args.code and args.data:
         ap.error("--code and --data are exclusive")
-    if not args.query and not args.stats:
-        ap.error("an address or a symbol name is required (or --stats, or --selftest)")
+    if args.range and (args.stats or args.query):
+        ap.error("--range takes no query and no --stats (it is its own report)")
+    if not args.query and not args.stats and not args.range:
+        ap.error("an address or a symbol name is required (or --range, or --stats, or --selftest)")
+    lo = hi = None
+    if args.range:
+        try:
+            lo, hi = (int(args.range[0], 16), int(args.range[1], 16))
+        except ValueError:
+            ap.error("both --range edges must be hex addresses (0x80799F98)")
+        if hi < lo:
+            ap.error("--range HI is below LO (0x%X < 0x%X)" % (hi, lo))
+        if args.step <= 0:
+            ap.error("--step must be positive")
     kinds = None
     if args.code:
         kinds = list(CODE_KINDS)
@@ -1136,6 +1271,19 @@ def main(argv=None, root=ROOT):
         remedy, asm_dir = None, obj_dir
     if args.stats:
         return stats_report(index, info, cmap, state, msg, remedy, asm_dir, root, args.json)
+    if args.range:
+        payload = range_report(index, cmap, lo, hi, args.step)
+        if args.json:
+            payload["dump"] = {"state": state, "message": msg, "remedy": remedy,
+                               "asm_dir": rel(asm_dir, root), "files": info.get("files", len(files)),
+                               "source": info.get("source", "asm")}
+            payload["index"] = {"path": rel(info["cache"], root), "cached": info["cached"],
+                                "reason": info["reason"], "built": index["built_utc"],
+                                "seconds": index["seconds"],
+                                "refs": info.get("stats", {}).get("refs", 0)}
+            print(json.dumps(payload, indent=2))
+            return 0
+        return print_range(payload, root=root, asm_dir=asm_dir, state=state, each=args.each)
     rep = query(args.query, index, cmap, kinds=kinds, limit=args.limit, pointers=args.pointers)
     if args.json:
         if rep.get("error"):
@@ -1463,6 +1611,49 @@ def selftest():
         check("data: the two sda21 accesses are two sites", rep["counts"]["sites"], 2)
         code, out = run(rep, root=tmp, asm=asm)
         check_in("data: the report names the reads", "read(s)", out)
+
+        # --- the census and `--range`: the per-address referrer runs (the .sdata2/.data seam) --------
+        check("reader: a source label is normalised to its unit", norm_reader("Pl/x.cpp"), "Pl/x")
+        check("reader: an unsplit address is not a unit", norm_reader("unsplit address"), None)
+        check("reader: a no-source label keeps the unit", norm_reader("Pl/x.cpp (no source yet)"),
+              "Pl/x")
+        census = readers_of(index, cmap)
+        check("census: a data word's readers are its referencing units", census(0x80500000),
+              {"menu/multi_result": 1})
+        check("census: both sda21 accesses count", census(0x80500020), {"menu/multi_result": 2})
+        check("census: an address nobody references has no reader", census(0x80500004), {})
+        check("census: the same address is answered from the cache",
+              census(0x80500000) is census(0x80500000), True)
+        rng = range_report(index, cmap, 0x80500000, 0x8050000C, 4)
+        check("range: four addresses are sampled", rng["range"]["addresses"], 4)
+        check("range: the run boundaries", [(r["start"], r["end"], r["readers"])
+                                             for r in rng["runs"]],
+              [(0x80500000, 0x80500000, ["menu/multi_result"]),
+               (0x80500004, 0x8050000C, [])])
+        check("range: the reader-set change is the seam", rng["seams"], [0x80500004])
+        check("range: a single-run range has no seam",
+              range_report(index, cmap, 0x80500004, 0x8050000C, 4)["seams"], [])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = print_range(rng, root=tmp, asm_dir=asm, state="present")
+        out = buf.getvalue()
+        check("range: print_range exits 0", rc, 0)
+        check_in("range: the runs are headed", "per-address referrer runs", out)
+        check_in("range: the reader is listed", "menu/multi_result", out)
+        check_in("range: the seam is named", "seams (1): 0x80500004", out)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(["--range", "0x80500000", "0x8050000C"], root=tmp)
+        out = buf.getvalue()
+        check("range: the CLI answers", rc, 0)
+        check_in("range: the CLI prints the run span", "0x80500004-0x8050000C", out)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(["--range", "0x80500000", "0x8050000C", "--json", "--each"], root=tmp)
+        payload = json.loads(buf.getvalue())
+        check("range: --json parses", rc, 0)
+        check("range: --json carries the runs", len(payload["runs"]), 2)
+        check("range: --json carries every address", len(payload["addresses"]), 4)
 
         # filters
         rep = query("quest_init__FUc", index, cmap, kinds=list(CODE_KINDS))
