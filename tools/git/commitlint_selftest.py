@@ -44,13 +44,13 @@ def build_tree(root: str) -> None:
     """A miniature repository: enough shape for every family to have a known member."""
     for rel in ("src/Network", "src/quest",
                 "tools/units", "tools/__pycache__", "tools/agents", "tools/git",   # grouping dirs, a private dir
-                ".agents/agents", "docs"):
+                ".claude/agents", "docs"):
         os.makedirs(os.path.join(root, rel), exist_ok=True)
     for rel in ("src/draw_shape.cpp",                                # a top-level src file is not a module
                 "README.md", "LICENSE", ".github.example", ".gitignore",
                 "tools/selftest.py", "tools/__init__.py", "tools/units/land.py",
                 "tools/units/stylelint.py", "tools/git/commitlint.py",
-                ".agents/agents/decompiler.md", ".agents/agents/surveyor.md",
+                ".claude/agents/decompiler.md", ".claude/agents/surveyor.md",
                 "docs/plan.md", "docs/pipeline.md"):
         with open(os.path.join(root, rel), "w", encoding="utf-8") as handle:
             handle.write("\n")

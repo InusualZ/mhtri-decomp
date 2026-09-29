@@ -55,13 +55,13 @@ flood the context.
 3. **Dry-run, then apply.** The tool refuses when the old name is not defined exactly once or the new name
    is already taken (`--force` overrides the latter), writes atomically, preserves the file's line endings,
    and prints just the one line it changed - that output *is* the diff to quote in the report.
-4. **Verify after**: `python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u <unit> <new-name>` must
+4. **Verify after**: `python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u <unit> <new-name>` must
    show the same match as before, and `ninja build/RMHE08/main.dol` must keep the same hash.
 5. **Never regenerate the map for a rename.** It is hand-editable; a regeneration (`ninja apply`) brings the
    generated names back and silently loses every documented rename.
 6. **Choosing the name is its own judgement call** - the real name when it is known, otherwise one **derived from
    context** that fits the surrounding naming scheme. A guess is licensed and marked in the unit header; a
-   generated `fn_xxxxxxxx` left in `src/` is a defect. The rules are in `AGENTS.md` -> Conventions ->
+   generated `fn_xxxxxxxx` left in `src/` is a defect. The rules are in `CLAUDE.md` -> Conventions ->
    "Commenting and naming", and `docs/memory-dump.md` is where real names come from.
 
 ## Merging phantom symbols (roadmap 7.9)

@@ -34,7 +34,7 @@ construction, and it costs ~0.04 s. `--measure` calls the *same* `unitutil.repor
 `tools/units/measure.py` scores a whole unit with, so there is one implementation of the metric and the
 two fronts cannot drift.
 
-**A proposal unit measures too** (AGENTS.md, "the proposal-unit measurement gap"). A worker registers a
+**A proposal unit measures too** (CLAUDE.md, "the proposal-unit measurement gap"). A worker registers a
 fresh proposal in its own worktree first (`configure.py` + `splits.txt`, per the brief) and MAIN has
 neither a ninja rule nor a split object for the range until that registration lands. That used to be the
 end of `--measure`; three workers hand-built a harness each (borrow a sibling's command line, score
@@ -1236,7 +1236,7 @@ def main() -> int:
                 # objdiff-cli's explicit diff mode is a different normalisation; say so, so nobody quotes it
                 print("    (objdiff's positional diff reports %s%% for the same object - not the report metric)"
                       % dmp)
-    print("\nnext: python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u %s <symbol>   (in MAIN)"
+    print("\nnext: python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u %s <symbol>   (in MAIN)"
           "\n      or: python tools/units/recompile.py %s --measure <symbol>" % (result["unit"], result["unit"]))
     if not result.get("fresh"):
         print("WARNING: the object's mtime did not move - treat any measurement as stale", file=sys.stderr)

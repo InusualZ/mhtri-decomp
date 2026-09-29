@@ -305,7 +305,7 @@ refuses a batch, names the row that refused, and the landing either passes every
   only its tip.
 * **A whole branch lands in one command.** `python tools/units/land.py land --branch worker/<slug>` runs record-base, applies the branch with the registration union, gates it, commits and releases - the landing path when the branch is whole. Reach for `--units` only when the batch's paths are not the branch's registration diff.
 * **`localonly.py pull` → land → `push`, and never patch the block while it is pulled out.** The local-only
-  block in `AGENTS.md` is pulled out for a landing and restored immediately after; editing it while it is
+  block in `CLAUDE.md` is pulled out for a landing and restored immediately after; editing it while it is
   pulled out is how the block drifts.
 * **The bootstrap exception.** A change **to the gate itself** cannot be gated by the gate it is changing, so
   it is committed **directly, path-limited** (the gate's own files and nothing else). This is the only landing
@@ -593,12 +593,12 @@ and `MAIN/.pi/notes/<slug>.md` and the evidence outlives the lane.
 
 ### 10.3 The handoff is the worker's final message
 
-A tool-spawned worker is a `pi --mode json` child the `subagent` tool waits for: when it exits, its **last
-assistant message** is returned to the orchestrator as the tool result. A pane-launched worker delivers the
-same last message into its pane, plus its outbox, and the orchestrator wakes on the pane going idle. Either
-way there is **no completion tool to call** — the old `subagent_done` sidecar belonged to an extension that is
-no longer installed, so a brief that asked for that tool would name a tool the worker does not have. A
-hand-written brief must carry the final-message instruction too.
+A worker is a headless `claude --agent <profile> -p` process (`tools/units/lanecmd.py` builds the command,
+with cwd at the slot): when it exits, its **last assistant message** is the run's output. A pane-launched worker
+delivers the same last message into its pane, plus its outbox, and the orchestrator wakes on the pane going
+idle. Either way there is **no completion tool to call**, so a brief that asked for one would name a tool the
+worker does not have. A hand-written brief must carry the final-message instruction too. A lane that needs a
+ruling ends its turn with the request; the orchestrator answers with `claude --resume <session-id> -p "<ruling>"`.
 
 ### 10.4 Who runs what
 
@@ -629,21 +629,12 @@ appears during the build is still refused), only delivered earlier.
 | a claim cannot be released | `git worktree remove` fails (`Permission denied` / "Device or resource busy") | a live pane is sitting in the worktree; teardown first (§10.8) |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
-### 10.6 A worker may fan out subagents — under the same rules
+### 10.6 A worker does not fan out subagents
 
-A unit is often several independent functions, so a worker may spawn its own subagents, under three rules that
-are part of the brief:
-
-* the subagents work **in the worker's worktree, on the worker's branch** — one branch, **one commit**, made by
-  the worker; a subagent never commits;
-* the worker assigns **disjoint files or functions** (one writer per file, inside a worker too) and is
-  **accountable for everything its subagents produce** — it re-measures every claim they make, exactly as the
-  orchestrator re-measures the worker's;
-* every subagent is handed the rules (the brief's part 6) **verbatim**. A subagent that has not read them will
-  name a field `unk4`, reach it with a pointer cast and use a `goto` — repair work charged to the worker.
-
-The worker's handoff covers its subagents' work as its own: `measured_with` says how the numbers were obtained,
-and `residual` covers whatever they left unfinished.
+A lane is one agent in one worktree: no profile carries the `Agent` tool, so a worker cannot spawn subagents
+and a brief must not tell it to. A unit too big for one lane is split by the orchestrator into more claims
+(more slots), each with its own branch, brief and commit — never inside a lane. One branch, one commit and one
+writer per file therefore hold by construction, and every score in the handoff is the lane's own measurement.
 
 ### 10.7 Acknowledgement, heartbeats and timeouts
 

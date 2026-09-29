@@ -1,23 +1,23 @@
 ---
-name: agents-md-local-only
-description: Pull and push the LOCAL-ONLY working-state section of AGENTS.md - take it out of the file into a state file before a commit that touches AGENTS.md, and put it back exactly where it was afterwards - through tools/agents/localonly.py. Use before any `git add AGENTS.md` (non-negotiables rule 8 forbids committing that section), after the commit to restore it, and to check a revision for leftover markers.
+name: claude-md-local-only
+description: Pull and push the LOCAL-ONLY working-state section of CLAUDE.md - take it out of the file into a state file before a commit that touches CLAUDE.md, and put it back exactly where it was afterwards - through tools/agents/localonly.py. Use before any `git add CLAUDE.md` (non-negotiables rule 8 forbids committing that section), after the commit to restore it, and to check a revision for leftover markers.
 license: MIT
-compatibility: an AGENTS.md with the LOCAL-ONLY-BEGIN / LOCAL-ONLY-END marker lines
+compatibility: an CLAUDE.md with the LOCAL-ONLY-BEGIN / LOCAL-ONLY-END marker lines
 metadata:
   author: mhtri-dtk
   tool: tools/agents/localonly.py
 ---
 
-# Pulling and pushing AGENTS.md's local-only section
+# Pulling and pushing CLAUDE.md's local-only section
 
 The `## Current task / plan` section between the two LOCAL-ONLY markers is live agent working state, and
 non-negotiables rule 8 forbids committing it: it would publish scratch state and hand the next session a
-stale plan. So a commit that touches `AGENTS.md` needs the section out of the file first, and back in
+stale plan. So a commit that touches `CLAUDE.md` needs the section out of the file first, and back in
 afterwards.
 
 ```sh
 python tools/agents/localonly.py pull     # section out of the file, into .pi/local-only.state.json
-git add AGENTS.md && git commit ...
+git add CLAUDE.md && git commit ...
 python tools/agents/localonly.py push     # section back exactly where it was
 ```
 
@@ -60,6 +60,6 @@ the surrounding text has moved.
 
 ## Verification
 
-`verify` runs rule 8's own check against a committed revision - `git show <rev>:AGENTS.md | grep -c
-'^<!-- LOCAL-ONLY'` must print `0`. Run it after committing AGENTS.md, and before claiming a commit is
+`verify` runs rule 8's own check against a committed revision - `git show <rev>:CLAUDE.md | grep -c
+'^<!-- LOCAL-ONLY'` must print `0`. Run it after committing CLAUDE.md, and before claiming a commit is
 clean.

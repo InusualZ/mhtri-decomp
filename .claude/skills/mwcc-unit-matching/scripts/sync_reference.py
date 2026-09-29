@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate this skill's references/ from the repository's canonical playbook.
 
-The repo is the source of truth: `docs/matching.md` holds the playbook and `AGENTS.md` holds the
+The repo is the source of truth: `docs/matching.md` holds the playbook and `CLAUDE.md` holds the
 index/todo table. This skill only carries the *method* plus generated copies, so nothing here should
 ever be hand-edited.
 
@@ -52,7 +52,7 @@ def build(root):
     src = os.path.join(root, "docs", "matching.md")
     text = open(src, encoding="utf-8").read()
     rel = os.path.relpath(src, root).replace(os.sep, "/")
-    script = ".agents/skills/mwcc-unit-matching/scripts/sync_reference.py"
+    script = ".claude/skills/mwcc-unit-matching/scripts/sync_reference.py"
 
     intro, numbered, ruled, example = [], [], [], []
     for heading, body in split_sections(text):

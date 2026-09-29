@@ -297,7 +297,7 @@ def selftest() -> int:
     check_true("a claim the balance cannot cover is refused", msg and msg.startswith("backlog:"))
     check_true("... and shows the balance", "balance is 1" in (msg or ""))
     check_true("... names the top item's target", "include/enemy/fn_801251d0.h" in (msg or ""))
-    check_true("... and carries a paste-ready lane", 'subagent(agent="fixer"' in (msg or ""))
+    check_true("... and carries a paste-ready lane", 'claude --agent fixer' in (msg or ""))
     check_true("... and says parked earns no credit", "`parked` earns no credit" in (msg or ""))
     empty = tempfile.mkdtemp(prefix="backlog-empty-")
     os.makedirs(os.path.join(empty, "outbox"))
@@ -745,8 +745,8 @@ def selftest() -> int:
     # --- lane task ---------------------------------------------------------------------------------
     lane = bl.lane_task(tmp, items[0])
     check("a shared-file item gets a fixer lane", lane["agent"], "fixer")
-    check_true("the lane's call is one line and a subagent call",
-               "\n" not in lane["call"] and lane["call"].startswith("subagent(agent=\"fixer\""))
+    check_true("the lane's call is one line and a headless claude call",
+               "\n" not in lane["call"] and lane["call"].startswith("cd ") and " claude --agent fixer " in lane["call"])
     check_true("the lane's task names the key and how to close it",
                key in lane["task"] and "--set-status" in lane["task"])
     check("a tooling item gets a worker lane",

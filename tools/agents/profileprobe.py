@@ -3,7 +3,7 @@
 
 A profile is a prompt, so the closest thing to a test has two halves:
 
-  T1 discovery - the file must appear as a project agent (`subagent list`).
+  T1 discovery - the file must appear as a project agent (`claude agents`).
   T2 recall    - a reader child that runs nothing and answers, from its own prompt
                  alone, what its job/limits/rules/verification/report are.
 
@@ -11,12 +11,12 @@ T2 has caught a real defect already: the first `decompiler` draft mis-numbered
 section 6.5's rule table (rule 1 described as the vtable rule, which is rule 10),
 and the probe's "rules 5 and 8 are not in my context" is what exposed it.
 
-    python .pi/bin/profileprobe.py <agent> [<agent> ...]
+    python tools/agents/profileprobe.py <agent> [<agent> ...]
 
-writes .pi/workflows/probe-<agents>.js and prints the per-agent checklist, so a
+writes .pi/probes/probe-<agent>.md, prints the launch command for each, and prints the per-agent checklist, so a
 profile change can be re-tested by re-running this and reading the replies
 against it. Behaviour on a real task (T3) is separate and is logged in
-.agents/agents/TESTS.md.
+docs/agent-profile-tests.md.
 """
 import io
 import json
@@ -79,26 +79,17 @@ def main(argv):
         sys.stderr.write(stale.stderr)
         print("refusing to probe: a profile is stale - run `python tools/agents/sync_profiles.py` first")
         return 1
-    lanes = []
+    probe_dir = os.path.join(main_dir, ".pi", "probes")
+    os.makedirs(probe_dir, exist_ok=True)
+    print("T2 recall probes - each runs headless with NO tools, so the child can only answer from its prompt:")
     for a in agents:
         task = (COMMON + EXTRA.get(a, "")) if a in EXTRA else COMMON
-        t = task.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
-        lanes.append('  { key: "probe-%s", agent: "%s", task: `%s` },' % (a, a, t))
-    js = "\n".join([
-        "// T2 recall probe for: %s - the child must run nothing and answer from its prompt." % ", ".join(agents),
-        "const lanes = ["] + lanes + [
-        "];",
-        "const ran = await runs.all(lanes);",
-        "emit(ran.map(function (r) { return { key: r.key, out: String(r.output || '') }; }));",
-        "return ran.map(function (r) { return { key: r.key }; });",
-    ])
-    out = os.path.join(main_dir, ".pi", "workflows", "probe-%s.js" % "-".join(agents))
-    io.open(out, "w", encoding="utf-8", newline="\n").write(js + "\n")
-    print("wrote %s" % os.path.relpath(out, main_dir))
-    print("launch: subagent({ async: true, worktree: false, workflowScriptPath: %s })"
-          % os.path.relpath(out, main_dir))
+        out = os.path.join(probe_dir, "probe-%s.md" % a)
+        io.open(out, "w", encoding="utf-8", newline="\n").write(task)
+        print("  claude --agent %s --tools \"\" -p < %s" % (a, os.path.relpath(out, main_dir).replace("\\", "/")))
     print()
-    print("T1 checklist (run `subagent list`): each of these must show as a project agent")
+    print("T1 checklist (run `claude agents` from MAIN and from a fresh worktree): each of these must show as a")
+    print("project agent")
     for a in agents:
         print("  - %s" % a)
     print()

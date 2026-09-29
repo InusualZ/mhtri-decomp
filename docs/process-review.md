@@ -129,7 +129,7 @@ regression scan in every batch, and the one time it matters is the time I forget
 
 **9. Extend `prepcommit.py` with the knowledge-delta check (mine, ~1 h).**
 It already computes per-unit measures. Add: "unit X improved by N points and no `src/` header, `docs/` file or
-`configure.py` comment changed" → warning. That turns the repo's own rule (AGENTS.md, "record it in the same
+`configure.py` comment changed" → warning. That turns the repo's own rule (CLAUDE.md, "record it in the same
 session") into a machine check instead of a discipline I have to remember.
 
 ### D. Turn repeated reasoning into tools

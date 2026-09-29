@@ -6,7 +6,7 @@ compatibility: decomp-toolkit project layout (configure.py, build.ninja, ninja, 
 metadata:
   author: mhtri-dtk
   canonical: docs/matching.md
-  todo-table: AGENTS.md (section "Matching playbook")
+  todo-table: CLAUDE.md (section "Matching playbook")
   generated-references: references/ (regenerate with scripts/sync_reference.py)
 ---
 
@@ -18,14 +18,14 @@ cause is a flag or the source, isolate one change at a time, and only claim a wi
 
 ## Read these first (they are the source of truth, not this file)
 
-1. **`AGENTS.md` -> "Matching playbook"** - the index table of every idea in the playbook, the problem each
+1. **`CLAUDE.md` -> "Matching playbook"** - the index table of every idea in the playbook, the problem each
    one solves, the status column that doubles as the todo list, and the current target/step. Work that
    table; this skill is the method behind it.
 2. **`docs/matching.md`** - the canonical playbook. `references/playbook.md` here is a generated copy;
    never edit it, regenerate it (see *Keeping in sync*).
 3. **The unit's own file header comment** - the residual diff of a unit (what still differs and why) is
 documented there, in one place. Per-function comments are short descriptions of what the function does and
-carry **no** symbol name and **no** match percentage; the naming and commenting rules are in `AGENTS.md` ->
+carry **no** symbol name and **no** match percentage; the naming and commenting rules are in `CLAUDE.md` ->
 Conventions ("Commenting and naming").
 
 ## The loop
@@ -44,7 +44,7 @@ Conventions ("Commenting and naming").
    `python scripts/mt.py variants --apply <name>`, force a rebuild (`rm -f <unit obj> && ninja <unit obj>`;
    ninja can consider a same-second source edit up to date), and re-measure on the real object.
 6. **Record the idea in the same session, before starting the next function.** Every idea that produced a
-   win gets a row in `AGENTS.md`'s playbook table *and* a section in `docs/matching.md` in the house style -
+   win gets a row in `CLAUDE.md`'s playbook table *and* a section in `docs/matching.md` in the house style -
    **Problem / Why try it / Result / Example** - with the numbers taken from the *unit's* object, then
    `python scripts/sync_reference.py` so `references/playbook.md` is not stale. Record it at the moment it
    works, not at the end of the session: a win that lives only in the chat or in a scratch report is lost at
@@ -52,7 +52,7 @@ Conventions ("Commenting and naming").
 
 ## The ideas, in short
 
-Full text with examples: `references/playbook.md` (same numbering as `AGENTS.md`'s table).
+Full text with examples: `references/playbook.md` (same numbering as `CLAUDE.md`'s table).
 
 | # | idea | one-line why |
 | --- | --- | --- |
@@ -149,7 +149,7 @@ Details, recipes and worked examples: `docs/memory-dump.md`.
   probe object - the recorded evidence must come from the real unit. For a probe written by hand (rather
   than by the variant tool) the merge is its own step: unify the types with casts at the use sites and
   re-measure **every** function of the unit afterwards (idea 24).
-* **A win that is not recorded is not progress either.** The idea goes into `AGENTS.md`'s table and a
+* **A win that is not recorded is not progress either.** The idea goes into `CLAUDE.md`'s table and a
   `docs/matching.md` section *in the same session* (loop step 6) - ideas discovered on the way to the
   target, not just the one that finished it.
 * A flag change is only acceptable with a measured result: sizes and per-function match, never "it looks
@@ -167,7 +167,7 @@ Details, recipes and worked examples: `docs/memory-dump.md`.
 
 ## Adding a new idea
 
-1. Add a `todo` row to `AGENTS.md` -> "Matching playbook": the idea and the problem it solves.
+1. Add a `todo` row to `CLAUDE.md` -> "Matching playbook": the idea and the problem it solves.
 2. Try it with the tools above, on one unit (`mt.py variants <name>` runs the probe).
 3. **Land it if it wins.** `python scripts/mt.py variants --apply <name>` writes the rewrite into the
    unit's real source (line endings preserved; it refuses when the rewrite does not apply or changes

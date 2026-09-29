@@ -76,7 +76,7 @@ import symbolpreflight as preflight  # noqa: E402  (the splits.txt / symbols.txt
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
                  ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2"]
 # Sections the queue never covers: `.text` is code, the four fragments are per-function and per-unit
-# side effects that travel with the code unit (docs/plan.md §6.5 / AGENTS.md "playbook 23").
+# side effects that travel with the code unit (docs/plan.md §6.5 / CLAUDE.md "playbook 23").
 NON_DATA_SECTIONS = (".text",) + tuple(preflight.FRAGMENT_SECTIONS)
 
 # docs/plan.md §8.4: MW ld emits these; they are not a translation unit's data.

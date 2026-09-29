@@ -42,9 +42,9 @@ one rule:
   "someone holds this" is never the only thing a reader can know;
 * `acquire` refuses a slot whose sentinel **names a different owner** instead of silently reclaiming it
   (`--force` is the deliberate override);
-* `release` **fails closed** on three signals - a RUNNING subagent run whose cwd resolves into the slot,
+* `release` **fails closed** on three signals - a RUNNING Claude session whose cwd resolves into the slot,
   a dirty tree, and commits on HEAD that no branch reaches - printing every reason and offering `--force`.
-  The run registry under the temp dir is the *only* live-lane signal available: a lock file records what
+  The session registry under the Claude config dir is the *only* live-lane signal available: a lock file records what
   *this tool* did, and a lane is a process the tool never launched, so `release_blockers` reads the
   harness' own run records rather than inferring liveness from anything it wrote itself.
 
@@ -123,6 +123,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
+from units import lanecmd  # noqa: E402
 
 DEFAULT_COUNT = 6
 SLOT_SUFFIX = ".slot"
@@ -145,7 +146,7 @@ SLOT_MARKER = ".used"
 #: How a lane's **kind of work** maps to the agent profile it is launched with.  This mapping is the fix
 #: `spawn` exists for: `queue.py`/`claims.py` left the profile to the lane (defaulting to `decompiler`), so
 #: three *tooling* lanes carried unit policy they could never satisfy and a general rule they must not
-#: break (AGENTS.md, "Operational mode").  The mapping is exhaustive - one kind per lane, never a guess.
+#: break (CLAUDE.md, "Operational mode").  The mapping is exhaustive - one kind per lane, never a guess.
 KIND_PROFILE = {
     "unit": "surveyor",       # survey a claim, then reconstruct - the four-leg unit loop and reconstruct its bodies
     "fix": "fixer",           # a refused gate or a measured regression on a branch
@@ -272,48 +273,44 @@ def _claims():
 def _land():
     """`land` imported late for the same reason as `_claims`: land imports claims, which imports slots.
 
-    Only `agents_md_real_change` is used, and only to keep the *one* implementation of "is AGENTS.md
-    really changed, or is that the LOCAL-ONLY block?" - a slot's AGENTS.md carries live working state by
+    Only `agents_md_real_change` is used, and only to keep the *one* implementation of "is CLAUDE.md
+    really changed, or is that the LOCAL-ONLY block?" - a slot's CLAUDE.md carries live working state by
     rule 8, so a second copy of that cut here would be the bug, not the reuse.
     """
     from units import land
     return land
 
 
-# --- the live-lane signal: the harness' async run registry -----------------------------------------
+# --- the live-lane signal: Claude Code's session registry ------------------------------------------
 
-#: The directory a `pi` harness keeps its async subagent runs under: `<temp>/pi-subagents-*/async-subagent-runs`.
-RUNS_DIRNAME = "async-subagent-runs"
+#: The directory Claude Code keeps one `<pid>.json` per live session under: `<config dir>/sessions`, where the
+#: config dir is `$CLAUDE_CONFIG_DIR` or `~/.claude`.  Each record carries `pid`, `sessionId`, `cwd`, `name`,
+#: `kind` (`interactive` / headless) and `status` (`busy` / `idle`).
+SESSIONS_DIRNAME = "sessions"
 
 
-def run_registries(temp: str | None = None) -> list[str]:
-    """Every async-subagent run registry under the temp dir: `<temp>/pi-subagents-*/async-subagent-runs`.
+def config_dir() -> str:
+    """Claude Code's config directory: `$CLAUDE_CONFIG_DIR`, else `~/.claude`."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def run_registries(config: str | None = None) -> list[str]:
+    """The session registry under the config dir, as a one-element list (empty when there is none).
 
     **This registry is the only live-lane signal available to this tool, so it is read, never inferred.**
     A lock of any kind - the `.used` sentinel, the JSON claim record - only records what *this tool* did,
     and a lane is a process the tool never launched: the project proved that the day a lane worked in MAIN
     and left no slot file at all (roadmap 7.31), and again on 2026-09-28, when a slot's claim was released
     while another lane was still working in it and the release detached HEAD under the live process.  The
-    harness records every run it launches - id, `cwd`, `state` - and that record is what
+    harness records every session it starts - pid, `cwd`, `status` - and that record is what
     `release_blockers` reads.
 
-    A host with no registry (no harness, or a different one) yields **no signal at all**: this returns an
-    empty list, and the dirty-tree and unreachable-commit guards are then the only backstops.  That is
-    stated rather than papered over - "no registry" is not "no lane".
+    A host with no registry yields **no signal at all**: this returns an empty list, and the dirty-tree and
+    unreachable-commit guards are then the only backstops.  That is stated rather than papered over -
+    "no registry" is not "no lane".
     """
-    temp = temp or tempfile.gettempdir()
-    try:
-        names = sorted(os.listdir(temp))
-    except OSError:
-        return []
-    out = []
-    for name in names:
-        if not name.startswith("pi-subagents-"):
-            continue
-        d = os.path.join(temp, name, RUNS_DIRNAME)
-        if os.path.isdir(d):
-            out.append(d)
-    return out
+    d = os.path.join(config or config_dir(), SESSIONS_DIRNAME)
+    return [d] if os.path.isdir(d) else []
 
 
 def _read_json(path: str) -> dict:
@@ -325,48 +322,62 @@ def _read_json(path: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def pid_alive(pid) -> bool:
+    """Whether a process with this pid is running.  Never signals it (`os.kill(pid, 0)` on Windows would
+    terminate the process), so the Windows branch asks the kernel for its exit code instead."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x1000, False, pid)        # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel.CloseHandle(handle)
+        return bool(ok) and code.value == 259                  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _live_run_record(record: dict, run_id: str, registry: str) -> dict:
-    """One run record, flattened to the fields a lane guard needs."""
-    steps = record.get("steps") or []
-    first = steps[0] if steps and isinstance(steps[0], dict) else {}
-    return {"run_id": record.get("runId") or run_id,
-            "cwd": record.get("cwd") or first.get("cwd") or "",
-            "state": record.get("state") or first.get("status") or "",
-            "agent": first.get("agent") or "",
-            "session": first.get("sessionName") or "",
+    """One session record, flattened to the fields a lane guard needs."""
+    return {"run_id": record.get("sessionId") or run_id,
+            "cwd": record.get("cwd") or "",
+            "state": "running",
+            "agent": record.get("agent") or record.get("kind") or "",
+            "session": record.get("name") or "",
             "pid": record.get("pid"),
             "registry": registry}
 
 
-def live_runs(registry: str | None = None, temp: str | None = None) -> list[dict]:
-    """Every **RUNNING** subagent run, from `status.json` in each run directory.
+def live_runs(registry: str | None = None, config: str | None = None) -> list[dict]:
+    """Every **live** Claude session, from `<registry>/<pid>.json`.
 
-    `<registry>/<run-id>/status.json` is the live record (`state: running`, `cwd`, `steps[0].agent` /
-    `.sessionName`); `.terminal-runs/<id>` is the harness' own finish marker, and a run named there is
-    finished **whatever a stale `status.json` says** - that ordering is what makes "the same record marked
-    finished must proceed" true rather than hopeful.  A record this function cannot read is skipped, not
-    guessed at: an unreadable registry is reported as no signal (`run_registries`), never as "no lane".
+    A record counts only while its process is alive: Claude Code removes the file on a clean exit, but a
+    crash leaves it behind, and a stale record must not wedge a slot forever - so liveness is the pid, not
+    the file's presence.  A record this function cannot read is skipped, not guessed at: an unreadable
+    registry is reported as no signal (`run_registries`), never as "no lane".
     """
     runs = []
-    for root in ([registry] if registry else run_registries(temp)):
-        terminal = set(os.listdir(os.path.join(root, ".terminal-runs"))
-                       if os.path.isdir(os.path.join(root, ".terminal-runs")) else [])
+    for root in ([registry] if registry else run_registries(config)):
         try:
             names = sorted(os.listdir(root))
         except OSError:
             continue
         for name in names:
-            if name.startswith("."):
+            if not name.endswith(".json"):
                 continue
-            d = os.path.join(root, name)
-            if not os.path.isdir(d) or name in terminal:
+            record = _read_json(os.path.join(root, name))
+            if not record or not pid_alive(record.get("pid")):
                 continue
-            record = _read_json(os.path.join(d, "status.json"))
-            if not record:
-                continue
-            run = _live_run_record(record, name, root)
-            if run["state"] == "running":
-                runs.append(run)
+            runs.append(_live_run_record(record, name[:-5], root))
     return runs
 
 
@@ -378,13 +389,13 @@ def _same_tree(a: str, b: str) -> bool:
     return x == y or x.startswith(y.rstrip(os.sep) + os.sep)
 
 
-def runs_in_slot(slot: str, registry: str | None = None, temp: str | None = None) -> list[dict]:
-    """Every RUNNING subagent run whose `cwd` resolves into `slot` - the slot is its working directory.
+def runs_in_slot(slot: str, registry: str | None = None, config: str | None = None) -> list[dict]:
+    """Every live Claude session whose `cwd` resolves into `slot` - the slot is its working directory.
 
     A lane launched with its cwd at a subdirectory of the slot is in the slot too, so the test is
     "inside", not "equal".
     """
-    return [run for run in live_runs(registry, temp) if _same_tree(run.get("cwd"), slot)]
+    return [run for run in live_runs(registry, config) if _same_tree(run.get("cwd"), slot)]
 
 
 def run_label(run: dict) -> str:
@@ -506,12 +517,12 @@ def slot_dirty(slot: str) -> list[str]:
 
     `git status --porcelain -uall` is the definition - tracked edits and untracked non-ignored files (the
     slot's `build/`, `orig/`, `.pi/` and `.used` are ignored, so the warm trees never show up here).  One
-    row is deliberately not dirt: an `AGENTS.md` whose only difference is its LOCAL-ONLY block, which is
+    row is deliberately not dirt: an `CLAUDE.md` whose only difference is its LOCAL-ONLY block, which is
     live working state by rule 8 and is dirty in every real slot - `land.agents_md_real_change` owns that
     judgement, and a release that called it dirt would refuse every ordinary teardown.
 
     The porcelain output is read **raw**: `git()` strips its stdout, which eats the leading space of the
-    first row and shifts every field by one (` M AGENTS.md` -> `M AGENTS.md`, so the path parses as
+    first row and shifts every field by one (` M CLAUDE.md` -> `M CLAUDE.md`, so the path parses as
     `GENTS.md`).  `clean_slot` reads `git clean`'s output the same way, for the same reason.
     """
     p = subprocess.run(["git", "-C", slot, "status", "--porcelain", "-uall"], capture_output=True,
@@ -523,7 +534,7 @@ def slot_dirty(slot: str) -> list[str]:
         if not row.strip():
             continue
         code, path = row[:2], row[3:].strip().strip('"')
-        if path == "AGENTS.md" and code.strip() in ("M", "MM"):
+        if path == "CLAUDE.md" and code.strip() in ("M", "MM"):
             if not _land().agents_md_real_change(slot):
                 continue
         out.append(row.rstrip())
@@ -557,12 +568,12 @@ def refs_containing(slot: str) -> list[str]:
 
 
 def release_blockers(main: str, n: int, d: str, allow_dirty: bool = False,
-                     registry: str | None = None, temp: str | None = None) -> list[tuple[str, str]]:
+                     registry: str | None = None, config: str | None = None) -> list[tuple[str, str]]:
     """Everything that makes releasing slot `n` unsafe: `[(one-line summary, detail)]`, `[]` if safe.
 
     Three signals, least to most precise:
 
-    * **a RUNNING subagent run whose cwd resolves into the slot** - read from the harness' run registry
+    * **a RUNNING Claude session whose cwd resolves into the slot** - read from the harness' session registry
       (`run_registries`), because that is the only place a live lane is visible at all: the `.used`
       sentinel and the JSON lock record say what *this tool* did, and the lane is a process the tool never
       launched.  This is the guard the 2026-09-28 release-while-running would have hit, and it names the
@@ -580,11 +591,11 @@ def release_blockers(main: str, n: int, d: str, allow_dirty: bool = False,
     "the reason is invisible" problem the landing gate spent a session fixing.
     """
     out: list[tuple[str, str]] = []
-    runs = runs_in_slot(d, registry, temp)
+    runs = runs_in_slot(d, registry, config)
     if runs:
-        out.append(("a RUNNING subagent run is still working in it: "
+        out.append(("a RUNNING Claude session is still working in it: "
                     + ", ".join(run_label(r) for r in runs),
-                    "cwd %s - the run registry under the temp dir is the only live-lane signal there is, "
+                    "cwd %s - the session registry under the Claude config dir is the only live-lane signal there is, "
                     "because a lock cannot see a lane" % d))
     if not allow_dirty:
         dirty = slot_dirty(d)
@@ -719,7 +730,7 @@ def slot_state(main: str, n: int, runs: list | None = None, claims_by_slot: dict
     `in use`:
 
     * `free` / `no worktree`;
-    * `LIVE` - a RUNNING subagent run's cwd is the slot (the only reading that sees a *lane*);
+    * `LIVE` - a RUNNING Claude session's cwd is the slot (the only reading that sees a *lane*);
     * `claimed` - a live claim: a registry row names this slot, or a non-stale lock record does;
     * `branch` - a branch is checked out and no live claim holds it (the reclaim/refusal decision);
     * `debris` - a `.used` sentinel on a *detached* worktree with no live claim: a crash remnant.
@@ -765,7 +776,7 @@ def slot_state(main: str, n: int, runs: list | None = None, claims_by_slot: dict
         why = ("no worktree at %s (its directory or `.git` is missing) - re-create it (`slots.py init`) or "
                "use another slot" % d)
     elif run:
-        state, why = "LIVE", "in use by a RUNNING subagent run %s" % run_label(run)
+        state, why = "LIVE", "in use by a RUNNING Claude session %s" % run_label(run)
     elif claim:
         state = "claimed"
         why = "in use by a live claim: %s (%s, branch %s)" % (
@@ -1267,7 +1278,7 @@ def _merge_tree_oid(returncode: int, stdout: str) -> str | None:
 def merge_tree_of(main: str, ref: str) -> str | None:
     """The tree `git merge-tree --write-tree main <ref>` computes, or None when the test cannot answer.
 
-    The free test the held-branch audit uses (AGENTS.md): it touches no worktree and no index, so it is safe
+    The free test the held-branch audit uses (CLAUDE.md): it touches no worktree and no index, so it is safe
     to run on a slot that is still checked out.  A conflict (nonzero exit) or anything unparseable is None.
     """
     p = subprocess.run(["git", "merge-tree", "--write-tree", "main", ref], cwd=main, capture_output=True,
@@ -1279,7 +1290,7 @@ def branch_fully_applied(main: str, branch: str) -> bool | None:
     """Whether `branch`'s **content** is already in main - the documented free test, fail closed.
 
     `git merge-tree --write-tree main <branch>` merges in memory; when its result tree equals `main^{tree}`
-    the branch adds no content and is fully applied.  This is the campaign's own test (AGENTS.md, the
+    the branch adds no content and is fully applied.  This is the campaign's own test (CLAUDE.md, the
     held-branch drain): `git diff main <b>` cannot decide it, because main has moved and an already-landed
     branch shows a huge deletion diff and looks unlanded.
 
@@ -1750,7 +1761,7 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
     `claims.release` does, so a release can never be the only place unlanded work lived.
 
     **It fails closed.**  A release detaches HEAD, runs `clean -ffdx` and deletes the branch, so everything
-    `release_blockers` can see - a RUNNING subagent run whose cwd is the slot (read from the harness' run
+    `release_blockers` can see - a RUNNING Claude session whose cwd is the slot (read from the harness' run
     registry: a lock cannot see a lane), a dirty tree, commits no branch reaches - refuses it, naming every
     reason, and `force` is the deliberate override that also states what it overrode.  On 2026-09-28 a
     release ran while another lane was still working in that slot: it detached HEAD under the live process
@@ -1842,8 +1853,8 @@ def tree_block(main: str, path: str) -> str:
 def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None,
           task: str | None = None, task_file: str | None = None, worker: str | None = None,
           force: bool = False) -> dict:
-    """Take a slot for a lane of `kind` and return the paste-ready launch: the `subagent({...})` line
-    followed by the standard "your tree" block.
+    """Take a slot for a lane of `kind` and return the paste-ready launch: the headless `claude --agent ...`
+    line (`lanecmd.lane_call`, run with its cwd at the slot) followed by the standard "your tree" block.
 
     **The slot is an explicit launch parameter.**  `slot=N` takes that slot *by number* through `acquire` -
     same fail-closed reset/seed, same refusal for a slot holding an **unlanded** branch, never a
@@ -1878,20 +1889,25 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
         lock["kind"] = kind
         lock["agent"] = profile
         write_lock(main, info["slot"], lock)
+    tail = ("End your turn with your report: your final message is the result the orchestrator receives. "
+            "If you need a ruling, end the turn with the request - the orchestrator resumes this session.")
     if task:
-        task_text = ("%s\n\nYou may fan out subagents. End your turn with your report: "
-                     "your final message is the result the orchestrator receives." % task)
+        task_text = "%s\n\n%s" % (task, tail)
     else:
         task_text = ("No task text was given (`--task-file` was not passed). Replace this placeholder with "
-                     "the lane's task. You may fan out subagents. End your turn with your report: your final "
-                     "message is the result the orchestrator receives.")
-    call = ("subagent(agent=%s, cwd=%s, task=%s)"
-            % (json.dumps(profile), json.dumps(path.replace("\\", "/")), json.dumps(task_text)))
+                     "the lane's task. " + tail)
+    launch = lanecmd.lane_call(profile, path, task_text, name="%s-slot%d" % (profile, info["slot"]),
+                               main=main, key="slot%d" % info["slot"])
+    call = launch["call"]
+    if lock:
+        lock["session_id"] = launch["session_id"]
+        write_lock(main, info["slot"], lock)
     # The claim-time proof goes INTO the lane's block, because the lane is who must not have to guess
     # whether its tree is current - the acquire-time completion happened before this line was rendered.
     block = "\n\n".join([tree_block(main, path)] + currency_lines(info["currency"]))
     return {"slot": info["slot"], "path": path, "agent": profile, "kind": kind,
-            "branch": info["branch"], "unit": unit, "spawnLine": "%s\n\n%s" % (call, block)}
+            "branch": info["branch"], "unit": unit, "sessionId": launch["session_id"],
+            "spawnLine": "%s\n\n%s" % (call, block)}
 
 
 # --- status --------------------------------------------------------------------------------------
@@ -2006,12 +2022,12 @@ def selftest() -> int:
         os.makedirs(os.path.join(repo, "build", "binutils"))
         os.makedirs(os.path.join(repo, "build", "tools"))
         open(os.path.join(repo, "configure.py"), "w").write("config.libs = []\n")
-        # AGENTS.md is committed with a real **em dash** in its prose, because a slot's AGENTS.md is dirty by
+        # CLAUDE.md is committed with a real **em dash** in its prose, because a slot's CLAUDE.md is dirty by
         # design (the LOCAL-ONLY block is live working state, rule 8) and `slot_dirty` has to tell that dirt
         # apart from real dirt.  The non-ASCII byte is what makes the comparison load-bearing: a decode that
         # used the host locale codec (`cp1252` here) would call every slot dirty (F34's failure, one file
         # over).  Written as UTF-8 explicitly - the fixture must not inherit the trap it guards against.
-        with open(os.path.join(repo, "AGENTS.md"), "w", encoding="utf-8", newline="\n") as fh:
+        with open(os.path.join(repo, "CLAUDE.md"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write("# repo notes\n\nprose with an em dash \u2014 in it\n")
         open(os.path.join(repo, ".gitignore"), "w").write(
             "build/\norig/\n.ninja_*\nbuild.ninja\nobjdiff.json\ncompile_commands.json\n__pycache__/\n.used\n")
@@ -2469,23 +2485,29 @@ def selftest() -> int:
         # --- E2/E3: the run registry is the live-lane signal -----------------------------------------
         live_slot = acquire(repo, "auto/live", slot=1)
         d_live = live_slot["dir"]
-        reg_root = os.path.join(tmp, "pi-subagents-selftest", RUNS_DIRNAME)
+        cfg_home = os.path.join(tmp, "claude-config")
+        reg_root = os.path.join(cfg_home, SESSIONS_DIRNAME)
         os.makedirs(reg_root)
-        check("the harness' registry directory is discovered under the temp dir",
-              run_registries(tmp), [reg_root])
+        check("the harness' session registry is discovered under the config dir",
+              run_registries(cfg_home), [reg_root])
+        check("... and a config dir with no registry yields no signal", run_registries(tmp), [])
         run_id = "11111111-2222-3333-4444-555555555555"
+        gone = subprocess.Popen([sys.executable, "-c", "pass"])
+        gone.wait()
+        check("a finished process is not alive", pid_alive(gone.pid), False)
+        check("this process is alive", pid_alive(os.getpid()), True)
 
         def write_run(state="running", cwd=None):
-            os.makedirs(os.path.join(reg_root, run_id), exist_ok=True)
-            with open(os.path.join(reg_root, run_id, "status.json"), "w", encoding="utf-8") as fh:
-                json.dump({"runId": run_id, "state": state, "cwd": cwd or d_live, "pid": os.getpid(),
-                           "steps": [{"agent": "worker", "sessionName": "worker: fix the thing",
-                                      "status": state}]}, fh)
+            # `finished` is a session whose process has exited: the record stays, the pid is dead
+            with open(os.path.join(reg_root, "%s.json" % run_id), "w", encoding="utf-8") as fh:
+                json.dump({"pid": os.getpid() if state == "running" else gone.pid, "sessionId": run_id,
+                           "cwd": cwd or d_live, "name": "worker: fix the thing", "kind": "headless",
+                           "status": "busy"}, fh)
 
         write_run()
         check("a RUNNING record is a live run", [r["run_id"] for r in live_runs(reg_root)], [run_id])
         check("... discovered through the temp dir too",
-              [r["run_id"] for r in live_runs(temp=tmp)], [run_id])
+              [r["run_id"] for r in live_runs(config=cfg_home)], [run_id])
         check("... carrying its cwd and session name",
               (live_runs(reg_root)[0]["cwd"], live_runs(reg_root)[0]["session"]),
               (d_live, "worker: fix the thing"))
@@ -2499,7 +2521,7 @@ def selftest() -> int:
         write_run()
         live_row = next(r for r in status(repo, registry=reg_root) if r["slot"] == 1)
         check("`status` reports the live run", (live_row["run"] or {}).get("run_id"), run_id)
-        check("... and says a run holds the slot", "RUNNING subagent run" in live_row["why"], True)
+        check("... and says a run holds the slot", "RUNNING Claude session" in live_row["why"], True)
         try:
             release(repo, slot=1, unit="auto/live", registry=reg_root)
             check("release REFUSES while a run is working in the slot", "no error", "SystemExit")
@@ -2512,14 +2534,10 @@ def selftest() -> int:
             check("... and offering --force", "--force" in str(exc), True)
         check("... and HEAD was not detached by the refusal",
               slot_attached_branch(d_live), claims.branch_for("auto/live"))
-        # the harness' own finish marker: the same record is finished and the release proceeds
-        os.makedirs(os.path.join(reg_root, ".terminal-runs"), exist_ok=True)
-        open(os.path.join(reg_root, ".terminal-runs", run_id), "w").close()
-        check("a terminal-run marker retires the record", live_runs(reg_root), [])
-        check("the finished run is no longer in the slot", runs_in_slot(d_live, reg_root), [])
-        os.remove(os.path.join(reg_root, ".terminal-runs", run_id))
+        # the session's process exits (a crash leaves the record behind): the record is dead, the release proceeds
         write_run(state="finished")
-        check("a finished state is not a live lane either", runs_in_slot(d_live, reg_root), [])
+        check("a record whose process has exited retires it", live_runs(reg_root), [])
+        check("the finished run is no longer in the slot", runs_in_slot(d_live, reg_root), [])
         write_run()
         forced_live = release(repo, slot=1, unit="auto/live", registry=reg_root, force=True)
         check("--force releases under a live run", forced_live["detached"], True)
@@ -2552,23 +2570,23 @@ def selftest() -> int:
         check("... recording what it overrode",
               any("no branch reaches" in line for line in orphan_forced["overridden"]), True)
 
-        # --- E2/E3: the slot's own live state (AGENTS.md's LOCAL-ONLY block) is not dirt ---------------
+        # --- E2/E3: the slot's own live state (CLAUDE.md's LOCAL-ONLY block) is not dirt ---------------
         blocky = acquire(repo, "auto/blocky", slot=1)
         d_blocky = blocky["dir"]
         check("a freshly acquired slot has a clean tree", slot_dirty(d_blocky), [])
-        with open(os.path.join(d_blocky, "AGENTS.md"), "r", encoding="utf-8", newline="") as fh:
+        with open(os.path.join(d_blocky, "CLAUDE.md"), "r", encoding="utf-8", newline="") as fh:
             base = fh.read()
-        with open(os.path.join(d_blocky, "AGENTS.md"), "w", encoding="utf-8", newline="") as fh:
+        with open(os.path.join(d_blocky, "CLAUDE.md"), "w", encoding="utf-8", newline="") as fh:
             fh.write(base + "<!-- LOCAL-ONLY-BEGIN: stripped before every commit, see Non-negotiables "
                      "rule 8 -->\nlive state, and an em dash \u2014\n<!-- LOCAL-ONLY-END -->\n")
-        check("an AGENTS.md carrying only its LOCAL-ONLY block is not dirt", slot_dirty(d_blocky), [])
+        check("an CLAUDE.md carrying only its LOCAL-ONLY block is not dirt", slot_dirty(d_blocky), [])
         check("... so a release needs no override", release_blockers(repo, 1, d_blocky), [])
-        with open(os.path.join(d_blocky, "AGENTS.md"), "a", encoding="utf-8", newline="") as fh:
+        with open(os.path.join(d_blocky, "CLAUDE.md"), "a", encoding="utf-8", newline="") as fh:
             fh.write("a real edit below the block \u2014\n")
-        check("a real AGENTS.md edit IS dirt", any("AGENTS.md" in r for r in slot_dirty(d_blocky)), True)
+        check("a real CLAUDE.md edit IS dirt", any("CLAUDE.md" in r for r in slot_dirty(d_blocky)), True)
         release(repo, slot=1, unit="auto/blocky", force=True)
-        check("... and the reset puts the committed AGENTS.md back",
-              open(os.path.join(d_blocky, "AGENTS.md"), encoding="utf-8").read().count("LOCAL-ONLY"), 0)
+        check("... and the reset puts the committed CLAUDE.md back",
+              open(os.path.join(d_blocky, "CLAUDE.md"), encoding="utf-8").read().count("LOCAL-ONLY"), 0)
 
         # --- E2/E3: the SEAM - the claim path's teardown is the release that caused the incident --------
         # 2026-09-28's release was `claims.py release`, not a bare `slots.py release`, so the guard has to
@@ -2630,9 +2648,11 @@ def selftest() -> int:
               slot_dir(repo, 1).replace("\\", "/"))
         check("... the kind maps to `worker`", sp["agent"], "worker")
         check("... the slot is on the claim's branch", slot_attached_branch(slot_dir(repo, 1)), sp["branch"])
-        check("... the line is a subagent call with that agent and cwd",
-              sp["spawnLine"].startswith('subagent(agent="worker", cwd="%s"'
+        check("... the line is a headless claude call with that agent, run in the slot",
+              sp["spawnLine"].startswith("cd %s && claude --agent worker "
                                           % slot_dir(repo, 1).replace("\\", "/")), True)
+        check("... carrying a session id the orchestrator can resume",
+              "--session-id %s" % sp["sessionId"] in sp["spawnLine"], True)
         check("... and carries task/slot/path/agent/kind/spawnLine",
               all(k in sp for k in ("slot", "path", "agent", "kind", "spawnLine")), True)
         check("... the block carries the `rev-parse --show-toplevel` self-check",
@@ -2955,20 +2975,19 @@ def selftest() -> int:
         land_into_main(live_land["branch"], msg="land: under a live lane")
         clear_lock(repo, 1)                      # the claim is gone; the only life left is the RUNNING run
         check("the live-lane branch is fully applied", branch_fully_applied(repo, live_land["branch"]), True)
-        reg_root2 = os.path.join(tmp, "pi-subagents-reclaim", RUNS_DIRNAME)
+        reg_root2 = os.path.join(tmp, "claude-reclaim", SESSIONS_DIRNAME)
         os.makedirs(reg_root2, exist_ok=True)
         run_id2 = "99999999-8888-7777-6666-555555555555"
-        os.makedirs(os.path.join(reg_root2, run_id2), exist_ok=True)
-        with open(os.path.join(reg_root2, run_id2, "status.json"), "w", encoding="utf-8") as fh:
-            json.dump({"runId": run_id2, "state": "running", "cwd": d_ll,
-                       "steps": [{"agent": "worker", "status": "running"}]}, fh)
+        rec2 = os.path.join(reg_root2, "%s.json" % run_id2)
+        with open(rec2, "w", encoding="utf-8") as fh:
+            json.dump({"pid": os.getpid(), "sessionId": run_id2, "cwd": d_ll, "kind": "headless"}, fh)
         live_v = reclaim_slot(repo, 1, registry=reg_root2)
         check("reclaim refuses a landed branch while a RUNNING lane is in the slot",
               live_v["reclaimed"], False)
         check("... naming the live run", run_id2 in live_v["reason"], True)
         check("... and leaving the branch attached", slot_attached_branch(d_ll), live_land["branch"])
-        os.makedirs(os.path.join(reg_root2, ".terminal-runs"), exist_ok=True)
-        open(os.path.join(reg_root2, ".terminal-runs", run_id2), "w").close()
+        with open(rec2, "w", encoding="utf-8") as fh:
+            json.dump({"pid": gone.pid, "sessionId": run_id2, "cwd": d_ll, "kind": "headless"}, fh)
         live_done = reclaim_slot(repo, 1, registry=reg_root2)
         check("... and reclaims once the run is finished", live_done["reclaimed"], True)
         check("... leaving the pool free", free_count(repo), 2)
@@ -2985,7 +3004,7 @@ def selftest() -> int:
         check("... and prints the one RECLAIMED line",
               "RECLAIMED" in buf.getvalue() and sl["branch"] in buf.getvalue(), True)
         check("... leaving the paste-ready stdout line untouched",
-              sp_rec["spawnLine"].startswith('subagent(agent="worker", cwd="%s"'
+              sp_rec["spawnLine"].startswith("cd %s && claude --agent worker "
                                               % slot_dir(repo, 1).replace("\\", "/")), True)
         release(repo, slot=1, unit="lane/spawn-reclaim", rescue=False)
         check("... and the pool is left as it was found", free_count(repo), 2)
@@ -3146,7 +3165,7 @@ def main() -> int:
             print(json.dumps({k: out[k] for k in ("slot", "path", "agent", "kind", "spawnLine")},
                              indent=2))
             return 0
-        # stdout is exactly the paste-ready artifact (the subagent line + the block); the header names the
+        # stdout is exactly the paste-ready artifact (the claude launch line + the block); the header names the
         # slot that was taken on stderr, so a caller can capture stdout verbatim.
         print("spawn slot %d (%s) for kind %s -> agent %s\n  path: %s"
               % (out["slot"], out["branch"], out["kind"], out["agent"], out["path"]),

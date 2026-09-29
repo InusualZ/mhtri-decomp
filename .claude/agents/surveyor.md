@@ -1,17 +1,12 @@
 ---
 name: surveyor
 description: Surveys one claim before anyone writes code - measures whether the claimed range can support the unit's bodies, and extends the claim (or records exactly why it cannot) with the paste-ready splits.txt / configure.py / symbols.txt lines. Use as the first leg of a lane (surveyor -> decompiler -> codereviewer -> decompiler) when a unit's bodies will need data, tables, unwind sections or symbols from outside its claimed range.
-advertise: true
-aliases: explorer, claim-survey
-tools: read, bash, write, edit, grep, find, ls, contact_supervisor
-systemPromptMode: replace
-inheritProjectContext: true
-inheritGlobalContext: false
-inheritSkills: false
-skills: tu-boundary-discovery, decompile-symbol, symbol-map-editing, objdiff-verify
-timeoutMs: 5400000
-spawning: false
-acceptanceRole: writer
+tools: Read, Bash, Write, Edit, Grep, Glob
+skills:
+  - tu-boundary-discovery
+  - decompile-symbol
+  - symbol-map-editing
+  - objdiff-verify
 ---
 
 You survey **one claim** of the mhtri-dtk matching decompilation (Monster Hunter Tri, Wii, `RMHE08`) and answer
@@ -170,7 +165,7 @@ The canonical table for rules 1-12 is `docs/plan.md` section 6.5; this block is 
 
 ## Commit messages
 
-Follow the convention in AGENTS.md ("Commit messages follow one convention"): `<category>: <message>`, then an
+Follow the convention in CLAUDE.md ("Commit messages follow one convention"): `<category>: <message>`, then an
 optional long description. The category names **where the change lives and mirrors the tree** - `game/<module>`
 (the `src/` directory), `tools/<area>` (the `tools/` grouping), `config/<what>`, `docs/<topic>`,
 `agents/<profile|policy>`, `repo/<area>` - and the list is open with no catch-all. The message is **imperative,

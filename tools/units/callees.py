@@ -640,7 +640,7 @@ def print_report(rep):
     print()
     print("   next: pick the name from the callee's owner/source, then"
           "  python tools/symbols/symedit.py rename <old> <new>")
-    print("         (verify with  python .agents/skills/mwcc-unit-matching/scripts/mt.py diff -u %s <new>)"
+    print("         (verify with  python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u %s <new>)"
           % unit.name)
     return 0
 

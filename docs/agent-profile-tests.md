@@ -7,7 +7,7 @@ mis-numbered the rule table (see T2 below).
 | # | test | how | what counts as passing |
 | --- | --- | --- | --- |
 | T0 | freshness | `python tools/agents/sync_profiles.py --check` | exits 0: every profile's generated section 6.5 block matches `docs/plan.md` section 6.5. A rule change that forgot the profiles fails here (`install.sh` and `profileprobe.py` both run it first) |
-| T1 | discovery | `subagent({ action: "list" })`, run from **MAIN** *and* from a fresh worktree | the name shows as a **project** agent with its aliases. Project agents are read from the **cwd's** `.agents/agents/`, so a lane in a worktree cut *before* a profile edit sees the old prompt - and the user-scope copy (`~/.pi/agent/agents/`, consulted for every cwd) is what closes that gap. **Run `tools/agents/install.sh` after every profile edit.** T1's original "there is no install step" was proven only from MAIN and is wrong for worktrees |
+| T1 | discovery | `subagent({ action: "list" })`, run from **MAIN** *and* from a fresh worktree | the name shows as a **project** agent with its aliases. Project agents are read from the **cwd's** `.claude/agents/`, so a lane in a worktree cut *before* a profile edit sees the old prompt - and the user-scope copy (`~/.claude/agents/`, consulted for every cwd) is what closes that gap. **Run `tools/agents/install.sh` after every profile edit.** T1's original "there is no install step" was proven only from MAIN and is wrong for worktrees |
 | T2 | recall | `python tools/agents/profileprobe.py <agent>...` then launch the printed call | the reader child, running nothing, states its job, its write limits **and the tell for being launched in MAIN**, the numbered rules **with the right numbers**, the pre-report verification **and that the `FAILED` count is the primary signal**, its report sections, and its role-specific rules - and names anything missing rather than inventing it |
 | T3 | behaviour | give it a **real** task of that shape and judge the result against the gate | lands through `landbranch.sh` first try; MAIN untouched; the role-specific proof present (see below); no row lower than before |
 
@@ -96,13 +96,13 @@ rule is still stated in full alongside it, and the run reports completed.
 ### T1 - discovery (2026-09-25)
 
 **PASS.** `decompiler`, `merger`, `fixer` all listed as project agents with aliases; the harness surfaced their
-`skills:` references as "proactive skill subagent suggestions". Discovery from `.agents/agents/` was proven by
-moving the `~/.pi/agent/agents/` copy away and re-listing: the agent was still there, so the tracked file is the
+`skills:` references as "proactive skill subagent suggestions". Discovery from `.claude/agents/` was proven by
+moving the `~/.claude/agents/` copy away and re-listing: the agent was still there, so the tracked file is the
 live one and there is no install or sync step.
 
 **Correction (2026-09-26).** That conclusion holds **from MAIN only**. The harness discovers project agents under
 the **cwd's** `.agents/`, and every campaign lane runs in a worktree cut at its claim time - so a worktree created
-before a profile edit sees the *old* prompt, silently. The user-scope copy (`~/.pi/agent/agents/`, consulted for
+before a profile edit sees the *old* prompt, silently. The user-scope copy (`~/.claude/agents/`, consulted for
 every cwd) is what closes that gap, so `tools/agents/install.sh` must run after **every** profile edit. The
 original test moved the user-scope copy away while cwd was MAIN, which cannot distinguish the two scopes.
 
@@ -132,7 +132,7 @@ believe the refusal is wrong, report it with evidence - never work around the ga
 
 T3's first launch failed outright: `Unknown agent: fixer`. The error's directory list *is* the finding:
 
-    - user:    ~/.pi/agent/agents            (consulted for every cwd)
+    - user:    ~/.claude/agents            (consulted for every cwd)
     - user:    ~/.agents                     (present but empty)
     - project: <worktree>/.agents            (present but empty)
     - project: <worktree>/.pi/agents         (absent)
@@ -142,8 +142,8 @@ worktree`** cut from the `main` of its claim time - so a worktree created before
 them, and the launch fails. Running `subagent list` from MAIN hides this completely: the profiles are there and
 they work.
 
-Fix: **`tools/agents/install.sh`** copies `.agents/agents/*.md` into `~/.pi/agent/agents/` (user scope, consulted
-for every cwd). `.agents/agents/` stays the reviewed source of truth. **Run it after every profile edit**, then
+Fix: **`tools/agents/install.sh`** copies `.claude/agents/*.md` into `~/.claude/agents/` (user scope, consulted
+for every cwd). `.claude/agents/` stays the reviewed source of truth. **Run it after every profile edit**, then
 re-probe. Without this test, every profile-based lane would have failed to launch - i.e. the whole point of the
 profiles.
 
@@ -240,10 +240,10 @@ the checklist carries it.
 from context. This **reverses** the earlier convention ("a speculative name is a bug; leave a generated name in
 place"), which was written down in four places; all four now say the same thing:
 
-* `AGENTS.md` -> Conventions -> "Commenting and naming" (the convention itself),
+* `CLAUDE.md` -> Conventions -> "Commenting and naming" (the convention itself),
 * `decompiler.md` (the profile's naming section and its `Commenting and naming` bullet),
-* `.agents/skills/decompile-symbol/SKILL.md` (the "never a speculative name" clause),
-* `.agents/skills/symbol-map-editing/SKILL.md` (the "`fn_xxxxxxxx` beats a speculative name" clause).
+* `.claude/skills/decompile-symbol/SKILL.md` (the "never a speculative name" clause),
+* `.claude/skills/symbol-map-editing/SKILL.md` (the "`fn_xxxxxxxx` beats a speculative name" clause).
 
 The rule: the real name when it is known; otherwise one **derived from context** - what the function does and who
 calls it, what the data holds and who reads it, the field's offset and the value stored there - kept in the
@@ -313,7 +313,7 @@ T1/T2/T3 are re-run after this edit; T2's probe questions were corrected with it
 ### Profile edit - the 2026-09-28 findings, where they change what a lane must do (2026-09-28)
 
 **What was annotated, and into which profile.** Only the findings that change a *lane's* behaviour - the
-orchestrator-side facts stay in AGENTS.md and the notes. Into all four: the launch/slot mechanism and the
+orchestrator-side facts stay in CLAUDE.md and the notes. Into all four: the launch/slot mechanism and the
 profile mapping (`python tools/units/slots.py spawn --kind KIND [--slot N]`, with `tooling`/`docs`->`worker`),
 the slot-reuse warning ("it built here before" is not evidence about this round), and "never run
 `claims.py release`". Into `decompiler`: `unitscore.py` and `pairgap.py` plus the corrected metric reading (a
@@ -361,12 +361,29 @@ codereviewer listed `pairgap.py`. The second-round merger child answered the sec
 from the generated block"* - the exact gap round one had found. All four children correctly observed that they
 were launched in MAIN and said they would stop and report; that is T2 exercising the tell, not a defect.
 
-**Residual gaps the probes named (recorded, not fixed here).** (1) AGENTS.md's playbook index has a
+**Residual gaps the probes named (recorded, not fixed here).** (1) CLAUDE.md's playbook index has a
 **duplicate row number** - 48 appears twice (the variadic-definition row and the `extern "C"` row) and 52
 follows 57 - so "playbook 48" was ambiguous in a finding's evidence line. **Fixed the same day**, with the
 index generator: the out-of-place section is now **73**, `docs/matching.md`'s numbers are unique and
 contiguous from 1 (asserted on the real plan by `sync_playbook_index_selftest.py`, which is what would have
 caught it), the one live citation of that section (`.pi/notes/802a6624-fn-802a6624-d9e7.md`, the
-float-varargs trap) was repointed, and AGENTS.md's index is now generated rather than hand-copied. (2) The profiles
+float-varargs trap) was repointed, and CLAUDE.md's index is now generated rather than hand-copied. (2) The profiles
 carry the playbook *index*, never `docs/matching.md`, so a lane can cite a row but not read it. (3) A
 `rename`-class finding has no `backlog.py` kind, so a reviewer's rename request is picked up by nothing.
+
+## Harness migration: pi -> Claude Code (2026-09-29)
+
+Everything above was measured under the pi harness. Under Claude Code the profiles live in `.claude/agents/*.md`
+(frontmatter: `name`, `description`, `tools`, `skills`; pi-only keys such as `aliases`, `inheritProjectContext`
+and `timeoutMs` are gone), project instructions are `CLAUDE.md`, and a lane is a headless
+`claude --agent <profile> -p` run with its cwd at the slot (`tools/units/lanecmd.py`). Read the T1/T2 rows above
+with these substitutions:
+
+| then | now |
+| --- | --- |
+| `subagent({ action: "list" })` / `subagent list` | `claude agents`, run from MAIN and from a fresh worktree |
+| user scope `~/.pi/agent/agents/` | `~/.claude/agents/` (`tools/agents/install.sh`) |
+| `contact_supervisor` (a blocking request) | end the turn with the request; the orchestrator answers with `claude --resume <session-id> -p "<ruling>"` |
+| T2 probe as a `.pi/workflows/*.js` script | `python tools/agents/profileprobe.py <agent>` prints `claude --agent <agent> --tools "" -p < .pi/probes/probe-<agent>.md` |
+
+The profiles have not been re-probed under Claude Code: run T1 and T2 before trusting them with a lane.

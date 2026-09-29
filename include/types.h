@@ -11,7 +11,7 @@
  *     uses belongs to that unit (or beside it, like `src/Camellia/camellia.h`);
  *   - `src/Camellia/camellia.c` is the exception and keeps its own typedefs: it is a vendor file mirroring
  *     upstream, its `u32` is `unsigned int` rather than `unsigned long`, and its 100 % match rests on those
- *     spellings (AGENTS.md -> Conventions, "Vendor files keep vendor naming");
+ *     spellings (CLAUDE.md -> Conventions, "Vendor files keep vendor naming");
  *   - the SDK's own headers, when a unit needs more than the primitives (`GXRenderModeObj`, `Vec`, `Mtx`,
  *     `OSHeapHandle`, ...), get a `dolphin/` mirror under `include/` rather than being re-declared per unit -
  *     that is the same rule, one level up.

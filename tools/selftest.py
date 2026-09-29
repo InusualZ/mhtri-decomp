@@ -28,8 +28,8 @@ older views - keeps **both**, because neither is a duplicate of the other. `--no
 
 **`--changed` maps sources, not only `tools/` (F37).** A batch that edits only docs can still break an
 invariant, and no `tools/**` selftest covers it: `docs/plan.md` is the source of the section-6.5 block
-generated into `.agents/agents/*.md` (`tools/agents/sync_profiles.py`), and `docs/matching.md` is the source
-of the skill's `references/` (`.agents/skills/mwcc-unit-matching/scripts/sync_reference.py --check`). Both
+generated into `.claude/agents/*.md` (`tools/agents/sync_profiles.py`), and `docs/matching.md` is the source
+of the skill's `references/` (`.claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check`). Both
 are selected when the diff touches those sources, so a docs batch verifies itself instead of reporting
 "GREEN, 0 selftests". The mapping is `SOURCE_ENTRIES`/`SOURCE_CHECKS` below.
 
@@ -79,26 +79,26 @@ COUNT_PATTERNS = (
     re.compile(r"(\d+)\s+checks?\b", re.I),
 )
 
-SR_REL = ".agents/skills/mwcc-unit-matching/scripts/sync_reference.py"
+SR_REL = ".claude/skills/mwcc-unit-matching/scripts/sync_reference.py"
 
 # **A diff outside `tools/` still owns invariants (F37).** `--changed` used to map only `tools/**` diffs, so
 # a docs/profiles batch reported "GREEN, 0 selftests" while the invariant it can break was exactly the one
 # nobody ran: the *generated* copies of those docs drifting from the source. Two mappings, because the two
 # shapes differ - `docs/plan.md` is the source of the section-6.5 block generated into
-# `.agents/agents/*.md`, and `tools/agents/sync_profiles.py`'s own selftest checks the real tree for that
+# `.claude/agents/*.md`, and `tools/agents/sync_profiles.py`'s own selftest checks the real tree for that
 # drift (`sync_profiles.check_profile`, i.e. what its `--check` does); `docs/matching.md` is the source of
-# the skill's `references/`, and `sync_reference.py` lives under `.agents/`, so `discover()` (which walks
+# the skill's `references/`, and `sync_reference.py` lives under `.claude/`, so `discover()` (which walks
 # `tools/`) never sees it and there is no entry to select - its `--check` runs as a synthetic entry.
 #
 # `SOURCE_ENTRIES`: source path -> selftest entry keys it must select.
 # `SOURCE_CHECKS`:  source path -> ((tool path relative to the root, extra argv), ...) to run as `--check`.
 SOURCE_ENTRIES = {
     "docs/plan.md": ("tools/agents/sync_profiles",),
-    "AGENTS.md": ("tools/agents/sync_playbook_index",),
+    "CLAUDE.md": ("tools/agents/sync_playbook_index",),
 }
 SOURCE_CHECKS = {
     "docs/matching.md": ((SR_REL, ("--check",)),),
-    "AGENTS.md": (("tools/agents/sync_playbook_index.py", ("--check",)),),
+    "CLAUDE.md": (("tools/agents/sync_playbook_index.py", ("--check",)),),
 }
 
 

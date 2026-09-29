@@ -1,6 +1,6 @@
 <!-- GENERATED FILE - do not edit.
      Source: docs/matching.md
-     Regenerate: python .agents/skills/mwcc-unit-matching/scripts/sync_reference.py
+     Regenerate: python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py
 -->
 
 ## Worked example: the `RSO/runtime` unit (DOL-side RSO loader/linker)

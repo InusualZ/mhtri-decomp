@@ -41,7 +41,7 @@
  * `fn_800CF948` (the 0x800D streams), the texture loader `fn_800D0764`..`fn_800D104C`, the hbm/PMIC
  * block, and the whole 0x800D3000..0x800D45AC group (g3d/memory-manager TUs).
  *
- * Residuals of the below-80 % reconstructions (all still applied, per AGENTS.md's best-variant rule):
+ * Residuals of the below-80 % reconstructions (all still applied, per CLAUDE.md's best-variant rule):
  *   - `fn_800CEF18` 77.4 % and `ran_suu__Fl` 68.2 %: the 0xB0/0xAD 16-bit mix.  The target materialises
  *     the divisor magic as `0x00AD7539` + `srwi ...,15` + `mulli ...,0xFF53`; writing `(v * 0xB0) %
  *     0xAD` on `u32` (best, 77.4 %) emits the 32-bit magic `0x7AD2208F`, and the `u16` spelling (60.2 %)

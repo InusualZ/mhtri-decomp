@@ -5,7 +5,7 @@ original object instruction for instruction. Flags are the *second* thing to loo
 first), but when the target's code is systematically "less optimized" than ours they are usually the whole
 story.
 
-Two rules from `AGENTS.md` apply throughout: a flag change is only acceptable with concrete evidence
+Two rules from `CLAUDE.md` apply throughout: a flag change is only acceptable with concrete evidence
 (non-negotiable #3), and proven flags belong in `configure.py` as a **per-library** `cflags_*` override -
 never by editing `cflags_base`/`cflags_runtime` for everybody.
 
@@ -23,7 +23,7 @@ never by editing `cflags_base`/`cflags_runtime` for everybody.
    there - the repository must build better, not just the probe. Prove it with the object hash.
 
 The tricks below are the individual moves; the worked example at the end is the whole loop run once.
-They are indexed in `AGENTS.md` ("Matching playbook") together with the problem each one solves and a
+They are indexed in `CLAUDE.md` ("Matching playbook") together with the problem each one solves and a
 status of each idea, kept current as a unit is worked on - a successful new idea
 becomes a section here in the same style.
 
@@ -311,10 +311,10 @@ have not found" from "the wrong flag that happens to fix one symptom".
 
 **Result.** Inspect what the near-miss variant does to the instruction stream. If it reorders instructions
 the target does not reorder, the flag is wrong and the residual belongs to source shape or liveness - stop
-flag hunting there and document the residual instead (see the matching policy in `AGENTS.md`). Document it
+flag hunting there and document the residual instead (see the matching policy in `CLAUDE.md`). Document it
 **once, in the unit's file header comment** - not as a comment on the function it concerns: a function
 comment is a short description of what the function does, never its symbol name, its match percentage or a
-residual (see `AGENTS.md` -> Conventions).
+residual (see `CLAUDE.md` -> Conventions).
 
 **Example**
 
@@ -1631,7 +1631,7 @@ place.** Two additions from the DWCi band (`.pi/notes/dwci-band-9050.md`, `.pi/n
   queue row only, 0 hits in `src/`/`include/`, and `symedit.py find` confirms the map rows are gone). The
   queue is a **regenerable cache** whose own fingerprints already prove it stale on three of four inputs, so
   a hand sweep would fix the strings and leave the fingerprints lying about freshness - the honest repair is
-  to **record the scope where the next rename reads it** (`.agents/skills/symbol-map-editing/SKILL.md` rule 2
+  to **record the scope where the next rename reads it** (`.claude/skills/symbol-map-editing/SKILL.md` rule 2
   now states the real roots and names the queue; its old "source, docs, tools" claim was false). Worth
   stating too: **`rename` is not one of `backlog.py`'s kinds**, so a rename filed in an outbox is picked up
   by nothing. Rule 2 judges each declaration by the **ownership of the address** it resolves to

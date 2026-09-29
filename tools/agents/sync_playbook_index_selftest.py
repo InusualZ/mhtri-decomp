@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Fixture tests for tools/agents/sync_playbook_index.py.
 
-The tool exists so the index in AGENTS.md cannot drift from `docs/matching.md` a second time, so the tests are
+The tool exists so the index in CLAUDE.md cannot drift from `docs/matching.md` a second time, so the tests are
 about the drift classes that actually happened plus the ones that must refuse:
 
 * a section number appearing twice (the duplicate 48 that made "playbook 48" ambiguous),
 * a section with no problem paragraph in either house style,
 * the file's physical order not being numeric order (47, 51, 73, 52... in today's plan),
 * a target with no marker pair, or with the markers reversed or duplicated,
-* and the real tree: today's plan must be clean and AGENTS.md must be in sync with it.
+* and the real tree: today's plan must be clean and CLAUDE.md must be in sync with it.
 
     python tools/agents/sync_playbook_index_selftest.py
 """
@@ -30,12 +30,12 @@ def check(name, got, want):
 
 
 def fixture(plan, target_lines):
-    """A throwaway repo: configure.py (for the root walk), docs/matching.md, AGENTS.md."""
+    """A throwaway repo: configure.py (for the root walk), docs/matching.md, CLAUDE.md."""
     root = tempfile.mkdtemp(prefix="spi-selftest-")
     os.makedirs(os.path.join(root, "docs"))
     open(os.path.join(root, "configure.py"), "w").close()
     open(os.path.join(root, "docs", "matching.md"), "w", encoding="utf-8", newline="").write(plan)
-    open(os.path.join(root, "AGENTS.md"), "w", encoding="utf-8", newline="").write(
+    open(os.path.join(root, "CLAUDE.md"), "w", encoding="utf-8", newline="").write(
         (chr(13) + chr(10)).join(target_lines))
     return root
 
@@ -65,7 +65,7 @@ PLAN = (chr(13) + chr(10)).join([
 ])
 
 TARGET = [
-    "# AGENTS.md",
+    "# CLAUDE.md",
     "",
     spi.BEGIN,
     "stale contents",
@@ -110,8 +110,8 @@ check("refuse: an empty plan is a shape change",
       any("shape changed" in d for d in spi.shape_defects({}, [])), True)
 
 for name, lines, want in (
-        ("no markers", ["# AGENTS.md", "", "no block"], "no playbook-index marker pair"),
-        ("markers reversed", ["# AGENTS.md", spi.END, "x", spi.BEGIN], "comes before the BEGIN marker"),
+        ("no markers", ["# CLAUDE.md", "", "no block"], "no playbook-index marker pair"),
+        ("markers reversed", ["# CLAUDE.md", spi.END, "x", spi.BEGIN], "comes before the BEGIN marker"),
         ("markers duplicated", [spi.BEGIN, spi.END, spi.BEGIN, spi.END], "appears more than once")):
     try:
         spi.splice((chr(13) + chr(10)).join(lines), block)
@@ -129,13 +129,13 @@ check("cell: a cap never splits a word", "wor..." not in spi.cell("word " * 80),
 # ---- end to end on a fixture ---------------------------------------------------------------------------
 root = fixture(PLAN, TARGET)
 check("e2e: write reports an update", spi.cmd_sync(args(root)), 0)
-check("e2e: the block was replaced and the rest kept", "stale contents" in spi.read(os.path.join(root, "AGENTS.md")),
+check("e2e: the block was replaced and the rest kept", "stale contents" in spi.read(os.path.join(root, "CLAUDE.md")),
       False)
-check("e2e: the surrounding file survived", "## After the block" in spi.read(os.path.join(root, "AGENTS.md")), True)
-check("e2e: CRLF preserved", chr(13) + chr(10) in spi.read(os.path.join(root, "AGENTS.md")), True)
+check("e2e: the surrounding file survived", "## After the block" in spi.read(os.path.join(root, "CLAUDE.md")), True)
+check("e2e: CRLF preserved", chr(13) + chr(10) in spi.read(os.path.join(root, "CLAUDE.md")), True)
 check("e2e: --check now passes", spi.cmd_sync(args(root, check=True)), 0)
-txt = spi.read(os.path.join(root, "AGENTS.md")).replace("The second problem.", "tampered", 1)
-open(os.path.join(root, "AGENTS.md"), "w", encoding="utf-8", newline="").write(txt)
+txt = spi.read(os.path.join(root, "CLAUDE.md")).replace("The second problem.", "tampered", 1)
+open(os.path.join(root, "CLAUDE.md"), "w", encoding="utf-8", newline="").write(txt)
 check("e2e: --check fails once the target is stale", spi.cmd_sync(args(root, check=True)), 1)
 
 # ---- the real tree -------------------------------------------------------------------------------------
@@ -154,7 +154,7 @@ try:
     got = spi.splice(real_target, spi.build_block(real_sections))
 except SystemExit as e:  # no marker pair yet is a defect to report, not a crash
     got = str(e)
-check("real: AGENTS.md's index is in sync with the plan", got, real_target)
+check("real: CLAUDE.md's index is in sync with the plan", got, real_target)
 
 failed = [r for r in RESULTS if not r[1]]
 for name, ok, got, want in RESULTS:

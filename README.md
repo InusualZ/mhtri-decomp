@@ -82,7 +82,7 @@ python tools/units/undefrefs.py --unit <Unit>      # references our object makes
 ```
 
 The ideas that actually turn a non-matching function into a matching one are collected in
-[docs/matching.md](docs/matching.md) (the playbook) and in `.agents/skills/mwcc-unit-matching/`.
+[docs/matching.md](docs/matching.md) (the playbook) and in `.claude/skills/mwcc-unit-matching/`.
 Work it as a list, one idea at a time, and record what failed too.
 
 ## Running the project as a pipeline
@@ -103,7 +103,7 @@ one unit at a time. One page of it:
    with its own seeded tree, and reports data — per-symbol scores, residuals — not prose.
 4. **The orchestrator lands one unit at a time, from `main`.**
    ```sh
-   python tools/agents/localonly.py pull                 # take the local-only block out of AGENTS.md
+   python tools/agents/localonly.py pull                 # take the local-only block out of CLAUDE.md
    python tools/units/land.py land --branch worker/<slug> --units <unit>
    python tools/agents/localonly.py push                 # put it back
    ```
@@ -128,7 +128,7 @@ The authoritative documents are:
 | [docs/pipeline.md](docs/pipeline.md) | how a batch is run: the three-phase loop, the slot model, the gate, the merge procedure, the tool roster |
 | [docs/plan.md](docs/plan.md) | the campaign plan: what "done" means, what a batch costs, roles, the coordinator protocol |
 | [docs/matching.md](docs/matching.md) | the playbook: every idea that has matched a function, and every idea ruled out |
-| [AGENTS.md](AGENTS.md) | the non-negotiables and the conventions, for agents and humans alike |
+| [CLAUDE.md](CLAUDE.md) | the non-negotiables and the conventions, for agents and humans alike |
 | [docs/tooling-requests.md](docs/tooling-requests.md) | the tooling register: what is missing, and who asked for it |
 
 ## Rules that will bite you
@@ -142,10 +142,10 @@ The authoritative documents are:
 * **A rename is two edits**: the map (`config/RMHE08/symbols.txt`) and the source that uses the name,
   in one change, through `python tools/symbols/symedit.py rename`. A unit's own symbols are named from
   context — no `fn_XXXXXXXX`/`lbl_XXXXXXXX` definitions are left behind.
-* **Never commit the local-only block of `AGENTS.md`** (the `<!-- LOCAL-ONLY ... -->` section): it is
+* **Never commit the local-only block of `CLAUDE.md`** (the `<!-- LOCAL-ONLY ... -->` section): it is
   live working state, not repository content. Use `tools/agents/localonly.py pull` before staging and
   `push` after the commit; verify with
-  `git show HEAD:AGENTS.md | grep -c '^<!-- LOCAL-ONLY'` → `0`.
+  `git show HEAD:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'` → `0`.
 
 ## Repository layout
 
@@ -160,8 +160,8 @@ build/                    everything generated (untracked): build.ninja, compile
 tools/                    our tooling by purpose: units/, objdiff/, flags/, symbols/, splits/, elf/,
                           agents/, plus the decomp-toolkit scripts at the top level
 docs/                     all documentation — the table above is the entry point
-.agents/agents/           the project's subagent profiles
-.agents/skills/           loadable skills: matching, verification, symbol map, TU discovery, local-only
+.claude/agents/           the project's subagent profiles
+.claude/skills/           loadable skills: matching, verification, symbol map, TU discovery, local-only
 ```
 
 ## Progress

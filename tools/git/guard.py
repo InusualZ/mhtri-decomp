@@ -6,7 +6,7 @@ is the logic behind it now: it can say what a staged path needs, and its CLI doe
 
     guard.py autocrlf    # warn (never refuse) when core.autocrlf=true, which silently defeats eol=lf
     guard.py eol         # EOL case: normalise a textish staged blob's CRs and re-stage it; refuse a binary
-    guard.py localonly   # pull the LOCAL-ONLY block out of a staged AGENTS.md and re-stage it
+    guard.py localonly   # pull the LOCAL-ONLY block out of a staged CLAUDE.md and re-stage it
 
 The three decisions are plain functions - `localonly_case`, `eol_case`, `autocrlf_warning` - so a test can
 call them directly (with the staged text or the staged paths handed in) without a shell and without first
@@ -14,7 +14,7 @@ building a git command; the CLI is the thin layer that reads the staged paths fr
 
 **The index blob, not the worktree.**  A commit carries the *index*, so the EOL case reads the staged blob
 (`git cat-file -p :<path>`) rather than the file on disk: a CRLF blob in the index is what would land,
-whatever the worktree looks like.  The `localonly` case reads the staged AGENTS.md the same way, so the
+whatever the worktree looks like.  The `localonly` case reads the staged CLAUDE.md the same way, so the
 auto-pull fires on exactly the commit that would otherwise carry the block (non-negotiable 8).
 
 **Why this lives here and not in `prepcommit.py`.**  `prepcommit.py` is a staging/commit-message CLI: it
@@ -31,7 +31,7 @@ import os
 import subprocess
 import sys
 
-AGENTS_MD = "AGENTS.md"
+AGENTS_MD = "CLAUDE.md"
 LOCALONLY_PREFIX = "<!-- LOCAL-ONLY"
 PENDING_MARKER = "localonly-pending"
 LOCALONLY_SCRIPT = os.path.join("tools", "agents", "localonly.py")
@@ -72,12 +72,12 @@ def index_blob(root: str, path: str) -> bytes | None:
 
 def localonly_case(staged_paths: list[str], staged_text: str | None = None,
                    root: str = ".") -> str:
-    """"pull the block, re-stage AGENTS.md" when the *staged* AGENTS.md has a marker line, else "nothing".
+    """"pull the block, re-stage CLAUDE.md" when the *staged* CLAUDE.md has a marker line, else "nothing".
 
     `staged_text` is the staged content when the caller already has it (a test); otherwise it is read from
     the index blob.  The marker is matched at the **start of a line**, not as a substring: rule 8's own
     prose quotes the marker, and a substring test matched that text as if it were the block and refused
-    three legitimate landings of a refactored AGENTS.md on 2026-09-28.
+    three legitimate landings of a refactored CLAUDE.md on 2026-09-28.
     """
     if AGENTS_MD not in staged_paths:
         return "nothing"
@@ -88,7 +88,7 @@ def localonly_case(staged_paths: list[str], staged_text: str | None = None,
         staged_text = blob.decode("utf-8", "replace")
     for line in staged_text.splitlines():
         if line.startswith(LOCALONLY_PREFIX):
-            return "pull the block, re-stage AGENTS.md"
+            return "pull the block, re-stage CLAUDE.md"
     return "nothing"
 
 
@@ -232,7 +232,7 @@ def cmd_localonly(args) -> int:
     pull = subprocess.run([sys.executable, script, "pull"], cwd=root, capture_output=True, text=True,
                           encoding="utf-8", errors="replace")
     if pull.returncode != 0:
-        sys.stderr.write("pre-commit: refusing - the staged AGENTS.md carries the LOCAL-ONLY block and "
+        sys.stderr.write("pre-commit: refusing - the staged CLAUDE.md carries the LOCAL-ONLY block and "
                          "pulling it failed:\n")
         sys.stderr.write((pull.stdout or "") + (pull.stderr or ""))
         sys.stderr.write("  restore the block with: python %s push\n" % LOCALONLY_SCRIPT)
@@ -240,7 +240,7 @@ def cmd_localonly(args) -> int:
     add = _git(root, "add", "--", AGENTS_MD)
     if add.returncode != 0:
         sys.stderr.write("pre-commit: refusing - pulled the LOCAL-ONLY block but could not re-stage "
-                         "AGENTS.md: %s\n" % add.stderr.decode("utf-8", "replace").strip())
+                         "CLAUDE.md: %s\n" % add.stderr.decode("utf-8", "replace").strip())
         sys.stderr.write("  restore the block with: python %s push\n" % LOCALONLY_SCRIPT)
         return 1
     if marker:
@@ -248,8 +248,8 @@ def cmd_localonly(args) -> int:
         with open(marker, "w", encoding="utf-8") as fh:
             fh.write("pulled %s; post-commit pushes the block back\n"
                      % datetime.datetime.now().isoformat(timespec="seconds"))
-    print("guard: the staged AGENTS.md carried a LOCAL-ONLY marker line; pulled the block and re-staged "
-          "AGENTS.md (stored in %s)" % STATE_REL)
+    print("guard: the staged CLAUDE.md carried a LOCAL-ONLY marker line; pulled the block and re-staged "
+          "CLAUDE.md (stored in %s)" % STATE_REL)
     print("guard:   if the commit fails, restore it with: python %s push" % LOCALONLY_SCRIPT)
     return 0
 
@@ -261,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, fn, blurb in (
         ("autocrlf", cmd_autocrlf, "warn when core.autocrlf=true defeats eol=lf (never refuses)"),
         ("eol", cmd_eol, "normalise CRs in staged text blobs and re-stage; refuse staged binary blobs"),
-        ("localonly", cmd_localonly, "pull the LOCAL-ONLY block out of a staged AGENTS.md and re-stage it"),
+        ("localonly", cmd_localonly, "pull the LOCAL-ONLY block out of a staged CLAUDE.md and re-stage it"),
     ):
         sub.add_parser(name, help=blurb).set_defaults(func=fn)
     args = ap.parse_args(argv)
