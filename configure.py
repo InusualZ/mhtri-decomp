@@ -709,9 +709,11 @@ config.libs = [
             # extabindex 0x8003123C..0x80031710).  Module `menu` from the left neighbour and from the
             # range's own entry points (`put_message`, `put_frame_dialog`, `GetMenuFontColor`); no
             # `__FILE__` string covers the range and the dump answers `zz_` for most of it, so the file
-            # keeps the map's stem (see its header).  Same `cflags_menu` as `menu_item.cpp`: the band
-            # carries 0 record-form instructions and keeps its tiny same-file `bl`s.
-            Object(NonMatching, "menu/fn_802A6624.cpp"),
+            # name is derived from what the range does (see its header - `menu_message.cpp`,
+            # re-homed 2026-09-29 from the map's stem by `worker/menu-num-8725`).  Same `cflags_menu`
+            # as `menu_item.cpp`: the band carries 0 record-form instructions and keeps its tiny
+            # same-file `bl`s.
+            Object(NonMatching, "menu/menu_message.cpp"),
             # Registered from proposal/802E4978_fn_802E4978.cpp: the UI band directly above
             # `menu/fn_802A6624.cpp`'s band's neighbours (`.text` 0x802E4978..0x802E7408, 29
             # functions / 10896 B).  Module `menu` and the map's stem as file name (brief section 2,

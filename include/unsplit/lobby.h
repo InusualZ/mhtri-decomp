@@ -24,7 +24,7 @@
  * `eft052_hold_row_get`, `eft052_hold_entry_set`) made the same move into `include/ef/eft052.h`. */
 #include "camera/camera.h"
 #include "ef/eft052.h"
-#include "menu/fn_802A6624.h"
+#include "menu/menu_message.h"
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
@@ -527,7 +527,7 @@ s32 fn_80222848(s32, s16 *);
 s32 fn_80222BC4(void*, s32, u8);
 /* `fn_802A7C04`/`fn_802A8EC0`/`fn_802A8ED8`/`menu_cursor_step`/`fn_802A8F50` (0x802A7C04-0x802A8F50) were
  * declared here while the menu band had no registered unit.  `menu/fn_802A6624.cpp` owns that range
- * now, so its header `include/menu/fn_802A6624.h` declares them and this header includes it (rule 2).
+ * now, so its header `include/menu/menu_message.h` declares them and this header includes it (rule 2).
  * They stood here with `s16` returns and `void*`/`s32` tails while the owner defines `s32` - that
  * mismatch is the `(10505) illegal overloading` this move clears. */
 s32 fn_802DE224(void);
@@ -570,7 +570,7 @@ void fn_8042E9A4(u32 id, u8* table);
 
 /* `GetMenuFontColor` (0x802AA3EC, the map's `GetMenuFontColor__Fbbbb`) was declared here while the
  * menu band had no registered unit; `menu/fn_802A6624.cpp` owns the address now and the owner's header
- * `include/menu/fn_802A6624.h`, included above, declares it with this same spelling (rule 2). */
+ * `include/menu/menu_message.h`, included above, declares it with this same spelling (rule 2). */
 /* `ItemName` (0x8029F628) and `put_menu_cursor` (0x802A2564) were declared here while the band between
  * `Pl/fn_80295EF4.cpp` and `stage/stg_w.cpp` had no registered unit.  `menu/menu_item.cpp` now owns
  * both addresses, so the declarations live in its header `include/menu/menu_item.h` (rule 2) - the
