@@ -101,6 +101,12 @@ target has. Settle it from the data, in this order:
   **candidate only** (~7 % of adjacent single-owner `.data` pairs invert, which is impossible inside one object).
 * `extab`/`extabindex` and the data-section fragments tile in link order, so a boundary shows as a jump in their
   owner sequence - and an `extabindex` entry names its own function, which pins a split exactly.
+* the `.data` **emission order** (playbook row 80, `docs/data-order-seams.md`): run `python
+  tools/splits/dataorder.py at <addr>` for the unit's `.data`. Inside one TU nothing but another vtable follows a
+  vtable and adjacent vtables descend, so a vtable followed by a string/data symbol, or an adjacent vtable pair
+  that goes **up**, inside your claimed range is a multi-TU seam - **report it** as a seam re-draw, never patch
+  the source around it. `python tools/units/vtableaudit.py --unit <unit> --order` checks the same order on your
+  built object (vtables last, in reverse class order) and warns when the source shape is wrong.
 
 Never compensate for a missing pool or string with a local literal or a re-declared symbol: that bakes the
 fragment's shape into the source and has to be undone when the seam is fixed. `tu-boundary-discovery` carries the

@@ -91,4 +91,10 @@ Order: 0 first; then 1, 2, 3 and 4 are independent and can run as parallel lanes
 ## 6. Progress
 
 * Playbook row 80 and this document: landed with the plan.
-* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phases 1-4: in progress as parallel lanes.
+* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phases 1-3: in progress as parallel lanes.
+* Phase 4: `vtableaudit.py --order` (branch `worker/data-order-p4-3611`): per built unit, every `__vt__*` after
+  every other `.data` symbol (`vtable-before-data`) and vtables in reverse class definition order (`vtable-order`,
+  class order read from the unit source and its includes). Warn-level, outside `--diff`'s violation set, no gate
+  row. Real objects: 293 built units, 3 with vtables (`network_transport` 7, `fn_803D3CE8` 1,
+  `NetworkSessionManagerPat` 1), 0 findings; `network_transport`'s 7 vtables descend exactly in reverse class order.
+  The `decompiler` profile's seam-check step and `codereviewer` name the check. 114-check selftest.
