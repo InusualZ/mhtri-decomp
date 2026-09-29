@@ -270,17 +270,6 @@ def _claims():
     return claims
 
 
-def _land():
-    """`land` imported late for the same reason as `_claims`: land imports claims, which imports slots.
-
-    Only `agents_md_real_change` is used, and only to keep the *one* implementation of "is CLAUDE.md
-    really changed, or is that the LOCAL-ONLY block?" - a slot's CLAUDE.md carries live working state by
-    rule 8, so a second copy of that cut here would be the bug, not the reuse.
-    """
-    from units import land
-    return land
-
-
 # --- the live-lane signal: Claude Code's session registry ------------------------------------------
 
 #: The directory Claude Code keeps one `<pid>.json` per live session under: `<config dir>/sessions`, where the
@@ -516,10 +505,8 @@ def slot_dirty(slot: str) -> list[str]:
     """The slot tree's rows a release would destroy: `[" M src/x.cpp", "?? notes.md"]`.
 
     `git status --porcelain -uall` is the definition - tracked edits and untracked non-ignored files (the
-    slot's `build/`, `orig/`, `.pi/` and `.used` are ignored, so the warm trees never show up here).  One
-    row is deliberately not dirt: an `CLAUDE.md` whose only difference is its LOCAL-ONLY block, which is
-    live working state by rule 8 and is dirty in every real slot - `land.agents_md_real_change` owns that
-    judgement, and a release that called it dirt would refuse every ordinary teardown.
+    slot's `build/`, `orig/`, `.pi/` and `.used` are ignored, so the warm trees never show up here).  Every
+    row is dirt, CLAUDE.md included: it is an ordinary tracked file.
 
     The porcelain output is read **raw**: `git()` strips its stdout, which eats the leading space of the
     first row and shifts every field by one (` M CLAUDE.md` -> `M CLAUDE.md`, so the path parses as
@@ -533,10 +520,6 @@ def slot_dirty(slot: str) -> list[str]:
     for row in (p.stdout or "").splitlines():
         if not row.strip():
             continue
-        code, path = row[:2], row[3:].strip().strip('"')
-        if path == "CLAUDE.md" and code.strip() in ("M", "MM"):
-            if not _land().agents_md_real_change(slot):
-                continue
         out.append(row.rstrip())
     return out
 
@@ -2136,11 +2119,9 @@ def selftest() -> int:
         os.makedirs(os.path.join(repo, "build", "binutils"))
         os.makedirs(os.path.join(repo, "build", "tools"))
         open(os.path.join(repo, "configure.py"), "w").write("config.libs = []\n")
-        # CLAUDE.md is committed with a real **em dash** in its prose, because a slot's CLAUDE.md is dirty by
-        # design (the LOCAL-ONLY block is live working state, rule 8) and `slot_dirty` has to tell that dirt
-        # apart from real dirt.  The non-ASCII byte is what makes the comparison load-bearing: a decode that
-        # used the host locale codec (`cp1252` here) would call every slot dirty (F34's failure, one file
-        # over).  Written as UTF-8 explicitly - the fixture must not inherit the trap it guards against.
+        # CLAUDE.md is committed with a real **em dash** in its prose: a decode that used the host locale codec
+        # (`cp1252` here) would call a clean slot dirty (F34's failure, one file over).  Written as UTF-8
+        # explicitly - the fixture must not inherit the trap it guards against.
         with open(os.path.join(repo, "CLAUDE.md"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write("# repo notes\n\nprose with an em dash \u2014 in it\n")
         open(os.path.join(repo, ".gitignore"), "w").write(
@@ -2684,23 +2665,16 @@ def selftest() -> int:
         check("... recording what it overrode",
               any("no branch reaches" in line for line in orphan_forced["overridden"]), True)
 
-        # --- E2/E3: the slot's own live state (CLAUDE.md's LOCAL-ONLY block) is not dirt ---------------
+        # --- CLAUDE.md is an ordinary tracked file: an edit is dirt, and a reset puts the committed text back ----
         blocky = acquire(repo, "auto/blocky", slot=1)
         d_blocky = blocky["dir"]
         check("a freshly acquired slot has a clean tree", slot_dirty(d_blocky), [])
-        with open(os.path.join(d_blocky, "CLAUDE.md"), "r", encoding="utf-8", newline="") as fh:
-            base = fh.read()
-        with open(os.path.join(d_blocky, "CLAUDE.md"), "w", encoding="utf-8", newline="") as fh:
-            fh.write(base + "<!-- LOCAL-ONLY-BEGIN: stripped before every commit, see Non-negotiables "
-                     "rule 8 -->\nlive state, and an em dash \u2014\n<!-- LOCAL-ONLY-END -->\n")
-        check("an CLAUDE.md carrying only its LOCAL-ONLY block is not dirt", slot_dirty(d_blocky), [])
-        check("... so a release needs no override", release_blockers(repo, 1, d_blocky), [])
         with open(os.path.join(d_blocky, "CLAUDE.md"), "a", encoding="utf-8", newline="") as fh:
-            fh.write("a real edit below the block \u2014\n")
-        check("a real CLAUDE.md edit IS dirt", any("CLAUDE.md" in r for r in slot_dirty(d_blocky)), True)
+            fh.write("an edit \u2014\n")
+        check("a CLAUDE.md edit IS dirt, with no special casing", any("CLAUDE.md" in r for r in slot_dirty(d_blocky)), True)
         release(repo, slot=1, unit="auto/blocky", force=True)
         check("... and the reset puts the committed CLAUDE.md back",
-              open(os.path.join(d_blocky, "CLAUDE.md"), encoding="utf-8").read().count("LOCAL-ONLY"), 0)
+              "an edit" in open(os.path.join(d_blocky, "CLAUDE.md"), encoding="utf-8").read(), False)
 
         # --- E2/E3: the SEAM - the claim path's teardown is the release that caused the incident --------
         # 2026-09-28's release was `claims.py release`, not a bare `slots.py release`, so the guard has to

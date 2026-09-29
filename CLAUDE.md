@@ -60,12 +60,8 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    working tree and report what you would commit).
 7. **Never paste `config/RMHE08/symbols.txt` into a prompt/tool output.** It is ~65,700 lines / 4.5 MB.
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
-8. **`CLAUDE.md` holds no live working state.** It used to carry a gitignored `LOCAL-ONLY` block; that block is
-   retired (archived under `.pi/notes/`, curated into `docs/pipeline.md` and `.pi/state.md`), so `CLAUDE.md` is an
-   ordinary tracked file and a plain `git commit` needs no special handling. Do not put session state, dated
-   snapshots or incident logs in it - they go in `.pi/state.md` or `.pi/notes/`. (The `localonly.py` tool, the
-   pre/post-commit hooks and `land.py`'s block handling are still in the tree and are no-ops without a block until
-   they are removed.)
+8. **`CLAUDE.md` holds no live working state.** It is an ordinary tracked file: session state, dated snapshots
+   and incident logs go in `.pi/state.md` or `.pi/notes/`, never here.
 
 ## Matching policy: flags and source variants
 
@@ -163,8 +159,8 @@ The steady loop, per unit:
 
 1. `queue.py next` claims one proposal - one worktree, one branch, one brief - and prints the paste-ready spawn.
 2. The worker registers its range at its final home and commits the bodies on its branch, measured.
-3. Apply that branch with `.pi/bin/applybranch.sh` (the merge-base diff; the local-only block records why the
-   two obvious alternatives lose work), and resolve the shared-file conflicts: `python
+3. Apply that branch with `.pi/bin/applybranch.sh` (the merge-base diff, not a tip-only cherry-pick and not a
+   plain two-way diff, which lose work), and resolve the shared-file conflicts: `python
    tools/units/mergebranch.py resolve` resolves the classes it can (a comment that names a unit **file** is not
    a stale symbol; a comment-only `src/**` difference takes main's comment and the branch's code) and refuses
    the rest. Then `land.py record-base` -> `land.py land --units <claim>` -> `claims.py release`.
@@ -218,9 +214,8 @@ harness reads the installed copy - a worktree cut before the edit otherwise serv
 
 All project skills live in one tracked folder, `.claude/skills/`, so every harness sees the same set:
 `mwcc-unit-matching/` (the playbook and its index), `symbol-map-editing/` (`tools/symbols/symedit.py` - look up, list by
-range and rename symbols without ever loading `symbols.txt` into context), `claude-md-local-only/`
-(`tools/agents/localonly.py` - pull the local-only section out of this file before a commit and push it
-back after), `objdiff-verify/` (proving a unit really matches), `tu-boundary-discovery/`
+range and rename symbols without ever loading `symbols.txt` into context),
+`objdiff-verify/` (proving a unit really matches), `tu-boundary-discovery/`
 (`tools/splits/tudiscover.py` - from one symbol address, work out which functions and data ranges form one
 translation unit, before any source is written) and `decompile-symbol/` (`tools/units/symbolpreflight.py`,
 plus `tools/units/m2cinput.py` for the `tools/m2c` decompiler - one symbol from an address to a registered,
@@ -263,9 +258,7 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                             symbols/  symbol-map proxy (symedit.py): look up, list by range and rename
                                       symbols in config/RMHE08/symbols.txt without loading it into
                                       context - see the `symbol-map-editing` skill
-                            agents/   CLAUDE.md housekeeping (localonly.py): pull the local-only
-                                      working-state section out before a commit and push it back after
-                                      - see the `claude-md-local-only` skill; subagent-profile sync
+                            agents/   subagent-profile sync
                                       (sync_profiles.py): generate each profile's section 6.5 rule
                                       block from docs/plan.md - `--check` exits non-zero when a
                                       profile is stale
@@ -341,8 +334,8 @@ objdiff compares the `src/` candidate against the `obj/` target. Keeping those t
 
 This repository was converted from the pi agent harness to Claude Code on 2026-09-29. What lives where:
 
-* **`CLAUDE.md`** (this file) is the project instructions file; it was `AGENTS.md`. The local-only block rule
-  (non-negotiable 8) is unchanged, and `tools/agents/localonly.py` and the git hooks address `CLAUDE.md`.
+* **`CLAUDE.md`** (this file) is the project instructions file; it was `AGENTS.md`. Live working state stays out of it
+  (non-negotiable 8).
 * **`.claude/agents/*.md`** are the subagent profiles (frontmatter `name`, `description`, `tools`, `skills`).
   `tools/agents/install.sh` copies them to `~/.claude/agents/`, so a worktree cut before a profile edit still
   sees the current prompt. `codereviewer` has no `Write`/`Edit` in `tools:` - read-only by construction.
@@ -493,7 +486,7 @@ regression if the hash goes red.
 ## Conventions
 
 * **Commit messages follow one convention**: `<category>: <message>`, then an optional long description. Approved
-  the same way as anything else — see Non-negotiables rule 6, and pull the local-only block out first (rule 8).
+  the same way as anything else — see Non-negotiables rule 6.
   * **`<category>` names where the change lives, and mirrors the tree**:
     * **`game/<module>`** — decompilation work. The module is the `src/` directory: `game/network`, `game/quest`,
       `game/menu`, `game/hud`, `game/pl`, `game/enemy`, `game/ef`, `game/g3d`, `game/nw24`, `game/dwci`,
@@ -587,10 +580,7 @@ regression if the hash goes red.
       stale `main.dol`, so a `NonMatching` object that does not compile still looks green.
 * [ ] For a single unit/symbol: the object compiled **and** its objdiff diff shows the claimed match level
       (per-symbol `match_percent`, equal section sizes) — see the `objdiff-verify` skill.
-* [ ] `git status --short` shows only intended files (no `build/`, no `orig/`, no scratch dirs). A lone
-      `M CLAUDE.md` just means the local-only block differs, which is expected.
-* [ ] The committed `CLAUDE.md` has no local-only block: `git show HEAD:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'`
-      → `0`.
+* [ ] `git status --short` shows only intended files (no `build/`, no `orig/`, no scratch dirs).
 * [ ] `symbols.txt` / `splits.txt` edits are byte-clean for the lines you didn't mean to touch
       (`git diff --stat` sanity check — these files are huge; a symbol rename goes through
       `python tools/symbols/symedit.py rename`, so its diff is exactly one line per symbol).

@@ -9,8 +9,6 @@ the parts that go wrong are mechanical:
 * `git add -A` would sweep up another agent's in-flight file (this repo has three agents in it),
 * build output, `orig/`, `.lavish/`, `.pi/` and scratch must never be staged, and a stray file in the tree
   (a `.stackdump`, a `__pycache__`) is an accident worth refusing rather than committing,
-* `CLAUDE.md` carries a LOCAL-ONLY block that non-negotiable 8 forbids committing: it has to be pulled out
-  before staging and pushed back afterwards, in that order, and the working tree must end up reviewable,
 * the commit message is supposed to carry the *results*, and those numbers already exist in
   `build/RMHE08/report.json`.
 
@@ -29,8 +27,6 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-STATE_FILE = os.path.join(ROOT, ".pi", "local-only.state.json")
-BEGIN_MARKER = "<!-- LOCAL-ONLY-BEGIN"
 
 STAGE_PREFIXES = ("src/", "include/", "tools/", "docs/", ".claude/skills/", "config/")
 STAGE_FILES = ("configure.py", "CLAUDE.md", ".gitignore")
@@ -58,13 +54,6 @@ def msg_path() -> str:
     return path if os.path.isabs(path) else os.path.join(ROOT, path)
 
 
-def localonly_markers() -> int:
-    path = os.path.join(ROOT, "CLAUDE.md")
-    if not os.path.exists(path):
-        return 0
-    return sum(1 for line in open(path, "r", encoding="utf-8") if line.startswith(BEGIN_MARKER))
-
-
 def classify(path: str) -> tuple[str, str]:
     """-> ('stage' | 'refuse', reason)."""
     if path in GROUND_TRUTH_FILES:
@@ -72,7 +61,7 @@ def classify(path: str) -> tuple[str, str]:
     if path in REFUSE_FILES or path.endswith(REFUSE_SUFFIXES):
         return "refuse", "build output or scratch, never committed"
     if path.startswith(REFUSE_PREFIXES):
-        return "refuse", "ignored or local-only tree"
+        return "refuse", "ignored scratch tree"
     if path in STAGE_FILES or path.startswith(STAGE_PREFIXES):
         return "stage", "project content"
     return "refuse", "unknown - decide by hand rather than sweeping it in"
@@ -271,13 +260,6 @@ def split_plan(paths: list[str]) -> list[tuple[str, list[str]]]:
     return [(name, group) for name, group in groups if group]
 
 
-def localonly(action: str) -> None:
-    script = os.path.join(ROOT, "tools", "agents", "localonly.py")
-    if not os.path.exists(script):
-        return
-    subprocess.run([sys.executable, script, action], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry-run", action="store_true", help="classify and show the plan, stage nothing")
@@ -330,37 +312,16 @@ def main() -> int:
         print("\n--- message (not written, nothing staged) ---\n" + message)
         return 0
 
-    agents_md = "CLAUDE.md" in paths
-    if agents_md:
-        localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
-        if not os.path.exists(STATE_FILE):
-            sys.exit(
-                "refusing to stage CLAUDE.md: pulling the LOCAL-ONLY block left no state file to restore from.\n"
-                "Its live section has to be recoverable before the file is staged - restore it by hand first."
-            )
-
     msg_file = msg_path()
     with open(msg_file, "w", encoding="utf-8") as fh:
         fh.write(message)
 
-    try:
-        git("add", "--", *paths)  # explicit paths only, never `git add -A`
-    finally:
-        if agents_md:
-            localonly("push")  # working tree keeps its live section, the index keeps the stripped blob
-            if localonly_markers() == 0:
-                print(
-                    "WARNING: the CLAUDE.md LOCAL-ONLY section did not come back into the working tree.\n"
-                    f"         The staged blob is correct (no block); restore the live section yourself - the\n"
-                    f"         most recent copy is the last commit or a sibling worktree's CLAUDE.md."
-                )
+    git("add", "--", *paths)  # explicit paths only, never `git add -A`
 
     print(f"\nstaged {len(paths)} path(s); message written to {os.path.relpath(msg_file, ROOT)}\n")
     print(git("status", "--short"))
     if args.commit:
         print(git("commit", "-F", msg_file))
-        if agents_md:
-            localonly("push")
         print(git("log", "--stat", "-1"))
     else:
         print(f"commit it with:\n  git commit -F {os.path.relpath(msg_file, ROOT)}\n")

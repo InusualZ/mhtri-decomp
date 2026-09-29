@@ -1,8 +1,7 @@
 #!/bin/sh
-# Pre-commit guard (docs/plan.md 7.18). Refuses a commit that carries any of the four things this repository
+# Pre-commit guard (docs/plan.md 7.18). Refuses a commit that carries any of the things this repository
 # must never commit, whichever path the commit takes - a worker's plain `git commit` on its branch included,
-# which is exactly the case prepcommit.py cannot see. The LOCAL-ONLY case no longer refuses: it pulls the
-# block out of a staged CLAUDE.md and re-stages it, so a landing that merely touched the file goes through.
+# which is exactly the case prepcommit.py cannot see.
 #
 # Enable once per clone/worktree:
 #     git config core.hooksPath tools/git/hooks
@@ -11,7 +10,6 @@
 #
 # The decisions and the fixes live in tools/git/guard.py so they are callable and testable without a shell:
 #   * `eol`        - normalise a textish staged blob's CRs and re-stage it; refuse a binary staged blob
-#   * `localonly`  - pull the LOCAL-ONLY block out of a staged CLAUDE.md and re-stage it
 #   * `autocrlf`   - warn (never refuse) when core.autocrlf=true silently defeats eol=lf
 
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
@@ -29,7 +27,7 @@ fi
 root=$(git rev-parse --show-toplevel)
 guard="$root/tools/git/guard.py"
 if [ ! -f "$guard" ]; then
-    echo "pre-commit: warning - $guard is missing, so the EOL and LOCAL-ONLY guards did not run." >&2
+    echo "pre-commit: warning - $guard is missing, so the EOL guard did not run." >&2
     exit 0
 fi
 
@@ -38,13 +36,6 @@ python "$guard" autocrlf || true
 # A staged blob with CRs would commit CRLF (docs/plan.md 7.18); normalise the textish ones, refuse the
 # binary ones rather than guess.
 if ! python "$guard" eol; then
-    exit 1
-fi
-
-# The LOCAL-ONLY working-state block is never committed (non-negotiable 8): pull it and re-stage CLAUDE.md.
-# post-commit pushes the block back; if this commit fails the block waits in the state file and the
-# printed `localonly.py push` is the one command that restores it.
-if ! python "$guard" localonly; then
     exit 1
 fi
 

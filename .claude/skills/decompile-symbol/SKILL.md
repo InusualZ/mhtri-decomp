@@ -213,9 +213,8 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
   Report in the handover what the run taught *and* what it tried that did not work: a `no` result saves the
   next session the same detour, and a unit-specific fact belongs in the unit's file header comment.
 * `CLAUDE.md`: **write it** when the change is a meaningful improvement to the system (a playbook row, a new
-  idea, a corrected rule) and report the write in the handover. Keep the local-only block rules:
-  `python tools/agents/localonly.py pull` before staging and `push` after a commit
-  (skill: `claude-md-local-only`). It is not a free-for-all: another agent edits that file too, so only
+  idea, a corrected rule) and report the write in the handover. It is not a free-for-all: another agent
+  edits that file too, so only
   meaningful improvements, and never an unevidenced flag. A **name** is not in that category: a symbol gets the
   best name its context supports (a guess is licensed, and marked in the unit header so a later pass can refine
   it), because a generated `fn_`/`lbl_`/`unk` left in `src/` is a defect.
@@ -232,10 +231,7 @@ claim with `mt.py diff -u <unit> <symbol>`, which reads the objects directly.
   writes the message with the measured results into the worktree's **private git dir**
   (`git rev-parse --git-path prepcommit_msg.txt`) - in a linked worktree `.git` is a *file*, so never
   hard-code `.git/...`.
-  For `CLAUDE.md` it pulls the LOCAL-ONLY block out before staging and pushes it straight back, so the working
-  tree keeps its live section while the *index* holds the stripped blob (non-negotiable 8); it **refuses to
-  stage the file** when the pull left no state to restore from, and warns when the block did not come back -
-  both were real failures before the guard existed. **It never commits:** the user reviews
+  **It never commits:** the user reviews
   `git diff --cached` and runs `git commit -F <that path>`. `--commit` executes it and is only for when they
   explicitly ask.
 * **Apply each finding in the same session, uncommitted.** The user reviews the working tree: an idea that

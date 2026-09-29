@@ -373,9 +373,6 @@ refuses a batch, names the row that refused, and the landing either passes every
   batch. Cherry-pick is the mechanism; a worker that left several commits is landed as its range rather than
   only its tip.
 * **A whole branch lands in one command.** `python tools/units/land.py land --branch worker/<slug>` runs record-base, applies the branch with the registration union, gates it, commits and releases - the landing path when the branch is whole. Reach for `--units` only when the batch's paths are not the branch's registration diff.
-* **`localonly.py pull` → land → `push`, and never patch the block while it is pulled out.** The local-only
-  block in `CLAUDE.md` is pulled out for a landing and restored immediately after; editing it while it is
-  pulled out is how the block drifts.
 * **The bootstrap exception.** A change **to the gate itself** cannot be gated by the gate it is changing, so
   it is committed **directly, path-limited** (the gate's own files and nothing else). This is the only landing
   that skips the gate, and its path-limit is what keeps the exception from becoming a habit.
@@ -407,9 +404,9 @@ refuses a batch, names the row that refused, and the landing either passes every
   re-reads main).
 * **Landing a whole branch:** `land.py land --branch worker/<x>` (a `-named` branch too) derives `--units`; the
   orchestrator's whole landing is that one command - never read the lane report (R9).
-* **The local-only-block dance is retired with the block.** Historically ` M <file>` with an empty `git diff`
-  (EOL churn) refused with *"main's tree is not clean"*; `git checkout -- <file>` settles it, but never when the
-  edit is a real one (check: `tools/agents/localonly.py` and the hooks if the mechanism is reused).
+* **` M <file>` with an empty `git diff` is EOL churn.** It refuses with *"main's tree is not clean"*;
+  `git checkout -- <file>` settles it, but never when the edit is a real one. `CLAUDE.md` is an ordinary tracked
+  file, so a real edit to it lands with `land.py land --units CLAUDE.md` like any other path.
 
 Related, and enforced by a different tool: the compile must actually happen. `NonMatching` units are not
 linked, so a green `ok` can coexist with an object that fails to compile — check `^FAILED` (R6). And the
