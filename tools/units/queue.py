@@ -6,7 +6,13 @@ worker the instant a slot frees without deriving anything. This is the other hal
 
     python tools/units/queue.py next [--count N] [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
     python tools/units/queue.py list [--json]
+    python tools/units/queue.py debt [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
     python tools/units/queue.py --selftest
+
+`debt` hands out the register's `naming`/`band-header` debt the same way: it claims the top open item on its
+file (`claims.claim`, the same worktree/branch lock), writes a brief naming every distinct at-fault name, and
+spends one credit through `backlog.record_claims` - one resolved item still earns exactly one. The register
+therefore both rations new proposal claims against the debt *and* lets a lane be tasked with paying it down.
 
 `next` picks the pooled unit with the lowest `.text` address that is still **unclaimed**, takes the claim
 (`claims.py claim` creates the worktree and the branch), renders the brief **from the current queue entry or
@@ -647,6 +653,109 @@ def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_
             "dry_run": dry_run, "claims": out}
 
 
+def debt_candidates(main: str, items=None, **kw) -> list:
+    """The claimable debt items, in rank order: open `naming`/`band-header` items whose file is free.
+
+    A debt item is held on its **file** (`backlog.debt_unit`), so the same claim lock a unit proposal uses
+    says whether the file is already in flight.  An item whose file is claimed is skipped, never handed to a
+    second lane - the register would otherwise offer work that the claim path refuses at the branch.
+    `items` lets a caller pass a single `backlog.build` (the queue does), so selection does not re-lint.
+    """
+    pool = backlog.debt_items(items) if items is not None else backlog.open_debt_items(main, **kw)
+    branches = claims.worker_branches(main)
+    out = []
+    for it in pool:
+        unit = backlog.debt_unit(it)
+        if brief.claim_for(main, unit) or claims.lock_held(main, unit, branches):
+            continue
+        out.append(it)
+    return out
+
+
+def no_debt(main: str) -> str:
+    """The refusal when no naming/band-header item is claimable."""
+    return ("no claimable debt: no open naming/band-header item has names outstanding and an unclaimed "
+            "file\n  run `python tools/units/backlog.py --print` to see the register")
+
+
+def write_debt_brief(main: str, claim_slug: str, text: str) -> str:
+    """Write a debt item's brief to the claim's own slug path (the file a unit claim's brief would use)."""
+    dest = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+    return dest
+
+
+def next_debt_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
+                    ratio: int = backlog.RATIO_DEFAULT, ignore_backlog: bool = False,
+                    slots_mode: bool | None = None, **kw) -> dict:
+    """Claim the top open naming/band-header debt item and hand a lane its file and distinct-name list.
+
+    The register *rations* new proposal claims against the debt; this is the other half - the debt itself is
+    **claimable**, exactly like a unit proposal, so the paydown becomes scheduled work instead of something a
+    lane does incidentally while passing through.  The claim is `claims.claim` (the same branch/worktree lock
+    a unit uses, held on the item's file), the credit is spent through `backlog.record_claims`, and one
+    resolved item still earns exactly one (`backlog.ledger_earned`).  The brief names every distinct name,
+    and the spawn's task leads with "clean the N names in this file".
+
+    The same guards as `next_brief` run first: the branch guard (the worktree is cut from MAIN's HEAD), the
+    slot cap (a free slot is the concurrency cap), the backlog credit gate (a claim spends `ratio`), and the
+    unlanded-branch guard; `--ignore-backlog` hands out the debt without spending, on purpose.
+    """
+    claim_fn = claim_fn or claims.claim
+    if not dry_run:
+        bad_branch = branch_error(main)
+        if bad_branch:
+            raise SystemExit("REFUSED queue debt | %s" % bad_branch)
+    cap = slot_cap(main, slots_mode)
+    if cap:
+        raise SystemExit("REFUSED queue debt | %s" % cap)
+    items, meta = backlog.build(main, **kw)
+    if not ignore_backlog:
+        # the same credit gate `next_brief` runs (`backlog.refusal`), asked once against this build; on a
+        # refusal the ready-to-paste message is rendered by `refusal` itself.
+        open_ = [i for i in items if i.status == "open"]
+        if open_:
+            summary = backlog.ledger_summary(items, meta["ledger"]["claims"], ratio,
+                                             free=int(meta["ledger"].get("free") or 0))
+            if summary["balance"] < ratio:
+                raise SystemExit("REFUSED queue debt | %s" % backlog.refusal(main, ratio=ratio, **kw))
+    if not dry_run:
+        blocked = unlanded_error(main, set())
+        if blocked:
+            raise SystemExit("REFUSED queue debt | %s" % blocked)
+    candidates = debt_candidates(main, items=items, **kw)
+    if not candidates:
+        raise SystemExit(no_debt(main))
+    item = candidates[0]
+    unit = backlog.debt_unit(item)
+    if dry_run:
+        # mirror `claim_entry`: a dry run claims nothing and never calls the claim function (a real
+        # `claims.claim` would refuse a MAIN-shaped path outside MAIN).
+        info = {"unit": unit, "branch": claims.branch_for(unit),
+                "worktree": claims.worktree_for(unit, main), "dry_run": True}
+    else:
+        info = claim_fn(unit, main, worker, False, kind="fix")
+    wt = info.get("worktree") or claims.worktree_for(unit, main)
+    claim_slug = claims.claim_slug(main, unit) or claims.slug(unit)
+    brief_path = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
+    if not dry_run:
+        brief_path = write_debt_brief(main, claim_slug, backlog.debt_brief(main, item))
+    spawn = backlog.debt_task(main, item, cwd=wt, brief=brief_path)
+    out = {"item": item.key, "kind": item.kind, "target": item.target, "names": list(item.names),
+           "weight": item.weight, "count": item.count, "unit": unit, "claim": info,
+           "worktree": wt, "brief": brief_path, "dry_run": dry_run, "spawn": spawn}
+    if not dry_run and not ignore_backlog:
+        backlog.record_claims(main, [{"unit": unit, "worker": worker or "",
+                                      "branch": info.get("branch"), "worktree": wt, "ratio": ratio,
+                                      "kind": "debt", "backlog": item.key,
+                                      "when": _dt.datetime.now(_dt.timezone.utc).replace(
+                                          microsecond=0).isoformat()}],
+                              ratio=ratio)
+    return out
+
+
 def pool_state(main: str) -> dict:
     """The pool's counts by state, plus the ready candidates in order."""
     entries = pool_entries(main)
@@ -1233,6 +1342,61 @@ def selftest() -> int:
         check("a wave with --ignore-backlog hands out without spending", wave_out["claimed"], 1)
         check("... and leaves the ledger untouched", backlog.load_ledger(tmp)["claims"], [])
 
+    # The debt itself is claimable (`queue.py debt`): a naming/band-header item is handed to a lane exactly
+    # like a unit proposal - the same `claims.claim` worktree/branch lock (held on the item's file), the same
+    # credit balance - so the paydown is scheduled work instead of something a lane does incidentally.  One
+    # resolved item still earns exactly one credit.
+    with tempfile.TemporaryDirectory() as tmp:
+        for sub in ("src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
+            os.makedirs(os.path.join(tmp, sub), exist_ok=True)
+        open(os.path.join(tmp, "configure.py"), "w", encoding="utf-8").write("config.libs = [\n]\n")
+        for cfg in ("symbols.txt", "splits.txt"):
+            open(os.path.join(tmp, "config", "RMHE08", cfg), "w", encoding="utf-8").write("")
+        open(os.path.join(tmp, "src", "mod", "debt.c"), "w", encoding="utf-8").write(
+            "void fn_80040598(void) {}\nvoid fn_80040599(void) {}\nvoid fn_8004059A(void) {}\n")
+
+        def fake_claim_debt(unit, main, worker, dry_run, **kw):
+            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
+                                               "worktree": claims.worktree_for(unit, main)}})
+            return {"unit": unit, "branch": claims.branch_for(unit),
+                    "worktree": claims.worktree_for(unit, main)}
+
+        debt_items = backlog.open_debt_items(tmp)
+        check("the register offers a naming debt item to claim",
+              [(i.kind, i.target, i.weight) for i in debt_items],
+              [("naming", "src/mod/debt.c", 3)])
+        before = backlog.build(tmp)[1]["summary"]["balance"]
+        out = next_debt_brief(tmp, "w-debt", dry_run=False, claim_fn=fake_claim_debt, slots_mode=False)
+        check("the queue hands out the debt item", (out["kind"], out["target"]),
+              ("naming", "src/mod/debt.c"))
+        check("... with its distinct name list as the brief", sorted(out["names"]),
+              ["fn_80040598", "fn_80040599", "fn_8004059A"])
+        check("... and the task is `clean the N names in this file`",
+              "clean the 3 distinct name(s) in `src/mod/debt.c`" in out["spawn"]["task"], True)
+        check("... the claim is held on the item's file", out["unit"], "src/mod/debt.c")
+        check("... the balance moves by exactly one",
+              before - backlog.build(tmp)[1]["summary"]["balance"], 1)
+        check("... exactly one claim is recorded", len(backlog.load_ledger(tmp)["claims"]), 1)
+        check("... and it is the debt claim", backlog.load_ledger(tmp)["claims"][0]["kind"], "debt")
+        # a claimed debt item is not handed out twice (the file's claim lock is the one a unit uses);
+        # `--ignore-backlog` bypasses the (now spent) credit gate so the skip is what is proved.
+        try:
+            next_debt_brief(tmp, None, dry_run=True, slots_mode=False, ignore_backlog=True)
+            check("a claimed debt item is not re-offered", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("a claimed debt item is not re-offered", "no claimable debt" in str(exc), True)
+        # one resolved debt item earns exactly one credit (the same currency as every other item)
+        done_items = backlog.build_items(backlog.outbox_dir(tmp), backlog.notes_dir(tmp),
+                                         backlog.tooling_register_path(tmp),
+                                         {debt_items[0].key: "done"},
+                                         lint_items=backlog.collect_lint_items(tmp))
+        check("a resolved debt item earns exactly one credit", backlog.ledger_earned(done_items), 1)
+        # a dry run claims nothing and spends nothing
+        claims.save_registry(tmp, {})
+        dry = next_debt_brief(tmp, None, dry_run=True, slots_mode=False, ignore_backlog=True)
+        check("a dry run claims no debt", (dry["dry_run"], dry["claim"].get("dry_run")), (True, True))
+        check("... and spends nothing", len(backlog.load_ledger(tmp)["claims"]), 1)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1276,6 +1440,17 @@ def main() -> int:
     n.add_argument("--json", action="store_true")
     l = sub.add_parser("list", help="the pool's state and the next ready candidates")
     l.add_argument("--json", action="store_true")
+    d = sub.add_parser("debt", help="claim the top naming/band-header backlog item (clean its names)")
+    d.add_argument("--worker", default=None)
+    d.add_argument("--dry-run", action="store_true")
+    d.add_argument("--ignore-backlog", action="store_true",
+                   help="hand out the debt even when the credit balance does not cover it, without "
+                        "spending a credit - the deliberate override")
+    d.add_argument("--no-slots", action="store_true",
+                   help="construct a throwaway worktree instead of taking from the reusable slot pool")
+    d.add_argument("--ratio", type=int, default=backlog.RATIO_DEFAULT,
+                   help="credits the debt claim spends (default 1: one resolved item buys one claim)")
+    d.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
@@ -1315,6 +1490,28 @@ def main() -> int:
                 print("  %-10s  %-42s  %s" % ("0x%X" % start if start is not None else "?", e["unit"], e["slug"]))
         else:
             print("\nno ready brief - run `python tools/units/brief.py --pool`")
+        return 0
+
+    if args.cmd == "debt":
+        out = next_debt_brief(main_wt, args.worker, args.dry_run,
+                              ratio=args.ratio, ignore_backlog=args.ignore_backlog,
+                              slots_mode=(False if args.no_slots else None))
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        sp = out["spawn"]
+        if out["dry_run"]:
+            print("DRY RUN - nothing claimed, nothing written\n")
+        else:
+            print("claimed debt %s (%s %s: %d name(s))\n  branch   %s\n  worktree %s\n  brief    %s\n"
+                  % (out["item"], out["kind"], out["target"], len(out["names"]),
+                     out["claim"].get("branch"), out["worktree"], out["brief"]))
+        print("spawn this worker:")
+        print("  agent: %s" % sp["agent"])
+        print("  label: %s  (the tool takes no name)" % sp["name"])
+        print("  cwd:   %s" % sp["cwd"])
+        print("  task:  %s" % sp["task"])
+        print("\n%s" % sp["call"])
         return 0
 
     if args.cmd == "next":
