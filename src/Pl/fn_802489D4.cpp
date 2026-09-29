@@ -64,6 +64,7 @@
 #include "ef.h"
 #include "g3d/g3d_calcworld.h"
 #include "ef/fn_800CDB2C.h"
+#include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 frame-window pool (rule 2) */
 
 /* The unit's definitions are `extern "C"`: the map spells every one of them `fn_XXXXXXXX`
  * (unmangled), and a C++ definition would mangle and pair nothing (playbook rows 42/48). */
@@ -494,7 +495,7 @@ void fn_8024A248(_PLW* self, s32 arg1) {
             if (arg1 == 0 || arg1 == 2) {
                 vec.z = pl_frame_window_8;
             } else {
-                vec.z = lbl_80799E48;
+                vec.z = pl_float_neg8;
             }
             /* +0x054 is the actor's rotation; other units read its first word as a scalar, so the
              * `_CP_VECTOR` view is taken through the named field rather than a byte offset. */
@@ -556,7 +557,7 @@ void fn_8024B46C(_PLW* self, s32 arg1) {
                 }
                 break;
             case 2:
-                if (Pl_frame_check(self, 1, lbl_80799E84, pl_float_zero) == 1) {
+                if (Pl_frame_check(self, 1, pl_frame_window_80, pl_float_zero) == 1) {
                     pl_act_enter(self, 0, 0x72, 2);
                 }
                 break;
@@ -754,7 +755,7 @@ void fn_8024C878(_PLW* self) {
         }
         return;
     case 1:
-        if (Pl_frame_check(self, 1, lbl_80799EAC, pl_float_zero) == 1) {
+        if (Pl_frame_check(self, 1, pl_frame_window_208, pl_float_zero) == 1) {
             if (Pl_master_ck(self) == 1) {
                 pl_act_enter(self, 0, 0x7E, 0xC);
                 return;
@@ -797,10 +798,10 @@ void fn_8024C96C(_PLW* self) {
 void fn_8024CA50(_PLW* self, s32 arg1) {
     if (arg1 == 0) {
         if (Pl_Skill_ck(self, 0xB0) == 1) {
-            self->field_0x354 = lbl_80799EB0;
+            self->field_0x354 = pl_float_1_7;
         }
     } else if (Pl_Skill_ck(self, 0xAF) == 1 || Pl_Skill_ck(self, 0xB0) == 1) {
-        self->field_0x354 = lbl_80799EB4;
+        self->field_0x354 = pl_float_1_8;
     }
 }
 
@@ -811,7 +812,7 @@ s16 fn_8024CD8C(_PLW* self, s16 value) {
     if (Pl_Skill_ck(self, 0xA6) == 1) {
         scaled = (s16)(pl_float_1_5 * (f32)scaled);
     } else if (Pl_Skill_ck(self, 0xA7) == 1) {
-        scaled = (s16)(lbl_80799EC4 * (f32)scaled);
+        scaled = (s16)(pl_float_0_66 * (f32)scaled);
     }
     return scaled;
 }

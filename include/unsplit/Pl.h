@@ -92,28 +92,13 @@ extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024
 extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805CAD74[]; /* 0x805CAD74 - the sibling table for the other actor kind */
 extern u32 lbl_805E2048[]; /* 0x805E2048 - the sibling table for the third actor kind */
-/* The `.sdata2` floats this band gates its frame checks on. */
-extern const f32 pl_float_zero; /* 0x80799E00 - the zero/identity angle the Pl frame checks compare
-                                * against; `const` because `Pl/pl_act_step.cpp` declares the same
-                                * pool word `const f32` in its own file (a bare `f32` redeclaration is
-                                * `(10563)`), and the pool is never written */
-extern const f32 pl_frame_window_30;
-extern const f32 lbl_80799E48;
-extern const f32 pl_frame_window_2;
-extern const f32 lbl_80799E84;
-extern const f32 lbl_80799EAC;
-extern const f32 lbl_80799EB0;
-extern const f32 lbl_80799EB4;
-extern const f32 pl_float_1_5;
-extern const f32 lbl_80799EC4;
-extern const f32 pl_frame_window_20;
-extern const f32 pl_frame_window_8;
+/* The `.sdata2` frame windows and float constants this band's frame checks gate on are owned by the
+ * data-only unit `Pl/pl_frame_data.cpp` (`.sdata2` 0x80799E00-0x80799F98): a consumer includes
+ * `Pl/pl_frame_data.h` and declares none of them here (rule 2). */
 /* 0x805C4898 - the per-chunk rotation-offset pair table `Pl/fn_802430E8.cpp:fn_80246158` reads
  * (`chunk_ofs * 2` and `chunk_ofs * 2 + 1`); the `.data` run is unclaimed, so this band header is its
  * rule-2 home. */
 extern f32 lbl_805C4898[];
-extern const f32 pl_frame_window_3; /* 0x80799E20 - the +1.0 angle `fn_80247CC4` rotates its motion vector by */
-extern const f32 pl_frame_window_90; /* 0x80799E24 - the frame gate `fn_80247EF0` hands `Pl_frame_check` */
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
  * The 0x8026A3xx trio (`fn_8026A328`/`fn_8026A34C`/`fn_8026A3A0`) sits inside the range
@@ -283,15 +268,10 @@ extern u16 lbl_80792030[];
 extern u16 lbl_80792038[];
 extern u16 lbl_805BFFE0[];
 
-/* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined - the run is
- * unclaimed, so this band header is their rule-2 home). */
-extern u8 lbl_805C4F5C[];  /* the per-act `.data` record `Pl_act_set_step_table` installs */
-extern const f32 pl_float_zero;
-extern const f32 pl_frame_window_2;
-extern const f32 lbl_80799EB0;
-extern const f32 pl_frame_window_85;
-extern const f32 pl_float_neg60;
-extern const f32 pl_frame_window_5;
+/* The per-act `.data` record `Pl_act_set_step_table` installs (the `.data` run is unclaimed, so this
+ * band header is its rule-2 home).  The `.sdata2` words that used to sit beside it are owned by
+ * `Pl/pl_frame_data.cpp` now and are reached through `Pl/pl_frame_data.h` (rule 2). */
+extern u8 lbl_805C4F5C[];
 
 /* The shell band `Pl/fn_802840DC.cpp` (`.text` 0x802840DC-0x80288CEC) reads these tables and
  * constants out of the band's unclaimed data runs, so this header is their rule-2 home.  Every name
