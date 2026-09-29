@@ -34,6 +34,8 @@ void OSRestoreInterrupts(BOOL level);
  * rule 2 reports them as an unplaceable gap - the module the band names is `OS`, which is this file. */
 void OSInitMutex(void* mutex);
 void OSLockMutex(void* mutex);
+/* untyped: opaque handle passed through - the caller owns the mutex's storage */
+void OSUnlockMutex(void* mutex);   /* the pair other half: the Network peer band unlocks with it */
 
 /* ----------------------------------------------------------------------------------------------
  * The OS thread and message-queue set the NHTTP library creates its comm thread with

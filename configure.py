@@ -2341,6 +2341,24 @@ config.libs = [
             Object(NonMatching, "Network/fn_803D3CE8.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Registered once, at its final home (docs/plan.md 12): proposal
+            # `803CCDF8_dtor_803CCDF8.cpp` (`.text` 0x803CCDF8..0x803D3CE8, 118 auto units / 28400 B).
+            # The transport half of the same band: the peer payload buffers and their error records,
+            # the socket peers' clear/set/send family and the NetworkSessionStable session state
+            # machine.  Module `Network` from the class names and the registered neighbours
+            # (`Network/fn_803D3CE8.cpp` abuts it exactly in extab/extabindex); no `__FILE__` string
+            # and only `zz_` dump names cover the code, and the tile spans more than one original TU,
+            # so the name is derived from the range's subject and is a GUESS (brief section 2,
+            # class 3 module + class 4 name).  C++ (`__dl__FPv`, virtual dispatch), the lib's
+            # `-Cpp_exceptions on` supplies the target's extab/extabindex.  The seam is unproven
+            # (discovery byte cap) and the unit header records it.
+            # Per-unit flag deviation (brief section 8.2), instruction-level evidence: `-O3` like
+            # the two sibling session units.  Measured on this source: the lib's `-O4,p` puts 14 rows
+            # at 100 % (unit score 4.05), `-O3` puts 37 of 38 there (unit score 7.37).  The unit's own
+            # lever is the file-scope `#pragma peephole off` in the source (playbook 39), with the
+            # measured before/after in the unit header.
+            Object(NonMatching, "Network/network_transport.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Registered once, at its final home (docs/plan.md 12): proposal
             # `8041A87C_fn_8041A87C.cpp` (`.text` 0x8041A87C..0x8041DF10, 71 functions / 13972 B).
             # Per-object flags (brief 8.2), instruction-level evidence: retail *calls* the small
             # file-static helpers from the big state machines - fn_8041DCDC's target body is

@@ -13,6 +13,12 @@
 
 #include "types.h"
 
+/* The band got its first *claimed* range (0x803CCDF8..0x803D3CE8, `Network/network_transport.cpp`),
+   so the declarations that range now owns moved into that unit's own header and are reached
+   through this include - a band header that still declared them would collide with the owner's
+   definitions (docs/plan.md 6.5 rule 2). */
+#include "Network/network_transport.h"
+
 typedef struct NetworkErrorInfo NetworkErrorInfo;
 /* the record's layout lives in `include/Network/fn_803D3CE8.h`, beside the GameSpy handshake that
  * fills it: `NetworkInstance::postError` below only takes a pointer to it. */
@@ -254,7 +260,6 @@ void resetCallback(NetworkInstance* self, s32 index);
 /* DWC/GameSpy session layer */
 void constructNetworkLibrary(void);   /* 0x804189C8, the sNetworkLibrary constructor body the opener calls */
 void decrement60d4(NetworkInstance* self);
-u32 getSomething5(NetworkInstance* self);
 s32 fn_803FD658(NetworkInstance* self);
 s32 fn_803FD694(NetworkInstance* self, s32 index);
 void fn_803FD794(NetworkInstance* self, void* info);
@@ -299,12 +304,8 @@ void fn_804167B4(void* out);
 void fn_80403F60(NetworkInstance* self, u32 handle);
 void fn_80403FE4(NetworkInstance* self, u32 handle, u32 offset, u32 size);
 void fn_80404070(NetworkInstance* self);
-void fn_803CCF14(void* self, const void* table, s32 a, s32 err);
 void dtor_803CA338(void* self, s32 flags);
-void dtor_803CCE9C(void* self, s32 flags);
 void OSLockMutex(void* mutex);
-void LockMutex(void* mutex);
-void UnlockMutex(void* mutex);
 void OSUnlockMutex(void* mutex);
 void OSInitMutex(void* mutex);
 s32 OSCreateThread(void* thread, void* entry, void* param, void* stack, u32 stackSize, s32 priority, u32 flags);
