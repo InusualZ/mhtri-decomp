@@ -75,6 +75,40 @@ def is_header_name(text: str | None) -> bool:
     return bool(text) and bool(HEADER_NAME_RE.match(text.strip()))
 
 
+SOURCE_NAME_RE = re.compile(r"^[A-Za-z0-9_./\-]*\.(?:c|cc|cpp|cp)$")
+#: Most non-header strings that may sit between two header names (or before the first one) of one inline tail:
+#: the assert message and the class-name argument of an inline instance (`ResLightSet`, `%s::%s: Object not valid.`).
+TAIL_RUN_MAX = 3
+
+
+def is_source_name(text: str | None) -> bool:
+    """A bare source file name (`g3d_anmvis.cpp`): the `__FILE__` of an assert in an OUT-OF-LINE function."""
+    return bool(text) and bool(SOURCE_NAME_RE.match(text.strip()))
+
+
+def inline_tail(gap: list["Sym"]) -> int:
+    """How many leading symbols of a `V->S` gap are the first TU's inline tail (0 when nothing says so).
+
+    An inline function's assert leaves a run of unmerged strings after the vtables - message, class name and the
+    *header* `__FILE__` (`g3d_resnode_ac.h`), one copy per instance - whereas the next TU's own strings lead with
+    its source `__FILE__` (`g3d_anmvis.cpp`) or a message of its own.  The tail is therefore the leading run of
+    strings up to and including the LAST header name that comes before the first source-file name, with at
+    most `TAIL_RUN_MAX` other strings between two header names.  A gap with no header name (the
+    `network_transport` gaps) has tail 0; a non-string symbol or a source-file name ends the run.
+    """
+    last = run = 0
+    for n, s in enumerate(gap):
+        if s.kind != STRING or is_source_name(s.text):
+            break
+        if is_header_name(s.text):
+            last, run = n + 1, 0
+        else:
+            run += 1
+            if run > TAIL_RUN_MAX:
+                break
+    return last
+
+
 def load_symbols(path: str = SYMBOLS) -> list[tuple[str, int, int | None, str]]:
     """`(section, address, size-or-None, name)` for every map row."""
     out = []
@@ -147,8 +181,9 @@ def seams(syms: list[Sym]) -> list[dict]:
     `kind` is
     * `V->S` (strong) - strings between this vtable group and a LATER vtable: another TU starts in the gap.
       `addr` is the earliest the new TU can begin (the first string), `latest` the next vtable, `width` the
-      number of symbols in the gap, `tail` how many leading strings look like an inline tail (a bare header
-      name) - the boundary is after them;
+      number of symbols in the gap, `tail` how many leading symbols are the first TU's inline tail
+      (`inline_tail`: strings up to the last header name before the first source-file name) - the boundary is
+      after them;
     * `V->tail` (weak) - strings after the vtable group with no later vtable: an inline tail or another TU;
     * `V->D` (weak) - an object over 8 B that is not a string (a jump table is one too);
     * `zigzag` (strong) - two adjacent vtables, owners going up.
@@ -169,9 +204,7 @@ def seams(syms: list[Sym]) -> list[dict]:
             k = j
             while k < len(syms) and syms[k].kind != VTABLE:
                 k += 1
-            tail = 0
-            while j + tail < k and syms[j + tail].kind == STRING and is_header_name(syms[j + tail].text):
-                tail += 1
+            tail = inline_tail(syms[j:k])
             if k < len(syms):
                 row.update(kind="V->S", latest=syms[k].addr, width=k - j, tail=tail)
             else:
@@ -200,13 +233,35 @@ def zigzag_pairs(syms: list[Sym]) -> collections.Counter:
     return c
 
 
+def narrow_gap() -> int:
+    """`dataseams.NARROW`, the widest `V->S` gap (in symbols) whose boundary is cut rather than only reported."""
+    tools = os.path.dirname(HERE)
+    for p in (os.path.join(tools, "units"), tools):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    import dataseams
+    return dataseams.NARROW
+
+
 def fragments(syms: list[Sym], weak: bool = False) -> list[list[Sym]]:
     """Cut the run at every strong seam (and the weak `V->D`/`V->tail` ones when `weak`): one list per probable TU.
 
-    A `V->S` cut is made at the earliest possible boundary (the first string of the gap); the true boundary is
-    after the row's `tail` inline-tail strings.
+    A `V->S` gap of at most `dataseams.NARROW` symbols is cut at its estimated boundary, the first symbol after
+    the row's `tail` inline-tail strings; a wider gap is not cut (a boundary is somewhere in it, and where is
+    unknown).  A zigzag and the weak kinds cut at their address.
     """
-    cuts = {s["addr"] for s in seams(syms) if weak or s["kind"] in STRONG_KINDS}
+    at = {s.addr: i for i, s in enumerate(syms)}
+    narrow = narrow_gap()
+    cuts = set()
+    for row in seams(syms):
+        if not (weak or row["kind"] in STRONG_KINDS):
+            continue
+        if row["kind"] == "V->S":
+            if row["width"] > narrow:
+                continue
+            cuts.add(syms[min(at[row["addr"]] + row["tail"], len(syms) - 1)].addr)
+        else:
+            cuts.add(row["addr"])
     out, cur = [], []
     for s in syms:
         if s.addr in cuts and cur:
@@ -410,6 +465,47 @@ def selftest() -> int:
           [(g["kind"], g["tail"]) for g in got], [("V->tail", 1)])
     check("... which fragments() does not cut", len(fragments(seq3)), 1)
 
+    # inline tails as the retail DOL has them: message + header pairs, unmerged repeats, the next TU's source name
+    def run(*spec):
+        out = []
+        for i, (kind, text) in enumerate(spec):
+            out.append(Sym(0x1000 + i * 0x40, 16, "%s%d" % (kind, i), kind, 0x100 if kind == VTABLE else None,
+                           text if kind == STRING else None))
+        return out
+
+    V, S, D = VTABLE, STRING, DATA
+    OBJ = "%s::%s: Object not valid."
+    pairs = run((V, None), (S, "NW4R:Failed assertion IsValid()"), (S, "g3d_fog.h"), (S, "NW4R:Failed assertion x"),
+                (S, "g3d_fog.h"), (S, "g3d_scnobj.cpp"), (S, "NW4R:Pointer Error: this is not valid"),
+                (V, None))
+    check("message + header pairs are an inline tail, the source name ends it", seams(pairs)[0]["tail"], 4)
+    check("... its fragment cut is the source name, not the first string",
+          [[s.name for s in f] for f in fragments(pairs)][1][0], "S5")
+    rep = run((V, None), (S, "ResAnmFog"), (S, OBJ), (S, "g3d_resanmfog_ac.h"), (S, "ResAnmLight"), (S, OBJ),
+              (S, "g3d_resanmlight_ac.h"), (S, "ResAnmScn"), (S, OBJ), (S, "g3d_resanmscn_ac.h"),
+              (S, "g3d_anmshp.cpp"), (V, None))
+    check("repeated unmerged literals (name, message, header) count as one tail", seams(rep)[0]["tail"], 9)
+    plain = run((V, None), (S, "NetworkPeerMcs::put: buf over"), (S, "NetworkSingleTcp::move: bad"), (V, None))
+    check("a gap with no header name has tail 0 (network_transport)", seams(plain)[0]["tail"], 0)
+    check("... and its fragment is cut at the first string", [[s.name for s in f] for f in fragments(plain)][1][0], "S1")
+    check("a source name before any header ends the run", seams(run((V, None), (S, "ef_cube.cpp"), (S, "msg"),
+          (S, "particle.h"), (V, None)))[0]["tail"], 0)
+    check("a header after the next TU's source name is not the tail",
+          seams(run((V, None), (S, "m"), (S, "a.h"), (S, "x.cpp"), (S, "m"), (S, "b.h"), (V, None)))[0]["tail"], 2)
+    check("too many plain strings between headers break the run",
+          seams(run((V, None), (S, "a"), (S, "b"), (S, "c"), (S, "d"), (S, "e.h"), (V, None)))[0]["tail"], 0)
+    check("a non-string symbol ends the run",
+          seams(run((V, None), (S, "m"), (S, "a.h"), (D, None), (S, "m"), (S, "b.h"), (V, None)))[0]["tail"], 2)
+    check("is_source_name", (is_source_name("g3d_anmvis.cpp"), is_source_name("a.c"), is_source_name("g3d_fog.h"),
+          is_source_name("see x.c for it")), (True, True, False, False))
+    wide = run((V, None), (S, "m"), (S, "a.h"), *[(S, "text%d" % i) for i in range(12)], (V, None))
+    check("a wide gap has its tail but fragments() does not cut it", (seams(wide)[0]["tail"], seams(wide)[0]["width"],
+          len(fragments(wide))), (2, 14, 1))
+    narrow_gap_run = run((V, None), (S, "m"), (S, "a.h"), (S, "next"), (V, None))
+    check("a narrow gap is cut after its tail", [[s.name for s in f] for f in fragments(narrow_gap_run)],
+          [["V0", "S1", "S2"], ["S3", "V4"]])
+    check("fragments() reuses dataseams' threshold", narrow_gap(), 8)
+
     # the real DOL, when the repo has it: the network_transport seams the discovery came from
     if os.path.exists(DOL) and os.path.exists(SYMBOLS):
         out = scan_dol()
@@ -419,6 +515,13 @@ def selftest() -> int:
         check("real DOL: the four network_transport V->S seams are inside the unit",
               found_nt, [0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40])
         check("real DOL: unclaimed .data holds candidate seams", out["in_unclaimed_data"] > 30, True)
+        rows_vs = [s for s in out["inside_registered_unit"] + out["unclaimed"] + out["at_registered_unit_start"]
+                   if s["kind"] == "V->S"]
+        check("real DOL: the g3d/ef inline tails are found (16 V->S rows measured 2026-09-29)",
+              sum(1 for s in rows_vs if s["tail"]) >= 12, True)
+        check("real DOL: the four network_transport gaps have no tail",
+              [s["tail"] for s in rows_vs if s["addr"] in (0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40)],
+              [0, 0, 0, 0])
 
     if fails:
         print("FAIL (%d)" % len(fails))
