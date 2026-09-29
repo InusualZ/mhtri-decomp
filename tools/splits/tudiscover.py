@@ -19,6 +19,17 @@ Observations, in decreasing authority:
   and stays within `--source-span-max`; a rejected name still votes as a soft source-file change.
 * **pool run jump** - two adjacent labels of one section whose referrer sets are disjoint and
   ordered; the boundary lies between the last referrer of the first run and the first of the second.
+* **data order** (`dataorder`: a vtable followed by a string; `dataorder-zz` and `dataorder-weak` are
+  softer; all soft by default, `--data-order strong` promotes the first) - MWCC emits one TU's `.data` as globals, strings, then vtables in reverse class order
+  (`docs/data-order-seams.md`), so in retail `.data` a vtable followed by a string starts a new TU (V->S),
+  and two adjacent vtables whose owners go *up* are two TUs (zigzag).  `tools/splits/dataorder.py`
+  classifies the symbols; here each seam becomes a `.text` interval - last referrer of the vtable run
+  before it .. first referrer of the run after it (a vtable's referrers are its constructors' stores;
+  its owner function stands in when nothing references it).  A vtable followed by other data (V->D) is
+  off by default (a jump table is `.data` too and its place in the order is unmeasured):
+  `--data-order weak` adds it as a weak vote, `--data-order off` disables the whole kind.  Why soft:
+  the `bench` tier 4 and `dataorder` subcommand measure it against `splits.txt` and the `__FILE__`
+  anchors, and the g3d units contradict the rule (docs/data-order-seams.md section 3).
 * **codegen fingerprint** (soft) - a `_savegpr_*`/`stmw` change or a record-form presence change
   between two neighbouring functions is a per-TU flag change (playbook idea 21).
 * **alignment gap** (soft) - a >4 byte gap; weak in this binary, where `.text` is one run with gaps
@@ -43,6 +54,8 @@ Usage (addresses in hex, or a symbol name):
                                       [--unit src/<Lib>/<file>.c] [--max-funcs 400]
     tudiscover.py stats                 # cache + coverage + observation counts
     tudiscover.py cache [--force]       # (re)build build/tmp/tudiscover/graph.json
+    tudiscover.py dataorder             # the `.data` emission-order seams mapped to `.text` intervals
+    tudiscover.py --selftest            # fixtures only, no asm dump needed
     tudiscover.py bench [--seeds 400] [--seed 7] [--seeds-per-unit 64] [--max-funcs 400]
                         [--json] [--save F] [--compare F]     # the tool's own scorecard
 
@@ -60,6 +73,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                   # tools/splits/ (dataorder)
 import unitutil as uu  # noqa: E402  (repo root + build layout)
 
 ROOT = uu.ROOT
@@ -98,6 +112,16 @@ REL_OBJ_RE = re.compile(r"(?ms)^\.obj\s+\"?([^\s,\"]+)\"?[^\n]*\n(.*?)^\.endobj\
 REL_OWNER_RE = re.compile(r"^\s*\.rel\s+([^\s,]+)", re.M)
 # Observation kinds by authority: `pool`/`source` pin a real boundary, the other two are weak.
 STRONG = ("pool", "source")
+#: `--data-order` modes: which `.data` emission-order seams (tools/splits/dataorder.py) become observations.
+#: `on` (default) - V->S and zigzag as soft votes (they rank candidates and show as pins, but cannot move a
+#: boundary alone); `strong` - V->S joins the strong kinds; `weak` - `on` plus V->D as a weak vote; `off`.
+DATA_ORDER_MODES = ("off", "on", "strong", "weak")
+DATA_ORDER_DEFAULT = "on"
+
+
+def strong_kinds(mode):
+    """The observation kinds that may move a boundary on their own, for a `--data-order` mode."""
+    return STRONG + (("dataorder",) if mode == "strong" else ())
 
 # Tier 1: how many functions inside one claimed `.text` range may seed their own closure, and how
 # many of the resulting distinct intervals the report lists (the rest are counted).
@@ -692,7 +716,85 @@ def source_file_label(dol, labels, name):
     return text.strip() if SRCFILE_RE.match(text.strip()) else None
 
 
-def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000):
+def data_order_records(addr, size, refs_of, dol, mode, syms=None):
+    """Map every `.data` emission-order seam to a `.text` interval (see the module docstring).
+
+    Returns `(soft, records)`.  `soft` are `(lo, hi, weight, kind, why)` observations; `records` has one
+    dict per seam with its status: `pinned` (a strict interval), `overlap` (the two sides' referrers
+    interleave: the rule does not hold for this seam) or `no-referrers` (nothing to place it by).
+    """
+    import dataorder as do
+    if syms is None:
+        syms = do.classify_all(do.load_symbols(), dol)
+    found = do.seams(syms)
+    if mode != "weak":
+        found = [f for f in found if f["kind"] != "V->D"]
+    by_addr = {s.addr: i for i, s in enumerate(syms)}
+    cut_at = {f["addr"] for f in found}
+    cut_list = sorted(by_addr[a] for a in cut_at)
+
+    def fn_index_of(a):
+        lo, hi = 0, len(addr)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if addr[mid] <= a:
+                lo = mid + 1
+            else:
+                hi = mid
+        i = lo - 1
+        return i if i >= 0 and a < addr[i] + max(size[i], 4) else None
+
+    def referrers(run):
+        got = set()
+        for s in run:
+            got.update(refs_of.get(s.name, ()))
+        if not got:
+            for s in run:
+                if s.kind == do.VTABLE and s.owner is not None and fn_index_of(s.owner) is not None:
+                    got.add(fn_index_of(s.owner))
+        return sorted(got)
+
+    kind_of = {"V->S": ("dataorder", 1.0), "zigzag": ("dataorder-zz", 0.5), "V->D": ("dataorder-weak", 0.25)}
+    soft, records = [], []
+    for f in found:
+        j = by_addr[f["addr"]]
+        after = [syms[j]]
+        k = j + 1
+        while k < len(syms) and syms[k].kind == syms[j].kind and syms[k].addr not in cut_at:
+            after.append(syms[k])
+            k += 1
+        # the run of vtables that ends the previous fragment (padding before the seam is skipped)
+        k = j - 1
+        while k >= 0 and syms[k].kind == do.DATA and syms[k].size <= do.PAD_MAX:
+            k -= 1
+        before = []
+        while k >= 0 and syms[k].kind == do.VTABLE:
+            before.append(syms[k])
+            if syms[k].addr in cut_at:
+                break
+            k -= 1
+        u, v = referrers(before), referrers(after)
+        # The whole fragments on either side pin tighter than the vtable/first-symbol runs, but a global
+        # shared with another TU breaks them: use them when they stay ordered, else keep the narrow pair.
+        ci = cut_list.index(j)
+        wu, wv = referrers(syms[(cut_list[ci - 1] if ci else 0):j]), \
+            referrers(syms[j:(cut_list[ci + 1] if ci + 1 < len(cut_list) else len(syms))])
+        if wu and wv and wu[-1] < wv[0]:
+            u, v = wu, wv
+        rec = {"addr": f["addr"], "seam": f["kind"], "before": f["before"], "after": f["after"]}
+        if not u or not v:
+            rec["status"] = "no-referrers"
+        elif u[-1] < v[0]:
+            kind, w = kind_of[f["kind"]]
+            rec.update(status="pinned", lo=u[-1], hi=v[0])
+            soft.append((u[-1], v[0], w, kind, "%s seam %s -> %s" % (f["kind"], f["before"], f["after"])))
+        else:
+            rec.update(status="overlap", u_last=u[-1], v_first=v[0])
+        records.append(rec)
+    return soft, records
+
+
+def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000, data_order="off", do_syms=None):
     """Ordered function list + every observation, in index space (cut i = boundary before f[i])."""
     ordered = sorted(fns, key=lambda n: fns[n]["addr"])
     idx = {n: i for i, n in enumerate(ordered)}
@@ -816,6 +918,12 @@ def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000):
                 soft.append((u[-1], v[0], 1.0, "pool",
                              "%s run jump %s -> %s" % (section, n1, n2)))
 
+    # Data emission order: a vtable followed by a string (or two ascending vtables) is a TU seam.
+    order_records = []
+    if data_order != "off":
+        more, order_records = data_order_records(addr, size, refs_of, dol, data_order, do_syms)
+        soft.extend(more)
+
     # Codegen fingerprint and alignment gaps between neighbours (weak, dense in this binary).
     for i in range(1, len(ordered)):
         prev, cur = graph["funcs"].get(ordered[i - 1]), graph["funcs"].get(ordered[i])
@@ -832,7 +940,8 @@ def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000):
 
     return {"ordered": ordered, "idx": idx, "addr": addr, "size": size, "refs_of": refs_of,
             "cls": cls, "must_link": must_link, "soft": soft, "owners_of": owners_of,
-            "source_names": source_names}
+            "source_names": source_names, "order_records": order_records,
+            "strong_kinds": strong_kinds(data_order)}
 
 
 def expand(an, seed, max_funcs):
@@ -892,7 +1001,7 @@ def score_cuts(an, lo, hi, window):
         for d in cand.values():
             d["support"] = round(d["support"], 3)
             d["share"] = round(d["support"] / avail, 3) if avail else 0.0
-            d["strong"] = [p for p in d["pins"] if p[0] in STRONG]
+            d["strong"] = [p for p in d["pins"] if p[0] in an.get("strong_kinds", STRONG)]
             d["rank"] = (len(d["strong"]), len(d["pins"]), d["share"])
         out.update(cand)
     return out
@@ -968,7 +1077,7 @@ def report(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=False)
     dol = Dol(DOL)
-    an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max)
+    an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max, args.data_order)
     ordered, idx = an["ordered"], an["idx"]
 
     if args.at in idx:
@@ -978,6 +1087,14 @@ def report(args):
         addr = int(args.at, 0) if not re.fullmatch(r"[0-9a-fA-F]+", args.at) else int(args.at, 16)
         hit = [i for i, n in enumerate(ordered)
                if fns[n]["addr"] <= addr < fns[n]["addr"] + max(fns[n]["size"], 4)]
+        # A `.data` address that is a data-order seam names the `.text` interval it pins: seed at its
+        # far end (the first referrer of the fragment the seam starts).
+        seam = [r for r in an["order_records"] if r["addr"] == addr and r["status"] == "pinned"]
+        if not hit and seam:
+            hit = [seam[0]["hi"]]
+            print("# 0x%08X is a %s seam in `.data`: the new TU's first code lies in .text 0x%08X..0x%08X"
+                  % (addr, seam[0]["seam"], an["addr"][seam[0]["lo"]], an["addr"][seam[0]["hi"]]),
+                  file=sys.stderr)
         if not hit:
             print("no function contains 0x%X - run `stats` to check the map/asm coverage" % addr,
                   file=sys.stderr)
@@ -1025,6 +1142,11 @@ def report(args):
         "boundaries": {"left": _clean(left), "right": _clean(right),
                        "candidates": {s: [_clean(c) for c in v] for s, v in ranked.items()}},
         "runs": runs,
+        "data_order": [{"addr": r["addr"], "seam": r["seam"], "before": r["before"], "after": r["after"],
+                        "text": [an["addr"][r["lo"]], an["addr"][r["hi"]]], "functions": r["hi"] - r["lo"]}
+                       for r in an["order_records"]
+                       if r["status"] == "pinned" and r["hi"] >= sug_lo - args.window
+                       and r["lo"] <= sug_hi + args.window],
     }
     if args.json:
         print(json.dumps(result, indent=2))
@@ -1096,6 +1218,13 @@ def print_human(res, ordered, fns, sug_lo, sug_hi):
         print("    %s" % ("strong evidence moves this boundary" if res["boundaries"][side]
                           else "only weak signals here: the closure edge is the best estimate"))
     print()
+    if res.get("data_order"):
+        print("`.data` emission-order seams pinning a TU start near here (the new TU's first code lies in the"
+              " interval; a narrow one names the boundary):")
+        for r in res["data_order"][:6]:
+            print("  0x%08X %-6s .text 0x%08X..0x%08X (%d fn)  %s -> %s"
+                  % (r["addr"], r["seam"], r["text"][0], r["text"][1], r["functions"], r["before"], r["after"]))
+        print()
     print("data the range would own (contiguous run per section; `dens` = share of labels inside the"
           " run that the range actually references, `leak` = also referenced from outside, `own` ="
           " claimed by the object's `.rel` lines with no reference at all):")
@@ -1256,14 +1385,64 @@ def tier_consistency(an, seeds, seed, max_funcs=400):
     return {"distinct_closures": len(spans), "partial_overlaps": partial}
 
 
+def tier_pins(an, claimed=None):
+    """Tier 4: how well the *narrow* strong observations (the pins `score_cuts` counts) name a real boundary.
+
+    `splits.txt` is the truth, and it only knows boundaries between registered units: a pinned cut at a
+    claimed unit's `.text` start or end is a `hit`, one strictly inside a claimed unit's `.text` is a `miss`
+    (a unit can be several TUs, so a miss is a candidate defect of the rule *or* a hidden seam), and one in
+    unclaimed `.text` is `unknown` and counts for neither.  `precision` = hit / (hit + miss); `recall` = the
+    share of claimed unit starts that carry a strong pin at exactly that cut.  Reported per observation kind.
+    """
+    claimed = claimed if claimed is not None else claimed_units()
+    addr = an["addr"]
+    edges, inner = set(), []
+    for secs in claimed.values():
+        t0, t1 = secs[".text"]
+        edges.update((t0, t1))
+        inner.append((t0, t1))
+    inner.sort()
+    starts = sorted(a for a, _b in inner)
+
+    def truth(a):
+        if a in edges:
+            return "hit"
+        for t0, t1 in inner:
+            if t0 < a < t1:
+                return "miss"
+            if t0 > a:
+                break
+        return "unknown"
+
+    per, cuts_of = {}, {}
+    for olo, ohi, _w, kind, _why in an["soft"]:
+        if kind not in an.get("strong_kinds", STRONG) or ohi - olo + 1 > 4:
+            continue
+        for c in range(olo, ohi + 1):
+            cuts_of.setdefault(kind, set()).add(c)
+    all_cuts = set()
+    for kind, cs in sorted(cuts_of.items()):
+        cnt = collections.Counter(truth(addr[c]) for c in cs)
+        per[kind] = {"cuts": len(cs), "hit": cnt["hit"], "miss": cnt["miss"], "unknown": cnt["unknown"],
+                     "precision": round(cnt["hit"] / max(1, cnt["hit"] + cnt["miss"]), 3)}
+        all_cuts |= cs
+    cnt = collections.Counter(truth(addr[c]) for c in all_cuts)
+    hit_addr = {addr[c] for c in all_cuts}
+    return {"per_kind": per, "hit": cnt["hit"], "miss": cnt["miss"], "unknown": cnt["unknown"],
+            "precision": round(cnt["hit"] / max(1, cnt["hit"] + cnt["miss"]), 3),
+            "claimed_starts": len(starts), "starts_pinned": sum(1 for a in starts if a in hit_addr),
+            "recall": round(sum(1 for a in starts if a in hit_addr) / max(1, len(starts)), 3)}
+
+
 def cmd_bench(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
-    an = analyse(fns, labels, graph, Dol(DOL), args.span_max, args.source_span_max)
+    an = analyse(fns, labels, graph, Dol(DOL), args.span_max, args.source_span_max, args.data_order)
     rows, classes = tier_labels(an, fns, labels, args.seeds_per_unit, args.max_funcs)
     score = {"labels": rows, "label_classes": classes,
              "sweep": tier_sweep(an, labels, args.seeds, args.seed, args.max_funcs),
              "consistency": tier_consistency(an, args.seeds, args.seed, args.max_funcs),
+             "pins": tier_pins(an), "data_order": args.data_order,
              "span_max": args.span_max, "source_span_max": args.source_span_max,
              "seeds": args.seeds, "seed": args.seed}
     if args.json:
@@ -1308,6 +1487,14 @@ def cmd_bench(args):
         c = score["consistency"]
         print("tier 3  consistency: %d distinct closures, %d partially overlapping pairs"
               % (c["distinct_closures"], c["partial_overlaps"]))
+        pn = score["pins"]
+        print("tier 4  strong pins vs splits.txt (--data-order %s): precision %.3f (hit %d, miss %d, unknown %d),"
+              " recall %.3f (%d of %d claimed unit starts pinned)"
+              % (args.data_order, pn["precision"], pn["hit"], pn["miss"], pn["unknown"], pn["recall"],
+                 pn["starts_pinned"], pn["claimed_starts"]))
+        for kind, row in pn["per_kind"].items():
+            print("        %-10s %4d cuts  hit %3d  miss %3d  unknown %4d  precision %.3f"
+                  % (kind, row["cuts"], row["hit"], row["miss"], row["unknown"], row["precision"]))
     if args.save:
         path = args.save if os.path.isabs(args.save) else os.path.join(ROOT, args.save)
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1325,6 +1512,10 @@ def cmd_bench(args):
             print("  %-16s %s -> %s%s" % (key, was, now, flag))
         print("  %-16s %s -> %s" % ("partial_overlaps", old["consistency"]["partial_overlaps"],
                                      score["consistency"]["partial_overlaps"]))
+        if "pins" in old:
+            for key in ("precision", "recall"):
+                now, was = score["pins"][key], old["pins"][key]
+                print("  pins %-11s %s -> %s%s" % (key, was, now, "" if now >= was else "  <-- worse"))
     return 0
 
 
@@ -1370,7 +1561,7 @@ def cmd_stats(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
     dol = Dol(DOL)
-    an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max)
+    an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max, args.data_order)
     covered = set(graph["funcs"])
     print("functions in map   %d" % len(fns))
     print("functions in asm   %d  (map entries with no `.fn` block in a parsed file: %d)"
@@ -1405,6 +1596,186 @@ def cmd_stats(args):
           " several copies = several emitters, not one merged literal)")
     print("  gaps = functions inside the span that do not reference it (a TU's assert-free"
           " functions); anchor count is one per accepted name, not per label")
+    return 0
+
+
+def data_order_stats(an, fns, claimed=None):
+    """How the `.data` emission-order seams sit against the other evidence (read-only, no ground truth claimed).
+
+    Per seam: `pinned` / `overlap` / `no-referrers`, then for a pinned one whether the cuts its interval admits
+    (`lo+1..hi`) are *all* vetoed by a must-link (`contradicted`, and `source` when a `__FILE__` anchor does it),
+    whether a registered unit's `.text` start falls in the interval (`at_unit_start`: independent agreement) or
+    the interval lies wholly inside one registered unit (`inside_unit`: the unit hides a seam, or the rule is
+    wrong there).
+    """
+    addr = an["addr"]
+    claimed = claimed if claimed is not None else claimed_units()
+    starts = {secs[".text"][0] for secs in claimed.values()}
+    texts = sorted((secs[".text"][0], secs[".text"][1], unit) for unit, secs in claimed.items())
+    out = {"seams": len(an["order_records"]), "by_status": collections.Counter(), "by_seam": collections.Counter(),
+           "contradicted": [], "source_contradicted": [], "at_unit_start": [], "inside_unit": [], "rows": []}
+    for r in an["order_records"]:
+        out["by_status"][r["status"]] += 1
+        out["by_seam"][(r["seam"], r["status"])] += 1
+        row = dict(r)
+        if r["status"] == "pinned":
+            cuts = range(r["lo"] + 1, r["hi"] + 1)
+            veto = {c: [w for a, b, w in an["must_link"] if a < c <= b] for c in cuts}
+            row["cuts"] = [addr[c] for c in cuts]
+            if cuts and all(veto[c] for c in cuts):
+                row["contradicted"] = sorted({w for c in cuts for w in veto[c]})[:3]
+                out["contradicted"].append(row)
+                if all(any(w.startswith('"') for w in veto[c]) for c in cuts):
+                    out["source_contradicted"].append(row)
+            row["at_unit_start"] = any(addr[c] in starts for c in cuts)
+            if row["at_unit_start"]:
+                out["at_unit_start"].append(row)
+            t0, t1 = addr[r["lo"]], addr[r["hi"]]
+            for a, b, unit in texts:
+                if a < t0 and t1 < b:
+                    row["inside_unit"] = unit
+                    out["inside_unit"].append(row)
+                    break
+        elif r["status"] == "overlap":
+            # the two sides' referrers interleave: a `__FILE__` anchor covering both ends says the source
+            # file spans the seam, i.e. the rule is contradicted by the strongest must-link there is
+            lo, hi = sorted((r["u_last"], r["v_first"]))
+            cover = [w for a, b, w in an["must_link"] if w.startswith('"') and a <= lo and hi <= b]
+            if cover:
+                row["contradicted"] = cover[:3]
+                out["contradicted"].append(row)
+                out["source_contradicted"].append(row)
+        out["rows"].append(row)
+    return out
+
+
+def cmd_dataorder(args):
+    """List every `.data` emission-order seam with its `.text` interval and how it sits against the other evidence."""
+    import dataorder as do
+    fns, labels = load_map()
+    graph = build_graph(fns, labels, force=False)
+    an = analyse(fns, labels, graph, Dol(DOL), args.span_max, args.source_span_max,
+                 "weak" if args.weak else args.data_order if args.data_order != "off" else "on")
+    st = data_order_stats(an, fns)
+    ranges = do.unit_data_ranges()
+    print("seams %d   status %s" % (st["seams"], dict(st["by_status"])))
+    print("by seam kind/status %s" % {"%s/%s" % k: v for k, v in sorted(st["by_seam"].items())})
+    print("pinned intervals agreeing with a registered unit's .text start: %d" % len(st["at_unit_start"]))
+    print("pinned intervals wholly inside one registered unit (a hidden seam, or the rule is wrong): %d"
+          % len(st["inside_unit"]))
+    print("contradicted by a must-link: %d (by a `__FILE__` anchor: %d)"
+          % (len(st["contradicted"]), len(st["source_contradicted"])))
+    if args.json:
+        print(json.dumps({k: v for k, v in st.items() if k != "rows"}, indent=1, default=str))
+        return 0
+    for r in st["rows"]:
+        if args.addr and r["addr"] != args.addr:
+            continue
+        u = do.unit_of(ranges, r["addr"])
+        line = "0x%08X %-6s %-12s" % (r["addr"], r["seam"], r["status"])
+        if r["status"] == "pinned":
+            line += " .text 0x%08X..0x%08X" % (an["addr"][r["lo"]], an["addr"][r["hi"]])
+            line += " %s%s%s" % ("[unit start] " if r.get("at_unit_start") else "",
+                                 "[INSIDE %s] " % r["inside_unit"] if r.get("inside_unit") else "",
+                                 "[CONTRADICTED: %s]" % "; ".join(r["contradicted"]) if r.get("contradicted") else "")
+        if r["status"] == "overlap" and r.get("contradicted"):
+            line += " [CONTRADICTED by %s]" % "; ".join(r["contradicted"])
+        line += "  (%s -> %s)%s" % (r["before"], r["after"], "  in %s" % u[0] if u else "")
+        if args.all or args.addr or r.get("contradicted") or u or r["status"] == "overlap":
+            print(line)
+    return 0
+
+
+def selftest():
+    """Fixtures only: the data-order observation on a synthetic map, no asm dump and no DOL."""
+    import dataorder as do
+    fails, checks = [], 0
+
+    def check(name, got, want):
+        nonlocal checks
+        checks += 1
+        if got != want:
+            fails.append("%s: got %r want %r" % (name, got, want))
+
+    # ten 0x10-byte functions f0..f9; TU1 = f0..f4, TU2 = f5..f9
+    addr = [0x80010000 + 0x10 * i for i in range(10)]
+    size = [0x10] * 10
+
+    def sym(a, sz, name, kind, owner=None):
+        return do.Sym(a, sz, name, kind, owner)
+
+    # TU1: strings s1, vtables vB, vA (owners down); TU2: string s2, vtable vC
+    syms = [sym(0x100, 16, "s1", do.STRING), sym(0x110, 16, "vB", do.VTABLE, addr[3]),
+            sym(0x120, 16, "vA", do.VTABLE, addr[1]),
+            sym(0x130, 16, "s2", do.STRING), sym(0x140, 16, "vC", do.VTABLE, addr[7])]
+    refs = {"s1": [0, 2], "vB": [3], "vA": [1], "s2": [6], "vC": [5, 7]}
+    soft, rec = data_order_records(addr, size, refs, None, "on", syms)
+    check("V->S seam becomes one pinned observation", [(o[0], o[1], o[3]) for o in soft], [(3, 5, "dataorder")])   # the far fragment's first referrer is vC's ctor
+    check("... the record says pinned at the string", [(r["addr"], r["seam"], r["status"]) for r in rec],
+          [(0x130, "V->S", "pinned")])
+    check("dataorder is soft by default and strong only with --data-order strong; zigzag/weak never",
+          [(m, [k for k in ("dataorder", "dataorder-zz", "dataorder-weak") if k in strong_kinds(m)])
+           for m in ("off", "on", "strong", "weak")],
+          [("off", []), ("on", []), ("strong", ["dataorder"]), ("weak", [])])
+
+    # interleaved referrers: the rule does not hold, the seam is recorded as overlap and adds no observation
+    soft, rec = data_order_records(addr, size, dict(refs, s2=[2]), None, "on", syms)
+    check("interleaved referrers: overlap, no observation", (soft, [r["status"] for r in rec]), ([], ["overlap"]))
+
+    # nothing references the vtable run: its owner function stands in
+    soft, rec = data_order_records(addr, size, {"s2": [6]}, None, "on", syms)
+    check("no referrer: the vtable's owner function stands in", [(o[0], o[1]) for o in soft], [(3, 6)])
+    bare = [sym(x.addr, x.size, x.name, x.kind) for x in syms]
+    soft, rec = data_order_records(addr, size, {}, None, "on", bare)
+    check("nothing references either side: no-referrers", (soft, [r["status"] for r in rec]), ([], ["no-referrers"]))
+
+    # zigzag: two vtables whose owners go up
+    zz = [sym(0x100, 16, "vA", do.VTABLE, addr[1]), sym(0x110, 16, "vB", do.VTABLE, addr[7])]
+    soft, rec = data_order_records(addr, size, {"vA": [1], "vB": [6]}, None, "on", zz)
+    check("zigzag is a soft `dataorder-zz` observation", [(o[2], o[3]) for o in soft], [(0.5, "dataorder-zz")])
+
+    # V->D is off by default and weak when asked for
+    vd = [sym(0x100, 16, "vA", do.VTABLE, addr[1]), sym(0x110, 64, "tbl", do.DATA)]
+    soft, rec = data_order_records(addr, size, {"vA": [1], "tbl": [6]}, None, "on", vd)
+    check("V->D is off by default", (soft, rec), ([], []))
+    soft, rec = data_order_records(addr, size, {"vA": [1], "tbl": [6]}, None, "weak", vd)
+    check("V->D is a weak vote with --data-order weak", [(o[2], o[3]) for o in soft], [(0.25, "dataorder-weak")])
+
+    # the observation reaches the scoring: a strong pin names the cut, and a must-link vetoes it
+    an = {"soft": [(3, 6, 1.0, "dataorder", "V->S seam")], "must_link": [], "ordered": list("abcdefghij"),
+          "addr": addr, "size": size, "strong_kinds": strong_kinds("on")}
+    cands = score_cuts(an, 5, 6, 4)
+    check("soft by default: a dataorder pin is listed but is not strong",
+          ([c for c in cands.values() if c["strong"]], any(c["pins"] for c in cands.values())), ([], True))
+    an["strong_kinds"] = strong_kinds("strong")
+    cands = score_cuts(an, 5, 6, 4)
+    pool = [c for c in cands.values() if c["strong"] and not c["veto"]]
+    check("--data-order strong: a dataorder observation is a strong pin", len(pool) > 0, True)
+    an["must_link"] = [(2, 6, '"file.c" (1 label(s), 2 refs)')]
+    cands = score_cuts(an, 5, 6, 4)
+    check("... but a must-link anchor across it vetoes every cut", [c for c in cands.values() if c["strong"] and not c["veto"]], [])
+
+    an = {"order_records": [{"addr": 0x130, "seam": "V->S", "before": "vB", "after": "s2", "status": "pinned",
+                             "lo": 3, "hi": 6},
+                            {"addr": 0x140, "seam": "V->S", "before": "x", "after": "y", "status": "pinned",
+                             "lo": 1, "hi": 2},
+                            {"addr": 0x150, "seam": "V->S", "before": "p", "after": "q", "status": "overlap",
+                             "u_last": 6, "v_first": 3}],
+          "must_link": [(3, 6, '"file.c" (1 label(s), 2 refs)'), (1, 2, "sym [private]")], "addr": addr}
+    st = data_order_stats(an, None, {"u/a": {".text": (addr[0], addr[3])}, "u/b": {".text": (addr[5], addr[9])}})
+    check("stats: a source anchor across the interval (or across interleaved referrers) is a source contradiction",
+          [r["addr"] for r in st["source_contradicted"]], [0x130, 0x150])
+    check("... and any must-link is a contradiction", [r["addr"] for r in st["contradicted"]], [0x130, 0x140, 0x150])
+    check("... an interval holding a registered unit start agrees with it",
+          [r["addr"] for r in st["at_unit_start"]], [0x130])
+    check("... status counts", dict(st["by_status"]), {"pinned": 2, "overlap": 1})
+
+    if fails:
+        print("FAIL (%d)" % len(fails))
+        for f in fails:
+            print("  " + f)
+        return 1
+    print("ok - %d checks" % checks)
     return 0
 
 
@@ -1453,8 +1824,16 @@ def cmd_prune(args):
 
 
 def main():
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--selftest", action="store_true", help="fixture checks, no asm dump needed")
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def data_order_arg(sp):
+        sp.add_argument("--data-order", choices=DATA_ORDER_MODES, default=DATA_ORDER_DEFAULT,
+                        help="`.data` emission-order seams (V->S strong, zigzag soft): off / on (default) / "
+                             "weak (adds V->D as a weak vote)")
 
     a = sub.add_parser("at", help="propose the TU boundary around an address or symbol")
     a.add_argument("at")
@@ -1470,18 +1849,21 @@ def main():
     a.add_argument("--splits", action="store_true", help="also print the splits.txt block")
     a.add_argument("--allow-stale", action="store_true",
                    help="print the splits block even when stale split-tree files remain (read-only)")
+    data_order_arg(a)
     a.set_defaults(func=report)
 
     b = sub.add_parser("stats", help="cache, coverage and observation counts")
     b.add_argument("--span-max", type=int, default=0x4000)
     b.add_argument("--source-span-max", type=int, default=0x8000)
     b.add_argument("--force", action="store_true", help="rebuild the graph cache")
+    data_order_arg(b)
     b.set_defaults(func=cmd_stats)
 
     c = sub.add_parser("cache", help="(re)build the graph cache only")
     c.add_argument("--force", action="store_true")
     c.add_argument("--span-max", type=int, default=0x4000)
     c.add_argument("--source-span-max", type=int, default=0x8000)
+    data_order_arg(c)
     c.set_defaults(func=lambda a: cmd_stats(a) or 0)
 
     d = sub.add_parser("bench", help="scorecard used to iterate on this tool")
@@ -1496,7 +1878,18 @@ def main():
     d.add_argument("--json", action="store_true")
     d.add_argument("--save", default=None, help="write the scorecard here (e.g. build/tmp/tudiscover/baseline.json)")
     d.add_argument("--compare", default=None, help="diff the sweep against a saved scorecard")
+    data_order_arg(d)
     d.set_defaults(func=cmd_bench)
+
+    g = sub.add_parser("dataorder", help="the `.data` emission-order seams as `.text` intervals")
+    g.add_argument("--span-max", type=int, default=0x4000)
+    g.add_argument("--source-span-max", type=int, default=0x8000)
+    g.add_argument("--data-order", choices=DATA_ORDER_MODES, default="on")
+    g.add_argument("--weak", action="store_true", help="include the weak V->D seams")
+    g.add_argument("--all", action="store_true", help="list every seam, not just the notable ones")
+    g.add_argument("--addr", type=lambda x: int(x, 16), default=None, help="one seam, by its .data address")
+    g.add_argument("--json", action="store_true")
+    g.set_defaults(func=cmd_dataorder)
 
     e = sub.add_parser("prune", help="remove the stale split-tree duplicates (dry run unless --apply)")
     e.add_argument("--apply", action="store_true", help="actually delete (default: dry run)")
