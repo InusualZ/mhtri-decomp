@@ -1,6 +1,7 @@
 # The `.data` emission order as translation-unit seam evidence
 
-Status: discovery measured 2026-09-29; the tool plan below is being executed (see "Progress").
+Status: discovery measured 2026-09-29; the tool plan below is landed (see "Progress"); the rule is
+established for Capcom game code and contradicted in g3d (section 3, section 6).
 
 ## 1. The discovery
 
@@ -106,34 +107,25 @@ Order: 0 first; then 1, 2, 3 and 4 are independent and can run as parallel lanes
 
 ## 6. Progress
 
-* Playbook row 80 and this document: landed with the plan.
-* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phases 1-3: in progress as parallel lanes.
-* Phase 4: `vtableaudit.py --order` (branch `worker/data-order-p4-3611`): per built unit, every `__vt__*` after
-  every other `.data` symbol (`vtable-before-data`) and vtables in reverse class definition order (`vtable-order`,
-  class order read from the unit source and its includes). Warn-level, outside `--diff`'s violation set, no gate
-  row. Real objects: 293 built units, 3 with vtables (`network_transport` 7, `fn_803D3CE8` 1,
-  `NetworkSessionManagerPat` 1), 0 findings; `network_transport`'s 7 vtables descend exactly in reverse class order.
-  The `decompiler` profile's seam-check step and `codereviewer` name the check. 114-check selftest.
-* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phases 1-4: in progress as parallel lanes.
-* Phase 2: `tools/units/dataseams.py` is the one consumer layer over `dataorder` (strong seams only: V->S and
-  zigzag; V->D is never used to cut or warn). `dataqueue.py` cuts a proposed `.data` run at strong seams
-  (`--no-seam-cut` opts out), prints how many runs contained one, and `--request` warns with the seams and the
-  suggested cut ranges when the requested range spans several TUs (the request row carries `seam_warning`).
-  `dataclaim.py` adds `seams`/`seam_warning` to each queue run (the verdict is unchanged; the reason gains a
-  `WARNING`, the summary a `multi-TU` line) and to each rule-12 claim record. `flipcheck.py` and `datagap.py`
-  name a differing `.data`: `order-only: the unit spans several TUs; seams at 0x...` when the two objects hold
-  the same symbols in a different sequence, else the multi-TU line. Measured on the committed queue: 76 of
-  3,050 `.data` runs contain a seam (127 seams). On `Network/network_transport` both tools name
-  0x805F9570, 0x805F9610, 0x805F9958 and 0x805F9A40 (plus the three zigzag seams); its object today is
-  not order-only (its `.data` is 0x560 of 0x100C bytes), so it gets the multi-TU line.
-* Phase 3: `attribute.py` attaches `data_seams` to a proposal (`data_seam_records`/`data_seams_for`, on top of
-  `dataorder.seams`) and `brief.py` prints a data-order paragraph at the top of the proposal brief: seams, a lower
-  bound `min_tus`, candidate `.text` cuts read off the vtable owners (never applied). A seam is *interior* when it
-  splits the range's own **dense** `.data` run (`density >= 0.5`; a sparse run spans other TUs' globals and is no
-  evidence) or lies between two vtables the range owns; other seams whose owner is in the range are *edge* and do
-  not raise the bound. `attribute.py dataseams` is the read-only report over the queue file. Measured: 11 of the 67
-  ready pool proposals carry an interior seam (min 2-5 TUs), 14 carry any.
-* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phase 1: `tudiscover.py` gained the
-  `dataorder`/`dataorder-zz`/`dataorder-weak` observations, `--data-order off|on|strong|weak`, the `dataorder`
-  subcommand, bench tier 4 and a fixture `--selftest` (branch `worker/data-order-p1-da80`). Phases 2-4: in
-  progress as parallel lanes.
+All five phases are landed (2026-09-29), each behind its own selftest and the landing gate.
+
+| phase | landed | what it is | measured |
+| --- | --- | --- | --- |
+| 0 | `6adaff25e` | `tools/splits/dataorder.py`: classify, seams, fragments; `scan`, `at` | 27 checks; 231 / 65 / 4 / 61 and 62 up / 52 down / 12 tie reproduced |
+| 4 | `00a0a38a1` | `vtableaudit.py --order`: vtables after every other `.data` symbol, reverse class order; profile and reviewer text | 3 of 293 built units have vtables, 0 findings; `network_transport`'s 7 vtables are in exact reverse class order |
+| 2 | `4d5768b95` | `dataseams.py` over `dataorder`; `dataqueue` cuts runs at strong seams and warns on a request; `dataclaim` seam warnings; `flipcheck`/`datagap` "order-only"/multi-TU line | 76 of 3,050 queue runs contain a strong seam (127 seams); both tools name the four `network_transport` seams (its object is 0x560 of 0x100C B, so it reads multi-TU, not order-only - that path is fixture-tested only) |
+| 3 | `035653805` | `attribute.py` `data_seams` on proposals, `attribute.py dataseams`, `brief.py` TU-probe paragraph with a lower bound on the TU count and candidate cuts (never applied) | 11 of 67 ready pool proposals carry an interior seam (at least 2-5 TUs), 14 carry any; a run only counts when it is dense (`density >= 0.5`), a rule the lane added |
+| 1 | `29a0d8ddf` | `tudiscover.py` observations `dataorder` / `dataorder-zz` / `dataorder-weak`, `--data-order off\|on\|strong\|weak` (default `on` = soft votes), the `dataorder` subcommand, bench tier 4 | `strong` costs 0.001 precision and gains no recall, so it is opt-in; the four `network_transport` seams are proposed |
+
+**What Phase 1 changed about the claim.** The rule is not universal: eight seams are contradicted by `__FILE__`
+anchors, all in the g3d (NW4R) library, and 28 pinned intervals lie wholly inside one registered unit. Treat the
+rule as established for the Capcom game code compiled with `Wii/1.3` (`network_transport`, and the built objects
+above) and as **unproven or wrong elsewhere** until the library's compiler version is checked. The tools therefore
+default to soft evidence and warnings, and none of them refuses.
+
+**Open**
+* Fit the observation weights (1.0 / 0.5 / 0.25 are unfitted); tune referrer selection with more ground truth.
+* Check whether g3d and the `ef` strategy units use a different MWCC version or emission order.
+* The order-only diagnosis is tested on fixture objects only, and `attribute.py queue` has not been re-run, so the
+  queue and the pool briefs carry no `data_seams` yet (the next regeneration adds them).
+* Split `Network/network_transport` at the four seams into per-class units, so its `.data` can match.
