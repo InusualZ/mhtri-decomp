@@ -1936,6 +1936,20 @@ config.libs = [
             # report's totals are unchanged except `total_units`, and `ninja build/RMHE08/ok` stays
             # green.  The file name is a guess (see the unit header).
             Object(NonMatching, "Pl/pl_act_data.cpp"),
+            # A **data-only** unit (owner's routing, 2026-09-30): it owns the Pl band's shared
+            # `.bss` collision-work run, 0x806AB848-0x806AC8A8 (0x1060 B, 12 arrays - the per-chunk
+            # move-work table, the hit-box and land tables, the per-slot collision-result arrays),
+            # and its source defines nothing.  The run is read by the Pl ground/hit collision band
+            # alone (`Pl/fn_8028F66C.cpp`, `Pl/fn_80295EF4.cpp`, `Pl/fn_8025F088.cpp`, `Pl/pl_act.cpp`)
+            # while its two edges are reader-disjoint (`Pl/fn_80288CEC.cpp` below it,
+            # `menu/menu_item.cpp` at 0x806AC8A8 above it), so one owner is the right model;
+            # giving it one is what lets those consumers include `Pl/bss_pool.h` instead of
+            # declaring the arrays into their own files (rules 12/2) and what keeps dtk from
+            # generating an anonymous `auto_*_bss` unit over the same bytes.  Measured: the
+            # whole-project report is unchanged row for row and its totals differ only by
+            # `total_units`, and `ninja build/RMHE08/ok` stays green.  The file name is a guess (see
+            # the unit header).
+            Object(NonMatching, "Pl/bss_pool.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802693C4_fn_802693C4` - the player part/motion cluster (0x802693C4-0x8026BA1C, 63
             # functions, 9816 B) with its own exception tables (extab 0x80012554-0x8001265C,

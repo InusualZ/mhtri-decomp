@@ -6,12 +6,12 @@
  *
  * Registration (docs/plan.md 12, evidence class 3 + 4):
  *   - no `__FILE__` string covers the range: the only strings its data touches are the `.sdata2`
- *     float pool 0x80799E00-0x80799FDC and `.bss` `lbl_806AB848`, and no source-name string is
+ *     float pool 0x80799E00-0x80799FDC and `.bss` `pl_move_work`, and no source-name string is
  *     referenced from the range at all (class 1 out);
  *   - `dumpmap.py lookup` answers only `zz_` placeholders for all 17 symbols (class 2 out);
  *   - the code is the `Pl` module: every actor parameter is a `_PLW` (`Pl_master_ck`, `Pl_act_ck`,
  *     `Pl_Skill_ck`, `Pl_cat_skill_ck`, `Get_motion_no`), it reads the move work
- *     `get_move_work_adrs`/`get_move_work_max` and the `lbl_806AB848` chunk table, and its siblings
+ *     `get_move_work_adrs`/`get_move_work_max` and the `pl_move_work` chunk table, and its siblings
  *     are `Pl/fn_80241558.cpp` (before) and `Pl/fn_80262940.cpp` (after);
  *   - all 17 map entries carry only the `fn_XXXXXXXX` stem, so the file keeps the stem.
  *
@@ -48,18 +48,9 @@
 #include "fn_8004CAD8.h"
 #include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 pool 0x80799E00-0x80799F98 (rule 2) */
 #include "Pl/pl_act_data.h" /* the owner of the pool's second run, 0x80799F98-0x80799FDC (rule 2) */
+#include "Pl/bss_pool.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 
-/* The per-chunk move-work table the player's motion layer reads: `lbl_806AB848` is 0x420 B of
- * 24-byte entries, 264 B (11 entries) per `_PLW::chunk_ofs` chunk.  Only the fields this unit reads
- * are named. size: 0x18 */
-typedef struct PlMoveEntry {
-    /* +0x00 */ u16 kind; /* non-zero marks a live entry; bit 1 is the "armed" flag */
-    /* +0x02 */ u8 pad_0x02[0x6];
-    /* +0x08 */ f32 x_0x08;
-    /* +0x0C */ u8 pad_0x0C[0x4];
-    /* +0x10 */ f32 z_0x10;
-    /* +0x14 */ u8 pad_0x14[0x4];
-} PlMoveEntry; /* size: 0x18 */
+/* One entry of `pl_move_work` is `PlMoveEntry`, declared by its owner's header (rule 1/2). */
 
 /* One 2840-byte (0xB18) move-work record `get_move_work_adrs` hands back; the motion slot `fn_802607C4`
  * scores sits at +0x188 and the entry's own kind byte at +0x1E1. size: 0xB18 */
@@ -112,7 +103,7 @@ s32 fn_80260198(_PLW* self) {
 
     if ((self->field_0x364 & 0xE0000007) != 0) {
         for (i = 0; i < 10; i++) {
-            PlMoveEntry* entry = (PlMoveEntry*)(lbl_806AB848 + self->chunk_ofs * 264 + i * 24);
+            PlMoveEntry* entry = &pl_move_work[self->chunk_ofs][i];
             u16 kind = entry->kind;
             u32 value;
 
@@ -267,7 +258,7 @@ void fn_8025FF0C(_PLW* self, u8 mode) {
         s32 i;
 
         for (i = 0; i < 10; i++) {
-            u16 kind = *(u16*)(lbl_806AB848 + self->chunk_ofs * 264 + i * 24);
+            u16 kind = pl_move_work[self->chunk_ofs][i].kind;
 
             if (kind == 0) {
                 break;

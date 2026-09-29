@@ -2,8 +2,10 @@
  * Pl/fn_8028F66C.cpp - the ground/hit collision TU of the `Pl` band.  `.text`
  * 0x8028F66C-0x80295EF4 (53 functions, 0x6888 B), extab 0x8001323C-0x800133CC (50 records) and
  * extabindex 0x800309D8-0x80030C30 (50 records); all three ranges are registered in splits.txt.
- * Nothing is claimed out of `.data`/`.sdata`/`.sdata2` (invariant 8.4): the `lbl_806ABxxx` tables
- * the query half walks and the unit's `.sdata2` pool are still emitted by the `auto_*` objects.
+ * Nothing is claimed out of `.data`/`.sdata`/`.sdata2` (invariant 8.4): the unit's `.sdata2` pool is
+ * still emitted by the `auto_*` objects, and the `.bss` collision-work tables the query half walks
+ * (`pl_move_work`, `pl_hit_box`, `pl_land_data`, `pl_hit_id_list`, ...) are owned by the data-only
+ * unit `Pl/bss_pool.cpp` (its header `Pl/bss_pool.h` declares them), not by this unit.
  *
  * Extent.  The LEFT edge is a real TU boundary, pinned by the `.sdata2` run: the preceding unit
  * (`Pl/fn_80288CEC.cpp`) owns 0x8079A270-0x8079A314 and this unit's pool starts exactly at
@@ -54,7 +56,7 @@
  *     record's layout.  They wait for those fields rather than re-cut `pl.h` from here.
  *   * The three big hits - `GetGroundHit2` (0x80291664, 920 B), `hit_ground_comon` (0x80291CD0,
  *     956 B) and `findInterSection3` (0x80295998, 1372 B), 3.2 KB together and the largest single
- *     win left - walk the `lbl_806AC088` (0x88-stride) land table and the `lbl_806AC880` hit list
+ *     win left - walk the `pl_land_data` (0x88-stride) land table and the `pl_hit_id_list` id list
  *     with a 0x40-byte hit record reading +0x00/+0x02/+0x07/+0x08/+0x10/+0x14/+0x1C/+0x20/+0x28/
  *     +0x2C/+0x30/+0x34/+0x38/+0x70.  Those bodies also carry the unit's only nested-loop dispatch,
  *     and `LandData` (reconstructed here from `fn_802977E4`, below) is a *different* record, so the
