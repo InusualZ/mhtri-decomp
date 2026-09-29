@@ -35,7 +35,7 @@
  *   0x80308E34..0x80308FB4 (4 rows, all drawn)  the machine's retire arm (`fn_80308E34`) and the
  *       screen's entry: `fn_80308E38` (the joint walk `eft035.cpp` shares), `fn_80308EC0` and
  *       `fn_80308F1C`.
- * The section split follows the same boundary: `fn_80308FB4` is the first function after it and the
+ * The section split follows the same boundary: `equip_info_update` (0x80308FB4) is the first function after it and the
  * first `extabindex` record of the next unit, so 20 records stay here and 20 is exactly the count
  * this range's framed functions need.
  *

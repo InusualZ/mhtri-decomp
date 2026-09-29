@@ -24,7 +24,7 @@
  * `extern "C"` so the emitted name stays the map's.
  *
  * SECTIONS.  extab/extabindex are this unit's own runs; the split at 0x80308FB4 is the first
- * extabindex record whose function is `fn_80308FB4` (0x80034674 + 12*20 = 0x80034764, its extab
+ * extabindex record whose function is `equip_info_update` (0x80034674 + 12*20 = 0x80034764, its extab
  * pointer 0x80015B54), and both runs tile exactly with the neighbours `ef/fn_8030681C.cpp`
  * (0x80015AB4 / 0x80034674) and `menu/fn_8031A6C0.cpp` (0x80015F3C / 0x80034D40).  No `.data`/`.sdata`
  * run is claimed: every table and constant the bodies read is shared with the neighbouring units of
@@ -32,25 +32,85 @@
  * section; every gap is target-extra, i.e. an unwritten body).
  *
  * STATUS (official metric, this worktree's `build/RMHE08/obj/menu/menu_infomation.o` vs ours):
- * **7.714038 % fuzzy, 1392 / 71436 `.text` bytes matched, 22 byte-identical rows**; 83 of the 149
- * rows are written.  They came from the three registrations this seam redrew: 28 rows of the old
- * 0x8030D338 fragment, 5 screen wrappers of the old `ef/fn_8030681C.cpp` head, and the 50 rows the
- * never-landed `menu/fn_80313E24.cpp` brought (13 with real bodies, 37 placeholders).  The head's
- * other 27 rows and the 0x8030D338..0x80313D5C fragment's 39 rows are unwritten, and they are the
- * residuals, in address order:
+ * **8.986390 % fuzzy, 2092 / 71436 `.text` bytes matched, 27 byte-identical rows**; 91 of the 149
+ * rows are written.  They came from the three registrations this seam redrew (28 rows of the old
+ * 0x8030D338 fragment, 5 screen wrappers of the old `ef/fn_8030681C.cpp` head, the 50 rows the
+ * never-landed `menu/fn_80313E24.cpp` brought) plus the five bodies this pass added.
+ *
+ * THIS PASS (2026-09-28).  Seven bodies written and measured (7.71 % -> 8.99 %), plus the names of 22
+ * of this unit's own `fn_XXXXXXXX` rows (rule 7), which the new call sites needed anyway:
+ *   `put_lsp_sprite_offset` (0x8030FAC0, 160 B), `put_lsp_sprite_runs` (0x80312F18, 108 B),
+ *       `put_equip_panel_row_variant` (0x803115E0, 124 B) and `put_equip_panel_row`
+ *       (0x803118B4, 108 B) 100.00.
+ *   `put_lsp_sprite_at_anchor` (0x80311A88, 96 B) 99.79  one sprite row, at the caller's packed
+ *       position when the id is 0.
+ *   `put_equip_panel_row_zero` (0x80311840, 116 B) 94.48 and `equip_info_update` (0x80308FB4, 228 B)
+ *       85.75.
+ *   `fn_8030FB78` (0x8030FB78, 200 B) 96.00 -> 100.00: an existing row, fixed by playbook 38 - the
+ *       `d.x = d.x - pos.x` pair stores through an `extsh` MWCC does not emit for `d.x -= pos.x`.
+ *
+ * RESIDUALS, in address order:
  *   `fn_80311540` 46.25  its tail-call argument is masked with `rlwinm r0,r6,0,31,28` + `clrlwi` (a
  *       bitfield/`char` conversion whose source shape is not recovered).
  *   `fn_803159CC` 69.19  the target branches on `(flags & 2)` in three arms where MWCC folds all
  *       four to one select.
+ *   `equip_info_update` 85.75: a register-colouring residual (the same instruction multiset, the
+ *       allocator's web order differs) on the `PutPageArrow` argument setup - `mt.py diff` shows the
+ *       two `extsb` pairs in r4/r5 where the target has them in r5/r6.
+ *   `put_equip_panel_row_zero` 94.48: `flag &= 7` on a `u8` gives `clrlwi r0,r0,29` where the target
+ *       has `rlwinm r0,r0,0,31,28` + `clrlwi r6,r0,24`, i.e. `(u8)(x & 0x80000007)` - the mask's
+ *       spelling is not recovered.
+ *   `put_lsp_sprite_at_anchor` 99.79: one argument-register move (`mr r3,r0` + `clrlwi r3,r3,16` taken
+ *       in the other order).
  *   the unwritten rows, largest first: `fn_80311C3C` (0xC64), `fn_80312F84` (0xBB8) - the Panic that
- *       builds this unit's `__FILE__` pair at 0x80313020 -, `fn_8030A9B4`, `fn_80311920`, the bowgun
- *       panels (`fn_8030E79C`/`fn_8031077C`/`fn_80310F30`/`fn_803116D8`) and the `fn_8031994C`/
- *       `fn_8031949C` dispatchers.
+ *       builds this unit's `__FILE__` pair at 0x80313020 -, `put_equip_info_upper_page`,
+ *       `fn_8030A9B4`, `put_equip_info_piece_page`, `fn_8031994C`/`fn_8031949C` and the bowgun panels
+ *       (`fn_8030E79C`/`fn_8031077C`/`fn_80310F30`/`put_equip_panel_row_ex`).
  *   the 37 tail placeholders (`fn_80315C00`, `fn_8031A428`, ...) are empty definitions kept so the
  *       map's rows pair by name; each is a body still to write, not a reconstruction.
  *
+ * BLOCKED BY A DECLARATION, NOT BY THE CODE (each measured, then held out of this commit).  Five more
+ * bodies were written and measured in this pass and are not in it, because each newly references a
+ * symbol whose correct spelling would mean editing a file another live lane owns this wave (`hud/`):
+ *   `fn_8030BFB4`/`fn_8030C0D4`/`fn_8030C1F4` (0x8030BFB4.., 288 B each) **measured 100.00 %** - the
+ *       equip panel's per-kind dispatcher, its three variants differing only in the case-0 builder.
+ *       They call `fn_802E14CC__FUsP6_EQUIPPC10_mh_ivec2_` and `fn_8030A05C` (below) calls
+ *       `fn_802E1134__FUsUcUlPC10_mh_ivec2_`; both addresses are in `hud/layout.cpp`'s registered
+ *       range and both are declared in `include/hud/layout.h` **inside its `extern "C"` block**, so
+ *       our object emits the unmangled name and `undefrefs.py` refuses the unit.  The fixing pass is
+ *       mechanical: rename the two symbols (rule 7), move those two declarations into that header's
+ *       C++-scope block, sweep `src/hud/layout.cpp`, and land these four bodies unchanged.
+ *   `fn_8030A05C` (0x8030A05C, 372 B) **measured 94.01 %** - the three-row piece preview, the same
+ *       `fn_802E1134` blocker.
+ *   `fn_8030C314` (520 B) **measured 87.50 %** as `put_equip_category_panel` - the per-category panel
+ *       dispatch.  Its tail calls `get_rare_color` (0x802DB254, owned by `ai/fn_802D44F4.cpp`), which
+ *       `include/hud/layout.h` likewise declares `extern "C"`: our object emits `get_rare_color`
+ *       where the map has `get_rare_color__FUc`.  Declaring it at C++ scope in the *owner's* header
+ *       (`include/ai/fn_802D44F4.h`, rule 2's home) clashes with that declaration while this unit
+ *       includes `hud/layout.h`, so the fix is the same one-line move.  Its `EquipWork` view stays
+ *       below, because `equip_detail_page_refresh` takes it too.
+ *   `PutPageArrow` (0x802DAF48) and `GetEquipName` (0x8027E9F0) were the same class of blocker and are
+ *       fixed in this commit: each is now declared at C++ scope in its owner's header
+ *       (`include/ai/fn_802D44F4.h` and `include/Pl/fn_8027D684.h`), so our object emits the map's
+ *       mangled spelling.  `undefrefs.py` listed both before that fix and lists neither now.
+ *   `get_lsp_data` (0x802E0550) is the one unresolved reference `undefrefs.py` still reports, and it
+ *       is **pre-existing** (`git show main:src/menu/menu_infomation.cpp` spells it 9 times): the same
+ *       `extern "C"` declaration, the same one-line fix, the same reason it is not in this commit.
+ *   `put_equip_info_upper_page`/`put_equip_info_piece_page` additionally read `lbl_80792BF4` and
+ *       `lbl_80794880`, unowned `.data`/`.sdata` of which this range is the only referrer: rule 12
+ *       says the unit claims those runs and emits them, its own measured step (a `.data` claim can
+ *       drop the target's `R_PPC_NONE` pool relocations) - deferred, not forgotten.
+ *
+ * RULE 7 NAMES.  The 22 renames are the names of this unit's own rows, derived from what each body
+ * does for its caller (the calling screen, the anchor id it draws at, the record it resolves).  The
+ * unwritten ones are explicit **GUESS**es: `fn_80315440`/`fn_803155BC` become
+ * `equip_variant_resolve`/`equip_variant_resolve_ex`, `fn_803116D8`/`fn_80311920` become
+ * `put_equip_panel_row_ex`/`put_equip_panel_row_base`, and `fn_803128A0`/`fn_80313C04` become
+ * `put_equip_panel_kind4`/`put_equip_panel_kind5` - each from the only evidence there is, the
+ * argument list `put_equip_category_panel` calls it with.  Refine them when the bodies are written.
+ *
  * MOVED BODIES.  The head's five wrappers and the tail's 13 bodies are the same source, with the
- * signature reconciliations one TU needs: `fn_80315440`/`fn_803155BC`/`fn_80315730`/`fn_80315A60`/
+ * signature reconciliations one TU needs: `equip_variant_resolve`/`equip_variant_resolve_ex`/`fn_80315730`/`fn_80315A60`/
  * `fn_80315274`/`fn_803153F8` now take the argument list the old 0x8030D338 half already called them
  * with (they were `void f(void)` placeholders in a separate TU), and `Set_equip_column_arrangement`
  * was written with `void*` parameters, which mangles to a name objdiff cannot pair; it now spells the
@@ -64,7 +124,10 @@
  * them too.  `StatusScreenWork` (include/menu/menu_infomation.h) is the head's partial view of the
  * same record - it lives in this unit's header because `ef/fn_8030681C.cpp`'s two below-the-seam
  * bodies read it as well.  The three tail records (`EquipColumnPanel`, `EquipSlotInfo`,
- * `EquipSubInfo`) and `EquipListWork` are this unit's own.
+ * `EquipSubInfo`) and `EquipListWork` are this unit's own.  `EquipWork` (this unit's own, defined
+ * below the declaration block) is the record `StatusScreenWork::equip` points at - the view the
+ * category panel proves, with the six piece records at 0x140 and the bowgun/ammo triple at
+ * 0x1D0/0x1E8/0x1F4.
  */
 
 #include "types.h"
@@ -76,6 +139,7 @@
 #include "Pl/pl_skill.h"
 #include "Pl/fn_8027D684.h"
 #include "ef/fn_800CDB2C.h"
+#include "ai/fn_802D44F4.h"
 #include "unsplit/menu.h"
 
 extern "C" int sprintf(s8*, const char*, ...);   /* 0x8045DECC, the OS Runtime's */
@@ -123,6 +187,21 @@ typedef struct EquipListWork {
     u8  pad_0x60A[2];              /* +0x60A */
 } EquipListWork;
 
+/* The equipment work record the status screens walk (the record `StatusScreenWork::equip` points
+ * at).  Only the view these bodies prove is named: the seven 0x0C-byte piece records at 0x140..0x188
+ * and the bowgun/ammo triple at 0x1D0/0x1E8/0x1F4.  size: 0x200 (approximate: max touched offset +
+ * 1, the record's own extent is larger - `put_equip_info_piece_page` reads +0x612). */
+typedef struct EquipWork {
+    u8     pad_0x000[0x140];        /* +0x000 */
+    _EQUIP piece[6];                /* +0x140  one piece record per equip row, stride 0x0C */
+    u8     pad_0x188[0x1D0 - 0x188];/* +0x188 */
+    _EQUIP bowgun;                  /* +0x1D0  the ranged-weapon record */
+    u8     pad_0x1DC[0x1E8 - 0x1DC];/* +0x1DC */
+    _EQUIP field_0x1E8;             /* +0x1E8  the ammo/coating record */
+    _EQUIP field_0x1F4;             /* +0x1F4  the second ammo record */
+} EquipWork;
+
+
 /* This unit's own C++-linkage exports (address order).  They are declared as their real signatures so
  * the C++ front-end reproduces the map's mangling (rule 9). */
 void Put_equip_dtl_basis_bowgun_gan1(_PLW*, _EQUIP_INDEX*, u16, u8, _mh_ivec2_*);
@@ -136,10 +215,14 @@ extern "C" {
 
 /* This unit's own forward declarations (address order).  They carry C linkage here so the definitions
  * below emit the map's bare `fn_XXXXXXXX` stems (rule 9: an `fn_` stem is not a mangling). */
+void equip_info_update(StatusScreenWork*);
+void put_equip_info_upper_page(StatusScreenWork*);
+void put_equip_info_piece_page(StatusScreenWork*);
 s32  fn_8030A1D0(void*, s32);
 s32  fn_8030A1DC(void*, s32, s32, s32);
-s32  fn_8030A30C(void*, void*, u32, s32);
+s32  equip_page_count_step(void*, void*, u32, s32);
 s32  fn_8030A328(void*, void*, s32, s32, u16, s8);
+void equip_detail_page_refresh(EquipWork*, _EQUIP*, s8 page, s8 last, u16 flags);
 s32  fn_8030B790(EquipListWork*);
 void fn_8030BACC(StatusScreenWork*);
 s32  fn_8030CA50(void*, void*, u32, u32);
@@ -147,21 +230,28 @@ s32  fn_8030CA68(void*, void*, s32, u16, u8);
 void fn_8030D6C0(void*, void*, void*, u16, u8);
 void fn_8030D6A8(void*, void*, u16, u8);
 void fn_8030D808(void*, void*, u16, u8);
-void fn_8030D728(void*, void*, void*, void*, u16, u8);
+void put_equip_row_variant(void*, void*, void*, void*, u16, u8);
 void fn_8030F814(void*, void*, u16, u8);
 void fn_8030F7B0(void*, void*, void*, u16, u8);
-void fn_8030FCC0(void*, void*, void*, void*, u16, u8);
+void put_equip_row_variant_ex(void*, void*, void*, void*, u16, u8);
 void fn_8030FD30(void*, void*, void*, void*, void*, void*, void*, u16);
 void fn_8030FC58(void*, void*, void*, u16, u8);
 void fn_80310560(void*, void*, void*, u16, u8);
-void fn_803105C8(void*, void*, void*, void*, u16, u8);
+void put_equip_row_variant2(void*, void*, void*, void*, u16, u8);
 void fn_80310638(void*, void*, void*, void*, void*, void*, void*, u16);
 void fn_80310E58(void*, void*, void*, u16, u8);
 void fn_80310EC0(void*, void*, void*, void*, u16, u8);
 void fn_80310F30(void*, void*, u16, u8);
 void fn_80311560(void*, void*, void*, u16, u8, u8);
-void fn_803116D8(void*, void*, u16, u8, u8);
+void put_equip_panel_row_ex(void*, void*, u16, u8, u8);
+void put_equip_panel_row_variant(EquipWork*, _EQUIP*, _EQUIP*, _EQUIP*, u16, u8, u8);
+void put_equip_panel_row_zero(EquipWork*, _EQUIP*, u16, u8);
+void put_equip_panel_row(EquipWork*, _EQUIP*, _EQUIP*, _EQUIP*, u16, u8);
+void put_lsp_sprite_at_anchor(u32*, u8);
+void put_lsp_sprite_runs(u32*);
+void put_equip_panel_row_base(EquipWork*, u8* rec, u16 a, u8 b);
 void fn_8030F87C(void*, void*, u16, u8);
+void put_lsp_sprite_offset(u16);
 void fn_8030FDA0(void*, void*, u16, u8);
 void fn_803106A8(void*, void*, u16, u8);
 void fn_8031077C(void*, void*, u8, void*);
@@ -191,8 +281,8 @@ u8   fn_80314F18(void*, void*);
 void fn_80314F90(void);
 void fn_80315274(void*, void*, u8);
 void fn_803153F8(EquipColumnPanel*, u8);
-u8   fn_80315440(void*, void*, void*, void*, void*);
-u8   fn_803155BC(void*, void*, void*, void*, u8, void*);
+u8   equip_variant_resolve(void*, void*, void*, void*, void*);
+u8   equip_variant_resolve_ex(void*, void*, void*, void*, u8, void*);
 u8   fn_80315730(void*, void*, void*, void*, void*, void*, void*, void*, void*);
 u8   fn_803159CC(u8);
 u8   fn_80315A60(void*, void*, u8);
@@ -232,7 +322,7 @@ void fn_8031A638(MenuSlot*);
 /* Callees other units own.  Most are declared in their owner's header and included above
  * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
  * and `fn_80272E30` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
- * `fn_800CF208` in `ef/fn_800CDB2C.h`; `fn_802E06B0` and `get_str_tbl` in `include/unsplit/menu.h`).
+ * `fn_800CF208` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `include/unsplit/menu.h`).
  * The three below cannot: `fn_802A8F14`'s owner header (`menu/fn_802A6624.h`) is included by
  * `menu/fn_8031A6C0.cpp`, which declares the same address itself as `s8 fn_802A8F14(s32, s32)`, so a
  * declaration there is an `(10197) illegal function overloading` in a landed unit; and
@@ -264,7 +354,7 @@ s32 fn_8030A1D0(void* equip, s32 mode)
 }
 
 /* The same, for a caller that carries a page id and a signed page delta. */
-s32 fn_8030A30C(void* a, void* b, u32 page, s32 delta)
+s32 equip_page_count_step(void* a, void* b, u32 page, s32 delta)
 {
     return fn_8030A328(a, b, 0, 0, page, delta);
 }
@@ -329,7 +419,7 @@ void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b
         tbl = (u16*)get_menu_lsp_tbl(0x8E);
         if (a == 0) {
             srcA = *(u32*)pos;
-            fn_802E06B0(0x80E, &vec, &srcA);
+            put_lsp_anchor_offset(0x80E, &vec, &srcA);
         } else if (pos == NULL) {
             get_lsp_data(0, &vec);
         } else {
@@ -339,7 +429,7 @@ void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b
         tbl = (u16*)get_menu_lsp_tbl(0x8F);
         if (b == 0) {
             srcB = *(u32*)pos;
-            fn_802E06B0(0x819, &vec, &srcB);
+            put_lsp_anchor_offset(0x819, &vec, &srcB);
         } else if (pos == NULL) {
             get_lsp_data(0, &vec);
         } else {
@@ -438,22 +528,22 @@ void fn_8030FB6C(u16 a) {
     fn_8030FB78(a, 7);
 }
 
-/* 0x80312DF0 - draw the sprite run `get_menu_lsp_tbl(0xCD)` names at the row `fn_802E06B0`
+/* 0x80312DF0 - draw the sprite run `get_menu_lsp_tbl(0xCD)` names at the row `put_lsp_anchor_offset`
  * positions from the caller's value. */
 void fn_80312DF0(u32* p) {
     u32 v = *p;
     _mh_ivec2_ pos;
-    fn_802E06B0(0x9A5, &pos, &v);
+    put_lsp_anchor_offset(0x9A5, &pos, &v);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xCD), &pos);
 }
 
 /* 0x8030D6C0 - the shared sword/small-blade branch: resolve the caller's variant into a stack
- * record with `fn_80315440` and hand off to the dispatcher (unless it reports "done"). */
+ * record with `equip_variant_resolve` and hand off to the dispatcher (unless it reports "done"). */
 void fn_8030D6C0(void* s0, void* s1, void* s2, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, s2, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, s2, &spb, out) == 1) {
         return;
     }
     fn_8030D808(s0, out, a, spb);
@@ -467,14 +557,14 @@ void fn_8030FB78(u16 a, u8 b) {
     if (a != 0) {
         get_lsp_data(0x8A7, &pos);
         get_lsp_data(a, &d);
-        d.x = d.x - pos.x;
-        d.y = d.y - pos.y;
+        d.x -= pos.x;
+        d.y -= pos.y;
     } else {
         d.x = 0;
         d.y = 0;
     }
     u32 tmp = *(u32*)&d;
-    fn_802E06B0(0x8A7, &pos, &tmp);
+    put_lsp_anchor_offset(0x8A7, &pos, &tmp);
     draw_font_idx(0x8A8, (s8*)((u8**)get_str_tbl(0x2E))[b], 0, &pos);
 }
 
@@ -495,7 +585,7 @@ void fn_8030D808(void* s0, void* s1, u16 a, u8 b) {
         off.y = 0;
     }
     src = off;
-    fn_802E06B0(0x84E, &pos, &src);
+    put_lsp_anchor_offset(0x84E, &pos, &src);
     u8 r = fn_80315A60(s0, s1, b);
     switch (r) {
     case 1:
@@ -513,10 +603,10 @@ void fn_8030D808(void* s0, void* s1, u16 a, u8 b) {
     }
 }
 
-/* 0x8030D728 - the second small-weapon branch entry (resolves through `fn_803155BC`). */
-void fn_8030D728(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
+/* 0x8030D728 - the second small-weapon branch entry (resolves through `equip_variant_resolve_ex`). */
+void put_equip_row_variant(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
     u8 out[24];
-    if (fn_803155BC(s0, p1, p2, p3, b, out) == 1) {
+    if (equip_variant_resolve_ex(s0, p1, p2, p3, b, out) == 1) {
         return;
     }
     fn_8030D808(s0, out, a, b);
@@ -524,16 +614,16 @@ void fn_8030D728(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
 
 /* ---- the same resolve-then-dispatch shape, one family per weapon sub-band ----
  * Each `fn_8030F7B0`-style entry resolves the caller's variant into a stack record with
- * `fn_80315440` and hands it to its band's dispatcher; `fn_8030FCC0`-style resolves through
- * `fn_803155BC` (six registers plus a slot); `fn_8030FD30`-style through `fn_80315730`, whose
+ * `equip_variant_resolve` and hands it to its band's dispatcher; `put_equip_row_variant_ex`-style resolves through
+ * `equip_variant_resolve_ex` (six registers plus a slot); `fn_8030FD30`-style through `fn_80315730`, whose
  * ninth (stack) argument is the record. */
 
-/* 0x8030F7B0 - the 0x8030F87C band's `fn_80315440` entry. */
+/* 0x8030F7B0 - the 0x8030F87C band's `equip_variant_resolve` entry. */
 void fn_8030F7B0(void* s0, void* s1, void* s2, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, s2, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, s2, &spb, out) == 1) {
         return;
     }
     fn_8030F87C(s0, out, a, spb);
@@ -544,27 +634,27 @@ void fn_8030F814(void* s0, void* s1, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, 0, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, 0, &spb, out) == 1) {
         return;
     }
     fn_8030F87C(s0, out, a, spb);
 }
 
-/* 0x8030FC58 - the 0x8030FDA0 band's `fn_80315440` entry. */
+/* 0x8030FC58 - the 0x8030FDA0 band's `equip_variant_resolve` entry. */
 void fn_8030FC58(void* s0, void* s1, void* s2, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, s2, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, s2, &spb, out) == 1) {
         return;
     }
     fn_8030FDA0(s0, out, a, spb);
 }
 
-/* 0x8030FCC0 - the 0x8030FDA0 band's `fn_803155BC` entry. */
-void fn_8030FCC0(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
+/* 0x8030FCC0 - the 0x8030FDA0 band's `equip_variant_resolve_ex` entry. */
+void put_equip_row_variant_ex(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
     u8 out[24];
-    if (fn_803155BC(s0, p1, p2, p3, b, out) == 1) {
+    if (equip_variant_resolve_ex(s0, p1, p2, p3, b, out) == 1) {
         return;
     }
     fn_8030FDA0(s0, out, a, b);
@@ -580,21 +670,21 @@ void fn_8030FD30(void* s0, void* p1, void* p2, void* p3, void* p4, void* p5, voi
     fn_8030FDA0(s0, out, a, tmp);
 }
 
-/* 0x80310560 - the 0x803106A8 band's `fn_80315440` entry. */
+/* 0x80310560 - the 0x803106A8 band's `equip_variant_resolve` entry. */
 void fn_80310560(void* s0, void* s1, void* s2, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, s2, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, s2, &spb, out) == 1) {
         return;
     }
     fn_803106A8(s0, out, a, spb);
 }
 
-/* 0x803105C8 - the 0x803106A8 band's `fn_803155BC` entry. */
-void fn_803105C8(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
+/* 0x803105C8 - the 0x803106A8 band's `equip_variant_resolve_ex` entry. */
+void put_equip_row_variant2(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
     u8 out[24];
-    if (fn_803155BC(s0, p1, p2, p3, b, out) == 1) {
+    if (equip_variant_resolve_ex(s0, p1, p2, p3, b, out) == 1) {
         return;
     }
     fn_803106A8(s0, out, a, b);
@@ -610,37 +700,37 @@ void fn_80310638(void* s0, void* p1, void* p2, void* p3, void* p4, void* p5, voi
     fn_803106A8(s0, out, a, tmp);
 }
 
-/* 0x80310E58 - the 0x80310F30 band's `fn_80315440` entry. */
+/* 0x80310E58 - the 0x80310F30 band's `equip_variant_resolve` entry. */
 void fn_80310E58(void* s0, void* s1, void* s2, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, s2, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, s2, &spb, out) == 1) {
         return;
     }
     fn_80310F30(s0, out, a, spb);
 }
 
-/* 0x80310EC0 - the 0x80310F30 band's `fn_803155BC` entry. */
+/* 0x80310EC0 - the 0x80310F30 band's `equip_variant_resolve_ex` entry. */
 void fn_80310EC0(void* s0, void* p1, void* p2, void* p3, u16 a, u8 b) {
     u8 out[24];
-    if (fn_803155BC(s0, p1, p2, p3, b, out) == 1) {
+    if (equip_variant_resolve_ex(s0, p1, p2, p3, b, out) == 1) {
         return;
     }
     fn_80310F30(s0, out, a, b);
 }
 
-/* 0x80311560 - the 0x803116D8 band's `fn_80315440` entry (its resolved byte is masked before it
+/* 0x80311560 - the 0x803116D8 band's `equip_variant_resolve` entry (its resolved byte is masked before it
  * is handed on). */
 void fn_80311560(void* s0, void* s1, void* s2, u16 a, u8 b, u8 c) {
     u8 out[36];
     u8 spb;
     spb = b;
-    if (fn_80315440(s0, s1, s2, &spb, out) == 1) {
+    if (equip_variant_resolve(s0, s1, s2, &spb, out) == 1) {
         return;
     }
     spb = (u8)(spb & 0x9FFFFFFF);
-    fn_803116D8(s0, out, a, spb, c);
+    put_equip_panel_row_ex(s0, out, a, spb, c);
 }
 
 /* 0x803106A8 - the 0x8031077C band's body: position the panel from the 0x8F0 anchor (or the
@@ -660,7 +750,7 @@ void fn_803106A8(void* s0, void* s1, u16 a, u8 b) {
         off.y = 0;
     }
     src = off;
-    fn_802E06B0(0x8F0, &pos, &src);
+    put_lsp_anchor_offset(0x8F0, &pos, &src);
     copy = pos;
     fn_8031077C(s0, s1, b, &copy);
 }
@@ -680,10 +770,10 @@ void fn_803142C8(u32 unused, u8 idx, const _mh_ivec2_* pos) {
     u32 out1;
     u32 tmp;
     u32 out2;
-    fn_802E06B0(0x9AA, &out1, &in);
+    put_lsp_anchor_offset(0x9AA, &out1, &in);
     u16* tbl = (u16*)get_menu_lsp_tbl(0xD0);
     tmp = out1;
-    fn_802E06B0(tbl[idx], &out2, &tmp);
+    put_lsp_anchor_offset(tbl[idx], &out2, &tmp);
     u16* tbl2 = (u16*)get_menu_lsp_tbl(0xD2);
     draw_sprite_ary(tbl2, (const _mh_ivec2_*)&out2);
 }
@@ -779,10 +869,10 @@ void fn_803153F8(struct EquipColumnPanel* self, u8 unused) {
 }
 
 /* 0x80315440 */
-u8 fn_80315440(void* a, void* b, void* c, void* d, void* e) { return 0; }
+u8 equip_variant_resolve(void* a, void* b, void* c, void* d, void* e) { return 0; }
 
 /* 0x803155BC */
-u8 fn_803155BC(void* a, void* b, void* c, void* d, u8 e, void* f) { return 0; }
+u8 equip_variant_resolve_ex(void* a, void* b, void* c, void* d, u8 e, void* f) { return 0; }
 
 /* 0x80315730 */
 u8 fn_80315730(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h, void* i) { return 0; }
@@ -1063,4 +1153,127 @@ void fn_8031A638(MenuSlot* self) {
             }
         }
     }
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * The unwritten bodies, in address order.  Each notes the shape its target's codegen proves where
+ * that shape is not obvious from the call list.
+ * --------------------------------------------------------------------------------------------------- */
+
+/* 0x80308FB4 - the equip-information screen's per-frame dispatch on its page mode: build the two
+ * sub-screens for modes 0 and 1, or refresh the detail page for the modes 2..10 with the mode's own
+ * value as the page delta. */
+void equip_info_update(StatusScreenWork* self) {
+    u16* table;
+    _mh_ivec2_ pos;
+
+    switch (self->field_0x1AE) {
+    case 0:
+        put_equip_info_upper_page(self);
+        break;
+    case 1:
+        put_equip_info_piece_page(self);
+        get_lsp_data(1482, &pos);
+        draw_sprite_idx(1497, &pos);
+        get_lsp_data(1322, &pos);
+        table = (u16*)get_menu_lsp_tbl(0);
+        PutPageArrow(table, self->field_0x1AE, self->field_0x1AF, self->field_0x08, &pos, 0);
+        break;
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+        equip_page_count_step(self->equip, 0, 0, self->field_0x1AE - 2);
+        equip_detail_page_refresh((EquipWork*)self->equip, NULL, self->field_0x1AE, self->field_0x1AF,
+                    self->field_0x08);
+        break;
+    }
+}
+
+/* 0x8030FAC0 - draw the sprite `id` at the 0x915 frame, offset from the 0x914 anchor (or from zero
+ * when the id is the anchor itself). */
+void put_lsp_sprite_offset(u16 id) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ d;
+
+    if (id != 0x914) {
+        get_lsp_data(0x914, &pos);
+        get_lsp_data(id, &d);
+        d.x -= pos.x;
+        d.y -= pos.y;
+    } else {
+        d.x = 0;
+        d.y = 0;
+    }
+    u32 tmp = *(u32*)&d;
+    put_lsp_anchor_offset(0x914, &pos, &tmp);
+    draw_sprite_idx(0x915, &pos);
+}
+
+/* 0x80311A88 - draw the sprite row `id` at the 0x917 anchor's offset when the id is set, or the
+ * caller's packed position otherwise. */
+void put_lsp_sprite_at_anchor(u32* p, u8 id) {
+    u32 v;
+    _mh_ivec2_ pos;
+
+    if (id == 0) {
+        v = *p;
+        put_lsp_anchor_offset(0x917, &pos, &v);
+    } else {
+        get_lsp_data(id, &pos);
+    }
+    draw_sprite_idx(0x918, &pos);
+}
+
+/* 0x80312F18 - draw the 0xC7 and 0x89 sprite runs at the 0x955 and 0x966 anchors, each offset by the
+ * caller's position. */
+void put_lsp_sprite_runs(u32* p) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ pos2;
+    u32 v = *p;
+    u32 v2;
+
+    put_lsp_anchor_offset(0x955, &pos, &v);
+    draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC7), &pos);
+    v2 = *(u32*)&pos;
+    put_lsp_anchor_offset(0x966, &pos2, &v2);
+    draw_sprite_ary((u16*)get_menu_lsp_tbl(0x89), &pos2);
+}
+
+/* 0x803115E0 - the `put_equip_panel_row_ex` panel's six-register resolve entry. */
+void put_equip_panel_row_variant(EquipWork* s0, _EQUIP* s1, _EQUIP* s2, _EQUIP* s3, u16 a, u8 b, u8 c) {
+    u8 out[24];
+
+    if (equip_variant_resolve_ex(s0, s1, s2, s3, b, out) == 1) {
+        return;
+    }
+    put_equip_panel_row_ex(s0, out, a, b, c);
+}
+
+/* 0x80311840 - the `put_equip_panel_row_base` panel's entry whose resolve word is forced to zero and whose flag
+ * byte keeps only its low three bits. */
+void put_equip_panel_row_zero(EquipWork* s0, _EQUIP* s1, u16 a, u8 b) {
+    u8 out[24];
+    u8 flag = b;
+
+    if (equip_variant_resolve(s0, s1, 0, &flag, out) == 1) {
+        return;
+    }
+    flag &= 7;
+    put_equip_panel_row_base(s0, out, a, flag);
+}
+
+/* 0x803118B4 - the `put_equip_panel_row_base` panel's six-register resolve entry. */
+void put_equip_panel_row(EquipWork* s0, _EQUIP* s1, _EQUIP* s2, _EQUIP* s3, u16 a, u8 b) {
+    u8 out[24];
+
+    if (equip_variant_resolve_ex(s0, s1, s2, s3, b, out) == 1) {
+        return;
+    }
+    put_equip_panel_row_base(s0, out, a, b);
 }

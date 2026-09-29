@@ -56,4 +56,14 @@ u32 fn_8027DC64(void);
 }
 #endif
 
+#ifdef __cplusplus
+/* C++-linkage declarations: the map's mangled name is the C++ front-end's own spelling of these
+ * (rule 9), so they are declared outside the `extern "C"` block above. */
+
+/* 0x8027E9F0 - the equipment piece's display name (its kind picks the string table, its id the
+ * row).  Added with `menu/menu_infomation.cpp`, its consumer: the call site and the target both spell
+ * it `GetEquipName__FUcUs`, so it must not be reached through an `extern "C"` declaration. */
+u32 GetEquipName(u8 kind, u16 id);
+#endif
+
 #endif /* MHTRI_PL_FN_8027D684_H */
