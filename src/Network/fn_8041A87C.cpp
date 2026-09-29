@@ -1303,9 +1303,9 @@ void GameSpyInterfaceThread::step()
                     peerMatch_4478 = (value_30 != peerId_4470);
                     if (lbl_806D3660.result_04 == 0) {
                         session_447C = peerId_4470 ^ selfPeerId_4474;
-                        fn_8050E290(lbl_80794CE0);
-                        r = DWCi_NatNegStartSession(session_447C, peerMatch_4478, (NetworkCallback)fn_8041B26C,
-                                        (NetworkCallback)fn_8041B334, &lbl_806D3660);
+                        r = DWCi_NatNegStartSession(fn_8050E290(lbl_80794CE0), session_447C, peerMatch_4478,
+                                        (NetworkCallback)fn_8041B26C, (NetworkCallback)fn_8041B334,
+                                        &lbl_806D3660);
                         if (r != 0) {
                             error = 0;
                             switch (r) {

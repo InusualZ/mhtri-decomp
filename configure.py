@@ -2463,7 +2463,12 @@ config.libs = [
             # 0x805124F4.  The right edge 0x805145B8 is the 16->4 byte function-packing change - the
             # DWCi/NHTTP library boundary.  `DWCi`, not NHTTP: the range calls only the DWCi
             # transport helpers and carries the GameSpy NATNEG pool.  Claims .text only.
-            Object(NonMatching, "DWCi/DWCi_NatNeg.c"),
+            # `cflags_base` without the lib's `-func_align 4`: this unit's retail functions all start
+            # 16-byte aligned (17/17, `gap_*` zero runs between them - unlike the 4-byte packing of the
+            # rest of the lib), and with 4 our object misses the `nop` MWCC inserts to align
+            # `DWCi_natNegTickIdleSockets`'s struct-copy loop (98.48 -> 100.00, the only row that moved for
+            # this reason).  `-O4,p` implies `-func_align 16`.
+            Object(NonMatching, "DWCi/DWCi_NatNeg.c", cflags=cflags_base),
         ],
     },
     {

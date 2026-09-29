@@ -16,8 +16,8 @@
  * the global cleanup called next to it, `DWCi_NatNegProcess` -> the per-iteration step, and
  * `DWCi_NatNegSendPacket` -> the header+payload send).  Each is a GUESS - the map has only
  * placeholders for the band - and a marker for a later reconstruction to confirm; the unit's own
- * header says so too.  Nine of its 17 functions have bodies today (see the unit's own header for
- * the measured list).
+ * header says so too.  All 17 functions have bodies (see the unit's own header for the measured
+ * list).
  */
 #ifndef MHTRI_DWCI_DWCI_NATNEG_H
 #define MHTRI_DWCI_DWCI_NATNEG_H
@@ -45,7 +45,13 @@ typedef struct DWCiSockAddrIn {
 } DWCiSockAddrIn;
 
 void DWCi_NatNegCleanup(void);
-s32  DWCi_NatNegStartSession(u32 session, s32 flag, DWCiCallback empty, DWCiCallback callback, void* result);
+/* Begins one negotiation: the game socket to bind the probes to (-1 for none), the cookie the peers share,
+ * this side's client index, the progress and completion callbacks and the caller's payload.  Returns
+ * 0 once the probes are out, 1 when the record cannot be allocated, 2 when the probe check failed or
+ * the socket cannot be created, 3 when a server address cannot be resolved. */
+/* untyped: caller-owned payload - handed back to both callbacks */
+s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallback progress,
+                            DWCiCallback complete, void* userData);
 void DWCi_NatNegEndSession(u32 session);
 void DWCi_NatNegProcess(void);
 void DWCi_NatNegSendPacket(void* data, u32 size, void* header);
@@ -64,27 +70,29 @@ extern char DWCi_natNegAddressFormat[6];
 extern char DWCi_natNegAddressFormatHost[3];
 extern char DWCi_natNegAddressFormatPort[4];
 
+/* 0x80794394 - the "%s.%s" the negotiator joins the game name and a server host with. */
+extern char DWCi_natNegHostFormat[6];
+
 /* 0x80794380 - the NATNEG message signature every announce opens with and every received datagram is
  * compared against.  Deliberately *unsized* here: a sized array reaches the symbol SDA21 while an
  * unsized one reaches it ADDR16_HA/LO (`lis`/`addi`), and the two consumers' target objects need the
  * two forms - `src/Network/fn_8041A87C.cpp` is ADDR16 throughout, and it sees only this header (via
  * `include/unsplit/Network.h`), so this is the form the shared declaration has to carry.  The unit's
- * own source re-declares it sized for its own ten SDA21 sites, which a unit may do for its own object
- * and which the later declaration decides (both measured; playbook row 12 - the reloc kind is a
- * codegen input).  RESIDUAL: `DWCi_natNegPollReplies` needs the absolute form, which the sized
- * declaration cannot produce - test whether it came from a different original TU (a seam near
- * 0x805125F0) before rewriting its source shape. */
+ * own source re-declares it sized before its first use, for the target's ten SDA21 sites (the first
+ * use of a symbol fixes its addressing for the whole translation unit - playbook row 12, the reloc
+ * kind is a codegen input).  RESIDUAL: `DWCi_natNegPollReplies` reaches it ABSOLUTELY in the target, which
+ * one TU cannot do together with the SDA sites - see the unit's header (seam request). */
 extern const u8 natNegMessageMagic[];
 
 /* 0x80794388/0x8079438C - the two idle sockets the negotiator keeps open for its own address
- * discovery; both are -1 when closed.  0x80794390 is the protocol id the announce messages carry. */
+ * discovery; both are -1 when closed.  0x80794390 is the NAT type the report messages carry. */
 extern s32 DWCi_natNegIdleSocketA;
 extern s32 DWCi_natNegIdleSocketB;
-extern u32 DWCi_natNegServerId;
+extern u32 DWCi_natNegNatType;
 
 /* 0x807614D8 (.bss, 0x80 B) - the host-name text the announce copies the local name from (read at 15
  * sites, written nowhere in the link set). */
-extern char DWCi_natNegHostText[];
+extern char DWCi_natNegGameName[];
 
 /* 0x807625C0 (.bss) - the two-buffer address-string ring `DWCi_formatAddress` /
  * `DWCi_natNegFormatAddress` write into, `DWCi_addressRingIndex` (declared unowned in
@@ -100,6 +108,18 @@ extern u8 DWCi_addressRing[];
  * (0xE0) the negotiator's session record, whose own layout is completed in `src/DWCi/DWCi_NatNeg.c`
  * (struct DWCiNatNegSession). */
 extern u8 DWCi_natNegAddressRing[];
+
+/* 0x80762700 (.bss, 0x200 B) - the receive buffer every negotiator poll reads a datagram into. */
+extern u8 DWCi_natNegRecvBuffer[0x200];
+
+/* 0x80762A20 (.bss, 0x200 B) - the receive buffer every negotiator socket's tick reads a datagram into.
+ * Inside the unit's claimed `.bss` run (0x807614D8..0x80762C20); this unit is its only referencer
+ * (`callers.py`), claimed in `splits.txt`. */
+extern u8 DWCi_natNegSocketRecvBuffer[0x200];
+
+/* 0x806308E8 (.data, 0x120 B) - the negotiator's string pool: the three server hosts
+ * ("natneg1/2/3.gs.nintendowifi.net", 0x1C bytes apart) then its log lines; claimed in `splits.txt`. */
+extern char DWCi_natNegStringPool[][28];
 extern u8 DWCi_natNegSession[];
 
 /* 0x80795828 the ring index, 0x80795848 the negotiator's list of per-server socket records (the
@@ -108,9 +128,24 @@ extern u8 DWCi_natNegSession[];
  * every announce, 0x80795860 the tick of its last poll and 0x80795864 the callback it reports a
  * completed negotiation through. */
 extern u32 DWCi_natNegAddressRingIndex;
+/* 0x8079583C/40/44 - set as the server's three reply types arrive; 0x80795838/30/2C/34 - set as the four
+ * slot reports (cookie 0..3) arrive.  The poll is finished when every one of them is set. */
+extern u32 DWCi_natNegType3Seen;
+extern u32 DWCi_natNegType2Seen;
+extern u32 DWCi_natNegType1Seen;
+extern u32 DWCi_natNegSlot0Ready;
+extern u32 DWCi_natNegSlot1Ready;
+extern u32 DWCi_natNegSlot2Ready;
+extern u32 DWCi_natNegSlot3Ready;
 extern void* DWCi_natNegSocketList;
 extern u32 DWCi_natNegServerAddr0;
-extern u32 DWCi_natNegServerToken;
+extern u32 DWCi_natNegServerAddr1;
+extern u32 DWCi_natNegServerAddr2;
+extern char* DWCi_natNegServerName0;
+extern char* DWCi_natNegServerName1;
+extern char* DWCi_natNegServerName2;
+extern u32 DWCi_natNegIdlePolling;
+extern u32 DWCi_natNegMappingScheme;
 extern u32 DWCi_natNegLastPollTick;
 extern void (*DWCi_natNegPollCallback)(u32, struct DWCiNatNegSession*);
 

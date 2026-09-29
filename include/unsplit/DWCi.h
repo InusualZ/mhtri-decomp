@@ -33,8 +33,19 @@
 struct DWCiConn;
 struct DWCiReq;
 struct DWCiAddrKey;
-struct DWCiHostEntry;
 struct DWCiCType;
+
+/* The resolver records `DWCi_parseAddress` and the NATNEG unit read: an entry whose +0x0C reaches the
+ * host's address words through one more indirection (the SDK's `hostent`: name, aliases, type, length,
+ * then the address list). */
+typedef struct DWCiHostAddr {
+    /* +0x00 */ u32 addr;
+} DWCiHostAddr; /* size: 0x04 */
+
+typedef struct DWCiHostEntry {
+    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x0C */ DWCiHostAddr** hosts;
+} DWCiHostEntry; /* size: 0x10 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +63,11 @@ extern char DWCi_addressFormatPort[4];
 /* 0x8060EDB0 - the character-class record `DWCi_parseAddress` validates port digits against (a header
  * whose +0x38 pointer reaches the per-character u16 flags, bit 3 marking a decimal digit). */
 extern struct DWCiCType DWCi_digitClassTable;
+
+/* 0x80795818 - the result of the NAT-probe check `fn_8050C770` runs (1 = failed, 2 / 3 = the two
+ * usable answers); the negotiator refuses to start while it reads 1.  Name and meaning are GUESSes
+ * from that writer (it sends a probe, waits for its echo and stores 1, 2 or 3). */
+extern s32 DWCi_natProbeStatus;
 
 /* 0x80795820 - the index of the two-buffer address-string ring `DWCi_formatAddress` writes into the
  * 0x807625C0 buffers (`DWCi_addressRing`, declared by the NATNEG unit's header - the word falls
@@ -81,9 +97,24 @@ void DWCi_socketClose(int sock);
 int DWCi_socketBind(int sock, void* buf, int len);
 int DWCi_socketSendTo(int sock, void* buf, int len, u32 flags, void* sa, int salen);
 int DWCi_socketGetLocalName(int sock, void* sa, int* salen);
+/* 0x8050AC70 - append a copy of the fixed-size record at `item` to the list. */
+/* untyped: opaque handle (the list) and byte range (the record copied in) */
+void DWCi_listAppend(void* list, void* item);
+/* 0x8050AF20 - delete the list's `index`th record. */
+/* untyped: opaque handle (the list) */
+void DWCi_listDeleteAt(void* list, u32 index);
 u32 DWCi_socketResolveAddress(char* host);
 int DWCi_socketGetLastError(int sock);
 struct DWCiHostEntry* DWCi_socketLookupHost(char* host);
+/* 0x8050B980 - receive one datagram: (socket, buffer, capacity, flags, sender address, its length in/out);
+ * -1 on failure. */
+int DWCi_socketRecvFrom(int sock, u8* buf, int len, u32 flags, DWCiSockAddrIn* sa, int* salen);
+/* 0x8050C1D0 - non-zero while the socket has a datagram waiting. */
+int DWCi_socketHasData(int sock);
+/* 0x8050C270 - the resolver record of this machine's own host (NULL when it cannot be read). */
+DWCiHostEntry* DWCi_socketGetLocalHostEntry(void);
+/* 0x8050C450 - non-zero when the address the pointer names is a usable (public) one. */
+int DWCi_hostAddressIsUsable(DWCiHostAddr* host);
 int DWCi_socketIsUsable(int sock);
 void DWCi_platformInit(void);
 void DWCi_platformCleanup(void);

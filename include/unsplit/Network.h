@@ -293,7 +293,7 @@ void fn_8050DF90(u32 socket, const void* data, s32 len);
 s32 fn_8050DFA0(u32 socket, void* out, void* address, void* buffer, u32 size, u32 timeout, const char* fmt, s32 flags);
 s32 fn_8050E150(u32 socket, const void* data, u32 size, s32 flags);
 void fn_8050E250(u32 socket);
-void fn_8050E290(u32 socket);
+s32 fn_8050E290(u32 socket);
 void fn_8050E2A0(u32 data, NetworkCallback callback);
 
 /* NHTTP / network utility layer */
