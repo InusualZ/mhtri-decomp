@@ -457,6 +457,7 @@ because it is finished.
 | `tools/units/callees.py` | **you are about to write bodies**: name a unit's callees — every generated symbol its bodies reference, its owner, the call shape — before rule 7 bites. |
 | `tools/units/callers.py` | **you need "who calls / who reads this"**: the whole-DOL caller index, **address-keyed** because the `asm/` dump is stale (rule 12's evidence tool; the session called it the single most useful recon tool). |
 | `tools/units/dataclaim.py --unit U` | **rule 12 bit you (an `extern` of unowned data)**: every data symbol U references but does not own, its census sharers, and the exact `splits.txt` claim / named data-only unit to paste. Read-only; it never writes `splits.txt`. |
+| `tools/units/unwindcut.py <unit> <cut>` | **you are re-cutting a seam** (moving a unit's right edge to a function boundary): the `extabindex`/`extab` partition at the cut with the sum check, the paste-ready lines for both halves, and the `.ctors`/`.dtors` words the cut obliges you to drop. Read-only; it refuses a cut that is not a function boundary. |
 | `tools/units/langcheck.py` | **a unit's language is in question**: decide C vs C++ from evidence (a mangled definition, a `.cpp` `__FILE__` string), never from convenience. |
 | `tools/units/recordmerge.py` | **two lanes each hold a view of the same record header**: fold them into one definition with the checks the hand passes lacked. |
 
@@ -466,6 +467,14 @@ Rule 12 (`docs/plan.md` §6.5) refuses an `extern` of data **no registered `spli
 and unlike rule 7 there is no rename remedy — the only remedies are ownership changes. There are exactly
 three shapes, and `dataclaim.py --unit U` decides between them mechanically (the address, the section, the
 map symbol and its **extent**, the registered owner, who else reads it, and the claim to paste):
+
+**The inverse — un-claiming a `.text` range obliges dropping the `.ctors`/`.dtors` words that point into it.**
+Releasing a `.text` range (a seam re-cut) obliges dropping every `.ctors`/`.dtors` word **whose target
+function leaves with the cut**, because dtk derives that word's claim from the unit that owns the
+constructor; a surviving word makes `dtk dol split` refuse `Mismatched splits for .ctors 4:0x8056F374
+(menu/menu_message.cpp) and function 3:0x802ABC4C (auto_fn_802ABC4C_text)` rather than mis-split, and
+dropping the claim lets dtk re-derive it from the tail. `tools/units/unwindcut.py <unit> <cut>` names the
+words and prints both halves' lines (`.pi/notes/menu-seam-recut-4622.md`).
 
 1. **Ordinary.** The range is free: claim it into the unit being worked. The claim must cover the
    **whole** map symbol extent (`symbols.txt`'s `size:`), and a claim's `end:` must be **4-aligned** — a
