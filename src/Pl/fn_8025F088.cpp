@@ -47,6 +47,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "fn_8004CAD8.h"
 #include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 pool 0x80799E00-0x80799F98 (rule 2) */
+#include "Pl/pl_act_data.h" /* the owner of the pool's second run, 0x80799F98-0x80799FDC (rule 2) */
 
 /* The per-chunk move-work table the player's motion layer reads: `lbl_806AB848` is 0x420 B of
  * 24-byte entries, 264 B (11 entries) per `_PLW::chunk_ofs` chunk.  Only the fields this unit reads
@@ -284,7 +285,7 @@ void fn_802607C4(_PLW* self) {
     s32 found = 0;
 
     if ((u16)Get_motion_no(self) == 38) {
-        f32 best = lbl_80799FD0;
+        f32 best = pl_float_2250000;
         PlMoveWork* work = (PlMoveWork*)get_move_work_adrs(3);
         u16 count = (u16)get_move_work_max(3);
         s32 i;
@@ -391,8 +392,8 @@ void fn_8025FA00(_PLW* self) {
                 }
                 if (self->field_0x00A == 8) {
                     self->field_0x06C -= pl_frame_window_2;
-                    if (self->field_0x06C < lbl_80799F98) {
-                        self->field_0x06C = lbl_80799F98;
+                    if (self->field_0x06C < pl_float_neg250) {
+                        self->field_0x06C = pl_float_neg250;
                     } else {
                         self->vec_0x03C.z += pl_frame_window_10;
                     }
@@ -648,7 +649,7 @@ s32 fn_80262688(_PLW* self) {
             (work->field_0x655 == self->chunk_ofs || work->field_0x655 == 0xFF) &&
             (Pl_act_ck(work, 0, 20) != 0 || Pl_act_ck(work, 0, 158) != 0) &&
             self->area_0x16 == work->area_0x16 &&
-            fn_80050EF4(&self->vec_0x03C, &work->vec_0x03C) >= lbl_80799FD8 &&
+            fn_80050EF4(&self->vec_0x03C, &work->vec_0x03C) >= pl_float_300 &&
             ((PlItemData*)GetItemData(work->field_0x650))->field_0x01 < 3) {
             self->field_0x658 = 90;
             if (fn_80273228(self, work->field_0x650, work->field_0x652) < work->field_0x652) {
@@ -777,14 +778,14 @@ void fn_8025F088(_PLW* self) {
     case 2:
         break;
     case 3:
-        if (self->vec_0x03C.y < lbl_80799FC4 + self->ground_y_0x060) {
-            fn_800524C0(lbl_80799FC8, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
+        if (self->vec_0x03C.y < pl_float_110 + self->ground_y_0x060) {
+            fn_800524C0(pl_float_0_6, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
                         &self->vec_0x03C);
         }
         break;
     default:
         if (self->field_0x01B == 0) {
-            fn_800524C0(lbl_80799FC0, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
+            fn_800524C0(pl_float_0_3, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
                         &self->vec_0x03C);
         }
         break;

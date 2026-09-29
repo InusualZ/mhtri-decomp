@@ -19,8 +19,8 @@
  * `lbl_` rows and are named as the bodies that read them are written.
  *
  * The unit owns this run only.  The `.sdata2` run that follows it, 0x80799F98-0x80799FDC (17 words, read
- * by `Pl/fn_8025F088.cpp` and `Pl/fn_80258FCC.cpp`), still has no owner: its declarations stay in
- * `include/Pl/fn_8025F088.h` and it is rule 12's open item for those two units.
+ * by `Pl/fn_8025F088.cpp` and `Pl/fn_80258FCC.cpp`), has its own owner now - `Pl/pl_act_data.cpp`,
+ * whose header `Pl/pl_act_data.h` declares those words.
  */
 #ifndef MHTRI_PL_FRAME_DATA_H
 #define MHTRI_PL_FRAME_DATA_H
