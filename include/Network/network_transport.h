@@ -24,6 +24,8 @@
    all a pointer parameter needs. */
 struct NetworkSessionStable;
 struct NetworkStreamWriter;
+struct NetworkPeerReceive;
+struct NetworkPeerInfo;
 /* the Pat band's opaque record types, which only ever cross as pointers (`receivePatInterfaces` /
    `flushPatRequests` below are the pumps `NetworkSessionManagerPat` drives) */
 class PatReceiver;
@@ -82,44 +84,86 @@ public:
 /* ---------------- the peer's socket handle ---------------------------------------------------- */
 
 /* The object the peer keeps at +0x04 and dispatches through: the +0x1C slot is a tail-jump
-   (`bctr`), which is the shape MWCC gives a virtual whose result is returned directly, and +0x28 is
-   the receive-buffer clear.  Only the two called slots are named; the gaps are the dispatch holes
-   between them (GUESS: both names are offset-derived - the range calls them and nothing else). */
+   (`bctr`), which is the shape MWCC gives a virtual whose result is returned directly, +0x28 is the
+   receive-buffer clear and +0x34 the shutdown the release path drives.  Only the called slots are
+   named; the gaps are the dispatch holes between them (GUESS: the names are offset-derived - the
+   range calls them and nothing else does). */
 class NetworkSocketHandle {
 public:
     /* +0x08 */ virtual void slot_08();
-    /* +0x0C */ virtual void slot_0C();
+    /* +0x0C (GUESS: name from the open path's mode store) */ virtual s32 open(u32 mode);
     /* +0x10 */ virtual void slot_10();
     /* +0x14 */ virtual void slot_14();
-    /* +0x18 */ virtual void slot_18();
+    /* +0x18 (GUESS: name from the open path's address store) */ virtual s32 setPeer(const u8* address);
     /* +0x1C (GUESS) */ virtual s32 closeSocket();
     /* +0x20 */ virtual void slot_20();
     /* +0x24 */ virtual void slot_24();
     /* +0x28 (GUESS) */ virtual s32 clearReceive();
+    /* +0x2C */ virtual void slot_2C();
+    /* +0x30 */ virtual void slot_30();
+    /* +0x34 (GUESS: name from the release path's shutdown) */ virtual void shutdownSocket();
 };   /* size: 0x04 - only ever reached through a pointer in this unit */
 
 /* ---------------- the peer that owns a socket and a byte stream ------------------------------- */
 
-/* The peer the socket helpers work on: the socket handle at +0x04 (which answers how much is
-   readable and takes the close/clear slots), the peer id at +0x0C and the two one-byte state flags
-   at +0x10/+0x18. */
-typedef struct NetworkPeerSocket {
-    void* unused_00;                 /* +0x00 */
+/* The peer the socket helpers work on, modelled as the class it is: the band's own `NetworkPeerSocket`
+   table (0x805F95E0) carries its nine slots and the range dispatches through them - `networkPeer_armDrop`
+   is slot 0x20 of that table, and the loop `networkPeer_resetSlots` drives is slot 0x1C.  The slots the
+   range never reaches are declared so the ones it does keep their offsets; none is defined here, so
+   MWCC emits no table for the class (rule 10).  The fields are the offsets the range addresses: the
+   socket at +0x04, the peer id, the two one-byte state flags, the peer's own 0x2400-byte work area and
+   the connection it registers with at +0x2428. */
+class NetworkPeerSocket {
+public:
+    /* +0x08 */ virtual void destroy(u32 flags);
+    /* +0x0C (GUESS) */ virtual void setInfo(const NetworkPeerInfo* info);
+    /* +0x10 */ virtual void slot_10();
+    /* +0x14 */ virtual void slot_14();
+    /* +0x18 */ virtual void slot_18();
+    /* +0x1C (GUESS) */ virtual void resetSlot(s8 index);
+    /* +0x20 */ virtual void armDrop();
+    /* +0x24 (GUESS) */ virtual s32 init();
+    /* +0x28 (GUESS) */ virtual void close();
+
     NetworkSocketHandle* handle_04;  /* +0x04 - the socket object */
     u32 unused_08;                   /* +0x08 */
     u32 peerId_0C;                   /* +0x0C - the identifier the socket was registered with */
     u8  armed_10;                    /* +0x10 - set while the peer has something to drop */
     u8  pad_11[0x07];                /* +0x11..+0x17 */
     u8  dropped_18;                  /* +0x18 - raised when the drop lands */
-} NetworkPeerSocket;   /* size: 0x1C (approximation - only the fields the range reads are evidenced) */
+    u8  work_19[0x2400];             /* +0x19..+0x2418 - the peer's own work area */
+    u32 workUsed_241C;               /* +0x241C - bytes in use */
+    u8  peerAddress_2420[0x06];      /* +0x2420..+0x2425 - the address the peer publishes */
+    u8  pad_2426[0x02];              /* +0x2426..+0x2427 */
+    NetworkPeerReceive* connection_2428; /* +0x2428 - the connection the peer registers with */
+    char label_242C[0x40];           /* +0x242C..+0x246B - the label the peer publishes */
+    s32  labelSize_246C;             /* +0x246C - bytes of it in use */
+};   /* size: 0x2470 */
 
-/* The peer that keeps its 0x2400-byte receive area inline. */
+/* The connection a peer registers with: its socket at +0x04, the address it was opened on at +0x08,
+   the four peer ids registered on it at +0x10, its own 0x2400-byte receive area at +0x20 and the byte
+   count behind it.  The release and open paths both work on it, which is what fixes the fields the
+   clear helper only implied. */
 typedef struct NetworkPeerReceive {
-    void* unused_00;        /* +0x00 */
-    u8  pad_04[0x1C];       /* +0x04..+0x1F */
-    u8  recv_20[0x2400];    /* +0x20..+0x241F */
-    u32 recvUsed_2420;      /* +0x2420 - bytes received */
+    void* unused_00;                 /* +0x00 */
+    NetworkSocketHandle* handle_04;  /* +0x04 - the socket the connection owns */
+    u8  address_08[0x06];            /* +0x08..+0x0D - the six-byte address it was opened on */
+    u8  pad_0E[0x02];                /* +0x0E..+0x0F */
+    u32 peers_10[4];                 /* +0x10..+0x1F - the peer ids registered on it */
+    u8  recv_20[0x2400];             /* +0x20..+0x241F */
+    u32 recvUsed_2420;               /* +0x2420 - bytes received */
 } NetworkPeerReceive;   /* size: 0x2424 */
+
+/* The record a peer publishes itself from: the six-byte address at +0x00, its connection at +0x08 and
+   the label it answers to with its used length (GUESS on the name - the setInfo slot and the stream
+   writer are the only readers). */
+typedef struct NetworkPeerInfo {
+    u8  address_00[0x06];               /* +0x00..+0x05 */
+    u8  pad_06[0x02];                   /* +0x06..+0x07 */
+    NetworkPeerReceive* connection_08;  /* +0x08 - the connection the peer registers with */
+    char label_0C[0x40];                /* +0x0C..+0x4B - the label it publishes */
+    s32  labelSize_4C;                  /* +0x4C - bytes of it in use */
+} NetworkPeerInfo;   /* size: 0x50 */
 
 /* ---------------- the peer that owns a byte stream -------------------------------------------- */
 
@@ -131,6 +175,20 @@ typedef struct NetworkByteStream {
     u32 size_08;           /* +0x08 - capacity */
     u32 cursor_0C;         /* +0x0C - bytes written so far */
 } NetworkByteStream;   /* size: 0x10 */
+
+/* The sink the stream helpers hand a record to: only its +0x20 slot is called here, it fills the
+   buffer it is given, and it reports how many bytes it took (GUESS: offset-derived - the range never
+   names the class, and the helper stays valid through a pointer). */
+class NetworkStreamSink {
+public:
+    /* +0x08 */ virtual void slot_08();
+    /* +0x0C */ virtual void slot_0C();
+    /* +0x10 */ virtual void slot_10();
+    /* +0x14 */ virtual void slot_14();
+    /* +0x18 */ virtual void slot_18();
+    /* +0x1C */ virtual void slot_1C();
+    /* +0x20 (GUESS) */ virtual s32 fill(u8* out, u32 size);
+};   /* size: 0x04 - only ever reached through a pointer in this unit */
 
 /* ---------------- the record the byte stream copies out --------------------------------------- */
 
@@ -221,24 +279,44 @@ s32 networkPeer_clearReceiveSocket(NetworkPeerSocket* self);
 void networkPeer_armDrop(NetworkPeerSocket* self);
 void networkPeer_clearReceiveBuffer(NetworkPeerReceive* self);
 
+/* the peer class's own entry points: the open path, the record it publishes, its table's constant
+   slots and the two loops that drive its per-slot hooks */
+s32 networkPeer_openSocket(NetworkPeerReceive* self, const u8* address);
+void networkPeer_setInfo(NetworkPeerSocket* self, const NetworkPeerInfo* info);
+s32 networkPeer_init(NetworkPeerSocket* self);
+void networkPeer_close(NetworkPeerSocket* self);
+void networkPeer_resetSlots(NetworkPeerSocket* self);
+void networkPeerBuffer_slot0C(NetworkPeerBuffer* self);
+s32 networkPeerBuffer_slot18(NetworkPeerBuffer* self);
+void networkPeerBuffer_slot20(NetworkPeerBuffer* self);
+s32 networkPeerBuffer_slot48(NetworkPeerBuffer* self);
+void networkPeerBuffer_slot50(NetworkPeerBuffer* self);
+s32 networkPeerBuffer_reset(NetworkPeerBuffer* self);
+
+/* The connection registry inside the range that logs through its own `NetworkSingleTcp::remove`
+   message; the range reaches it through the peer's +0x2428 connection. */
+void NetworkSingleTcp_remove(NetworkPeerReceive* connection, NetworkPeerSocket* peer);
+
 /* the byte stream */
 void networkPeerStream_putByte(NetworkByteStream* self, u8 value);
 void networkPeerStream_forwardRecord(NetworkByteStream* self, NetworkPeerBuffer* sink);
+void networkPeerStream_pullRecord(NetworkByteStream* self, NetworkStreamSink* sink);
+void networkPeerStream_putRecord(NetworkByteStream* self, const NetworkPeerRecord* record);
+void networkPeerStream_putU16(NetworkByteStream* self, u16 value);
+void networkPeerStream_putU32(NetworkByteStream* self, u32 value);
 void networkPeerStream_takeByte(NetworkByteStream* self, u8* out);
+void networkPeerStream_takeU32(NetworkByteStream* self, u32* out);
 void networkPeerStream_takeRecord(NetworkByteStream* self, NetworkPeerRecord* record);
 void networkPeerStream_readLength(NetworkByteStream* self, u16* out);
 
 /* the peer name */
 s32 networkPeer_setName(NetworkPeerConfig* self, const char* name);
 
-/* the two socket-teardown tails and the two helpers they tail into.  The two `release*` bodies are
-   NOT written yet (they load a logger singleton and a log string, both of which the `.data` blocker
-   above covers), so this unit references two symbols it does not define - a link-time residual for
-   whoever flips the unit, recorded in the unit header. */
-void networkPeer_disconnect(NetworkPeerBuffer* self);
-void networkPeer_disconnectSocket(NetworkPeerBuffer* self);
-void networkPeer_release(NetworkPeerBuffer* self);
-void networkPeer_releaseSocket(NetworkPeerBuffer* self);
+/* the two socket-teardown tails and the two helpers they tail into */
+void networkPeer_disconnect(NetworkPeerReceive* self);
+void networkPeer_disconnectSocket(NetworkPeerReceive* self);
+void networkPeer_release(NetworkPeerReceive* self);
+void networkPeer_releaseSocket(NetworkPeerReceive* self);
 
 /* the record table */
 void networkPeer_resetCode(NetworkPeerRecordTable* self);
