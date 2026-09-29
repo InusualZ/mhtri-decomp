@@ -456,8 +456,60 @@ because it is finished.
 | `tools/splits/tudiscover.py` | **you need a TU boundary**: propose the translation-unit seam around an address, offline, from the data-section referrer runs. |
 | `tools/units/callees.py` | **you are about to write bodies**: name a unit's callees — every generated symbol its bodies reference, its owner, the call shape — before rule 7 bites. |
 | `tools/units/callers.py` | **you need "who calls / who reads this"**: the whole-DOL caller index, **address-keyed** because the `asm/` dump is stale (rule 12's evidence tool; the session called it the single most useful recon tool). |
+| `tools/units/dataclaim.py --unit U` | **rule 12 bit you (an `extern` of unowned data)**: every data symbol U references but does not own, its census sharers, and the exact `splits.txt` claim / named data-only unit to paste. Read-only; it never writes `splits.txt`. |
 | `tools/units/langcheck.py` | **a unit's language is in question**: decide C vs C++ from evidence (a mangled definition, a `.cpp` `__FILE__` string), never from convenience. |
 | `tools/units/recordmerge.py` | **two lanes each hold a view of the same record header**: fold them into one definition with the checks the hand passes lacked. |
+
+#### 9.4.1 Claiming data: rule 12's three shapes, and the two recipes lanes kept re-deriving
+
+Rule 12 (`docs/plan.md` §6.5) refuses an `extern` of data **no registered `splits.txt` range covers**,
+and unlike rule 7 there is no rename remedy — the only remedies are ownership changes. There are exactly
+three shapes, and `dataclaim.py --unit U` decides between them mechanically (the address, the section, the
+map symbol and its **extent**, the registered owner, who else reads it, and the claim to paste):
+
+1. **Ordinary.** The range is free: claim it into the unit being worked. The claim must cover the
+   **whole** map symbol extent (`symbols.txt`'s `size:`), and a claim's `end:` must be **4-aligned** — a
+   partial `.sdata`/`.sdata2` claim does not link.
+2. **Span.** The unit already owns a run of that section: claim the **contiguous span, gap included**.
+3. **Named data-only unit.** A pool/table several units read: register a **named** unit that owns it.
+
+The first is `docs/plan.md` rule 12 itself. The other two are the recipes worth spelling out, each with
+the failure it prevents.
+
+**Recipe 1 — the span claim (a second run of one section).** A unit that claims several runs of one
+section must own the bytes *between* them. Claiming a band's jump tables but not the unnamed blobs
+between them splits the range against dtk's own `auto_<n>_<addr>_data` unit; that unit then lands *inside*
+the claiming unit's address range and `dtk dol split` stops with
+`Cyclic dependency encountered while resolving link order: <unit> -> auto_<n>_<addr>_data` (playbook 53,
+`fn_80429B94`). Either claim every run of that section, or drop a run entirely; a *leading* or *trailing*
+unclaimed run is harmless (one direction, no cycle) — only a run **between** two of the unit's own does
+this. The fix is one line: merge the two ranges into the span that covers both, gap included.
+`dataclaim.py --unit U` prints that line whenever `U` already owns a run below the symbol.
+
+**Recipe 2 — the named data-only unit (a shared pool/table).** When a pool several units read has no
+owner, do **not** claim it into one reader: a partial `.sdata2`/`.sdata` claim cannot be linked, and if
+the bytes are not one unit's own the claim would also be wrong. Register a **named data-only unit**: a
+`splits.txt` range covering the whole pool, a `symbols.txt` name, and a source file that **defines
+nothing**. That is legitimate, not a cheat: the unit is `NonMatching`, so the original bytes stay in the
+binary and the **DOL is untouched**, while the range gains an owner — strictly better than the anonymous
+`auto_XX_data` unit dtk would otherwise create. The consumers then `#include` the owner's header and
+declare into it (rule 2's home). One owner per pool.
+
+```
+# splits.txt
+Pl/sdata2_pool.cpp:
+	.sdata2     start:0x80799E00 end:0x8079A000
+
+# symbols.txt
+Pl/sdata2_pool = .sdata2:0x80799E00; // type:object size:0x200
+
+# src/Pl/sdata2_pool.cpp   - NonMatching, defines nothing
+```
+
+The failure this prevents is the inverse of recipe 1's: claiming a shared pool (or a `.sdata2` sub-range)
+into one reader either fails to link or re-attributes bytes another unit also emits. `dataclaim.py --unit U`
+names the sharers from `callers.py`'s census and prints the block above whenever a referenced pool is read
+by a unit other than `U`.
 
 ### 9.5 The rules and the audits
 
