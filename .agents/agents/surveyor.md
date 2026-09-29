@@ -52,6 +52,20 @@ prints the address, section, **extent**, owner, whether it is private to the uni
 remedy, and the exact `splits.txt` line to paste. It reuses the campaign's census, so its reader counts are the
 ones the rest of the tooling agrees with.
 
+`python tools/units/vtableaudit.py --diff <ref>` is the other tool that shapes a claim, and it belongs beside
+`dataclaim.py`: for any range that holds **code-pointer runs** - a vtable, a function-pointer record, a switch
+table - **rule 10, not rule 12, is the binding constraint**. `dataclaim.py` does not model rule 10, so its top
+remedy can be a gate refusal; the first lane to run this profile measured a maximal `.data` claim at **4 added
+rule-10 violations** and it was refused. A run the unit owns and neither emits nor references is the violation,
+so before you commit a claim that spans code-pointer words, run `vtableaudit.py --diff` on it and treat a grown
+rule-10 set as a refusal of the claim, not a note for the gate.
+
+**The briefed claim is a transcription, not the authority.** Generate the range from the tree - the unit's
+registered rows in `config/RMHE08/splits.txt` (`git grep "<Unit>" config/RMHE08/splits.txt`) - never from the
+brief's prose. The first lane's brief named a `.data` range that **another registered unit owned**; one grep
+caught it, and a lane that trusted the brief would have claimed a neighbour's bytes. A claim transcribed from
+prose can be a silent theft, so the survey starts by diffing the briefed range against `splits.txt`.
+
 ## The three claim shapes, and how to choose
 
 * **`claim-into-unit`** - the range is free and effectively yours. Claim the **whole map symbol extent**, and a
@@ -119,9 +133,15 @@ On your branch (committed, and named in your report):
 2. **A survey report** in `MAIN/.pi/notes/<slug>.md` and `MAIN/.pi/outbox/<slug>.json` (`<slug>` = your branch
    minus `worker/`): per section, what the unit needs, what it owns, the verdict, the evidence and the risk; the
    ranges you left unclaimed with the reason; and how far the next decompiler can get before it hits a wall.
+3. **The claim's ordering** - for every range whose claim depends on code that does not exist yet, say what must
+   be true first. A range holding code-pointer runs becomes claimable only *after* the class that emits it - or
+   the function that stores it - is reconstructed: **the claim follows the class reconstruction, it does not
+   precede it**. Name the dependency and the range it unblocks, so the decompiler writes that class first and
+   returns for the claim, instead of the claim sitting in the tree as a rule-10 refusal.
 
 Close with: the branch, the commit id, the claim diff, the two measurements, the tiling or sum proof for any
-partition, and the single sentence a decompiler most needs - **what it can now write that it could not before.**
+partition, the single sentence a decompiler most needs - **what it can now write that it could not before** -
+and, for any sequenced claim, **what must be reconstructed first**.
 
 ## Type and naming discipline (section 6.5)
 
