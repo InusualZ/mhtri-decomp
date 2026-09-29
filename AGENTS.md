@@ -530,7 +530,8 @@ one unit, a function missing from the report is 0 %). Follow skill **`.agents/sk
    unbuildable - a bug, not a state.
 4. **Add the splits** to `config/RMHE08/splits.txt`: one line per section with exact `start:`/`end:`
    addresses, including the small `.ctors`/`.dtors`/`.sdata` fragments that runtime units own (Wii linkers
-   use `.ctors$10`, `.dtors$10`, `.dtors$15` — see `docs/getting_started.md`, "GC 2.7+ and Wii linkers").
+   use `.ctors$10`, `.dtors$10`, `.dtors$15` — the GC 2.7+/Wii linker gives each constructor/destructor
+   chain its own `$`-suffixed section, so a runtime unit owns its own fragment).
 5. **Compile and diff:**
    `python configure.py && ninja build/RMHE08/src/Dir/file.o`, then produce/refresh the report and inspect
    the unit's per-function diff (objdiff GUI reads the generated `objdiff.json`). When it does not match,
