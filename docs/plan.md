@@ -69,7 +69,7 @@ The campaign is not one loop; it is four phases with different economics, and co
 | unclaimed (proposal backlog, §1) | **20 224 functions** |
 | per module | `Runtime.PPCEABI.H` 19 of 20 symbols at 100 % (`__register_fragment` 93.68 %); `Pl` 3 units, 150+ of 189 closed (`pl_master` 99.99 %, `pl_skill` 96.07 %, `pl_act` 93.75 %); `main.cpp` 47 functions, 37 at 100 %; `sys_mem.cpp` complete; the `auto/` unit `80040598_fn_80040598` 97.19 % (its home is now `src/fn_80040598.cpp`, §12); `Camellia` 99.97 % and `RSO` 99.71 % (both with named residuals), `g3d`, `OS`, `Network` at 100 % |
 | flags landed | `cflags_main` (`-O3 -inline noauto`), `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`), `cflags_ppceabi` (`cflags_runtime` + `-func_align 4`) — each with its instruction-level evidence in `configure.py`. **The flag *set* is under audit (2026-09-28) and this plan asserts no default set**: see §8.2 and `.pi/notes/flags-audit-645d.md` |
-| tooling that exists | `ledger.py`, `attribute.py` (+ selftest), `symbolpreflight.py`, `tudiscover.py`, `dump_asm.py`, `m2cinput.py` (+ selftest), `symedit.py`, `symdiff.py`, `mt.py`, `prepcommit.py`, `localonly.py`, `tools/m2c` (submodule) - plus the **analysis tier** a residual leads to: `tools/mwcc-debugger/` (the compiler's own IR - the PCode after each optimizer pass, gated by `locate/verify_pcode.py`), `tools/mwlink_debugger.py` (the linker's own run: `trace`/`diagnose`/`verify`/`align`/`order`, the link step is **Wii/1.0**), `tools/units/callers.py` (who calls this / who reads this, whole-DOL and address-keyed) and `tools/units/flipcheck.py` (is this object flip-ready) |
+| tooling that exists | `ledger.py`, `attribute.py` (+ selftest), `symbolpreflight.py`, `tudiscover.py`, `dump_asm.py`, `m2cinput.py` (+ selftest), `symedit.py`, `symdiff.py`, `mt.py`, `prepcommit.py`, `tools/m2c` (submodule) - plus the **analysis tier** a residual leads to: `tools/mwcc-debugger/` (the compiler's own IR - the PCode after each optimizer pass, gated by `locate/verify_pcode.py`), `tools/mwlink_debugger.py` (the linker's own run: `trace`/`diagnose`/`verify`/`align`/`order`, the link step is **Wii/1.0**), `tools/units/callers.py` (who calls this / who reads this, whole-DOL and address-keyed) and `tools/units/flipcheck.py` (is this object flip-ready) |
 
 Everything above is *derived*, never remembered: `python tools/units/ledger.py` reads `symbols.txt` (through
 `symedit.py`), `splits.txt`, `configure.py` and `build/RMHE08/report.json`. A stale `report.json` lies — the
@@ -226,7 +226,7 @@ time) is still written and a stale one is reclaimed.
 **`release` fails closed, and the live lane is read from the harness, not inferred.** A release detaches the
 slot, runs `clean -ffdx` and deletes the branch, so it refuses (printing every reason and offering `--force`)
 when a **live Claude session's `cwd` resolves into the slot**, when the tree is dirty (`git status
---porcelain`, minus an `CLAUDE.md` whose only difference is its LOCAL-ONLY block), or when HEAD holds
+--porcelain`, `CLAUDE.md` included), or when HEAD holds
 **commits no branch reaches**. The run record is the only live-lane signal there is: a lock cannot see a lane
 (the project proved it twice - the lane that worked in MAIN and left no slot file, and the 2026-09-28 release
 that ran while another lane was still working in the slot and detached HEAD under the live process), so
@@ -534,8 +534,8 @@ the residual in the header — the `CLAUDE.md` playbook rows are that second pas
 
 One commit per unit (or per batch registered together), area-prefixed and imperative, carrying the sources, the
 registration, the flags it proved and the knowledge delta. `prepcommit.py` stages explicit paths only, refuses
-build/original/scratch output, verifies the DOL SHA-1, and handles the `CLAUDE.md` LOCAL-ONLY block
-(non-negotiable 8). The local-only `## Current task / plan` block is updated **in the same commit**. History is
+build/original/scratch output, and verifies the DOL SHA-1. Live working state is kept in `.pi/state.md`, not in `CLAUDE.md`
+(non-negotiable 8). History is
 never rewritten; nothing is ever pushed.
 
 ### 6.5 Type and naming discipline — mandatory in phases B and C
@@ -712,7 +712,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.15 | worktree-safe measurement | a fresh worktree has no `build/` and cannot measure at all; this blocks the first 4-worker round | a worker in a worktree measures its own object against `MAIN`'s target and prints both paths | inside 7.1 |
 | 7.16 | `land.py` owns the baseline | `ninja changes` compares against a `baseline.json` nobody refreshes, so a per-batch regression can hide | `verify` refreshes the baseline after a green batch and reports the batch's own delta | inside 7.5 |
 | 7.17 | **done** - `tools/units/dataqueue.py` writes the queue; `dataclaim.py` (7.8) still has to consume it | data is 18.5 % of the DOL (1 233 640 B, 45 176 symbols, 720 B matched) and its queue is comments nothing reads | every data run `attribute.py` sees is in the queue with a verdict, and `land.py` reports the queue's size | ~40 |
-| 7.18 | **ground-truth guard**: `prepcommit.py` refuses `config/RMHE08/build.sha1` and `config/RMHE08/config.yml`, and a tracked **`tools/git/hooks/pre-commit`** (enabled with `git config core.hooksPath tools/git/hooks` — local config, so 7.18 also states the checks that do *not* depend on a hook: `prepcommit.py`'s and `land.py`'s path refusals) refuses `orig/**`, `build/` and the LOCAL-ONLY block on **any** commit path | `prepcommit.classify('config/RMHE08/build.sha1')` returns `stage` today: a worker or I could rewrite the DOL's expected hash and commit it, after which green `ok` means nothing | a staged `build.sha1` is refused, and the hash is checked against `orig/RMHE08/sys/main.dol`'s own sha1 | ~40 |
+| 7.18 | **ground-truth guard**: `prepcommit.py` refuses `config/RMHE08/build.sha1` and `config/RMHE08/config.yml`, and a tracked **`tools/git/hooks/pre-commit`** (enabled with `git config core.hooksPath tools/git/hooks` — local config, so 7.18 also states the checks that do *not* depend on a hook: `prepcommit.py`'s and `land.py`'s path refusals) refuses `orig/**` and `build/` on **any** commit path | `prepcommit.classify('config/RMHE08/build.sha1')` returns `stage` today: a worker or I could rewrite the DOL's expected hash and commit it, after which green `ok` means nothing | a staged `build.sha1` is refused, and the hash is checked against `orig/RMHE08/sys/main.dol`'s own sha1 | ~40 |
 | 7.19 | link-order audit for flips | 13 584 objects link in 66-131 s now; with hundreds of `Matching` units the order, pool placement and symbol collisions become real | after a batch of flips, compare `main.MAP`'s section/symbol order against the original and diff the DOL | ~60 |
 | 7.20 | transactional `attribute.py apply` | `apply` writes `splits.txt` first and can leave a half-registration; `plan` can propose overlapping data spans | no proposal overlaps a claimed range, both shared files are written via temp+rename, and a failure restores them | ~40 |
 | 7.21 | `tools/units/stylelint.py` - the rules of §6.5 | 19 units carry 376 auto-generated names, 237 pointer-arithmetic field accesses, 320 `unk*` fields, **0** struct-size annotations, and now a `goto` backlog in `Pl/pl_act`/`Pl/pl_skill`; a rule enforced by remembering is not a rule | flags each rule as `file:line` (including `\bgoto\b` and an unmarked `void *` parameter or return), reports a per-unit backlog (`--budget`), and `land.py` refuses a batch that **adds** a violation | ~140 |
@@ -852,7 +852,7 @@ would make every later `ok` meaningless (7.18 enforces it). Never commit build o
 scratch. Never change compiler flags/`mw_version`/tool tags to make something build - a flag change needs
 instruction-level evidence and is called out explicitly. `Matching` only when byte-identical. Do not rename or
 delete a map symbol unless nothing else depends on it. Never rewrite history, never push. Never print
-`symbols.txt`. Never commit the LOCAL-ONLY block.
+`symbols.txt`.
 
 **8.2 Flag policy.** A scoped `#pragma` in the source is for **one unit's** deviation; a **lib** flag is for when
 **two or more units of that lib agree** on the real command line (that is how `Pl`'s four flags were settled:
@@ -939,8 +939,8 @@ relocations, not expressible in C
 6. `pl_master`'s `fn_8026F908` (9 bytes) is an allocator colouring tie-break — recorded, not chased.
 7. Artifacts for the owner are **light-theme** (owner preference, 2026-09-22).
 
-`CLAUDE.md`'s local-only block is a **pointer to this file**, not a second queue: where the two disagree, this
-file wins and the block is corrected in the same commit.
+`.pi/state.md` is a **pointer to this file**, not a second queue: where the two disagree, this
+file wins and the state file is corrected in the same commit.
 
 **Escalation queue (open):** a re-attribution the `preflight` verdict calls `approve`; a `never touch` owner; a
 policy question; a batch that would exceed the standing commit approval. Keep working on the rest and hand the
@@ -998,7 +998,7 @@ Measured cost 2026-09-27: **~29 s wall** (8 workers) on a current build tree, do
 (27 s) and `claims.py --selftest` (20 s) which run concurrently - so the added gate row costs well under a minute,
 and `land.py verify --no-selftests` skips it outright if a landing must be fast.
 
-**Handover.** Before a compaction or the end of a session: the local-only block says which batch is open, the
+**Handover.** Before a compaction or the end of a session: `.pi/state.md` says which batch is open, the
 ledger is the state, and anything worth keeping is in `docs/`, a skill, `CLAUDE.md` or a unit header. A finding
 that lives in a reply is lost — that has already happened once here.
 
@@ -1376,7 +1376,6 @@ and `tools/units/dataqueue.py::write_queue`, which duplicates the same primitive
 | four agents editing one file | worktrees + branches (§5.1), one writer per unit, `land.py`'s file-set check |
 | a worker in a worktree cannot measure (no `build/`, no `build.ninja`) | 7.15 — `MAIN` resolution, explicit `--target`/`--flags`, the submodule init; the first worktree round does not start without it |
 | a worker's commits silently dropped by a tip-only cherry-pick | §5.1's one-commit rule, or a range cherry-pick |
-| committing the LOCAL-ONLY block | non-negotiable 8, `prepcommit.py`/`localonly.py` |
 | rewriting the DOL's ground truth (`build.sha1`) | 7.18's refusal + the sha1 cross-check against `orig/RMHE08/sys/main.dol` |
 | a worker's diff landing on `main` before verification | `git cherry-pick --no-commit` → verify → commit (§5.1) |
 | a worktree that cannot be removed (submodule, untracked evidence) | no submodule in worktrees; evidence in `MAIN/.pi/`; `remove --force` + `branch -D` + `prune` (7.2) |

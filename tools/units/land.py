@@ -113,9 +113,7 @@ The pathspec still takes every *allowed* dirty path, so an unrelated edit that w
 working tree rode the next commit twice on 2026-09-24 (a prepared `docs/plan.md` under `85ddd7b6`, a
 `src/RSO/runtime.c` header under `890631e8`). `record-base` now snapshots the paths already dirty when the
 batch opens (`dirty_at_base`), and `land_stageable` excludes one unless the batch names it as a unit - the
-snapshot is the only way to tell "already dirty at the base" from "dirty because of this batch". CLAUDE.md's
-LOCAL-ONLY block is the one exception: it is live state that is always dirty, not foreign work, so only a
-real edit outside the block enters the snapshot.
+snapshot is the only way to tell "already dirty at the base" from "dirty because of this batch".
 
 The one outside-the-batch path this gate does not refuse is **tool scratch**: `d<digits>.json` /
 `t<digits>.json` in the repo root, the objdiff `diff` dumps a tool leaves behind (`65492794` ignored them, but
@@ -187,7 +185,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "agents"))
 
 import unitutil  # noqa: E402
 import prepcommit as pc  # noqa: E402
-import localonly  # noqa: E402
 from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
 from units import handoff as handoff_mod  # noqa: E402
@@ -310,41 +307,11 @@ def git(args: list[str], cwd: str, check: bool = True) -> str:
     return p.stdout
 
 
-def agents_md_real_change(main: str) -> bool:
-    """True when CLAUDE.md differs from HEAD beyond its LOCAL-ONLY working-state section.
-
-    CLAUDE.md is dirty between every commit because the LOCAL-ONLY block is live state (non-negotiable 8),
-    so recording it as foreign in the base snapshot would stop `land` committing *any* CLAUDE.md edit - the
-    block would be the only thing the snapshot ever saw. `localonly.find_block` is the marker parser of
-    record, so reuse it rather than re-deriving the cut (rule 8's own text mentions the markers).
-    """
-    path = os.path.join(main, "CLAUDE.md")
-    if not os.path.exists(path):
-        return False
-    head = git(["show", "HEAD:CLAUDE.md"], main, check=False)
-    if not head:
-        return False          # untracked: `land_stageable` already refuses it, so the answer does not matter
-    try:
-        with open(path, encoding="utf-8", newline="") as fh:
-            text = fh.read()
-        found = localonly.find_block(text)
-    except (OSError, SystemExit):
-        return True           # unreadable or malformed: treat it as a real change, the conservative choice
-    if not found:
-        return True
-    start, _end, trimmed = found
-    stripped = text[:start] + text[trimmed:]
-    return stripped.replace("\r\n", "\n") != head.replace("\r\n", "\n")
-
-
 def record_base(main: str, units: list[str] | None = None) -> dict:
     head = git(["rev-parse", "HEAD"], main).strip()
     # HEAD == base here, so `changed_paths` is exactly "what was already dirty when the batch opened":
     # tracked edits and untracked files alike. `land_stageable` reads it back as the foreign-path guard.
-    # CLAUDE.md is the one exception: its LOCAL-ONLY block is live state, so only a real edit counts.
     dirty = changed_paths(main)
-    if "CLAUDE.md" in dirty and not agents_md_real_change(main):
-        dirty = [p for p in dirty if p != "CLAUDE.md"]
     data = {"base": head, "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "subject": git(["log", "-1", "--format=%s"], main).strip(),
             "ledger": ledger_numbers(main), "report": report_snapshot(main),
@@ -1137,28 +1104,13 @@ def require_clean_tree(main: str) -> str | None:
 
     One implementation and one message for every entry point, because a dirty tree blocks the gate twice
     over: `record-base` records the dirt as foreign work (so `land_stageable` excludes the batch's own
-    paths), and the pick aborts on a file the dirt already touched.  CLAUDE.md's LOCAL-ONLY block is always
-    dirty by design and is not a real change (`agents_md_real_change`).
+    paths), and the pick aborts on a file the dirt already touched.  Every row is dirt, CLAUDE.md included.
     """
     rows = changed_status(main)
-    # What counts as dirt: every row, except an CLAUDE.md whose LOCAL-ONLY block is its only difference.
-    # The LOCAL-ONLY block is live working state (rule 8) and is dirty in every tree, so it is judged once
-    # per call, not once per row.
-    agents_clean = "CLAUDE.md" in [p for _c, p in rows] and not agents_md_real_change(main)
-    dirty: list[str] = []
-    kept: list[str] = []
-    for code, path in rows:
-        if path == "CLAUDE.md" and agents_clean:
-            continue
-        dirty.append("%s %s" % (code or "??", path))
-        kept.append(path)
+    dirty = ["%s %s" % (code or "??", path) for code, path in rows]
     if not dirty:
         return None
-    # the paths in the suggested command are the *dirty* ones, not every row: an CLAUDE.md that was just
-    # excluded (live state) must not be offered for stashing - the reader is being told what to clean, and
-    # stashing live working state is not that.  (`paths` used to be built from `rows`, so the command named
-    # CLAUDE.md in exactly the case where it had just been ruled clean.)
-    paths = " ".join(kept)
+    paths = " ".join(path for _code, path in rows)
     return ("main's tree is not clean: %s\n  a dirty tree is recorded as foreign work at `record-base` "
             "and aborts the pick, so clean it first, e.g.:\n"
             "    git -C %s stash push --include-untracked -- %s\n"
@@ -2869,21 +2821,13 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     if subject is not None:
         # the guard above means subject is a real one here, never the empty shell substitution
         write_land_message(main, message_body_with_subject(open(msg_file, encoding="utf-8").read(), subject))
-    agents_md = "CLAUDE.md" in stageable
-    if agents_md:
-        pc.localonly("pull")  # the LOCAL-ONLY block must not be committed (non-negotiable 8)
-    try:
-        stage_batch(main, stageable)
-        foreign = staged_elsewhere(main, stageable)
-        if foreign:
-            print(foreign_warning(foreign), file=sys.stderr)
-        # A pathspec, never a bare `git commit`: that takes the whole index and is how another stream's staged
-        # edit landed under the batch's message twice on 2026-09-23. `git commit -- <paths>` reads the working
-        # tree, so the LOCAL-ONLY block goes back into CLAUDE.md *after* the commit, never before it.
-        p = commit_pathspec(main, msg_file, stageable)
-    finally:
-        if agents_md:
-            pc.localonly("push")
+    stage_batch(main, stageable)
+    foreign = staged_elsewhere(main, stageable)
+    if foreign:
+        print(foreign_warning(foreign), file=sys.stderr)
+    # A pathspec, never a bare `git commit`: that takes the whole index and is how another stream's staged
+    # edit landed under the batch's message twice on 2026-09-23.
+    p = commit_pathspec(main, msg_file, stageable)
     if p.returncode != 0:
         clear_land_message(main)
         tail = ((p.stderr or p.stdout) or "").strip().splitlines()
@@ -2927,7 +2871,7 @@ def selftest() -> int:
     check("outside the batch: build", outside_batch(["build/RMHE08/main.dol"]), ["build/RMHE08/main.dol"])
     check("outside the batch: ground truth", outside_batch(["config/RMHE08/build.sha1"]),
           ["config/RMHE08/build.sha1"])
-    check("outside the batch: the local-only state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
+    check("outside the batch: the campaign state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
 
     # a `--units` entry that names a repo PATH is not a unit: it has no `Object(...)` line, no splits.txt
     # block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows must skip it. The extension
@@ -3930,8 +3874,8 @@ def selftest() -> int:
     check("... and not just 'build stopped'", ninja_detail.rstrip().endswith("subcommand failed."), False)
 
     # the snapshot the guard reads: `record_base` must capture what was dirty when it ran, so a path the
-    # batch edits afterwards is batch material and one that was dirty before it is foreign. CLAUDE.md is
-    # special: its LOCAL-ONLY block is live state and always dirty, so only a real edit may enter the set.
+    # batch edits afterwards is batch material and one that was dirty before it is foreign. CLAUDE.md is an
+    # ordinary tracked file here: an edit to it is foreign when dirty at the base and stageable when named.
     with tempfile.TemporaryDirectory() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
@@ -3948,14 +3892,14 @@ def selftest() -> int:
         check("record_base snapshots the dirty set", data.get("dirty_at_base"), ["src/a.c"])
         check("the snapshot is read back", base_dirty_paths(tmp), {"src/a.c"})
         with open(os.path.join(tmp, "CLAUDE.md"), "w", encoding="utf-8") as fh:
-            fh.write("base agents\n" + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
-        check("a LOCAL-ONLY-only CLAUDE.md is not foreign",
-              "CLAUDE.md" in (record_base(tmp).get("dirty_at_base") or []), False)
-        with open(os.path.join(tmp, "CLAUDE.md"), "w", encoding="utf-8") as fh:
-            fh.write("base agents\nedited outside the block\n"
-                     + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
-        check("a real CLAUDE.md edit is foreign",
+            fh.write("base agents\nedited\n")
+        check("a CLAUDE.md edit dirty at the base is foreign, like any file",
               "CLAUDE.md" in (record_base(tmp).get("dirty_at_base") or []), True)
+        check("... and a CLAUDE.md edit the batch names is stageable with no special casing",
+              "CLAUDE.md" in land_stageable(["CLAUDE.md"], changed_status(tmp), base_dirty_paths(tmp)), True)
+        check("... and one the batch does not name, dirty at the base, is left alone",
+              "CLAUDE.md" in land_stageable(["src/a.c"], changed_status(tmp), base_dirty_paths(tmp)), False)
+        check("... and the clean-tree gate treats it as dirt", "CLAUDE.md" in (require_clean_tree(tmp) or ""), True)
 
     with tempfile.TemporaryDirectory() as tmp:
         repo_git(tmp, "init", "-q")
@@ -4464,18 +4408,12 @@ def selftest() -> int:
         check("... naming the path", "src/a.cpp" in (dirty or ""), True)
         check("... and the exact clean command", "stash push --include-untracked" in (dirty or ""), True)
         repo_git(tmp, "checkout", "--", "src/a.cpp")
-        open(os.path.join(tmp, "CLAUDE.md"), "w", encoding="utf-8").write(
-            "base\n" + localonly.BEGIN + "\nworking state\n" + localonly.END + "\n")
-        check("clean-tree: a LOCAL-ONLY-only CLAUDE.md is not dirty", require_clean_tree(tmp), None)
-        # ... and when something ELSE is dirty, the suggested stash command names only that something: an
-        # CLAUDE.md that was just ruled clean is not offered for stashing (its block is live state).
         with open(os.path.join(tmp, "src", "a.cpp"), "w", encoding="utf-8") as fh:
             fh.write("real dirt\n")
         message = require_clean_tree(tmp) or ""
         check("clean-tree: the dirt is refused", "main's tree is not clean: M src/a.cpp" in message, True)
         check("... and the stash command names it", "stash push --include-untracked -- src/a.cpp" in message,
               True)
-        check("... but not the CLAUDE.md it just ruled clean", "CLAUDE.md" not in message, True)
         repo_git(tmp, "checkout", "--", "src/a.cpp")
 
     def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
@@ -4628,12 +4566,11 @@ def selftest() -> int:
 
     # --- F34: the gate's own decode, and the lint that keeps it that way ---------------------------------
     # `land.run` used `text=True` with no codec, so git's UTF-8 stdout was decoded with the host's locale
-    # codec (`cp1252` here) while `agents_md_real_change` compared it against CLAUDE.md read as UTF-8.  One
-    # em dash in CLAUDE.md's prose made the two spellings differ, the comparison never matched, and the
-    # landing gate refused *every* landing with "main's tree is not clean: M CLAUDE.md" - a false refusal
-    # (the file is byte-equal to HEAD once the LOCAL-ONLY block is cut, and `PYTHONUTF8=1` flipped the same
-    # call to False).  The fixture is that em dash at byte level: a check that decodes through the locale is
-    # exactly the failure it is here to catch, so it must not itself be host-dependent.
+    # codec (`cp1252` here) while a file was compared against it read as UTF-8.  One em dash in CLAUDE.md's
+    # prose made the two spellings differ, and the landing gate refused *every* landing with "main's tree is
+    # not clean: M CLAUDE.md" - a false refusal.  The fixture is that em dash at byte level: a check that
+    # decodes through the locale is exactly the failure it is here to catch, so it must not itself be
+    # host-dependent.
     dash = "\u2014"
     probe = run([sys.executable, "-c", "import sys; sys.stdout.buffer.write(bytes.fromhex('%s'))"
                  % dash.encode("utf-8").hex()], SELF_REPO)
@@ -4642,23 +4579,17 @@ def selftest() -> int:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         prose = "prose with an em dash %s in it\n" % dash
-        _write_tree(tmp, {"CLAUDE.md": prose})            # committed: rule 8 keeps the block out of HEAD
+        _write_tree(tmp, {"CLAUDE.md": prose})
         head_text = run(["git", "show", "HEAD:CLAUDE.md"], tmp).stdout
         head_bytes = subprocess.run(["git", "show", "HEAD:CLAUDE.md"], cwd=tmp,
                                     capture_output=True).stdout
         check("F34: `run` returns HEAD's em dash, not its cp1252 spelling", dash in head_text, True)
         check("... where a locale decode of those same bytes would not have matched",
               dash in head_bytes.decode("cp1252", "replace"), False)
+        check("F34: an unchanged non-ASCII CLAUDE.md is clean", require_clean_tree(tmp), None)
         with open(os.path.join(tmp, "CLAUDE.md"), "w", encoding="utf-8", newline="") as fh:
-            fh.write(prose + localonly.BEGIN + "\nlive working state\n" + localonly.END + "\n")
-        check("F34: non-ASCII prose plus a LOCAL-ONLY block is not a real change",
-              agents_md_real_change(tmp), False)
-        check("... so the clean-tree gate lets the landing through", require_clean_tree(tmp), None)
-        with open(os.path.join(tmp, "CLAUDE.md"), "w", encoding="utf-8", newline="") as fh:
-            fh.write("prose with an em dash %s and an EDIT\n" % dash
-                     + localonly.BEGIN + "\nlive working state\n" + localonly.END + "\n")
-        check("... while a real edit outside the block still refuses", agents_md_real_change(tmp), True)
-        check("... naming CLAUDE.md", "CLAUDE.md" in (require_clean_tree(tmp) or ""), True)
+            fh.write("prose with an em dash %s and an EDIT\n" % dash)
+        check("... while a real edit is dirt, naming CLAUDE.md", "CLAUDE.md" in (require_clean_tree(tmp) or ""), True)
 
     strays = sp.trap_sites(SELF_REPO)
     check("every text-mode subprocess call in tools/ pins its codec (F34's rule)", strays, [])

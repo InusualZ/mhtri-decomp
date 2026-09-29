@@ -1,25 +1,5 @@
 #!/bin/sh
-# Post-commit guard (docs/plan.md 7.18). The pre-commit hook pulled the LOCAL-ONLY block out of a staged
-# CLAUDE.md to make the commit legal (non-negotiable 8); this puts it back into the working tree now that the
-# commit exists.
-#
-# The marker pre-commit writes is the whole state machine: it survives a *failed* commit (post-commit never
-# runs), so the block stays in `.pi/local-only.state.json` and `python tools/agents/localonly.py push`
-# restores it; the next successful commit restores it here automatically.
-#
-#   git config core.hooksPath tools/git/hooks
-#
-# A push failure is reported but never fails the commit - the commit already happened, and the state file
-# still holds the block.
-
-root=$(git rev-parse --show-toplevel)
-marker=$(git rev-parse --git-path localonly-pending)
-[ -f "$marker" ] || exit 0
-
-if python "$root/tools/agents/localonly.py" push; then
-    rm -f "$marker"
-else
-    echo "post-commit: localonly push failed - the LOCAL-ONLY block is still stored in .pi/local-only.state.json" >&2
-    echo "  restore it with: python tools/agents/localonly.py push" >&2
-fi
+# Retired: the CLAUDE.md local-only block no longer exists, so there is nothing to push back.
+# The file is removed by a direct commit after the landing (the gate cannot land the deletion of an
+# extension-less path - it reads it as a unit name).
 exit 0

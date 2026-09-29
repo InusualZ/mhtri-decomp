@@ -241,8 +241,8 @@ def build_block(section):
 def markers(text):
     """(begin_index, end_index) line numbers of the block's markers, matched on whole lines.
 
-    Matched on whole lines on purpose: the marker text may also be quoted in prose, and `localonly.py`
-    records what a non-anchored search does to an edit range.
+    Matched on whole lines on purpose: the marker text may also be quoted in prose, and a substring
+    search would take that quotation for a marker.
     """
     lines = text.split("\n")
     begins = [i for i, line in enumerate(lines) if line.rstrip("\r") == BEGIN]
