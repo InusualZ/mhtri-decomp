@@ -196,12 +196,19 @@ one-line self-check (`git rev-parse --show-toplevel` must equal the tree; if it 
 
 | profile | used when |
 | --- | --- |
-| `decompiler` | unit work: proposals, body passes, and the phase-1 and phase-3 legs of the pipeline |
+| `surveyor` | a claim is surveyed **first**: what the unit needs and owns, and the ready-to-paste claim extension |
+| `decompiler` | unit work: the body pass after a survey, and the phase-1 and phase-3 legs of the pipeline |
 | `fixer` | a **refused gate**, or a measured regression — it fixes the named failure, not the neighbourhood |
 | `merger` | a refused apply — but prefer `mergebranch.py` (§5) |
 | `codereviewer` | the phase-2 review; **read-only by construction** (its tool list has no write/edit) |
 | `worker` | anything else, and tooling |
 | `scout` / `planner` / `reviewer` | read-only recon, planning, and review outside the pipeline |
+
+A unit claim runs **four legs**: `surveyor` -> `decompiler` -> `codereviewer` -> `decompiler`. The surveyor goes
+first because four lanes in one day each lost a round to a claim that was too small - an unowned pool, an unowned
+table, a range that was two translation units, a seam re-cut done by hand - and each of those is cheaper to answer
+before the body pass than during it. `queue.py next` emits the `surveyor` leg for a fresh claim; the decompiler and
+the review are launched once the survey lands.
 
 The rule-text blocks in these profiles are **machine-generated** from `docs/plan.md` §6.5 and the matching
 skill: run `python tools/agents/sync_profiles.py --check` and never hand-edit between the markers.

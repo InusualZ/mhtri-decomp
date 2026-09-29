@@ -346,8 +346,8 @@ def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
     `kind` is the lane kind and the agent profile comes from `slots.profile_for_kind(kind)` - the one
     mapping `slots.spawn` also uses, so a queue spawn and a `slots.py spawn` for the same kind can never
     disagree. `profile` is the deliberate override for a caller that needs an explicit one; the default is
-    `unit` -> `decompiler` (a registration-and-reconstruction lane is unit work, the project's
-    `.agents/agents/decompiler.md`), and `fix`/`merge`/`tooling`/`docs`/... come from the same table.
+    `unit` -> `surveyor` (a registration-and-reconstruction lane is unit work, the project's
+    `.agents/agents/decompiler.md`), and `fix`/`merge`/`tooling`/`docs`/... come from the same table. A `unit` claim runs four legs: `surveyor` (the claim survey), `decompiler` (the bodies), a read-only `codereviewer` pass, then the decompiler resumes.
 
     The task names the brief by its absolute MAIN path: the brief is written into MAIN *after* the worktree
     was created, so the worktree's own checkout does not contain it. The call is the default `subagent`
@@ -856,7 +856,7 @@ def selftest() -> int:
         check("dry-run's spawn is a subagent call",
               dry["spawn"]["call"].startswith("subagent(agent=\"decompiler\""), True)
         check("... and a proposal lane defaults to the decompiler profile",
-              dry["spawn"]["agent"] == "decompiler", True)
+              dry["spawn"]["agent"] == "surveyor", True)
         check("... recording the kind it was taken as", dry["spawn"]["kind"], "unit")
         # the profile comes from the ONE mapping (`slots.profile_for_kind`), so a queue spawn and a
         # `slots.py spawn` for the same kind cannot disagree - and a tooling lane is NOT a decompiler lane
