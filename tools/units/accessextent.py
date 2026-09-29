@@ -3,7 +3,7 @@
 
     python tools/units/accessextent.py <address|name> [--json] [--limit N] [--min-offset 0xN]
                                        [--elf PATH] [--objdump PATH] [--accessor NAME]
-                                       [--rebuild] [--selftest]
+                                       [--block ACCESSOR] [--rebuild] [--selftest]
 
 **The question.** "How big is this data block?" is answered today by the furthest offset anything reaches
 into it, and that number goes into `splits.txt` as a size. Until now every lane answered it by hand: the
@@ -51,11 +51,22 @@ never dereferenced, an offset term the size of an address - never guessed. A too
 worse than no tool, because the claim it justifies becomes real in `splits.txt`, and a size that is 2 bytes
 short silently claims bytes belonging to the next object in the link order.
 
-**The strongest evidence is reported separately.** A `memset`/`memcpy`/`memmove`/`bzero` call whose buffer
-is the block and whose size argument is a constant *states* the extent: `memset(get_userdata(), 0, 0x6000)`
-is a 0x6000-byte record, whatever the accesses reach. Those sites are listed with their function and
-address, preferred over the inferred maximum, and a disagreement between the two numbers is printed loudly
-- the dangerous direction (an access past the stated size) most loudly of all.
+**The strongest evidence is reported separately, and a clear is not a copy.** A `memset`/`bzero` call
+whose buffer is the block and whose size argument is a constant *states* the extent: `memset(get_userdata(),
+0, 0x6000)` is a 0x6000-byte record, whatever the accesses reach. A `memcpy`/`memmove` whose buffer is the
+block is a *partial* operation - save data copied into the record, one field copied out - so its constant is
+a lower bound, never the record's size; and a call of either kind whose buffer is the block *plus an offset*
+says nothing about the whole block. The verdict therefore names `zeroing size` and `copy size` separately,
+prefers a whole-block clear as the extent, and refuses to escalate over a partial copy: a `memcpy(blk, ...,
+0x6000)` into a 0x6AB8-byte record is not evidence that the record is only 0x6000 bytes. Those sites are
+listed with their function, address, class and buffer offset; a disagreement between the extent and the
+inferred reach is printed loudly, the dangerous direction (an access past the stated size) most loudly of all.
+
+**A block with no symbol is seeded through its accessor.** Some records have no map row - `Q_MoveWork` is
+heap, reached as `*(u32*)(0x806685E0 + 0xA4)` then `+0x10 + index*4` - so a census keyed on a symbol answers
+*0 accesses*. `--block <accessor>` treats `r3 = bl <accessor>` as the block base: the accessor's call sites
+are the census, their callers are the functions interpreted, and one heap record reached through one accessor
+is one command (`--block get_move_work_adrs`).
 
 **The three numbers are labelled, always.** The default output spells out `furthest static access` (the
 maximum offset the DOL contains - what a bare "furthest" means), `furthest loop-carried` (a displacement
@@ -134,11 +145,22 @@ ALIGN = 4                      # data objects are at least word-aligned; the cla
 # the address space, so the two never meet.
 MAX_OFFSET_TERM = 0x10000000
 
-# Which callees state an extent directly. A `memset`-like call's *buffer* argument being the block and its
-# *size* argument being a constant is the allocation talking about itself.
+# Which callees state an extent directly, and what *kind* of statement that is. A `memset`-like call's
+# *buffer* argument being the block and its *size* argument being a constant is the allocation talking
+# about itself - but a clear and a copy say different things and must not share one class:
+#
+#   * a *zeroing* call (`memset`/`bzero`/`__fill_mem`) of the whole block is the initialiser clearing the
+#     allocation, so its constant size IS the extent;
+#   * a *copy* (`memcpy`/`memmove`) whose buffer is the block is a partial operation - save data copied
+#     into the record, one field copied out - so its size is a lower bound, never the record's own size.
+#
+# (And a call of either kind with the buffer at a non-zero offset, `memset(blk + 0x6778, 0, 140)`, says
+# nothing about the block at all.) The class is carried with every literal so the verdict can split them.
 MEM_SIZE_REG = {"memset": "r5", "memcpy": "r5", "memmove": "r5", "bzero": "r4", "__fill_mem": "r5"}
 MEM_BUF_REGS = {"memset": ("r3",), "memcpy": ("r3", "r4"), "memmove": ("r3", "r4"),
                 "bzero": ("r3",), "__fill_mem": ("r3",)}
+MEM_CLASS = {"memset": "zeroing", "bzero": "zeroing", "__fill_mem": "zeroing",
+             "memcpy": "copy", "memmove": "copy"}
 
 
 # --------------------------------------------------------------------------------------------------
@@ -616,16 +638,19 @@ def loop_derived(access_addr, regs, loops, insns):
 
 
 def interpret(insns, fstart, blk_sites, accessor_addrs, mem_callees, cache_writes=frozenset(),
-              addr_sites=None, blk_addrs=frozenset()):
+              addr_sites=None, blk_addrs=frozenset(), accessor_kinds=None):
     """The whole light interpretation of one function.
 
     -> `(accesses, unresolved, literals, escapes)`. `blk_sites` maps a census site's address to the
     register that site loads the block into; `accessor_addrs` are functions that cache *and return* the
     pointer (`get_userdata`), so a `bl` to one leaves `blk` in r3; `mem_callees` maps a callee address to
-    `(name, size_reg, buf_regs)` for the `memset`-like calls that state an extent; `cache_writes` are the
+    `(name, size_reg, buf_regs, class)` for the `memset`-like calls that state an extent (`class` is
+    `zeroing` for a clear, `copy` for a memcpy/memmove); `cache_writes` are the
     census's own store sites into the queried symbol, which cache the pointer rather than leak it; and
     `addr_sites`/`blk_addrs` carry the object form - the instruction that materialises the symbol's own
-    address, and that address itself, for a symbol that is the block rather than a pointer to it.
+    address, and that address itself, for a symbol that is the block rather than a pointer to it. For a
+    seeded query, `accessor_kinds` optionally maps an accessor address to the constant its first argument
+    must hold at the call (`get_move_work_adrs(0)` vs `(2)`), so one accessor's records are not merged.
     """
     addr_sites = addr_sites or {}
     last = insns[-1][0] + 4 if insns else fstart
@@ -682,6 +707,14 @@ def interpret(insns, fstart, blk_sites, accessor_addrs, mem_callees, cache_write
                                              "provable trip count" % base_reg, "origin": bv.origin})
                 return
             total += g
+        if plausible_offset(total) is None:
+            # A base a *callee* left in a callee-saved register can be tracked as `blk` and then added
+            # to a materialised address; the sum is the size of an address, not an offset, and must be
+            # refused rather than reported as a reach tens of gigabytes into the block.
+            unresolved.append({"site": addr, "function": fstart, "instruction": text_of(addr),
+                               "reason": "the offset term is the size of an address, not an offset",
+                               "origin": bv.origin})
+            return
         accesses.append({"offset": total, "width": width, "site": addr, "function": fstart,
                          "instruction": text_of(addr), "reads": mnem in LOADS,
                          "base": base_reg, "regs": sorted(bv.regs), "origin": bv.origin,
@@ -720,17 +753,19 @@ def interpret(insns, fstart, blk_sites, accessor_addrs, mem_callees, cache_write
         _writes, is_branch, is_call = writes_of(mnem, ops)
         if is_call:
             callee = branch_target(ops)
+            arg0 = const_of(regs, "r3")      # the accessor's own argument, before the call clears r3
             mc = mem_callees.get(callee)
             spent = set()
             if mc is not None:
-                name, size_reg, buf_regs = mc
+                name, size_reg, buf_regs, klass = mc
                 size = const_of(regs, size_reg)
                 for r in buf_regs:
                     v = regs.get(r)
                     if v is not None and v.blk and not v.regs:
                         literals.append({"size": size, "site": addr, "function": fstart,
                                          "instruction": text_of(addr), "callee": name, "arg": r,
-                                         "offset": v.off, "measured": size is not None})
+                                         "offset": v.off, "measured": size is not None,
+                                         "class": klass})
                         spent.add(r)
             for n in range(3, 11):
                 r = "r%d" % n
@@ -742,7 +777,9 @@ def interpret(insns, fstart, blk_sites, accessor_addrs, mem_callees, cache_write
             for n in range(0, 13):
                 regs.pop("r%d" % n, None)
             if callee in accessor_addrs:
-                regs["r3"] = a_blk(origin=("accessor", callee))
+                want = accessor_kinds.get(callee) if accessor_kinds else None
+                if want is None or arg0 == want:
+                    regs["r3"] = a_blk(origin=("accessor", callee))
             continue
         if is_branch:
             tgt = branch_target(ops)
@@ -825,7 +862,7 @@ def mem_callees(cmap):
         if base in MEM_SIZE_REG:
             for section, addr, _type in cmap.symbols[name]:
                 if section in C.CODE_SECTIONS:
-                    out[addr] = (name, MEM_SIZE_REG[base], MEM_BUF_REGS[base])
+                    out[addr] = (name, MEM_SIZE_REG[base], MEM_BUF_REGS[base], MEM_CLASS[base])
     return out
 
 
@@ -1115,50 +1152,135 @@ def analyze(target, index, cmap, info, objdump, elf, accessor_names=None, root=R
                                                    for u in out["unresolved"]).items(),
                                    key=lambda kv: -kv[1]))
 
-    inferred = None
-    if out["accesses"]:
-        far = out["accesses"][0]
-        inferred = align_up(far["offset"] + far["width"])
-    literal_sizes = [x["size"] for x in out["literal"] if x["size"]]
-    literal_size = max(literal_sizes) if literal_sizes else None
-    far = out["accesses"][0] if out["accesses"] else None
-    loop = next((x for x in out["accesses"] if x.get("loop_carried")), None)
-    loop_ties = [fmt(x["site"]) for x in out["accesses"]
-                 if loop and x.get("loop_carried") and x["offset"] == loop["offset"]]
+    out["verdict"] = build_verdict(out["accesses"], out["literal"])
+    return out
 
-    def fname(row):
-        return (row.get("name") or fmt(row.get("function"))) if row else None
 
-    # The three numbers are named, and "furthest" on its own always means the *static* one: a
-    # loop-carried reach is a derived figure (a displacement plus a bound read out of a guard), and the
-    # data-extent brief that asked for this tool was mis-read exactly that way once.
-    verdict = {"furthest_static_offset": fmt(far["offset"]) if far else None,
-               "furthest_static_width": far["width"] if far else None,
-               "furthest_static_site": fmt(far["site"]) if far else None,
-               "furthest_static_function": fname(far),
-               "furthest_static_loop_carried": bool(far and far.get("loop_carried")),
-               "furthest_loop_carried_offset": fmt(loop["offset"]) if loop else None,
-               "furthest_loop_carried_width": loop["width"] if loop else None,
-               "furthest_loop_carried_site": fmt(loop["site"]) if loop else None,
-               "furthest_loop_carried_sites": loop_ties,
-               "furthest_loop_carried_function": fname(loop),
-               "inferred_size": fmt(inferred) if inferred is not None else None,
-               "literal_size": fmt(literal_size) if literal_size is not None else None,
-               "suggested_size": fmt(literal_size if literal_size is not None else inferred),
-               "evidence": ("the constant size argument of %s at %s"
-                            % (out["literal"][0]["callee"], fmt(out["literal"][0]["site"]))
-                            if literal_size is not None and out["literal"] else
-                            "the furthest static access")}
-    if literal_size is not None and inferred is not None and literal_size != inferred:
-        if inferred > literal_size:
-            verdict["disagreement"] = (
-                "ESCALATE: an access reaches %s but the stated size is only %s - %s byte(s) past the "
-                "allocation" % (fmt(inferred), fmt(literal_size), inferred - literal_size))
-        else:
-            verdict["disagreement"] = (
-                "the literal size %s and the inferred reach %s differ (%s byte(s) unread)"
-                % (fmt(literal_size), fmt(inferred), literal_size - inferred))
-    out["verdict"] = verdict
+def _r3_const_before(insns, site):
+    """The constant r3 holds at the call at `site`, or None.
+
+    The last write of r3 before the call must be an `li r3, k` / `addi r3, r0, k`; any other write (`mr`,
+    a load, `lis`) makes it unknown, and an unknown argument never matches a requested kind.
+    """
+    val = None
+    for addr, mnem, ops in insns:
+        if addr >= site:
+            break
+        if 3 not in writes_of(mnem, ops)[0]:
+            continue
+        toks = split_ops(ops)
+        n = None
+        if mnem == "li" and len(toks) >= 2 and toks[0] == "r3":
+            n = parse_int(toks[1])
+        elif mnem in ("addi", "addis") and len(toks) >= 3 and toks[0] == "r3" and toks[1] == "r0":
+            n = parse_int(toks[2])
+        val = n
+    return val
+
+
+def analyze_seeded(seed, index, cmap, info, objdump, elf, kind=None, root=ROOT):
+    """The whole answer for a block reached through one accessor, with no symbol to query.
+
+    Some records have no map row at all: `Q_MoveWork` is heap, reached as
+    `*(u32*)(0x806685E0 + 0xA4)` then `+0x10 + index*4` (its accessor `get_move_work_adrs`), so a census
+    keyed on a symbol answers *0 accesses* and the inferred half of the verdict does not exist. The seed
+    is that accessor: every `bl <accessor>` leaves the block in r3, so the callers of the accessor are
+    the functions interpreted and r3 is the block base inside them. One heap record reached through one
+    accessor is one command.
+
+    An accessor can hand back several record kinds (`get_move_work_adrs(0)` is the 0x22E8 quest/lobby
+    move work, `(2)` a 0xB20 array, `(3)` a 0xB18 one); `kind` keeps only the call sites whose first
+    argument is that constant, so the kinds are not merged and the answer is the record's own extent.
+
+    The result carries the same shape `analyze` returns, so `print_report` and `build_verdict` serve both.
+    """
+    rep = C.query(seed, index, cmap, limit=0, pointers=True)
+    out = {"query": seed, "resolved": rep.get("resolved"), "error": rep.get("error"),
+           "census": {"counts": rep.get("counts"), "how": rep.get("how"),
+                      "notes": rep.get("notes")},
+           "elf": C.rel(elf, root), "objdump": objdump,
+           "verdict": {}, "accesses": [], "unresolved": [], "literal": [], "interior": [],
+           "accessors": [], "counts": {}, "seed": None}
+    if rep.get("error"):
+        return out
+    hit = rep["resolved"]
+    faddr = int(hit["address"], 16)
+    if hit.get("section") not in C.CODE_SECTIONS:
+        out["error"] = ("--block %s is %s: the seed must be a function whose return value is the block"
+                        % (seed, hit.get("section") or "not code"))
+        out["verdict"] = {"error": out["error"]}
+        return out
+
+    # The census of a seeded query is the set of *call sites* of the accessor, not references to a
+    # symbol: at each one r3 is the block after the call, and the function around it is interpreted.
+    q = C.query(seed, index, cmap, kinds=["call"], limit=0)
+    calls = q.get("references", [])
+    out["seed"] = {"name": hit["name"], "address": hit["address"]}
+    out["accessors"] = ["%s %s returns the block in r3" % (hit["address"], hit["name"])]
+    needed = {}
+    for r in calls:
+        c = r.get("caller") or {}
+        if c.get("address"):
+            needed.setdefault(int(c["address"], 16), c.get("name"))
+    funcs = disassemble(objdump, elf, set(needed)) if needed else {}
+    if kind is not None:
+        # keep only the call sites whose first argument is the requested constant; an accessor with
+        # several record kinds (`get_move_work_adrs(0)` vs `(2)`) must not have its records merged.
+        calls = [r for r in calls
+                 if _r3_const_before(funcs.get(int((r.get("caller") or {})
+                                                 .get("address", "0x0"), 16)) or [],
+                                     int(r["site"], 16)) == kind]
+        needed = {}
+        for r in calls:
+            c = r.get("caller") or {}
+            if c.get("address"):
+                needed.setdefault(int(c["address"], 16), c.get("name"))
+        out["seed"]["kind"] = kind
+    counts = dict(q.get("counts") or {})
+    counts.update(call=len(calls), sites=len(calls), functions=len(needed))
+    out["census"]["counts"] = counts
+    out["counts"]["functions_decoded"] = len(needed)
+    if not needed:
+        what = ("nothing calls %s" % hit["name"] if kind is None
+                else "no call to %s passes r3 = %s" % (hit["name"], kind))
+        out["verdict"] = {"error": what}
+        return out
+    a_kinds = {faddr: kind} if kind is not None else None
+    mem = mem_callees(cmap)
+    accesses, unresolved, literals, escapes = [], [], [], []
+    for fa in sorted(needed):
+        insns = funcs.get(fa)
+        if insns is None:
+            continue
+        a, u, lit, esc = interpret(insns, fa, {}, {faddr}, mem, frozenset(), {}, frozenset(),
+                                   a_kinds)
+        accesses.extend(a)
+        unresolved.extend(u)
+        literals.extend(lit)
+        escapes.extend(esc)
+    unresolved.extend(escapes)
+
+    def name_of(f):
+        if f is None:
+            return None
+        if needed.get(f):
+            return needed[f]
+        hit_ = cmap.name_at(f)
+        return hit_[0] if hit_ else None
+
+    for rows in (accesses, unresolved, literals):
+        for row in rows:
+            row["name"] = name_of(row.get("function"))
+    out["accesses"] = sorted(accesses, key=lambda x: (-x["offset"], x["site"]))
+    out["unresolved"] = sorted(unresolved, key=lambda x: x["site"])
+    out["literal"] = sorted(literals, key=lambda x: (-(x["size"] or 0), x["site"]))
+    out["reasons"] = dict(sorted(collections.Counter(_reason_kind(u["reason"])
+                                                   for u in out["unresolved"]).items(),
+                                   key=lambda kv: -kv[1]))
+    out["counts"].update(refs=len(calls), calls=len(calls), accesses=len(out["accesses"]),
+                         unresolved=len(out["unresolved"]), literal=len(out["literal"]),
+                         escaped=len(escapes), object_mode=False)
+    out["verdict"] = build_verdict(out["accesses"], out["literal"])
     return out
 
 
@@ -1187,6 +1309,101 @@ def fmt(n):
     return "0x%X" % n if n is not None else None
 
 
+def build_verdict(accesses, literals):
+    """The labelled answer: the three numbers, the split literal statements, and the disagreement.
+
+    **A clear and a copy are different evidence.** A `memset`-like call whose buffer is the block states
+    the record's own extent - it is the initialiser clearing the allocation. A `memcpy`/`memmove` whose
+    buffer is the block is a *partial* operation (save data copied into the record, one field copied out):
+    its size is a lower bound, never the block's size. They must not share one `literal size`. Worse, a
+    call of either kind with the buffer at a non-zero offset (`memset(blk + 0x6778, 0, 140)`) says nothing
+    about the block at all. The two classes and the two offsets are therefore reported separately, the
+    whole-block *clear* is preferred as the extent, and the disagreement line names which statement it is
+    actually about - a partial copy the reach runs past is not an escalation.
+    """
+    far = accesses[0] if accesses else None
+    inferred = align_up(far["offset"] + far["width"]) if far is not None else None
+    loop = next((x for x in accesses if x.get("loop_carried")), None)
+    loop_ties = [fmt(x["site"]) for x in accesses
+                 if loop and x.get("loop_carried") and x["offset"] == loop["offset"]]
+
+    def fname(row):
+        return (row.get("name") or fmt(row.get("function"))) if row else None
+
+    def cls_size(klass, at_base):
+        vals = [x["size"] for x in literals
+                if x.get("size") and x.get("class") == klass
+                and ((x.get("offset") or 0) == 0) == at_base]
+        return max(vals) if vals else None
+
+    zeroing_size = cls_size("zeroing", True)
+    copy_size = cls_size("copy", True)
+    sub_zeroing_size = cls_size("zeroing", False)
+    sub_copy_size = cls_size("copy", False)
+    # the extent: a whole-block clear first, then a whole-block copy (a lower bound); a sub-block
+    # operation is never the block's size.
+    literal_size = zeroing_size if zeroing_size is not None else copy_size
+    chosen = None
+    if literal_size is not None:
+        want = "zeroing" if zeroing_size is not None else "copy"
+        chosen = next((x for x in literals
+                       if x.get("size") == literal_size and x.get("class") == want
+                       and (x.get("offset") or 0) == 0), None)
+
+    # The three numbers are named, and "furthest" on its own always means the *static* one: a
+    # loop-carried reach is a derived figure (a displacement plus a bound read out of a guard), and the
+    # data-extent brief that asked for this tool was mis-read exactly that way once.
+    verdict = {"furthest_static_offset": fmt(far["offset"]) if far else None,
+               "furthest_static_width": far["width"] if far else None,
+               "furthest_static_site": fmt(far["site"]) if far else None,
+               "furthest_static_function": fname(far),
+               "furthest_static_loop_carried": bool(far and far.get("loop_carried")),
+               "furthest_loop_carried_offset": fmt(loop["offset"]) if loop else None,
+               "furthest_loop_carried_width": loop["width"] if loop else None,
+               "furthest_loop_carried_site": fmt(loop["site"]) if loop else None,
+               "furthest_loop_carried_sites": loop_ties,
+               "furthest_loop_carried_function": fname(loop),
+               "inferred_size": fmt(inferred) if inferred is not None else None,
+               "literal_size": fmt(literal_size) if literal_size is not None else None,
+               "zeroing_size": fmt(zeroing_size) if zeroing_size is not None else None,
+               "copy_size": fmt(copy_size) if copy_size is not None else None,
+               "sub_block_zeroing_size": fmt(sub_zeroing_size) if sub_zeroing_size is not None else None,
+               "sub_block_copy_size": fmt(sub_copy_size) if sub_copy_size is not None else None,
+               "suggested_size": fmt(literal_size if literal_size is not None else inferred),
+               "evidence": ("the constant size argument of %s at %s"
+                            % (chosen["callee"], fmt(chosen["site"]))
+                            if chosen is not None else "the furthest static access")}
+    notes = []
+    if zeroing_size is not None and copy_size is not None and zeroing_size != copy_size:
+        notes.append("the whole-block clear states %s while the whole-block copy states %s"
+                     % (fmt(zeroing_size), fmt(copy_size)))
+    if literal_size is not None and inferred is not None and literal_size != inferred:
+        if inferred > literal_size:
+            verdict["disagreement"] = (
+                "ESCALATE: an access reaches %s but the stated size is only %s - %s byte(s) past the "
+                "allocation" % (fmt(inferred), fmt(literal_size), inferred - literal_size))
+        else:
+            verdict["disagreement"] = (
+                "the literal size %s and the inferred reach %s differ (%s byte(s) unread)"
+                % (fmt(literal_size), fmt(inferred), literal_size - inferred))
+    elif literal_size is None and inferred is not None and (sub_copy_size is not None
+                                                            or sub_zeroing_size is not None):
+        # no whole-block statement: a sub-block clear or copy is partial, so it cannot contradict the
+        # reach - the old tool escalated here because it read a copy into the record as the record's size.
+        stated = []
+        if sub_zeroing_size is not None:
+            stated.append("a clear of %s" % fmt(sub_zeroing_size))
+        if sub_copy_size is not None:
+            stated.append("a copy of %s" % fmt(sub_copy_size))
+        notes.append("no whole-block statement (the largest sub-block operation is %s) - the inferred "
+                     "reach %s is not contradicted by a partial copy"
+                     % (" and ".join(stated), fmt(inferred)))
+    if notes:
+        parts = ([verdict["disagreement"]] if verdict.get("disagreement") else []) + notes
+        verdict["disagreement"] = "; ".join(parts)
+    return verdict
+
+
 # --------------------------------------------------------------------------------------------------
 # the answer
 # --------------------------------------------------------------------------------------------------
@@ -1202,20 +1419,31 @@ def print_report(rep, info=None, root=ROOT, limit=20, min_offset=0):
                                (" size:0x%X" % hit["size"]) if hit.get("size") else ""))
     print("   owner  %s (%s)" % (hit["owner"], hit["owner_state"]))
     c = rep["census"]["counts"]
-    # the census's *own* rows, all three of them: the tool's refined kinds are its interpretation, and a
-    # coarse census reports no reads and no writes at all (`callers.py`'s object fallback), so mixing the
-    # two would print "0 read(s), 0 write(s), 0 address-taken" for a block with 789 readers.
-    print("   census %d read(s), %d write(s), %d address-taken over %d function(s) - "
-          "tools/units/callers.py%s"
-          % (c["read"], c["write"], c["addr"], c["functions"],
-             " (cached)" if info and info.get("cached") else ""))
-    print("   block  %s" % ("the symbol's own address is the block (object form)"
-                            if rep["counts"].get("object_mode")
-                            else "the value the symbol holds is the block (pointer form)"))
+    seeded = rep.get("seed")
+    if seeded:
+        print("   census %d call(s) to %s over %d function(s) - tools/units/callers.py%s"
+              % (c.get("call", 0), seeded["name"], c["functions"],
+                 " (cached)" if info and info.get("cached") else ""))
+    else:
+        # the census's *own* rows, all three of them: the tool's refined kinds are its interpretation,
+        # and a coarse census reports no reads and no writes at all (`callers.py`'s object fallback), so
+        # mixing the two would print "0 read(s), 0 write(s), 0 address-taken" for a block with 789 readers.
+        print("   census %d read(s), %d write(s), %d address-taken over %d function(s) - "
+              "tools/units/callers.py%s"
+              % (c["read"], c["write"], c["addr"], c["functions"],
+                 " (cached)" if info and info.get("cached") else ""))
+    print("   block  %s" % ("the block is r3 after every `bl %s` (accessor-seeded)" % seeded["name"]
+                            if seeded else
+                            ("the symbol's own address is the block (object form)"
+                             if rep["counts"].get("object_mode")
+                             else "the value the symbol holds is the block (pointer form)")))
     print("   code   %s via %s - %d function(s) decoded (the census's + every memset-like caller)"
           % (rep["elf"], rep["objdump"], rep["counts"].get("functions_decoded", 0)))
-    for a in rep["accessors"]:
+    for a in ([] if seeded else rep["accessors"]):
         print("   accessor %s caches the pointer and returns it" % a)
+    if seeded:
+        print("   seed   the block is r3 after every `bl %s` - the census is the accessor's call "
+              "sites" % seeded["name"])
     print()
     if v.get("error"):
         print("   %s" % v["error"])
@@ -1232,7 +1460,16 @@ def print_report(rep, info=None, root=ROOT, limit=20, min_offset=0):
     print("     inferred size          %-10s (the furthest static offset + its width, rounded to %d)"
           % (v["inferred_size"] or "-", ALIGN))
     print("     literal size           %-10s (%s)"
-          % (v["literal_size"] or "-", v["evidence"] if v["literal_size"] else "no memset-like call"))
+          % (v["literal_size"] or "-",
+             v["evidence"] if v["literal_size"] else "no whole-block clear or copy"))
+    print("     zeroing size           %-10s (a clear of the whole block - the allocation stating its "
+          "size%s)" % (v.get("zeroing_size") or "-",
+                        "; the largest sub-block clear is %s" % v["sub_block_zeroing_size"]
+                        if v.get("sub_block_zeroing_size") else ""))
+    print("     copy size              %-10s (a copy into the whole block - partial, a lower bound%s)"
+          % (v.get("copy_size") or "-",
+             "; the largest sub-block copy is %s" % v["sub_block_copy_size"]
+             if v.get("sub_block_copy_size") else ""))
     print("   >> suggested size for the claim: %s  (%s)" % (v["suggested_size"] or "UNKNOWN",
                                                             v["evidence"]))
     print("   (a bare 'furthest' here always means the *static* access; the loop-carried one is the "
@@ -1254,7 +1491,8 @@ def print_report(rep, info=None, root=ROOT, limit=20, min_offset=0):
     if not rows:
         print("   (none resolved)")
     for section, note in (("interior", "interior references the census folds into the instruction text"),
-                          ("literal", "literal size arguments - the allocation stating its own extent"),
+                          ("literal", "literal size arguments - a clear of the whole block states the "
+                                      "extent, a copy is partial (the +K is the buffer's offset)"),
                           ("unresolved", "unresolved - said per site, never guessed")):
         items = rep[section]
         if not items:
@@ -1266,10 +1504,11 @@ def print_report(rep, info=None, root=ROOT, limit=20, min_offset=0):
                 print("     %5d  %s" % (n, reason))
         for a in (items if not limit else items[:limit]):
             if section == "literal":
-                print("     %-10s %s  %-14s %s  (%s)" % (
-                    fmt(a["size"]) if a["size"] else "?", fmt(a["site"]),
-                    (a.get("name") or func_name(a.get("function")))[:14], a["instruction"] or "?",
-                    "%s is the block" % a["arg"]))
+                where = "the block" if not a.get("offset") else "+0x%X" % a["offset"]
+                print("     %-10s %-9s %-10s %-14s %s  (%s %s)" % (
+                    fmt(a["size"]) if a["size"] else "?", "[%s]" % a.get("class", "?"),
+                    fmt(a["site"]), (a.get("name") or func_name(a.get("function")))[:14],
+                    a["instruction"] or "?", a["arg"], where))
             elif section == "interior":
                 print("     +0x%-8X %s  %s" % (a["offset"], fmt(a["site"]), a["instruction"]))
             else:
@@ -1300,6 +1539,10 @@ def main(argv=None, root=ROOT):
     ap.add_argument("--objdump", help="the objdump to use (default build/binutils/powerpc-eabi-objdump.exe)")
     ap.add_argument("--accessor", action="append", default=[],
                     help="name a function that returns the block (repeatable)")
+    ap.add_argument("--block", metavar="ACCESSOR[(K)]",
+                    help="census a block with no symbol: treat `r3 = bl <ACCESSOR>` as the block base, "
+                         "so every caller of the accessor is interpreted. Append `(K)` to keep only the "
+                         "call sites whose first argument is the constant K")
     ap.add_argument("--rebuild", action="store_true", help="rebuild the census even if its cache is valid")
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
@@ -1322,8 +1565,17 @@ def main(argv=None, root=ROOT):
         print("   %s does not exist, so the sites' instructions cannot be decoded." % C.rel(elf, root))
         print("   the census alone says *that* the address is read, never how far.")
         return 2
-    if not args.target:
-        ap.error("an address or a symbol name is required (or --selftest)")
+    if not args.target and not args.block:
+        ap.error("an address, a symbol name, or --block ACCESSOR is required (or --selftest)")
+
+    # `--block get_move_work_adrs(0)` seeds the accessor and keeps only the call sites passing r3 = 0;
+    # the bare name takes every call site.
+    block_seed, block_kind = args.block, None
+    if args.block:
+        m = re.match(r"^\s*(.*?)\s*(?:\(\s*(0[xX][0-9A-Fa-f]+|\d+)\s*\))?\s*$", args.block)
+        if m and m.group(1):
+            block_seed = m.group(1)
+            block_kind = parse_int(m.group(2)) if m.group(2) is not None else None
 
     cmap = C.load_map(root)
     index, info = C.load_index(root=root, rebuild=args.rebuild)
@@ -1338,8 +1590,12 @@ def main(argv=None, root=ROOT):
             print("   remedy: %s" % DUMP_TOOL)
             return 2
     try:
-        rep = analyze(args.target, index, cmap, info, objdump, elf, accessor_names=args.accessor,
-                      root=root)
+        if args.block:
+            rep = analyze_seeded(block_seed, index, cmap, info, objdump, elf, kind=block_kind,
+                                 root=root)
+        else:
+            rep = analyze(args.target, index, cmap, info, objdump, elf, accessor_names=args.accessor,
+                          root=root)
     except RuntimeError as exc:
         print("== the disassembly failed")
         print("   %s" % exc)
@@ -1483,7 +1739,7 @@ def selftest():
         (0x1000400C, "bl", "80004350 <memset>"),
         (0x10004010, "blr", ""),
     ]
-    mem = {0x80004350: ("memset", "r5", ("r3",))}
+    mem = {0x80004350: ("memset", "r5", ("r3",), "zeroing")}
     acc, unr, lit, esc = interpret(f, 0x10004000, {}, {0x8004D120}, mem)
     check("literal: the size argument is read off the call", [x["size"] for x in lit], [0x6000])
     check("literal: the block is the destination", [x["arg"] for x in lit], ["r3"])
@@ -1498,6 +1754,101 @@ def selftest():
     # without the accessor, r3 is not the block and the call is not a size statement
     acc, unr, lit, esc = interpret(f, 0x10004000, {}, set(), mem)
     check("literal: no accessor -> no block -> no literal size", lit, [])
+
+    # (e) a clear and a partial copy are different evidence: only a clear of the *whole* block is the
+    # extent, and a copy is a lower bound that must not be read as the block's size.
+    mem2 = {0x80004000: ("memcpy", "r5", ("r3", "r4"), "copy"),
+            0x80004350: ("memset", "r5", ("r3",), "zeroing")}
+    k = [
+        (0x10005000, "lwz", "r3,-17824(r13)"),
+        (0x10005004, "li", "r4,0"),
+        (0x10005008, "li", "r5,64"),
+        (0x1000500C, "bl", "80004000 <memcpy>"),
+        (0x10005010, "lwz", "r3,-17824(r13)"),
+        (0x10005014, "li", "r4,0"),
+        (0x10005018, "li", "r5,128"),
+        (0x1000501C, "bl", "80004350 <memset>"),
+        (0x10005020, "blr", ""),
+    ]
+    acc, unr, lit, esc = interpret(k, 0x10005000, {0x10005000: "r3", 0x10005010: "r3"}, set(), mem2)
+    check("literal: a clear and a copy are reported as different classes",
+          sorted((x["class"], x["size"]) for x in lit), [("copy", 0x40), ("zeroing", 0x80)])
+    # a copy whose buffer is the block *plus an offset* says nothing about the block's extent
+    l = [
+        (0x10005100, "lwz", "r3,-17824(r13)"),
+        (0x10005104, "addi", "r3,r3,64"),
+        (0x10005108, "li", "r4,0"),
+        (0x1000510C, "li", "r5,24576"),
+        (0x10005110, "bl", "80004000 <memcpy>"),
+        (0x10005114, "blr", ""),
+    ]
+    acc, unr, lit, esc = interpret(l, 0x10005100, {0x10005100: "r3"}, set(), mem2)
+    check("literal: the buffer's offset is carried with the statement",
+          [(x["class"], x["size"], x["offset"]) for x in lit], [("copy", 0x6000, 0x40)])
+    # the extent prefers a whole-block clear over a whole-block copy, and a sub-block copy is never it
+    _acc = [{"offset": 0x7C, "width": 4, "site": 0x1000, "function": 0x2000, "name": "f",
+             "loop_carried": False}]
+    v = build_verdict(_acc, [{"size": 0x80, "class": "zeroing", "offset": 0, "callee": "memset",
+                              "site": 0x3000},
+                             {"size": 0x40, "class": "copy", "offset": 0, "callee": "memcpy",
+                              "site": 0x4000}])
+    check("verdict: the whole-block clear is the extent over the whole-block copy",
+          (v["zeroing_size"], v["copy_size"], v["literal_size"], v["suggested_size"]),
+          ("0x80", "0x40", "0x80", "0x80"))
+    check("verdict: the whole-block clear and copy are both named in the disagreement",
+          (v.get("disagreement") or "").startswith(
+              "the whole-block clear states 0x80 while the whole-block copy states 0x40"), True)
+    # the Q_ItemWork shape: a save-data copy at +0x698 and a sub-block clear, with no whole-block statement
+    v = build_verdict(
+        [{"offset": 0x6AB4, "width": 1, "site": 0x1000, "function": 0x2000,
+          "name": "fn_803AEED0", "loop_carried": False}],
+        [{"size": 0x6000, "class": "copy", "offset": 0x698, "callee": "memcpy", "site": 0x5000},
+         {"size": 0x8C, "class": "zeroing", "offset": 0x6778, "callee": "memset", "site": 0x6000}])
+    check("verdict: a sub-block copy is not the extent", v["literal_size"], None)
+    check("verdict: the reach is the suggested size when nothing states the whole block",
+          v["suggested_size"], "0x6AB8")
+    check("verdict: no false ESCALATE over a partial copy",
+          (v.get("disagreement") or "").startswith("no whole-block statement"), True)
+    check("verdict: the sub-block sizes are still reported",
+          (v["sub_block_copy_size"], v["sub_block_zeroing_size"]), ("0x6000", "0x8C"))
+
+    # (f) the seeded mode: no symbol to query, the block is `r3` after `bl <accessor>`
+    m = [
+        (0x10006000, "li", "r3,0"),
+        (0x10006004, "bl", "800cfa90 <get_move_work_adrs__FUc>"),
+        (0x10006008, "lwz", "r4,0x22E0(r3)"),
+        (0x1000600C, "blr", ""),
+    ]
+    acc, unr, lit, esc = interpret(m, 0x10006000, {}, {0x800CFA90}, {})
+    check("seed: `r3 = bl <accessor>` is the block base",
+          [(fmt(x["offset"]), x["width"], tuple(x["origin"])) for x in acc],
+          [("0x22E0", 4, ("accessor", 0x800CFA90))])
+    check("seed: without the accessor nothing is claimed",
+          interpret(m, 0x10006000, {}, set(), {})[0], [])
+    check("seed: a block reached through the accessor still reports its literal clears",
+          [x["class"] for x in interpret(
+              m[:3] + [(0x1000600C, "li", "r5,32"), (0x10006010, "bl", "80004350 <memset>"),
+                       (0x10006014, "blr", "")],
+              0x10006000, {}, {0x800CFA90}, mem)[2]], ["zeroing"])
+    # an accessor that hands back several record kinds: the argument selects which one is the block
+    n = [
+        (0x10006100, "li", "r3,0"),
+        (0x10006104, "bl", "800cfa90 <get_move_work_adrs__FUc>"),
+        (0x10006108, "lwz", "r4,0x22E0(r3)"),
+        (0x1000610C, "li", "r3,2"),
+        (0x10006110, "bl", "800cfa90 <get_move_work_adrs__FUc>"),
+        (0x10006114, "lwz", "r4,0x200(r3)"),
+        (0x10006118, "blr", ""),
+    ]
+    check("seed: a kind filter keeps only the matching call site",
+          [fmt(x["offset"]) for x in interpret(n, 0x10006100, {}, {0x800CFA90}, {},
+                                               accessor_kinds={0x800CFA90: 0})[0]], ["0x22E0"])
+    check("seed: the other kind's accesses are the ones kept for it",
+          [fmt(x["offset"]) for x in interpret(n, 0x10006100, {}, {0x800CFA90}, {},
+                                               accessor_kinds={0x800CFA90: 2})[0]], ["0x200"])
+    check("seed: with no filter the kinds' accesses are merged",
+          sorted(fmt(x["offset"]) for x in interpret(n, 0x10006100, {}, {0x800CFA90}, {})[0]),
+          ["0x200", "0x22E0"])
 
     # --- align ------------------------------------------------------------------------------------
     check("align: 0x53A2+2 rounds to 0x53A4", align_up(0x53A2 + 2), 0x53A4)
@@ -1540,6 +1891,20 @@ def selftest():
           interpret(j, 0x60001000, {}, set(), {}, frozenset())[0], [])
     check("plausible: a small constant is an offset", plausible_offset(0x5366), 0x5366)
     check("plausible: an address-sized constant is refused", plausible_offset(0x80660000), None)
+    # a base added to a materialised address is not an offset: refuse it rather than report a
+    # tens-of-gigabytes reach (a shape the accessor-seeded census exposed)
+    o = [
+        (0x10006200, "lwz", "r3,-17824(r13)"),
+        (0x10006204, "lis", "r4,-32666"),
+        (0x10006208, "addi", "r4,r4,-31264"),
+        (0x1000620C, "add", "r5,r3,r4"),
+        (0x10006210, "lbz", "r0,0(r5)"),
+        (0x10006214, "blr", ""),
+    ]
+    acc, unr, lit, esc = interpret(o, 0x10006200, {0x10006200: "r3"}, set(), {})
+    check("plausible: a base plus a materialised address is refused, not reported", acc, [])
+    check("plausible: and the site says why",
+          [u["reason"] for u in unr], ["the offset term is the size of an address, not an offset"])
 
     # --- the coarse census: `callers.py`'s object fallback, which carries no instruction text -------
     # Its rows name the symbol and the relocation and call every non-call reference `addr`, and its
@@ -1662,6 +2027,27 @@ def selftest():
               sysw["verdict"].get("inferred_size"), "0xA5C")
         check("acceptance: and its object form is recognised",
               sysw["counts"].get("object_mode"), True)
+        # The two defects the field lane found on the quest records, pinned against this tree's symbols:
+        # a `memcpy` into the record is not the record's size, and a record with no symbol is censusable
+        # through its accessor.
+        qwp = analyze("quest_work_ptr", index, cmap, info, objdump, elf)
+        check("acceptance: a copy into the record is not read as the record's size",
+              (qwp["verdict"].get("literal_size"), qwp["verdict"].get("suggested_size")),
+              (None, "0x6AB8"))
+        check("acceptance: the sub-block copy is still reported, in its own class",
+              (qwp["verdict"].get("sub_block_copy_size"),
+               (qwp["verdict"].get("disagreement") or "").startswith("no whole-block statement")),
+              ("0x6000", True))
+        qw = analyze("quest_work", index, cmap, info, objdump, elf)
+        check("acceptance: a whole-block clear is the extent",
+              (qw["verdict"].get("zeroing_size"), qw["verdict"].get("literal_size")),
+              ("0x6AB8", "0x6AB8"))
+        seeded = analyze_seeded("get_move_work_adrs", index, cmap, info, objdump, elf, kind=0)
+        check("acceptance: a block with no symbol is censusable through its accessor",
+              (seeded["verdict"].get("furthest_static_offset"),
+               seeded["verdict"].get("inferred_size")), ("0x22E4", "0x22E8"))
+        check("acceptance: the seeded census is the accessor's own call sites, kind-filtered",
+              (seeded["counts"].get("calls"), seeded["seed"].get("kind")), (129, 0))
     print("== accessextent selftest")
     for n in notes:
         print("   note %s" % n)
