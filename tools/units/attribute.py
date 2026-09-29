@@ -1098,6 +1098,7 @@ def queue_doc(proposals: list[dict], cap: int, fingerprints: dict | None = None)
             "tu": p.get("tu"),
             "functions": p["functions"],
             "runs": p["runs"],
+            **({"data_seams": p["data_seams"]} if p.get("data_seams") else {}),
         } for p in proposals],
     }
 

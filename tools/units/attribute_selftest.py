@@ -866,6 +866,11 @@ def selftest() -> int:
     check("seams: propose() attaches data_seams only when a seam bears on the proposal",
           ["data_seams" in p for p in at.propose(fake_an(FUNCS), {}, {}, {}, 0x1000, whole_end, min_bytes=0,
                                                  max_bytes=0x4000, claimed=[], seam_records=[])], [False])
+    _p = {"unit": "u", "text": [1, 2], "count": 1, "bytes": 1, "cxx": False, "functions": [], "runs": {}}
+    _fp = {"dol_sha1": "x", "symbols_sha1": "x", "splits_sha1": "x", "configure_sha1": "x"}
+    _d = at.queue_doc([dict(_p, data_seams={"seams": [], "min_tus": 2, "weak": 0}), _p], 0, _fp)["units"]
+    check("seams: queue_doc writes data_seams when present and omits it otherwise",
+          ["data_seams" in u for u in _d], [True, False])
     check("seams: the dataseams subcommand is read-only and has no region arguments",
           at.build_parser().parse_args(["dataseams"]).cmd, "dataseams")
 
