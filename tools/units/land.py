@@ -218,8 +218,11 @@ from units import vtableaudit as vta  # noqa: E402
 # actionable half - does our object relocate a name nothing can provide - not a relocation diff.
 from units import undefrefs as uref  # noqa: E402
 
-ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".claude/")
-ALLOWED_FILES = ("configure.py", "CLAUDE.md", ".gitignore",
+ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".claude/", ".github.example/")
+# Root documents and repo-config files a docs/tooling batch legitimately edits (commit categories
+# `repo/readme`, `repo/license`, `repo/gitignore`, `repo/ci`): README.md, LICENSE, `.gitattributes` (line-ending
+# policy) and `.flake8` (the tools' lint config). Deliberately absent: `.gitmodules` and `Add-Exclusion.ps1`.
+ALLOWED_FILES = ("configure.py", "CLAUDE.md", ".gitignore", "README.md", "LICENSE", ".gitattributes", ".flake8",
                  "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt")
 BASE_FILE = os.path.join(".pi", "land-base.json")
 
@@ -649,23 +652,37 @@ def conflict_marker_files(main: str, paths: list[str]) -> list[tuple[str, int, s
     return found
 
 
-def is_batch_path(main: str, entry: str) -> bool:
+def _exists_at(main: str, base: str | None, entry: str) -> bool:
+    """True when `entry` is a file or directory in `base`'s tree (`git cat-file -e <base>:<entry>`)."""
+    if not base:
+        return False
+    try:
+        return subprocess.run(["git", "cat-file", "-e", "%s:%s" % (base, entry)], cwd=main,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except OSError:
+        return False
+
+
+def is_batch_path(main: str, entry: str, base: str | None = None) -> bool:
     """True when a `--units` entry names a repo PATH the batch stages, not a translation unit.
 
     A unit is named at an extensionless path (`<module>/<name>`, or `src/<module>/<name>` - `norm_unit`
     strips the source extension) whose source file is `<name>.c`/`.cpp`, so the bare name is **not** a file
-    in the tree.  Two signals therefore say "path": the entry still carries a file extension, or the tree
+    in the tree.  Three signals therefore say "path": the entry still carries a file extension, the tree
     has something at that exact path - which `.gitignore`, `LICENSE`, `Makefile` and a directory like `docs`
-    do, and a unit never does.  Only the extension signal existed first, so an extension-less path was still
-    read as a unit and the registration row refused the batch with a message about a source file that is
-    registered in name only (2026-09-27, after the tool-batch fix).
+    do, and a unit never does - or the batch BASE's tree has it.  The last is for a batch that DELETES (or
+    renames away) an extension-less file such as `tools/git/hooks/post-commit`: the gate runs after the
+    apply, where the file no longer exists, so the tree test alone read it as a unit and demanded an
+    `Object(...)` line and an outbox for it (2026-09-28, the hook removal).
     """
     if os.path.splitext(entry)[1]:
         return True
-    return os.path.exists(os.path.join(main, entry))
+    if os.path.exists(os.path.join(main, entry)):
+        return True
+    return _exists_at(main, base, entry)
 
 
-def unit_rows(main: str, units: list[str]) -> list[str]:
+def unit_rows(main: str, units: list[str], base: str | None = None) -> list[str]:
     """The unit-shaped subset of a `--units` list: translation units, not paths the batch stages.
 
     `is_batch_path` draws the line for every unit-shaped gate row (outbox, branch, registration, compile,
@@ -675,7 +692,7 @@ def unit_rows(main: str, units: list[str]) -> list[str]:
     `residual`/`flags_probed` from a non-unit record - a BOOKKEEPING refusal while every real gate row passed
     (2026-09-28, cost one round-trip and was landed with `--no-outbox`).
     """
-    return [u for u in units if not is_batch_path(main, u)]
+    return [u for u in units if not is_batch_path(main, u, base)]
 
 
 def unit_owned_paths(units: list[str]) -> set[str]:
@@ -2271,7 +2288,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # compile, target drift) must not assert unit properties about it. It stays in `units` for the staging and
     # ledger rows, which is how the path is committed. (2026-09-27: a tool-only batch could not land at all
     # before the extension signal - the registration row refused every `tools/` path.)
-    unit_units = unit_rows(main, units)
+    unit_units = unit_rows(main, units, base or read_base(main).get("base"))
     allow_regression = [a.strip() for a in (allow_regression or []) if a.strip()]
     checks: list[tuple[str, bool, str, str, str, str]] = []
 
@@ -2872,6 +2889,41 @@ def selftest() -> int:
     check("outside the batch: ground truth", outside_batch(["config/RMHE08/build.sha1"]),
           ["config/RMHE08/build.sha1"])
     check("outside the batch: the campaign state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
+
+    # a batch that DELETES an extension-less file: after the apply the tree no longer has it, so only the
+    # BASE's tree can say it was a path (`tools/git/hooks/post-commit`, 2026-09-28). Real temporary repo.
+    with tempfile.TemporaryDirectory() as tmp:
+        def _g(*a):
+            subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=tmp, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _g("init", "-q")
+        os.makedirs(os.path.join(tmp, "tools", "git", "hooks"))
+        open(os.path.join(tmp, "tools", "git", "hooks", "post-commit"), "w").write("#!/bin/sh\n")
+        open(os.path.join(tmp, "tools", "git", "hooks", "pre-commit"), "w").write("#!/bin/sh\n")
+        _g("add", "-A")
+        _g("commit", "-q", "-m", "base")
+        base = git(["rev-parse", "HEAD"], tmp).strip()
+        os.remove(os.path.join(tmp, "tools", "git", "hooks", "post-commit"))
+        hook = "tools/git/hooks/post-commit"
+        check("a deleted extension-less file is gone from the tree", os.path.exists(os.path.join(tmp, hook)), False)
+        check("... and without the base it is misread as a unit (the bug)", is_batch_path(tmp, hook), False)
+        check("... with the base it is a batch path", is_batch_path(tmp, hook, base), True)
+        check("unit_rows drops the deleted hook given the base",
+              unit_rows(tmp, [hook, "Pl/pl_act"], base), ["Pl/pl_act"])
+        check("a unit name that is not a path is still a unit at the base",
+              is_batch_path(tmp, "menu/arena_result", base), False)
+        check("an extension-less file that exists is still a path",
+              is_batch_path(tmp, "tools/git/hooks/pre-commit", base), True)
+        check("a directory at the base is a path", is_batch_path(tmp, "tools/git", base), True)
+        check("an unresolvable base changes nothing", is_batch_path(tmp, hook, "0" * 40), False)
+
+    # ALLOWED_FILES: the root documents a docs/tooling batch edits are allowed, an unknown root file is not
+    check("inside the batch: README.md", outside_batch(["README.md"]), [])
+    check("inside the batch: LICENSE", outside_batch(["LICENSE"]), [])
+    check("inside the batch: .gitattributes and .flake8", outside_batch([".gitattributes", ".flake8"]), [])
+    check("inside the batch: the CI example", outside_batch([".github.example/workflows/build.yml"]), [])
+    check("outside the batch: an unknown root file", outside_batch(["notes.txt"]), ["notes.txt"])
+    check("outside the batch: .gitmodules", outside_batch([".gitmodules"]), [".gitmodules"])
 
     # a `--units` entry that names a repo PATH is not a unit: it has no `Object(...)` line, no splits.txt
     # block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows must skip it. The extension

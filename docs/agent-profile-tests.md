@@ -361,6 +361,8 @@ codereviewer listed `pairgap.py`. The second-round merger child answered the sec
 from the generated block"* - the exact gap round one had found. All four children correctly observed that they
 were launched in MAIN and said they would stop and report; that is T2 exercising the tell, not a defect.
 
+*(Superseded: the index has since left CLAUDE.md for `.claude/skills/mwcc-unit-matching/references/index.md`; what follows is the historical record.)*
+
 **Residual gaps the probes named (recorded, not fixed here).** (1) CLAUDE.md's playbook index has a
 **duplicate row number** - 48 appears twice (the variadic-definition row and the `extern "C"` row) and 52
 follows 57 - so "playbook 48" was ambiguous in a finding's evidence line. **Fixed the same day**, with the
