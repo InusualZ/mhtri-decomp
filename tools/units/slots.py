@@ -2674,7 +2674,7 @@ def selftest() -> int:
         check("... and `docs` maps to the `worker` fallback", freed["agent"], "worker")
         release(repo, slot=2, unit="lane/spawn-first-free", rescue=False)
         unit_sp = spawn(repo, "unit", unit="lane/spawn-unit", task="Reconstruct the unit.")
-        check("... and `unit` maps to `decompiler`", unit_sp["agent"], "decompiler")
+        check("... and `unit` maps to `surveyor`", unit_sp["agent"], "surveyor")
         check("... on the first free slot again", unit_sp["slot"], 2)
         release(repo, slot=2, unit="lane/spawn-unit", rescue=False)
         release(repo, slot=1, unit="lane/spawn-hold", rescue=False)

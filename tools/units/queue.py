@@ -849,13 +849,13 @@ def selftest() -> int:
         check("dry-run leaves the pool brief in place", os.path.exists(by_unit["auto/stubB"]["path"]), True)
         check("dry-run picks the lowest address", dry["unit"], "auto/stubB")
         check("dry-run's spawn names the profile and the slug",
-              dry["spawn"]["name"], "decompiler-" + claims.slug("auto/stubB"))
+              dry["spawn"]["name"], "surveyor-" + claims.slug("auto/stubB"))
         check("dry-run's spawn has the worktree as cwd", dry["spawn"]["cwd"], claims.worktree_for("auto/stubB", tmp))
         check("dry-run's spawn task names the brief", dry["brief"].replace("\\", "/") in dry["spawn"]["task"], True)
         check("dry-run's spawn task names the unit", "auto/stubB" in dry["spawn"]["task"], True)
         check("dry-run's spawn is a subagent call",
-              dry["spawn"]["call"].startswith("subagent(agent=\"decompiler\""), True)
-        check("... and a proposal lane defaults to the decompiler profile",
+              dry["spawn"]["call"].startswith("subagent(agent=\"surveyor\""), True)
+        check("... and a proposal lane defaults to the surveyor profile",
               dry["spawn"]["agent"] == "surveyor", True)
         check("... recording the kind it was taken as", dry["spawn"]["kind"], "unit")
         # the profile comes from the ONE mapping (`slots.profile_for_kind`), so a queue spawn and a
