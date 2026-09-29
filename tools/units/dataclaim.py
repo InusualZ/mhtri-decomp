@@ -607,11 +607,15 @@ def analyze(root: str = ROOT, queue_path: str | None = None) -> list[dict]:
 #                   included, or dtk inserts an `auto_*_data` unit inside the range and the split dies
 #                   with a link-order cycle (playbook 53).
 #   3. named owner  a pool/table several units read: register a named data-only unit - a splits.txt
-#                   range, a symbols.txt name, and a source file that defines nothing. For a
+#                   range, a source file that defines nothing, and (optional) a symbols.txt name. For a
 #                   `NonMatching` unit the original bytes stay in the DOL (the binary is untouched)
 #                   while the range gains an owner, and the consumers declare into its header (rule 2).
 #                   Strictly better than the anonymous `auto_XX_data` unit dtk would otherwise create;
-#                   one owner per pool.
+#                   one owner per pool. The `symbols.txt:` row is OPTIONAL and OVERLAPPING: the pool's
+#                   words are already named and own those addresses, so one object symbol over the
+#                   span would sit on top of them. The accepted `Pl/pl_frame_data` precedent (and its
+#                   `Pl/pl_act_data` follow-on) registered the `splits.txt` range alone and the link
+#                   worked; the output says so instead of leaving a lane to decide.
 #
 # Read-only by design: it never writes `splits.txt` (or anything else). `--dry-run` is accepted and only
 # asserts that; the reference listing is the same either way.
@@ -745,17 +749,30 @@ def recommend(rec: dict, unit: str, unit_ranges: list[tuple[int, int]]) -> dict:
         pool = rec["pool"]
         pool_name = "%s/%s_pool" % (module or section_stem(section), section_stem(section))
         pstart, pend = pool["start"], align_up(pool["end"])
+        # The pool's rows already OWN these addresses: a unit-level `symbols.txt` row would place ONE
+        # object symbol over the whole span, on top of the word rows that are already named there. The
+        # accepted `Pl/pl_frame_data` registration (408 B, and its `Pl/pl_act_data` follow-on) added the
+        # `splits.txt` range and NO row, and the split linked - so the row is optional, and a lane must
+        # not spend time deciding whether it is required. `overlap` is how many named rows it would
+        # overlap.
+        overlap = int(pool.get("count") or 0)
         note = ("the pool (%d unowned symbol(s), 0x%X-0x%X) is read by %d unit(s) besides `%s` (%s): "
                 "register a named data-only unit owning the whole pool - a `splits.txt` range, a "
-                "`symbols.txt` name, and a source file that defines nothing. A `NonMatching` unit "
-                "keeps the original bytes in the binary (the DOL is untouched) and the consumers "
-                "declare into its header (rule 2). One owner per pool: a partial `.sdata2` claim "
-                "cannot be linked."
+                "source file that defines nothing, and (optional, see below) a `symbols.txt` name. A "
+                "`NonMatching` unit keeps the original bytes in the binary (the DOL is untouched) and "
+                "the consumers declare into its header (rule 2). One owner per pool: a partial "
+                "`.sdata2` claim cannot be linked."
                 % (pool["count"], pool["start"], pool["end"], len(sharers), unit,
                    ", ".join(sharers[:SHARERS_SHOWN])))
+        note += (" The `symbols.txt:` row is OPTIONAL and OVERLAPPING: the pool's %d row(s) at "
+                 "0x%X-0x%X already own those addresses, so one object symbol would span them - the "
+                 "accepted `Pl/pl_frame_data` precedent registered the unit with the `splits.txt` "
+                 "range alone; omit it when the words are already named."
+                 % (overlap, pool["start"], pool["end"]))
         return {"remedy": "named-owner-unit", "claim_start": pstart, "claim_end": pend,
                 "splits": splits_unit_block(pool_name, section, pstart, pend),
-                "symbols": symbols_row(pool_name, section, pstart, pend - pstart), "note": note}
+                "symbols": symbols_row(pool_name, section, pstart, pend - pstart),
+                "symbols_optional": True, "symbols_overlap_rows": overlap, "note": note}
     below = [r for r in unit_ranges if r[1] <= address]
     if below:
         rs, re_ = max(below, key=lambda r: r[1])
@@ -774,17 +791,17 @@ def recommend(rec: dict, unit: str, unit_ranges: list[tuple[int, int]]) -> dict:
 
 
 def norm_reader(label: str | None) -> str | None:
-    """A census owner label -> a unit name, or None for the labels that are not units."""
-    if not label:
-        return None
-    label = label.strip()
-    if label in ("unsplit address", "unsplit") or label.startswith("unsplit ("):
-        return None
-    if label.endswith(" (no source yet)"):
-        label = label[: -len(" (no source yet)")]
-    if label.endswith((".c", ".cpp", ".cp")):
-        label = os.path.splitext(label)[0]
-    return label
+    """A census owner label -> a unit name, or None for the labels that are not units.
+
+    The one implementation is `callers.norm_reader` (the tool that builds the census); this re-export is
+    what `dataclaim`'s sharer lists and its selftest read through, so the two tools cannot disagree
+    about who a label names.
+    """
+    try:
+        from units import callers as callers_mod  # noqa: PLC0415
+    except ImportError:                           # pragma: no cover - direct script execution
+        import callers as callers_mod             # type: ignore
+    return callers_mod.norm_reader(label)
 
 
 def declaration_locations(root: str, names) -> dict[str, list[str]]:
@@ -909,21 +926,12 @@ def census_readers(root: str):
         source = "elf"
     if index is None:
         return None, {"source": source, "state": "missing", "reason": info.get("reason")}
-    cache: dict[int, dict] = {}
-
-    def readers_of(address: int) -> dict:
-        if address not in cache:
-            rep = callers_mod.query("0x%08X" % address, index, cmap, limit=0)
-            counts: dict[str, int] = {}
-            for ref in rep.get("references", ()):
-                unit = norm_reader((ref.get("caller") or {}).get("owner"))
-                if unit:
-                    counts[unit] = counts.get(unit, 0) + 1
-            cache[address] = counts
-        return cache[address]
-
-    return readers_of, {"source": source, "state": "present", "files": info.get("files"),
-                        "cached": info.get("cached"), "reason": info.get("reason")}
+    # One census, one implementation: `callers.readers_of` wraps the query this tool would otherwise
+    # rebuild, so the sharer list here and `callers.py --range`'s runs are the same reader sets.
+    return callers_mod.readers_of(index, cmap), {"source": source, "state": "present",
+                                                 "files": info.get("files"),
+                                                 "cached": info.get("cached"),
+                                                 "reason": info.get("reason")}
 
 
 def reference_report(root: str, unit: str) -> dict:
@@ -1001,6 +1009,13 @@ def render_references(payload: dict) -> str:
             lines.append("      splits.txt: %s" % rec["splits"].replace("\n", "\n                 "))
         if rec.get("symbols"):
             lines.append("      symbols.txt: %s" % rec["symbols"])
+            if rec.get("symbols_optional"):
+                lines.append("                   OPTIONAL and OVERLAPPING - the pool's %d row(s) at "
+                             "0x%08X-0x%08X already own those addresses; the `Pl/pl_frame_data` "
+                             "precedent registered with the `splits.txt` range alone - omit this "
+                             "line when the words are already named"
+                             % (rec.get("symbols_overlap_rows") or 0,
+                                (pool or {}).get("start"), (pool or {}).get("end")))
         lines.append("      %s" % rec["note"])
     lines.append("  summary: " + ", ".join("%s %d" % (key, payload["summary"].get(key, 0))
                                             for key in REMEDIES))
@@ -1273,6 +1288,20 @@ def selftest() -> int:
           shared["symbols"].startswith("Pl/sdata_pool = .sdata:0x00001000;"), True)
     check("remedy: the named unit explains NonMatching and the DOL",
           ("NonMatching" in shared["note"] and "DOL" in shared["note"]), True)
+    check("remedy: the symbols.txt row is marked optional", shared["symbols_optional"], True)
+    check("remedy: and counts the rows it would overlap", shared["symbols_overlap_rows"], 2)
+    check("remedy: the note says OPTIONAL and names the precedent",
+          ("OPTIONAL" in shared["note"] and "Pl/pl_frame_data" in shared["note"]), True)
+
+    # the exact pool the two Pl lanes hand-wrote a diff for: 17 word rows, one 0x44 object over them
+    sdata_pool = {"start": 0x80799F98, "end": 0x80799FDC, "count": 17,
+                  "readers": ["Pl/fn_80258FCC", "Pl/fn_8025F088"]}
+    sdata = recommend(rec("pl_float_neg250", ".sdata2", 0x80799F98, 0x4,
+                          sharers=["Pl/fn_80258FCC"], pool=sdata_pool), "Pl/fn_8025F088", [])
+    check("remedy: the pool lane's row is produced exactly", sdata["symbols"],
+          "Pl/sdata2_pool = .sdata2:0x80799F98; // type:object size:0x44")
+    check("remedy: it is marked optional", sdata["symbols_optional"], True)
+    check("remedy: overlapping the 17 word rows", sdata["symbols_overlap_rows"], 17)
 
     private = recommend(rec("c", ".data", 0x2000, 0x8), "Pl/pl_act", [])
     check("remedy: a private symbol is claimed into the unit", private["remedy"], "claim-into-unit")
@@ -1317,6 +1346,21 @@ def selftest() -> int:
     check("render: the remedy is printed", "remedy: claim-into-unit" in render_references(payload), True)
     check("render: the summary counts the remedies",
           "claim-into-unit 1" in render_references(payload), True)
+
+    # the optional/overlapping `symbols.txt:` line, rendered for the pool the lanes hand-diffed
+    sdata_home = dict(rec("pl_float_neg250", ".sdata2", 0x80799F98, 0x4,
+                          sharers=["Pl/fn_80258FCC"], pool=sdata_pool), **sdata)
+    sdata_payload = {"unit": "Pl/fn_8025F088", "object": "build/RMHE08/obj/Pl/fn_8025F088.o",
+                     "census": {"source": "asm"}, "entries": [sdata_home],
+                     "summary": _remedy_counts([sdata_home])}
+    sdata_text = render_references(sdata_payload)
+    check("render: the optional symbols.txt line is printed",
+          "symbols.txt: Pl/sdata2_pool = .sdata2:0x80799F98;" in sdata_text, True)
+    check("render: and it is called OPTIONAL and OVERLAPPING",
+          "OPTIONAL and OVERLAPPING" in sdata_text, True)
+    check("render: naming how many rows it overlaps", "17 row(s)" in sdata_text, True)
+    check("render: and telling the reader it can be omitted",
+          "omit this" in sdata_text and "pl_frame_data" in sdata_text, True)
 
     # --- `declared in:` - the address's owner vs the declaration's actual home ----------------------
     with tempfile.TemporaryDirectory() as tmp:
