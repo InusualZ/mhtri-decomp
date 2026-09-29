@@ -1,15 +1,16 @@
 /*
  * menu/menu_message.cpp - the menu band's list/cursor layer and its message helpers.
  *
- * `.text` 0x802A6624-0x802AD9C0 (139 functions, 29596 B), extab 0x800137D4-0x80013B0C (103 8-byte
- * records) and extabindex 0x8003123C-0x80031710 (103 12-byte records, one per framed function), from
- * `proposal/802A6624_fn_802A6624.cpp`.  `.ctors` 0x8056F374-0x8056F37C (two words) is dtk's own
- * addition and the two functions it names are this unit's constructors.
+ * `.text` 0x802A6624-0x802AA764 (71 functions, 16704 B), extab 0x800137D4-0x8001398C (55 8-byte
+ * records) and extabindex 0x8003123C-0x800314D0 (55 12-byte records, one per framed function), from
+ * `proposal/802A6624_fn_802A6624.cpp`.  The range was **cut** at 0x802AA764 on 2026-09-29 by
+ * `worker/menu-seam-recut-4622` - see the seam note below - and the cut took the `.ctors`
+ * 0x8056F374-0x8056F37C words with it, because both name tail functions.
  *
  * Module `menu`: the left neighbour is `menu/menu_item.cpp`, the range calls into it
  * (`GetItemData__FUs`, `get_menu_lsp_tbl__FUs`) and its own entry points are the menu's
- * (`put_message`, `put_frame_dialog`, `GetMenuFontColor`, `pull_shell_work`).  File name: derived
- * (class 3 + class 4).  Class 1 and class 2 are both empty - no `__FILE__` string covers the range
+ * (`put_message`, `put_frame_dialog`, `GetMenuFontColor`, the list/cursor entry points).  File name:
+ * derived (class 3 + class 4).  Class 1 and class 2 are both empty - no `__FILE__` string covers the range
  * (the only one in this `.data` run is `menu_item.cpp` at 0x805CDFC8, referenced from
  * 0x802A5444/0x802A579C/0x802A64B0, i.e. the range before this one) and the runtime dump answers
  * `zz_XXXXXXXX_` for every unnamed row here - so the name comes from what the range does and is
@@ -24,20 +25,51 @@
  * and the `.bss` table `lbl_806BE340` is referenced from both this range and 0x802A5E64 in the
  * proposal before it - so the cut is very likely through one translation unit.  This unit keeps the
  * proposal's extent because a worker may not re-cut a claim, and reuses the offsets rather than
- * inventing a type (`include/menu/menu_message.h` says which).
+ * inventing a type (`include/menu/menu_message.h` says which).  The right edge was re-cut (below);
+ * **this left edge is still unproven and still the proposal's**.
  *
- * Second seam, unproven too, and stronger: the trailing block (`pull_shell_work`, 0x802AA764, to
- * `fn_802AD9A8`) is **not the menu module**.  It is the player's gunner-shell pool and actor layer:
- * `_SHELL_W` (the 0x10C record `include/ef.h` documents; `push_shell_work` `memset`s exactly 0x10C),
- * pool `lbl_806AD698`, and `yure_move` is called from `Pl/fn_80288CEC.cpp`, `charmake_move` and
- * `arena_game_task`.  12892 of the 29596 bytes (44 %, 70 of the 139 rows) may belong to another TU.
- * No `__FILE__` string and no pooled literal covers the range, so the boundary cannot be settled from
- * the data here - `tudiscover.py at 0x802AA764` reports only weak signals.  The evidence is in this
- * header for the orchestrator; nothing in the block was written this pass.
+ * Second seam, **decided and cut** at 0x802AA764 on 2026-09-29 by `worker/menu-seam-recut-4622`.
+ * The trailing block (`pull_shell_work` 0x802AA764 to `fn_802AD9A8`) is **not the menu module**: it
+ * is the player's gunner-shell pool and actor layer - `_SHELL_W` (the 0x10C record `include/ef.h`
+ * documents; `push_shell_work` `memset`s exactly 0x10C), pool `lbl_806AD698`, and `yure_move` is
+ * called from `Pl/fn_80288CEC.cpp`, `charmake_move` and `arena_game_task`.  Because no `__FILE__`
+ * string and no pooled literal covers the range the boundary could not be settled from the data;
+ * `tudiscover.py at 0x802AA764` reports only weak signals, so the cut is the orchestrator's ruling
+ * on that behavioural evidence.  It is a **pure re-attribution**: the trailing half was left
+ * unclaimed, so dtk re-created its own `auto_*` units for it, and only ownership moved - the
+ * project's `matched_code` (609052), `matched_data` (24544) and every function count are unchanged,
+ * the DOL SHA-1 is unchanged, and all 19 of this unit's byte-identical rows kept their score *and*
+ * their unit.
  *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for 99 of this range's 139 symbols (the 40
- * named rows are the `put_message`/`put_frame_dialog`/`GetMenuFontColor`/`shell_*`/`serial_*`/
- * `niku_*`/`yure_move` family the runtime dump carries).  2026-09-29: no `fn_XXXXXXXX` this file
+ * The two unwind runs were partitioned **by function**, not by size.  `extabindex` carries one
+ * 12-byte record per framed function (`{fn_addr, fn_size, etab_addr}` in function-address order) and
+ * `extab` is 1:1 with it at 8 bytes each - record `i`'s `etab_addr` is `0x800137D4 + 8*i`, which is
+ * what makes the split exact.  The record whose `fn_addr` is `pull_shell_work__FUl` (0x802AA764) is
+ * index **55**, so this unit keeps records 0-54 (extab 440 B, extabindex 660 B) and the tail's 48
+ * records went with it: extab 0x8001398C-0x80013B0C (384 B) and extabindex
+ * 0x800314D0-0x80031710 (576 B), tiling exactly.  The old `.ctors` claim could not stay either -
+ * both of its words name tail functions (`fn_802ABC4C`, `fn_802AD9A8`) and `dtk dol split` refuses
+ * the mismatch outright (`Mismatched splits for .ctors 4:0x8056F374 and function 3:0x802ABC4C`) -
+ * so this unit now owns the two unwind runs and nothing else.  0x802AA764 is a clean function
+ * boundary (`fn_802AA6A8`, 188 B, ends exactly there).
+ *
+ * Re-registration recipe for the tail - a future lane's unit, deliberately **not** created here,
+ * because registering it would oblige its 38 unnamed `fn_*` rows (of 68) to be named in the same
+ * change (rule 7).  Range: one unit over `.text` 0x802AA764-0x802AD9C0 (12892 B, 68 rows), extab
+ * 0x8001398C-0x80013B0C, extabindex 0x800314D0-0x80031710 (48 records) and `.ctors`
+ * 0x8056F374-0x8056F37C - dtk's `auto_*` units tile those four runs exactly today, so `splits.txt`
+ * only has to claim them.  Language: C.  Module and name: derive them; the evidence is `_SHELL_W` in
+ * `include/ef.h` (`push_shell_work` memsets 0x10C), the shell pool `lbl_806AD698`, and the callers
+ * `Pl/fn_80288CEC.cpp` (`yure_move`), `charmake_move` and `arena_game_task`.  The map already carries
+ * the `shell_*`/`serial_*`/`niku_*`/`yure_move` family names, so the remaining `fn_*` stems take
+ * their names from that context - what each one stores into `_SHELL_W`, which pool it walks, who
+ * calls it - and the field names they touch mean extending `include/ef.h` (its +0x030..+0x10C run is
+ * one pad block).
+ *
+ * Naming note: the symbol map still has only `fn_XXXXXXXX` for 34 of this range's 71 symbols (the
+ * range's named rows are the `menu_*` names this file derived plus the
+ * `put_message`/`put_frame_dialog`/`GetMenuFontColor`/`get_*_str` family the runtime dump carries, and
+ * the 34 unnamed ones are all unwritten).  2026-09-29: no `fn_XXXXXXXX` this file
  * **defines** is left generated.  The list/cursor block became `menu_list_mode_get`,
  * `menu_list_count_update`, `menu_list_fill`, `menu_list_names_set`, `menu_cursor_move`,
  * `menu_cursor_seek`, `menu_cursor_column_step`; the frame/page draw block `menu_frame_entries_build`,
@@ -56,8 +88,10 @@
  * `src/Pl/pl_skill.cpp` call it and `Pl/` is outside this lane's write scope.
  *
  * Reconstructed: the menu list/cursor layer, the palette getters, the four string-table accessors
- * and the system dialog's OK-button row - 19 of the 139 rows are byte-identical, 1596 of 29596
- * `.text` bytes (5.39262 %), unit metric 12.13434 %.  Rows this pass added: `GetMenuFontColorRed`
+ * and the system dialog's OK-button row - 19 of the 71 rows are byte-identical, 1596 of 16704
+ * `.text` bytes (9.55460 %), unit metric 21.49952 % (it was 12.13434 % over the pre-cut 29596 B -
+ * the metric rose because the denominators shrank, not because a row moved: `matched_code` is 1596
+ * before and after).  Rows the naming pass added: `GetMenuFontColorRed`
  * 0 -> 100, `GetMenuIconColor` 0 -> 100, `get_item_name_str`/`get_player_name_str`/
  * `get_group2_name_str`/`get_digit_str` 0 -> 100 each, `put_message_sys_ok_button__Fv` 0 -> 100,
  * `GetMenuFontColor` 0 -> 95.59.  Every pre-existing row measures exactly what it did before.
@@ -102,7 +136,8 @@
  * which no link input defines; the object's relocations now spell the target's names name for name,
  * and the change is codegen-neutral (0 of 2189 unit rows moved, DOL hash unchanged).
  *
- * The 120 unwritten bodies, by block:
+ * The 52 unwritten bodies, by block (the shell/serial/niku block that used to be the third one left
+ * with the cut - a shell-layer owner is the re-registration recipe above, not this unit):
  *   * `fn_802A6F64`-`fn_802A7CC8` (0x408/0x1B8/0x314/0x140/0x40/0x1C8/0x84/0x40/0x84/0x358 B): the
  *     frame/message page writers.  `fn_802A6F64` and `fn_802A7524` are half-written as declarations
  *     only - their bodies are the two biggest in the block and need the `_SPR_DATA_` record (the
@@ -111,10 +146,6 @@
  *     page layer.  Written call sites are needed first: their bodies build `_SPR_DATA_` copies and call
  *     the variadic `font_print_ex(s16, s16, s16, char*, ...)`, whose `crclr 4*cr1+eq` the target
  *     carries.
- *   * `pull_shell_work`-`yure_move` (0x10..0x12B4 B, ~60 rows): the shell/serial/niku layer.  Every
- *     one of them takes `_SHELL_W` (include/ef.h's union view, whose +0x030..+0x10C run is one pad
- *     block); naming the fields they touch means extending that shared header, which is a separate
- *     change from this registration.  `fn_802AC484` (0x12B4 B) alone is 16 % of the range.
  *   * known non-byte-identical rows: `menu_list_fill` 82.76 (the two-block list fill - the retail loop
  *     is unrolled five-fold with constant displacements and our `for` over `rec[0x130 * j]` is not),
  *     `fn_802A8F14` 76.67 (the ceiling-divide helper: same instruction sequence, the allocator swaps

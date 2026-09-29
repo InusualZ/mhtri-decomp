@@ -87,7 +87,9 @@ struct MenuListWork {
 
 /* The range's own entry points the neighbouring units call.  `include/unsplit/lobby.h` and
  * `include/lobby/fn_801F3294.h` published them while the band had no registered unit; this range now
- * owns 0x802A6624-0x802AD9C0, so the declarations live here and both headers include this one
+ * owns 0x802A6624-0x802AA764 (re-cut from 0x802AD9C0 on 2026-09-29 - see `menu_message.cpp`'s header
+ * for the seam and the tail's re-registration recipe), so the declarations live here and both headers
+ * include this one
  * (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
  * parameters are what the retail call sites need: a narrow argument must not be narrowed back to `s16`
  * for the call).  `toggle_word_step` is unwritten - its callers spell it as below. */
