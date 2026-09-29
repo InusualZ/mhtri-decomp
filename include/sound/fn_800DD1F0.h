@@ -45,7 +45,7 @@ void fn_800E3264(MHchar* track, u32 arg);
 /* 0x800E1640 / 0x800E16DC / 0x800E2198 - the model-block setters the Pl part accessors tail-call.
  * The addresses sit inside this unit's range (0x800DD1F0-0x800E3CBC), so the declarations belong to
  * this header (rule 2); `Pl/fn_802693c4.cpp` and `Pl/pl_act.cpp` are the call sites.  The value
- * setters' return is `u32` because `Pl_frame_check`/`fn_8026A33C` pass it straight back to their own
+ * setters' return is `u32` because `Pl_frame_check`/`Pl_motion_end_ck` pass it straight back to their own
  * callers, which compare it against 1. */
 void fn_800E1640(MHchar* chr, f32 value);
 u32 fn_800E16DC(MHchar* chr, u16 motion, s32 flag);

@@ -53,30 +53,30 @@ extern "C" {
 void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask);
 
 /* 0x80275AC4 / 0x80275ADC - the two act-state entries that also set a marker byte. */
-void fn_80275AC4(struct _PLW* self, s32 a, u16 b, u16 c);
+void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
 void fn_80275ADC(struct _PLW* self, s32 a, u16 b, u16 c);
 
 /* 0x80275B04 - arms the act's three status bits from a packed mask. */
-void fn_80275B04(struct _PLW* self, u16 a, u32 b, u32 c);
+void Pl_act_set_motion(struct _PLW* self, u16 a, u32 b, u32 c);
 
 /* 0x80275C18 - the act dispatcher's motion hand-off (`Pl_chr_setX` or its blended sibling). */
 void fn_80275C18(struct _PLW* plw, u32 motion, u32 a, u32 b, u32 c);
 
 /* 0x80275C34 and the three no-argument entries that drive it. */
 void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d);
-void fn_802761B8(struct _PLW* self, u32 a, u32 b, u32 c);
+void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c);
 void fn_802761C4(struct _PLW* self, u32 a, u32 b, u32 c);
 void fn_802761D0(struct _PLW* self, u32 a, u32 b, u32 c);
 
 /* 0x80276238 - clears the act's hold latch and re-enters the act state. */
-void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c);
+void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
 
 /* 0x80276254 / 0x80276270 - the two gauge-budget predicates. */
 s32 fn_80276254(struct _PLW* self, s32 value);
 s32 fn_80276270(struct _PLW* plw, s32 value);
 
 /* 0x8027628C - adds `delta` to the act's hold gauge, clamped to 0..`+0x372`. */
-void fn_8027628C(struct _PLW* plw, s16 delta);
+void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta);
 
 /* 0x8027633C and its two wrappers - the act's frame step. */
 s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out);
@@ -95,7 +95,7 @@ u32 Pl_act_state_ck(struct _PLW* plw);
 
 /* 0x80276868 / 0x802768F8 / 0x80276A3C - the stagger-budget setters. */
 void fn_80276868(struct _PLW* plw, s16 amount);
-void fn_802768F8(struct _PLW* plw, s16 amount);
+void pl_act_gauge_gate(struct _PLW* plw, s16 amount);
 void fn_80276A3C(struct _PLW* plw);
 
 /* 0x802745DC / 0x802748C8 / 0x80274AB8 / 0x80274AEC - the armed-slot and act-kind predicates.

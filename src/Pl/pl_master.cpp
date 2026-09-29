@@ -40,7 +40,7 @@
  *
  * Residual: none. All 24 functions are 100 % and `.text` is byte-identical to the target (0x45A0 B, 0
  * differing bytes).
- *   - `fn_8026F908` was the last 9 bytes, and they were a colouring tie-break rather than a code shape.
+ *   - `pl_act_param_tier_ck` was the last 9 bytes, and they were a colouring tie-break rather than a code shape.
  *     Retail coalesces the load result with the index-address temp (`add r4,r3,r0; lha r4,212(r4)`, so
  *     `value` r4 and the class temp r5); the natural source - `s16 value = (s16)self->unkD4[idx];` before
  *     the early-out, which is the only spelling that puts `level` in r6 - keeps them apart (`lha r5,212(r4)`,
@@ -173,7 +173,7 @@ typedef struct ActState {
 /* Unmangled map names: `extern "C"` so the compiler emits the map's spelling. */
 extern "C" {
 void fn_8026A618(_PLW* self, u32 id);
-u32 fn_8026A644(_PLW* self, u32 id);
+u32 pl_part_flag_ck(_PLW* self, u32 id);
 void fn_8026A678(_PLW* self, u32 id);
 u32 fn_8026A6F4(_PLW* self, u32 id);
 u32 fn_8026B99C(_PLW* self);
@@ -205,7 +205,7 @@ extern "C" void fn_8026BE94(_PLW* self, ActState* req, u32 mask, u32 idx);
 extern "C" void fn_8026CC7C(_PLW* self);
 extern "C" void fn_8026BA1C(_PLW* self);
 u32 Pl_master_ck(_PLW* self);
-extern "C" u8 fn_8026F908(_PLW* self, u32 idx);
+extern "C" u8 pl_act_param_tier_ck(_PLW* self, u32 idx);
 extern "C" u32 fn_8026F9A4(_PLW* self, u32 idx, u16 low, u16 high);
 extern "C" u32 fn_8026FA6C(_PLW* self, u32 idx, u16 low, u16 high);
 extern "C" u32 fn_8026FB20(_PLW* self, s32 kind);
@@ -413,7 +413,7 @@ extern "C" void fn_8026BF98(_PLW* self)
             }
             if (st->unk7E & 2) {
                 if (self->unk308 == 0) {
-                    if (fn_8026F908(self, 0) >= 1) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1) {
                         fn_8026A618(self, 27);
                     } else {
                         fn_8026A618(self, 26);
@@ -435,7 +435,7 @@ extern "C" void fn_8026BF98(_PLW* self)
                 fn_8026A618(self, 10);
             }
             if (st->flagsB8 & 0x100) {
-                if (fn_8026F908(self, 0) >= 1) {
+                if (pl_act_param_tier_ck(self, 0) >= 1) {
                     fn_8026A618(self, 27);
                 } else {
                     fn_8026A618(self, 26);
@@ -509,7 +509,7 @@ extern "C" void fn_8026BF98(_PLW* self)
         if ((st->flagsB8 & 0x80) != 0 && (st->flagsBC & 0x20) != 0) {
             fn_8026A618(self, 71);
             fn_8026A618(self, 73);
-            if (fn_8026A644(self, 1) == 0) {
+            if (pl_part_flag_ck(self, 1) == 0) {
                 fn_8026A618(self, 70);
                 fn_8026A618(self, 72);
             }
@@ -578,7 +578,7 @@ extern "C" void fn_8026BF98(_PLW* self)
         }
         if ((st->flagsBC & 0x200) != 0 || fn_8026BA04(self) == 1) {
             fn_8026A618(self, 6);
-            if (fn_8026A644(self, 1) == 0) {
+            if (pl_part_flag_ck(self, 1) == 0) {
                 fn_8026A618(self, 52);
                 fn_8026A618(self, 2);
                 fn_8026A618(self, 5);
@@ -589,7 +589,7 @@ extern "C" void fn_8026BF98(_PLW* self)
             if (st->unk58 <= lbl_8079A020) {
                 fn_8026A618(self, 73);
             }
-            if (fn_8026A644(self, 1) == 0) {
+            if (pl_part_flag_ck(self, 1) == 0) {
                 fn_8026A618(self, 70);
                 if (st->unk58 <= lbl_8079A020) {
                     fn_8026A618(self, 72);
@@ -607,7 +607,7 @@ extern "C" void fn_8026BF98(_PLW* self)
         }
         if (st->flagsBC & 0x200) {
             fn_8026A618(self, 76);
-            if (fn_8026A644(self, 1) == 0) {
+            if (pl_part_flag_ck(self, 1) == 0) {
                 fn_8026A618(self, 53);
                 fn_8026A618(self, 77);
             }
@@ -620,7 +620,7 @@ extern "C" void fn_8026BF98(_PLW* self)
             fn_8026A618(self, 11);
         }
         if ((st->flagsBC & 0x200) != 0 && self->unk308 == 0) {
-            if (fn_8026F908(self, 0) >= 1) {
+            if (pl_act_param_tier_ck(self, 0) >= 1) {
                 fn_8026A618(self, 27);
             } else {
                 fn_8026A618(self, 26);
@@ -695,7 +695,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 3);
                     fn_8026A678(self, 6);
                     fn_8026A678(self, 0xC);
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A678(self, 0x10);
                     } else {
                         fn_8026A678(self, 0x12);
@@ -750,7 +750,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x12);
                     fn_8026A678(self, 6);
                     fn_8026A678(self, 0x13);
-                    if (fn_8026A644(self, 1) == 0) {
+                    if (pl_part_flag_ck(self, 1) == 0) {
                         fn_8026A618(self, 0xC);
                         fn_8026A618(self, 0x18);
                     }
@@ -934,7 +934,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 7);
                 }
                 if ((s32) (st->unk7E & 1) != 0) {
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A678(self, 4);
                         fn_8026A678(self, 5);
                     }
@@ -953,7 +953,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 if ((s32) (st->unk7E & 2) != 0) {
                     fn_8026A678(self, 0xC);
                     fn_8026A678(self, 0xB);
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A678(self, 1);
                         fn_8026A618(self, 0x4B);
                         return;
@@ -967,7 +967,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x15);
                 }
                 if (fn_8026F9A4(self, 1, 0x1555, 0x6AAB) == 1U) {
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A678(self, 4);
                         fn_8026A678(self, 5);
                     }
@@ -982,7 +982,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 } else if (fn_8026F9A4(self, 1, 0xD555, 0x1555) == 1U) {
                     fn_8026A678(self, 1);
                     fn_8026A678(self, 0xC);
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A618(self, 0x4B);
                     } else {
                         fn_8026A618(self, 0x4A);
@@ -1010,7 +1010,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
             }
             break;
         case 1:
-            if ((st->unk58 <= lbl_8079A020) && ((s32) (st->flagsBC & 0x200) != 0) && (fn_8026A644(self, 1) == 0)) {
+            if ((st->unk58 <= lbl_8079A020) && ((s32) (st->flagsBC & 0x200) != 0) && (pl_part_flag_ck(self, 1) == 0)) {
                 fn_8026A618(self, 0xC);
                 fn_8026A618(self, 0x18);
             }
@@ -1038,7 +1038,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                         fn_8026A678(self, 6);
                     }
                 }
-                if (fn_8026F908(self, 0) >= 1U) {
+                if (pl_act_param_tier_ck(self, 0) >= 1U) {
                     fn_8026A678(self, 3);
                 }
                 fn_8026A678(self, 9);
@@ -1058,7 +1058,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 } else {
                     if (st->unk54 >= lbl_8079A028) {
                         fn_8026A678(self, 0xC);
-                        if (fn_8026F908(self, 0) >= 1U) {
+                        if (pl_act_param_tier_ck(self, 0) >= 1U) {
                             fn_8026A618(self, 0x4B);
                         } else {
                             fn_8026A618(self, 0x4A);
@@ -1071,7 +1071,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 if (fn_8026FA6C(self, 0, 0xA000, 0xE000) == 1U) {
                     fn_8026A678(self, 0xF);
                 }
-                if (fn_8026F908(self, 0) >= 1U) {
+                if (pl_act_param_tier_ck(self, 0) >= 1U) {
                     fn_8026A678(self, 8);
                 }
                 fn_8026A678(self, 5);
@@ -1079,7 +1079,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 fn_8026A678(self, 0x12);
             }
             if ((s32) (st->flagsBC & 0x40) != 0) {
-                if (fn_8026F908(self, 0) >= 1U) {
+                if (pl_act_param_tier_ck(self, 0) >= 1U) {
                     fn_8026A678(self, 4);
                     fn_8026A678(self, 5);
                 }
@@ -1119,7 +1119,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 4);
                     fn_8026A678(self, 0xF);
                     fn_8026A678(self, 0x12);
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A678(self, 0xE);
                     } else {
                         fn_8026A678(self, 7);
@@ -1144,7 +1144,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0);
                     fn_8026A678(self, 1);
                     fn_8026A678(self, 4);
-                    if (fn_8026F908(self, 0) >= 1U) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1U) {
                         fn_8026A678(self, 0xE);
                     } else {
                         fn_8026A678(self, 7);
@@ -1174,7 +1174,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
             }
             break;
         case 1:
-            if ((st->unk58 <= lbl_8079A020) && ((s32) (st->flagsBC & 0x200) != 0) && (fn_8026A644(self, 1) == 0)) {
+            if ((st->unk58 <= lbl_8079A020) && ((s32) (st->flagsBC & 0x200) != 0) && (pl_part_flag_ck(self, 1) == 0)) {
                 fn_8026A678(self, 9);
                 fn_8026A678(self, 0xA);
             }
@@ -1483,7 +1483,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x19);
                     fn_8026A678(self, 0x1C);
                     fn_8026A678(self, 1);
-                    if ((s32) fn_8026F908(self, 0) == 0) {
+                    if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
                         fn_8026A678(self, 0xC);
                     }
                     fn_8026A678(self, 0xA);
@@ -1496,7 +1496,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x1C);
                     fn_8026A678(self, 0x1D);
                     fn_8026A678(self, 1);
-                    if ((s32) fn_8026F908(self, 0) == 0) {
+                    if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
                         fn_8026A678(self, 0xC);
                     }
                     fn_8026A678(self, 0xA);
@@ -1538,7 +1538,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x11);
                     fn_8026A678(self, 0x12);
                     fn_8026A678(self, 0x13);
-                    if ((s32) fn_8026F908(self, 0) == 0) {
+                    if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
                         fn_8026A678(self, 0xC);
                     }
                     fn_8026A678(self, 7);
@@ -1563,7 +1563,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                         fn_8026A678(self, 0x14);
                         fn_8026A678(self, 0x15);
                         fn_8026A678(self, 0x18);
-                        if ((s32) fn_8026F908(self, 0) == 0) {
+                        if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
                             fn_8026A678(self, 0xC);
                         }
                     }
@@ -1597,7 +1597,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 fn_8026A678(self, 5);
             }
             if ((st->unk58 <= lbl_8079A020) && ((s32) (st->flagsBC & 0x200) != 0)) {
-                if ((s32) fn_8026F908(self, 0) == 0) {
+                if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
                     fn_8026A678(self, 0xC);
                 }
                 fn_8026A678(self, 0x14);
@@ -1675,7 +1675,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 if (fn_8026FB20(self, 0x1000) == 1U) {
                     fn_8026A678(self, 8);
                 }
-                if ((s32) fn_8026F908(self, 0) == 0) {
+                if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
                     fn_8026A678(self, 0xC);
                 }
             }
@@ -1730,7 +1730,7 @@ extern "C" u32 fn_8026F888(_PLW* self)
 #pragma peephole reset
 
 /* 0x8026F908: maps a part's motion value to an attack level (3/1/0), 0 for the "gun" weapon classes. */
-extern "C" u8 fn_8026F908(_PLW* self, u32 idx)
+extern "C" u8 pl_act_param_tier_ck(_PLW* self, u32 idx)
 {
     u32 level = 0;
     s16 value = (s16)self->unkD4[idx];
@@ -1782,7 +1782,7 @@ extern "C" u32 fn_8026F9A4(_PLW* self, u32 idx, u16 low, u16 high)
             return 0;
         }
     }
-    if (fn_8026F908(self, idx) >= 1 && (u16)(self->unkD0[idx] - low) <= (u16)(high - low)) {
+    if (pl_act_param_tier_ck(self, idx) >= 1 && (u16)(self->unkD0[idx] - low) <= (u16)(high - low)) {
         return 1;
     }
     return 0;
@@ -1834,7 +1834,7 @@ extern "C" u32 fn_8026FB20(_PLW* self, s32 kind)
 /* 0x8026FC40 */
 extern "C" u32 fn_8026FC40(_PLW* self, u32 idx, u16 low, u16 high)
 {
-    if (fn_8026F908(self, idx) >= 1 && (u16)(self->unkD0[idx] - low) <= (u16)(high - low)) {
+    if (pl_act_param_tier_ck(self, idx) >= 1 && (u16)(self->unkD0[idx] - low) <= (u16)(high - low)) {
         return 1;
     }
     return 0;
@@ -1914,7 +1914,7 @@ extern "C" u32 fn_8026FE98(_PLW* self, u32 mask)
 }
 
 /* 0x8026FEC0 */
-extern "C" void fn_8026FEC0(_PLW* self, u32 mask)
+extern "C" void pl_act_set_flag(_PLW* self, u32 mask)
 {
     if ((mask & 0x80000000) == 0) {
         self->unk35C |= mask;

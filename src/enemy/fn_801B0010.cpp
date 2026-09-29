@@ -50,7 +50,7 @@
  * 95.64 and `fn_801B03E8` 91.35 -> 93.65: the branch had declared `Pl/pl_skill.h`'s `fn_802731B4`/
  * `fn_80272E30` at C++ scope, while their owner defines them `extern "C"`, so their call sites were
  * emitting a mangled reloc the target does not have).  Everything else that changed here:
- *   * `fn_80267270` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
+ *   * `pl_model_state_set` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
  *     its owner existed) to the owner's header `include/Pl/fn_80262940.h`; `fn_801E01BC` likewise to
  *     `include/enemy/fn_801DB8E0.h`, and this unit's own three band symbols to
  *     `include/enemy/fn_801B0010.h` (`fn_801B0010` was parked in `unsplit/enemy.h` with the note
@@ -120,7 +120,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "unsplit/enemy.h"
-#include "Pl/fn_80262940.h" /* fn_80267270 (rule 2: its owner's header) */
+#include "Pl/fn_80262940.h" /* pl_model_state_set (rule 2: its owner's header) */
 
 #include "mh3_pad.h"
 
@@ -365,7 +365,7 @@ extern "C" u32 fn_801B0230(_ENEMY_WORK* work, _PLW* plw) {
     }
     work->plw_0x32C = plw;
     fn_80272E30(plw, work->field_0x328, -1);
-    fn_80267270(plw, 2, 0x1B, work->field_0x328);
+    pl_model_state_set(plw, 2, 0x1B, work->field_0x328);
     return 1;
 }
 
@@ -379,7 +379,7 @@ extern "C" void fn_801B03E8(_ENEMY_WORK* work) {
         return;
     }
     fn_80272E30(work->plw_0x32C, work->field_0x328, 1);
-    fn_80267270(work->plw_0x32C, 2, 0x1C, work->field_0x328);
+    pl_model_state_set(work->plw_0x32C, 2, 0x1C, work->field_0x328);
     work->field_0x328 = 0;
     work->plw_0x32C = NULL;
 }

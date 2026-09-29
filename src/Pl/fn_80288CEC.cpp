@@ -185,7 +185,7 @@ void fn_800553B4(u8 idx);
 void fn_800D8E44(void* handle);
 void fn_800F6710(void);
 void fn_802673B8(void);
-void fn_80275AC4(void* self, u32 a, u32 b, u32 c);
+void pl_act_enter(void* self, u32 a, u32 b, u32 c);
 u32 fn_8027CB1C(void* self);
 u32 fn_802B0668(u8 idx);
 void fn_802BE568(void* self, u32 sub);
@@ -256,9 +256,9 @@ void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
             self->field_0x565 = 1;
             if (primary == 0) {
                 if (self->kind_0x09 == 3) {
-                    fn_80275AC4(self, 4, 0x39, 0x4080);
+                    pl_act_enter(self, 4, 0x39, 0x4080);
                 } else {
-                    fn_80275AC4(self, 4, 0xF, 0x4000);
+                    pl_act_enter(self, 4, 0xF, 0x4000);
                 }
             }
         }

@@ -12,7 +12,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-/* The owner's header for `fn_80267270` (0x80267270, `Pl/fn_80262940.cpp`'s range).  This header used
+/* The owner's header for `pl_model_state_set` (0x80267270, `Pl/fn_80262940.cpp`'s range).  This header used
  * to declare it `u32` while the owner defines it `void` - the `(10505) illegal overloading` this
  * include clears (docs/plan.md 6.5 rule 2). */
 #include "Pl/fn_80262940.h"
@@ -76,7 +76,7 @@ u32 fn_80224AC4(void* physics);
 u32 fn_80262940(struct _PLW* self);
 u32 fn_802642D0(struct _PLW* self);
 u32 fn_802657F8(struct _PLW* self);
-/* `fn_80267270` (0x80267270) stood here as `u32 (struct _PLW*, u32, s32, u16)`; its owner
+/* `pl_model_state_set` (0x80267270) stood here as `u32 (struct _PLW*, u32, s32, u16)`; its owner
  * `Pl/fn_80262940.cpp` defines it `void`, so `include/Pl/fn_80262940.h`, included above, declares it
  * and this header no longer does (rule 2).  `fn_80262940`/`fn_802642D0`/`fn_802657F8` stay: that
  * owner's header does not declare them yet. */
@@ -124,13 +124,13 @@ extern "C" {
 #endif
 
 /* The unit's read-only pool constants (playbook 29: declared, never defined). */
-extern const f32 lbl_80799E00;
-extern const f32 lbl_80799E08;
-extern const f32 lbl_80799E18;
-extern const f32 lbl_80799E2C;
-extern const f32 lbl_80799E38;
+extern const f32 pl_float_zero;
+extern const f32 pl_frame_window_1;
+extern const f32 pl_frame_window_10;
+extern const f32 pl_frame_window_2;
+extern const f32 pl_frame_window_30;
 extern const f32 lbl_80799E50;
-extern const f32 lbl_80799E80;
+extern const f32 pl_frame_window_100;
 extern const f32 lbl_80799E88;
 extern const f32 lbl_80799E9C;
 extern const f32 lbl_80799F98;

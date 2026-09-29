@@ -62,8 +62,8 @@
  * but never a generated *path*), and the only evidence a name can come from before the bodies exist is
  * the target object's own call surface, read with `tools/units/m2cinput.py`: of its 48 functions, 31
  * call `Pl_frame_check__FP4_PLWUlff` (15 `Pl_master_ck__FP4_PLW`), and the range's heaviest callees are
- * all in the `Pl`/`player` band - `fn_8026A33C` x44, `fn_803313D0` x40, `fn_80275B04` x33,
- * `fn_802761B8` x24, `fn_80277C50` x24, `fn_80275AC4` x16, `fn_802770E8` x10 - plus the effect spawns
+ * all in the `Pl`/`player` band - `Pl_motion_end_ck` x44, `fn_803313D0` x40, `Pl_act_set_motion` x33,
+ * `Pl_act_set_motion_slot` x24, `fn_80277C50` x24, `pl_act_enter` x16, `Pl_act_set_step_table` x10 - plus the effect spawns
  * `res_eft_create__FUsUsUl`, `res_eft_model_create__FP6MHcharUsUl` and `eft007_set__FP4_PLWUcUcUlPQ34nw4r4math4VEC3f`.
  * So the half runs the *player records'* frame checks and spawns the hit effects; the pass that writes
  * the bodies renames this file from them, and if a `Pl` home turns out to be right, this unit moves.

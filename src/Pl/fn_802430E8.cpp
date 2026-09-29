@@ -32,7 +32,7 @@
  * mw_version Wii/1.0).
  *
  * Residual: 9 of the range's 30 functions are written and all nine measure 100.0 %
- * (`fn_802430E8`, `fn_80245DA0`, `fn_80245E20`, `fn_80246158`, `fn_802466C4`, `fn_802478A4`,
+ * (`fn_802430E8`, `pl_act_clear_wait`, `fn_80245E20`, `fn_80246158`, `fn_802466C4`, `fn_802478A4`,
  * `fn_80247C2C`, `fn_80247EF0`, `fn_802488D4`).  The other 21 - `fn_80244E88` (0xE68 B, the
  * per-motion effect dispatcher `Pl/fn_80229ECC.cpp` calls with `&_PLW::field_0xAF4`) and
  * `fn_80245CF0`/`fn_80245E6C`/`fn_80245F40`/`fn_80245FD8`/`fn_802461F0`/`fn_802462FC`/`fn_80246654`/
@@ -518,7 +518,7 @@ extern "C" void fn_802430E8(_PLW* work, u8 part) {
 
 /* Clears the act's timer/latch block on entry and, when the alternate path is taken on a live master,
  * drops the 0x300 pair from the act bitfield. */
-extern "C" void fn_80245DA0(_PLW* self, u8 a) {
+extern "C" void pl_act_clear_wait(_PLW* self, u8 a) {
     if (Pl_master_ck(self) == 1 && a == 0) {
         self->field_0x3D8 &= ~0x300;
     }
@@ -546,7 +546,7 @@ extern "C" void fn_80246158(_PLW* self) {
     VEC3_ctor(&vec);
     VEC3_ctor(&scratch);
     vec.x = lbl_805C4898[self->chunk_ofs * 2];
-    vec.y = lbl_80799E00;
+    vec.y = pl_float_zero;
     vec.z = lbl_805C4898[self->chunk_ofs * 2 + 1];
     rotVecY(&vec, self->field_0x058);
     self->motion_pos_0x3C = self->motion_pos_0x3C + vec.x;
@@ -571,17 +571,17 @@ extern "C" void fn_802466C4(_PLW* self) {
 
 /* Drives the act's first two steps: arm the motion and hold, then wait for it. */
 extern "C" void fn_802478A4(_PLW* self) {
-    fn_80277C48(self, 2);
+    pl_act_set_step_time(self, 2);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_8026A224(self, 0x12, 4, 0);
-        fn_80275B04(self, 0, 0, 0);
-        fn_80277C58(self);
+        Pl_chr_set_attr_default(self, 0x12, 4, 0);
+        Pl_act_set_motion(self, 0, 0, 0);
+        pl_act_set_frame_timer(self);
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 0, 6, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 6, 0);
         }
         break;
     }
@@ -606,25 +606,25 @@ extern "C" void fn_80247C2C(_PLW* self) {
 
 /* Runs the first two act steps of the alternate chase and then the shared chase update. */
 extern "C" void fn_80247EF0(_PLW* self, u32 a) {
-    fn_80277C48(self, 2);
+    pl_act_set_step_time(self, 2);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
         if (a == 0) {
-            fn_80275B04(self, 2, 0, 0);
-            fn_8026A224(self, 0x22, 4, 0);
+            Pl_act_set_motion(self, 2, 0, 0);
+            Pl_chr_set_attr_default(self, 0x22, 4, 0);
         } else {
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x8B, 4, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x8B, 4, 0);
         }
         self->field_0x585 = 0;
         break;
     case 1:
-        if (Pl_frame_check(self, 1, lbl_80799E24, lbl_80799E00) == 1) {
+        if (Pl_frame_check(self, 1, pl_frame_window_90, pl_float_zero) == 1) {
             if (a == 0) {
-                fn_80275AC4(self, 0, 0xB, 0);
+                pl_act_enter(self, 0, 0xB, 0);
             } else {
-                fn_80275AC4(self, 0, 0x4B, 0);
+                pl_act_enter(self, 0, 0x4B, 0);
             }
             return;
         }
@@ -640,19 +640,19 @@ extern "C" void fn_802488D4(_PLW* self, u32 a) {
     case 0:
         self->act_step_0x05++;
         if (a == 0) {
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 0x24, 6, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 0x24, 6, 0);
         } else {
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x8D, 6, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x8D, 6, 0);
         }
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             if (a == 0) {
-                fn_802761B8(self, 0, 6, 0);
+                Pl_act_set_motion_slot(self, 0, 6, 0);
             } else {
-                fn_802761B8(self, 3, 6, 0);
+                Pl_act_set_motion_slot(self, 3, 6, 0);
             }
             return;
         }

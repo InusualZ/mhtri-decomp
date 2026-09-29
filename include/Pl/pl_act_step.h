@@ -13,15 +13,10 @@ struct _PLW;
 extern "C" {
 #endif
 
-/* 0x80257E70 - the three-timer reset `Pl/pl_act_step.cpp` defines at 0x80257E70; the map name is
- * unmangled, so the definition is `extern "C"` and so is this declaration. */
-void fn_80257E70(struct _PLW* self);
-
-/* 0x8025FA00 - this unit's range owns the address, but the body is not reconstructed yet; the
- * signature is the one the previous band header carried.  It is declared here anyway so the
- * declaration is not left in `include/unsplit/Pl.h` (rule 2 forbids the band header holding a
- * symbol a registered unit owns). */
-u32 fn_8025FA00(void* a, void* b);
+/* 0x80257E70 - the three-timer reset of the guard act (GUESS, class 4: the map has only the `fn_`
+ * stem and `dumpmap.py` answers `zz_0257e70_`); its definition is `extern "C"` because the map row
+ * is unmangled.  `Pl/fn_80258FCC.cpp` is its only caller outside this unit. */
+void pl_act_guard_timer_reset(struct _PLW* self);
 
 #ifdef __cplusplus
 }

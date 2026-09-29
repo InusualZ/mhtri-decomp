@@ -23,7 +23,7 @@
  * RESIDUAL (this pass).  13 of the 74 functions are written, all above the brief's bar: 11
  * byte-identical, `fn_80259684` 98.32 % (476 B) and `fn_8025A7FC` 94.68 % (312 B).
  *  - `fn_80259684`: the target materialises the `0` argument of `fn_80277DAC` AFTER the two float
- *    arguments (`lfs f1, lbl_80799F00; lfs f2, lbl_80799F04; li r4,0`), ours before them.  Same
+ *    arguments (`lfs f1, pl_frame_window_85; lfs f2, pl_float_neg60; li r4,0`), ours before them.  Same
  *    instruction count and size; only the materialisation order differs.
  *  - `fn_8025A7FC`: the target schedules the `threshold = 15` materialisation between the
  *    `cmplwi` and the `bne` of the `field_0x128 == 2` test, ours before the load.  Same size.
@@ -59,7 +59,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_act_step.h"   /* 0x80257E70 - the owner of the three-timer reset this unit calls */
-#include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the fn_8026A224/33C/644/3A8 group */
+#include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the Pl_chr_set_attr_default/33C/644/3A8 group */
 #include "fn_8004CAD8.h"
 #include "unsplit/Pl.h"
 
@@ -93,43 +93,43 @@ extern "C" void fn_80258FCC(_PLW* self, s16 a2, s16 a3, u8 a4)
         }
     }
     if (*timer <= 0) {
-        fn_80245DA0(self, 0);
+        pl_act_clear_wait(self, 0);
         if (a3 == 0) {
             self->field_0x3D8 &= ~0x300;
-            fn_80275AC4(self, 6, 45, 0);
+            pl_act_enter(self, 6, 45, 0);
         } else {
             self->field_0x3D8 &= ~0x300;
-            fn_80275AC4(self, 6, 65, 0);
+            pl_act_enter(self, 6, 65, 0);
         }
         return;
     }
     if (a4 != 0) {
         return;
     }
-    if (fn_8026A644(self, 4) == 1) {
+    if (pl_part_flag_ck(self, 4) == 1) {
         if (self->field_0x378 >= 150) {
             self->field_0x0A8 = self->field_0x058;
             if (a3 == 0) {
-                fn_80275AC4(self, 6, 73, 4);
+                pl_act_enter(self, 6, 73, 4);
             } else {
-                fn_80275AC4(self, 6, 72, 4);
+                pl_act_enter(self, 6, 72, 4);
             }
             return;
         }
     }
-    if (fn_8026F908(self, 0) >= 1) {
-        fn_8026A3A8(self);
-        if (fn_8026A644(self, 0) == 1 && (s8)self->field_0x266 == 0) {
+    if (pl_act_param_tier_ck(self, 0) >= 1) {
+        pl_act_set_cam_ang(self);
+        if (pl_part_flag_ck(self, 0) == 1 && (s8)self->field_0x266 == 0) {
             if (a3 == 0) {
                 if (Pl_act_ck(self, 6, 47) != 0) {
                     return;
                 }
-                fn_80275AC4(self, 6, 47, 0);
+                pl_act_enter(self, 6, 47, 0);
             } else {
                 if (Pl_act_ck(self, 6, 67) != 0) {
                     return;
                 }
-                fn_80275AC4(self, 6, 67, 0);
+                pl_act_enter(self, 6, 67, 0);
             }
             return;
         }
@@ -140,7 +140,7 @@ extern "C" void fn_80258FCC(_PLW* self, s16 a2, s16 a3, u8 a4)
             if ((s8)self->field_0x266 != 0) {
                 return;
             }
-            fn_80275AC4(self, 6, 46, 0);
+            pl_act_enter(self, 6, 46, 0);
         } else {
             if (Pl_act_ck(self, 6, 66) != 0) {
                 return;
@@ -148,7 +148,7 @@ extern "C" void fn_80258FCC(_PLW* self, s16 a2, s16 a3, u8 a4)
             if ((s8)self->field_0x266 != 0) {
                 return;
             }
-            fn_80275AC4(self, 6, 66, 0);
+            pl_act_enter(self, 6, 66, 0);
         }
         return;
     }
@@ -159,9 +159,9 @@ extern "C" void fn_80258FCC(_PLW* self, s16 a2, s16 a3, u8 a4)
         return;
     }
     if (a3 == 0) {
-        fn_80275AC4(self, 6, 44, 0);
+        pl_act_enter(self, 6, 44, 0);
     } else {
-        fn_80275AC4(self, 6, 64, 0);
+        pl_act_enter(self, 6, 64, 0);
     }
 }
 
@@ -176,13 +176,13 @@ extern "C" void fn_80259310(_PLW* self, s32 a2, s32 a3)
         self->act_step_0x05++;
         flag = 0;
         self->field_0x18 = 0;
-        fn_8027AC0C(self);
+        pl_act_clear_flag5bb(self);
         Pl_chr_setX(self, 51, 4, 0);
         if (a2 == 0) {
             self->field_0x3F6 = 0;
             self->field_0x3F0 = 0;
-            fn_80257E70(self);
-            fn_80245DA0(self, 0);
+            pl_act_guard_timer_reset(self);
+            pl_act_clear_wait(self, 0);
             if (a3 == 0) {
                 self->field_0x418 = 900;
             } else {
@@ -192,12 +192,12 @@ extern "C" void fn_80259310(_PLW* self, s32 a2, s32 a3)
             self->field_0x45C = 0;
             self->field_0x28 = 4;
         } else {
-            fn_80245DA0(self, 1);
+            pl_act_clear_wait(self, 1);
             self->field_0x28 = 4;
         }
-        fn_80275B04(self, 0, 0, 1);
+        Pl_act_set_motion(self, 0, 0, 1);
         fn_8027D4F0(self);
-        fn_802770E8(self, (u32)lbl_805C4F5C, 0);
+        Pl_act_set_step_table(self, (u32)lbl_805C4F5C, 0);
     case 1:
         self->field_0x28 = self->field_0x28 - 1;
         if (self->field_0x28 <= 0) {
@@ -221,15 +221,15 @@ extern "C" void fn_8025948C(_PLW* self)
     case 0:
         self->act_step_0x05++;
         self->field_0x18 = 0;
-        fn_80275B04(self, 0, 0, 1);
+        Pl_act_set_motion(self, 0, 0, 1);
         fn_8027D4F0(self);
-        fn_8026A224(self, 307, 6, 0);
-        fn_8027AC0C(self);
+        Pl_chr_set_attr_default(self, 307, 6, 0);
+        pl_act_clear_flag5bb(self);
         self->field_0x354 = lbl_80799EB0;
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_80276238(self, 0, 4, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            pl_act_reenter(self, 0, 4, 0);
         }
         break;
     }
@@ -247,18 +247,18 @@ extern "C" void fn_8025953C(_PLW* self, s32 a2)
         self->act_step_0x05++;
         self->field_0x28 = 20;
         self->field_0x266 = 30;
-        fn_8026A224(self, 52, 4, 0);
-        fn_8027AC0C(self);
-        fn_80277C58(self);
-        fn_80275B04(self, 0, 0, 1);
+        Pl_chr_set_attr_default(self, 52, 4, 0);
+        pl_act_clear_flag5bb(self);
+        pl_act_set_frame_timer(self);
+        Pl_act_set_motion(self, 0, 0, 1);
         fn_8027D4F0(self);
-        fn_8026FEC0(self, 0x40);
-        fn_802770E8(self, (u32)lbl_805C4F5C, 0);
+        pl_act_set_flag(self, 0x40);
+        Pl_act_set_step_table(self, (u32)lbl_805C4F5C, 0);
         return;
     case 1:
-        v.x = lbl_80799E00;
-        v.y = lbl_80799E00;
-        v.z = lbl_80799E2C;
+        v.x = pl_float_zero;
+        v.y = pl_float_zero;
+        v.z = pl_frame_window_2;
         rotVecY(&v, self->field_0x058);
         self->field_0x03C = self->field_0x03C + v.x;
         self->field_0x040 = self->field_0x040 + v.y;
@@ -286,31 +286,31 @@ extern "C" void fn_80259684(_PLW* self, s32 a2)
         } else {
             Pl_chr_setX(self, 59, 4, 0);
         }
-        fn_8027AC0C(self);
+        pl_act_clear_flag5bb(self);
         self->field_0x28 = 20;
         self->field_0x266 = 30;
-        fn_80277C58(self);
-        fn_80275B04(self, 0, 0, 1);
+        pl_act_set_frame_timer(self);
+        Pl_act_set_motion(self, 0, 0, 1);
         fn_8027D4F0(self);
-        fn_8026FEC0(self, 0x180);
-        fn_802770E8(self, (u32)lbl_805C4F5C, 0);
+        pl_act_set_flag(self, 0x180);
+        Pl_act_set_step_table(self, (u32)lbl_805C4F5C, 0);
         return;
     case 1:
         if (Pl_master_ck(self) == 0) {
             return;
         }
-        if (fn_80277DAC(self, 0, lbl_80799F00, lbl_80799F04) != 0) {
+        if (fn_80277DAC(self, 0, pl_frame_window_85, pl_float_neg60) != 0) {
             self->field_0x0A8 = (u16)self->field_0x058;
             if (a2 == 0) {
-                fn_80275AC4(self, 6, 48, 0);
+                pl_act_enter(self, 6, 48, 0);
                 return;
             }
-            fn_80275AC4(self, 6, 68, 0);
+            pl_act_enter(self, 6, 68, 0);
             return;
         }
-        v.x = lbl_80799E00;
-        v.y = lbl_80799E00;
-        v.z = lbl_80799F08;
+        v.x = pl_float_zero;
+        v.y = pl_float_zero;
+        v.z = pl_frame_window_5;
         rotVecY(&v, self->field_0x058);
         self->field_0x03C = self->field_0x03C + v.x;
         self->field_0x040 = self->field_0x040 + v.y;

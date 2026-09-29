@@ -75,7 +75,7 @@ u32 fn_80267A78(u8 index);
 u8 fn_80267C84(struct _PLW* self);
 u32 fn_80268308(struct _PLW* self);
 s32 fn_80269394(struct _PLOBJ* obj);
-void fn_80267270(struct _PLW* self, u32 action, s32 a, u16 b);
+void pl_model_state_set(struct _PLW* self, u32 action, s32 a, u16 b);
 s32 fn_80264B4C(struct _PLW* self);
 void fn_80266EB8(struct _PLW* self);
 void fn_80268E38(struct _PLW* self, u8* slots, u8 index);
@@ -241,10 +241,10 @@ u32 fn_80265748(_PLW* self) {
 /* 0x80265780 - fires the "draw the weapon" action request. */
 void fn_80265780(_PLW* self) {
     if (self->kind_0x09 == 3) {
-        fn_80275AC4(self, 6, 0x22, 0);
+        pl_act_enter(self, 6, 0x22, 0);
         return;
     }
-    fn_80275AC4(self, 6, 0x20, 0);
+    pl_act_enter(self, 6, 0x20, 0);
 }
 
 /* 0x802673A4 - stores the maximum player count. */
@@ -475,7 +475,7 @@ s32 fn_80269394(_PLOBJ* obj) {
 }
 
 /* 0x80267270 - forwards an action request to the actor's G3D work. */
-void fn_80267270(_PLW* self, u32 action, s32 a, u16 b) {
+void pl_model_state_set(_PLW* self, u32 action, s32 a, u16 b) {
     if (Pl_master_ck(self) != 0 || action == 3) {
         switch (action) {
         case 2:

@@ -107,7 +107,7 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area);                /* the weapon-s
 void fn_801148E4(_EFT* self);                                    /* the on-screen impact sound */
 _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type);       /* the family allocator */
 void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx);            /* place the record on its actor */
-void fn_80114C20(void* actor, u8 key);                           /* eft020 wrappers, per actor kind */
+void ef_inst_spawn(void* actor, u8 key);                           /* eft020 wrappers, per actor kind */
 void fn_80114C6C(void* actor, u8 key, s32 joint);
 void fn_80114CC8(void* actor, u8 key);
 void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
@@ -1351,10 +1351,10 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
 }
 
 /* ===================================================================================================
- * 0x80114C20  fn_80114C20(void* actor, u8 key) - spawn an eft020 record for a per-key effect
+ * 0x80114C20  ef_inst_spawn(void* actor, u8 key) - spawn an eft020 record for a per-key effect
  * =================================================================================================== */
 
-void fn_80114C20(void* actor, u8 key)
+void ef_inst_spawn(void* actor, u8 key)
 {
     _EFT* effect;
 

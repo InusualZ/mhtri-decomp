@@ -24,12 +24,16 @@ u32 fn_8027BC48(s32 arg);
 /* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
  * which calls them; all four are in this unit's `.text` range (0x80276B58-0x8027D684). */
 void fn_80276B58(struct _PLW* self, s32 value);
-void fn_802770E8(struct _PLW* self, u32 table, s32 arg2);   /* the owner's own `void` definition */
+void Pl_act_set_step_table(struct _PLW* self, u32 table, s32 arg2);   /* the owner's own `void` definition */
 void fn_8027AC00(struct _PLW* self);
-void fn_8027AC0C(struct _PLW* self);
+void pl_act_clear_flag5bb(struct _PLW* self);
 void fn_8027D4F0(struct _PLW* self);
 void fn_8027D510(struct _PLW* self);
 s32 fn_80277DAC(struct _PLW* self, s32 a, f32 b, f32 c);
+/* 0x80277B44 - arms the actor's `+0x396` gauge/hold word (the field's own `s16`; the sibling
+ * `pl_act_set_gauge_arm_skilled` at 0x80277B4C scales it by the cat-skill arms 28/29).  Added with
+ * `Pl/pl_act_step.cpp`'s act-175/act-89 arms (rule 2). */
+void pl_act_set_gauge_arm(struct _PLW* self, s16 value);
 u32 fn_8027A198(struct _PLW* self);
 void fn_8027A17C(struct _PLW* self);
 void fn_8027A190(struct _PLW* self, s32 a);
@@ -43,15 +47,15 @@ s32 fn_8027D40C(struct _PLW* self);
 
 /* The rest of this unit's `.text` that `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) calls; the
  * signatures are the owners' own definitions in `src/Pl/pl_act.cpp` (rule 2: this header is the
- * owner's).  `fn_80277C58`, which both this unit and `Pl/fn_8024F200.cpp` drive, is declared in the
+ * owner's).  `pl_act_set_frame_timer`, which both this unit and `Pl/pl_act_step.cpp` drive, is declared in the
  * block below. */
 void fn_802771A0(struct _PLW* self, s32 value);
 s32 fn_8027A340(struct _PLW* self);
 void fn_8027A57C(struct _PLW* self, u16 a, u8 b);
-void fn_8027BE2C(struct _PLW* self);
+void pl_act_clear_mode5c4(struct _PLW* self);
 void fn_80277BC4(struct _PLW* self, u8 flag);
 void fn_80277C50(struct _PLW* self, s16 value);
-void fn_80278564(struct _PLW* self, u32 value);
+void pl_act_arm_flags(struct _PLW* self, u32 value);
 void fn_80276CE8(struct _PLW* self, s16 value);
 
 /* 0x8027D310 - the three-argument target-check helper `ai/fn_802CC794.cpp` and the enemy units
@@ -65,10 +69,10 @@ u32 fn_80278310(u8 a, nw4r::math::VEC3* v, u8 b);
  * wider return changes no link name. */
 u32 fn_8027D050(struct _PLW* self);
 
-/* 0x80277C58 / 0x80278674 - the two unmangled motion helpers `Pl/fn_8024F200.cpp` drives; both are
+/* 0x80277C58 / 0x80278674 - the two unmangled motion helpers `Pl/pl_act_step.cpp` drives; both are
  * defined by this unit (`Pl/pl_act.cpp:1073` and `:3526`), so their declarations live here. */
-void fn_80277C48(struct _PLW* self, s32 arg);
-void fn_80277C58(struct _PLW* self);
+void pl_act_set_step_time(struct _PLW* self, s32 arg);
+void pl_act_set_frame_timer(struct _PLW* self);
 void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 
 /* Added with `Pl/fn_80273B14.cpp`, whose act entry and frame step call them (rule 2):

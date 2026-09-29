@@ -2,7 +2,7 @@
  * The player "action/handler" cluster of the `Pl` module: `.text` 0x802489D4-0x8024F200 (42
  * functions, 0x6D2C B), with its own exception tables - extab 0x80011DB4-0x80011EFC (41 records)
  * and extabindex 0x8002EB78-0x8002ED64 (41 records).  Both runs are bracketed exactly by the
- * neighbouring functions: `fn_802488D4`'s extab record ends at 0x80011DB4 and `fn_8024F200`'s
+ * neighbouring functions: `fn_802488D4`'s extab record ends at 0x80011DB4 and `pl_act_step_offhand_gesture`'s
  * starts at 0x80011EFC, so the extent is pinned by the section runs, not by a byte cap.
  *
  * WHAT IT IS.  The band drives a `_PLW` (player work) actor through its act/step state machine and
@@ -56,7 +56,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_act.h"
-#include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the fn_8026A224/33C/644 group */
+#include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the Pl_chr_set_attr_default/33C/644 group */
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
@@ -93,22 +93,22 @@ void fn_80249424(_PLW* self, s32 arg1) {
     case 0:
         self->act_step_0x05++;
         if (arg1 == 0) {
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 0x3C, 4, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 0x3C, 4, 0);
         } else {
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x87, 4, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x87, 4, 0);
         }
         self->act_end_request = 0;
         fn_80101594(self);
         return;
     case 1:
-        if (Pl_master_ck(self) != 0 && (fn_8026A644(self, 4) == 1 || self->act_end_request != 0)) {
+        if (Pl_master_ck(self) != 0 && (pl_part_flag_ck(self, 4) == 1 || self->act_end_request != 0)) {
             if (arg1 == 0) {
-                fn_80275AC4(self, 0, 0x15, 0);
+                pl_act_enter(self, 0, 0x15, 0);
                 return;
             }
-            fn_80275AC4(self, 0, 0x9F, 0);
+            pl_act_enter(self, 0, 0x9F, 0);
         }
         return;
     }
@@ -123,16 +123,16 @@ void fn_80249558(_PLW* self, s32 arg1) {
     case 0:
         self->act_step_0x05++;
         if (arg1 == 0) {
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 0x3D, 4, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 0x3D, 4, 0);
             return;
         }
-        fn_80275B04(self, 3, 0, 0);
-        fn_8026A224(self, 0x88, 4, 0);
+        Pl_act_set_motion(self, 3, 0, 0);
+        Pl_chr_set_attr_default(self, 0x88, 4, 0);
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, self->kind_0x09, 4, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, self->kind_0x09, 4, 0);
         }
         return;
     }
@@ -150,11 +150,11 @@ void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
     case 0:
         self->act_step_0x05++;
         if (arg1 == 0) {
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 0x200, 4, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 0x200, 4, 0);
         } else {
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x214, 4, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x214, 4, 0);
         }
         if (arg2 == 1) {
             fn_802D884C(&item, &value);
@@ -164,8 +164,8 @@ void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
         }
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, self->kind_0x09, 4, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, self->kind_0x09, 4, 0);
         }
         /* the last case has no branch: retail falls straight into the epilogue */
     }
@@ -183,13 +183,13 @@ void fn_80249768(_PLW* self, s32 arg1) {
     case 0:
         self->act_step_0x05++;
         if (arg1 == 0) {
-            fn_80275B04(self, 0, 0, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
             Pl_chr_setX(self, 1, 6, 0);
         } else {
-            fn_80275B04(self, 3, 0, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
             Pl_chr_setX(self, 0x64, 6, 0);
         }
-        fn_80277C58(self);
+        pl_act_set_frame_timer(self);
         if (fn_8042CB9C() == 1) {
             self->act_end_request = 0;
         }
@@ -204,13 +204,13 @@ void fn_80249768(_PLW* self, s32 arg1) {
         if (timer > 0x258 || self->act_end_request != 0) {
             if (self->act_end_request == 1) {
                 if (arg1 == 0) {
-                    fn_80275AC4(self, 0, 0x49, 0);
+                    pl_act_enter(self, 0, 0x49, 0);
                     return;
                 }
-                fn_80275AC4(self, 0, 0xA0, 0);
+                pl_act_enter(self, 0, 0xA0, 0);
                 return;
             }
-            fn_802761B8(self, self->kind_0x09, 2, 0);
+            Pl_act_set_motion_slot(self, self->kind_0x09, 2, 0);
             return;
         }
         return;
@@ -225,10 +225,10 @@ void fn_802498E0(_PLW* self) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0x8003, 0, 0);
+        Pl_act_set_motion(self, 0x8003, 0, 0);
         self->field_0x28 = 0x1E;
         if (self->field_0x018 == 0) {
-            fn_802770E8(self, (u32)lbl_805BE824, 0);
+            Pl_act_set_step_table(self, (u32)lbl_805BE824, 0);
             return;
         }
         fn_802771A0(self, 0);
@@ -264,34 +264,34 @@ void fn_802498E0(_PLW* self) {
     }
 }
 
-/* 0x8024A51C - the "sit/rest" handler: one arming step, then a two-way exit through `fn_80275AC4`. */
+/* 0x8024A51C - the "sit/rest" handler: one arming step, then a two-way exit through `pl_act_enter`. */
 void fn_8024A51C(_PLW* self, s32 arg1) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
         self->field_0x018 = 0;
-        fn_80275B04(self, 0, 0, 0);
-        fn_8026A224(self, 7, 2, 0);
-        fn_8027BE2C(self);
-        fn_80277C58(self);
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, 7, 2, 0);
+        pl_act_clear_mode5c4(self);
+        pl_act_set_frame_timer(self);
         if (arg1 == 0) {
-            fn_8027AC0C(self);
+            pl_act_clear_flag5bb(self);
             return;
         }
         fn_8027AC00(self);
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             if (Pl_master_ck(self) == 1) {
                 if (arg1 == 0) {
-                    fn_80275AC4(self, 0, 0x1F, 0);
+                    pl_act_enter(self, 0, 0x1F, 0);
                     return;
                 }
-                fn_80275AC4(self, 0xA, 0xE, 0);
+                pl_act_enter(self, 0xA, 0xE, 0);
                 return;
             }
             self->act_step_0x05++;
-            fn_8026A224(self, 8, 6, 0);
+            Pl_chr_set_attr_default(self, 8, 6, 0);
             return;
         }
         return;
@@ -302,11 +302,11 @@ void fn_8024A51C(_PLW* self, s32 arg1) {
 void fn_8024A640(_PLW* self) {
     if (self->act_step_0x05 == 0) {
         self->act_step_0x05++;
-        fn_80275B04(self, 0x8001, 0, 0);
+        Pl_act_set_motion(self, 0x8001, 0, 0);
         self->field_0x018 = 0;
         Pl_chr_setX(self, 8, 4, 0);
-        fn_80277C58(self);
-        fn_802770E8(self, (u32)lbl_805BE5B8, 0);
+        pl_act_set_frame_timer(self);
+        Pl_act_set_step_table(self, (u32)lbl_805BE5B8, 0);
     }
 }
 
@@ -315,12 +315,12 @@ void fn_8024A6CC(_PLW* self) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 1, 0, 0);
-        fn_8026A224(self, 9, 0, 0);
+        Pl_act_set_motion(self, 1, 0, 0);
+        Pl_chr_set_attr_default(self, 9, 0, 0);
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 0, 4, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
         }
         return;
     }
@@ -337,11 +337,11 @@ void fn_8024A75C(_PLW* self, s32 arg1) {
         self->act_step_0x05++;
         self->field_0x018 = 0;
         if (arg1 == 0 || arg1 == 2) {
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 5, 4, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 5, 4, 0);
         } else {
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x7A, 6, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x7A, 6, 0);
         }
         self->field_0x28 = 0x96;
         return;
@@ -353,32 +353,32 @@ void fn_8024A75C(_PLW* self, s32 arg1) {
         }
         self->act_step_0x05++;
         if (arg1 == 0 || arg1 == 2) {
-            fn_8026A224(self, 6, 4, 0);
+            Pl_chr_set_attr_default(self, 6, 4, 0);
             return;
         }
-        fn_8026A224(self, 0x7C, 4, 0);
+        Pl_chr_set_attr_default(self, 0x7C, 4, 0);
         return;
     case 2:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             fn_80276868(self, self->field_0x37A);
             if (arg1 == 0 || arg1 == 2) {
-                fn_802761B8(self, 0, 6, 0);
+                Pl_act_set_motion_slot(self, 0, 6, 0);
                 return;
             }
-            fn_802761B8(self, 3, 4, 0);
+            Pl_act_set_motion_slot(self, 3, 4, 0);
         }
         break;
     }
 }
 
 /* 0x8024A8EC - the "item use" handler: arms one of three motion/SE rows selected by `arg1`, then
- * ends the act through the matching `fn_80275AC4` code. */
+ * ends the act through the matching `pl_act_enter` code. */
 void fn_8024A8EC(_PLW* self, s32 arg1) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0, 0, 0);
-        fn_8026A224(self, lbl_805C4A54[arg1 * 2], lbl_805C4A54[arg1 * 2 + 1], 0);
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, lbl_805C4A54[arg1 * 2], lbl_805C4A54[arg1 * 2 + 1], 0);
         self->field_0x018 = 0;
         if (arg1 == 0) {
             self->field_0x5B8 = 0;
@@ -387,16 +387,16 @@ void fn_8024A8EC(_PLW* self, s32 arg1) {
         }
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             switch (arg1) {
             case 0:
-                fn_80275AC4(self, 0, 0x23, 2);
+                pl_act_enter(self, 0, 0x23, 2);
                 return;
             case 1:
-                fn_80275AC4(self, 0, 0x78, 2);
+                pl_act_enter(self, 0, 0x78, 2);
                 return;
             case 2:
-                fn_80275AC4(self, 0, 0x77, 2);
+                pl_act_enter(self, 0, 0x77, 2);
                 break;
             }
         }
@@ -427,7 +427,7 @@ s32 fn_8024AA04(u16 motion) {
 }
 
 /* 0x8024A248 - the "ride/mount" handler: arms one of three motion sets from the actor's `+0x2`
- * kind, then either ends the act through `fn_80275AC4` or pushes the rider along the mount's
+ * kind, then either ends the act through `pl_act_enter` or pushes the rider along the mount's
  * rotation. */
 void fn_8024A248(_PLW* self, s32 arg1) {
     VEC3 vec;
@@ -436,7 +436,7 @@ void fn_8024A248(_PLW* self, s32 arg1) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 3, 0, 0);
+        Pl_act_set_motion(self, 3, 0, 0);
         if ((u32)arg1 <= 1U) {
             fn_80277BC4(self, 0);
         } else {
@@ -445,54 +445,54 @@ void fn_8024A248(_PLW* self, s32 arg1) {
         fn_80277C50(self, 0);
         fn_80276B58(self, -0x96);
         fn_8027A17C(self);
-        fn_8026FEC0(self, 0x1000);
-        fn_80278564(self, 1);
+        pl_act_set_flag(self, 0x1000);
+        pl_act_arm_flags(self, 1);
         if (self->field_0x018 == 0) {
-            fn_8026A224(self, 0x7B, 4, 0);
+            Pl_chr_set_attr_default(self, 0x7B, 4, 0);
             return;
         }
         if (arg1 == 0 || arg1 == 2) {
-            fn_8026A224(self, 0x426, 4, 0);
+            Pl_chr_set_attr_default(self, 0x426, 4, 0);
         } else {
-            fn_8026A224(self, 0x427, 4, 0);
+            Pl_chr_set_attr_default(self, 0x427, 4, 0);
         }
         switch (self->field_0x002) {
         case 1:
-            fn_802770E8(self, (u32)lbl_805C9118, 0);
+            Pl_act_set_step_table(self, (u32)lbl_805C9118, 0);
             return;
         case 2:
-            fn_802770E8(self, (u32)lbl_805CAD74, 0);
+            Pl_act_set_step_table(self, (u32)lbl_805CAD74, 0);
             return;
         case 8:
             if (fn_80331104() == 0) {
-                fn_802770E8(self, (u32)lbl_805E2048, 0);
+                Pl_act_set_step_table(self, (u32)lbl_805E2048, 0);
                 return;
             }
             return;
         }
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             if (Pl_master_ck(self) == 0 || self->field_0x018 == 1) {
-                fn_802761B8(self, 3, 8, 0);
+                Pl_act_set_motion_slot(self, 3, 8, 0);
                 return;
             }
-            if (fn_8026F908(self, 0) >= 2U) {
-                if (fn_8026A644(self, 0x25) == 1) {
-                    fn_80275AC4(self, 1, 9, 0x80);
+            if (pl_act_param_tier_ck(self, 0) >= 2U) {
+                if (pl_part_flag_ck(self, 0x25) == 1) {
+                    pl_act_enter(self, 1, 9, 0x80);
                     return;
                 }
-                fn_80275AC4(self, 1, 7, 0x80);
+                pl_act_enter(self, 1, 7, 0x80);
                 return;
             }
-            fn_80275AC4(self, 1, 8, 0x80);
+            pl_act_enter(self, 1, 8, 0x80);
             return;
         }
-        if (Pl_Skill_ck(self, 0xB6) == 1 && Pl_frame_check(self, 2, lbl_80799E4C, lbl_80799E00) == 1) {
-            vec.x = lbl_80799E00;
-            vec.y = lbl_80799E00;
+        if (Pl_Skill_ck(self, 0xB6) == 1 && Pl_frame_check(self, 2, pl_frame_window_20, pl_float_zero) == 1) {
+            vec.x = pl_float_zero;
+            vec.y = pl_float_zero;
             if (arg1 == 0 || arg1 == 2) {
-                vec.z = lbl_80799E54;
+                vec.z = pl_frame_window_8;
             } else {
                 vec.z = lbl_80799E48;
             }
@@ -506,13 +506,13 @@ void fn_8024A248(_PLW* self, s32 arg1) {
 }
 
 /* 0x8024B35C - the two-step "fall" handler: arms the motion row for `arg1`, then ends the act
- * through the `fn_802761B8` or `fn_80275AC4` code that `arg1` selects. */
+ * through the `Pl_act_set_motion_slot` or `pl_act_enter` code that `arg1` selects. */
 void fn_8024B35C(_PLW* self, s32 arg1) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0, 0, 0);
-        fn_8026A224(self, lbl_805C4A60[arg1], 0, 0);
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, lbl_805C4A60[arg1], 0, 0);
         return;
     case 1:
         if ((u32)(arg1 - 3) > 1U) {
@@ -521,18 +521,18 @@ void fn_8024B35C(_PLW* self, s32 arg1) {
                     return;
                 }
             } else {
-                if (fn_8026A33C(self) == 1) {
+                if (Pl_motion_end_ck(self) == 1) {
                     if (arg1 == 1) {
-                        fn_80275AC4(self, 0, 0x71, 2);
+                        pl_act_enter(self, 0, 0x71, 2);
                         return;
                     }
-                    fn_80275AC4(self, 0, 0x72, 2);
+                    pl_act_enter(self, 0, 0x72, 2);
                 }
                 return;
             }
         }
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 0, 4, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
         }
         return;
     }
@@ -543,27 +543,27 @@ void fn_8024B46C(_PLW* self, s32 arg1) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0, 0, 0);
-        fn_8026A224(self, lbl_805C4A6C[arg1], 0, 0);
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, lbl_805C4A6C[arg1], 0, 0);
         return;
     case 1:
         if ((u32)(arg1 - 3) > 1U && arg1 != 0) {
             switch (arg1) {
             case 1:
-                if (fn_8026A33C(self) == 1) {
-                    fn_80275AC4(self, 0, 0x71, 2);
+                if (Pl_motion_end_ck(self) == 1) {
+                    pl_act_enter(self, 0, 0x71, 2);
                     return;
                 }
                 break;
             case 2:
-                if (Pl_frame_check(self, 1, lbl_80799E84, lbl_80799E00) == 1) {
-                    fn_80275AC4(self, 0, 0x72, 2);
+                if (Pl_frame_check(self, 1, lbl_80799E84, pl_float_zero) == 1) {
+                    pl_act_enter(self, 0, 0x72, 2);
                 }
                 break;
             }
         } else {
-            if (fn_8026A33C(self) == 1) {
-                fn_802761B8(self, 0, 4, 0);
+            if (Pl_motion_end_ck(self) == 1) {
+                Pl_act_set_motion_slot(self, 0, 4, 0);
                 return;
             }
             return;
@@ -579,17 +579,17 @@ void fn_8024B594(_PLW* self, s32 arg1) {
     case 0:
         self->act_step_0x05++;
         if (arg1 == 0) {
-            fn_80275B04(self, 0x8000, 0, 0);
-            fn_8026A224(self, 0x29, 2, 0);
+            Pl_act_set_motion(self, 0x8000, 0, 0);
+            Pl_chr_set_attr_default(self, 0x29, 2, 0);
         } else {
-            fn_80275B04(self, 0x8003, 0, 0);
-            fn_8026A224(self, 0x7E, 2, 0);
+            Pl_act_set_motion(self, 0x8003, 0, 0);
+            Pl_chr_set_attr_default(self, 0x7E, 2, 0);
         }
-        fn_80277C58(self);
+        pl_act_set_frame_timer(self);
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, self->kind_0x09, 8, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, self->kind_0x09, 8, 0);
         }
         return;
     }
@@ -602,51 +602,51 @@ void fn_8024B66C(_PLW* self, s32 arg1) {
         self->act_step_0x05++;
         switch (arg1) {
         case 0:
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 7, 2, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 7, 2, 0);
             return;
         case 1:
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x16C, 4, 0);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x16C, 4, 0);
             return;
         case 2:
-            fn_80275B04(self, 1, 0, 0);
-            fn_8026A224(self, 0x135, 4, 0);
+            Pl_act_set_motion(self, 1, 0, 0);
+            Pl_chr_set_attr_default(self, 0x135, 4, 0);
             return;
         }
         break;
     case 1:
         switch (arg1) {
         case 0:
-            if (fn_8026A33C(self) == 1) {
+            if (Pl_motion_end_ck(self) == 1) {
                 self->act_step_0x05++;
                 if (Pl_master_ck(self) == 1) {
-                    fn_80275AC4(self, 0, 0x29, 0xC);
+                    pl_act_enter(self, 0, 0x29, 0xC);
                     return;
                 }
-                fn_8026A224(self, 8, 6, 0);
+                Pl_chr_set_attr_default(self, 8, 6, 0);
                 return;
             }
             return;
         case 1:
-            if (Pl_frame_check(self, 0, lbl_80799E38, lbl_80799E00) == 1) {
+            if (Pl_frame_check(self, 0, pl_frame_window_30, pl_float_zero) == 1) {
                 self->act_step_0x05++;
                 if (Pl_master_ck(self) == 1) {
-                    fn_80275AC4(self, 0, 0x99, 0xC);
+                    pl_act_enter(self, 0, 0x99, 0xC);
                     return;
                 }
-                self->field_0x354 = lbl_80799E00;
+                self->field_0x354 = pl_float_zero;
                 return;
             }
             break;
         case 2:
-            if (Pl_frame_check(self, 0, lbl_80799E4C, lbl_80799E00) == 1) {
+            if (Pl_frame_check(self, 0, pl_frame_window_20, pl_float_zero) == 1) {
                 self->act_step_0x05++;
                 if (Pl_master_ck(self) == 1) {
-                    fn_80275AC4(self, 0, 0x9C, 0xC);
+                    pl_act_enter(self, 0, 0x9C, 0xC);
                     return;
                 }
-                self->field_0x354 = lbl_80799E00;
+                self->field_0x354 = pl_float_zero;
             }
             break;
         }
@@ -655,7 +655,7 @@ void fn_8024B66C(_PLW* self, s32 arg1) {
 }
 
 /* 0x8024B868 - the "get-up from evade" handler: arms the motion, feeds the pending item back, then
- * waits 14 frames before handing over to `fn_802761B8`. */
+ * waits 14 frames before handing over to `Pl_act_set_motion_slot`. */
 void fn_8024B868(_PLW* self, s32 arg1) {
     s32 timer;
 
@@ -664,16 +664,16 @@ void fn_8024B868(_PLW* self, s32 arg1) {
         self->act_step_0x05++;
         switch (arg1) {
         case 0:
-            fn_80275B04(self, 0, 0, 0);
-            fn_8026A224(self, 8, 6, 0);
+            Pl_act_set_motion(self, 0, 0, 0);
+            Pl_chr_set_attr_default(self, 8, 6, 0);
             break;
         case 1:
-            fn_80275B04(self, 3, 0, 0);
-            fn_8026A224(self, 0x16C, 0, 0x1E);
+            Pl_act_set_motion(self, 3, 0, 0);
+            Pl_chr_set_attr_default(self, 0x16C, 0, 0x1E);
             break;
         case 2:
-            fn_80275B04(self, 1, 0, 0);
-            fn_8026A224(self, 0x135, 0, 0x14);
+            Pl_act_set_motion(self, 1, 0, 0);
+            Pl_chr_set_attr_default(self, 0x135, 0, 0x14);
             break;
         }
         self->field_0x28 = 0;
@@ -692,7 +692,7 @@ void fn_8024B868(_PLW* self, s32 arg1) {
                 self->field_0x28 = timer;
                 if (timer >= 0xE) {
                     self->act_step_0x05++;
-                    fn_8026A224(self, 9, 0, 0);
+                    Pl_chr_set_attr_default(self, 9, 0, 0);
                     return;
                 }
             }
@@ -701,8 +701,8 @@ void fn_8024B868(_PLW* self, s32 arg1) {
         self->act_step_0x05++;
         return;
     case 2:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, self->kind_0x09, 2, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, self->kind_0x09, 2, 0);
         }
         break;
     }
@@ -714,8 +714,8 @@ void fn_8024C75C(_PLW* self) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0, 0, 0);
-        fn_8026A224(self, 0x136, 0, 0x3C);
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, 0x136, 0, 0x3C);
         if (Pl_master_ck(self) == 1) {
             fn_8024D094(self);
             if (fn_8027BC48(1) == 0) {
@@ -723,20 +723,20 @@ void fn_8024C75C(_PLW* self) {
             }
         }
         if (Pl_Skill_ck(self, 0xB8) == 1) {
-            self->field_0x354 = lbl_80799E2C;
+            self->field_0x354 = pl_frame_window_2;
             return;
         }
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
-            fn_8026A224(self, 0x131, -4, 0xCE);
+            Pl_chr_set_attr_default(self, 0x131, -4, 0xCE);
             return;
         }
         break;
     case 2:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 0, 0xA, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 0xA, 0);
         }
     }
 }
@@ -746,17 +746,17 @@ void fn_8024C878(_PLW* self) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 3, 0, 0);
-        fn_8026A224(self, 0x16B, -8, 0);
+        Pl_act_set_motion(self, 3, 0, 0);
+        Pl_chr_set_attr_default(self, 0x16B, -8, 0);
         if (Pl_Skill_ck(self, 0xB8) == 1) {
-            self->field_0x354 = lbl_80799E2C;
+            self->field_0x354 = pl_frame_window_2;
             return;
         }
         return;
     case 1:
-        if (Pl_frame_check(self, 1, lbl_80799EAC, lbl_80799E00) == 1) {
+        if (Pl_frame_check(self, 1, lbl_80799EAC, pl_float_zero) == 1) {
             if (Pl_master_ck(self) == 1) {
-                fn_80275AC4(self, 0, 0x7E, 0xC);
+                pl_act_enter(self, 0, 0x7E, 0xC);
                 return;
             }
             self->act_step_0x05++;
@@ -764,7 +764,7 @@ void fn_8024C878(_PLW* self) {
         }
         break;
     case 2:
-        fn_8026A224(self, 0x16B, 0, 0xD0);
+        Pl_chr_set_attr_default(self, 0x16B, 0, 0xD0);
     }
 }
 
@@ -773,8 +773,8 @@ void fn_8024C96C(_PLW* self) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 3, 0, 0);
-        fn_8026A224(self, 0x16B, 0, 0xD0);
+        Pl_act_set_motion(self, 3, 0, 0);
+        Pl_chr_set_attr_default(self, 0x16B, 0, 0xD0);
         if (Pl_master_ck(self) == 1) {
             fn_8024D094(self);
             if (fn_8027BC48(1) == 0) {
@@ -782,13 +782,13 @@ void fn_8024C96C(_PLW* self) {
             }
         }
         if (Pl_Skill_ck(self, 0xB8) == 1) {
-            self->field_0x354 = lbl_80799E2C;
+            self->field_0x354 = pl_frame_window_2;
             return;
         }
         return;
     case 1:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 3, 0xA, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 0xA, 0);
         }
     }
 }
@@ -809,7 +809,7 @@ s16 fn_8024CD8C(_PLW* self, s16 value) {
     s16 scaled = value;
 
     if (Pl_Skill_ck(self, 0xA6) == 1) {
-        scaled = (s16)(lbl_80799EC0 * (f32)scaled);
+        scaled = (s16)(pl_float_1_5 * (f32)scaled);
     } else if (Pl_Skill_ck(self, 0xA7) == 1) {
         scaled = (s16)(lbl_80799EC4 * (f32)scaled);
     }
