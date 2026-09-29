@@ -30,11 +30,17 @@ int NWC24iAsyncIoctlCallback(u32 value, u32* out);
 int NWC24iCheckUserIdCRC(void);
 u64 getUnScrambleId(void);
 int NWC24iSetRtcCounter(u32 value, u32 flag);
-int NWC24iSynchronizeRtcCounter(void);
 
-/* the shutdown pair */
+/* `flag` is passed straight on to `NWC24iSetRtcCounter`'s second argument; the band's only caller
+ * (`__OSInitNet`, 0x804D67C4) passes 0, so what the device does with a non-zero value is not visible
+ * from this image - the parameter name is a GUESS. */
+int NWC24iSynchronizeRtcCounter(u32 flag);
+
+/* the shutdown pair: `NWC24iPrepareShutdown` is called once at OS bring-up, and
+ * `NWC24iRequestShutdown` is the OS shutdown handler registered against it (`final`/`event` are the
+ * arguments the OS hands every registered handler). */
 int NWC24iPrepareShutdown(void);
-int NWC24iRequestShutdown(void);
+BOOL NWC24iRequestShutdown(BOOL final, u32 event);
 
 #ifdef __cplusplus
 }

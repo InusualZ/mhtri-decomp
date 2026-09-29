@@ -40,21 +40,10 @@ extern u32 sNwc24WorkInit;
 extern s32 sNwc24SuspendCount;
 extern s32 sNwc24ResumeLimit;
 
-/* The device layer's own work block (`.bss` 0x80766B00, 0xE0 B): the mutex its requests take and
- * the two 32-byte buffers an ioctl travels in. size: 0xE0 */
-typedef struct NWC24RtcWork {
-    /* +0x000 */ u8 pad_0x000[0x80];
-    /* +0x080 */ OSMutex mutex;
-    /* +0x098 */ u8 pad_0x098[0x08];
-    /* +0x0A0 */ u32 inBuffer[8];
-    /* +0x0C0 */ u32 outBuffer[8];
-} NWC24RtcWork;
-
-/* 0x80766B00 - the device layer's work block. */
-extern NWC24RtcWork sNwc24RtcWork;
-
-/* 0x807958B8 - its one-time-initialisation flag. */
-extern u32 sNwc24RtcWorkInit;
+/* The device layer's own work block (`.bss` 0x80766B00, 0xE0 B) and its one-time-initialisation flag
+ * (`.sbss` 0x807958B8) are NOT declared here: `NWC24/nwc24_io.c` is their only referencer (checked
+ * with `tools/units/callers.py`), so it claims `.bss` 0x80766B00-0x80766C40 and `.sbss`
+ * 0x807958B8-0x807958D8 and defines them itself (rule 12). */
 
 /* 0x80795898 - the library's work pointer; +0x08 is the cached user id (two words). */
 extern u32* sNwc24UserWork;
@@ -67,14 +56,14 @@ extern u32* sNwc24UserWork;
 
 /* The device-path and error-report literals the device layer opens and reports through.  The two
  * copies of the request path (0x80631178 and 0x80631200) are what makes the NWC24 band two
- * translation units (`-str reuse` merges identical literals inside one TU). */
+ * translation units (`-str reuse` merges identical literals inside one TU).  `Nwc24RequestPath2`
+ * (0x80631200) and `Nwc24RequestShutdownName` (0x80631214) are NOT declared here: `NWC24/nwc24_io.c`
+ * claims `.data` 0x806311E8-0x8063122A and defines them itself (rule 12). */
 extern const char Nwc24RequestPath[];      /* 0x80631178 "/dev/net/kd/request" */
 extern const char Nwc24SetScriptModeName[]; /* 0x8063118C "NWC24iSetScriptMode" */
 extern const char Nwc24GenerateUserIdName[]; /* 0x806311A0 "NWC24iRequestGenerateUserId" */
 extern const char Nwc24TimePath[];         /* 0x806311C0 "/dev/net/kd/time" */
 extern const char Nwc24SetRtcName[];       /* 0x806311D4 "NWC24iSetRtcCounter" */
-extern const char Nwc24RequestPath2[];     /* 0x80631200 "/dev/net/kd/request" (the second unit's) */
-extern const char Nwc24RequestShutdownName[]; /* 0x80631214 "NWC24iRequestShutdown" */
 
 #ifdef __cplusplus
 }
