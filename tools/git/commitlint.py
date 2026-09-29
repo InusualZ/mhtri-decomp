@@ -24,7 +24,9 @@ drift from the tree it describes:
 * `game/<module>` - the directories under `src/`.  A member is matched **case-insensitively**: the
   convention's own examples lower-case the prose (`game/network`), while the tree directory is
   `src/Network`, and a lint that rejected the spec's example would be a false positive.
-* `tools/<area>` - the directories under `tools/`, plus the top-level scripts as themselves.
+* `tools/<area>` - a directory under `tools/` (the grouping: `tools/units`, `tools/git`, `tools/flags`),
+  or the **stem of any script at any depth** (`tools/units/land.py` -> `tools/land`,
+  `tools/units/stylelint.py` -> `tools/stylelint`).
 * `agents/<name>` - the profiles in `.agents/agents/*.md`, plus `policy` for AGENTS.md.
 * `config/{flags,symbols,splits}` - the three inputs the convention names (configure.py -> `flags`,
   symbols.txt -> `symbols`, splits.txt -> `splits`).
@@ -98,16 +100,19 @@ def _subdirs(path: str) -> set:
 def derive_members(root: str) -> dict:
     """The valid members of every known family, read from the tree at `root`.
 
-    Derived, never hard-coded, so the lint follows the tree: a module added under `src/` or a grouping added
-    under `tools/` becomes a valid category the moment the directory exists.
+    Derived, never hard-coded, so the lint follows the tree: a module added under `src/` or a tool added
+    under `tools/` becomes a valid category the moment the file or directory exists.
     """
     root = os.path.abspath(root)
     members: dict = {}
 
     members["game"] = _subdirs(os.path.join(root, "src"))
 
-    # tools/<area>: the directories under tools/ plus the top-level scripts as themselves (`tools/selftest`,
-    # `tools/unitutil`, ...).  `__pycache__` and the `__init__` shim are not tools.
+    # tools/<area>: the directories directly under tools/ (`tools/units`, `tools/git`, ...) plus the stem of
+    # every script **at any depth** (`tools/units/land.py` -> `tools/land`, `tools/units/stylelint.py` ->
+    # `tools/stylelint`).  A walk, not a fixed depth: the convention names the tool itself (`tools/land`), and
+    # the script that implements it sits one grouping down.  `__pycache__`, the `__init__` shim and dotted
+    # names are not tools.
     tools: set = set()
     tdir = os.path.join(root, "tools")
     try:
@@ -119,7 +124,11 @@ def derive_members(root: str) -> dict:
             continue
         if os.path.isdir(os.path.join(tdir, name)):
             tools.add(name)
-        elif name.endswith(".py"):
+    for _dirpath, dirnames, filenames in os.walk(tdir):
+        dirnames[:] = [d for d in dirnames if not (d.startswith(".") or d.startswith("_"))]
+        for name in filenames:
+            if name.startswith(".") or name.startswith("_") or not name.endswith(".py"):
+                continue
             tools.add(name[:-3])
     members["tools"] = tools
 
