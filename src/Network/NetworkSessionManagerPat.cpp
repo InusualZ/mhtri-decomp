@@ -23,19 +23,27 @@
  * object does not emit would be a claim without an emission (playbook 78).  A later pass that
  * reconstructs them extends the claim to the whole run.
  *
- * RESIDUALS.  (1) The class overrides five of the table's 114 slots, so the emitted table is right at
- * `+0x08`..`+0x18` and at the 45 slots that inherit the base's implementations (50 of the target's 112
- * relocated slots, plus the two RTTI words), and wrong at the other 62: **48** slots point at this
- * band's functions (0x803D70B8..0x803DDB64) and **14** at adjustor thunks / other bands (0x803DEF38,
- * 0x803DEF4C, 0x803DF010, 0x803DF028, 0x803DF0A4, 0x803DF0C4, 0x803DF154, 0x803DF158, 0x803DF160,
- * 0x803DF168, 0x803DF170, 0x803DF178, 0x803DE56C, 0x803DE5F4); ours hold the base's pure stubs there.
- * The list is regenerated, never transcribed - one command per object, paired by slot offset:
- *     python tools/units/relocaudit.py --unit Network/NetworkSessionManagerPat   # the reference view
- *     build/binutils/powerpc-eabi-objdump.exe -r build/RMHE08/{obj,src}/Network/NetworkSessionManagerPat.o
- * (the `.data` offsets are the slot offsets: `+0x008` is the deleting destructor, `+0x018` the key
- * function, and every slot is 4 bytes, so the 114th ends at `+0x1C8`).  A slot becomes right by
- * declaring that override in the class and reconstructing its body in the band that owns the address;
- * the addresses are the map rows listed above, so each one is a named unit's work, not this unit's.
+ * RESIDUALS.  (1) The table is now complete at the reloc level: our object carries a relocation at
+ * **all 112** slots the target relocates, each naming the symbol the target's object names.  It did not
+ * before - the base leaves 62 of those slots pure, so 61 of them were emitted as `0x00000000` and the
+ * 62nd as the base's `setFlag79` - and closing them is what `NetworkSessionManagerPat`'s declaration
+ * block in `include/Network/fn_803D3CE8.h` is for: one override per filled slot.  What is still
+ * UNWRITTEN is the 62 overriding bodies.  They live in bands no unit has claimed (0x803D72F4..0x803DDB64,
+ * 0x803DE56C/0x803DE5F4, 0x803DEF38..0x803DF178 - 20,068 B), so each declaration's name and parameter
+ * list is a reconstruction from that body: `handleCircleJoin` calls `sendReqCircleJoin`,
+ * `getCircleInfoCount` is `lwz r3,0xAF0(r3)`, the 21 request handlers read their argument as a
+ * `NetworkRequest*` and call `NetworkRequest_getArgument`.  Where a body identifies nothing, the name is
+ * the vtable offset it fills (`slot_068`), which is this class's own scheme (`slot_13C` in the base).
+ * The map rows carry those mangled spellings because the TARGET object's relocation name is generated
+ * from the map: the pairing is the declaration's, so a later pass that refines a name refines the map
+ * row with it.  Census (never transcribe it - regenerate): `python tools/units/vtableaudit.py --at
+ * 0x805FB0F8 --json` gives all 112 rows (index, address, target, owner); the `.data` offsets ARE the
+ * slot offsets (`+0x008` deleting destructor, `+0x018` the key function, four bytes a slot, 114 words
+ * to `+0x1C8`), so both objects' `.rela.data` compare slot for slot.
+ * The map boundary this work moved: the target's `+0x03C` points at 0x803DF0C4, a 4-byte `blr` inside
+ * what the map had as `fn_803DF0A4`'s 0x24-byte extent.  A slot holds a function entry, and `void f() {}`
+ * is exactly `blr` - so 0x803DF0C4 is the empty `setFlag79` override and 0x803DF0A4 ends at 0x20; the
+ * extent was shrunk and the 4-byte row added with it.
  * (2) `move` itself is reconstructed from the disassembly and is 8 bytes short of the target's 572
  * (93.13986 %), which also moves the `extabindex` record's length word by the same 8 bytes - that is
  * the only remaining difference in this object's `extab`/`extabindex`.
