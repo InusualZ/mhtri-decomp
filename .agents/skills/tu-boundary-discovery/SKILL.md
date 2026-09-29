@@ -189,8 +189,10 @@ The first answer was **wrong**, and the scorecard did not notice - both facts sh
   run once filename-less functions are ignored, no other name cited inside, pool runs bounded at the
   anchor) - with the caveat that its span is a *lower bound*, since 60 % of it is uncited.
 * The one tier-1 success (`Runtime.PPCEABI.H/__init_cpp_exceptions.cpp`, exact) is **accidentally
-  supported**: its recipe is already written in `docs/getting_started.md`, and the privacy of a DOL-local
-  symbol cannot be proven from the binary. It is the weakest available test of the tool; do not read it as
+  supported**: a `.cpp` runtime unit written from the library's own updated
+  `global_destructor_chain.c`/`__init_cpp_exceptions.cpp` text matches by construction, and the privacy of a
+  DOL-local symbol cannot be proven from the binary. It is the weakest available test of the tool; do not
+  read it as
   the tool having validated itself.
 * The RSO unit also shows the data side working independently of `.text`: its jump table (`@1845`,
   `.rel`-owned by `RSOStaticLocateObject`), its string pool (`@1841`) and `lbl_80629C40` (used by
@@ -271,8 +273,8 @@ read `splits.txt` as an input as well as an answer key (idea 1).
 * **`scope:local` is not a proof on a DOL.** 0 of 21 655 auto `lbl_*` objects carry it, and 22 451 of
   23 216 `scope:local` objects are `@`-pool symbols; the split object is dtk-synthesized and echoes the
   annotation as `STB_LOCAL`. A `static` `.sdata` object and a one-TU global are byte-identical in a DOL.
-* **The three claimed units are a weak test set**: two have no evidence at all and the third is the recipe
-  documented in `docs/getting_started.md`. Tier 2/3 are what an idea is actually judged on.
+* **The three claimed units are a weak test set**: two have no evidence at all and the third is the
+  source-identical runtime recipe above. Tier 2/3 are what an idea is actually judged on.
 * **Stale split-tree artifacts**: `build/<version>/asm/` and `obj/` accumulate duplicates across re-splits
   (95 files each here; dtk never prunes), and there is a second generated tree at `build/tmp/exp/out/asm/`.
   Prefer the path from `splits.txt`'s group name; do not consume a bare top-level `.s`.
