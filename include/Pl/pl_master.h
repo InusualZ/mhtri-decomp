@@ -38,11 +38,11 @@ u32 fn_8026FD94(struct _PLW* self);
 u32 fn_8026FE44(struct _PLW* self);
 /* 0x8026F908 - this unit's own helper `Pl/fn_802489D4.cpp` calls; the map name is a bare `fn_` stem,
  * so `extern "C"`. */
-u8 fn_8026F908(struct _PLW* self, u32 idx);
+u8 pl_act_param_tier_ck(struct _PLW* self, u32 idx);
 /* 0x8026FEC0 - the status-bit setter the player act cluster (`Pl/fn_802489D4.cpp`) and the player
- * act dispatcher (`Pl/fn_8024F200.cpp`) drive; the owner defines it unmangled (`Pl/pl_master.cpp`),
+ * act dispatcher (`Pl/pl_act_step.cpp`) drive; the owner defines it unmangled (`Pl/pl_master.cpp`),
  * so the declaration is `extern "C"`.  One declaration: `mask`/`bits` are the same `u32`. */
-void fn_8026FEC0(struct _PLW* self, u32 bits);
+void pl_act_set_flag(struct _PLW* self, u32 bits);
 #ifdef __cplusplus
 }
 #endif
@@ -58,11 +58,11 @@ u32 fn_8026FD0C(struct _PLW* self);
 u32 Pl_act_ck(struct _PLW* self, u8 group, u16 action);
 
 /* Declarations added with `Pl/fn_80258FCC.cpp` (the act state-machine band): added at this header's
- * C++ scope, i.e. the same linkage as the symbols above.  `fn_8026FEC0` is declared (once, with
+ * C++ scope, i.e. the same linkage as the symbols above.  `pl_act_set_flag` is declared (once, with
  * `extern "C"`) in the status-bit setter block near the top - MAIN's copy is the authority for it. */
 void fn_8026FEF0(struct _PLW* self, s32 v);
 u32 fn_8026FE44(struct _PLW* self);
-u8 fn_8026F908(struct _PLW* self, u32 a);
+u8 pl_act_param_tier_ck(struct _PLW* self, u32 a);
 u32 fn_8026F888(struct _PLW* self);
 /* 0x8026FB20 - the act's status-bit test `Pl/fn_80273B14.cpp`'s act entry gates its
  * direction flip on; added with that unit (rule 2). */

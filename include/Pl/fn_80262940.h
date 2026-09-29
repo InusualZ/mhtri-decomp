@@ -1,6 +1,6 @@
 /* The enemy-side consumer of `Pl/fn_80262940.cpp`'s action dispatcher.
  *
- * `fn_80267270` (`.text` 0x80267270, inside that unit's range 0x80262940..0x802693C4) was declared
+ * `pl_model_state_set` (`.text` 0x80267270, inside that unit's range 0x80262940..0x802693C4) was declared
  * in three wrong places before this header existed (docs/plan.md 6.5 rule 2): `enemy/fn_801B0010.cpp`
  * carried a local copy, `include/unsplit/Pl.h` - a fallback band - carried another, and
  * `include/Pl/fn_8025F088.h` carries a third, differently-typed one whose range does not cover the
@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 /* r3 the player work, r4 the action, r5/r6 the two scalars the owner's body stores beside it. */
-void fn_80267270(struct _PLW* self, u32 action, s32 a, u16 b);
+void pl_model_state_set(struct _PLW* self, u32 action, s32 a, u16 b);
 
 #ifdef __cplusplus
 }

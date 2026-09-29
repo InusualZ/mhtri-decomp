@@ -89,8 +89,8 @@ void fn_8025F478(_PLW* self) {
         if (fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
             self->field_0x064 = value;
             self->field_0x074 = 1;
-            if (self->vec_0x03C.y >= value - lbl_80799E38) {
-                self->vec_0x03C.y = value - lbl_80799E38;
+            if (self->vec_0x03C.y >= value - pl_frame_window_30) {
+                self->vec_0x03C.y = value - pl_frame_window_30;
             }
             if (Pl_suimen_ck(self) == 1) {
                 self->field_0x075 = 1;
@@ -117,7 +117,7 @@ s32 fn_80260198(_PLW* self) {
             if (kind == 0) {
                 break;
             }
-            value = fn_80050A40(entry->x_0x08, entry->z_0x10, lbl_80799E00, lbl_80799E00);
+            value = fn_80050A40(entry->x_0x08, entry->z_0x10, pl_float_zero, pl_float_zero);
             if ((kind & 2) != 0) {
                 self->field_0x058 = value;
                 self->field_0x0A8 = value;
@@ -375,40 +375,40 @@ void fn_8025FA00(_PLW* self) {
                     self->vec_0x03C.y = self->ground_y_0x060;
                 }
             } else if (Pl_master_ck(self) == 1 && self->field_0x00A != 8) {
-                fn_80275AC4(self, 1, 21, 12);
+                pl_act_enter(self, 1, 21, 12);
             }
             break;
         default:
             if (self->field_0x585 != 0) {
                 break;
             }
-            if (self->vec_0x03C.y - value <= lbl_80799E38) {
+            if (self->vec_0x03C.y - value <= pl_frame_window_30) {
                 self->vec_0x03C.y = value;
                 self->field_0x585 = 0;
                 if (fn_8027DCA8(self) == 1 || (self->field_0x5A4 & 0x1000) == 0) {
                     break;
                 }
                 if (self->field_0x00A == 8) {
-                    self->field_0x06C -= lbl_80799E2C;
+                    self->field_0x06C -= pl_frame_window_2;
                     if (self->field_0x06C < lbl_80799F98) {
                         self->field_0x06C = lbl_80799F98;
                     } else {
-                        self->vec_0x03C.z += lbl_80799E18;
+                        self->vec_0x03C.z += pl_frame_window_10;
                     }
                 } else if (Pl_master_ck(self) == 1 && self->field_0x370 <= 0) {
                     fn_80278BE4(self);
                     return;
                 } else {
-                    fn_80275AC4(self, 6, 52, 0);
+                    pl_act_enter(self, 6, 52, 0);
                 }
                 break;
             }
             if (self->field_0x370 > 0) {
                 self->kind_0x09 = 2;
                 if (self->field_0x00A != 12) {
-                    fn_80275AC4(self, 2, 1, 0);
+                    pl_act_enter(self, 2, 1, 0);
                 } else {
-                    fn_80275AC4(self, 12, 6, 0);
+                    pl_act_enter(self, 12, 6, 0);
                 }
             } else if (self->field_0x00A == 8) {
                 self->vec_0x03C.y = value;
@@ -429,7 +429,7 @@ void fn_8025FA00(_PLW* self) {
                     if (Pl_master_ck(self) == 1 && self->field_0x370 <= 0) {
                         fn_80278BE4(self);
                     } else {
-                        fn_80275AC4(self, 0, 151, 12);
+                        pl_act_enter(self, 0, 151, 12);
                     }
                 }
             }
@@ -440,8 +440,8 @@ void fn_8025FA00(_PLW* self) {
                     self->vec_0x03C.y = self->ground_y_0x060;
                 }
             } else if (Pl_act_ck(self, 0, 151) == 0 &&
-                       self->vec_0x03C.y < lbl_80799E80 + self->ground_y_0x060) {
-                self->vec_0x03C.y = lbl_80799E80 + self->ground_y_0x060;
+                       self->vec_0x03C.y < pl_frame_window_100 + self->ground_y_0x060) {
+                self->vec_0x03C.y = pl_frame_window_100 + self->ground_y_0x060;
             }
             break;
         default:
@@ -452,14 +452,14 @@ void fn_8025FA00(_PLW* self) {
                 if (self->vec_0x03C.y <= value) {
                     if (self->field_0x00A != 8) {
                         self->kind_0x09 = 3;
-                        fn_80275AC4(self, 1, 20, 12);
+                        pl_act_enter(self, 1, 20, 12);
                     }
                 } else if (self->field_0x370 > 0) {
                     self->kind_0x09 = 2;
                     if (self->field_0x00A != 12) {
-                        fn_80275AC4(self, 2, 1, 0);
+                        pl_act_enter(self, 2, 1, 0);
                     } else {
-                        fn_80275AC4(self, 12, 6, 0);
+                        pl_act_enter(self, 12, 6, 0);
                     }
                 }
             }
@@ -472,16 +472,16 @@ void fn_8025FA00(_PLW* self) {
             self->field_0x074 = 1;
             if (self->field_0x00A == 0) {
                 if ((u32)(self->act_no - 74) > 3 && (self->act_no < 104 || self->act_no > 105) &&
-                    self->vec_0x03C.y >= self->field_0x064 - lbl_80799E38) {
-                    self->vec_0x03C.y = self->field_0x064 - lbl_80799E38;
+                    self->vec_0x03C.y >= self->field_0x064 - pl_frame_window_30) {
+                    self->vec_0x03C.y = self->field_0x064 - pl_frame_window_30;
                 }
             } else if (self->field_0x00A == 1) {
                 if (self->act_no != 21 &&
-                    self->vec_0x03C.y >= self->field_0x064 - lbl_80799E38) {
-                    self->vec_0x03C.y = self->field_0x064 - lbl_80799E38;
+                    self->vec_0x03C.y >= self->field_0x064 - pl_frame_window_30) {
+                    self->vec_0x03C.y = self->field_0x064 - pl_frame_window_30;
                 }
-            } else if (self->vec_0x03C.y >= self->field_0x064 - lbl_80799E38) {
-                self->vec_0x03C.y = self->field_0x064 - lbl_80799E38;
+            } else if (self->vec_0x03C.y >= self->field_0x064 - pl_frame_window_30) {
+                self->vec_0x03C.y = self->field_0x064 - pl_frame_window_30;
             }
             if (Pl_suimen_ck(self) == 1) {
                 self->field_0x075 = 1;
@@ -524,7 +524,7 @@ s32 fn_8025F588(_PLW* self) {
             self->kind_0x09 = 0;
             break;
         default:
-            if (self->vec_0x03C.y - value > lbl_80799E38) {
+            if (self->vec_0x03C.y - value > pl_frame_window_30) {
                 if (self->field_0x370 > 0) {
                     self->kind_0x09 = 2;
                     if ((self->field_0x5C4 & 0xF) != 0) {
@@ -540,13 +540,13 @@ s32 fn_8025F588(_PLW* self) {
                         fn_802756F0(self, 6, 69, 0);
                         return 1;
                     }
-                    fn_80275AC4(self, 2, 1, 0);
+                    pl_act_enter(self, 2, 1, 0);
                     return 1;
                 }
                 if (self->field_0x00A == 8) {
                     self->vec_0x03C.y = value;
                 }
-                fn_80275AC4(self, 2, 1, 0);
+                pl_act_enter(self, 2, 1, 0);
             }
             break;
         }
@@ -589,18 +589,18 @@ s32 fn_8025F588(_PLW* self) {
             self->field_0x075 = 0;
             self->kind_0x09 = 2;
             if ((self->field_0x5C4 & 0xF) != 0) {
-                fn_80275AC4(self, 12, 6, 0);
+                pl_act_enter(self, 12, 6, 0);
             } else if (fn_80278C7C(self) == 1) {
                 fn_802756F0(self, 6, 49, 0);
             } else if (fn_80278CD0(self) == 1) {
                 fn_802756F0(self, 6, 69, 0);
             } else {
-                fn_80275AC4(self, 2, 1, 0);
+                pl_act_enter(self, 2, 1, 0);
             }
             return 1;
         }
-        if (self->vec_0x03C.y >= value - lbl_80799E38) {
-            self->vec_0x03C.y = value - lbl_80799E38;
+        if (self->vec_0x03C.y >= value - pl_frame_window_30) {
+            self->vec_0x03C.y = value - pl_frame_window_30;
         }
         if (Pl_suimen_ck(self) == 1) {
             self->field_0x075 = 1;
@@ -652,18 +652,18 @@ s32 fn_80262688(_PLW* self) {
             self->field_0x658 = 90;
             if (fn_80273228(self, work->field_0x650, work->field_0x652) < work->field_0x652) {
                 if ((u16)fn_80273044(self, work->field_0x650) == 0xFFFF) {
-                    fn_80267270(self, 1, 0, 0);
+                    pl_model_state_set(self, 1, 0, 0);
                 } else {
-                    fn_80267270(self, 2, 30, work->field_0x650);
+                    pl_model_state_set(self, 2, 30, work->field_0x650);
                 }
                 return 0;
             }
             self->field_0x650 = work->field_0x650;
             self->field_0x652 = work->field_0x652;
             if (self->kind_0x09 == 3) {
-                fn_80275AC4(self, 0, 161, 0);
+                pl_act_enter(self, 0, 161, 0);
             } else {
-                fn_80275AC4(self, 0, 91, 0);
+                pl_act_enter(self, 0, 91, 0);
             }
             if (fn_8042CB9C() == 1) {
                 if (Pl_master_ck(self) == 1) {
@@ -674,7 +674,7 @@ s32 fn_80262688(_PLW* self) {
                 work->field_0x656 = 0xFF;
                 fn_80272E30(self, self->field_0x650, self->field_0x652);
                 self->field_0x656 = 1;
-                fn_80267270(self, 2, 29, self->field_0x650);
+                pl_model_state_set(self, 2, 29, self->field_0x650);
                 if ((u16)fn_8004EB18(self->field_0x650) == 1) {
                     fn_800F16D4(4);
                 }

@@ -51,7 +51,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "Pl/fn_802693C4.h"   /* `Pl/fn_802693C4.cpp` owns 0x802693C4-0x8026BA1C, so its
-                          * `fn_8026A224`/`fn_8026A2DC`/`fn_8026A2F8`/`Pl_chr_setX` declarations
+                          * `Pl_chr_set_attr_default`/`fn_8026A2DC`/`fn_8026A2F8`/`Pl_chr_setX` declarations
                           * come from the owner's header, not from the band header (rule 2) */
 #include "ef/fn_800CDB2C.h"
 #include "unsplit/unknown.h"
@@ -1228,7 +1228,7 @@ void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask)
 }
 
 /* Sets the per-act marker byte and arms the act. */
-void fn_80275AC4(struct _PLW* plw, s32 a, u16 b, u16 c)
+void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c)
 {
     plw->field_0x00E = 1;
     fn_802756F0(plw, a, b, c);
@@ -1249,7 +1249,7 @@ void fn_80275AFC(struct _PLW* plw, s8 value)
 }
 
 /* Arms the act's three status bits from a packed mask. */
-void fn_80275B04(struct _PLW* plw, u16 a, u32 b, u32 c)
+void Pl_act_set_motion(struct _PLW* plw, u16 a, u32 b, u32 c)
 {
     switch ((u8)a) {
     case 1:
@@ -1268,18 +1268,18 @@ void fn_80275B04(struct _PLW* plw, u16 a, u32 b, u32 c)
     if ((a & 0x8000) != 0) {
         fn_8026FEF0(plw, 1);
     } else {
-        fn_8026FEC0(plw, 1);
+        pl_act_set_flag(plw, 1);
     }
     if (b == 0) {
         fn_8026FEF0(plw, 2);
     } else {
-        fn_8026FEC0(plw, 2);
+        pl_act_set_flag(plw, 2);
     }
     if (c == 0) {
         fn_8026FEF0(plw, 4);
         return;
     }
-    fn_8026FEC0(plw, 4);
+    pl_act_set_flag(plw, 4);
 }
 
 /* The act-state dispatcher's motion hand-off. */
@@ -1288,7 +1288,7 @@ void fn_80275C18(struct _PLW* plw, u32 motion, u32 a, u32 b, u32 c)
     if ((u16)c == 0) {
         Pl_chr_setX(plw, (u16)motion, a, b);
     } else {
-        fn_8026A224(plw, (u16)motion, a, b);
+        Pl_chr_set_attr_default(plw, (u16)motion, a, b);
     }
 }
 
@@ -1314,7 +1314,7 @@ void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d)
                 } else {
                     fn_80275C18(plw, 0x18, a, b, d);
                 }
-                fn_80275AC4(plw, 0, 0x6A, (u16)c);
+                pl_act_enter(plw, 0, 0x6A, (u16)c);
                 return;
             }
             if (plw->field_0x018 == 1) {
@@ -1327,12 +1327,12 @@ void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d)
                 } else {
                     fn_80275C18(plw, 0x3E9, a, b, d);
                 }
-                fn_80275AC4(plw, 0, 0, (u16)c);
+                pl_act_enter(plw, 0, 0, (u16)c);
                 return;
             }
             if (fn_8027AC18(plw) == 1U) {
                 fn_80275C18(plw, 0x190, a, b, d);
-                fn_80275AC4(plw, 0xA, 0, (u16)c);
+                pl_act_enter(plw, 0xA, 0, (u16)c);
                 return;
             }
             if (plw->field_0x37A <= 0x96) {
@@ -1374,7 +1374,7 @@ void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d)
                     break;
                 }
             }
-            fn_80275AC4(plw, 0, 0, (u16)c);
+            pl_act_enter(plw, 0, 0, (u16)c);
             return;
         }
         if (plw->field_0x018 == 0) {
@@ -1396,24 +1396,24 @@ void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d)
         } else {
             fn_80275C18(plw, 0x41A, a, b, d);
         }
-        fn_80275AC4(plw, 0, 0x16, (u16)(c | 0x80));
+        pl_act_enter(plw, 0, 0x16, (u16)(c | 0x80));
         return;
     }
     if (plw->field_0x585 != 0) {
         fn_80275C18(plw, 0x18, a, b, d);
-        fn_80275AC4(plw, 0, 0x6A, (u16)c);
+        pl_act_enter(plw, 0, 0x6A, (u16)c);
         return;
     }
     fn_80275C18(plw, 8, a, b, d);
     if (fn_8027AC18(plw) == 1U) {
-        fn_80275AC4(plw, 0xA, 0xE, (u16)c);
+        pl_act_enter(plw, 0xA, 0xE, (u16)c);
         return;
     }
-    fn_80275AC4(plw, 0, 0x1F, (u16)c);
+    pl_act_enter(plw, 0, 0x1F, (u16)c);
 }
 
 /* The three no-argument act-state entries. */
-void fn_802761B8(struct _PLW* self, u32 a, u32 b, u32 c)
+void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c)
 {
     fn_80275C34(self, a, b, c, 0, 0);
 }
@@ -1435,7 +1435,7 @@ void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c)
 }
 
 /* Clears the act's hold latch and re-enters the act state. */
-void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c)
+void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c)
 {
     self->field_0x442 = 0;
     self->field_0x30A = 0xFF;
@@ -1455,7 +1455,7 @@ s32 fn_80276270(struct _PLW* plw, s32 value)
 }
 
 /* Adds `delta` to the act's hold gauge, clamped to 0..`+0x372`. */
-void fn_8027628C(struct _PLW* plw, s16 delta)
+void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta)
 {
     if (Pl_master_ck(plw) != 0 && (fn_8027BC48(0) != 1U || delta >= 0) && plw->field_0x00A != 8) {
         s16 value;
@@ -1489,7 +1489,7 @@ s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out)
         return 0;
     }
     before = plw->field_0x370;
-    fn_8027628C(plw, delta);
+    pl_act_add_hold_gauge(plw, delta);
     if (plw->field_0x370 <= 0) {
         if (Pl_cat_skill_ck(plw, 0x2C) == 1U) {
             if (plw->field_0x447 == 0 && before >= 0x40) {
@@ -1560,7 +1560,7 @@ void fn_802765B4(struct _PLW* plw, s16 amount)
             value -= value / 4;
         }
     }
-    fn_8027628C(plw, value);
+    pl_act_add_hold_gauge(plw, value);
 }
 
 /* Grows the act's gauge ceilings (and, when `a` is 0, the soft cap) by `amount`. */
@@ -1657,7 +1657,7 @@ void fn_80276868(struct _PLW* plw, s16 amount)
 }
 
 /* The same step with the defence-skill and combo modifiers folded in. */
-void fn_802768F8(struct _PLW* plw, s16 amount)
+void pl_act_gauge_gate(struct _PLW* plw, s16 amount)
 {
     s16 value = amount;
 

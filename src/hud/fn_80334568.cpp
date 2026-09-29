@@ -85,21 +85,22 @@
 #include "ef/fn_800CDB2C.h"
 #include "Pl/pl_act.h"
 #include "Pl/fn_802693C4.h"
+#include "Pl/fn_80273B14.h" /* the owner header of the act-motion setters (rule 2) */
 #include "hud/fn_80334568.h"
 
 /* Advances the act-change state machine: step 0 enters the act (its motion, its SE and the paired
- * `fn_80275B04` step) and step 1 waits for the act's frame check before handing the act's motion on. */
+ * `Pl_act_set_motion` step) and step 1 waits for the act's frame check before handing the act's motion on. */
 void fn_803346B4(_PLW* plw) {
     switch (plw->act_step_0x05) {
     case 0:
         plw->act_step_0x05 += 1;
-        fn_80275B04(plw, 3, 0, 0);
-        fn_8026A224(plw, 0x494, 4, 0x5A);
-        fn_802770E8(plw, (u32)lbl_805E1ED0, 0);
+        Pl_act_set_motion(plw, 3, 0, 0);
+        Pl_chr_set_attr_default(plw, 0x494, 4, 0x5A);
+        Pl_act_set_step_table(plw, (u32)lbl_805E1ED0, 0);
         break;
     case 1:
-        if (fn_8026A33C(plw) == 1) {
-            fn_802761B8(plw, 3, 4, 0);
+        if (Pl_motion_end_ck(plw) == 1) {
+            Pl_act_set_motion_slot(plw, 3, 4, 0);
         }
         break;
     }

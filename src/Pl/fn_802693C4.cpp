@@ -237,7 +237,7 @@ s16 fn_8026A068(_PLW* self, u16 id)
 
 /* The character attribute setter's argument shuffle: the motion word is narrowed and the fifth
  * argument is left 0. */
-void fn_8026A224(_PLW* self, u16 motion, s32 a, s32 b)
+void Pl_chr_set_attr_default(_PLW* self, u16 motion, s32 a, s32 b)
 {
     Pl_chr_set_attr(self, motion, a, b, 0);
 }
@@ -270,7 +270,7 @@ void fn_8026A2DC(_PLW* self)
     ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xF1 = 0;
 }
 
-void fn_8026A2EC(_PLW* self, u8 value)
+void pl_model_set_state(_PLW* self, u8 value)
 {
     ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xF2 = value;
 }
@@ -287,7 +287,7 @@ u32 fn_8026A328(_PLW* self, u16 frame, f32 a, f32 b)
 }
 
 /* The model layer's frame reset. */
-u32 fn_8026A33C(_PLW* self)
+u32 Pl_motion_end_ck(_PLW* self)
 {
     return fn_800E2198(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, 0);
 }
@@ -297,7 +297,7 @@ f32 fn_8026A34C(_PLW* self)
     return ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0x74;
 }
 
-f32 fn_8026A358(_PLW* self)
+f32 pl_rig_get_float_a4(_PLW* self)
 {
     return ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xA4;
 }
@@ -362,7 +362,7 @@ void fn_8026A618(_PLW* self, s32 id)
     self->id_flags_0xE0[id / 32] |= 1 << (id & 31);
 }
 
-u32 fn_8026A644(_PLW* self, s32 id)
+u32 pl_part_flag_ck(_PLW* self, s32 id)
 {
     return (self->id_flags_0xE0[id / 32] & (1 << (id & 31))) != 0;
 }

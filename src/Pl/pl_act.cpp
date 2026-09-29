@@ -24,7 +24,7 @@
  *     fn_80276D94 = 96.4 / fn_80276E08 = 89.6; with it off, 100.0 / 92.7 / 100.0 / 94.0.
  *     `-O4,p -opt nopeephole` is worse still (92.5 / 87.4 / 78.7 / 93.9), so the level is `-O3`.
  *   * `-inline auto` -> **`-inline noauto`** (playbook 28): with `auto` the 46-instruction
- *     `fn_802770E8` is inlined into all three arms of `fn_802771A0` (57 -> 229 instructions, 0.00 %);
+ *     `Pl_act_set_step_table` is inlined into all three arms of `fn_802771A0` (57 -> 229 instructions, 0.00 %);
  *     `noauto` puts it back at 100.00 % and moves nothing else. `-inline off` measures identically here,
  *     but `noauto` is the spelling the sibling `main.cpp` needed, so it is the one to commit.
  *   * `-func_align` stays out: `-O3` already packs on 4 B, which is what the retail starts want.
@@ -492,7 +492,7 @@ extern "C" u32 fn_8026FE44(_PLW*);
 extern "C" void fn_800E1640(u8*, f32);
 extern "C" u32 fn_802B0688(void*);
 extern "C" void fn_8026FEF0(_PLW*, s32);
-extern "C" void fn_80275AC4(_PLW*, s32, u16, u16);
+extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
 u8* get_move_work_adrs(u8);
 
 /* In-unit callees that the appended bodies reference before their own definition. */
@@ -517,7 +517,7 @@ void rotVecXYZ(nw4r::math::VEC3*, _CP_VECTOR*);
 
 extern "C" void fn_800FC0D4(_CP_VECTOR*, void*);
 extern "C" f32 fn_80050EF4(void*, void*);
-extern "C" u32 fn_80114C20(_PLW*, s32);
+extern "C" u32 ef_inst_spawn(_PLW*, s32);
 extern "C" u32 fn_802B0668(u8);
 extern "C" u32 fn_802753E4(_PLW*, s32);
 extern "C" void fn_80278D1C(_PLW*);
@@ -540,7 +540,7 @@ void lb_entry_handover_send(s32, u8, u8);
 extern "C" void fn_80272E30(_PLW*, u16, s16);
 extern "C" void fn_802E5D68(u16);
 
-extern "C" s32 fn_8026A644(_PLW*, s32);
+extern "C" s32 pl_part_flag_ck(_PLW*, s32);
 extern "C" u8 fn_802748C8(_PLW*);
 u32 GetItemData(u16);
 
@@ -728,7 +728,7 @@ extern "C" s32 fn_802770E0(void)
 
 /* 0x802770E8: initialises the actor's attack-range state - the id/count words, the zeroed tail fields and
  * the 16-byte per-range table. */
-extern "C" void fn_802770E8(_PLW* self, u32 table, s32 arg2)
+extern "C" void Pl_act_set_step_table(_PLW* self, u32 table, s32 arg2)
 {
     self->unk318 = table;
     self->unk313 = (s8)arg2;
@@ -746,27 +746,27 @@ extern "C" void fn_802771A0(_PLW* self, s32 arg1)
 {
     if (self->unk009 != 3) {
         if (self->unk002 == 8 && fn_80331104() == 0) {
-            fn_802770E8(self, (u32)lbl_805E2248, (s16)arg1);
+            Pl_act_set_step_table(self, (u32)lbl_805E2248, (s16)arg1);
         } else {
-            fn_802770E8(self, lbl_805BF448[self->unk002], (s16)arg1);
+            Pl_act_set_step_table(self, lbl_805BF448[self->unk002], (s16)arg1);
         }
     } else {
         if (self->unk002 == 8 && fn_80331104() == 0) {
-            fn_802770E8(self, (u32)lbl_805E25D0, (s16)arg1);
+            Pl_act_set_step_table(self, (u32)lbl_805E25D0, (s16)arg1);
         } else {
-            fn_802770E8(self, lbl_805BF46C[self->unk002], (s16)arg1);
+            Pl_act_set_step_table(self, lbl_805BF46C[self->unk002], (s16)arg1);
         }
     }
 }
 
 /* 0x80277B44 */
-extern "C" void fn_80277B44(_PLW* self, s16 arg1)
+extern "C" void pl_act_set_gauge_arm(_PLW* self, s16 arg1)
 {
     self->unk396 = arg1;
 }
 
 /* 0x80277B4C: scales the actor's attack-range modifier by the two armour skills. */
-extern "C" void fn_80277B4C(_PLW* self, s16 arg1)
+extern "C" void pl_act_set_gauge_arm_skilled(_PLW* self, s16 arg1)
 {
     self->unk396 = arg1;
     if (Pl_cat_skill_ck(self, 28) == 1) {
@@ -777,7 +777,7 @@ extern "C" void fn_80277B4C(_PLW* self, s16 arg1)
 }
 
 /* 0x80277C48 */
-extern "C" void fn_80277C48(_PLW* self, s16 arg1)
+extern "C" void pl_act_set_step_time(_PLW* self, s16 arg1)
 {
     self->unk580 = arg1;
 }
@@ -807,7 +807,7 @@ extern "C" s32 fn_802784A8(_PLW* self)
 }
 
 /* 0x80278564 */
-extern "C" void fn_80278564(_PLW* self, u32 arg1)
+extern "C" void pl_act_arm_flags(_PLW* self, u32 arg1)
 {
     self->unk388 |= (u8)arg1;
 }
@@ -941,7 +941,7 @@ extern "C" void fn_8027AC00(_PLW* self)
 }
 
 /* 0x8027AC0C */
-extern "C" void fn_8027AC0C(_PLW* self)
+extern "C" void pl_act_clear_flag5bb(_PLW* self)
 {
     self->unk5BB = 0;
 }
@@ -1069,7 +1069,7 @@ extern "C" void fn_8027D584(_PLW* self, u8* arg1)
 }
 
 /* 0x80277C58: writes the actor's remaining vertical range from its motion frame data. */
-extern "C" void fn_80277C58(_PLW* self)
+extern "C" void pl_act_set_frame_timer(_PLW* self)
 {
     u8* p = self->unk13C;
     f32 v = *(f32*)(p + 72);
@@ -1093,7 +1093,7 @@ extern "C" void fn_80277BC4(_PLW* self, u8 arg1)
     } else {
         v = 12;
     }
-    fn_80277B44(self, v);
+    pl_act_set_gauge_arm(self, v);
 }
 
 /* 0x80277EC0: hands the actor's vertical speed to its motion frame and caches the result. */
@@ -1181,7 +1181,7 @@ extern "C" void fn_80278B58(_PLW* self, s32 arg1, s32 arg2)
     self->unk376 = 0;
     fn_802789EC(self, 1);
     fn_8027A17C(self);
-    fn_80275AC4(self, 8, (u16)arg1, (u16)(arg2 | 32));
+    pl_act_enter(self, 8, (u16)arg1, (u16)(arg2 | 32));
 }
 
 /* 0x80278BE4 */
@@ -1289,7 +1289,7 @@ extern "C" void fn_8027A08C(_PLW* self, s8 arg1)
 }
 
 /* 0x8027BE2C */
-extern "C" void fn_8027BE2C(_PLW* self)
+extern "C" void pl_act_clear_mode5c4(_PLW* self)
 {
     if ((self->unk5C4 & 0xF) != 0) {
         self->unk5C4 &= 0xF0;
@@ -1413,7 +1413,7 @@ extern "C" s32 fn_8027A2A0(_PLW* self, s32 arg1)
     if (self->unk5E6 != 0) {
         v = 0;
     }
-    if (fn_8026A644(self, 55) == 0 && (u8)arg1 == 0) {
+    if (pl_part_flag_ck(self, 55) == 0 && (u8)arg1 == 0) {
         v = 0;
     }
     return v;
@@ -1680,7 +1680,7 @@ extern "C" void fn_8027C8B4(_PLW* self, s32 arg1)
         if (self->unk384 >= 100) {
             self->unk384 = 100;
             if ((u32)Pl_master_ck(self) == 1 && self->unk468 == 0) {
-                fn_80114C20(self, 1);
+                ef_inst_spawn(self, 1);
             }
             fn_8027C89C(self, 900);
         }
@@ -2645,7 +2645,7 @@ struct _MOVE_WORK {
 };
 
 u16 get_move_work_max(u8);
-extern "C" void fn_8027628C(_MOVE_WORK*, s32);
+extern "C" void pl_act_add_hold_gauge(_MOVE_WORK*, s32);
 extern "C" void fn_8027D6A4(_MOVE_WORK*, s32, s32);
 extern "C" void fn_8027D6C0(_MOVE_WORK*, s32, s32);
 
@@ -2663,28 +2663,28 @@ extern "C" void fn_8027D0D4(u8 arg0, u8 arg1)
         if (p->unk000 != 0 && p->unk016 == arg0) {
             switch (arg1) {
             case 0:
-                fn_8027628C(p, 0x32);
-                fn_80114C20((_PLW*)p, 0);
+                pl_act_add_hold_gauge(p, 0x32);
+                ef_inst_spawn((_PLW*)p, 0);
                 break;
             case 1:
                 fn_80279154((_PLW*)p, 1, 0xA);
                 p->unk44A = 0x1518;
-                fn_80114C20((_PLW*)p, 1);
+                ef_inst_spawn((_PLW*)p, 1);
                 break;
             case 2:
                 if ((u32)fn_80279194((_PLW*)p, 1, 0x14) == 1) {
                     p->unk44E = 0x1518;
                 }
-                fn_80114C20((_PLW*)p, 2);
+                ef_inst_spawn((_PLW*)p, 2);
                 break;
             case 3:
             case 6:
                 if (arg1 == 3) {
-                    fn_8027628C(p, 0x14);
+                    pl_act_add_hold_gauge(p, 0x14);
                 } else {
-                    fn_8027628C(p, 0x32);
+                    pl_act_add_hold_gauge(p, 0x32);
                 }
-                fn_80114C20((_PLW*)p, 0);
+                ef_inst_spawn((_PLW*)p, 0);
                 break;
             case 4:
             case 7:
@@ -2694,7 +2694,7 @@ extern "C" void fn_8027D0D4(u8 arg0, u8 arg1)
                     fn_80279154((_PLW*)p, 1, 5);
                 }
                 p->unk44A = 0x1518;
-                fn_80114C20((_PLW*)p, 1);
+                ef_inst_spawn((_PLW*)p, 1);
                 break;
             case 5:
             case 8:
@@ -2705,34 +2705,34 @@ extern "C" void fn_8027D0D4(u8 arg0, u8 arg1)
                 } else if ((u32)fn_80279194((_PLW*)p, 1, 0x14) == 1) {
                     p->unk44E = 0x1518;
                 }
-                fn_80114C20((_PLW*)p, 2);
+                ef_inst_spawn((_PLW*)p, 2);
                 break;
             case 9:
                 p->unk3EA = 0;
-                fn_80114C20((_PLW*)p, 4);
+                ef_inst_spawn((_PLW*)p, 4);
                 break;
             case 10:
                 if (p->unk466 < 0x2328) {
                     p->unk466 = 0x2328;
                 }
-                fn_80114C20((_PLW*)p, 7);
+                ef_inst_spawn((_PLW*)p, 7);
                 break;
             case 11:
                 if (p->unk464 < 0x2328) {
                     p->unk464 = 0x2328;
                 }
-                fn_80114C20((_PLW*)p, 6);
+                ef_inst_spawn((_PLW*)p, 6);
                 break;
             case 12:
                 if (p->unk412 < 0x1518) {
                     p->unk412 = 0x1518;
                 }
-                fn_80114C20((_PLW*)p, 5);
+                ef_inst_spawn((_PLW*)p, 5);
                 break;
             case 13:
                 fn_8027D6A4(p, 1, 0x1518);
                 fn_8027D6C0(p, 1, 0x1518);
-                fn_80114C20((_PLW*)p, 9);
+                ef_inst_spawn((_PLW*)p, 9);
                 break;
             case 14:
                 p->unk42E = 0;
@@ -2762,7 +2762,7 @@ extern "C" void fn_8027D0D4(u8 arg0, u8 arg1)
                 p->unk40A = 0;
                 p->unk40C = 0;
                 p->unk3DC &= 0xFFFFFC00;
-                fn_80114C20((_PLW*)p, 9);
+                ef_inst_spawn((_PLW*)p, 9);
                 break;
             }
         }
@@ -3067,7 +3067,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                     break;
                 }
             } else if (arg2 == 2) {
-                if (fn_8026A644(self, 0x37) == 0) {
+                if (pl_part_flag_ck(self, 0x37) == 0) {
                     break;
                 }
             }
@@ -3109,14 +3109,14 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
             if ((s32)self->unk5E6 == 0) {
                 u8 r;
                 u8 c;
-                if (fn_8026A644(self, 0x38) != 0) {
+                if (pl_part_flag_ck(self, 0x38) != 0) {
                     f25 = 1;
-                } else if (fn_8026A644(self, 0x39) != 0) {
+                } else if (pl_part_flag_ck(self, 0x39) != 0) {
                     f24 = 1;
                 }
-                if (fn_8026A644(self, 0x3A) != 0) {
+                if (pl_part_flag_ck(self, 0x3A) != 0) {
                     f27 = 1;
-                } else if (fn_8026A644(self, 0x3B) != 0) {
+                } else if (pl_part_flag_ck(self, 0x3B) != 0) {
                     f26 = 1;
                 }
                 r = get_cfg(self->unk008, 2);
@@ -3774,7 +3774,7 @@ extern "C" s32 fn_8027A340(_PLW* self)
     if (self->unk5E6 != 0) {
         ok = 0;
     }
-    if (fn_8026A644(self, 0x1D) == 0) {
+    if (pl_part_flag_ck(self, 0x1D) == 0) {
         if (self->unk00A == 4) {
             s32 id = self->unk00C;
             if (id != 0x13 && id != 0x2A && id != 0x2E && id != 0x15 && id != 0x2C && id != 0x30) {

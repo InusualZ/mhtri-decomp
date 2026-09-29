@@ -35,7 +35,7 @@ extern "C" {
 #endif
 void fn_8027350C(struct _PLW* self, s32 part);
 /* 0x80272E30 - the item/skill value setter `Pl/fn_802489D4.cpp` calls and the item/motion lookup
- * `Pl/pl_act.cpp` and `Pl/fn_8024F200.cpp` call; the owner defines it `extern "C" s16`
+ * `Pl/pl_act.cpp` and `Pl/pl_act_step.cpp` call; the owner defines it `extern "C" s16`
  * (`Pl/pl_skill.cpp:1233`), so the declaration keeps that return. */
 s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
 /* 0x802739F0 - the equipment-slot record resolver `Pl/fn_80273B14.cpp`'s act-kind switch calls;

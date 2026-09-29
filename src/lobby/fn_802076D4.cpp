@@ -80,7 +80,7 @@ void fn_80207284(_LB_NPC* self);
 void fn_80207698(_LB_NPC* self);
 
 /* The Pl-band helpers, and this group's own neighbours. */
-u32 fn_8026A33C(_PLW* self);
+u32 Pl_motion_end_ck(_PLW* self);
 u32 game_ready_ck(void);
 u32 fn_8021B8A8(u8 a, u8 b);
 u32 fn_8021B8F4(u8 a, u8 b);
@@ -423,13 +423,13 @@ void fn_8020A5F4(_PLW* self, u32 id, s32 arg, s32 speed, u16 flags)
     self->kind_0x09 = (u8)id;
     self->flag_0x30E = 1;
     if (fn_80208AB8() != 0 || fn_80208AC0(self) != 0) {
-        fn_8026A224(self, 51, speed, arg);
+        Pl_chr_set_attr_default(self, 51, speed, arg);
         fn_8020A5D4(self, 12, 0, flags);
     } else if (fn_80208AE8(self) == 1) {
-        fn_8026A224(self, 21, speed, arg);
+        Pl_chr_set_attr_default(self, 21, speed, arg);
         fn_8020A5D4(self, 0, 0, flags);
     } else {
-        fn_8026A224(self, 1, speed, arg);
+        Pl_chr_set_attr_default(self, 1, speed, arg);
         fn_8020A5D4(self, 0, 0, flags);
     }
 }
@@ -456,7 +456,7 @@ void fn_8020AD14(_LB_NPC* self)
         break;
     }
     case 1:
-        if (fn_8026A33C((_PLW*)self) == 1) {
+        if (Pl_motion_end_ck((_PLW*)self) == 1) {
             fn_8020A70C((_PLW*)self, 0, 4, 0);
         }
         break;
@@ -479,7 +479,7 @@ void fn_8020AEF0(_PLW* self)
         break;
     }
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             fn_8020A70C(self, 0, 6, 0);
         }
         break;
@@ -496,7 +496,7 @@ void fn_8020AF90(_PLW* self)
         fn_8020A5EC(self, 1);
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             Pl_chr_setX(self, 609, 6, 0);
             fn_8020A3E4(self, 0, 4, 32);
         }
@@ -514,7 +514,7 @@ void fn_8020B264(_PLW* self)
         fn_8020A5EC(self, 0);
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             fn_8020A70C(self, 0, 4, 0);
         }
         break;

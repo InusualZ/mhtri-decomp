@@ -56,7 +56,7 @@
  *   * dead-copy chains (playbook 35) on every local of RSORelocate's case 10 and of
  *     RSORelocateSmallDataSection, chained and independent, 1-6 deep, before and after the live
  *     definition: only a >= 3-deep chain of `low` moves anything, and it lands a *worse* 14-row
- *     arrangement - the trick that closed `Pl/pl_master`'s fn_8026F908 does not transfer here;
+ *     arrangement - the trick that closed `Pl/pl_master`'s pl_act_param_tier_ck does not transfer here;
  *   * level 3 before LocateObject / RSOStaticLocateObject / RSORelocateSmallDataSection: byte-identical
  *     to level 4, so the level-3 pragma really is RSORelocate-only;
  *   * case 10 with `relocation->addend` named, reused, cast, operand-swapped or summed into a local

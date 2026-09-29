@@ -205,7 +205,7 @@ void fn_802842D4(_PLW* self, u8 kind, ShellAtkRow* row, u32 table)
         b = row->param_0x0E;
         attack = row->attack_0x10;
         add = 0;
-        fn_802770E8(self, table, 0);
+        Pl_act_set_step_table(self, table, 0);
         if (kind == 0) {
             self->act_step_0x05++;
         }
@@ -216,7 +216,7 @@ void fn_802842D4(_PLW* self, u8 kind, ShellAtkRow* row, u32 table)
         attack = 0;
         add = row->add_0x06;
     }
-    fn_8026A224(self, motion, a, b);
+    Pl_chr_set_attr_default(self, motion, a, b);
     if (add != 0) {
         self->field_0x058 += add;
         self->field_0x0A8 = self->field_0x058;
@@ -273,18 +273,18 @@ void fn_80284780(_PLW* self, s32 kind)
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0, 1, 0);
+        Pl_act_set_motion(self, 0, 1, 0);
         fn_802842D4(self, 0, &lbl_805C9A78[kind], (u32)lbl_805C9DC8);
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
             fn_802842D4(self, 1, &lbl_805C9A78[kind], (u32)lbl_805C9DC8);
         }
         break;
     case 2:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 0, 6, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 6, 0);
         } else {
             fn_802845F0(self, lbl_8079A1E8);
         }
@@ -299,7 +299,7 @@ void fn_80284884(_PLW* self, s32 kind)
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 0, 1, 0);
+        Pl_act_set_motion(self, 0, 1, 0);
         self->field_0x28 = 0;
         if (kind == 1) {
             fn_802842D4(self, 0, &lbl_805C9AC0[kind], (u32)lbl_805C9EBC);
@@ -308,7 +308,7 @@ void fn_80284884(_PLW* self, s32 kind)
         }
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
             if (kind == 1) {
                 fn_802842D4(self, 1, &lbl_805C9AC0[kind], (u32)lbl_805C9EBC);
@@ -318,8 +318,8 @@ void fn_80284884(_PLW* self, s32 kind)
         }
         break;
     case 2:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 0, 6, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 6, 0);
         } else {
             fn_802845F0(self, lbl_8079A1EC);
         }
@@ -376,18 +376,18 @@ void fn_80286BF0(_PLW* self, s32 kind)
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 3, 1, 0);
+        Pl_act_set_motion(self, 3, 1, 0);
         fn_802842D4(self, 0, &lbl_805C9CAC[kind], (u32)lbl_805CA938);
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
             fn_802842D4(self, 1, &lbl_805C9CAC[kind], (u32)lbl_805CA938);
         }
         break;
     case 2:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 3, 6, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 6, 0);
         } else {
             fn_802845F0(self, lbl_8079A1E8);
         }
@@ -402,18 +402,18 @@ void fn_80286CF4(_PLW* self, s32 kind)
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80275B04(self, 3, 1, 0);
+        Pl_act_set_motion(self, 3, 1, 0);
         fn_802842D4(self, 0, &lbl_805C9CD0[kind], (u32)lbl_805CACC4);
         break;
     case 1:
-        if (fn_8026A33C(self) == 1) {
+        if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
             fn_802842D4(self, 1, &lbl_805C9CD0[kind], (u32)lbl_805CACC4);
         }
         break;
     case 2:
-        if (fn_8026A33C(self) == 1) {
-            fn_802761B8(self, 3, 6, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 6, 0);
         } else {
             fn_802845F0(self, lbl_8079A1E8);
         }

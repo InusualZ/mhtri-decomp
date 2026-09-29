@@ -28,6 +28,10 @@ u32 my_player_no(void);
 void fn_800CF394(s8 value);
 u8  fn_800CF208(void);
 u32 move_work_state_ck(void);
+/* 0x800CF2C4 - the play-mode/move-state dispatcher: it reads `fn_800CF208()`, switches on
+ * `PlayMode_ck()` and hands the caller's mode byte on (`Pl/pl_act_step.cpp`'s act-175 arm is a
+ * consumer, so the declaration belongs here - rule 2). */
+void ef_move_state_dispatch(u8 mode);
 
 s32 fn_800CED10(char* path, u32 dma, u32 size);
 /* Builds the nw4r::ef::EffectSystem the effect manager keeps at `eft_control` +0x04. */

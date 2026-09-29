@@ -99,12 +99,12 @@ typedef struct MHchar {
     /* +0x068 */ u8 pad_0x68[0xC];
     /* +0x074 */ f32 field_0x74;   /* read by `fn_8026A34C` (0x8026A34C) */
     /* +0x078 */ u8 pad_0x78[0x2C];
-    /* +0x0A4 */ f32 field_0xA4;   /* read by `fn_8026A358` (0x8026A358) */
+    /* +0x0A4 */ f32 field_0xA4;   /* read by `pl_rig_get_float_a4` (0x8026A358) */
     /* +0x0A8 */ u8 pad_0xA8[0x14];
     /* +0x0BC */ f32 field_0xBC;   /* the value `fn_8026A364` tests against 0 */
     /* +0x0C0 */ u8 pad_0xC0[0x31];
     /* +0x0F1 */ u8 field_0xF1;     /* the model visibility flag `fn_8026A2D0`/`fn_8026A2DC` set */
-    /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `fn_8026A2EC`/`fn_8026A2F8` */
+    /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `pl_model_set_state`/`fn_8026A2F8` */
     /* +0x0F3 */ u8 pad_0xF3[0x21];
     /* +0x114 */ s32 field_0x114;
     /* +0x118 */ s32 field_0x118;
@@ -159,11 +159,11 @@ struct _PLW {
     };
     /* +0x005 */ u8 act_step_0x05;   /* the per-act state step the lobby act handlers advance */
     /* +0x006 */ u8 field_0x006;      /* the act's follow-up stage: reset when the step advances and
-                                      * bumped once the step's frame check passes (`Pl/fn_8024F200.cpp`);
+                                      * bumped once the step's frame check passes (`Pl/pl_act_step.cpp`);
                                       * the nested handlers advance it as their second-level counter
                                       * (`Pl/fn_802489D4.cpp`) */
     /* +0x007 */ u8 field_0x007;      /* the act's skill tier, 1-3, picked from the cat-skill level
-                                      * (`Pl/fn_8024F200.cpp`) */
+                                      * (`Pl/pl_act_step.cpp`) */
     /* +0x008 */ u8 chunk_ofs;     /* plus 0x14 is the chunk index its files go to */
     /* +0x009 */ u8 kind_0x09;   /* compared against 3; `ef/eft019.cpp` names this same `_PLW` byte
                                   * `kind_0x09` and `enemy.h` names the analogous byte `state_0x009` */
@@ -175,7 +175,7 @@ struct _PLW {
                             * save/restore the fn_80273B14 unit needs inside it (same byte total) */
         /* +0x00E */ u8 act_state_0x00E[0x14 - 0x0E];
         struct {
-            /* +0x00E */ u8 field_0x00E;     /* set to 1 by the act-state entry (`fn_80275AC4`) */
+            /* +0x00E */ u8 field_0x00E;     /* set to 1 by the act-state entry (`pl_act_enter`) */
             /* +0x00F */ u8 prev_act_kind;   /* the +0x00A act kind as it was before the entry,
                                               * saved by `fn_802756F0` */
             /* +0x010 */ u16 prev_act_no;    /* the +0x00C act number the entry replaced */
@@ -200,7 +200,7 @@ struct _PLW {
                                        * `Pl/pl_master.cpp`'s own view of the record calls it `unk18` */
         /* +0x018 */ u8 field_0x018;  /* the two-way variant the act handlers branch on - cleared on
                                        * entry, and `1` selects the alternate motion/effect set
-                                       * (`Pl/fn_802489D4.cpp`, `Pl/fn_8024F200.cpp`) */
+                                       * (`Pl/fn_802489D4.cpp`, `Pl/pl_act_step.cpp`) */
         /* +0x018 */ u8 unk18;        /* the pre-merge spelling, kept as a union member so no other
                                        * consumer breaks (rule 5) */
     };
@@ -385,7 +385,7 @@ struct _PLW {
     /* +0x0B4 */ s16 unk0B4;
     /* +0x0B6 */ u16 field_0x0B6;  /* a bit field: bit 0 and bit 15 are tested and the low decimal
                                    * pair feeds the +0x354 scale (`Pl/fn_802489D4.cpp`); the low 3
-                                   * bits are the cat-skill level `Pl/fn_8024F200.cpp` reads */
+                                   * bits are the cat-skill level `Pl/pl_act_step.cpp` reads */
     /* +0x0B8 */ union {   /* one u16, two spellings: this branch's padding and the sound view's name */
         /* +0x0B8 */ u8 pad_0xB8[0x2];
         /* +0x0B8 */ u16 field_0x0B8;
@@ -399,7 +399,7 @@ struct _PLW {
     /* +0x0D0 */ u8 pad_0xD0[0xC];
     /* +0x0DC */ u32 id_flags_0xDC;  /* the id bit set/tested/cleared by fn_8026A6D8 / fn_8026A6F4 /
                                       * fn_8026A718 (bit `id & 31`) */
-    /* +0x0E0 */ u32 id_flags_0xE0[4];  /* 128 ids, set/tested by fn_8026A618 / fn_8026A644 */
+    /* +0x0E0 */ u32 id_flags_0xE0[4];  /* 128 ids, set/tested by fn_8026A618 / pl_part_flag_ck */
     /* +0x0F0 */ u32 id_flags_0xF0[4];  /* 128 ids, set/tested by fn_8026A678 / fn_8026A6A4 */
     /* +0x100 */ u8 pad_0x100[0x10];
     /* +0x110 */ f32 unk110;
@@ -487,7 +487,7 @@ struct _PLW {
     /* +0x300 */ u8 unk300[0x304 - 0x300];
     /* +0x304 */ u16 field_0x304;
     /* +0x306 */ union { /* the effect/motion id `fn_80272E30` is fed and indexed on; one member per
-                          * offset, both spellings kept (rule 5); `Pl/fn_8024F200.cpp` and
+                          * offset, both spellings kept (rule 5); `Pl/pl_act_step.cpp` and
                           * `Pl/fn_802489D4.cpp` read it */
         /* +0x306 */ u16 field_0x306;
         /* +0x306 */ u16 unk306;        /* the pre-merge spelling, kept so no other consumer breaks */
@@ -501,7 +501,7 @@ struct _PLW {
             /* +0x30A */ union {   /* the run's last two bytes, with this unit's armed byte */
                 /* +0x30A */ u8 unk30A[0x30C - 0x30A];
                 struct {
-                    /* +0x30A */ u8 field_0x30A;  /* the act's armed byte (`fn_80276238` sets
+                    /* +0x30A */ u8 field_0x30A;  /* the act's armed byte (`pl_act_reenter` sets
                                                    * 0xFF); `fn_80274570` tests it */
                     /* +0x30B */ u8 pad_0x30B;
                 };
@@ -635,11 +635,11 @@ struct _PLW {
     /* +0x36B */ u8 unk36B;
     /* +0x36C */ s16 field_0x36C;
     /* +0x36E */ u8 unk36E[0x370 - 0x36E];
-    /* +0x370 */ union { /* the health pair: current and cap, both signed 16-bit (`fn_8027628C`
+    /* +0x370 */ union { /* the health pair: current and cap, both signed 16-bit (`pl_act_add_hold_gauge`
                          * adds a signed delta to the current, `fn_80276690` moves the cap and clamps
                          * the current to it, and the reset sets current = cap) */
         /* +0x370 */ s16 health;      /* current health; clamped to [0, cap], and to >= 1 by the act
-                                       * path that takes `-0xA` damage through `fn_8027628C` */
+                                       * path that takes `-0xA` damage through `pl_act_add_hold_gauge` */
         /* +0x370 */ s16 field_0x370; /* the pre-merge spelling `Pl/fn_80262940.cpp` reads; this
                                        * branch's view of the same word is the act's current hold
                                        * gauge (`fn_80276690`) */
@@ -829,7 +829,7 @@ struct _PLW {
     /* +0x400 */ union {   /* one u16 pair; the pre-merge view is the single `unk400` run */
         /* +0x400 */ u8 unk400[0x404 - 0x400];
         struct {
-            /* +0x400 */ u16 field_0x400;   /* the guard/stamina timer family `Pl/fn_8024F200.cpp` resets */
+            /* +0x400 */ u16 field_0x400;   /* the guard/stamina timer family `Pl/pl_act_step.cpp` resets */
             /* +0x402 */ u16 field_0x402;
         };
     };
@@ -869,7 +869,7 @@ struct _PLW {
         /* +0x42E */ u8 pad_0x42E[0x16];
         struct {
             /* +0x42E */ u8 pad_0x42E_start[0x14];
-            /* +0x442 */ u16 field_0x442;  /* cleared by the act-state re-entry (`fn_80276238`) */
+            /* +0x442 */ u16 field_0x442;  /* cleared by the act-state re-entry (`pl_act_reenter`) */
         };
     };
     /* +0x444 */ s8 field_0x444;  /* the shell timer's re-arm countdown (`fn_80258FCC`) */
@@ -1060,7 +1060,7 @@ struct _PLW {
                                       * projection reads it as a signed per-frame step (its sign
                                       * selects the 45/35 degrees it adds), and `Pl/pl_act.cpp`
                                       * clamps its own copy of the same byte to +/-100 */
-    /* +0x584 */ union {   /* the pre-merge 0x14-byte run; the fn_8024F200 unit split it at +0x596
+    /* +0x584 */ union {   /* the pre-merge 0x14-byte run; the pl_act_step_offhand_gesture unit split it at +0x596
                            * and one later unit split its head - one member per offset (M3), so the
                            * +0x584 head pair is named once, in the second view below */
         /* +0x584 */ u8 pad_0x584[0x14];
@@ -1078,7 +1078,7 @@ struct _PLW {
         };
     };
     /* +0x598 */ u16 field_0x598;   /* the three act fields `fn_802DE578` is handed the address of
-                                    * (`Pl/fn_8024F200.cpp` reads it first, `Pl/fn_802489D4.cpp` too) */
+                                    * (`Pl/pl_act_step.cpp` reads it first, `Pl/fn_802489D4.cpp` too) */
     /* +0x59A */ union {   /* one u16, two spellings */
         /* +0x59A */ u8 pad_0x59A[0x2];
         /* +0x59A */ u16 field_0x59A;

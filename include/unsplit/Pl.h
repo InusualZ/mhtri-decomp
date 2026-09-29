@@ -30,11 +30,11 @@ s32 fn_802748C8(void* a);
 
 /* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
  * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x80258FCC-0x80262940 and
- * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home.  (`fn_80257E70`
- * moved to `Pl/fn_8024F200.h` when that unit claimed 0x8024F200-0x80258FCC.  The
+ * 0x80273B14-0x80276B58 / 0x8027D684-... , so this band header is their rule-2 home.  (`pl_act_guard_timer_reset`
+ * moved to `Pl/pl_act_step.h` when that unit claimed 0x8024F200-0x80258FCC.  The
  * `fn_8025FA00`/`fn_80260A18`/`fn_80261770`/`fn_802621B0`/`fn_80262688` declarations that stood here
  * are owned by `Pl/fn_8025F088.cpp` (proposal 8025F088, `.text` 0x8025F088-0x80262940) and live in
- * `Pl/fn_8025F088.h` - that unit's range, not `Pl/fn_8024F200.h`, covers their addresses.) */
+ * `Pl/fn_8025F088.h` - that unit's range, not `Pl/pl_act_step.h`, covers their addresses.) */
 /* `fn_802745DC`'s return is the owner's `u32` (`Pl/fn_80273B14.cpp`), not the pre-merge `u16`: the
  * callee's own body is byte-identical either way (every path ends in an `lhzx`/`li`), while the
  * landed caller `Pl/fn_8027D684.cpp`'s measured row needs the `u32` - retail materialises the
@@ -45,7 +45,7 @@ s32 fn_80274AB8(struct _PLW* self);  /* the owner's own definition (fn_80273B14.
 s32 fn_80276254(struct _PLW* self, s32 v);
 s32 fn_802764B0(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 s32 fn_80276514(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
-void fn_80275AC4(struct _PLW* self, s32 a, u16 b, u16 c);
+void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
 s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
 u32 fn_8027E220(struct _PLW* self, s32 v);
@@ -65,55 +65,55 @@ void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
 /* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
-/* The Pl helpers `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) and `Pl/fn_8024F200.cpp`
+/* The Pl helpers `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) and `Pl/pl_act_step.cpp`
  * (0x8024F200-0x80258FCC) call that sit in the band's unclaimed runs (0x802430E8-0x80258FCC and
  * 0x80273B14-0x80276B58; the third run main listed here, 0x802693C4-0x8026BA1C, is owned by
  * `Pl/fn_802693C4.cpp`).  This band header is their rule-2 home, and the C
  * linkage here is the map's (every name is a bare `fn_XXXXXXXX`).  Each signature is the owner's own
  * body where one exists, the call site's register width otherwise - one declaration serves both
  * consumers, so the widths are the ones the two units' call sites agree on.  The
- * `fn_8026A224`/`fn_8026A33C`/`fn_8026A644` trio moved into `Pl/fn_802693C4.h` with the unit that now
+ * `Pl_chr_set_attr_default`/`Pl_motion_end_ck`/`pl_part_flag_ck` trio moved into `Pl/fn_802693C4.h` with the unit that now
  * owns 0x802693C4-0x8026BA1C. */
 /* The second argument is `u16`: retail keeps the `clrlwi r4,r4,16` that narrows the `lis`/`subi`
  * constant at the `0x8001`/`0x8003` call sites, which MWCC only emits for a narrower parameter.
- * `Pl/fn_8024F200.cpp`'s calls pass 0/3, so the width is immaterial there. */
-void fn_80275B04(struct _PLW* self, u16 a, u32 b, u32 c);
-void fn_802761B8(struct _PLW* self, u32 a, u32 b, u32 c);
+ * `Pl/pl_act_step.cpp`'s calls pass 0/3, so the width is immaterial there. */
+void Pl_act_set_motion(struct _PLW* self, u16 a, u32 b, u32 c);
+void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c);
 void fn_80276868(struct _PLW* self, s16 value);
 u32 fn_80276800(struct _PLW* self, s32 v);
 
 /* The unclaimed `.data` tables this unit's act handlers index (no registered `.data` range covers
  * them, so - like the band's code - this header is their rule-2 home). */
-extern u32 lbl_805BE824[]; /* 0x805BE824 - the per-act SE/motion table `fn_802770E8` is handed */
+extern u32 lbl_805BE824[]; /* 0x805BE824 - the per-act SE/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805BE5B8[]; /* 0x805BE5B8 - the sibling table `fn_8024A640` is handed */
 extern u16 lbl_805C4A54[]; /* 0x805C4A54 - 3 rows of {u16 motion, u16 param} `fn_8024A8EC` reads */
 extern u16 lbl_805C4A60[]; /* 0x805C4A60 - the sibling motion row table `fn_8024B35C` indexes */
 extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024B46C` indexes */
-extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `fn_802770E8` is handed */
+extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805CAD74[]; /* 0x805CAD74 - the sibling table for the other actor kind */
 extern u32 lbl_805E2048[]; /* 0x805E2048 - the sibling table for the third actor kind */
 /* The `.sdata2` floats this band gates its frame checks on. */
-extern const f32 lbl_80799E00; /* 0x80799E00 - the zero/identity angle the Pl frame checks compare
-                                * against; `const` because `Pl/fn_8024F200.cpp` declares the same
+extern const f32 pl_float_zero; /* 0x80799E00 - the zero/identity angle the Pl frame checks compare
+                                * against; `const` because `Pl/pl_act_step.cpp` declares the same
                                 * pool word `const f32` in its own file (a bare `f32` redeclaration is
                                 * `(10563)`), and the pool is never written */
-extern const f32 lbl_80799E38;
+extern const f32 pl_frame_window_30;
 extern const f32 lbl_80799E48;
-extern const f32 lbl_80799E2C;
+extern const f32 pl_frame_window_2;
 extern const f32 lbl_80799E84;
 extern const f32 lbl_80799EAC;
 extern const f32 lbl_80799EB0;
 extern const f32 lbl_80799EB4;
-extern const f32 lbl_80799EC0;
+extern const f32 pl_float_1_5;
 extern const f32 lbl_80799EC4;
-extern const f32 lbl_80799E4C;
-extern const f32 lbl_80799E54;
+extern const f32 pl_frame_window_20;
+extern const f32 pl_frame_window_8;
 /* 0x805C4898 - the per-chunk rotation-offset pair table `Pl/fn_802430E8.cpp:fn_80246158` reads
  * (`chunk_ofs * 2` and `chunk_ofs * 2 + 1`); the `.data` run is unclaimed, so this band header is its
  * rule-2 home. */
 extern f32 lbl_805C4898[];
-extern const f32 lbl_80799E20; /* 0x80799E20 - the +1.0 angle `fn_80247CC4` rotates its motion vector by */
-extern const f32 lbl_80799E24; /* 0x80799E24 - the frame gate `fn_80247EF0` hands `Pl_frame_check` */
+extern const f32 pl_frame_window_3; /* 0x80799E20 - the +1.0 angle `fn_80247CC4` rotates its motion vector by */
+extern const f32 pl_frame_window_90; /* 0x80799E24 - the frame gate `fn_80247EF0` hands `Pl_frame_check` */
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
  * The 0x8026A3xx trio (`fn_8026A328`/`fn_8026A34C`/`fn_8026A3A0`) sits inside the range
@@ -206,23 +206,23 @@ void fn_802430E8(struct _PLW* self, u8 part);
 
 /* The 0x8026A224 / 0x8026A33C / 0x8026A644 group above is owned by `Pl/fn_802693C4.cpp` and declared
  * in `Pl/fn_802693C4.h`, which the three player-act consumers (`Pl/fn_802489D4.cpp`,
- * `Pl/fn_8024F200.cpp`, `Pl/fn_80258FCC.cpp`) include.  The 0x80275B04 / 0x802761B8 pair sits in the
+ * `Pl/pl_act_step.cpp`, `Pl/fn_80258FCC.cpp`) include.  The 0x80275B04 / 0x802761B8 pair sits in the
  * band's unclaimed run 0x80273B14-0x80276B58, so the band header is its rule-2 home; where the two
  * lanes spelled one argument differently the MAIN spelling is kept (M7). */
 
 /* The act tail's predicates and setters, called by `Pl/fn_80258FCC.cpp` (`.text`
- * 0x80258FCC-0x8025F088).  `fn_80245DA0` sits in the unclaimed run 0x802430E8-0x80258FCC, so the band
- * header is its rule-2 home; `fn_8026A3A8` sits inside `Pl/fn_802693C4.cpp`'s range and is declared
+ * 0x80258FCC-0x8025F088).  `pl_act_clear_wait` sits in the unclaimed run 0x802430E8-0x80258FCC, so the band
+ * header is its rule-2 home; `pl_act_set_cam_ang` sits inside `Pl/fn_802693C4.cpp`'s range and is declared
  * in `Pl/fn_802693C4.h`. */
 /* The return was `u32`; the owner's own body ends without ever setting r3 (the value callers would
  * read is `Pl_master_ck`'s), and `Pl/fn_80258FCC.cpp` drops it at all three call sites, so the
  * declaration is `void` (docs/plan.md 6.5 rule 2: the owner owns the spelling). */
-void fn_80245DA0(struct _PLW* self, u8 a);
+void pl_act_clear_wait(struct _PLW* self, u8 a);
 
 /* The act band's remaining Pl helpers, added with the rest of `Pl/fn_80258FCC.cpp`.  Each signature
  * is the callee's own body (its prologue's argument saves and the width it narrows them to), not a
  * guess from the call site. */
-void fn_80276238(struct _PLW* self, s32 a, s32 b, s32 c);
+void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
 u32 fn_8027D8A0(struct _PLW* self, s32 a);
 
 /* Pl-band callees and tables with no registered owner, added with `Pl/fn_80273B14.cpp`
@@ -256,7 +256,7 @@ extern const f32 lbl_8079A084;
  * signature here is that owner's (`include/Pl/fn_80273B14.h`) and not a second, differently-typed
  * spelling of it: two C-linkage declarations of one name with different parameter types are the
  * `illegal function overloading` class (rule 2).  The owner's `u16` third parameter is what
- * retail's own callers narrow to (`fn_80275AC4`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
+ * retail's own callers narrow to (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
  * reproduces the callee's own `clrlwi` on the mask. */
 void fn_802756F0(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
@@ -285,13 +285,13 @@ extern u16 lbl_805BFFE0[];
 
 /* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined - the run is
  * unclaimed, so this band header is their rule-2 home). */
-extern u8 lbl_805C4F5C[];  /* the per-act `.data` record `fn_802770E8` installs */
-extern const f32 lbl_80799E00;
-extern const f32 lbl_80799E2C;
+extern u8 lbl_805C4F5C[];  /* the per-act `.data` record `Pl_act_set_step_table` installs */
+extern const f32 pl_float_zero;
+extern const f32 pl_frame_window_2;
 extern const f32 lbl_80799EB0;
-extern const f32 lbl_80799F00;
-extern const f32 lbl_80799F04;
-extern const f32 lbl_80799F08;
+extern const f32 pl_frame_window_85;
+extern const f32 pl_float_neg60;
+extern const f32 pl_frame_window_5;
 
 /* The shell band `Pl/fn_802840DC.cpp` (`.text` 0x802840DC-0x80288CEC) reads these tables and
  * constants out of the band's unclaimed data runs, so this header is their rule-2 home.  Every name
@@ -303,7 +303,7 @@ extern const f32 lbl_80799F08;
 /* The band's own tables, all unclaimed: `lbl_805C9608` is the 0x1A-byte-row attack table
  * `Pl/pl_act.cpp`'s `fn_80277974` walks (its `base` argument), and the `ShellAtkRow` arrays below are
  * the per-shell-kind attack rows `fn_802842D4` is handed (`&row[kind]`, 0x12 bytes per row).  The
- * second run of labels are the `u32` tables `fn_802842D4` passes on to `fn_802770E8`.  Declared,
+ * second run of labels are the `u32` tables `fn_802842D4` passes on to `Pl_act_set_step_table`.  Declared,
  * never defined (invariant 8.4). */
 extern u8 lbl_805C9608[];
 extern s32 lbl_80792188[2]; /* 0x80792188 - the 8-byte id list (two zero-initialised ids) the attack
@@ -322,7 +322,7 @@ typedef struct ShellAtkRow {
     /* +0x04 */ s16 value_0x04; /* second set: the motion's second argument */
     /* +0x06 */ u16 add_0x06;   /* second set: frames added to the actor's own frame counters */
     /* +0x08 */ s16 gate_0x08;  /* > 0 arms the motion gate (`fn_80277C50`) with this value */
-    /* +0x0A */ u16 motion_0x0A;  /* first set: the motion `fn_8026A224` sets */
+    /* +0x0A */ u16 motion_0x0A;  /* first set: the motion `Pl_chr_set_attr_default` sets */
     /* +0x0C */ s16 param_0x0C;   /* first set: the motion's first argument */
     /* +0x0E */ s16 param_0x0E;   /* first set: the motion's second argument */
     /* +0x10 */ s16 attack_0x10;  /* first set: the attack value `fn_80284204` is run with */
@@ -339,7 +339,7 @@ extern ShellAtkRow lbl_805C9C1C[];
 extern ShellAtkRow lbl_805C9CAC[];
 extern ShellAtkRow lbl_805C9CD0[];
 
-/* The attack-row tables' companion records: `fn_802842D4` hands these to `fn_802770E8` as a `u32` and
+/* The attack-row tables' companion records: `fn_802842D4` hands these to `Pl_act_set_step_table` as a `u32` and
  * reads the `s16` at +0x8 of one as the row's motion gate. */
 extern u8 lbl_805C9DC8[];
 extern u8 lbl_805C9E4C[];

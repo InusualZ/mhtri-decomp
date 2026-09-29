@@ -30,31 +30,31 @@ void fn_802695A4(u8 player, void* equipA, void* equipB);
 u8 fn_802699AC(void);
 s16 fn_8026A00C(u16 id);
 s16 fn_8026A068(struct _PLW* self, u16 id);
-void fn_8026A224(struct _PLW* self, u16 motion, s32 a, s32 b);
+void Pl_chr_set_attr_default(struct _PLW* self, u16 motion, s32 a, s32 b);
 void fn_8026A230(struct _PLW* self, s32 a, u16 motion, s32 b, s32 c);
 void fn_8026A23C(struct _PLW* self, s32 index, f32 value);
 void fn_8026A2BC(struct _PLW* self);
 void fn_8026A2D0(struct _PLW* self, u8 value);
 void fn_8026A2DC(struct _PLW* self);
-void fn_8026A2EC(struct _PLW* self, u8 value);
+void pl_model_set_state(struct _PLW* self, u8 value);
 void fn_8026A2F8(struct _PLW* self);
 u32 fn_8026A328(struct _PLW* self, u16 frame, f32 a, f32 b);
-u32 fn_8026A33C(struct _PLW* self);
+u32 Pl_motion_end_ck(struct _PLW* self);
 f32 fn_8026A34C(struct _PLW* self);
-f32 fn_8026A358(struct _PLW* self);
+f32 pl_rig_get_float_a4(struct _PLW* self);
 u32 fn_8026A364(struct _PLW* self);
 void fn_8026A394(struct _PLW* self, s32 joint, nw4r::math::MTX34* out);
 u8 fn_8026A3A0(struct _PLW* self);
-void fn_8026A3A8(struct _PLW* self);
+void pl_act_set_cam_ang(struct _PLW* self);
 void fn_8026A4E4(struct _PLW* self);
 void fn_8026A518(struct _PLW* self);
 void fn_8026A570(struct _PLW* self);
 void fn_8026A590(struct _PLW* self);
 void fn_8026A618(struct _PLW* self, s32 id);
 /* The id-flag tests return the unsigned `u32` the map's base spelling and this unit's callers agree on:
- * `Pl/fn_802489D4.cpp`, `Pl/fn_8024F200.cpp` and `Pl/fn_80258FCC.cpp` compare `fn_8026A644(...) == 1`
+ * `Pl/fn_802489D4.cpp`, `Pl/pl_act_step.cpp` and `Pl/fn_80258FCC.cpp` compare `pl_part_flag_ck(...) == 1`
  * and retail performs a `cmplwi r3,1` there (`cmpwi` is the signed form). */
-u32 fn_8026A644(struct _PLW* self, s32 id);
+u32 pl_part_flag_ck(struct _PLW* self, s32 id);
 void fn_8026A678(struct _PLW* self, s32 id);
 s32 fn_8026A6A4(struct _PLW* self, s32 id);
 void fn_8026A6D8(struct _PLW* self, s32 id);
@@ -69,7 +69,7 @@ void fn_8026AF08(struct _PLW* self, u32 value);
 #ifdef __cplusplus
 }
 
-/* The mangled half (rule 9).  `Pl_chr_set_attr` takes the fifth `u32` argument `fn_8026A224` fills in
+/* The mangled half (rule 9).  `Pl_chr_set_attr` takes the fifth `u32` argument `Pl_chr_set_attr_default` fills in
  * with 0; `Pl_frame_check`/`fn_8026A328` ignore their two floats and pass a constant flag instead. */
 void set_com_motion_type(u8 type);
 u16 Get_motion_no(struct _PLW* self);
