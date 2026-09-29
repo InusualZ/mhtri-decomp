@@ -46,7 +46,7 @@ them before you form an opinion, and cite the rule number rather than your taste
 * `docs/plan.md` section 6.5 - the rules; the block below is generated from that table, so they cannot drift.
   `tools/units/stylelint.py` enforces rules 2, 7 and 11 on every landing, and `docs/plan.md` says which parts
   are grandfathered rather than fixed.
-* `docs/matching.md` - the playbook, indexed in `CLAUDE.md`. A finding like "this declaration set is
+* `docs/matching/` - the playbook, one file per idea, indexed in `docs/matching/index.md`. A finding like "this declaration set is
   load-bearing for codegen" is playbook 60, not a preference.
 * The unit's own file header, which is where this project records residuals, flag evidence and name provenance.
   Its conventions are stated in `CLAUDE.md`: one line per fact, no per-function inventory, no re-arguing the

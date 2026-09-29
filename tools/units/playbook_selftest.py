@@ -26,25 +26,19 @@ import playbook as pb  # noqa: E402
 AGENTS = """\
 # CLAUDE.md
 
-## Matching playbook (index of `docs/matching.md`)
+# Matching playbook - index
 
-| # | idea | problem it solves | status |
-| --- | --- | --- | --- |
-| 35 | A dead copy chain steers the allocator's web priority | Two webs sharing one register pair look unreachable from the source. | done |
-| 38 | An `s16` parameter with a compound assignment makes a narrow field store raw | A masked `stb`/`sth` means MWCC is narrowing the value to the field. | done |
+| # | idea | status | tags | problem |
+| --- | --- | --- | --- | --- |
+| 35 | [A dead copy chain steers the allocator's web priority](035-dead-copy-chain.md) | works | allocator | Two webs sharing one register pair look unreachable from the source. |
+| 38 | [An `s16` parameter with a compound assignment makes a narrow field store raw](038-s16.md) | works | | A masked `stb`/`sth` means MWCC is narrowing the value to the field. |
 """
 
-MATCHING = """\
-# Matching compiler flags
-
-## 35. A dead copy chain steers the allocator's web priority
-
-**Problem.** ...
-
-## 38. An `s16` parameter with a compound assignment is what makes a field store raw
-
-**Problem.** ...
-"""
+MATCHING_IDEAS = {
+    "035-dead-copy-chain.md": "---\nid: 35\ntitle: A dead copy chain steers the allocator's web priority\n---\n\n# 35.\n",
+    "038-s16.md": "---\nid: 38\ntitle: An `s16` parameter with a compound assignment is what makes a field store raw\n"
+                  "---\n\n# 38.\n",
+}
 
 
 def outbox(unit, worker, **kw):
@@ -66,7 +60,7 @@ def selftest() -> int:
     def check_true(name, got):
         check(name, bool(got), True)
 
-    rows = pb.existing_rows(AGENTS, MATCHING)
+    rows = pb.existing_rows(AGENTS, os.path.join(tempfile.mkdtemp(prefix="pb-none-"), "absent"))
 
     # --- pure helpers ------------------------------------------------------------------------------
     check("tokens strip backticks/stopwords", "s16" in pb.tokens("An `s16` parameter with a compound"), True)
@@ -107,9 +101,11 @@ def selftest() -> int:
     os.makedirs(obx)
     os.makedirs(notes)
     agents_p = os.path.join(tmp, "CLAUDE.md")
-    matching_p = os.path.join(tmp, "matching.md")
+    matching_p = os.path.join(tmp, "matching")
+    os.makedirs(matching_p)
+    for _n, _t in MATCHING_IDEAS.items():
+        open(os.path.join(matching_p, _n), "w", encoding="utf-8").write(_t)
     open(agents_p, "w", encoding="utf-8").write(AGENTS)
-    open(matching_p, "w", encoding="utf-8").write(MATCHING)
 
     fixtures = {
         "a.json": outbox("auto/A", "w1",
@@ -207,7 +203,7 @@ def selftest() -> int:
 
     # --- rendering ---------------------------------------------------------------------------------
     sec = pb.render_section(peep, 39)
-    for needle in ("## 39.", "**Problem.**", "**Why try it.**", "**Result.**", "**Example.**",
+    for needle in ("id: 39", "# 39.", "tags: [", "**Problem.**", "**Why try it.**", "**Result.**", "**Example.**",
                    "auto/A", "auto/B", "auto/C", "auto/D"):
         check_true("section contains %s" % needle, needle in sec)
     row = pb.render_agents_row(peep, 39)
@@ -218,13 +214,15 @@ def selftest() -> int:
 
     # --- end-to-end run ----------------------------------------------------------------------------
     h_before = hashlib.sha1(open(agents_p, "rb").read()).hexdigest()
-    m_before = hashlib.sha1(open(matching_p, "rb").read()).hexdigest()
+    m_before = sorted((f, hashlib.sha1(open(os.path.join(matching_p, f), "rb").read()).hexdigest())
+                      for f in os.listdir(matching_p))
     report = pb.run(obx, notes, drafts, matching_p, agents_p, write=True)
     check("next row is 39", report["next_row"], 39)
     check("rows drafted", report["rows_drafted"], len(ready))
     check("duplicates merged", report["duplicates_merged"], sum(len(g.findings) - 1 for g in ready))
     check("docs/matching.md untouched",
-          hashlib.sha1(open(matching_p, "rb").read()).hexdigest(), m_before)
+          sorted((f, hashlib.sha1(open(os.path.join(matching_p, f), "rb").read()).hexdigest())
+                 for f in os.listdir(matching_p)), m_before)
     check("CLAUDE.md untouched",
           hashlib.sha1(open(agents_p, "rb").read()).hexdigest(), h_before)
     files = set(os.listdir(drafts))

@@ -1,9 +1,4 @@
-<!-- GENERATED FILE - do not edit.
-     Source: docs/matching.md
-     Regenerate: python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py
--->
-
-## Ruled out - do not re-run these
+# Ruled out - do not re-run these
 
 * **Compiler version.** Compile the matrix once for the unit; if it is flat, version is not the lever.
 * **The whole `-opt` axis.** Sweep the compiler's own keyword list once. Beyond the one or two keywords

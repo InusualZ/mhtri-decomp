@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """Fixture tests for tools/agents/sync_playbook_index.py.
 
-The tool exists so the index in the skill cannot drift from `docs/matching.md` a second time, so the tests are
-about the drift classes that actually happened plus the ones that must refuse:
-
-* a section number appearing twice (the duplicate 48 that made "playbook 48" ambiguous),
-* a section with no problem paragraph in either house style,
-* the file's physical order not being numeric order (47, 51, 73, 52... in today's plan),
-* a target with no marker pair, or with the markers reversed or duplicated,
-* and the real tree: today's plan must be clean and the skill index must be in sync with it.
+The index is generated from the front matter of docs/matching/NNN-slug.md, so the tests are about the classes
+that must refuse (a duplicate id, a missing or malformed key, an unknown tag or status, a file-name/front-matter
+mismatch, a demo naming a missing file), about ordering and escaping in the generated table, about `--where`
+and `--json`, and about the real tree: it must be clean and index.md must be in sync.
 
     python tools/agents/sync_playbook_index_selftest.py
 """
 import argparse
+import io
+import contextlib
+import json
 import os
 import sys
 import tempfile
@@ -29,133 +28,144 @@ def check(name, got, want):
     return ok
 
 
-def fixture(plan, target_lines):
-    """A throwaway repo: configure.py (for the root walk), docs/matching.md, the skill index."""
+def idea_text(n, title="An idea", status="works", problem="A problem.", tags="[flags]", applies="[]", demo="",
+              extra=None, drop=None):
+    kv = [("id", str(n)), ("title", title), ("status", status), ("problem", problem), ("tags", tags),
+          ("applies", applies), ("demo", demo)]
+    lines = ["---"]
+    for k, v in kv:
+        if drop == k:
+            continue
+        lines.append("%s: %s" % (k, v) if v else "%s:" % k)
+    if extra:
+        lines.append(extra)
+    lines += ["---", "", "# %d. %s" % (n, title), "", "**Problem.** %s" % problem, ""]
+    return "\n".join(lines)
+
+
+def fixture(files):
+    """A throwaway repo: configure.py (for the root walk) and docs/matching/<name>: <text>."""
     root = tempfile.mkdtemp(prefix="spi-selftest-")
-    os.makedirs(os.path.join(root, "docs"))
+    os.makedirs(os.path.join(root, "docs", "matching"))
     open(os.path.join(root, "configure.py"), "w").close()
-    open(os.path.join(root, "docs", "matching.md"), "w", encoding="utf-8", newline="").write(plan)
-    os.makedirs(os.path.dirname(os.path.join(root, spi.TARGET_REL)))
-    open(os.path.join(root, spi.TARGET_REL), "w", encoding="utf-8", newline="").write(
-        (chr(13) + chr(10)).join(target_lines))
+    for name, text in files.items():
+        with open(os.path.join(root, "docs", "matching", name), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
     return root
 
 
 def args(root, **kw):
-    a = argparse.Namespace(check=False, print_block=False, repo=root)
+    a = argparse.Namespace(check=False, print_block=False, repo=root, where=None, json=False)
     for k, v in kw.items():
         setattr(a, k, v)
     return a
 
 
-PLAN = (chr(13) + chr(10)).join([
-    "## 3. The third idea",
-    "",
-    "**Problem.** The third problem, in one line.",
-    "",
-    "**Why it happens.** Because.",
-    "",
-    "## 1. The first idea",
-    "",
-    "Problem: the first problem, in the older house style, and it | holds a pipe.",
-    "",
-    "## 2. The second idea",
-    "",
-    "**Problem.** The second problem.",
-    "",
-])
+def run(root, **kw):
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        rc = spi.cmd_sync(args(root, **kw))
+    return rc, out.getvalue(), err.getvalue()
 
-TARGET = [
-    "# CLAUDE.md",
-    "",
-    spi.BEGIN,
-    "stale contents",
-    spi.END,
-    "",
-    "## After the block",
-]
+
+def defects_of(files):
+    return spi.load_ideas(fixture(files))[1]
+
+
+GOOD = {
+    "003-third-idea.md": idea_text(3, "The third idea", problem="The third | problem, with a pipe.", tags="[pragma, data]"),
+    "001-first-idea.md": idea_text(1, "The first idea", problem="the first problem: lower-case start."),
+    "002-second-idea.md": idea_text(2, "The second idea", tags="[]", applies="[Wii/1.3]"),
+    "README.md": "# not an idea\n",
+}
 
 # ---- parsing ---------------------------------------------------------------------------------------------
-sections, order = spi.parse_sections(PLAN)
-check("parse: order is the file's order", order, [3, 1, 2])
-check("parse: titles", [sections[n]["title"] for n in (1, 2, 3)],
-      ["The first idea", "The second idea", "The third idea"])
-check("parse: `**Problem.**` paragraph", spi.problem_sentence(sections[2]["body"]), "The second problem.")
-check("parse: older `Problem:` line", spi.problem_sentence(sections[1]["body"]),
-      "the first problem, in the older house style, and it | holds a pipe.")
-check("parse: clean fixture has no defects", spi.shape_defects(sections, order), [])
+fm, body = spi.parse_front_matter(idea_text(7, problem="a: b \"quoted\" c"))
+check("front matter: value read raw (colon and quotes kept)", fm["problem"], 'a: b "quoted" c')
+check("front matter: empty demo is empty", fm["demo"], "")
+check("front matter: body starts after the block", body.startswith("\n# 7."), True)
+check("front matter: CRLF accepted", spi.parse_front_matter(idea_text(7).replace("\n", "\r\n"))[0]["id"], "7")
+check("tags: bracket list", spi.parse_list("[a, b]"), ["a", "b"])
+check("tags: empty list", spi.parse_list("[]"), [])
+check("tags: not a list", spi.parse_list("a, b"), None)
+check("problem_sentence: continuation lines joined",
+      spi.problem_sentence(["", "**Problem.** one", "two", "", "x"]), "one two")
 
-# ---- the generated block --------------------------------------------------------------------------------
-block = spi.build_block(sections)
-rows = [ln for ln in block.split(chr(10))
-        if ln.startswith("| ") and not ln.startswith("| # ") and "---" not in ln]
-check("block: rows are sorted by number, not file order", [r.split("|")[1].strip() for r in rows], ["1", "2", "3"])
-check("block: a pipe in the problem sentence is escaped", "holds a pipe" in rows[0] and
-      spi.BS + "|" in rows[0], True)
-check("block: starts with the BEGIN marker", block.split(chr(10))[0], spi.BEGIN)
-check("block: ends with the END marker", block.rstrip(chr(10)).split(chr(10))[-1], spi.END)
+# ---- the good fixture --------------------------------------------------------------------------------------
+root = fixture(GOOD)
+ideas, defects = spi.load_ideas(root)
+check("good: no defects", defects, [])
+check("good: sorted by id, README ignored", [i["id"] for i in ideas], [1, 2, 3])
+block = spi.build_index(ideas)
+rows = [ln for ln in block.split("\n") if ln.startswith("| ") and not ln.startswith("| # ") and "---" not in ln]
+check("index: rows sorted by id", [r.split("|")[1].strip() for r in rows], ["1", "2", "3"])
+check("index: pipe in the problem escaped", spi.BS + "|" in rows[2], True)
+check("index: problem capitalised", "Lower-case start" not in rows[0] and "The first problem" in rows[0], True)
+check("index: title links to its file", "[The first idea](001-first-idea.md)" in rows[0], True)
+check("index: tags column", "| pragma, data |" in rows[2], True)
+check("index: starts with the generated banner", block.split("\n")[0], spi.BEGIN)
+check("index: 220-char cap with ellipsis",
+      spi.cell("word " * 80).endswith("...") and len(spi.cell("word " * 80)) <= spi.CELL_CAP + 3, True)
 
-# ---- refusals -------------------------------------------------------------------------------------------
-dupe, dupe_order = spi.parse_sections(PLAN + (chr(13) + chr(10)).join(["", "## 3. The third idea again", "",
-                                                                      "**Problem.** A clash."]))
-defects = spi.shape_defects(dupe, dupe_order)
-check("refuse: a duplicate section number is named with its count",
-      any("section 3 appears 2 times" in d for d in defects), True)
+# ---- refusals ----------------------------------------------------------------------------------------------
+dup = dict(GOOD)
+dup["003-again.md"] = idea_text(3, "Clash")
+check("refuse: duplicate id named with its files",
+      any("id 3 appears 2 times" in d and "003-again.md" in d for d in defects_of(dup)), True)
+for label, files, want in (
+        ("missing key", {"001-a.md": idea_text(1, drop="problem")}, "key `problem` is missing"),
+        ("unknown key", {"001-a.md": idea_text(1, extra="colour: red")}, "unknown front-matter key `colour`"),
+        ("unknown tag", {"001-a.md": idea_text(1, tags="[flags, bogus]")}, "unknown tag `bogus`"),
+        ("bad status", {"001-a.md": idea_text(1, status="maybe")}, "status `maybe`"),
+        ("tags not a list", {"001-a.md": idea_text(1, tags="flags")}, "tags must be a bracket list"),
+        ("id/name mismatch", {"005-a.md": idea_text(6)}, "does not match front-matter id 6"),
+        ("bad file name", {"001-Bad_Slug.md": idea_text(1)}, "is not `NNN-slug.md`"),
+        ("no front matter", {"001-a.md": "# 1. no fm\n"}, "no front matter"),
+        ("unclosed front matter", {"001-a.md": "---\nid: 1"}, "never closed"),
+        ("empty problem", {"001-a.md": idea_text(1, problem="")}, "empty problem"),
+        ("demo names a missing file", {"001-a.md": idea_text(1, demo="001-a.cpp")}, "missing file `001-a.cpp`"),
+        ("demo of another id", {"001-a.md": idea_text(1, demo="002-x.cpp"), "002-x.cpp": ""}, "must be a `001-*` file"),
+        ("empty dir", {}, "no NNN-slug.md idea file")):
+    check("refuse: %s" % label, any(want in d for d in defects_of(files)), True)
+check("accept: a demo that exists", defects_of({"001-a.md": idea_text(1, demo="001-a.cpp"), "001-a.cpp": "int x;\n"}), [])
+check("refuse: a missing docs/matching dir",
+      spi.load_ideas(tempfile.mkdtemp(prefix="spi-empty-"))[1], ["docs/matching does not exist"])
 
-noprob, noprob_order = spi.parse_sections((chr(13) + chr(10)).join(["## 7. No problem here", "", "Just prose."]))
-defects = spi.shape_defects(noprob, noprob_order)
-check("refuse: a section with no problem sentence is named",
-      any("section 7 has neither" in d for d in defects), True)
-
-check("refuse: an empty plan is a shape change",
-      any("shape changed" in d for d in spi.shape_defects({}, [])), True)
-
-for name, lines, want in (
-        ("no markers", ["# CLAUDE.md", "", "no block"], "no playbook-index marker pair"),
-        ("markers reversed", ["# CLAUDE.md", spi.END, "x", spi.BEGIN], "comes before the BEGIN marker"),
-        ("markers duplicated", [spi.BEGIN, spi.END, spi.BEGIN, spi.END], "appears more than once")):
-    try:
-        spi.splice((chr(13) + chr(10)).join(lines), block)
-        got = "no refusal"
-    except SystemExit as e:
-        got = str(e)
-    check("refuse: %s" % name, want in got, True)
-
-# ---- cell() ---------------------------------------------------------------------------------------------
-check("cell: collapses newlines", spi.cell("a" + chr(10) + "  b"), "a b")
-check("cell: caps at a word boundary",
-      spi.cell("word " * 80).endswith("..."), True)
-check("cell: a cap never splits a word", "wor..." not in spi.cell("word " * 80), True)
-
-# ---- end to end on a fixture ---------------------------------------------------------------------------
-root = fixture(PLAN, TARGET)
-check("e2e: write reports an update", spi.cmd_sync(args(root)), 0)
-check("e2e: the block was replaced and the rest kept", "stale contents" in spi.read(os.path.join(root, spi.TARGET_REL)),
-      False)
-check("e2e: the surrounding file survived", "## After the block" in spi.read(os.path.join(root, spi.TARGET_REL)), True)
-check("e2e: CRLF preserved", chr(13) + chr(10) in spi.read(os.path.join(root, spi.TARGET_REL)), True)
-check("e2e: --check now passes", spi.cmd_sync(args(root, check=True)), 0)
-txt = spi.read(os.path.join(root, spi.TARGET_REL)).replace("The second problem.", "tampered", 1)
-open(os.path.join(root, spi.TARGET_REL), "w", encoding="utf-8", newline="").write(txt)
-check("e2e: --check fails once the target is stale", spi.cmd_sync(args(root, check=True)), 1)
+# ---- end to end ----------------------------------------------------------------------------------------------
+root = fixture(GOOD)
+rc, out, err = run(root)
+check("e2e: write reports an update", (rc, "updated" in out), (0, True))
+target = os.path.join(root, "docs", "matching", "index.md")
+check("e2e: index.md written", os.path.isfile(target), True)
+check("e2e: --check passes", run(root, check=True)[0], 0)
+check("e2e: index.md is not itself parsed as an idea", spi.load_ideas(root)[1], [])
+with open(target, "a", encoding="utf-8", newline="") as f:
+    f.write("tampered\n")
+check("e2e: --check fails once index.md is stale", run(root, check=True)[0], 1)
+check("e2e: a second write repairs it", (run(root)[0], run(root, check=True)[0]), (0, 0))
+rc, out, err = run(root, where=2)
+check("where: prints the path", (rc, out.strip()), (0, "docs/matching/002-second-idea.md"))
+rc, out, err = run(root, where=99)
+check("where: unknown id exits 1", (rc, out, "no idea 99" in err), (1, "", True))
+rc, out, err = run(root, json=True)
+check("json: parsed index", [(i["id"], i["file"]) for i in json.loads(out)],
+      [(1, "001-first-idea.md"), (2, "002-second-idea.md"), (3, "003-third-idea.md")])
+bad = fixture(dup)
+rc, out, err = run(bad)
+check("e2e: a refusal writes nothing and exits 1",
+      (rc, os.path.exists(os.path.join(bad, "docs", "matching", "index.md"))), (1, False))
 
 # ---- the real tree -------------------------------------------------------------------------------------
 real = spi.find_root()
-real_sections, real_order = spi.parse_sections(spi.read(os.path.join(real, spi.PLAN_REL)))
+real_ideas, real_defects = spi.load_ideas(real)
+check("real: docs/matching parses with no defect", real_defects, [])
+check("real: ids are unique and contiguous from 1",
+      [i["id"] for i in real_ideas] == list(range(1, len(real_ideas) + 1)), True)
 try:
-    real_defects = spi.shape_defects(real_sections, real_order)
-except Exception as e:  # a parse crash is itself a defect to report
-    real_defects = [str(e)]
-check("real: docs/matching.md parses with no defect (no duplicate number, every section has a problem)",
-      real_defects, [])
-check("real: section numbers are unique and contiguous from 1",
-      sorted(real_sections) == list(range(1, len(real_sections) + 1)), True)
-real_target = spi.read(os.path.join(real, spi.TARGET_REL))
-try:
-    got = spi.splice(real_target, spi.build_block(real_sections))
-except SystemExit as e:  # no marker pair yet is a defect to report, not a crash
-    got = str(e)
-check("real: the skill's references/index.md is in sync with the plan", got, real_target)
+    have = spi.read(os.path.join(real, *spi.TARGET_REL.split("/")))
+except OSError:
+    have = None
+check("real: docs/matching/index.md is in sync with the idea files", have, spi.build_index(real_ideas))
 
 failed = [r for r in RESULTS if not r[1]]
 for name, ok, got, want in RESULTS:
