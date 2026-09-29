@@ -823,6 +823,42 @@ def selftest() -> int:
           at.input_fingerprints(at.Layout(Path(tmp) / "nope", Path(tmp) / "nope2", Path(tmp)))["splits_sha1"],
           None)
 
+    # --- data-order seams (docs/data-order-seams.md): `.data` evidence attached to a proposal --------
+    import dataorder as _do
+    S = _do.Sym
+    syms = [S(0x100, 0x40, "vt_a", _do.VTABLE, 0x1100), S(0x140, 0x10, "str_a", _do.STRING),
+            S(0x150, 0x40, "vt_b", _do.VTABLE, 0x1200), S(0x190, 0x40, "vt_c", _do.VTABLE, 0x1300),
+            S(0x1D0, 0x40, "vt_d", _do.VTABLE, 0x1280), S(0x210, 0x20, "blob", _do.DATA)]
+    recs = at.data_seam_records(syms)
+    check("seams: the records are dataorder's seams, none re-derived",
+          [(r["addr"], r["kind"]) for r in recs],
+          [(x["addr"], x["kind"]) for x in _do.seams(syms)])
+    check("seams: owners attached (zigzag both, V->S before only)",
+          [(r["kind"], r["before_owner"], r["after_owner"]) for r in recs],
+          [("V->S", 0x1100, None), ("zigzag", 0x1200, 0x1300), ("V->D", 0x1280, None)])
+    dense = {".data": {"start": 0x100, "end": 0x250, "density": 0.9}}
+    got = at.data_seams_for([0x1000, 0x2000], dense, recs)
+    check("seams: interior strong seams give the lower bound", got["min_tus"], 3)
+    check("seams: an interior V->D is weak, not counted", got["weak"], 1)
+    check("seams: a V->S cut is after the owner, a zigzag cut is between the owners",
+          [i.get("cut") for i in got["seams"]],
+          [{"after": 0x1100}, {"between": [0x1200, 0x1300]}, {"after": 0x1280}])
+    sparse = {".data": {"start": 0x100, "end": 0x250, "density": 0.2}}
+    got = at.data_seams_for([0x1000, 0x1250], sparse, recs)
+    check("seams: a sparse run is no evidence - only owners inside the text bear on it",
+          [(i["addr"], i["interior"]) for i in got["seams"]], [(0x140, False), (0x190, False)])
+    check("seams: ... and an edge never raises the lower bound", got["min_tus"], 1)
+    check("seams: owners outside the range and no run -> nothing",
+          at.data_seams_for([0x5000, 0x6000], {}, recs), None)
+    check("seams: a seam exactly at the run's start is not interior",
+          at.data_seams_for([0x5000, 0x6000], {".data": {"start": 0x140, "end": 0x141, "density": 1.0}}, recs), None)
+    check("seams: no records is no evidence", at.data_seams_for([0x1000, 0x2000], dense, None), None)
+    check("seams: propose() attaches data_seams only when a seam bears on the proposal",
+          ["data_seams" in p for p in at.propose(fake_an(FUNCS), {}, {}, {}, 0x1000, whole_end, min_bytes=0,
+                                                 max_bytes=0x4000, claimed=[], seam_records=[])], [False])
+    check("seams: the dataseams subcommand is read-only and has no region arguments",
+          at.build_parser().parse_args(["dataseams"]).cmd, "dataseams")
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
