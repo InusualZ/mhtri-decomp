@@ -147,7 +147,7 @@ SLOT_MARKER = ".used"
 #: three *tooling* lanes carried unit policy they could never satisfy and a general rule they must not
 #: break (AGENTS.md, "Operational mode").  The mapping is exhaustive - one kind per lane, never a guess.
 KIND_PROFILE = {
-    "unit": "decompiler",     # register a proposal at its final home and reconstruct its bodies
+    "unit": "surveyor",       # survey a claim, then reconstruct - the four-leg unit loop and reconstruct its bodies
     "fix": "fixer",           # a refused gate or a measured regression on a branch
     "merge": "merger",        # a refused apply
     "tooling": "worker",      # the fallback for a task that is none of the specific ones
@@ -2607,7 +2607,7 @@ def selftest() -> int:
         # (the defect: the launcher left both choices to the lane, and three tooling lanes were told
         # `decompiler` - unit policy they could never satisfy. `spawn` makes both explicit.)
         check("the kind mapping is the whole table", KIND_PROFILE,
-              {"unit": "decompiler", "fix": "fixer", "merge": "merger", "tooling": "worker",
+              {"unit": "surveyor", "fix": "fixer", "merge": "merger", "tooling": "worker",
                "docs": "worker", "review": "codereviewer", "scout": "scout", "plan": "planner"})
         check("PROFILES is the table's values, not a second copy", PROFILES,
               tuple(sorted(set(KIND_PROFILE.values()))))
