@@ -843,10 +843,20 @@ struct _PLW {
                                 /* +0x404 */ s16 field_0x404;
         };
     };
-    /* +0x406 */ u8 unk406[0x40E - 0x406];
+    /* +0x406 */ union {   /* the pre-merge 8-byte run, recut by the act unit (same byte total) */
+        /* +0x406 */ u8 unk406[0x40E - 0x406];
+        struct {   /* the four timer words the act-84 entry clears; all four are `u16` at the
+                    * access (`sth`) and the entry is the only writer */
+            /* +0x406 */ u16 field_0x406;
+            /* +0x408 */ u16 field_0x408;
+            /* +0x40A */ u16 field_0x40A;
+            /* +0x40C */ u16 field_0x40C;
+        };
+    };
     /* +0x40E */ s16 unk40E;
     /* +0x410 */ union {   /* the 4-byte run 0x410-0x413, with the act's re-arm word inside */
         /* +0x410 */ u8 unk410[0x414 - 0x410];
+        /* +0x410 */ u16 field_0x410;  /* the second timer pair's first word (`Pl/pl_act_step.cpp`) */
         struct {
             /* +0x410 */ u8 pad_0x410[0x2];
             /* +0x412 */ s16 field_0x412;  /* the hold-gauge re-arm word `Pl_act_state_ck` tests */
@@ -859,7 +869,10 @@ struct _PLW {
     /* +0x41C */ s16 field_0x41C;
     /* +0x41E */ s16 field_0x41E;         /* second shell timer, cleared by `fn_802656EC` */
     /* +0x420 */ s16 unk420;
-    /* +0x422 */ s16 unk422;
+    /* +0x422 */ union {
+        /* +0x422 */ s16 unk422;
+        /* +0x422 */ u16 field_0x422;  /* one of the timer pair the act-84 entry clears */
+    };
     /* +0x424 */ s16 unk424;
     /* +0x426 */ s16 unk426;
     /* +0x428 */ s16 unk428;
@@ -868,7 +881,14 @@ struct _PLW {
     /* +0x42E */ union {   /* the 0x16-byte run 0x42E-0x443, with the act-end word inside it */
         /* +0x42E */ u8 pad_0x42E[0x16];
         struct {
-            /* +0x42E */ u8 pad_0x42E_start[0x14];
+            /* +0x42E */ u16 field_0x42E;   /* the five-word timer run the act-84 entry clears; the
+                                            * access is a raw `sth` and nothing reads them else-
+                                            * where, so the width is taken from the store */
+            /* +0x430 */ u16 field_0x430;
+            /* +0x432 */ u16 field_0x432;
+            /* +0x434 */ u16 field_0x434;
+            /* +0x436 */ u16 field_0x436;
+            /* +0x438 */ u8 pad_0x438[0xA];
             /* +0x442 */ u16 field_0x442;  /* cleared by the act-state re-entry (`pl_act_reenter`) */
         };
     };

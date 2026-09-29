@@ -1912,6 +1912,17 @@ config.libs = [
             # whole band), so the stem is the map's `fn_8024F200` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
             Object(NonMatching, "Pl/pl_act_step.cpp"),
+            # A **data-only** unit (owner's routing, 2026-09-30): it owns the Pl band's shared
+            # `.sdata2` frame-window/float pool, 0x80799E00-0x80799F98 (408 B, the exact extent of
+            # the map's `pl_*` `.sdata2` rows), and its source defines nothing.  The run is the MWLD
+            # merge of several Pl objects' own pools (one word is read by several TUs), so no single
+            # consumer can emit it; giving it one owner is what lets the ~20 `_PLW` consumers
+            # include `Pl/pl_frame_data.h` instead of declaring the words into their own file, which
+            # is the rule-12 finding, and what keeps dtk from creating an anonymous
+            # `auto_*_sdata2` unit over the same band.  Measured: moving the claim here from
+            # `Pl/pl_act_step.cpp` left every row of the whole-project report unchanged and
+            # `ninja build/RMHE08/ok` green.
+            Object(NonMatching, "Pl/pl_frame_data.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802693C4_fn_802693C4` - the player part/motion cluster (0x802693C4-0x8026BA1C, 63
             # functions, 9816 B) with its own exception tables (extab 0x80012554-0x8001265C,

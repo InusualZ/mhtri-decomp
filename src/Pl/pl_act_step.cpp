@@ -37,6 +37,17 @@
  *     (1, 2, or 3);
  *   * `pl_act_guard_timer_reset` (0x80257E70) - zeroes the two running guard timers and re-arms the
  *     third at 30 frames.
+ *   * round 2, all class-4 GUESSes: `pl_act_step_84` (0x802504BC) - act 84, the only act id the
+ *     dispatcher table gives that address; `pl_act_guard_gauge_adjust` (0x80252AEC) - steps
+ *     `_PLW+0x0AC` (the guard gauge `pl_act_step_89` also clears) by the caller's two part flags and
+ *     clamps it; `pl_act_arm_motion_and_flag` (0x802552F0) - arms a motion plus one of two flags and
+ *     the actor mode, shared by the eleven weapon-act handlers above it; `pl_act_charge_repeat_step`
+ *     (0x802574E4) - runs one repeat of the caller's six-part charge motion; `pl_act_countdown_step`
+ *     (0x80257DA4) - arms attribute 26 with a 40/80-frame countdown; `pl_act_step_attr_1007` /
+ *     `_1056` / `_1018` (0x8025553C / 0x80255E08 / 0x802562EC) and `pl_act_step_attr_112`
+ *     (0x80253FF8) - the three-step weapon-act handlers, named from the attribute their arming step
+ *     passes `Pl_chr_set_attr_default` (they are not in the act dispatch table; `fn_802564B0`'s
+ *     `jumptable_805C4EB0` is what reaches the first three).
  *
  * Names this unit renamed in other units (the band's core API; every one is a **GUESS** derived from
  * the callee's own body, and the owner's header carries the declaration - rule 2):
@@ -62,7 +73,7 @@
  * the set the sibling Pl units measure with.  The per-part argument is `s32`, not `u8`: retail
  * compares it with `cmpwi r4,0` and never masks it, which a `u8` declaration cannot produce.
  *
- * Residual (12 of the range's 92 functions are written; the other 80 have no body yet).  Measured
+ * Residual (20 of the range's 92 functions are written; the other 72 have no body yet).  Measured
  * with `unitscore.py Pl/pl_act_step`: unchanged by the naming pass (a rename moves an objdiff score
  * only through a relocation name).
  *   * `pl_act_step_offhand_gesture` 99.91 - `.text` (260 insns), `extab` and `extabindex` are byte-identical; the
@@ -82,19 +93,51 @@
  *   * the seven bodies added with the naming pass are all at 100.00 (`pl_act_step_86` 184 B,
  *     `pl_act_step_89` 280 B, `pl_act_step_94` 212 B, `pl_act_step_175` 200 B, `pl_act_step_151`
  *     168 B, `pl_act_step_timer_wait` 172 B, `pl_act_gauge_gate_by_skill` 84 B).
- *   * **three more bodies are written and measured but deliberately not in this change**:
- *     `pl_act_step_135` (396 B, acts 135/137), `pl_act_step_121` (348 B, act 121) and
- *     `pl_act_step_arm_table` (176 B) each load a pool/tables symbol this file does not already
- *     declare (`pl_frame_window_44` `.sdata2:0x80799E40`, `pl_frame_window_46` `.sdata2:0x80799EF4`,
- *     `pl_act_step_table_247` `.data:0x805BEBEC`).  All three are unowned - no registered
- *     `splits.txt` range covers them - so declaring one is a *new* rule-12 finding in whichever file
- *     holds it (and a rule-2 finding if that file is a `src/`), and the gate refuses a batch that
- *     adds one.  The unit's local declaration block already spends its whole budget on the eight
- *     pool words the pre-existing bodies use, so the three need a batch of their own - the same
- *     batch that claims the `.sdata2` run (playbook 23 forbids a partial claim) or that adds them
- *     while removing an equal number of unowned-data declarations elsewhere.
- *   * the 74 `.sdata2` floats the range reads (`pl_float_zero`...`pl_frame_window_50`) are unowned: they are
- *     named in the map but **not claimed** - a partial `.sdata2` claim does not link (playbook 23).
+ *   * the eleven further bodies added in round 2 are all at 100.00: `pl_act_step_84` (272 B, act 84),
+ *     `pl_act_step_attr_112` (308 B), `pl_act_guard_gauge_adjust` (296 B), `pl_act_arm_motion_and_flag`
+ *     (152 B), `pl_act_charge_repeat_step` (596 B), `pl_act_countdown_step` (204 B), `pl_act_step_attr_1007`
+ *     (144 B), `pl_act_step_attr_1056` (144 B), `pl_act_step_attr_1018` (144 B), plus the two the
+ *     previous pass wrote and held back for want of a pool word - `pl_act_step_121` (348 B, act 121)
+ *     and `pl_act_step_135` (396 B, acts 135/137).
+ *   * **the Pl band's shared `.sdata2` pool now has a named owner**, which is what unblocked every
+ *     body in round 2.  Rule 12 counts findings per (rule, file) and all eight of this file's pool
+ *     `extern`s resolved to `unsplit`, so its count was 8 and **any** new pool declaration was
+ *     refused by construction.  Route taken: the run `0x80799E00..0x80799F98` (408 B, the exact
+ *     extent of the map's `pl_*` `.sdata2` rows) is claimed by the **data-only unit
+ *     `Pl/pl_frame_data.cpp`**, and this unit reads the words through its header
+ *     (`Pl/pl_frame_data.h`, included above) instead of declaring them locally.  That is the right
+ *     shape rather than this unit holding the claim itself: the run is the MWLD *merge* of several
+ *     Pl objects' own pools (`Pl/fn_802430E8.cpp`, `Pl/fn_802489D4.cpp`, `Pl/fn_80258FCC.cpp`,
+ *     `Pl/fn_8025F088.cpp` and this unit all read the same addresses - `callers.py 0x80799E40`
+ *     answers 7 sites in 5 functions across 3 objects), so no single consumer can own or emit it,
+ *     and the owner unit gives every one of those ~20 consumers somewhere to declare into.
+ *     Measured, both when this unit held the claim and when it moved to the owner unit: **every row
+ *     of the whole-project report is unchanged** (the 408 B of `total_data` simply changes unit; the
+ *     only new report rows are the owner unit and the tail auto unit `auto_11_80799F98_sdata2` the
+ *     re-split creates) and `ninja build/RMHE08/ok` stayed green.  Residual: the pool is *declared*,
+ *     never defined (playbook 29 - and the owner unit's source intentionally defines nothing), so
+ *     `datagap.py --unit Pl/pl_frame_data` reports `.sdata2 target-extra 408 B`: the bytes are the
+ *     original's and a `NonMatching` unit contributes exactly those to the link.
+ *   * `include/pl.h` gained **named union members only** (`field_0x406/408/40A/40C/410/422`,
+ *     `field_0x42E/430/432/434/436`) for the timer run `pl_act_step_84` clears; headers carry rules
+ *     2/12 only, so no rule 5 finding is created, the `_PLW` layout is unchanged and no consumer's
+ *     codegen moves (the whole-project report was diffed row by row: 0 changes).
+ *   * **one further body is written and measured but still held back**: `pl_act_step_arm_table`
+ *     (176 B, 100.00 % measured) needs the `.data` step record `pl_act_step_table_247`
+ *     (`.data:0x805BEBEC`), which is unowned, unclaimed and *outside* the Pl pool run the owner unit
+ *     holds - declaring it here is a new rule-12 finding, and this batch has already spent the
+ *     headroom a claim gives.  Its source is in `.pi/notes/pl-step2-ed81.md`; claiming the `.data`
+ *     run it lives in is a separate measured change (filed as a `range` request in this unit's
+ *     outbox).
+ *   * the remaining `.data` labels the range reads (`lbl_805BDC48`, `lbl_805BDF78`, `lbl_805BEE14`,
+ *     `lbl_805C4AD0`, the three `jumptable_805C4Axx`/`805C4DC4`/`805C4EB0` and
+ *     `pl_act_step_table_247`) are unowned and unclaimed, which is what blocks the handlers that use
+ *     them (74 rows still open).
+ *   * `pl_act_charge_repeat_step`'s `part <= 2` test is `(u32)part <= 2`: the parameter stays `s32`
+ *     (retail's inner 6-arm `switch` uses `cmpwi`, which a `u32` parameter turns into `cmplwi` and
+ *     costs 2 points), but the range test itself is unsigned in retail (`cmplwi r30,2`).
+ *   * a **new `fn_` name is still a rule-7 finding**, so every remaining body needs its callee named
+ *     first (`fn_8027BC48` alone blocks 9 of the 74 open rows).
  *
  * Load-bearing shapes worth copying into the next functions of this range:
  *   * the per-part argument is `s32`, never `u8` - a `u8` declaration makes MWCC mask it
@@ -111,6 +154,7 @@
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_act_step.h"
+#include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 float pool (rule 2) */
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_80273B14.h" /* the owner header of the act-motion setters (rule 2) */
 #include "Pl/fn_80262940.h" /* the owner header of the model-state setter */
@@ -129,20 +173,9 @@ void fn_802F39DC(_PLW* self, s32 arg);
 }
 #endif
 
-/* The unit's frame windows and its `.data` step record, unclaimed pool/tables (playbook 23, rule 12):
- * declared, never defined, so the load operands pair with the map's own symbols.  They are declared
- * here rather than in `include/unsplit/Pl.h` because the band header's copy would be a *new* rule-12
- * finding there, while this file's block is the one the unit already carried. */
-
-/* The `.sdata2` floats this act cluster gates its frame checks on. */
-extern const f32 pl_float_zero;
-extern const f32 pl_frame_window_96;
-extern const f32 pl_frame_window_142;
-extern const f32 pl_frame_window_190;
-extern const f32 pl_frame_window_246;
-extern const f32 pl_frame_window_238;
-extern const f32 pl_frame_window_260;
-extern const f32 pl_frame_window_104;
+/* The frame windows this act cluster gates its frame checks on are this unit's *use* of the Pl band's
+ * shared `.sdata2` pool; the declarations live in their owner's header (`Pl/pl_frame_data.h`, included
+ * above) and the range is claimed by the data-only unit `Pl/pl_frame_data.cpp` (rule 2 + rule 12). */
 
 /* Advances one step of the act the player entered from an off-hand gesture.  The act step byte
  * picks between the arming step and the per-skill follow-up steps; the two constants the follow-up
@@ -512,6 +545,122 @@ extern "C" void pl_act_step_89(_PLW* self, s32 part)
 
 
 
+/* Advances act 121's step: the arming step restarts the actor's move work, arms motion 318 with
+ * attribute -4 and starts the act's 60-frame `+0x028` countdown, which the function decrements on
+ * every call; the second step waits out the act's 46-frame window and arms motion 345; the third
+ * waits for the master gate with the countdown expired before handing the model state on, and hands
+ * the motion on once the model reports it finished. */
+extern "C" void pl_act_step_121(_PLW* self)
+{
+    pl_model_set_state(self, 2);
+    pl_act_set_step_time(self, 2);
+    if (self->field_0x28 != 0) {
+        self->field_0x28--;
+    }
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        self->field_0x006 = 0;
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, 318, -4, 0);
+        self->field_0x28 = 60;
+        break;
+    case 1:
+        if (Pl_frame_check(self, 1, pl_frame_window_46, pl_float_zero) == 1) {
+            self->act_step_0x05++;
+            Pl_chr_set_attr_default(self, 345, 0, 0);
+        }
+        break;
+    case 2:
+        if (Pl_master_ck(self) == 1 && self->field_0x28 == 0 && self->field_0x006 == 0) {
+            self->field_0x006++;
+            pl_model_state_set(self, 1, 25, 0);
+        }
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* Advances acts 135 and 137's step: the arming step restarts the motion and arms attribute 320 with
+ * the actor's flag word (or 324 alone for the second part); the follow-up waits out the act's
+ * 44-frame window and its part flag before re-entering the act, and the second part counts the same
+ * window up until the act's own two frames have passed. */
+extern "C" void pl_act_step_135(_PLW* self, s32 part)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        self->field_0x006 = 0;
+        Pl_act_set_motion(self, 0, 0, 0);
+        if (part == 0) {
+            Pl_chr_set_attr_default(self, 320, 4, 0);
+            pl_act_set_flag(self, 512);
+        } else {
+            Pl_chr_set_attr_default(self, 324, 4, 0);
+        }
+        break;
+    case 1:
+        switch (part) {
+        case 0:
+            if (self->field_0x006 >= 3 ||
+                (Pl_frame_check(self, 1, pl_frame_window_44, pl_float_zero) == 1 &&
+                 pl_part_flag_ck(self, 4) == 1)) {
+                pl_act_enter(self, 0, 136, 0);
+            } else if (Pl_frame_check(self, 1, pl_rig_get_float_a4(self), pl_float_zero) == 1) {
+                self->field_0x006++;
+            }
+            break;
+        case 1:
+            if (Pl_frame_check(self, 1, pl_rig_get_float_a4(self), pl_float_zero) == 1) {
+                if (++self->field_0x006 >= 2) {
+                    pl_act_enter(self, 0, 138, 0);
+                }
+            }
+            break;
+        default:
+            break;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* Advances the weapon act whose arming step carries attribute 112: the arming step arms motion 3
+ * with flag 64 and copies the actor's second counter into its first; the follow-up step enters act
+ * 8 out of its 56-frame window while the act's tier still reads 0, and the unmatched path falls
+ * back to entering act 7 once the model reports the motion finished. */
+extern "C" void pl_act_step_attr_112(_PLW* self)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 0, 0);
+        pl_act_set_flag(self, 64);
+        self->field_0x058 = self->field_0x0A8;
+        Pl_chr_set_attr_default(self, 112, 0, 0);
+        break;
+    case 1:
+        if (Pl_master_ck(self) == 1) {
+            if (Pl_frame_check(self, 1, pl_frame_window_56, pl_float_zero) == 1 &&
+                pl_act_param_tier_ck(self, 0) == 0) {
+                pl_act_enter(self, 1, 8, 0);
+            } else if (Pl_motion_end_ck(self) == 1) {
+                pl_act_enter(self, 1, 7, 0);
+            }
+        } else if (Pl_frame_check(self, 1, pl_frame_window_56, pl_float_zero) == 1) {
+            pl_act_enter(self, 1, 8, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 /* Resets the three guard timers the act cluster counts down: the two running timers to zero and the
  * third to its 30-frame window. */
 extern "C" void pl_act_guard_timer_reset(_PLW* self)
@@ -519,4 +668,259 @@ extern "C" void pl_act_guard_timer_reset(_PLW* self)
     self->field_0x400 = 0;
     self->field_0x3FC = 0;
     self->field_0x402 = 30;
+}
+
+/* Advances act 84's step: restarts the actor's move work and re-arms the act's whole timer block -
+ * the stagger timer, the stamina/guard pair, the two four-word runs and the act bitfield - then
+ * hands the act to 85 once the model reports the motion finished. */
+extern "C" void pl_act_step_84(_PLW* self)
+{
+    pl_model_set_state(self, 2);
+    pl_act_set_step_time(self, 2);
+    pl_act_set_gauge_arm(self, 2);
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, 326, -6, 0);
+        self->field_0x3EA = 0;
+        pl_act_clear_wait(self, 0);
+        self->field_0x3FC = 0;
+        self->field_0x42E = 0;
+        self->field_0x430 = 0;
+        self->field_0x432 = 0;
+        self->field_0x434 = 0;
+        self->field_0x436 = 0;
+        self->field_0x422 = 0;
+        self->field_0x404 = 0;
+        self->field_0x406 = 0;
+        self->field_0x408 = 0;
+        self->field_0x40A = 0;
+        self->field_0x40C = 0;
+        self->field_0x3DC = 0;
+        self->field_0x410 = 0;
+        self->field_0x3F4 = 0;
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            pl_act_enter(self, 0, 85, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* Steps this act's guard gauge by the caller's two part flags and clamps it into the act's window.
+ * The first flag takes 1024 off the gauge unless the menu owns the screen, the second puts 1024
+ * back, and neither leaves the gauge to walk back toward zero in 768 steps; the result is then
+ * clamped to the caller's two limits, held in the same 16-bit wrap the field itself uses. */
+extern "C" void pl_act_guard_gauge_adjust(_PLW* self, u16 neg_limit, u16 pos_limit, s32 flag_a,
+                                          s32 flag_b)
+{
+    u32 gauge;
+
+    if (pl_part_flag_ck(self, flag_a) == 1 && Pl_suimen_ck(self) == 0) {
+        self->field_0x0AC -= 1024;
+    } else if (pl_part_flag_ck(self, flag_b) == 1) {
+        self->field_0x0AC += 1024;
+    } else {
+        gauge = self->field_0x0AC;
+        if ((s16)gauge >= 0) {
+            if (gauge >= 768) {
+                self->field_0x0AC = gauge - 768;
+            } else {
+                self->field_0x0AC = 0;
+            }
+        } else {
+            if (gauge >= 64768) {
+                self->field_0x0AC = 0;
+            } else {
+                self->field_0x0AC = gauge + 768;
+            }
+        }
+    }
+    gauge = self->field_0x0AC;
+    if ((s16)gauge < 0) {
+        if ((u16)gauge <= neg_limit) {
+            self->field_0x0AC = neg_limit;
+        }
+    } else if ((u16)gauge >= pos_limit) {
+        self->field_0x0AC = pos_limit;
+    }
+}
+
+/* Arms one motion of the caller's part, sets the act's low or high flag from the second argument,
+ * marks the actor mode, and re-arms the act's flag set unless the caller says otherwise.  Shared by
+ * the whole weapon-act band above 0x80255388, which is why its arguments stay generic. */
+extern "C" void pl_act_arm_motion_and_flag(_PLW* self, u16 motion, u8 high_flag, u8 skip_arm)
+{
+    Pl_act_set_motion(self, motion, 0, 0);
+    if (high_flag == 0) {
+        pl_act_set_flag(self, 16);
+    } else {
+        pl_act_set_flag(self, 80);
+    }
+    self->field_0x018 = 1;
+    if (skip_arm == 0) {
+        pl_act_arm_flags(self, 1);
+    }
+}
+
+/* Runs one repeat of the charge act the caller's part selects: the arming step picks the motion
+ * (0 for the low parts, 3 for the high ones) and the attribute (211 or 263) together with the
+ * repeat count the part sets at `+0x007`; the follow-up step waits out that many motion-end reports
+ * before re-entering the act, and the last step hands the act's own motion slot on. */
+extern "C" void pl_act_charge_repeat_step(_PLW* self, s32 part)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        self->field_0x006 = 0;
+        switch (part) {
+        case 0:
+            self->field_0x007 = 1;
+            Pl_act_set_motion(self, 0, 0, 1);
+            Pl_chr_set_attr_default(self, 211, 4, 0);
+            break;
+        case 1:
+            self->field_0x007 = 2;
+            Pl_act_set_motion(self, 0, 0, 1);
+            Pl_chr_set_attr_default(self, 211, 4, 0);
+            break;
+        case 2:
+            self->field_0x007 = 4;
+            Pl_act_set_motion(self, 0, 0, 1);
+            Pl_chr_set_attr_default(self, 211, 4, 0);
+            break;
+        case 3:
+            self->field_0x007 = 1;
+            Pl_act_set_motion(self, 3, 0, 1);
+            Pl_chr_set_attr_default(self, 263, 4, 0);
+            break;
+        case 4:
+            self->field_0x007 = 2;
+            Pl_act_set_motion(self, 3, 0, 1);
+            Pl_chr_set_attr_default(self, 263, 4, 0);
+            break;
+        case 5:
+            self->field_0x007 = 4;
+            Pl_act_set_motion(self, 3, 0, 1);
+            Pl_chr_set_attr_default(self, 263, 4, 0);
+            break;
+        default:
+            break;
+        }
+        pl_act_set_frame_timer(self);
+        self->field_0x28 = 0;
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            if (++self->field_0x006 >= self->field_0x007) {
+                self->act_step_0x05++;
+                if ((u32)part <= 2) {
+                    Pl_chr_set_attr_default(self, 212, 2, 0);
+                } else {
+                    Pl_chr_set_attr_default(self, 264, 2, 0);
+                }
+            }
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            pl_act_reenter(self, self->kind_0x09, 12, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* Arms one of the act's countdown motions: the arming step clears the actor mode, arms attribute 26
+ * with its frame timer and the motion, and starts a 40-frame countdown for the first part (80 for
+ * the others); the follow-up hands motion slot 12 on once the countdown runs out. */
+extern "C" void pl_act_countdown_step(_PLW* self, s32 part)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        self->field_0x018 = 0;
+        Pl_chr_set_attr_default(self, 26, 6, 0);
+        pl_act_set_frame_timer(self);
+        Pl_act_set_motion(self, 0, 0, 1);
+        if (part == 0) {
+            self->field_0x28 = 40;
+        } else {
+            self->field_0x28 = 80;
+        }
+        break;
+    case 1:
+        if (--self->field_0x28 <= 0) {
+            Pl_act_set_motion_slot(self, 0, 12, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* Advances the weapon act whose arming step carries attribute 1007: it arms that attribute, hands
+ * the act's motion on through the shared part armer, and hands motion slot 2 on once the model
+ * reports the motion finished. */
+extern "C" void pl_act_step_attr_1007(_PLW* self)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_chr_set_attr_default(self, 1007, 2, 0);
+        pl_act_arm_motion_and_flag(self, 0, 0, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 2, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* The same three steps for the weapon act whose arming step carries attribute 1056, which arms
+ * motion 3 instead of motion 0. */
+extern "C" void pl_act_step_attr_1056(_PLW* self)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_chr_set_attr_default(self, 1056, 2, 0);
+        pl_act_arm_motion_and_flag(self, 3, 0, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 2, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* And for the weapon act whose arming step carries attribute 1018: the follow-up does not arm the
+ * act's own motion but enters the child act 5 instead. */
+extern "C" void pl_act_step_attr_1018(_PLW* self)
+{
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_chr_set_attr_default(self, 1018, 2, 0);
+        pl_act_arm_motion_and_flag(self, 0, 0, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            pl_act_enter(self, 5, 1, 0);
+        }
+        break;
+    default:
+        break;
+    }
 }

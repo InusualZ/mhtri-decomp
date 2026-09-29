@@ -475,6 +475,9 @@ ef/fn_80101DF4.cpp:
 	.text       start:0x80101DF4 end:0x80101FA4
 	.sdata2     start:0x807966E8 end:0x807966F0
 
+Pl/pl_frame_data.cpp:
+	.sdata2     start:0x80799E00 end:0x80799F98
+
 ef/eft007.cpp:
 	extab       start:0x8000BEFC end:0x8000BF7C
 	extabindex  start:0x80025D64 end:0x80025E24
