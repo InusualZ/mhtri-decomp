@@ -508,17 +508,21 @@ def data_seam_records(syms) -> list[dict]:
     """`dataorder.seams` with each seam's two vtable owners attached (`before_owner`/`after_owner`, or None).
 
     `dataorder` classifies and finds the seams; this only adds what a `.text` cut needs, the address of each
-    vtable's first code slot. The classification is never redone here.
+    vtable's first code slot. The classification is never redone here. A `V->S` row is a gap `[addr, latest)`
+    (the boundary lies after its inline-tail strings), so its `after_owner` is the vtable that ends the gap, at
+    `latest`; a `V->tail` row (a vtable, strings, no later vtable) is no evidence and is dropped.
     """
     by_addr = {s.addr: i for i, s in enumerate(syms)}
     out = []
     for sm in do.seams(syms):
+        if sm["kind"] == "V->tail":
+            continue
         j = by_addr.get(sm["addr"])
         if j is None:
             continue
         before = next((syms[k] for k in range(j - 1, -1, -1)
                        if syms[k].name == sm["before"] and syms[k].kind == do.VTABLE), None)
-        after = syms[j]
+        after = syms[by_addr[sm["latest"]]] if sm.get("latest") in by_addr else syms[j]
         out.append(dict(sm, before_owner=before.owner if before else None,
                         after_owner=after.owner if after.kind == do.VTABLE else None))
     return out
@@ -535,13 +539,16 @@ def data_seams_for(text, runs, records) -> dict | None:
     """The `.data` seams that bear on one proposal, or None when there are none.
 
     A seam is **interior** when it splits the proposal's own `.data` run (`start < addr < end`) or, for a
-    zigzag, when both vtable owners are inside `text` - then the range holds data of two TUs. A run counts only
+    zigzag, when both vtable owners are inside `text` - then the range holds data of two TUs. A `V->S` seam is a
+    gap `[addr, latest)`: it says a boundary lies somewhere in it (after the inline-tail strings), so it is at
+    least one more TU and `min_tus` stays a valid lower bound, but the *first string* is not the cut. A run counts only
     when it is dense (`DENSE_RUN_MIN`); a sparse run is not evidence of anything. A seam with one
     owner inside `text` and nothing else is an **edge** (it names a neighbour's boundary; informative, not
     counted). `min_tus` is `1 +` the interior strong seams (`V->S`, zigzag); an interior `V->D` is weak
     (a jump table is `.data` too) and is only counted in `weak`. `cut` is a candidate `.text` address read
-    off the vtable owners - never applied: a zigzag puts the cut between the two owners, a `V->S`/`V->D`
-    puts it after the owner of the vtable before the seam.
+    off the vtable owners - never applied: a zigzag and a `V->S` gap put it between the two owners (when both are
+    known and ordered), a `V->D` after the owner of the vtable before the seam. `V->tail` rows are no evidence
+    and are never counted.
     """
     t0, t1 = text
     d = (runs or {}).get(".data") or {}
@@ -559,12 +566,18 @@ def data_seams_for(text, runs, records) -> dict | None:
         both = r["kind"] == "zigzag" and inside(bo) and inside(ao)
         if not (in_run or inside(bo) or inside(ao)):
             continue
+        if r["kind"] == "V->tail":
+            continue
         seen.add(r["addr"])
         item = {"addr": r["addr"], "kind": r["kind"], "before": r["before"], "after": r["after"],
                 "interior": bool(in_run or both)}
-        if r["kind"] == "zigzag":
-            if both and bo < ao:
+        if r.get("latest") is not None:
+            item.update(latest=r["latest"], width=r.get("width"), tail=r.get("tail", 0))
+        if r["kind"] in ("zigzag", "V->S"):
+            if inside(bo) and inside(ao) and bo < ao:
                 item["cut"] = {"between": [bo, ao]}
+            elif r["kind"] == "V->S" and inside(bo):
+                item["cut"] = {"after": bo}
         elif inside(bo):
             item["cut"] = {"after": bo}
         out.append(item)
@@ -595,7 +608,9 @@ def cmd_dataseams(args) -> int:
         return 0
     print("%d of %d queue entries have a data seam bearing on them" % (len(hits), len(doc.get("units", []))))
     for lbl, ds in hits:
-        shown = ["0x%08X %s%s" % (i["addr"], i["kind"], "" if i["interior"] else " (edge)")
+        shown = ["0x%08X %s%s%s" % (i["addr"], i["kind"],
+                                    " gap->0x%08X" % i["latest"] if i.get("latest") else "",
+                                    "" if i["interior"] else " (edge)")
                  for i in ds["seams"]]
         print("  %-46s min %d TUs, %d weak: %s%s" % (lbl, ds["min_tus"], ds["weak"], ", ".join(shown[:4]),
                                                   " (+%d)" % (len(shown) - 4) if len(shown) > 4 else ""))

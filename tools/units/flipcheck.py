@@ -311,7 +311,8 @@ def data_seam_problems(unit: str, name: str, ours_path: str, obj_path: str, seam
 
     A unit's `.data` that holds the target's symbols in another sequence reads as a plain byte/size mismatch
     everywhere else. `dataseams.seam_note` (docs/data-order-seams.md) names it - `order-only: the unit spans
-    several TUs; seams at 0x...` - when the target's range contains a strong vtable/string seam, and adds the
+    several TUs; seams: at 0x... / a boundary in [a, b)` - when the target's range contains a strong seam (a
+    `V->S` gap, where the boundary position is uncertain, or a zigzag; never `V->tail`/`V->D`), and adds the
     multi-TU line when the section differs otherwise. Empty for another section and for a range with no seam.
     """
     if name != ".data":

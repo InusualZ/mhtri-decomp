@@ -47,9 +47,12 @@ non-`.text` section whose size differs between our object and the target object 
 
 **(d) emission order (warn-level, `docs/data-order-seams.md`, playbook row 80).** MWCC emits one TU's `.data`
 as globals, strings (`@NNN`), then vtables in the **reverse** of class definition order. In our built object
-every `__vt__*` symbol must therefore come after every other `.data` symbol (`vtable-before-data`), and the
+every `__vt__*` symbol must therefore come after every non-string `.data` symbol (`vtable-before-data`), and the
 vtables must descend in class order (`vtable-order`; the order comes from the class definitions in the unit's
 source and the project headers it includes, a vtable whose class cannot be resolved is skipped and counted).
+`@NNN` / `@STRING@<inline function>` string literals **after** a vtable are not a finding: they are the "inline tail" (the strings of inline
+functions - in-class bodies, free `inline` functions - are emitted after the vtables, unmerged), so only a
+non-string, non-vtable symbol (an initialised global) after a vtable is flagged.
 A finding means the source order or a hand-modelled table is wrong. These findings are **reported, never
 part of the `--diff` violation set** - the gate row refuses only the rule-10 kinds above.
 
@@ -877,6 +880,15 @@ def class_order_from_texts(text_of, root: str) -> list:
     return order
 
 
+STRING_LIT_RE = re.compile(r"^@(?:\d+|stringBase\d+|STRING@.+)$")
+
+
+def is_string_literal(name: str) -> bool:
+    """A compiler string literal (`@123`, `@stringBase0`, or `@STRING@<function>` - the name MWCC gives an inline
+    function's own copy, measured on a scratch TU): after a vtable it is an inline function's tail."""
+    return bool(STRING_LIT_RE.match(name))
+
+
 def emission_order(our: dict, classes: list) -> dict:
     """Findings on one object's `.data` emission order (see the module docstring, (d)).
 
@@ -894,7 +906,7 @@ def emission_order(our: dict, classes: list) -> dict:
     if vts:
         first = vts[0]["value"]
         for s in others:
-            if s["value"] > first:
+            if s["value"] > first and not is_string_literal(s["name"]):
                 out["findings"].append({"kind": "vtable-before-data", "offset": s["value"],
                                         "symbol": s["name"],
                                         "detail": "%s at .data+0x%X follows the first vtable %s at +0x%X"
@@ -1291,7 +1303,8 @@ def main(argv=None) -> int:
     ap.add_argument("--unit", default=None, help="one registered unit (path, with or without extension)")
     ap.add_argument("--runs", action="store_true", help="report only the owned code-pointer runs")
     ap.add_argument("--sections", action="store_true", help="report only the section-size differences")
-    ap.add_argument("--order", action="store_true", help="report only the .data emission-order findings")
+    ap.add_argument("--order", action="store_true", help="report only the .data emission-order findings (globals after a vtable, "
+                         "vtable order; @NNN strings after a vtable are an inline tail, not a finding)")
     ap.add_argument("--fields", action="store_true", help="report only the +0x00 fn-table-pointer fields")
     ap.add_argument("--diff", metavar="REF", default=None,
                     help="compare the working tree with REF; exit 1 when the rule-10 set grows")

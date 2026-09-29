@@ -696,10 +696,15 @@ def selftest() -> int:
     check("vtable_class: qualified is unresolved", va.vtable_class("__vt__Q23ns1A"), None)
     good = va.emission_order(order_obj(["@1", "@2", "__vt__1C", "__vt__1B", "__vt__1A"]), classes)
     check("order: strings then reverse vtables is clean", (good["vtables"], good["findings"]), (3, []))
-    late = va.emission_order(order_obj(["@1", "__vt__1B", "@2", "__vt__1A"]), classes)
-    check("order: a string after a vtable is a finding",
+    tail = va.emission_order(order_obj(["@1", "__vt__1B", "@2", "__vt__1A", "@stringBase0", "@77", "@STRING@g__1AFv"]), classes)
+    check("order: @NNN strings after a vtable are an inline tail, not a finding", tail["findings"], [])
+    late = va.emission_order(order_obj(["@1", "__vt__1B", "glob", "__vt__1A", "@9"]), classes)
+    check("order: an initialised global after a vtable is a finding (a tail string next to it is not)",
           [(f["kind"], f["symbol"], f["offset"]) for f in late["findings"]],
-          [("vtable-before-data", "@2", 0x40)])
+          [("vtable-before-data", "glob", 0x40)])
+    check("is_string_literal: @NNN and @stringBaseN only",
+          [va.is_string_literal(n) for n in ("@12", "@stringBase0", "@STRING@f__Fv", "@etb_80001000", "lbl_1", "@")],
+          [True, True, True, False, False, False])
     up = va.emission_order(order_obj(["@1", "__vt__1A", "__vt__1B"]), classes)
     check("order: vtables in class order (ascending) is a finding",
           [(f["kind"], f["symbol"], f["offset"]) for f in up["findings"]], [("vtable-order", "__vt__1B", 0x40)])

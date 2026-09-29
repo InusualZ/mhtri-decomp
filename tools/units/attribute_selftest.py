@@ -833,16 +833,26 @@ def selftest() -> int:
     check("seams: the records are dataorder's seams, none re-derived",
           [(r["addr"], r["kind"]) for r in recs],
           [(x["addr"], x["kind"]) for x in _do.seams(syms)])
-    check("seams: owners attached (zigzag both, V->S before only)",
+    check("seams: owners attached (a V->S gap's after-owner is the vtable that ends it; V->D has none)",
           [(r["kind"], r["before_owner"], r["after_owner"]) for r in recs],
-          [("V->S", 0x1100, None), ("zigzag", 0x1200, 0x1300), ("V->D", 0x1280, None)])
+          [("V->S", 0x1100, 0x1200), ("zigzag", 0x1200, 0x1300), ("V->D", 0x1280, None)])
+    check("seams: a V->S record carries its gap", [(r["latest"], r["width"], r["tail"]) for r in recs[:1]],
+          [(0x150, 1, 0)])
     dense = {".data": {"start": 0x100, "end": 0x250, "density": 0.9}}
     got = at.data_seams_for([0x1000, 0x2000], dense, recs)
     check("seams: interior strong seams give the lower bound", got["min_tus"], 3)
     check("seams: an interior V->D is weak, not counted", got["weak"], 1)
-    check("seams: a V->S cut is after the owner, a zigzag cut is between the owners",
+    check("seams: a V->S gap and a zigzag cut between the two owners, a V->D after the owner",
           [i.get("cut") for i in got["seams"]],
-          [{"after": 0x1100}, {"between": [0x1200, 0x1300]}, {"after": 0x1280}])
+          [{"between": [0x1100, 0x1200]}, {"between": [0x1200, 0x1300]}, {"after": 0x1280}])
+    check("seams: the V->S item carries its gap, not a cut at the first string",
+          [(i["addr"], i.get("latest")) for i in got["seams"][:1]], [(0x140, 0x150)])
+    tailsyms = [S(0x100, 0x40, "vt_a", _do.VTABLE, 0x1100), S(0x140, 0x10, "str_a", _do.STRING, None, "x.h"),
+                S(0x150, 0x10, "str_b", _do.STRING, None, "a message")]
+    tailrecs = at.data_seam_records(tailsyms)
+    check("seams: V->tail (a vtable, strings, no later vtable) is no evidence: no record, no min_tus",
+          (tailrecs, at.data_seams_for([0x1000, 0x2000], {".data": {"start": 0x100, "end": 0x160, "density": 1.0}},
+                                       tailrecs)), ([], None))
     sparse = {".data": {"start": 0x100, "end": 0x250, "density": 0.2}}
     got = at.data_seams_for([0x1000, 0x1250], sparse, recs)
     check("seams: a sparse run is no evidence - only owners inside the text bear on it",

@@ -353,10 +353,14 @@ def selftest() -> int:
         seam_tgt = write(tmp, "seam_tgt.o", build_obj(
             [(".data", st + vt)], [("lbl_str", 8, ".data", 0x11, 0), ("__vt__A", 12, ".data", 0x11, 8)]))
         seams = [{"addr": 0x1008, "kind": "V->S"}, {"addr": 0x1100, "kind": "zigzag"}]
+        gap_seams = [{"addr": 0x1008, "kind": "V->S", "latest": 0x1080, "width": 30, "tail": 0, "cut": 0x1008}]
         got = fc.data_seam_problems("U/u", ".data", seam_ours, seam_tgt, seams, (0x1000, 0x1200))
         expect("a reordered .data is order-only and names the seams",
-               (len(got), "order-only: the unit spans several TUs; seams at 0x00001008, 0x00001100" in got[0]),
+               (len(got), "order-only: the unit spans several TUs; seams: at 0x00001008, at 0x00001100" in got[0]),
                (1, True))
+        got = fc.data_seam_problems("U/u", ".data", seam_ours, seam_tgt, gap_seams, (0x1000, 0x1200))
+        expect("a V->S gap says 'a boundary in [a, b)', not a position",
+               (len(got), "seams: a boundary in [0x00001008, 0x00001080)" in got[0]), (1, True))
         expect("a range with no seam adds no line",
                fc.data_seam_problems("U/u", ".data", seam_ours, seam_tgt, seams, (0x2000, 0x2100)), [])
         expect("another section adds no line",
@@ -365,7 +369,7 @@ def selftest() -> int:
             [(".data", st)], [("lbl_str", 8, ".data", 0x11, 0)]))
         got = fc.data_seam_problems("U/u", ".data", seam_other, seam_tgt, seams, (0x1000, 0x1200))
         expect("a .data that differs in more than order gets the multi-TU line, not order-only",
-               (len(got), "order-only" in got[0], "spans 3 TUs" in got[0]), (1, False, True))
+               (len(got), "order-only" in got[0], "spans at least 3 TUs" in got[0]), (1, False, True))
         expect("the strict permutation line is the strict one",
                "every one of the 2 symbol(s)" in lines[2], True)
         expect("the mislaid-layout line is not printed for a strict permutation",

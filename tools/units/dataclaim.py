@@ -408,8 +408,8 @@ def summary(entries: list[dict], queue_path: str) -> str:
              "  -> " + queue_path]
     spanning = [e for e in entries if e.get("seam_warning")]
     if spanning:
-        lines.insert(3, "  multi-TU: %d run(s) contain a strong .data emission-order seam (V->S/zigzag) and can "
-                        "never match as one unit (%d of them `safe`)"
+        lines.insert(3, "  multi-TU: %d run(s) contain a strong .data emission-order seam (V->S gap/zigzag) and "
+                        "span at least 2 TUs, so can never match as one unit (%d of them `safe`)"
                      % (len(spanning), sum(1 for e in spanning if e["verdict"] == "safe")))
     for entry in risky[:5]:
         lines.append("  %-8s %s 0x%08X-0x%08X (%d B, %s): %s"
@@ -1438,8 +1438,14 @@ def selftest() -> int:
     check("summary counts the multi-TU runs", "multi-TU: 1 run(s)" in summary([spanning, good], "q.json"), True)
     claim_rec = reference_record("Pl/pl_act", rec("t", ".data", 0x1000, 0x8), 8, "map", None, None, [], None,
                                  {}, strong)
-    check("a rule-12 claim over a seam warns", ("the proposed claim spans 2 TUs" in (claim_rec["seam_warning"] or ""),
+    check("a rule-12 claim over a seam warns", ("the proposed claim spans at least 2 TUs" in (claim_rec["seam_warning"] or ""),
                                                 "WARNING" in claim_rec["note"]), (True, True))
+    gap = [{"addr": 0x1004, "kind": "V->S", "latest": 0x1400, "width": 60, "tail": 0, "cut": 0x1004}]
+    gap_rec = reference_record("Pl/pl_act", rec("t", ".data", 0x1000, 0x8), 8, "map", None, None, [], None,
+                               {}, gap)
+    check("a rule-12 claim over a wide gap warns that a boundary lies in [addr, latest), suggesting no cut",
+          ("boundary in [0x00001004, 0x00001400)" in (gap_rec["seam_warning"] or ""),
+           "no cut suggested" in (gap_rec["seam_warning"] or "")), (True, True))
     check("a rule-12 claim clear of seams does not",
           reference_record("Pl/pl_act", rec("t", ".data", 0x2000, 0x8), 8, "map", None, None, [], None,
                            {}, strong)["seam_warning"], None)
