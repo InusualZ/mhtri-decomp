@@ -125,6 +125,7 @@ sys.path.insert(0, str(ROOT / "tools" / "splits"))
 sys.path.insert(0, str(ROOT / "tools" / "units"))
 
 import tudiscover as td  # noqa: E402  (path set above)
+import dataorder as do  # noqa: E402  (the `.data` emission-order seams; docs/data-order-seams.md)
 import sharedfiles as sf  # noqa: E402
 import langcheck as lc  # noqa: E402
 
@@ -503,6 +504,104 @@ def segments(an, lo: int, hi: int, min_bytes: int, max_bytes: int):
     return owner_merge(an, out, max_bytes)
 
 
+def data_seam_records(syms) -> list[dict]:
+    """`dataorder.seams` with each seam's two vtable owners attached (`before_owner`/`after_owner`, or None).
+
+    `dataorder` classifies and finds the seams; this only adds what a `.text` cut needs, the address of each
+    vtable's first code slot. The classification is never redone here.
+    """
+    by_addr = {s.addr: i for i, s in enumerate(syms)}
+    out = []
+    for sm in do.seams(syms):
+        j = by_addr.get(sm["addr"])
+        if j is None:
+            continue
+        before = next((syms[k] for k in range(j - 1, -1, -1)
+                       if syms[k].name == sm["before"] and syms[k].kind == do.VTABLE), None)
+        after = syms[j]
+        out.append(dict(sm, before_owner=before.owner if before else None,
+                        after_owner=after.owner if after.kind == do.VTABLE else None))
+    return out
+
+
+#: A `.data` run is `min..max` over the labels the range's functions reference, so a range that touches two
+#: far-apart shared globals gets a run spanning dozens of other TUs. Only a *dense* run (most labels inside it
+#: are the range's own - `tudiscover.data_runs`' `density`) is contiguous enough for a seam inside it to mean
+#: the range's data is several TUs.
+DENSE_RUN_MIN = 0.5
+
+
+def data_seams_for(text, runs, records) -> dict | None:
+    """The `.data` seams that bear on one proposal, or None when there are none.
+
+    A seam is **interior** when it splits the proposal's own `.data` run (`start < addr < end`) or, for a
+    zigzag, when both vtable owners are inside `text` - then the range holds data of two TUs. A run counts only
+    when it is dense (`DENSE_RUN_MIN`); a sparse run is not evidence of anything. A seam with one
+    owner inside `text` and nothing else is an **edge** (it names a neighbour's boundary; informative, not
+    counted). `min_tus` is `1 +` the interior strong seams (`V->S`, zigzag); an interior `V->D` is weak
+    (a jump table is `.data` too) and is only counted in `weak`. `cut` is a candidate `.text` address read
+    off the vtable owners - never applied: a zigzag puts the cut between the two owners, a `V->S`/`V->D`
+    puts it after the owner of the vtable before the seam.
+    """
+    t0, t1 = text
+    d = (runs or {}).get(".data") or {}
+    lo, hi = d.get("start"), d.get("end")
+
+    def inside(a):
+        return a is not None and t0 <= a < t1
+
+    seen, out = set(), []
+    for r in records or ():
+        if r["addr"] in seen:
+            continue
+        bo, ao = r.get("before_owner"), r.get("after_owner")
+        in_run = lo is not None and d.get("density", 1.0) >= DENSE_RUN_MIN and lo < r["addr"] < hi
+        both = r["kind"] == "zigzag" and inside(bo) and inside(ao)
+        if not (in_run or inside(bo) or inside(ao)):
+            continue
+        seen.add(r["addr"])
+        item = {"addr": r["addr"], "kind": r["kind"], "before": r["before"], "after": r["after"],
+                "interior": bool(in_run or both)}
+        if r["kind"] == "zigzag":
+            if both and bo < ao:
+                item["cut"] = {"between": [bo, ao]}
+        elif inside(bo):
+            item["cut"] = {"after": bo}
+        out.append(item)
+    if not out:
+        return None
+    strong = sum(1 for i in out if i["interior"] and i["kind"] != "V->D")
+    return {"seams": out, "min_tus": 1 + strong,
+            "weak": sum(1 for i in out if i["interior"] and i["kind"] == "V->D")}
+
+
+def load_data_seam_records() -> list[dict]:
+    """The DOL's `.data` seams with owners (reads `orig/` and the map; writes nothing)."""
+    rows = do.load_symbols()
+    return data_seam_records(do.classify_all(rows, td.Dol(do.DOL)))
+
+
+def cmd_dataseams(args) -> int:
+    """Read-only: attach `data_seams` to the queue file's entries in memory and report; the file is not written."""
+    doc = json.loads(Path(args.queue).read_text(encoding="utf-8"))
+    records = load_data_seam_records()
+    hits = []
+    for u in doc.get("units", []):
+        ds = data_seams_for(u["text"], u.get("runs"), records)
+        if ds:
+            hits.append((u["label"], ds))
+    if args.json:
+        print(json.dumps({lbl: ds for lbl, ds in hits}, indent=1))
+        return 0
+    print("%d of %d queue entries have a data seam bearing on them" % (len(hits), len(doc.get("units", []))))
+    for lbl, ds in hits:
+        shown = ["0x%08X %s%s" % (i["addr"], i["kind"], "" if i["interior"] else " (edge)")
+                 for i in ds["seams"]]
+        print("  %-46s min %d TUs, %d weak: %s%s" % (lbl, ds["min_tus"], ds["weak"], ", ".join(shown[:4]),
+                                                  " (+%d)" % (len(shown) - 4) if len(shown) > 4 else ""))
+    return 0
+
+
 def tu_probe(an, lo_i: int, hi_i: int, note: str | None = None) -> dict:
     """What `tudiscover`'s own evidence says about this range - one TU, part of one, or several.
 
@@ -550,7 +649,7 @@ def tu_probe(an, lo_i: int, hi_i: int, note: str | None = None) -> dict:
 
 
 def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_BYTES_DEFAULT,
-            max_bytes: int = MAX_BYTES_DEFAULT, claimed=None) -> list[dict]:
+            max_bytes: int = MAX_BYTES_DEFAULT, claimed=None, seam_records=None) -> list[dict]:
     """One proposal per unit the region's evidence supports, in address order.
 
     The walk is over maximal *unclaimed* runs of functions inside `[start, end)`, not over seeds: a run
@@ -564,7 +663,9 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
     span rather than its start. Two proposals that overlap, or that overlap a registered unit, are not
     emitted at all (`drop_overlaps` reports them); with today's evidence the tiling is disjoint by
     construction, and this is the invariant that keeps it so. `claimed` is `claimed_text()`'s shape,
-    injectable so the selftest can partition without the repo's `splits.txt`.
+    injectable so the selftest can partition without the repo's `splits.txt`. `seam_records` is
+    `data_seam_records`' shape (None = no data-order evidence): a proposal that a `.data` seam bears on gets a
+    `data_seams` entry (`data_seams_for`).
     """
     ordered = an["ordered"]
     claimed = claimed_text() if claimed is None else claimed
@@ -591,7 +692,7 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
             cxx = language["lang"] == "c++"
             data = td.data_runs(an, labels, lo_i, hi_i)
             data.update(td.extab_runs(an, labels, graph, lo_i, hi_i))
-            out.append({
+            entry = {
                 "unit": placeholder(names[0], first_addr, cxx),
                 "text": [first_addr, an["addr"][hi_i - 1] + an["size"][hi_i - 1]],
                 "functions": [{"name": n, "address": an["addr"][lo_i + k],
@@ -604,7 +705,11 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
                 "seam_note": note,
                 "tu": tu_probe(an, lo_i, hi_i, note),
                 "runs": data,
-            })
+            }
+            ds = data_seams_for(entry["text"], data, seam_records)
+            if ds:
+                entry["data_seams"] = ds
+            out.append(entry)
     kept, dropped = drop_overlaps(out, claimed)
     for why in dropped:
         print("dropped: %s" % why, file=sys.stderr)
@@ -1149,6 +1254,9 @@ def build_parser() -> argparse.ArgumentParser:
         a.add_argument("--json", action="store_true")
         a.add_argument("--dry-run", action="store_true")
         a.add_argument("--limit", type=int, default=0, help="apply at most N units")
+    ds = sub.add_parser("dataseams", help="read-only: which queue entries a `.data` seam bears on")
+    ds.add_argument("--queue", default=str(QUEUE_PATH))
+    ds.add_argument("--json", action="store_true")
     parsers["apply"].add_argument(
         "--legacy-register", action="store_true",
         help="the retired behaviour: write src/auto stubs plus the configure.py and splits.txt entries. "
@@ -1172,6 +1280,8 @@ def main() -> int:
         ap.print_help()
         return 2
 
+    if args.cmd == "dataseams":
+        return cmd_dataseams(args)
     start, end = int(args.start, 0), int(args.end, 0)
     fns, labels, graph, an = load()
     straddling = [(an["addr"][i], an["ordered"][i]) for i in range(len(an["ordered"]))
@@ -1182,7 +1292,8 @@ def main() -> int:
               "      region is half-open on function boundaries, so they belong to the next one; pass an\n"
               "      `end` on a function edge to include them"
               % (len(straddling), end, straddling[0][1], straddling[0][0]), file=sys.stderr)
-    props = propose(an, fns, labels, graph, start, end, args.min_bytes, args.max_bytes)
+    props = propose(an, fns, labels, graph, start, end, args.min_bytes, args.max_bytes,
+                    seam_records=load_data_seam_records())
     if args.limit:
         props = props[:args.limit]
     kept, refused, detail = cap_batch(props, args.max_total_bytes)

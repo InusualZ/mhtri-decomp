@@ -1206,6 +1206,10 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     if warning:
         lines.append(warning)
         lines.append("")
+    seam_note = _data_seam_note(p)
+    if seam_note:
+        lines.append(seam_note)
+        lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
     _your_tree_lines(lines, b)
@@ -1487,6 +1491,50 @@ def _tu_warning(p: dict) -> str | None:
                 "`python tools/splits/tudiscover.py at 0x%08X` (or work it as one unit and say why) "
                 "before you register." % at)
     return None
+
+
+def _data_seam_note(p: dict) -> str | None:
+    """The `.data` emission-order evidence for a proposal (`attribute.data_seams_for`), or None.
+
+    MWCC emits one TU's `.data` as globals, strings, then vtables in reverse class order, so a vtable followed
+    by a string or other data (or two vtables whose owners go up) starts a new TU (`docs/data-order-seams.md`).
+    An *interior* seam (inside the range's own dense `.data` run, or between two vtables the range owns) makes
+    the range at least `min_tus` translation units; an *edge* seam is a neighbour's boundary and only
+    informs. A `cut` is a candidate `.text` address read off a vtable owner - never applied.
+    """
+    ds = p.get("data_seams") or {}
+    seams = ds.get("seams") or []
+    if not seams:
+        return None
+    interior = [s for s in seams if s.get("interior")]
+
+    def show(items, limit=6):
+        out = ["`0x%08X` %s (`%s` -> `%s`)" % (s["addr"], s["kind"], s.get("before", "?"), s.get("after", "?"))
+               for s in items[:limit]]
+        return ", ".join(out) + (" (+%d more)" % (len(items) - limit) if len(items) > limit else "")
+
+    cuts = []
+    for s in seams:
+        c = s.get("cut") or {}
+        if "between" in c:
+            cuts.append("between `0x%08X` and `0x%08X` (the vtable owners of seam `0x%08X`)"
+                        % (c["between"][0], c["between"][1], s["addr"]))
+        elif "after" in c:
+            cuts.append("after `0x%08X` (the vtable owner before seam `0x%08X`)" % (c["after"], s["addr"]))
+    if interior:
+        head = ("**Data-order evidence (TU probe): this range's `.data` holds %d seam(s) at %s; it is at least "
+                "%d translation units - decide the seam BEFORE writing bodies.**"
+                % (len(interior), show(interior), ds.get("min_tus", 1 + len(interior))))
+        if ds.get("weak"):
+            head += " (%d of them are weak `V->D` seams: a jump table is `.data` too.)" % ds["weak"]
+    else:
+        head = ("**Data-order evidence (TU probe): a `.data` seam sits at this range's edge (%s) - a neighbouring "
+                "unit's boundary, not a split inside the range.**" % show(seams))
+    tail = " Check `python tools/splits/dataorder.py at 0x%08X` before you register." % seams[0]["addr"]
+    if cuts:
+        tail += (" Candidate `.text` cuts (not applied, verify each against the callers): %s."
+                 % "; ".join(cuts[:4]))
+    return head + tail
 
 
 def brief_unit(path: str) -> str | None:
@@ -1898,6 +1946,31 @@ def selftest() -> int:
               "TU probe" not in render_proposal(tmp, build_proposal(tmp, clean, None,
                                                                assume_claim=True), None), True)
         check("an untagged entry gets no TU warning", _tu_warning({}), None)
+
+        # data-order evidence (attribute.data_seams_for): interior seams give a lower bound and candidate cuts
+        seamed = dict(entry, data_seams={"min_tus": 3, "weak": 1, "seams": [
+            {"addr": 0x805F9570, "kind": "V->S", "before": "vt_a", "after": "str_b", "interior": True,
+             "cut": {"after": 0x80161700}},
+            {"addr": 0x805F9610, "kind": "zigzag", "before": "vt_b", "after": "vt_c", "interior": True,
+             "cut": {"between": [0x80161700, 0x80161900]}}]})
+        _st = render_proposal(tmp, build_proposal(tmp, seamed, None, assume_claim=True), None)
+        check("the data-order note states the lower bound",
+              "holds 2 seam(s)" in _st and "at least 3 translation units" in _st, True)
+        check("... names the seam BEFORE bodies", "decide the seam BEFORE writing bodies" in _st, True)
+        check("... offers the owner addresses as candidate cuts, labelled not applied",
+              "Candidate `.text` cuts (not applied" in _st and "after `0x80161700`" in _st
+              and "between `0x80161700` and `0x80161900`" in _st, True)
+        check("... the note is at the top of the brief", _st.index("Data-order evidence")
+              < _st.index("## 1 · This is a proposal"), True)
+        _edge = _data_seam_note({"text": [0x1000, 0x2000], "data_seams": {"min_tus": 1, "weak": 0, "seams": [
+            {"addr": 0x805F9570, "kind": "V->S", "before": "a", "after": "b", "interior": False}]}})
+        check("an edge-only seam is not a lower bound", "at least" in _edge, False)
+        check("... but it is still named", "at this range's edge" in _edge, True)
+        check("no data seams, no note", (_data_seam_note({}), _data_seam_note({"data_seams": {"seams": []}})),
+              (None, None))
+        check("a proposal without data seams renders without the note",
+              "Data-order evidence" in render_proposal(tmp, build_proposal(tmp, clean, None,
+                                                                          assume_claim=True), None), False)
         # §1 states what the range's edges rest on, in the worker's words, whether or not it warns
         check("the §1 table carries the TU evidence row",
               "| TU evidence |" in render_proposal(tmp, build_proposal(tmp, clean, None,

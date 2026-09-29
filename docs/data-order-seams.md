@@ -110,3 +110,10 @@ Order: 0 first; then 1, 2, 3 and 4 are independent and can run as parallel lanes
   3,050 `.data` runs contain a seam (127 seams). On `Network/network_transport` both tools name
   0x805F9570, 0x805F9610, 0x805F9958 and 0x805F9A40 (plus the three zigzag seams); its object today is
   not order-only (its `.data` is 0x560 of 0x100C bytes), so it gets the multi-TU line.
+* Phase 3: `attribute.py` attaches `data_seams` to a proposal (`data_seam_records`/`data_seams_for`, on top of
+  `dataorder.seams`) and `brief.py` prints a data-order paragraph at the top of the proposal brief: seams, a lower
+  bound `min_tus`, candidate `.text` cuts read off the vtable owners (never applied). A seam is *interior* when it
+  splits the range's own **dense** `.data` run (`density >= 0.5`; a sparse run spans other TUs' globals and is no
+  evidence) or lies between two vtables the range owns; other seams whose owner is in the range are *edge* and do
+  not raise the bound. `attribute.py dataseams` is the read-only report over the queue file. Measured: 11 of the 67
+  ready pool proposals carry an interior seam (min 2-5 TUs), 14 carry any.
