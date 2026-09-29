@@ -312,6 +312,7 @@ that section's own problem sentence, truncated at 220 characters - so this index
 | 77 | `rlwinm x,x,0,MB,ME` keeps an inclusive BIT RANGE - so `MB=ME` is a single-bit test, never an extend | `quest_move_state_ck` measured **94.16666 %** and the lane's residual said "front-end artefact": the target reads `lbz r0,0x22D4(r3)` then `rlwinm r3,r0,0,24,24` where our build emits a bare `lbz`. Twelve spellings... |
 | 78 | A data claim must cover the run the unit actually TOUCHES, not the extent the symbol happens to name | `NHTTP/d_nhttp`'s `.sbss` claim covered **4 B** (`0x80795880`, the list head) while the unit's own rows relocate three words of a **16-byte run** at `0x80795878-0x80795888`: two lazy-init flags (`li r0,1` / `stw`,... |
 | 79 | A reconstruction is not deferred for a low match score | Twice in one session a measured call was made to leave something out because its bytes would score badly: a `.data` run a unit's own rows read (`arena_stage_config`, 0x24E0 B, whose three readers were rename-blocked)... |
+| 80 | MWCC emits a TU's `.data` as globals, strings, then vtables in reverse - so a vtable followed by data is a TU seam | `Network/network_transport` converted its peer types to real classes so the compiler would emit their vtables, and every table came out at the right size - yet the unit's `.data` section scored 10.4 % of 4108 B. The... |
 <!-- PLAYBOOK-INDEX-END -->
 
 The two tables below hold ideas with **no section of their own**: tried in one unit's context and failed,
@@ -391,7 +392,9 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                             elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
                             splits/   TU boundary discovery (tudiscover.py): from one symbol address,
                                       work out which functions and data ranges form one translation
-                                      unit - see the `tu-boundary-discovery` skill
+                                      unit - see the `tu-boundary-discovery` skill; dataorder.py
+                                      (in progress): the `.data` emission-order seam evidence,
+                                      docs/data-order-seams.md
                             symbols/  symbol-map proxy (symedit.py): look up, list by range and rename
                                       symbols in config/RMHE08/symbols.txt without loading it into
                                       context - see the `symbol-map-editing` skill
@@ -439,6 +442,10 @@ docs/                     Where all documentation lives — ours and dtk-templat
                           oracle for names/signatures/data (never for codegen) - see below.
                           rso-modules.md documents the RSO module format, the inventory and the
                           splitter blocker.
+                          data-order-seams.md explains why a vtable followed by data in retail `.data` is a
+                          TU seam (MWCC emits globals, strings, then vtables in reverse), the measured
+                          result, and the plan that feeds it into tudiscover, dataclaim, flipcheck and
+                          attribute (playbook row 80).
 ```
 
 ### External oracles

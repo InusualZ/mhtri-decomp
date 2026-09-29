@@ -2593,3 +2593,31 @@ vtable's band was claimed and emitted the same way - five slots correct, the rem
 pass's work list, unit left `NonMatching` because a **claim is about ownership and a flip is about proof**. Two
 rules follow: never leave a reconstructed artefact unowned because its score is small, and when the score is
 genuinely the reason something looks unattractive, record the *work list* rather than the deferral.
+
+
+## 80. MWCC emits a TU's `.data` as globals, strings, then vtables in reverse - so a vtable followed by data is a TU seam
+
+**Problem.** `Network/network_transport` converted its peer types to real classes so the compiler would emit their
+vtables, and every table came out at the right size - yet the unit's `.data` section scored 10.4 % of 4108 B. The
+retail run `0x805F94E0..0x805F9A40` interleaves each vtable with strings, and no source spelling of one TU produces
+that order. It reads as a data-claim or class-model problem and invites more class rewrites.
+
+**Why it happens.** MWCC lays out one TU's `.data` in a fixed order (measured with the project's flags on a scratch
+file): initialised globals over 8 B in definition order, then string literals in first-use order, then **vtables
+last, in the reverse of class order** (`__vt__C, __vt__B, __vt__A`). The linker concatenates TU fragments, so in
+retail `.data` a vtable followed by a string or ordinary data symbol starts a **new TU**, and two adjacent vtables
+whose owners' first code slots go *up* in address are two TUs (inside one TU they descend). Small (at most 8 B)
+objects go to `.sdata` and const tables to `.sdata2`, so they take no part.
+
+**How to work it.** Classify the run's symbols (vtable: leading `0,0` header and code pointers; string: printable
+NUL-terminated; jump tables are not vtables) and look for vtable→string/data transitions and "up" vtable pairs
+before claiming or reconstructing it (`docs/data-order-seams.md`). Cut the claim at those seams: one claim per TU
+fragment. A claim that contains one can never match in a single unit, whatever the classes look like.
+
+**Result.** The whole DOL has 230 vtables and 65 vtable→data transitions: 4 inside registered units (all in
+`network_transport`) and 61 in unclaimed `.data`, plus 69 "up" adjacent pairs there - candidate seams for the
+proposals no tool could cut. The plan for feeding it into `tudiscover`, `dataclaim`, `flipcheck` and `attribute`
+is in `docs/data-order-seams.md`.
+
+**Example.** `network_transport`: seams at 0x805F9570, 0x805F9610, 0x805F9958 and 0x805F9A40 (each a string
+after a peer/resolver vtable) split the unit's `.data` into per-class TUs.
