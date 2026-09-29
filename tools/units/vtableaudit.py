@@ -45,6 +45,14 @@ That is `fn_table_fields`, and it is what makes the `_VTable`-named blind spot i
 non-`.text` section whose size differs between our object and the target object is reported, marked `missing`
 (ours is 0), `extra` (the target has none), `short` or `long`.
 
+**(d) emission order (warn-level, `docs/data-order-seams.md`, playbook row 80).** MWCC emits one TU's `.data`
+as globals, strings (`@NNN`), then vtables in the **reverse** of class definition order. In our built object
+every `__vt__*` symbol must therefore come after every other `.data` symbol (`vtable-before-data`), and the
+vtables must descend in class order (`vtable-order`; the order comes from the class definitions in the unit's
+source and the project headers it includes, a vtable whose class cannot be resolved is skipped and counted).
+A finding means the source order or a hand-modelled table is wrong. These findings are **reported, never
+part of the `--diff` violation set** - the gate row refuses only the rule-10 kinds above.
+
 What the tool **cannot** decide, said plainly: whether an emitted table came from a `virtual` class or from a
 hand-written array of the same bytes. Both compile to the same object; the difference is in the source (`virtual`
 methods plus the constructor that stores the table vs. an array initializer). The tool's job is the part that is
@@ -59,6 +67,7 @@ Read-only by construction: no `ninja`, no compile, no link, no write anywhere. S
     python tools/units/vtableaudit.py                    # every registered unit, runs + refs + section diffs
     python tools/units/vtableaudit.py --runs             # only the owned code-pointer runs
     python tools/units/vtableaudit.py --sections         # only the section-size differences
+    python tools/units/vtableaudit.py --order            # only the .data emission-order findings
     python tools/units/vtableaudit.py --fields           # only the fn-table-pointer fields at +0x00
     python tools/units/vtableaudit.py --unit Pl/pl_master
     python tools/units/vtableaudit.py --diff <ref>       # exit 0 = the batch adds no rule-10 violation
@@ -772,7 +781,8 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
     target = read_object(target_path)
     rel = lambda p: os.path.relpath(p, main).replace("\\", "/")
     rec = {"unit": path, "flag": flag, "our": rel(our_path), "target": rel(target_path),
-           "status": "ok", "runs": [], "sections": [], "missing": [], "range_mismatch": []}
+           "status": "ok", "runs": [], "sections": [], "missing": [], "range_mismatch": [],
+           "order": {"vtables": 0, "unresolved": 0, "findings": []}}
 
     if our is None or target is None:
         rec["status"] = "unbuilt"
@@ -814,9 +824,115 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
                          tree["text_ranges"])
             rec["runs"].append(run)
 
+    rec["order"] = emission_order(our, class_order(main, path))
     rec["verdicts"] = {v: sum(1 for r in rec["runs"] if r["verdict"] == v)
                        for v in ("emitted", "referenced", "violation", "n/a")}
     return rec
+
+
+# --------------------------------------------------------------------------------------------------
+# (d) emission order of one built object's `.data`
+# --------------------------------------------------------------------------------------------------
+VT_NAME_RE = re.compile(r"^__vt__(\d+)(.+)$")
+INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
+CLASS_DEF_RE = re.compile(r"\b(?:class|struct)\s+([A-Za-z_]\w*)\s*(?::[^{;]*)?\{")
+
+
+def vtable_class(name: str):
+    """The plain class name in `__vt__<len><name>`, or None (qualified, templated or not a vtable)."""
+    m = VT_NAME_RE.match(name)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return m.group(2) if len(m.group(2)) == n else None
+
+
+def class_order_from_texts(text_of, root: str) -> list:
+    """Class names in definition order over `root` and the includes `text_of` can resolve.
+
+    `text_of(name, includer)` returns an included file's `(key, text)` or None. An include is followed at
+    its own position (the preprocessor's order) and only once.
+    """
+    seen, order = set(), []
+
+    def walk(key, text):
+        if key in seen:
+            return
+        seen.add(key)
+        code = blank_literals(text)
+        events = [(m.start(), "inc", m.group(1)) for m in INCLUDE_RE.finditer(text)]
+        events += [(m.start(), "cls", m.group(1)) for m in CLASS_DEF_RE.finditer(code)]
+        for _pos, kind, val in sorted(events):
+            if kind == "cls":
+                if val not in order:
+                    order.append(val)
+            else:
+                got = text_of(val, key)
+                if got:
+                    walk(*got)
+
+    got = text_of(root, None)
+    if got:
+        walk(*got)
+    return order
+
+
+def emission_order(our: dict, classes: list) -> dict:
+    """Findings on one object's `.data` emission order (see the module docstring, (d)).
+
+    `classes` is the class definition order. Returns `{"vtables": n, "unresolved": n, "findings": [...]}`.
+    """
+    out = {"vtables": 0, "unresolved": 0, "findings": []}
+    if ".data" not in our["order"]:
+        return out
+    sec = our["order"].index(".data")
+    syms = sorted((s for s in our["symbols"] if s["shndx"] == sec and s["name"]),
+                  key=lambda s: (s["value"], s["name"]))
+    vts = [s for s in syms if s["name"].startswith("__vt__")]
+    others = [s for s in syms if not s["name"].startswith("__vt__")]
+    out["vtables"] = len(vts)
+    if vts:
+        first = vts[0]["value"]
+        for s in others:
+            if s["value"] > first:
+                out["findings"].append({"kind": "vtable-before-data", "offset": s["value"],
+                                        "symbol": s["name"],
+                                        "detail": "%s at .data+0x%X follows the first vtable %s at +0x%X"
+                                                  % (s["name"], s["value"], vts[0]["name"], first)})
+    resolved = []
+    for s in vts:
+        cls = vtable_class(s["name"])
+        if cls in classes:
+            resolved.append((classes.index(cls), s))
+        else:
+            out["unresolved"] += 1
+    for (i, a), (j, b) in zip(resolved, resolved[1:]):
+        if not j < i:
+            out["findings"].append({"kind": "vtable-order", "offset": b["value"], "symbol": b["name"],
+                                    "detail": "%s at +0x%X follows %s at +0x%X but its class is defined "
+                                              "after it (vtables descend in class order)"
+                                              % (b["name"], b["value"], a["name"], a["value"])})
+    return out
+
+
+def class_order(main: str, path: str) -> list:
+    """`class_order_from_texts` over the working tree: the unit source (`src/`-relative) and `include/`."""
+    src_root = os.path.join(main, "src")
+    inc_root = os.path.join(main, "include")
+
+    def text_of(name, includer):
+        if includer is None:
+            cands = [os.path.join(src_root, name)]
+        else:
+            cands = [os.path.join(os.path.dirname(includer), name)]
+        cands += [os.path.join(inc_root, name), os.path.join(src_root, name)]
+        for c in cands:
+            c = os.path.normpath(c)
+            body = read_text(c) if os.path.isfile(c) else None
+            if body is not None:
+                return c, body
+        return None
+    return class_order_from_texts(text_of, path)
 
 
 def _verdict_run(run, section, first, words, address, our, our_bases, symbols_by_name, text_ranges):
@@ -912,6 +1028,7 @@ def sweep(main: str, only: str | None = None, text_ref: str | None = None) -> di
         "run_verdicts": {v: sum(1 for r in runs if r["verdict"] == v)
                          for v in ("emitted", "referenced", "violation", "n/a")},
         "violations": violations,
+        "order_findings": [dict(f, unit=rec["unit"]) for rec in records for f in rec["order"]["findings"]],
         "references": refs,
         "reference_kinds": {k: sum(1 for r in refs if r["kind"] == k)
                             for k in ("external", "foreign", "own", "unresolved")},
@@ -1144,6 +1261,12 @@ def render(s: dict, out=sys.stdout, show_runs=True, show_refs=True, show_section
                   "MWCC emit the table"
                   % (ref["file"], ref["line"], ref["symbol"], ref["address"]), file=out)
 
+    ofs = s["order_findings"]
+    print("  .data emission order (vtables last, in reverse class order; warn-level): %d finding(s)"
+          % len(ofs), file=out)
+    for f in ofs:
+        print("    WARN %-18s %-40s %s" % (f["kind"], f["unit"], f["detail"]), file=out)
+
     diffs = s["sections"]
     print("  section completeness (ours vs the target object, every non-.text section): %d differences "
           "over %d units" % (len(diffs), s["units_with_section_diff"]), file=out)
@@ -1168,6 +1291,7 @@ def main(argv=None) -> int:
     ap.add_argument("--unit", default=None, help="one registered unit (path, with or without extension)")
     ap.add_argument("--runs", action="store_true", help="report only the owned code-pointer runs")
     ap.add_argument("--sections", action="store_true", help="report only the section-size differences")
+    ap.add_argument("--order", action="store_true", help="report only the .data emission-order findings")
     ap.add_argument("--fields", action="store_true", help="report only the +0x00 fn-table-pointer fields")
     ap.add_argument("--diff", metavar="REF", default=None,
                     help="compare the working tree with REF; exit 1 when the rule-10 set grows")
@@ -1224,6 +1348,12 @@ def main(argv=None) -> int:
         for key in added:
             print("  ADDED %s" % key)
         return 1 if added else 0
+    if args.order and not args.json:
+        print("vtableaudit --order: %d finding(s) over %d built units"
+              % (len(s["order_findings"]), s["units_built"]))
+        for f in s["order_findings"]:
+            print("  WARN %-18s %-40s %s" % (f["kind"], f["unit"], f["detail"]))
+        return 0
     if args.json:
         print(json.dumps(s, indent=2))
     else:

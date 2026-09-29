@@ -83,6 +83,9 @@ them before you form an opinion, and cite the rule number rather than your taste
     would have broken the DOL. Check, in this order:
     * **`python tools/units/flipcheck.py <unit>`** - one command, and it names the section that does not
       match;
+    * **`.data` emission order**: `python tools/units/vtableaudit.py --unit <unit> --order` - vtables last, in
+      reverse class order in our object (playbook 80); a claimed `.data` run with a vtable followed by a string is
+      a multi-TU seam (`tools/splits/dataorder.py at <addr>`);
     * **sections against the claim**: the `extab`/`extabindex`/`.ctors`/`.dtors`/`.data` ranges in
       `splits.txt` versus what the object actually emits (`tools/elf/elfsect.py`, or objdiff's section
       rows);

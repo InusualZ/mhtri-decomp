@@ -683,6 +683,36 @@ def selftest() -> int:
         check("the unbuilt unit names the missing path",
               s2["unbuilt"][0]["missing"], ["build/RMHE08/src/t/gone.o"])
 
+    # -- (d) the .data emission order ----------------------------------------------------------
+    def order_obj(names):
+        """An object whose `.data` symbols are `names` at 0x20-byte strides, in the given order."""
+        syms = [("", 0, 0, 0, 0)] + [(n, 0x20 * i, 0x20, LOCAL_OBJ, 2) for i, n in enumerate(names)]
+        blob = build_object(syms, [(TEXT, 1, b"\x00" * 16), (DATA, 1, b"\x00" * (0x20 * len(names)))])
+        with tempfile.TemporaryDirectory() as t:
+            return va.read_object(write_elf(os.path.join(t, "o.o"), blob))
+
+    classes = ["A", "B", "C"]
+    check("vtable_class: plain", va.vtable_class("__vt__1A"), "A")
+    check("vtable_class: qualified is unresolved", va.vtable_class("__vt__Q23ns1A"), None)
+    good = va.emission_order(order_obj(["@1", "@2", "__vt__1C", "__vt__1B", "__vt__1A"]), classes)
+    check("order: strings then reverse vtables is clean", (good["vtables"], good["findings"]), (3, []))
+    late = va.emission_order(order_obj(["@1", "__vt__1B", "@2", "__vt__1A"]), classes)
+    check("order: a string after a vtable is a finding",
+          [(f["kind"], f["symbol"], f["offset"]) for f in late["findings"]],
+          [("vtable-before-data", "@2", 0x40)])
+    up = va.emission_order(order_obj(["@1", "__vt__1A", "__vt__1B"]), classes)
+    check("order: vtables in class order (ascending) is a finding",
+          [(f["kind"], f["symbol"], f["offset"]) for f in up["findings"]], [("vtable-order", "__vt__1B", 0x40)])
+    skip = va.emission_order(order_obj(["@1", "__vt__1A", "__vt__1Z"]), classes)
+    check("order: an unresolved class is skipped and counted", (skip["unresolved"], skip["findings"]),
+          (1, []))
+    check("order: no .data section is clean", va.emission_order({"order": [], "symbols": []}, classes)["findings"], [])
+    files = {"u.cpp": '#include "h.h"\nclass C : public B { virtual void f(); };\n',
+             "h.h": 'class A;\nstruct A { virtual void f(); };\n#include "g.h"\n// class Z {\n',
+             "g.h": "class B : A { };\n"}
+    order = va.class_order_from_texts(lambda n, inc: (n, files[n]) if n in files else None, "u.cpp")
+    check("class order: includes at their position, forward decls and comments ignored", order, ["A", "B", "C"])
+
     print("vtableaudit selftest: %d checks, %d failed" % (checks, len(fails)))
     for f in fails:
         print("  FAIL %s" % f)
