@@ -22,6 +22,29 @@ extern "C" {
 /* 0x804CB380 - records a library's version string with the OS. */
 void OSRegisterVersion(const char* version);
 
+/* 0x804D4D50 - the console's 64-bit tick counter, one tick per bus clock cycle. */
+u64 OSGetTime(void);
+
+/* 0x804CB420 - which kind of title is running (the SDK's `OS_APP_TYPE_*` values). */
+u8 OSGetAppType(void);
+
+/* size: 0x10 - the record `OSRegisterShutdownFunction` links into the OS's shutdown list; the
+ * library fills `func` and `priority`, the OS owns the two list links. */
+typedef struct OSShutdownFunctionInfo {
+    /* +0x00 */ BOOL (*func)(BOOL final, u32 event);
+    /* +0x04 */ u32 priority;
+    /* +0x08 */ struct OSShutdownFunctionInfo* next;
+    /* +0x0C */ struct OSShutdownFunctionInfo* prev;
+} OSShutdownFunctionInfo; /* size: 0x10 */
+
+/* 0x804D21F0 - add a shutdown-function record to the OS's ordered list. */
+void OSRegisterShutdownFunction(OSShutdownFunctionInfo* info);
+
+/* 0x800000F8 - the console's bus clock in Hz, read straight out of the low-memory arena.  The original
+ * object carries no relocation for it, i.e. the source spelled the address out (same shape as
+ * `NWC24_RTC_USER_ID` in `unsplit/NWC24.h`). */
+#define OS_BUS_CLOCK (*(u32*)0x800000F8)
+
 /* 0x804D0C70 / 0x804D0CB0 - disable interrupts, returning the previous state; restore it. */
 BOOL OSDisableInterrupts(void);
 void OSRestoreInterrupts(BOOL level);

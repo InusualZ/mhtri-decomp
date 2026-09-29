@@ -1466,7 +1466,10 @@ NWC24/nwc24_msg.c:
 
 NWC24/nwc24_io.c:
 	.text       start:0x8051E068 end:0x8051E864
-	.sbss       start:0x807958C0 end:0x807958C8
+	.data       start:0x806311E8 end:0x8063122C
+	.bss        start:0x80766B00 end:0x80766C40
+	.sdata      start:0x80794440 end:0x80794448
+	.sbss       start:0x807958B8 end:0x807958D8
 
 fn_805482CC.cpp:
 	.text       start:0x805482CC end:0x8054E894
