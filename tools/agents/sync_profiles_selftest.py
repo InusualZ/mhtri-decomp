@@ -14,10 +14,15 @@ The test pins that in three ways:
 * on the real tree - every generated profile is in sync with the real plan, and none still teaches the deleted
   `rule 7 deferred` escape (that is the drift this tool exists to end);
 * against `brief.plan_section` - the brief and the profiles read section 6.5 through the same bytes.
+
+It also pins the coverage tripwire: a file in `.agents/agents/` with a frontmatter `name:` that is not in
+`sync_profiles.PROFILES` is an error (a prose file without frontmatter is skipped, `TESTS.md` included), so a
+new profile cannot be added without being checked.
 """
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -147,6 +152,48 @@ def selftest() -> int:
     check("the same profile is in sync once regenerated", sp.check_profile(tmp, rel, good), None)
     check("regeneration left the surrounding prose alone",
           open(path, encoding="utf-8", newline="").read().startswith("before\n\n"), True)
+
+    # --- the coverage tripwire: a frontmatter profile not in PROFILES is an error --------------------
+    cov = tempfile.mkdtemp(prefix="sync-profiles-coverage-")
+    agents_dir = os.path.join(cov, ".agents", "agents")
+    os.makedirs(agents_dir)
+    listed_rel = os.path.join(".agents", "agents", "listed.md")
+    orphan_rel = os.path.normpath(os.path.join(".agents", "agents", "orphan.md"))
+    prose_rel = os.path.normpath(os.path.join(".agents", "agents", "TESTS.md"))
+    noname_rel = os.path.normpath(os.path.join(".agents", "agents", "noname.md"))
+    with open(os.path.join(cov, "configure.py"), "w", encoding="utf-8") as fh:
+        fh.write("")
+    with open(os.path.join(cov, listed_rel), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("---\nname: listed\ndescription: x\n---\n\n%s\nold\n%s\n" % (sp.BEGIN, sp.END))
+    with open(os.path.join(cov, orphan_rel), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("---\nname: orphan\ndescription: y\n---\n\nprose\n")
+    with open(os.path.join(cov, prose_rel), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("# prose\n\nno frontmatter here\n")
+    with open(os.path.join(cov, noname_rel), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("---\ndescription: z\n---\n\nprose\n")
+    found = sp.uncovered_profiles(cov, [listed_rel])
+    check("an unlisted frontmatter profile is reported", found, [orphan_rel])
+    check("a listed profile is not reported", listed_rel in found, False)
+    check("prose with no frontmatter is skipped", prose_rel in found, False)
+    check("frontmatter without a name: is skipped", noname_rel in found, False)
+    check("an absent .agents/agents is no error",
+          sp.uncovered_profiles(tempfile.mkdtemp(prefix="sync-profiles-nodir-")), [])
+    check("the real tree has no unlisted profile", sp.uncovered_profiles(ROOT), [])
+
+    def run_sync(*argv):
+        return subprocess.run([sys.executable, sp.__file__] + list(argv),
+                              capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+    before = open(os.path.join(cov, orphan_rel), encoding="utf-8").read()
+    run_w = run_sync("--repo", cov)
+    check("sync (write) fails closed on an unlisted profile", run_w.returncode != 0, True)
+    check("sync names the unlisted file", "orphan.md" in run_w.stderr, True)
+    check("sync wrote nothing on an unlisted profile",
+          open(os.path.join(cov, orphan_rel), encoding="utf-8").read(), before)
+    run_c = run_sync("--repo", cov, "--check")
+    check("--check fails closed on an unlisted profile", run_c.returncode != 0, True)
+    check("--check names the unlisted file", "orphan.md" in run_c.stderr, True)
+    check("--check does not print the happy line", "all profiles in sync" in run_c.stdout, False)
 
     # --- the real tree ---------------------------------------------------------------------------------
     real = sp.plan_section(ROOT)

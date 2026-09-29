@@ -27,6 +27,12 @@ It is idempotent (`python tools/agents/sync_profiles.py` writes the block only w
 `--check` exits non-zero when a profile's block does not match what the plan says today - so a rule
 change that forgets the profiles fails the check instead of silently leaving the prompts stale.
 
+The same tripwire covers the profile *set*, not only its text: a file in `.agents/agents/` whose frontmatter
+carries a `name:` (i.e. a profile, unlike `TESTS.md`, which is prose) that is **not** in `PROFILES` is an
+error that names the file. `surveyor.md` was added to the directory but not to `PROFILES`, and `--check`
+went on printing "all profiles in sync" while the new profile carried none of the rules - the exact failure
+this tool exists to prevent, one level up. A new profile is only covered once it is listed here.
+
 The block is generated from the *table*, so a new rule (rule 12) and every exception clause (rule 2's
 unowned extern -> `include/unsplit/`; rule 7's "no exemption and no deferral"; rule 11's
 `/* untyped: <reason> */`) reach every generated profile the moment the plan does. If the plan's section-6.5
@@ -65,6 +71,11 @@ END = "<!-- SECTION-6.5-RULES-END -->"
 
 PLAN_HEADING = "### 6.5 Type and naming discipline"
 PLAN_REL = os.path.join("docs", "plan.md")
+AGENTS_REL = os.path.join(".agents", "agents")
+
+# A leading YAML frontmatter block opens with `---` on line 1 and closes on the next `---` line. Only a
+# `name:` inside that block makes a file a profile; prose (`TESTS.md`) has no frontmatter and is skipped.
+NAME_RE = re.compile(r"^name:\s*\S")
 
 # The profiles whose section 6.5 text is generated (paths relative to the repository root). merger.md
 # used to be excluded here ("it keeps its own hand-written prose"), and the 2026-09-28 profile probe
@@ -103,6 +114,50 @@ def repo_root(start):
         if parent == d:
             raise SystemExit("repo root (configure.py) not found above %s" % start)
         d = parent
+
+
+def frontmatter_name(text):
+    """The `name:` line from a leading YAML frontmatter block, or None when the file is not a profile.
+
+    `TESTS.md` and any prose file have no frontmatter at all, so they are skipped - only a file that the
+    runtime would actually load as an agent (a frontmatter `name:`) is a profile this tool must cover.
+    """
+    lines = to_lf(text).split("\n")
+    if not lines or lines[0].rstrip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.rstrip() == "---":
+            return None
+        if NAME_RE.match(line):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def uncovered_profiles(root, profiles=None):
+    """Profile files in `.agents/agents/` that carry a frontmatter `name:` but are not in `profiles`.
+
+    This is the tripwire for the failure this tool exists to prevent, one level up: a profile added to the
+    directory but not to `PROFILES` keeps whatever section 6.5 text it has, and `--check` still prints the
+    happy line. A file without frontmatter (prose) is not a profile and is not reported. `profiles` is an
+    injection point for the selftest; the real call uses the module's `PROFILES`.
+    """
+    listed = {os.path.normpath(p) for p in (profiles if profiles is not None else PROFILES)}
+    d = os.path.join(root, AGENTS_REL)
+    if not os.path.isdir(d):
+        return []
+    out = []
+    for name in sorted(os.listdir(d)):
+        path = os.path.join(d, name)
+        rel = os.path.normpath(os.path.join(AGENTS_REL, name))
+        if rel in listed or not os.path.isfile(path):
+            continue
+        try:
+            text = read(path)
+        except OSError:
+            continue
+        if frontmatter_name(text):
+            out.append(rel)
+    return out
 
 
 def plan_section(root):
@@ -256,6 +311,15 @@ def check_profile(root, rel, block):
 
 def cmd_sync(a):
     root = repo_root(a.repo or HERE)
+    # fail closed on the profile SET before doing anything else: an unlisted profile is never checked, so
+    # reporting "all profiles in sync" while one is unlisted is the drift this tool is supposed to stop
+    unlisted = uncovered_profiles(root)
+    if unlisted:
+        for rel in unlisted:
+            print("error: %s has frontmatter `name:` but is not in PROFILES - add it to "
+                  "tools/agents/sync_profiles.py, or its section 6.5 block is never generated or checked" % rel,
+                  file=sys.stderr)
+        return 1
     block = build_block(plan_section(root))
     if a.print_block:
         print(block)
