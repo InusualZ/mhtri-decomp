@@ -52,6 +52,22 @@ pass that counted them gave a bogus 402/130 split).
   (`__FILE__` anchors) - that needs the asm dump (`python tools/splits/dump_asm.py`, 200-400 s) and is Phase 1's
   acceptance test.
 * Measured on `Wii/1.3` only. Other libraries use other compiler versions.
+* **Phase 1 measurement (tudiscover, 2026-09-29, asm dump fresh).** `tudiscover.py dataorder` maps each of the
+  127 V->S/zigzag seams to a `.text` interval: **78 pinned, 48 overlap** (the vtable side's referrers come after
+  the string side's - the rule does not hold for that seam under this mapping), 1 without referrers. The four
+  `network_transport` seams (0x805F9570 / 9610 / 9958 / 9A40) all pin, to 81 / 6 / 3 / 8 functions. Against
+  the other evidence: **8 seams are contradicted by a `__FILE__` anchor** - a `.c`/`.cpp` name whose referrers
+  sit on both sides of the seam - and every one is in the g3d library: V->S at 0x8058BE40 (`g3d_anmchr.cpp`),
+  0x8058C928 (`g3d_anmscn.cpp`), 0x8058D5F8 (`g3d_anmtexsrt.cpp`), 0x8058F070 (`g3d_scnmdl.cpp`), 0x8058F388
+  (`g3d_scnmdlsmpl.cpp`), 0x8058F6B0 and the zigzag 0x8058F670 (`g3d_scnroot.cpp`), 0x8058FB00
+  (`g3d_state.cpp`). One more V->S, 0x80594A40, pins to 0x800C6054..0x800C8680, inside
+  `ef/ef_drawstrategyimpl.cpp`, whose own `__FILE__` name plus two `.sdata2` pools span it. So the rule is
+  **wrong for at least the g3d (NW4R) TUs** - consistent with a different compiler version there - and
+  unproven for the ef strategy units. Twenty-eight further pinned intervals lie wholly inside one registered
+  unit (mostly the `ef/ef_draw*strategy*` units, `sound/fn_800E*`, `homebutton/*`): either a hidden second TU
+  or the same rule failure; they are not counted as errors. Bench tier 4 (strong pins vs `splits.txt`): the 36
+  data-seam cuts make 3 hits and 30 misses, which lowers overall precision 0.110 -> 0.109, so the kind is
+  **soft by default** and `--data-order strong` is opt-in. V->D (`--weak`) adds 39 seams, of which 31 pin.
 * Untested: RTTI-on classes (the game builds `-RTTI off`, so vtable headers are `0,0`), `extern "C"` data,
   function-local statics, and data emitted by `#pragma` sections.
 * A vtable owner is approximated by its first code slot; the key function would be exact. Twelve adjacent pairs
@@ -117,3 +133,7 @@ Order: 0 first; then 1, 2, 3 and 4 are independent and can run as parallel lanes
   evidence) or lies between two vtables the range owns; other seams whose owner is in the range are *edge* and do
   not raise the bound. `attribute.py dataseams` is the read-only report over the queue file. Measured: 11 of the 67
   ready pool proposals carry an interior seam (min 2-5 TUs), 14 carry any.
+* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phase 1: `tudiscover.py` gained the
+  `dataorder`/`dataorder-zz`/`dataorder-weak` observations, `--data-order off|on|strong|weak`, the `dataorder`
+  subcommand, bench tier 4 and a fixture `--selftest` (branch `worker/data-order-p1-da80`). Phases 2-4: in
+  progress as parallel lanes.
