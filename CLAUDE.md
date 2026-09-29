@@ -490,7 +490,9 @@ This repository was converted from the pi agent harness to Claude Code on 2026-0
   distinct tokens and distinct slots) and tokens expire after `--ttl` (default 900 s). An unarmed launch - a
   manual `--worktree`, an ad hoc isolated subagent - gets an ordinary git worktree under `.claude/worktrees/`
   and is removed the ordinary way. A slot needs a **current** build tree (the hook never re-seeds; it fails and
-  returns the token). Claude Code did not call the remove hook after a clean subagent, so the
+  returns the token). For a claimed unit, `worktreehook.py arm --slot N` binds the token to the slot
+  `queue.py next` / `claims.py claim` already took, so the subagent works in the claim's own slot and branch
+  (no adoption step). Claude Code did not call the remove hook after a clean subagent, so the
   orchestrator runs **`python tools/units/slots.py collect --path <the result's worktreePath> --release`** when a
   lane's result arrives: it copies the slot's `.pi/outbox/*.json` and `.pi/notes/*.md` into MAIN, reports the
   commits main lacks, and releases the slot only when nothing is unlanded.

@@ -13,6 +13,11 @@ against an **arm token**: the orchestrator runs `worktreehook.py arm N` right be
 Code would have done itself - a plain git worktree under `.claude/worktrees/<name>` - and `remove` cleans that
 kind up the same way.
 
+**A token can name a slot** (`arm --slot 3`): the orchestrator has already claimed that slot for a unit
+(`queue.py next` acquires one and cuts the claim's branch), and the token binds the launch to it - `create`
+hands that very slot over instead of acquiring another, so the claim, its branch, its brief and the lane share
+one directory with no adoption step.  A token with no slot means "any current free slot".
+
   create  reads the hook JSON on stdin.  Armed: takes the first free slot whose build tree is already
           **current**, cuts a placeholder branch `worker/hook-<stamp>-<pid>` off main's tip and prints the slot path
           (the only thing stdout may carry).  Slot choice is `slots.acquire`'s own atomic `.used` sentinel, so
@@ -27,7 +32,7 @@ Every call appends the raw input and the decision to `<main>/.pi/lanes/hook.log`
 `cwd`, `hook_event_name`, `name` (`agent-<agentId>`), `prompt_id`, `scratchpad_dir`, `session_id`,
 `transcript_path` (create) and `worktree_path` (remove).
 
-  python tools/units/worktreehook.py arm N [--ttl SECONDS] | disarm | status
+  python tools/units/worktreehook.py arm N [--ttl SECONDS] | arm --slot N [--slot M ...] | disarm | status
   python tools/units/worktreehook.py create|remove        # stdin: the hook JSON
   python tools/units/worktreehook.py --selftest
 """
@@ -84,15 +89,19 @@ def _tokens(main: str) -> list[str]:
         return []
 
 
-def arm(main: str, count: int, ttl: int = TOKEN_TTL) -> list[str]:
-    """Write `count` tokens that each authorise one slot hand-out for the next `ttl` seconds."""
+def arm(main: str, count: int = 0, ttl: int = TOKEN_TTL, slot_numbers: list[int] | None = None) -> list[str]:
+    """Write tokens that each authorise one slot hand-out for the next `ttl` seconds.
+
+    `count` tokens name no slot (any current free one); each number in `slot_numbers` is a token bound to
+    that slot.
+    """
     os.makedirs(armed_dir(main), exist_ok=True)
     stamp = int(time.time() * 1000)
     names = []
-    for i in range(count):
+    for i, slot in enumerate([None] * count + list(slot_numbers or [])):
         name = "%d-%02d-%d.token" % (stamp, i, os.getpid())
         with open(os.path.join(armed_dir(main), name), "w", encoding="utf-8") as fh:
-            json.dump({"expires": time.time() + ttl}, fh)
+            json.dump({"expires": time.time() + ttl, "slot": slot}, fh)
         names.append(name)
     return names
 
@@ -122,8 +131,17 @@ def disarm(main: str) -> int:
     return n
 
 
-def take_token(main: str) -> str | None:
-    """Consume one live token, atomically: the name, or `None` when there is none.
+def _token_slot(path: str) -> int | None:
+    try:
+        with open(path, encoding="utf-8") as fh:
+            slot = json.load(fh).get("slot")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return slot if isinstance(slot, int) and not isinstance(slot, bool) else None
+
+
+def take_token(main: str) -> dict | None:
+    """Consume one live token, atomically: `{"name", "slot"}` (slot is `None` for "any"), or `None`.
 
     The claim is an exclusive create (`O_EXCL`) of `<token>.claim`: of two hooks racing for the same token
     exactly one create succeeds.  (A rename was tried first and is NOT safe here - on Windows two threads
@@ -145,6 +163,7 @@ def take_token(main: str) -> str | None:
             os.close(os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
         except OSError:
             continue
+        slot = _token_slot(src)
         won = os.path.exists(src)
         if won:
             try:
@@ -156,13 +175,14 @@ def take_token(main: str) -> str | None:
         except OSError:
             pass
         if won:
-            return name
+            return {"name": name, "slot": slot}
     return None
 
 
-def give_back(main: str, count: int = 1, ttl: int = TOKEN_TTL) -> None:
-    """Return tokens a failed hand-out did not use, so a slot shortage does not silently disarm the batch."""
-    arm(main, count, ttl)
+def give_back(main: str, token: dict, ttl: int = TOKEN_TTL) -> None:
+    """Return a token a failed hand-out did not use, so a slot shortage does not silently disarm the batch."""
+    arm(main, 0 if token.get("slot") is not None else 1, ttl,
+        [token["slot"]] if token.get("slot") is not None else None)
 
 
 # --- create ----------------------------------------------------------------------------------------
@@ -214,14 +234,33 @@ def create_plain(main: str, data: dict) -> str:
     return path
 
 
+def create_bound(main: str, slot: int, data: dict) -> str:
+    """Hand over slot `slot`, which the orchestrator has already claimed - never acquire another.
+
+    Refuses (SystemExit) unless the slot is occupied by a claim (its `.used` sentinel) and is on a branch:
+    a token naming a free or detached slot means the claim was released or never made.
+    """
+    d = slots.slot_dir(main, slot)
+    branch = slots.slot_attached_branch(d) if os.path.isdir(d) else None
+    if not branch or not slots.marker_present(d):
+        log(main, "create-bound-refused", slot=slot, branch=branch, input=data)
+        raise SystemExit("worktreehook: slot %d is not a claimed slot on a branch (branch=%r) - claim it first "
+                         "(queue.py next / slots.py acquire) and arm it again" % (slot, branch))
+    log(main, "create-bound", slot=slot, branch=branch, path=d, input=data)
+    return d
+
+
 def create(main: str, data: dict) -> str:
-    """A slot when armed, otherwise a plain worktree."""
-    if take_token(main) is None:
+    """The claimed slot a token names, else any current free slot when armed, otherwise a plain worktree."""
+    token = take_token(main)
+    if token is None:
         return create_plain(main, data)
     try:
+        if token["slot"] is not None:
+            return create_bound(main, token["slot"], data)
         return create_slot(main, data)
     except SystemExit:
-        give_back(main)
+        give_back(main, token)
         raise
 
 
@@ -314,7 +353,8 @@ def selftest() -> int:
         check("arm(3) makes three live tokens", armed_count(main), 3)
         got = [take_token(main) for _ in range(4)]
         check("three takes succeed and the fourth finds none", [g is not None for g in got], [True, True, True, False])
-        check("... each token name was distinct", len({g for g in got if g}), 3)
+        check("... each token name was distinct", len({g["name"] for g in got if g}), 3)
+        check("... an unbound token names no slot", got[0]["slot"], None)
         check("... and the armed count is back to zero", armed_count(main), 0)
         arm(main, 1, ttl=-1)
         check("an expired token is not live", armed_count(main), 0)
@@ -334,7 +374,7 @@ def selftest() -> int:
             t = take_token(main)
             if t:
                 with lock:
-                    wins.append(t)
+                    wins.append(t["name"])
         threads = [threading.Thread(target=racer) for _ in range(12)]
         for t in threads:
             t.start()
@@ -342,6 +382,9 @@ def selftest() -> int:
             t.join()
         check("12 racing hooks share 5 tokens: exactly 5 win", len(wins), 5)
         check("... and no token is taken twice", len(set(wins)), 5)
+        arm(main, 0, slot_numbers=[4, 6])
+        taken = sorted(take_token(main)["slot"] for _ in range(2))
+        check("slot-bound tokens carry their slot", taken, [4, 6])
 
         # --- plain worktrees (unarmed) -----------------------------------------------------------
         path = quiet(create, main, {"name": "agent-abc123"})
@@ -389,8 +432,11 @@ def selftest() -> int:
             def slot_dir(self, _m, n):
                 return self.dirs[n]
 
-            def slot_attached_branch(self, _d):
-                return "worker/x"
+            def slot_attached_branch(self, d):
+                return None if d == self.dirs[1] else "worker/x"
+
+            def marker_present(self, d):
+                return d != self.dirs[2]
 
             def unlanded_reason(self, _m, _n):
                 return self.reason
@@ -411,6 +457,20 @@ def selftest() -> int:
             check("the next create, unarmed, is a plain worktree",
                   _under(quiet(create, main, {"name": "agent-2"}), plain_root(main)), True)
             quiet(remove, main, {"worktree_path": os.path.join(plain_root(main), "agent-2")})
+            for d in fake.dirs.values():
+                os.makedirs(d, exist_ok=True)
+            arm(main, 0, slot_numbers=[3])
+            path = quiet(create, main, {"name": "agent-b"})
+            check("a slot-bound token hands over THAT claimed slot", path, fake.dirs[3])
+            check("... acquiring nothing", len(fake.acquired), 1)
+            arm(main, 0, slot_numbers=[1])
+            res = quiet(create, main, {"name": "agent-c"})
+            check("a token naming a detached slot is refused", isinstance(res, SystemExit), True)
+            check("... and returned, still bound to its slot", (armed_count(main), take_token(main)["slot"]), (1, 1))
+            arm(main, 0, slot_numbers=[2])
+            res = quiet(create, main, {"name": "agent-d"})
+            check("a token naming a slot with no claim marker is refused", isinstance(res, SystemExit), True)
+            disarm(main)
             fake.verify = lambda _m, n: {"ok": False, "reasons": ["stale"]}
             arm(main, 1)
             res = quiet(create, main, {"name": "agent-3"})
@@ -446,8 +506,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--selftest", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
-    a = sub.add_parser("arm", help="authorise N slot hand-outs for the next --ttl seconds")
-    a.add_argument("count", type=int)
+    a = sub.add_parser("arm", help="authorise N slot hand-outs (or hand-outs of named claimed slots) for --ttl seconds")
+    a.add_argument("count", type=int, nargs="?", default=0, help="any-current-free-slot tokens")
+    a.add_argument("--slot", type=int, action="append", default=[],
+                   help="a token bound to this already-claimed slot (repeatable)")
     a.add_argument("--ttl", type=int, default=TOKEN_TTL)
     sub.add_parser("disarm", help="remove every arm token")
     sub.add_parser("status", help="how many hand-outs are armed")
@@ -461,8 +523,13 @@ def main(argv=None) -> int:
         return 2
     root = _main_root()
     if args.cmd == "arm":
-        arm(root, args.count, args.ttl)
-        print("armed %d slot hand-out(s), expiring in %ds" % (args.count, args.ttl))
+        if args.count + len(args.slot) < 1:
+            sys.stderr.write("arm: give a count and/or --slot N\n")
+            return 2
+        arm(root, args.count, args.ttl, args.slot)
+        print("armed %d hand-out(s)%s, expiring in %ds" % (
+            args.count + len(args.slot), " (slots %s)" % ", ".join(map(str, args.slot)) if args.slot else "",
+            args.ttl))
         return 0
     if args.cmd == "disarm":
         print("removed %d token(s)" % disarm(root))
