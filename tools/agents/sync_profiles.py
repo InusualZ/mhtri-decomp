@@ -89,6 +89,7 @@ PROFILES = (
     os.path.join(".agents", "agents", "merger.md"),
     os.path.join(".agents", "agents", "codereviewer.md"),
     os.path.join(".agents", "agents", "surveyor.md"),
+    os.path.join(".agents", "agents", "worker.md"),
 )
 
 # A rule table row: `| 1 | **title** | meaning |`. The meaning cell is one physical line in the plan.
