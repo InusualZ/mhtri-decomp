@@ -61,17 +61,40 @@ struct Q_SlotPair {
     /* +0x7 */ u8 pad_0x07;
 };  /* size: 0x8 */
 
+/* The result row `Q_ItemWork::record_0x3C` points at, as this unit reads it: only the word at +0x310,
+ * whose bit 0x00800000 marks a live row.  `menu/arena_result.cpp`'s own view of the same record
+ * (`include/unsplit/menu.h`'s `QuestRecord`) names the rest of it; that header is not this unit's to
+ * extend, so the prefix this unit reads stays here - merging the two views is a follow-up. */
+struct Q_ResultRow {
+    /* +0x000 */ u8 pad_0x000[0x310];
+    /* +0x310 */ u32 flags_0x310;   /* bit 0x00800000: the row is live */
+};  /* size: 0x314 (a prefix of the 0x714-byte row) */
+
 /* The item work (`get_move_work_adrs(0)->0xDC`), the same block `quest_work_ptr` points at; only the
- * offsets this unit names are here (the lot tables' run at +0x9C is one region, addressed but not
- * walked by name). */
+ * offsets this unit names are here (the lot tables' run at 0x9C is one region, addressed but not
+ * walked by name).  MEASURED size 0x6AB8 (`accessextent.py quest_work` / `quest_work_ptr`):
+ *   * literal - `quest_init` clears the whole block, `memset(quest_work_ptr, 0, 0x6AB8)` at 0x803AD4BC,
+ *     and `fn_803B7F70` does the same at 0x803B7FA0 (`accessextent.py quest_work`, the object form);
+ *   * cross-check - the block's readers reach 0x6AB4 at their furthest (`fn_803AEED0`'s `stb r0,27316`),
+ *     i.e. 0x6AB8 rounded up, over 364 resolved accesses in 38 functions;
+ *   * the tool's own DISAGREEMENT line here is the OTHER literal: `memcpy(quest_work_ptr, ..., 0x6000)`
+ *     at 0x803AD680 copies the 0x6000-byte save sub-block INTO the record, so 0x6000 is not its extent.
+ * The .bss row tiles the record exactly (`quest_text_buffer` begins at 0x806CC310 = 0x806C5858 + 0x6AB8). */
 struct Q_ItemWork {
-    /* +0x0000 */ u8 pad_0x0000[0x40];
+    /* +0x0000 */ u8 pad_0x0000[0x3C];
+    /* +0x003C */ Q_ResultRow* record_0x3C;     /* the current result row, 0 when there is none */
     /* +0x0040 */ Q_ItemCount slots_0x40[5];  /* the five delivered-item slots `quest_item_slot_add` merges into */
     /* +0x0054 */ u8 rot_0x54;                /* the round-robin slot the next new id takes */
     /* +0x0055 */ u8 flag_0x55;               /* set when a slot changed */
     /* +0x0056 */ u8 pad_0x0056[0x9C - 0x56];
     /* +0x009C */ union {
         /* +0x009C */ Q_LotEntry lot_0x9C[0xFD];  /* the first weighted lot table */
+        struct {
+            /* +0x009C */ Q_LotEntry lot_e0a_0x9C[0xB];   /* element 0's own table (see `lot_e0b`) */
+            /* +0x00C8 */ Q_LotEntry lot_e0b_0xC8[0xD];   /* its second table: `quest_pair_roll_first` walks both */
+            /* +0x00FC */ Q_LotEntry lot_e1_0xFC[0x18];   /* element 1's table */
+            /* +0x015C */ Q_LotEntry lot_e2_0x15C[0xCD];  /* element 2's table */
+        };
         /* +0x009C */ u8 pad_0x009C[0x3F4];
     };
     /* +0x0490 */ Q_CountSet set_c;
@@ -102,7 +125,15 @@ struct Q_UserData {
     /* +0x3B10 */ u8 pad_0x3B10[0x6000 - 0x3B10];
 };  /* size: 0x6000 */
 
-/* The per-slot "move work" `get_move_work_adrs` indexes; only the fields this unit names are here. */
+/* The per-slot "move work" `get_move_work_adrs` indexes; only the fields this unit names are here.
+ * MEASURED size 0x22E8 (was 0x22E0 approximate): the record is the stride its own allocator clears -
+ * `ef/fn_800CDB2C.cpp`'s `fn_800CF948` sizes slot 0's block as `max * 0x22E8` (`mulli r30,r3,8936` at
+ * 0x800CF9D4) and memsets exactly that (0x800CFA68), and no other site in the DOL indexes a move work by
+ * a different constant (`grep 8936` = 1 site).  The literal and the reach disagree by 4 bytes, which is
+ * the interesting case: the furthest access anything makes is +0x22E3 (`lb_area_change_flag`'s
+ * `stb r0,8931(r3)`, the lobby band's own `flag_0x22E3`), so the inferred reach is 0x22E4 and the last 4
+ * bytes are cleared but never read.  The literal decides - it is what the allocator reserved and what
+ * `max` multiplies - so the tail stays filler. */
 struct Q_MoveWork {
     /* +0x0000 */ u8 pad_0x0000[0xDC];
     /* +0x00DC */ Q_ItemWork* item_work;   /* the item work `move_work_item_work_get` returns */
@@ -120,7 +151,29 @@ struct Q_MoveWork {
     /* +0x22D4 */ u8 state_0x22D4;          /* the state byte `quest_move_state_valid_ck`/`_get` read */
     /* +0x22D5 */ u8 pad_0x22D5[0x7];
     /* +0x22DC */ u8 flag_0x22DC;
-};  /* size: 0x22E0 (approximate) */
+    /* +0x22DD */ u8 pad_0x22DD[0x22E8 - 0x22DD];  /* cleared, never read: the lobby's own view names
+                                                   * +0x22E3, this one reads up to +0x22DC */
+};  /* size: 0x22E8 */
+
+/* One 3-byte entry of the reward-group table `fn_803ABE44` indexes by a group count (clamped to the
+ * last entry) and reads `picks`/`flag` from: the band's own roll table at `.data` 0x805F7AC0. */
+struct Q_RewardGroup {
+    /* +0x0 */ u8 index;   /* the entry's own number, 0..5 */
+    /* +0x1 */ u8 picks;   /* how many roll slots the group fills */
+    /* +0x2 */ u8 flag;    /* the pair kind the rolls are stored with */
+};  /* size: 0x3 */
+
+/* The band's roll-threshold tables (`.data` 0x805F7AB0..0x805F7AF8, claimed and DEFINED by
+ * `src/quest/quest_entry.cpp`): each `chance` table is a run of one byte per pick slot, 32 or 22, in
+ * the same shape `quest_element_clear` builds in-line.  `_a` is the four-pick form `quest_pair_roll_all`
+ * copies, `_b` the two-pick form `quest_pair_roll_first`/`_last` copy and `_c` the one
+ * `quest_monster_setup` copies; each is used as two 8-entry halves.  The reward-group table is
+ * `fn_803ABE44`'s.  Nothing writes any of them. */
+extern u8 quest_pair_chance_tbl_a[0x10];
+extern u8 quest_pair_chance_tbl_b[0x10];
+extern u8 quest_pair_chance_tbl_c[0x10];
+extern u8 quest_pair_chance_tbl_d[0x4];
+extern Q_RewardGroup quest_reward_group_tbl[6];
 
 /* The unit's declarations.  C linkage: the two units that already call into this band
  * (`menu/menu_item_page.cpp`, `lobby/lb_companion_ui.cpp`) declare them inside their own `extern "C"`
@@ -128,9 +181,6 @@ struct Q_MoveWork {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* The save/user block `get_userdata` returns (declared here: its band has no registered owner yet). */
-struct Q_UserData* get_userdata(void);
 
 /* The item work of the local slot, or NULL when the slot has none. */
 Q_ItemWork* move_work_item_work_get(void);
@@ -144,7 +194,7 @@ extern Q_ItemPair* const q_item_pair_tbl_high[];
 
 /* This unit's own `.bss` (claimed and DEFINED by `src/quest/quest_entry.cpp`, `.bss`
  * 0x806C5558..0x806C5858): the band's four 0xC0-byte picked-pair tables.  The quest lot picks write
- * them (`quest_element_clear` refills `_a` from the item work's lot table, `fn_803AB914` fills `_a` at
+ * them (`quest_element_clear` refills `_a` from the item work's lot table, `quest_pair_roll_all` fills `_a` at
  * four offsets), and `quest_item_pair_tbl_copy` moves `_a`/`_b` into a result row's two adjacent 0xC0
  * buffers. */
 extern Q_ItemPair quest_item_pair_tbl_a[0x30];
@@ -166,6 +216,19 @@ s16 quest_item_slot_find(Q_ItemCount* slots, u16 id);
 s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count);
 /* Moves the two first picked-pair tables into a result record's two adjacent 0xC0 buffers (0x803AB3BC). */
 void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b);
+
+/* The arena pair-roll variants `menu/arena_result.cpp`'s `fn_803B2354` dispatches between by quest
+ * flag (0x803AB914 is its fallback, 0x803ABB74 and 0x803ABCDC the two flagged arms): each copies one
+ * of the band's chance tables in, sets the pl skill slots and zeroes all four pair tables, then fills
+ * `quest_item_pair_tbl_a` from the item work's own lot tables.  The first parameter is the caller's
+ * player record - `quest_pl_skill_slot_set` hands it to `Pl_Skill_ck__FP4_PLWUs`, which is what fixes
+ * the type. */
+void quest_pair_roll_all(_PLW* owner, u8 state);
+void quest_pair_roll_first(_PLW* owner, u8 state);
+void quest_pair_roll_last(_PLW* owner, u8 state);
+/* The pl-skill slot fix-up the three rolls call first: the 4-element chance buffer the picks then
+ * walk, and a set/clear mode.  Body unwritten (0x803AB438). */
+void quest_pl_skill_slot_set(_PLW* owner, u8* chance, s32 mode);
 /* The local slot's item work handed to the band below (0x803AA060) with `idx` and 1.  Body unwritten. */
 u32 quest_item_work_notify(s32 idx);
 
@@ -268,6 +331,12 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s3
 #endif
 
 #ifdef __cplusplus
+/* The save/user block `get_userdata` returns - its band has no registered owner, so the declaration
+ * lives here, and at C++ scope like `get_move_work_adrs` below: the map's row is the mangling
+ * `get_userdata__Fv` (0x8004D120), so a C-scope declaration makes the object relocate an unmangled
+ * `get_userdata` that no link input defines and `undefrefs.py` answers NOT READY. */
+struct Q_UserData* get_userdata(void);
+
 /* The move-work accessor this unit reaches every per-slot record through.  Its owner is
  * `ef/fn_800CDB2C.cpp`; that unit's own header cannot carry it (three other headers spell the same
  * mangling with a different return type, so a declaration there breaks ten units on

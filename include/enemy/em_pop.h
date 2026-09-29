@@ -157,6 +157,12 @@ s32 quest_all_player_item_count_sum(u16 id);
 s32 quest_arena_count_get(s32 index);
 s32 quest_arena_need_get(s32 index);
 
+/* Whether any of the item work's three elements is in its entry state: `quest_work_ptr` must be set,
+ * the move work's own +0x22D4 state byte must not be 1, and one of the three element flag words at
+ * +0x94/+0xF4/+0x154 needs bit 4 set together with bit 2 and bit 10 (with or without bit 4 again) -
+ * 0x404 or 0x414.  Forces the pair rolls in `quest_pair_roll_all` (0x803B5E2C). */
+u32 quest_element_state_ck(void);
+
 #ifdef __cplusplus
 }
 #endif

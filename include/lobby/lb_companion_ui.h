@@ -17,6 +17,12 @@
 #include "types.h"
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 
+/* `include/lobby/lb_quest_screen.h` (where `quest_element_pick_ck` belongs) cannot be included from
+ * here: it declares `fmt_803AA41C(s32, f32)` (the owner's two-argument form) where this header's own
+ * list carries the one-argument `fn_803AA41C(s32)`, so the pair trips `illegal function overloading`.
+ * The declaration below is the owner's own signature, so a TU that sees both still agrees. */
+struct QuestWork;
+
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
 typedef struct _mh_ivec2_ {
@@ -501,7 +507,7 @@ void fn_802B45F4(u8 index);
 void fn_803B3074(u8 value, u16 a, s16 b);
 void fn_803B6998(u16 a, u16 b);
 s32 fn_803AA41C(s32 a);
-u32 fn_803AA060(LbCompanionWork* work, u8 index, s32 a);
+u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 void fn_803A9F28(LbCompanionWork* work, LbCompanionSlot* slot, u16 index, u32 a);
 void fn_802AB760(LbRowWork* row, u8 value, u16 word);
 s8 fn_800CF384(void);
