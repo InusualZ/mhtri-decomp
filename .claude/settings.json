@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python tools/units/worktreehook.py create", "timeout": 120 }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python tools/units/worktreehook.py remove", "timeout": 120 }
+        ]
+      }
+    ]
+  }
+}

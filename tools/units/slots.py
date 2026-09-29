@@ -1812,6 +1812,95 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
     return result
 
 
+# --- collect -------------------------------------------------------------------------------------
+
+#: The evidence a lane leaves under its own `.pi/`: `(subdirectory, extension)`.  `release` runs `clean -ffdx`
+#: and `.pi/` is ignored, so anything here that is not copied out before the release is gone.
+EVIDENCE = (("outbox", ".json"), ("notes", ".md"))
+
+
+def unlanded_reason(main: str, n: int) -> str | None:
+    """Why slot `n` must NOT be released yet (the one predicate `collect --release` and the worktree hook share).
+
+    A dirty tree, or a checked-out branch whose content main does not have: both are work a release would
+    detach from HEAD.  `None` means the slot holds nothing that is not already in main.
+    """
+    d = slot_dir(main, n)
+    dirty = slot_dirty(d)
+    if dirty:
+        return "uncommitted changes (%d row(s), e.g. %s)" % (len(dirty), dirty[0])
+    branch = slot_attached_branch(d)
+    if branch and branch_fully_applied(main, branch) is not True:
+        return "branch %s holds commits main does not have" % branch
+    return None
+
+
+def collect(main: str, slot: int | None = None, path: str | None = None, release_after: bool = False,
+            force: bool = False, registry: str | None = None) -> dict:
+    """Pull a finished lane's evidence out of its slot and say what state the slot is in.
+
+    The slot comes from `slot` or from `path` (a subagent's reported worktree path).  Copies the slot's
+    `.pi/outbox/*.json` and `.pi/notes/*.md` into MAIN's `.pi/` - a file MAIN already has is kept when it is at
+    least as new, so a lane that wrote to MAIN directly is never overwritten by an older copy.  Reports the
+    branch, the commits it holds that main does not, the dirty rows and whether a release is safe.
+
+    With `release_after` the slot is released **only when `unlanded_reason` is `None`** (or `force` says the
+    caller has read it): collecting is what makes releasing safe, and it never releases over unlanded work.
+    """
+    claims = _claims()
+    n = slot if slot is not None else slot_of_path(main, path)
+    if n is None:
+        raise SystemExit("REFUSED collect: no slot resolves from %r - pass --slot N or a slot's path" % (path,))
+    d = slot_dir(main, n)
+    if not os.path.isdir(d):
+        raise SystemExit("REFUSED collect: slot %d does not exist (%s)" % (n, d))
+    branch = slot_attached_branch(d)
+    copied, kept = [], []
+    for sub, ext in EVIDENCE:
+        src_dir = os.path.join(d, ".pi", sub)
+        if not os.path.isdir(src_dir):
+            continue
+        for name in sorted(os.listdir(src_dir)):
+            src = os.path.join(src_dir, name)
+            if not name.endswith(ext) or not os.path.isfile(src):
+                continue
+            dst = os.path.join(main, ".pi", sub, name)
+            if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src):
+                kept.append("%s/%s" % (sub, name))
+                continue
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+            copied.append("%s/%s" % (sub, name))
+    commits = []
+    if branch:
+        head = git(["rev-parse", "HEAD"], main)
+        commits = [ln for ln in git(["log", "--format=%h %s", "%s..%s" % (head, branch)], main).splitlines() if ln]
+    reason = unlanded_reason(main, n)
+    out = {"slot": n, "dir": d, "branch": branch, "slug": claims.slug_of_branch(branch) if branch else None,
+           "copied": copied, "kept": kept, "commits": commits, "dirty": slot_dirty(d),
+           "unlanded": reason, "released": False}
+    if release_after:
+        if reason and not force:
+            out["kept_because"] = reason
+        else:
+            out["release"] = release(main, slot=n, branch=branch, registry=registry, force=force)
+            out["released"] = True
+    return out
+
+
+def collect_lines(out: dict) -> list[str]:
+    """The human summary of `collect`."""
+    lines = ["slot %d  %s" % (out["slot"], out["branch"] or "(detached)")]
+    lines.append("  evidence copied to MAIN/.pi: %s" % (", ".join(out["copied"]) or "none"))
+    if out["kept"]:
+        lines.append("  already in MAIN and at least as new: %s" % ", ".join(out["kept"]))
+    lines.append("  commits main does not have: %d%s" % (len(out["commits"]),
+                 "".join("\n    " + c for c in out["commits"][:10])))
+    lines.append("  release: %s" % ("DONE" if out["released"] else
+                 ("kept - %s" % out["unlanded"] if out["unlanded"] else "safe (nothing unlanded)")))
+    return lines
+
+
 # --- spawn ---------------------------------------------------------------------------------------
 
 def profile_for_kind(kind: str) -> str:
@@ -3009,6 +3098,42 @@ def selftest() -> int:
         release(repo, slot=1, unit="lane/spawn-reclaim", rescue=False)
         check("... and the pool is left as it was found", free_count(repo), 2)
 
+        # (g) collect: evidence out of the slot, the unlanded verdict, and a release that never eats work
+        with open(os.path.join(repo, ".git", "info", "exclude"), "a", encoding="utf-8") as fh:
+            fh.write("\n.pi/\n")               # the real repo ignores `.pi/`; the fixture must too
+        cs = acquire(repo, "lane/collect-a", slot=1)
+        d_c = cs["dir"]
+        os.makedirs(os.path.join(d_c, ".pi", "outbox"), exist_ok=True)
+        os.makedirs(os.path.join(d_c, ".pi", "notes"), exist_ok=True)
+        with open(os.path.join(d_c, ".pi", "outbox", "collect-a.json"), "w") as fh:
+            fh.write("{}")
+        with open(os.path.join(d_c, ".pi", "notes", "collect-a.md"), "w") as fh:
+            fh.write("note")
+        with open(os.path.join(d_c, ".pi", "notes", "ignored.txt"), "w") as fh:
+            fh.write("not evidence")
+        col = collect(repo, path=d_c)
+        check("collect resolves the slot from a path", col["slot"], 1)
+        check("... copies the outbox and notes evidence",
+              sorted(col["copied"]), ["notes/collect-a.md", "outbox/collect-a.json"])
+        check("... into MAIN's .pi", os.path.exists(os.path.join(repo, ".pi", "outbox", "collect-a.json")), True)
+        check("... and only evidence files", os.path.exists(os.path.join(repo, ".pi", "notes", "ignored.txt")), False)
+        check("a clean slot with no commits holds nothing unlanded", col["unlanded"], None)
+        again = collect(repo, slot=1)
+        check("a second collect keeps what MAIN already has (as new)",
+              (again["copied"], sorted(again["kept"])), ([], ["notes/collect-a.md", "outbox/collect-a.json"]))
+        commit(d_c, "collect: unlanded content")
+        held = collect(repo, slot=1, release_after=True)
+        check("collect reports the commit main does not have", len(held["commits"]), 1)
+        check("... calls the slot unlanded", "holds commits main does not have" in (held["unlanded"] or ""), True)
+        check("... and --release REFUSES over it (kept, not released)",
+              (held["released"], "kept_because" in held), (False, True))
+        check("... leaving the branch attached", slot_attached_branch(d_c), cs["branch"])
+        land_into_main(cs["branch"], msg="land: collect-a")
+        landed = collect(repo, slot=1, release_after=True)
+        check("once landed, --release frees the slot", landed["released"], True)
+        check("... and the slot is free again", free_count(repo), 2)
+        check("an unknown path is refused", _raises(lambda: collect(repo, path=os.path.join(tmp, "nowhere"))), True)
+
     NINJA_RUNNER = saved_ninja
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -3073,6 +3198,13 @@ def main() -> int:
     sp.add_argument("--force", action="store_true",
                     help="take a slot whose `.used` sentinel names a claim whose owner is gone")
     sp.add_argument("--json", action="store_true")
+    co = sub.add_parser("collect", help="copy a finished lane's evidence out of its slot into MAIN/.pi and "
+                                         "report what the slot holds (--release frees it when nothing is unlanded)")
+    co.add_argument("--slot", type=int, default=None)
+    co.add_argument("--path", default=None, help="a slot's path, as a subagent's result reports it")
+    co.add_argument("--release", action="store_true", help="release the slot after collecting, if nothing is unlanded")
+    co.add_argument("--force", action="store_true", help="with --release: release even over unlanded work")
+    co.add_argument("--json", action="store_true")
     s = sub.add_parser("status", help="every slot, its lock and whether its build tree is current")
     s.add_argument("--json", action="store_true")
     v = sub.add_parser("verify", help="validate each slot's build tree against MAIN's current map/DOL")
@@ -3104,6 +3236,13 @@ def main() -> int:
         print("  present: %s" % (out["present"] or "none"))
         for n, note in out["notes"]:
             print("  slot %d: %s" % (n, note))
+        return 0
+    if args.cmd == "collect":
+        out = collect(main_wt, args.slot, args.path, args.release, args.force)
+        if args.json:
+            print(json.dumps(out, indent=2))
+        else:
+            print("\n".join(collect_lines(out)))
         return 0
     if args.cmd == "acquire":
         if args.dry_run:
