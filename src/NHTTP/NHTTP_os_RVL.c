@@ -326,7 +326,7 @@ BOOL NHTTPi_isRecvBufFull(NHTTPRecvBuf* info, u32 size) {
 
 /* 0x80515768 (0xC): clear the request-info record. */
 void NHTTPi_InitRequestInfo(NHTTPRequestInfo* info) {
-    info->field_0x00 = 0;
+    info->active = NULL;
 }
 
 /* 0x80515010 (0x98): assert the caller's thread.  `offThread` selects which side is legal - with
