@@ -602,7 +602,7 @@ def _data_step(lines: list[str]) -> None:
     lines.append("    --unblocks '<the rows/symbols it unblocks>'")
     lines.append("```")
     lines.append("")
-    lines.append("That writes `tools/units/data-requests.json` (deduplicated, byte-deterministic). It is only "
+    lines.append("That writes `.pi/data-requests.json` (gitignored, deduplicated, byte-deterministic; the orchestrator's `collect` merges it into MAIN's). It is only "
                  "the **filing channel**: the ruling is the orchestrator's, so raise the request through the "
                  "supervisor protocol - never edit `splits.txt` yourself.")
 

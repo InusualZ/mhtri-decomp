@@ -1835,6 +1835,27 @@ def unlanded_reason(main: str, n: int) -> str | None:
     return None
 
 
+def _merge_data_requests(main: str, slot_root: str) -> int:
+    """Merge the data-claim requests a lane filed in its own `.pi/data-requests.json` into MAIN's register.
+
+    The register is a deduplicated set (`dataqueue.merge_request`), so a plain file copy would drop MAIN's
+    other lanes' rows.  Returns how many rows were added or changed.
+    """
+    from units import dataqueue as dq
+    theirs = dq.load_requests(slot_root)
+    if not theirs:
+        return 0
+    merged, changed = dq.load_requests(main), 0
+    for row in theirs:
+        merged, did = dq.merge_request(merged, row)
+        changed += 1 if did else 0
+    if changed:
+        dst = os.path.join(main, dq.REQUESTS_REL)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        dq.write_requests(dst, dq.render_requests(merged))
+    return changed
+
+
 def collect(main: str, slot: int | None = None, path: str | None = None, release_after: bool = False,
             force: bool = False, registry: str | None = None) -> dict:
     """Pull a finished lane's evidence out of its slot and say what state the slot is in.
@@ -1871,13 +1892,15 @@ def collect(main: str, slot: int | None = None, path: str | None = None, release
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
             copied.append("%s/%s" % (sub, name))
+    requests_merged = _merge_data_requests(main, d)
     commits = []
     if branch:
         head = git(["rev-parse", "HEAD"], main)
         commits = [ln for ln in git(["log", "--format=%h %s", "%s..%s" % (head, branch)], main).splitlines() if ln]
     reason = unlanded_reason(main, n)
     out = {"slot": n, "dir": d, "branch": branch, "slug": claims.slug_of_branch(branch) if branch else None,
-           "copied": copied, "kept": kept, "commits": commits, "dirty": slot_dirty(d),
+           "copied": copied, "kept": kept, "requests_merged": requests_merged, "commits": commits,
+           "dirty": slot_dirty(d),
            "unlanded": reason, "released": False}
     if release_after:
         if reason and not force:
@@ -1892,6 +1915,8 @@ def collect_lines(out: dict) -> list[str]:
     """The human summary of `collect`."""
     lines = ["slot %d  %s" % (out["slot"], out["branch"] or "(detached)")]
     lines.append("  evidence copied to MAIN/.pi: %s" % (", ".join(out["copied"]) or "none"))
+    if out.get("requests_merged"):
+        lines.append("  data-claim requests merged into MAIN/.pi/data-requests.json: %d" % out["requests_merged"])
     if out["kept"]:
         lines.append("  already in MAIN and at least as new: %s" % ", ".join(out["kept"]))
     lines.append("  commits main does not have: %d%s" % (len(out["commits"]),
@@ -3132,6 +3157,19 @@ def selftest() -> int:
         landed = collect(repo, slot=1, release_after=True)
         check("once landed, --release frees the slot", landed["released"], True)
         check("... and the slot is free again", free_count(repo), 2)
+        req_row = {"unit": "Lane/unit", "section": ".data", "start": 0x1000, "end": 0x1010, "size": 16,
+                   "evidence": "e", "unblocks": "u"}
+        other_row = dict(req_row, unit="Other/unit", start=0x2000, end=0x2010)
+        from units import dataqueue as _dq
+        _dq.write_requests(os.path.join(repo, _dq.REQUESTS_REL), _dq.render_requests([other_row]))
+        cs2 = acquire(repo, "lane/collect-b", slot=1)
+        _dq.write_requests(os.path.join(cs2["dir"], _dq.REQUESTS_REL), _dq.render_requests([req_row]))
+        col2 = collect(repo, slot=1)
+        check("collect merges a lane's data requests into MAIN's register", col2["requests_merged"], 1)
+        check("... keeping MAIN's other rows",
+              sorted(r["unit"] for r in _dq.load_requests(repo)), ["Lane/unit", "Other/unit"])
+        check("... and a second collect adds nothing", collect(repo, slot=1)["requests_merged"], 0)
+        release(repo, slot=1, unit="lane/collect-b", rescue=False)
         check("an unknown path is refused", _raises(lambda: collect(repo, path=os.path.join(tmp, "nowhere"))), True)
 
     NINJA_RUNNER = saved_ninja
