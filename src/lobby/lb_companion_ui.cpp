@@ -734,7 +734,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
         if (companion != NULL) {
             if (req->sel_0x04.bytes_0x00.d_0x03 == 0) {
                 if (fn_8042CC20() != 0 && fn_803AA41C(1) == 0 &&
-                    fn_803AA060(companion, req->mask_0x08.byte_0x00, 1) != 1 &&
+                    quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1 &&
                     (s8)companion->step_0x2C != 4) {
                     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x16);
                     cmd.flag_0x08 = req->mask_0x08.byte_0x00;
@@ -743,7 +743,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
                     fn_8042C9C8(&cmd, 0xC);
                 }
             } else if (work->state_0xFA <= 2 && fn_803AA41C(1) == 0 &&
-                       fn_803AA060(companion, req->mask_0x08.byte_0x00, 1) != 1) {
+                       quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1) {
                 index = req->mask_0x08.byte_0x00;
                 fn_803A9F28(companion, &companion->slots_0x94[index], (u16)index, 0);
             }
