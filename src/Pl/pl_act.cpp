@@ -254,6 +254,7 @@
 #include "enemy/enemy_control.h"
 #include "ef/fn_800CDB2C.h"   /* my_player_no (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "Pl/bss_pool.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* The actor the whole Pl_* family takes as its first argument. Only the offsets this unit touches are named;
@@ -267,8 +268,6 @@ struct _CP_VECTOR {
 
 /* `nw4r::math::VEC3` / `MTX34` come from `nw4r/math.h`, reached through `enemy_control.h`
  * (rule 1: the layout is defined once).  This file used to carry a second copy. */
-
-extern u8 lbl_806AB848[];
 
 /* One 4-byte entry of the actor's 24-slot item table at 0x278: an item id and a signed value.
  * Pl/pl_skill.cpp carries the same type as `_SLOTENT`; the two belong in one Pl-wide header. */
@@ -1478,8 +1477,8 @@ extern "C" u8 fn_8027D050(_PLW* self)
     }
     if ((self->unk364 & 0xE0000007) != 0) {
         for (s32 i = 0; i < 10; i++) {
-            if (lbl_806AB848[i * 24 + self->unk008 * 264 + 20] != 0) {
-                v = lbl_806AB848[self->unk008 * 264 + i * 24 + 20];
+            if (pl_move_work[self->unk008][i].carve_0x14 != 0) {
+                v = pl_move_work[self->unk008][i].carve_0x14;
                 break;
             }
         }

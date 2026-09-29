@@ -13,6 +13,9 @@ Sections:
 	.sdata2     type:rodata align:4
 	.sbss2      type:bss align:32
 
+Pl/bss_pool.cpp:
+	.bss        start:0x806AB848 end:0x806AC8A8
+
 main.cpp:
 	extab       start:0x800066E0 end:0x80006770
 	extabindex  start:0x8001E480 end:0x8001E558

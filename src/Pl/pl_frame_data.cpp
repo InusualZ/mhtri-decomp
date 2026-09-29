@@ -31,9 +31,9 @@
  *
  * Residual: the `.sdata2` run that follows this one, 0x80799F98-0x80799FDC (17 words), is **not**
  * ours: it was claimed by `Pl/pl_act_data.cpp`, which owns it and declares its words in
- * `Pl/pl_act_data.h`.  `lbl_806AB848` (`.bss` 0x806AB848, 0x420 B, declared in
- * `Pl/fn_8025F088.h`) is a different pool shared by 11 units - the target object of
- * `Pl/fn_8025F088.cpp` carries no `.bss` at all - so its rule 12 row is still open.
+ * `Pl/pl_act_data.h`.  The band's shared `.bss` collision-work run (`pl_move_work` and the collision
+ * arrays) is a different pool: it now has its own data-only owner, `Pl/bss_pool.cpp`
+ * (`Pl/bss_pool.h`).
  */
 
 #include "types.h"

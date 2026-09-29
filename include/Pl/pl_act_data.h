@@ -28,9 +28,10 @@
  * `pl_frame_window_<n>`, any other constant is `pl_float_<value>`.  Each role is the load site that
  * identifies it, so a later pass can refine the name where the value alone does not decide it.
  *
- * This unit owns this run only.  `lbl_806AB848` (`.bss` 0x806AB848, 0x420 B, declared in
- * `Pl/fn_8025F088.h`) is a different pool shared by 11 units, and the target object of
- * `Pl/fn_8025F088.cpp` carries no `.bss` at all, so it is not this unit's.
+ * This unit owns this run only.  The `.bss` collision-work run that follows the two `.sdata2` runs
+ * (the move-work table, the hit-box and land tables, the per-slot collision results) is a different
+ * pool shared by the `Pl` ground/hit collision band, and it has its own data-only owner,
+ * `Pl/bss_pool.cpp` (`Pl/bss_pool.h`), so it is not this unit's.
  */
 #ifndef MHTRI_PL_ACT_DATA_H
 #define MHTRI_PL_ACT_DATA_H

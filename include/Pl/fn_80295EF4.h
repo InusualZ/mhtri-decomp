@@ -1,9 +1,7 @@
 /*
- * The types and the unowned-symbol declarations `src/Pl/fn_80295EF4.cpp` needs (docs/plan.md 6.5
- * rules 3/4).  The two records below are shared with the neighbouring Pl bands (the land table
- * `lbl_806AC088` and the hit registry are walked by `Pl/fn_8028F66C.cpp`'s range as well), so this
- * header is where they live until the band's own owner header exists - see the unit's
- * `config_requests` entry.
+ * `Pl/fn_80295EF4.cpp`'s hit-registry record and its remaining unowned declaration (docs/plan.md 6.5
+ * rules 3/4).  The array types this band reads are owned by `Pl/bss_pool.cpp`'s header
+ * `Pl/bss_pool.h`, which `src/Pl/fn_80295EF4.cpp` includes (rule 2).
  */
 #ifndef MHTRI_PL_FN_80295EF4_H
 #define MHTRI_PL_FN_80295EF4_H
@@ -48,47 +46,9 @@ struct HitRegistry {
     /* +0x0E */ u16 unused_0x0E;
 };
 
-/* One cell of the land table (`.bss` `lbl_806AC088`, 15 records of 0x88 bytes - the count and the
- * stride are the `__construct_array` call `fn_80297C30` makes with `fn_80297D9C` as the element
- * constructor).  The four 0xC-byte vectors are the elements that constructor zeroes; `box_min_0x48`
- * /`box_max_0x54` are the AABB `fn_80296368` tests a point against (its lower bounds are read at
- * +0x48/+0x50 and its upper bounds at +0x54/+0x5C); the two accessor pairs `dim0_0x34`..`cells_0x3C`
- * and `dim0_0x74`..`cells_0x78` are the 3-D grids `fn_802969A8`/`fn_802969D0` index and
- * `fn_802963B0`/`fn_802963FC` range-check - the names are the index each dimension bounds, read out
- * of the index arithmetic, not a guess.
- * size: 0x88 */
-struct LandData {
-    /* +0x00 */ u8 unused_0x00[0x0C];
-    /* +0x0C */ nw4r::math::VEC3 vec_0x0C;
-    /* +0x18 */ nw4r::math::VEC3 vec_0x18;
-    /* +0x24 */ u8 unused_0x24[0x30 - 0x24];
-    /* +0x30 */ s32 dim_z_0x30;        /* grid A: third index; `fn_802963FC` bounds `z` by it */
-    /* +0x34 */ s32 dim_y_0x34;        /* grid A: second index (the x stride) */
-    /* +0x38 */ s32 dim_x_0x38;        /* grid A: first index */
-    /* +0x3C */ u32* cells_0x3C;      /* grid A: the word each cell holds */
-    /* +0x40 */ u8 unused_0x40[0x48 - 0x40];
-    /* +0x48 */ nw4r::math::VEC3 box_min_0x48;
-    /* +0x54 */ nw4r::math::VEC3 box_max_0x54;
-    /* +0x60 */ u8 unused_0x60[0x6C - 0x60];
-    /* +0x6C */ s32 dim_z_0x6C;        /* grid B: third index; `fn_802963B0` bounds `z` by it */
-    /* +0x70 */ s32 dim_y_0x70;        /* grid B: second index (the x stride) */
-    /* +0x74 */ s32 dim_x_0x74;        /* grid B: first index */
-    /* +0x78 */ u32* cells_0x78;      /* grid B: the word each cell holds */
-    /* +0x7C */ u8 unused_0x7C[0x88 - 0x7C];
-};
-
-/* The 0x3C-byte box record `lbl_806ABC78` holds ten of (the `__construct_array` call `fn_80297C30`
- * makes with `fn_80297DE8` as the element constructor): four 0xC-byte vectors behind an 8-byte
- * header, plus a trailing word the constructor does not touch.
- * size: 0x3C */
-struct PlHitBox {
-    /* +0x00 */ u8 unused_0x00[0x08];
-    /* +0x08 */ nw4r::math::VEC3 vec_0x08;
-    /* +0x14 */ nw4r::math::VEC3 vec_0x14;
-    /* +0x20 */ nw4r::math::VEC3 vec_0x20;
-    /* +0x2C */ nw4r::math::VEC3 vec_0x2C;
-    /* +0x38 */ u8 unused_0x38[0x3C - 0x38];
-};
+/* The land record (`.bss` `pl_land_data`, 15 x 0x88) and the 0x3C-byte hit-box record (`.bss`
+ * `pl_hit_box`, 10 of them) are declared by their owner's header `Pl/bss_pool.h`, which
+ * `src/Pl/fn_80295EF4.cpp` includes (rule 2); the layouts live there. */
 
 /* The 0x14-byte position record `fn_80297BE4` copies, `fn_802977E4` initialises and the joint
  * followers write through `fn_8029971C`/`fn_80299780`.  `fn_802977E4` zeroes the eight header bytes
@@ -109,13 +69,12 @@ struct PlHitPoint {
 extern "C" {
 #endif
 
-/* The three globals this unit's functions operate on; their sizes are the map's `size:` fields
- * (`lbl_806AC880` 0x28, `lbl_806AC088` 0x7F8, `lbl_806AC8A8` 0x10 - the last one through the
- * `HitRegistry` type above).  All three sit in `.bss`, which this unit does not claim. */
-extern u32 lbl_806AC880[0x28 / 4];
+/* The remaining globals this unit's functions operate on: the hit registry (`.bss` `lbl_806AC8A8`,
+ * 0x10, through the `HitRegistry` type above) and the 0x25-byte tile-id table `lbl_805CDC88`
+ * (`.data`).  Both are unowned, so they are declared here; the land table `pl_land_data` and the
+ * hit-id list `pl_hit_id_list` moved to their owner's header `Pl/bss_pool.h` (rule 2). */
 /* The 0x25-byte tile-id table `fn_8029B8F4` indexes (`.data`; unowned, so declared here). */
 extern u8 lbl_805CDC88[];
-extern LandData lbl_806AC088[0x7F8 / 0x88];
 extern HitRegistry lbl_806AC8A8;
 
 #ifdef __cplusplus

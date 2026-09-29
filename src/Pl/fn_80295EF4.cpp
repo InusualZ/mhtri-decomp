@@ -71,6 +71,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
 #include "Pl/fn_80295EF4.h"
+#include "Pl/bss_pool.h"   /* the owner of the `.bss` arrays `pl_land_data` / `pl_hit_id_list` (rule 2) */
 
 /* The pool constants this pass needs: 0.0f (`lbl_8079A330`), 1.0f (`lbl_8079A338`) and the pair
  * `lbl_8079A380` = 0.0f / `lbl_8079A3A4` = 1.0f.  They are declared, never defined (invariant 8.4). */
@@ -95,7 +96,7 @@ extern "C" u32 fn_802961F8(u32 key, u32* list, s32 count)
 /* The same scan over the global id array. */
 extern "C" u32 fn_80296228(u32 key, s32 count)
 {
-    u32* list = lbl_806AC880;
+    u32* list = pl_hit_id_list;
 
     while (count > 0) {
         if (key == *list) {
@@ -218,7 +219,7 @@ u16 get_hit_id(void)
 }
 
 /* ------------------------------------------------------------------------------------------------ *
- * The land table (`.bss` `lbl_806AC088`, 15 x 0x88).
+ * The land table (`.bss` `pl_land_data`, 15 x 0x88).
  * ------------------------------------------------------------------------------------------------ */
 
 /* Zeroes the four vectors of one land record. */
@@ -234,7 +235,7 @@ extern "C" LandData* fn_80297D9C(LandData* self)
 /* Clears the whole table. */
 extern "C" void fn_8029708C(void)
 {
-    memset(lbl_806AC088, 0, 0x7F8);
+    memset(pl_land_data, 0, 0x7F8);
 }
 
 /* ------------------------------------------------------------------------------------------------ *
@@ -306,7 +307,7 @@ extern "C" u32 fn_802969D0(s32 x, s32 y, s32 z, LandData* land)
 }
 
 /* ------------------------------------------------------------------------------------------------ *
- * The 0x3C-byte box record (`.bss` `lbl_806ABC78`, 10 records).
+ * The 0x3C-byte box record (`.bss` `pl_hit_box`, 10 records).
  * ------------------------------------------------------------------------------------------------ */
 
 /* Zeroes the four vectors of one box record. */

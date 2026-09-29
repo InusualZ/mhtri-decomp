@@ -31,9 +31,9 @@
  *
  * Measured when the claim landed: the whole-project report's totals are unchanged except
  * `total_units` (the run changes owner, it does not change size) and `ninja build/RMHE08/ok` stays
- * green.  Residual: `lbl_806AB848` (`.bss`, 0x420 B, shared by 11 units) is declared in
- * `Pl/fn_8025F088.h` and is **not** this run's - the target object carries no `.bss` - so its rule
- * 12 row stays until a `.bss` owner is registered for it.
+ * green.  Residual: the `.bss` move-work table at 0x806AB848 is **not** this run's - the target
+ * object carries no `.bss` - so it was declared in `Pl/fn_8025F088.h` until the run got its own
+ * data-only owner, `Pl/bss_pool.cpp` (its header is `Pl/bss_pool.h`).
  */
 
 #include "types.h"
