@@ -38,13 +38,13 @@ class NetworkCommunityPat;
 /* The slot +0x0C element: a class derived from the root whose table the map names
  * `NetworkLayer_VTable` (0x805FB5D0).  The installed object is built by `fn_803E0C18`, which calls
  * `fn_803DF2EC` (the root, which stores 0x805FB5D0) first. */
-class NetworkLayer;
+class NetworkLayerPat;
 
 typedef struct NetworkPat {
     /* +0x00 */ NetworkSessionManagerPat* sessionManager_00;
     /* +0x04 */ void* slot04_04;   /* never installed in this build - see `clearNetworkPatSlot04` */
     /* +0x08 */ NetworkCommunityPat* community_08;
-    /* +0x0C */ NetworkLayer* layer_0C;
+    /* +0x0C */ NetworkLayerPat* layer_0C;
     /* +0x10 */ u32 installed_10;  /* ctor sets -1; bits 0..3 enable slots 0..3 for the +0x18 dispatch */
 } NetworkPat;   /* size: 0x14 */
 
@@ -55,16 +55,16 @@ extern "C" {
 /* Getters.  `index` is signed (`cmpwi r4,0`) and only 0 is accepted. */
 NetworkSessionManagerPat* getNetworkSessionManagerPat(NetworkPat* self, s32 index);
 NetworkCommunityPat* getNetworkCommunityPat(NetworkPat* self, s32 index);
-NetworkLayer* getNetworkLayerPat(NetworkPat* self, s32 index);
+NetworkLayerPat* getNetworkLayerPat(NetworkPat* self, s32 index);
 
 /* Installers: take the slot only when it is empty. */
 s32 setNetworkCommunityPat(NetworkPat* self, NetworkCommunityPat* value);
-s32 setNetworkLayerPat(NetworkPat* self, NetworkLayer* value);
+s32 setNetworkLayerPat(NetworkPat* self, NetworkLayerPat* value);
 
 /* Uninstallers: clear the slot only when `value` is the entry it holds, else -1. */
 s32 clearNetworkSessionManagerPat(NetworkPat* self, NetworkSessionManagerPat* value);
 s32 clearNetworkCommunityPat(NetworkPat* self, NetworkCommunityPat* value);
-s32 clearNetworkLayerPat(NetworkPat* self, NetworkLayer* value);
+s32 clearNetworkLayerPat(NetworkPat* self, NetworkLayerPat* value);
 /* untyped: opaque handle - slot +0x04 is never installed (the DOL has no setter for it) */
 s32 clearNetworkPatSlot04(NetworkPat* self, void* value);
 

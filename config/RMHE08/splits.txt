@@ -1352,6 +1352,11 @@ Network/initNetworkSessionStable.cpp:
 	extabindex  start:0x8003AB9C end:0x8003ABA8
 	.text       start:0x803DEA30 end:0x803DEB38
 
+Network/NetworkLayerPatStep.cpp:
+	extab       start:0x8001ACC0 end:0x8001ACC8
+	extabindex  start:0x8003B010 end:0x8003B01C
+	.text       start:0x803E44C8 end:0x803E4888
+
 Network/network_state.cpp:
 	extab       start:0x8001BD9C end:0x8001BE24
 	extabindex  start:0x8003C06C end:0x8003C138

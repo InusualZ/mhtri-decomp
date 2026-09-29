@@ -2328,6 +2328,13 @@ config.libs = [
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/network_state.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Registered once, at its final home: proposal `803E44C8_fn_803E44C8` (`.text`
+            # 0x803E44C8..0x803E4888, 1 function / 960 B) - `NetworkLayerPat`'s request state machine
+            # (vtable slot +0x104 of `lbl_805FC1E0`), with its own extab/extabindex record.  The name is a
+            # GUESS (unit header).  `-O3` like the sibling session units: measured with the lib's
+            # `-O4,p` (everything else equal) the unit's one function scores 90.14167 %, against 100.00000 % at `-O3`.
+            Object(NonMatching, "Network/NetworkLayerPatStep.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over
             # the unit's 79 rows, the lib's `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and
             # getReflectName3C at 51.28 where `-O3` puts all four at 100.00, and `-inline auto` scores

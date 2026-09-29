@@ -386,6 +386,45 @@ extern const char lbl_806036B0[];
  * unit that also includes `Network/fn_803D3CE8.h` cannot take them from here). */
 #include "unsplit/NetworkData.h"
 
+/* ---- the layer request state machine's callees (0x803DECF0..0x803EF4C8, 0x8040144C..0x80401B68) ---- */
+
+/* The request record `NetworkRequest_getError` copies out: the three words `NetworkRequest_setError`
+ * stores under the request's mutex (+0x54/+0x58/+0x5C of `NetworkRequest`). */
+typedef struct NetworkRequestError {
+    u32 code_00;
+    u32 arg_04;
+    u32 arg_08;
+} NetworkRequestError;   /* size: 0x0C */
+
+class NetworkLayerPat;             /* include/Network/NetworkLayerPat.h */
+class NetworkSessionManagerPat;    /* include/Network/fn_803D3CE8.h */
+typedef struct NetworkRequest NetworkRequest;   /* include/Network/fn_803D3CE8.h */
+
+/* 0x803E3598 - copies the request's error record out under its mutex; false while none is set. */
+s32 NetworkRequest_getError(NetworkRequest* request, NetworkRequestError* out);
+/* GUESS on both names: 0x803EF3C0 and 0x803EF4C8 are the siblings of `setCollectionLog` for the two
+ * fixed codes the state machine's flag tests report (0x80060033 and 0x80060012); the names follow the
+ * flag bits that select them (bit 0 = the session dropped, bit 1 = the request was cancelled). */
+void setCollectionLogSessionLost(NetworkLayerPat* self, NetworkRequest* request);
+void setCollectionLogAborted(NetworkLayerPat* self, NetworkRequest* request);
+/* 0x803EF568 - records `code` (+ two arguments) as the request's error and reports it to the server. */
+void setCollectionLog(NetworkLayerPat* self, NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b);
+/* GUESS: 0x803EBAF0 hands one layer event (kind 3 = error, kind 4 = done) to the callback object the
+ * layer holds, after posting `info` to the network singleton. */
+void notifyLayerEvent(NetworkLayerPat* self, u32 kind, s32 code, u32 has_info, NetworkRequestError* info,
+                      u32 context);
+/* GUESS: 0x803EB9D4 walks the layer's 100 child slots and releases each finished one. */
+void pollLayerSlots(NetworkLayerPat* self);
+/* GUESS: 0x803EBA5C reports the layer's slot counts as one kind-0x14 event. */
+void notifyLayerSlotSummary(NetworkLayerPat* self);
+/* GUESS: 0x803DECF0 clears the session manager's busy byte and releases its buffers. */
+void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self);
+/* The layer requests: each writes its op-code and returns the request id (the callee narrows it to 16
+ * bits, but its caller stores the full register, so the declared type is the wide one - playbook 66). */
+u32 sendReqLayerUp(NetworkInstance* self);
+u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg);
+u32 sendReqLayerUserList(NetworkInstance* self);
+
 }
 
 /* `__dl__FPv`'s real spelling (the caller's `operator delete`); see the ef units' convention.

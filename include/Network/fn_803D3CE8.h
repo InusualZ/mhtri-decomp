@@ -171,7 +171,7 @@ typedef struct NetworkRequestDesc {
 } NetworkRequestDesc;
 
 typedef struct NetworkRequest {
-    u32 unused_00;              /* +0x00 */
+    s32 state_00;               /* +0x00 - the request's state-machine step */
     u32 unused_04;              /* +0x04 */
     u32 unused_08;              /* +0x08 */
     NetworkBuffer* buffer;  /* +0x0C */
@@ -557,6 +557,7 @@ public:
     virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
     GameSpyInterfaceThread();
     void canClose();
+    s32 initialize();
     void armCancel();
     bool requestClose();
     /* The error handshake `move` runs (all three are plain members - the target calls them by their
