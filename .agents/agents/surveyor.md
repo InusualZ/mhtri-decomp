@@ -147,3 +147,13 @@ The canonical table for rules 1-12 is `docs/plan.md` section 6.5; this block is 
 
 **Enforcement is a tool, not a promise.** `tools/units/stylelint.py` (roadmap 7.21) reports each rule with `file:line`, per unit and as a backlog, and **`land.py verify` refuses a batch that adds a violation** — a rule enforced by remembering is not a rule. Rule 7 has **no exemption and no deferral**: every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` in `src/` is a finding, whoever owns the symbol. The **only** grandfather is the gate's `--diff`: an existing finding never blocks a landing, while an *added* one refuses - so committed work is not revoked, and the mounted debt cannot grow. A file with no bodies is held to the rule too, and a `rule 7 deferred` comment exempts nothing. **Rule 10 is checked the same way**: `tools/units/vtableaudit.py` reports every owned-but-unemitted code-pointer run and every source write of a `+0x00` function-pointer-table pointer, `python tools/units/vtableaudit.py --diff <ref>` is the comparison the gate uses, and the row refuses a batch whose rule-10 set grows - add-only, exactly like the lint, because the tree already carries some. **Rule 12 is checked the same way**: `tools/units/stylelint.py` reports every `extern` of a data symbol that no registered `splits.txt` range covers - the unit that reads or writes the bytes claims the range and matches it - and the gate's `--diff` grandfathers the sites the tree already carries while refusing an *added* one.
 <!-- SECTION-6.5-RULES-END -->
+
+## Commit messages
+
+Follow the convention in AGENTS.md ("Commit messages follow one convention"): `<category>: <message>`, then an
+optional long description. The category names **where the change lives and mirrors the tree** - `game/<module>`
+(the `src/` directory), `tools/<area>` (the `tools/` grouping), `config/<what>`, `docs/<topic>`,
+`agents/<profile|policy>`, `repo/<area>` - and the list is open with no catch-all. The message is **imperative,
+says what was made, and is at most 120 characters**. A long description is optional and **structural**: files, units,
+symbols, measured numbers, sections or claims added. It never carries reasoning - no why, no alternatives, no account
+of the work; that goes in the unit header, the plan docs, the outbox or `.pi/notes/`.

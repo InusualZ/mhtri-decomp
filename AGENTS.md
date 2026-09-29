@@ -584,9 +584,29 @@ regression if the hash goes red.
 
 ## Conventions
 
-* **Commit messages** (only once a commit has been approved — see Non-negotiables rule 6): short imperative
-  subject, area-prefixed, e.g. `Camellia: match Camellia_Ekeygen`, `RMHE08: refresh symbols.txt`,
-  `configure.py: add REL flags`. Describe *why* when fixing a mismatch.
+* **Commit messages follow one convention**: `<category>: <message>`, then an optional long description. Approved
+  the same way as anything else — see Non-negotiables rule 6, and pull the local-only block out first (rule 8).
+  * **`<category>` names where the change lives, and mirrors the tree**:
+    * **`game/<module>`** — decompilation work. The module is the `src/` directory: `game/network`, `game/quest`,
+      `game/menu`, `game/hud`, `game/pl`, `game/enemy`, `game/ef`, `game/g3d`, `game/nw24`, `game/dwci`,
+      `game/camellia`, `game/os`, `game/pl` …
+    * **`tools/<area>`** — our tooling, by the `tools/` grouping it lives in: `tools/land`, `tools/stylelint`,
+      `tools/slots`, `tools/agents`, `tools/symbols`, `tools/objdiff`, `tools/flags`, `tools/splits` …
+    * **`config/<what>`** — a `configure.py` / `symbols.txt` / `splits.txt`-only change: `config/flags`,
+      `config/symbols`, `config/splits`.
+    * **`docs/<topic>`** — documentation that is not this file: `docs/plan`, `docs/pipeline`, `docs/matching`.
+    * **`agents/<profile|policy>`** — a subagent profile (`agents/decompiler`, `agents/surveyor`) or this file
+      (`agents/policy`).
+    * **`repo/<area>`** — the repository itself: `repo/readme`, `repo/license`, `repo/ci`, `repo/gitignore`.
+    * The list is **open, and there is no catch-all**: if nothing fits, add a category and use it. A `misc`/`chore`
+      default is how the convention dies.
+  * **`<message>` is imperative, says what was made, and is at most 120 characters.** "match the vtable slots",
+    "give the register a name-based weight", "remove the count cap" — not a description of the problem, and not of
+    the investigation that found it.
+  * **A long description is optional and structural.** Include it only when the subject cannot hold the work: which
+    files, units, symbols or rows changed, the measured numbers, the sections or claims added. It must **not** carry
+    reasoning — no *why* this decision, no alternatives considered, no account of the work. That belongs in the unit
+    header, the plan docs, the outbox or `.pi/notes/`, where it sits beside the code rather than in `git log`.
 * **Keep generated/large churn separate.** A `symbols.txt` regeneration or an analyzer settings change gets
   its own commit; never mix it with source changes or unrelated formatting.
 * **Naming and commenting** (see "Commenting and naming" below): use the real name when it is known, and

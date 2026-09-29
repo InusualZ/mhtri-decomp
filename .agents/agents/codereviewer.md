@@ -296,3 +296,13 @@ lines with a stray `L`. Use the helper instead:
 
 `--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
 is the difference between a rewrite and a corruption. Assert the count every time.
+
+## Commit messages
+
+Follow the convention in AGENTS.md ("Commit messages follow one convention"): `<category>: <message>`, then an
+optional long description. The category names **where the change lives and mirrors the tree** - `game/<module>`
+(the `src/` directory), `tools/<area>` (the `tools/` grouping), `config/<what>`, `docs/<topic>`,
+`agents/<profile|policy>`, `repo/<area>` - and the list is open with no catch-all. The message is **imperative,
+says what was made, and is at most 120 characters**. A long description is optional and **structural**: files, units,
+symbols, measured numbers, sections or claims added. It never carries reasoning - no why, no alternatives, no account
+of the work; that goes in the unit header, the plan docs, the outbox or `.pi/notes/`.
