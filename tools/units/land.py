@@ -843,7 +843,11 @@ def _union_conflicts(tree: str, branch: str, base: str | None = None, paths: lis
     `config/RMHE08/splits.txt`), **unionguard** (a disjoint addition, not a delete/rename/overlap), and
     the **invariants** (`ur.check_union`).  The union is computed in memory and the invariants asserted
     *before* anything is written, so a union that duplicates a key, overlaps a range or drops a
-    registration never reaches the tree.
+    registration never reaches the tree.  `ur.union_text_full` also reports a **prose** hunk whose two
+    sides neither carried the other (a comment paragraph both sides rewrote, with no superset): unioning
+    it would duplicate the prose and reintroduce generated names, so it is refused here rather than
+    written - the scope gate already keeps the registration class (`configure.py`/`splits.txt`) a pure
+    declaration union.
     """
     try:
         stages = ug.unmerged(tree)
@@ -884,9 +888,16 @@ def _union_conflicts(tree: str, branch: str, base: str | None = None, paths: lis
                 text = fh.read()
         except OSError as exc:
             return _resolve_result(False, "cannot read %s: %s" % (path, exc))
-        merged, hunks = ur.union_text(text)
+        merged, hunks, decisions = ur.union_text_full(text, path)
         if hunks == 0 or "<<<<<<<" in merged or ">>>>>>>" in merged:
             return _resolve_result(False, "%s carries no conflict block to union" % path)
+        blocked = [d for d in decisions if d.get("blocked")]
+        if blocked:
+            return _resolve_result(
+                False,
+                "%s carries a prose conflict hunk with no superset (hunk %d: %s) - unioning it would "
+                "duplicate the prose and reintroduce generated names; resolve it by hand"
+                % (path, blocked[0]["hunk"], blocked[0]["why"]))
         merged_texts[path] = merged
 
     main_splits = _tree_text(tree, "main", "config/RMHE08/splits.txt")

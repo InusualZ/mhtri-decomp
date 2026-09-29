@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""The append-union resolver and its invariant assertions, for `land.py`.
+"""The union resolver and its invariant assertions, for `land.py`.
 
 Eight of the thirteen live branches conflict with `main` on **one** class, and it is not a defect: two
 sibling bands register *adjacent address ranges*, so their `config/RMHE08/splits.txt` blocks and
 `configure.py` `Object(...)` lines append at the *same anchor*.  That is an add/add conflict whose
 resolution is the pure **append-union** - ours block then theirs - which is also the address order both
 files require.  There are no header conflicts in this class.
+
+The union is **per hunk, not per file** (`unionprose.union_markers`, the one rule shared with
+`mergebranch.py`): an additive declaration block still appends, but a **comment paragraph both sides
+rewrote** takes the **superset** side.  This module's `union_text` used to append every hunk, which is the
+same prose-union defect `mergebranch` was fixed for (`7099e70d9`) - it duplicated the paragraph
+mid-sentence and reintroduced the older side's generated names (2026-09-29: `include/unsplit/lobby.h` and
+`include/lobby/fn_801F3294.h`).  `land.py` refuses a header conflict before it reaches this union anyway,
+but `union_text`/`union_file` are public and a hand `union_file <header>` was a live path to the defect;
+now a prose hunk with no superset is `blocked` and `land._union_conflicts` refuses it rather than writing
+the placeholder.
 
 The union itself used to live in an **untracked** `.pi/bin/union.py`, driven by an untracked
 `.pi/bin/applybranch.sh` that ended in `git add -A` - "the land path depends on a script no reviewer or a
@@ -34,6 +44,18 @@ import collections
 import os
 import re
 import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(HERE)
+# `unionprose` is the one union rule (code hunks union, prose hunks take the superset), shared with
+# `mergebranch.py`: `union_text` had the same prose-union defect `mergebranch.union_markers` was fixed
+# for, so the classification lives once and both import it rather than drift apart.
+for _path in (TOOLS, HERE):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from units import unionprose as up  # noqa: E402
 
 # The only two paths a registration append-conflict may touch.  A conflicted header or a `src/**` file is
 # a *different* class (a real content conflict) and is never unioned here - `.pi/bin/mergeline`'s rule:
@@ -53,50 +75,52 @@ _RANGE_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]
 _OBJECT_RE = re.compile(r"Object\(\s*([A-Za-z_]\w*)\s*,\s*\"([^\"]+)\"\s*\)")
 
 
-def union_text(text: str) -> tuple[str, int]:
-    """Ours block then theirs for every conflict hunk in `text`; `(merged, hunks_resolved)`.
+def union_text_full(text: str, path: str = "") -> tuple[str, int, list[dict]]:
+    """Union a `--diff3` merge result **by hunk class**; `(merged, hunks, decisions)`.
 
-    A `--diff3` conflict carries an extra `|||||||` base section, which is dropped: the base is never part
-    of a union (it is what both sides moved away from).  A file with no markers is returned unchanged with
-    a hunk count of zero, so a caller can tell "resolved something" from "nothing to do".
+    The rule is `unionprose.union_markers`, the one implementation shared with `mergebranch.py`: an
+    **additive declaration block** (the registration class this module exists for) unions as before, but a
+    **comment paragraph both sides rewrote** takes the **superset** side instead of being appended line-by-
+    line - which duplicated the prose mid-sentence and reintroduced the older side's generated names (the
+    2026-09-29 merger lane, `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h`).  A `--diff3`
+    conflict carries an extra `|||||||` base section; it is used for the superset proof and never emitted.
+    A file with no markers is returned unchanged with a hunk count of zero, so a caller can tell "resolved
+    something" from "nothing to do".
+
+    `decisions` is one dict per hunk (`unionprose.union_markers`' shape): a hunk with `blocked` must be
+    refused by the caller, never written - `land._union_conflicts` does exactly that.
     """
-    lines = text.replace("\r\n", "\n").split("\n")
-    if not any(line.startswith("<<<<<<<") for line in lines):
-        return text, 0
-    out: list[str] = []
-    i, hunks = 0, 0
-    while i < len(lines):
-        if lines[i].startswith("<<<<<<<"):
-            ours: list[str] = []
-            theirs: list[str] = []
-            i += 1
-            while i < len(lines) and not lines[i].startswith(("=======", "|||||||")):
-                ours.append(lines[i])
-                i += 1
-            if i < len(lines) and lines[i].startswith("|||||||"):
-                while i < len(lines) and not lines[i].startswith("======="):
-                    i += 1
-            if i < len(lines):          # the `=======` separator
-                i += 1
-            while i < len(lines) and not lines[i].startswith(">>>>>>>"):
-                theirs.append(lines[i])
-                i += 1
-            if i < len(lines):          # the `>>>>>>>` end marker
-                i += 1
-            out.extend(ours)
-            out.extend(theirs)
-            hunks += 1
-            continue
-        out.append(lines[i])
-        i += 1
-    return "\n".join(out), hunks
+    return up.union_markers(text, path)
+
+
+def union_text(text: str) -> tuple[str, int]:
+    """`union_text_full` without the decisions: `(merged, hunks_resolved)`.
+
+    Kept for callers that only need the text; the landing path uses `union_text_full` so it can refuse a
+    `blocked` prose hunk instead of writing the placeholder.
+    """
+    merged, hunks, _decisions = union_text_full(text)
+    return merged, hunks
 
 
 def union_file(path: str) -> int:
-    """Union-resolve `path` in place; the number of hunks resolved (0 = it had no markers)."""
+    """Union-resolve `path` in place; the number of hunks resolved (0 = it had no markers).
+
+    A `blocked` hunk (a prose paragraph neither side is the superset of) is **not written**: the file is
+    left alone and a `REFUSED` line is printed, because writing the placeholder would silently drop one
+    side's prose.  Every non-code hunk is reported so which rule fired is visible.
+    """
     with open(path, encoding="utf-8", newline="") as fh:
         text = fh.read()
-    merged, hunks = union_text(text)
+    merged, hunks, decisions = union_text_full(text, path)
+    if hunks:
+        for d in decisions:
+            if d["class"] != "code":
+                tag = "BLOCKED" if d.get("blocked") else "took %s" % d["took"]
+                print("    %-32s hunk %d %-5s %-9s %s" % (path, d["hunk"], d["class"], tag, d["why"]))
+    if hunks and any(d.get("blocked") for d in decisions):
+        print("    %-32s REFUSED - a prose hunk has no superset; resolve it by hand" % path)
+        return 0
     if hunks:
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(merged)
@@ -229,6 +253,112 @@ def selftest() -> int:
     check("... with no hunk", n, 0)
     d3 = "a\n<<<<<<< ours\no\n||||||| base\nstale\n=======\nt\n>>>>>>> theirs\nz\n"
     check("a --diff3 conflict drops the base section", union_text(d3)[0], "a\no\nt\nz\n")
+
+    # --- the union by hunk class (the 2026-09-29 prose defect) ------------------------------------
+    # (a) an ADDITIVE DECLARATION BLOCK - the registration class this module exists for - still unions,
+    # and every decision is `code`, so the landing path's behaviour is unchanged for it.
+    additive = ("Sections:\n"
+                "anchor.cpp:\n\t.text       start:0x80000000 end:0x80000800\n"
+                "<<<<<<< ours\n"
+                "menu/main.cpp:\n\t.text       start:0x80001000 end:0x80002000\n"
+                "||||||| base\n"
+                "=======\n"
+                "menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n"
+                ">>>>>>> theirs\n"
+                "menu/tail.cpp:\n\t.text       start:0x80002000 end:0x80003000\n")
+    a_merged, a_hunks, a_dec = union_text_full(additive, "config/RMHE08/splits.txt")
+    check("an additive declaration block still unions both sides",
+          ("menu/main.cpp" in a_merged, "menu/branch.cpp" in a_merged,
+           a_merged.index("menu/main.cpp") < a_merged.index("menu/branch.cpp")), (True, True, True))
+    check("... it is one code hunk with no side taken and no warning",
+          (a_hunks, [d["class"] for d in a_dec], [d["took"] for d in a_dec],
+           [d.get("warning") for d in a_dec]), (1, ["code"], [None], [None]))
+
+    # (b) the two REAL conflicts from the recorded revisions (base `1fb32e620`, main `093017eaf`,
+    # branch `aa1c85431`): both sides rewrote the same comment paragraph, so the resolution is the
+    # branch's superset copy - asserted by ABSENCE as well as equality.
+    for rel, conflict, superset, real_path in (
+            ("include/unsplit/lobby.h", up.REAL_LOBBY_CONFLICT, up.REAL_LOBBY_SUPERSET,
+             "include/unsplit/lobby.h"),
+            ("include/lobby/fn_801F3294.h", up.REAL_FN_CONFLICT, up.REAL_FN_SUPERSET,
+             "include/lobby/fn_801F3294.h")):
+        r_merged, r_hunks, r_dec = union_text_full(conflict, real_path)
+        check("%s: every real hunk is prose" % rel, [d["class"] for d in r_dec], ["prose"] * r_hunks)
+        check("%s: every prose hunk takes the branch's superset" % rel, [d["took"] for d in r_dec],
+              ["theirs"] * r_hunks)
+        check("%s: the resolution equals the superset blob region" % rel, r_merged, superset)
+        check("%s: NO duplicated prose (no nested `/*`)" % rel, up.nested_comment(r_merged), False)
+        check("%s: NO old generated name reintroduced" % rel,
+              any(n in r_merged for n in up.OLD_GENERATED_NAMES), False)
+        check("%s: NO old `menu/fn_802A6624.*` path reintroduced" % rel,
+              ("menu/fn_802A6624.cpp" in r_merged, "include/menu/fn_802A6624.h" in r_merged),
+              (False, False))
+    # the old (unfixed) union really would have duplicated the prose - the defect is real, not asserted
+    def _old_union(text):
+        """The pre-fix behaviour: every hunk as ours-then-theirs, base dropped."""
+        out, i, src = [], 0, text.splitlines(keepends=True)
+        while i < len(src):
+            if src[i].startswith("<<<<<<<"):
+                ours, theirs, mode = [], [], "ours"
+                i += 1
+                while i < len(src) and not src[i].startswith(">>>>>>>"):
+                    if src[i].startswith("|||||||"):
+                        mode = "base"
+                    elif src[i].startswith("======="):
+                        mode = "theirs"
+                    elif mode == "ours":
+                        ours.append(src[i])
+                    elif mode == "theirs":
+                        theirs.append(src[i])
+                    i += 1
+                out.extend(ours)
+                out.extend(theirs)
+            else:
+                out.append(src[i])
+            i += 1
+        return "".join(out)
+
+    check("... and the plain union WOULD have duplicated it (the defect is real)",
+          up.nested_comment(_old_union(up.REAL_LOBBY_CONFLICT)), True)
+
+    # (c) a MIXED comment+code region: no superset, so it keeps the union and REPORTS what it did.
+    mixed = ("int a;\n"
+             "<<<<<<< ours\n"
+             "/* main's paragraph. */\n"
+             "int a_main;\n"
+             "||||||| base\n"
+             "int a_base;\n"
+             "=======\n"
+             "/* the branch's paragraph. */\n"
+             "int a_lane;\n"
+             ">>>>>>> theirs\n"
+             "int z;\n")
+    mix_merged, _mh, mix_dec = union_text_full(mixed, "include/mixed/thing.h")
+    check("a mixed region still unions as before", mix_merged,
+          "int a;\n/* main's paragraph. */\nint a_main;\n/* the branch's paragraph. */\nint a_lane;\nint z;\n")
+    check("... it is reported (mixed, no side, a warning naming the file)",
+          (mix_dec[0]["class"], mix_dec[0]["took"], "include/mixed/thing.h" in mix_dec[0].get("warning", "")),
+          ("mixed", None, True))
+
+    # (d) a PROSE hunk with no superset is blocked, and `union_file` refuses to write it (never a silent
+    # drop of one side's prose).
+    prose_no_sup = ("<<<<<<< ours\n"
+                    "/* main changed one word. */\n"
+                    "||||||| base\n"
+                    "/* the base paragraph. */\n"
+                    "=======\n"
+                    "/* the branch changed another. */\n"
+                    ">>>>>>> theirs\n")
+    _pns_merged, _ph, pns_dec = union_text_full(prose_no_sup, "include/else/thing.h")
+    check("a prose hunk with no superset is blocked", (pns_dec[0]["class"], pns_dec[0].get("blocked")),
+          ("prose", True))
+    with tempfile.TemporaryDirectory() as tmp:
+        victim = os.path.join(tmp, "thing.h")
+        with open(victim, "w", encoding="utf-8", newline="") as fh:
+            fh.write(prose_no_sup)
+        check("... union_file reports no hunk resolved (it did not write)", union_file(victim), 0)
+        with open(victim, encoding="utf-8", newline="") as fh:
+            check("... and the conflict is left intact for a hand resolution", fh.read(), prose_no_sup)
 
     # --- duplicate keys / objects -----------------------------------------------------------------
     splits = ("Sections:\n\t.text       type:code align:32\n\n"
