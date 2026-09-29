@@ -1499,6 +1499,7 @@ NWC24/nwc24_msg.c:
 
 NWC24/nwc24_io.c:
 	.text       start:0x8051E068 end:0x8051E864
+	.rodata     start:0x80574E00 end:0x80574E10
 	.data       start:0x806311E8 end:0x8063122C
 	.bss        start:0x80766B00 end:0x80766C40
 	.sdata      start:0x80794440 end:0x80794448

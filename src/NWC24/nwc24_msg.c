@@ -172,7 +172,7 @@ int NWC24iGetUserId(u32* userId) {
     userId[1] = NWC24_RTC_USER_ID_HI;
     if ((userId[0] | userId[1]) == 0) {
         error = -5;
-    } else if (NWC24iCheckUserIdCRC() == 0) {
+    } else if (NWC24iCheckUserIdCRC(((u64)userId[0] << 32) | userId[1]) == 0) {
         return 0;
     }
     error = NWC24SuspendScheduler();

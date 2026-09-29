@@ -27,8 +27,8 @@ u32 NWC24iIsAsyncIoctlBusy(void);
 int NWC24iAsyncIoctlCallback(u32 value, u32* out);
 
 /* the user-id pair and the RTC pair */
-int NWC24iCheckUserIdCRC(void);
-u64 getUnScrambleId(void);
+int NWC24iCheckUserIdCRC(u64 userId);
+u64 getUnScrambleId(u64 id);
 int NWC24iSetRtcCounter(u32 value, u32 flag);
 
 /* `flag` is passed straight on to `NWC24iSetRtcCounter`'s second argument; the band's only caller
