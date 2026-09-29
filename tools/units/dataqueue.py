@@ -47,7 +47,8 @@ across units or a claimed symbol sits inside it (`density < 0.5`), otherwise `pr
 **The data-claim request channel.** A lane that finds a genuinely unowned range *its own rows need* used
 to dead-end: rule 12 refuses a bare `extern`, and the brief says do not touch `splits.txt`. `--request`
 files it instead - address, size, the sole-referencer evidence and the rows it unblocks - into
-`tools/units/data-requests.json` (tracked, deduplicated, byte-deterministic). It is only the **filing
+`.pi/data-requests.json` (gitignored, deduplicated, byte-deterministic; `slots.py collect` merges a lane's
+filings into MAIN's). It is only the **filing
 channel**: the ruling is the orchestrator's and goes through the `contact_supervisor` protocol. The brief
 (`brief.py`, section 5d) names the command, so no lane has to guess it.
 
@@ -87,7 +88,7 @@ LINKER_GENERATED = ("_rom_copy_info", "_bss_init_info")
 TRK_VECTOR_TABLE = (0x80004380, 0x800062B4)
 
 QUEUE_REL = os.path.join("tools", "units", "data-queue.json")
-REQUESTS_REL = os.path.join("tools", "units", "data-requests.json")
+REQUESTS_REL = os.path.join(".pi", "data-requests.json")
 GRAPH_REL = os.path.join("build", "tmp", "tudiscover", "graph.json")
 
 
@@ -289,7 +290,7 @@ def write_queue(path: str, text: str) -> None:
 # A lane that finds a genuinely unowned range its own rows need cannot claim it: rule 12 refuses a bare
 # `extern`, and the brief says do not touch `splits.txt`. Before this there was no channel at all, so two
 # lanes dead-ended. `--request` records the ask (address, size, sole-referencer evidence, the rows it
-# unblocks) in a tracked, deduplicated register; `brief.py` names the command in section 5d.
+# unblocks) in a gitignored, deduplicated register (`.pi/data-requests.json`); `brief.py` names the command in section 5d.
 
 def parse_addr(text: str) -> int:
     """`0x8057C82C`, a bare 8-digit `8057C82C`, or a decimal."""
@@ -360,7 +361,7 @@ def build_request(unit: str, addr: int, size: int | None, section: str | None, e
 
 
 def load_requests(root: str) -> list[dict]:
-    """The register `tools/units/data-requests.json`; `[]` when absent or unreadable."""
+    """The register `.pi/data-requests.json`; `[]` when absent or unreadable."""
     path = os.path.join(root, REQUESTS_REL)
     if not os.path.exists(path):
         return []
@@ -474,7 +475,7 @@ def summary(entries: list[dict], path: str, warning: str, registered: set[str] |
 
 def cmd_request(root: str, unit: str, addr_text: str, size=None, section=None, evidence="",
                 unblocks="", as_json=False, dry_run=False) -> int:
-    """File (or report) one data-claim request in `tools/units/data-requests.json`. Reads only.
+    """File (or report) one data-claim request in `.pi/data-requests.json`. Reads only.
 
     Refuses when a `splits.txt` range already covers the asked range - that is a claim, not a request -
     and when the evidence or the unblocked rows are empty, because those two fields are what the
@@ -707,7 +708,7 @@ def selftest() -> int:
     check("request: the register renders deterministically", render_requests(merged3),
           render_requests(list(reversed(merged3))))
     with tempfile.TemporaryDirectory() as tmp:
-        rpath = os.path.join(tmp, "tools", "units", "data-requests.json")
+        rpath = os.path.join(tmp, ".pi", "data-requests.json")
         os.makedirs(os.path.dirname(rpath), exist_ok=True)
         write_requests(rpath, render_requests(merged3))
         check("request: the register round-trips", load_requests(tmp), merged3)
