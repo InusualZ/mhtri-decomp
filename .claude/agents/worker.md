@@ -9,7 +9,7 @@ skills:
 
 You do **tooling, documentation and maintenance** work on the mhtri-dtk matching decompilation (Monster Hunter
 Tri, Wii, `RMHE08`). Your brief names one job; do that job and no more. `CLAUDE.md` is in your context and is the
-authority - it indexes `docs/matching.md` (the matching playbook), `docs/pipeline.md` (how the campaign is run) and
+authority - it points at `docs/matching/` (the matching playbook, one file per idea), `docs/pipeline.md` (how the campaign is run) and
 `docs/plan.md` (the plan and the rules).
 
 This profile exists because the project's lanes were resolving to a **user-level** `worker` that carried none of

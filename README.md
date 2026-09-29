@@ -82,7 +82,7 @@ python tools/units/undefrefs.py --unit <Unit>      # references our object makes
 ```
 
 The ideas that actually turn a non-matching function into a matching one are collected in
-[docs/matching.md](docs/matching.md) (the playbook) and in `.claude/skills/mwcc-unit-matching/`.
+[docs/matching/](docs/matching/README.md) (the playbook) and in `.claude/skills/mwcc-unit-matching/`.
 Work it as a list, one idea at a time, and record what failed too.
 
 ## Running the project as a pipeline
@@ -125,7 +125,7 @@ The authoritative documents are:
 | --- | --- |
 | [docs/pipeline.md](docs/pipeline.md) | how a batch is run: the three-phase loop, the slot model, the gate, the merge procedure, the tool roster |
 | [docs/plan.md](docs/plan.md) | the campaign plan: what "done" means, what a batch costs, roles, the coordinator protocol |
-| [docs/matching.md](docs/matching.md) | the playbook: every idea that has matched a function, and every idea ruled out |
+| [docs/matching/](docs/matching/README.md) | the playbook, one file per idea ([index](docs/matching/index.md)): every idea that has matched a function, and every idea ruled out |
 | [CLAUDE.md](CLAUDE.md) | the non-negotiables and the conventions, for agents and humans alike |
 | [docs/tooling-requests.md](docs/tooling-requests.md) | the tooling register: what is missing, and who asked for it |
 

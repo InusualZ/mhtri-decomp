@@ -86,7 +86,7 @@ A unit's flag evidence belongs next to its definition in `configure.py` (a per-l
 override below `cflags_runtime`), not in this file; this file only carries the policy.
 
 The *how* - the ideas, the problem each one solves and whether it has been tried - is the playbook index
-in the `mwcc-unit-matching` skill (`references/index.md`; see "Matching playbook").
+in `docs/matching/index.md` (see "Matching playbook").
 
 ## Operational mode: production runs
 
@@ -186,21 +186,24 @@ backlog disappears.
 
 ## Matching playbook
 
-`docs/matching.md` is the playbook for making a unit match its original object (one numbered idea per section).
+`docs/matching/` is the playbook for making a unit match its original object: **one file per idea**,
+`NNN-slug.md`, with a permanent id (`docs/matching.md` is only an entry page so old "playbook N" citations resolve).
 It is **not** loaded into every lane: load the project skill **`mwcc-unit-matching`**
 (`.claude/skills/mwcc-unit-matching/`, tracked) when a unit's functions mismatch.
 
-* **The index** of every numbered idea (title + the problem it solves) is the skill's generated
-  `references/index.md`; the full text is the generated `references/playbook.md`; the ideas tried and ruled
-  out, and the recipe for working the list, are the hand-kept `working-the-list.md` beside `SKILL.md`.
-* **Never edit the generated files.** `python tools/agents/sync_playbook_index.py` writes the index and
-  `python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py` writes `references/`; both take `--check`
-  and both run from `tools/selftest.py` whenever `docs/matching.md` changes.
+* **The index** of every idea (id, title, status, tags, the problem it solves) is the generated
+  `docs/matching/index.md`; `python tools/agents/sync_playbook_index.py --where N` prints idea N's path. The loop,
+  the tag vocabulary and how ideas are recorded are in `docs/matching/README.md`; the ideas tried and ruled out
+  are `ruled-out.md` and `todo.md` beside it.
+* **Never edit the generated files.** `python tools/agents/sync_playbook_index.py` writes `index.md` (from the
+  front matter of the idea files) and `python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py` writes
+  the skill's portable byte copy `references/matching/`; both take `--check` and both run from
+  `tools/selftest.py` whenever anything under `docs/matching/` changes.
 * `python .claude/skills/mwcc-unit-matching/scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`,
   `frames`, `matrix`, `sweep`, `variants`, `shapes`, `diff`, `slots`, `sections`, `dwarf`).
 * **How to work an idea:** one at a time, with evidence (numbers, sizes, first-divergence indices); an idea that
-  works earns a `docs/matching.md` section in the same session (Problem / Why it happens / How to work it /
-  Result / Example) and the next free number; an idea that fails is recorded as ruled out so nobody re-runs it;
+  works earns its own `docs/matching/NNN-slug.md` in the same session (front matter, then Problem / Why it
+  happens / How to work it / Result / Example) with the next free id (ids are never renumbered); an idea that fails is recorded as ruled out so nobody re-runs it;
   unit-specific findings belong in the unit's header comment.
 
 All project **subagent profiles** live in `.claude/agents/` (tracked), discovered by the harness as *project*
@@ -247,7 +250,7 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       mwcc_matrix.py, optsweep.py, tryvar.py,
                                       shapesearch.py + shapes.py,
                                       infer.py) + variants/<lib>.py data
-                                      - see docs/matching.md
+                                      - see docs/matching/
                             objdiff/  objdiff consumers (symdiff.py, slotmap.py)
                             elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
                             splits/   TU boundary discovery (tudiscover.py): from one symbol address,
@@ -291,8 +294,8 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                                       units/m2cinput.py feeds - see the `decompile-symbol` skill
 docs/                     Where all documentation lives — ours and dtk-template's. Anything worth
                           writing down goes here. Keep docs short and to the point, not dense.
-                          matching.md is the matching playbook; its ideas are indexed in the
-                          "Matching playbook" section above.
+                          matching/ is the matching playbook, one NNN-slug.md per idea, indexed in
+                          matching/index.md (matching.md is a legacy entry page).
                           plan.md is the campaign plan: every symbol in symbols.txt, the four steps per
                           symbol, the 80 % bar for closing one, and the order to work in.
                           memory-dump.md documents the shared Ghidra runtime memory dump: real SDK

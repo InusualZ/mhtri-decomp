@@ -11,8 +11,8 @@ skills:
 ---
 
 You reconstruct translation units (TUs) of **Monster Hunter Tri** (Wii, USA, `RMHE08`) for a matching
-decompilation. The project's `CLAUDE.md` is in your context: it is the authority on policy, and it indexes
-`docs/matching.md`, the playbook you work from. Read your brief, then work the unit end to end.
+decompilation. The project's `CLAUDE.md` is in your context: it is the authority on policy, and it points at
+`docs/matching/`, the playbook you work from (`index.md` lists every idea by symptom). Read your brief, then work the unit end to end.
 
 A unit "matches" when the C/C++ source in `src/` compiles to code that links into a `main.dol` byte-identical
 to the original. That is the goal. The **policy** is narrower and more useful day to day: apply the
@@ -393,7 +393,8 @@ layout is still annotated field by field, sizes and offsets), and member declara
 
 ## Codegen levers (the ones that pay, in order)
 
-The full list is `docs/matching.md`, indexed in `CLAUDE.md`. The recurring wins:
+The full list is `docs/matching/index.md` (one `NNN-slug.md` per idea; `python tools/agents/sync_playbook_index.py
+--where N` prints idea N's path). The recurring wins:
 
 * **Peephole keeps retail's unfused forms** in many bands: a kept `clrlwi`+`cmpwi`, `extsh`+`cmpwi`,
   `subi`+`cmpwi`, or a masked narrow store. A scoped `#pragma peephole off` (paired with `peephole on` where

@@ -308,8 +308,9 @@ are `Matching`; a `NonMatching` unit whose object does not compile is simply nev
 **R7 — A docs diff maps to no selftest, so run the doc-adjacent checks by hand.**
 The failure: `selftest.py --changed` maps only `tools/**` diffs to selftests, so a docs/profiles batch reports
 **GREEN with 0 tests** while the invariants it can actually break — `sync_profiles.py --check`,
-`sync_reference.py --check` — are never run. So a documentation change runs those two by hand until
-`--changed` maps docs to them. (F37 — the mapping is a known gap, not yet closed.)
+`sync_reference.py --check` — are never run. `--changed` now maps `docs/plan.md`, `docs/matching/**`, the skill's
+`SKILL.md` and `references/matching/**` to those checks (F37, `SOURCE_ENTRIES`/`SOURCE_CHECKS` in
+`tools/selftest.py`); a docs diff outside those runs its adjacent checks by hand.
 
 **R8 — Long drafts go through the file tool, not a shell heredoc.**
 The failure: a shell heredoc **truncates silently** when a second heredoc follows (a long playbook draft was lost

@@ -28,9 +28,10 @@ older views - keeps **both**, because neither is a duplicate of the other. `--no
 
 **`--changed` maps sources, not only `tools/` (F37).** A batch that edits only docs can still break an
 invariant, and no `tools/**` selftest covers it: `docs/plan.md` is the source of the section-6.5 block
-generated into `.claude/agents/*.md` (`tools/agents/sync_profiles.py`), and `docs/matching.md` is the source
-of the skill's `references/` (`.claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check`, and the
-index `references/index.md` by `tools/agents/sync_playbook_index.py --check`). Both
+generated into `.claude/agents/*.md` (`tools/agents/sync_profiles.py`), and `docs/matching/` (one file per
+playbook idea) is the source of the skill's `references/matching/` copy
+(`.claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check`) and of the generated
+`docs/matching/index.md` (`tools/agents/sync_playbook_index.py --check`). Both
 are selected when the diff touches those sources, so a docs batch verifies itself instead of reporting
 "GREEN, 0 selftests". The mapping is `SOURCE_ENTRIES`/`SOURCE_CHECKS` below.
 
@@ -93,16 +94,32 @@ SR_REL = ".claude/skills/mwcc-unit-matching/scripts/sync_reference.py"
 #
 # `SOURCE_ENTRIES`: source path -> selftest entry keys it must select.
 # `SOURCE_CHECKS`:  source path -> ((tool path relative to the root, extra argv), ...) to run as `--check`.
+# A key ending in `/` is a PREFIX: every changed path under it selects the entry (the playbook is a directory
+# of idea files, so an exact-path key cannot name them).
+SKILL_MATCHING = ".claude/skills/mwcc-unit-matching/references/matching/"
 SOURCE_ENTRIES = {
     "docs/plan.md": ("tools/agents/sync_profiles",),
     "docs/matching.md": ("tools/agents/sync_playbook_index",),
+    "docs/matching/": ("tools/agents/sync_playbook_index",),
+    SKILL_MATCHING: ("tools/agents/sync_playbook_index",),
     ".claude/skills/mwcc-unit-matching/SKILL.md": ("tools/agents/sync_playbook_index",),
 }
 SOURCE_CHECKS = {
     "docs/matching.md": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
-    ".claude/skills/mwcc-unit-matching/references/index.md": (("tools/agents/sync_playbook_index.py", ("--check",)),),
+    "docs/matching/": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
+    SKILL_MATCHING: ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
     ".claude/skills/mwcc-unit-matching/SKILL.md": ((SR_REL, ("--check",)),),
 }
+
+
+def _source_lookup(table: dict, src: str):
+    """The table's value for `src`: the exact key, then every `dir/` prefix key that contains it."""
+    src = src.replace("\\", "/")
+    out = list(table.get(src, ()))
+    for key, val in table.items():
+        if key.endswith("/") and src.startswith(key):
+            out.extend(val)
+    return out
 
 
 class Entry:
@@ -351,7 +368,7 @@ def mapped_entries(changed: list[str]) -> list[str]:
     """
     out: list[str] = []
     for src in changed:
-        for key in SOURCE_ENTRIES.get(src.replace("\\", "/"), ()):
+        for key in _source_lookup(SOURCE_ENTRIES, src):
             if key not in out:
                 out.append(key)
     return out
@@ -365,7 +382,7 @@ def mapped_checks(changed: list[str]) -> list[tuple[str, list[str]]]:
     """
     out, seen = [], set()
     for src in changed:
-        for rel, extra in SOURCE_CHECKS.get(src.replace("\\", "/"), ()):
+        for rel, extra in _source_lookup(SOURCE_CHECKS, src):
             name = "%s %s" % (rel, " ".join(extra))
             if name in seen:
                 continue
@@ -523,9 +540,14 @@ def selftest() -> int:
           ([n for n, _t in mapped_checks([".claude/skills/mwcc-unit-matching/SKILL.md"])],
            mapped_entries([".claude/skills/mwcc-unit-matching/SKILL.md"])),
           ([SR_REL + " --check"], ["tools/agents/sync_playbook_index"]))
-    check("an edit to the generated index selects the index check",
-          [n for n, _t in mapped_checks([".claude/skills/mwcc-unit-matching/references/index.md"])],
-          ["tools/agents/sync_playbook_index.py --check"])
+    check("an edit under docs/matching/ selects the index selftest, the index check and the skill copy check",
+          ([n for n, _t in mapped_checks(["docs/matching/043-retails-per-string-lis-addi-addressing.md"])],
+           mapped_entries(["docs/matching/index.md"])),
+          ([SR_REL + " --check", "tools/agents/sync_playbook_index.py --check"], ["tools/agents/sync_playbook_index"]))
+    check("an edit under the skill's references/matching/ selects both checks",
+          [n for n, _t in mapped_checks([SKILL_MATCHING + "index.md"])],
+          [SR_REL + " --check", "tools/agents/sync_playbook_index.py --check"])
+    check("a file next to docs/matching/ (not under it) selects nothing", mapped_checks(["docs/matching-other.md"]), [])
     check("... and the argv runs that tool with --check",
           md_checks[0][1] if md_checks else None, [SR_REL, "--check"])
     check("a source with no mapped check maps to nothing", mapped_checks(["docs/plan.md"]), [])
@@ -545,6 +567,9 @@ def selftest() -> int:
 
     try:
         for source, want in (("docs/plan.md", [("tools/agents/sync_profiles", "tool", "--selftest")]),
+                             ("docs/matching/README.md", [(SR_REL + " --check", "check", "--check"),
+                                               ("tools/agents/sync_playbook_index", "tool", "--selftest"),
+                                               ("tools/agents/sync_playbook_index.py --check", "check", "--check")]),
                              ("docs/matching.md", [(SR_REL + " --check", "check", "--check"),
                                                ("tools/agents/sync_playbook_index", "tool", "--selftest"),
                                                ("tools/agents/sync_playbook_index.py --check", "check", "--check")])):
