@@ -375,6 +375,45 @@ def read_base(main: str) -> dict:
         return {}
 
 
+def land_subject(units):
+    # The gate s subject follows AGENTS.md s commit convention: a category that mirrors the tree, then an
+    # imperative message of at most 120 characters. Derived from the batch, so the two cannot drift.
+    entries = [u.strip() for u in (units or []) if u.strip()]
+    if not entries:
+        return "repo/batch: land a batch"
+    first = entries[0].replace("\\", "/")
+    for pre in ("src/", "include/"):
+        if first.startswith(pre):
+            first = first[len(pre):]
+            break
+    parts = first.split("/")
+    root = parts[0]
+    stem = root[:-4] if root.endswith(".cpp") else (root[:-2] if root.endswith(".c") else root)
+    lo = stem.lower()
+    if lo == "tools":
+        cat = "tools/" + (parts[1] if len(parts) > 1 else "tools")
+    elif lo == "docs":
+        cat = "docs/" + (parts[1][:-3] if len(parts) > 1 and parts[1].endswith(".md") else (parts[1] if len(parts) > 1 else "docs"))
+    elif lo == "config":
+        base = parts[-1]
+        cat = "config/" + {"symbols.txt": "symbols", "splits.txt": "splits", "configure.py": "flags"}.get(base, "config")
+    elif lo == ".agents":
+        cat = "agents/" + (parts[2][:-3] if len(parts) > 2 and parts[2].endswith(".md") else "policy")
+    elif lo in (".github", ".git"):
+        cat = "repo/ci"
+    elif lo == "agents.md":
+        cat = "agents/policy"
+    elif lo in ("readme.md", "license", "gitignore"):
+        cat = "repo/" + lo.replace(".md", "")
+    else:
+        cat = "game/" + lo
+    tail = "" if len(entries) == 1 else (" and %d more" % (len(entries) - 1))
+    msg = "land " + first + tail
+    if len(msg) > 120:
+        msg = msg[:117] + "..."
+    return cat + ": " + msg
+
+
 def land_message_path(main: str) -> str:
     """The gate's commit message. Only a green gate writes it (`write_land_message`); a red one clears it."""
     return os.path.join(main, ".git", "land_msg.txt")
@@ -2630,7 +2669,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         note = (detail if not good else "") or info
         print("%-58s %s%s" % (name[:58], "PASS" if good else "FAIL", ("  " + note[:80]) if note else ""))
 
-    body = ["land: %s" % ("; ".join(units) if units else "batch"),
+    body = [land_subject(units),
             "",
             "ledger: %s" % summary(before, after),
             "gates: ground truth ok, base %s, %d check(s), ok recreated=%s%s%s"
