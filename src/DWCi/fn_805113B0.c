@@ -208,16 +208,6 @@ typedef struct DWCiCType {
 } DWCiCType; /* size: 0x48 */
 
 
-/* The resolver records DWCi_parseAddress falls back to: an entry whose +0x0C reaches the host's address
- * word through one more indirection. */
-typedef struct DWCiHostAddr {
-    /* +0x00 */ u32 addr;
-} DWCiHostAddr; /* size: 0x04 */
-
-typedef struct DWCiHostEntry {
-    /* +0x00 */ u8 pad_0x00[0xC];
-    /* +0x0C */ DWCiHostAddr** hosts;
-} DWCiHostEntry; /* size: 0x10 */
 
 /* The unit's own entry points, in address order. */
 u32 DWCi_sendControlFrame(DWCiReq* req);

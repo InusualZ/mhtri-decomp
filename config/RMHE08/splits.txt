@@ -1474,7 +1474,8 @@ DWCi/fn_805113B0.c:
 
 DWCi/DWCi_NatNeg.c:
 	.text       start:0x80512490 end:0x805145B8
-	.bss        start:0x807614D8 end:0x80762A20
+	.data       start:0x806308E8 end:0x80630A08
+	.bss        start:0x807614D8 end:0x80762C20
 	.sdata      start:0x80794368 end:0x807943A0
 	.sbss       start:0x80795828 end:0x80795878
 
