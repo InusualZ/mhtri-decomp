@@ -66,6 +66,8 @@ SYMBOLS = os.path.join(MAIN, "config", "RMHE08", "symbols.txt")
 # `flipcheck.py runtime` name the same unit and the same object (aliased: `claims` is a local function here)
 sys.path.insert(0, os.path.join(MAIN, "tools"))
 from units import claims as claims_mod  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
 
 # section names may or may not start with a dot: extab/extabindex do not.
 SEC_RE = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
@@ -301,6 +303,21 @@ def section_byte_problems(name: str, mine: bytes, tgt: bytes, ours_path: str,
                         "address order; order (or forward-declare) the source so the layout matches"
                         % (name, order[0], order[1], order[2], differing_bytes(mine, tgt), order[3]))
     return problems
+
+
+def data_seam_problems(unit: str, name: str, ours_path: str, obj_path: str, seams: list[dict] | None = None,
+                       rng: tuple[int, int] | None = None) -> list[str]:
+    """The `.data` emission-order diagnosis for a differing `.data`: `order-only` or the multi-TU line.
+
+    A unit's `.data` that holds the target's symbols in another sequence reads as a plain byte/size mismatch
+    everywhere else. `dataseams.seam_note` (docs/data-order-seams.md) names it - `order-only: the unit spans
+    several TUs; seams at 0x...` - when the target's range contains a strong vtable/string seam, and adds the
+    multi-TU line when the section differs otherwise. Empty for another section and for a range with no seam.
+    """
+    if name != ".data":
+        return []
+    note = dataseams.seam_note(unit, ours_path, obj_path, name, seams, rng)
+    return [note] if note else []
 
 
 # Row 36 (docs/matching.md): `dol split` writes the target objects with `export_all: true`, which stamps
@@ -707,6 +724,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
             continue
         if mine != tgt:
             problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
+            problems += data_seam_problems(unit, name, src_path, obj_path)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.

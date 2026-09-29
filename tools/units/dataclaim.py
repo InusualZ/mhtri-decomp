@@ -67,6 +67,7 @@ import elfsect  # noqa: E402  (the project's object section reader)
 import symbolpreflight as preflight  # noqa: E402
 import ledger as ledger_mod  # noqa: E402  (Objects/covering + the report's numbers)
 import dataqueue as dq  # noqa: E402  (the queue's own section order is this tool's sort key)
+import dataseams  # noqa: E402  (`.data` emission-order seams - a run spanning several TUs)
 
 GAME = "RMHE08"
 QUEUE_REL = os.path.join("tools", "units", "data-queue.json")
@@ -204,6 +205,12 @@ def effect_text(verdict: str, size: int, gain: int, stats: dict | None) -> str:
 def _finish(entry: dict, verdict: str, reason: str, affected: dict | None,
             size: int, gain: int, stats: dict | None) -> dict:
     entry["verdict"] = verdict
+    # a run that contains a strong `.data` emission-order seam spans several TUs (docs/data-order-seams.md):
+    # whatever else is true of it, it can never match as one unit. Warn - the verdict is unchanged.
+    warn = dataseams.warning(entry["start"], entry["end"], entry.get("seams") or []) if entry.get("seams") else None
+    if warn and verdict != "overlap":
+        reason += "; WARNING: this run " + warn
+    entry["seam_warning"] = warn
     entry["reason"] = reason
     entry["affected"] = affected
     entry["expected"] = effect_text(verdict, size, gain, stats)
@@ -235,6 +242,7 @@ def classify(run: dict, claimed: list[dict], target: dict | None, ours: dict | N
         "target_hex": None,
         "our_hex": None,
         "equal_prefix": None,
+        "seams": list(run.get("seams") or []),
     }
 
     hits = overlapping(run, claimed)
@@ -398,6 +406,11 @@ def summary(entries: list[dict], queue_path: str) -> str:
              % (verdicts.get("safe", 0), verdicts.get("lowers-score", 0), verdicts.get("overlap", 0),
                 verdicts.get("unowned", 0)),
              "  -> " + queue_path]
+    spanning = [e for e in entries if e.get("seam_warning")]
+    if spanning:
+        lines.insert(3, "  multi-TU: %d run(s) contain a strong .data emission-order seam (V->S/zigzag) and can "
+                        "never match as one unit (%d of them `safe`)"
+                     % (len(spanning), sum(1 for e in spanning if e["verdict"] == "safe")))
     for entry in risky[:5]:
         lines.append("  %-8s %s 0x%08X-0x%08X (%d B, %s): %s"
                      % (entry.get("verdict"), entry.get("section"), entry["start"], entry["end"],
@@ -521,6 +534,7 @@ def analyze(root: str = ROOT, queue_path: str | None = None) -> list[dict]:
     dol_map = dol_sections(dol)
 
     target_cache: dict[str, dict | None] = {}
+    strong_seams = dataseams.load_strong()
 
     def sections_of(rel_path: str) -> dict | None:
         if rel_path not in target_cache:
@@ -539,7 +553,8 @@ def analyze(root: str = ROOT, queue_path: str | None = None) -> list[dict]:
         enriched = {"unit": unit, "section": section, "start": start, "end": end,
                     "queue_verdict": run.get("verdict"), "leak": run.get("leak"),
                     "density": run.get("density"), "registered": registered,
-                    "our_object": our_rel, "our_object_exists": os.path.exists(os.path.join(root, our_rel))}
+                    "our_object": our_rel, "our_object_exists": os.path.exists(os.path.join(root, our_rel)),
+                    "seams": dataseams.seams_in(strong_seams, start, end) if section == ".data" else []}
 
         # 2. the target's bytes: the covering split object, cross-checked against the DOL
         obj_path, obj_base = covering_object(objects, section, start)
@@ -842,8 +857,12 @@ def declaration_locations(root: str, names) -> dict[str, list[str]]:
 
 def reference_record(unit: str, entry: dict, extent: int, extent_source: str, owner: str | None,
                      pool: dict | None, unit_ranges: list[tuple[int, int]], obj_rel: str | None,
-                     declarations: dict | None = None) -> dict:
-    """One referenced symbol's row: the facts plus `recommend`'s decision, JSON-safe throughout."""
+                     declarations: dict | None = None, seams: list[dict] | None = None) -> dict:
+    """One referenced symbol's row: the facts plus `recommend`'s decision, JSON-safe throughout.
+
+    `seams` (strong `.data` emission-order seams) is checked against the claim `recommend` proposes: a claim that
+    contains one spans several TUs, and the record says so (`seam_warning`, also appended to `note`).
+    """
     start, end, rounded = claim_span(entry["address"], extent)
     sharers = sorted(set(pool["readers"]) - {unit}) if pool else []
     rec = {
@@ -857,6 +876,12 @@ def reference_record(unit: str, entry: dict, extent: int, extent_source: str, ow
         "remedy": None, "splits": None, "symbols": None, "note": "",
     }
     rec.update(recommend(rec, unit, unit_ranges))
+    rec["seam_warning"] = None
+    if seams and rec["section"] == ".data" and rec.get("claim_start") is not None:
+        warn = dataseams.warning(rec["claim_start"], rec["claim_end"], seams)
+        if warn:
+            rec["seam_warning"] = "the proposed claim " + warn
+            rec["note"] = (rec["note"] + "; WARNING: " + rec["seam_warning"]) if rec["note"] else rec["seam_warning"]
     return rec
 
 
@@ -976,7 +1001,8 @@ def reference_report(root: str, unit: str) -> dict:
                     [row for row in rows if _is_unsplit(ownership, row["name"])], readers_of)
             pool = unowned_cache[section].get(entry["address"])
         records.append(reference_record(unit, entry, extent, extent_source, owner, pool,
-                                        ranges.get(section, []), obj_rel, declarations))
+                                        ranges.get(section, []), obj_rel, declarations,
+                                        dataseams.load_strong()))
     records.sort(key=lambda x: (section_key(x["section"]), x["address"]))
     return {"unit": unit, "object": obj_rel, "census": census_info, "entries": records,
             "summary": _remedy_counts(records)}
@@ -1395,6 +1421,28 @@ def selftest() -> int:
     check("reference_record keys a name it did not see as not declared",
           reference_record("Pl/pl_act", rec("z", ".data", 0x3000, 4), 4, "map", None, None, [], None,
                            {})["declared_in"], [])
+
+    # --- emission-order seams: a run/claim that spans several TUs is warned about, never silently safe
+    strong = [{"addr": 0x1004, "kind": "V->S"}]
+    spanning = classify(run(seams=dataseams.seams_in(strong, 0x1000, 0x1008)), claimed,
+                        target(b"ABCDEFGH"), ours(0x1000, b"ABCDEFGH"), symbol_at, stats)
+    check("a spanning run keeps its verdict", spanning["verdict"], "safe")
+    check("... but names the seam and the cut in its reason",
+          ("WARNING" in spanning["reason"], "0x00001004 (V->S)" in spanning["reason"],
+           "0x00001004-0x00001008" in spanning["reason"]), (True, True, True))
+    check("... and records the seams", spanning["seams"], strong)
+    check("a run with no seam carries no warning", (good["seam_warning"], "WARNING" in good["reason"]), (None, False))
+    over = classify(run(section=".data", start=0x9004, end=0x900C, seams=strong), claimed,
+                    target(b"\x00" * 8), ours(0x9000, b"\x00" * 8, at=0x9000), symbol_at, stats)
+    check("an overlap refusal stays the refusal, not a multi-TU note", "WARNING" in over["reason"], False)
+    check("summary counts the multi-TU runs", "multi-TU: 1 run(s)" in summary([spanning, good], "q.json"), True)
+    claim_rec = reference_record("Pl/pl_act", rec("t", ".data", 0x1000, 0x8), 8, "map", None, None, [], None,
+                                 {}, strong)
+    check("a rule-12 claim over a seam warns", ("the proposed claim spans 2 TUs" in (claim_rec["seam_warning"] or ""),
+                                                "WARNING" in claim_rec["note"]), (True, True))
+    check("a rule-12 claim clear of seams does not",
+          reference_record("Pl/pl_act", rec("t", ".data", 0x2000, 0x8), 8, "map", None, None, [], None,
+                           {}, strong)["seam_warning"], None)
 
     if fails:
         print("FAIL (%d)" % len(fails))

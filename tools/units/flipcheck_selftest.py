@@ -128,7 +128,8 @@ def build_obj(sections, symbols, relocs=(), flags=None, version=0x0E, with_comme
         typ = SHT_RELA if n.startswith(".rela") else SHT_SYMTAB if n == ".symtab" else \
             SHT_STRTAB if n in (".strtab", ".shstrtab") else SHT_PROGBITS
         entsize = 12 if typ == SHT_RELA else 16 if typ == SHT_SYMTAB else 0
-        struct.pack_into(">IIIIIIIIII", buf, shoff + i * 40, sh_name[n], typ, 0, 0, o, size, 0, 0, 4, entsize)
+        link = index[".strtab"] if typ == SHT_SYMTAB else 0     # a symbol table names its string table (real ELF)
+        struct.pack_into(">IIIIIIIIII", buf, shoff + i * 40, sh_name[n], typ, 0, 0, o, size, link, 0, 4, entsize)
     return bytes(buf)
 
 
@@ -343,6 +344,28 @@ def selftest() -> int:
         expect("the differing-byte count is printed", lines[1],
                ".text: 8 of 8 bytes differ from the target object")
         expect("the permutation is named", ("permutation" in lines[2], "2 symbol" in lines[2]), (True, True))
+
+        # 17b. `.data` emission-order seams: the same symbols in another sequence is `order-only` and names the
+        #      seams; the objects here are the fixture (a vtable+string TU pair laid out as one TU would).
+        vt, st = b"\0" * 8 + b"\x80\x01\x00\x00", b"hello\0\0\0"
+        seam_ours = write(tmp, "seam_ours.o", build_obj(
+            [(".data", vt + st)], [("__vt__A", 12, ".data", 0x11, 0), ("@1", 8, ".data", 0x01, 12)]))
+        seam_tgt = write(tmp, "seam_tgt.o", build_obj(
+            [(".data", st + vt)], [("lbl_str", 8, ".data", 0x11, 0), ("__vt__A", 12, ".data", 0x11, 8)]))
+        seams = [{"addr": 0x1008, "kind": "V->S"}, {"addr": 0x1100, "kind": "zigzag"}]
+        got = fc.data_seam_problems("U/u", ".data", seam_ours, seam_tgt, seams, (0x1000, 0x1200))
+        expect("a reordered .data is order-only and names the seams",
+               (len(got), "order-only: the unit spans several TUs; seams at 0x00001008, 0x00001100" in got[0]),
+               (1, True))
+        expect("a range with no seam adds no line",
+               fc.data_seam_problems("U/u", ".data", seam_ours, seam_tgt, seams, (0x2000, 0x2100)), [])
+        expect("another section adds no line",
+               fc.data_seam_problems("U/u", ".text", seam_ours, seam_tgt, seams, (0x1000, 0x1200)), [])
+        seam_other = write(tmp, "seam_other.o", build_obj(
+            [(".data", st)], [("lbl_str", 8, ".data", 0x11, 0)]))
+        got = fc.data_seam_problems("U/u", ".data", seam_other, seam_tgt, seams, (0x1000, 0x1200))
+        expect("a .data that differs in more than order gets the multi-TU line, not order-only",
+               (len(got), "order-only" in got[0], "spans 3 TUs" in got[0]), (1, False, True))
         expect("the strict permutation line is the strict one",
                "every one of the 2 symbol(s)" in lines[2], True)
         expect("the mislaid-layout line is not printed for a strict permutation",
