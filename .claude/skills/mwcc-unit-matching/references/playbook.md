@@ -2614,6 +2614,10 @@ NUL-terminated; jump tables are not vtables) and look for vtable→string/data t
 before claiming or reconstructing it (`docs/data-order-seams.md`). Cut the claim at those seams: one claim per TU
 fragment. A claim that contains one can never match in a single unit, whatever the classes look like.
 
+**Scope.** Measured for the Capcom game code built with `Wii/1.3`. Eight seams in the g3d (NW4R) library are
+contradicted by `__FILE__` anchors, so do not apply the rule there without checking that library's compiler
+(`python tools/splits/tudiscover.py dataorder` lists each seam's contradictions).
+
 **Result.** The whole DOL has 231 vtables and 65 vtable→string transitions: 4 inside registered units (all in
 `network_transport`) and 61 in unclaimed `.data`, plus 58 "up" adjacent pairs there - candidate seams for the
 proposals no tool could cut (`python tools/splits/dataorder.py scan`). The plan for feeding it into `tudiscover`, `dataclaim`, `flipcheck` and `attribute`
