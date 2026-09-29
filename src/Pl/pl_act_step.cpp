@@ -1,5 +1,5 @@
 /*
- * Pl/fn_8024F200.cpp - the player's per-act state machine cluster.
+ * Pl/pl_act_step.cpp - the player's per-act state machine cluster.
  *
  * Proposal `8024F200_fn_8024F200`, registered once at its final home.  `.text`
  * 0x8024F200-0x80258FCC (40396 B, 92 functions): every function takes the player work
@@ -31,7 +31,7 @@
  * compares it with `cmpwi r4,0` and never masks it, which a `u8` declaration cannot produce.
  *
  * Residual (5 of the range's 92 functions are written; the other 87 have no body yet).  Measured
- * with `recompile.py Pl/fn_8024F200.cpp --measure <symbol>`:
+ * with `recompile.py Pl/pl_act_step.cpp --measure <symbol>`:
  *   * `fn_8024F200` 99.91 - `.text` (260 insns), `extab` and `extabindex` are byte-identical; the
  *     only gap is a *name*: the target's one `R_PPC_ADDR32` in extabindex points at dtk's
  *     `@etb_80011EFC` where MWCC writes its own anonymous `@283` local (the same class of residual
@@ -61,7 +61,7 @@
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
-#include "Pl/fn_8024F200.h"
+#include "Pl/pl_act_step.h"
 #include "Pl/fn_802693C4.h"
 #include "unsplit/Pl.h"
 

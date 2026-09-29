@@ -58,7 +58,7 @@
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
 #include "Pl/pl_skill.h"
-#include "Pl/fn_8024F200.h"   /* 0x80257E70 - the owner of the three-timer reset this unit calls */
+#include "Pl/pl_act_step.h"   /* 0x80257E70 - the owner of the three-timer reset this unit calls */
 #include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the fn_8026A224/33C/644/3A8 group */
 #include "fn_8004CAD8.h"
 #include "unsplit/Pl.h"
