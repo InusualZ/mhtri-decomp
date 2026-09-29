@@ -2197,9 +2197,9 @@ def selftest() -> int:
         out = claim("Pl/seeded", seed_main, "w", False, cwd=seed_main)
         seed_wt = out["worktree"]
         check("the claim records the lane kind and its agent profile",
-              (out["kind"], out["agent"]), ("unit", "decompiler"))
+              (out["kind"], out["agent"]), ("unit", "surveyor"))
         check("... in the registry too",
-              load_registry(seed_main)["Pl/seeded"].get("agent"), "decompiler")
+              load_registry(seed_main)["Pl/seeded"].get("agent"), "surveyor")
         # the profile comes from `slots.profile_for_kind`, the ONE mapping: a tooling claim is a `worker`,
         # not a `decompiler` (unit policy + a no-subagents rule in a job with no unit)
         tooling = claim("Pl/tooled", seed_main, "w", True, cwd=seed_main, kind="tooling")

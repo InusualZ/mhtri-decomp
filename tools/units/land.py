@@ -403,8 +403,8 @@ def land_subject(units):
         cat = "repo/ci"
     elif lo == "agents.md":
         cat = "agents/policy"
-    elif lo in ("readme.md", "license", "gitignore"):
-        cat = "repo/" + lo.replace(".md", "")
+    elif lo.startswith("readme") or lo.startswith("license") or lo in (".gitignore", ".gitattributes", "gitignore", "gitattributes"):
+        cat = "repo/" + ("readme" if lo.startswith("readme") else ("license" if lo.startswith("license") else lo))
     else:
         cat = "game/" + lo
     tail = "" if len(entries) == 1 else (" and %d more" % (len(entries) - 1))
