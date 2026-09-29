@@ -483,6 +483,17 @@ This repository was converted from the pi agent harness to Claude Code on 2026-0
   `acceptEdits`) and the allowed tools (default `Bash`).
 * **A live lane is read from `~/.claude/sessions/<pid>.json`** (`slots.live_runs`): a record counts while its pid
   is alive, and `release`/`reclaim` refuse a slot a live session is working in.
+* **Prototype - in-session subagents in slots.** `.claude/settings.json` points the `WorktreeCreate` /
+  `WorktreeRemove` hooks at `tools/units/worktreehook.py`. The hook hands out a slot only **when armed**:
+  run `python tools/units/worktreehook.py arm N` right before launching N lanes (Agent tool,
+  `isolation: "worktree"`); each launch consumes one token (an exclusive-create claim, so parallel hooks get
+  distinct tokens and distinct slots) and tokens expire after `--ttl` (default 900 s). An unarmed launch - a
+  manual `--worktree`, an ad hoc isolated subagent - gets an ordinary git worktree under `.claude/worktrees/`
+  and is removed the ordinary way. A slot needs a **current** build tree (the hook never re-seeds; it fails and
+  returns the token). Claude Code did not call the remove hook after a clean subagent, so the
+  orchestrator runs **`python tools/units/slots.py collect --path <the result's worktreePath> --release`** when a
+  lane's result arrives: it copies the slot's `.pi/outbox/*.json` and `.pi/notes/*.md` into MAIN, reports the
+  commits main lacks, and releases the slot only when nothing is unlanded.
 * **`.pi/` is unchanged.** It is the campaign's own gitignored scratch (outbox, notes, claims, lane state), not
   the old harness's directory, and lanes and tools still write there.
 * **A lane cannot block on a question.** The `contact_supervisor` channel is gone: a lane ends its turn with the
