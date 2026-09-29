@@ -549,6 +549,31 @@ def selftest() -> int:
               "main added" in text and "branch added" in text, True)
         check("disjoint-union: union left no markers", "<<<<<<<" in text, False)
 
+    # --- the 2026-09-29 prose defect: unionguard unions nothing, so it cannot duplicate the prose ------
+    # A comment paragraph both sides rewrote has a NON-empty base section -> the guard refuses it by name.
+    # That is the property that keeps the landing path safe independently of the resolver, and it is why
+    # unionguard does **not** share `unionresolve.union_text`'s prose-union defect (measured 2026-09-29).
+    prose_rewrite = ("<<<<<<< ours\n"
+                     " * ((10505) illegal overloading).  `menu/fn_802A6624.cpp` owns the address and its header\n"
+                     " * `include/menu/menu_message.h` (included below) declares the `s32`/`u16` spelling\n"
+                     "||||||| base\n"
+                     " * ((10505) illegal overloading).  `menu/fn_802A6624.cpp` owns the address and its header\n"
+                     " * `include/menu/fn_802A6624.h` (included below) declares the `s32`/`u16` spelling\n"
+                     "=======\n"
+                     " * ((10505) illegal overloading).  `menu/menu_message.cpp` owns the address and its header\n"
+                     " * `include/menu/menu_message.h` (included below) declares the `s32`/`u16` spelling\n"
+                     ">>>>>>> theirs\n")
+    check("prose-rewrite: the non-empty base is the overlap signal (refuse)",
+          has_base_region(prose_rewrite), True)
+    additive_insert = ("<<<<<<< ours\n"
+                       "void fn_80002000(void);\n"
+                       "||||||| base\n"
+                       "=======\n"
+                       "void fn_80002040(void);\n"
+                       ">>>>>>> theirs\n")
+    check("additive-insert: the empty base is the disjoint-addition signal (allow)",
+          has_base_region(additive_insert), False)
+
     if fails:
         print("unionguard: %d check(s), %d failure(s)" % (checks, len(fails)))
         for f in fails:
