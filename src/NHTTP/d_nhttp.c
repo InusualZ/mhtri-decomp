@@ -28,12 +28,24 @@
  *
  * FLAGS.  `cflags_nhttp`, as its two siblings.
  *
- * BODY (2026-09-28, second/third/fourth pass).  29 of the 108 functions are byte-identical, 68 rows
- * are unwritten and the unit is 9.87 % fuzzy over its 24712 B.  The connection-list API
+ * BODY (2026-09-28, second..fifth pass).  31 of the 108 functions are byte-identical, 63 rows are
+ * unwritten and the unit is 13.84 % fuzzy over its 24712 B.  The connection-list API
  * (0x8051B0D8..0x8051B79C), the three comm-thread flag accessors and the six public entry points at
- * 0x8051A300..0x8051A5CC are what they added, over the string helpers the first pass left.  The
- * fourth pass is the rule-12 data claim below, which turned two blocked rows into bodies:
+ * 0x8051A300..0x8051A5CC are what passes two and three added, over the string helpers the first pass
+ * left; pass four is the rule-12 data claim below.  Pass five (this one) is the *range-test
+ * lowering*, which moved ten rows and is the single biggest result in the unit:
  *
+ *    100.00  NHTTPi_RegisterCallbacks    (140 B, was unwritten; "Load-bearing source shapes")
+ *    100.00  NHTTPi_urlEncodedLengthN    (116 B, 61.21 -> 100.00)
+ *     94.22  NHTTPi_compareToken        (180 B, was unwritten)
+ *     93.38  NHTTPi_encodeUrlChar       (160 B, 67.38 -> 93.38)
+ *     86.37  NHTTPi_strnicmp            (204 B, 29.02 -> 86.37)
+ *     81.16  NHTTPi_strToHex            (292 B, was unwritten)
+ *     73.49  NHTTPi_containsString      (172 B, was unwritten)
+ *     72.78  NHTTPi_strtonum            (144 B, was unwritten)
+ *     59.64  NHTTPi_urlEncodedLength    (112 B, unchanged - see the residual)
+ *
+ * (the rows passes two..four left, none of them moved by this pass:)
  *    100.00  NHTTPi_GetConnectionListLength (0x8051B358, 32 B)
  *     92.91  NHTTPi_ControlConnectionList  (272/264 B) - the list walk, see the residual
  *
@@ -50,11 +62,7 @@
  *     92.93  NHTTPi_GetResponseSize     (116/108)
  *     92.26  NHTTPi_BufferFullCallback  (280/276)
  *     92.26  NHTTPi_RecvCallback        (280/276)
- *     67.38  NHTTPi_encodeUrlChar       (160/156)
  *     65.83  NHTTPi_AddConnection / OmitConnectionList (48/48)
- *     61.21  NHTTPi_urlEncodedLengthN   (116/116)
- *     59.64  NHTTPi_urlEncodedLength    (112/112)
- *     29.02  NHTTPi_strnicmp            (204/168)
  *
  * NAMING (rule 7).  Every function defined here already has a real map name (`NHTTPi_*`); the
  * `fn_` names it *references* were derived by their owners' lanes and are reached through the owner
@@ -65,7 +73,9 @@
  * -> `NHTTPi_urlEncodedLengthN`; (second pass) `0x8051B1E8` -> `NHTTPi_AddConnection`,
  * `0x8051B578` -> `NHTTPi_RecvCallback` (phase 3 of the callback set; the phase is what the body
  * reports, the receive half is a GUESS at which half that is), `0x8051B774` -> `NHTTPi_SetSock` and
- * `0x8051B784` -> `NHTTPi_GetSock` (from the +0x2C slot the `NHTTPi_SocRecv*` wrappers read).  No
+ * `0x8051B784` -> `NHTTPi_GetSock` (from the +0x2C slot the `NHTTPi_SocRecv*` wrappers read);
+ * (fifth pass) `.data:0x80630B38` -> `NHTTPi_base64Alphabet` - the 0x41-byte digit table the
+ * `NHTTPi_Base64Encode` derivation indexes, named from its contents and its one reader.  No
  * deferral is needed here: every `fn_` this unit references is reached through its owner's header.
  *
  * Third-pass names, all GUESSes and all read off the body itself, since neither the map nor the
@@ -109,6 +119,28 @@
  *     is enough for the auto-inliner to fold its body in (`stw r0,0xb88(r31)` vs retail's
  *     `addi`+`bl`), so its row drops 100 -> 95.38.  `#pragma dont_inline on` around the singleton
  *     holds it, and is the shape this unit keeps.
+ *   - THE RANGE TEST IS A SOURCE INPUT, and pass five's biggest find.  MWCC folds `c >= LO &&
+ *     c <= HI` (variable on the left of both comparisons) into its unsigned `addi`/`clrlwi`/
+ *     `cmplwi` form, which retail almost never has.  Two spellings of the *same* test reach retail's
+ *     code, and which one is needed depends on the context:
+ *       * the pair written with **`&`** and parenthesised - `((c >= 'A') & (c <= 'Z'))` - makes MWCC
+ *         materialise both comparisons as 0/1 values and `and.` them (retail's branchless
+ *         `srawi`/`srwi`/`subfc`/`adde`/`and.` idiom).  This is `NHTTPi_toLower`'s body, which is
+ *         inlined at four call sites, and it is why `strnicmp` jumped 29.02 -> 86.37 and
+ *         `compareToken` 0 -> 94.22.
+ *       * the **constant on the left** of a comparison - `'0' <= c && c <= '9'` - defeats the fold
+ *         for a *branching* test and gives retail's two `cmpwi`s.  That took `urlEncodedLengthN`
+ *         61.21 -> 100.00 and `encodeUrlChar` 67.38 -> 93.38.  It also needs the `&` pair nested in a
+ *         `&&` chain when the pair itself must stay materialised: `strtonum`'s
+ *         `c != ' ' && isDigit` with `u32 isDigit = (c >= '0') & (c <= '9');` keeps retail's space
+ *         test, which the plain `&&` spelling lets MWCC fold away entirely.
+ *     `NHTTPi_urlEncodedLength` is the exception: the same constant-on-the-left chain that finishes
+ *     `...N` makes MWCC merge two of *its* ranges and costs 24 points (59.64 -> 35.86), so the two
+ *     siblings keep different spellings of one test.  Do not unify them.
+ *   - `NHTTPi_containsString` walks the haystack with a pointer (`const char* p` incremented per
+ *     iteration) while indexing `haystack[i + k]` in the inner scan, and tests
+ *     `i < haystackLen - needleLen + 1`; the `<= haystackLen - needleLen` spelling makes MWCC hoist
+ *     the bound and costs the trailing `blt`.
  * CLAIMED DATA (rule 12, 2026-09-28).  The unit owns four runs in `splits.txt` and defines every object
  * in them; the `.bss`/`.sbss` ones are zero-filled, and the `.data`/`.sdata` pair is the version tag.
  *
@@ -166,16 +198,41 @@
  *     connection itself lands in differs (retail r31, ours r29).  `x != NULL && cb != NULL` and the
  *     nested-if form measure identically, and moving the three exchanged words into a nested block
  *     (to change the allocator's web order) does not move either.
- *   - `NHTTPi_strnicmp` (29.02) additionally differs in the both-terminators test: retail emits a
- *     redundant re-test chain (`extsb. r12,r6` / `beq` / `cmpwi r31,0` / `bne` / `cmpwi r12,0` /
- *     `bne` / `cmpwi r31,0` / `bne`) where our `if (c1 == 0 && c2 == 0)` collapses to two `bne`s,
- *     and its `NHTTPi_toLower` stays branchless (`srawi`/`srwi`/`subfc`/`adde`) where ours folds.
- *   - The four partial string rows share one residual: our build folds every `c >= 'A' && c <= 'Z'`
- *     style range test into MWCC's unsigned `subi` + `clrlwi` + `cmplwi` idiom, where retail keeps
- *     the two `cmpwi`s (`cmpwi r0,0x30 / blt / cmpwi r0,0x39 / ble`).  `#pragma peephole off` around
- *     `NHTTPi_encodeUrlChar` was measured and costs 4.75 points (67.38 -> 62.63), so the fold is not
- *     the peephole pass.  It is the single reason `NHTTPi_encodeUrlChar` and both
- *     `urlEncodedLength` rows stop where they do.
+ *   - `NHTTPi_strnicmp` (86.37) still differs in the both-terminators test: retail emits a redundant
+ *     re-test chain (`extsb. r12,r6` / `beq` / `cmpwi r31,0` / `bne` / `cmpwi r12,0` / `bne` /
+ *     `cmpwi r31,0` / `bne`) where our `if (c1 == 0 && c2 == 0)` collapses to two `bne`s.  Its
+ *     `NHTTPi_toLower` half is now retail's (see the `&` shape above); that fix alone took it
+ *     29.02 -> 86.37.
+ *   - `NHTTPi_urlEncodedLength` (59.64) is the one string row the range-test fix did not reach: the
+ *     constant-on-the-left chain that finishes its `...N` sibling makes MWCC merge two of its
+ *     ranges (`cmpwi r0,58` / `cmpwi r0,32`), 59.64 -> 35.86, so it keeps the plain spelling and the
+ *     fold.  Every other spelling tried (constant on the left on one/two/three of the ranges, the
+ *     `&` pair, a `switch`) measured at or below 59.64.
+ *   - `NHTTPi_compareToken` (94.22), `NHTTPi_strToHex` (81.16) and `NHTTPi_strtonum` (72.78) share
+ *     one residual: retail keeps `*a` (resp. the parsed character, the pair's value) in a
+ *     callee-saved register, which buys it a stack frame ours does not need (compareToken: retail
+ *     0xb4 B with r31 saved, ours 0x9c; strToHex: retail 0x124, ours 0x100).  `strtonum` additionally
+ *     keeps retail's `and.` where the `u32 isDigit` local gives `and` + `cmpwi r0,0`.
+ *   - `NHTTPi_strToHex`'s own head guard - `(n == 8) & (*s >= '8')` - is the one place the `&` pair
+ *     did *not* help: written that way MWCC distributes it into two branches, and the materialised
+ *     `u32 tooBig = ...` spelling that does reproduce retail's `and.` (11 instructions to retail's
+ *     11) scores *worse* positionally (81.16 -> 79.71), so the distributed form stays.
+ *   - `NHTTPi_containsString` (73.49) has the shape right and differs in register pressure only:
+ *     ours needs one more live value and spills the `matched` counter to r31, so it carries a frame
+ *     retail does not have (retail keeps it in r12).
+ *   - `NHTTPi_Base64Encode` (476 B) is the one row this pass *derived and then removed*, and the
+ *     reason is rule 12, not the code: its body is complete and needs the 0x41-byte base64 digit
+ *     table at `.data:0x80630B38`, which no registered range covers.  Declaring it in the band
+ *     header is what stylelint reports as an *added* rule-12 finding (16 -> 18), and the gate
+ *     refuses that; claiming the table alone would leave an `auto_*_data` unit *inside* this
+ *     unit's `.data` run, which is playbook 53's link-order cycle.  So the row stays unwritten and
+ *     the unblock is one measured claim: `.data 0x80630B38..0x80630C50` in `splits.txt`, with the
+ *     0x118 bytes defined here (the table, then the "CONNECT  " / " HTTP/1.1" /
+ *     "Proxy-Authorization: Basic " literals `fn_80515774` reaches), which makes the run contiguous
+ *     with the 0x80630C50 version-tag claim already in place.  The derived body (measured 37.92:
+ *     retail divides by 3 with `li r0,3` + `divwu` where we strength-reduce to `mulhw`, and the
+ *     padding tail lands differently) is recorded in this lane's outbox,
+ *     `.pi/outbox/net-nhttp-rows.json`.
  *   - `NHTTPi_ControlConnectionList` (92.91, 272/264 B): the frame, the registers and every arm match
  *     - retail keeps the walk's link slot in r4 inside the `else` branch (so the source declares it
  *     there) and its mode parameter is signed (`cmpwi`) - and the only difference left is the switch's
@@ -183,10 +240,15 @@
  *     and 1), ours the linear chain 0,1,2,4 over the same four arms.  Five spellings were measured
  *     (link hoisted 71.09, link in the `else` 89.84, signed mode 92.91, a `default:` arm written first
  *     92.91, a five-case switch 92.91), so the lowering is not reachable from the source shape.
- *   - The remaining 68 rows are unwritten.  `d_nhttp.c` is a multi-wave unit: the connection /
+ *   - The remaining 63 rows are unwritten.  `d_nhttp.c` is a multi-wave unit: the connection /
  *     request / response state machine (`fn_80515774` 1576 B, `fn_8051900C` 1180 B, `fn_805199C4`
- *     1520 B, `fn_80518308` 932 B), the `NHTTPi_Soc*` socket wrappers and the Base64 encoder are
- *     still open.
+ *     1520 B, `fn_80518308` 932 B), the `NHTTPi_Soc*` socket wrappers, `NHTTPi_SaveBuf` and
+ *     `NHTTPi_Base64Encode` are still open.  Pass five's likely next targets, all small and all
+ *     fully read already: `fn_8051AAB0` (92 B), `NHTTPCreateRequest`=`fn_8051A8A4` (132 B),
+ *     `NHTTPDestroyResponse`=`fn_8051AB4C` (132 B), `fn_8051A928` (196 B), `fn_8051AC38` (96 B),
+ *     `fn_8051AC98` (92 B), `fn_8051AF8C` (96 B), `fn_8051AFEC` (112 B) and `fn_80516BD8` (84 B) -
+ *     public NHTTP-API wrappers whose bodies, callees and GUESS names are worked out in this
+ *     lane's outbox (`.pi/outbox/net-nhttp-rows.json`), which this pass' budget did not reach.
  */
 
 #include "NHTTP/d_nhttp.h"
@@ -241,7 +303,7 @@ int NHTTPi_strcmp(const char* a, const char* b) {
 /* The case fold `NHTTPi_strnicmp` and `NHTTPi_strToHex` both need.  MWCC inlines it at every call
  * site, so it has no symbol of its own. */
 static char NHTTPi_toLower(char c) {
-    return (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
+    return ((c >= 'A') & (c <= 'Z')) ? c + 32 : c;
 }
 
 /* 0x80516CAC (0xC): zero-fill shim (memset(dst, 0, n)). */
@@ -280,7 +342,7 @@ s32 NHTTPi_encodeUrlChar(u8* dst, char c) {
         dst[0] = '+';
         return 1;
     }
-    if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+    if (('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
         dst[0] = value;
         return 1;
     }
@@ -317,7 +379,7 @@ s32 NHTTPi_urlEncodedLengthN(const char* s, s32 n) {
     s32 length = 0;
 
     for (; n > 0; n--) {
-        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+        if (('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
             c == ' ') {
             length += 1;
         } else {
@@ -326,6 +388,109 @@ s32 NHTTPi_urlEncodedLengthN(const char* s, s32 n) {
         c = *p++;
     }
     return length;
+}
+
+/* 0x80516F08 (0x124): read at most `n` characters as a hexadecimal number.  Leading spaces are
+ * skipped and a space or NUL after the first digit ends the number; answers -1 when the field holds
+ * no hex digit, when a character is neither a hex digit, a space nor the end, and when eight
+ * characters would carry the value into the sign bit. */
+s32 NHTTPi_strToHex(const char* s, s32 n) {
+    s32 value = 0;
+    BOOL seen = FALSE;
+
+    if (n > 8) {
+        return -1;
+    }
+    if ((n == 8) & (*s >= '8')) {
+        return -1;
+    }
+    for (; n > 0; n--) {
+        char c = NHTTPi_toLower(*s);
+
+        if ('0' <= c && c <= '9') {
+            value = value * 16 + (c - '0');
+            seen = TRUE;
+        } else if ('a' <= c && c <= 'f') {
+            value = value * 16 + (c - 'a' + 10);
+            seen = TRUE;
+        } else if (seen && (c == ' ' || c == 0)) {
+            break;
+        } else if (!seen && c == ' ') {
+            /* a leading space is skipped */
+        } else {
+            return -1;
+        }
+        s++;
+    }
+    return value;
+}
+
+/* 0x80517248 (0xB4): compare two tokens case-insensitively.  Answers 0 once both have run out at a
+ * NUL or a space, -1 as soon as a character differs. */
+s32 NHTTPi_compareToken(const char* a, const char* b) {
+    while (NHTTPi_toLower(*a) == NHTTPi_toLower(*b)) {
+        if (*a == 0 || *a == ' ') {
+            return 0;
+        }
+        a++;
+        b++;
+    }
+    return -1;
+}
+
+/* 0x805172FC (0x90): read at most `n` characters as a decimal number, skipping spaces.  Answers -1
+ * when the field held no digit at all, or when the number needs more than nine digits. */
+s32 NHTTPi_strtonum(const char* s, s32 n) {
+    s32 value = 0;
+    s32 digits = 0;
+
+    for (; n > 0; n--) {
+        char c = *s;
+        u32 isDigit = (c >= '0') & (c <= '9');
+
+        if (c != ' ' && isDigit) {
+            value = value * 10 + (c - '0');
+            digits++;
+            if (digits > 9) {
+                return -1;
+            }
+        }
+        s++;
+    }
+    if (digits == 0) {
+        return -1;
+    }
+    return value;
+}
+
+/* 0x8051738C (0xAC): find `needle` inside the first `haystackLen` characters of `haystack`.
+ * Answers 0 on a hit and -1 on a miss, or when the needle is the longer of the two. */
+s32 NHTTPi_containsString(const char* haystack, s32 haystackLen, const char* needle, s32 needleLen) {
+    const char* p;
+    s32 i;
+    s32 k;
+
+    if (haystackLen < needleLen) {
+        return -1;
+    }
+    p = haystack;
+    for (i = 0; i < haystackLen - needleLen + 1; i++) {
+        if (*p == needle[0]) {
+            s32 matched = 1;
+
+            for (k = 1; k < needleLen; k++) {
+                if (haystack[i + k] != needle[k]) {
+                    break;
+                }
+                matched++;
+            }
+            if (matched == needleLen) {
+                return 0;
+            }
+        }
+        p++;
+    }
+    return -1;
 }
 
 /* The public NHTTP entry points 0x8051A300..0x8051A5CC (the map still carries their `fn_` rows;
@@ -379,6 +544,22 @@ s32 NHTTPi_GetConnectionStatus(NHTTPConnection* connection) {
         return conn->field_0x04;
     }
     return -1;
+}
+
+/* 0x8051A4E8 (0x8C): bring the HTTP layer up with the caller's two command callbacks and one
+ * command id.  The library's version banner is registered once, behind its own lazy-init flag, and
+ * all three arguments go on to `NHTTPi_Startup`; answers 0 when it came up and -1 when it did not. */
+s32 NHTTPi_RegisterCallbacks(void (*commandCallback)(u32), void (*commandCallbackEx)(u32), u32 command) {
+    NHTTPInfo* info = NHTTPi_GetSystemInfoP();
+
+    if (NHTTPi_versionRegistered == 0) {
+        OSRegisterVersion(NHTTPi_versionString);
+        NHTTPi_versionRegistered = 1;
+    }
+    return !NHTTPi_Startup(info, (NHTTPAllocFn)commandCallback, (NHTTPFreeFn)commandCallbackEx,
+                           command)
+               ? -1
+               : 0;
 }
 
 /* 0x8051A574 (0x34): tear the HTTP layer down.  The caller's callback is handed straight to
