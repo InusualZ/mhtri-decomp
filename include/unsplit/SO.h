@@ -37,6 +37,48 @@ u16 SOHtoNs(u16 port);
  * NHTTP library's async cleanup closes the one `NHTTPi_Startup` opened (`-1` when there is none). */
 s32 SOClose(s32 fd);
 
+/* The IPv4 socket address `SOConnect` takes: the length byte (8), the family (2, AF_INET), the port in
+ * network order and the address word. size: 0x8 */
+typedef struct SOSockAddrIn {
+    /* +0x0 */ u8 len;
+    /* +0x1 */ u8 family;
+    /* +0x2 */ u16 port;
+    /* +0x4 */ u32 addr;
+} SOSockAddrIn;
+
+/* The resolver result `SOGetAddrInfo` fills and `SOFreeAddrInfo` releases (a getaddrinfo record).
+ * size: 0x20 */
+typedef struct SOAddrInfo {
+    /* +0x00 */ s32 flags;
+    /* +0x04 */ s32 family;
+    /* +0x08 */ s32 socketType;
+    /* +0x0C */ s32 protocol;
+    /* +0x10 */ u32 addrLength;
+    /* +0x14 */ char* canonName;
+    /* +0x18 */ SOSockAddrIn* addr;
+    /* +0x1C */ struct SOAddrInfo* next;
+} SOAddrInfo;
+
+/* 0x8051F8FC - open a socket (domain 2 = AF_INET, type 1 = stream); the descriptor, or a negative error. */
+s32 __SOCreateSocket(s32 domain, s32 type, s32 protocol);
+
+/* 0x80521054 - set one socket option; `value` is the option's own bytes. */
+s32 SOSetSockOpt(s32 fd, s32 level, s32 option, u32* value, s32 length);
+
+/* 0x8051FE40 - connect the socket to the address. */
+s32 SOConnect(s32 fd, SOSockAddrIn* addr);
+
+/* 0x805202E8 - shut the socket down (how 2 = both directions). */
+s32 SOShutdown(s32 fd, s32 how);
+
+/* 0x80520148 / 0x80520194 - receive into / send from a byte range; the byte count, or a negative error. */
+s32 SORecv(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
+s32 SOSend(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
+
+/* 0x80520D0C / 0x80520FF0 - resolve a host name (getaddrinfo) and release the result. */
+s32 SOGetAddrInfo(const char* node, const char* service, const SOAddrInfo* hints, SOAddrInfo** result);
+void SOFreeAddrInfo(SOAddrInfo* info);
+
 #ifdef __cplusplus
 }
 #endif

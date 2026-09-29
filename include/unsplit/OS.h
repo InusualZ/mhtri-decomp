@@ -79,6 +79,15 @@ typedef struct OSThread { u8 pad_0x000[0x318]; } OSThread;
 /* size: 0x18 - the OS mutex the NHTTP and NWC24 bands initialise, lock and unlock */
 typedef struct OSMutex { u8 pad_0x00[0x18]; } OSMutex;
 
+/* size: 0x08 - the head and tail of a queue of waiting threads */
+typedef struct OSThreadQueue { void* head; void* tail; } OSThreadQueue;
+
+/* 0x804D2140 / 0x804D2150 - the 4-byte branch stubs the NHTTP completion record reaches
+ * `OSInitThreadQueue` (0x804D3960) and the wakeup routine (0x804D4B20, the dump's `OSWakeupThread`)
+ * through.  Their names are GUESSes from the branch each one holds. */
+void OSInitThreadQueueThunk(OSThreadQueue* queue);
+void OSWakeupThreadThunk(OSThreadQueue* queue);
+
 /* 0x804D3C00 - the thread the OS is currently running, null before the scheduler starts. */
 OSThread* OSGetCurrentThread(void);
 

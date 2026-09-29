@@ -63,6 +63,16 @@ s32 NHTTPi_SocRecvFromOffset(s32 handle, NHTTPConnection* conn, s32 flags, s32 o
 s32 NHTTPi_SocRecvOffsetRange(s32 handle, NHTTPConnection* conn, s32 flags, s32 offset, s32 length,
                               s32 arg);
 
+/* 0x805152C4 (0xF8): the index of the first space in the ring's stream between `start` and `end`, or
+ * -1 when there is none. */
+s32 NHTTPi_RecvBufFindSpace(NHTTPRecvBuf* ring, s32 start, s32 end);
+
+/* 0x805153BC (0x1F0): the case-insensitive search `NHTTPi_findHeaderField` names a header with: 0 when
+ * the ring's stream between `start` and `end` holds `name` (each character compared upper-cased, the
+ * `terminator` character also ending it), -1 when it does not.  Declared from its callers in
+ * `d_nhttp.c`; the body is still unwritten. */
+s32 NHTTPi_RecvBufFindUpper(NHTTPRecvBuf* ring, s32 start, s32 end, const char* name, s32 terminator);
+
 /* 0x805156F0 (0x1C): true when the ring holds at least `size` bytes. */
 BOOL NHTTPi_isRecvBufFull(NHTTPRecvBuf* info, u32 size);
 

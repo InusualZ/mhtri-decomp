@@ -118,10 +118,10 @@ void NHTTPi_InitSystemInfo(NHTTPInfo* info) {
     info->alloc_fn = 0;
     info->free_fn = 0;
     info->field_0x7CC = 0;
-    info->field_0x7D0 = -1;
-    info->field_0x7DC = 0;
+    info->socket = -1;
+    info->quitFlag = 0;
     info->comm_stack = 0;
-    info->field_0x7E4 = 0;
+    info->sslHook = NULL;
 }
 
 /* 0x805145E8 (0x5C): forward to the registered allocator (a null slot answers null). */
@@ -180,12 +180,12 @@ s32 NHTTPi_Startup(NHTTPInfo* info, NHTTPAllocFn alloc, NHTTPFreeFn free, u32 ar
     bgnend->free_fn = (void*)free;
     bgnend->error = 0;
     bgnend->ssl_error = 0;
-    bgnend->field_0x7DC = 0;
+    bgnend->quitFlag = 0;
     NHTTPi_InitListInfo(list);
     NHTTPi_InitRequestInfo(request);
     NHTTPi_initLockReqList(mutex);
     NHTTPi_InitConnectionList();
-    bgnend->field_0x7D0 = -1;
+    bgnend->socket = -1;
     {
         NHTTPInfo* sys = NHTTPi_GetSystemInfoP();
 
@@ -256,10 +256,10 @@ void NHTTPi_CleanupAsync(NHTTPInfo* info, NHTTPCompletionCallback callback) {
     if (count != 0) {
         printf(NHTTPi_connRestWarning, count);
     }
-    fd = bgnend->field_0x7D0;
+    fd = bgnend->socket;
     if (fd >= 0) {
         SOClose(fd);
-        bgnend->field_0x7D0 = -1;
+        bgnend->socket = -1;
     }
 }
 
@@ -482,7 +482,7 @@ s32 NHTTPi_cancelRequest(NHTTPRequestList* list, void* connection, s32 id) {
         NHTTPi_destroyRequestObject(connection, node->request);
         NHTTPi_free(node);
         if (obj != 0) {
-            obj->field_0x04 = 8;
+            obj->status = 8;
             NHTTPi_CompleteCallback(connection, obj);
         }
         ret = 1;
@@ -548,7 +548,7 @@ s32 NHTTPi_createCommThread(NHTTPThreadInfo* thread, u32 arg, u8* stack) {
 
 /* 0x80514F94 (0x48): flag the quit, wake the queue and wait for the thread to exit. */
 void NHTTPi_destroyCommThread(NHTTPThreadInfo* thread, NHTTPInfo* info) {
-    info->field_0x7DC = 1;
+    info->quitFlag = 1;
     OSSendMessage(&thread->queue, 0, OS_MESSAGE_NOBLOCK);
     OSJoinThread(&thread->thread, 0);
 }

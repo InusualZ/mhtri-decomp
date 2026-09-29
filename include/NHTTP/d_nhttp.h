@@ -45,17 +45,44 @@ typedef struct NHTTPSock {
  * `NHTTPDestroy` forwards: no arguments, no return. */
 typedef void (*NHTTPCompletionCallback)(void);
 
-/* The response object a connection's +0x14 slot holds.  Only the fields the request/response
- * callbacks exchange with the caller are modelled. size: 0x43C (approximate) */
+/* The registered allocator pair `NHTTPi_Startup` installs: the allocator takes a size and an
+ * alignment and returns the block, the free takes the block back.  Both are untyped at the block
+ * (the info block stores them as bare words). */
+typedef void* (*NHTTPAllocFn)(u32 size, u32 align); /* untyped: byte range */
+typedef void (*NHTTPFreeFn)(void* block); /* untyped: byte range */
+struct NHTTPResponse;
+struct NHTTPSock;
+
+/* The caller's hooks on a response: the buffer-full callback is handed the buffer word (in and out),
+ * the size word, the socket, the allocator pair and the response's own size word, and answers what
+ * goes back into the first word of the phase-2 arguments; the free callback gets the buffer back; the
+ * completion hook gets the connection's status, the response and its size word. */
+typedef s32 (*NHTTPBufferFullCallback)(u32* buffer, u32* size, struct NHTTPSock* sock, NHTTPAllocFn alloc,
+                                       NHTTPFreeFn free, s32 length);
+typedef void (*NHTTPFreeBufferCallback)(u32 buffer, NHTTPFreeFn free, s32 size);
+typedef void (*NHTTPCompleteCallback)(s32 status, struct NHTTPResponse* response, s32 size);
+
+/* The response object a connection's +0x14 slot (a request's +0x2C) holds: the receive ring of
+ * `NHTTP_os_RVL.h` (its 0x38-byte head, the 512-byte block list at +0x34 and the 0x400 bytes at +0x38)
+ * followed by the caller's own word - which is why the sibling's `NHTTPRecvBuf` helpers take the same
+ * pointer.  Names are read off the bodies of `d_nhttp.c`. size: 0x43C */
 typedef struct NHTTPResponse {
-    /* +0x000 */ u32 field_0x00;
-    /* +0x004 */ u32 field_0x04;   /* the third word the phase-2/3 callback exchanges */
-    /* +0x008 */ u8 pad_0x008[0x14];
-    /* +0x01C */ u32 field_0x1C;   /* the second word the phase-2/3 callback exchanges */
-    /* +0x020 */ u8 pad_0x020[0x8];
-    /* +0x028 */ u32 field_0x28;   /* the first word the phase-2/3 callback exchanges */
-    /* +0x02C */ u8 pad_0x02C[0x40C];
-    /* +0x438 */ u32 field_0x438;
+    /* +0x000 */ s32 headerLength;      /* bytes of the response head buffered in the ring */
+    /* +0x004 */ u32 received;          /* the third word the phase-2/3 callback exchanges */
+    /* +0x008 */ u32 receivedTotal;
+    /* +0x00C */ s32 contentLength;     /* the Content-Length header's value, -1 when it has none */
+    /* +0x010 */ u32 completed;         /* 1 once the response ended without an error */
+    /* +0x014 */ u32 headersParsed;     /* 1 once the status line and the fields were read */
+    /* +0x018 */ s32 statusCode;
+    /* +0x01C */ u32 bufferSize;        /* the second word the phase-2/3 callback exchanges */
+    /* +0x020 */ void* auxBufferA;
+    /* +0x024 */ void* auxBufferB;
+    /* +0x028 */ u32 userBuffer;        /* the first word the phase-2/3 callback exchanges */
+    /* +0x02C */ NHTTPBufferFullCallback bufferFullCallback;
+    /* +0x030 */ NHTTPFreeBufferCallback freeCallback;
+    /* +0x034 */ struct NHTTPRecvBlock* blocks;   /* the ring's 512-byte block list */
+    /* +0x038 */ u8 data[0x400];
+    /* +0x438 */ u32 userData;          /* the word the caller gave the request; the last argument of every phase callback */
 } NHTTPResponse;
 
 struct NHTTPConnection;
@@ -84,19 +111,19 @@ typedef s32 (*NHTTPConnectionCallback)(struct NHTTPConnection* connection, s32 p
  * buffer's own bookkeeping and the extent the bodies address is 0x8048.  Only the fields the
  * reconstructed bodies touch are named. size: 0x8060 */
 typedef struct NHTTPConnection {
-    /* +0x000 */ u32 field_0x00;
-    /* +0x004 */ u32 field_0x04;     /* 8 once the request was cancelled */
-    /* +0x008 */ u32 unused_0x08;
-    /* +0x00C */ u32 field_0x0C;     /* 1 after creation, 0 once the request was notified */
-    /* +0x010 */ struct NHTTPRequest* request;   /* the object `fn_80515774` builds */
+    /* +0x000 */ u32 state;          /* 0 created, 1 queued, 2 sending, 3 receiving the head, 4 the body, 5 done */
+    /* +0x004 */ u32 status;         /* 0xF at creation, 8 once cancelled, the request's own error once finished */
+    /* +0x008 */ s32 sslStatus;      /* the last `SSLDoHandshake` answer */
+    /* +0x00C */ u32 pending;        /* 1 after creation, 0 once the request was notified */
+    /* +0x010 */ struct NHTTPRequest* request;   /* the object `NHTTPi_createRequestObject` builds */
     /* +0x014 */ NHTTPResponse* response;
-    /* +0x018 */ s32 field_0x18;
+    /* +0x018 */ s32 requestId;      /* the id `NHTTP_SendRequestAsync` answered, -1 before */
     /* +0x01C */ NHTTPConnectionCallback callback;
     /* +0x020 */ struct NHTTPConnection* next;   /* the request list's link */
-    /* +0x024 */ u32 field_0x24;     /* the first word the phase-1 callback exchanges */
-    /* +0x028 */ u32 field_0x28;     /* the second word the phase-1 callback exchanges */
+    /* +0x024 */ u32 postData;       /* the first word the phase-1 callback exchanges: the piece it hands out */
+    /* +0x028 */ u32 postLength;     /* the second: that piece's length, 0 when it is done */
     /* +0x02C */ NHTTPSock* sock;    /* the socket `NHTTPi_SocRecvOffsetRange` reads */
-    /* +0x030 */ u32 unused_0x30;
+    /* +0x030 */ NHTTPCompleteCallback completeCallback;   /* the caller's phase-4 hook */
     /* +0x034 */ u32 unused_0x34;
     /* +0x038 */ u32 unused_0x38;
     /* +0x03C */ u32 unused_0x3C;
@@ -112,9 +139,11 @@ typedef struct NHTTPListInfo {
     /* +0x04 */ void* tail;
 } NHTTPListInfo;
 
-/* The request-info record. size: 0x04 */
+/* The request-info record: the request node the comm thread is serving now, null between requests
+ * (`NHTTPi_dequeueRequest` sets it, `NHTTPi_finishRequest` frees and clears it). size: 0x04 */
+struct NHTTPRequestNode;
 typedef struct NHTTPRequestInfo {
-    /* +0x00 */ u32 field_0x00;
+    /* +0x00 */ struct NHTTPRequestNode* active;
 } NHTTPRequestInfo;
 
 /* The request-list mutex info: `created` is the lazy-init flag. size: 0x1C */
@@ -124,22 +153,17 @@ typedef struct NHTTPMutexInfo {
 } NHTTPMutexInfo;
 
 /* The comm-thread info.  The queue (0x20 B), the 2-slot message array the queue is told holds 3
- * (0x10 B), the OS thread block (0x318 B) and the ready flag `NHTTPi_InitThreadInfo` clears /
- * `NHTTPi_markCommThreadReady` sets. size: 0x34C */
+ * (0x10 B), the OS thread block (0x318 B), the ready flag `NHTTPi_InitThreadInfo` clears /
+ * `NHTTPi_markCommThreadReady` sets, and the request send buffer. size: 0x460 */
 typedef struct NHTTPThreadInfo {
     /* +0x000 */ OSMessageQueue queue;
     /* +0x020 */ OSMessage msgArray[2];
     /* +0x030 */ OSThread thread;
     /* +0x348 */ u32 ready;   /* NHTTPi_markCommThreadReady / NHTTPi_isCommThreadReady */
+    /* +0x34C */ u8 pad_0x34C[0x14];
+    /* +0x360 */ u8 sendBuffer[0x100];   /* the 256-byte buffer `NHTTPi_SaveBuf` fills before each send */
 } NHTTPThreadInfo;
 
-/* The 8-byte OS thread queue the completion record ends in (the Dolphin `OSThreadQueue`: the head and
- * tail links `OSInitThreadQueue`/`OSWakeupThread` operate on).  Declared beside its one user until a
- * band header carries the OS type. size: 0x8 */
-typedef struct NHTTPThreadQueue {
-    /* +0x00 */ void* head;
-    /* +0x04 */ void* tail;
-} NHTTPThreadQueue;
 
 /* The synchronisation record `NHTTPi_NotifyCompletion` lazily initialises (`NHTTPi_completionSync`,
  * `.bss` 0x80762C20): the +0x00 init flag, the mutex the connection's notified flag is cleared under,
@@ -148,22 +172,38 @@ typedef struct NHTTPThreadQueue {
 typedef struct NHTTPiCompletionSync {
     /* +0x00 */ u32 initialized;
     /* +0x04 */ OSMutex mutex;
-    /* +0x1C */ NHTTPThreadQueue queue;
+    /* +0x1C */ OSThreadQueue queue;
     /* +0x24 */ u8 pad_0x24[0x1C];
 } NHTTPiCompletionSync;
 
-/* The NHTTP system-info block. size: 0xB8C */
+/* One proxy setting the network configuration holds (`NHTTPSetSystemProxy` reads the plain and the
+ * https one): whether it is on, whether it carries credentials, the host, port and credentials.
+ * size: 0x148 */
+typedef struct NHTTPProxyConfig {
+    /* +0x000 */ u8 enabled;
+    /* +0x001 */ u8 authEnabled;
+    /* +0x002 */ u8 pad_0x002[2];
+    /* +0x004 */ char host[0x100];
+    /* +0x104 */ u16 port;
+    /* +0x106 */ char user[0x21];
+    /* +0x127 */ char password[0x21];
+} NHTTPProxyConfig;
+
+/* The NHTTP system-info block. size: 0xCA0 */
 typedef struct NHTTPInfo {
-    /* +0x000 */ u8 pad_0x000[0x7C4];
+    /* +0x000 */ u8 pad_0x000[0x28];
+    /* +0x028 */ NHTTPProxyConfig httpProxy;
+    /* +0x170 */ NHTTPProxyConfig httpsProxy;
+    /* +0x2B8 */ u8 pad_0x2B8[0x50C];
     /* +0x7C4 */ void* alloc_fn;   /* registered allocator (NHTTPi_alloc) */
     /* +0x7C8 */ void* free_fn;    /* registered free (NHTTPi_free) */
     /* +0x7CC */ u32 field_0x7CC;   /* 1 once NHTTPi_Startup has finished */
-    /* +0x7D0 */ s32 field_0x7D0;   /* the socket NHTTPi_Startup opened, -1 when none */
+    /* +0x7D0 */ s32 socket;        /* the socket NHTTPi_Startup opened, -1 when none */
     /* +0x7D4 */ s32 ssl_error;     /* NHTTPi_SetSSLError / NHTTPi_GetSSLError */
     /* +0x7D8 */ s32 error;         /* NHTTPi_SetError / NHTTPi_GetError */
-    /* +0x7DC */ u32 field_0x7DC;   /* the comm thread's quit flag */
+    /* +0x7DC */ u32 quitFlag;      /* the comm thread's quit flag */
     /* +0x7E0 */ void* comm_stack;  /* the 8192-byte block NHTTPi_Startup gave the comm thread */
-    /* +0x7E4 */ u32 field_0x7E4;
+    /* +0x7E4 */ void (*sslHook)(s32 ssl, u32 arg);   /* called with each new SSL context and the request's arg */
     /* +0x7E8 */ u8 pad_0x7E8[0x18];
     /* +0x800 */ NHTTPListInfo list;
     /* +0x808 */ NHTTPRequestInfo request;
@@ -171,6 +211,26 @@ typedef struct NHTTPInfo {
     /* +0x828 */ u8 pad_0x828[0x18];
     /* +0x840 */ NHTTPThreadInfo thread;
 } NHTTPInfo;
+
+/* The comm thread's working state: `NHTTPi_commThreadLoop` keeps one on its stack and hands it to
+ * every step of serving a request.  Names are read off the bodies.  size: 0x340 */
+typedef struct NHTTPCommContext {
+    /* +0x000 */ s32 requestId;         /* the request being served, -1 between requests */
+    /* +0x004 */ char host[0x100];      /* the host the socket is connected to */
+    /* +0x104 */ u8 recvScratch[0x200]; /* the response's spill buffer once the caller's is full */
+    /* +0x304 */ u8 statusLine[0x10];   /* the first bytes of the response */
+    /* +0x314 */ u32 address;           /* the resolved address of `host` */
+    /* +0x318 */ u32 lastAddress;       /* and the one the socket is connected to */
+    /* +0x31C */ u32 port;
+    /* +0x320 */ u32 lastPort;
+    /* +0x324 */ s32 sendUsed;          /* bytes queued in the request send buffer */
+    /* +0x328 */ s32 recvCount;         /* bytes of the response head received */
+    /* +0x32C */ s32 contentRemaining;  /* the body bytes still to come, or the current chunk's */
+    /* +0x330 */ s32 error;             /* the request's error code, 0 when it is going well */
+    /* +0x334 */ s32 again;             /* 1 to run the next round on the same socket */
+    /* +0x338 */ s32 connected;         /* 1 while the socket is kept for the next request */
+    /* +0x33C */ s32 chunked;           /* 1 for a chunked body */
+} NHTTPCommContext;
 
 /* `NHTTPi_GetSystemInfoP`'s singleton slot and the block it points at. */
 #include "unsplit/NHTTP.h"
@@ -267,12 +327,96 @@ void NHTTPi_BufferFullCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connectio
 void NHTTPi_RecvCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
 void NHTTPi_NotifyCompletion(NHTTPConnection* connection);
 
-/* The raw socket receive the RVL wrappers end in.  Its body belongs to `d_nhttp.c` (still
- * unwritten); the six-parameter signature is a GUESS - only the register mapping is proven, from
- * `NHTTPi_SocRecvFromOffset`/`NHTTPi_SocRecvOffsetRange`, which forward their own arguments
- * unchanged. */
+/* The raw socket receive the RVL wrappers end in.  The sibling `NHTTP_os_RVL.c` declared the six
+ * parameters as (handle, conn, flags, ...); the body reads them as the request-list mutex, the
+ * REQUEST (its +0xAC SSL handle and +0x00 cancel flag), the socket, the buffer, its length and the
+ * receive flags, so `conn` is a request and `handle` a mutex there (a shared-file request). */
 s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 length, s32 arg);
-void NHTTPi_destroyRequestObject(void* connection, s32 request); /* untyped: opaque handle */
+s32 NHTTPi_destroyRequestObject(NHTTPMutexInfo* mutex, s32 request);
+
+/* The socket layer (0x805163A4..0x80516C2C) - the raw SO wrappers with the request's SSL handle in
+ * front: a send/receive goes through SSL when the request holds a handle, and the error mapping is
+ * shared by both directions. */
+s32 NHTTPi_SocClose(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd);
+s32 NHTTPi_SocSSLConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd);
+s32 NHTTPi_SocRecv_sub(NHTTPConnection* connection, s32 fd, u8* buf, s32 length, s32 flags);
+s32 NHTTPi_SocSend(struct NHTTPRequest* request, s32 fd, u8* buf, s32 length, s32 flags);
+s32 NHTTPi_SocSend_sub(s32 fd, u8* buf, s32 length, s32 flags);
+s32 NHTTPi_SocConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd,
+                      u32 address, u32 port);
+void NHTTPi_SocShutdown(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd);
+s32 NHTTPi_probeSocket(s32 fd);
+s32 NHTTPi_openSocket(struct NHTTPRequest* request);
+u32 NHTTPi_resolveHostName(struct NHTTPRequest* request, const char* name);
+
+/* The string helpers (0x8051702C..0x80517634) and the connection/request API (0x8051A1B8..0x8051AFEC):
+ * the public NHTTP calls take the request handle `NHTTPCreateRequest` answered (a request object) or,
+ * for the response-side calls, the response handle. */
+s32 NHTTPi_strToDec(const char* s, s32 n);
+s32 NHTTPi_uintToStr(char* buf, u32 value);
+s32 NHTTPi_isHeaderEnd(const char* window, s32 count);
+NHTTPConnection* NHTTPCreateConnection(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                       NHTTPConnectionCallback callback, u32 userData);
+s32 NHTTPGetBodyBuffer(NHTTPConnection* connection, u32* buffer, u32* size);
+struct NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                            NHTTPCompleteCallback completeCallback, u32 userData,
+                                            NHTTPBufferFullCallback bufferFullCallback,
+                                            NHTTPFreeBufferCallback freeCallback);
+s32 NHTTPi_dispatchConnectionCallback(NHTTPConnection* connection, s32 phase, NHTTPCallbackArgs* args);
+struct NHTTPRequest* NHTTPCreateRequest(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                        NHTTPCompleteCallback completeCallback, u32 userData);
+s32 NHTTPSendRequestAsync(struct NHTTPRequest* request);
+s32 NHTTPCancelRequest(s32 id);
+void NHTTPDestroyResponse(NHTTPResponse* response);
+s32 NHTTPGetBodyAll(NHTTPResponse* response, u32* buffer);
+s32 NHTTPGetResultCode(NHTTPResponse* response);
+s32 NHTTPSetVerifyOption(struct NHTTPRequest* handle, u32 option);
+s32 NHTTPClearRootCA(struct NHTTPRequest* handle);
+s32 NHTTPClearClientCert(struct NHTTPRequest* handle);
+s32 NHTTPAddHeaderField(struct NHTTPRequest* handle, const char* token, const char* value);
+s32 NHTTPAddPostDataAscii(struct NHTTPRequest* handle, const char* token, const char* value);
+
+/* The request and response objects (0x80515774..0x805161A4) and the public API over them. */
+struct NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 method, u32 buffer,
+                                                u32 bufferSize, u32 userData,
+                                                NHTTPBufferFullCallback bufferFullCallback,
+                                                NHTTPFreeBufferCallback freeCallback);
+void NHTTP_DestroyRequest(NHTTPInfo* info, struct NHTTPRequest* request);
+void NHTTP_DestroyResponse(NHTTPMutexInfo* mutex, NHTTPResponse* response);
+s32 NHTTP_SendRequestAsync(NHTTPInfo* info, struct NHTTPRequest* request);
+s32 NHTTPi_cancelRequestById(NHTTPInfo* info, s32 id);
+
+/* The request writer (0x805176FC..0x80518308) and the rest of the public API. */
+s32 NHTTPi_SaveBuf(struct NHTTPRequest* request, u8* buffer, s32 fd, s32* used, u8* data, s32 length);
+s32 NHTTPi_queryPostFieldSize(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, const char* key, s32* total,
+                              s32 mode);
+s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, u8* buffer, const char* key,
+                         s32 fd, s32* used, s32 mode);
+s32 NHTTPi_ensureRecvSpace(NHTTPMutexInfo* mutex, NHTTPResponse* response);
+s32 NHTTPi_appendSendData(NHTTPCommContext* context, const char* data, s32 length);
+s32 NHTTPi_sendHeaderFields(NHTTPCommContext* context);
+s32 NHTTPSetProxy(struct NHTTPRequest* handle, const char* host, s32 port, const char* user,
+                  const char* password);
+s32 NHTTPSetSystemProxy(struct NHTTPRequest* handle);
+s32 NHTTPi_Base64Encode(char* dst, const char* src);
+
+/* The comm thread's steps (0x80518970..0x80519FB4): each takes the working state the loop keeps. */
+s32 NHTTPi_dequeueRequest(NHTTPCommContext* context);
+void NHTTPi_finishRequest(NHTTPCommContext* context);
+s32 NHTTPi_prepareTarget(NHTTPCommContext* context);
+s32 NHTTPi_connectSocket(NHTTPCommContext* context);
+s32 NHTTPi_negotiateSSL(NHTTPCommContext* context);
+s32 NHTTPi_sendProxyConnect(NHTTPCommContext* context);
+s32 NHTTPi_recvProxyConnectReply(NHTTPCommContext* context);
+s32 NHTTPi_sendRawPostBody(NHTTPCommContext* context);
+s32 NHTTPi_sendMultipartBody(NHTTPCommContext* context);
+s32 NHTTPi_sendUrlEncodedBody(NHTTPCommContext* context);
+s32 NHTTPi_sendRequest(NHTTPCommContext* context);
+s32 NHTTPi_recvResponseHeaders(NHTTPCommContext* context);
+s32 NHTTPi_parseResponseHeaders(NHTTPCommContext* context);
+s32 NHTTPi_recvResponseBody(NHTTPCommContext* context);
+struct NHTTPRecvBuf;
+s32 NHTTPi_findHeaderField(struct NHTTPRecvBuf* ring, const char* name, s32* offset);
 
 /* 0x8051A4E8 - bring the HTTP layer up with the caller's two command callbacks and one command id:
  * the body registers this library's version once and hands all three on to `NHTTPi_Startup`,
