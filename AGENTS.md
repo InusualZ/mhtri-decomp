@@ -590,8 +590,10 @@ regression if the hash goes red.
     * **`game/<module>`** — decompilation work. The module is the `src/` directory: `game/network`, `game/quest`,
       `game/menu`, `game/hud`, `game/pl`, `game/enemy`, `game/ef`, `game/g3d`, `game/nw24`, `game/dwci`,
       `game/camellia`, `game/os`, `game/pl` …
-    * **`tools/<area>`** — our tooling, by the `tools/` grouping it lives in: `tools/land`, `tools/stylelint`,
-      `tools/slots`, `tools/agents`, `tools/symbols`, `tools/objdiff`, `tools/flags`, `tools/splits` …
+    * **`tools/<area>`** — our tooling, by the name the tree gives it: the `tools/` groupings
+      (`tools/agents`, `tools/units`, `tools/git`, `tools/symbols`, `tools/objdiff`, `tools/flags`,
+      `tools/splits` …) and any script's stem at any depth (`tools/land`, `tools/stylelint`, `tools/slots`,
+      from `tools/units/land.py`, …). The member set is derived from the tree, not a fixed list.
     * **`config/<what>`** — a `configure.py` / `symbols.txt` / `splits.txt`-only change: `config/flags`,
       `config/symbols`, `config/splits`.
     * **`docs/<topic>`** — documentation that is not this file: `docs/plan`, `docs/pipeline`, `docs/matching`.

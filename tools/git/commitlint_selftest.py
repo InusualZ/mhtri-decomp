@@ -43,12 +43,13 @@ def run(*args: str, cwd: str = None):
 def build_tree(root: str) -> None:
     """A miniature repository: enough shape for every family to have a known member."""
     for rel in ("src/Network", "src/quest",
-                "tools/units", "tools/__pycache__", "tools/agents",     # a grouping dir, a private dir
+                "tools/units", "tools/__pycache__", "tools/agents", "tools/git",   # grouping dirs, a private dir
                 ".agents/agents", "docs"):
         os.makedirs(os.path.join(root, rel), exist_ok=True)
     for rel in ("src/draw_shape.cpp",                                # a top-level src file is not a module
                 "README.md", "LICENSE", ".github.example", ".gitignore",
                 "tools/selftest.py", "tools/__init__.py", "tools/units/land.py",
+                "tools/units/stylelint.py", "tools/git/commitlint.py",
                 ".agents/agents/decompiler.md", ".agents/agents/surveyor.md",
                 "docs/plan.md", "docs/pipeline.md"):
         with open(os.path.join(root, rel), "w", encoding="utf-8") as handle:
@@ -91,8 +92,8 @@ def selftest() -> int:
         members = cl.derive_members(root)
         check("game members are the src/ directories", members["game"], {"Network", "quest"})
         check("game does not take a top-level src file as a module", "draw_shape" in members["game"], False)
-        check("tools members are the groupings plus the top-level scripts",
-              members["tools"], {"units", "selftest", "agents"})
+        check("tools members are the groupings plus every script's stem at any depth",
+              members["tools"], {"units", "git", "agents", "selftest", "land", "stylelint", "commitlint"})
         check("tools does not take __pycache__", "__pycache__" in members["tools"], False)
         check("tools does not take the __init__ shim", "__init__" in members["tools"], False)
         check("agents members are the profiles plus `policy`",
@@ -107,6 +108,12 @@ def selftest() -> int:
         check("a new src/ directory joins the game family",
               "enemy" in cl.derive_members(root)["game"], True)
         os.rmdir(os.path.join(root, "src", "enemy"))
+        # a new script at ANY depth joins the tools family (`tools/units/newtool.py` -> `tools/newtool`)
+        with open(os.path.join(root, "tools", "units", "newtool.py"), "w", encoding="utf-8") as handle:
+            handle.write("\n")
+        check("a new script at any depth joins the tools family",
+              "newtool" in cl.derive_members(root)["tools"], True)
+        os.remove(os.path.join(root, "tools", "units", "newtool.py"))
 
         # --- 2. the five checks, as pure functions ----------------------------------------------------------
         # a passing message
@@ -116,10 +123,18 @@ def selftest() -> int:
         # own examples lower-case the prose while the tree directory is `Network`, so the member match is
         # case-insensitive and both spellings pass.
         for good in ("game/network: x", "game/Network: x", "game/quest: x", "tools/units: x",
+                     "tools/git: x", "tools/land: x", "tools/stylelint: x", "tools/commitlint: x",
                      "tools/selftest: x", "agents/decompiler: x", "agents/policy: x", "config/flags: x",
                      "config/symbols: x", "config/splits: x", "docs/plan: x", "repo/readme: x",
                      "repo/gitignore: x"):
             check("known member passes: %s" % good, _errors(good, members), [])
+
+        # a script stem at any depth is a member, so the convention's own examples (`tools/land`,
+        # `tools/stylelint`) lint clean even though each script sits one grouping down ...
+        # ... while a near miss is still an ERROR, and the suggestion names the real member
+        near = _errors("tools/land2: do a thing", members)
+        check("a near-miss script stem is still an error", len(near), 1)
+        check("its suggestion names the real tool", "tools/land" in near[0], True)
 
         # 2a. subject shape: a missing colon
         missing = _errors("game/network match the transport state machine", members)

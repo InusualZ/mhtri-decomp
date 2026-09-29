@@ -419,6 +419,33 @@ def land_message_path(main: str) -> str:
     return os.path.join(main, ".git", "land_msg.txt")
 
 
+def subject_lint(main: str, subject: str, runner=None, tool: str | None = None) -> tuple:
+    """Lint the gate's own composed subject with `tools/git/commitlint.py` - the convention's own checker.
+
+    Every landing is written under a subject `land_subject` composes, so a regression there (an invented
+    category, a message past the limit) would land a message AGENTS.md's convention forbids and nothing would
+    notice. The row calls the tool rather than re-deriving the rules: AGENTS.md is the convention,
+    commitlint.py is its mechanical checker, and a second copy here would drift from both.
+
+    The tool's exit codes are the contract (`--diff`'s 0/1/2): **0** clean, **1** a violation, **2** nothing
+    was checked - and 2 is a *failure* here, because a lint that did not run must never read as approval.
+
+    `runner` and `tool` are the seams the selftest uses (the real tool, pinned to a fixture `--root`); the
+    gate passes neither.
+    """
+    tool = os.path.abspath(tool or os.path.join(main, "tools", "git", "commitlint.py"))
+    if not os.path.exists(tool):
+        return True, "commitlint.py not built yet - the row is skipped"
+    runner = runner or (lambda args: run(args, main))
+    p = runner([sys.executable, tool, "--message", subject, "--root", main])
+    if p.returncode == 0:
+        return True, ""
+    detail = command_detail(p)
+    if p.returncode == 2:
+        return False, "commitlint checked nothing (exit 2), which is not a pass: %s" % detail
+    return False, detail
+
+
 def write_land_message(main: str, body: str) -> str:
     path = land_message_path(main)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -2435,6 +2462,19 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                  "well",
           info="no file in the batch grew a `rule 7 deferred` escape")
 
+    # 4d. the gate's own subject follows the convention (AGENTS.md's commit-message convention). The gate
+    # composes every landing's subject through `land_subject`; the row runs `commitlint.py` over it, so the
+    # convention and its checker cannot drift: a category `land_subject` invents, or a message past 120
+    # characters, fails the batch here instead of landing. The tool is called, never re-implemented - and its
+    # exit 2 ("nothing checked") is a failure, so a lint that did not run cannot pass this row.
+    subject = land_subject(units)
+    ok_subject, subject_detail = subject_lint(main, subject)
+    check("the gate's own subject follows the convention", ok_subject, subject_detail, info=subject,
+          remedy="the composed subject `%s` is a commitlint violation, so the batch would land a message "
+                 "AGENTS.md's convention forbids; fix `land_subject` (or the batch's unit names) so the "
+                 "category is a known member and the message is at most 120 characters, then re-run - "
+                 "`python tools/git/commitlint.py --message \"<subject>\"` reproduces it" % subject)
+
     before = recorded.get("ledger") or ledger_numbers(main)
     flip = flips_objects(main)
     ok_file = os.path.join(main, "build", "RMHE08", "ok")
@@ -2669,7 +2709,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         note = (detail if not good else "") or info
         print("%-58s %s%s" % (name[:58], "PASS" if good else "FAIL", ("  " + note[:80]) if note else ""))
 
-    body = [land_subject(units),
+    body = [subject,
             "",
             "ledger: %s" % summary(before, after),
             "gates: ground truth ok, base %s, %d check(s), ok recreated=%s%s%s"
@@ -2990,6 +3030,48 @@ def selftest() -> int:
           message_body_with_subject("land: Pl/pl_act\n\nledger: closed 1 -> 2\n",
                                     "ef: land fn_800FAE08 (41/41 symbols)"),
           "ef: land fn_800FAE08 (41/41 symbols)\n\nledger: closed 1 -> 2\n")
+
+    # 4d. the gate's own subject row (AGENTS.md's commit convention). `land_subject` composes the subject
+    # every landing is written under, and the row runs `commitlint.py` over it - the tool, never a second copy
+    # of the rules. The demonstration uses the REAL tool against a fixture tree (`--root` pins the member set
+    # to the fixture, not this checkout), so its verdict is the convention's, not a stub's restatement.
+    check("a unit under src/ composes a game/<module> subject",
+          land_subject(["Network/network_transport"]), "game/network: land Network/network_transport")
+    check("a tool path composes the grouping category",
+          land_subject(["tools/units/land.py"]), "tools/units: land tools/units/land.py")
+    check("no units still yields a conventional subject",
+          land_subject([]), "repo/batch: land a batch")
+
+    with tempfile.TemporaryDirectory() as lint_root:
+        for rel in ("tools/units/land.py", "tools/units/stylelint.py", "tools/git/commitlint.py"):
+            path = os.path.join(lint_root, *rel.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "w", encoding="utf-8").close()
+        cl_tool = os.path.normpath(os.path.join(HERE, "..", "git", "commitlint.py"))
+        check("the real commitlint.py exists for the row to call", os.path.exists(cl_tool), True)
+
+        # a good composed subject passes: `tools/land` is a member now (the script is `tools/units/land.py`)
+        good_ok, good_detail = subject_lint(lint_root, "tools/land: land tools/units/land.py", tool=cl_tool)
+        check("the row PASSES a good composed subject", good_ok, True)
+        check("... and a pass carries no detail", good_detail, "")
+
+        # ... and a bad one is refused. `land_subject` reads the first segment after `tools/`, so a unit
+        # under an invented grouping composes a category no member matches.
+        bad_subject = land_subject(["tools/land2/tool.py"])
+        check("a unit under an invented grouping composes a bad subject",
+              bad_subject, "tools/land2: land tools/land2/tool.py")
+        bad_ok, bad_detail = subject_lint(lint_root, bad_subject, tool=cl_tool)
+        check("the row REFUSES a bad composed subject", bad_ok, False)
+        check("... and the refusal carries commitlint's own finding, not a restatement",
+              "not a known `tools` member" in bad_detail, True)
+
+        # exit 2 is "nothing checked" - the row treats it as a failure, never a pass
+        class _NothingChecked:
+            returncode, stdout, stderr = 2, "commitlint: nothing was checked", ""
+        stub_ok, stub_detail = subject_lint(lint_root, "tools/land: x", tool=cl_tool,
+                                            runner=lambda args: _NothingChecked())
+        check("the row treats exit 2 (nothing checked) as a failure", stub_ok, False)
+        check("... and says the lint did not run", "nothing was checked" in stub_detail, True)
 
     # the warning that keeps a foreign staged edit visible: `land` leaves it alone and names it
     check("the foreign-index warning names the path",
