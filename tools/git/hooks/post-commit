@@ -1,5 +1,0 @@
-#!/bin/sh
-# Retired: the CLAUDE.md local-only block no longer exists, so there is nothing to push back.
-# The file is removed by a direct commit after the landing (the gate cannot land the deletion of an
-# extension-less path - it reads it as a unit name).
-exit 0
