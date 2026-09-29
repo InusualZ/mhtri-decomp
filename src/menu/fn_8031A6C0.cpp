@@ -47,7 +47,7 @@
 extern "C" {
 
 u16* fn_802A9DE0(MenuSel* self, s16 index);
-void fn_802A6C1C(u16* value);
+void menu_cursor_column_step(u16* value);
 s8   fn_802A8F14(s32 a, s32 b);
 s32  fn_80274570(void* a);
 s32  fn_8033AAFC(u16 a);

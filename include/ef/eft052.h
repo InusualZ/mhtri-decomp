@@ -7,7 +7,7 @@
  * the band header re-exports this one for the units that already include it (the same move
  * `include/menu/menu_message.h` and `include/camera/camera.h` made for their bands).
  * `lobby/fn_801E7530.cpp` calls `eft052_hold_entry_set`; `eft052_item_value_get` and
- * `eft052_page_counts_get` are called by `lobby/fn_801EC9F8.cpp` and `menu/fn_802A6624.cpp`, which
+ * `eft052_page_counts_get` are called by `lobby/fn_801EC9F8.cpp` and `menu/menu_message.cpp`, which
  * still declare them at their own call sites (their rule-2 pass moves those to their headers).
  *
  * `eft052_hold_entry_set`'s entry argument is `void*`, not the unit's private `CockpitHoldEntry`

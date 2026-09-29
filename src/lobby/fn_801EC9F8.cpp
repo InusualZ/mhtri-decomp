@@ -48,7 +48,7 @@
  * `lobby/fn_801E7530.cpp`, whose `LbMenuWork` in `include/unsplit/lobby.h` marks +0x02/+0x06/+0x0A as
  * padding where this range reads them - filed as a shared-file request to merge the two views.
  * `include/unsplit/lobby.h` itself cannot be included: its `fn_8021213C(s32, s16)` takes two arguments
- * where this range passes one, and its `fn_802A8EC0` takes `s16`s where the call sites pass `u8`s, so
+ * where this range passes one, and its `menu_cursor_step_fixed_tail` takes `s16`s where the call sites pass `u8`s, so
  * the callee declarations live in this file (plain prototypes, one shared-file request each).
  */
 #include "types.h"
@@ -73,7 +73,7 @@ typedef struct LbDigitPane {
     /* +0x01 */ u8 sub_0x01;
     /* +0x02 */ u8 digit_hundreds_0x02;
     /* +0x03 */ u8 digit_hundreds_max_0x03;
-    /* +0x04 */ s32 stepper_0x04;       /* the 4-byte stepper state `fn_802A8F50` walks */
+    /* +0x04 */ s32 stepper_0x04;       /* the 4-byte stepper state `toggle_word_step` walks */
     /* +0x08 */ u16 flags_0x08;         /* bit 0x100 / 0x200 arm the two blink timers */
     /* +0x0A */ s16 digit_ones_0x0A;
     /* +0x0C */ s16 digit_tens_0x0C;
@@ -106,19 +106,19 @@ typedef struct LbListPane {
     /* +0x006 */ u8 unused_0x006[0xA];
     /* +0x010 */ void* data_0x010;      /* the equipment work block `fn_801ED284` backs up */
     /* +0x014 */ s16 row_0x014;         /* the cursor row */
-    /* +0x016 */ u8 row_sub_0x016;      /* the 8-step row pair `fn_802A8EC0` walks */
+    /* +0x016 */ u8 row_sub_0x016;      /* the 8-step row pair `menu_cursor_step_fixed_tail` walks */
     /* +0x017 */ u8 row_sub_max_0x017;
     /* +0x018 */ s16 column_0x018;      /* the cursor column */
     /* +0x01A */ u8 column_sub_0x01A;   /* the 8-step column pair `menu_cursor_step` walks */
     /* +0x01B */ u8 column_sub_max_0x01B;
-    /* +0x01C */ s16 move_0x01C;        /* the pad-driven 4-step state at +0x1C (fn_802A8EC0's base) */
+    /* +0x01C */ s16 move_0x01C;        /* the pad-driven 4-step state at +0x1C (menu_cursor_step_fixed_tail's base) */
     /* +0x01E */ s16 move_max_0x01E;
     /* +0x020 */ s16 entry_0x020;       /* the 4-step state at +0x20 (fn_802A91AC's cursor base) */
     /* +0x022 */ s16 entry_max_0x022;
     /* +0x024 */ u16 item_id_0x024;
     /* +0x026 */ u8 active_0x026;       /* the "confirm is open" latch `fn_801ED56C` waits on */
     /* +0x027 */ u8 unused_0x027[5];
-    /* +0x02C */ s32 stepper_0x02C;     /* the 4-byte stepper state `fn_802A8F50` walks */
+    /* +0x02C */ s32 stepper_0x02C;     /* the 4-byte stepper state `toggle_word_step` walks */
     /* +0x030 */ u8 unused_0x030[0x388];
     /* +0x3B8 */ LbItemList items_0x3B8; /* the 0x65-entry list `fn_801ECF74` fills */
 } LbListPane; /* size: 0x54C (the extent this range reads) */
@@ -148,9 +148,9 @@ typedef struct LbEquipPane {
     /* +0x02 */ s16 index_0x02;         /* the id slot the cursor is on */
     /* +0x04 */ u16 ids_0x04[3];        /* the three equipped item ids (0xFFFF = empty) */
     /* +0x0A */ u8 unused_0x0A[2];
-    /* +0x0C */ s32 stepper_0x0C;       /* the 4-byte stepper state `fn_802A8F50` walks */
+    /* +0x0C */ s32 stepper_0x0C;       /* the 4-byte stepper state `toggle_word_step` walks */
     /* +0x10 */ u8 icon_0x10[6];        /* the icon run `fn_80219080` fills */
-    /* +0x16 */ s16 move_0x16;          /* the 4-step state `fn_802A8EC0`'s base is at */
+    /* +0x16 */ s16 move_0x16;          /* the 4-step state `menu_cursor_step_fixed_tail`'s base is at */
     /* +0x18 */ s16 move_max_0x18;
     /* +0x1A */ s16 cursor_0x1A;
     /* +0x1C */ u8 unused_0x1C[4];
@@ -215,7 +215,7 @@ typedef struct LbItemDb {
  * The symbols this range reads.  Everything below is a plain prototype at file scope (the project's
  * convention for callees whose owner has no publishable header); each one is filed as a shared-file
  * request.  `lobby_w` and `lbl_80794880` are re-declared here with this range's own view because the
- * callee signatures `include/unsplit/lobby.h` publishes for `fn_802A8EC0`/`fn_8021213C` do not match
+ * callee signatures `include/unsplit/lobby.h` publishes for `menu_cursor_step_fixed_tail`/`fn_8021213C` do not match
  * the ones this range calls (the header declares `fn_8021213C(s32, s16)` where this range passes one
  * argument), so including it cannot compile.
  */
@@ -323,11 +323,11 @@ void fn_80219590(void* p, void* a);
 s32 fn_8021B7EC(s32 a);
 s32 fn_802738E8(s32 a);
 s32 fn_8027EFB4(u8 kind);
-s16 fn_802A8EC0(u8 value, u8 max, u16 pad, s32 step, s32 step2, void* state);
-s32 fn_802A8EEC(u8 value, u8 max, u16 pad, s32 a, s32 b, s32 c, void* state);
+s16 menu_cursor_step_fixed_tail(u8 value, u8 max, u16 pad, s32 step, s32 step2, void* state);
+s32 menu_cursor_step_forward(u8 value, u8 max, u16 pad, s32 a, s32 b, s32 c, void* state);
 s16 menu_cursor_step(s16 value, s16 max, u16 pad, s32 step, s32 step2);
 u8 fn_802A8F14(s16 value, s32 max);
-s32 fn_802A8F50(void* state, u16 pad, s32 a, s32 b, s32 c);
+s32 toggle_word_step(void* state, u16 pad, s32 a, s32 b, s32 c);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
 s32 fn_802A91AC(void* state, s16 index, u16 pad, u16 value, void* step);
 void fn_802A98BC(void* list, u16 count);
 void fn_802A9BB8(LbItemSlot* p);
@@ -483,7 +483,7 @@ void fn_801ECDD4(LbDigitPane* self)
             self->digit_tens_0x0C = menu_cursor_step(self->digit_tens_0x0C, 10, fn_802122AC(), 1, 2);
         }
     } else if (fn_8021213C(0x300) != 0) {
-        self->digit_hundreds_0x02 = fn_802A8EEC(self->digit_hundreds_0x02, self->digit_hundreds_max_0x03,
+        self->digit_hundreds_0x02 = menu_cursor_step_forward(self->digit_hundreds_0x02, self->digit_hundreds_max_0x03,
                                                 fn_802122E8(), 0x100, 0x200, 6, &self->flags_0x08);
         if ((self->flags_0x08 & 0x100) != 0) {
             self->blink_a_0x12 = 0;
@@ -569,7 +569,7 @@ s32 fn_801ED048(LbDigitPane* self, LbListPane* list)
         }
         return 0;
     }
-    result = fn_802A8F50(&self->stepper_0x04, fn_802122E8(), 4, 8, 0xFFFF);
+    result = toggle_word_step(&self->stepper_0x04, fn_802122E8(), 4, 8, 0xFFFF);
     switch (result) {
     case 1:
         count = fn_8004AE70(lbl_80794880);
@@ -706,7 +706,7 @@ s32 fn_801ED56C(LbListPane* self, u8 arg)
         }
         return 0;
     }
-    result = fn_802A8F50(&self->stepper_0x02C, fn_802122E8(), 4, 8, 0xFFFF);
+    result = toggle_word_step(&self->stepper_0x02C, fn_802122E8(), 4, 8, 0xFFFF);
     switch (result) {
     case 1:
         if (arg == 0) {
@@ -791,7 +791,7 @@ s32 fn_801ED688(LbListPane* self, u8 arg)
         } else if (fn_802121F4(3) != 0) {
             self->row_0x014 = menu_cursor_step(self->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
-            self->row_sub_0x016 = fn_802A8EC0(self->row_sub_0x016, self->row_sub_max_0x017,
+            self->row_sub_0x016 = menu_cursor_step_fixed_tail(self->row_sub_0x016, self->row_sub_max_0x017,
                                              fn_802122AC(), 4, 8, &self->move_0x01C);
         }
         break;
@@ -983,7 +983,7 @@ s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
         } else if (fn_802121F4(3) != 0) {
             list->row_0x014 = menu_cursor_step(list->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
-            list->row_sub_0x016 = fn_802A8EC0(list->row_sub_0x016, list->row_sub_max_0x017,
+            list->row_sub_0x016 = menu_cursor_step_fixed_tail(list->row_sub_0x016, list->row_sub_max_0x017,
                                               fn_802122AC(), 4, 8, &list->move_0x01C);
         }
         break;
@@ -1099,7 +1099,7 @@ s32 fn_801EE1E4(LbListPane* self)
         } else if (fn_802121F4(3) != 0) {
             self->column_0x018 = menu_cursor_step(self->column_0x018, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
-            self->column_sub_0x01A = fn_802A8EC0(self->column_sub_0x01A, self->column_sub_max_0x01B,
+            self->column_sub_0x01A = menu_cursor_step_fixed_tail(self->column_sub_0x01A, self->column_sub_max_0x01B,
                                                  fn_802122AC(), 4, 8, &self->move_0x01C);
         }
         break;
@@ -1139,7 +1139,7 @@ s32 fn_801EE1E4(LbListPane* self)
         } else if (fn_802121F4(3) != 0) {
             self->row_0x014 = menu_cursor_step(self->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
-            self->row_sub_0x016 = fn_802A8EC0(self->row_sub_0x016, self->row_sub_max_0x017,
+            self->row_sub_0x016 = menu_cursor_step_fixed_tail(self->row_sub_0x016, self->row_sub_max_0x017,
                                               fn_802122AC(), 4, 8, &self->move_0x01C);
         }
         break;
@@ -1324,7 +1324,7 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         }
         break;
     case 2:
-        r = fn_802A8F50(&self->stepper_0x04, fn_802122E8(), 4, 8, 0xFFFF);
+        r = toggle_word_step(&self->stepper_0x04, fn_802122E8(), 4, 8, 0xFFFF);
         switch (r) {
         case 1:
             self->phase_0x00 = 0;

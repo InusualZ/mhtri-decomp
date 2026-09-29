@@ -12,7 +12,7 @@
  * `get_userdata`), `sound/fn_800D7F54.cpp` (`sysSE_req`, `fn_800DBDD4`), `ef/fn_800CDB2C.cpp`
  * (`my_player_no`, `get_move_work_adrs`, `file_loading_ck`), `ef/eft_res.h` (`fn_800F886C`),
  * `menu/menu_item.cpp` (`GetItemData`, `ItemName`, `get_menu_lsp_tbl`, `put_menu_cursor`),
- * `menu/fn_802A6624.cpp`, `hud/layout.cpp`, `fn_80047398.cpp` - all included, never re-declared
+ * `menu/menu_message.cpp`, `hud/layout.cpp`, `fn_80047398.cpp` - all included, never re-declared
  * (rule 2). `system_w`, `q_result_msg_adrs`, `Psw` and the `sprintf`/`strcpy`/`strcat` family sit in
  * address bands whose bracketing registered units name different modules, so they are rule 2's
  * documented `unsplit` gap and are declared here.

@@ -221,7 +221,7 @@ typedef struct MENU_MOVE_WORK {
     /* +0x5DB */ s8 value_0x5DB[0x545];
 } MENU_MOVE_WORK;
 
-/* The option-list records `fn_802A674C`/`fn_802A695C` and the draw walk: 0x130-byte records whose
+/* The option-list records `menu_list_fill`/`menu_list_names_set` and the draw walk: 0x130-byte records whose
  * +0x00 byte says the row is filled, +0x03 the label and +0x0D its value text.  `.bss` 0x806BE340. */
 extern u8 lbl_806BE340[];
 
@@ -231,7 +231,7 @@ typedef struct MENU_ITEM_PANEL {
     /* +0x00 */ u8 unused_0x00[0x48];
 } MENU_ITEM_PANEL;
 
-/* One 0x18-byte cell of the item grid at +0x6C that `fn_802A6EF4` lays out.  The one byte this range
+/* One 0x18-byte cell of the item grid at +0x6C that `menu_frame_draw_page` lays out.  The one byte this range
  * reads is +0x02: nonzero when the cell's entry may be picked. size: 0x18 */
 typedef struct MENU_ITEM_SLOT {
     /* +0x00 */ u8 unused_0x00;
@@ -280,11 +280,11 @@ typedef struct MENU_ITEM_W {
     /* +0x01B */ u8 pad_0x01B[0x09];
     /* +0x024 */ MENU_ITEM_PANEL panel_0x024;
     /* +0x06C */ MENU_ITEM_SLOT slots_0x06C[12]; /* the run to +0x18C (12 x 0x18) */
-    /* +0x18C */ u32 field_0x18C;  /* the pick-state word `fn_802A9068` advances (its low byte is the state `fn_802A9F48` draws) */
+    /* +0x18C */ u32 field_0x18C;  /* the pick-state word `toggle_word_step_dpad` advances (its low byte is the state `fn_802A9F48` draws) */
     /* +0x190 */ _PLW* plw;         /* the player work record the item list acts on */
     /* +0x194 */ MENU_ITEM_ENTRY* page_0x194; /* the first page's entries */
     /* +0x198 */ MENU_ITEM_ENTRY* page_0x198; /* the second page's entries (see `two_page`) */
-    /* +0x19C */ u16 field_0x19C;   /* the key word `fn_802A6C1C` is handed */
+    /* +0x19C */ u16 field_0x19C;   /* the key word `menu_cursor_column_step` is handed */
     /* +0x19E */ u16 field_0x19E;   /* its output word */
     /* +0x1A0 */ u8 grid_w;         /* the grid's column count */
     /* +0x1A1 */ u8 grid_h;         /* its row count */
@@ -323,14 +323,14 @@ extern "C" {
 void fn_802A4EF8(MENU_ITEM_W* self, s8 index);
 s32 fn_802A4FEC(MENU_ITEM_W* self);
 s32 fn_802A5320(MENU_ITEM_W* self);
-void fn_802A66BC(MENU_ITEM_W* self);
-u8 fn_802A6624(MENU_ITEM_W* self);
-u8 fn_802A674C(MENU_ITEM_W* self, s8 filter);
-s32 fn_802A695C(MENU_ITEM_W* self, u8 index);
-void fn_802A6C1C(void* key);
-void fn_802A6C28(void* page_a, void* page_b, s8 rows, s32 id, s32 flag);
-void fn_802A6EF4(void* page, void* slots, s8 cols, s8 rows, u16 timer, u32 flags);
-s32 fn_802A9068(void* key, u16 keys, s32 a, s32 b);
+void menu_list_count_update(MENU_ITEM_W* self);
+u8 menu_list_mode_get(MENU_ITEM_W* self);
+u8 menu_list_fill(MENU_ITEM_W* self, s8 filter);
+s32 menu_list_names_set(MENU_ITEM_W* self, u8 index);
+void menu_cursor_column_step(void* key);
+void menu_frame_entries_build(void* page_a, void* page_b, s8 rows, s32 id, s32 flag);
+void menu_frame_draw_page(void* page, void* slots, s8 cols, s8 rows, u16 timer, u32 flags);
+s32 toggle_word_step_dpad(void* key, u16 keys, s32 a, s32 b);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
 s32 fn_802A91AC(s16* cursor, s16 max, u16 keys, u16 held, u16* changed);
 void fn_802A9BB8(void* page_a, void* page_b);
 void fn_802A9BCC(_PLW* plw, void* page_a, void* page_b);
@@ -369,7 +369,7 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
         return 3;
     }
 
-    mode = fn_802A6624(self);
+    mode = menu_list_mode_get(self);
     switch (mode) {
     case 0:
     case 3:
@@ -403,7 +403,7 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
     case 1:
         if (keys & 0x10) {
             ok = 0;
-            if (fn_802A674C(self, -1) != 0) {
+            if (menu_list_fill(self, -1) != 0) {
                 ok = 1;
             }
             if (ok == 1) {
@@ -419,7 +419,7 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
                 result = 2;
             }
         } else {
-            if (fn_802A674C(self, -1) != 0) {
+            if (menu_list_fill(self, -1) != 0) {
                 if (keys & 3) {
                     self->item_cursor = (s8)menu_cursor_step(self->item_cursor, self->item_count, keys, 1, 2);
                 }
@@ -437,7 +437,7 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
         } else if (mode == 2) {
             plw->field_0x655 = 0x80;
         }
-        if (fn_802A695C(self, plw->field_0x655) == 0) {
+        if (menu_list_names_set(self, plw->field_0x655) == 0) {
             result = 2;
             break;
         }
@@ -488,7 +488,7 @@ extern "C" s32 fn_802A579C(MENU_ITEM_W* self) {
         return 3;
     }
 
-    mode = fn_802A6624(self);
+    mode = menu_list_mode_get(self);
     if (mode != 3) {
         return 4;
     }
@@ -570,7 +570,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
             self->timer_0x23A--;
         }
         if (self->flag_0x1B0 != 0) {
-            switch (fn_802A9068(&self->field_0x18C, keys, 1, 2)) {
+            switch (toggle_word_step_dpad(&self->field_0x18C, keys, 1, 2)) {
             case 1:
                 if (self->menu_kind == 2) {
                     fn_802A9BB8(self->page_0x194, self->page_0x198);
@@ -599,7 +599,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
 
         if (keys & 0x10) {
             if (self->slots_0x06C[(s8)self->grid_row].ready_0x02 != 0) {
-                fn_802A66BC(self);
+                menu_list_count_update(self);
                 fn_802A4EF8(self, self->action_no);
                 self->state = 1;
                 sysSE_req(0);
@@ -610,7 +610,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
             result = 2;
             sysSE_req(1);
         } else {
-            fn_802A6C1C(&self->field_0x19C);
+            menu_cursor_column_step(&self->field_0x19C);
             if (keys & 0x8000) {
                 if (self->flag_0x1B1 == 0) {
                     sysSE_req(1);
@@ -652,7 +652,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
                 break;
             case 2:
                 if (fn_802A64B0(self) == 1) {
-                    mode = fn_802A6624(self);
+                    mode = menu_list_mode_get(self);
                     self->item_cursor = 0;
                     self->cursor = 1;
                     self->cursor_max = entry->value;
@@ -849,10 +849,10 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
     }
 
     if (self->flag_0x1B0 == 0) {
-        fn_802A6EF4(two_page != 0 ? self->page_0x198 : self->page_0x194, self->slots_0x06C,
+        menu_frame_draw_page(two_page != 0 ? self->page_0x198 : self->page_0x194, self->slots_0x06C,
                     (s8)(self->grid_w + 1), (s8)self->grid_h, (u16)self->timer_0x23A, flags);
     } else {
-        fn_802A6C28(self->page_0x194, self->page_0x198, (s8)self->grid_h, 628, 0);
+        menu_frame_entries_build(self->page_0x194, self->page_0x198, (s8)self->grid_h, 628, 0);
     }
 
     if (line_kind != 0 && (u8)span != 0xFF) {
@@ -954,7 +954,7 @@ extern "C" s32 fn_802A64B0(MENU_ITEM_W* self) {
 
     item_id = fn_802A9DE0(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w))->id;
 
-    switch ((u8)fn_802A6624(self)) {
+    switch ((u8)menu_list_mode_get(self)) {
     default:
         return 0;
 
@@ -962,7 +962,7 @@ extern "C" s32 fn_802A64B0(MENU_ITEM_W* self) {
         if (GetItemData(item_id)->level_0x01 >= 3) {
             return 0;
         }
-        if (fn_802A674C(self, -1) == 0) {
+        if (menu_list_fill(self, -1) == 0) {
             return 0;
         }
         break;
@@ -971,7 +971,7 @@ extern "C" s32 fn_802A64B0(MENU_ITEM_W* self) {
         if (GetItemData(item_id)->level_0x01 >= 3) {
             return 0;
         }
-        if (fn_802A674C(self, (s8)self->slot_id) == 0) {
+        if (menu_list_fill(self, (s8)self->slot_id) == 0) {
             return 0;
         }
         break;
