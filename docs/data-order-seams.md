@@ -30,16 +30,16 @@ Two consequences for **retail** `.data`, which is the concatenation of per-TU fr
 
 ## 2. How much it finds
 
-`.pi/seam_data_order.py` (scratch, untracked; the reusable core is Phase 0 below) classifies every `.data`
-symbol of the retail DOL: **vtable** (leading `0,0` header, all other words code pointers or zero), **string**
+`tools/splits/dataorder.py scan` (Phase 0, landed) classifies every `.data` symbol of the retail DOL: **vtable** (leading `0,0` header, all other words code pointers or zero), **string**
 (printable, NUL-terminated), otherwise **data**. Jump tables are not vtables: they have no `0,0` header (a first
 pass that counted them gave a bogus 402/130 split).
 
 | measure | result |
 | --- | --- |
-| `.data` symbols classified | 11,254: 230 vtables, 3,728 strings, 7,296 other |
-| vtable → string/data transitions | 65: **4 inside registered units** (all in `network_transport`, the seams that cost a full pass), 61 in unclaimed `.data` |
-| adjacent vtable pairs | 121 in unclaimed `.data`: 69 "up" (seam), 52 "down" (same TU); 3 "up" inside `network_transport` (all real seams); 1 "up" at a registered unit start |
+| `.data` symbols classified | 11,254: 231 vtables, 3,728 strings, 7,295 other |
+| vtable → string transitions (V→S, strong) | 65: **4 inside registered units** (all in `network_transport`, the seams that cost a full pass), 61 in unclaimed `.data` |
+| vtable → other data (V→D, weak) | 39: 37 in unclaimed `.data`, 2 at registered unit starts; a jump table is `.data` too and its place in the order is unmeasured |
+| adjacent vtable pairs | 126: 62 "up" (seam) - 58 unclaimed, 3 inside `network_transport` (all real seams), 1 at a registered unit start; 52 "down" (same TU); 12 ties (equal owners: no evidence, not counted) |
 | counterexamples found | none - but the ground truth is thin (see 3) |
 
 ## 3. Confidence and limits
@@ -54,7 +54,8 @@ pass that counted them gave a bogus 402/130 split).
 * Measured on `Wii/1.3` only. Other libraries use other compiler versions.
 * Untested: RTTI-on classes (the game builds `-RTTI off`, so vtable headers are `0,0`), `extern "C"` data,
   function-local statics, and data emitted by `#pragma` sections.
-* A vtable owner is approximated by its first code slot; the key function would be exact.
+* A vtable owner is approximated by its first code slot; the key function would be exact. Twelve adjacent pairs
+  share an owner (identical first slot) and are treated as no evidence.
 
 ## 4. Which tools it touches
 
@@ -74,8 +75,8 @@ gate row is verified on the whole tree first.
 
 * **Phase 0 - the core** (`tools/splits/dataorder.py`): classify `.data` symbols from the DOL and the map;
   fragment a run; report V→S transitions and zigzag pairs with addresses and owners; CLI `dataorder.py at
-  <addr>`, `dataorder.py scan --json`. Selftest on fixtures, plus the real-DOL numbers in section 2 as a
-  regression baseline. Acceptance: reproduces 230 / 65 / 4 / 61 and the 69/52 split.
+  <addr>`, `dataorder.py scan --json`. Selftest on fixtures, plus the real DOL: the four `network_transport`
+  seams must be found. Acceptance: reproduces 231 / 65 / 4 / 61 and the 62 up / 52 down / 12 tie split.
 * **Phase 1 - tudiscover** (needs the asm dump): the two observations, scored by `tudiscover.py bench`.
   Acceptance: bench precision/recall does not drop, and the `network_transport` seams (0x805F9570, 0x805F9610,
   0x805F9958, 0x805F9A40) are proposed as boundaries; report any V→S transition a strong must-link contradicts.
@@ -90,4 +91,4 @@ Order: 0 first; then 1, 2, 3 and 4 are independent and can run as parallel lanes
 ## 6. Progress
 
 * Playbook row 80 and this document: landed with the plan.
-* Phase 0: in progress.
+* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phases 1-4: in progress as parallel lanes.

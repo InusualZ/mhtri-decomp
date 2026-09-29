@@ -392,8 +392,8 @@ tools/                    Tooling. dtk-template's scripts at the top level (proj
                             elf/      object/DWARF readers (elfsect.py, dwarfmap.py)
                             splits/   TU boundary discovery (tudiscover.py): from one symbol address,
                                       work out which functions and data ranges form one translation
-                                      unit - see the `tu-boundary-discovery` skill; dataorder.py
-                                      (in progress): the `.data` emission-order seam evidence,
+                                      unit - see the `tu-boundary-discovery` skill; dataorder.py:
+                                      the `.data` emission-order seam evidence,
                                       docs/data-order-seams.md
                             symbols/  symbol-map proxy (symedit.py): look up, list by range and rename
                                       symbols in config/RMHE08/symbols.txt without loading it into

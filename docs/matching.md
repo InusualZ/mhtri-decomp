@@ -2704,9 +2704,9 @@ NUL-terminated; jump tables are not vtables) and look for vtable→string/data t
 before claiming or reconstructing it (`docs/data-order-seams.md`). Cut the claim at those seams: one claim per TU
 fragment. A claim that contains one can never match in a single unit, whatever the classes look like.
 
-**Result.** The whole DOL has 230 vtables and 65 vtable→data transitions: 4 inside registered units (all in
-`network_transport`) and 61 in unclaimed `.data`, plus 69 "up" adjacent pairs there - candidate seams for the
-proposals no tool could cut. The plan for feeding it into `tudiscover`, `dataclaim`, `flipcheck` and `attribute`
+**Result.** The whole DOL has 231 vtables and 65 vtable→string transitions: 4 inside registered units (all in
+`network_transport`) and 61 in unclaimed `.data`, plus 58 "up" adjacent pairs there - candidate seams for the
+proposals no tool could cut (`python tools/splits/dataorder.py scan`). The plan for feeding it into `tudiscover`, `dataclaim`, `flipcheck` and `attribute`
 is in `docs/data-order-seams.md`.
 
 **Example.** `network_transport`: seams at 0x805F9570, 0x805F9610, 0x805F9958 and 0x805F9A40 (each a string
