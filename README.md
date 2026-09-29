@@ -103,9 +103,7 @@ one unit at a time. One page of it:
    with its own seeded tree, and reports data — per-symbol scores, residuals — not prose.
 4. **The orchestrator lands one unit at a time, from `main`.**
    ```sh
-   python tools/agents/localonly.py pull                 # take the local-only block out of CLAUDE.md
    python tools/units/land.py land --branch worker/<slug> --units <unit>
-   python tools/agents/localonly.py push                 # put it back
    ```
    The gate is ~28 rows: full build, the batch's own objects compiled, ledger delta, style lint,
    rule-10 vtable ownership, undefined-reference check, tool selftests, and the DOL hash. A refusal is
@@ -142,10 +140,7 @@ The authoritative documents are:
 * **A rename is two edits**: the map (`config/RMHE08/symbols.txt`) and the source that uses the name,
   in one change, through `python tools/symbols/symedit.py rename`. A unit's own symbols are named from
   context — no `fn_XXXXXXXX`/`lbl_XXXXXXXX` definitions are left behind.
-* **Never commit the local-only block of `CLAUDE.md`** (the `<!-- LOCAL-ONLY ... -->` section): it is
-  live working state, not repository content. Use `tools/agents/localonly.py pull` before staging and
-  `push` after the commit; verify with
-  `git show HEAD:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'` → `0`.
+* **`CLAUDE.md` holds no live working state**: session state goes in `.pi/state.md` (gitignored).
 
 ## Repository layout
 
@@ -161,7 +156,7 @@ tools/                    our tooling by purpose: units/, objdiff/, flags/, symb
                           agents/, plus the decomp-toolkit scripts at the top level
 docs/                     all documentation — the table above is the entry point
 .claude/agents/           the project's subagent profiles
-.claude/skills/           loadable skills: matching, verification, symbol map, TU discovery, local-only
+.claude/skills/           loadable skills: matching, verification, symbol map, TU discovery
 ```
 
 ## Progress
