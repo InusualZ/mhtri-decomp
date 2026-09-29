@@ -1431,6 +1431,17 @@ Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 AX/AXFXReverbHi.c:
 	.text       start:0x80474CB0 end:0x80475E24
 
+OS/PPCArch.c:
+	.text       start:0x804770E0 end:0x804772F0
+	.data       start:0x80612CE0 end:0x80612D18
+
+EXI/EXIBios.c:
+	.text       start:0x804AFED0 end:0x804B17D0
+	.data       start:0x8061A4F0 end:0x8061A538
+	.bss        start:0x80746B60 end:0x80746C20
+	.sdata      start:0x80793E30 end:0x80793E34
+	.sbss       start:0x80795198 end:0x8079519C
+
 EXI/ProbeBarnacle.c:
 	.text       start:0x804B17D0 end:0x804B8020
 
