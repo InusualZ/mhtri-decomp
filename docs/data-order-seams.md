@@ -79,6 +79,14 @@ useful seams are the narrow ones.
   seam counts treat the first string after a vtable as the boundary, which the inline tail moves later. They are
   warnings and soft votes only; Phase 5 realigns them (section 6: the strong bench pins went from 3 hit / 30
   miss to 0 hit / 10 miss, and a `V->S` seam is now a gap, not a cut at the first string).
+* **The inline tail is recognisable (measured 2026-09-29, `dataorder.inline_tail`).** Real tails are runs of
+  message, class-name and header-name strings (`NW4R:Failed assertion ...`, `g3d_resnode_ac.h`, `ResAnmFog`,
+  `%s::%s: Object not valid.`, `g3d_resanmfog_ac.h`), one unmerged copy per inline instance, and the next TU
+  starts with its own source `__FILE__` (`g3d_anmvis.cpp`). The tail is the leading run of strings up to the last
+  header name before the first source-file name (at most 3 plain strings between headers). It gives `tail > 0`
+  on 16 of the 65 `V->S` rows (all g3d and ef, none in `network_transport`); by referrers, all 16 cut points are
+  clean (every tail string is referenced by an earlier function than every following string) and 12 also change
+  registered unit at the cut. Details: section 6.
 * Untested: RTTI-on classes (the game builds `-RTTI off`, so vtable headers are `0,0`), `extern "C"` data,
   function-local statics, data emitted by `#pragma` sections, `-lang=c` translation units, and `GC/1.2.5n` code
   (which would interleave).
@@ -127,6 +135,7 @@ All five phases are landed (2026-09-29), each behind its own selftest and the la
 | 2 | `4d5768b95` | `dataseams.py` over `dataorder`; `dataqueue` cuts runs at strong seams and warns on a request; `dataclaim` seam warnings; `flipcheck`/`datagap` "order-only"/multi-TU line | 76 of 3,050 queue runs contain a strong seam (127 seams); both tools name the four `network_transport` seams (its object is 0x560 of 0x100C B, so it reads multi-TU, not order-only - that path is fixture-tested only) |
 | 3 | `035653805` | `attribute.py` `data_seams` on proposals, `attribute.py dataseams`, `brief.py` TU-probe paragraph with a lower bound on the TU count and candidate cuts (never applied) | 11 of 67 ready pool proposals carry an interior seam (at least 2-5 TUs), 14 carry any; a run only counts when it is dense (`density >= 0.5`), a rule the lane added |
 | 1 | `29a0d8ddf` | `tudiscover.py` observations `dataorder` / `dataorder-zz` / `dataorder-weak`, `--data-order off\|on\|strong\|weak` (default `on` = soft votes), the `dataorder` subcommand, bench tier 4 | `strong` costs 0.001 precision and gains no recall, so it is opt-in; the four `network_transport` seams are proposed |
+| 5b | (this branch) | `dataorder.inline_tail`: `tail` recognises message + header strings up to the next TU's source `__FILE__`; `fragments()` cuts a narrow `V->S` gap after the tail and no longer cuts a wide one | 16 of 65 `V->S` rows have `tail > 0` (0 before); 16 of 16 clean by referrer order, 12 change unit at the cut, 0 of 49 tail-0 rows contradicted, the four `network_transport` gaps stay 0; 2 of the 25 narrow gaps (0x8058F388, 0x80597CD8) now cut after a tail |
 
 **What Phase 1 changed about the claim.** The rule is not universal: eight seams are contradicted by `__FILE__`
 anchors, all in the g3d (NW4R) library, and 28 pinned intervals lie wholly inside one registered unit. Treat the
@@ -163,7 +172,23 @@ first written, and the cause is the inline tail, not a different compiler (secti
 | `attribute.py`, `brief.py` | `V->S` item carries `latest`/`width`/`tail`; its candidate cut is between the two vtable owners (not after one); `V->tail` records dropped; TU-probe text says "a boundary in [addr, latest)" | 11 of 67 ready pool proposals carry an interior seam (14 any): unchanged, the real DOL has no `V->tail` row |
 | `flipcheck.py`, `datagap.py` | order-only / multi-TU lines come from `dataseams` (corrected strong seams) and say "a boundary in [a, b)" for a gap | fixture-tested (the real order-only case is still untested) |
 
-Findings for the rule text (not edited here): `dataorder.seams()`'s `tail` counts only leading strings that are bare
-header names, but the real inline tails start with an assert message (`NW4R:Failed assertion ...`, then
+Findings for the rule text (not edited here; the tail heuristic below is the answer, row 5b): `dataorder.seams()`'s
+`tail` counted only leading strings that were bare header names, but the real inline tails start with an assert message (`NW4R:Failed assertion ...`, then
 `g3d_resnode_ac.h`, message, header, ...), so `tail` is 0 for every real seam and no narrow gap is cut after a tail
 yet; the 0x805F94E0 seam family of `network_transport` and the g3d gaps are the evidence.
+
+**Phase 5b - the tail heuristic, measured on the real DOL** (`.pi/notes/data-order-tail.md` holds the tables).
+
+* Rule: `tail` = the leading run of strings of a `V->S` gap up to the last header name (`*.h`, `.hpp`, `.inl`) before
+  the first source name (`*.c`, `*.cpp`), a non-string symbol also ending the run, with at most `TAIL_RUN_MAX` (3)
+  plain strings between headers. Stable for 2 to 10 (1 loses three rows, 0 loses all).
+* Result: 16 of 65 rows get `tail > 0` (11 g3d-library, 5 ef); 14 of the 16 are wide gaps, so they only warn.
+  Referrer check (`callers.py` index, function containing each site): the cut is a clean partition in text order for
+  16 of 16, the tail units differ from the units of the next strings for 12 (the other four sit inside
+  one registered unit or have no registered referrer after the tail). No tail-0 row changes registered unit within its
+  first six strings (0 of 49 contradicted), and the four `network_transport` gaps
+  keep tail 0 (all their referrers are in that one multi-TU unit, so referrers cannot split them).
+* Limits: the check is order and unit labels, not retail TU boundaries (none exist for these rows); a vtable's first
+  slot is not its TU (a derived class starts with a base function), so the vtable owner is not used as ground truth.
+* `fragments()` now cuts a `V->S` gap of at most `dataseams.NARROW` symbols after its tail and leaves a wider gap
+  uncut (it only had a cut at the first string before); it has no consumer outside `dataorder`'s own selftest.
