@@ -21,6 +21,18 @@ conflict but from the two failure modes this tool is built against:
   out from main, a marker-based guard skips it - and `src/…`, driven that way, silently dropped 157 header
   lines and a whole unit registration. This tool records the conflicted-path list **before** touching
   anything and requires every path on it to be *verifiably* represented, by content.
+* **A merge in progress is not a dirty tree.** The merge itself stages every auto-merged file and leaves
+  the conflicted paths unmerged, so a `status --porcelain` guard run *before* the merge is detected
+  refuses the re-run this tool's own failure message tells the operator to make (2026-09-29: a resolution
+  that crashed on an add/add path could not be resumed at all). The merge is checked **first**, and a
+  resume is allowed exactly when this tool's state file describes it and nothing *outside* the merge has
+  been touched.
+* **An add/add path has no three-way base, and that is a class, not an accident.** A path added on both
+  sides (a re-home on each side, or two files landing on one name) has no blob in the merge base, so
+  `git merge-file` cannot run on it at all. Each side is diffed against the base of the path it was
+  **renamed from** - for a re-home that pre-rename path is the true three-way base - and the side that is
+  the **superset** wins; with no base to derive, the two copies are compared whole. Neither being the
+  superset is a refusal, and whichever side was taken is named in the output and in the commit.
 
 **Resolution is per class, because each class has exactly one correct rule:**
 
@@ -28,6 +40,7 @@ conflict but from the two failure modes this tool is built against:
 |---|---|
 | `config/**/symbols.txt` | main's file, then the branch's own rename pairs re-applied as **exact row replacements** - a symbol map is address-ordered, so a textual union reorders it and renames nothing |
 | `src/**` | whichever side already carries the other side's work (the branch's edit there is usually a rename sweep, and main's file may already hold it). If neither does, a **comment-only** delta (identical code after `stylelint.strip`) keeps main's block and records the branch's dropped paragraph; otherwise **refuse** and name what is missing |
+| an **add/add** path (no blob in the merge base) | each side diffed against the base of the path *it was renamed from*; with no such base, the **superset** of the two copies - and the side taken is always named, never guessed |
 | an unsplit band header (`include/unsplit/*`) | a three-way union, then the **rule-2 address sweep**: a declaration whose address is inside a registered `.text` range belongs to that unit's header, and where it should move is reported |
 | anything else | a three-way union |
 
@@ -42,6 +55,8 @@ object.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -92,8 +107,15 @@ def merge_head_path(root: str) -> str:
 
     Never `os.path.join(root, ".git", ...)`: in a linked worktree (every slot) `.git` is a *file* pointing
     at the real git dir, so that path never exists and an in-progress merge would look like a fresh one.
+    `rev-parse --git-path` is the authority, but **git answers relative to the worktree** (`.git/MERGE_HEAD`),
+    and `os.path.exists` would then resolve it against the calling process's cwd: a caller that passes
+    `--root` (or any programmatic caller, the selftest's fixtures included) saw no merge in progress and
+    started a second `git merge` over the one already there.  It is joined onto `root` for that reason.
     """
-    return git(root, "rev-parse", "--git-path", "MERGE_HEAD").strip()
+    p = git(root, "rev-parse", "--git-path", "MERGE_HEAD").strip()
+    if p and not os.path.isabs(p):
+        p = os.path.join(root, p)
+    return p
 
 
 def merge_in_progress(root: str) -> bool:
@@ -104,6 +126,60 @@ def merge_in_progress(root: str) -> bool:
 def conflicted(root: str) -> list[str]:
     """The unmerged paths, git's own answer - the list the resolution is driven from."""
     return [ln for ln in git(root, "diff", "--name-only", "--diff-filter=U").splitlines() if ln.strip()]
+
+
+def worktree_edits(root: str) -> list[str]:
+    """The paths whose *working tree* differs from the index, deduplicated (`git diff --name-only`).
+
+    An unmerged path is reported here once per index stage, which is why this is not just a `status`
+    wrapper - and why a merge in progress is not the same thing as a dirty tree (see
+    `cleanliness_blocker`). Untracked files are deliberately absent: git's own diff does not see them.
+    """
+    seen: list[str] = []
+    for ln in git(root, "diff", "--name-only").splitlines():
+        p = ln.strip()
+        if p and p not in seen:
+            seen.append(p)
+    return seen
+
+
+def cleanliness_blocker(root: str, in_merge: bool, conflicted_paths: list[str], dry_run: bool) -> str | None:
+    """The reason this tree may not be touched, or `None` when it may.
+
+    A **fresh** merge must start from a known state, so any dirt refuses it (unchanged).  A **resume** is
+    different: the merge in progress is itself the dirt - git stages every auto-merged file and leaves the
+    conflicted paths unmerged - so requiring a clean tree refuses the re-run this tool's own message asks
+    for.  A merge is only resumed when this tool's state file describes it (checked by the caller), and
+    what still has to hold is that nothing *outside* the merge has been edited: an edit to a path the
+    merge does not own is a real refusal, and it names the path.
+    """
+    if dry_run:
+        return None
+    if not in_merge:
+        if git(root, "status", "--porcelain").strip():
+            return "the tree is not clean - commit or stash first (a merge must start from a known state)"
+        return None
+    allowed = set(conflicted_paths)
+    stray = [p for p in worktree_edits(root) if p not in allowed]
+    if stray:
+        return ("a merge is in progress but the tree has changed outside it (%d path(s): %s) - resolve or "
+                "stash them first, or `git merge --abort`" % (len(stray), ", ".join(stray[:3])))
+    return None
+
+
+def rename_sources(root: str, base: str, ref: str) -> dict[str, str]:
+    """`destination -> source` for every rename git detects between two refs (`-M`), in one call.
+
+    This is the same detector that decided a path was an *add* on that side of the merge, so it is the
+    right authority for "which path is this one's pre-rename base".  Called once per ref, lazily, and
+    only when an add/add path is actually being resolved.
+    """
+    out: dict[str, str] = {}
+    for line in git(root, "diff", "-M", "--name-status", "--diff-filter=R", base, ref).splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3 and parts[0].startswith("R"):
+            out[parts[2]] = parts[1]
+    return out
 
 
 def newline_of(data: bytes) -> str:
@@ -274,6 +350,53 @@ def missing_from(candidate: list[str], wanted: list[str]) -> list[str]:
     return [l for l in wanted if l not in candidate]
 
 
+def addadd_choice(base_lines: list[str], ours: list[str], theirs: list[str]) -> tuple[str | None, str]:
+    """Which side of an **add/add** path carries the other's work: `("ours" | "theirs" | None, why)`.
+
+    A path added on both sides has no blob of its own in the merge base, so `git merge-file` has no
+    three-way base to work from (`merge_file(root, ours, None, theirs)` is a `TypeError`, and the branch
+    class that produces it - a re-home on each side - is common, not exotic).  The lane that hit it
+    resolved by hand with the rule implemented here: each side is diffed against the base of the path *it
+    was renamed from* (for a re-home the pre-rename path **is** the true three-way base), and the side that
+    is the **superset** of the other wins.  `base_lines == []` means no such base is derivable, and then
+    the two copies are compared whole - the same rule, with nothing to subtract.
+
+    A side is the superset when it contains every line the other side has and it has not.  Neither side
+    being the superset is a **refusal**, never a guess: two independent files that landed on one path, or
+    two different rename sources, is a decision only the author can make.  `why` always names the side
+    taken and the evidence, because "which copy won, and why" has to be readable in the merge commit.
+    """
+    ours_add = branch_only_additions(base_lines, ours)
+    theirs_add = branch_only_additions(base_lines, theirs)
+    ours_sup = not missing_from(ours, theirs_add)
+    theirs_sup = not missing_from(theirs, ours_add)
+    if ours_sup and theirs_sup:
+        # Mutual containment of additions: the copies differ only in lines neither side *added* (a
+        # deletion, a reorder).  Keep the copy that is the literal superset when exactly one is - a
+        # deletion is not a replacement - and otherwise main's, which is the merge's incumbent truth.
+        if not missing_from(ours, theirs) and missing_from(theirs, ours):
+            return "ours", ("both copies carry the other's additions and main's keeps every line the "
+                             "branch's has - kept main's copy")
+        if not missing_from(theirs, ours) and missing_from(ours, theirs):
+            return "theirs", ("both copies carry the other's additions and the branch's keeps every "
+                               "line main's has - kept the branch's copy")
+        return "ours", ("both copies carry the other's additions (%d main-side, %d branch-side) - kept "
+                         "main's copy" % (len(ours_add), len(theirs_add)))
+    if ours_sup:
+        return "ours", ("main's copy carries all %d line(s) only the branch's copy adds - main's copy "
+                         "is the superset" % len(theirs_add))
+    if theirs_sup:
+        return "theirs", ("the branch's copy carries all %d line(s) only main's copy adds - the "
+                           "branch's copy is the superset" % len(ours_add))
+    miss_ours = missing_from(ours, theirs_add)
+    miss_theirs = missing_from(theirs, ours_add)
+    return None, ("neither copy is a superset: main's lacks %d line(s) the branch's adds (e.g. %r) and the "
+                  "branch's lacks %d of main's (e.g. %r) - no base and no superset, so this one is the "
+                  "author's call (`git merge-file -p --diff3` with the pre-rename path as the base)"
+                  % (len(miss_ours), (miss_ours[0][:50] if miss_ours else ""),
+                     len(miss_theirs), (miss_theirs[0][:50] if miss_theirs else "")))
+
+
 def map_symbols(map_text: str) -> tuple[set[str], dict[int, str]]:
     """`(every row's name, address -> name)` for a `symbols.txt`: the map a generated name must resolve through."""
     live: set[str] = set()
@@ -370,15 +493,23 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
             print("REFUSED %s | %s" % (branch or "?", reason))
         return code
 
-    if not dry_run and git(root, "status", "--porcelain").strip():
-        return bail("the tree is not clean - commit or stash first (a merge must start from a known state)")
+    # A merge in progress is checked **first**: the guard below is for a *fresh* merge (it must start from
+    # a known state), and running it before this test refused the re-run after a crashed resolution - the
+    # re-run this tool's own failure message tells the operator to make.  See `cleanliness_blocker`.
     head = git(root, "rev-parse", "HEAD").strip()
+    in_merge = merge_in_progress(root)
     tip_state = load_state(root)
-    if git(root, "merge-base", "--is-ancestor", "main", "HEAD") and not merge_in_progress(root):
+    if in_merge and not tip_state:
+        return bail("a merge is in progress but this tool has no state for it - finish or abort it by "
+                    "hand (`git merge --abort`)")
+    blocker = cleanliness_blocker(root, in_merge, tip_state.get("conflicted", []), dry_run)
+    if blocker:
+        return bail(blocker)
+    if git(root, "merge-base", "--is-ancestor", "main", "HEAD") and not in_merge:
         print("up to date: main is already an ancestor of %s - nothing to merge" % head[:8])
         return 0
 
-    if not merge_in_progress(root):
+    if not in_merge:
         base = git(root, "merge-base", "main", "HEAD").strip()
         p = subprocess.run(["git", "merge", "--no-commit", "--no-ff", "main"], cwd=root,
                            capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -387,14 +518,12 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
                           "merge_output": (p.stdout + p.stderr)[-2000:]})
         print("merged main into %s: %d conflicted path(s)" % (head[:8], len(todo)))
     else:
-        if not tip_state.get("conflicted"):
-            return bail("a merge is in progress but this tool has no state for it - finish or abort it by "
-                        "hand (`git merge --abort`)")
         base, todo = tip_state["base"], tip_state["conflicted"]
         print("resuming a merge of main into %s: %d recorded conflicted path(s)" % (head[:8], len(todo)))
 
     splits = blob(root, "main", "config/RMHE08/splits.txt") or b""
     ranges = text_ranges(splits.decode("utf-8", "replace"))
+    rename_maps: dict[str, dict[str, str]] = {}
     actions: list[dict] = []
     blockers: list[str] = []
 
@@ -411,6 +540,46 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
             continue
         kind = classification(path)
         action = {"path": path, "class": kind}
+
+        # --- add/add: no blob at this path in the merge base -------------------------------------------------
+        # The path was added on both sides, so there is no three-way base *here* and `merge_file` cannot
+        # run at all (`base_b` is None: its TypeError/AttributeError is what this branch replaces).  The
+        # true base of a re-home is the path it was renamed from; when no side names one, the superset of
+        # the two copies is the only answer that is not a guess.  A `symbols.txt` is left to its own
+        # class below - a map is resolved by row surgery, never by taking a side whole.
+        if base_b is None and kind != "map":
+            if "main" not in rename_maps:
+                rename_maps["main"] = rename_sources(root, base, "main")
+            if "HEAD" not in rename_maps:
+                rename_maps["HEAD"] = rename_sources(root, base, "HEAD")
+            src_ours, src_theirs = rename_maps["main"].get(path), rename_maps["HEAD"].get(path)
+            if src_ours and src_theirs and src_ours != src_theirs:
+                blockers.append("%s: renamed from %r on main but from %r on the branch - two different "
+                                "three-way bases for one path, so there is nothing to diff either copy "
+                                "against. This one is the author's call."
+                                % (path, src_ours, src_theirs))
+                continue
+            src = src_ours or src_theirs
+            base_add = blob(root, base, src) if src else None
+            side, why = addadd_choice(lines_of(base_add) if base_add is not None else [],
+                                      lines_of(ours), lines_of(theirs))
+            prefix = ("the pre-rename base is %r; " % src) if base_add is not None else \
+                     "no pre-rename base is derivable, so the two copies are compared whole; "
+            if side is None:
+                blockers.append("%s: %s%s" % (path, prefix, why))
+                continue
+            taken_bytes = ours if side == "ours" else theirs
+            taken = lines_of(taken_bytes)
+            if kind == "band":
+                # a band header still owes the rule-2 address sweep, whichever copy was taken
+                kept, dropped = sweep_band_header(taken, ranges)
+                taken = kept
+                if dropped:
+                    action["moved"] = [{"decl": d[:70], "owner": o} for d, o in dropped]
+            restore(root, path, taken, newline_of(taken_bytes))
+            action.update(addadd=True, took=side, note=prefix + why)
+            actions.append(action)
+            continue
 
         if kind == "map":
             # the branch's own rename pairs, re-applied onto main's file as exact row replacements
@@ -491,6 +660,20 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
         actions.append(action)
 
     # --- the proof, before anything is committed -----------------------------------------------------
+    # an add/add resolution takes one whole side, so it is proved by identity: the path must be *that*
+    # side's copy, never a union of the two (a union is the one thing an add/add pair must never become).
+    for a in actions:
+        if not a.get("addadd") or not os.path.isfile(os.path.join(root, a["path"])):
+            continue
+        ref, label = ("HEAD", "the branch") if a.get("took") == "theirs" else ("main", "main")
+        want = blob(root, ref, a["path"])
+        want_lines = lines_of(want) if want is not None else None
+        if want_lines is not None and a.get("moved"):
+            want_lines, _ = sweep_band_header(want_lines, ranges)   # a band header owes the rule-2 sweep
+        if want_lines is not None and want_lines != (read_lines(root, a["path"]) or []):
+            blockers.append("%s: the add/add resolution is not %s's copy (it must be one side whole, never "
+                            "a union of the two)" % (a["path"], label))
+
     comment_only = {a["path"] for a in actions if a.get("comment_only")}
     for path in todo:
         if not os.path.isfile(os.path.join(root, path)):
@@ -551,7 +734,9 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
             if a.get("moved"):
                 extra = " | %d declaration(s) belong elsewhere: %s -> %s" % (
                     len(a["moved"]), a["moved"][0]["decl"][:40], a["moved"][0]["owner"])
-            print("  %-44s %-9s %s%s" % (a["path"], a["class"], note, extra))
+            # an add/add path says which side it took: "which copy won" must be readable in the output
+            print("  %-44s %-9s %s%s" % (a["path"], "add/add" if a.get("addadd") else a["class"],
+                                         note, extra))
         for b in blockers:
             print("BLOCKED  %s" % b)
     if blockers:
@@ -569,7 +754,16 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
         return 0
     msg = ["merge main into the branch (resolved by class: %s)" % ", ".join(sorted({a["class"] for a in actions}))
            if actions else "merge main into the branch"]
-    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    # stage **the merge's own paths**, not the whole tree: `add -A` here would fold whatever else the
+    # lane's worktree happens to carry (an untracked scratch file, its own notes) into the merge commit -
+    # and a resumed merge deliberately tolerates untracked files, so it must not stage them.  Deletions
+    # were already staged by `git rm` in the loop above.
+    present = [p for p in todo if os.path.isfile(os.path.join(root, p))]
+    if present:
+        p = subprocess.run(["git", "add", "--", *present], cwd=root, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
+        if p.returncode != 0:
+            return bail("staging the merge's own paths failed: %s" % (p.stderr or p.stdout).strip()[:200])
     p = subprocess.run(["git", "commit", "-q", "-m", msg[0]], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         return bail("the merge commit failed: %s" % (p.stderr or p.stdout).strip()[:200])
@@ -877,6 +1071,244 @@ def selftest() -> int:
     # the guard that must NOT be weakened: a full body rewrite on the same line still refuses
     code4, _merged4, _source4, _log4 = e2e(src_same_line=True)
     check("a real code conflict still blocks after the comment-only fix", code4, 1)
+
+    # ------------------------------------------------------------------------------------------------
+    # ADD/ADD + THE RESUME GUARD (2026-09-29).  Both defects were found by a merger lane that then did the
+    # work by hand.  (1) An add/add path (added on both sides - a re-home on each side, which is common,
+    # not exotic) has no blob in the merge base, and `resolve` called `merge_file(root, ours, None, ...)`:
+    # a `TypeError`/`AttributeError`, never a resolution.  (2) The `the tree is not clean` guard ran before
+    # the merge-in-progress test, so the re-run the tool's own message asks for was refused - the state
+    # file and the conflicted list were then driven by hand.
+    # ------------------------------------------------------------------------------------------------
+    side, why = addadd_choice([], ["a", "b"], ["a", "b", "c"])
+    check("an add/add pair with no base blob: the superset side wins", side, "theirs")
+    check("... and the choice is explained (which side, and why)", "superset" in why and "branch" in why, True)
+    check("... symmetrically (main's copy can be the superset too)",
+          addadd_choice([], ["a", "b", "c"], ["a", "b"])[0], "ours")
+    check("... and an ambiguous pair is refused, never guessed", addadd_choice([], ["a"], ["b"])[0], None)
+    check("... naming what each side lacks",
+          "neither copy is a superset" in addadd_choice([], ["a"], ["b"])[1], True)
+    abase = ["/* the band */", "int a;", "int b;"]
+    check("with a pre-rename base, only each side's own additions are compared",
+          addadd_choice(abase, abase + ["main_only"], abase + ["main_only", "branch_only"])[0], "theirs")
+    check("... so a copy that only *deletes* is not the superset",
+          addadd_choice(abase, abase[:2], abase + ["branch_only"])[0], "theirs")
+    check("... and disjoint additions are refused (no superset either way)",
+          addadd_choice(abase, abase + ["x"], abase + ["y"])[0], None)
+    check("... a tie is broken by the copy that kept every line (a deletion is not a replacement)",
+          addadd_choice(abase, abase + ["x"], abase[:2] + ["x"])[0], "ours")
+    check("... and that tie-break is symmetric too",
+          addadd_choice(abase, abase[:2] + ["x"], abase + ["x"])[0], "theirs")
+    check("... identical copies are not a decision at all (main's is kept)",
+          addadd_choice(abase, abase, abase)[0], "ours")
+
+    @contextlib.contextmanager
+    def fixture():
+        """A throwaway repository plus the `qgit`/`put` helpers the fixtures below share."""
+        with tempfile.TemporaryDirectory() as tmp:
+            def qgit(*args: str, check: bool = True) -> str:
+                p = subprocess.run(["git", "-c", "user.email=t@e.invalid", "-c", "user.name=t",
+                                    "-c", "commit.gpgsign=false", *args], cwd=tmp, capture_output=True,
+                                   text=True, encoding="utf-8", errors="replace")
+                if check and p.returncode != 0:
+                    raise AssertionError("git %s failed: %s" % (" ".join(args), p.stderr))
+                return p.stdout
+
+            def put(rel: str, text: str) -> None:
+                path = os.path.join(tmp, rel)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(text)
+
+            yield tmp, qgit, put
+
+    def project(qgit, put, rows: list[str]) -> None:
+        """The `main`/`lane` pair every fixture here starts from: both sides insert a row in the same place
+        of `symbols.txt` and the lane edits `src/f.c`, so the merge has at least one real conflict."""
+        qgit("init", "-q")
+        qgit("checkout", "-q", "-b", "main")
+        put("config/RMHE08/symbols.txt", "\n".join(rows) + "\n")
+        put("config/RMHE08/splits.txt", "src/f.c:\n\t.text       start:0x80001000 end:0x80001100\n")
+        put("src/f.c", "int a;\nint pad1;\nint pad2;\nint b;\n")
+        qgit("add", "-A")
+        qgit("commit", "-q", "-m", "base")
+        qgit("checkout", "-q", "-b", "lane")
+        put("config/RMHE08/symbols.txt",
+            "\n".join(rows[:2] + ["lane_renamed = .text:0x80001080; // type:function size:0x40"]) + "\n")
+        qgit("commit", "-q", "-am", "the branch renames a map row")
+        qgit("checkout", "-q", "main")
+        put("config/RMHE08/symbols.txt",
+            "\n".join(rows[:2] + ["main_added = .text:0x80001060; // type:function size:0x20", rows[2]]) + "\n")
+        qgit("commit", "-q", "-am", "main adds a map row")
+        qgit("checkout", "-q", "lane")
+
+    def run_quiet(root: str, dry_run: bool) -> tuple[int, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = resolve(root, "lane", dry_run=dry_run, as_json=False)
+        return code, out.getvalue()
+
+    def e2e_addadd_no_base() -> tuple[int, str, str]:
+        """Fixture (a): a path added on both sides with **no base blob at all** (no rename to point at),
+        main's copy a strict subset of the branch's.  It used to raise before it could decide anything."""
+        with fixture() as (tmp, qgit, put):
+            qgit("init", "-q")
+            qgit("checkout", "-q", "-b", "main")
+            put("README", "the root\n")
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "base")
+            qgit("checkout", "-q", "-b", "lane")
+            put("src/Pl/new.cpp", "one\ntwo\nthree\n")
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "the branch adds the file")
+            qgit("checkout", "-q", "main")
+            put("src/Pl/new.cpp", "one\ntwo\n")
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "main adds the same path")
+            qgit("checkout", "-q", "lane")
+            # prove the fixture is the class under test before the tool runs: unmerged, **no stage 1**
+            qgit("merge", "--no-commit", "--no-ff", "main", check=False)
+            stages = sorted(ln.split()[2] for ln in
+                            git(tmp, "ls-files", "-u", "--", "src/Pl/new.cpp").splitlines() if ln.strip())
+            check("the fixture is a real add/add: unmerged with no base stage", stages, ["2", "3"])
+            qgit("merge", "--abort")
+            code, report = run_quiet(tmp, dry_run=True)
+            merged = "\n".join(read_lines(tmp, "src/Pl/new.cpp") or [])
+            return code, report, merged
+
+    code5, report5, merged5 = e2e_addadd_no_base()
+    check("add/add with no base blob resolves instead of crashing", code5, 0)
+    check("... taking the superset side's copy", merged5.strip(), "one\ntwo\nthree")
+    check("... and reporting which side won, as add/add",
+          ("add/add" in report5, "superset" in report5), (True, True))
+
+    def e2e_addadd_rehome() -> tuple[int, str, str, bool]:
+        """Fixture (a'), the lane's real case: the **same re-home on both sides**.  Main's rename is
+        detected (its copy is nearly the old file), the branch's is not (its copy carries the whole naming
+        pass, so git reads it as a *new* file) - which is what makes this add/add rather than a rename.
+        The pre-rename path is the true three-way base, and the branch's copy is the superset."""
+        with fixture() as (tmp, qgit, put):
+            body = "".join("line %d\n" % i for i in range(20))
+            qgit("init", "-q")
+            qgit("checkout", "-q", "-b", "main")
+            put("src/Pl/fn_8024F200.cpp", body)
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "base")
+            qgit("checkout", "-q", "-b", "lane")
+            qgit("mv", "src/Pl/fn_8024F200.cpp", "src/Pl/pl_act_step.cpp")
+            put("src/Pl/pl_act_step.cpp", "main_edit 0\n" + body[len("line 0\n"):]
+                + "".join("lane_line_%d\n" % i for i in range(40)))
+            qgit("commit", "-q", "-am", "the branch re-homes and adds")
+            qgit("checkout", "-q", "main")
+            qgit("mv", "src/Pl/fn_8024F200.cpp", "src/Pl/pl_act_step.cpp")
+            put("src/Pl/pl_act_step.cpp", "main_edit 0\n" + body[len("line 0\n"):])
+            qgit("commit", "-q", "-am", "main re-homes (the pure half)")
+            qgit("checkout", "-q", "lane")
+            code, report = run_quiet(tmp, dry_run=True)
+            merged = "\n".join(read_lines(tmp, "src/Pl/pl_act_step.cpp") or [])
+            resurrected = os.path.exists(os.path.join(tmp, "src/Pl/fn_8024F200.cpp"))
+            return code, report, merged, resurrected
+
+    code6, report6, merged6, resurrected6 = e2e_addadd_rehome()
+    check("a re-home add/add (both sides, one side's rename undetected) resolves", code6, 0)
+    check("... by taking the branch's copy (it carries main's edit)",
+          ("main_edit 0" in merged6, "lane_line_0" in merged6), (True, True))
+    check("... whole - never a union, never markers", "<<<<<<<" not in merged6, True)
+    check("... against the pre-rename base git names for it",
+          "pre-rename base is 'src/Pl/fn_8024F200.cpp'" in report6, True)
+    check("... and the pre-rename path itself is not resurrected", resurrected6, False)
+
+    def e2e_addadd_band() -> tuple[int, str, str]:
+        """An add/add **band header**: taking a side whole still owes the rule-2 address sweep, so a
+        declaration whose address a registered unit owns is moved out (and named), as in every other
+        band resolution."""
+        with fixture() as (tmp, qgit, put):
+            qgit("init", "-q")
+            qgit("checkout", "-q", "-b", "main")
+            put("config/RMHE08/splits.txt", "src/f.c:\n\t.text       start:0x80001000 end:0x80001100\n")
+            put("README", "the root\n")
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "base")
+            qgit("checkout", "-q", "-b", "lane")
+            put("include/unsplit/Pl.h", "/* the band */\n"
+                "void fn_80001040(void);        /* 0x80001040 */\n"
+                "void unowned_thing(void);      /* 0x80700000 */\n")
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "the branch adds the band header")
+            qgit("checkout", "-q", "main")
+            put("include/unsplit/Pl.h", "/* the band */\n")
+            qgit("add", "-A")
+            qgit("commit", "-q", "-m", "main adds the same header, empty")
+            qgit("checkout", "-q", "lane")
+            code, report = run_quiet(tmp, dry_run=True)
+            merged = "\n".join(read_lines(tmp, "include/unsplit/Pl.h") or [])
+            return code, report, merged
+
+    code7b, report7b, merged7b = e2e_addadd_band()
+    check("an add/add band header resolves", code7b, 0)
+    check("... keeping the branch's copy's unowned declaration", "unowned_thing" in merged7b, True)
+    check("... and sweeping the one a registered unit owns", "fn_80001040" not in merged7b, True)
+    check("... naming where it belongs", "belong elsewhere" in report7b and "src/f.c" in report7b, True)
+
+    def e2e_resume(stray: bool) -> dict:
+        """Fixture (b): a **mid-merge** tree.  A `--dry-run` leaves exactly what a crash leaves - MERGE_HEAD,
+        the state file, the resolved paths written, nothing committed - so the second invocation is the
+        tool's own documented re-run.  With `stray`, an edit the merge does not own is made first: that is
+        still a dirty tree and must still refuse."""
+        with fixture() as (tmp, qgit, put):
+            rows = ["fn_80001000 = .text:0x80001000; // type:function size:0x40",
+                    "fn_80001040 = .text:0x80001040; // type:function size:0x40",
+                    "fn_80001080 = .text:0x80001080; // type:function size:0x40"]
+            project(qgit, put, rows)
+            code1, first = run_quiet(tmp, dry_run=True)
+            crash_state = {"merge_head": merge_in_progress(tmp),
+                           "clean": cleanliness_blocker(tmp, True, conflicted(tmp), False)}
+            put("scratch.txt", "the lane's own notes\n")          # untracked: not the merge's business
+            if stray:
+                put("src/f.c", "int a;\nint lane_touched_this;\nint pad2;\nint b;\n")
+            code2, second = run_quiet(tmp, dry_run=False)
+            out = {"code1": code1, "code2": code2, "first": first, "second": second,
+                   "merged": "\n".join(read_lines(tmp, "config/RMHE08/symbols.txt") or []),
+                   "still_merging": merge_in_progress(tmp),
+                   "scratch_tracked": bool(git(tmp, "ls-files", "scratch.txt").strip()),
+                   "scratch_left": os.path.isfile(os.path.join(tmp, "scratch.txt")),
+                   "committed": git(tmp, "log", "--oneline", "-2").splitlines()}
+            out.update(crash_state)
+            return out
+
+    r = e2e_resume(stray=False)
+    check("the dry run that leaves the mid-merge tree resolved", r["code1"], 0)
+    check("the fixture leaves a merge in progress, as a crash does", r["merge_head"], True)
+    check("a tree dirty only because a merge is in progress is not a dirty tree", r["clean"], None)
+    check("the second invocation RESUMES instead of refusing the re-run", r["code2"], 0)
+    check("... and says so", "resuming" in r["second"], True)
+    check("... finishing the merge", r["still_merging"], False)
+    check("... with both sides of the map kept",
+          ("lane_renamed" in r["merged"], "main_added" in r["merged"]), (True, True))
+    check("... and an untracked file is NOT swept into the merge commit", r["scratch_tracked"], False)
+    check("... while it is still in the worktree", r["scratch_left"], True)
+
+    s = e2e_resume(stray=True)
+    check("an edit the merge does not own still refuses a resume", s["code2"], 1)
+    check("... naming the path and the reason",
+          ("outside it" in s["second"], "src/f.c" in s["second"]), (True, True))
+    check("... and committing nothing", s["still_merging"], True)
+
+    def e2e_foreign_merge() -> tuple[int, str]:
+        """A merge this tool did **not** start has no recorded conflicted list to drive, and is not
+        resumable: it is refused by that name (`git merge --abort` is the way out)."""
+        with fixture() as (tmp, qgit, put):
+            rows = ["fn_80001000 = .text:0x80001000; // type:function size:0x40",
+                    "fn_80001040 = .text:0x80001040; // type:function size:0x40",
+                    "fn_80001080 = .text:0x80001080; // type:function size:0x40"]
+            project(qgit, put, rows)
+            subprocess.run(["git", "merge", "--no-commit", "--no-ff", "main"], cwd=tmp,
+                           capture_output=True)
+            return run_quiet(tmp, dry_run=False)
+
+    code7, report7 = e2e_foreign_merge()
+    check("a merge this tool did not start is refused, not resumed blindly", code7, 1)
+    check("... by name", "no state for it" in report7, True)
 
     if fails:
         print("FAIL (%d)" % len(fails))
