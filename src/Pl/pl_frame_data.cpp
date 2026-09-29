@@ -15,8 +15,8 @@
  * and this unit) - so no single consumer can emit it alone and the owner is the model for it.
  *
  * Range: `.sdata2` 0x80799E00-0x80799F98, the exact extent of the map's `pl_*` `.sdata2` rows
- * (0x80799E00 `pl_float_zero` .. 0x80799F94 `pl_frame_window_50`; the next named row is the
- * unrelated `lbl_80799F98`).  4-aligned on both ends.
+ * (0x80799E00 `pl_float_zero` .. 0x80799F94 `pl_frame_window_50`; the row that follows is
+ * `pl_float_neg250`, owned by `Pl/pl_act_data.cpp`).  4-aligned on both ends.
  *
  * Measured when the claim moved here from `Pl/pl_act_step.cpp`: the whole-project report is unchanged
  * row for row (the 408 B of `total_data` simply changes unit) and `ninja build/RMHE08/ok` stays green.
@@ -29,12 +29,11 @@
  * the rest of the run (`lbl_80799E48` -> `pl_float_neg8`, `lbl_80799E84` -> `pl_frame_window_80`, ...,
  * `lbl_80799EC4` -> `pl_float_0_66`); the map rows and every reference moved in the same change.
  *
- * Residual: the `.sdata2` run that follows this one, 0x80799F98-0x80799FDC (17 words: the 8
- * `lbl_80799Fxx` declarations in `Pl/fn_8025F088.h` plus `lbl_806AB848`, the unit's `.bss` chunk
- * table), is *not* ours and has no owner - `dataclaim.py --unit Pl/fn_8025F088` still answers
- * `named-owner-unit` for it, and its declarations are rule 12's open item there.  It sits at the head
- * of dtk's tail bulk unit `auto_11_80799F98_sdata2` (0x80799F98-0x8079B740, 6056 B), so owning it is
- * the same claim operation this unit's own registration was.
+ * Residual: the `.sdata2` run that follows this one, 0x80799F98-0x80799FDC (17 words), is **not**
+ * ours: it was claimed by `Pl/pl_act_data.cpp`, which owns it and declares its words in
+ * `Pl/pl_act_data.h`.  `lbl_806AB848` (`.bss` 0x806AB848, 0x420 B, declared in
+ * `Pl/fn_8025F088.h`) is a different pool shared by 11 units - the target object of
+ * `Pl/fn_8025F088.cpp` carries no `.bss` at all - so its rule 12 row is still open.
  */
 
 #include "types.h"

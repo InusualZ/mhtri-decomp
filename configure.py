@@ -1923,6 +1923,19 @@ config.libs = [
             # `Pl/pl_act_step.cpp` left every row of the whole-project report unchanged and
             # `ninja build/RMHE08/ok` green.
             Object(NonMatching, "Pl/pl_frame_data.cpp"),
+            # A **data-only** unit (same routing): the Pl band's *second* shared `.sdata2` constant
+            # run, 0x80799F98-0x80799FDC (68 B, 17 words) - the act frame windows, distance
+            # thresholds and blend factors `Pl/fn_8025F088.cpp` and `Pl/fn_80258FCC.cpp` load - whose
+            # source defines nothing.  Both edges are measured: 0x80799F94 before it is loaded only
+            # by `Pl/pl_act_step.cpp` and 0x80799FDC after it only by `Pl/fn_80262940.cpp`, so the
+            # run is the head of dtk's tail bulk unit `auto_11_80799F98_sdata2`.  It is the MWLD
+            # merge of the two consumers' own pools (their referrer runs are disjoint and ordered),
+            # so giving it one owner is what lets them include `Pl/pl_act_data.h` instead of
+            # declaring the words into their own file (rule 12) and what keeps dtk from generating
+            # an anonymous `auto_*_sdata2` unit over the same bytes.  Measured: the whole-project
+            # report's totals are unchanged except `total_units`, and `ninja build/RMHE08/ok` stays
+            # green.  The file name is a guess (see the unit header).
+            Object(NonMatching, "Pl/pl_act_data.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802693C4_fn_802693C4` - the player part/motion cluster (0x802693C4-0x8026BA1C, 63
             # functions, 9816 B) with its own exception tables (extab 0x80012554-0x8001265C,

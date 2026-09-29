@@ -123,20 +123,14 @@ u32 Pl_suimen_ck(struct _PLW* self); /* -> Pl_suimen_ck__FP4_PLW */
 extern "C" {
 #endif
 
-/* This unit's read of the Pl band's `.sdata2` pools (playbook 29: declared, never defined).  The words
- * inside `Pl/pl_frame_data.cpp`'s run (0x80799E00-0x80799F98) are declared in that owner's header and
- * included where they are used - `Pl/fn_8025F088.cpp` includes `Pl/pl_frame_data.h` (rule 2).  What is
- * left here is the *second* run, 0x80799F98-0x80799FDC, which still has no registered owner. */
-extern const f32 lbl_80799F98;
-extern const f32 lbl_80799FC0;
-extern const f32 lbl_80799FC4;
-extern const f32 lbl_80799FC8;
-extern const f32 lbl_80799FCC;
-extern const f32 lbl_80799FD0;
-extern const f32 lbl_80799FD4;
-extern const f32 lbl_80799FD8;
+/* This unit's reads of the Pl band's `.sdata2` pools (playbook 29: declared, never defined) are
+ * declared by their owners' headers and included where they are used (rule 2): the words inside
+ * `Pl/pl_frame_data.cpp`'s run (0x80799E00-0x80799F98) by `Pl/pl_frame_data.h`, and the words of
+ * the run that follows (0x80799F98-0x80799FDC) by `Pl/pl_act_data.h`, both included by
+ * `Pl/fn_8025F088.cpp`.  Nothing from either run is declared here any more. */
 
-/* The player's per-chunk move-work table (`.bss` 0x806AB848, 0x420 B). */
+/* The player's per-chunk move-work table (`.bss` 0x806AB848, 0x420 B); no registered owner yet, so
+ * its rule 12 row stays (see the unit header). */
 extern u8 lbl_806AB848[];
 
 #ifdef __cplusplus
