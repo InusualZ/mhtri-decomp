@@ -318,6 +318,8 @@ void OSUnlockMutex(void* mutex);
 void OSInitMutex(void* mutex);
 s32 OSCreateThread(void* thread, void* entry, void* param, void* stack, u32 stackSize, s32 priority, u32 flags);
 s32 OSResumeThread(void* thread);
+/* untyped: opaque handle passed through - the OS thread record */
+s32 OSIsThreadTerminated(void* thread);
 void OSSleepTicks(u64 ticks);
 
 /* another TU's vtables (rule 10: reference, never rebuild) */

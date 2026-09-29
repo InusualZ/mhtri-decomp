@@ -1330,7 +1330,7 @@ Network/network_transport.cpp:
 	extab       start:0x800198C8 end:0x80019E5C
 	extabindex  start:0x8003A0BC end:0x8003A524
 	.text       start:0x803CCDF8 end:0x803D3CE8
-	.data       start:0x805F9A40 end:0x805FA4EC
+	.data       start:0x805F94E0 end:0x805FA4EC
 	.bss        start:0x806D2C60 end:0x806D3650
 	.sbss       start:0x80794C98 end:0x80794CA0
 

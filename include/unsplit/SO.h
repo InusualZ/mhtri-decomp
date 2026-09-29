@@ -79,6 +79,10 @@ s32 SOSend(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
 s32 SOGetAddrInfo(const char* node, const char* service, const SOAddrInfo* hints, SOAddrInfo** result);
 void SOFreeAddrInfo(SOAddrInfo* info);
 
+/* 0x805204F8 - parse the dotted-quad text `name` into the four address bytes at `out`; 1 on success
+ * (the SDK's INETATON ioctl), negative on failure. */
+s32 SOInetAtoN(const char* name, u8* out);
+
 #ifdef __cplusplus
 }
 #endif

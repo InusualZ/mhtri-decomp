@@ -1886,7 +1886,8 @@ void* NetworkPeerGameSpy::destroy(s16 flags)
 {
     if (this != NULL) {
         dtor_803CA338(mutex_6614, -1);
-        dtor_803CCE9C(this, 0);
+        /* C cast: this class still hand-models `void* vtable_00`, unrelated to NetworkPeerBase; the measured alternatives failed. */
+        ((NetworkPeerBase*)this)->NetworkPeerBase::destroy(0);
         if (flags > 0) {
             operator delete(this);
         }
