@@ -61,12 +61,11 @@
  * `0x80794440` (span 400 B) binds NWC24iPrepareShutdown to NWC24iRequestShutdown at the band's top;
  * the split position and its window are documented in the sibling's header.
  *
- * BODY (fourth pass 2026-09-28).  Eleven of the twelve functions are reconstructed and SEVEN are
- * byte-identical: `NWC24iOpenFd`, `NWC24iIsAsyncIoctlBusy`, `NWC24iCloseFd`, `NWC24iIoctl`,
- * `NWC24iCheckUserIdCRC`, `NWC24iSynchronizeRtcCounter` and `NWC24iRequestShutdown` (the last three
- * added by this pass).  The unit measures 66.40704 % fuzzy over its 2044 B (39.65558 % before this
- * pass; matched code 404 -> 760 B of 2044).  The definitions run in ADDRESS order (flip requirement),
- * so a body written later slots into its own address, not at the end.
+ * BODY.  All twelve functions are reconstructed and seven are byte-identical: `NWC24iOpenFd`,
+ * `NWC24iIsAsyncIoctlBusy`, `NWC24iCloseFd`, `NWC24iIoctl`, `NWC24iCheckUserIdCRC`,
+ * `NWC24iSynchronizeRtcCounter` and `NWC24iRequestShutdown`.  The unit measures 80.69472 % fuzzy over
+ * its 2044 B.  The definitions run in ADDRESS order (flip requirement), so a body written later slots
+ * into its own address, not at the end.
  *
  * DATA CLAIMED (rule 12; each range is referenced ONLY by this unit's own rows - checked with
  * `tools/units/callers.py` - so it is this TU's to own): `.sdata` 0x80794440-0x80794448
@@ -76,13 +75,12 @@
  * unowned and therefore declared `extern` in `include/unsplit/NWC24.h`: the sibling half's device-path
  * literals (`.data` 0x80631178-0x806311E8) and the library's message work block
  * (`.bss` 0x80766980-0x80766B00) - both are read by `nwc24_msg.c`'s rows as well, so claiming them
- * here would steal the sibling's bytes.  The `.rodata` 0x80574E00-0x80574E10 nibble table is this
- * unit's too (its only referencer is `getUnScrambleId`) and is a filed range request: it can only be
- * claimed once the body that emits it exists.
+ * The `.rodata` 0x80574E00-0x80574E10 nibble table (`sNwc24UserIdSbox`, renamed from lbl_80574E00) is claimed too: its only
+ * referencer is `getUnScrambleId`, and the body now emits it.
  *
  * LOAD-BEARING SHAPES (each measured):
  *   - `NWC24iCheckUserIdCRC`: `for (i = 0; i < 43; i++) if ((id >> (53 - (i + 1))) & 1) id ^=
- *     0x635ULL << (42 - i);` over `getUnScrambleId()`'s u64 (the declaration's return type had to
+ *     0x635ULL << (42 - i);` over `getUnScrambleId()`'s u64 (the return type had to
  *     become `u64` - the object returns r3:r4 and the shifts lower to `__shr2u`/`__shl2i`), answering
  *     -37 when anything is left.  The `53 - (i + 1)` spelling is load-bearing: the folded `52 - i`
  *     loses the `addi r0,r29,0x1` the target carries and measures 97.08 % instead of 100 %.
@@ -112,16 +110,24 @@
  *     form was kept: the pragma is a TU-wide setting (playbook 33) and its sibling `nwc24_msg.c`
  *     carries the same line for the same reason.
  *
- * NOT reconstructed, with the reason:
- *   - `getUnScrambleId` (0x8051E100, 644 B, 0 %): the 64-bit obfuscation transform
- *     `NWC24iCheckUserIdCRC` runs on.  It is 161 instructions of `rlwimi`/`rotlwi`/`clrlslwi`/`extrwi`
- *     over SIX pairs of nibble lookups into the `.rodata` 0x80574E00 table (each pair is
- *     `table[hi] << 4 | table[lo]`, i.e. a byte substitution), around a bit permutation of the 53-bit
- *     input (`(hi & 0x1FFFFF) ^ 0x5E5E`, `lo ^ 0x5E5E5E5E`) and an output XOR with 0xB3B3B3B3.  It has
- *     no loop and no source shape to anchor on, and no reference implementation is in the image, so
- *     writing it blind would bake a wrong body into the unit.  Recoverable only from the DWC/NWC24 SDK
- *     source; the `.rodata` 0x80574E00-0x80574E10 table is referenced only by this function, so it is
- *     this unit's to claim whenever the body is written (range request filed in the outbox).
+ * getUnScrambleId (45.35 %, semantics PROVEN): the function takes the 64-bit user id in
+ *   r3:r4 (the CRC wrapper and its caller pass it straight through - both were declared `(void)` before, which
+ *   is why a `bl` alone scored 100 %) and is, bit for bit: `v = ((id & 2^53-1) ^ 0x5E5E5E5E5E5E) & 2^53-1`; rotate
+ *   `v` one bit right inside 53 bits; move bytes 1,5,3,4,2,0 round the 6-cycle (byte0<-1, 1<-5, 5<-3, 3<-4,
+ *   4<-2, 2<-0); substitute bytes 0..5 through the 16-entry nibble table (`hi<<4 | lo`, `.rodata` 0x80574E00);
+ *   rotate 10 bits left inside 53 bits; xor 0xB3B3B3B3B3B3.  Derived by emulating the target's 161 instructions
+ *   over random inputs and matching a model (0 mismatches over 2000 inputs; the source transcribed likewise).
+ *   Load-bearing shapes: the cycle is moves through ONE temporary and its START is load-bearing (start at byte
+ *   2 = 45.35 %, the other five starts 36.7-43.8 %); per-byte replace is `(v & ~(0xFFULL << s)) | (u8)sub << s`
+ *   with the nibbles indexed from a `u32` byte (`(u32)(v >> s) & 0xFF`), which is what makes MWCC insert with
+ *   `rlwimi` and index with `rlwinm` as retail does; a `u8` sub value widened through `u64` costs a `srawi`.
+ *   Residual: 0x290 B against 0x284; the mask/rotate chains of the byte cycle and the final 53-bit rotate are
+ *   scheduled/combined differently (retail folds the final rotate into four `rlwinm`/`rlwimi` with no trailing
+ *   mask; ours keeps `slwi`/`srwi`/`or`), and the register order of the early constants differs.  The original
+ *   spelling of the cycle and the rotate is not decidable from the DOL; six cycle starts, two rotate spellings
+ *   and two final-mask spellings were measured (grid, 24 builds).
+ *
+ * Other residuals:
  *   - `NWC24iSetRtcCounter`'s own residual (92.24 %, frame 0x30 both sides, all three `bl`s kept):
  *     retail's thread guard is an if-assignment into `error` that is re-tested (`li r3,-1` / `li r3,0` /
  *     `cmpwi r3,0` / `bge <body>` / `b <epilogue>`), four instructions ours does not carry because ours
@@ -148,7 +154,7 @@
  * `ours-extra` row.  `target-extra .data 68 B (ours 66 B)` is the two bytes of alignment padding
  * between this half's last literal (ends 0x8063122A) and the next `.data` object (0x80631230) - bytes
  * the source cannot emit as a definition, the same class as the sibling's own 6-byte pad.  The
- * `target-extra .text 2044 B` / `.rela.text 972 B` rows are `getUnScrambleId` alone.
+ * `.rodata` and `.text` have no gap now.
  */
 
 #include "types.h"
@@ -238,11 +244,11 @@ static char Nwc24PrepareShutdownName[] = "NWC24iPrepareShutdown";
 static char Nwc24RequestPath2[] = "/dev/net/kd/request";
 static char Nwc24RequestShutdownName[] = "NWC24iRequestShutdown";
 
-/* 0x8051E068 (0x98): validate the cached user id - unscramble it and fold bit `52 - i` of the
+/* 0x8051E068 (0x98): validate the 64-bit user id - unscramble it and fold bit `52 - i` of the
  * running value back into it 42 + i positions up, 43 times; anything left over is the -37 answer. */
-int NWC24iCheckUserIdCRC(void)
+int NWC24iCheckUserIdCRC(u64 userId)
 {
-    u64 id = getUnScrambleId();
+    u64 id = getUnScrambleId(userId);
     int i;
 
     for (i = 0; i < 43; i++) {
@@ -254,6 +260,48 @@ int NWC24iCheckUserIdCRC(void)
         return -37;
     }
     return 0;
+}
+
+/* The 4-bit substitution table of the user-id scramble (`.rodata` 0x80574E00). */
+static const u8 sNwc24UserIdSbox[16] = {
+    0x0D, 0x05, 0x09, 0x07, 0x00, 0x0F, 0x0A, 0x02, 0x0C, 0x03, 0x0E, 0x01, 0x08, 0x06, 0x0B, 0x04
+};
+
+#define NWC24_ID_MASK 0x1FFFFFFFFFFFFFULL
+
+#define NWC24_BYTE(v, n) ((u32)((v) >> (8 * (n))) & 0xFF)
+#define NWC24_PUT_BYTE(v, n, b) ((v) = ((v) & ~(0xFFULL << (8 * (n)))) | ((u64)(u8)(b) << (8 * (n))))
+
+/* Replaces byte `n` of `v` with its substitution: each nibble goes through the table. */
+#define NWC24_SUB_BYTE(v, n)                                                              \
+    do {                                                                                  \
+        u32 in_ = NWC24_BYTE(v, n);                                                       \
+        NWC24_PUT_BYTE(v, n, (sNwc24UserIdSbox[in_ >> 4] << 4) | sNwc24UserIdSbox[in_ & 0xF]); \
+    } while (0)
+
+/* 0x8051E100 (0x284): undo the friend-code scramble of a 53-bit user id - mask, xor, rotate one bit
+ * right, move six bytes round a cycle, substitute them, then rotate ten bits back and xor again. */
+u64 getUnScrambleId(u64 id)
+{
+    u64 v = ((id & NWC24_ID_MASK) ^ 0x5E5E5E5E5E5EULL) & NWC24_ID_MASK;
+    u32 first;
+
+    v = (v >> 1) | ((v & 1) << 52);
+    first = NWC24_BYTE(v, 2);
+    NWC24_PUT_BYTE(v, 2, NWC24_BYTE(v, 0));
+    NWC24_PUT_BYTE(v, 0, NWC24_BYTE(v, 1));
+    NWC24_PUT_BYTE(v, 1, NWC24_BYTE(v, 5));
+    NWC24_PUT_BYTE(v, 5, NWC24_BYTE(v, 3));
+    NWC24_PUT_BYTE(v, 3, NWC24_BYTE(v, 4));
+    NWC24_PUT_BYTE(v, 4, first);
+    NWC24_SUB_BYTE(v, 0);
+    NWC24_SUB_BYTE(v, 1);
+    NWC24_SUB_BYTE(v, 2);
+    NWC24_SUB_BYTE(v, 3);
+    NWC24_SUB_BYTE(v, 4);
+    NWC24_SUB_BYTE(v, 5);
+    v = ((v << 10) | (v >> 43)) & NWC24_ID_MASK;
+    return (v ^ 0xB3B3B3B3B3B3ULL) & NWC24_ID_MASK;
 }
 
 /* 0x8051E384 (0x148): write the RTC counter through the time device - the value pair travels in the
