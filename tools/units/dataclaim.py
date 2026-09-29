@@ -39,7 +39,9 @@ registered source, or the queue's own `never`/`owner-held`/`not claimed` refusal
 
     python tools/units/dataclaim.py --unit Pl/pl_act_step [--dry-run] [--json]
         rule 12, the other direction: every data symbol that unit references but does not own,
-        with who else reads it and the exact `splits.txt` claim (or named data-only unit) to fix it.
+        with who else reads it, where the declaration actually sits (`declared in:` - the
+        address's owner and the declaration's home can disagree), and the exact `splits.txt`
+        claim (or named data-only unit) to fix it.
         Read-only - it never writes `splits.txt`; `--dry-run` just says so explicitly.
 
 Read-only by design: no `ninja`, no compile, no link, no write to `splits.txt`. `land.py` owns the batch
@@ -53,6 +55,7 @@ import json
 import os
 import struct
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -784,8 +787,45 @@ def norm_reader(label: str | None) -> str | None:
     return label
 
 
+def declaration_locations(root: str, names) -> dict[str, list[str]]:
+    """`{name: [repo-relative declaration paths]}` for `names`, read from `include/` and `src/`.
+
+    A declaration is a site `stylelint.declaration_sites` reads (the `extern` keyword or a plain function
+    prototype) - the same reading rules 2 and 12 use. The remedy is derived from the address's *owner*;
+    this says where the declaration actually sits, so an `owner-header` remedy beside `declared in:
+    include/unsplit/<band>.h` shows the gap in one line. An empty list renders as `not declared`.
+    """
+    from units import stylelint as sl  # noqa: PLC0415 - the one declaration reader
+    want = set(names)
+    out: dict[str, list[str]] = {n: [] for n in want}
+    if not want:
+        return out
+    for top in (sl.HEADERS, sl.SRC):
+        base = os.path.join(root, top)
+        if not os.path.isdir(base):
+            continue
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+            for fn in sorted(filenames):
+                if not fn.endswith(sl.SUFFIXES):
+                    continue
+                path = os.path.join(dirpath, fn)
+                try:
+                    text = sl.read_text(path)
+                except OSError:
+                    continue
+                if not any(name in text for name in want):    # a cheap pre-filter before the parse
+                    continue
+                rel = os.path.relpath(path, root).replace(os.sep, "/")
+                for name, _pos, _line in sl.declaration_sites(sl.Source(path, rel, text)):
+                    if name in want and rel not in out[name]:
+                        out[name].append(rel)
+    return out
+
+
 def reference_record(unit: str, entry: dict, extent: int, extent_source: str, owner: str | None,
-                     pool: dict | None, unit_ranges: list[tuple[int, int]], obj_rel: str | None) -> dict:
+                     pool: dict | None, unit_ranges: list[tuple[int, int]], obj_rel: str | None,
+                     declarations: dict | None = None) -> dict:
     """One referenced symbol's row: the facts plus `recommend`'s decision, JSON-safe throughout."""
     start, end, rounded = claim_span(entry["address"], extent)
     sharers = sorted(set(pool["readers"]) - {unit}) if pool else []
@@ -793,7 +833,8 @@ def reference_record(unit: str, entry: dict, extent: int, extent_source: str, ow
         "name": entry["name"], "section": entry["section"], "address": entry["address"],
         "extent": extent, "extent_source": extent_source,
         "claim_start": start, "claim_end": end, "not_4_aligned": rounded,
-        "owner": owner, "object": obj_rel, "shared": bool(sharers), "sharers": sharers,
+        "owner": owner, "declared_in": list((declarations or {}).get(entry["name"], [])),
+        "object": obj_rel, "shared": bool(sharers), "sharers": sharers,
         "pool": ({"start": pool["start"], "end": pool["end"], "count": pool["count"],
                    "readers": sorted(pool["readers"])} if pool else None),
         "remedy": None, "splits": None, "symbols": None, "note": "",
@@ -899,6 +940,7 @@ def reference_report(root: str, unit: str) -> dict:
     ranges = unit_ranges(splits, unit)
     ref_names, obj_rel = unit_data_references(root, unit)
     unowned_cache: dict[str, list[dict]] = {}
+    declarations = declaration_locations(root, ref_names)
     records, seen = [], set()
     for name in ref_names:
         entry = by_name.get(name)
@@ -926,7 +968,7 @@ def reference_report(root: str, unit: str) -> dict:
                     [row for row in rows if _is_unsplit(ownership, row["name"])], readers_of)
             pool = unowned_cache[section].get(entry["address"])
         records.append(reference_record(unit, entry, extent, extent_source, owner, pool,
-                                        ranges.get(section, []), obj_rel))
+                                        ranges.get(section, []), obj_rel, declarations))
     records.sort(key=lambda x: (section_key(x["section"]), x["address"]))
     return {"unit": unit, "object": obj_rel, "census": census_info, "entries": records,
             "summary": _remedy_counts(records)}
@@ -953,6 +995,8 @@ def render_references(payload: dict) -> str:
             lines.append("      pool 0x%08X-0x%08X (%d symbol(s), %d reader(s))"
                          % (pool["start"], pool["end"], pool["count"], len(pool["readers"])))
         lines.append("      remedy: %s" % rec["remedy"])
+        lines.append("      declared in: %s" % (", ".join(rec.get("declared_in") or [])
+                                                   or "not declared"))
         if rec.get("splits"):
             lines.append("      splits.txt: %s" % rec["splits"].replace("\n", "\n                 "))
         if rec.get("symbols"):
@@ -1273,6 +1317,40 @@ def selftest() -> int:
     check("render: the remedy is printed", "remedy: claim-into-unit" in render_references(payload), True)
     check("render: the summary counts the remedies",
           "claim-into-unit 1" in render_references(payload), True)
+
+    # --- `declared in:` - the address's owner vs the declaration's actual home ----------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        for rel, body in (("include/unsplit/mod.h", "extern const u16 t;\n"),
+                          ("include/mod/owner.h", "extern const u16 t;\n"),
+                          ("src/other/c.c", "void f(void) {}\n")):
+            path = os.path.join(tmp, *rel.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(body)
+        loc = declaration_locations(tmp, ["t", "absent"])
+        check("declared in: every declaration site is found, sorted", sorted(loc["t"]),
+              ["include/mod/owner.h", "include/unsplit/mod.h"])
+        check("declared in: a name with no declaration is empty", loc["absent"], [])
+        check("declared in: a non-declaration is not a home", declaration_locations(tmp, ["f"])["f"], [])
+
+    home = dict(rec("t", ".data", 0x2000, 0x8, owner="Other/unit"), **header)
+    home["declared_in"] = ["include/unsplit/mod.h"]
+    home_payload = {"unit": "Pl/pl_act", "object": "build/RMHE08/obj/Pl/pl_act.o",
+                    "census": {"source": "elf"}, "entries": [home],
+                    "summary": _remedy_counts([home])}
+    check("render: the declaration home is printed beside the remedy",
+          "declared in: include/unsplit/mod.h" in render_references(home_payload), True)
+    nowhere = dict(home)
+    nowhere["declared_in"] = []
+    nowhere_payload = dict(home_payload, entries=[nowhere])
+    check("render: no declaration site reads not declared",
+          "declared in: not declared" in render_references(nowhere_payload), True)
+    built = reference_record("Pl/pl_act", rec("t", ".data", 0x2000, 0x8, owner="Other/unit"),
+                             8, "map", "Other/unit", None, [], None, {"t": ["include/unsplit/mod.h"]})
+    check("reference_record carries the declaration home", built["declared_in"], ["include/unsplit/mod.h"])
+    check("reference_record keys a name it did not see as not declared",
+          reference_record("Pl/pl_act", rec("z", ".data", 0x3000, 4), 4, "map", None, None, [], None,
+                           {})["declared_in"], [])
 
     if fails:
         print("FAIL (%d)" % len(fails))

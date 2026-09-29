@@ -17,6 +17,7 @@ candidate decides the cached index is built, a clean batch does not, and the ind
 from __future__ import annotations
 
 import os
+import shutil
 import struct
 import sys
 import tempfile
@@ -337,6 +338,44 @@ def selftest() -> int:
         expect("the cache carries the other input's provider",
                index["providers"].get("provided_elsewhere", []),
                [os.path.normpath(os.path.join("build", "RMHE08", "obj", "provided.o"))])
+
+        # 6b. `--base <rev>`: the snapshot is reconstructed from the base tree's own objects (a temporary
+        #     worktree of the revision, the units compiled there), so a refusal can be judged pre-existing
+        #     from one command instead of reverting the working tree. The hooks stand in for git and the
+        #     compiler; the comparison that runs is the real `unresolved_names` path.
+        base_tree = os.path.join(tmp, "basetree")
+        write(base_tree, os.path.join("src", "U.cpp"), b"// the base source\n")
+        write(base_tree, os.path.join("config", "RMHE08", "symbols.txt"),
+              b"mapped_name = .text:0x80000000;\n")
+        seen = {}
+
+        def fake_compile(unit, main, wt):
+            obj = write(wt, os.path.join("build", "RMHE08", "src", unit + ".o"), open(ours, "rb").read())
+            return {"object": obj, "compiled": True}
+
+        def fake_add(main, rev, path):
+            seen["rev"] = rev
+            shutil.copytree(base_tree, path)
+
+        def fake_remove(main, path):
+            seen["removed"] = path
+
+        snap_at = ur.snapshot_base_at("MAIN", "BASE", ["U"], add_worktree=fake_add,
+                                      remove_worktree=fake_remove, compiler=fake_compile)
+        expect("--base: the revision asked for is the one checked out", seen.get("rev"), "BASE")
+        expect("--base: the temporary worktree is removed after", seen.get("removed") is not None, True)
+        expect("--base: the base object's unresolved set is captured", snap_at.get("U", {}).get("refs"), [wrong])
+        fresh_at = ur.snapshot_base_at("MAIN", "BASE", ["new/unit"], add_worktree=fake_add,
+                                       remove_worktree=fake_remove, compiler=fake_compile)
+        expect("--base: a unit the base never had is recorded with no refs", fresh_at.get("new/unit"),
+               {"source": None, "refs": []})
+        pre_at = ur.check_units(tree, ["U"], base_snapshot=snap_at)
+        expect("--base: the pre-existing refusal is reported, never refused", pre_at["problems"], [])
+        expect("--base: and the debt is named with its count",
+               "1 pre-existing" in (pre_at["pre_existing"][0] if pre_at["pre_existing"] else ""), True)
+        unread = ur.check_units(tree, ["U"], base_snapshot={"U": {"refs": None}})
+        expect("--base: an unreadable base is unjudged, never a false refusal",
+               (unread["missing"], unread["problems"]), (["U"], []))
 
         # 7. A batch whose units carry only map rows has no candidate, so `check_units` never builds the
         #    index: the patched index raises, and no cache file appears.

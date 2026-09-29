@@ -53,6 +53,7 @@ selftest pins it as a negative fixture). And a unit whose *only* wrong reference
 (the selftest pins that as the regression test for add-only).
 
     python tools/units/undefrefs.py <unit> [...]   # the refusal, spelled out
+    python tools/units/undefrefs.py <unit> --base <rev>  # judge against the base revision's own objects
     python tools/units/undefrefs.py --census [PATH]  # the pre-existing-debt register
     python tools/units/undefrefs.py --selftest
 """
@@ -63,9 +64,11 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if os.path.dirname(HERE) not in sys.path:
@@ -418,6 +421,15 @@ def _prepare(main: str, units: list[str]):
     return map_set, linker_set, prepared, any_candidates
 
 
+def refs_of(our: dict, target: dict | None, *, map_set: set[str], linker_set: set[str],
+            providers: dict[str, list[str]], ref_count: dict[str, int],
+            target_rel: str) -> list[str]:
+    """The names `our` relocates that no link input can define, sorted - the snapshot's per-unit set."""
+    hits = unresolved_names(our, target, map_set=map_set, providers=providers,
+                           ref_count=ref_count, target_rel=target_rel, linker_set=linker_set)
+    return sorted({n for n, _ in hits})
+
+
 def snapshot_base(main: str, units: list[str] | None = None) -> dict:
     """`{unit: {"source": sha, "refs": [name, ...]}}` - the base tree's own unresolved references.
 
@@ -432,10 +444,122 @@ def snapshot_base(main: str, units: list[str] | None = None) -> dict:
     index = link_symbol_index(main) if any_candidates else {"providers": {}, "ref_count": {}}
     out = {}
     for unit, our, target, target_rel in prepared:
-        hits = unresolved_names(our, target, map_set=map_set, providers=index["providers"],
-                                ref_count=index["ref_count"], target_rel=target_rel, linker_set=linker_set)
-        out[unit] = {"source": source_sha(main, unit), "refs": sorted({n for n, _ in hits})}
+        out[unit] = {"source": source_sha(main, unit),
+                     "refs": refs_of(our, target, map_set=map_set, linker_set=linker_set,
+                                     providers=index["providers"], ref_count=index["ref_count"],
+                                     target_rel=target_rel)}
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------
+# the base snapshot of a *revision* (`--base <rev>`), reconstructed from the git objects
+# ---------------------------------------------------------------------------------------------------------
+
+BASE_WORKTREE_PREFIX = "undefrefs-base-"
+
+
+def _unit_stem(unit: str) -> str:
+    """`Pl/fn_8025F088.cpp` -> `Pl/fn_8025F088`; the unit vocabulary is extensionless."""
+    unit = unit.replace("\\", "/").strip("/")
+    for ext in SOURCE_EXTS:
+        if unit.endswith(ext):
+            return unit[: -len(ext)]
+    return unit
+
+
+def _base_source_rel(wt: str, unit: str) -> str | None:
+    """`src/<unit>.<ext>` as the base worktree spells it, or None when the base never had the unit."""
+    stem = _unit_stem(unit)
+    for ext in SOURCE_EXTS:
+        rel = "src/%s%s" % (stem, ext)
+        if os.path.exists(os.path.join(wt, rel)):
+            return rel
+    return None
+
+
+def _add_base_worktree(main: str, rev: str, path: str) -> None:
+    """A detached worktree of `rev` at `path` (which must not exist yet)."""
+    p = subprocess.run(["git", "worktree", "add", "--detach", path, rev], cwd=main,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if p.returncode != 0:
+        raise RuntimeError("git worktree add %s failed: %s" % (rev, (p.stderr or p.stdout).strip()))
+
+
+def _remove_base_worktree(main: str, path: str) -> None:
+    """Remove the temporary worktree, dirty or not (it only ever holds compiled scratch)."""
+    if os.path.exists(path):
+        subprocess.run(["git", "worktree", "remove", "--force", path], cwd=main,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    subprocess.run(["git", "worktree", "prune"], cwd=main,
+                   capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def _compile_base_unit(unit: str, main: str, wt: str) -> dict:
+    """Compile `unit` from the base worktree with the command `recompile.py` borrows from MAIN."""
+    from units import recompile  # noqa: PLC0415 - keep the import off the hot `--census` path
+    rel = _base_source_rel(wt, unit) or ("src/%s.cpp" % _unit_stem(unit))
+    return recompile.compile_unit(rel[len("src/"):], main, wt)
+
+
+def snapshot_base_at(main: str, rev: str, units: list[str], *, add_worktree=None, remove_worktree=None,
+                     compiler=None) -> dict:
+    """`snapshot_base` for a **revision**: compile its units in a temporary worktree and read *those*.
+
+    `--base <rev>` used to answer `UNJUDGED`, so a lane proving a refusal pre-existing had to revert the
+    changed files and rebuild the objects by hand - four minutes for two objects. This reconstructs the
+    same snapshot from the git objects: a detached worktree of `rev`, the named units compiled against
+    the base headers, then the same `unresolved_names` comparison `record-base`/`snapshot_base` make. A
+    unit the base never had is recorded with no refs (every reference is the batch's own). The worktree
+    is removed afterwards, success or failure.
+
+    `add_worktree`/`remove_worktree`/`compiler` are injection points for the selftest, which has no git
+    and no compiler; production calls pass the three defaults.
+    """
+    units = [_unit_stem(u) for u in units if u.strip("/")]
+    if not units:
+        return {}
+    add = add_worktree or _add_base_worktree
+    remove = remove_worktree or _remove_base_worktree
+    compile_unit = compiler or _compile_base_unit
+    parent = tempfile.mkdtemp(prefix=BASE_WORKTREE_PREFIX)
+    wt = os.path.join(parent, "tree")
+    try:
+        add(main, rev, wt)
+        snapshot: dict = {}
+        map_set = map_rows(wt)
+        linker_set = linker_symbols(wt)
+        prepared = []
+        for unit in units:
+            rel = _base_source_rel(wt, unit)
+            if rel is None:
+                snapshot[unit] = {"source": None, "refs": []}      # the base never had this unit
+                continue
+            result = compile_unit(unit, main, wt) or {}
+            obj = result.get("object")
+            our = load_object(obj) if obj and os.path.exists(obj) else None
+            if our is None:
+                snapshot[unit] = {"source": None, "refs": None}    # the base could not be read: `missing`
+                continue
+            target_rel = os.path.normpath(os.path.join(OBJ_REL, unit + ".o"))
+            target_path = os.path.join(main, target_rel)
+            target = load_object(target_path) if os.path.exists(target_path) else None
+            prepared.append((unit, our, target, target_rel, rel))
+        known = map_set | linker_set
+        any_candidates = any(external_candidates(our, known) for _u, our, _t, _r, _s in prepared)
+        index = link_symbol_index(main) if any_candidates else {"providers": {}, "ref_count": {}}
+        for unit, our, target, target_rel, rel in prepared:
+            path = os.path.join(wt, rel)
+            sha = hashlib.sha1(open(path, "rb").read()).hexdigest() if os.path.exists(path) else None
+            snapshot[unit] = {"source": sha,
+                              "refs": refs_of(our, target, map_set=map_set, linker_set=linker_set,
+                                              providers=index["providers"],
+                                              ref_count=index["ref_count"], target_rel=target_rel)}
+        return snapshot
+    finally:
+        try:
+            remove(main, wt)
+        finally:
+            shutil.rmtree(parent, ignore_errors=True)
 
 
 def census(main: str) -> list[tuple[str, str, str | None, str | None]]:
@@ -505,6 +629,9 @@ def check_units(main: str, units: list[str], base_snapshot: dict | None = None,
     judged = []
     for unit, our, target, target_rel in prepared:
         entry = base_snapshot.get(unit)
+        if entry is not None and entry.get("refs") is None:
+            result["missing"].append(unit)             # an explicit cannot-judge marker (`--base` failure)
+            continue
         if entry is None:
             if base and base_source_exists(main, base, unit):
                 result["missing"].append(unit)
@@ -552,7 +679,10 @@ def main() -> int:
                     help="the tree holding build/ and config/ (default: this tool's tree)")
     ap.add_argument("--base-snapshot", metavar="PATH",
                     help="the base snapshot (a `.pi/land-base.json` or a bare `{unit: {refs}}`)")
-    ap.add_argument("--base", default=None, help="the batch base commit (for the missing-snapshot ask)")
+    ap.add_argument("--base", default=None,
+                    help="the batch base commit: with no --base-snapshot, its own unresolved references "
+                         "are reconstructed from the git objects (a temporary worktree, the named units "
+                         "compiled there), so a pre-existing refusal is answerable from one command")
     ap.add_argument("--snapshot-base", metavar="PATH",
                     help="write THIS tree's unresolved-reference snapshot to PATH and exit")
     ap.add_argument("--census", action="store_true",
@@ -583,8 +713,19 @@ def main() -> int:
             sys.stdout.write(text)
         return 0
     snapshot = _load_snapshot(args.base_snapshot) if args.base_snapshot else {}
-    result = check_units(args.main, [u.strip("/") for u in args.units],
-                         base_snapshot=snapshot, base=args.base)
+    units = [u.strip("/") for u in args.units]
+    if args.base and not args.base_snapshot and units:
+        # `--base <rev>` is a one-command answer: reconstruct the base snapshot from the git objects so
+        # the add-only row can report pre-existing debt instead of asking for a `record-base` first.
+        fresh = [u for u in units if u not in snapshot]
+        if fresh:
+            try:
+                snapshot.update(snapshot_base_at(args.main, args.base, fresh))
+            except (RuntimeError, SystemExit) as exc:
+                # a bad rev: mark the units unjudged rather than letting an absent snapshot refuse them
+                print("undefrefs: cannot read the base snapshot: %s" % exc, file=sys.stderr)
+                snapshot.update({u: {"source": None, "refs": None} for u in fresh})
+    result = check_units(args.main, units, base_snapshot=snapshot, base=args.base)
     if args.json:
         print(json.dumps(result, indent=2))
     else:
