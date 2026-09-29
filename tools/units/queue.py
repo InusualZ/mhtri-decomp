@@ -1094,7 +1094,7 @@ def selftest() -> int:
         check("... every claim carries its own spawn",
               [c["unit"] for c in out["claims"]], [units[0], units[2]])
         check("... and every spawn is a subagent call",
-              all(c["spawn"]["call"].startswith("subagent(agent=\"decompiler\"")
+              all(c["spawn"]["call"].startswith("subagent(agent=\"surveyor\"")
                   for c in out["claims"]), True)
         check("... claimed through the same path as a single pick",
               units[2] in claims.load_registry(tmp), True)
@@ -1417,7 +1417,7 @@ def main() -> int:
     n.add_argument("--worker", default=None)
     n.add_argument("--kind", default="unit",
                    help="the lane kind; the agent profile comes from it via `slots.profile_for_kind` - "
-                        "`unit`->decompiler (a proposal lane registers and reconstructs a unit), "
+                        "`unit`->surveyor (a fresh claim is surveyed first, then reconstructed - the four-leg loop unit), "
                         "`fix`->fixer, `merge`->merger, `tooling`/`docs`->worker, `review`->codereviewer, "
                         "`scout`/`plan` read-only. An unknown kind is refused with the list (default: unit)")
     n.add_argument("--profile", default=None, choices=_profiles(),
