@@ -30,6 +30,7 @@
 
 /* the band's rate/timer float pool (values read off the DOL; each name is the use the range makes of
    it).  `networkRateFloor` is the one word of the set that lives in `.sdata`, not `.sdata2`. */
+extern f32 networkMcsRetryInterval;       /* 0x8079C6C8 = 0.5f - seconds the Mcs peer waits between two connection attempts */
 extern f32 networkMillisecondsPerSecond;   /* 0x8079C6EC = 1000.0f */
 extern f32 networkRateScale;               /* 0x8079C6F0 = 2.0f */
 extern f32 networkRateMax;                 /* 0x8079C6F8 = 1.0f */
@@ -44,5 +45,16 @@ extern f32 networkRequestZero;             /* 0x8079C740 = 0.0f */
 extern f32 networkRequestTimerIdle;        /* 0x8079C748 = 0.0f */
 extern f32 networkRequestTimerReset;       /* 0x8079C750 = 0.0f */
 extern f32 networkSessionPatTimeOrigin;    /* 0x8079C754 = -3600.0f */
+
+/* the band's initialised `.sdata` words (GUESS on every name: each is read off the setter that writes it) */
+extern u32 networkSessionNotifyValue;         /* 0x80793910 = 1 */
+extern u32 networkSessionMaxHosts;            /* 0x80793914 = 0x10 */
+extern u32 networkSessionMaxSubhosts;         /* 0x80793918 = 4 */
+extern f32 networkSessionHostTimeout;         /* 0x8079391C = 20.0f */
+extern f32 networkSessionSubhostTimeout;      /* 0x80793920 = 20.0f */
+extern f32 networkSessionRateStep;            /* 0x80793924 = 0.25f - 1 / the divisor `setRate` was given */
+extern s32 networkSessionRateWindow;          /* 0x80793928 = 0x200 - the quotient `setRate` stores */
+extern f32 networkSessionUnit;                /* 0x8079C6D0 = 1.0f */
+extern f32 networkNonceScale;                 /* 0x8079C6E0 = 1000.0f */
 
 #endif /* NETWORK_SHARED_DATA_H */

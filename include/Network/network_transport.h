@@ -2,11 +2,12 @@
  * include/Network/network_transport.h - the types and declarations `Network/network_transport.cpp`
  * owns and the rest of the Network band reaches through.
  *
- * The types are reconstructed from the range's own instructions: the error-record base every peer
- * constructor in the band fills, the 0x2000-byte payload buffer with its head peer/socket pair, the
- * peer that owns a byte stream, and the peer that owns a four-entry record table.  Every field
- * carries the offset the target addresses and a name from what the range stores in it; a field the
- * range never touches is `unused_`/`pad_` with its offset kept (rules 3-5).
+ * The types are reconstructed from the range's own instructions: the abstract peer whose error record
+ * every peer constructor fills, the payload buffer, Udp and Mcs peers derived from it, the two resolver
+ * classes and the session base - the classes whose tables this unit's object emits - plus the socket
+ * users and the byte stream.  Every field carries the offset the target addresses and a name from what
+ * the range stores in it; a field the range never touches is `unused_`/`pad_` with its offset kept
+ * (rules 3-5).
  *
  * The declarations below are the symbols this unit owns that other units call.  They used to be
  * declared in `include/unsplit/Network.h` and `include/Network/fn_803D3CE8.h`; after this unit's
@@ -18,13 +19,13 @@
 #define NETWORK_NETWORK_TRANSPORT_H
 
 #include "types.h"
+#include "unsplit/SO.h"
 
 /* The neighbouring units' classes, named but not defined here: this header is included BY
    `Network/fn_803D3CE8.h`, so it cannot include it back.  A forward declaration of the class name is
    all a pointer parameter needs. */
 struct NetworkSessionStable;
 struct NetworkStreamWriter;
-struct NetworkPeerReceive;
 struct NetworkPeerInfo;
 /* the Pat band's opaque record types, which only ever cross as pointers (`receivePatInterfaces` /
    `flushPatRequests` below are the pumps `NetworkSessionManagerPat` drives) */
@@ -33,68 +34,102 @@ class PatRequestQueue;
 
 /* ---------------- the peer's error record --------------------------------------------------- */
 
-/* The 0x10-byte base the transport peers derive from: the vptr their constructors store, then the
-   three-word record a failing operation fills in **once** (the range's `networkPeerError_set`
-   refuses to overwrite a filled record). */
-typedef struct NetworkPeerError {
-    void* unused_00;        /* +0x00 - the vptr every constructor in the band stores */
-    const void* source_04;  /* +0x04 - the table or string the failing operation was given */
+/* The `source` word of an error record when the failing operation stores a constant: which transport
+   operation failed (the record's field is a pointer because other peers store the table they were
+   given, so the constants cross as `(const void*)`).  The values are the constants the range stores as immediates (the target relocates them against `@eti_` extabindex
+   rows only because dtk derives a group-relative name for the `lis`/`addi` pair - they are not
+   addresses).  GUESS on every name: each one is read off the operation that stores it. */
+enum NetworkPeerErrorSource {
+    NETWORK_ERROR_NONE = 0,
+    NETWORK_ERROR_UDP_UNATTACHED = 0x80030002,   /* the udp peer has no udp object to send/receive on */
+    NETWORK_ERROR_PUT_TOO_BIG = 0x80030004,      /* `NetworkSessionStable::put: data too big` */
+    NETWORK_ERROR_MCS_SOCKET = 0x80030011,       /* the Mcs peer's socket open/close/idle failed */
+    NETWORK_ERROR_MCS_STATE = 0x80030012,        /* the Mcs peer's state machine met an armed flag */
+    NETWORK_ERROR_PEER_SEND = 0x80030021,        /* a peer's send overflowed or the socket refused it */
+    NETWORK_ERROR_PEER_RECEIVE = 0x80030022,     /* a peer's receive failed or read a zero length */
+    NETWORK_ERROR_PUT_OVERFLOW = 0x80030032      /* `NetworkSessionStable::put: data overflow` */
+};
+
+/* The abstract peer the transport peers derive from (GUESS on the name: the class is the error-record
+   holder every peer constructor chains, and its table carries the eight slots the three peers below
+   fill).  Its vtable (0x805F94E0, 0x30 B: the deleting `destroy` and eight pure slots plus `slot_2C`, size padding: the +0x2C word is the size's alignment tail) is emitted here,
+   from the `destroy` this unit defines.  The pure slots carry the *union* of the derived peers'
+   signatures - a derived slot with a different parameter list would be a new virtual and would move
+   every later slot - so the peers that ignore an argument simply leave it unused (GUESS on every
+   parameter list: the buffer/Mcs `send` and the buffer/Udp `put` take fewer arguments than the widest
+   spelling).  The record is the three words a failing operation fills in **once**
+   (`networkPeerError_set` refuses to overwrite a filled record). */
+class NetworkPeerBase {
+public:
+    NetworkPeerBase();
+    /* +0x08 the deleting destructor as a plain virtual: the peers chain it with flags 0 by hand (the
+       hand-written `destroy` shape the band's other peers use), so no destructor vptr store is emitted */
+    virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x0C (GUESS: the Udp peer binds its slot here, the Mcs peer its record, the buffer ignores it) */
+    virtual void setContext(const void* context) = 0; /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
+    /* +0x10 (GUESS) */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind) = 0;
+    /* +0x14 (GUESS) */ virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind) = 0;
+    /* +0x18 (GUESS: the Tcp pump hands it a packet, its length and three zeros) */ virtual s32 put(const u8* packet, s32 length, u32 a, u32 b, u32 c) = 0;
+    /* +0x1C (GUESS: the Mcs peer's connect machine; the others clear their queue and report usable) */ virtual s32 move() = 0;
+    /* +0x20 (GUESS: only the Mcs peer does anything) */ virtual void armDrop() = 0;
+    /* +0x24 (GUESS: the peers clear through the +0x28 slot and report usable) */ virtual s32 init() = 0;
+    /* +0x28 (GUESS: empties the peer's payload/queue; the Mcs peer's close) */ virtual void reset() = 0;
+    /* +0x2C - not a code slot (retail relocates 9 per table): a pure slot only so the table is 0x30 B, the size's alignment tail */ virtual void slot_2C() = 0;
+
+    const void* source_04;  /* +0x04 - what failed: a `NetworkPeerErrorSource` value or the table the failing operation was given */
     u32 argument_08;        /* +0x08 - its size or argument */
     u32 code_0C;            /* +0x0C - the error code */
-} NetworkPeerError;   /* size: 0x10 */
+};   /* size: 0x10 */
 
 /* The same three words as a caller-owned record: the range copies them out intact. */
 typedef struct NetworkPeerErrorRecord {
     const void* source;  /* +0x00 */
-    u32 argument;        /* +0x04 */
-    u32 code;            /* +0x08 */
+    u32 argument;  /* +0x04 */
+    u32 code;      /* +0x08 */
 } NetworkPeerErrorRecord;   /* size: 0x0C */
 
 /* ---------------- the peer payload buffer --------------------------------------------------- */
 
-/* The peer/socket pair `setPeerAndSocket` stores in the payload buffer's first two words, then the
-   0x1FF8 bytes of payload behind it. */
-typedef struct NetworkPeerPayload {
-    u32 peer_00;           /* +0x00 */
-    u32 socket_04;         /* +0x04 */
-    u8  data_08[0x1FF8];   /* +0x08..+0x1FFF */
-} NetworkPeerPayload;   /* size: 0x2000 */
-
-/* The 0x2014-byte peer buffer: the 0x2000-byte payload at +0x10 (whose head is the peer/socket
-   pair) and the used-byte count at +0x2010.  It is a class with virtuals - the range's `init` slots
-   dispatch the clear through +0x28, which is MWCC's own virtual-call shape - and no virtual is
-   defined here, so MWCC emits no table for it (the band's tables belong to the peer classes). */
-class NetworkPeerBuffer {
+/* The 0x2014-byte peer buffer (table 0x805F9510): the 0x2000-byte payload at +0x10 and the used-byte
+   count at +0x2010.  Its `init` slot dispatches the clear through +0x28, which is MWCC's own virtual-call
+   shape. */
+class NetworkPeerBuffer : public NetworkPeerBase {
 public:
-    /* +0x08 */ virtual void slot_08();
-    /* +0x0C */ virtual void slot_0C();
-    /* +0x10 */ virtual void slot_10();
-    /* +0x14 */ virtual void slot_14();
-    /* +0x18 */ virtual void slot_18();
-    /* +0x1C */ virtual void slot_1C();
-    /* +0x20 */ virtual void slot_20();
-    /* +0x24 (GUESS: name from the call the stream helpers make) */ virtual s32 put(const void* data, u32 size); /* untyped: byte range (the record's bytes) */
-    /* +0x28 */ virtual void clearPayload();
+    NetworkPeerBuffer();
+    /* +0x08 */ virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x0C */ virtual void setContext(const void* context); /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
+    /* +0x10 */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind);
+    /* +0x14 */ virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind);
+    /* +0x18 */ virtual s32 put(const u8* packet, s32 length, u32 a, u32 b, u32 c);
+    /* +0x1C (docs/memory-dump.md names this one `clearBuffer`) */ virtual s32 move();
+    /* +0x20 */ virtual void armDrop();
+    /* +0x24 */ virtual s32 init();
+    /* +0x28 */ virtual void reset();
 
-    NetworkPeerErrorRecord error_04; /* +0x0004 - the record a failing operation fills */
-    NetworkPeerPayload payload_10;   /* +0x0010 - the payload, head word pair first */
+    u8 payload_10[0x2000];           /* +0x0010 - the bytes queued for the socket */
     u32 used_2010;                   /* +0x2010 - bytes in use */
 };   /* size: 0x2014 */
 
 /* ---------------- the peer's socket handle ---------------------------------------------------- */
 
-/* The object the peer keeps at +0x04 and dispatches through: the +0x1C slot is a tail-jump
+/* The six-byte peer address the transport keeps and logs: four address bytes and a port. */
+struct NetworkPeerAddress {
+    u8  ip_00[4];   /* +0x00 - the IPv4 address */
+    u16 port_04;    /* +0x04 */
+};   /* size: 0x06 */
+
+/* The object the transport users keep at +0x04 and dispatch through: the +0x1C slot is a tail-jump
    (`bctr`), which is the shape MWCC gives a virtual whose result is returned directly, +0x28 is the
-   receive-buffer clear and +0x34 the shutdown the release path drives.  Only the called slots are
-   named; the gaps are the dispatch holes between them (GUESS: the names are offset-derived - the
-   range calls them and nothing else does). */
+   receive-buffer clear, +0x34 the shutdown the release path drives and +0x38/+0x3C the datagram send and
+   receive the Tcp and Udp users call.  Only the called slots are named; the gaps are the dispatch holes
+   between them (GUESS: the names are offset-derived - the range calls them and nothing else does). */
 class NetworkSocketHandle {
 public:
     /* +0x08 */ virtual void slot_08();
     /* +0x0C (GUESS: name from the open path's mode store) */ virtual s32 open(u32 mode);
     /* +0x10 */ virtual void slot_10();
     /* +0x14 */ virtual void slot_14();
-    /* +0x18 (GUESS: name from the open path's address store) */ virtual s32 setPeer(const u8* address);
+    /* +0x18 (GUESS: name from the open path's address store) */ virtual s32 setPeer(const NetworkPeerAddress* address);
     /* +0x1C (GUESS) */ virtual s32 closeSocket();
     /* +0x20 */ virtual void slot_20();
     /* +0x24 */ virtual void slot_24();
@@ -102,68 +137,161 @@ public:
     /* +0x2C */ virtual void slot_2C();
     /* +0x30 */ virtual void slot_30();
     /* +0x34 (GUESS: name from the release path's shutdown) */ virtual void shutdownSocket();
+    /* +0x38 (GUESS: the send helpers pass bytes, a length and the peer address) */ virtual s32 send(const u8* data, s32 size, const NetworkPeerAddress* address);
+    /* +0x3C (GUESS: the receive twin - a buffer, its capacity and the sender's address out) */ virtual s32 receive(u8* out, s32 size, NetworkPeerAddress* address);
 };   /* size: 0x04 - only ever reached through a pointer in this unit */
 
-/* ---------------- the peer that owns a socket and a byte stream ------------------------------- */
+/* What the Tcp and Udp users share: a vptr word and the socket they were opened on at +0x04.  Size
+   evidence: `networkPeer_openSocket` copies the connection's address to +0x08 (`memcpy(&address_08, ..)`),
+   so the base ends there; nothing reads the +0x00 word, which is why it stays `unused_`. */
+struct NetworkSocketUser {
+    void* unused_00;                 /* +0x00 */
+    NetworkSocketHandle* handle_04;  /* +0x04 - the socket the user owns */
+};   /* size: 0x08 */
 
-/* The peer the socket helpers work on, modelled as the class it is: the band's own `NetworkPeerSocket`
-   table (0x805F95E0) carries its nine slots and the range dispatches through them - `networkPeer_armDrop`
-   is slot 0x20 of that table, and the loop `networkPeer_resetSlots` drives is slot 0x1C.  The slots the
-   range never reaches are declared so the ones it does keep their offsets; none is defined here, so
-   MWCC emits no table for the class (rule 10).  The fields are the offsets the range addresses: the
-   socket at +0x04, the peer id, the two one-byte state flags, the peer's own 0x2400-byte work area and
-   the connection it registers with at +0x2428. */
-class NetworkPeerSocket {
+/* ---------------- the Tcp connection and the Udp socket ---------------------------------------- */
+
+/* The peer class the connection pumps: only its +0x18 slot is called from here. */
+class NetworkPeerMcs;
+
+/* `NetworkSingleTcp`: its socket at +0x04, the address it was opened on at +0x08, the four peers
+   registered on it at +0x10, its own 0x2400-byte receive area at +0x20 and the byte count behind it. */
+struct NetworkSingleTcp : public NetworkSocketUser {
+    NetworkPeerAddress address_08;   /* +0x08..+0x0D - the address it was opened on */
+    u8  pad_0E[0x02];                /* +0x0E..+0x0F */
+    NetworkPeerMcs* peers_10[4];  /* +0x10..+0x1F - the peers registered on it */
+    u8  recv_20[0x2400];             /* +0x20..+0x241F */
+    u32 recvUsed_2420;               /* +0x2420 - bytes received */
+};   /* size: 0x2424 */
+
+/* `NetworkMultipleUdp`: one socket shared by up to four peers, each with its own address at +0x0E and
+   its own 0x1770-byte reassembly buffer behind the one datagram buffer at +0x26.  The datagram is 0x5DC
+   bytes because that is the capacity `flushPatRequests` reads with and `receivePackets` frames into; the
+   map's 0x5E0 for the `.bss` scratch packet is dtk's gap to the next symbol (a 32-byte boundary), i.e. the
+   same 0x5DC plus alignment - the source declares that scratch as [0x5E0] because [0x5DC] measures the
+   `.bss` row at 70 %.  Size: (approximation - the last word the range touches, `used_63C4[3]`, ends at
+   +0x63D4). */
+struct NetworkMultipleUdp : public NetworkSocketUser {
+    u8  pad_08[0x06];                /* +0x08..+0x0D */
+    NetworkPeerAddress addresses_0E[4]; /* +0x0E..+0x25 - the four peers' addresses */
+    u8  datagram_26[0x5DC];          /* +0x26..+0x601 - the datagram just received */
+    u8  received_602[4][0x1770];     /* +0x602..+0x63C1 - each peer's queued bytes */
+    u8  pad_63C2[0x02];              /* +0x63C2..+0x63C3 */
+    s32 used_63C4[4];                /* +0x63C4..+0x63D3 - bytes queued per peer */
+};   /* size: 0x63D4 (approximation - see above) */
+
+/* ---------------- the peers ------------------------------------------------------------------- */
+
+/* The Udp peer (table 0x805F9540): the abstract peer, the peer index it owns on the socket at +0x10 and
+   the socket at +0x14.  Its constructor lives outside this unit (the table is stored by an unowned
+   function); the `destroy` defined here is the key function that makes MWCC emit the table. */
+class NetworkPeerUdp : public NetworkPeerBase {
 public:
-    /* +0x08 */ virtual void destroy(u32 flags);
-    /* +0x0C (GUESS) */ virtual void setInfo(const NetworkPeerInfo* info);
-    /* +0x10 */ virtual void slot_10();
-    /* +0x14 */ virtual void slot_14();
-    /* +0x18 */ virtual void slot_18();
-    /* +0x1C (GUESS) */ virtual void resetSlot(s8 index);
+    /* +0x08 */ virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x0C (docs/memory-dump.md names this one `setPeerAndSocket`) */ virtual void setContext(const void* context); /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
+    /* +0x10 (`sendPackets`) */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind);
+    /* +0x14 (`receivePackets`) */ virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind);
+    /* +0x18 */ virtual s32 put(const u8* packet, s32 length, u32 a, u32 b, u32 c);
+    /* +0x1C */ virtual s32 move();
     /* +0x20 */ virtual void armDrop();
-    /* +0x24 (GUESS) */ virtual s32 init();
-    /* +0x28 (GUESS) */ virtual void close();
+    /* +0x24 */ virtual s32 init();
+    /* +0x28 (GUESS: the reset helper's tail twin) */ virtual void reset();
 
-    NetworkSocketHandle* handle_04;  /* +0x04 - the socket object */
-    u32 unused_08;                   /* +0x08 */
-    u32 peerId_0C;                   /* +0x0C - the identifier the socket was registered with */
+    s32 peerIndex_10;                   /* +0x10 - the slot the peer owns on the Udp socket */
+    NetworkMultipleUdp* udp_14;         /* +0x14 - the socket */
+};   /* size: 0x18 (approximation - only the two fields the range touches are evidenced) */
+
+/* The pair `setPeerAndSocket` copies in. */
+struct NetworkPeerUdpBinding {
+    s32 peerIndex;                      /* +0x00 */
+    NetworkMultipleUdp* udp;            /* +0x04 */
+};   /* size: 0x08 */
+
+/* The Mcs peer (table 0x805F95E0, the `NetworkPeerMcs` the log strings name): the abstract peer, the
+   one-byte flags, the state the connect machine walks, its own 0x2400-byte work area and the connection
+   it registers with. */
+class NetworkPeerMcs : public NetworkPeerBase {
+public:
+    NetworkPeerMcs(u8 armed);
+    /* +0x08 */ virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x0C (GUESS: the record it publishes itself from) */ virtual void setContext(const void* context); /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
+    /* +0x10 */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind);
+    /* +0x14 */ virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind);
+    /* +0x18 */ virtual s32 put(const u8* packet, s32 length, u32 a, u32 b, u32 c);
+    /* +0x1C (GUESS: the connect machine) */ virtual s32 move();
+    /* +0x20 */ virtual void armDrop();
+    /* +0x24 */ virtual s32 init();
+    /* +0x28 (GUESS: closes the peer's connection) */ virtual void reset();
+
     u8  armed_10;                    /* +0x10 - set while the peer has something to drop */
-    u8  pad_11[0x07];                /* +0x11..+0x17 */
+    u8  pad_11[0x03];                /* +0x11..+0x13 */
+    s32 state_14;                    /* +0x14 - the connect machine's state */
     u8  dropped_18;                  /* +0x18 - raised when the drop lands */
     u8  work_19[0x2400];             /* +0x19..+0x2418 - the peer's own work area */
     u32 workUsed_241C;               /* +0x241C - bytes in use */
-    u8  peerAddress_2420[0x06];      /* +0x2420..+0x2425 - the address the peer publishes */
+    NetworkPeerAddress peerAddress_2420; /* +0x2420..+0x2425 - the address the peer publishes */
     u8  pad_2426[0x02];              /* +0x2426..+0x2427 */
-    NetworkPeerReceive* connection_2428; /* +0x2428 - the connection the peer registers with */
+    NetworkSingleTcp* connection_2428; /* +0x2428 - the connection the peer registers with */
     char label_242C[0x40];           /* +0x242C..+0x246B - the label the peer publishes */
     s32  labelSize_246C;             /* +0x246C - bytes of it in use */
 };   /* size: 0x2470 */
-
-/* The connection a peer registers with: its socket at +0x04, the address it was opened on at +0x08,
-   the four peer ids registered on it at +0x10, its own 0x2400-byte receive area at +0x20 and the byte
-   count behind it.  The release and open paths both work on it, which is what fixes the fields the
-   clear helper only implied. */
-typedef struct NetworkPeerReceive {
-    void* unused_00;                 /* +0x00 */
-    NetworkSocketHandle* handle_04;  /* +0x04 - the socket the connection owns */
-    u8  address_08[0x06];            /* +0x08..+0x0D - the six-byte address it was opened on */
-    u8  pad_0E[0x02];                /* +0x0E..+0x0F */
-    u32 peers_10[4];                 /* +0x10..+0x1F - the peer ids registered on it */
-    u8  recv_20[0x2400];             /* +0x20..+0x241F */
-    u32 recvUsed_2420;               /* +0x2420 - bytes received */
-} NetworkPeerReceive;   /* size: 0x2424 */
 
 /* The record a peer publishes itself from: the six-byte address at +0x00, its connection at +0x08 and
    the label it answers to with its used length (GUESS on the name - the setInfo slot and the stream
    writer are the only readers). */
 typedef struct NetworkPeerInfo {
-    u8  address_00[0x06];               /* +0x00..+0x05 */
+    NetworkPeerAddress address_00;      /* +0x00..+0x05 */
     u8  pad_06[0x02];                   /* +0x06..+0x07 */
-    NetworkPeerReceive* connection_08;  /* +0x08 - the connection the peer registers with */
+    NetworkSingleTcp* connection_08;    /* +0x08 - the connection the peer registers with */
     char label_0C[0x40];                /* +0x0C..+0x4B - the label it publishes */
     s32  labelSize_4C;                  /* +0x4C - bytes of it in use */
 } NetworkPeerInfo;   /* size: 0x50 */
+
+/* The session base class (table 0x805F99A0, 0xA0 B: the deleting destructor, thirty-three pure slots
+   and the four setters this unit defines - GUESS on the class name, evidenced only by `networkPeer_resetSlots`
+   driving its +0x1C slot once per slot index and by the setters' slot positions).  The destructor is the
+   key function that makes MWCC emit the table. */
+class NetworkSessionBase {
+public:
+    virtual ~NetworkSessionBase();
+    /* +0x0C */ virtual void slot_0C() = 0;
+    /* +0x10 */ virtual void slot_10() = 0;
+    /* +0x14 */ virtual void slot_14() = 0;
+    /* +0x18 */ virtual void slot_18() = 0;
+    /* +0x1C (GUESS) */ virtual void resetSlot(s8 index) = 0;
+    /* +0x20 */ virtual void slot_20() = 0;
+    /* +0x24 */ virtual void slot_24() = 0;
+    /* +0x28 */ virtual void slot_28() = 0;
+    /* +0x2C */ virtual void slot_2C() = 0;
+    /* +0x30 */ virtual void slot_30() = 0;
+    /* +0x34 */ virtual void slot_34() = 0;
+    /* +0x38 */ virtual void slot_38() = 0;
+    /* +0x3C */ virtual void slot_3C() = 0;
+    /* +0x40 */ virtual void slot_40() = 0;
+    /* +0x44 */ virtual void slot_44() = 0;
+    /* +0x48 */ virtual void slot_48() = 0;
+    /* +0x4C */ virtual void slot_4C() = 0;
+    /* +0x50 (GUESS: the name follows the words it writes) */ virtual void setLimits(u32 maxHosts, u32 maxSubhosts);
+    /* +0x54 (GUESS) */ virtual void setHostTimeout(f32 seconds);
+    /* +0x58 (GUESS) */ virtual void setSubhostTimeout(f32 seconds);
+    /* +0x5C (GUESS) */ virtual void setRate(s32 count, s32 divisor);
+    /* +0x60 */ virtual void slot_60() = 0;
+    /* +0x64 */ virtual void slot_64() = 0;
+    /* +0x68 */ virtual void slot_68() = 0;
+    /* +0x6C */ virtual void slot_6C() = 0;
+    /* +0x70 */ virtual void slot_70() = 0;
+    /* +0x74 */ virtual void slot_74() = 0;
+    /* +0x78 */ virtual void slot_78() = 0;
+    /* +0x7C */ virtual void slot_7C() = 0;
+    /* +0x80 */ virtual void slot_80() = 0;
+    /* +0x84 */ virtual void slot_84() = 0;
+    /* +0x88 */ virtual void slot_88() = 0;
+    /* +0x8C */ virtual void slot_8C() = 0;
+    /* +0x90 */ virtual void slot_90() = 0;
+    /* +0x94 */ virtual void slot_94() = 0;
+    /* +0x98 */ virtual void slot_98() = 0;
+    /* +0x9C */ virtual void slot_9C() = 0;
+};   /* size: 0x04 - the state lives in unit-level globals */
 
 /* ---------------- the peer that owns a byte stream -------------------------------------------- */
 
@@ -176,9 +304,10 @@ typedef struct NetworkByteStream {
     u32 cursor_0C;         /* +0x0C - bytes written so far */
 } NetworkByteStream;   /* size: 0x10 */
 
-/* The sink the stream helpers hand a record to: only its +0x20 slot is called here, it fills the
-   buffer it is given, and it reports how many bytes it took (GUESS: offset-derived - the range never
-   names the class, and the helper stays valid through a pointer). */
+/* The sink the stream helpers hand a record to: only its +0x20 and +0x24 slots are called here, the first
+   fills the buffer it is given and the second takes a record, each reporting how many bytes it moved
+   (GUESS: offset-derived - the range never names the class, and the helper stays valid through a
+   pointer). */
 class NetworkStreamSink {
 public:
     /* +0x08 */ virtual void slot_08();
@@ -188,6 +317,7 @@ public:
     /* +0x18 */ virtual void slot_18();
     /* +0x1C */ virtual void slot_1C();
     /* +0x20 (GUESS) */ virtual s32 fill(u8* out, u32 size);
+    /* +0x24 (GUESS) */ virtual s32 put(const u8* data, u32 size);
 };   /* size: 0x04 - only ever reached through a pointer in this unit */
 
 /* ---------------- the record the byte stream copies out --------------------------------------- */
@@ -217,40 +347,58 @@ typedef struct NetworkPeerLock {
     u8    mutex_04[0x1C];    /* +0x04..+0x1F - the OS mutex's own storage */
 } NetworkPeerLock;   /* size: 0x20 (approximation - only the +0x04 offset is evidenced) */
 
-/* ---------------- the peer name and its per-peer flags ---------------------------------------- */
+/* ---------------- the name resolver ------------------------------------------------------------ */
 
-/* The record a peer publishes under: its name at +0x04 (at most 0x1FF bytes), then the same
-   four-word record table and one-byte error code the block below has, and the flag at +0x1560 that
-   makes a rename fail. */
-typedef struct NetworkPeerConfig {
-    void* unused_00;        /* +0x00 */
+/* The abstract resolver (table 0x805F9938, 0x20 B: the deleting destructor and five pure slots - the
+   sixth entry of the derived table stays pure too): the name it resolves (at most 0x1FF bytes), the
+   four-word address table and how many of them are live.  The destructor is the key function that makes
+   MWCC emit the table. */
+class NetworkResolverBase {
+public:
+    NetworkResolverBase();
+    virtual ~NetworkResolverBase();
+    /* +0x0C (GUESS) */ virtual s32 setName(const char* name) = 0;
+    /* +0x10 (GUESS) */ virtual void resetCode() = 0;
+    /* +0x14 (GUESS: the state machine `check()` in the log strings) */ virtual s32 check() = 0;
+    /* +0x18 (GUESS) */ virtual void recordGet(s32 index, u32* out) = 0;
+    /* +0x1C */ virtual void slot_1C() = 0;
+
     char  name_04[0x200];   /* +0x04..+0x203 */
-    u8    pad_204[0x10];    /* +0x204..+0x213 */
-    u32   count_214;        /* +0x214 */
-    u8    code_218;         /* +0x218 */
-    u8    pad_219[0x1347];  /* +0x219..+0x155F */
-    u32   flag_1560;        /* +0x1560 - set while the peer must not be renamed */
-} NetworkPeerConfig;   /* size: 0x1564 */
+    u32   records_204[4];   /* +0x204..+0x213 - the resolved addresses */
+    u32   count_214;        /* +0x214 - how many of them are live */
+};   /* size: 0x218 (evidence: the derived constructor stores its first own field, `code_218`, at +0x218
+        and the base constructor's last store is the word at +0x214) */
 
-/* ---------------- the peer that owns a four-entry record table -------------------------------- */
+/* `NetworkResolverWii` (table 0x805F9980): the base record plus the state of the lookup - the one-byte
+   state at +0x218 (idle until the first failure, then 0xFF; 0x0A while the lookup thread runs, 0x0F when it
+   ended, 0x14 once the addresses are copied, 0x5A on failure), the thread the lookup runs on with its
+   stack, the lookup's result and inputs and the SDK's result list. */
+class NetworkResolverWii : public NetworkResolverBase {
+public:
+    NetworkResolverWii();
+    virtual ~NetworkResolverWii();
+    /* +0x0C */ virtual s32 setName(const char* name);
+    /* +0x10 */ virtual void resetCode();
+    /* +0x14 */ virtual s32 check();
+    /* +0x18 */ virtual void recordGet(s32 index, u32* out);
 
-/* The per-peer record table: four words at +0x204, how many of them are live at +0x214 and the
-   peer's one-byte error code at +0x218. */
-typedef struct NetworkPeerRecordTable {
-    void* unused_00;       /* +0x00 */
-    u8  pad_04[0x200];     /* +0x04..+0x203 */
-    u32 records_204[4];    /* +0x204..+0x213 */
-    u32 count_214;         /* +0x214 */
-    u8  code_218;          /* +0x218 - idle until the first failure, then 0xFF */
-} NetworkPeerRecordTable;   /* size: 0x21C */
+    u8    code_218;                    /* +0x218 - the lookup's state */
+    u8    pad_219[0x07];               /* +0x219..+0x21F */
+    u8    thread_220[0x318];           /* +0x220..+0x537 - the OS thread the lookup runs on */
+    u8    stack_538[0x1000];           /* +0x538..+0x1537 - its stack */
+    s32   result_1538;                 /* +0x1538 - what the lookup returned */
+    const char* lookupName_153C;       /* +0x153C - the name the thread resolves */
+    SOAddrInfo hints_1540;             /* +0x1540..+0x155F - the lookup hints: only the family is set */
+    SOAddrInfo* addrInfo_1560;         /* +0x1560 - the SDK's result list, freed when consumed */
+};   /* size: 0x1564 */
 
 /* ---------------- this unit's own definitions -------------------------------------------------- */
 
 extern "C" {
 
 /* the error record */
-void networkPeerError_get(NetworkPeerError* self, NetworkPeerErrorRecord* out);
-void networkPeerError_clear(NetworkPeerError* self);
+void networkPeerError_get(NetworkPeerBase* self, NetworkPeerErrorRecord* out);
+void networkPeerError_clear(NetworkPeerBase* self);
 /* untyped: opaque handle passed through - the callers hand the peer they already hold */
 void networkPeerError_set(void* self, const void* source, u32 argument, s32 code);
 
@@ -263,43 +411,40 @@ void* networkSmallObject_destroy(void* self, s32 flags);
 void* networkSmallObject_init(void* self);
 
 /* the payload buffer */
-s32 clearBuffer(NetworkPeerBuffer* self);
-void clearBuffer2(NetworkPeerBuffer* self);
-s32 networkPeerBuffer_init(NetworkPeerBuffer* self);
-NetworkPeerBuffer* networkPeerBuffer_destroy(NetworkPeerBuffer* self, s32 flags);
-void setPeerAndSocket(NetworkPeerBuffer* self, const u32* peerAndSocket);
 
-/* the socket peer */
-s32 getAvailableToRead(NetworkPeerSocket* self);
-s32 networkPeer_getAvailableToRead(NetworkPeerSocket* self);
-NetworkSocketHandle* networkPeer_getSocket(NetworkPeerSocket* self);
-u32 networkPeer_getPeerId(NetworkPeerSocket* self);
-s32 networkPeer_closeSocket(NetworkPeerSocket* self);
-s32 networkPeer_clearReceiveSocket(NetworkPeerSocket* self);
-void networkPeer_armDrop(NetworkPeerSocket* self);
-void networkPeer_clearReceiveBuffer(NetworkPeerReceive* self);
+/* the Udp peer */
 
-/* the peer class's own entry points: the open path, the record it publishes, its table's constant
-   slots and the two loops that drive its per-slot hooks */
-s32 networkPeer_openSocket(NetworkPeerReceive* self, const u8* address);
-void networkPeer_setInfo(NetworkPeerSocket* self, const NetworkPeerInfo* info);
-s32 networkPeer_init(NetworkPeerSocket* self);
-void networkPeer_close(NetworkPeerSocket* self);
-void networkPeer_resetSlots(NetworkPeerSocket* self);
-void networkPeerBuffer_slot0C(NetworkPeerBuffer* self);
-s32 networkPeerBuffer_slot18(NetworkPeerBuffer* self);
-void networkPeerBuffer_slot20(NetworkPeerBuffer* self);
-s32 networkPeerBuffer_slot48(NetworkPeerBuffer* self);
-void networkPeerBuffer_slot50(NetworkPeerBuffer* self);
-s32 networkPeerBuffer_reset(NetworkPeerBuffer* self);
+/* the Mcs peer */
+void networkPeer_resetSlots(NetworkSessionBase* self);
 
-/* The connection registry inside the range that logs through its own `NetworkSingleTcp::remove`
-   message; the range reaches it through the peer's +0x2428 connection. */
-void NetworkSingleTcp_remove(NetworkPeerReceive* connection, NetworkPeerSocket* peer);
+/* the socket users (Tcp connection and Udp socket) */
+s32 getAvailableToRead(NetworkSocketUser* self);
+s32 networkPeer_getAvailableToRead(NetworkSocketUser* self);
+s32 networkPeer_closeSocket(NetworkSocketUser* self);
+s32 networkPeer_clearReceiveSocket(NetworkSocketUser* self);
+void networkPeer_clearReceiveBuffer(NetworkSingleTcp* self);
+s32 networkPeer_openSocket(NetworkSingleTcp* self, const NetworkPeerAddress* address);
+void networkPeer_release(NetworkSingleTcp* self);
+void networkPeer_releaseSocket(NetworkSingleTcp* self);
+void networkPeer_disconnect(NetworkSingleTcp* self);
+void networkPeer_disconnectSocket(NetworkSingleTcp* self);
+
+/* the Tcp connection */
+s32 NetworkSingleTcp_add(NetworkSingleTcp* self, NetworkPeerMcs* peer);
+void NetworkSingleTcp_remove(NetworkSingleTcp* self, NetworkPeerMcs* peer);
+s32 NetworkSingleTcp_send(NetworkSingleTcp* self, const u8* data, s32 size);
+s32 NetworkSingleTcp_getError(NetworkSingleTcp* self);
+
+/* the Udp socket */
+void NetworkMultipleUdp_remove(NetworkMultipleUdp* self, const NetworkPeerAddress* address);
+void NetworkMultipleUdp_reset(NetworkMultipleUdp* self, s32 peerIndex);
+s32 NetworkMultipleUdp_send(NetworkMultipleUdp* self, s32 peerIndex, const u8* data, s32 size);
+s32 NetworkMultipleUdp_receive(NetworkMultipleUdp* self, s32 peerIndex, u8* out, s32 capacity);
+s32 NetworkMultipleUdp_getError(NetworkMultipleUdp* self);
 
 /* the byte stream */
 void networkPeerStream_putByte(NetworkByteStream* self, u8 value);
-void networkPeerStream_forwardRecord(NetworkByteStream* self, NetworkPeerBuffer* sink);
+void networkPeerStream_forwardRecord(NetworkByteStream* self, NetworkStreamSink* sink);
 void networkPeerStream_pullRecord(NetworkByteStream* self, NetworkStreamSink* sink);
 void networkPeerStream_putRecord(NetworkByteStream* self, const NetworkPeerRecord* record);
 void networkPeerStream_putU16(NetworkByteStream* self, u16 value);
@@ -308,30 +453,18 @@ void networkPeerStream_takeByte(NetworkByteStream* self, u8* out);
 void networkPeerStream_takeU32(NetworkByteStream* self, u32* out);
 void networkPeerStream_takeRecord(NetworkByteStream* self, NetworkPeerRecord* record);
 void networkPeerStream_readLength(NetworkByteStream* self, u16* out);
+u8* networkPeer_getSocket(NetworkByteStream* self);
+u32 networkPeer_getPeerId(NetworkByteStream* self);
 
-/* the peer name */
-s32 networkPeer_setName(NetworkPeerConfig* self, const char* name);
+/* the name resolver */
+/* untyped: opaque handle passed through - the OS thread entry receives and returns a plain pointer */
+void* networkResolver_threadEntry(void* self);
+void networkResolver_lookup(NetworkResolverWii* self);
 
-/* the two socket-teardown tails and the two helpers they tail into */
-void networkPeer_disconnect(NetworkPeerReceive* self);
-void networkPeer_disconnectSocket(NetworkPeerReceive* self);
-void networkPeer_release(NetworkPeerReceive* self);
-void networkPeer_releaseSocket(NetworkPeerReceive* self);
-
-/* the record table */
-void networkPeer_resetCode(NetworkPeerRecordTable* self);
-void networkPeer_recordGet(NetworkPeerRecordTable* self, s32 index, u32* out);
-
-/* the peer classes' deleting destructors (the map's own `dtor_` names, kept: they chain the base
-   destructor and nothing in the range pins their class down) */
-/* untyped: opaque handle passed through - the callers hand the peer they already hold */
-void* dtor_803CCE9C(void* self, s32 flags);
-NetworkPeerError* dtor_803CD708(NetworkPeerError* self, s32 flags);
-NetworkPeerError* dtor_803CD764(NetworkPeerError* self, s32 flags);
-NetworkPeerError* dtor_803CF108(NetworkPeerError* self, s32 flags);
-NetworkPeerError* dtor_803CF694(NetworkPeerError* self, s32 flags);
+/* the remaining deleting destructors (the map's own `dtor_` names, kept: they belong to classes this
+   unit does not model, and nothing in the range pins those classes down) */
 NetworkPeerOwner* dtor_803CF8F4(NetworkPeerOwner* self, s32 flags);
-NetworkPeerError* dtor_803D14C0(NetworkPeerError* self, s32 flags);
+NetworkPeerBase* dtor_803D14C0(NetworkPeerBase* self, s32 flags);
 
 /* the session accessors this unit owns */
 s32 NetworkSessionStable_getOwnIndex(NetworkSessionStable* self);
@@ -343,6 +476,8 @@ s32 NetworkSessionStable_getOwnIndex(NetworkSessionStable* self);
 void NetworkSessionStable_sendStream(NetworkSessionStable* self, NetworkStreamWriter* stream,
                                      u32 a, u32 b, const void* term, u32 c); /* untyped: byte range (the terminator) */
 void NetworkSessionStable_setNotifyValue(u32 value);
+u32 networkSessionNonce_generate(void);
+s32 networkSessionNonce_isValid(u32 nonce);
 /* untyped: opaque handle passed through - only the peer band owns the mutex layout */
 void LockMutex(void* mutex);
 /* untyped: opaque handle passed through - only the peer band owns the mutex layout */
@@ -353,7 +488,7 @@ u32 getSomething5(void* self);
 /* The Pat manager's two pumps: their addresses (0x803CE064, 0x803CE5F0) are inside this unit's range,
    so rule 2 gives them to its owner's header.  `Network/fn_803D3CE8.h` - the Pat band's own header,
    which includes this one - and its neighbour `Network/NetworkSessionManagerPat.cpp` take them from
-   here. */
+   here.  They are `NetworkSingleTcp::move` and `NetworkMultipleUdp::move` (the log strings name them). */
 void receivePatInterfaces(PatReceiver* receiver);
 void flushPatRequests(PatRequestQueue* queue);
 

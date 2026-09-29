@@ -2403,8 +2403,16 @@ config.libs = [
             # at 100 % (unit score 4.05), `-O3` puts 37 of 38 there (unit score 7.37).  The unit's own
             # lever is the file-scope `#pragma peephole off` in the source (playbook 39), with the
             # measured before/after in the unit header.
+            # `-pool off` (playbook 43): the target materialises each log string with its own
+            # `lis`/`addi` pair (NetworkMultipleUdp_receive: `lis r4,lbl_805F988C@ha` /
+            # `addi r4,r4,lbl_805F988C@l`, then `lis r4,lbl_805F98C4@ha` for the next string), where the
+            # default pooling addresses every string of a function through one `@stringBase0` register
+            # (`lis r5,...@ha` once, then `addi r4,r25,0x2ec`).  Measured at unit level on the current
+            # source (2026-09-29, same tree, only this flag toggled): with pooling the unit scores 38.71 %
+            # and 81 of 145 rows are at 100 %; with `-pool off` 38.80 % and 81 rows - the flag moves one
+            # row, `NetworkMultipleUdp_receive` 89.53 % -> 94.06 %, and lowers none.
             Object(NonMatching, "Network/network_transport.cpp",
-                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # A **data-only** unit: the Network band's shared small-data pool, `.sdata2`
             # 0x8079C690-0x8079C758 (200 B) and `.sdata` 0x80793900-0x80793930 (48 B), whose source
             # defines nothing (playbook 23/53 route 2, playbook 54; the model is
