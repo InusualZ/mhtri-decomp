@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """dataseams.py - the `.data` emission-order seams (tools/splits/dataorder.py) as a guard for data-claim tools.
 
-`dataorder.py` classifies every retail `.data` symbol and finds the TU seams (docs/data-order-seams.md): a vtable
-followed by a string (`V->S`) or two adjacent vtables whose owners go up (`zigzag`) start a new TU.  Those two are
-**strong**; `V->D` is weak (a jump table is `.data` too) and is never used to cut or refuse.
+`dataorder.py` classifies every retail `.data` symbol and finds the TU seams (docs/data-order-seams.md): strings
+between two vtable groups (`V->S`) or two adjacent vtables whose owners go up (`zigzag`).  Those two are
+**strong**; `V->tail` (a vtable, strings, no later vtable: possibly an inline tail) and `V->D` are weak and are
+never used to cut, warn or refuse.
+
+A `V->S` row is a **gap** `[addr, latest)`, not a cut at its first string: a TU's inline-function strings follow
+its vtables, so the boundary lies somewhere in the gap, after the leading `tail` strings.  This layer therefore
+gives each row a `cut` (the address of the first symbol after the tail) and only *cuts* a gap that is narrow
+(`width <= NARROW`, where the position is known to a few symbols); a wide gap only *warns* that "a TU boundary
+lies in [addr, latest)".  A `zigzag` seam has no gap and cuts at its own address.
 
 This module is the thin consumer layer the claim tools share - `dataqueue.py` (cut a proposed run), `dataclaim.py`
 (warn on a run or a rule-12 claim), `flipcheck.py` and `datagap.py` (name an order-only mismatch).  It classifies
@@ -24,11 +31,14 @@ for _p in (os.path.join(TOOLS, "splits"), TOOLS, HERE):
         sys.path.insert(0, _p)
 
 STRONG = ("V->S", "zigzag")
+#: A V->S gap with at most this many symbols is cut (at the end of its tail); a wider one only warns.
+NARROW = 8
 _CACHE: dict = {}
 
 
 def load_strong() -> list[dict]:
-    """Every strong `.data` seam of the retail DOL as `{addr, kind, before, after}`, cached.
+    """Every strong `.data` seam of the retail DOL as `{addr, kind, before, after}` (a `V->S` row also carries
+    `latest`, `width`, `tail` and `cut` - the first symbol after the tail strings), cached.
 
     Returns `[]` (never raises) when the DOL or the map is not readable: a guard must not break a tool that
     could otherwise run; `load_error()` says why the list is empty.
@@ -40,6 +50,11 @@ def load_strong() -> list[dict]:
         import tudiscover as td
         syms = do.classify_all(do.load_symbols(), td.Dol(do.DOL))
         found = [s for s in do.seams(syms) if s["kind"] in STRONG]
+        at = {x.addr: i for i, x in enumerate(syms)}
+        for row in found:
+            if row["kind"] == "V->S" and row["addr"] in at:
+                k = min(at[row["addr"]] + row.get("tail", 0), len(syms) - 1)
+                row["cut"] = syms[k].addr
         _CACHE["error"] = None
     except Exception as exc:  # noqa: BLE001 - see the docstring
         found = []
@@ -58,25 +73,70 @@ def seams_in(seams: list[dict], start: int, end: int) -> list[dict]:
     return [s for s in seams if start < s["addr"] < end]
 
 
+def is_gap(seam: dict) -> bool:
+    """A `V->S` row that carries its gap `[addr, latest)` (rows from `dataorder.seams`)."""
+    return seam.get("kind") == "V->S" and seam.get("latest") is not None
+
+
+def cut_point(seam: dict) -> int | None:
+    """Where a run is cut for this seam, or None when the position is too uncertain to cut.
+
+    A `zigzag` (and a legacy row with no gap) cuts at `addr`; a narrow `V->S` gap cuts at `cut`, the first symbol
+    after its inline-tail strings; a wide gap has no cut point - it only warns.
+    """
+    if not is_gap(seam):
+        return seam["addr"]
+    if seam.get("width", 0) <= NARROW:
+        return seam.get("cut", seam["addr"])
+    return None
+
+
 def cut_ranges(start: int, end: int, seams: list[dict]) -> list[tuple[int, int]]:
-    """`[start, end)` cut at every seam inside it: one `(start, end)` per probable TU."""
-    points = [start] + sorted({s["addr"] for s in seams_in(seams, start, end)}) + [end]
+    """`[start, end)` cut at every cuttable seam inside it: one `(start, end)` per probable TU."""
+    cuts = {cut_point(s) for s in seams_in(seams, start, end)} - {None}
+    points = [start] + sorted(c for c in cuts if start < c < end) + [end]
     return [(points[i], points[i + 1]) for i in range(len(points) - 1)]
 
 
+def cut_addresses(seams: list[dict] | None) -> set[int]:
+    """The addresses `dataqueue` cuts a run at: every seam's `cut_point`, wide gaps excluded."""
+    return {c for c in (cut_point(s) for s in (seams or ())) if c is not None}
+
+
+def where(seam: dict) -> str:
+    """`at 0x..` for a seam with a known position, `a boundary in [a, b)` for a gap."""
+    if is_gap(seam):
+        return "a boundary in [0x%08X, 0x%08X)" % (seam["addr"], seam["latest"])
+    return "at 0x%08X" % seam["addr"]
+
+
 def describe(seams: list[dict]) -> str:
-    """`0x805F9570 (V->S), 0x805F9610 (V->S)` - what a warning names."""
-    return ", ".join("0x%08X (%s)" % (s["addr"], s["kind"]) for s in sorted(seams, key=lambda s: s["addr"]))
+    """`0x805F9570 (V->S), 0x805F9610 (zigzag)` - what a warning names; a gap adds its `[addr, latest)`."""
+    return ", ".join("0x%08X (%s)" % (s["addr"], s["kind"] + (", boundary in [0x%08X, 0x%08X)" % (s["addr"], s["latest"])
+                                                              if is_gap(s) else ""))
+                     for s in sorted(seams, key=lambda s: s["addr"]))
 
 
 def warning(start: int, end: int, seams: list[dict]) -> str | None:
-    """The one-line warning for a range that contains seams, with the suggested cut ranges; None when clean."""
+    """The one-line warning for a range that contains seams, with the suggested cut ranges; None when clean.
+
+    Each seam is at least one more TU (a gap holds one boundary somewhere in it), so the count is a lower bound.
+    Only narrow gaps and zigzags give cut ranges; a wide gap says where a boundary lies and nothing more.
+    """
     inside = seams_in(seams, start, end)
     if not inside:
         return None
-    return ("spans %d TUs, not one: .data emission-order seams at %s - it can never match as one unit; "
-            "suggested cuts: %s" % (len(inside) + 1, describe(inside),
-                                    ", ".join("0x%08X-0x%08X" % r for r in cut_ranges(start, end, inside))))
+    cuts = cut_ranges(start, end, inside)
+    if len(cuts) > 1:
+        cut_text = "suggested cuts: " + ", ".join("0x%08X-0x%08X" % r for r in cuts)
+    else:
+        cut_text = "no cut suggested: the boundary position is uncertain (wide gap)"
+    wide = [s for s in inside if cut_point(s) is None]
+    if wide and len(cuts) > 1:
+        cut_text += "; a boundary also lies in " + ", ".join(
+            "[0x%08X, 0x%08X)" % (s["addr"], s["latest"]) for s in wide)
+    return ("spans at least %d TUs, not one: .data emission-order seams %s - it can never match as one unit; %s"
+            % (len(inside) + 1, describe(inside), cut_text))
 
 
 def section_chunks(path: str, section: str) -> list[bytes] | None:
@@ -130,18 +190,18 @@ def order_only_message(section: str, seams: list[dict]) -> str:
     if not seams:
         return ("%s: order-only: the same symbols in a different sequence, but no strong .data emission-order "
                 "seam is known inside the unit's range - one TU may still lay them out differently" % section)
-    return ("%s: order-only: the unit spans several TUs; seams at %s - the target's symbols are the same, "
+    return ("%s: order-only: the unit spans several TUs; seams: %s - the target's symbols are the same, "
             "in the order of separate translation units (one TU emits globals, strings, then vtables in "
             "reverse class order), so split the unit at the seams" % (
-                section, ", ".join("0x%08X" % s["addr"] for s in sorted(seams, key=lambda s: s["addr"]))))
+                section, ", ".join(where(s) for s in sorted(seams, key=lambda s: s["addr"]))))
 
 
 def multi_tu_message(section: str, start: int, end: int, seams: list[dict]) -> str:
     """The weaker diagnosis: the section differs and the unit's target range spans several TUs."""
-    return ("%s: the target range 0x%08X-0x%08X spans %d TUs (emission-order seams at %s) - a unit is one TU, "
-            "so this section cannot match until the unit is split at the seams"
+    return ("%s: the target range 0x%08X-0x%08X spans at least %d TUs (emission-order seams: %s) - a unit is one "
+            "TU, so this section cannot match until the unit is split at the seams"
             % (section, start, end, len(seams) + 1,
-               ", ".join("0x%08X" % s["addr"] for s in sorted(seams, key=lambda s: s["addr"]))))
+               ", ".join(where(s) for s in sorted(seams, key=lambda s: s["addr"]))))
 
 
 def seam_note(unit: str, ours_path: str, target_path: str, section: str = ".data",
@@ -183,8 +243,8 @@ def selftest() -> int:
     check("a clean range is not cut", cut_ranges(0x1300, 0x1400, sm), [(0x1300, 0x1400)])
     check("a clean range has no warning", warning(0x1300, 0x1400, sm), None)
     w = warning(0x1000, 0x1300, sm) or ""
-    check("the warning names the seams and the TU count",
-          ("0x00001100 (V->S)" in w, "0x00001200 (zigzag)" in w, "spans 3 TUs" in w), (True, True, True))
+    check("the warning names the seams and the TU lower bound",
+          ("0x00001100 (V->S)" in w, "0x00001200 (zigzag)" in w, "spans at least 3 TUs" in w), (True, True, True))
     check("the warning suggests the cuts", "0x00001000-0x00001100" in w and "0x00001200-0x00001300" in w, True)
     check("order_only: the same symbols reordered", order_only([b"a", b"bb", b"c"], [b"bb", b"a", b"c"]), True)
     check("order_only: identical sequences are not", order_only([b"a", b"bb"], [b"a", b"bb"]), False)
@@ -192,7 +252,7 @@ def selftest() -> int:
     check("order_only: a different symbol count is not", order_only([b"a"], [b"a", b"b"]), False)
     check("order_only: no evidence is not", (order_only(None, [b"a"]), order_only([], [])), (False, False))
     check("the order-only line names the seams",
-          "seams at 0x00001100, 0x00001200" in order_only_message(".data", sm), True)
+          "seams: at 0x00001100, at 0x00001200" in order_only_message(".data", sm), True)
     check("... and says so when no seam is known", "no strong .data emission-order seam" in order_only_message(".data", []),
           True)
     check("section_chunks tolerates a missing file", section_chunks("does/not/exist.o", ".data"), None)
@@ -200,7 +260,29 @@ def selftest() -> int:
           seam_note("u", "no.o", "no2.o", seams=sm, rng=(0x1300, 0x1400)), None)
     multi = seam_note("u", "no.o", "no2.o", seams=sm, rng=(0x1000, 0x1300)) or ""
     check("unreadable objects still name the multi-TU range",
-          ("spans 3 TUs" in multi, "0x00001100, 0x00001200" in multi), (True, True))
+          ("spans at least 3 TUs" in multi, "at 0x00001100, at 0x00001200" in multi), (True, True))
+    # gaps: a narrow V->S gap cuts at the end of its inline tail, a wide one only warns, V->tail is never given here
+    narrow = {"addr": 0x1100, "kind": "V->S", "latest": 0x1180, "width": 3, "tail": 1, "cut": 0x1120}
+    wide = {"addr": 0x1200, "kind": "V->S", "latest": 0x1800, "width": 40, "tail": 0, "cut": 0x1200}
+    zz = {"addr": 0x1900, "kind": "zigzag"}
+    gaps = [narrow, wide, zz]
+    check("cut_point: narrow gap = end of tail, wide gap = none, zigzag = its address",
+          [cut_point(x) for x in gaps], [0x1120, None, 0x1900])
+    check("cut_point: a legacy V->S row without a gap cuts at its address", cut_point(sm[0]), 0x1100)
+    check("cut_addresses drops the wide gap", cut_addresses(gaps), {0x1120, 0x1900})
+    check("cut_ranges cut at the tail's end, never at the first string or inside a wide gap",
+          cut_ranges(0x1000, 0x2000, gaps), [(0x1000, 0x1120), (0x1120, 0x1900), (0x1900, 0x2000)])
+    gw = warning(0x1000, 0x2000, gaps) or ""
+    check("the gap warning says a boundary lies in [addr, latest), with a lower bound",
+          ("boundary in [0x00001100, 0x00001180)" in gw, "boundary in [0x00001200, 0x00001800)" in gw,
+           "spans at least 4 TUs" in gw), (True, True, True))
+    check("... and lists the wide gap as uncertain, not cut",
+          ("a boundary also lies in [0x00001200, 0x00001800)" in gw, "0x00001200-" in gw), (True, False))
+    only_wide = warning(0x1000, 0x2000, [wide]) or ""
+    check("a range with only a wide gap warns and suggests no cut",
+          ("no cut suggested" in only_wide, "suggested cuts:" in only_wide), (True, False))
+    check("the multi-TU/order-only lines say 'a boundary in [a, b)' for a gap",
+          "a boundary in [0x00001200, 0x00001800)" in multi_tu_message(".data", 0x1000, 0x2000, [wide]), True)
     g = globals()
     saved = g["section_chunks"]
     try:
@@ -208,7 +290,7 @@ def selftest() -> int:
                                                       "same.o": [b"S1", b"V1"], "other.o": [b"XX"]}[path]
         order = seam_note("u", "o.o", "t.o", seams=sm, rng=(0x1000, 0x1300)) or ""
         check("same symbols in another sequence is order-only, with the seams",
-              (": order-only: the unit spans several TUs; seams at 0x00001100, 0x00001200" in order), True)
+              (": order-only: the unit spans several TUs; seams: at 0x00001100, at 0x00001200" in order), True)
         check("identical objects need no note", seam_note("u", "same.o", "same.o", seams=sm, rng=(0x1000, 0x1300)), None)
         check("different symbols are the multi-TU line, not order-only",
               "order-only" in (seam_note("u", "o.o", "other.o", seams=sm, rng=(0x1000, 0x1300)) or ""), False)

@@ -180,10 +180,12 @@ def cut_runs_at_seams(runs: list[dict], seams: list[dict] | None) -> list[dict]:
     """Cut each `.data` run at every strong emission-order seam (`dataorder`: V->S, zigzag).
 
     A run that contains a seam spans several TUs and can never match in one unit, so a proposed claim must not
-    be one span. The cut is at the seam's own address - the first symbol of the next TU - and only strong
-    seams are given here (`V->D` is weak: never a cut). Other sections and seam-free runs pass through.
+    be one span. A `zigzag` cuts at its own address; a `V->S` gap cuts at the end of its inline-tail strings
+    (`dataseams.cut_point`) when the gap is narrow, and **not at all** when it is wide - the boundary lies
+    somewhere in `[addr, latest)`, which the request warning names. Only strong seams are given here (`V->tail`
+    and `V->D` are weak: never a cut). Other sections and seam-free runs pass through.
     """
-    cuts = {s["addr"] for s in (seams or ())}
+    cuts = dataseams.cut_addresses(seams)
     if not cuts:
         return runs
     out: list[dict] = []
@@ -818,6 +820,19 @@ def selftest() -> int:
     req_big = build_request("u", 0x1000, 0x70, ".data", "e", "u", seam_syms, [], cutq, strong)
     check("seams: an explicit --size that spans TUs warns", "seam_warning" in req_big, True)
 
+    # a V->S gap: narrow with an inline tail cuts AFTER the tail (0x1030, not the first string 0x1020);
+    # a wide gap is not cut at all and the request only warns "a boundary in [addr, latest)"
+    narrow = [{"addr": 0x1020, "kind": "V->S", "latest": 0x1040, "width": 2, "tail": 1, "cut": 0x1030}]
+    cutn = build_entries(seam_syms, [], {}, lambda s, a: None, narrow)
+    check("seams: a narrow gap cuts at the end of its inline tail, not at the first string",
+          [(e["start"], e["end"]) for e in cutn], [(0x1000, 0x1030), (0x1030, 0x1070)])
+    wide_gap = [{"addr": 0x1020, "kind": "V->S", "latest": 0x1040, "width": 40, "tail": 0, "cut": 0x1020}]
+    cutw = build_entries(seam_syms, [], {}, lambda s, a: None, wide_gap)
+    check("seams: a wide gap is not cut", [(e["start"], e["end"]) for e in cutw], [(0x1000, 0x1070)])
+    req_wide = build_request("u", 0x1000, None, ".data", "e", "u", seam_syms, [], cutw, wide_gap)
+    check("seams: ... the request warns that a boundary lies in the gap",
+          "boundary in [0x00001020, 0x00001040)" in req_wide.get("seam_warning", ""), True)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for failure in fails:
@@ -861,9 +876,10 @@ def main() -> int:
     uncut = build_entries(symbols, splits, funcs, cover)
     entries = build_entries(symbols, splits, funcs, cover, seams)
     hit = runs_with_seams(uncut, dataseams.load_strong())
-    print("seams: %d of %d proposed run(s) contain a strong .data seam (V->S/zigzag) and span several TUs "
-          "(%d of them proposed); %s -> %d -> %d run(s)"
+    print("seams: %d of %d proposed run(s) contain a strong .data seam (V->S gap/zigzag) and span at least 2 TUs "
+          "(%d of them proposed; %d with only wide gaps, warned not cut); %s -> %d -> %d run(s)"
           % (len(hit), len(uncut), sum(1 for e in hit if e["verdict"] == "proposed"),
+             sum(1 for e in hit if not dataseams.cut_addresses(dataseams.seams_in(dataseams.load_strong(), e["start"], e["end"]))),
              "cut at the seams" if seams else "NOT cut (--no-seam-cut)", len(uncut), len(entries)),
           file=sys.stderr if args.json else sys.stdout)
     if args.limit:

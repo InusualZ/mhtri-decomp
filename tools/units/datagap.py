@@ -229,7 +229,7 @@ def selftest() -> int:
     real = dataseams.seam_note
     try:
         dataseams.seam_note = lambda unit, src, obj, **kw: (
-            ".data: order-only: the unit spans several TUs; seams at 0x00001100" if unit == "A/a" else None)
+            ".data: order-only: the unit spans several TUs; seams: at 0x00001100" if unit == "A/a" else None)
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             def touch(rel):
@@ -246,7 +246,7 @@ def selftest() -> int:
                       "src": os.path.join(tmp, "no", "such.o"), "fuzzy": 0.0}]
             got = seam_notes(pairs)
         eq([u for u, _n in got], ["main/A/a"], "only a unit with a note is listed; a missing object is skipped")
-        eq("order-only: the unit spans several TUs; seams at" in got[0][1], True,
+        eq("order-only: the unit spans several TUs; seams: at" in got[0][1], True,
            "the note is the order-only diagnosis")
     finally:
         dataseams.seam_note = real

@@ -19,17 +19,20 @@ Observations, in decreasing authority:
   and stays within `--source-span-max`; a rejected name still votes as a soft source-file change.
 * **pool run jump** - two adjacent labels of one section whose referrer sets are disjoint and
   ordered; the boundary lies between the last referrer of the first run and the first of the second.
-* **data order** (`dataorder`: a vtable followed by a string; `dataorder-zz` and `dataorder-weak` are
-  softer; all soft by default, `--data-order strong` promotes the first) - MWCC emits one TU's `.data` as globals, strings, then vtables in reverse class order
-  (`docs/data-order-seams.md`), so in retail `.data` a vtable followed by a string starts a new TU (V->S),
-  and two adjacent vtables whose owners go *up* are two TUs (zigzag).  `tools/splits/dataorder.py`
-  classifies the symbols; here each seam becomes a `.text` interval - last referrer of the vtable run
-  before it .. first referrer of the run after it (a vtable's referrers are its constructors' stores;
-  its owner function stands in when nothing references it).  A vtable followed by other data (V->D) is
-  off by default (a jump table is `.data` too and its place in the order is unmeasured):
-  `--data-order weak` adds it as a weak vote, `--data-order off` disables the whole kind.  Why soft:
-  the `bench` tier 4 and `dataorder` subcommand measure it against `splits.txt` and the `__FILE__`
-  anchors, and the g3d units contradict the rule (docs/data-order-seams.md section 3).
+* **data order** (`dataorder`: strings between two vtable groups; `dataorder-zz` and `dataorder-weak` are
+  softer; all soft by default, `--data-order strong` promotes the first) - MWCC emits one TU's `.data` as
+  globals, out-of-line strings, vtables in reverse class order, then the strings of *inline* functions (the
+  "inline tail", `docs/data-order-seams.md`).  So in retail `.data` strings between two vtable groups (V->S) mean
+  **a boundary somewhere in the gap** [first string, next vtable), after the leading inline-tail strings; a vtable
+  followed by strings and no later vtable (V->tail) is no evidence and is dropped.  Two adjacent vtables whose
+  owners go *up* are two TUs (zigzag).  `tools/splits/dataorder.py` classifies the symbols; here each seam becomes
+  a `.text` interval - last referrer of the vtable run before it (and of the gap's tail strings) .. first
+  referrer of the vtable run after the gap (a vtable's referrers are its constructors' stores; its owner function
+  stands in when nothing references it).  The strings past the tail are not used: they may belong to either TU.
+  A vtable followed by other data (V->D) is off by default (a jump table is `.data` too and its place in the
+  order is unmeasured): `--data-order weak` adds it as a weak vote, `--data-order off` disables the whole kind.
+  Why soft: the `bench` tier 4 and `dataorder` subcommand measure it against `splits.txt` and the `__FILE__`
+  anchors (docs/data-order-seams.md section 6).
 * **codegen fingerprint** (soft) - a `_savegpr_*`/`stmw` change or a record-form presence change
   between two neighbouring functions is a per-TU flag change (playbook idea 21).
 * **alignment gap** (soft) - a >4 byte gap; weak in this binary, where `.text` is one run with gaps
@@ -726,9 +729,10 @@ def data_order_records(addr, size, refs_of, dol, mode, syms=None):
     import dataorder as do
     if syms is None:
         syms = do.classify_all(do.load_symbols(), dol)
-    found = do.seams(syms)
-    if mode != "weak":
-        found = [f for f in found if f["kind"] != "V->D"]
+    # V->tail is no evidence at all (a vtable followed by strings and no later vtable may be an inline tail),
+    # so only V->S, zigzag and (on request) V->D become observations.
+    found = [f for f in do.seams(syms)
+             if f["kind"] in ("V->S", "zigzag") or (mode == "weak" and f["kind"] == "V->D")]
     by_addr = {s.addr: i for i, s in enumerate(syms)}
     cut_at = {f["addr"] for f in found}
     cut_list = sorted(by_addr[a] for a in cut_at)
@@ -759,10 +763,23 @@ def data_order_records(addr, size, refs_of, dol, mode, syms=None):
     for f in found:
         j = by_addr[f["addr"]]
         after = [syms[j]]
-        k = j + 1
-        while k < len(syms) and syms[k].kind == syms[j].kind and syms[k].addr not in cut_at:
-            after.append(syms[k])
-            k += 1
+        gap = f["kind"] == "V->S"
+        if gap:
+            # A V->S row is a GAP [addr, latest): the first `tail` strings are the previous TU's inline tail and
+            # the boundary lies somewhere after them, before the next vtable group (which is the new TU's).
+            j2 = by_addr[f["latest"]]
+            tail_syms = syms[j:j + f.get("tail", 0)]
+            after = [syms[j2]]
+            k = j2 + 1
+            while k < len(syms) and syms[k].kind == do.VTABLE and syms[k].addr not in cut_at:
+                after.append(syms[k])
+                k += 1
+        else:
+            tail_syms = []
+            k = j + 1
+            while k < len(syms) and syms[k].kind == syms[j].kind and syms[k].addr not in cut_at:
+                after.append(syms[k])
+                k += 1
         # the run of vtables that ends the previous fragment (padding before the seam is skipped)
         k = j - 1
         while k >= 0 and syms[k].kind == do.DATA and syms[k].size <= do.PAD_MAX:
@@ -774,20 +791,31 @@ def data_order_records(addr, size, refs_of, dol, mode, syms=None):
                 break
             k -= 1
         u, v = referrers(before), referrers(after)
-        # The whole fragments on either side pin tighter than the vtable/first-symbol runs, but a global
-        # shared with another TU breaks them: use them when they stay ordered, else keep the narrow pair.
-        ci = cut_list.index(j)
-        wu, wv = referrers(syms[(cut_list[ci - 1] if ci else 0):j]), \
-            referrers(syms[j:(cut_list[ci + 1] if ci + 1 < len(cut_list) else len(syms))])
-        if wu and wv and wu[-1] < wv[0]:
-            u, v = wu, wv
+        if tail_syms:
+            u = sorted(set(u) | set(referrers(tail_syms)))
+        if not gap:
+            # The whole fragments on either side pin tighter than the vtable runs, but a global shared with
+            # another TU breaks them: use them when they stay ordered, else keep the narrow pair.  (A V->S gap
+            # gets no such refinement: the strings past the tail may belong to either side.)
+            ci = cut_list.index(j)
+            wu, wv = referrers(syms[(cut_list[ci - 1] if ci else 0):j]), \
+                referrers(syms[j:(cut_list[ci + 1] if ci + 1 < len(cut_list) else len(syms))])
+            if wu and wv and wu[-1] < wv[0]:
+                u, v = wu, wv
         rec = {"addr": f["addr"], "seam": f["kind"], "before": f["before"], "after": f["after"]}
+        if gap:
+            rec.update(latest=f["latest"], width=f["width"], tail=f.get("tail", 0))
         if not u or not v:
             rec["status"] = "no-referrers"
         elif u[-1] < v[0]:
             kind, w = kind_of[f["kind"]]
             rec.update(status="pinned", lo=u[-1], hi=v[0])
-            soft.append((u[-1], v[0], w, kind, "%s seam %s -> %s" % (f["kind"], f["before"], f["after"])))
+            if gap:
+                what = "V->S gap [0x%08X, 0x%08X) %s -> %s" % (f["addr"], f["latest"], f["before"],
+                                                              syms[by_addr[f["latest"]]].name)
+            else:
+                what = "%s seam %s -> %s" % (f["kind"], f["before"], f["after"])
+            soft.append((u[-1], v[0], w, kind, what))
         else:
             rec.update(status="overlap", u_last=u[-1], v_first=v[0])
         records.append(rec)
@@ -1680,6 +1708,8 @@ def cmd_dataorder(args):
                                  "[CONTRADICTED: %s]" % "; ".join(r["contradicted"]) if r.get("contradicted") else "")
         if r["status"] == "overlap" and r.get("contradicted"):
             line += " [CONTRADICTED by %s]" % "; ".join(r["contradicted"])
+        if r.get("latest"):
+            line += " gap [0x%08X,0x%08X) width %d tail %d" % (r["addr"], r["latest"], r["width"], r["tail"])
         line += "  (%s -> %s)%s" % (r["before"], r["after"], "  in %s" % u[0] if u else "")
         if args.all or args.addr or r.get("contradicted") or u or r["status"] == "overlap":
             print(line)
@@ -1701,33 +1731,45 @@ def selftest():
     addr = [0x80010000 + 0x10 * i for i in range(10)]
     size = [0x10] * 10
 
-    def sym(a, sz, name, kind, owner=None):
-        return do.Sym(a, sz, name, kind, owner)
+    # TU1: strings s1, vtables vB, vA (owners down), inline tail `x_ac.h`; TU2: string s2, vtable vC
+    def sym(a, sz, name, kind, owner=None, text=None):
+        return do.Sym(a, sz, name, kind, owner, text)
 
-    # TU1: strings s1, vtables vB, vA (owners down); TU2: string s2, vtable vC
     syms = [sym(0x100, 16, "s1", do.STRING), sym(0x110, 16, "vB", do.VTABLE, addr[3]),
-            sym(0x120, 16, "vA", do.VTABLE, addr[1]),
-            sym(0x130, 16, "s2", do.STRING), sym(0x140, 16, "vC", do.VTABLE, addr[7])]
-    refs = {"s1": [0, 2], "vB": [3], "vA": [1], "s2": [6], "vC": [5, 7]}
+            sym(0x120, 16, "vA", do.VTABLE, addr[1]), sym(0x130, 16, "hdr", do.STRING, None, "x_ac.h"),
+            sym(0x140, 16, "s2", do.STRING, None, "a message"), sym(0x150, 16, "vC", do.VTABLE, addr[7])]
+    refs = {"s1": [0, 2], "vB": [3], "vA": [1], "hdr": [2], "s2": [6], "vC": [5, 7]}
     soft, rec = data_order_records(addr, size, refs, None, "on", syms)
-    check("V->S seam becomes one pinned observation", [(o[0], o[1], o[3]) for o in soft], [(3, 5, "dataorder")])   # the far fragment's first referrer is vC's ctor
-    check("... the record says pinned at the string", [(r["addr"], r["seam"], r["status"]) for r in rec],
-          [(0x130, "V->S", "pinned")])
+    check("V->S gap becomes one pinned observation: last vtable/tail referrer .. next vtable's first referrer",
+          [(o[0], o[1], o[3]) for o in soft], [(3, 5, "dataorder")])
+    check("... the record carries the gap (first string, latest = next vtable, width, tail)",
+          [(r["addr"], r["seam"], r["status"], r["latest"], r["width"], r["tail"]) for r in rec],
+          [(0x130, "V->S", "pinned", 0x150, 2, 1)])
+    check("... the strings past the tail (TU2's, or an undetected tail) do not move the interval",
+          [(o[0], o[1]) for o in data_order_records(addr, size, dict(refs, s2=[9]), None, "on", syms)[0]], [(3, 5)])
+    check("... a tail string referenced later in .text widens the interval's lower end",
+          [(o[0], o[1]) for o in data_order_records(addr, size, dict(refs, hdr=[4]), None, "on", syms)[0]], [(4, 5)])
     check("dataorder is soft by default and strong only with --data-order strong; zigzag/weak never",
           [(m, [k for k in ("dataorder", "dataorder-zz", "dataorder-weak") if k in strong_kinds(m)])
            for m in ("off", "on", "strong", "weak")],
           [("off", []), ("on", []), ("strong", ["dataorder"]), ("weak", [])])
 
     # interleaved referrers: the rule does not hold, the seam is recorded as overlap and adds no observation
-    soft, rec = data_order_records(addr, size, dict(refs, s2=[2]), None, "on", syms)
+    soft, rec = data_order_records(addr, size, dict(refs, vC=[2, 7]), None, "on", syms)
     check("interleaved referrers: overlap, no observation", (soft, [r["status"] for r in rec]), ([], ["overlap"]))
 
-    # nothing references the vtable run: its owner function stands in
-    soft, rec = data_order_records(addr, size, {"s2": [6]}, None, "on", syms)
-    check("no referrer: the vtable's owner function stands in", [(o[0], o[1]) for o in soft], [(3, 6)])
-    bare = [sym(x.addr, x.size, x.name, x.kind) for x in syms]
+    # nothing references the vtable runs: their owner functions stand in
+    soft, rec = data_order_records(addr, size, {}, None, "on", syms)
+    check("no referrer: the vtables' owner functions stand in (and the tail has none)",
+          [(o[0], o[1]) for o in soft], [(3, 7)])
+    bare = [sym(x.addr, x.size, x.name, x.kind, None, x.text) for x in syms]
     soft, rec = data_order_records(addr, size, {}, None, "on", bare)
     check("nothing references either side: no-referrers", (soft, [r["status"] for r in rec]), ([], ["no-referrers"]))
+
+    # V->tail (a vtable, strings, and no later vtable) is no evidence: it is not an observation and has no record
+    tl = syms[:5]
+    soft, rec = data_order_records(addr, size, refs, None, "weak", tl)
+    check("V->tail is no evidence, even with --data-order weak", (soft, rec), ([], []))
 
     # zigzag: two vtables whose owners go up
     zz = [sym(0x100, 16, "vA", do.VTABLE, addr[1]), sym(0x110, 16, "vB", do.VTABLE, addr[7])]
@@ -1832,7 +1874,7 @@ def main():
 
     def data_order_arg(sp):
         sp.add_argument("--data-order", choices=DATA_ORDER_MODES, default=DATA_ORDER_DEFAULT,
-                        help="`.data` emission-order seams (V->S strong, zigzag soft): off / on (default) / "
+                        help="`.data` emission-order seams (V->S = a boundary in a gap, zigzag; soft): off / on (default) / "
                              "weak (adds V->D as a weak vote)")
 
     a = sub.add_parser("at", help="propose the TU boundary around an address or symbol")

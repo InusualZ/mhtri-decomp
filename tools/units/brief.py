@@ -1496,11 +1496,13 @@ def _tu_warning(p: dict) -> str | None:
 def _data_seam_note(p: dict) -> str | None:
     """The `.data` emission-order evidence for a proposal (`attribute.data_seams_for`), or None.
 
-    MWCC emits one TU's `.data` as globals, strings, then vtables in reverse class order, so a vtable followed
-    by a string or other data (or two vtables whose owners go up) starts a new TU (`docs/data-order-seams.md`).
-    An *interior* seam (inside the range's own dense `.data` run, or between two vtables the range owns) makes
-    the range at least `min_tus` translation units; an *edge* seam is a neighbour's boundary and only
-    informs. A `cut` is a candidate `.text` address read off a vtable owner - never applied.
+    MWCC emits one TU's `.data` as globals, strings, vtables in reverse class order, then the strings of inline
+    functions, so strings between two vtable groups (or two vtables whose owners go up) mean a TU boundary
+    (`docs/data-order-seams.md`). A `V->S` seam is a **gap**: the boundary lies somewhere in `[addr, latest)`
+    after the inline-tail strings, the first string is not the cut. An *interior* seam (inside the range's own
+    dense `.data` run, or between two vtables the range owns) makes the range at least `min_tus` translation
+    units; an *edge* seam is a neighbour's boundary and only informs. A `cut` is a candidate `.text` address
+    read off the vtable owners - never applied.
     """
     ds = p.get("data_seams") or {}
     seams = ds.get("seams") or []
@@ -1509,7 +1511,9 @@ def _data_seam_note(p: dict) -> str | None:
     interior = [s for s in seams if s.get("interior")]
 
     def show(items, limit=6):
-        out = ["`0x%08X` %s (`%s` -> `%s`)" % (s["addr"], s["kind"], s.get("before", "?"), s.get("after", "?"))
+        out = ["%s %s (`%s` -> `%s`)"
+               % ("a boundary in `[0x%08X, 0x%08X)`" % (s["addr"], s["latest"]) if s.get("latest")
+                  else "`0x%08X`" % s["addr"], s["kind"], s.get("before", "?"), s.get("after", "?"))
                for s in items[:limit]]
         return ", ".join(out) + (" (+%d more)" % (len(items) - limit) if len(items) > limit else "")
 
@@ -1517,12 +1521,13 @@ def _data_seam_note(p: dict) -> str | None:
     for s in seams:
         c = s.get("cut") or {}
         if "between" in c:
-            cuts.append("between `0x%08X` and `0x%08X` (the vtable owners of seam `0x%08X`)"
+            cuts.append("between `0x%08X` and `0x%08X` (the vtable owners of seam `0x%08X`; the boundary lies "
+                        "between their first referrers, not at a string)"
                         % (c["between"][0], c["between"][1], s["addr"]))
         elif "after" in c:
             cuts.append("after `0x%08X` (the vtable owner before seam `0x%08X`)" % (c["after"], s["addr"]))
     if interior:
-        head = ("**Data-order evidence (TU probe): this range's `.data` holds %d seam(s) at %s; it is at least "
+        head = ("**Data-order evidence (TU probe): this range's `.data` holds %d seam(s): %s; it is at least "
                 "%d translation units - decide the seam BEFORE writing bodies.**"
                 % (len(interior), show(interior), ds.get("min_tus", 1 + len(interior))))
         if ds.get("weak"):
@@ -1962,6 +1967,12 @@ def selftest() -> int:
               and "between `0x80161700` and `0x80161900`" in _st, True)
         check("... the note is at the top of the brief", _st.index("Data-order evidence")
               < _st.index("## 1 · This is a proposal"), True)
+        _gap = _data_seam_note({"text": [0x1000, 0x2000], "data_seams": {"min_tus": 2, "weak": 0, "seams": [
+            {"addr": 0x805F9570, "kind": "V->S", "before": "vt_a", "after": "str_b", "interior": True,
+             "latest": 0x805F9610, "width": 3, "tail": 1, "cut": {"between": [0x1100, 0x1500]}}]}})
+        check("a V->S gap is named as a boundary in [addr, latest), never as a cut at the first string",
+              ("a boundary in `[0x805F9570, 0x805F9610)`" in _gap, "at least 2 translation units" in _gap,
+               "not at a string" in _gap), (True, True, True))
         _edge = _data_seam_note({"text": [0x1000, 0x2000], "data_seams": {"min_tus": 1, "weak": 0, "seams": [
             {"addr": 0x805F9570, "kind": "V->S", "before": "a", "after": "b", "interior": False}]}})
         check("an edge-only seam is not a lower bound", "at least" in _edge, False)

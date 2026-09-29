@@ -77,7 +77,8 @@ useful seams are the narrow ones.
   `.text`).
 * **Tool numbers were computed with the old rule.** Phase 1's bench (strong pins 3 hit / 30 miss) and Phase 2/3's
   seam counts treat the first string after a vtable as the boundary, which the inline tail moves later. They are
-  warnings and soft votes only; Phase 5 realigns them (section 5).
+  warnings and soft votes only; Phase 5 realigns them (section 6: the strong bench pins went from 3 hit / 30
+  miss to 0 hit / 10 miss, and a `V->S` seam is now a gap, not a cut at the first string).
 * Untested: RTTI-on classes (the game builds `-RTTI off`, so vtable headers are `0,0`), `extern "C"` data,
   function-local statics, data emitted by `#pragma` sections, `-lang=c` translation units, and `GC/1.2.5n` code
   (which would interleave).
@@ -150,3 +151,19 @@ first written, and the cause is the inline tail, not a different compiler (secti
   leading inline-tail strings, and re-run bench tier 4; `dataseams`/`dataqueue`/`dataclaim` must cut a gap by its
   `tail`, not at its first string; `attribute`/`brief` wording says "a boundary in [addr, latest)", not a cut at
   a string.
+
+**Phase 5 - measured (branch `worker/data-order-p5-ca02`).**
+
+| consumer | change | before -> after |
+| --- | --- | --- |
+| `vtableaudit.py --order` | `@NNN` / `@STRING@<inline function>` strings after a vtable are the inline tail, not a `vtable-before-data` finding; only an initialised global after a vtable is | scratch TU (global, strings, two classes, an in-class inline body, a free inline function; `Wii/1.3 -O3`): 2 false findings -> 0; a hand-moved global: 1 finding |
+| `tudiscover.py` (`dataorder*`, bench tier 4) | a `V->S` seam is a gap `[addr, latest)`: interval = last referrer of the vtable run and of the tail strings .. first referrer of the next vtable run; no whole-fragment tightening; `V->tail` dropped from pins | `--data-order strong`: 36 cuts, 3 hit / 30 miss (precision 0.091) -> 10 cuts, 0 hit / 10 miss (0.000); default `on`/`off`: precision 0.110, recall 0.555, unchanged (the seams are soft) |
+| `tudiscover.py dataorder` | contradictions by a must-link | 10 (8 by a `__FILE__` anchor) -> 2 (1 by an anchor, the g3d_scnroot zigzag); the 8 g3d and the ef V->S seams are no longer contradicted: 8 g3d + ef now pin an interval holding a registered unit start; pinned intervals at a unit start 20 -> 38; V->S pinned/overlap 42/22 -> 49/16 |
+| `dataseams.py`, `dataqueue.py`, `dataclaim.py` | each `V->S` row gets a `cut` (first symbol after the tail); a gap of at most 8 symbols cuts there, a wider one only warns "a boundary in [addr, latest)"; zigzag cuts at its address; warnings say "at least N TUs" | 76 of 3,050 queue runs contain a strong seam (unchanged); 49 hold a cuttable seam (narrow V->S gap or zigzag), 27 only wide gaps (warn, no cut); of the 65 V->S rows 25 are narrow (width <= 8), 40 wide; no narrow gap has a detected tail |
+| `attribute.py`, `brief.py` | `V->S` item carries `latest`/`width`/`tail`; its candidate cut is between the two vtable owners (not after one); `V->tail` records dropped; TU-probe text says "a boundary in [addr, latest)" | 11 of 67 ready pool proposals carry an interior seam (14 any): unchanged, the real DOL has no `V->tail` row |
+| `flipcheck.py`, `datagap.py` | order-only / multi-TU lines come from `dataseams` (corrected strong seams) and say "a boundary in [a, b)" for a gap | fixture-tested (the real order-only case is still untested) |
+
+Findings for the rule text (not edited here): `dataorder.seams()`'s `tail` counts only leading strings that are bare
+header names, but the real inline tails start with an assert message (`NW4R:Failed assertion ...`, then
+`g3d_resnode_ac.h`, message, header, ...), so `tail` is 0 for every real seam and no narrow gap is cut after a tail
+yet; the 0x805F94E0 seam family of `network_transport` and the g3d gaps are the evidence.
