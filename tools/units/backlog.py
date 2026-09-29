@@ -41,14 +41,23 @@ Four sources, one register:
   rule-7 findings (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unk*`), one `band-header` item
   per file carrying rule-2 findings (an `extern` that belongs in the owner's header or `include/unsplit/`),
   and one `untyped` item per file carrying rule-11 findings (a `void *` parameter or return type with no
-  `/* untyped: <reason> */` marker). The item's ask names the file, the rule and the count, and the count
-  is the item's rank weight, so the high-traffic file surfaces first. A lint item's key is the (kind, file)
-  pair, so a partial fix keeps its status; the item is carried forward from the published register even
-  after the findings are gone, so `triage` can prove the file clean and close it (and so a resolved item
-  stays in the register and earns its credit). This is the "do not revoke committed progress - work the
-  debt slowly" half of the owner's naming ruling (2026-09-27): hundreds of such open items against the
-  campaign's balance keep naming and typing work interleaved with new claims through the ratio, with no
-  special-casing.
+  `/* untyped: <reason> */` marker). The item's ask names the file, the rule and the **distinct at-fault
+  names** still outstanding, and that count - not the occurrence count - is the item's rank weight, because
+  one name repeated 500 times is one rename while 50 distinct names are 50 (`lint_index`). The names come
+  from `stylelint.finding_identity`'s token, the same predicate the landing gate's `--diff` refuses a *new*
+  token on, so the register and the gate can never disagree about what "a name" is. A lint item's key is the
+  (kind, file) pair, so a partial fix keeps its status; the item is carried forward from the published
+  register even after the findings are gone, so `triage` can prove the file clean and close it (and so a
+  resolved item stays in the register and earns its credit). This is the "do not revoke committed progress
+  - work the debt slowly" half of the owner's naming ruling (2026-09-27): hundreds of such open items
+  against the campaign's balance keep naming and typing work interleaved with new claims through the ratio,
+  with no special-casing.
+
+  A `naming`/`band-header` item is also **claimable** (`queue.py debt`): it carries the file and its distinct
+  name list, so a lane can be handed "clean the N names in this file" through the same `claims.py`
+  worktree/branch lock a unit proposal uses, spending one credit through `record_claims` - one resolved item
+  still earns exactly one. The debt becomes scheduled work instead of something a lane pays down
+  incidentally while passing through.
 * **`tools/units/undefrefs.py`**'s pre-existing-debt register (`--census`): one `undefrefs` item per unit
   whose object relocates a name no link input can define - the flip blocker a score cannot see. The unit's
   reference count is the item's rank weight, so the worst unit leads. Like a lint item it is an ordinary
@@ -82,13 +91,22 @@ each change.
     python tools/units/backlog.py --check               # exit 1 when the register is missing or stale
     python tools/units/backlog.py --set-status KEY done # open / done / parked, then regenerate
     python tools/units/backlog.py --selftest
+    python tools/units/queue.py debt                    # claim the top naming/band-header item
 
 Ranking is by what predicts value: the number of independent filers, then an item's weight (a
-`naming`/`band-header` item's live finding count, or an `undefrefs` unit's reference count, so the
-high-traffic file or worst unit leads), then recency, then
-`tooling.py`'s votes. An item also shows how long it has been open; an item filed in an early phase may be
-stale because the code moved on, and that is exactly what the register is for - it is surfaced, never
-silently dropped, and a human or lane parks it.
+`naming`/`band-header` item's **distinct at-fault name** count - one name repeated 500 times is nearly no
+work, 50 names are 50 renames - an `untyped` item's `void *` count, or an `undefrefs` unit's reference
+count, so the file with the most work outstanding leads), then recency, then
+`tooling.py`'s votes. The register also publishes the summed weight per rule (naming, band-header, untyped,
+undefrefs) so "is the debt shrinking?" is a number rather than a memory; `--print` shows it. An item also
+shows how long it has been open; an item filed in an early phase may be stale because the code moved on, and
+that is exactly what the register is for - it is surfaced, never silently dropped, and a human or lane parks
+it.
+
+The published JSON is `version: 2`: the shape is backward-compatible (new keys only), but an item's
+`weight` for `naming`/`band-header` is now the distinct-name count rather than the occurrence count. The old
+occurrence number is preserved on the item as `count`, and each such item also carries its `names` list - the
+one place the meaning changed, so a reader that treated `weight` as occurrences should read `count` instead.
 """
 from __future__ import annotations
 
@@ -121,6 +139,16 @@ NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-
 # no special-casing.
 LINT_KINDS = ("naming", "band-header", "untyped")
 LINT_RULES = {"naming": 7, "band-header": 2, "untyped": 11}
+# The name-based lint kinds: their weight is the number of **distinct at-fault names** - the token
+# `stylelint.finding_identity` carries - not the occurrence count. One name repeated 500 times is one
+# rename; 50 distinct names are 50 (`lint_index`). `untyped` is deliberately not one of them: a rule-11
+# finding is a declaration's `void *`, not a name to clear, so it keeps its occurrence count.
+NAME_KINDS = ("naming", "band-header")
+RULE_KIND = {7: "naming", 2: "band-header", 11: "untyped"}
+# The lint kinds the queue can hand out as a *claim* (`queue.py debt`): the item names a file and carries
+# its distinct name list, so a lane can be given "clean the N names in this file" exactly like a unit
+# proposal - the same `claims.py` claim, the same credit balance, one resolved item still earning one.
+DEBT_KINDS = ("naming", "band-header")
 # The undefined-reference source: one item per unit whose object relocates a name no link input can define.
 # `undefrefs.py` owns the one rule for "a name nothing defines" (`unresolved_names`); this source reads it,
 # never re-implements it, and - like every other kind - it is an ordinary open item the ratio rations
@@ -323,7 +351,10 @@ class Item:
     ask: str
     filings: list[Filing] = field(default_factory=list)
     votes: int = 0          # tooling.py's vote count (0 for a config_request item)
-    weight: int = 0         # a lint item's live finding count (0 for every other kind)
+    weight: int = 0         # the item's rank weight: a naming/band-header item's distinct-name count, an
+                            # untyped item's finding count, an undefrefs unit's reference count (0 otherwise)
+    names: list[str] = field(default_factory=list)  # a naming/band-header item's distinct at-fault names
+    count: int = 0          # the live occurrence count behind `weight` (0 for every non-lint kind)
     flavour: str = ""
     first: str = ""
     last: str = ""
@@ -511,13 +542,52 @@ def stylelint_findings(main: str) -> list[dict]:
 
 
 def lint_counts(findings: list[dict]) -> dict:
-    """`{(kind, file): n}` for the lint findings the backlog is filed against (rules 7, 2 and 11)."""
+    """`{(kind, file): n}` - the raw occurrence counts for the lint rules the backlog is filed against.
+
+    This is the *count* the item's report keeps (`Item.count`), never its weight: the weight is the distinct
+    name count (`lint_index`), so the two differ exactly on the file that repeats one name.
+    """
     out: dict = {}
     for f in findings:
-        kind = {7: "naming", 2: "band-header", 11: "untyped"}.get(f["rule"])
+        kind = RULE_KIND.get(f["rule"])
         if kind:
             key = (kind, f["file"])
             out[key] = out.get(key, 0) + 1
+    return out
+
+
+def lint_names(findings: list[dict]) -> set:
+    """The distinct at-fault names among `findings` - the lint's own token notion, never a second one.
+
+    `stylelint.finding_identity` is what the landing gate's `--diff` compares (rule, file, at-fault token,
+    detail); the **token** is the name a rename/move clears.  Reading the token through that function is
+    what keeps this register from re-deriving "a name" from a finding's prose, so the register and the gate
+    cannot disagree about which occurrences carry one name.
+    """
+    from units import stylelint as sl
+    return {sl.finding_identity(f)[2] for f in findings}
+
+
+def lint_index(findings: list[dict]) -> dict:
+    """`{(kind, file): {"names": [...], "count": n, "weight": w}}` for the backlog's lint kinds.
+
+    `weight` is the **distinct at-fault name count** for `naming`/`band-header` (rules 7 and 2) - the unit
+    of work this register measures, because one name repeated 500 times is one rename while 50 names are
+    50 - and the occurrence count for `untyped` (rule 11), whose finding is a declaration's `void *`, not a
+    name.  `names` is the sorted name list a claim's brief hands a lane; `count` is the raw occurrence
+    count, kept so a reader can see the file whose 500 occurrences are one name.
+    """
+    grouped: dict = {}
+    for f in findings:
+        kind = RULE_KIND.get(f["rule"])
+        if kind:
+            grouped.setdefault((kind, f["file"]), []).append(f)
+    out: dict = {}
+    for key, finds in grouped.items():
+        names = lint_names(finds)
+        out[key] = {"names": sorted(n for n in names if n),
+                    "count": len(finds),
+                    "weight": len(names) if key[0] in NAME_KINDS else len(finds)}
     return out
 
 
@@ -541,33 +611,39 @@ def collect_lint_items(main: str, register: str | None = None) -> list[Item]:
     Current findings create items; `_prior_lint_items` carries the already-published ones forward so a file
     whose findings were fixed is not silently dropped - its item stays for `triage` to prove done (and, once
     done, stays in the register and earns the credit). The item's key is the (kind, file) pair with a stable
-    `defect` (`rule 7` / `rule 2`), so a partial fix keeps its status. `weight` is the live finding count, so
-    `rank` surfaces the high-traffic file first; a zero-count carry-forward keeps the last known count in its
-    ask for the human reading it, but weighs nothing.
+    `defect` (`rule 7` / `rule 2`), so a partial fix keeps its status. `weight` is the **distinct at-fault
+    name count** for `naming`/`band-header` (`lint_index`), so `rank` surfaces the file with the most
+    *renames* outstanding - not the most occurrences - and the item carries the `names` list a claim hands a
+    lane; `untyped` keeps its occurrence count. A zero-weight carry-forward keeps the last known count in its
+    ask for the human reading it, but weighs nothing and is not claimable.
     """
-    counts = lint_counts(stylelint_findings(main))
+    index = lint_index(stylelint_findings(main))
     prior = _prior_lint_items(load_register(main, register))
     items: list[Item] = []
-    for key in sorted(set(counts) | set(prior)):
+    for key in sorted(set(index) | set(prior)):
         kind, target = key
-        live = counts.get(key, 0)
+        row = index.get(key) or {"names": [], "count": 0, "weight": 0}
+        live, names, count = row["weight"], list(row["names"]), row["count"]
+        if kind not in NAME_KINDS:
+            names = []   # `untyped` weighs occurrences; its names are not the unit of work
         last = int((prior.get(key) or {}).get("weight") or 0)
         rule = LINT_RULES[kind]
         if kind == "naming":
-            ask = ("`%s` carries %d rule-7 finding(s) (auto-generated `fn_`/`lbl_`/`loc_` or bare `unk*` "
-                   "names) - name each from what it does or holds and rename the map row in the same "
-                   "change" % (target, live or last))
+            ask = ("`%s` carries %d distinct rule-7 name(s) (auto-generated `fn_`/`lbl_`/`loc_` or bare "
+                   "`unk*` spellings the file already flagged) - name each from what it does or holds and "
+                   "rename the map row in the same change"
+                   % (target, live or last))
         elif kind == "untyped":
             ask = ("`%s` carries %d rule-11 finding(s) (a `void *` parameter or return type) - name the "
                    "real type at every call site, or mark the declaration `/* untyped: <byte range|opaque "
                    "handle|caller-owned payload> */` with the case that makes it genuinely untyped"
                    % (target, live or last))
         else:
-            ask = ("`%s` carries %d rule-2 finding(s) (an `extern` declared where it is not owned) - move "
-                   "each declaration to its owner's header (or `include/unsplit/`) and #include it"
+            ask = ("`%s` carries %d distinct rule-2 name(s) (an `extern` declared where it is not owned) - "
+                   "move each declaration to its owner's header (or `include/unsplit/`) and #include it"
                    % (target, live or last))
         items.append(Item(kind=kind, target=target, defect="rule %d" % rule, status="open",
-                          default_status="open", ask=ask, weight=live,
+                          default_status="open", ask=ask, weight=live, names=names, count=count,
                           filings=[Filing(source="stylelint", lane="stylelint", when="", detail=ask)]))
     return items
 
@@ -633,13 +709,31 @@ def collect_undefref_items(main: str, register: str | None = None) -> list[Item]
 def rank(items: list[Item]) -> list[Item]:
     """Filers first (the priority signal), then the item's weight, then recency; open before closed.
 
-    The weight is a `naming`/`band-header` item's live finding count, so the high-traffic file surfaces
-    first even though it carries no filing date; every other kind weighs 0, which leaves their existing
-    filer/recency/vote order untouched. `votes` (`tooling.py`'s) stays the last tie-break.
+    The weight is a `naming`/`band-header` item's **distinct-name count** (one name repeated 500 times is
+    nearly no work; 50 names are 50 renames), an `untyped` item's finding count, or an `undefrefs` unit's
+    reference count, so the item with the most work outstanding surfaces first even though it carries no
+    filing date; every other kind weighs 0, which leaves their existing filer/recency/vote order untouched.
+    `votes` (`tooling.py`'s) stays the last tie-break.
     """
     order = {"open": 0, "parked": 1, "done": 2}
     return sorted(items, key=lambda it: (order.get(it.status, 3), -it.filer_count, -it.weight,
                                          _neg(it.last), -it.votes, it.kind, it.target, it.defect))
+
+
+def weight_sums(items: list[Item]) -> dict:
+    """The open debt by kind - the summed rank weight - plus a `total`, the report's burn-down number.
+
+    `naming`/`band-header` contribute their distinct-name count (the renames outstanding), `untyped` its
+    `void *` count, `undefrefs` its undefined-reference count; every other kind weighs 0 and is omitted.
+    Summing only `open` items makes "is the debt shrinking?" a number rather than a memory. `payload`
+    publishes this under `weights`, and `--print` shows it.
+    """
+    out: dict = {}
+    for it in items:
+        if it.status == "open" and it.weight:
+            out[it.kind] = out.get(it.kind, 0) + it.weight
+    out["total"] = sum(v for k, v in out.items() if k != "total")
+    return out
 
 
 def _neg(iso: str) -> float:
@@ -762,9 +856,10 @@ def payload(items: list[Item], as_of: str, counts: dict, ledger=None) -> dict:
     ratio = ledger.get("ratio", RATIO_DEFAULT)
     summary = ledger_summary(items, claims, ratio, free=int(ledger.get("free") or 0))
     return {
-        "version": 1,
+        "version": 2,
         "as_of": as_of,
         "counts": counts,
+        "weights": weight_sums(items),
         "ledger": {"claims": list(claims), "ratio": ratio, "base": summary["base"],
                    "earned": summary["earned"], "spent": summary["spent"],
                    "free": summary["free"], "balance": summary["balance"]},
@@ -782,6 +877,8 @@ def payload(items: list[Item], as_of: str, counts: dict, ledger=None) -> dict:
                 "filer_count": it.filer_count,
                 "votes": it.votes,
                 "weight": it.weight,
+                "count": it.count,
+                "names": list(it.names),
                 "first": it.first,
                 "last": it.last,
                 "age_days": None if it.age_days is None else round(it.age_days, 2),
@@ -829,12 +926,32 @@ def build(main: str, outbox: str | None = None, notes: str | None = None,
               "parked": sum(1 for i in items if i.status == "parked"),
               "total": len(items)}
     return items, {"as_of": as_of, "counts": counts, "ledger": ledger,
-                   "summary": ledger_summary(items, ledger["claims"], ledger["ratio"])}
+                   "summary": ledger_summary(items, ledger["claims"], ledger["ratio"]),
+                   "weights": weight_sums(items)}
 
 
 def open_items(main: str, **kw) -> list[Item]:
     items, _ = build(main, **kw)
     return [i for i in items if i.status == "open"]
+
+
+def debt_items(items: list[Item]) -> list[Item]:
+    """The claimable debt among `items`: open `naming`/`band-header` items with names outstanding.
+
+    Pure, so the queue can filter a single `build` instead of re-linting the tree.  A carried-forward item
+    whose findings are gone weighs 0 and has no names, so it is not claimable (it is for `triage` to close).
+    """
+    return [it for it in items
+            if it.status == "open" and it.kind in DEBT_KINDS and it.weight > 0 and it.names]
+
+
+def open_debt_items(main: str, **kw) -> list[Item]:
+    """The claimable debt in rank order (the file with the most names outstanding leads).
+
+    These are the items the queue can hand out as a claim (`queue.py debt`): the register already rations new
+    proposal claims against them, and this is the other half - the debt itself can be scheduled.
+    """
+    return debt_items(open_items(main, **kw))
 
 
 def write_register(main: str, items: list[Item], as_of: str, counts: dict, ledger: dict,
@@ -867,8 +984,84 @@ def record_claims(main: str, claims: list[dict], ratio: int = RATIO_DEFAULT,
     return ledger_summary(items, ledger["claims"], ratio, free=ledger.get("free", 0))
 
 
-def lane_task(main: str, item: Item) -> dict:
-    """A ready-to-paste lane for a backlog item - mirroring how `queue.py next` prints its spawn line."""
+def debt_unit(item: Item) -> str:
+    """The claim unit of a debt item: the file it names.
+
+    A debt claim is held on the file (`claims.claim`), so the same branch/worktree lock a unit proposal uses
+    covers the file: a lane can be handed the debt while it is unclaimed, and a debt item whose file is
+    already claimed is skipped, never handed to a second lane.
+    """
+    return item.target
+
+
+def debt_names_line(item: Item, limit: int = 0) -> str:
+    """`item`'s distinct names as one clause for a brief - all of them, or the first `limit` with a count."""
+    names = list(item.names or [])
+    if not names:
+        return "no live names"
+    shown = names if limit <= 0 else names[:limit]
+    text = ", ".join("`%s`" % n for n in shown)
+    if limit > 0 and len(names) > limit:
+        text += ", ... (%d more)" % (len(names) - limit)
+    return text
+
+
+def debt_brief(main: str, item: Item) -> str:
+    """The brief for a claimable debt item - its file, its rule and the exact names to clear.
+
+    A naming item's names are renamed (and the map row renamed in the same change); a band-header item's
+    extern declarations are moved to their owner.  The list is the item's `names`, which came from the
+    lint's own token notion, so it is exactly the work left and nothing else.
+    """
+    rule = LINT_RULES.get(item.kind, "?")
+    fix = ("Rename each name below from what the function/data means, and rename its `symbols.txt` row in "
+           "the same change, until rule 7 no longer fires in the file." if item.kind == "naming" else
+           "For each symbol below, move its declaration to its owner's header (or `include/unsplit/`) and "
+           "`#include` it, until rule 2 no longer fires in the file.")
+    lines = ["# Debt brief: %s" % item.key, "",
+             "File: `%s`" % item.target,
+             "Rule: `%s` (rule %s)" % (item.kind, rule),
+             "Names outstanding: %d  (occurrences: %d)" % (len(item.names or []), item.count),
+             "", fix, ""]
+    if item.names:
+        lines += ["Names (%d):" % len(item.names), ""]
+        lines += ["- `%s`" % n for n in item.names]
+    else:
+        lines += ["No names are live now; the item is carried forward for `triage` to close."]
+    lines += ["", "When every name is gone the item resolves:", "",
+              "    python tools/units/backlog.py --set-status %s done" % item.key, ""]
+    return "\n".join(lines)
+
+
+def debt_task(main: str, item: Item, cwd: str | None = None, brief: str | None = None) -> dict:
+    """A ready-to-paste debt lane: "clean the N names in this file", with the names in the task.
+
+    Mirrors `lane_task` but leads with the file and its name list, because the payment is the names.  `cwd`
+    is the claim's worktree when the queue claimed one; `brief` names the written brief file.
+    """
+    root = (cwd or main).replace("\\", "/")
+    names = debt_names_line(item, limit=60)
+    task = ("Work the campaign debt item `%s` (%s): clean the %d distinct name(s) in `%s` - %s. "
+            "This is claimable debt, so `queue.py debt` spends one credit on it exactly like a proposal "
+            "claim, and resolving it earns one back: do the work, then mark it "
+            "`python tools/units/backlog.py --set-status %s done` (`parked` earns no credit). "
+            % (item.key, item.kind, len(item.names or []), item.target, names, item.key))
+    if brief:
+        task += "Your brief is %s. " % brief.replace("\\", "/")
+    task += ("Commit on your own branch; end your turn with your report - your final message is the result "
+             "the orchestrator receives.")
+    return {"agent": "fixer", "name": "fixer-debt-%s" % item.key[:32], "cwd": root, "task": task,
+            "call": "subagent(agent=\"fixer\", cwd=\"%s\", task=%s)" % (root, json.dumps(task))}
+
+
+def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None = None) -> dict:
+    """A ready-to-paste lane for a backlog item - mirroring how `queue.py next` prints its spawn line.
+
+    A `naming`/`band-header` item delegates to `debt_task`, so the lane is told the file and its names
+    (`debt_task`), not merely the item's key.
+    """
+    if item.kind in DEBT_KINDS and item.names:
+        return debt_task(main, item, cwd=cwd, brief=brief)
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
                "naming": "fixer", "band-header": "fixer", "untyped": "fixer",
                "undefrefs": "fixer",
@@ -881,10 +1074,13 @@ def lane_task(main: str, item: Item) -> dict:
             "orchestrator receives."
             % (item.key, item.kind, item.target, item.ask, item.key,
                register_path(main).replace("\\", "/")))
+    root = (cwd or main).replace("\\", "/")
+    if brief:
+        task += " Your brief is %s." % brief.replace("\\", "/")
     return {"agent": profile, "name": "%s-backlog-%s" % (profile, item.key[:32]),
-            "cwd": main.replace("\\", "/"), "task": task,
+            "cwd": root, "task": task,
             "call": "subagent(agent=\"%s\", cwd=\"%s\", task=%s)"
-                    % (profile, main.replace("\\", "/"), json.dumps(task))}
+                    % (profile, root, json.dumps(task))}
 
 
 def refusal(main: str, top: int = 3, ratio: int = RATIO_DEFAULT, wants: int = 1, **kw) -> str | None:
@@ -1261,10 +1457,13 @@ def _check_tooling(main: str, item: Item, ctx: dict):
 def _check_lint(main: str, item: Item, ctx: dict):
     """Whether a lint-derived item's findings are gone - re-linted now, never remembered.
 
-    The count is read from the file itself with `stylelint.lint_source` (rule 11 with `rule11_findings`,
-    which has no ownership dependency and sees the unsplit band), the same functions that produced the
-    item, so the check cannot drift from the lint. A missing file is `stale`; a rule-2 check needs the
-    symbols/splits map, so with the map absent it stays open rather than call itself resolved.
+    The findings are read from the file itself with `stylelint.lint_source` (rule 11 with `rule11_findings`,
+    which has no ownership dependency and sees the unsplit band), the same functions that produced the item,
+    so the check cannot drift from the lint.  For `naming`/`band-header` the item is judged on the file's
+    **distinct at-fault names** (`lint_names`, the lint's own token notion): it resolves only when every
+    name is gone, never because the occurrence count merely fell - one rename of a repeated name is one
+    name gone.  A missing file is `stale`; a rule-2 check needs the symbols/splits map, so with the map
+    absent it stays open rather than call itself resolved.
     """
     rule = LINT_RULES.get(item.kind)
     # A lint kind filed as an outbox `config_requests` entry (`kind: naming`) with no file names the *kind* as
@@ -1287,16 +1486,22 @@ def _check_lint(main: str, item: Item, ctx: dict):
     if rule == 11:
         # Rule 11 is source-local and has no ownership dependency, so it is read straight from the file:
         # `lint_source` returns early for the unsplit band (rule 2 only), which would call a band item
-        # resolved while its `void *` parameters are still there.
+        # resolved while its `void *` parameters are still there.  Its weight is the occurrence count, so
+        # it resolves when no finding remains.
         findings = sl.rule11_findings(sl.Source(path, item.target, read(path)))
-    else:
-        findings = [f for f in sl.lint_source(sl.Source(path, item.target, read(path)), ownership)
-                    if f["rule"] == rule]
-    if findings:
-        return ("open", "%s still carries %d rule-%d finding(s)"
-                % (item.target, len(findings), rule))
-    return ("resolved", "rule %d no longer fires in %s (re-linted with the same rule that filed it)"
-            % (rule, item.target))
+        if findings:
+            return ("open", "%s still carries %d rule-11 finding(s)" % (item.target, len(findings)))
+        return ("resolved", "rule %d no longer fires in %s (re-linted with the same rule that filed it)"
+                % (rule, item.target))
+    findings = [f for f in sl.lint_source(sl.Source(path, item.target, read(path)), ownership)
+                if f["rule"] == rule]
+    names = lint_names(findings)
+    if names:
+        shown = ", ".join("`%s`" % n for n in sorted(n for n in names if n)[:3])
+        return ("open", "%s still carries %d distinct rule-%d name(s)%s"
+                % (item.target, len(names), rule, (" (%s ...)" % shown) if shown else ""))
+    return ("resolved", "rule %d no longer fires in %s (re-linted with the same rule that filed it; every "
+            "distinct name is gone)" % (rule, item.target))
 
 
 def _undefref_census(main: str, ctx: dict):
@@ -1428,6 +1633,18 @@ def print_report(items: list[Item], meta: dict, top: int) -> None:
     if meta.get("summary"):
         print("  %s" % ledger_line(meta["summary"]))
         print("    (`parked` earns no credit - parking removes a ghost; only a resolved `done` buys a claim)")
+    w = meta.get("weights") or {}
+    if w:
+        names = [k for k in ("naming", "band-header") if w.get(k)]
+        other = [k for k in sorted(w) if k not in ("total", "naming", "band-header") and w.get(k)]
+        if names:
+            print("  names outstanding: %s  (%d distinct names)"
+                  % (" / ".join("%s %d" % (k, w[k]) for k in names),
+                     sum(w[k] for k in names)))
+        if other:
+            print("  other open debt weight: %s"
+                  % " / ".join("%s %d" % (k, w[k]) for k in other))
+        print("  total open debt weight: %d" % w.get("total", 0))
     print("  rank  filers  age  kind         item")
     for i, it in enumerate(items[:top], 1):
         age = "-" if it.age_days is None else "%.0fd" % it.age_days
@@ -1550,7 +1767,8 @@ def main() -> int:
               "parked": sum(1 for i in items if i.status == "parked"),
               "total": len(items)}
     meta = {"as_of": as_of, "counts": counts, "ledger": ledger,
-            "summary": ledger_summary(items, ledger["claims"], args.ratio)}
+            "summary": ledger_summary(items, ledger["claims"], args.ratio),
+            "weights": weight_sums(items)}
 
     if args.check:
         if not os.path.exists(register):

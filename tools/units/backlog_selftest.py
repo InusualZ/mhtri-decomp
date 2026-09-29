@@ -548,6 +548,70 @@ def selftest() -> int:
                          {"splits": bl._splits_ranges(ldir)})[0], "open")
     check("a tree with no src/ contributes no lint items", bl.collect_lint_items(tmp), [])
 
+    # --- (a) the weight is distinct names, not occurrences ------------------------------------------
+    # The owner's ruling: a landing is refused only for a name NEW to the file, so the register must
+    # measure the same thing. Two files with the SAME occurrence count but different distinct-name counts
+    # must order by names: one name repeated six times is one rename, six names are six.
+    wdir = tempfile.mkdtemp(prefix="backlog-weights-")
+    for d in ("src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
+        os.makedirs(os.path.join(wdir, d))
+    open(os.path.join(wdir, "configure.py"), "w", encoding="utf-8").write("config.libs = [\n]\n")
+    for cfg in ("symbols.txt", "splits.txt"):
+        open(os.path.join(wdir, "config", "RMHE08", cfg), "w", encoding="utf-8").write("")
+    open(os.path.join(wdir, "src", "mod", "repeat.c"), "w", encoding="utf-8").write(
+        "void fn_80040598(void) {}\n" * 6)
+    open(os.path.join(wdir, "src", "mod", "distinct.c"), "w", encoding="utf-8").write(
+        "".join("void fn_8004060%d(void) {}\n" % i for i in range(6)))
+    widx = bl.lint_index(bl.stylelint_findings(wdir))
+    rep_key, dis_key = ("naming", "src/mod/repeat.c"), ("naming", "src/mod/distinct.c")
+    check("the weight of a repeated name is its distinct-name count, not its occurrences",
+          (widx[rep_key]["weight"], widx[rep_key]["count"]), (1, 6))
+    check("... and its names list is the one distinct name", widx[rep_key]["names"], ["fn_80040598"])
+    check("... while six distinct names weigh six, at the same occurrence count",
+          (widx[dis_key]["weight"], widx[dis_key]["count"]), (6, 6))
+    witems = bl.collect_lint_items(wdir)
+    check("the collect_lint_items weight is the distinct-name count (the item's counter is the count)",
+          [(i.target, i.weight, i.count) for i in witems if i.kind == "naming"],
+          [("src/mod/distinct.c", 6, 6), ("src/mod/repeat.c", 1, 6)])
+    check("equal occurrence counts order by distinct names (the repeated name last)",
+          [i.target for i in bl.rank(witems) if i.kind == "naming"],
+          ["src/mod/distinct.c", "src/mod/repeat.c"])
+    check("the naming ask reports the distinct-name count, not the occurrences",
+          [i.ask for i in witems if i.target == "src/mod/repeat.c"][0].count("1 distinct rule-7 name"), 1)
+    check("the weight sum is the distinct names outstanding, per rule",
+          bl.weight_sums(witems)["naming"], 7)
+    wpayload = bl.payload(witems, "", {"open": 2, "done": 0, "parked": 0, "total": 2},
+                         {"claims": [], "ratio": 1})
+    check("the payload publishes the weight sum per rule", wpayload["weights"]["naming"], 7)
+    check("... keeps the occurrence count on the item",
+          [it["count"] for it in wpayload["items"] if it["target"] == "src/mod/repeat.c"], [6])
+    check("... and the names list the claim hands a lane",
+          [it["names"] for it in wpayload["items"] if it["target"] == "src/mod/repeat.c"],
+          [["fn_80040598"]])
+    check("the payload version marks the one changed meaning (weight)", wpayload["version"], 2)
+
+    # --- (b) triage resolves on distinct names gone, never on a lower occurrence count ---------------
+    rep_item = {i.target: i for i in witems}["src/mod/repeat.c"]
+    dis_item = {i.target: i for i in witems}["src/mod/distinct.c"]
+    wctx = {"splits": bl._splits_ranges(wdir)}
+    dec, ev = bl._check_lint(wdir, rep_item, wctx)
+    check("triage: a repeated name keeps its naming item open", dec, "open")
+    check_true("... and is judged by distinct names (1), never by the 6 occurrences",
+               "1 distinct rule-7 name" in (ev or ""))
+    # the occurrence count falls 6 -> 1, but a distinct name remains: still open
+    open(os.path.join(wdir, "src", "mod", "distinct.c"), "w", encoding="utf-8").write(
+        "void fn_80040600(void) {}\n")
+    dec, ev = bl._check_lint(wdir, dis_item, wctx)
+    check("triage: a lower count with one distinct name left stays open", dec, "open")
+    check_true("... naming the one name still outstanding", "fn_80040600" in (ev or ""))
+    # every distinct name gone: resolved
+    open(os.path.join(wdir, "src", "mod", "distinct.c"), "w", encoding="utf-8").write(
+        "void named_from_what_it_does(void) {}\n")
+    check("triage: the item resolves once the distinct names are gone",
+          bl._check_lint(wdir, dis_item, wctx)[0], "resolved")
+    check_true("... and says every distinct name is gone", "distinct name is gone" in
+               (bl._check_lint(wdir, dis_item, wctx)[1] or ""))
+
     # --- the fourth source: undefined references, one item per unit, ranked by reference count ------
     # The rule is `undefrefs.unresolved_names` (reached through `undefrefs.census`); this source reads it,
     # never re-implements it. The fixture is a real ELF32 object - `undefrefs_selftest.build_obj` is reused
@@ -697,6 +761,20 @@ def selftest() -> int:
     check("a band-header item gets a fixer lane",
           bl.lane_task(tmp, bl.Item(kind="band-header", target="src/a.c", defect="rule 2", status="open",
                                     default_status="open", ask="x"))["agent"], "fixer")
+    # a claimable debt item's lane leads with the file and the distinct name list (`debt_task`)
+    debt_item = bl.Item(kind="naming", target="src/mod/a.c", defect="rule 7", status="open",
+                        default_status="open", ask="x", weight=2,
+                        names=["fn_80040598", "fn_80040599"], count=6)
+    dtask = bl.debt_task(tmp, debt_item)
+    check("a debt item's lane is a fixer", dtask["agent"], "fixer")
+    check_true("... whose task names the file, the count and the names",
+               "clean the 2 distinct name(s) in `src/mod/a.c`" in dtask["task"]
+               and "fn_80040598" in dtask["task"] and "fn_80040599" in dtask["task"])
+    dbrief = bl.debt_brief(tmp, debt_item)
+    check_true("... and whose brief is the file + the full name list",
+               "src/mod/a.c" in dbrief and dbrief.count("- `") == 2
+               and "--set-status %s done" % debt_item.key in dbrief)
+    check("the debt claim unit is the item's file", bl.debt_unit(debt_item), "src/mod/a.c")
 
     if fails:
         print("FAIL (%d)" % len(fails))
