@@ -72,6 +72,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import sharedfiles as sf  # noqa: E402  (the one writer for shared files - docs/plan.md 7.12)
 import symbolpreflight as preflight  # noqa: E402  (the splits.txt / symbols.txt parsers)
+import dataseams  # noqa: E402  (`.data` emission-order seams: a run that spans several TUs)
 
 # dtk's section order (mirrors tudiscover.SECTION_ORDER) - the queue's deterministic sort key.
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
@@ -166,12 +167,51 @@ def split_by_owner(runs: list[dict], refs: dict[str, set[str]], fn_unit: dict[st
             if current is not None and sig == current["sig"]:
                 current["end"] = max(current["end"], end)
                 current["names"].append(name)
+                current["items"].append([address, name, end])
             else:
                 current = {"section": run["section"], "start": address, "end": end,
-                           "names": [name], "sig": sig}
+                           "names": [name], "sig": sig, "items": [[address, name, end]]}
                 out.append(current)
     out.sort(key=lambda r: (_section_key(r["section"]), r["start"], r["end"]))
     return out
+
+
+def cut_runs_at_seams(runs: list[dict], seams: list[dict] | None) -> list[dict]:
+    """Cut each `.data` run at every strong emission-order seam (`dataorder`: V->S, zigzag).
+
+    A run that contains a seam spans several TUs and can never match in one unit, so a proposed claim must not
+    be one span. The cut is at the seam's own address - the first symbol of the next TU - and only strong
+    seams are given here (`V->D` is weak: never a cut). Other sections and seam-free runs pass through.
+    """
+    cuts = {s["addr"] for s in (seams or ())}
+    if not cuts:
+        return runs
+    out: list[dict] = []
+    for run in runs:
+        if run["section"] != ".data" or not any(run["start"] < c < run["end"] for c in cuts):
+            out.append(run)
+            continue
+        current = None
+        for item in run["items"]:
+            address, name, end = item
+            if current is not None and address in cuts:
+                current = None
+            if current is None:
+                current = {"section": run["section"], "start": address, "end": end, "names": [name],
+                           "sig": run.get("sig"), "items": [item]}
+                out.append(current)
+            else:
+                current["end"] = max(current["end"], end)
+                current["names"].append(name)
+                current["items"].append(item)
+    out.sort(key=lambda r: (_section_key(r["section"]), r["start"], r["end"]))
+    return out
+
+
+def runs_with_seams(entries: list[dict], seams: list[dict] | None) -> list[dict]:
+    """The queue entries (any verdict) whose `.data` range contains a strong seam."""
+    return [e for e in entries
+            if e["section"] == ".data" and dataseams.seams_in(seams or [], e["start"], e["end"])]
 
 
 def refs_by_symbol(funcs: dict) -> dict[str, set[str]]:
@@ -228,11 +268,12 @@ def verdict_for(names: list[str], leak: int, density: float, start: int) -> str:
     return "proposed"
 
 
-def build_entries(symbols: list[dict], splits: list[dict], funcs: dict, cover) -> list[dict]:
+def build_entries(symbols: list[dict], splits: list[dict], funcs: dict, cover, seams=None) -> list[dict]:
     """The whole queue, in the plan's shape, in a deterministic order - pure.
 
     `cover(section, address)` names the split object covering an address (the ledger's
-    `Objects.covering`), so an unattributed run still resolves to the region it lives in.
+    `Objects.covering`), so an unattributed run still resolves to the region it lives in. `seams` (the strong
+    `.data` emission-order seams, `dataseams.load_strong()`) cuts a run that would span several TUs.
     """
     refs = refs_by_symbol(funcs)
     fn_unit = function_units(symbols, splits)
@@ -240,7 +281,7 @@ def build_entries(symbols: list[dict], splits: list[dict], funcs: dict, cover) -
     for entry in symbols:
         by_section.setdefault(entry["section"], []).append(entry)
     entries = []
-    for run in split_by_owner(group_runs(select(symbols, splits)), refs, fn_unit):
+    for run in cut_runs_at_seams(split_by_owner(group_runs(select(symbols, splits)), refs, fn_unit), seams):
         names = run["names"]
         nameset = set(names)
         unit, leak = run_unit(run, refs, fn_unit)
@@ -333,7 +374,8 @@ def owns(splits: list[dict], section: str, start: int, end: int) -> dict | None:
 
 
 def build_request(unit: str, addr: int, size: int | None, section: str | None, evidence: str,
-                  unblocks: str, symbols: list[dict], splits: list[dict], entries: list[dict]) -> dict:
+                  unblocks: str, symbols: list[dict], splits: list[dict], entries: list[dict],
+                  seams: list[dict] | None = None) -> dict:
     """One request dict - pure, so the selftest needs no repository.
 
     `size` defaults to the queue run that covers the address (the span the lane would claim), and the
@@ -355,9 +397,13 @@ def build_request(unit: str, addr: int, size: int | None, section: str | None, e
     size = int(size)
     if size <= 0:
         raise SystemExit("--size must be positive")
-    return {"unit": unit, "section": section or "?", "start": addr, "end": addr + size,
-            "size": size, "evidence": evidence.strip(), "unblocks": unblocks.strip(),
-            "queue_verdict": (run or {}).get("verdict")}
+    entry = {"unit": unit, "section": section or "?", "start": addr, "end": addr + size,
+             "size": size, "evidence": evidence.strip(), "unblocks": unblocks.strip(),
+             "queue_verdict": (run or {}).get("verdict")}
+    warn = dataseams.warning(addr, addr + size, seams or []) if section == ".data" else None
+    if warn:
+        entry["seam_warning"] = warn
+    return entry
 
 
 def load_requests(root: str) -> list[dict]:
@@ -485,7 +531,8 @@ def cmd_request(root: str, unit: str, addr_text: str, size=None, section=None, e
     symbols, splits, funcs, cover, warning = load_inputs(root)
     if warning:
         print("WARNING: %s" % warning, file=sys.stderr)
-    entries = build_entries(symbols, splits, funcs, cover)
+    seams = dataseams.load_strong()
+    entries = build_entries(symbols, splits, funcs, cover, seams)
     section_hint = section or infer_section(symbols, addr)
     run = run_for(entries, addr, section_hint)
     probe = int(size) if size else ((run["end"] - run["start"]) if run else 4)
@@ -494,7 +541,7 @@ def cmd_request(root: str, unit: str, addr_text: str, size=None, section=None, e
         print("REFUSED: %s already owns %s 0x%X-0x%X, so there is nothing to request - it is a claim"
               % (owner["unit"], owner["section"], owner["start"], owner["end"]))
         return 1
-    entry = build_request(unit, addr, size, section, evidence, unblocks, symbols, splits, entries)
+    entry = build_request(unit, addr, size, section, evidence, unblocks, symbols, splits, entries, seams)
     requests = load_requests(root)
     merged, changed = merge_request(requests, entry)
     path = os.path.join(root, REQUESTS_REL)
@@ -506,6 +553,8 @@ def cmd_request(root: str, unit: str, addr_text: str, size=None, section=None, e
              "  [queue: %s]" % entry["queue_verdict"] if entry.get("queue_verdict") else ""))
     print("  evidence: %s" % entry["evidence"])
     print("  unblocks: %s" % entry["unblocks"])
+    if entry.get("seam_warning"):
+        print("  WARNING: this range %s" % entry["seam_warning"])
     if dry_run:
         print("dry run: nothing written")
         return 0
@@ -721,7 +770,7 @@ def selftest() -> int:
         g = globals()
         saved = (g["load_inputs"], g["build_entries"])
         g["load_inputs"] = lambda root: (req_syms, req_splits, {}, None, "")
-        g["build_entries"] = lambda symbols, splits, funcs, cover: req_entries
+        g["build_entries"] = lambda symbols, splits, funcs, cover, seams=None: req_entries
         try:
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
@@ -740,6 +789,34 @@ def selftest() -> int:
                   "already owns" in buf.getvalue(), True)
         finally:
             g["load_inputs"], g["build_entries"] = saved
+
+    # --- emission-order seams: a run that spans several TUs is cut, and a request that spans one warns
+    seam_syms = [sym("vtA", ".data", 0x1000, 0x20), sym("strB", ".data", 0x1020, 0x10),
+                 sym("dC", ".data", 0x1030, 0x10), sym("vtD", ".data", 0x1040, 0x20),
+                 sym("strE", ".data", 0x1060, 0x10)]
+    strong = [{"addr": 0x1020, "kind": "V->S"}, {"addr": 0x1060, "kind": "V->S"}]
+    plain = build_entries(seam_syms, [], {}, lambda s, a: None)
+    check("seams: without seams one run spans everything", [(e["start"], e["end"]) for e in plain],
+          [(0x1000, 0x1070)])
+    check("seams: runs_with_seams finds the spanning run", len(runs_with_seams(plain, strong)), 1)
+    cutq = build_entries(seam_syms, [], {}, lambda s, a: None, strong)
+    check("seams: a strong seam cuts the run into one span per TU", [(e["start"], e["end"]) for e in cutq],
+          [(0x1000, 0x1020), (0x1020, 0x1060), (0x1060, 0x1070)])
+    check("seams: the cut queue contains no seam", runs_with_seams(cutq, strong), [])
+    check("seams: a weak V->D seam is never a cut (only strong seams are passed)",
+          [(e["start"], e["end"]) for e in build_entries(seam_syms, [], {}, lambda s, a: None, [])],
+          [(0x1000, 0x1070)])
+    check("seams: another section is never cut",
+          len(build_entries([sym("a", ".rodata", 0x1000, 0x20), sym("b", ".rodata", 0x1020, 0x10)],
+                            [], {}, lambda s, a: None, strong)), 1)
+    req_seam = build_request("u", 0x1000, None, ".data", "e", "u", seam_syms, [], plain, strong)
+    check("seams: a request over a spanning run carries the warning",
+          ("0x00001020 (V->S)" in req_seam.get("seam_warning", ""), "0x00001060-0x00001070" in req_seam.get("seam_warning", "")),
+          (True, True))
+    req_fit = build_request("u", 0x1000, None, ".data", "e", "u", seam_syms, [], cutq, strong)
+    check("seams: a request inside one TU's fragment is clean", "seam_warning" in req_fit, False)
+    req_big = build_request("u", 0x1000, 0x70, ".data", "e", "u", seam_syms, [], cutq, strong)
+    check("seams: an explicit --size that spans TUs warns", "seam_warning" in req_big, True)
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -764,6 +841,8 @@ def main() -> int:
     ap.add_argument("--section", default=None, help="requested section (default: inferred from the address)")
     ap.add_argument("--evidence", default="", help="sole-referencer evidence for the request")
     ap.add_argument("--unblocks", default="", help="the rows/symbols this range unblocks")
+    ap.add_argument("--no-seam-cut", action="store_true",
+                    help="do not cut runs at strong .data emission-order seams (docs/data-order-seams.md)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -776,7 +855,17 @@ def main() -> int:
                            section=args.section, evidence=args.evidence, unblocks=args.unblocks,
                            as_json=args.json, dry_run=args.dry_run)
     symbols, splits, funcs, cover, warning = load_inputs(root)
-    entries = build_entries(symbols, splits, funcs, cover)
+    seams = [] if args.no_seam_cut else dataseams.load_strong()
+    if dataseams.load_error() and not args.no_seam_cut:
+        print("WARNING: .data seams unavailable (%s) - runs are not cut" % dataseams.load_error(), file=sys.stderr)
+    uncut = build_entries(symbols, splits, funcs, cover)
+    entries = build_entries(symbols, splits, funcs, cover, seams)
+    hit = runs_with_seams(uncut, dataseams.load_strong())
+    print("seams: %d of %d proposed run(s) contain a strong .data seam (V->S/zigzag) and span several TUs "
+          "(%d of them proposed); %s -> %d -> %d run(s)"
+          % (len(hit), len(uncut), sum(1 for e in hit if e["verdict"] == "proposed"),
+             "cut at the seams" if seams else "NOT cut (--no-seam-cut)", len(uncut), len(entries)),
+          file=sys.stderr if args.json else sys.stdout)
     if args.limit:
         entries = entries[:args.limit]
     text = render(entries)

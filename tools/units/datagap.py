@@ -49,6 +49,9 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
+
 META_SECTIONS = {".comment", ".note.split", ".shstrtab", ".strtab", ".symtab", ".dynsym", ".dynstr"}
 
 # The sections that make a unit's *data* wrong rather than its code unfinished.
@@ -132,6 +135,25 @@ def scan(rows, mode="ours-extra", all_sections=False, min_fuzzy=0.0):
         yield name, extra, missing
 
 
+def seam_notes(pairs) -> list[tuple[str, str]]:
+    """`(unit, note)` for every scanned unit whose `.data` differs and whose target range spans several TUs.
+
+    `dataseams.seam_note` decides (docs/data-order-seams.md): `order-only` when the two objects hold the same
+    symbols in a different sequence - a size comparison cannot see that - else the multi-TU line. Units whose
+    range holds no strong seam, or whose objects agree, are silent.
+    """
+    out = []
+    for row in pairs:
+        if not (os.path.exists(row["obj"]) and os.path.exists(row["src"])):
+            continue
+        # the report's unit name carries a `main/` prefix; splits.txt names the unit by its source path
+        stem = os.path.splitext(row["obj"].replace("\\", "/").split("/obj/", 1)[-1])[0]
+        note = dataseams.seam_note(stem, row["src"], row["obj"])
+        if note:
+            out.append((row["unit"], note))
+    return out
+
+
 def summary_lines(listed: int, data_rows: int, scanned: int, mode: str,
                   flip_blockers: bool, min_fuzzy: float) -> list[str]:
     """The closing lines, honest about the **direction** a zero is a zero *of*.
@@ -202,6 +224,33 @@ def selftest() -> int:
         e, m = compare_sections({name: t}, {name: o})
         eq(len(e) + len(m) <= 1, True, f"one direction only for {t}/{o}")
 
+    # emission-order seams: a unit whose sizes agree can still be order-only, and the size scan is blind to it
+    eq(compare_sections({".data": 4108}, {".data": 4108}), ([], []), "equal sizes are silent to the size scan")
+    real = dataseams.seam_note
+    try:
+        dataseams.seam_note = lambda unit, src, obj, **kw: (
+            ".data: order-only: the unit spans several TUs; seams at 0x00001100" if unit == "A/a" else None)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            def touch(rel):
+                path = os.path.join(tmp, rel)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                open(path, "wb").close()
+                return path
+
+            pairs = [{"unit": "main/A/a", "obj": touch("build/RMHE08/obj/A/a.o"),
+                      "src": touch("build/RMHE08/src/A/a.o"), "fuzzy": 0.0},
+                     {"unit": "main/B/b", "obj": touch("build/RMHE08/obj/B/b.o"),
+                      "src": touch("build/RMHE08/src/B/b.o"), "fuzzy": 0.0},
+                     {"unit": "main/C/c", "obj": touch("build/RMHE08/obj/C/c.o"),
+                      "src": os.path.join(tmp, "no", "such.o"), "fuzzy": 0.0}]
+            got = seam_notes(pairs)
+        eq([u for u, _n in got], ["main/A/a"], "only a unit with a note is listed; a missing object is skipped")
+        eq("order-only: the unit spans several TUs; seams at" in got[0][1], True,
+           "the note is the order-only diagnosis")
+    finally:
+        dataseams.seam_note = real
+
     print(f"datagap selftest: {checks} checks OK")
     return 0
 
@@ -246,6 +295,9 @@ def main(argv=None) -> int:
         if missing:
             bits.append("target-extra " + ", ".join(f"{s} {t}B (ours {o}B)" for s, t, o in missing))
         print(f"{name}: " + "; ".join(bits))
+    notes = seam_notes(pairs)
+    for name, note in notes:
+        print(f"{name}: {note}")
     data_rows = sum(1 for _n, e, m in rows if m or any(s != ".text" for s, _o, _t in e))
     for line in [""] + summary_lines(len(rows), data_rows, len(pairs), args.mode,
                                       args.flip_blockers, args.min_fuzzy):
@@ -253,7 +305,8 @@ def main(argv=None) -> int:
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
-            json.dump([{"unit": n, "ours_extra": e, "target_extra": m} for n, e, m in rows], fh, indent=1)
+            json.dump([{"unit": n, "ours_extra": e, "target_extra": m} for n, e, m in rows]
+                      + [{"unit": n, "seam_note": t} for n, t in notes], fh, indent=1)
         print(f"wrote {args.json}")
     return 0
 

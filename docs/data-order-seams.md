@@ -98,3 +98,15 @@ Order: 0 first; then 1, 2, 3 and 4 are independent and can run as parallel lanes
   row. Real objects: 293 built units, 3 with vtables (`network_transport` 7, `fn_803D3CE8` 1,
   `NetworkSessionManagerPat` 1), 0 findings; `network_transport`'s 7 vtables descend exactly in reverse class order.
   The `decompiler` profile's seam-check step and `codereviewer` name the check. 114-check selftest.
+* Phase 0: landed (`tools/splits/dataorder.py`, 27-check selftest). Phases 1-4: in progress as parallel lanes.
+* Phase 2: `tools/units/dataseams.py` is the one consumer layer over `dataorder` (strong seams only: V->S and
+  zigzag; V->D is never used to cut or warn). `dataqueue.py` cuts a proposed `.data` run at strong seams
+  (`--no-seam-cut` opts out), prints how many runs contained one, and `--request` warns with the seams and the
+  suggested cut ranges when the requested range spans several TUs (the request row carries `seam_warning`).
+  `dataclaim.py` adds `seams`/`seam_warning` to each queue run (the verdict is unchanged; the reason gains a
+  `WARNING`, the summary a `multi-TU` line) and to each rule-12 claim record. `flipcheck.py` and `datagap.py`
+  name a differing `.data`: `order-only: the unit spans several TUs; seams at 0x...` when the two objects hold
+  the same symbols in a different sequence, else the multi-TU line. Measured on the committed queue: 76 of
+  3,050 `.data` runs contain a seam (127 seams). On `Network/network_transport` both tools name
+  0x805F9570, 0x805F9610, 0x805F9958 and 0x805F9A40 (plus the three zigzag seams); its object today is
+  not order-only (its `.data` is 0x560 of 0x100C bytes), so it gets the multi-TU line.
