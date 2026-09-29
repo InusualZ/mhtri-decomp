@@ -63,24 +63,42 @@
  * those rows is byte-identical (measured: 32/32 rows at 100 % in the same build).  Playbook 39/41 -
  * the pragma is the lever, the command line's `-opt nopeephole` is accepted and changes nothing.
  *
- * RESIDUAL.  Written: the 38 rows below (2128 B of the range's 28400 B), 37 of them byte-identical.
+ * VTABLES (found this pass; they are what names the two peer classes).  Every one of these functions'
+ * addresses occurs as a slot in one of the two `.data` tables at 0x805F9510 and 0x805F95E0 (a 4-byte
+ * big-endian scan for the address over the DOL maps a function to its table and its slot offset, and
+ * the log string that follows each table names the class): 0x805F9510 is the payload-buffer peer
+ * (`NetworkPeerBuffer`, its slot 0x10, 0x1C, 0x24, 0x28, 0x3C, 0x40, 0x44, 0x48, 0x54 are the rows
+ * below) and 0x805F95E0 the socket peer (`NetworkPeerSocket`, slots 0x0C..0x28).  This is why the four
+ * 4-byte/8-byte rows are virtual slots with constant bodies rather than free functions, and why the
+ * `slot0C`-style names carry a slot offset instead of a role: nothing in an empty body pins one.
+ *
+ * RESIDUAL.  Written: the 56 rows below (3584 B of the range's 28400 B), 55 of them byte-identical.
  *   - `networkPeerStream_takeRecord` 81.39 % (184 B, same size): the remaining diff is the second
  *     operand of the `||` guard - retail branches *forward* to the shared zero-store (`bgt`) where
  *     ours falls through - plus one `lhz` reload of the address-taken length local.  Both spellings
  *     tried (two separate guards, a combined `||`, a `raw` copy into a register local); the best is
  *     the one here (74.76 % -> 81.39 %).  The shape is the peephole pass's block layout, not a
  *     source form: recorded, not pursued.
- *   - this unit **references two symbols it does not define**: `networkPeer_release` and
- *     `networkPeer_releaseSocket` (their bodies load a logger singleton and a log string, which the
- *     `.data` blocker covers).  Harmless while the object is `NonMatching`; a link-time residual for
- *     whoever flips the unit.
+ *   - the range still **references three symbols it does not define**, all unowned data the source
+ *     declares rather than claims: `networkSocketPool_acquire`/`networkSocketPool_release` are
+ *     defined (0x804187F0/0x80418864) in an unsplit band, and `NetworkSingleTcp_remove` (0x803CE470)
+ *     is inside this range but still unwritten because its body loads one of the `.data` log strings.
+ *     Harmless while the object is `NonMatching`; a link-time residual for whoever flips the unit.
  * Everything else in the range is unwritten.  The blocker for the majority of it is the `.data` run
  * above (about 40 functions load one of its strings or tables); the rest are the four vtable stores
- * (rule 10 - a table emitter needs the classes reconstructed first), the slots whose field offsets
- * live in `NetworkSessionStable`'s padding in the neighbouring header (naming them means editing
- * another unit's type), and the `@eti_800300XX` constants `sendPackets`/`fn_803CCF88` load, which land
- * inside the `extabindex` table and so have no symbol to name (a pool artefact of the original
- * object, playbook 58).
+ * (rule 10 - a table emitter needs the classes reconstructed first), the `@eti_800300XX` constants 18
+ * functions load, and the `NetworkSessionStable`-slot rows below.  The `@eti_` constants are the hard
+ * blocker and they are not a naming problem: `sendPackets` (0x803CD25C) loads 0x80030002 and
+ * `fn_803CCF88` (0x803CCF88) 0x80030021, i.e. addresses **inside the extabindex table** - the DOL
+ * really holds `lis r4,0x8003 / addi r4,r4,0x21` there, and the nearest map row is `@eti_80030018`
+ * with addend 9, so the operand is not any object's data and no source spelling can produce it
+ * (dtk's group-relative derivation, playbook 58's class).  18 of the range's functions carry one.
+ *   - the `NetworkSessionStable` rows (`fn_803D1558`, `fn_803D2494`, `fn_803D2508`,
+ *     `NetworkSessionStable_setConnectionInterval`, `fn_803D25xx`, `getSomething5`, 0x8F4 B in all)
+ *     need fields **inside** `NetworkSessionStable`'s and `NetworkSessionSlot`'s padding in
+ *     `include/Network/fn_803D3CE8.h` - the slots' per-slot header at slot-0x10 and their +0x04 float,
+ *     and the session's +0x14810/+0x14824/+0x16CE4 words.  That header belongs to the neighbouring
+ *     unit a later lane owns, so this pass left them unwritten rather than fork the type.
  *
  * DATA.  `.text` plus the object's `extab` (0x800198C8..0x80019E5C) and `extabindex`
  * (0x8003A0BC..0x8003A524) are claimed; no `.data`/`.sdata`/`.sdata2` run is, and the source emits
@@ -93,7 +111,13 @@
 #include "Network/network_transport.h"
 #include "Network/fn_803D3CE8.h"
 #include "unsplit/NetworkData.h"
-#include "unsplit/OS.h"
+/* `unsplit/Network.h` is the Network band's code half: it declares `getNetworkLogger` and the two
+   socket-pool helpers the peer teardown calls.  It cannot be included beside `unsplit/OS.h` - the two
+   band headers declare `OSCreateThread`/`OSResumeThread` with different signatures (`OS.h` typed,
+   `Network.h` untyped), and a TU that sees both fails with `(10197) illegal function overloading`.
+   This file needs only `OSLockMutex`/`OSUnlockMutex`, which `Network.h` declares with the same shape,
+   so `OS.h` stays out. */
+#include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -522,17 +546,250 @@ NetworkPeerError* dtor_803D14C0(NetworkPeerError* self, s32 flags)
 /* the manager's mutex wrappers and the session accessor                                           */
 /* ---------------------------------------------------------------------------------------------- */
 
+/* The whole block below keeps its `bl`s: retail calls every one of these helpers out of line
+   (`networkPeer_close` and the two forwarders would otherwise fold the teardown in, and the
+   forwarders would stop being the 4-byte tail branches retail has). */
+#pragma dont_inline on
+
+/* Releases the peer's socket: shuts the socket down, hands it back to the pool the peer band
+   registers with, and clears the peer's own slot. */
+void networkPeer_release(NetworkPeerReceive* self)
+{
+    if (self->handle_04 != NULL) {
+        self->handle_04->shutdownSocket();
+        networkSocketPool_release(getNetworkLogger(), self->handle_04);
+        self->handle_04 = NULL;
+    }
+}
+
+/* The same teardown for the second peer class in the band (GUESS: identical body, the two classes'
+   tables differ). */
+void networkPeer_releaseSocket(NetworkPeerReceive* self)
+{
+    if (self->handle_04 != NULL) {
+        self->handle_04->shutdownSocket();
+        networkSocketPool_release(getNetworkLogger(), self->handle_04);
+        self->handle_04 = NULL;
+    }
+}
+
+/* Opens the connection's socket and registers the address it was opened on: the socket comes from the
+   band's pool, `open`/`setPeer` are the socket's own two slots, and the six address bytes are kept on
+   the connection.  Returns 0, or the negative step that failed. */
+s32 networkPeer_openSocket(NetworkPeerReceive* self, const u8* address)
+{
+    if (self->handle_04 != NULL) {
+        return -1;
+    }
+    self->handle_04 = networkSocketPool_acquire(getNetworkLogger());
+    if (self->handle_04 == NULL) {
+        return -2;
+    }
+    if (self->handle_04->open(1) < 0) {
+        networkPeer_release(self);
+        return -3;
+    }
+    if (self->handle_04->setPeer(address) < 0) {
+        networkPeer_release(self);
+        return -4;
+    }
+    memcpy(self->address_08, address, 6);
+    return 0;
+}
+
+/* Hands the connection's four peer ids to the peer class's own reset slot. */
+void networkPeer_resetSlots(NetworkPeerSocket* self)
+{
+    s32 index;
+
+    for (index = 0; index < 4; index++) {
+        self->resetSlot((s8)index);
+    }
+}
+
+/* Publishes the peer's record: the six-byte address, the connection it registers with, and up to 0x40
+   bytes of label with its used length. */
+void networkPeer_setInfo(NetworkPeerSocket* self, const NetworkPeerInfo* info)
+{
+    s32 available;
+    s32 labelSize;
+
+    memcpy(self->peerAddress_2420, info->address_00, 6);
+    self->connection_2428 = info->connection_08;
+    memset(self->label_242C, 0, 0x40);
+    available = info->labelSize_4C;
+    if (available < 0x40) {
+        labelSize = available;
+    } else {
+        labelSize = 0x40;
+    }
+    self->labelSize_246C = labelSize;
+    memcpy(self->label_242C, info->label_0C, labelSize);
+}
+
+/* Closes the peer: drops it from its connection's registry and, when it was armed, releases the
+   socket and empties both work areas. */
+void networkPeer_close(NetworkPeerSocket* self)
+{
+    if (self->connection_2428 != NULL) {
+        NetworkSingleTcp_remove(self->connection_2428, self);
+        if (self->armed_10 != 0) {
+            networkPeer_release(self->connection_2428);
+            networkPeer_clearReceiveBuffer(self->connection_2428);
+        }
+    }
+    memset(self->work_19, 0, 0x2400);
+    self->workUsed_241C = 0;
+}
+
+/* The peer class's init slot: close whatever the peer was holding and report it usable. */
+s32 networkPeer_init(NetworkPeerSocket* self)
+{
+    self->close();
+    return 1;
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* the peer table's constant slots (vtable 0x805F9510)                                             */
+/* ---------------------------------------------------------------------------------------------- */
+
+/* Slots 0x0C/0x18/0x20/0x48/0x50 of the peer table are empty or constant; nothing in a body pins a
+   role, so the names carry the slot offset the table gives them. */
+void networkPeerBuffer_slot0C(NetworkPeerBuffer* self)
+{
+}
+
+s32 networkPeerBuffer_slot18(NetworkPeerBuffer* self)
+{
+    return 0;
+}
+
+void networkPeerBuffer_slot20(NetworkPeerBuffer* self)
+{
+}
+
+s32 networkPeerBuffer_slot48(NetworkPeerBuffer* self)
+{
+    return 0;
+}
+
+void networkPeerBuffer_slot50(NetworkPeerBuffer* self)
+{
+}
+
+/* Slot 0x54 has slot 0x24's body: clear through the class's own clear slot and report it usable. */
+s32 networkPeerBuffer_reset(NetworkPeerBuffer* self)
+{
+    self->clearPayload();
+    return 1;
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* the stream's record writers and reader                                                          */
+/* ---------------------------------------------------------------------------------------------- */
+
+/* Fills the stream's leading 0xE-byte record from a sink and advances the cursor over it. */
+void networkPeerStream_pullRecord(NetworkByteStream* self, NetworkStreamSink* sink)
+{
+    if (self->cursor_0C + 0xE <= self->size_08) {
+        if (sink->fill(&self->data_04[self->cursor_0C], 0xE) > 0) {
+            self->cursor_0C += 0xE;
+        }
+    }
+}
+
+/* Writes the record's u16 length prefix and then its bytes, when both fit. */
+void networkPeerStream_putRecord(NetworkByteStream* self, const NetworkPeerRecord* record)
+{
+    if (self->cursor_0C + record->size_04 + 2 <= self->size_08) {
+        networkPeerStream_putU16(self, record->size_04);
+        if (record->data_00 != NULL && record->size_04 != 0) {
+            memcpy(&self->data_04[self->cursor_0C], record->data_00, record->size_04);
+        }
+        self->cursor_0C += record->size_04;
+    }
+}
+
+/* Writes one 2-byte value, encoded through the log manager's own value slot. */
+void networkPeerStream_putU16(NetworkByteStream* self, u16 value){
+    u16 encoded;
+
+    if (self->cursor_0C + 2 > self->size_08) {
+        return;
+    }
+    encoded = getNetworkLogger()->encode_4C(value);
+    memcpy(&self->data_04[self->cursor_0C], &encoded, 2);
+    self->cursor_0C += 2;
+}
+
+/* Writes one 4-byte value, encoded through the log manager's own value slot. */
+void networkPeerStream_putU32(NetworkByteStream* self, u32 value)
+{
+    u32 encoded;
+
+    if (self->cursor_0C + 4 > self->size_08) {
+        return;
+    }
+    encoded = getNetworkLogger()->encode_54(value);
+    memcpy(&self->data_04[self->cursor_0C], &encoded, 4);
+    self->cursor_0C += 4;
+}
+
+/* Records the stream's leading length prefix into the caller's u16, decoded through the log
+   manager's own value slot, then drops the two bytes from the front. */
+void networkPeerStream_readLength(NetworkByteStream* self, u16* out)
+{
+    u16 encoded;
+    u32 remaining;
+
+    if (self->cursor_0C < 2) {
+        return;
+    }
+    memcpy(&encoded, self->data_04, 2);
+    *out = getNetworkLogger()->flag_48(encoded);
+    remaining = self->cursor_0C - 2;
+    self->cursor_0C = remaining;
+    if (remaining != 0) {
+        memmove(self->data_04, self->data_04 + 2, remaining);
+    }
+}
+
+/* Takes the stream's leading 4-byte value, decoded through the log manager's own value slot, and
+   drops it from the front. */
+void networkPeerStream_takeU32(NetworkByteStream* self, u32* out)
+{
+    u32 value;
+    u32 remaining;
+
+    if (self->cursor_0C < 4) {
+        return;
+    }
+    memcpy(&value, self->data_04, 4);
+    *out = getNetworkLogger()->decode_50(value);
+    remaining = self->cursor_0C - 4;
+    self->cursor_0C = remaining;
+    if (remaining != 0) {
+        memmove(self->data_04, self->data_04 + 4, remaining);
+    }
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* the manager's mutex wrappers and the session accessor                                           */
+/* ---------------------------------------------------------------------------------------------- */
+
 /* Releases the peer's socket through the peer's own helper. */
-void networkPeer_disconnect(NetworkPeerBuffer* self)
+void networkPeer_disconnect(NetworkPeerReceive* self)
 {
     networkPeer_release(self);
 }
 
 /* The same teardown for the second peer class in the band (GUESS: identical tail). */
-void networkPeer_disconnectSocket(NetworkPeerBuffer* self)
+void networkPeer_disconnectSocket(NetworkPeerReceive* self)
 {
     networkPeer_releaseSocket(self);
 }
+
+#pragma dont_inline off
 
 /* Locks the mutex a peer keeps at its own +0x04. */
 /* untyped: opaque handle passed through - only the peer band owns the mutex layout */

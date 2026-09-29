@@ -53,8 +53,8 @@ public:
     /* +0x44 */ virtual void pad_44();
     /* +0x48 */ virtual u16  flag_48(u16 value);
     /* +0x4C */ virtual u16  encode_4C(u32 value);
-    /* +0x50 */ virtual void pad_50();
-    /* +0x54 */ virtual void pad_54();
+    /* +0x50 (GUESS: the transport stream readers' value decode) */ virtual u32 decode_50(u32 value);
+    /* +0x54 (GUESS: the transport stream writers' value encode) */ virtual u32 encode_54(u32 value);
     /* +0x58 */ virtual void pad_58();
     /* +0x5C */ virtual void pad_5C();
     /* +0x60 */ virtual f32  getTime_60();
@@ -249,6 +249,14 @@ extern "C" {
 
 /* debug manager */
 NetworkLogger* getNetworkLogger(void);
+
+/* The socket pool the transport peers register their socket with (0x804187F0 / 0x80418864 - no
+ * registered range covers either address).  Both bodies walk a four-entry table at the manager's
+ * +0x04 and take the socket from the manager's own +0x8C slot, so the argument is the manager the
+ * transport band reaches through `getNetworkLogger` (GUESS on both names: they carry the acquire /
+ * release roles the two call sites give them, nothing in the range spells them). */
+NetworkSocketHandle* networkSocketPool_acquire(NetworkLogger* pool);
+s32 networkSocketPool_release(NetworkLogger* pool, NetworkSocketHandle* socket);
 
 /* network singleton and its callbacks.  `getInstance_` (0x803768F0) is owned by
  * `enemy/em020_ai.cpp` now that its range is registered - rule 2: the declaration moved to the
