@@ -8,6 +8,7 @@ violation is refused before it is committed.
 
     python tools/units/stylelint.py --budget          # the per-unit backlog over src/
     python tools/units/stylelint.py --diff <ref>      # exit 0 = the working tree adds no violation
+    python tools/units/stylelint.py --diff <ref> --list-added  # ... and name each added finding
     python tools/units/stylelint.py --ref <branch>    # read-only: judge a held branch's committed tree
     python tools/units/stylelint.py --json            # machine-readable findings + budget
     python tools/units/stylelint.py --selftest
@@ -72,6 +73,15 @@ allowed (an existing finding never blocks a landing), while adding one is refuse
 "do not revoke committed progress" - the mounted debt is worked slowly through the backlog register
 (`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as
 before.**
+
+**`--diff` says how many; `--list-added` says which.** A `+N rule R <file>` row names no occurrence, so a
+lane that reads `+76 rule 7` cannot tell which of its renames are load-bearing: one dropped three whole
+bodies to find out, then re-added them (2026-09-30). The flag names every added finding as `rule R
+<file>:<line> <token>` - the `fn_XXXXXXXX`/`unkNN` a rename closes, the symbol a rule 2/12 wants moved or
+claimed, the declaration/type/field a rule 3/5/9/11 names - grouped by rule then file, with the per-file
+count so the biggest offender leads (`backlog.py`'s weight convention). The same rows are the `detail` key
+of the `--diff`/`--ref` `--json` payload. It is a **report**: the exit status and the flag-absent summary
+lines are byte-identical, because the landing gate reads them.
 
 `--ref <branch>` is the **read-only** sibling of `--diff`: it judges a *held branch's committed tree*
 against the merge base `--diff` would resolve (the branch's tip for the `after` side, exactly as if the
@@ -436,7 +446,7 @@ def rule1_findings(sources: list[Source]) -> list[dict]:
         for extra in files[1:]:
             out.append(_finding(by_rel[extra], 1, where[name][extra],
                                 "type `%s` is defined in `%s` and again in `%s` - one definition, in the "
-                                "owner's header" % (name, owner, extra)))
+                                "owner's header" % (name, owner, extra), token=name))
     return out
 
 
@@ -914,7 +924,7 @@ def rule12_findings(src: Source, ownership: "Ownership | None") -> list[dict]:
         out.append(_finding(src, 12, line,
                             "`%s` is unowned data - no registered range covers `%s:0x%X`; the unit that "
                             "uses it claims the range in its own `splits.txt` and matches the bytes "
-                            "(rule 12)" % (name, r["section"], r["address"])))
+                            "(rule 12)" % (name, r["section"], r["address"]), token=name))
     return out
 
 
@@ -1170,8 +1180,16 @@ def enclosing_call(code: str, pos: int) -> str | None:
     return None
 
 
-def _finding(src: Source, rule: int, line: int, detail: str) -> dict:
-    return {"rule": rule, "file": src.rel, "line": line,
+def _finding(src: Source, rule: int, line: int, detail: str, token: str | None = None) -> dict:
+    """One finding.  `token` is the identifier at fault - the `fn_XXXXXXXX`/`unkNN` a rule-7 rename
+    closes, the declared symbol rule 2/12 wants moved or claimed, the type/field a rule 3/5 wants named.
+
+    The detail string carries the same identifier in prose, but `--list-added` (and the `--diff --json`
+    payload) names it as data so a lane can read *which* occurrences a `+N rule R` summary stands for
+    without re-deriving them from the diff.  It is `None` for the rules whose finding has no single
+    named token (rule 8's `goto`).
+    """
+    return {"rule": rule, "file": src.rel, "line": line, "token": token,
             "text": src.line_text(line).strip()[:160], "detail": detail}
 
 
@@ -1181,7 +1199,7 @@ def _rule2_finding(src: Source, line: int, name: str, detail: str) -> dict:
     `--diff` judges an added rule-2 finding by the *address* its symbol resolves to, so the name has to
     survive as a field (the `detail` string is prose meant for a human); `owed_rename_completion` reads it.
     """
-    return dict(_finding(src, 2, line, detail), symbol=name)
+    return dict(_finding(src, 2, line, detail, token=name), symbol=name)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1421,9 +1439,9 @@ def rule11_findings(src: Source) -> list[dict]:
         for chunk, off in _split_parameters(code, d["params_pos"], d["params_pos"] + len(d["params"])):
             if RULE11_VOID_PTR_RE.search(chunk):
                 first = off + (len(chunk) - len(chunk.lstrip()))
-                out.append(_finding(src, 11, src.line_of(first), _RULE11_PARAM_DETAIL))
+                out.append(_finding(src, 11, src.line_of(first), _RULE11_PARAM_DETAIL, token=d["name"]))
         if RULE11_VOID_PTR_RE.search(d["ret"]):
-            out.append(_finding(src, 11, d["line"], _RULE11_RET_DETAIL))
+            out.append(_finding(src, 11, d["line"], _RULE11_RET_DETAIL, token=d["name"]))
     return out
 
 
@@ -1477,7 +1495,8 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
 
     for idx, d in enumerate(defs):
         if idx not in sized:
-            out.append(_finding(src, 3, d["line"], "type `%s` has no `/* size: 0xNN */`" % d["name"]))
+            out.append(_finding(src, 3, d["line"], "type `%s` has no `/* size: 0xNN */`" % d["name"],
+                                token=d["name"]))
 
     field_spans: list[tuple[int, int]] = []
     for d in defs:
@@ -1497,14 +1516,16 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
                 for l in range(first_line, max(first_line, line) + 1)
             )
             if not has_offset:
-                out.append(_finding(src, 4, line, "field `%s` has no offset annotation" % name))
+                out.append(_finding(src, 4, line, "field `%s` has no offset annotation" % name, token=name))
             if UNK_FIELD_RE.match(name):
-                out.append(_finding(src, 5, line, "field `%s` needs a context name or pad_0xNN" % name))
+                out.append(_finding(src, 5, line, "field `%s` needs a context name or pad_0xNN" % name,
+                                    token=name))
 
     for m in RULE6_RE.finditer(src.code):
         if enclosing_call(src.code, m.start()) in MEM_FUNCS:
             continue
-        out.append(_finding(src, 6, src.line_of(m.start()), "pointer arithmetic: `%s`" % m.group(0).strip()))
+        out.append(_finding(src, 6, src.line_of(m.start()),
+                            "pointer arithmetic: `%s`" % m.group(0).strip(), token=m.group(0).strip()))
 
     def in_field(pos: int) -> bool:
         return any(a <= pos < b for a, b in field_spans)
@@ -1512,14 +1533,16 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     # Rule 7 is unconditional: no path is exempt, a file with no bodies is held to it, and a
     # `rule 7 deferred` comment is inert. Every generated spelling fires, whoever owns the symbol.
     for m in RULE7_FN_RE.finditer(src.code):
-        out.append(_finding(src, 7, src.line_of(m.start()), "auto-generated name `%s`" % m.group(0)))
+        out.append(_finding(src, 7, src.line_of(m.start()),
+                            "auto-generated name `%s`" % m.group(0), token=m.group(0)))
     for m in RULE7_UNK_RE.finditer(src.code):
         if not in_field(m.start()):
-            out.append(_finding(src, 7, src.line_of(m.start()), "bare `%s` identifier" % m.group(0)))
+            out.append(_finding(src, 7, src.line_of(m.start()),
+                                "bare `%s` identifier" % m.group(0), token=m.group(0)))
     for m in RULE7_LBL_RE.finditer(src.code):
         out.append(_finding(src, 7, src.line_of(m.start()),
                             "data label `%s` - name it from what it holds and where it is used, and "
-                            "rename the map row" % m.group(0)))
+                            "rename the map row" % m.group(0), token=m.group(0)))
 
     for m in RULE8_RE.finditer(src.code):
         out.append(_finding(src, 8, src.line_of(m.start()), "goto statement"))
@@ -1535,10 +1558,12 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
         line = src.line_of(m.start())
         if looks_like_declaration(src.code, m.start()):
             out.append(_finding(src, 9, line,
-                                "mangled name `%s` is declared - declare its owner and include it" % name))
+                                "mangled name `%s` is declared - declare its owner and include it" % name,
+                                token=name))
         else:
             out.append(_finding(src, 9, line,
-                                "mangled name `%s` is called - call it through its owner" % name))
+                                "mangled name `%s` is called - call it through its owner" % name,
+                                token=name))
 
     if ownership is not None:
         out.extend(rule2_findings(src, ownership))
@@ -1588,7 +1613,7 @@ def codegen_pragma_findings(src: "Source") -> list[dict]:
     for m in CODEGEN_PRAGMA_RE.finditer(src.code):
         out.append(_finding(src, 10, src.line_of(m.start()),
                             "codegen pragma `#pragma %s` in a shared header - state it in the "
-                            "`.c`/`.cpp` that needs it, never in the header" % m.group(1)))
+                            "`.c`/`.cpp` that needs it, never in the header" % m.group(1), token=m.group(1)))
     return out
 
 
@@ -1612,15 +1637,15 @@ def header_pragma_findings(root: str) -> list[dict]:
     return out
 
 
-def header_pragma_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
-    """Rule-10 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
+def header_pragma_findings_at_ref(root: str, ref: str, rename: dict | None = None) -> list[dict]:
+    """Rule-10 findings for `include/` as it was at `ref`, keyed `(rule, path_now)` - the back side.
 
     `rename` is `{path_at_ref: path_now}` (see `renames_of`): a renamed header keeps its finding under the
     path the *working tree* spells, so the whole-tree walk lines up with `header_pragma_findings`'s walk -
     without it, a rename alone reported the header's existing rule-10 finding as an addition.
     """
     rename = rename or {}
-    out: dict = {}
+    out = []
     for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
         if not path.endswith(HEADER_SUFFIXES):
             continue
@@ -1628,9 +1653,13 @@ def header_pragma_counts_at_ref(root: str, ref: str, rename: dict | None = None)
             text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        for f in codegen_pragma_findings(Source(path, rename.get(path, path), text)):
-            out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
+        out.extend(codegen_pragma_findings(Source(path, rename.get(path, path), text)))
     return out
+
+
+def header_pragma_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
+    """Rule-10 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+    return rule_counts(header_pragma_findings_at_ref(root, ref, rename))
 
 
 def header_rule11_findings(root: str) -> list[dict]:
@@ -1685,8 +1714,8 @@ def header_rule2_findings(root: str, ownership: "Ownership | None" = None) -> li
     return out
 
 
-def header_rule11_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
-    """Rule-11 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
+def header_rule11_findings_at_ref(root: str, ref: str, rename: dict | None = None) -> list[dict]:
+    """Rule-11 findings for `include/` as it was at `ref`, keyed `(rule, path_now)` - the back side.
 
     `rename` is `{path_at_ref: path_now}`: rule 11 has no per-file walk to fall back on (it is reported
     only by `header_rule11_findings`), so an untranslated base path was the *only* key a renamed header had
@@ -1694,7 +1723,7 @@ def header_rule11_counts_at_ref(root: str, ref: str, rename: dict | None = None)
     `include/Network/network_pat_control.h` alone.
     """
     rename = rename or {}
-    out: dict = {}
+    out = []
     for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
         if not path.endswith(HEADER_SUFFIXES):
             continue
@@ -1702,14 +1731,18 @@ def header_rule11_counts_at_ref(root: str, ref: str, rename: dict | None = None)
             text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        for f in rule11_findings(Source(path, rename.get(path, path), text)):
-            out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
+        out.extend(rule11_findings(Source(path, rename.get(path, path), text)))
     return out
 
 
-def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | None" = None,
-                                rename: dict | None = None) -> dict:
-    """Rule-12 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side.
+def header_rule11_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
+    """Rule-11 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+    return rule_counts(header_rule11_findings_at_ref(root, ref, rename))
+
+
+def header_rule12_findings_at_ref(root: str, ref: str, ownership: "Ownership | None" = None,
+                                  rename: dict | None = None) -> list[dict]:
+    """Rule-12 findings for `include/` as it was at `ref`, keyed `(rule, path_now)` - the back side.
 
     Each side of a `--diff` is judged by the map it was written against (the rule-2 precedent): a rename
     that moves a data symbol out of a registered range must not read as a rule-12 addition.
@@ -1721,9 +1754,9 @@ def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | Non
     if ownership is None:
         ownership = load_ownership_at_ref(root, ref)
     if ownership is None:
-        return {}
+        return []
     rename = rename or {}
-    out: dict = {}
+    out = []
     for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
         if not path.endswith(HEADER_SUFFIXES):
             continue
@@ -1731,9 +1764,14 @@ def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | Non
             text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        for f in rule12_findings(Source(path, rename.get(path, path), text), ownership):
-            out[(f["rule"], f["file"])] = out.get((f["rule"], f["file"]), 0) + 1
+        out.extend(rule12_findings(Source(path, rename.get(path, path), text), ownership))
     return out
+
+
+def header_rule12_counts_at_ref(root: str, ref: str, ownership: "Ownership | None" = None,
+                                rename: dict | None = None) -> dict:
+    """Rule-12 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+    return rule_counts(header_rule12_findings_at_ref(root, ref, ownership, rename))
 
 
 def rule11_local_total(root: str) -> int:
@@ -1835,6 +1873,74 @@ def diff_deltas(before: dict[tuple[int, str], int], after: dict[tuple[int, str],
             added.append({"rule": key[0], "file": key[1], "added": delta,
                           "before": before.get(key, 0), "after": after.get(key, 0)})
     return added
+
+
+def finding_identity(f: dict) -> tuple:
+    """A line-independent identity for a finding: rule, file, at-fault token and detail text.
+
+    `--diff` compares only (rule, file) counts, so a count delta cannot say *which* occurrences are new.
+    Matching the two sides by this identity - the token and detail a lane acts on, never the line, which
+    moves with every edit above it - is what lets `--list-added` name the added occurrences when the
+    file's pre-existing findings shifted.
+    """
+    return (f["rule"], f["file"], f.get("token"), f["detail"])
+
+
+def added_finding_detail(added: list[dict], after_findings: list[dict],
+                         before_findings: list[dict]) -> list[dict]:
+    """The findings behind `added`'s `+N rule R <file>` rows, named: rule, file, line and token.
+
+    `added` is `diff_deltas`' (rule, file) count deltas, so by itself it names no occurrence.  Grouping the
+    after-side findings by (rule, file) and dropping those the before side already carried (a multiset, by
+    `finding_identity`) recovers exactly the new ones.  The list is capped at `added` because a rename
+    credit can reduce a row's delta below what the identity subtraction finds.
+
+    The returned rows carry only what a reader needs - the file and line that locate the occurrence and the
+    token that names it - so the `--diff --json` `detail` key is stable whatever the internal finding adds.
+    """
+    before: dict[tuple, collections.Counter] = {}
+    for f in before_findings:
+        before.setdefault((f["rule"], f["file"]), collections.Counter())[finding_identity(f)] += 1
+    after: dict[tuple, list] = {}
+    for f in after_findings:
+        after.setdefault((f["rule"], f["file"]), []).append(f)
+    out = []
+    for row in sorted(added, key=lambda a: (a["rule"], -a["added"], a["file"])):
+        key = (row["rule"], row["file"])
+        remaining = collections.Counter(before.get(key, ()))
+        fresh = []
+        for f in sorted(after.get(key, ()), key=lambda f: f["line"]):
+            ident = finding_identity(f)
+            if remaining[ident] > 0:
+                remaining[ident] -= 1
+                continue
+            fresh.append(f)
+        for f in fresh[:row["added"]]:
+            out.append({"rule": f["rule"], "file": f["file"], "line": f["line"],
+                        "token": f.get("token"), "detail": f["detail"]})
+    return out
+
+
+def added_detail_lines(detail: list[dict]) -> list[str]:
+    """`--list-added`'s report: grouped by rule, then by file with its count, biggest offender first.
+
+    The per-file count is the weight `backlog.py` ranks by, so the file that grew the most surfaces first;
+    each finding is then named the way a lane acts on it - `rule R <file>:<line> <token>` - so a `+N rule R`
+    summary can be read down to the identifiers behind it without re-deriving them from the diff.
+    """
+    lines = []
+    for rule in sorted({d["rule"] for d in detail}):
+        by_file: dict[str, list[dict]] = {}
+        for d in detail:
+            if d["rule"] == rule:
+                by_file.setdefault(d["file"], []).append(d)
+        lines.append("rule %d:" % rule)
+        for path in sorted(by_file, key=lambda p: (-len(by_file[p]), p)):
+            lines.append("  %s (%d)" % (path, len(by_file[path])))
+            for d in by_file[path]:
+                token = (" %s" % d["token"]) if d.get("token") else ""
+                lines.append("    rule %d %s:%d%s" % (d["rule"], d["file"], d["line"], token))
+    return lines
 
 
 def git(root: str, *args: str) -> str:
@@ -2001,12 +2107,13 @@ def renames_of(pairs: list[tuple[str | None, str]]) -> dict:
     return {before: after for before, after in pairs if before and before != after}
 
 
-def rule1_counts_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> dict:
-    """Rule-1 counts for the ref's whole `src/` tree, keyed by the path each file has now.
+def rule1_findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> list[dict]:
+    """Rule-1 findings for the ref's whole `src/` tree, keyed by the path each file has now.
 
     Rule 1 is cross-file, so unlike `findings_at_ref` (which lints only the changed files) it has to see
     every file: a batch can duplicate a type that already lives in an untouched file. A rename is keyed by
-    its new path so the two sides stay comparable.
+    its new path so the two sides stay comparable.  Returned as findings (not only counts) so
+    `--list-added` can subtract the base side's occurrences by a line-independent identity.
     """
     rename = renames_of(pairs)
     sources = []
@@ -2016,7 +2123,12 @@ def rule1_counts_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]
         except RuntimeError:
             continue
         sources.append(Source(path, rename.get(path, path), text))
-    return rule_counts(rule1_findings(sources))
+    return rule1_findings(sources)
+
+
+def rule1_counts_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]]) -> dict:
+    """Rule-1 counts for the ref's whole `src/` tree, keyed by the path each file has now."""
+    return rule_counts(rule1_findings_at_ref(root, ref, pairs))
 
 
 # --------------------------------------------------------------------------------------------------
@@ -2620,6 +2732,42 @@ def selftest() -> int:
           [(x["rule"], x["file"], x["added"]) for x in
            diff_deltas(hdr_before, {(2, "include/mod/a.h"): 3})], [(2, "include/mod/a.h", 1)])
 
+    # --- `--list-added`: which occurrence, not only how many (2026-09-28) -------------------------
+    # A UI lane read "+76 rule 7" and had to drop three bodies to learn which of its renames were
+    # load-bearing.  The count delta is (rule, file); the detail names the occurrences behind it, excluding
+    # the ones the file already carried.  The match is line-independent, so bodies added above a
+    # pre-existing finding must not re-list it.
+    def _af(rule: int, file: str, line: int, token: str, detail: str = "d") -> dict:
+        return {"rule": rule, "file": file, "line": line, "token": token, "detail": detail}
+    bfa = [_af(7, "src/Pl/pl_act.cpp", 1, "fn_80040598"),
+           _af(11, "src/Pl/pl_act.cpp", 2, "base_fn"),
+           _af(12, "src/Pl/pl_act.cpp", 3, "old_data")]
+    afa = [_af(7, "src/Pl/pl_act.cpp", 10, "fn_80040598"),   # shifted down by the new body, still old
+           _af(7, "src/Pl/pl_act.cpp", 20, "fn_80275B04"),   # added
+           _af(11, "src/Pl/pl_act.cpp", 30, "base_fn"),
+           _af(11, "src/Pl/pl_act.cpp", 40, "new_fn"),       # added
+           _af(12, "src/Pl/pl_act.cpp", 50, "old_data"),
+           _af(12, "src/Pl/pl_act.cpp", 60, "new_data")]     # added
+    detail = added_finding_detail(diff_deltas(rule_counts(bfa), rule_counts(afa)), afa, bfa)
+    check("--list-added names exactly the three added occurrences",
+          [(d["rule"], d["line"], d["token"]) for d in detail],
+          [(7, 20, "fn_80275B04"), (11, 40, "new_fn"), (12, 60, "new_data")])
+    check("... and a shifted pre-existing finding is not re-listed",
+          [d["token"] for d in detail if d["token"] in ("fn_80040598", "base_fn", "old_data")], [])
+    check("... and an unchanged count names nothing",
+          added_finding_detail(diff_deltas(rule_counts(afa), rule_counts(afa)), afa, afa), [])
+    # ordering: grouped by rule, then file with its count, biggest offender first (backlog.py's weight).
+    many = [_af(7, "src/A/a.cpp", 1, "fn_00000001"), _af(7, "src/A/a.cpp", 2, "fn_00000002"),
+            _af(7, "src/B/b.cpp", 3, "fn_00000003")]
+    lines = added_detail_lines(added_finding_detail(diff_deltas({}, rule_counts(many)), many, []))
+    check("--list-added groups by rule then file, biggest file first",
+          [ln for ln in lines if ln.startswith("rule") or ln.startswith("  src")],
+          ["rule 7:", "  src/A/a.cpp (2)", "  src/B/b.cpp (1)"])
+    check("... with one `rule R <file>:<line> <token>` line per occurrence",
+          [ln for ln in lines if ln.startswith("    rule ")],
+          ["    rule 7 src/A/a.cpp:1 fn_00000001", "    rule 7 src/A/a.cpp:2 fn_00000002",
+           "    rule 7 src/B/b.cpp:3 fn_00000003"])
+
     # --- `--diff`: the OWNERSHIP OF THE ADDRESS, not the spelling of the name -----------------------
     # The 2026-09-28 incident.  `cb7d49aaa` renamed four map rows and landed the map alone; completing the
     # rename in the referrers then read as "+4 added rule-2 violations", because the base copy's *old*
@@ -3067,6 +3215,109 @@ def selftest() -> int:
         check("--ref on the same rename also measures delta 0", rc_ref_rename, 0)
         check("... with no added row", ref_rename["added"], [])
 
+    # --- `--list-added`: name the findings a `--diff` counts, grouped the way a lane needs them -------
+    # 2026-09-28: a UI lane read "+76 rule 7" with no way to learn *which* tokens were added; it dropped
+    # three whole bodies to find the load-bearing renames, then re-added them.  The diff below adds one
+    # occurrence of each of rules 7, 11 and 12 to a file that already carries findings of all three, so
+    # the detail must name the new ones and exclude the old.
+    with tempfile.TemporaryDirectory() as tmp:
+        def agit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+
+        def aput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def arev() -> str:
+            return subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace").stdout.strip()
+
+        agit("init", "-q")
+        agit("checkout", "-q", "-b", "main")
+        aput("config/RMHE08/symbols.txt",
+             "owned_thing = .text:0x80200000; // type:function size:0x10\n"
+             "new_data = .data:0x80400010; // type:object size:0x10\n")
+        # `new_data` starts owned by another unit, so the base `extern` is a rule-2 finding, never rule 12.
+        # The batch drops that range (making it unowned data): rule 12 rises 0 -> 1 while rule 2 stays 1
+        # (owned-foreign and unsplit both fire rule 2), so the diff adds exactly one rule 7, 11 and 12.
+        base_splits = ("other/other_unit.c:\n\t.text       start:0x80200000 end:0x80200010\n"
+                       "\t.data       start:0x80400000 end:0x80400020\n")
+        base_file = ("void fn_80040598(void) {}\n"
+                     "void base_fn(void *p);\n"
+                     "extern u8 new_data[];\n")
+        aput("config/RMHE08/splits.txt", base_splits)
+        aput("src/Pl/pl_act.cpp", base_file)
+        agit("add", "-A")
+        agit("commit", "-q", "-m", "base carries a pre-existing finding of each of rules 7, 11 and 2")
+        base_sha = arev()
+        aput("config/RMHE08/splits.txt",
+             "other/other_unit.c:\n\t.text       start:0x80200000 end:0x80200010\n")
+        aput("src/Pl/pl_act.cpp",
+             "void fn_80040598(void) {}\n"
+             "void fn_80275B04(void) {}\n"
+             "void base_fn(void *p);\n"
+             "void new_fn(void *q);\n"
+             "extern u8 new_data[];\n")
+        old_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_plain = main(["--diff", base_sha])
+            plain = out.getvalue()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_list = main(["--diff", base_sha, "--list-added"])
+            listed = out.getvalue()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_json = main(["--diff", base_sha, "--json"])
+            data = json.loads(out.getvalue())
+        finally:
+            os.chdir(old_cwd)
+        # the flag is a report only: exit status and the summary a lane/gate reads are untouched.
+        check("--list-added leaves the exit status alone", (rc_plain, rc_list, rc_json), (1, 1, 1))
+        check("... the absent-flag summary line is byte-identical",
+              plain.splitlines()[0],
+              "stylelint: the batch adds 3 section 6.5 violation(s) over 1 changed file(s):")
+        check("... and its per-rule rows are the ones a lane already reads",
+              [ln for ln in plain.splitlines() if ln.startswith("  +")],
+              ["  +1 rule 7  src/Pl/pl_act.cpp  (1 -> 2)",
+               "  +1 rule 11  src/Pl/pl_act.cpp  (1 -> 2)",
+               "  +1 rule 12  src/Pl/pl_act.cpp  (0 -> 1)"])
+        check("... the without-flag run carries no detail", "added findings" in plain, False)
+        check("--diff --json names exactly the three added findings",
+              [(d["rule"], d["file"], d["line"], d["token"]) for d in data["detail"]],
+              [(7, "src/Pl/pl_act.cpp", 2, "fn_80275B04"),
+               (11, "src/Pl/pl_act.cpp", 4, "new_fn"),
+               (12, "src/Pl/pl_act.cpp", 5, "new_data")])
+        check("... and never the pre-existing occurrences",
+              [ln for ln in listed.splitlines() if "fn_80040598" in ln or "base_fn" in ln], [])
+        check("--list-added prints the same three, grouped by rule",
+              [ln for ln in listed.splitlines() if ln.startswith("    rule ")],
+              ["    rule 7 src/Pl/pl_act.cpp:2 fn_80275B04",
+               "    rule 11 src/Pl/pl_act.cpp:4 new_fn",
+               "    rule 12 src/Pl/pl_act.cpp:5 new_data"])
+        check("... with the per-file count line", "  src/Pl/pl_act.cpp (1)" in listed, True)
+        # a file that only already carries findings: touching it (a comment) adds none, so the exit status
+        # stays 0 - a pre-existing finding never blocks.
+        aput("config/RMHE08/splits.txt", base_splits)
+        aput("src/Pl/pl_act.cpp", "/* touched, adds no finding */\n" + base_file)
+        os.chdir(tmp)
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_pre = main(["--diff", base_sha, "--list-added"])
+            pre_text = out.getvalue()
+        finally:
+            os.chdir(old_cwd)
+        check("a diff that adds nothing to a file of pre-existing findings exits 0", rc_pre, 0)
+        check("... and prints no detail", "added findings" in pre_text, False)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -3125,7 +3376,8 @@ def _resolve_diff_ref(root: str, ref: str) -> str:
     return base
 
 
-def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_json: bool) -> int:
+def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_json: bool,
+                   list_added: bool = False) -> int:
     """Judge a **held branch** read-only: its committed tree against the merge base `--diff` would use.
 
     `--diff REF` compares the *working tree* with REF, so it cannot judge a branch that is not checked out -
@@ -3183,28 +3435,32 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
     # read the *base* side, so a renamed header must be keyed by the path the branch spells (a rename alone
     # is not an addition), exactly as `--diff` does it.
     rename = renames_of(pairs)
-    before = merge_counts(
-        rule_counts(base_findings),
-        rule1_counts_at_ref(root, base, pairs),
-        header_pragma_counts_at_ref(root, base, rename),
-        header_rule11_counts_at_ref(root, base, rename),
-        header_rule12_counts_at_ref(root, base, base_ownership, rename))
+    before_findings = (
+        base_findings
+        + rule1_findings_at_ref(root, base, pairs)
+        + header_pragma_findings_at_ref(root, base, rename)
+        + header_rule11_findings_at_ref(root, base, rename)
+        + header_rule12_findings_at_ref(root, base, base_ownership, rename))
+    before = rule_counts(before_findings)
     touched = findings_of_ref(root, branch, pairs, after_ownership)
     after_sources = sources_of_ref(root, branch, pairs)
     freed_gaps = {src.rel: base_gaps.get(src.rel, set()) - unresolved_declarations(src, after_ownership)
                   for src in after_sources}
-    after = merge_counts(
-        rule_counts(touched),
-        rule1_counts_at_ref(root, branch, []),
-        header_pragma_counts_at_ref(root, branch),
-        header_rule11_counts_at_ref(root, branch),
-        header_rule12_counts_at_ref(root, branch, after_ownership))
+    after_findings = (
+        touched
+        + rule1_findings_at_ref(root, branch, [])
+        + header_pragma_findings_at_ref(root, branch)
+        + header_rule11_findings_at_ref(root, branch)
+        + header_rule12_findings_at_ref(root, branch, after_ownership))
+    after = rule_counts(after_findings)
     added, credits = apply_rename_credits(diff_deltas(before, after), touched, base_ownership,
                                          after_ownership, base_symbols,
                                          {p: len(names) for p, names in freed_gaps.items()})
     credit_lines = rename_credit_lines(credits, freed_gaps)
+    detail = added_finding_detail(added, after_findings, before_findings)
     if as_json:
-        print(json.dumps({"ref": branch, "base": base, "added": added, "changed": rels,
+        print(json.dumps({"ref": branch, "base": base, "added": added, "detail": detail,
+                          "changed": rels,
                           "rename_credits": [{"rule": r, "file": p, "count": n,
                                               "stopped_spelling": sorted(freed_gaps.get(p, ()))}
                                              for (r, p), n in sorted(credits.items())],
@@ -3218,6 +3474,10 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
                                                       a["after"]))
         for line in credit_lines:
             print(line)
+        if list_added:
+            print("  added findings, by rule then file (biggest file first):")
+            for line in added_detail_lines(detail):
+                print(line)
         for num, what in UNCHECKED:
             print("  not checked (cross-file): rule %d - %s" % (num, what))
         for rule, prefix, why in EXEMPT:
@@ -3240,6 +3500,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="read-only: judge the named branch's committed tree against its merge base, so a "
                          "held branch can be checked without checking it out (same comparison as --diff)")
     ap.add_argument("--budget", action="store_true", help="report the backlog per unit over src/")
+    ap.add_argument("--list-added", action="store_true",
+                    help="with --diff/--ref: also name each added finding (rule, file, line and the "
+                         "identifier/token), grouped by rule then file, biggest file first")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
@@ -3255,7 +3518,7 @@ def main(argv: list[str] | None = None) -> int:
     ownership = load_ownership(root)
 
     if args.ref is not None:
-        return ref_comparison(root, args.ref, ownership, args.json)
+        return ref_comparison(root, args.ref, ownership, args.json, args.list_added)
 
     if args.diff is not None:
         args.diff = _resolve_diff_ref(root, args.diff)
@@ -3271,13 +3534,15 @@ def main(argv: list[str] | None = None) -> int:
             # old path and `diff_deltas` reads it as an addition (rule 11's six on one rename, rule 12's
             # one) even though the per-file walks already key by the new path.
             rename = renames_of(pairs)
-            before = merge_counts(
-                rule_counts(base_findings),
-                rule1_counts_at_ref(root, args.diff, pairs),
-                header_pragma_counts_at_ref(root, args.diff, rename),
-                header_rule11_counts_at_ref(root, args.diff, rename),
-                header_rule12_counts_at_ref(root, args.diff,
-                                            load_ownership_at_ref(root, args.diff) or ownership, rename))
+            # every source of the `before` count is kept as findings, not only counts: `--list-added`
+            # subtracts the base side's occurrences, and the count is `rule_counts` of the same list.
+            before_findings = (
+                base_findings
+                + rule1_findings_at_ref(root, args.diff, pairs)
+                + header_pragma_findings_at_ref(root, args.diff, rename)
+                + header_rule11_findings_at_ref(root, args.diff, rename)
+                + header_rule12_findings_at_ref(root, args.diff, base_ownership, rename))
+            before = rule_counts(before_findings)
             # the base copy's rule-2 symbols, so a credit can only ever touch a name that is *new* to the
             # file: one it already declared is part of `before`, never one of the batch's additions
             base_symbols: dict = {}
@@ -3301,18 +3566,20 @@ def main(argv: list[str] | None = None) -> int:
                                 read_text(os.path.join(root, a))) for _b, a in pairs]
         freed_gaps = {src.rel: base_gaps.get(src.rel, set()) - unresolved_declarations(src, ownership)
                       for src in after_sources}
-        after = merge_counts(
-            rule_counts(touched),
-            rule_counts(rule1_findings(all_sources(root))),
-            rule_counts(header_pragma_findings(root)),
-            rule_counts(header_rule11_findings(root)),
-            rule_counts(header_rule12_findings(root, ownership)))
+        after_findings = (
+            touched
+            + rule1_findings(all_sources(root))
+            + header_pragma_findings(root)
+            + header_rule11_findings(root)
+            + header_rule12_findings(root, ownership))
+        after = rule_counts(after_findings)
         added, credits = apply_rename_credits(diff_deltas(before, after), touched, base_ownership,
                                              ownership, base_symbols,
                                              {p: len(names) for p, names in freed_gaps.items()})
         credit_lines = rename_credit_lines(credits, freed_gaps)
+        detail = added_finding_detail(added, after_findings, before_findings)
         if args.json:
-            print(json.dumps({"ref": args.diff, "added": added, "changed": rels,
+            print(json.dumps({"ref": args.diff, "added": added, "detail": detail, "changed": rels,
                               "rename_credits": [{"rule": r, "file": p, "count": n,
                                                   "stopped_spelling": sorted(freed_gaps.get(p, ()))}
                                                  for (r, p), n in sorted(credits.items())],
@@ -3326,6 +3593,10 @@ def main(argv: list[str] | None = None) -> int:
                                                           a["after"]))
             for line in credit_lines:
                 print(line)
+            if args.list_added:
+                print("  added findings, by rule then file (biggest file first):")
+                for line in added_detail_lines(detail):
+                    print(line)
             for num, what in UNCHECKED:
                 print("  not checked (cross-file): rule %d - %s" % (num, what))
             for rule, prefix, why in EXEMPT:
