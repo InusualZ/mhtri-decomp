@@ -1909,7 +1909,7 @@ config.libs = [
             # `enemy_control.cpp` at 0x805A1BB8 and `menu_item.cpp` at 0x805CDFC8 carries none for the
             # whole band), so the stem is the map's `fn_8024F200` with a rule-7 deferral.  It uses
             # `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_8024F200.cpp"),
+            Object(NonMatching, "Pl/pl_act_step.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802693C4_fn_802693C4` - the player part/motion cluster (0x802693C4-0x8026BA1C, 63
             # functions, 9816 B) with its own exception tables (extab 0x80012554-0x8001265C,

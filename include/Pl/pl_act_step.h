@@ -1,9 +1,9 @@
 /*
- * Declarations owned by `Pl/fn_8024F200.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
+ * Declarations owned by `Pl/pl_act_step.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
  * header instead of declaring the symbol itself.
  */
-#ifndef MHTRI_PL_FN_8024F200_H
-#define MHTRI_PL_FN_8024F200_H
+#ifndef MHTRI_PL_ACT_STEP_H
+#define MHTRI_PL_ACT_STEP_H
 
 #include "types.h"
 
@@ -13,7 +13,7 @@ struct _PLW;
 extern "C" {
 #endif
 
-/* 0x80257E70 - the three-timer reset `Pl/fn_8024F200.cpp` defines at 0x80257E70; the map name is
+/* 0x80257E70 - the three-timer reset `Pl/pl_act_step.cpp` defines at 0x80257E70; the map name is
  * unmangled, so the definition is `extern "C"` and so is this declaration. */
 void fn_80257E70(struct _PLW* self);
 
@@ -27,4 +27,4 @@ u32 fn_8025FA00(void* a, void* b);
 }
 #endif
 
-#endif /* MHTRI_PL_FN_8024F200_H */
+#endif /* MHTRI_PL_ACT_STEP_H */
