@@ -69,10 +69,12 @@ generated spelling on either side of an ownership line is the defect. The rule a
 bodies too, and **no comment exempts anything**: a `rule 7 deferred` line is now just inert text, not a key.
 
 The **only** grandfather is the gate's own `--diff`: touching a file that already carries findings is
-allowed (an existing finding never blocks a landing), while adding one is refused. That is the owner's
-"do not revoke committed progress" - the mounted debt is worked slowly through the backlog register
-(`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as
-before.**
+allowed (an existing finding never blocks a landing), while a finding whose token is *new to that file* is
+refused - the judgement is the **token set difference per (rule, file)**, not a count delta, so a file may
+go on spelling the names it already flagged (30 more occurrences add no identity and no row) while a
+brand-new `fn_XXXXXXXX`/unowned-data extern still refuses. That is the owner's "do not revoke committed
+progress" - the mounted debt is worked slowly through the backlog register (`tools/units/backlog.py`),
+never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as before.**
 
 **`--diff` says how many; `--list-added` says which.** A `+N rule R <file>` row names no occurrence, so a
 lane that reads `+76 rule 7` cannot tell which of its renames are load-bearing: one dropped three whole
@@ -1878,44 +1880,166 @@ def diff_deltas(before: dict[tuple[int, str], int], after: dict[tuple[int, str],
 def finding_identity(f: dict) -> tuple:
     """A line-independent identity for a finding: rule, file, at-fault token and detail text.
 
-    `--diff` compares only (rule, file) counts, so a count delta cannot say *which* occurrences are new.
-    Matching the two sides by this identity - the token and detail a lane acts on, never the line, which
-    moves with every edit above it - is what lets `--list-added` name the added occurrences when the
-    file's pre-existing findings shifted.
+    The identity is the **token and the detail** a lane acts on - never the line, which moves with every
+    edit above it.  `added_identities` compares the two sides' identity *sets* per (rule, file), so
+    writing 30 more occurrences of a name the file already spells adds no identity (and is not an
+    addition), while a token new to the file is one, however many times it is spelled.  Keeping `detail`
+    in the tuple is what stops two different complaints about one token (rule 7's `auto-generated name`
+    and its `bare` identifier, say) from collapsing into one.
     """
     return (f["rule"], f["file"], f.get("token"), f["detail"])
 
 
-def added_finding_detail(added: list[dict], after_findings: list[dict],
-                         before_findings: list[dict]) -> list[dict]:
+def _covering_range(own: "Ownership", section: str, address: int) -> "tuple | None":
+    """The `(start, end)` of the registered range covering `address` in `section`, or None.
+
+    The range, not the unit path, is what tells one ownership from another across a rename: a batch that
+    renames a unit file (`menu/fn_802A6624.cpp` -> `menu/menu_message.cpp`) keeps every boundary, so an
+    address's ownership is unchanged even though the unit the map spells changed.
+    """
+    for start, end, _unit in own.ranges.get(section, ()):
+        if start <= address < end:
+            return (start, end)
+    return None
+
+
+def rename_map(base: "Ownership | None", after: "Ownership | None",
+               names: "set[str] | None" = None) -> dict:
+    """`{name_at_base: name_now}` for the map rows whose **address** is unchanged and whose **name** changed.
+
+    The symbol sibling of `renames_of` (which maps a *path* at the ref to the path now): a batch that
+    renames a `symbols.txt` row keeps the address, so the two sides must read as *the same symbol,
+    renamed*, never as one removal plus one addition.  This is the same address-is-the-identity view
+    `owed_rename_completion` uses for its credit, and the same `+62 rule-2 violations for a pure rename`
+    artefact that `load_ownership_at_ref` fixed on the map side - the token comparison needs it too.
+
+    A pair is admitted only when both maps resolve the shared address to the **same** kind and the same
+    ownership - the same covering `(start, end)` for an owned range (the unit *path* may itself have been
+    renamed) or the same unsplit module - so a range the batch re-registered to a different unit, or
+    moved, is not read as a rename of the old row.  `names` bounds the walk to the tokens the caller
+    actually compares (a `--diff` supplies its base side's tokens) instead of the whole 4.5 MB map.
+    """
+    out: dict[str, str] = {}
+    if base is None or after is None:
+        return out
+    for name in (names if names is not None else list(base.symbols)):
+        entries = base.symbols.get(name)
+        if not entries or len(entries) != 1:
+            continue
+        section, address, _type = entries[0]
+        now = after.name_at(section, address)
+        if not now or now == name:
+            continue
+        was, is_ = base.resolution_at(section, address), after.resolution_at(section, address)
+        if not was or not is_ or was.get("kind") != is_.get("kind"):
+            continue
+        if was.get("kind") == "owned":
+            if _covering_range(base, section, address) != _covering_range(after, section, address):
+                continue
+        elif was.get("module") != is_.get("module"):
+            continue
+        out[name] = now
+    return out
+
+
+def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None) -> dict:
+    """`f` with its token - and the owner path its detail spells - translated: the same token, renamed.
+
+    Two translations, because a rename changes two things a base-side finding names.  `symbols`
+    (`rename_map`) renames the **token** and its backticked occurrence in the prose, so a renamed
+    declaration presents the identity the working side does.  `files` (`renames_of`) renames any
+    **path** in the prose: a rule-2 finding's detail names the *owner unit* ("`x` is owned by
+    `src/menu/fn_802A6624.cpp`"), and when the batch re-homes that unit too the same finding would look
+    like a new one for no reason but the unit's new name.
+
+    The map holds only map-row names, so a finding whose token is not a renamed row comes back unchanged.
+    """
+    tok = f.get("token")
+    detail = f["detail"]
+    token2 = tok
+    if tok and tok in (symbols or {}):
+        token2 = symbols[tok]
+        detail = detail.replace("`%s`" % tok, "`%s`" % token2)
+    for old, new in (files or {}).items():
+        if old != new:
+            detail = detail.replace(old, new)
+    if token2 == tok and detail == f["detail"]:
+        return f
+    return dict(f, token=token2, detail=detail)
+
+
+def added_identities(before_findings: list[dict], after_findings: list[dict],
+                     symbols: "dict | None" = None, files: "dict | None" = None) -> dict:
+    """`{(rule, file): [finding, ...]}` - one entry per after-side identity **new to that file**.
+
+    This is the whole judgement `--diff` makes, as a **set difference per (rule, file)** rather than a
+    count delta: an occurrence is an *addition* only when its identity (`finding_identity`) was not
+    already firing in that file at the base.  A file that spells an already-flagged `fn_XXXXXXXX`/`unkNN`
+    /unowned-data extern 30 more times adds no identity and no row; a token new to the file is one, and is
+    refused, however many times the batch spells it.  The entry chosen for an identity is the first
+    occurrence by line, so a brand-new callee called five times is named once.
+
+    Each base identity is admitted **under every spelling a rename gives it** (`renamed_finding`, driven by
+    the symbol map and the file map): the old name (a referrer that kept the old spelling) and the new one
+    (the rename completed) - so a rename is never one removal plus one addition, the artefact class the
+    base side's own map is already judged by - while a name the maps never carried stays a new token.
+    """
+    before: dict = {}
+    for f in before_findings:
+        known = before.setdefault((f["rule"], f["file"]), set())
+        known.add(finding_identity(f))
+        moved = renamed_finding(f, symbols or {}, files)
+        if moved is not f:
+            known.add(finding_identity(moved))
+    after: dict = {}
+    for f in after_findings:
+        after.setdefault((f["rule"], f["file"]), []).append(f)
+    out: dict = {}
+    for key, finds in after.items():
+        known = before.get(key, ())
+        seen: dict = {}
+        for f in sorted(finds, key=lambda f: f["line"]):
+            ident = finding_identity(f)
+            if ident in known or ident in seen:
+                continue
+            seen[ident] = f
+        if seen:
+            out[key] = list(seen.values())
+    return out
+
+
+def added_rows(fresh: dict, before_counts: dict, after_counts: dict) -> list[dict]:
+    """The `+N rule R <file> (before -> after)` rows the message prints, from `added_identities`.
+
+    `N` is the number of identities new to the file (what counts as an addition), not the count delta:
+    a file that spells an already-flagged name 30 more times has no row at all.  `before`/`after` stay the
+    (rule, file) counts, so the row still says how the file's debt moved while `N` says what is new.
+    """
+    out = []
+    for key in sorted(fresh):
+        rule, file = key
+        out.append({"rule": rule, "file": file, "added": len(fresh[key]),
+                    "before": before_counts.get(key, 0), "after": after_counts.get(key, 0)})
+    return out
+
+
+def added_finding_detail(added: list[dict], after_findings: list[dict], before_findings: list[dict],
+                         symbols: "dict | None" = None, files: "dict | None" = None) -> list[dict]:
     """The findings behind `added`'s `+N rule R <file>` rows, named: rule, file, line and token.
 
-    `added` is `diff_deltas`' (rule, file) count deltas, so by itself it names no occurrence.  Grouping the
-    after-side findings by (rule, file) and dropping those the before side already carried (a multiset, by
-    `finding_identity`) recovers exactly the new ones.  The list is capped at `added` because a rename
-    credit can reduce a row's delta below what the identity subtraction finds.
+    `added` is `added_rows`' new-identity rows, so by itself it says how many new tokens a file gained but
+    not which.  Re-deriving `added_identities` (with the same symbol/file rename maps) names each one - the
+    first occurrence of each new identity by line - and the list is capped at `row["added"]` because a
+    rename credit can reduce a row below what the identity comparison finds.
 
     The returned rows carry only what a reader needs - the file and line that locate the occurrence and the
     token that names it - so the `--diff --json` `detail` key is stable whatever the internal finding adds.
     """
-    before: dict[tuple, collections.Counter] = {}
-    for f in before_findings:
-        before.setdefault((f["rule"], f["file"]), collections.Counter())[finding_identity(f)] += 1
-    after: dict[tuple, list] = {}
-    for f in after_findings:
-        after.setdefault((f["rule"], f["file"]), []).append(f)
+    fresh = added_identities(before_findings, after_findings, symbols, files)
     out = []
     for row in sorted(added, key=lambda a: (a["rule"], -a["added"], a["file"])):
         key = (row["rule"], row["file"])
-        remaining = collections.Counter(before.get(key, ()))
-        fresh = []
-        for f in sorted(after.get(key, ()), key=lambda f: f["line"]):
-            ident = finding_identity(f)
-            if remaining[ident] > 0:
-                remaining[ident] -= 1
-                continue
-            fresh.append(f)
-        for f in fresh[:row["added"]]:
+        for f in fresh.get(key, ())[:row["added"]]:
             out.append({"rule": f["rule"], "file": f["file"], "line": f["line"],
                         "token": f.get("token"), "detail": f["detail"]})
     return out
@@ -3242,8 +3366,11 @@ def selftest() -> int:
              "owned_thing = .text:0x80200000; // type:function size:0x10\n"
              "new_data = .data:0x80400010; // type:object size:0x10\n")
         # `new_data` starts owned by another unit, so the base `extern` is a rule-2 finding, never rule 12.
-        # The batch drops that range (making it unowned data): rule 12 rises 0 -> 1 while rule 2 stays 1
-        # (owned-foreign and unsplit both fire rule 2), so the diff adds exactly one rule 7, 11 and 12.
+        # The batch drops that range (making it unowned data): rule 12 rises 0 -> 1 (a genuine addition),
+        # and the *same* token now carries a *different* rule-2 complaint - owned-foreign -> unsplit - which
+        # the identity keeps distinct (its detail differs), so rule 2 is named too even though its count does
+        # not rise.  A count delta could not see that; the token set can.  Exactly one brand-new rule 7 and
+        # rule 11 token is added on top (the file's pre-existing `fn_80040598`/`base_fn` are not additions).
         base_splits = ("other/other_unit.c:\n\t.text       start:0x80200000 end:0x80200010\n"
                        "\t.data       start:0x80400000 end:0x80400020\n")
         base_file = ("void fn_80040598(void) {}\n"
@@ -3283,23 +3410,29 @@ def selftest() -> int:
         check("--list-added leaves the exit status alone", (rc_plain, rc_list, rc_json), (1, 1, 1))
         check("... the absent-flag summary line is byte-identical",
               plain.splitlines()[0],
-              "stylelint: the batch adds 3 section 6.5 violation(s) over 1 changed file(s):")
+              "stylelint: the batch adds 4 section 6.5 violation(s) over 1 changed file(s):")
         check("... and its per-rule rows are the ones a lane already reads",
               [ln for ln in plain.splitlines() if ln.startswith("  +")],
-              ["  +1 rule 7  src/Pl/pl_act.cpp  (1 -> 2)",
+              ["  +1 rule 2  src/Pl/pl_act.cpp  (1 -> 1)",
+               "  +1 rule 7  src/Pl/pl_act.cpp  (1 -> 2)",
                "  +1 rule 11  src/Pl/pl_act.cpp  (1 -> 2)",
                "  +1 rule 12  src/Pl/pl_act.cpp  (0 -> 1)"])
         check("... the without-flag run carries no detail", "added findings" in plain, False)
-        check("--diff --json names exactly the three added findings",
+        # the rule-2 row is (1 -> 1): the count did not rise, but the *token* `new_data` now carries the
+        # unsplit complaint instead of the owned-foreign one - two different complaints about one token,
+        # which the identity keeps distinct by construction.
+        check("--diff --json names exactly the four added findings",
               [(d["rule"], d["file"], d["line"], d["token"]) for d in data["detail"]],
-              [(7, "src/Pl/pl_act.cpp", 2, "fn_80275B04"),
+              [(2, "src/Pl/pl_act.cpp", 5, "new_data"),
+               (7, "src/Pl/pl_act.cpp", 2, "fn_80275B04"),
                (11, "src/Pl/pl_act.cpp", 4, "new_fn"),
                (12, "src/Pl/pl_act.cpp", 5, "new_data")])
         check("... and never the pre-existing occurrences",
               [ln for ln in listed.splitlines() if "fn_80040598" in ln or "base_fn" in ln], [])
-        check("--list-added prints the same three, grouped by rule",
+        check("--list-added prints the same four, grouped by rule",
               [ln for ln in listed.splitlines() if ln.startswith("    rule ")],
-              ["    rule 7 src/Pl/pl_act.cpp:2 fn_80275B04",
+              ["    rule 2 src/Pl/pl_act.cpp:5 new_data",
+               "    rule 7 src/Pl/pl_act.cpp:2 fn_80275B04",
                "    rule 11 src/Pl/pl_act.cpp:4 new_fn",
                "    rule 12 src/Pl/pl_act.cpp:5 new_data"])
         check("... with the per-file count line", "  src/Pl/pl_act.cpp (1)" in listed, True)
@@ -3317,6 +3450,184 @@ def selftest() -> int:
             os.chdir(old_cwd)
         check("a diff that adds nothing to a file of pre-existing findings exits 0", rc_pre, 0)
         check("... and prints no detail", "added findings" in pre_text, False)
+
+    # --- the count cap is gone: an addition is a *token new to the file*, not a count delta (2026-09-30) --
+    # A count delta cannot say which occurrences are new, so the old `--diff` refused EVERY added
+    # occurrence of anything in a file that already carried a finding.  A lane at 69 rule-7 findings had to
+    # rename five symbols (carrying 445 of its band's 466 references, referrers in another module) merely to
+    # earn the right to write a body, and two more lanes lost 920 B of 100 %-measured bodies to rule 12,
+    # which has no rename remedy at all.  The judgement is now the **token set difference per (rule, file)**:
+    # spelling an already-flagged name 30 more times is not an addition; a token new to the file still is.
+    # The exit-code contract (0 clean / 1 additions / 2 nothing measured) and the `+N rule R (before ->
+    # after)` rows are unchanged - only what `N` counts.
+    with tempfile.TemporaryDirectory() as tmp:
+        def cgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+
+        def cput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def crev() -> str:
+            return subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace").stdout.strip()
+
+        cgit("init", "-q")
+        cgit("checkout", "-q", "-b", "main")
+        # the base symbol map: `unowned_data` is data no range claims (rule 12); `fn_80040598` is an
+        # auto-generated stem (rule 7); `old_name` is owned by `other/other_unit.c`, so declaring it here is
+        # a rule-2 finding - the two rules the rename map exists for.
+        symbols_txt = ("owned_fn = .text:0x80200000; // type:function size:0x10\n"
+                       "unowned_data = .data:0x80400000; // type:object size:0x10\n"
+                       "fn_80040598 = .text:0x80201000; // type:function size:0x10\n"
+                       "fn_80275B04 = .text:0x80201010; // type:function size:0x10\n"
+                       "old_name = .text:0x80200030; // type:function size:0x10\n"
+                       "pl_act_step_reset = .text:0x80201020; // type:function size:0x10\n")
+        cput("config/RMHE08/symbols.txt", symbols_txt)
+        cput("config/RMHE08/splits.txt",
+             "other/other_unit.c:\n\t.text       start:0x80200000 end:0x80201000\n"
+             "Pl/pl_act.cpp:\n\t.text       start:0x80201000 end:0x80202000\n")
+        cput("src/other/other_unit.c", "void owned_fn(void) {}\n")
+        base_file = ("void fn_80040598(void) {}\n"
+                     "extern u8 unowned_data[];\n"
+                     "extern void old_name(void);\n")
+        cput("src/Pl/pl_act.cpp", base_file)
+        cgit("add", "-A")
+        cgit("commit", "-q", "-m", "base: one rule-7, one rule-12 and one rule-2 finding")
+        base_sha = crev()
+        # the thirty more spellings of the ALREADY-FLAGGED stem the cap used to refuse
+        more = "void user(void) {\n" + "".join("    fn_80040598();\n" for _ in range(30)) + "}\n"
+        old_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            def crun(*extra: str) -> tuple:
+                # the working map is rewritten per scenario; the mtime cache can miss a same-tick write
+                _OWNERSHIP_CACHE.clear()
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                    rc = main(["--diff", base_sha, *extra])
+                return rc, out.getvalue()
+
+            # (a) +30 occurrences of an already-flagged token -> PASS (this is the cap being removed)
+            cput("src/Pl/pl_act.cpp", base_file + more)
+            rc_a, out_a = crun()
+            check("(a) 30 more occurrences of an already-flagged token are not additions", rc_a, 0)
+            check("... and print no `+N rule R` row", [ln for ln in out_a.splitlines()
+                                                    if ln.startswith("  +")], [])
+
+            # (b) the same file gaining a *new* generated token -> REFUSE, naming it
+            cput("src/Pl/pl_act.cpp", base_file + more + "void extra(void) { fn_80275B04(); }\n")
+            rc_b, out_b = crun("--list-added")
+            check("(b) a new generated token in that file refuses", rc_b, 1)
+            check("... the row keeps both the new count and the old one",
+                  [ln for ln in out_b.splitlines() if ln.startswith("  +")],
+                  ["  +1 rule 7  src/Pl/pl_act.cpp  (1 -> 32)"])
+            check("... and names the one token that is new, never the 31 that are not",
+                  [ln for ln in out_b.splitlines() if ln.strip().startswith("rule 7 src/")],
+                  ["    rule 7 src/Pl/pl_act.cpp:36 fn_80275B04"])
+
+            # (c) a rename in that file (old token -> real name) -> PASS, with the count falling
+            cput("src/Pl/pl_act.cpp",
+                 "void pl_act_step_reset(void) {}\n"
+                 "extern u8 unowned_data[];\n"
+                 "extern void old_name(void);\n"
+                 "void user(void) {\n" + "".join("    pl_act_step_reset();\n"
+                                                  for _ in range(30)) + "}\n")
+            own_work = load_ownership(tmp)
+            after_c = open(os.path.join(tmp, "src/Pl/pl_act.cpp"), encoding="utf-8").read()
+            check("(c) the rename really is a falling count",
+                  (sum(1 for f in lint_source(Source("src/Pl/pl_act.cpp", "src/Pl/pl_act.cpp",
+                                                     git_bytes(tmp, "show", "%s:src/Pl/pl_act.cpp"
+                                                               % base_sha).decode("utf-8")),
+                                             own_work) if f["rule"] == 7),
+                   sum(1 for f in lint_source(Source("src/Pl/pl_act.cpp", "src/Pl/pl_act.cpp",
+                                                     after_c),
+                                             own_work) if f["rule"] == 7)), (1, 0))
+            rc_c, out_c = crun("--json")
+            check("... and measures clean", (rc_c, json.loads(out_c)["added"]), (0, []))
+
+            # the symbol rename the map translates: `old_name` -> `new_name` at the SAME address, own by the
+            # same unit.  A count delta sees 1 -> 1 and passes; a naive token set would call it a removal
+            # plus an addition and refuse, which is the `+62 rule-2 violations for a pure rename` artefact.
+            cput("config/RMHE08/symbols.txt",
+                 symbols_txt.replace("old_name = .text:0x80200030",
+                                     "new_name = .text:0x80200030"))
+            cput("src/Pl/pl_act.cpp", base_file.replace("old_name", "new_name"))
+            base_own_c2 = load_ownership_at_ref(tmp, base_sha)
+            after_own_c2 = load_ownership(tmp)
+            check("(e) rename_map reads the row rename the base declared under the old name",
+                  rename_map(base_own_c2, after_own_c2, {"old_name"}), {"old_name": "new_name"})
+            rc_rename, out_rename = crun("--json")
+            check("... so a pure symbol rename still measures clean (no removal + addition)",
+                  (rc_rename, json.loads(out_rename)["added"]), (0, []))
+            # the *whole unit* renamed too (`menu/fn_802A6624.cpp` -> `menu/menu_message.cpp`): the range
+            # boundaries are identical, so the address is unchanged and the row is still the same symbol.
+            # The owner *path* a rule-2 detail spells moves with it, or the same finding reads as new.
+            unit_a = Ownership({"old_row": [(".text", 0x80200030, "function")]},
+                               {".text": [(0x80200000, 0x80201000, "menu/fn_802A6624.cpp")]})
+            unit_b = Ownership({"new_row": [(".text", 0x80200030, "function")]},
+                               {".text": [(0x80200000, 0x80201000, "menu/menu_message.cpp")]})
+            check("... even when the owning unit file was renamed with it",
+                  rename_map(unit_a, unit_b, {"old_row"}), {"old_row": "new_row"})
+            check("... and the owner path its detail spells is translated with the unit",
+                  renamed_finding({"rule": 2, "file": "x", "line": 1, "token": "old_row",
+                                   "detail": "`old_row` is owned by `src/menu/fn_802A6624.cpp`"},
+                                  {"old_row": "new_row"},
+                                  {"src/menu/fn_802A6624.cpp": "src/menu/menu_message.cpp"}),
+                  {"rule": 2, "file": "x", "line": 1, "token": "new_row",
+                   "detail": "`new_row` is owned by `src/menu/menu_message.cpp`"})
+            # ... but a range the batch moved to another owner is NOT a rename: the boundaries differ
+            moved_unit = Ownership({"new_row": [(".text", 0x80200030, "function")]},
+                                   {".text": [(0x80200000, 0x80200008, "menu/menu_message.cpp")]})
+            check("... while a range that moved is not read as a rename",
+                  rename_map(unit_a, moved_unit, {"old_row"}), {})
+
+            # the same rename is NOT credited when the address moved: the map (`rename_map`) keys on the
+            # address, so `new_name` at a new address leaves the old declaration's finding in place.
+            cput("config/RMHE08/symbols.txt",
+                 symbols_txt.replace("old_name = .text:0x80200030",
+                                     "new_name = .text:0x80200080"))
+            rc_moved, out_moved = crun("--json")
+            check("... and an address that moved is not read as a rename",
+                  (rc_moved, [a["rule"] for a in json.loads(out_moved)["added"]]), (1, [2]))
+            cput("config/RMHE08/symbols.txt", symbols_txt)
+
+            # (d) a NEW file -> every token in it is new -> REFUSE
+            cput("src/Pl/pl_act.cpp", base_file)
+            cput("src/Pl/brand_new.cpp", "void fn_80ABCDEF(void) {}\n")
+            rc_d, out_d = crun("--list-added")
+            check("(d) a new file's every token is an addition", rc_d, 1)
+            check("... named on the new file",
+                  [ln for ln in out_d.splitlines() if ln.strip().startswith("rule 7 src/")],
+                  ["    rule 7 src/Pl/brand_new.cpp:1 fn_80ABCDEF"])
+            os.remove(os.path.join(tmp, "src/Pl/brand_new.cpp"))
+
+            # (f) base unreadable -> REFUSE, never pass silently.  A comment-only touch adds no token, so
+            # with the base readable it exits 0; blinded, the base side contributes no identity at all and
+            # every after-side finding is an addition - the fail-closed half of the judgement.
+            cput("src/Pl/pl_act.cpp", "/* touched, adds no token */\n" + base_file)
+            rc_ok, out_ok = crun()
+            check("(f) a token-preserving touch passes when the base is readable", rc_ok, 0)
+            real_git_bytes = globals()["git_bytes"]
+
+            def _blind(root: str, *args: str) -> bytes:
+                if args[:1] == ("show",) and args[1].startswith(base_sha) \
+                        and args[1].endswith("src/Pl/pl_act.cpp"):
+                    raise RuntimeError("selftest: simulated unreadable base object")
+                return real_git_bytes(root, *args)
+
+            globals()["git_bytes"] = _blind
+            try:
+                rc_blind, _out_blind = crun()
+            finally:
+                globals()["git_bytes"] = real_git_bytes
+            check("... and REFUSES when the base blob cannot be read", rc_blind, 1)
+        finally:
+            os.chdir(old_cwd)
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -3453,11 +3764,18 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
         + header_rule11_findings_at_ref(root, branch)
         + header_rule12_findings_at_ref(root, branch, after_ownership))
     after = rule_counts(after_findings)
-    added, credits = apply_rename_credits(diff_deltas(before, after), touched, base_ownership,
-                                         after_ownership, base_symbols,
-                                         {p: len(names) for p, names in freed_gaps.items()})
+    # a declaration the base side spelled under a name this batch renamed is the *same* declaration:
+    # `rename_map` (symbols) and `renames_of` (files) let `added_identities` admit a base identity under
+    # both spellings, so a rename reads as a rename and never as removal + addition.
+    symbol_rename = rename_map(base_ownership, after_ownership,
+                               {f.get("token") for f in before_findings if f.get("token")})
+    added, credits = apply_rename_credits(
+        added_rows(added_identities(before_findings, after_findings, symbol_rename, rename),
+                   before, after),
+        touched, base_ownership, after_ownership, base_symbols,
+        {p: len(names) for p, names in freed_gaps.items()})
     credit_lines = rename_credit_lines(credits, freed_gaps)
-    detail = added_finding_detail(added, after_findings, before_findings)
+    detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename)
     if as_json:
         print(json.dumps({"ref": branch, "base": base, "added": added, "detail": detail,
                           "changed": rels,
@@ -3573,11 +3891,18 @@ def main(argv: list[str] | None = None) -> int:
             + header_rule11_findings(root)
             + header_rule12_findings(root, ownership))
         after = rule_counts(after_findings)
-        added, credits = apply_rename_credits(diff_deltas(before, after), touched, base_ownership,
-                                             ownership, base_symbols,
-                                             {p: len(names) for p, names in freed_gaps.items()})
+        # a declaration the base side spelled under a name this batch renamed is the *same* declaration:
+        # `rename_map` (symbols) and `renames_of` (files) let `added_identities` admit a base identity
+        # under both spellings, so a rename reads as a rename and never as removal + addition.
+        symbol_rename = rename_map(base_ownership, ownership,
+                                   {f.get("token") for f in before_findings if f.get("token")})
+        added, credits = apply_rename_credits(
+            added_rows(added_identities(before_findings, after_findings, symbol_rename, rename),
+                       before, after),
+            touched, base_ownership, ownership, base_symbols,
+            {p: len(names) for p, names in freed_gaps.items()})
         credit_lines = rename_credit_lines(credits, freed_gaps)
-        detail = added_finding_detail(added, after_findings, before_findings)
+        detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename)
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "detail": detail, "changed": rels,
                               "rename_credits": [{"rule": r, "file": p, "count": n,
