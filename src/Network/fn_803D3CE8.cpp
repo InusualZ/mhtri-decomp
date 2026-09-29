@@ -171,7 +171,7 @@ extern "C" void fn_803D3CE8(NetworkSessionStable* self, u32 value)
     n = writeByte(&stream, 1);
     writeSize(&stream, (u16)(n + writeUInt(&stream, value)));
     term = -1;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -185,7 +185,7 @@ extern "C" void NetworkSessionStable_send8(NetworkSessionStable* self)
     fn_803F8A14(&stream, 0);
     writeSize(&stream, writeByte(&stream, 2));
     term = -1;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -199,7 +199,7 @@ extern "C" void NetworkSessionStable_send6(NetworkSessionStable* self, s8 value)
     fn_803F8A14(&stream, 0);
     writeSize(&stream, writeByte(&stream, 6));
     term = value;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -215,7 +215,7 @@ extern "C" void NetworkSessionStable_send10(NetworkSessionStable* self, s8 idx)
     n = writeByte(&stream, 10);
     writeSize(&stream, (u16)(n + fn_803F8BDC(&stream, &self->slots_14838[idx].state_20)));
     term = -2;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -240,7 +240,7 @@ extern "C" void NetworkSessionStable_send11(NetworkSessionStable* self, s8 a, u3
     n4 = n3 + writeUInt(&stream, scaled);
     writeSize(&stream, (u16)(n4 + writeByte(&stream, (u32)d)));
     term = a;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -261,7 +261,7 @@ extern "C" void NetworkSessionStable_send8or9(NetworkSessionStable* self, u32 ha
     n = (u16)(n + writeUInt(&stream, self->slots_14838[idx].playerId_40));
     writeSize(&stream, (u16)(n + writeUInt(&stream, self->tick_16CD8)));
     term = idx;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -277,7 +277,7 @@ extern "C" void NetworkSessionStable_send4(NetworkSessionStable* self, const voi
     n = writeByte(&stream, 4);
     writeSize(&stream, (u16)(n + writeBytes(&stream, data, len)));
     term = idx;
-    fn_803D39BC(self, &stream, 0, 1, &term, 0xFF);
+    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
     dtor_803CB958(&stream, -1);
 }
 
@@ -1063,7 +1063,7 @@ void NetworkSessionManager::setFlag79(s8 value)
 
 void NetworkSessionManager::notify(s32 value)
 {
-    fn_803CF66C(value);
+    NetworkSessionStable_setNotifyValue(value);
 }
 
 void NetworkSessionManager::setFlag7A(s8 value)

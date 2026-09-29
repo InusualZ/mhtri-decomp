@@ -1702,7 +1702,7 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
     flagByte = flag;
     slot = interface_6634->getSlotState(peer_6638);
     if (slot < 0) {
-        fn_803CCF14(this, lbl_806036A0, 0, -1);
+        networkPeerError_set(this, lbl_806036A0, 0, -1);
         return -1;
     }
     record = sendBuffer_14;
@@ -1746,11 +1746,11 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
     }
     slot = interface_6634->findSlot(peer_6638);
     if (slot < 0) {
-        fn_803CCF14(this, lbl_806036A0, 0, -2);
+        networkPeerError_set(this, lbl_806036A0, 0, -2);
         return -1;
     }
     if (interface_6634->sendUnreliable((u8)slot, sendBuffer_14, total) == 0) {
-        fn_803CCF14(this, lbl_806036A0, 0, -3);
+        networkPeerError_set(this, lbl_806036A0, 0, -3);
         return -1;
     }
     return total;
@@ -1777,7 +1777,7 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
     *flag = 0;
     slot = interface_6634->getSlotState(peer_6638);
     if (slot < 0) {
-        fn_803CCF14(this, lbl_806036A0, 0, 0);
+        networkPeerError_set(this, lbl_806036A0, 0, 0);
         return -1;
     }
     if (received_10 < 4) {

@@ -15,6 +15,7 @@
 #define FN_803D3CE8_H
 
 #include "types.h"
+#include "Network/network_transport.h"
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
@@ -381,14 +382,14 @@ typedef struct PatCircleInfo {
     /* +0x379 */ u8 pad_379[0x3];
 } PatCircleInfo;   /* size: 0x37C */
 
-/* The Pat band's helpers.  No registered unit owns their addresses, and this header - not
- * `include/unsplit/Network.h` - is where this band's unowned helpers already live (`networkPatAttachBuffer`,
- * `networkPatResetCircleInfo`, `PatInterface_*`), so they are declared beside the records they take.
- * The first three were the map's `fn_803CE064` / `fn_803CE5F0` / `fn_803DE524` until this pass renamed
- * them from what their bodies do (**GUESSES**, each recorded where it is declared); the last two are
- * the map's own names. */
-extern "C" void receivePatInterfaces(PatReceiver* receiver);
-extern "C" void flushPatRequests(PatRequestQueue* queue);
+/* The Pat band's helpers.  `receivePatInterfaces` (0x803CE064) and `flushPatRequests` (0x803CE5F0)
+ * sit inside `Network/network_transport.cpp`'s claimed range, so rule 2 gives their declarations to
+ * that unit's header (`Network/network_transport.h`, included at the top of this file).  The rest have
+ * no registered owner, and this header - not `include/unsplit/Network.h` - is where this band's
+ * unowned helpers already live (`networkPatAttachBuffer`, `networkPatResetCircleInfo`, `PatInterface_*`),
+ * so they are declared beside the records they take.  The first three of the five were the map's
+ * `fn_803CE064` / `fn_803CE5F0` / `fn_803DE524` until the Pat pass renamed them from what their bodies
+ * do (**GUESSES**, each recorded where it is declared); the last two are the map's own names. */
 /* the manager itself is declared below - the band's helpers take it, so name it first, and
  * `NetworkInstance` is the session singleton's class (`include/unsplit/Network.h` defines it; a
  * forward declaration is enough here because only a pointer crosses the call) */
@@ -627,8 +628,8 @@ void networkStreamWriter_commit(NetworkStreamWriterDefault* self);
 void networkStreamWriter_bytes(NetworkStreamWriterDefault* self);
 u32 networkStreamWriter_size(const void* sub);
 
-/* the send/flush tail */
-void fn_803D39BC(NetworkSessionStable* self, NetworkStreamWriter* stream, u32 a, u32 b, const void* term, u32 c);
+/* the send/flush tail (`NetworkSessionStable_sendStream`) is declared by its owner,
+   `Network/network_transport.h`, which this header includes at the top. */
 
 /* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
    so rule 2 puts it in the band header `include/unsplit/Network.h` (which types it as the class
@@ -669,19 +670,14 @@ void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void*
 void networkSessionReflect1(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
 /* untyped: opaque handle passed through - only the writer band owns the layout */
 void networkSmallObject_construct(void* self);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkSmallObject_dtor(void* self, s32 flags);
+
 /* untyped: opaque handle passed through - only the writer band owns the layout */
 void fn_803CA338(void* self);
 /* untyped: opaque handle passed through - only the writer band owns the layout */
 void dtor_803CA338(void* self, s32 flags);
 /* untyped: opaque handle passed through - only the writer band owns the layout */
 void networkInstance_initMutex(void* self);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void LockMutex(void* mutex);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void UnlockMutex(void* mutex);
-void fn_803CF66C(s32 value);
+
 /* untyped: opaque handle passed through - only the writer band owns the layout */
 s32 __ptmf_scall(void* self);
 
@@ -714,8 +710,6 @@ void __construct_array(void* ptr, void* ctor, void* dtor, u32 size, u32 count);
 void __destroy_arr(void* ptr, void* dtor, u32 size, u32 count);
 
 s32 __ptmf_scall(void* self);
-void LockMutex(void* mutex);
-void UnlockMutex(void* mutex);
 
 }
 
