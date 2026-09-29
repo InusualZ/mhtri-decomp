@@ -38,4 +38,16 @@ void fn_802D94C4(u8 mode);
 }
 #endif
 
+#ifdef __cplusplus
+/* C++-linkage declarations: the map's mangled name is the C++ front-end's own spelling of these
+ * (rule 9), so they are declared outside the `extern "C"` block above. */
+
+/* 0x802DAF48 - the page-arrow putter the equip-information screens call: it draws the arrow sprite
+ * rows `table` names at the anchor `pos`, for the (current, last) page pair and the flags byte.
+ * Added with that consumer (rule 2: this range owns the address; the signature is its call site's
+ * argument list, and the vector type is forward-declared so the header stays self-contained). */
+struct _mh_ivec2_;
+void PutPageArrow(u16* table, s16 cur, s16 last, u16 flags, const struct _mh_ivec2_* pos, u8 extra);
+#endif
+
 #endif /* MHTRI_AI_FN_802D44F4_H */
