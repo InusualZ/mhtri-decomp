@@ -115,6 +115,14 @@ defects**, one of them **invisible to every score the project has**:
 **The verdict, in the form it should be quoted:** *run 1 showed the loop polices the record; run 2 shows it
 finds real defects.* Neither run alone is the claim.
 
+**Later reviews (2026-09-28): 6 reviews, 6 material catches, none visible to any gate row.** A false 100 % (a
+`bl` to the wrong symbol *name* - objdiff scores a reloc-name mismatch as equal); a gate hole (the rule-11 row
+is COUNT-based, so an added `void*` hid behind nine removals); a struct that scored 100 % while `0xC` wrong for
+17 rows (an overflowed pad); a regression in a function the branch never touched (`NWC24iSetRtcCounter`
+44.17 -> 40.50, fixed to 92.24 by `dont_inline` scoped to one function); `stylelint --ref`'s vacuous clean.
+Review judges the branch's own diff: `stylelint --diff main` **from MAIN**, per-function objdiff, and the
+**relocation** view. A recorded residual is a landed win, not a finding; a review that finds nothing says so.
+
 ### 1.5 The honest limits (unmeasured, and not to be implied away)
 
 * **Cost per phase is unmeasured.** Phase 1 and 3 are ordinary decompiler lanes; phase 2's report was 87 lines
@@ -213,6 +221,48 @@ the review are launched once the survey lands.
 The rule-text blocks in these profiles are **machine-generated** from `docs/plan.md` §6.5 and the matching
 skill: run `python tools/agents/sync_profiles.py --check` and never hand-edit between the markers.
 
+* **The profile is not cosmetic.** Reconstruction/recon work runs as `decompiler`, never `worker`: three
+  networking recon lanes launched as `worker` never saw the §6.5 naming/type policy and all three were
+  refused for ~130 names. `slots.py spawn --kind KIND` decides the profile (`unit`->`decompiler`,
+  `fix`->`fixer`, `merge`->`merger`, `tooling`/`docs`->`worker`, `review`->`codereviewer`); an unknown kind is
+  refused.
+* **Policy never lives only in hand-written duplication.** The profiles once taught the retired `rule 7
+  deferred:` key and no rule 11 because nothing detected divergence from §6.5. `sync_profiles.py --check`
+  (wired into `install.sh` and `profileprobe.py`, deliberately **not** the land gate) now fails on it, so a
+  rule-change batch must also run `python tools/agents/sync_profiles.py`. A profile edit is live only after
+  `tools/agents/install.sh`.
+
+### 2.5 Slot and worktree hygiene
+
+* **A lane working in MAIN costs a landing.** A lane launched with `cwd = MAIN` cloned into the repo root and
+  the next landing was refused (*"paths outside the batch appeared during the build"*). Cure is structural: the
+  spawn line's `cwd` is the claim's own slot, MAIN is refused, and `land` pre-flights MAIN for lane scratch
+  (`.tmp-*`, `.ws-*`, `upstream/`) before the build. A stray untracked file in MAIN (`??`) blocks every landing:
+  check `git status --short`, delete it once the slot copy is proven identical. Scratch belongs in `.pi/tmp/`.
+* **A fresh worktree is missing every non-tracked payload.** `tools/m2c` (submodule, empty after `worktree
+  add`: `git submodule update --init tools/m2c`), `build/binutils` (0 files; `ninja tools`), `orig/`. Slots and
+  the seeder handle this; a hand-built worktree does not. `orig/` is **copied** below `ORIG_JUNCTION_MIN_BYTES`
+  (64 MB; the repo's is 6.6 MB), because a junction's teardown emptied MAIN's originals twice.
+* **Teardown.** `git worktree remove` cannot remove a tree holding a submodule; the manual path is `rm -rf
+  <wt> && git worktree prune && git branch -D <branch>`, only after `LANDED` (R3) or proof the branch is
+  applied, and only in MAIN. Never `claims.py release` from inside a worktree - it wiped one. A lane launched
+  outside the registry leaves its branch behind: `claims.py release --branch <name>` (`--force` only once the
+  gate said "no batch path is stageable"). Plain `git worktree remove` on a junctioned tree follows the
+  junction into MAIN.
+* **Check the brief slug against the worktree slug** when pasting several `queue.py next` launches: one was
+  launched with the `80394038` task in the `803967f0` tree. `briefs/<slug>.md` in the task must equal the cwd's
+  slug.
+* **Rescue and resolve refs are a safety net.** `claims.release` parks `refs/rescue/<slug>` first; the audit
+  runs at teardown (`rescue.py audit`: `redundant` is pruned, `landed-with-drift` is reported and never
+  pruned, `unlanded`/`unknown` are named and kept; fail-open). A re-claim of a unit overwrites its slug's ref.
+  Judge a `land/resolve-*` helper by its **content**, not by whether its unit is registered (the `--merged`
+  test misleads). `refs/codex/*` is an external tool's; leave it alone. The measured result of the full audit:
+  0 of 193 refs held unlanded work.
+* **Classify a held branch for free:** `git merge-tree --write-tree main <b>` against `git rev-parse
+  main^{tree}` - equal means fully applied. Never `git diff main <b>` (main moved; it shows a huge deletion).
+  Read the held branch's own `build/RMHE08/report.json` before transplanting a body. `.pi/notes/
+  held-branch-inventory.md` holds the per-branch verdicts.
+
 ---
 
 ## 3. Operating rules, each with the failure that produced it
@@ -285,6 +335,25 @@ This is the umbrella the others sit under. R1 is its sharpest instance; R7 and R
 up (a check that never executes in the environment where it matters reports success). Before trusting any
 "clean"/"green"/"READY", ask **where it printed that** and whether the tool's inputs existed there.
 
+**R12 — A refused landing pollutes both trees.**
+The failure: a REFUSED landing left a modified tracked file *and* MAIN's build tree holding its own split objects
+(`config.json` predates the map), so the next batch's row reported *"no unit's split target object moved"* for a
+unit it never touched. Cure: `git status` after every refusal; `ninja` in MAIN restores the tree (the `acquire`
+currency check catches it); when a row blames a neighbour, `rm -rf build/RMHE08 && python configure.py &&
+ninja`, then `ninja build/RMHE08/report.json` + `land.py record-base`.
+
+**R13 — A gate hands out a work order; it must be complete.**
+The failure: `rule7_defer_growth` listed `defs[:3]` and a batch that renamed exactly the 3 shown was refused
+again (it defined 8; one unit had 33). Two lanes lost a unit of work each. A refusal message lists every
+offender and leads with the count. Same class: a batch **must name the symbols its own units define** and
+register at a **named path** (a `fn_XXXXXXXX.c` path is refused) - only references to other units' symbols
+were ever deferrable, and now nothing is (§11).
+
+**R14 — An edit anchored on a heading eats the heading.**
+The failure: an `Edit` whose anchor was a `**HEADING.**` line replaced it, so the next paragraph lost its title.
+Put the heading verbatim at the end of the replacement, then check the seam with `sed`. Also: anchors written
+with `\n` silently fail on a CRLF file - assert the match count (§12).
+
 ---
 
 ## 4. The gate and the landing
@@ -310,6 +379,37 @@ refuses a batch, names the row that refused, and the landing either passes every
 * **The bootstrap exception.** A change **to the gate itself** cannot be gated by the gate it is changing, so
   it is committed **directly, path-limited** (the gate's own files and nothing else). This is the only landing
   that skips the gate, and its path-limit is what keeps the exception from becoming a habit.
+
+**Gate rows that cost a round, and the cure for each**
+
+* **`--units` must name what the row names.** The *"a neighbour's split target object moved"* row fires on a
+  unit the batch may not have touched; name exactly the unit it names in `--units` (a rename does **not**
+  re-range a neighbour - `verifyunit.target_object_fingerprint` drops names by design; the row's test is not the
+  fingerprint alone, so do not guess at renames). A deliberate neighbour re-range needs `--units <neighbour>`
+  **and** `--allow-regression <neighbour>` when a function legitimately leaves it (`--allow-regression` is
+  refused as stale when not needed).
+* **A path is not a unit.** `is_batch_path` says "path" on a file extension *or* something in the tree at that
+  exact path; a unit's bare name is never a file. A tools-only/docs-only/comment-only batch names its paths (or,
+  for a sweep with no registration diff, every unit) in `--units`; a tooling file left staged after a fixer batch
+  needs its own commit (the gate warns *"the index holds N path outside this batch"*).
+* **Expect a BOOKKEEPING bounce from a lane outbox** and reach for `--no-outbox` when the real rows are green:
+  the outbox row validates one unit per branch (a 2+ unit branch can never satisfy it), attributes renames
+  strictly, wants `flags_probed[].verdict` in `reject`/`adopt`/`inconclusive`, and rejects an unknown
+  `config_requests` kind (`seam`). A header named in `--units` once demanded residual/flags for a non-unit path
+  (`unit_units` fix pending; check: `land.py` outbox row).
+* **Lane-side pre-check for rule 7:** `land.rule7_defer_growth(<worktree>, <base>)` and
+  `land.band_ownership_warnings(...)` must both return `[]`; two lanes were refused after a full unit for not
+  running them. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors.
+* **A committed scratch file refuses the batch** (`.tmp_dg.json`): remove it on the branch, never `--no-outbox`.
+* **`--already-applied` and the commit-sweep guard.** A tracked file dirty at `record-base` rides the next unit
+  commit unless the batch names it (`CLAUDE.md`/`docs/plan.md` did): land the orchestrator-side tools/docs batch
+  first. `land` refuses off `main`. A commit to main mid-flight does not endanger a running lane (`record-base`
+  re-reads main).
+* **Landing a whole branch:** `land.py land --branch worker/<x>` (a `-named` branch too) derives `--units`; the
+  orchestrator's whole landing is that one command - never read the lane report (R9).
+* **The local-only-block dance is retired with the block.** Historically ` M <file>` with an empty `git diff`
+  (EOL churn) refused with *"main's tree is not clean"*; `git checkout -- <file>` settles it, but never when the
+  edit is a real one (check: `tools/agents/localonly.py` and the hooks if the mechanism is reused).
 
 Related, and enforced by a different tool: the compile must actually happen. `NonMatching` units are not
 linked, so a green `ok` can coexist with an object that fails to compile — check `^FAILED` (R6). And the
@@ -341,6 +441,30 @@ must be brought current before landing.
 — **157 header lines and a registration lost that way**. A merge that reports success has not necessarily
 carried the branch; the resolver's job is to make the carried set explicit rather than inferred from git's exit
 code.
+
+**The by-hand classes, for when `mergebranch.py` blocks** (proven on three lanes; ~1.5 h and two content losses
+is what the tool replaced):
+
+* `TIP=$(git rev-parse HEAD); MB=$(git merge-base main $TIP); git merge main`, then `mkdir -p .pi/tmp`.
+* `symbols.txt`: take main's file and re-apply the branch's rename pairs by exact row replacement; a rename
+  collision resolves as both sides' new names and neither side's old ones, which keeps the line count equal to
+  main's (a cheap invariant). `splits.txt` is a union of blocks - but a block's **position** decides dtk's link
+  order (`lb_quest_board` anywhere but between its neighbours died with *Cyclic dependency encountered*).
+* Other files: `git merge-file -p --diff3 <ours=git show main:f> <base=git show $MB:f> <theirs=git show $TIP:f>`.
+  `git apply --3way` writes markers and **exits 0**, and refuses once the tree differs from the index.
+* `include/unsplit/*.h`: the rule-2 sweep - drop every declaration whose address is inside a registered `.text`
+  range and **move the ones a unit still uses into the owner's header** (rule 2 has no deferral); a `void*` in the
+  new home needs `/* untyped: <reason> */`. `include/unsplit/menu.h` is the hot spot: two `menu` lanes in one wave
+  collide, so prefer disjoint subsystems.
+* **After merging, re-check every name the branch references**: a rename is two edits and a merge resolves only
+  the map half (`fn_803754F4` -> `em020_aim_target_ck` left a source call to a dead name; the gate caught it only
+  at link). For each `fn_[0-9A-F]{8}` in the branch's changed files, if it is no longer a map name use the
+  address's current one.
+* Finish with `python configure.py && ninja -k 0` (grep `^FAILED`), `rm -f build/RMHE08/ok && ninja
+  build/RMHE08/ok`, `stylelint.py --diff <merge-base>`.
+* **Verify a merge by the measurement, not by a green build**: a `NonMatching` unit's object is not linked, so a
+  clean-looking merge (an `isSubState_*` vs `queryPatOpeningFlag*` naming collision; `configure.py` cflags lost)
+  sat green until someone disbelieved a score. Never skip a conflicted file for having no markers.
 
 ---
 
@@ -391,7 +515,30 @@ The campaign's scores are its evidence, so the metric is treated as a single art
   regression. This is also why R10 — a tree a commit behind `main` — belongs here: a known-answer control run
   against a stale tree answers a question about the wrong source.
 * **`report.json` is an order-only target.** It is a product of the build, not an input to it; treating it as
-  an input is how a report and the objects it describes drift apart.
+  an input is how a report and the objects it describes drift apart. After a source edit `ninja
+  build/RMHE08/report.json` says "no work to do" and you read the **previous** build's scores (a lane read "all
+  new functions score 0 %" for three iterations): delete it or touch a source first, then diff the whole-project
+  report - it is the cheapest neighbour-regression check (playbook 60).
+* **Resolve MAIN by `git rev-parse --git-common-dir`, never by the first `git worktree list` entry** (registration
+  order): `symdiff.py` run from a slot once reported 0.91743 for a symbol the slot's own report had at 100.0 and it
+  looked like a merge destroyed 67 functions. `recompile.py --measure` prints tree, target object + mtime and warns
+  when the target is MAIN's under a worktree cwd; it resolves against MAIN's map - pass `--main .`.
+* **Refuse an object older than its source.** Hand-built scorers silently measured a STALE object when a compile
+  failed (two false "improvements"); `recompile.py` asserts the mtime advanced. Three lanes re-derived the same
+  scorer in one session - use `measure.py` / `recompile.py --measure`, do not write a fourth.
+* **A rename-only or `bl`-name mismatch scores equal.** objdiff scores a reloc-name mismatch as a match, so a
+  false 100 % can hide a `bl` to the wrong symbol: compare a per-symbol **relocation-name multiset** (an open
+  tool request - a target-vs-ours reloc summary; three lanes asked). A struct-size lint is likewise open (`sizeof`
+  vs the strides the target's disassembly uses).
+* **`report.json` carries NO evidence for an `Object(Matching, ...)` unit.** `metadata.complete: true` pins the
+  unit at 100 (an intact pair and a one-byte-corrupted pair both read `fuzzy_match_percent: 100.0`; playbook 75),
+  so the ledger's matched bytes do not move when a claim lands. The backstop is `verifyunit.py`'s **address-aware
+  byte comparison** (a pad-named row resolves by address; a corrupted byte still refuses). Also: a fully matched
+  row omits `fuzzy_match_percent` while a *function* entry with none is 0 % - arithmetic-check the unit percent.
+* **Re-measure headline numbers, do not copy them.** `python tools/units/ledger.py` gives covered/closed/matched
+  and the `.text` denominator (the DOL file size is never the denominator; dtk's `complete_code_percent` is not
+  quoted). `datagap --unit` labels a `.text` overrun a size residual and prints only `ours-extra` by default -
+  "0 unit(s) listed" means "no extra", not "no object".
 
 ---
 
@@ -412,6 +559,28 @@ it is verified, not asserted.
 * **The record's `Matching` claim is verified from a fresh compile**, never from the author's object. The
   author's object proves what the author compiled; a fresh compile of the committed source proves what the
   repository holds. (Run 1's phase 2 did exactly this, and it is what makes the flip trustworthy.)
+
+* **A `.text` match is not a claim about the object.** `constructNetworkWiiMediator` read 100.00 % and was not
+  flip-ready: `operator new(n)` + a null check lowers to the same 16 instructions but MWCC emits no cleanup, so
+  `extab` was 8 B against the target's 24 B (playbook 62). Run `flipcheck.py` before believing a 100 % unit;
+  it now also refuses the `@etb_`/`@eti_` class. In a lib built `-Cpp_exceptions off`, a file-scoped `#pragma
+  exceptions on` is **required**, not stylistic; the deciding evidence is the call site's relocation.
+* **The `@etb_`/`@eti_` class is fixed by a build step**, not source: `tools/elf/objextab.py` (chained after
+  `objalign` in all four MWCC rules) renames the extab/extabindex entries to `splits.txt start + st_value` and
+  sets the symtab binding global (playbook 59). Promoted symbols keep their index in the local range (`sh_info`
+  untouched). `ef/ef_emform` is **not** in that class (row 46).
+* **Row 46: the answer is the symbol, not the section.** The linker builds ctor/dtor entries from the
+  `__*_reference` symbols; renaming an MWCC `.ctors$10` leaves the output byte-identical and renaming the symbols
+  fails the link (catalogue id 205). A section-name compare cannot see this. Use `mwlink_debugger.py trace
+  [--link]` (§9.7); the **link step is `Wii/1.0`** (`build.ninja` global `mw_version`), per-object compiles `Wii/1.3`.
+* **`.init` and link-generated data.** dtk classifies the TRK vector image as link PADDING (`pad_NN_ADDR_init`); a
+  `type:function` symbol over the exact claimed extent retires the pad symbol (playbook 74; a sized
+  `type:object` made `dol split` fail with an overlap error). MWCC pads every object in `.init` to 8 bytes.
+  The 164 B `_eti_init_info`/`_rom_copy_info`/`_bss_init_info`/`_ctors$99`/`_dtors$99` tables are unclaimable by
+  design (`is_linker_generated_object()`) and inert; `__start.c`'s `extern`s stay correct.
+* **`flipcheck` READY was measured wrong 2 of 5 times** (`g3d_resfile` `undefined: '@eti_...'`, `ef_emform`
+  hash) - the DOL is the only proof. A flip lane that hits a hash move quotes the `ninja diff` / `undefined:`
+  diagnostic verbatim rather than guessing. The flip count moves on **landing**, not on the branch.
 
 One further, still-open limit worth stating plainly: `flipcheck.py`'s relocation half **does not run for an
 already-`Matching` unit**, so a reviewer of a landed flip must re-run that check by hand (a filed tool gap,
@@ -550,6 +719,25 @@ by a unit other than `U`.
 | `tools/mwcc-debugger/` + `locate/verify_pcode.py` | **a body differs and the source shapes are exhausted**: drive `mwcceppc.exe` under gdb, dump the per-pass PCode, and classify which optimizer pass is responsible. |
 | `tools/mwlink_debugger.py` | **the DOL hash moved after a flip**: interrogate `mwldeppc.exe` — trace / diagnose / align / phases. **In production** per its six-point gate: health-checked against `main.MAP`/`main.elf`, `main.elf` never written, 260/260 sampled inputs, with its own gaps note. |
 
+**Debugger detail worth knowing.** `mwcc-debugger`: run `verify_pcode.py` on the last dump first (`MATCH` or a
+real `FAIL`), then on the dump before the divergence for a `PASS-DELTA` that **names the pass**
+(`after-peephole` for the `lbzu` fusion), and write that pass into the unit header's residual; a missing gdb is
+one `fetch_gdb.py` line. `mwlink_debugger.py`: `trace` (kept/dropped, section addresses with bytes read back from
+the ELF, symbol resolution, decoded relocations, ctor/dtor rank), `trace --link` (the build's own link line into
+scratch, byte-identical to `main.elf`), `phases [--prove]`, `messages` (the linker's message catalogue lives in PE
+RT_STRING resources - why `strings` finds nothing), `verify`. **No `mwldeppc.exe` carries a CodeView blob** (31
+checked), so the compiler's lever is absent for the linker. Gaps channels: `.pi/notes/mwcc-debugger-gaps.md`,
+`.pi/notes/mwlink-debugger-gaps.md` (§6).
+
+### 9.8 Audit and recovery
+
+| tool | use it when … |
+| --- | --- |
+| `tools/units/rescue.py audit` | **you want to know if any `refs/rescue/*` holds unlanded work**: classifies `redundant` / `landed-with-drift` / `unlanded` / `unknown` (~40 s); `--prune` deletes only `redundant`. |
+| `tools/units/verifyunit.py` | **a `Matching` claim needs a byte-level backstop**: address-aware comparison, since `report.json` carries no evidence for `Matching` units (§7). |
+| `tools/units/backlog.py triage` | **the register may hold ghosts**: classifies open items resolved / stale / open from evidence and parks only what it can prove (§11). |
+| `tools/units/ledger.py` | **you need a headline number**: covered / closed / matched, re-measured, never quoted from a doc. |
+
 ---
 
 ## 10. The coordinator protocol: brief, outbox, handoff
@@ -664,3 +852,81 @@ returns the slot to `main`'s tip, deletes the branch and clears the lock; for a 
 (`--no-slots`) it removes the worktree instead. The rescue ref the release parked the un-merged commits at is
 audited on the spot: `redundant` is pruned, drift is reported, `unlanded`/`unknown` are named loudly and kept.
 **Nothing in a round constructs a worktree by hand.**
+
+### 10.9 Orchestration hazards
+
+* **Parallel launches: one child per launch, and never a workflow child with `cwd = MAIN`.** The MAIN-cwd child of
+  a three-child workflow never appeared and produced no error (R4). A read-only MAIN lane is a plain single
+  headless launch (`tools/units/lanecmd.py`).
+* **A lane that needs a ruling ends its turn with the request** and is resumed by `claude --resume <session-id>
+  -p "<ruling>"`.
+* **A slot goes to a problem before a new unit; a refused slot is refilled with a `fixer`, not a claim** (the
+  queue refuses while a branch holds unlanded work). `queue.py next --count N` strides the address order, so no
+  two wave lanes hold adjacent proposals (adjacency is the vector for shared-TU and rule-2 boundary clashes).
+* **`attribute.py queue <start> <end>` REWRITES the queue file.** Run it over the whole unclaimed region (`cap:
+  0`), or add briefs with `brief.py`; a partial run deletes the rest of the pool. Claimed proposals were once
+  re-offered by `queue.py next`: check `claims.py list` first if it refuses at random.
+* **`tools/splits/tudiscover.py` needs the asm dump** (`python tools/splits/dump_asm.py`; `write_asm: false` by
+  default; `dol split` is then 200-400 s instead of ~18 s).
+* **A `Matching` flip is one unit per commit, byte-identical, with a green `ok`** (§8); a lane on an exhausted
+  row records the residual with both measurements and does not use `goto` (rule 8).
+
+---
+
+## 11. Owner rulings (standing policy, dated)
+
+These are decisions, not lessons. Do not relax one without the owner.
+
+| date | ruling |
+| --- | --- |
+| 2026-09-21 | The orchestrator has standing approval to commit its own campaign work without per-commit asking (rule 6); nothing is ever pushed, history is never rewritten. |
+| 2026-09-24 | **Steady, not maximum, throughput.** Six lanes at most, covering unit workers and tool fixes together; refill one slot per completion, not in waves. |
+| 2026-09-26 | A slot is not filled while finished work sits unlanded (`queue.py next` refuses; `--allow-unlanded <branch>` parks one on purpose). A lane gets the profile that matches its job (§2.4). |
+| 2026-09-27 | **Budget is not a concern - keep lanes working.** Never cut a lane short for turns, tokens or wall-clock, never steer one to "wrap up"; if it looks like it is thrashing, report it and let it run. Only a genuinely exhausted row (every conformant shape tried and measured) stops a row. The published budget rule in the profiles is the worker's own judgement, not the orchestrator's reason to interrupt. |
+| 2026-09-27 | **Slot pool approved.** Six reusable slots; a slot holds a directory, never a branch; every claim cuts a fresh branch off main's tip; a free slot is the concurrency cap; the reset is verified and fail-closed (§2). "A lane never builds its own environment." |
+| 2026-09-27 | **Backlog policy v2 - ratio + triage.** One resolved backlog item (`range`, `shared-file`, `flag`, `naming`, `band-header`, `untyped`, open tooling rows) per new proposal claim; `done` earns a credit, `parked` earns none, a claim is free while the register is clean (`ledger["free"]`), `--ignore-backlog` is a deliberate override. `rename` requests are not backlog (the landing applies them). Triage is evidence-based: no evidence, stays open. |
+| 2026-09-27 | **Naming: no exemption.** No `fn_`/`lbl_`/`loc_`/`unkNN` may survive in `src/`, whoever owns the symbol; the `rule 7 deferred:` key, the `src/auto/` key, the bodyless-file key and the own/foreign `lbl_` split are all deleted. The one grandfathering is the gate's `--diff` (existing findings never block, an added one refuses). Existing debt is register items ("work on them slowly" is the ratio). A dump cannot name them (26,065 of 30,992 dump entries are placeholders), so a name comes from context. |
+| 2026-09-27 | **Inventing a context-derived name is sanctioned**: nothing is unnameable; the honest part is the **mark** (in the owner unit's header, else the file that uses it most), not refusing to name. A rename propagates to every referrer in one batch. |
+| 2026-09-27 | **Rule 11: `void *` is banned** in parameter and return types; the exemption is a per-DECLARATION `/* untyped: <reason> */` (byte range, opaque handle, caller-owned payload), never a per-file key; never a cast; locals out of scope. Heterogeneous call sites mean the *sites* are wrong: settle the type once and let the compiler enumerate mismatches. A map name is the linkage contract, but a helper's **type** is not constrained by the binary. |
+| 2026-09-27 | **Rule 7 covers data; rule 2 covers unowned symbols** (a local `extern` of an unowned symbol belongs in an `include/unsplit/` band header; rule 12 later made an unowned *data* extern a claim instead). A lane that needs an unnamed neighbour renames it, sweeps every reference and re-measures - naming, not deferral. |
+| 2026-09-28 | **`decomp -> review -> decomp` is the standing procedure** (§1): a branch is reviewed read-only before it lands and findings are cleared on the same branch. |
+| 2026-09-27 | **Every tool section in a profile carries a feedback loop**: a gaps note as a register source, check it before filing (a repeat is a vote), the report's tooling line, and a tool that *misled* is the most valuable report. A novel row ranks only with two distinct filers (§6). |
+| 2026-09-27 | The `@etb_`/`@eti_` post-compile build step (`objextab.py`) was owner-approved; changing compiler flags, `mw_version` or tool tags still needs concrete evidence and an explicit call-out (rule 3). |
+| 2026-09-28 | The `.init` TRK-image request was landed; the residual 164 B is closed as unclaimable (§8). Parked decisions still standing: `memcpy.c`/`memset.c` stay separate; `-func_align 4` waits for `Runtime.PPCEABI.H`'s next pass; one `Matching` flip per commit. |
+| 2026-09-29 | **No `--allow-rule12` (and no `--no-outbox` for a code row) unless the owner rules.** `land.py --allow-rule12 <token>` exists as a recorded allowance; using it is the owner's call, not a lane's. (Session brief; check: `land.py` `set_allow_rule12`.) |
+| standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
+
+---
+
+## 12. Tooling and environment traps
+
+Grouped by cause; each cost a lane ~30 min the first time.
+
+* **git-bash / MSYS.** `recompile.py --measure` and `measure.py` are unusable from git-bash: `absolutize()` turns
+  cmd's `/c` into `C:\c`, an interactive cmd runs and no object is written (the "`-o` is a DIRECTORY" message
+  misattributes it; `MSYS_NO_PATHCONV` / `MSYS2_ARG_CONV_EXCL` do not help). Use PowerShell/cmd, or `ninja` +
+  `tools/objdiff/symdiff.py -u <unit>`; an MSYS-safe whole-unit probe took 0.3 s.
+* **Line endings.** Files are LF in the repo and working tree (`* text=auto eol=lf`; a clone must not set
+  `core.autocrlf=true`, which overrides `eol=lf`). Older notes said `include/**`/`configure.py` are CRLF - if a
+  scripted anchor with `\n` fails to match, `assert` the match count and read/write with `newline=""`.
+* **Encoding.** Source stays UTF-8 with no BOM (`sjiswrap`); MWCC on this host turns a literal `\n` into CRLF
+  (playbook 45); a Windows `PermissionError [WinError 5]` was seen once in a selftest on a fresh temp worktree
+  (AV/indexer, not reproduced).
+* **Shell.** A heredoc **truncates silently** when a second one follows (R8); prefer the file tool for long text.
+  `m2c` needs `-t ppc-mwcc-c` (the default MIPS rejects `stwu`) and its `.s` needs a space after each comma.
+* **Staleness.** `report.json` and `build/` are only current if you proved it (§7, R10, R12); `ok` prints OK off a
+  stale `main.dol` and never sees an uncompiled `NonMatching` object (R6). `build/binutils`
+  may be empty (`ninja tools`); `symdiff.py -u <unit>` lists every symbol (a bulk scorer over `report.json` was
+  hand-written twice).
+* **MAIN's build tree.** Anything that reads it treats it read-only: a seed lane once deleted `.ninja_deps` /
+  `.ninja_log` and restored them with a full `ninja`. The merge warns about unreachable loose objects every time
+  (harmless; `git prune` is open).
+* **`symedit.py` cannot split a merged map row** (two functions in one row): a direct two-line edit is needed
+  (a `split` subcommand is wanted). `dumpmap.py` emits junk duplicates (open).
+* **Lint quirks.** Rule 3 wants the canonical `size: 0xNN`; rule 6 false-positives on `(u32)(*(u8 *)p - 252)`
+  (write the dereference); a `#pragma` in a shared header leaks into every including TU (keep pragmas in the `.c`/
+  `.cpp`; a lint is wanted; playbook 32/60); `stylelint --diff <ref>` auto-selects the merge base when the ref is
+  not an ancestor, and a `--ref` that judges 0 files exits 2.
+* **Harness.** A worktree cut before a profile edit serves the old prompt until `tools/agents/install.sh`.
+  `handoff.py --check` may resolve MAIN's stale map (open). `docs/tooling-requests.md` is regenerated by
+  `tooling.py`.
