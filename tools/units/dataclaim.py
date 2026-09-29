@@ -32,10 +32,15 @@ registered source, or the queue's own `never`/`owner-held`/`not claimed` refusal
 
     python tools/units/dataclaim.py                   # verdicts over the whole queue + summary
     python tools/units/dataclaim.py --risky 10        # the riskiest runs, with their reason
-    python tools/units/dataclaim.py --unit Pl/pl_act  # one unit's runs
+    python tools/units/dataclaim.py --queue-unit Pl/pl_act   # one unit's proposed runs
     python tools/units/dataclaim.py --json            # machine-readable entries
     python tools/units/dataclaim.py --out FILE        # write the verdicts (atomic)
     python tools/units/dataclaim.py --selftest
+
+    python tools/units/dataclaim.py --unit Pl/pl_act_step [--dry-run] [--json]
+        rule 12, the other direction: every data symbol that unit references but does not own,
+        with who else reads it and the exact `splits.txt` claim (or named data-only unit) to fix it.
+        Read-only - it never writes `splits.txt`; `--dry-run` just says so explicitly.
 
 Read-only by design: no `ninja`, no compile, no link, no write to `splits.txt`. `land.py` owns the batch
 that acts on these verdicts.
@@ -583,6 +588,401 @@ def analyze(root: str = ROOT, queue_path: str | None = None) -> list[dict]:
     return sort_entries(entries)
 
 
+# ==================================================================================================
+# rule 12: the data a unit references but does not own, and the one-line claim that fixes it
+# ==================================================================================================
+#
+# `docs/plan.md` 6.5 rule 12 refuses an `extern` of data no registered `splits.txt` range covers, and
+# unlike rule 7 there is no rename remedy - the only remedies are ownership changes, which lanes were
+# deriving by hand. This mode lists, for one unit, every data symbol its object references and does not
+# own, with the census (who else reads it) and the exact `splits.txt` text to paste. Three shapes:
+#
+#   1. ordinary     the range is free: claim it into the unit being worked. A claim covers the WHOLE
+#                   map symbol extent and its `end:` is 4-aligned (a partial `.sdata`/`.sdata2` claim
+#                   cannot be linked).
+#   2. span         the unit already owns a run of that section: claim the contiguous span, gap
+#                   included, or dtk inserts an `auto_*_data` unit inside the range and the split dies
+#                   with a link-order cycle (playbook 53).
+#   3. named owner  a pool/table several units read: register a named data-only unit - a splits.txt
+#                   range, a symbols.txt name, and a source file that defines nothing. For a
+#                   `NonMatching` unit the original bytes stay in the DOL (the binary is untouched)
+#                   while the range gains an owner, and the consumers declare into its header (rule 2).
+#                   Strictly better than the anonymous `auto_XX_data` unit dtk would otherwise create;
+#                   one owner per pool.
+#
+# Read-only by design: it never writes `splits.txt` (or anything else). `--dry-run` is accepted and only
+# asserts that; the reference listing is the same either way.
+
+CLAIM_ALIGN = 4
+DATA_SECTIONS = (".rodata", ".data", ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2")
+POOL_EXPAND_LIMIT = 512          # symbols around the seed we are willing to walk (a sanity cap)
+POOL_SPAN_LIMIT = 0x4000         # bytes: a pool this wide is a different question (the auto run)
+SHARERS_SHOWN = 12
+REMEDIES = ("claim-into-unit", "span-claim", "named-owner-unit", "owner-header")
+
+
+def align_up(value: int, alignment: int = CLAIM_ALIGN) -> int:
+    return (value + alignment - 1) // alignment * alignment
+
+
+def section_stem(section: str) -> str:
+    return section.lstrip(".").replace(".", "_")
+
+
+def extent_of(entry: dict, following: dict | None) -> tuple[int, str]:
+    """`(extent, source)` for one map row: its own `size:`, else the distance to the next row.
+
+    `symbols.txt` rows carry `size:` for real data (a float is 4, a table its length); a label row may
+    not, and then the row's extent is the distance to the next row in the section. `default` is the
+    last resort and is named so a reader knows it was a floor, never a measurement.
+    """
+    size = int(entry.get("size") or 0)
+    if size > 0:
+        return size, "map"
+    if following is not None and following["address"] > entry["address"]:
+        return following["address"] - entry["address"], "next"
+    return CLAIM_ALIGN, "default"
+
+
+def claim_span(address: int, extent: int) -> tuple[int, int, bool]:
+    """The `(start, end, rounded)` a `splits.txt` claim needs: start at the row, `end:` 4-aligned."""
+    end = align_up(address + extent)
+    return address, end, end != address + extent
+
+
+def splits_range_line(section: str, start: int, end: int, indent: str = "\t") -> str:
+    return "%s%s start:0x%08X end:0x%08X" % (indent, section, start, end)
+
+
+def splits_unit_block(unit: str, section: str, start: int, end: int) -> str:
+    return "%s.cpp:\n%s" % (unit, splits_range_line(section, start, end))
+
+
+def symbols_row(name: str, section: str, address: int, size: int, type_: str = "object") -> str:
+    return "%s = %s:0x%08X; // type:%s size:0x%X" % (name, section, address, type_, size)
+
+
+def _adjacent(prev: dict, nxt: dict) -> bool:
+    """Whether two map rows touch (the previous row's declared extent reaches the next row)."""
+    return prev["address"] + int(prev.get("size") or 0) == nxt["address"]
+
+
+def pool_components(rows: list[dict], readers_of) -> list[dict]:
+    """Partition the section's unowned rows into reader-connected, address-contiguous pools.
+
+    One left-to-right pass: a row joins the current pool while it touches the previous row and its
+    readers overlap the pool's (an unread row always joins - an unnamed blob between two unowned
+    constants is still the same pool). A reader-disjoint neighbour starts a new pool, which is what
+    separates the `Pl` pool from the `enemy` pool inside one enormous unclaimed run. The partition
+    does not depend on which symbol asked, so every symbol of one pool is recommended the same owner.
+    Two caps bound a pathological walk (`POOL_EXPAND_LIMIT` symbols, `POOL_SPAN_LIMIT` bytes).
+    """
+    comps: list[dict] = []
+    cur = None
+    for row in rows:
+        extra = set(readers_of(row["address"]))
+        joins = (cur is not None and _adjacent(cur["last"], row)
+                 and (not cur["readers"] or not extra or bool(extra & cur["readers"]))
+                 and cur["count"] < POOL_EXPAND_LIMIT
+                 and row["address"] - cur["lo"]["address"] <= POOL_SPAN_LIMIT)
+        if joins:
+            cur["rows"].append(row)
+            cur["readers"] |= extra
+            cur["count"] += 1
+            cur["last"] = row
+            cur["hi"] = row
+        else:
+            cur = {"lo": row, "hi": row, "last": row, "readers": set(extra),
+                   "count": 1, "rows": [row]}
+            comps.append(cur)
+    return comps
+
+
+def section_pools(rows: list[dict], readers_of) -> dict[int, dict]:
+    """`{row address: pool}` for every unowned row of one section (one partition, reused)."""
+    out: dict[int, dict] = {}
+    for comp in pool_components(rows, readers_of):
+        pool = {"start": comp["lo"]["address"],
+                "end": comp["hi"]["address"] + int(comp["hi"].get("size") or CLAIM_ALIGN),
+                "count": comp["count"], "readers": comp["readers"]}
+        for row in comp["rows"]:
+            out[row["address"]] = pool
+    return out
+
+
+def pool_around(entry: dict, rows: list[dict], readers_of) -> dict:
+    """The reader-connected pool containing `entry`, or a one-symbol pool when the row is not there."""
+    pool = section_pools(rows, readers_of).get(entry["address"])
+    if pool is not None:
+        return pool
+    return {"start": entry["address"], "end": entry["address"] + CLAIM_ALIGN,
+            "count": 1, "readers": set(readers_of(entry["address"]))}
+
+
+def recommend(rec: dict, unit: str, unit_ranges: list[tuple[int, int]]) -> dict:
+    """The remedy for one referenced-but-not-owned symbol, and the text to paste.
+
+    `rec` carries `name/section/address/extent/owner/sharers/pool`. `unit_ranges` is the unit's own
+    registered `(start, end)` runs in this section, so a second run (playbook 53) is visible.
+    """
+    section, address, extent = rec["section"], rec["address"], rec["extent"]
+    start, end, rounded = claim_span(address, extent)
+    round_note = ("the map extent ends at 0x%X (not 4-aligned): the claim's `end:` rounds up to 0x%X"
+                  % (address + extent, end)) if rounded else ""
+    owner = rec.get("owner")
+    if owner:
+        return {"remedy": "owner-header", "claim_start": None, "claim_end": None,
+                "splits": None, "symbols": None,
+                "note": "`%s` is owned by `%s`: declare it in that unit's header and #include it "
+                        "(rule 2) - rule 12 does not fire and there is nothing to claim"
+                        % (rec["name"], owner)}
+    sharers = rec.get("sharers") or []
+    if sharers:
+        module = unit.split("/", 1)[0] if "/" in unit else unit
+        pool = rec["pool"]
+        pool_name = "%s/%s_pool" % (module or section_stem(section), section_stem(section))
+        pstart, pend = pool["start"], align_up(pool["end"])
+        note = ("the pool (%d unowned symbol(s), 0x%X-0x%X) is read by %d unit(s) besides `%s` (%s): "
+                "register a named data-only unit owning the whole pool - a `splits.txt` range, a "
+                "`symbols.txt` name, and a source file that defines nothing. A `NonMatching` unit "
+                "keeps the original bytes in the binary (the DOL is untouched) and the consumers "
+                "declare into its header (rule 2). One owner per pool: a partial `.sdata2` claim "
+                "cannot be linked."
+                % (pool["count"], pool["start"], pool["end"], len(sharers), unit,
+                   ", ".join(sharers[:SHARERS_SHOWN])))
+        return {"remedy": "named-owner-unit", "claim_start": pstart, "claim_end": pend,
+                "splits": splits_unit_block(pool_name, section, pstart, pend),
+                "symbols": symbols_row(pool_name, section, pstart, pend - pstart), "note": note}
+    below = [r for r in unit_ranges if r[1] <= address]
+    if below:
+        rs, re_ = max(below, key=lambda r: r[1])
+        s, e = min(rs, start), align_up(max(re_, end))
+        note = ("`%s` already owns %s 0x%X-0x%X and this run is separate from it: claim the "
+                "contiguous span, gap included, or dtk inserts an `auto_*_data` unit inside the "
+                "range and `dtk dol split` dies with a link-order cycle (playbook 53)"
+                % (unit, section, rs, re_))
+        return {"remedy": "span-claim", "claim_start": s, "claim_end": e,
+                "splits": splits_range_line(section, s, e), "symbols": None,
+                "note": (round_note + "; " + note) if rounded else note}
+    note = "the range is free: claim it into `%s`, covering the whole map symbol extent" % unit
+    return {"remedy": "claim-into-unit", "claim_start": start, "claim_end": end,
+            "splits": splits_range_line(section, start, end), "symbols": None,
+            "note": (round_note + "; " + note) if rounded else note}
+
+
+def norm_reader(label: str | None) -> str | None:
+    """A census owner label -> a unit name, or None for the labels that are not units."""
+    if not label:
+        return None
+    label = label.strip()
+    if label in ("unsplit address", "unsplit") or label.startswith("unsplit ("):
+        return None
+    if label.endswith(" (no source yet)"):
+        label = label[: -len(" (no source yet)")]
+    if label.endswith((".c", ".cpp", ".cp")):
+        label = os.path.splitext(label)[0]
+    return label
+
+
+def reference_record(unit: str, entry: dict, extent: int, extent_source: str, owner: str | None,
+                     pool: dict | None, unit_ranges: list[tuple[int, int]], obj_rel: str | None) -> dict:
+    """One referenced symbol's row: the facts plus `recommend`'s decision, JSON-safe throughout."""
+    start, end, rounded = claim_span(entry["address"], extent)
+    sharers = sorted(set(pool["readers"]) - {unit}) if pool else []
+    rec = {
+        "name": entry["name"], "section": entry["section"], "address": entry["address"],
+        "extent": extent, "extent_source": extent_source,
+        "claim_start": start, "claim_end": end, "not_4_aligned": rounded,
+        "owner": owner, "object": obj_rel, "shared": bool(sharers), "sharers": sharers,
+        "pool": ({"start": pool["start"], "end": pool["end"], "count": pool["count"],
+                   "readers": sorted(pool["readers"])} if pool else None),
+        "remedy": None, "splits": None, "symbols": None, "note": "",
+    }
+    rec.update(recommend(rec, unit, unit_ranges))
+    return rec
+
+
+def _remedy_counts(records: list[dict]) -> dict:
+    counts = {key: 0 for key in REMEDIES}
+    for rec in records:
+        counts[rec["remedy"]] = counts.get(rec["remedy"], 0) + 1
+    return counts
+
+
+def _next_row(rows: list[dict], address: int) -> dict | None:
+    for row in rows:
+        if row["address"] > address:
+            return row
+    return None
+
+
+def unit_ranges(splits: list[dict], unit: str) -> dict[str, list[tuple[int, int]]]:
+    """The unit's own registered `(start, end)` per section, keyed by the split's bare unit name."""
+    out: dict[str, list[tuple[int, int]]] = {}
+    for block in splits:
+        if os.path.splitext(block["unit"])[0] != unit:
+            continue
+        for rng in block["ranges"]:
+            out.setdefault(rng["section"], []).append((rng["start"], rng["end"]))
+    return out
+
+
+def unit_data_references(root: str, unit: str) -> tuple[list[str], str | None]:
+    """`(names, object)` for the data symbols the unit's object references. The target object first
+    (what retail's TU needs), its source object as the fallback (a unit not split yet)."""
+    rel = os.path.splitext(unit)[0] + ".o"
+    try:
+        from units import undefrefs as uref  # noqa: PLC0415 - one ELF relocation reader
+    except ImportError:                       # pragma: no cover - direct script execution
+        import undefrefs as uref              # type: ignore
+    for base in (OBJ_DIR, SRC_DIR):
+        path = os.path.join(root, base, rel)
+        if not os.path.exists(path):
+            continue
+        loaded = uref.load_object(path)
+        if loaded is not None:
+            names = sorted(set(loaded["refs"]) - set(loaded.get("defined") or {}))
+            return names, os.path.join(base, rel).replace("\\", "/")
+    return [], None
+
+
+def census_readers(root: str):
+    """`(readers_of, info)` from `callers.py`'s census - reused, never a second graph.
+
+    `readers_of(address) -> {unit: sites}` normalises the census's owner labels to unit names so a
+    sharer list joins the unit vocabulary everything else uses. The census itself is `callers.py`'s
+    (the asm dump when present, the split objects' relocations otherwise); this only reads it.
+    """
+    try:
+        from units import callers as callers_mod  # noqa: PLC0415
+    except ImportError:                           # pragma: no cover - direct script execution
+        import callers as callers_mod             # type: ignore
+    cmap = callers_mod.load_map(root)
+    asm_dir = callers_mod.asm_dir_of(root)
+    files = callers_mod.all_asm_files(asm_dir)
+    if files:
+        index, info = callers_mod.load_index(root=root, asm_dir=asm_dir)
+        source = "asm"
+    else:
+        index, info = callers_mod.load_elf_index(root=root, cmap=cmap)
+        source = "elf"
+    if index is None:
+        return None, {"source": source, "state": "missing", "reason": info.get("reason")}
+    cache: dict[int, dict] = {}
+
+    def readers_of(address: int) -> dict:
+        if address not in cache:
+            rep = callers_mod.query("0x%08X" % address, index, cmap, limit=0)
+            counts: dict[str, int] = {}
+            for ref in rep.get("references", ()):
+                unit = norm_reader((ref.get("caller") or {}).get("owner"))
+                if unit:
+                    counts[unit] = counts.get(unit, 0) + 1
+            cache[address] = counts
+        return cache[address]
+
+    return readers_of, {"source": source, "state": "present", "files": info.get("files"),
+                        "cached": info.get("cached"), "reason": info.get("reason")}
+
+
+def reference_report(root: str, unit: str) -> dict:
+    """Classify every data symbol `unit` references and does not own, with a remedy per symbol."""
+    from units import stylelint as sl  # noqa: PLC0415 - the one ownership index
+    ownership = sl.load_ownership(root)
+    if ownership is None:
+        raise RuntimeError("no config/RMHE08/symbols.txt or splits.txt - nothing to decide against")
+    readers_of, census_info = census_readers(root)
+    if readers_of is None:
+        readers_of = lambda _address: {}  # noqa: E731 - sharing is unchecked, the claim still is
+    by_name, by_section, _by_address = preflight.load_symbols()
+    splits = preflight.load_splits()
+    ranges = unit_ranges(splits, unit)
+    ref_names, obj_rel = unit_data_references(root, unit)
+    unowned_cache: dict[str, list[dict]] = {}
+    records, seen = [], set()
+    for name in ref_names:
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        section = entry["section"]
+        if section not in DATA_SECTIONS or entry.get("type") == "function":
+            continue
+        resolved = ownership.resolve(name)
+        if resolved is None or resolved["kind"] == "dup":
+            continue
+        if resolved["kind"] == "owned" and resolved["unit"] == unit:
+            continue
+        key = (section, entry["address"])
+        if key in seen:
+            continue
+        seen.add(key)
+        rows = by_section.get(section, [])
+        extent, extent_source = extent_of(entry, _next_row(rows, entry["address"]))
+        owner = resolved["unit"] if resolved["kind"] == "owned" else None
+        pool = None
+        if owner is None:
+            if section not in unowned_cache:
+                unowned_cache[section] = section_pools(
+                    [row for row in rows if _is_unsplit(ownership, row["name"])], readers_of)
+            pool = unowned_cache[section].get(entry["address"])
+        records.append(reference_record(unit, entry, extent, extent_source, owner, pool,
+                                        ranges.get(section, []), obj_rel))
+    records.sort(key=lambda x: (section_key(x["section"]), x["address"]))
+    return {"unit": unit, "object": obj_rel, "census": census_info, "entries": records,
+            "summary": _remedy_counts(records)}
+
+
+def _is_unsplit(ownership, name: str) -> bool:
+    resolved = ownership.resolve(name)
+    return resolved is not None and resolved["kind"] == "unsplit"
+
+
+def render_references(payload: dict) -> str:
+    """The one screen an operator reads: every referenced-but-not-owned symbol, its sharers, its fix."""
+    unit, records = payload["unit"], payload["entries"]
+    lines = ["unit %s -> %d referenced data symbol(s) it does not own  (object %s)"
+             % (unit, len(records), payload.get("object") or "-")]
+    for rec in records:
+        pool = rec.get("pool")
+        shared = ("shared by " + ", ".join(rec["sharers"])) if rec["sharers"] else \
+            "private to this unit"
+        lines.append("  %-8s 0x%08X  %-28s extent 0x%-5X owner %s  %s"
+                     % (rec["section"], rec["address"], rec["name"], rec["extent"],
+                        rec["owner"] or "unowned", shared))
+        if rec["remedy"] == "named-owner-unit" and pool:
+            lines.append("      pool 0x%08X-0x%08X (%d symbol(s), %d reader(s))"
+                         % (pool["start"], pool["end"], pool["count"], len(pool["readers"])))
+        lines.append("      remedy: %s" % rec["remedy"])
+        if rec.get("splits"):
+            lines.append("      splits.txt: %s" % rec["splits"].replace("\n", "\n                 "))
+        if rec.get("symbols"):
+            lines.append("      symbols.txt: %s" % rec["symbols"])
+        lines.append("      %s" % rec["note"])
+    lines.append("  summary: " + ", ".join("%s %d" % (key, payload["summary"].get(key, 0))
+                                            for key in REMEDIES))
+    return "\n".join(lines)
+
+
+def reference_cli(unit: str, as_json: bool = False, dry_run: bool = False) -> int:
+    unit = os.path.splitext(unit.replace("\\", "/"))[0]
+    if dry_run:
+        print("dataclaim: --dry-run - read-only; `splits.txt` is never written", file=sys.stderr)
+    try:
+        payload = reference_report(ROOT, unit)
+    except RuntimeError as exc:
+        print("dataclaim: %s" % exc, file=sys.stderr)
+        return 2
+    if payload.get("object") is None:
+        print("dataclaim: no built object for `%s` (build/RMHE08/obj/<unit>.o or src/<unit>.o)"
+              % unit, file=sys.stderr)
+        return 2
+    if as_json:
+        sys.stdout.write(json.dumps(payload, indent=1, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(render_references(payload) + "\n")
+    return 0
+
+
 # -- selftest -------------------------------------------------------------------------------------------------
 
 def selftest() -> int:
@@ -770,6 +1170,110 @@ def selftest() -> int:
     check("hex_prefix truncates", hex_prefix(bytes(range(32))), bytes(range(16)).hex())
     check("hex_prefix of nothing is None", hex_prefix(None), None)
 
+    # --- rule 12: referenced-but-unowned data, the sharing census, and the three claim shapes -----
+    rows = [
+        {"name": "a", "section": ".sdata", "address": 0x1000, "size": 0x4, "type": "object"},
+        {"name": "b", "section": ".sdata", "address": 0x1004, "size": 0x2, "type": "object"},
+        {"name": "c", "section": ".data", "address": 0x2000, "size": 0x8, "type": "object"},
+        {"name": "d", "section": ".data", "address": 0x2008, "size": 0x0, "type": "object"},
+        {"name": "e", "section": ".data", "address": 0x2010, "size": 0x4, "type": "object"},
+    ]
+    pool_readers = {0x1000: {"U": 1}, 0x1004: {"U": 1, "V": 2}, 0x2000: {"U": 1},
+                    0x2008: {}, 0x2010: {"U": 1}}
+
+    def rof(address):
+        return pool_readers.get(address, {})
+
+    check("extent: the map `size:` is used first", extent_of(rows[0], rows[1]), (4, "map"))
+    check("extent: a size-0 row takes the distance to the next", extent_of(rows[3], rows[4]), (8, "next"))
+    check("extent: a trailing size-0 row falls back",
+          extent_of({"name": "z", "address": 0x9000, "size": 0}, None), (4, "default"))
+    check("claim: a not-4-aligned extent rounds the end up",
+          claim_span(0x1004, 0x2), (0x1004, 0x1008, True))
+    check("claim: a 4-aligned extent is not rounded", claim_span(0x2000, 0x8), (0x2000, 0x2008, False))
+    check("splits: the range line is the paste shape",
+          splits_range_line(".sdata", 0x1000, 0x1008), "\t.sdata start:0x00001000 end:0x00001008")
+    check("splits: a unit block names the file",
+          splits_unit_block("Pl/sdata_pool", ".sdata", 0x1000, 0x1008),
+          "Pl/sdata_pool.cpp:\n\t.sdata start:0x00001000 end:0x00001008")
+    check("symbols: the pool row carries address and size",
+          symbols_row("Pl/sdata_pool", ".sdata", 0x1000, 0x8),
+          "Pl/sdata_pool = .sdata:0x00001000; // type:object size:0x8")
+
+    pool = pool_around(rows[0], rows[:2], rof)
+    check("pool: contiguous symbols merge",
+          (pool["start"], pool["end"], pool["count"]), (0x1000, 0x1006, 2))
+    check("pool: the readers are the union", sorted(pool["readers"]), ["U", "V"])
+    lone = pool_around(rows[2], rows[2:], rof)
+    check("pool: an unread neighbour is still included",
+          (lone["start"], lone["count"]), (0x2000, 2))
+    disjoint = pool_around(
+        {"name": "x", "address": 0x3000, "size": 0x4},
+        [{"name": "x", "address": 0x3000, "size": 0x4},
+         {"name": "y", "address": 0x3004, "size": 0x4}],
+        lambda a: {0x3000: {"U": 1}, 0x3004: {"Z": 1}}.get(a, {}))
+    check("pool: a reader-disjoint neighbour ends the pool",
+          (disjoint["start"], disjoint["count"]), (0x3000, 1))
+
+    def rec(name, section, address, extent, owner=None, sharers=None, pool=None):
+        return {"name": name, "section": section, "address": address, "extent": extent,
+                "owner": owner, "sharers": sharers or [], "pool": pool}
+
+    plain_pool = {"start": 0x1000, "end": 0x1006, "count": 2, "readers": ["Pl/pl_act", "V"]}
+    shared = recommend(rec("a", ".sdata", 0x1000, 0x4, sharers=["V"], pool=plain_pool),
+                       "Pl/pl_act", [])
+    check("remedy: a shared symbol gets a named data-only unit", shared["remedy"], "named-owner-unit")
+    check("remedy: the named unit is <module>/<section>_pool",
+          shared["splits"], "Pl/sdata_pool.cpp:\n\t.sdata start:0x00001000 end:0x00001008")
+    check("remedy: the named unit gets a symbols.txt row",
+          shared["symbols"].startswith("Pl/sdata_pool = .sdata:0x00001000;"), True)
+    check("remedy: the named unit explains NonMatching and the DOL",
+          ("NonMatching" in shared["note"] and "DOL" in shared["note"]), True)
+
+    private = recommend(rec("c", ".data", 0x2000, 0x8), "Pl/pl_act", [])
+    check("remedy: a private symbol is claimed into the unit", private["remedy"], "claim-into-unit")
+    check("remedy: the claim covers the whole extent", private["splits"],
+          "\t.data start:0x00002000 end:0x00002008")
+
+    span = recommend(rec("c", ".data", 0x2000, 0x8), "Pl/pl_act", [(0x1F00, 0x1FF0)])
+    check("remedy: a second run of one section becomes a span claim", span["remedy"], "span-claim")
+    check("remedy: the span starts at the unit's own run", span["claim_start"], 0x1F00)
+    check("remedy: the span includes the gap and the symbol", span["claim_end"], 0x2008)
+    check("remedy: the span names playbook 53's cycle", "link-order cycle" in span["note"], True)
+
+    header = recommend(rec("t", ".data", 0x2000, 0x8, owner="Other/unit"), "Pl/pl_act", [])
+    check("remedy: data another unit owns is rule 2's, not a claim", header["remedy"], "owner-header")
+    check("remedy: rule 2's remedy makes no claim", header["splits"], None)
+    check("remedy: rule 2's remedy names the owner", "`Other/unit`" in header["note"], True)
+
+    rounded = recommend(rec("b", ".sdata", 0x1004, 0x2), "Pl/pl_act", [])
+    check("remedy: a not-4-aligned extent still claims the whole symbol", rounded["claim_end"], 0x1008)
+    check("remedy: and it says the end was rounded", "not 4-aligned" in rounded["note"], True)
+
+    check("readers: a source label is normalised to its unit",
+          norm_reader("Pl/pl_act_step.cpp"), "Pl/pl_act_step")
+    check("readers: a C source label too", norm_reader("Pl/fn_8010D1A8.c"), "Pl/fn_8010D1A8")
+    check("readers: an unsplit-address label is not a unit", norm_reader("unsplit address"), None)
+    check("readers: an unsplit-module label is not a unit", norm_reader("unsplit (ef)"), None)
+    check("readers: a no-source-yet label keeps the unit name",
+          norm_reader("Pl/x.cpp (no source yet)"), "Pl/x")
+
+    splits_fix = [{"unit": "Pl/pl_act.cpp",
+                   "ranges": [{"section": ".data", "start": 0x1F00, "end": 0x1FF0}]}]
+    check("unit_ranges: keyed by the bare unit name",
+          unit_ranges(splits_fix, "Pl/pl_act"), {".data": [(0x1F00, 0x1FF0)]})
+    check("unit_ranges: another unit is not this one's", unit_ranges(splits_fix, "Pl/other"), {})
+
+    payload = {"unit": "Pl/pl_act", "object": "build/RMHE08/obj/Pl/pl_act.o",
+               "census": {"source": "elf"},
+               "entries": [dict(rec("c", ".data", 0x2000, 0x8), **private)],
+               "summary": _remedy_counts([dict(rec("c", ".data", 0x2000, 0x8), **private)])}
+    check("render: the unit header counts the symbols",
+          render_references(payload).splitlines()[0].startswith("unit Pl/pl_act -> 1 "), True)
+    check("render: the remedy is printed", "remedy: claim-into-unit" in render_references(payload), True)
+    check("render: the summary counts the remedies",
+          "claim-into-unit 1" in render_references(payload), True)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for failure in fails:
@@ -785,7 +1289,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--json", action="store_true", help="print the classified entries on stdout")
     ap.add_argument("--risky", type=int, default=0, metavar="N", help="print the N riskiest runs")
-    ap.add_argument("--unit", default=None, help="only this unit's runs")
+    ap.add_argument("--unit", default=None, metavar="U",
+                    help="rule 12: the data symbols unit U references but does not own, with a "
+                         "recommended remedy and the exact splits.txt text to paste (read-only; "
+                         "splits.txt is never written)")
+    ap.add_argument("--dry-run", action="store_true", dest="dry_run",
+                    help="assert the reference listing is read-only (the default and only mode)")
+    ap.add_argument("--queue-unit", default=None, metavar="U",
+                    help="only this unit's proposed runs (the data queue)")
     ap.add_argument("--limit", type=int, default=0, help="only the first N runs (the queue's own order)")
     ap.add_argument("--out", default=None, metavar="FILE", help="write the entries here (atomic)")
     ap.add_argument("--queue", default=None, metavar="FILE", help="the queue to read")
@@ -795,9 +1306,12 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
-    entries = analyze(queue_path=args.queue)
     if args.unit:
-        entries = [e for e in entries if e["unit"] == args.unit]
+        return reference_cli(args.unit, as_json=args.json, dry_run=args.dry_run)
+
+    entries = analyze(queue_path=args.queue)
+    if args.queue_unit:
+        entries = [e for e in entries if e["unit"] == args.queue_unit]
     if args.limit:
         entries = entries[:args.limit]
 
