@@ -6,7 +6,8 @@
  * disassembly (every field offset is the one the target instructions address).  `NetworkSessionManager`
  * is a CLASS with inheritance (rule 10): the base declares the 112-slot vtable the DOL carries at
  * 0x805FA908, so MWCC emits the table and the vptr store instead of the unit writing them by hand; the
- * 61 slots the original leaves 0 are pure virtual (`NetworkSessionManagerPat`'s table fills them).  The
+ * 61 slots the original leaves 0 are pure virtual, and `NetworkSessionManagerPat` declares the override
+ * that fills each one (see that class's own comment).  The
  * bit-stream writer and the neighbouring `fn_` helpers are declared `extern "C"` because their owners
  * are still unsplit; per brief section 6.5 rule 2 those sites are the named unsplit gap.
  */
@@ -236,10 +237,10 @@ public:
     virtual void request368();                             /* +0x020 */
     virtual s32 hasBuffer();                               /* +0x024 */
     virtual u32 canSend_28() = 0;                          /* +0x028 */
-    virtual void pure_02C() = 0;                           /* +0x02C */
-    virtual void pure_030() = 0;                           /* +0x030 */
-    virtual void pure_034() = 0;                           /* +0x034 */
-    virtual void pure_038() = 0;                           /* +0x038 */
+    virtual void copyNameList(const u8* src) = 0;         /* +0x02C */
+    virtual void copyNameListTail(const u8* src) = 0;     /* +0x030 */
+    virtual void setSessionName(const char* name) = 0;    /* +0x034 */
+    virtual void setCircleRecords(u32 id, const u8* src, u32 count) = 0; /* +0x038 */
     virtual void setFlag79(s8 value);                      /* +0x03C */
     virtual void notify(s32 value);                        /* +0x040 */
     virtual void setFlag7A(s8 value);                      /* +0x044 */
@@ -251,20 +252,20 @@ public:
     virtual void request392();                             /* +0x05C */
     virtual void request396(u32 a, u32 b);                 /* +0x060 */
     virtual void request400(u32 a, u32 b);                 /* +0x064 */
-    virtual void pure_068() = 0;                           /* +0x068 */
-    virtual void pure_06C() = 0;                           /* +0x06C */
-    virtual void pure_070() = 0;                           /* +0x070 */
-    virtual void pure_074() = 0;                           /* +0x074 */
-    virtual void pure_078() = 0;                           /* +0x078 */
-    virtual void pure_07C() = 0;                           /* +0x07C */
-    virtual void pure_080() = 0;                           /* +0x080 */
-    virtual void pure_084() = 0;                           /* +0x084 */
-    virtual void pure_088() = 0;                           /* +0x088 */
-    virtual void pure_08C() = 0;                           /* +0x08C */
-    virtual void pure_090() = 0;                           /* +0x090 */
-    virtual void pure_094() = 0;                           /* +0x094 */
-    virtual void pure_098() = 0;                           /* +0x098 */
-    virtual void pure_09C() = 0;                           /* +0x09C */
+    virtual void slot_068() = 0;                          /* +0x068 */
+    virtual void slot_06C() = 0;                          /* +0x06C */
+    virtual u32 getCircleInfoCount() = 0;                 /* +0x070 */
+    virtual void getCircleItemName(char* dst, u32 size, s32 idx) = 0; /* +0x074 */
+    virtual void exportCircleItem(u8* dst, s32 idx) = 0;  /* +0x078 */
+    virtual void getCircleItemRecord(char* dst, s32 idx) = 0; /* +0x07C */
+    virtual u32 getCircleItemWord_170(s32 idx) = 0;       /* +0x080 */
+    virtual u32 getCircleItemWord_174(s32 idx) = 0;       /* +0x084 */
+    virtual u32 getCircleItemWord_178(s32 idx) = 0;       /* +0x088 */
+    virtual u32 getCircleItemWord_17C(s32 idx) = 0;       /* +0x08C */
+    virtual u32 getCircleItemSize_170_178(s32 idx) = 0;   /* +0x090 */
+    virtual u32 getCircleItemSize_174_17C(s32 idx) = 0;   /* +0x094 */
+    virtual u32 getCircleItemByte_180(s32 idx) = 0;       /* +0x098 */
+    virtual u32 slot_09C() = 0;                           /* +0x09C */
     virtual void abortRequest4();                          /* +0x0A0 */
     virtual void abortRequest14();                         /* +0x0A4 */
     virtual void request404(u32 a);                        /* +0x0A8 */
@@ -278,25 +279,25 @@ public:
     virtual void request436();                             /* +0x0C8 */
     virtual void request440();                             /* +0x0CC */
     virtual void request444();                             /* +0x0D0 */
-    virtual void pure_0D4() = 0;                           /* +0x0D4 */
-    virtual void pure_0D8() = 0;                           /* +0x0D8 */
-    virtual void pure_0DC() = 0;                           /* +0x0DC */
-    virtual void pure_0E0() = 0;                           /* +0x0E0 */
-    virtual void pure_0E4() = 0;                           /* +0x0E4 */
-    virtual void pure_0E8() = 0;                           /* +0x0E8 */
-    virtual void pure_0EC() = 0;                           /* +0x0EC */
-    virtual void pure_0F0() = 0;                           /* +0x0F0 */
-    virtual void pure_0F4() = 0;                           /* +0x0F4 */
-    virtual void pure_0F8() = 0;                           /* +0x0F8 */
-    virtual void pure_0FC() = 0;                           /* +0x0FC */
-    virtual void pure_100() = 0;                           /* +0x100 */
-    virtual void pure_104() = 0;                           /* +0x104 */
-    virtual void pure_108() = 0;                           /* +0x108 */
-    virtual void pure_10C() = 0;                           /* +0x10C */
-    virtual void pure_110() = 0;                           /* +0x110 */
-    virtual void pure_114() = 0;                           /* +0x114 */
-    virtual void pure_118() = 0;                           /* +0x118 */
-    virtual void pure_11C() = 0;                           /* +0x11C */
+    virtual void clearString(char* dst, s32 size) = 0;    /* +0x0D4 */
+    virtual u32 getWord_528() = 0;                        /* +0x0D8 */
+    virtual u32 getWord_524() = 0;                        /* +0x0DC */
+    virtual u32 getWord_530() = 0;                        /* +0x0E0 */
+    virtual u32 getWord_52C() = 0;                        /* +0x0E4 */
+    virtual u32 getSize_528_530() = 0;                    /* +0x0E8 */
+    virtual u32 getSize_524_52C() = 0;                    /* +0x0EC */
+    virtual void getPlayerRecordName(u8 idx, char* dst, s32 size) = 0; /* +0x0F0 */
+    virtual void clearStringWithId(u32 id, char* dst, s32 size) = 0; /* +0x0F4 */
+    virtual s32 getPlayerRecord(u8 idx, u8* dst) = 0;     /* +0x0F8 */
+    virtual u32 slot_0FC() = 0;                           /* +0x0FC */
+    virtual u8 getByte_534() = 0;                         /* +0x100 */
+    virtual f32 getTimeSincePublish() = 0;                /* +0x104 */
+    virtual void slot_108() = 0;                          /* +0x108 */
+    virtual u32 slot_10C() = 0;                           /* +0x10C */
+    virtual u32 slot_110() = 0;                           /* +0x110 */
+    virtual u32 slot_114() = 0;                           /* +0x114 */
+    virtual u32 slot_118() = 0;                           /* +0x118 */
+    virtual u32 slot_11C() = 0;                           /* +0x11C */
     virtual s32 getInt(s8 value);                          /* +0x120 */
     virtual f32 getFloat(s8 value);                        /* +0x124 */
     virtual void broadcastPlayerSlots(u32 a, u32 b);       /* +0x128 */
@@ -316,29 +317,29 @@ public:
     virtual void slot_160();                               /* +0x160 */
     virtual void slot_164();                               /* +0x164 */
     virtual void slot_168();                               /* +0x168 */
-    virtual void pure_16C() = 0;                           /* +0x16C */
-    virtual void pure_170() = 0;                           /* +0x170 */
-    virtual void pure_174() = 0;                           /* +0x174 */
-    virtual void pure_178() = 0;                           /* +0x178 */
-    virtual void pure_17C() = 0;                           /* +0x17C */
-    virtual void pure_180() = 0;                           /* +0x180 */
-    virtual void pure_184() = 0;                           /* +0x184 */
-    virtual void pure_188() = 0;                           /* +0x188 */
-    virtual void pure_18C() = 0;                           /* +0x18C */
-    virtual void pure_190() = 0;                           /* +0x190 */
-    virtual void pure_194() = 0;                           /* +0x194 */
-    virtual void pure_198() = 0;                           /* +0x198 */
-    virtual void pure_19C() = 0;                           /* +0x19C */
-    virtual void pure_1A0() = 0;                           /* +0x1A0 */
-    virtual void pure_1A4() = 0;                           /* +0x1A4 */
-    virtual void pure_1A8() = 0;                           /* +0x1A8 */
-    virtual void pure_1AC() = 0;                           /* +0x1AC */
-    virtual void pure_1B0() = 0;                           /* +0x1B0 */
-    virtual void pure_1B4() = 0;                           /* +0x1B4 */
-    virtual void pure_1B8() = 0;                           /* +0x1B8 */
-    virtual void pure_1BC() = 0;                           /* +0x1BC */
+    virtual void updateSession(NetworkRequest* request) = 0; /* +0x16C */
+    virtual void shutdown(NetworkRequest* request) = 0;   /* +0x170 */
+    virtual void handleCircleCreate(NetworkRequest* request) = 0; /* +0x174 */
+    virtual void slot_178(NetworkRequest* request) = 0;   /* +0x178 */
+    virtual void handleCircleListLayer(NetworkRequest* request) = 0; /* +0x17C */
+    virtual void handleCircleJoin(NetworkRequest* request) = 0; /* +0x180 */
+    virtual void slot_184(NetworkRequest* request) = 0;   /* +0x184 */
+    virtual void slot_188(NetworkRequest* request) = 0;   /* +0x188 */
+    virtual void handleServerTimeout(NetworkRequest* request) = 0; /* +0x18C */
+    virtual void slot_190(NetworkRequest* request) = 0;   /* +0x190 */
+    virtual void handleCircleInfoSet(NetworkRequest* request) = 0; /* +0x194 */
+    virtual void handleCircleMatchEndInfo(NetworkRequest* request) = 0; /* +0x198 */
+    virtual void slot_19C(NetworkRequest* request) = 0;   /* +0x19C */
+    virtual void slot_1A0(NetworkRequest* request) = 0;   /* +0x1A0 */
+    virtual void slot_1A4(NetworkRequest* request) = 0;   /* +0x1A4 */
+    virtual void slot_1A8(NetworkRequest* request) = 0;   /* +0x1A8 */
+    virtual void handleCircleMatchOptionSet(NetworkRequest* request) = 0; /* +0x1AC */
+    virtual void handleCircleMatchStart(NetworkRequest* request) = 0; /* +0x1B0 */
+    virtual void handleGameSpyError(NetworkRequest* request) = 0; /* +0x1B4 */
+    virtual void slot_1B8(NetworkRequest* request) = 0;   /* +0x1B8 */
+    virtual void handleCircleMatchEnd(NetworkRequest* request) = 0; /* +0x1BC */
     virtual s8 mapId_1C0(s32 value) = 0;                   /* +0x1C0 */
-    virtual void pure_1C4() = 0;                           /* +0x1C4 */
+    virtual void slot_1C4(s8 value) = 0;                  /* +0x1C4 */
 
     u32 unused_04;                             /* +0x04 */
     u32 unused_08;                             /* +0x08 */
@@ -402,21 +403,25 @@ extern "C" void sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, 
 
 /* -------------------------------- NetworkSessionManagerPat ---------------------------------- */
 
-/* The derived class the tail of the range defines.  It is declared here so MWCC emits the
-   constructor's vptr store and the destructor itself (rule 10).  `move` is declared **first**: it is
-   the class's key function and its body lives in the next band (0x803D70B8, now named after what it
-   overrides - `move__24NetworkSessionManagerPatFv` in the map), so no Pat vtable is emitted into this
-   object - which is what the target shows (its `.data` is the base table alone).
+/* The derived class the tail of the range defines.  Declared here so MWCC emits the vptr store and
+   the destructor itself (rule 10).  `move` is declared **first** - it is the class's key function, so
+   the table is emitted in the TU that defines it (this band) and nowhere else.
 
-   THE VTABLE IS STILL NOBODY'S (2026-09-28).  MWCC emits a class's table in the TU that defines its
-   key function, so `__vt__24NetworkSessionManagerPat` (0x805FB0F0, 0x1C8 B / 114 slots) belongs to the
-   band that opens at 0x803D70B8 - unclaimed, and its `.data` run 0x805FAAD0..0x805FB2B8 (the two
-   message strings, the three jump tables and the table itself) is unclaimed with it.  This declaration
-   still overrides only the five slots above, while the target's table is filled by 112 functions: 49
-   of them in 0x803D70B8..0x803DDB64, 49 inside this unit's range, 14 elsewhere.  No unit can emit a
-   matching table until those ~100 overrides are declared - which is why 0x805FB0F0 is left unclaimed
-   rather than owned-but-wrong.  The slot - address census is in
-   `.pi/notes/network-pat-abstraction.md` section (a) and in the 2026-09-28 `network-pat-class` report. */
+   62 OF THE TABLE'S 112 SLOTS ARE THIS CLASS'S OVERRIDES (2026-09-28, slot work).  The base leaves
+   those slots pure, so without a declaration here each one is a **zero word** in our emitted table:
+   the target holds a code address, ours held 0x00000000 at 61 slots and the base's `setFlag79` at the
+   62nd.  The overrides below therefore are not decoration - they are what makes the table carry a
+   relocation at every one of the 112 slots the target relocates.
+
+   THE NAMES AND PARAMETER LISTS ARE RECONSTRUCTIONS, and the list is the evidence.  Each body's own
+   callees and field offsets name it where they identify it (`copyNameList`, `setSessionName`,
+   `setCircleRecords`, `handleCircleJoin`, ...); where the disassembly identifies nothing, the name is
+   the vtable offset it fills (`slot_068`), which is this class's own existing scheme
+   (`slot_13C`/`slot_140`/`slot_148` in the base).  The parameter lists come from the argument
+   registers each body reads before writing them, with the pointer types the bodies demonstrate
+   (`NetworkRequest*` for the 21 handlers, which all call `NetworkRequest_getArgument`/
+   `getRecord`).  A later pass that writes one of these bodies owns refining both.  The slot census
+   (index, address, target, owner) is `python tools/units/vtableaudit.py --at 0x805FB0F8 --json`. */
 class NetworkSessionManagerPat : public NetworkSessionManager {
 public:
     virtual void move();                     /* +0x018 - the key function, defined in the next band */
@@ -425,6 +430,71 @@ public:
     virtual void init(u32 a, u32 b);         /* +0x00C */
     virtual void clear();                    /* +0x010 */
     virtual void release();                  /* +0x014 - the Pat flush ("finalNetwork") */
+
+    /* every slot of the class's table that the target fills from outside the base's own band: 62
+       overrides, in slot order (each body lives at the address the slot points to) */
+    virtual u32 canSend_28();                             /* +0x028 */
+    virtual void copyNameList(const u8* src);             /* +0x02C */
+    virtual void copyNameListTail(const u8* src);         /* +0x030 */
+    virtual void setSessionName(const char* name);        /* +0x034 */
+    virtual void setCircleRecords(u32 id, const u8* src, u32 count); /* +0x038 */
+    virtual void setFlag79(s8 value);                     /* +0x03C */
+    virtual void slot_068();                              /* +0x068 */
+    virtual void slot_06C();                              /* +0x06C */
+    virtual u32 getCircleInfoCount();                     /* +0x070 */
+    virtual void getCircleItemName(char* dst, u32 size, s32 idx); /* +0x074 */
+    virtual void exportCircleItem(u8* dst, s32 idx);      /* +0x078 */
+    virtual void getCircleItemRecord(char* dst, s32 idx); /* +0x07C */
+    virtual u32 getCircleItemWord_170(s32 idx);           /* +0x080 */
+    virtual u32 getCircleItemWord_174(s32 idx);           /* +0x084 */
+    virtual u32 getCircleItemWord_178(s32 idx);           /* +0x088 */
+    virtual u32 getCircleItemWord_17C(s32 idx);           /* +0x08C */
+    virtual u32 getCircleItemSize_170_178(s32 idx);       /* +0x090 */
+    virtual u32 getCircleItemSize_174_17C(s32 idx);       /* +0x094 */
+    virtual u32 getCircleItemByte_180(s32 idx);           /* +0x098 */
+    virtual u32 slot_09C();                               /* +0x09C */
+    virtual void clearString(char* dst, s32 size);        /* +0x0D4 */
+    virtual u32 getWord_528();                            /* +0x0D8 */
+    virtual u32 getWord_524();                            /* +0x0DC */
+    virtual u32 getWord_530();                            /* +0x0E0 */
+    virtual u32 getWord_52C();                            /* +0x0E4 */
+    virtual u32 getSize_528_530();                        /* +0x0E8 */
+    virtual u32 getSize_524_52C();                        /* +0x0EC */
+    virtual void getPlayerRecordName(u8 idx, char* dst, s32 size); /* +0x0F0 */
+    virtual void clearStringWithId(u32 id, char* dst, s32 size); /* +0x0F4 */
+    virtual s32 getPlayerRecord(u8 idx, u8* dst);         /* +0x0F8 */
+    virtual u32 slot_0FC();                               /* +0x0FC */
+    virtual u8 getByte_534();                             /* +0x100 */
+    virtual f32 getTimeSincePublish();                    /* +0x104 */
+    virtual void slot_108();                              /* +0x108 */
+    virtual u32 slot_10C();                               /* +0x10C */
+    virtual u32 slot_110();                               /* +0x110 */
+    virtual u32 slot_114();                               /* +0x114 */
+    virtual u32 slot_118();                               /* +0x118 */
+    virtual u32 slot_11C();                               /* +0x11C */
+    virtual void updateSession(NetworkRequest* request);  /* +0x16C */
+    virtual void shutdown(NetworkRequest* request);       /* +0x170 */
+    virtual void handleCircleCreate(NetworkRequest* request); /* +0x174 */
+    virtual void slot_178(NetworkRequest* request);       /* +0x178 */
+    virtual void handleCircleListLayer(NetworkRequest* request); /* +0x17C */
+    virtual void handleCircleJoin(NetworkRequest* request); /* +0x180 */
+    virtual void slot_184(NetworkRequest* request);       /* +0x184 */
+    virtual void slot_188(NetworkRequest* request);       /* +0x188 */
+    virtual void handleServerTimeout(NetworkRequest* request); /* +0x18C */
+    virtual void slot_190(NetworkRequest* request);       /* +0x190 */
+    virtual void handleCircleInfoSet(NetworkRequest* request); /* +0x194 */
+    virtual void handleCircleMatchEndInfo(NetworkRequest* request); /* +0x198 */
+    virtual void slot_19C(NetworkRequest* request);       /* +0x19C */
+    virtual void slot_1A0(NetworkRequest* request);       /* +0x1A0 */
+    virtual void slot_1A4(NetworkRequest* request);       /* +0x1A4 */
+    virtual void slot_1A8(NetworkRequest* request);       /* +0x1A8 */
+    virtual void handleCircleMatchOptionSet(NetworkRequest* request); /* +0x1AC */
+    virtual void handleCircleMatchStart(NetworkRequest* request); /* +0x1B0 */
+    virtual void handleGameSpyError(NetworkRequest* request); /* +0x1B4 */
+    virtual void slot_1B8(NetworkRequest* request);       /* +0x1B8 */
+    virtual void handleCircleMatchEnd(NetworkRequest* request); /* +0x1BC */
+    virtual s8 mapId_1C0(s32 value);                      /* +0x1C0 */
+    virtual void slot_1C4(s8 value);                      /* +0x1C4 */
 
     NetworkRequest pool2_1C4[2];               /* +0x1C4..+0x30B */
     u8 pad_30C[0x54];                          /* +0x30C..+0x35F */
