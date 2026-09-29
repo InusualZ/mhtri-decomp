@@ -47,6 +47,10 @@ never relinks, so `main.elf` never runs and `ok` is the only edge that re-valida
   passes. The rule used to be a "landing-review rule" (a habit), and
   `Network/fn_803D3CE8.cpp`'s two `self->vtable = &NetworkSessionManagerVTable;` writes survived a landing
   through it (2026-09-27); a silent pass is what that classification bought, so a silent pass is gone;
+* checks rule 12 in the style lint, with a recorded allowance (`--allow-rule12 <token>`) for a lane that
+  needs an unowned-data `extern` **now** while the claim is already scheduled: repeatable, printed in the
+  landing log with the token it excused, and any rule-12 addition the allowance does not name - or any
+  other rule at all - still refuses. Like rule 10's, it is a command-line record, never a key in a file;
 * runs the style lint when it exists (7.21), reports the ledger delta, and warns when a unit improved with no
   document or header change to show for it (7.10); the lint row carries the **head** of stylelint's output -
   where the findings are - and never its trailing "not enforced: ..." legend, which on 2026-09-25 made a FAIL
@@ -1637,6 +1641,78 @@ def rule10_growth(before: dict, after: dict, units: list[str]) -> tuple[list[str
     return grew, touched
 
 
+ALLOW_RULE12: list[str] = []
+
+
+def set_allow_rule12(tokens: list[str] | None) -> None:
+    """Record the rule-12 tokens *this invocation* accepts deliberately - the command's own audit trail.
+
+    Mirrors `set_allow_rule10`: the value travels on the module (the row lives in `verify`, which both
+    `land()` and the CLI's `verify` path reach), it is set **only** from a command line - never from a key
+    in a file, which is what the no-exemption ruling removed - and the row prints it, so the landing log
+    carries the token it excused. The token is the at-fault symbol name rule 12 fires on (the `extern`'s
+    identifier), the rename-stable key `stylelint --list-added` prints.
+    """
+    global ALLOW_RULE12                                                   # noqa: PLW0603 - one invocation
+    ALLOW_RULE12 = [t.strip() for t in (tokens or []) if t and t.strip()]
+
+
+def rule12_verdict(added: list[dict], detail: list[dict],
+                   allowed: list[str]) -> tuple[bool, list[str], list[str], list[dict]]:
+    """The rule-12 half of the style-lint row, as a pure function.
+
+    `added`/`detail` are `stylelint --diff --json`'s: the `(rule, file)` count deltas and the added
+    occurrences (each carrying its `token`). Only rule-12 additions can ever be excused by
+    `--allow-rule12 <token>`; a single added violation of any other rule refuses the row. Returns
+    `(ok, excused, refused, other_rules)`. An allowance that matches nothing is not an error by itself -
+    it simply excuses nothing, and the refusal it was meant for stands unless its own token is named.
+    """
+    other = [a for a in added if a.get("rule") != 12]
+    if other:
+        return False, [], [], other
+    sanctioned = set(allowed)
+    tokens = [d.get("token") for d in detail if d.get("rule") == 12]
+    excused = sorted({t for t in tokens if t and t in sanctioned})
+    refused = sorted({t for t in tokens if not t or t not in sanctioned})
+    rule12_added = sum(int(a.get("added") or 0) for a in added if a.get("rule") == 12)
+    if len(tokens) < rule12_added:
+        # the JSON named fewer added occurrences than the counts: the named tokens cannot be proven to
+        # cover them, so it refuses. A silent pass on an unverifiable delta is the failure this guards.
+        refused.append("<unnamed rule-12 occurrence>")
+    return (not other and not refused), excused, refused, []
+
+
+def rule12_lint_row(p, allowed: list[str] | None) -> tuple[bool, str, str, list[str]]:
+    """The style-lint row's `(ok, detail, info, excused)` with `--allow-rule12` in play.
+
+    Rule 12 is refused inside the style lint (it is part of its `--diff`), so the allowance has to be
+    applied to *its* decision. `--json` carries the added `(rule, file)` counts and the added
+    occurrences; a clean run passes, anything the allowance does not cover - any other rule, or a
+    rule-12 token not named - is the refusal, with what stylelint printed. A non-zero exit whose JSON
+    carries no `added` (a refusal that is not a delta: no map, no dump) is a failure too, never a pass.
+    """
+    if p.returncode == 0:
+        return True, "", "", []
+    try:
+        payload = json.loads(p.stdout or "{}")
+    except ValueError:
+        return False, command_detail(p), "", []
+    added = payload.get("added") or []
+    if not added:
+        return False, command_detail(p), "", []
+    detail = payload.get("detail") or []
+    ok, excused, refused, _other = rule12_verdict(added, detail, allowed or [])
+    if ok:
+        return True, "", ("rule 12: %d addition(s) authorised by --allow-rule12" % len(excused)
+                           if excused else ""), excused
+    lines = ["+%d rule %d %s (%d -> %d)" % (a.get("added", 0), a.get("rule"), a.get("file"),
+                                            a.get("before", 0), a.get("after", 0)) for a in added]
+    if refused:
+        lines.append("unexcused rule 12 (add --allow-rule12 <token> to accept deliberately): %s"
+                     % ", ".join(refused))
+    return False, "; ".join(lines[:6]) or command_detail(p), "", excused
+
+
 def band_ownership_warnings(main: str, base: str | None) -> list[str]:
     """Rule-2 warnings a batch introduces at the registration boundary. Never a refusal.
 
@@ -2252,10 +2328,23 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # 4. the style lint (7.21), when it exists
     lint = os.path.join(main, "tools", "units", "stylelint.py")
     if os.path.exists(lint):
-        p = run([sys.executable, lint, "--diff", want_base or "HEAD"], main)
+        # `--json` carries the added (rule, file) counts and the added occurrences, so rule 12's own
+        # allowance (`--allow-rule12 <token>`) can be applied to the lint's decision: a token the command
+        # line sanctioned is excused and printed here; anything else the delta added still refuses.
+        p = run([sys.executable, lint, "--diff", want_base or "HEAD", "--json"], main)
+        lint_ok, lint_detail, lint_info, lint_excused = rule12_lint_row(p, ALLOW_RULE12)
+        if lint_excused:
+            print("rule 12: %d authorised by --allow-rule12 (recorded, not a file-level exemption): %s"
+                  % (len(lint_excused), "; ".join(lint_excused)))
         # the head of the output, never the tail: stylelint prints its findings first and its "not enforced"
         # legend last, so a tail hides the violation the batch has to fix (2026-09-25, `.pi/land.log`).
-        check("style lint (§6.5) adds no violation", p.returncode == 0, command_detail(p))
+        check("style lint (§6.5) adds no violation", lint_ok, lint_detail, info=lint_info,
+              remedy="rule 12 refuses an `extern` of data no registered `splits.txt` range covers: claim "
+                     "the range into the unit (the whole map symbol extent, `end:` 4-aligned), or "
+                     "register a named data-only unit when several units read the pool - "
+                     "`python tools/units/dataclaim.py --unit <unit>` prints the claim. A rule-12 "
+                     "addition a landing must take now, with the claim already scheduled, is accepted "
+                     "by `--allow-rule12 <token>` (recorded in the landing log).")
     else:
         check("style lint (§6.5)", True, info="not built yet (roadmap 7.21) - skipped")
 
@@ -3291,6 +3380,33 @@ def selftest() -> int:
     check("rule10: a batch touching a file that already has one passes",
           module.rule10_growth(existing, existing, ["ai/fn_802CC794"]),
           ([], ["ai/fn_802CC794.cpp .data"]))
+
+    # --- rule 12: the style-lint row's allowance, applied to stylelint's own --diff JSON -----------
+    # Rule 12 is refused inside the style lint, so `--allow-rule12 <token>` is applied to that row's
+    # `added`/`detail` delta. The token is the at-fault symbol name `--list-added` prints.
+    added12 = [{"rule": 12, "file": "src/Pl/pl_act_step.cpp", "added": 1, "before": 0, "after": 1}]
+    detail12 = [{"rule": 12, "file": "src/Pl/pl_act_step.cpp", "line": 9,
+                 "token": "pl_frame_window_44", "detail": "unowned data"}]
+    check("rule12: an addition with no allowance is refused",
+          module.rule12_verdict(added12, detail12, []), (False, [], ["pl_frame_window_44"], []))
+    check("rule12: the named token is excused",
+          module.rule12_verdict(added12, detail12, ["pl_frame_window_44"]),
+          (True, ["pl_frame_window_44"], [], []))
+    check("rule12: an allowance that matches nothing keeps the refusal",
+          module.rule12_verdict(added12, detail12, ["some_other_symbol"]),
+          (False, [], ["pl_frame_window_44"], []))
+    check("rule12: a count with fewer named tokens refuses",
+          module.rule12_verdict([{"rule": 12, "file": "a.cpp", "added": 2, "before": 0, "after": 2}],
+                                detail12, ["pl_frame_window_44"])[0], False)
+    check("rule12: another rule's addition is never excusable",
+          module.rule12_verdict([{"rule": 2, "file": "a.cpp", "added": 1, "before": 0, "after": 1}],
+                                detail12, ["pl_frame_window_44"])[0], False)
+    check("rule12: a clean delta has nothing to excuse", module.rule12_verdict([], [], []),
+          (True, [], [], []))
+    module.set_allow_rule12([" pl_frame_window_44 ", "", None])
+    check("rule12: set_allow_rule12 trims and drops blanks", module.ALLOW_RULE12,
+          ["pl_frame_window_44"])
+    module.set_allow_rule12([])
 
 
     def fake_verify_with(write, gate_code=0, gate_problems=()):
@@ -4445,6 +4561,10 @@ def main() -> int:
                    help="do not release the batch's claims")
     v.add_argument("--allow-regression", action="append", default=[],
                    help="unit whose measured regression is authorised by a rule (recorded in the message); repeatable")
+    v.add_argument("--allow-rule12", action="append", default=[], metavar="TOKEN",
+                   help="rule-12 token (the unowned data symbol an `extern` names) a landing accepts "
+                        "deliberately, with the claim already scheduled; repeatable, recorded in the "
+                        "landing log, never a key in a file")
     v.add_argument("--no-selftests", action="store_true", dest="no_selftests",
                    help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
                         "--changed` is the narrower lane loop)")
@@ -4468,6 +4588,10 @@ def main() -> int:
                          "`run:.data:805FB0F8` for the Pat vtable the owner ruled stays claimed while "
                          "its slots are written; repeatable, recorded in the landing log, never a key "
                          "in a file")
+    ld.add_argument("--allow-rule12", action="append", default=[], metavar="TOKEN",
+                    help="rule-12 token (the unowned data symbol an `extern` names) a landing accepts "
+                         "deliberately, with the claim already scheduled; repeatable, recorded in the "
+                         "landing log, never a key in a file")
     ld.add_argument("--no-selftests", action="store_true", dest="no_selftests",
                     help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
                          "--changed` is the narrower lane loop)")
@@ -4507,6 +4631,7 @@ def main() -> int:
             print("REFUSED verify | %s" % bad_branch)
             return 1
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
+        set_allow_rule12(args.allow_rule12)
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
                       check_outbox=not args.no_outbox, release_claims=not args.no_release,
                       no_selftests=args.no_selftests)
@@ -4514,6 +4639,7 @@ def main() -> int:
         if args.branch:
             units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
             set_allow_rule10(args.allow_rule10)
+            set_allow_rule12(args.allow_rule12)
             return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
                                check_outbox=not args.no_outbox, release_claims=not args.no_release,
@@ -4523,6 +4649,7 @@ def main() -> int:
             return 1
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         set_allow_rule10(args.allow_rule10)
+        set_allow_rule12(args.allow_rule12)
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     allow_rule10=args.allow_rule10,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
