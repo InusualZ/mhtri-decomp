@@ -391,7 +391,7 @@ def selftest() -> int:
         check("unarmed create makes a plain worktree under .claude/worktrees",
               isinstance(path, str) and _under(path, plain_root(main)) and os.path.isdir(path), True)
         check("... on its own branch", subprocess.run(["git", "-C", path, "branch", "--show-current"],
-                                                      capture_output=True, text=True).stdout.strip(),
+                                                      capture_output=True, text=True, encoding="utf-8").stdout.strip(),
               "worktree-agent-abc123")
         check("a name with odd characters is made safe", _safe_name("../a b/c"), "a-b-c")
         with open(os.path.join(path, "dirty.md"), "w") as fh:
@@ -403,7 +403,7 @@ def selftest() -> int:
         check("... the directory is gone", os.path.exists(path), False)
         check("... and its unmerged-nothing branch with it",
               subprocess.run(["git", "-C", main, "branch", "--list", "worktree-agent-abc123"],
-                             capture_output=True, text=True).stdout.strip(), "")
+                             capture_output=True, text=True, encoding="utf-8").stdout.strip(), "")
         check("a path that is neither slot nor plain is not ours (exit 0)",
               quiet(remove, main, {"worktree_path": os.path.join(tmp, "elsewhere")}), 0)
 
