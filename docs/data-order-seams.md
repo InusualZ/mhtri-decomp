@@ -1,76 +1,86 @@
 # The `.data` emission order as translation-unit seam evidence
 
-Status: discovery measured 2026-09-29; the tool plan below is landed (see "Progress"); the rule is
-established for Capcom game code and contradicted in g3d (section 3, section 6).
+Status: discovery measured 2026-09-29 and **corrected the same day** (section 3): the first version of the rule
+was wrong because the measurement left out inline functions. The corrected rule and the tools built on it are
+below; what is still unproven is listed in section 3.
 
 ## 1. The discovery
 
-Finishing `Network/network_transport` showed that the retail `.data` run `0x805F94E0..0x805F9A40` **interleaves
-each vtable with strings**, and that one translation unit (TU) cannot reproduce that order: after the lane
-converted the peer types to real classes, every table was emitted at the right size, but the `.data` section
-scored 10.4 % of 4108 B. The unit is several TUs, and the registered range hides it.
+Finishing `Network/network_transport` showed that the retail `.data` run `0x805F94E0..0x805F9A40` interleaves
+vtables with strings, and that one translation unit (TU) cannot reproduce that order: after the lane converted the
+peer types to real classes, every table was emitted at the right size, but the `.data` section scored 10.4 % of
+4108 B. The unit is several TUs, and the registered range hides it.
 
-The reason is how MWCC lays out one TU's `.data`. Measured by compiling a scratch file with the project's own
-flags (`Wii/1.3`, `-O3`, `-pool off`, `-str reuse`):
+The reason is how MWCC lays out one TU's `.data`. Measured by compiling scratch files with the project's flags
+(`Wii/1.3`, `-O3`, `-inline noauto`, `-str reuse`; `.pi/tmp/data-order-verify/` holds the scripts and the full
+matrix):
 
 | position in the TU's `.data` | what | order inside the group |
 | --- | --- | --- |
 | 1 | initialised global data (over 8 B) | definition order |
-| 2 | string literals (`@NNN`) | first-use order |
+| 2 | string literals of **out-of-line** functions | first-use order; identical literals merge (`-str reuse`) |
 | 3 | **vtables** (`__vt__<class>`) | **reverse** of class order (`C, B, A` for `A, B, C`) |
+| 4 | string literals of **inline** functions (in-class bodies, virtual or not, free `inline` functions) | emission order; **one unmerged copy per inline instance** - the "inline tail" |
 
-Objects of at most 8 B go to `.sdata`, and const tables to `.sdata2`; neither takes part. The one built object
-with several vtables in the repo agrees (`network_transport.o`: one `D`, eighteen `@` literals, seven `__vt__`).
+So a TU's `.data` is `D* S* V* s*`. Objects of at most 8 B go to `.sdata`, and const tables to `.sdata2`; neither
+takes part. This order holds on all nine `Wii/*` compilers and on `GC/3.0a3`..`3.0a5.2`; `GC/1.0`..`2.7`
+interleave each vtable with inline strings (`D S4 V1 s4 V2 S1`). The project builds nearly everything with
+`Wii/1.3`, two libs with `Wii/1.0`, one with `GC/3.0a3` and one with `GC/1.2.5n`.
 
-Two consequences for **retail** `.data`, which is the concatenation of per-TU fragments in link order:
+The linker concatenates TU fragments, so in **retail** `.data`:
 
-* **Rule V→S.** A vtable followed by a string or ordinary data symbol means a new TU starts there. Inside one TU
-  nothing but another vtable can follow a vtable.
-* **Rule zigzag.** Inside one TU adjacent vtables descend by owner address (their first code slot). An adjacent
-  pair whose owners go *up* is a boundary between two TUs, even when no string separates them.
+* **V->S (strong).** Two vtable groups with strings (or other data) between them: the second group belongs to a
+  later TU, because a TU's vtables are contiguous. The boundary lies somewhere in the gap - *after* any inline tail
+  of the first TU. Its width can be one symbol (`network_transport`) or hundreds.
+* **V->tail (weak).** A vtable group followed by strings and no later vtable: an inline tail of the same TU, or
+  the next TU. **A vtable followed by strings is not, by itself, a seam.**
+* **Zigzag (strong).** Inside one TU adjacent vtables descend by owner address (their first code slot); an adjacent
+  pair whose owners go *up* is two TUs, even with no string between them. The reverse order held on every
+  compiler tried, and no contradiction was found; it has not been tested against a retail TU with known classes.
+* **V->D (weak).** A vtable followed by ordinary data: globals precede vtables in a TU, but a jump table is `.data`
+  too and its place in the order is unmeasured.
 
 ## 2. How much it finds
 
-`tools/splits/dataorder.py scan` (Phase 0, landed) classifies every `.data` symbol of the retail DOL: **vtable** (leading `0,0` header, all other words code pointers or zero), **string**
-(printable, NUL-terminated), otherwise **data**. Jump tables are not vtables: they have no `0,0` header (a first
-pass that counted them gave a bogus 402/130 split).
+`tools/splits/dataorder.py scan` classifies every `.data` symbol of the retail DOL: **vtable** (leading `0,0`
+header, all other words code pointers or zero), **string** (printable, NUL-terminated), otherwise **data**. Jump
+tables are not vtables: they have no `0,0` header (a first pass that counted them gave a bogus 402/130 split).
 
 | measure | result |
 | --- | --- |
 | `.data` symbols classified | 11,254: 231 vtables, 3,728 strings, 7,295 other |
-| vtable → string transitions (V→S, strong) | 65: **4 inside registered units** (all in `network_transport`, the seams that cost a full pass), 61 in unclaimed `.data` |
-| vtable → other data (V→D, weak) | 39: 37 in unclaimed `.data`, 2 at registered unit starts; a jump table is `.data` too and its place in the order is unmeasured |
-| adjacent vtable pairs | 126: 62 "up" (seam) - 58 unclaimed, 3 inside `network_transport` (all real seams), 1 at a registered unit start; 52 "down" (same TU); 12 ties (equal owners: no evidence, not counted) |
-| counterexamples found | none - but the ground truth is thin (see 3) |
+| V->S (strong: strings between two vtable groups) | 65: **4 inside registered units** (all in `network_transport`, gap widths 1, 16, 1, 44), 61 in unclaimed `.data` (23 with a gap of at most 8 symbols, 45 at most 30, widest 414) |
+| V->D (weak) | 39: 37 in unclaimed `.data`, 2 at registered unit starts |
+| adjacent vtable pairs | 126: 62 "up" (seam) - 58 unclaimed, 3 inside `network_transport`, 1 at a registered unit start; 52 "down" (same TU); 12 ties (equal owners: no evidence) |
 
-## 3. Confidence and limits
+A wide gap says only "a TU boundary is somewhere in here": unclaimed `.data` holds many TUs with no vtables, so the
+useful seams are the narrow ones.
 
-* The compiler side is measured: one scratch TU plus one built object. The retail side is an inference from a
-  linker that concatenates TU fragments (tudiscover already measures Spearman 1.000 for `.sdata2` against
+## 3. Confidence, and the correction
+
+* **The first version of the rule was wrong.** It said "a vtable followed by a string starts a new TU". The
+  scratch test behind it had no inline functions with strings. Phase 1 (`tudiscover`) then found the rule
+  contradicted by strong `__FILE__` anchors at eight g3d seams (0x8058BE40, 0x8058C928, 0x8058D5F8, 0x8058F070,
+  0x8058F388, 0x8058F6B0, the zigzag 0x8058F670, 0x8058FB00) and at 0x80594A40 in `ef/ef_drawstrategyimpl`. A
+  read-only verification lane (2026-09-29) tested four explanations and found **inline-function strings** (the
+  fourth row of the table): at every one of those seams the first strings after the vtable are inline-function
+  asserts (`g3d_resnode_ac.h`, `g3d_calcworld.h`, `particle.h`, repeated unmerged), and their first referrer is a
+  function of the *same* registered unit as the TU's `__FILE__`. The vtable classification is right (leading `0,0`,
+  code slots) and g3d is `Wii/1.3` like the Capcom code, so it is not a compiler difference. The rule is wrong for
+  **all** `Wii/1.3` code as first written, Capcom included; the grammar above is the correction.
+* **What survives.** Strings between two vtable groups (V->S), and the zigzag. Under the corrected grammar the
+  `network_transport` gaps at 0x805F9570, 0x805F9610 and 0x805F9958 are still seams: a vtable follows each gap.
+  The last one, 0x805F9A40, follows the final vtable of the run, so it may be an inline tail.
+* **Ground truth is scarce.** Only three built units have vtables (293 built); `network_transport` is the only
+  multi-vtable one, and no `Matching` g3d unit claims `.data`. The compiler side is measured; the retail side is an
+  inference from a linker that concatenates TU fragments (tudiscover measures Spearman 1.000 for `.sdata2` against
   `.text`).
-* Ground truth is scarce: registered units claim little vtable data, so only `network_transport` (which is now
-  known to be multi-TU) exercises the rule. It has **not** been checked against tudiscover's must-link evidence
-  (`__FILE__` anchors) - that needs the asm dump (`python tools/splits/dump_asm.py`, 200-400 s) and is Phase 1's
-  acceptance test.
-* Measured on `Wii/1.3` only. Other libraries use other compiler versions.
-* **Phase 1 measurement (tudiscover, 2026-09-29, asm dump fresh).** `tudiscover.py dataorder` maps each of the
-  127 V->S/zigzag seams to a `.text` interval: **78 pinned, 48 overlap** (the vtable side's referrers come after
-  the string side's - the rule does not hold for that seam under this mapping), 1 without referrers. The four
-  `network_transport` seams (0x805F9570 / 9610 / 9958 / 9A40) all pin, to 81 / 6 / 3 / 8 functions. Against
-  the other evidence: **8 seams are contradicted by a `__FILE__` anchor** - a `.c`/`.cpp` name whose referrers
-  sit on both sides of the seam - and every one is in the g3d library: V->S at 0x8058BE40 (`g3d_anmchr.cpp`),
-  0x8058C928 (`g3d_anmscn.cpp`), 0x8058D5F8 (`g3d_anmtexsrt.cpp`), 0x8058F070 (`g3d_scnmdl.cpp`), 0x8058F388
-  (`g3d_scnmdlsmpl.cpp`), 0x8058F6B0 and the zigzag 0x8058F670 (`g3d_scnroot.cpp`), 0x8058FB00
-  (`g3d_state.cpp`). One more V->S, 0x80594A40, pins to 0x800C6054..0x800C8680, inside
-  `ef/ef_drawstrategyimpl.cpp`, whose own `__FILE__` name plus two `.sdata2` pools span it. So the rule is
-  **wrong for at least the g3d (NW4R) TUs** - consistent with a different compiler version there - and
-  unproven for the ef strategy units. Twenty-eight further pinned intervals lie wholly inside one registered
-  unit (mostly the `ef/ef_draw*strategy*` units, `sound/fn_800E*`, `homebutton/*`): either a hidden second TU
-  or the same rule failure; they are not counted as errors. Bench tier 4 (strong pins vs `splits.txt`): the 36
-  data-seam cuts make 3 hits and 30 misses, which lowers overall precision 0.110 -> 0.109, so the kind is
-  **soft by default** and `--data-order strong` is opt-in. V->D (`--weak`) adds 39 seams, of which 31 pin.
+* **Tool numbers were computed with the old rule.** Phase 1's bench (strong pins 3 hit / 30 miss) and Phase 2/3's
+  seam counts treat the first string after a vtable as the boundary, which the inline tail moves later. They are
+  warnings and soft votes only; Phase 5 realigns them (section 5).
 * Untested: RTTI-on classes (the game builds `-RTTI off`, so vtable headers are `0,0`), `extern "C"` data,
-  function-local statics, and data emitted by `#pragma` sections.
+  function-local statics, data emitted by `#pragma` sections, `-lang=c` translation units, and `GC/1.2.5n` code
+  (which would interleave).
 * A vtable owner is approximated by its first code slot; the key function would be exact. Twelve adjacent pairs
   share an owner (identical first slot) and are treated as no evidence.
 
@@ -129,3 +139,14 @@ default to soft evidence and warnings, and none of them refuses.
 * The order-only diagnosis is tested on fixture objects only, and `attribute.py queue` has not been re-run, so the
   queue and the pool briefs carry no `data_seams` yet (the next regeneration adds them).
 * Split `Network/network_transport` at the four seams into per-class units, so its `.data` can match.
+
+**Correction (same day).** The verification lane's answer to "is the g3d contradiction true?": yes for the rule as
+first written, and the cause is the inline tail, not a different compiler (section 3). `dataorder.py` now returns
+`V->S` only when a later vtable follows the strings (with `latest`, `width` and `tail` fields), `V->tail` and
+`V->D` as weak. Phase 5 below carries the consumers.
+
+* **Phase 5 - realign the consumers with the inline tail.** `vtableaudit.py --order` must not flag `@NNN` strings
+  after a vtable (an inline tail); `tudiscover` must treat a `V->S` seam as "a boundary in the gap", after the
+  leading inline-tail strings, and re-run bench tier 4; `dataseams`/`dataqueue`/`dataclaim` must cut a gap by its
+  `tail`, not at its first string; `attribute`/`brief` wording says "a boundary in [addr, latest)", not a cut at
+  a string.

@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """dataorder.py - translation-unit seams read from the *order* of retail `.data`.
 
-MWCC lays out one TU's `.data` in a fixed order (measured on a scratch file with the project's flags, see
-`docs/data-order-seams.md`): initialised globals over 8 B in definition order, then string literals in first-use
-order, then **vtables last, in the reverse of class order**.  The linker concatenates TU fragments, so in retail:
+MWCC lays out one TU's `.data` in a fixed order (measured with the project's flags, see
+`docs/data-order-seams.md`): initialised globals over 8 B in definition order, the strings of out-of-line
+functions in first-use order, **vtables in the reverse of class order**, then the strings of **inline** functions
+(the "inline tail": in-class bodies and free `inline` functions, one unmerged copy per instance).  So a TU is
+`D* S* V* s*`, and the linker concatenates TU fragments.  In retail:
 
-* **V->S / V->D** - a vtable followed by a string (strong) or by ordinary data (weak: a jump table is `.data` too
-  and its place in the order is unmeasured) starts a new TU;
+* **V->S** (strong) - two vtable groups with strings between them: the second group is another TU, and the
+  boundary lies somewhere in the gap (after any inline tail).  A vtable followed by strings and *no* later vtable
+  is `V->tail` (weak): it may be an inline tail of the same TU, which is exactly what the g3d "contradictions"
+  were.  **A vtable followed by strings is not by itself a seam.**
+* **V->D** (weak) - a vtable followed by ordinary data (a jump table is `.data` too, its place is unmeasured);
 * **zigzag** - two *adjacent* vtables whose owners' first code slots go **up** in address are two TUs (inside one
   TU they descend).
 
@@ -42,6 +47,7 @@ VTABLE, STRING, DATA = "V", "S", "D"
 PRINTABLE = set(range(32, 127)) | {9, 10, 13}
 #: A `D` symbol this small between a vtable and the next symbol is alignment padding, not a new object.
 PAD_MAX = 8
+STRONG_KINDS = ("V->S", "zigzag")
 SYMBOL_RE = re.compile(r"^(\S+) = (\S+):0x([0-9A-Fa-f]+);(.*)$")
 SIZE_RE = re.compile(r"size:0x([0-9A-Fa-f]+)")
 
@@ -49,16 +55,24 @@ SIZE_RE = re.compile(r"size:0x([0-9A-Fa-f]+)")
 class Sym:
     """One `.data` symbol with its size, kind and (for a vtable) owner - the address of its first code slot."""
 
-    __slots__ = ("addr", "size", "name", "kind", "owner")
+    __slots__ = ("addr", "size", "name", "kind", "owner", "text")
 
-    def __init__(self, addr, size, name, kind=DATA, owner=None):
-        self.addr, self.size, self.name, self.kind, self.owner = addr, size, name, kind, owner
+    def __init__(self, addr, size, name, kind=DATA, owner=None, text=None):
+        self.addr, self.size, self.name, self.kind, self.owner, self.text = addr, size, name, kind, owner, text
 
     def as_dict(self):
         d = {"addr": self.addr, "size": self.size, "name": self.name, "kind": self.kind}
         if self.owner is not None:
             d["owner"] = self.owner
         return d
+
+
+HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9_./\\-]*\.(?:h|hpp|inl)$")
+
+
+def is_header_name(text: str | None) -> bool:
+    """A bare header file name (`g3d_resnode_ac.h`): the `__FILE__` of an assert in an INLINE function."""
+    return bool(text) and bool(HEADER_NAME_RE.match(text.strip()))
 
 
 def load_symbols(path: str = SYMBOLS) -> list[tuple[str, int, int | None, str]]:
@@ -120,17 +134,25 @@ def classify_all(rows, reader) -> list[Sym]:
     tlo, thi = text_range(rows)
     out = []
     for addr, size, name in data_symbols(rows):
-        kind, owner = classify(reader.read(addr, size), tlo, thi)
-        out.append(Sym(addr, size, name, kind, owner))
+        blob = reader.read(addr, size)
+        kind, owner = classify(blob, tlo, thi)
+        text = blob.rstrip(b"\0").decode("latin-1") if kind == STRING else None
+        out.append(Sym(addr, size, name, kind, owner, text))
     return out
 
 
 def seams(syms: list[Sym]) -> list[dict]:
-    """Every seam between neighbouring symbols: `{addr, kind, before, after}` in address order.
+    """Every seam after a vtable group: `{addr, kind, before, after, ...}` in address order.
 
-    `kind` is `V->S` (strong), `V->D` (weak: an object over 8 B that is not a string) or `zigzag` (two adjacent
-    vtables, owners going up).  Padding (a `D` of at most 8 B) between the two is skipped.  `addr` is where the
-    new TU's data begins.
+    `kind` is
+    * `V->S` (strong) - strings between this vtable group and a LATER vtable: another TU starts in the gap.
+      `addr` is the earliest the new TU can begin (the first string), `latest` the next vtable, `width` the
+      number of symbols in the gap, `tail` how many leading strings look like an inline tail (a bare header
+      name) - the boundary is after them;
+    * `V->tail` (weak) - strings after the vtable group with no later vtable: an inline tail or another TU;
+    * `V->D` (weak) - an object over 8 B that is not a string (a jump table is one too);
+    * `zigzag` (strong) - two adjacent vtables, owners going up.
+    Padding (a `D` of at most 8 B) is skipped.
     """
     out = []
     for i, a in enumerate(syms):
@@ -142,15 +164,25 @@ def seams(syms: list[Sym]) -> list[dict]:
         if j >= len(syms):
             continue
         b = syms[j]
+        row = {"addr": b.addr, "before": a.name, "after": b.name}
         if b.kind == STRING:
-            kind = "V->S"
+            k = j
+            while k < len(syms) and syms[k].kind != VTABLE:
+                k += 1
+            tail = 0
+            while j + tail < k and syms[j + tail].kind == STRING and is_header_name(syms[j + tail].text):
+                tail += 1
+            if k < len(syms):
+                row.update(kind="V->S", latest=syms[k].addr, width=k - j, tail=tail)
+            else:
+                row.update(kind="V->tail", width=k - j, tail=tail)
         elif b.kind == DATA:
-            kind = "V->D"
+            row["kind"] = "V->D"
         elif a.owner is not None and b.owner is not None and b.owner > a.owner:
-            kind = "zigzag"
+            row["kind"] = "zigzag"
         else:
             continue
-        out.append({"addr": b.addr, "kind": kind, "before": a.name, "after": b.name})
+        out.append(row)
     return out
 
 
@@ -169,8 +201,12 @@ def zigzag_pairs(syms: list[Sym]) -> collections.Counter:
 
 
 def fragments(syms: list[Sym], weak: bool = False) -> list[list[Sym]]:
-    """Cut the run at every strong seam (and the weak `V->D` ones when `weak`): one list per probable TU."""
-    cuts = {s["addr"] for s in seams(syms) if weak or s["kind"] != "V->D"}
+    """Cut the run at every strong seam (and the weak `V->D`/`V->tail` ones when `weak`): one list per probable TU.
+
+    A `V->S` cut is made at the earliest possible boundary (the first string of the gap); the true boundary is
+    after the row's `tail` inline-tail strings.
+    """
+    cuts = {s["addr"] for s in seams(syms) if weak or s["kind"] in STRONG_KINDS}
     out, cur = [], []
     for s in syms:
         if s.addr in cuts and cur:
@@ -348,7 +384,31 @@ def selftest() -> int:
     got = classify_all(rows2, fake)
     check("classify_all reads the DOL through the map", [(s.name, s.kind) for s in got],
           [("v", VTABLE), ("s", STRING)])
-    check("... and finds the V->S seam", [s["kind"] for s in seams(got)], ["V->S"])
+    check("... a vtable then a string with no later vtable is only a weak V->tail",
+          [s["kind"] for s in seams(got)], ["V->tail"])
+    check("a bare header name is an inline-tail string", (is_header_name("g3d_resnode_ac.h"),
+          is_header_name("particle.h"), is_header_name("%s::%s: Object not valid."), is_header_name("a.c")),
+          (True, True, False, False))
+    check("... but a message that merely mentions .h is not", is_header_name("see foo.h for details"), False)
+
+    def tsym(name, kind, text=None, owner=None, size=16):
+        return Sym(0, size, name, kind, owner, text)
+    seq2 = [tsym("v1", VTABLE, owner=0x100), tsym("hdr", STRING, "x_ac.h"), tsym("msg", STRING, "A::f failed"),
+            tsym("v2", VTABLE, owner=0x400)]
+    for i, x in enumerate(seq2):
+        x.addr = 0x1000 + i * 0x40
+    got = seams(seq2)
+    check("vtable, strings, later vtable: a strong V->S seam", [g["kind"] for g in got], ["V->S"])
+    check("... earliest boundary is the first string, latest the next vtable",
+          (got[0]["addr"], got[0]["latest"], got[0]["width"]), (0x1040, 0x10C0, 2))
+    check("... and the leading header name is counted as an inline tail", got[0]["tail"], 1)
+    seq3 = [tsym("v1", VTABLE, owner=0x100), tsym("hdr", STRING, "x_ac.h"), tsym("msg", STRING, "A::f failed")]
+    for i, x in enumerate(seq3):
+        x.addr = 0x1000 + i * 0x40
+    got = seams(seq3)
+    check("vtable then an inline-looking tail and no later vtable: weak V->tail",
+          [(g["kind"], g["tail"]) for g in got], [("V->tail", 1)])
+    check("... which fragments() does not cut", len(fragments(seq3)), 1)
 
     # the real DOL, when the repo has it: the network_transport seams the discovery came from
     if os.path.exists(DOL) and os.path.exists(SYMBOLS):
