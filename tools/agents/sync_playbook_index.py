@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""sync_playbook_index.py - generate CLAUDE.md's matching-playbook index from docs/matching.md.
+"""sync_playbook_index.py - generate the matching-playbook index (the skill's references/index.md) from docs/matching.md.
 
-`docs/matching.md` is the playbook: one section per idea, headed `## N. Title`. `CLAUDE.md` carries the index
-a worker actually reads. That index was hand-maintained, and it drifted the way a hand copy does - rows out of
+`docs/matching.md` is the playbook: one section per idea, headed `## N. Title`. The index lives in the
+`mwcc-unit-matching` skill (`references/index.md`, loaded on demand - it used to sit in CLAUDE.md and cost every
+lane ~8k tokens of context). That index was hand-maintained, and it drifted the way a hand copy does - rows out of
 numeric order, **two sections numbered 48** (so "playbook 48" was genuinely ambiguous in the notes that cite
 it: one note means the `extern "C"` row, another the float-varargs row), and it stopped at 70 while the
 playbook kept growing. This tool derives it instead - the number, the section title and the section's own
-problem sentence - between a marker pair in CLAUDE.md, sorted by number.
+problem sentence - between a marker pair in the target file, sorted by number.
 
 Two properties are the point. The index cannot describe an idea the playbook does not hold, and a **duplicate
 section number is refused loudly** instead of emitted twice: that refusal is the tripwire which would have
 caught the duplicate 48 the day it was written.
 
-    python tools/agents/sync_playbook_index.py             # write the block into CLAUDE.md
+    python tools/agents/sync_playbook_index.py             # write the block into the skill's references/index.md
     python tools/agents/sync_playbook_index.py --check     # exit 1 when the block is stale; write nothing
     python tools/agents/sync_playbook_index.py --print     # print the block
     python tools/agents/sync_playbook_index.py --selftest  # fixtures: order, duplicates, missing problem
@@ -29,7 +30,8 @@ BEGIN = ("<!-- PLAYBOOK-INDEX-BEGIN - generated from docs/matching.md by "
 END = "<!-- PLAYBOOK-INDEX-END -->"
 
 PLAN_REL = os.path.join("docs", "matching.md")
-TARGET_REL = "CLAUDE.md"
+TARGET_REL = os.path.join(".claude", "skills", "mwcc-unit-matching", "references", "index.md")
+TARGET_NAME = TARGET_REL.replace(os.sep, "/")
 
 # `## 12. Title` (and `## 12. Title - subtitle`); a section with no number is not indexed.
 SECTION_RE = re.compile(r"^##\s+(\d+)\.\s+(.*?)\s*$")
@@ -50,7 +52,7 @@ LEAD = [
 
 
 def read(path):
-    """Read a repository text file newline-preserving (CLAUDE.md and the plan are CRLF)."""
+    """Read a repository text file newline-preserving."""
     with open(path, "r", encoding="utf-8", newline="") as f:
         return f.read()
 
@@ -154,7 +156,7 @@ def splice(target_text, block):
     begins = [i for i, ln in enumerate(lines) if ln.rstrip(chr(13)) == BEGIN]
     ends = [i for i, ln in enumerate(lines) if ln.rstrip(chr(13)) == END]
     if not begins or not ends:
-        raise SystemExit("refusing: no playbook-index marker pair in CLAUDE.md - insert `%s` and `%s` around "
+        raise SystemExit("refusing: no playbook-index marker pair in the target - insert `%s` and `%s` around "
                          "the table first" % (BEGIN, END))
     if len(begins) > 1 or len(ends) > 1:
         raise SystemExit("refusing: the marker appears more than once (begin=%d, end=%d)" % (len(begins), len(ends)))
@@ -183,18 +185,18 @@ def cmd_sync(a):
         old = read(target_path)
         if old != new_text:
             print("stale: %s's playbook index differs from %s (%d ideas) - run "
-                  "python tools/agents/sync_playbook_index.py" % (TARGET_REL, PLAN_REL, len(sections)),
+                  "python tools/agents/sync_playbook_index.py" % (TARGET_NAME, PLAN_REL, len(sections)),
                   file=sys.stderr)
             return 1
         print("%s's playbook index is in sync with %s (%d ideas, numbers %d-%d)"
-              % (TARGET_REL, PLAN_REL, len(sections), min(sections), max(sections)))
+              % (TARGET_NAME, PLAN_REL, len(sections), min(sections), max(sections)))
         return 0
     if read(target_path) == new_text:
-        print("%s: in sync" % TARGET_REL)
+        print("%s: in sync" % TARGET_NAME)
         return 0
     write(target_path, new_text)
     print("updated %s (%d ideas, numbers %d-%d)"
-          % (TARGET_REL, len(sections), min(sections), max(sections)))
+          % (TARGET_NAME, len(sections), min(sections), max(sections)))
     return 0
 
 

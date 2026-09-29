@@ -29,7 +29,8 @@ older views - keeps **both**, because neither is a duplicate of the other. `--no
 **`--changed` maps sources, not only `tools/` (F37).** A batch that edits only docs can still break an
 invariant, and no `tools/**` selftest covers it: `docs/plan.md` is the source of the section-6.5 block
 generated into `.claude/agents/*.md` (`tools/agents/sync_profiles.py`), and `docs/matching.md` is the source
-of the skill's `references/` (`.claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check`). Both
+of the skill's `references/` (`.claude/skills/mwcc-unit-matching/scripts/sync_reference.py --check`, and the
+index `references/index.md` by `tools/agents/sync_playbook_index.py --check`). Both
 are selected when the diff touches those sources, so a docs batch verifies itself instead of reporting
 "GREEN, 0 selftests". The mapping is `SOURCE_ENTRIES`/`SOURCE_CHECKS` below.
 
@@ -94,11 +95,13 @@ SR_REL = ".claude/skills/mwcc-unit-matching/scripts/sync_reference.py"
 # `SOURCE_CHECKS`:  source path -> ((tool path relative to the root, extra argv), ...) to run as `--check`.
 SOURCE_ENTRIES = {
     "docs/plan.md": ("tools/agents/sync_profiles",),
-    "CLAUDE.md": ("tools/agents/sync_playbook_index",),
+    "docs/matching.md": ("tools/agents/sync_playbook_index",),
+    ".claude/skills/mwcc-unit-matching/SKILL.md": ("tools/agents/sync_playbook_index",),
 }
 SOURCE_CHECKS = {
-    "docs/matching.md": ((SR_REL, ("--check",)),),
-    "CLAUDE.md": (("tools/agents/sync_playbook_index.py", ("--check",)),),
+    "docs/matching.md": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
+    ".claude/skills/mwcc-unit-matching/references/index.md": (("tools/agents/sync_playbook_index.py", ("--check",)),),
+    ".claude/skills/mwcc-unit-matching/SKILL.md": ((SR_REL, ("--check",)),),
 }
 
 
@@ -512,8 +515,17 @@ def selftest() -> int:
     check("a Windows-style path maps identically", mapped_entries(["docs\\plan.md"]),
           ["tools/agents/sync_profiles"])
     md_checks = mapped_checks(["docs/matching.md"])
-    check("docs/matching.md selects the skill's sync_reference check",
-          [name for name, _tail in md_checks], [SR_REL + " --check"])
+    check("docs/matching.md selects the skill's sync_reference check and the playbook-index check",
+          [name for name, _tail in md_checks], [SR_REL + " --check", "tools/agents/sync_playbook_index.py --check"])
+    check("docs/matching.md also selects the playbook-index selftest", mapped_entries(["docs/matching.md"]),
+          ["tools/agents/sync_playbook_index"])
+    check("a skill SKILL.md edit selects the reference check and the index selftest",
+          ([n for n, _t in mapped_checks([".claude/skills/mwcc-unit-matching/SKILL.md"])],
+           mapped_entries([".claude/skills/mwcc-unit-matching/SKILL.md"])),
+          ([SR_REL + " --check"], ["tools/agents/sync_playbook_index"]))
+    check("an edit to the generated index selects the index check",
+          [n for n, _t in mapped_checks([".claude/skills/mwcc-unit-matching/references/index.md"])],
+          ["tools/agents/sync_playbook_index.py --check"])
     check("... and the argv runs that tool with --check",
           md_checks[0][1] if md_checks else None, [SR_REL, "--check"])
     check("a source with no mapped check maps to nothing", mapped_checks(["docs/plan.md"]), [])
@@ -533,7 +545,9 @@ def selftest() -> int:
 
     try:
         for source, want in (("docs/plan.md", [("tools/agents/sync_profiles", "tool", "--selftest")]),
-                             ("docs/matching.md", [(SR_REL + " --check", "check", "--check")])):
+                             ("docs/matching.md", [(SR_REL + " --check", "check", "--check"),
+                                               ("tools/agents/sync_playbook_index", "tool", "--selftest"),
+                                               ("tools/agents/sync_playbook_index.py --check", "check", "--check")])):
             subprocess.run = fake_git(source)
             picked, unclaimed = changed_entries(entries, "HEAD", ROOT)
             check("a %s-only diff selects %s" % (source, want[0][0]),
