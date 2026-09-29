@@ -19,6 +19,15 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   `src/auto/` units are moved to their final homes under the register-once rule (`docs/plan.md` §12), and a
   region still unclaimed in `symbols.txt` is a proposal backlog, not a defect.
 
+## Where the state and the lessons live
+
+* **Live campaign state** (what is in flight, parked decisions, open tool asks, how to re-measure the ledger) is in
+  `.pi/state.md` - gitignored, read it at the start of a session, refresh it rather than append.
+* **Durable lessons and the owner's dated rulings** are in `docs/pipeline.md` (sections 3-5 for the rules, the gate
+  and the merge procedure, 11 for the rulings, 12 for tooling and environment traps).
+* **History** (what earlier sessions did and why) is `.pi/notes/claude-local-block-archive-2026-09-29.md` and the
+  other files under `.pi/notes/`; none of it is loaded into a lane's context.
+
 ## Non-negotiables
 
 1. **Never modify `orig/RMHE08/**`.** It is the original game data and the ground truth for every diff.
@@ -51,19 +60,12 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    working tree and report what you would commit).
 7. **Never paste `config/RMHE08/symbols.txt` into a prompt/tool output.** It is ~65,700 lines / 4.5 MB.
    Grep it, slice it, or use `dtk`/objdiff; do not print it.
-8. **Never commit the local-only block in this file.** Everything between `<!-- LOCAL-ONLY-BEGIN` and
-   `<!-- LOCAL-ONLY-END -->` (the `## Current task / plan` section) is live agent working state, not repo
-   content. **`land.py` handles it for you**: when CLAUDE.md is in the batch it runs `localonly pull` before
-   the commit and `push` in a `finally`, and it tells the block apart from a real edit
-   (`agents_md_real_change`). So **never run `localonly.py pull` + `git checkout -- CLAUDE.md` by hand** -
-   that checkout silently reverts the real CLAUDE.md edit you are landing; land the batch and let the tool
-   do it. **A plain `git commit` is safe too** (2026-09-28): the pre-commit hook pulls the block out and
-   re-stages CLAUDE.md, and `post-commit` pushes it back (both in `tools/git/hooks/`, and the pending state
-   is `.git/localonly-pending`); if the commit fails, the hook prints the one command that restores the
-   block. Use the tool directly (`python tools/agents/localonly.py pull|push`, skill: `claude-md-local-only`)
-   only for a manual CLAUDE.md commit, and verify a revision with
-   `git show HEAD:CLAUDE.md | grep -c '^<!-- LOCAL-ONLY'` → `0`. (This rule's own prose mentions the
-   markers, so anchor the match at line start; the tool matches whole marker lines for the same reason.)
+8. **`CLAUDE.md` holds no live working state.** It used to carry a gitignored `LOCAL-ONLY` block; that block is
+   retired (archived under `.pi/notes/`, curated into `docs/pipeline.md` and `.pi/state.md`), so `CLAUDE.md` is an
+   ordinary tracked file and a plain `git commit` needs no special handling. Do not put session state, dated
+   snapshots or incident logs in it - they go in `.pi/state.md` or `.pi/notes/`. (The `localonly.py` tool, the
+   pre/post-commit hooks and `land.py`'s block handling are still in the tree and are no-ops without a block until
+   they are removed.)
 
 ## Matching policy: flags and source variants
 
