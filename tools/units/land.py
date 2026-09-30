@@ -327,6 +327,10 @@ def record_base(main: str, units: list[str] | None = None) -> dict:
     # so the snapshot is the base's own objects, not a stale build; `units is None` snapshots every object
     # already present (the manual `record-base` flow, which does not name its units).
     norm = [claims.norm_unit(u.strip("/")) for u in (units or []) if u.strip()]
+    # a unit the batch renames/folds away (declared with --unit-rename OLD=NEW) is registered at the BASE, so its
+    # own objects and references must be in the base snapshot too or the merge onto NEW has nothing to merge
+    if norm:
+        norm = norm + [o for o in UNIT_RENAME_LISTS if o not in norm]
     if norm and os.path.exists(os.path.join(main, "build.ninja")):
         targets = compile_targets(norm)
         if targets:
