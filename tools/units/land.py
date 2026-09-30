@@ -1752,9 +1752,10 @@ def set_allow_orphan(addresses: list[str] | None) -> None:
 
 UNIT_RENAMES: dict[str, str] = {}
 UNIT_RENAME_LISTS: dict[str, list[str]] = {}
+UNIT_SURVIVORS: set[str] = set()   # units named in --units: still registered after the batch, so a donor among them keeps its own entry
 
 
-def set_unit_renames(pairs: list[str] | None) -> None:
+def set_unit_renames(pairs: list[str] | None, survivors: list[str] | None = None) -> None:
     """Record `OLD=NEW` unit renames *this invocation* declares (a batch that `git mv`s or folds registered units).
 
     The base snapshots (undefrefs, orphans) are keyed by unit name, so a renamed unit would read as a NEW
@@ -1766,7 +1767,8 @@ def set_unit_renames(pairs: list[str] | None) -> None:
     fold map) keeps only the OLDs with exactly one target so an explicit pair never narrows a derived map.
     `OLD=` with no NEW says the unit's base entries go with it.
     """
-    global UNIT_RENAMES, UNIT_RENAME_LISTS                                # noqa: PLW0603 - one invocation
+    global UNIT_RENAMES, UNIT_RENAME_LISTS, UNIT_SURVIVORS                # noqa: PLW0603 - one invocation
+    UNIT_SURVIVORS = {claims.norm_unit(u.strip('/')) for u in (survivors or []) if u.strip()}
     lists: dict[str, list[str]] = {}
     for item in pairs or []:
         if "=" in item:
@@ -1791,7 +1793,10 @@ def rename_snapshot_keys(snapshot: dict) -> dict:
         return snapshot
     out: dict = {}
     for k, v in sorted(snapshot.items(), key=lambda kv: kv[0] in UNIT_RENAME_LISTS):      # NEW's own entries first
-        for nk in (UNIT_RENAME_LISTS.get(k) or [k]):
+        targets = list(UNIT_RENAME_LISTS.get(k) or [k])
+        if k in UNIT_SURVIVORS and k not in targets:
+            targets.append(k)
+        for nk in targets:
             if not nk:
                 continue
             if nk not in out:
@@ -3183,6 +3188,9 @@ def selftest() -> int:
     check("unit renames: one OLD onto several NEWs is copied to each; only single-target OLDs reach the data row",
           (UNIT_RENAMES, rename_snapshot_keys({"E/donor": {"refs": ["d"]}, "E/x": {"refs": ["a"]}})),
           ({"E/solo": "E/z"}, {"E/x": {"refs": ["a", "d"]}, "E/y": {"refs": ["d"]}}))
+    set_unit_renames(["E/d=E/x"], ["E/d", "E/x"])
+    check("unit renames: a donor that survives the batch keeps its own entry beside the copy",
+          rename_snapshot_keys({"E/d": {"refs": ["d"]}}), {"E/x": {"refs": ["d"]}, "E/d": {"refs": ["d"]}})
     set_unit_renames(None)
     check("unit renames: none declared leaves the snapshot alone",
           rename_snapshot_keys({"OS/a": {"y": 2}}), {"OS/a": {"y": 2}})
@@ -5114,7 +5122,7 @@ def main() -> int:
             units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
             set_allow_rule10(args.allow_rule10)
             set_allow_rule12(args.allow_rule12)
-            set_unit_renames(args.unit_rename)
+            set_unit_renames(args.unit_rename, units)
             set_allow_orphan(args.allow_orphan)
             return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
@@ -5126,7 +5134,7 @@ def main() -> int:
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         set_allow_rule10(args.allow_rule10)
         set_allow_rule12(args.allow_rule12)
-        set_unit_renames(args.unit_rename)
+        set_unit_renames(args.unit_rename, units)
         set_allow_orphan(args.allow_orphan)
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     allow_rule10=args.allow_rule10,
