@@ -163,13 +163,13 @@ void networkPeer_release(NetworkSingleTcp* self)
 #pragma dont_inline off
 
 /* Registers a peer in the connection's first free slot of four; the slot, or -1 (logged) when full. */
-s32 NetworkSingleTcp_add(NetworkSingleTcp* self, NetworkPeerMcs* peer)
+s32 NetworkSingleTcp::add(NetworkPeerMcs* peer)
 {
     s32 index;
 
     for (index = 0; index < 4; index++) {
-        if (self->peers_10[index] == NULL) {
-            self->peers_10[index] = peer;
+        if (this->peers_10[index] == NULL) {
+            this->peers_10[index] = peer;
             getNetworkLogger()->signal_0C(3, "NetworkSingleTcp::add: %d\n", index);
             return index;
         }
@@ -179,13 +179,13 @@ s32 NetworkSingleTcp_add(NetworkSingleTcp* self, NetworkPeerMcs* peer)
 }
 
 /* Unregisters a peer from the connection (logged when it is not registered). */
-void NetworkSingleTcp_remove(NetworkSingleTcp* self, NetworkPeerMcs* peer)
+void NetworkSingleTcp::remove(NetworkPeerMcs* peer)
 {
     s32 index;
 
     for (index = 0; index < 4; index++) {
-        if (self->peers_10[index] == peer) {
-            self->peers_10[index] = NULL;
+        if (this->peers_10[index] == peer) {
+            this->peers_10[index] = NULL;
             getNetworkLogger()->signal_0C(3, "NetworkSingleTcp::remove: %d\n", index);
             return;
         }
@@ -201,13 +201,13 @@ void networkPeer_clearReceiveBuffer(NetworkSingleTcp* self)
 }
 
 /* Sends bytes on the connection's socket; -1 (logged) when it has none. */
-s32 NetworkSingleTcp_send(NetworkSingleTcp* self, const u8* data, s32 size)
+s32 NetworkSingleTcp::send(const u8* data, s32 size)
 {
-    if (self->handle_04 == NULL) {
+    if (this->handle_04 == NULL) {
         getNetworkLogger()->warn_10("NetworkSingleTcp::send: socket is NULL\n");
         return -1;
     }
-    return self->handle_04->send(data, size, NULL);
+    return this->handle_04->send(data, size, NULL);
 }
 
 /* Same question for the peer class that keeps its socket in the same slot (GUESS: identical body,
@@ -221,10 +221,10 @@ s32 networkPeer_getAvailableToRead(NetworkSocketUser* self)
 }
 
 /* The socket's last error code; 0 when the connection has no socket. */
-s32 NetworkSingleTcp_getError(NetworkSingleTcp* self)
+s32 NetworkSingleTcp::getError()
 {
-    if (self->handle_04 != NULL) {
-        return networkSocketHandle_getLastError(self->handle_04);
+    if (this->handle_04 != NULL) {
+        return networkSocketHandle_getLastError(this->handle_04);
     }
     return 0;
 }
@@ -287,14 +287,14 @@ void networkPeer_releaseSocket(NetworkSingleTcp* self)
 #pragma dont_inline off
 
 /* Forgets the peer that owns an address: its address and its queued bytes (logged). */
-void NetworkMultipleUdp_remove(NetworkMultipleUdp* self, const NetworkPeerAddress* address)
+void NetworkMultipleUdp::remove(const NetworkPeerAddress* address)
 {
     s32 index;
 
     for (index = 0; index < 4; index++) {
-        if (memcmp(&self->addresses_0E[index], address, 6) == 0) {
-            memset(&self->addresses_0E[index], 0, 6);
-            self->used_63C4[index] = 0;
+        if (memcmp(&this->addresses_0E[index], address, 6) == 0) {
+            memset(&this->addresses_0E[index], 0, 6);
+            this->used_63C4[index] = 0;
             getNetworkLogger()->signal_0C(3, "NetworkMultipleUdp::remove: %d.%d.%d.%d:%d\n",
                                           address->ip_00[0], address->ip_00[1], address->ip_00[2], address->ip_00[3],
                                           address->port_04);
@@ -304,36 +304,36 @@ void NetworkMultipleUdp_remove(NetworkMultipleUdp* self, const NetworkPeerAddres
 }
 
 /* Drops the bytes queued for one peer slot (logged when the slot or the socket is invalid). */
-void NetworkMultipleUdp_reset(NetworkMultipleUdp* self, s32 peerIndex)
+void NetworkMultipleUdp::reset(s32 peerIndex)
 {
     if (peerIndex < 0 || 4 <= peerIndex) {
         getNetworkLogger()->warn_10("NetworkMultipleUdp::reset: peer_id is invalid -> %d\n", peerIndex);
         return;
     }
-    if (self->handle_04 == NULL) {
+    if (this->handle_04 == NULL) {
         getNetworkLogger()->warn_10("NetworkMultipleUdp::reset: socket is NULL\n");
         return;
     }
-    self->used_63C4[peerIndex] = 0;
+    this->used_63C4[peerIndex] = 0;
 }
 
 /* Sends bytes to one peer slot's address; -1 (logged) when the slot or the socket is invalid. */
-s32 NetworkMultipleUdp_send(NetworkMultipleUdp* self, s32 peerIndex, const u8* data, s32 size)
+s32 NetworkMultipleUdp::send(s32 peerIndex, const u8* data, s32 size)
 {
     if (peerIndex < 0 || 4 <= peerIndex) {
         getNetworkLogger()->warn_10("NetworkMultipleUdp::send: peer_id is invalid -> %d\n", peerIndex);
         return -1;
     }
-    if (self->handle_04 == NULL) {
+    if (this->handle_04 == NULL) {
         getNetworkLogger()->warn_10("NetworkMultipleUdp::send: socket is NULL\n");
         return -1;
     }
-    return self->handle_04->send(data, size, &self->addresses_0E[peerIndex]);
+    return this->handle_04->send(data, size, &this->addresses_0E[peerIndex]);
 }
 
 /* Takes the two length-prefixed payloads a peer slot has queued into the caller's buffer; 0 when they
    are incomplete or do not fit, -1 (logged) on an invalid slot or socket, else the bytes taken. */
-s32 NetworkMultipleUdp_receive(NetworkMultipleUdp* self, s32 peerIndex, u8* out, s32 capacity)
+s32 NetworkMultipleUdp::receive(s32 peerIndex, u8* out, s32 capacity)
 {
     u16 length;
     u16 length2;
@@ -346,22 +346,22 @@ s32 NetworkMultipleUdp_receive(NetworkMultipleUdp* self, s32 peerIndex, u8* out,
         getNetworkLogger()->warn_10("NetworkMultipleUdp::receive: peer_id is invalid -> %d\n", peerIndex);
         return -1;
     }
-    if (self->handle_04 == NULL) {
+    if (this->handle_04 == NULL) {
         getNetworkLogger()->warn_10("NetworkMultipleUdp::receive: socket is NULL\n");
         return -1;
     }
-    used = &self->used_63C4[peerIndex];
+    used = &this->used_63C4[peerIndex];
     if (*used < 2) {
         return 0;
     }
-    queue = self->received_602[peerIndex];
+    queue = this->received_602[peerIndex];
     memcpy(&length, queue, 2);
     length = getNetworkLogger()->flag_48(length);
     if (length == 0 || length > 0x400) {
         getNetworkLogger()->warn_10("NetworkMultipleUdp::receive: invalid packet %d from %d.%d.%d.%d:%d\n", length,
-                                    self->addresses_0E[peerIndex].ip_00[0], self->addresses_0E[peerIndex].ip_00[1],
-                                    self->addresses_0E[peerIndex].ip_00[2], self->addresses_0E[peerIndex].ip_00[3],
-                                    self->addresses_0E[peerIndex].port_04);
+                                    this->addresses_0E[peerIndex].ip_00[0], this->addresses_0E[peerIndex].ip_00[1],
+                                    this->addresses_0E[peerIndex].ip_00[2], this->addresses_0E[peerIndex].ip_00[3],
+                                    this->addresses_0E[peerIndex].port_04);
         *used = 0;
         return 0;
     }
@@ -400,10 +400,10 @@ s32 getAvailableToRead(NetworkSocketUser* self)
 }
 
 /* The socket's last error code; 0 when the Udp socket has none. */
-s32 NetworkMultipleUdp_getError(NetworkMultipleUdp* self)
+s32 NetworkMultipleUdp::getError()
 {
-    if (self->handle_04 != NULL) {
-        return networkSocketHandle_getLastError(self->handle_04);
+    if (this->handle_04 != NULL) {
+        return networkSocketHandle_getLastError(this->handle_04);
     }
     return 0;
 }

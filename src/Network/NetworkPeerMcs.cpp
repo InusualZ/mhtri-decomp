@@ -120,8 +120,8 @@ s32 NetworkPeerMcs::send(const u8* data, s32 size, const u8* data2, s32 size2, s
     memcpy(networkMcsPacketBuffer, &prefix, 2);
     memcpy(networkMcsPacketBuffer + 2, data, size);
     if ((this->armed_10 == 0 || networkPeer_clearReceiveSocket(this->connection_2428) != 0)
-        && NetworkSingleTcp_send(this->connection_2428, networkMcsPacketBuffer, size + 2) < 0) {
-        error = NetworkSingleTcp_getError(this->connection_2428);
+        && this->connection_2428->send(networkMcsPacketBuffer, size + 2) < 0) {
+        error = this->connection_2428->getError();
         networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, networkPeer_getAvailableToRead(this->connection_2428), error);
         return -1;
     }
@@ -144,7 +144,7 @@ s32 NetworkPeerMcs::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind)
         return 0;
     }
     if (this->armed_10 == 0 && networkPeer_getAvailableToRead(this->connection_2428) != 0) {
-        error = NetworkSingleTcp_getError(this->connection_2428);
+        error = this->connection_2428->getError();
         networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, networkPeer_getAvailableToRead(this->connection_2428), error);
         return -1;
     }
@@ -217,7 +217,7 @@ s32 NetworkPeerMcs::move()
             return -1;
         }
         if (networkPeer_getAvailableToRead(this->connection_2428) != 0) {
-            error = NetworkSingleTcp_getError(this->connection_2428);
+            error = this->connection_2428->getError();
             networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, networkPeer_getAvailableToRead(this->connection_2428), error);
             return -1;
         }
@@ -230,7 +230,7 @@ s32 NetworkPeerMcs::move()
         networkMcsRetryTime = getNetworkLogger()->getTime_60();
         memset(this->work_19, 0, 0x2400);
         this->workUsed_241C = 0;
-        NetworkSingleTcp_add(this->connection_2428, this);
+        this->connection_2428->add(this);
         return 1;
     }
     if (this->connection_2428 == NULL) {
@@ -247,7 +247,7 @@ s32 NetworkPeerMcs::move()
     case 0:
         networkPeer_clearReceiveBuffer(this->connection_2428);
         if (networkPeer_openSocket(this->connection_2428, &this->peerAddress_2420) < 0) {
-            error = NetworkSingleTcp_getError(this->connection_2428);
+            error = this->connection_2428->getError();
             networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, networkPeer_getAvailableToRead(this->connection_2428), error);
             this->state_14 = 0;
             return -1;
@@ -259,14 +259,14 @@ s32 NetworkPeerMcs::move()
     case 1:
         result = networkPeer_closeSocket(this->connection_2428);
         if (result < 0) {
-            error = NetworkSingleTcp_getError(this->connection_2428);
+            error = this->connection_2428->getError();
             networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, networkPeer_getAvailableToRead(this->connection_2428), error);
             this->state_14 = 0;
             return -1;
         }
         if (result > 0) {
             networkMcsRetryTime = getNetworkLogger()->getTime_60();
-            NetworkSingleTcp_send(this->connection_2428, (u8*)this->label_242C, this->labelSize_246C);
+            this->connection_2428->send((u8*)this->label_242C, this->labelSize_246C);
             this->state_14 = 0;
             return 1;
         }
@@ -301,7 +301,7 @@ s32 NetworkPeerMcs::init()
 void NetworkPeerMcs::reset()
 {
     if (this->connection_2428 != NULL) {
-        NetworkSingleTcp_remove(this->connection_2428, this);
+        this->connection_2428->remove(this);
         if (this->armed_10 != 0) {
             networkPeer_release(this->connection_2428);
             networkPeer_clearReceiveBuffer(this->connection_2428);
