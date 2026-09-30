@@ -16,6 +16,7 @@
 #define MHTRI_MENU_MENU_MESSAGE_H
 
 #include "types.h"
+#include "id_value.h"
 
 /* One record of the item-record table `lbl_806BE340` (two blocks of five, 0x130 B each): a validity
  * byte, the short (10-byte) name the list keeps, and the long name at +0x0D.  Field sizes are the
@@ -75,9 +76,13 @@ struct MenuListWork {
     /* +0x007 */ s8 columns_0x007;    /* columns per row */
     /* +0x008 */ u8 unused_0x008[0x00F - 0x008];
     /* +0x00F */ u8 kind_0x00F;       /* 1: the move table, 2: the record table */
-    /* +0x010 */ u8 unused_0x010[0x016 - 0x010];
+    /* +0x010 */ u8 two_page_0x010;  /* set when a slot index of 24 or more addresses `page_b_0x198` */
+    /* +0x011 */ u8 unused_0x011[0x016 - 0x011];
     /* +0x016 */ u8 count_0x016;      /* the list count `menu_list_count_update` recomputes */
-    /* +0x017 */ u8 unused_0x017[0x1BB - 0x017];
+    /* +0x017 */ u8 unused_0x017[0x194 - 0x017];
+    /* +0x194 */ IdValue* page_a_0x194; /* the 24 slots of the first page */
+    /* +0x198 */ IdValue* page_b_0x198; /* the 8 slots of the second page (`two_page_0x010`) */
+    /* +0x19C */ u8 unused_0x19C[0x1BB - 0x19C];
     /* +0x1BB */ u8 list_count_0x1BB; /* the count `menu_list_fill` fills in */
     /* +0x1BC */ u8 unused_0x1BC[0x1BE - 0x1BC];
     /* +0x1BE */ s8 list_0x1BE[0x0A]; /* the ten list ids `menu_list_fill` writes */
@@ -87,12 +92,15 @@ struct MenuListWork {
 
 /* The range's own entry points the neighbouring units call.  `include/unsplit/lobby.h` and
  * `include/lobby/fn_801F3294.h` published them while the band had no registered unit; this range now
- * owns 0x802A6624-0x802AA764 (re-cut from 0x802AD9C0 on 2026-09-29 - see `menu_message.cpp`'s header
- * for the seam and the tail's re-registration recipe), so the declarations live here and both headers
- * include this one
- * (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
+ * owns 0x802A6624-0x802AA764 (re-cut from 0x802AD9C0 on 2026-09-29; the unit header has the open seams),
+ * so the declarations live here and both headers include this one (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
  * parameters are what the retail call sites need: a narrow argument must not be narrowed back to `s16`
- * for the call).  `toggle_word_step` is unwritten - its callers spell it as below. */
+ * for the call).  `toggle_word_step*` take their caller-owned state word untyped; the cursor steps' `moved`
+ * tail is the `u16*` the callers hand in.  The record-typed helpers (`menu_list_*`, `menu_slot_*`,
+ * `menu_item_slot_accepts`, `menu_cursor_column_step`) are not declared here: their consumers still view
+ * the record as their own struct (`MENU_ITEM_W`, `MenuSel`) and declare them locally. */
+struct MenuScroll;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -102,10 +110,20 @@ void draw_dialog_piece(struct _SPR_DATA_* spr, s16 x, s16 y, s16 width, s16 heig
                          const struct _mh_ivec2_* pos);
 void put_frame_dialog(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color);
 
-s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
+s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, u16* moved);
 s32 menu_cursor_step_open_last(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
+s32 menu_cursor_step_forward(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, u16* moved);
 s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
-s32 toggle_word_step(void* state, u16 pad, s32 a, s32 b, s32 c);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
+s16 menu_page_count(s16 a, s16 b);
+s32 menu_cursor_page_move(s16* cursor, s16 max, u16 keys, u16 held, u16* moved);
+void menu_scroll_init(struct MenuScroll* scroll, u16 index, u16 total, u8 rows_per_page);
+void menu_scroll_step(struct MenuScroll* scroll, u16 buttons, s32 sfx);
+void item_pairs_compact_sort(IdValue* pairs, s32 count);
+void item_pages_sort(IdValue* pool, IdValue* page);
+/* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
+s32 toggle_word_step_dpad(void* state, u16 keys, s32 dec_mask, s32 inc_mask);
+/* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
+s32 toggle_word_step(void* state, u16 pad, s32 a, s32 b, s32 c);
 s8* get_item_name_str(u8 index);
 s8* get_player_name_str(u8 index);
 s8* get_group2_name_str(u8 index);

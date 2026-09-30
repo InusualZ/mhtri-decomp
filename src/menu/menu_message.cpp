@@ -1,160 +1,61 @@
 /*
  * menu/menu_message.cpp - the menu band's list/cursor layer and its message helpers.
  *
- * `.text` 0x802A6624-0x802AA764 (71 functions, 16704 B), extab 0x800137D4-0x8001398C (55 8-byte
- * records) and extabindex 0x8003123C-0x800314D0 (55 12-byte records, one per framed function), from
- * `proposal/802A6624_fn_802A6624.cpp`.  The range was **cut** at 0x802AA764 on 2026-09-29 by
- * `worker/menu-seam-recut-4622` - see the seam note below - and the cut took the `.ctors`
- * 0x8056F374-0x8056F37C words with it, because both name tail functions.
+ * `.text` 0x802A6624-0x802AA764 (71 functions, 16704 B), extab 0x800137D4-0x8001398C and extabindex
+ * 0x8003123C-0x800314D0 (55 records each, one per framed function), `.data` 0x805CE00C-0x805CE040.
+ * 48 of 71 rows written, 42 byte-identical, 23 unwritten; objdiff unit metric 44.78 %; still `NonMatching`.
+ * The object emits no `.sdata`: the target's `.sdata` reads (`"%d"` 0x807922A0, `"%s"` 0x807922A4/0x807922A8)
+ * belong to bodies that are not written yet.
  *
- * Module `menu`: the left neighbour is `menu/menu_item.cpp`, the range calls into it
- * (`GetItemData__FUs`, `get_menu_lsp_tbl__FUs`) and its own entry points are the menu's
- * (`put_message`, `put_frame_dialog`, `GetMenuFontColor`, the list/cursor entry points).  File name:
- * derived (class 3 + class 4).  Class 1 and class 2 are both empty - no `__FILE__` string covers the range
- * (the only one in this `.data` run is `menu_item.cpp` at 0x805CDFC8, referenced from
- * 0x802A5444/0x802A579C/0x802A64B0, i.e. the range before this one) and the runtime dump answers
- * `zz_XXXXXXXX_` for every unnamed row here - so the name comes from what the range does and is
- * MARKED GUESS: the selection list and its cursor, and the message/frame dialog the window puts up.
- * The unit was registered at the map's stem and re-homed to `menu/menu_message.cpp` +
- * `include/menu/menu_message.h` on 2026-09-29 by `worker/menu-num-8725` (the gate refuses a unit
- * registered at a generated file name).
+ * Provenance: registered from `proposal/802A6624_fn_802A6624.cpp` and re-homed here on 2026-09-29; the name is
+ * a GUESS from what the range does (the selection list and its cursor, the message/frame dialog) - no
+ * `__FILE__` string covers it.  The right edge was cut at 0x802AA764 (the tail is the gunner-shell layer, see
+ * `.pi/notes/menu-message-4d56.md` for the cut, the unwind-run partition and the tail's recipe).
  *
- * Seam: unproven.  Discovery's own warning says the edge is `--max-bytes`'s cap, not a TU boundary,
- * and the two neighbouring proposals (0x802A5444 and my start) are one run.  The band's first block
- * is the *same object* `menu_item.h` calls `MenuSlot` (the kind byte at +0x0F, the count at +0x16),
- * and the `.bss` table `lbl_806BE340` is referenced from both this range and 0x802A5E64 in the
- * proposal before it - so the cut is very likely through one translation unit.  This unit keeps the
- * proposal's extent because a worker may not re-cut a claim, and reuses the offsets rather than
- * inventing a type (`include/menu/menu_message.h` says which).  The right edge was re-cut (below);
- * **this left edge is still unproven and still the proposal's**.
+ * Seams, both open: the left edge is the proposal's own (`lbl_806BE340` is also read from the range before it,
+ * and the first block is `menu_item.h`'s `MenuSlot`); the two `"%s"` copies (0x807922A4 read from 0x802A78F4 and
+ * 0x802A7B0C, 0x807922A8 read only at 0x802AA078..0x802AA234) cannot both exist in one TU under `-str reuse`, so
+ * a boundary very likely lies somewhere in 0x802A7B80..0x802A9F48.  Not acted on; only data whose referrers all
+ * lie below 0x802A7B80 is claimed here (the `.data` table above), and the `"%d"`/`"%s"` `.sdata` claim was tried
+ * and dropped (it reclassifies `menu_infomation.cpp`'s three `lbl_80792BE*` externs from rule 12 to rule 2).
  *
- * Second seam, **decided and cut** at 0x802AA764 on 2026-09-29 by `worker/menu-seam-recut-4622`.
- * The trailing block (`pull_shell_work` 0x802AA764 to `fn_802AD9A8`) is **not the menu module**: it
- * is the player's gunner-shell pool and actor layer - `_SHELL_W` (the 0x10C record `include/ef.h`
- * documents; `push_shell_work` `memset`s exactly 0x10C), pool `lbl_806AD698`, and `yure_move` is
- * called from `Pl/fn_80288CEC.cpp`, `charmake_move` and `arena_game_task`.  Because no `__FILE__`
- * string and no pooled literal covers the range the boundary could not be settled from the data;
- * `tudiscover.py at 0x802AA764` reports only weak signals, so the cut is the orchestrator's ruling
- * on that behavioural evidence.  It is a **pure re-attribution**: the trailing half was left
- * unclaimed, so dtk re-created its own `auto_*` units for it, and only ownership moved - the
- * project's `matched_code` (609052), `matched_data` (24544) and every function count are unchanged,
- * the DOL SHA-1 is unchanged, and all 19 of this unit's byte-identical rows kept their score *and*
- * their unit.
+ * GUESS names (from the body, not pinned by a caller): `menu_page_count` (ceil-divide of a count by a page
+ * size, 0 divisor reported as 1), `menu_text_*center_x*`, `menu_item_pick_seek`, `item_pair*`/`item_pages_*`,
+ * `menu_slot_*`, `get_group2_name_str`, `menu_item_row_sprite_ids`; the cursor page move's 0x04/0x08 bits as
+ * "first"/"last" is a guess too.
  *
- * The two unwind runs were partitioned **by function**, not by size.  `extabindex` carries one
- * 12-byte record per framed function (`{fn_addr, fn_size, etab_addr}` in function-address order) and
- * `extab` is 1:1 with it at 8 bytes each - record `i`'s `etab_addr` is `0x800137D4 + 8*i`, which is
- * what makes the split exact.  The record whose `fn_addr` is `pull_shell_work__FUl` (0x802AA764) is
- * index **55**, so this unit keeps records 0-54 (extab 440 B, extabindex 660 B) and the tail's 48
- * records went with it: extab 0x8001398C-0x80013B0C (384 B) and extabindex
- * 0x800314D0-0x80031710 (576 B), tiling exactly.  The old `.ctors` claim could not stay either -
- * both of its words name tail functions (`fn_802ABC4C`, `fn_802AD9A8`) and `dtk dol split` refuses
- * the mismatch outright (`Mismatched splits for .ctors 4:0x8056F374 and function 3:0x802ABC4C`) -
- * so this unit now owns the two unwind runs and nothing else.  0x802AA764 is a clean function
- * boundary (`fn_802AA6A8`, 188 B, ends exactly there).
+ * Load-bearing source shapes (MWCC 1.3 allocation, measured): a `++x` / `x--` statement instead of
+ * `x = x + 1` keeps a narrow local in place (`menu_cursor_move`, `menu_frame_entries_build`,
+ * `menu_cursor_page_move`); declaring a local and assigning it later, in the target's register order, decides
+ * which callee-saved register it gets (`item_pairs_compact_sort`, `menu_item_pick_seek`,
+ * `menu_text_block_center_x`); `menu_frame_entries_build_row` is a four-iteration `for`, not four unrolled
+ * blocks; a pooled `u16` result needs the `u16` variable, not a cast (`menu_slot_find`).
  *
- * Re-registration recipe for the tail - a future lane's unit, deliberately **not** created here,
- * because registering it would oblige its 38 unnamed `fn_*` rows (of 68) to be named in the same
- * change (rule 7).  Range: one unit over `.text` 0x802AA764-0x802AD9C0 (12892 B, 68 rows), extab
- * 0x8001398C-0x80013B0C, extabindex 0x800314D0-0x80031710 (48 records) and `.ctors`
- * 0x8056F374-0x8056F37C - dtk's `auto_*` units tile those four runs exactly today, so `splits.txt`
- * only has to claim them.  Language: C.  Module and name: derive them; the evidence is `_SHELL_W` in
- * `include/ef.h` (`push_shell_work` memsets 0x10C), the shell pool `lbl_806AD698`, and the callers
- * `Pl/fn_80288CEC.cpp` (`yure_move`), `charmake_move` and `arena_game_task`.  The map already carries
- * the `shell_*`/`serial_*`/`niku_*`/`yure_move` family names, so the remaining `fn_*` stems take
- * their names from that context - what each one stores into `_SHELL_W`, which pool it walks, who
- * calls it - and the field names they touch mean extending `include/ef.h` (its +0x030..+0x10C run is
- * one pad block).
+ * Residuals (non-identical written rows).
+ *   * `menu_page_count` 76.67: target `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B); the
+ *     parameter copies land in other registers (five shapes measured).
+ *   * `menu_list_fill` 90.91: register-only - the target keeps `self` in r30 and the record pointer in r29
+ *     (ours the other way) and computes each `id` extension before the record test; 520 vs 528 B.
+ *   * `menu_scroll_init` 95.00: an inverted branch and a dropped `b` in the target's order, 116 vs 120 B.
+ *   * `GetMenuFontColor` 95.59: the target keeps the inner `if (b == 1)` arm as a plain `bne` + `blr` where MWCC
+ *     folds the same source into a conditional return, one instruction shorter (four shapes measured, all fold).
+ *   * `item_pairs_shell_sort` 98.06 and `menu_frame_page_draw` 98.75: allocation-only (the latter keeps two
+ *     locals in the highest callee-saved registers where the target keeps parameters).
+ *   * Unwritten bodies are blocked by (a) `.data` reads no claim covers yet (`dialog_piece_uv_tbl` 0x805CE0A0,
+ *     `lbl_805CE160`/`lbl_805CE180`/`lbl_805CE18C`, `lbl_805CE090`, the 0x805CE040..0x805CE07C blobs - second half,
+ *     unproven), (b) `.sdata2` 120.0f at 0x8079A3F8 (sole referrer `fn_802AA4F4`), (c) callees no header declares
+ *     with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `fn_802E1320`, `get_rare_color`, `draw_number_idx`,
+ *     `fn_8027993C`/`fn_80279B84`, the font cluster: `font_print` is `char*` in `unsplit/menu.h` where the map's
+ *     variadic `font_print__FPSce` has `crclr`).
+ *   * rule-2 debt: `menu/menu_item.cpp`, `menu/fn_8031A6C0.cpp` and `lobby/fn_801EC9F8.cpp` still declare the
+ *     record-typed entry points (`menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`, `menu_cursor_column_step`)
+ *     locally because they view the record as `MENU_ITEM_W` / `MenuSel`, not `MenuListWork`; folding the views is a
+ *     separate change.  `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h` declare `menu_cursor_step` as
+ *     a C++ five-argument function while this range owns 0x802A8EFC and the target spells it bare.
  *
- * Naming note: the symbol map still has only `fn_XXXXXXXX` for 34 of this range's 71 symbols (the
- * range's named rows are the `menu_*` names this file derived plus the
- * `put_message`/`put_frame_dialog`/`GetMenuFontColor`/`get_*_str` family the runtime dump carries, and
- * the 34 unnamed ones are all unwritten).  2026-09-29: no `fn_XXXXXXXX` this file
- * **defines** is left generated.  The list/cursor block became `menu_list_mode_get`,
- * `menu_list_count_update`, `menu_list_fill`, `menu_list_names_set`, `menu_cursor_move`,
- * `menu_cursor_seek`, `menu_cursor_column_step`; the frame/page draw block `menu_frame_entries_build`,
- * `menu_frame_entries_build_row`, `menu_frame_draw_page`, `menu_frame_page_draw`,
- * `menu_frame_row_draw`, `menu_frame_draw_blocks`; the item-row draw block `menu_item_row_draw`,
- * `menu_item_row_draw_by_lsp`, `menu_item_row_draw_values`, `menu_item_row_draw_pages`,
- * `menu_hold_row_draw_by_lsp`; the pad-driven walk `menu_cursor_wrap`,
- * `menu_cursor_step_fixed_tail`/`_open_last`/`_forward` (an arity family that differs only in the
- * tail arguments it fixes - MARKED GUESS), `toggle_word_step`, `toggle_word_step_dpad`.  The rows
- * added with this pass's bodies are named from their callers: `get_item_name_str`,
- * `get_player_name_str` and `get_digit_str` are the item / player-slot / digit-glyph groups
- * `ef/eft050.cpp` indexes, while `get_group2_name_str`'s group is not pinned and keeps an index name
- * (MARKED GUESS); `draw_dialog_piece` + `dialog_piece_uv_tbl` are the dialog's frame-piece draw and
- * its uv table, and the bodies are pending the `.data` claim below.  `fn_802A8F14` (the `s16`
- * ceiling divide) KEEPS its generated name on purpose - `include/Pl/pl_skill.h` +
- * `src/Pl/pl_skill.cpp` call it and `Pl/` is outside this lane's write scope.
- *
- * Reconstructed: the menu list/cursor layer, the palette getters, the four string-table accessors
- * and the system dialog's OK-button row - 19 of the 71 rows are byte-identical, 1596 of 16704
- * `.text` bytes (9.55460 %), unit metric 21.49952 % (it was 12.13434 % over the pre-cut 29596 B -
- * the metric rose because the denominators shrank, not because a row moved: `matched_code` is 1596
- * before and after).  Rows the naming pass added: `GetMenuFontColorRed`
- * 0 -> 100, `GetMenuIconColor` 0 -> 100, `get_item_name_str`/`get_player_name_str`/
- * `get_group2_name_str`/`get_digit_str` 0 -> 100 each, `put_message_sys_ok_button__Fv` 0 -> 100,
- * `GetMenuFontColor` 0 -> 95.59.  Every pre-existing row measures exactly what it did before.
- *
- * Residuals, biggest first.
- *   * The `.data` blocker this pass found - `draw_dialog_piece` (132 B) and `put_frame_dialog`
- *     (504 B) are derived but NOT in the source: their bodies read `dialog_piece_uv_tbl` at
- *     0x805CE0A0, which no registered `splits.txt` range covers (only an analyzer `auto_*_data` unit
- *     does), so an `extern` for it would be a rule-12 finding.  The fix is to claim the `.data` run
- *     in this unit's own `splits.txt` and define the 0xC0 bytes - measured before and after, because
- *     a `.data` claim can drop the target's pool relocations (playbook 23/78).  The same run holds
- *     `lbl_805CE160`/`lbl_805CE180`/`lbl_805CE18C` (`fn_802A907C`, 304 B), `lbl_805CE090`
- *     (`fn_802AA68C`, 28 B) and the 0x805CE040..0x805CE07C blobs those pointers name, so one claim
- *     unblocks ~1.3 KB of bodies - it is the first follow-up.
- *   * `GetMenuFontColor` 95.59259: the target keeps the inner `if (b == 1)` arm as a plain
- *     `bne <else>` + `blr` where MWCC folds the same source into a conditional return, one
- *     instruction shorter than the target.  Four shapes were measured (`if`/`else`, `if` + `return`,
- *     a ternary, and the negated `if (b != 1)`) - all four fold; the negated one scores highest
- *     (95.59) because it puts the two colour bodies in the target's order.  Flag-shaped or a
- *     block-ordering pass, not reachable from the source side with this unit's flags so far.
- *   * `put_message` (284 B) + `put_message_sys` (180 B) need the font cluster
- *     (`font_print`/`font_locate`/`flfntSetColor`), whose band home `include/unsplit/menu.h` spells
- *     `font_print(char*)` while the map's own name is the variadic `font_print__FPSce` and the target
- *     call site carries `crclr 4*cr1+eq`.  That one declaration is consumed by every unit including
- *     the band header, so fixing it is its own change (the relocation-name class).
- *   * `toggle_word_step` (280 B) + `toggle_word_step_dpad` (20 B) are fully derived but unwritten:
- *     `toggle_word_step`'s declaration reaches 49 call sites in `lobby/` units through
- *     `include/unsplit/lobby.h`, and the retail call sites narrow three of its five parameters to
- *     `u16` where the header spells them `s32` - writing it means re-measuring those units.
- *   * rule-2 debt left: `src/lobby/fn_801EC9F8.cpp`, `include/lobby/fn_8020C588.h` and
- *     `src/menu/menu_item.cpp` still declare `toggle_word_step`/`toggle_word_step_dpad` locally
- *     rather than including this unit's header (swept to the new names, and given rule-11 markers for
- *     the shared untyped state word).  `src/hud/layout.cpp` + `src/hud/move_work_update.cpp` name the
- *     unit by its old path in prose; both are outside this lane's write scope.
- *
- * Declaration linkage (2026-09-29): every callee the written bodies call is declared the way the map
- * spells it - `extern "C"` for a bare row (`strcpy`, `fn_802A9BB8`, `eft052_page_counts_get` and the
- * two `menu_frame_*` writers, whose forward declarations must also carry the definition's parameter
- * list) and global C++ scope for a mangled one (`PutPageArrow`, whose owner's signature
- * `include/ai/fn_802D44F4.h` carries, and `get_lsp_data`/`get_wide_offset`, which moved out of
- * `include/hud/layout.h`'s `extern "C"` block).  A declaration in that block emits the bare stem,
- * which no link input defines; the object's relocations now spell the target's names name for name,
- * and the change is codegen-neutral (0 of 2189 unit rows moved, DOL hash unchanged).
- *
- * The 52 unwritten bodies, by block (the shell/serial/niku block that used to be the third one left
- * with the cut - a shell-layer owner is the re-registration recipe above, not this unit):
- *   * `fn_802A6F64`-`fn_802A7CC8` (0x408/0x1B8/0x314/0x140/0x40/0x1C8/0x84/0x40/0x84/0x358 B): the
- *     frame/message page writers.  `fn_802A6F64` and `fn_802A7524` are half-written as declarations
- *     only - their bodies are the two biggest in the block and need the `_SPR_DATA_` record (the
- *     `draw_dialog_piece` + `.data` claim item above).
- *   * `put_frame_dialog`-`fn_802AA6A8` (0x1F8..0xBC B, 20 rows): the `put_message`/`put_frame_dialog`
- *     page layer.  Written call sites are needed first: their bodies build `_SPR_DATA_` copies and call
- *     the variadic `font_print_ex(s16, s16, s16, char*, ...)`, whose `crclr 4*cr1+eq` the target
- *     carries.
- *   * known non-byte-identical rows: `menu_list_fill` 82.76 (the two-block list fill - the retail loop
- *     is unrolled five-fold with constant displacements and our `for` over `rec[0x130 * j]` is not),
- *     `fn_802A8F14` 76.67 (the ceiling-divide helper: same instruction sequence, the allocator swaps
- *     the two parameters' registers), `menu_cursor_move` 97.58, `menu_frame_page_draw` 97.57,
- *     `menu_frame_entries_build_row` 89.14, `menu_item_row_draw_pages` 90.91.
- *   * rule-2 note: `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h` declare
- *     `menu_cursor_step` as a C++ five-argument function; this range owns 0x802A8EFC and the target
- *     object's relocations spell it bare, so both declarations want moving to this unit's header
- *     (they cannot be included here - `(10597) illegal function overloading`).
+ * Declaration linkage: every callee the written bodies call is declared the way the map spells it -
+ * `extern "C"` for a bare row and global C++ scope for a mangled one (`PutPageArrow`, `get_lsp_data`,
+ * `get_wide_offset`, `flfntStrLen`); a declaration in an `extern "C"` block emits the bare stem.
  *
  * Inventory and evidence: `python tools/units/ledger.py unit menu/menu_message.cpp`.
  */
@@ -165,6 +66,9 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "ef/fn_800CDB2C.h"
 #include "menu/menu_message.h"
+#include "menu/menu_item.h"
+#include "g3d/g3d_anmchr.h"
+#include "fn_80047398.h"
 #include "hud/layout.h"
 #include "menu/get_pop_dat_ptr.h"
 
@@ -177,7 +81,6 @@ extern "C" char* strcpy(char* dst, const char* src);
  * --------------------------------------------------------------------------------------------------- */
 
 extern "C" u32 quest_move_state_valid_ck(void);
-extern "C" s32 menu_cursor_wrap(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g);
 
 /* The HUD's 2D element library (`hud/layout.h`, its owner's header) supplies the `_mh_ivec2_` /
  * `_SPR_DATA_` records and every `draw_*`/`put_*` entry this range calls, so none of them is
@@ -186,26 +89,29 @@ extern "C" s32 menu_cursor_wrap(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g)
 
 void sysSE_req(long id);
 u8** get_str_tbl(long index);
-u16* get_menu_lsp_tbl(u16 idx);
 u8* get_move_work_adrs(u8 kind);
 s32 get_move_work_max(u8 kind);
-extern "C" void fn_802A9BB8(void* dst, const void* src);
 extern "C" void menu_frame_draw_blocks(void* dst, void* src, s8 a, s8 b, u16 c, s32 d, struct _mh_ivec2_* e);
-extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, s32 d, u8 e);
+extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 d, u8 e);
 
 /* The two source tables the list is built from (map symbols, unclaimed - playbook 29). */
 extern MenuSourceRecord lbl_806BE340[10];   /* 2 x 5 records: validity byte + two names */
 
-/* The two draw helpers that sit in no registered range, so the declaration is this unit's call
+/* The draw helper that sits in no registered range, so the declaration is this unit's call
  * sites' (rule 2's unsplit case - the address bands interleave, so `include/unsplit/<module>.h` has
  * no sound module to move them to). */
 void PutPageArrow(u16* table, s16 a, s16 b, u16 flags, const struct _mh_ivec2_* pos, u8 mode);
-void font_flush(void);
+
+/* The sprite-id run (terminated by 0xFFFF) `menu_item_row_draw_values` hands to `draw_sprite_ary` (`.data` 0x805CE00C). */
+u16 menu_item_row_sprite_ids[26] = {
+    0x00A9, 0x00AA, 0x0089, 0x00A4, 0x008B, 0x00A5, 0x00A6, 0x00A7,
+    0x008F, 0x00A8, 0x0093, 0x00AB, 0x00AC, 0x00B2, 0x00B3, 0x00B4,
+    0x00B5, 0x00B6, 0x00B7, 0x00B8, 0x00B9, 0x009D, 0x00AD, 0x00AE,
+    0xFFFF, 0x0000
+};
 
 /* This unit's own bodies, in address order. */
 extern "C" void menu_frame_row_draw(s32 select, u32* dst, void* entry, s32 flags, struct _mh_ivec2_* pos);
-extern "C" s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
-extern "C" s16 fn_802A8F14(s16 a, s16 b);
 extern "C" void menu_item_row_draw(u16* item, struct _mh_ivec2_* pos);
 extern "C" void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
 extern "C" void eft052_page_counts_get(u16 id, s32* a, s32* b, s32* c);
@@ -261,43 +167,44 @@ extern "C" u8 menu_list_count_update(MenuListWork* self)
 /* Fills the list at +0x1BE from the active kind's table, skipping the currently selected index, and
  * stores the count.  Kind 2 walks two blocks of five records of the item table, kind 1 the move
  * table's variable-length block.  A negative index means "the current selection". */
-extern "C" u8 menu_list_fill(MenuListWork* self, s8 index_)
+extern "C" u8 menu_list_fill(MenuListWork* self, s32 index)
 {
     s8* dst = self->list_0x1BE;
-    s8 index = index_;
 
     self->list_count_0x1BB = 0;
     if (self->kind_0x00F == 2) {
         u8* rec = (u8*)&lbl_806BE340[0];
-        int block;
+        s8 pick;
         s8 id;
+        s32 block;
 
-        if (index_ < 0) {
+        if ((s8)index < 0) {
             index = my_player_no();
         }
         id = 0;
+        pick = index;
         for (block = 0; block < 2; block++) {
-            if (rec[0] != 0 && id != index) {
+            if (rec[0] != 0 && id != pick) {
                 self->list_count_0x1BB++;
                 *dst++ = id;
             }
             id++;
-            if (rec[0x130] != 0 && id != index) {
+            if (rec[0x130] != 0 && id != pick) {
                 self->list_count_0x1BB++;
                 *dst++ = id;
             }
             id++;
-            if (rec[0x260] != 0 && id != index) {
+            if (rec[0x260] != 0 && id != pick) {
                 self->list_count_0x1BB++;
                 *dst++ = id;
             }
             id++;
-            if (rec[0x390] != 0 && id != index) {
+            if (rec[0x390] != 0 && id != pick) {
                 self->list_count_0x1BB++;
                 *dst++ = id;
             }
             id++;
-            if (rec[0x4C0] != 0 && id != index) {
+            if (rec[0x4C0] != 0 && id != pick) {
                 self->list_count_0x1BB++;
                 *dst++ = id;
             }
@@ -307,14 +214,16 @@ extern "C" u8 menu_list_fill(MenuListWork* self, s8 index_)
     } else if (self->kind_0x00F == 1) {
         u8* rec = get_move_work_adrs(2);
         s8 count;
+        s8 pick;
         s32 i;
 
-        if (index_ < 0) {
+        if ((s8)index < 0) {
             index = my_player_no();
         }
         count = get_move_work_max(2);
+        pick = index;
         for (i = 0; i < count; i++) {
-            if (rec[0] != 0 && rec[8] != index) {
+            if (rec[0] != 0 && rec[8] != pick) {
                 self->list_count_0x1BB++;
                 *dst++ = rec[8];
             }
@@ -369,13 +278,13 @@ extern "C" void menu_cursor_move(MenuListWork* self, s8 step)
 
         if ((input & 4) != 0) {
             self->step_0x002 = 4;
-            cursor = cursor - 1;
+            cursor--;
             if (cursor < 0) {
                 cursor = self->rows_0x005 - 1;
             }
         } else {
             self->step_0x002 = 8;
-            cursor = cursor + 1;
+            cursor++;
             if (cursor >= self->rows_0x005) {
                 cursor = 0;
             }
@@ -414,7 +323,7 @@ extern "C" void menu_cursor_column_step(MenuListWork* self)
 }
 
 /* Builds the list of two 0x60-byte entry blocks the message frame draws from: copies the 0x60-byte
- * source into a work buffer, folds it through `fn_802A9BB8`, marks each of the eight entries with its
+ * source into a work buffer, folds it through `item_pages_sort`, marks each of the eight entries with its
  * ordinal and whether its source slot is in use, then hands the lot to `menu_frame_draw_blocks` with the LSP
  * position the `flags` word selects.  `mode` 1 adds the 0x800 bit to the draw flags. */
 extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
@@ -423,12 +332,14 @@ extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 ls
     u16 mask[0x10];
     u16 work[0x30];
     MenuListEntry entries[8];
-    MenuListEntry* entry = entries;
+    u16* pair;
+    MenuListEntry* entry;
     u16* p;
-    s32 flags = 0x20;
-    s16 index = 0;
-    int block;
+    s32 index;
+    s32 block;
+    s32 flags;
 
+    flags = 0x20;
     if (mode == 1) {
         flags |= 0x800;
     }
@@ -438,42 +349,42 @@ extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 ls
         memcpy(mask, src_b, 0x20);
         p = mask;
     }
-    fn_802A9BB8(work, p);
+    item_pages_sort((IdValue*)work, (IdValue*)p);
+    pair = work;
+    entry = entries;
+    index = 0;
     for (block = 0; block < 2; block++) {
         entry[0].index_0x06 = index;
         entry[0].field_0x01 = 0;
-        if (p[0] != 0) {
+        if (pair[0] != 0) {
             entry[0].present_0x02 = 1;
         } else {
             entry[0].present_0x02 = 0;
         }
-        index++;
-        entry[1].index_0x06 = index;
+        entry[1].index_0x06 = ++index;
         entry[1].field_0x01 = 0;
-        if (p[2] != 0) {
+        if (pair[2] != 0) {
             entry[1].present_0x02 = 1;
         } else {
             entry[1].present_0x02 = 0;
         }
-        index++;
-        entry[2].index_0x06 = index;
+        entry[2].index_0x06 = ++index;
         entry[2].field_0x01 = 0;
-        if (p[4] != 0) {
+        if (pair[4] != 0) {
             entry[2].present_0x02 = 1;
         } else {
             entry[2].present_0x02 = 0;
         }
-        index++;
-        entry[3].index_0x06 = index;
+        entry[3].index_0x06 = ++index;
         entry[3].field_0x01 = 0;
-        if (p[6] != 0) {
+        if (pair[6] != 0) {
             entry[3].present_0x02 = 1;
         } else {
             entry[3].present_0x02 = 0;
         }
         index++;
+        pair += 8;
         entry += 4;
-        p += 8;
     }
     get_lsp_data(lsp_index, (struct _mh_ivec2_*)lsp);
     menu_frame_draw_blocks(work, entries, 1, kind, 0, flags, (struct _mh_ivec2_*)lsp);
@@ -486,9 +397,10 @@ extern "C" void menu_frame_entries_build_row(void* unused, u16* src_a, u16* src_
 {
     s16 lsp[2];
     u16 mask[0x10];
-    MenuListEntry entries[4];
     u16 work[0x30];
+    MenuListEntry entries[4];
     u16* p;
+    s32 i;
 
     memcpy(work, src_a, 0x60);
     p = src_b;
@@ -496,34 +408,15 @@ extern "C" void menu_frame_entries_build_row(void* unused, u16* src_a, u16* src_
         memcpy(mask, src_b, 0x20);
         p = mask;
     }
-    fn_802A9BB8(work, p);
-    entries[0].index_0x06 = 0;
-    entries[0].field_0x01 = 0;
-    if (p[0] != 0) {
-        entries[0].present_0x02 = 1;
-    } else {
-        entries[0].present_0x02 = 0;
-    }
-    entries[1].index_0x06 = 1;
-    entries[1].field_0x01 = 0;
-    if (p[2] != 0) {
-        entries[1].present_0x02 = 1;
-    } else {
-        entries[1].present_0x02 = 0;
-    }
-    entries[2].index_0x06 = 2;
-    entries[2].field_0x01 = 0;
-    if (p[4] != 0) {
-        entries[2].present_0x02 = 1;
-    } else {
-        entries[2].present_0x02 = 0;
-    }
-    entries[3].index_0x06 = 3;
-    entries[3].field_0x01 = 0;
-    if (p[6] != 0) {
-        entries[3].present_0x02 = 1;
-    } else {
-        entries[3].present_0x02 = 0;
+    item_pages_sort((IdValue*)work, (IdValue*)p);
+    for (i = 0; i < 4; i++) {
+        entries[i].index_0x06 = i;
+        entries[i].field_0x01 = 0;
+        if (work[i * 2] != 0) {
+            entries[i].present_0x02 = 1;
+        } else {
+            entries[i].present_0x02 = 0;
+        }
     }
     get_lsp_data(lsp_index, (struct _mh_ivec2_*)lsp);
     menu_frame_page_draw((u32*)work, entries, 0, kind, 0, 0x20, mode);
@@ -542,7 +435,7 @@ extern "C" void menu_frame_draw_page(void* a, void* b, s8 c, s8 d, u16 e, s32 f)
  * anchor position, the per-kind offset and a row stride of 26 pixels, then walks the four entries
  * of the block `menu_frame_entries_build`/`menu_frame_entries_build_row` filled.  `mode` 0..2 selects the page style; anything
  * else is a no-op. */
-extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, s32 flags_in, u8 mode)
+extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 flags_in, u8 mode)
 {
     MenuLspPos pos;
     MenuLspPos rows;
@@ -550,26 +443,26 @@ extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 
     u16 flags;
     u16* tbl;
     s32 select;
-    s16 dx;
-    s16 dy;
-    s32 flags_ = flags_in;
+    u32 flags_ = flags_in;
     s32 i;
+    s16 dy;
+    s16 dx;
 
-    get_lsp_data(get_menu_lsp_tbl(361)[mode], (struct _mh_ivec2_*)&pos);
+    get_lsp_data(((u16*)get_menu_lsp_tbl(361))[mode], (struct _mh_ivec2_*)&pos);
     base = (MenuLspPos*)get_lsp_data(3936, 0);
     dx = pos.x - base->x;
     dy = pos.y - base->y;
     switch (flags_in & 3) {
     case 0:
-        tbl = get_menu_lsp_tbl(362);
+        tbl = (u16*)get_menu_lsp_tbl(362);
         select = 2;
         break;
     case 1:
-        tbl = get_menu_lsp_tbl(363);
+        tbl = (u16*)get_menu_lsp_tbl(363);
         select = 3;
         break;
     case 2:
-        tbl = get_menu_lsp_tbl(364);
+        tbl = (u16*)get_menu_lsp_tbl(364);
         select = 3;
         break;
     default:
@@ -583,10 +476,10 @@ extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 
     if ((flags_in & 0x10) != 0) {
         flags |= 8;
     }
-    PutPageArrow(get_menu_lsp_tbl(365), a, b, flags, (struct _mh_ivec2_*)&pos, 0);
+    PutPageArrow((u16*)get_menu_lsp_tbl(365), a, b, flags, (struct _mh_ivec2_*)&pos, 0);
     base = (MenuLspPos*)get_lsp_data(3961, 0);
-    rows.x = base->x + dx;
-    rows.y = base->y + dy;
+    rows.x = dx + base->x;
+    rows.y = dy + base->y;
     if (c != 0) {
         flags_ |= 1024;
     }
@@ -607,11 +500,44 @@ extern "C" void menu_item_row_draw_by_lsp(u16 id, u16* item)
     menu_item_row_draw(item, (struct _mh_ivec2_*)&pos);
 }
 
+/* Steps `value` down when `keys` holds the `dec_mask` bits and up when it holds `inc_mask`, wrapping inside
+ * [0, count); plays the SE (unless it is -1) and reports the mask that moved it through `*moved`. */
+extern "C" s32 menu_cursor_wrap(s32 value, s32 count, u16 keys, u16 dec_mask, u16 inc_mask, s32 sfx, u16* moved)
+{
+    u16 mask = 0;
+
+    if (count > 1) {
+        if ((keys & dec_mask) != 0) {
+            if (sfx != -1) {
+                sysSE_req(sfx);
+            }
+            mask = dec_mask;
+            value--;
+            if (value < 0) {
+                value = count - 1;
+            }
+        } else if ((keys & inc_mask) != 0) {
+            if (sfx != -1) {
+                sysSE_req(sfx);
+            }
+            mask = inc_mask;
+            value++;
+            if (value >= count) {
+                value = 0;
+            }
+        }
+    }
+    if (moved != NULL) {
+        *moved = mask;
+    }
+    return value;
+}
+
 /* The four forwarders onto `menu_cursor_wrap`'s cursor step, each supplying a different tail of the
  * argument list; the wrapped index they report is what the menu's column cursor stores. */
-extern "C" s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f)
+extern "C" s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, u16* moved)
 {
-    return menu_cursor_wrap(a, b, c, d, e, 3, f);
+    return menu_cursor_wrap(a, b, c, d, e, 3, moved);
 }
 
 /* Same step with the sixth argument zeroed. */
@@ -621,9 +547,9 @@ extern "C" s32 menu_cursor_step_open_last(s32 a, s32 b, u16 c, u16 d, u16 e, s32
 }
 
 /* Same step, both tail arguments passed through. */
-extern "C" s32 menu_cursor_step_forward(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, s32 g)
+extern "C" s32 menu_cursor_step_forward(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, u16* moved)
 {
-    return menu_cursor_wrap(a, b, c, d, e, f, g);
+    return menu_cursor_wrap(a, b, c, d, e, f, moved);
 }
 
 /* Same step with the two fixed tail values 3 and 0 - the entry point the cursor call sites use. */
@@ -633,7 +559,7 @@ extern "C" s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e)
 }
 
 /* Ceiling of `a / b`, with b == 0 reported as 1. */
-extern "C" s16 fn_802A8F14(s16 a, s16 b)
+extern "C" s16 menu_page_count(s16 a, s16 b)
 {
     s16 q;
 
@@ -647,15 +573,66 @@ extern "C" s16 fn_802A8F14(s16 a, s16 b)
     return q + 1;
 }
 
+/* Steps a two-state selector (`*state` is 0 or 1) from the pad word `keys`: 0x10 confirms (1 when the state was
+ * 0, else 2) and 0x20 selects state 1 (2 when it already was), while `dec_mask` / `inc_mask` move it to 0 / 1.
+ * The move SE is skipped for `sfx` 0xFFFE.  Returns 0 when it only moved. */
+/* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
+extern "C" s32 toggle_word_step(void* state, u16 keys, s32 dec_mask, s32 inc_mask, s32 sfx)
+{
+    s32* word = (s32*)state;
+
+    if ((keys & 0x10) != 0) {
+        if (*word == 0) {
+            if ((u16)sfx < 0xFFFE) {
+                sysSE_req(0);
+            }
+            return 1;
+        }
+        if ((u16)sfx != 0xFFFE) {
+            sysSE_req(0);
+        }
+        return 2;
+    }
+    if ((keys & 0x20) != 0) {
+        if (*word != 1) {
+            *word = 1;
+            sysSE_req(1);
+        } else {
+            if ((u16)sfx != 0xFFFE) {
+                sysSE_req(1);
+            }
+            return 2;
+        }
+    } else if ((keys & (u16)dec_mask) != 0) {
+        if (*word != 0) {
+            *word = 0;
+            sysSE_req(3);
+        }
+    } else if ((keys & (u16)inc_mask) != 0) {
+        if (*word != 1) {
+            *word = 1;
+            sysSE_req(3);
+        }
+    }
+    return 0;
+}
+
+/* The pad-only form of `toggle_word_step`: no SE override. */
+/* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
+extern "C" s32 toggle_word_step_dpad(void* state, u16 keys, s32 dec_mask, s32 inc_mask)
+{
+    return toggle_word_step(state, keys, (u16)dec_mask, (u16)inc_mask, 0);
+}
+
 /* The item row at the position the caller supplies: `eft052_page_counts_get` yields the row's two value words
  * (the second already summed), which the `menu_item_row_draw_values` page routine draws.  A null or empty item is
  * skipped. */
 extern "C" void menu_item_row_draw_pages(u16* item, struct _mh_ivec2_* pos)
 {
-    s32 value = 0;
+    s32 value;
     s32 low;
     s32 high;
-    s32 sum = 0;
+    s32 sum;
 
     if (item != NULL) {
         if (item[0] != 0) {
@@ -676,6 +653,496 @@ extern "C" void menu_hold_row_draw_by_lsp(u16 id, u16* item)
 
     get_lsp_data(id, (struct _mh_ivec2_*)&pos);
     menu_item_row_draw_pages(item, (struct _mh_ivec2_*)&pos);
+}
+
+/* Moves the 1-based cursor `*cursor` inside [1, max] from the pad word `keys` (bits 0x04 / 0x08 jump to the
+ * first / last entry) and the held word `held` (bits 0x01 / 0x02 step up / down), plays the move SE and
+ * reports the bit that moved it through `*moved`.  Returns 1 for the 0x10 button, 2 for the 0x20 one. */
+extern "C" s32 menu_cursor_page_move(s16* cursor, s16 max, u16 keys, u16 held, u16* moved)
+{
+    s32 result = 0;
+
+    *moved = 0;
+    if ((keys & 0x10) != 0) {
+        *moved = 0x10;
+        result = 1;
+    } else if ((keys & 0x20) != 0) {
+        *moved = 0x20;
+        result = 2;
+    } else if ((keys & 4) != 0) {
+        if (*cursor != 1) {
+            *cursor = 1;
+            *moved = 4;
+            sysSE_req(3);
+        }
+    } else if ((keys & 8) != 0) {
+        if (max != *cursor) {
+            *cursor = max;
+            *moved = 8;
+            sysSE_req(3);
+        }
+    } else if ((held & 1) != 0) {
+        if (*cursor < max) {
+            (*cursor)++;
+            *moved = 1;
+            sysSE_req(3);
+        }
+    } else if ((held & 2) != 0) {
+        if (*cursor > 1) {
+            (*cursor)--;
+            *moved = 2;
+            sysSE_req(3);
+        }
+    }
+    return result;
+}
+
+/* Sets the scroll record up for `total` entries at `rows_per_page` rows a page with the cursor on the flat
+ * entry `index`: the page count, the last page's row count, and the cursor's page/row split. */
+extern "C" void menu_scroll_init(MenuScroll* scroll, u16 index, u16 total, u8 rows_per_page)
+{
+    s32 rows;
+    s32 pages;
+    s32 page;
+    u8 limit;
+
+    scroll->index = index;
+    scroll->rows_per_page = rows_per_page;
+    rows = rows_per_page;
+    pages = (u8)((total + rows - 1) / rows);
+    scroll->col_count = pages;
+    limit = total - rows * (pages - 1);
+    scroll->field_0x007 = limit;
+    page = index / rows;
+    scroll->col = page;
+    scroll->row = index % rows;
+    if (page < pages - 1) {
+        limit = rows;
+    }
+    scroll->row_limit = limit;
+    scroll->move_flags = 0;
+}
+
+/* Moves the scroll cursor from the pad word `buttons`: bits 0x04 / 0x08 turn the page (wrapping, playing the
+ * `sfx` SE), bits 0x01 / 0x02 move the row inside the page (wrapping, SE 3); the move bits go to
+ * `move_flags` and the flat index is recomputed. */
+extern "C" void menu_scroll_step(MenuScroll* scroll, u16 buttons, s32 sfx)
+{
+    s16 col;
+    s16 row;
+    u8 limit;
+
+    scroll->move_flags = 0;
+    row = scroll->row;
+    col = scroll->col;
+    if ((buttons & 0xC) != 0 && scroll->col_count > 1) {
+        if ((buttons & 4) != 0) {
+            col--;
+            if (col < 0) {
+                col = scroll->col_count - 1;
+            }
+            scroll->move_flags |= 4;
+        } else {
+            col++;
+            if (col >= scroll->col_count) {
+                col = 0;
+            }
+            scroll->move_flags |= 8;
+        }
+        if (col >= scroll->col_count - 1) {
+            limit = scroll->field_0x007;
+        } else {
+            limit = scroll->rows_per_page;
+        }
+        scroll->row_limit = limit;
+        if (row >= limit) {
+            row = limit - 1;
+            scroll->row = row;
+        }
+        scroll->col = col;
+        sysSE_req(sfx);
+    } else if ((buttons & 3) != 0) {
+        limit = scroll->row_limit;
+        if (limit > 1) {
+            if ((buttons & 1) != 0) {
+                row--;
+                if (row < 0) {
+                    row = limit - 1;
+                }
+                scroll->move_flags |= 1;
+            } else {
+                row++;
+                if (row >= limit) {
+                    row = 0;
+                }
+                scroll->move_flags |= 2;
+            }
+            sysSE_req(3);
+        }
+        scroll->row = row;
+    }
+    scroll->index = row + scroll->rows_per_page * col;
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * The text-centring helpers and the item-pair list layer (0x802A9508..0x802A9E20).
+ * --------------------------------------------------------------------------------------------------- */
+
+/* The x a single line of text starts at so that it is centred on `center`: half the line's width, where
+ * a glyph is `size / 2` wide. */
+extern "C" s16 menu_text_center_x(char* text, s32 center, s16 size)
+{
+    return center - (size * flfntStrLen(text)) / 4;
+}
+
+/* The x a line starts at when its glyph cells are `size` apart, so a line of n glyphs spans n - 1 gaps. */
+extern "C" s16 menu_text_center_x_by_gaps(char* text, s32 center, s16 size)
+{
+    return center - (size * (flfntStrLen(text) - 1)) / 2;
+}
+
+/* The x a block of newline-separated lines starts at so that its widest line is centred on `center`;
+ * stores the number of lines in `*out_lines` when the caller wants it. */
+extern "C" s16 menu_text_block_center_x(char* text, s32 center, s16 size, s16* out_lines)
+{
+    s32 lines;
+    s32 widest;
+    char* start;
+
+    start = text;
+    lines = 0;
+    widest = 0;
+    while (*text != 0) {
+        s32 width;
+
+        text = flfntStrChr(text, 10);
+        lines++;
+        if (text != NULL) {
+            width = text - start;
+            start = text;
+        } else {
+            width = flfntStrLen(start);
+        }
+        if (width < 0) {
+            width = -width;
+        }
+        if (widest < width) {
+            widest = width;
+        }
+        if (text == NULL) {
+            break;
+        }
+        text++;
+    }
+    if (out_lines != NULL) {
+        *out_lines = lines;
+    }
+    return center - (widest >> 1) * (size >> 1);
+}
+
+/* The next list slot from the player's current pick that holds an item the pick may land on (one whose
+ * record has the pickable bit and is not kind 1), walking the 26 slots once; stores it as the new pick.
+ * Returns -1 when the list is empty. */
+extern "C" s32 menu_item_pick_seek(_PLW* plw, IdValue* pairs)
+{
+    s32 left;
+    u32 slot = plw->field_0x304;
+    s32 filled;
+
+    if (pairs[slot].id != 0) {
+        return (s16)slot;
+    }
+    left = 0x1A;
+    filled = 0;
+    do {
+        if (pairs[slot].id != 0) {
+            ItemDataRecord* record;
+
+            filled++;
+            record = GetItemData(pairs[slot].id);
+            if ((record->field_0x002 & 8) != 0 && record->kind_0x00 != 1) {
+                plw->field_0x304 = slot;
+                return (s16)slot;
+            }
+        }
+        slot++;
+        if (slot >= 0x1A) {
+            slot = 0;
+        }
+        left--;
+    } while (left != 0);
+    return -(filled == 0);
+}
+
+/* The sort key of one list slot: 0 for an empty slot, else the item record's sort word in the high half
+ * over the item id. */
+extern "C" u32 item_pair_sort_key(IdValue* pair)
+{
+    u32 key = 0;
+
+    if (pair->id != 0) {
+        u32 hi = GetItemData(pair->id)->sort_order_0x006 << 16;
+
+        key = hi + pair->id;
+    }
+    return key;
+}
+
+/* Shell-sorts the first `count` slots by their sort key, ties broken by the larger count first. */
+extern "C" void item_pairs_shell_sort(IdValue* pairs, u32 count)
+{
+    s32 gap = 1;
+    IdValue pivot;
+
+    while (gap < count) {
+        gap = gap * 3 + 1;
+    }
+    gap /= 3;
+    while (gap >= 1) {
+        u32 i;
+
+        for (i = gap; i < count; i++) {
+            u32 key;
+            s32 j;
+
+            item_pair_copy(&pivot, &pairs[i]);
+            key = item_pair_sort_key(&pivot);
+            for (j = i - gap; j >= 0; j -= gap) {
+                u32 other = item_pair_sort_key(&pairs[j]);
+
+                if (other > key || (other == key && pivot.value > pairs[j].value)) {
+                    item_pair_copy(&pairs[j + gap], &pairs[j]);
+                } else {
+                    break;
+                }
+            }
+            item_pair_copy(&pairs[j + gap], &pivot);
+        }
+        gap /= 3;
+    }
+}
+
+/* Compacts the first `count` slots so every filled one comes first (each hole takes the next filled slot's
+ * place), then orders the filled run with `item_pairs_shell_sort`. */
+extern "C" void item_pairs_compact_sort(IdValue* pairs, s32 count)
+{
+    IdValue* slot = pairs;
+    IdValue* next;
+    s32 left;
+    s32 filled;
+
+    filled = 0;
+    left = count;
+    while (left != 0) {
+        if (slot->id != 0) {
+            filled++;
+        } else {
+            s32 remaining;
+
+            next = slot + 1;
+            remaining = left - 1;
+            for (; remaining != 0; remaining--, next++) {
+                if (next->id != 0) {
+                    item_pair_copy(slot, next);
+                    next->id = 0;
+                    next->value = 0;
+                    filled++;
+                    break;
+                }
+            }
+        }
+        left--;
+        slot++;
+    }
+    item_pairs_shell_sort(pairs, filled);
+}
+
+/* Inserts `*pair` into the 8-slot ordered `table`: the first empty slot takes it, otherwise it displaces the
+ * first slot it sorts before and the displaced pairs ripple down.  `*pair` is cleared when it found a place
+ * and holds the pair pushed off the end when the table was full. */
+extern "C" void item_pair_table_insert(IdValue* pair, IdValue* table)
+{
+    IdValue carry;
+    IdValue next;
+    IdValue* slot = table;
+    s32 i = 0;
+    s32 j;
+
+    for (; i < 8; i++, slot++) {
+        if (slot->id == 0) {
+            item_pair_copy(slot, pair);
+            pair->id = 0;
+            pair->value = 0;
+            return;
+        }
+        if (pair->id <= slot->id && (pair->id != slot->id || pair->value >= slot->value)) {
+            item_pair_copy(&carry, slot);
+            item_pair_copy(slot, pair);
+            j = i + 1;
+            slot++;
+            for (; j < 8; j++, slot++) {
+                if (slot->id == 0) {
+                    item_pair_copy(slot, &carry);
+                    pair->id = 0;
+                    pair->value = 0;
+                    return;
+                }
+                item_pair_copy(&next, slot);
+                item_pair_copy(slot, &carry);
+                item_pair_copy(&carry, &next);
+            }
+            item_pair_copy(pair, &carry);
+            return;
+        }
+    }
+}
+
+/* Folds the 8-slot `page` and the kind-1 items of the 24-slot `pool` into one ordered page, writes that back
+ * to `page`, and compacts the pool. */
+extern "C" void item_pages_merge(IdValue* pool, IdValue* page)
+{
+    IdValue merged[8];
+    IdValue* slot;
+    s32 i;
+
+    merged[0].id = 0;
+    merged[0].value = 0;
+    merged[1].id = 0;
+    merged[1].value = 0;
+    merged[2].id = 0;
+    merged[2].value = 0;
+    merged[3].id = 0;
+    merged[3].value = 0;
+    merged[4].id = 0;
+    merged[4].value = 0;
+    merged[5].id = 0;
+    merged[5].value = 0;
+    merged[6].id = 0;
+    merged[6].value = 0;
+    merged[7].id = 0;
+    merged[7].value = 0;
+    slot = page;
+    for (i = 0; i < 8; i++, slot++) {
+        if (slot->id != 0) {
+            item_pair_table_insert(slot, merged);
+        }
+    }
+    slot = pool;
+    for (i = 0; i < 24; i++, slot++) {
+        if (slot->id != 0 && GetItemData(slot->id)->kind_0x00 == 1) {
+            item_pair_table_insert(slot, merged);
+        }
+    }
+    memcpy(page, merged, 0x20);
+    item_pairs_compact_sort(pool, 24);
+}
+
+/* Orders a 24-slot item pool: on its own when there is no second page, else together with that page. */
+extern "C" void item_pages_sort(IdValue* pool, IdValue* page)
+{
+    if (page == NULL) {
+        item_pairs_compact_sort(pool, 24);
+    } else {
+        item_pages_merge(pool, page);
+    }
+}
+
+/* The slot code of `id` in the item lists: the index of its slot in the 9-slot `page` with the 0x80 bit set
+ * when it is there, else its index in the 24-slot `pool`, else 0xFF. */
+extern "C" u16 item_slot_code_find(IdValue* pool, IdValue* page, u16 id)
+{
+    s32 index = item_pair_index_find(id, page, 9);
+
+    if (index >= 0) {
+        return (u16)index | 0x80;
+    }
+    index = item_pair_index_find(id, pool, 24);
+    if (index >= 0) {
+        return (u16)index;
+    }
+    return 0xFF;
+}
+
+/* Whether slot `index` addresses the second page (only a two-page list has one, from slot 24 on). */
+extern "C" s32 menu_slot_index_is_page_b(MenuListWork* self, s16 index)
+{
+    if (self->two_page_0x010 != 0 && index >= 24) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the item may go in slot `index`: anything but a kind-1 item is refused on the second page. */
+extern "C" u32 menu_item_slot_accepts(MenuListWork* self, u16 id, s16 index)
+{
+    if (GetItemData(id)->kind_0x00 != 1 && menu_slot_index_is_page_b(self, index) != 0) {
+        return 0;
+    }
+    return 1;
+}
+
+/* The list slot `index` names: the first page's, or the second page's from slot 24 on. */
+extern "C" IdValue* menu_slot_get(MenuListWork* self, s16 index)
+{
+    if (self->two_page_0x010 != 0 && index >= 24) {
+        return &self->page_b_0x198[index - 24];
+    }
+    return &self->page_a_0x194[index];
+}
+
+/* The slot index of item `id` (first page 0-23, second page 24-31), or 0xFF when it is in neither. */
+extern "C" s16 menu_slot_find(MenuListWork* self, u16 id)
+{
+    IdValue* slot = self->page_a_0x194;
+    u16 index = 0;
+    s32 group;
+
+    for (group = 0; group < 3; group++) {
+        if (slot[0].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[1].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[2].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[3].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[4].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[5].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[6].id == id) {
+            return index;
+        }
+        index++;
+        if (slot[7].id == id) {
+            return index;
+        }
+        index++;
+        slot += 8;
+    }
+    if (self->two_page_0x010 != 0) {
+        s32 i;
+
+        slot = self->page_b_0x198;
+        for (i = 0; i < 8; i++, slot++) {
+            if (slot->id == id) {
+                return i + 24;
+            }
+        }
+    }
+    return 0xFF;
 }
 
 /* ---------------------------------------------------------------------------------------------------

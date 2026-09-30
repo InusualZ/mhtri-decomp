@@ -52,6 +52,8 @@
  * the callee declarations live in this file (plain prototypes, one shared-file request each).
  */
 #include "types.h"
+#include "id_value.h"
+#include "menu/menu_message.h"
 
 #include "Runtime.PPCEABI.H/memset.h"
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
@@ -88,12 +90,10 @@ typedef struct LbDigitPane {
     /* +0x1D */ u8 done_0x1D;
 } LbDigitPane; /* size: 0x1E (the extent this range reads) */
 
-/* The 0x194-byte item list `fn_801ECF74` builds at `LbListPane::items_0x3B8`; the two words at +0x190
- * are the list's own tail flags. */
+/* The 0x194-byte item list `fn_801ECF74` builds at `LbListPane::items_0x3B8`: 0x65 id/value pairs, the last
+ * of which the rebuild loop clears before every re-insert. */
 typedef struct LbItemList {
-    /* +0x000 */ u8 entries_0x000[0x190];
-    /* +0x190 */ s16 tail_a_0x190;
-    /* +0x192 */ s16 tail_b_0x192;
+    /* +0x000 */ IdValue entries_0x000[0x65];
 } LbItemList; /* size: 0x194 */
 
 /* The item-list pane `fn_801ED688`/`fn_801EE1E4` walk and `fn_801ECF74` fills: the cursor pair, the
@@ -111,9 +111,9 @@ typedef struct LbListPane {
     /* +0x018 */ s16 column_0x018;      /* the cursor column */
     /* +0x01A */ u8 column_sub_0x01A;   /* the 8-step column pair `menu_cursor_step` walks */
     /* +0x01B */ u8 column_sub_max_0x01B;
-    /* +0x01C */ s16 move_0x01C;        /* the pad-driven 4-step state at +0x1C (menu_cursor_step_fixed_tail's base) */
+    /* +0x01C */ u16 move_0x01C;        /* the pad-driven 4-step state at +0x1C (menu_cursor_step_fixed_tail's base) */
     /* +0x01E */ s16 move_max_0x01E;
-    /* +0x020 */ s16 entry_0x020;       /* the 4-step state at +0x20 (fn_802A91AC's cursor base) */
+    /* +0x020 */ s16 entry_0x020;       /* the 4-step state at +0x20 (menu_cursor_page_move's cursor base) */
     /* +0x022 */ s16 entry_max_0x022;
     /* +0x024 */ u16 item_id_0x024;
     /* +0x026 */ u8 active_0x026;       /* the "confirm is open" latch `fn_801ED56C` waits on */
@@ -122,12 +122,6 @@ typedef struct LbListPane {
     /* +0x030 */ u8 unused_0x030[0x388];
     /* +0x3B8 */ LbItemList items_0x3B8; /* the 0x65-entry list `fn_801ECF74` fills */
 } LbListPane; /* size: 0x54C (the extent this range reads) */
-
-/* One 4-byte row of the item database's slot table at +0x180. */
-typedef struct LbItemSlot {
-    /* +0x00 */ u16 id_0x00;
-    /* +0x02 */ s16 value_0x02;
-} LbItemSlot; /* size: 0x4 */
 
 /* The equipment work block `LbListPane::data_0x010` points at: the working eight-item id/kind run and
  * the backup run `fn_801ED284` copies it into. */
@@ -178,10 +172,10 @@ typedef struct LbMenuPanel {
 } LbMenuPanel; /* size: 0x10 (the extent this range reads) */
 
 /* The lobby work block (`lobby_w`, 0x806AAB44, 0x17C bytes in the map).  This range reads the menu
- * pointer and the two u16 counters `fn_802A91AC` takes. */
+ * pointer and the two u16 counters `menu_cursor_page_move` takes. */
 typedef struct LbLobbyRoot {
     /* +0x000 */ u8 unused_0x000[0x84];
-    /* +0x084 */ u16 count_0x084;      /* the item count `fn_802A91AC` takes as its pad argument */
+    /* +0x084 */ u16 count_0x084;      /* the item count `menu_cursor_page_move` takes as its pad argument */
     /* +0x086 */ u16 count_b_0x086;
     /* +0x088 */ u8 unused_0x088[0x24];
     /* +0x0AC */ LbMenuPanel* menu_0x0AC;
@@ -207,7 +201,7 @@ typedef struct LbItemDb {
     /* +0x008E */ s16 sub_0x8E;
     /* +0x0090 */ s16 sub_0x90;
     /* +0x0092 */ u8 unused_0x0092[0xEE];
-    /* +0x0180 */ LbItemSlot slots_0x180[0x320]; /* the slot table the item calls index */
+    /* +0x0180 */ IdValue slots_0x180[0x320]; /* the slot table the item calls index */
     /* +0x0E00 */ LbEquipRec equip_0x0E00[0x100]; /* the 0xC-byte equipment records */
 } LbItemDb; /* size: 0x1A00+ (only the runs this range indexes are named) */
 
@@ -269,26 +263,26 @@ extern u8 jumptable_805B8B98[0x2C];
 extern "C" {
 /* The lobby UI API.  Signatures are the caller-side ones the call sites imply (the callee is
  * `NonMatching` in every case, so the width a call site uses is what its codegen needs). */
-s32 item_pair_copy(LbItemSlot* dst, const LbItemSlot* src);
+s32 item_pair_copy(IdValue* dst, const IdValue* src);
 s32 fn_8004A20C(LbEquipRec* dst, const LbEquipRec* src);
 u16 fn_8004AE70(LbItemDb* db);
 s16 fn_8004AE98(LbItemDb* db);
 u32 fn_8004AEC0(LbItemDb* db, void* p);
 s16 fn_8004AF0C(u8 side);
 s16 fn_8004AF20(LbItemDb* db);
-LbItemSlot* fn_8004AF60(LbItemDb* db, u8 side);
-LbItemSlot* fn_8004AF78(LbItemDb* db);
+IdValue* fn_8004AF60(LbItemDb* db, u8 side);
+IdValue* fn_8004AF78(LbItemDb* db);
 u16 fn_8004AFC8(LbItemDb* db, s16 index);
 s16 fn_8004AFFC(LbItemDb* db, s16 index);
 s32 fn_8004B460(LbItemDb* db, u8 side);
 s16 fn_8004B624(LbItemDb* db, u16 id);
 s16 fn_8004B7B0(u16 id, void* slots, u16 count);
-s16 fn_8004BA00(u16 id, LbItemSlot* base, s16 count);
+s16 item_pair_index_find(u16 id, IdValue* base, s16 count);
 s32 item_take(u16 id, s16 a, void* p, s32 b, s32 c, s32 d);
 void fn_8004BBEC(LbItemDb* db, u16 id, s16 a, u8 side, s32 b);
 s32 fn_8004BD30(void* p);
 s32 fn_8004BD58(void* dst, u16 count, u16 id, s16 v, void* tmp);
-s32 fn_8004B870(LbItemSlot* slots, u16 index, s16 delta);
+s32 fn_8004B870(IdValue* slots, u16 index, s16 delta);
 s32 fn_8004BEA4(u16 id, s16 a, s16* out);
 s32 fn_8004BF28(void* dst, u16 count);
 u16 fn_8004C004(void* slots, u16 count);
@@ -323,14 +317,6 @@ void fn_80219590(void* p, void* a);
 s32 fn_8021B7EC(s32 a);
 s32 fn_802738E8(s32 a);
 s32 fn_8027EFB4(u8 kind);
-s16 menu_cursor_step_fixed_tail(u8 value, u8 max, u16 pad, s32 step, s32 step2, void* state);
-s32 menu_cursor_step_forward(u8 value, u8 max, u16 pad, s32 a, s32 b, s32 c, void* state);
-s16 menu_cursor_step(s16 value, s16 max, u16 pad, s32 step, s32 step2);
-u8 fn_802A8F14(s16 value, s32 max);
-s32 toggle_word_step(void* state, u16 pad, s32 a, s32 b, s32 c);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
-s32 fn_802A91AC(void* state, s16 index, u16 pad, u16 value, void* step);
-void fn_802A98BC(void* list, u16 count);
-void fn_802A9BB8(LbItemSlot* p);
 s32 fn_802BBAC4(s32 a);
 s32 fn_8031BFEC(void* p, s32 a, s32 b);
 s32 fn_8031C028(void* p, u16 a);
@@ -460,7 +446,7 @@ void fn_801ECD50(LbDigitPane* self)
     self->phase_0x00 = 0;
     self->sub_0x01 = 0;
     self->digit_hundreds_0x02 = 0;
-    self->digit_hundreds_max_0x03 = fn_802A8F14(fn_8004AE70(lbl_80794880), 100);
+    self->digit_hundreds_max_0x03 = menu_page_count(fn_8004AE70(lbl_80794880), 100);
     self->stepper_0x04 = 0;
     self->anim_0x0E = 0;
     self->timer_0x10 = 0;
@@ -484,7 +470,7 @@ void fn_801ECDD4(LbDigitPane* self)
         }
     } else if (fn_8021213C(0x300) != 0) {
         self->digit_hundreds_0x02 = menu_cursor_step_forward(self->digit_hundreds_0x02, self->digit_hundreds_max_0x03,
-                                                fn_802122E8(), 0x100, 0x200, 6, &self->flags_0x08);
+                                                             fn_802122E8(), 0x100, 0x200, 6, &self->flags_0x08);
         if ((self->flags_0x08 & 0x100) != 0) {
             self->blink_a_0x12 = 0;
         }
@@ -527,7 +513,7 @@ void fn_801ECEF0(LbDigitPane* self)
 /* Rebuilds the pane's 101-entry item list from the database's slot table. */
 void fn_801ECF74(LbListPane* self)
 {
-    LbItemSlot* slot;
+    IdValue* slot;
     LbItemList* list;
     LbEquipRec tmp;
     u16 count;
@@ -538,17 +524,17 @@ void fn_801ECF74(LbListPane* self)
     memset(list, 0, 404);
     i = 0;
     do {
-        fn_8004BD58(list, 101, slot->id_0x00, slot->value_0x02, &tmp);
+        fn_8004BD58(list, 101, slot->id, slot->value, &tmp);
         i++;
         slot++;
     } while (i < 101U);
-    fn_802A98BC(list, 101);
+    item_pairs_compact_sort(list->entries_0x000, 101);
     count = fn_8004AE70(lbl_80794880);
     for (; i < count; i++, slot++) {
-        list->tail_a_0x190 = 0;
-        list->tail_b_0x192 = 0;
-        fn_8004BD58(list, 101, slot->id_0x00, slot->value_0x02, &tmp);
-        fn_802A98BC(list, 101);
+        list->entries_0x000[0x64].id = 0;
+        list->entries_0x000[0x64].value = 0;
+        fn_8004BD58(list, 101, slot->id, slot->value, &tmp);
+        item_pairs_compact_sort(list->entries_0x000, 101);
     }
 }
 
@@ -574,7 +560,7 @@ s32 fn_801ED048(LbDigitPane* self, LbListPane* list)
     case 1:
         count = fn_8004AE70(lbl_80794880);
         fn_8004BF28(&lbl_80794880->slots_0x180[0], count);
-        fn_802A98BC(&lbl_80794880->slots_0x180[0], count);
+        item_pairs_compact_sort(&lbl_80794880->slots_0x180[0], count);
         self->active_0x1C = 0;
         self->digit_ones_0x0A = 0;
         self->digit_tens_0x0C = 0;
@@ -637,12 +623,12 @@ void fn_801ED284(LbListPane* self)
     }
     if (fn_8004AEC0(lbl_80794880, cfg) == 1U) {
         self->side_0x005 = 1;
-        self->row_sub_max_0x017 = fn_802A8F14(fn_8004AF0C(1U), 8);
-        self->column_sub_max_0x01B = fn_802A8F14(fn_8004AF0C(0U), 8);
+        self->row_sub_max_0x017 = menu_page_count(fn_8004AF0C(1U), 8);
+        self->column_sub_max_0x01B = menu_page_count(fn_8004AF0C(0U), 8);
     } else {
         self->side_0x005 = 0;
-        self->row_sub_max_0x017 = fn_802A8F14(fn_8004AF0C(0U), 8);
-        self->column_sub_max_0x01B = fn_802A8F14(fn_8004AF0C(1U), 8);
+        self->row_sub_max_0x017 = menu_page_count(fn_8004AF0C(0U), 8);
+        self->column_sub_max_0x01B = menu_page_count(fn_8004AF0C(1U), 8);
     }
     self->move_0x01C = 0;
     self->active_0x026 = 0;
@@ -672,7 +658,7 @@ void fn_801ED464(LbListPane* self)
     fn_8004BBEC(lbl_80794880, id, self->entry_0x020, side, 1);
     fn_8004BBEC(lbl_80794880, id, -self->entry_0x020, self->side_0x005, 1);
     limit = fn_8004AF0C(side);
-    v = fn_8004BA00(id, fn_8004AF60(lbl_80794880, side), limit);
+    v = item_pair_index_find(id, fn_8004AF60(lbl_80794880, side), limit);
     self->entry_max_0x022 = v;
     self->column_sub_0x01A = v / 8;
 }
@@ -695,7 +681,8 @@ s32 fn_801ED56C(LbListPane* self, u8 arg)
 {
     s32 result;
     u8 side;
-    LbItemSlot* off;
+    IdValue* pool;
+    IdValue* off;
 
     if (self->active_0x026 == 0) {
         if (fn_8021213C(0x40) == 1U) {
@@ -714,12 +701,13 @@ s32 fn_801ED56C(LbListPane* self, u8 arg)
         } else {
             side = self->side_0x005 == 0;
         }
+        pool = fn_8004AF60(lbl_80794880, side);
         if (side == 1) {
-            off = &fn_8004AF60(lbl_80794880, side)[0x18];
+            off = &pool[0x18];
         } else {
             off = 0;
         }
-        fn_802A9BB8(off);
+        item_pages_sort(pool, off);
         self->active_0x026 = 0;
         sysSE_req(0);
         break;
@@ -792,12 +780,12 @@ s32 fn_801ED688(LbListPane* self, u8 arg)
             self->row_0x014 = menu_cursor_step(self->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             self->row_sub_0x016 = menu_cursor_step_fixed_tail(self->row_sub_0x016, self->row_sub_max_0x017,
-                                             fn_802122AC(), 4, 8, &self->move_0x01C);
+                                                              fn_802122AC(), 4, 8, &self->move_0x01C);
         }
         break;
     case 1:
-        r = fn_802A91AC(&self->entry_0x020, self->move_max_0x01E, lobby_w.count_0x084,
-                        fn_802122AC(), &self->move_0x01C);
+        r = menu_cursor_page_move(&self->entry_0x020, self->move_max_0x01E, lobby_w.count_0x084,
+                                  fn_802122AC(), &self->move_0x01C);
         switch (r) {
         case 1:
             self->phase_0x001 += 1;
@@ -827,13 +815,13 @@ s32 fn_801ED688(LbListPane* self, u8 arg)
 /* The affordable count of the slot's item. */
 s16 fn_801ED9E4(s16 index)
 {
-    LbItemSlot* slot;
+    IdValue* slot;
     s16 limit;
     s16 value;
 
     slot = &lbl_80794880->slots_0x180[index];
-    limit = fn_8004B624(lbl_80794880, slot->id_0x00);
-    value = slot->value_0x02;
+    limit = fn_8004B624(lbl_80794880, slot->id);
+    value = slot->value;
     if (limit < value) {
         value = limit;
     }
@@ -843,13 +831,13 @@ s16 fn_801ED9E4(s16 index)
 /* The affordable count of the `index`-th entry of the side's own slot table. */
 s16 fn_801EDA34(u16 index, u8 side)
 {
-    LbItemSlot* slot;
+    IdValue* slot;
     s16 limit;
     s16 value;
 
     slot = &fn_8004AF60(lbl_80794880, side == 0)[index];
-    limit = fn_8004B624(lbl_80794880, slot->id_0x00);
-    value = slot->value_0x02;
+    limit = fn_8004B624(lbl_80794880, slot->id);
+    value = slot->value;
     if (limit < value) {
         return limit;
     }
@@ -886,11 +874,11 @@ u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
     if (slot_id != 0) {
         data = GetItemData(slot_id);
         limit = fn_8004AF0C(side);
-        if (fn_8004BA00(item_id, fn_8004AF60(lbl_80794880, side), limit) >= 0x18 && *data != 1) {
+        if (item_pair_index_find(item_id, fn_8004AF60(lbl_80794880, side), limit) >= 0x18 && *data != 1) {
             return 2;
         }
         limit = fn_8004AF0C(side);
-        if (fn_8004BA00(slot_id, fn_8004AF60(lbl_80794880, side), limit) >= 0) {
+        if (item_pair_index_find(slot_id, fn_8004AF60(lbl_80794880, side), limit) >= 0) {
             return 3;
         }
     }
@@ -900,8 +888,8 @@ u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
 /* The item-selection step machine driven by the digit entry (pick / drag / confirm). */
 s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
 {
-    LbItemSlot tmp;
-    LbItemSlot* slots;
+    IdValue tmp;
+    IdValue* slots;
     s32 result;
     s16 value;
     s16 index;
@@ -925,17 +913,17 @@ s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
             self->pick_0x16 = index;
             if (index > 0) {
                 limit = fn_8004AF20(lbl_80794880);
-                move = fn_8004BA00(lbl_80794880->slots_0x180[self->cursor_0x1A].id_0x00,
+                move = item_pair_index_find(lbl_80794880->slots_0x180[self->cursor_0x1A].id,
                                    fn_8004AF78(lbl_80794880), limit);
                 list->entry_max_0x022 = move;
-                list->item_id_0x024 = lbl_80794880->slots_0x180[self->cursor_0x1A].id_0x00;
+                list->item_id_0x024 = lbl_80794880->slots_0x180[self->cursor_0x1A].id;
                 if (move < 0) {
                     self->phase_0x00 += 1;
                     limit = fn_8004AF20(lbl_80794880);
-                    move = fn_8004BA00(0, fn_8004AF78(lbl_80794880), limit);
+                    move = item_pair_index_find(0, fn_8004AF78(lbl_80794880), limit);
                     if (move >= 0) {
                         if (list->side_0x005 == 1 && *GetItemData(list->item_id_0x024) == 1) {
-                            s16 extra = fn_8004BA00(0, &fn_8004AF78(lbl_80794880)[0x18], 8);
+                            s16 extra = item_pair_index_find(0, &fn_8004AF78(lbl_80794880)[0x18], 8);
                             if (extra >= 0) {
                                 move = extra + 0x18;
                             }
@@ -984,38 +972,38 @@ s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
             list->row_0x014 = menu_cursor_step(list->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             list->row_sub_0x016 = menu_cursor_step_fixed_tail(list->row_sub_0x016, list->row_sub_max_0x017,
-                                              fn_802122AC(), 4, 8, &list->move_0x01C);
+                                                              fn_802122AC(), 4, 8, &list->move_0x01C);
         }
         break;
     case 2:
-        index = fn_802A91AC(&self->pick_0x16, self->pick_max_0x18, lobby_w.count_0x084,
-                            fn_802122AC(), &self->flags_0x08);
+        index = menu_cursor_page_move(&self->pick_0x16, self->pick_max_0x18, lobby_w.count_0x084,
+                                      fn_802122AC(), &self->flags_0x08);
         switch (index) {
         case 1:
             slots = &lbl_80794880->slots_0x180[0];
-            id = slots[self->cursor_0x1A].id_0x00;
-            if (fn_8004AF78(lbl_80794880)[list->entry_max_0x022].id_0x00 != 0
-                && id != fn_8004AF78(lbl_80794880)[list->entry_max_0x022].id_0x00) {
+            id = slots[self->cursor_0x1A].id;
+            if (fn_8004AF78(lbl_80794880)[list->entry_max_0x022].id != 0
+                && id != fn_8004AF78(lbl_80794880)[list->entry_max_0x022].id) {
                 item_pair_copy(&tmp, &fn_8004AF78(lbl_80794880)[list->entry_max_0x022]);
                 fn_8004BD30(&fn_8004AF60(lbl_80794880, list->side_0x005)[list->entry_max_0x022]);
                 item_take(id, self->pick_max_0x18,
                             &fn_8004AF60(lbl_80794880, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
                 fn_8004B870(&lbl_80794880->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
-                fn_8004BEA4(tmp.id_0x00, tmp.value_0x02, &value);
+                fn_8004BEA4(tmp.id, tmp.value, &value);
             } else {
                 item_take(id, self->pick_max_0x18,
                             &fn_8004AF60(lbl_80794880, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
                 fn_8004B870(&lbl_80794880->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
             }
             limit = fn_8004AF20(lbl_80794880);
-            list->entry_max_0x022 = fn_8004BA00(id, fn_8004AF78(lbl_80794880), limit);
+            list->entry_max_0x022 = item_pair_index_find(id, fn_8004AF78(lbl_80794880), limit);
             list->row_sub_0x016 = list->entry_max_0x022 / 8;
             self->phase_0x00 += 1;
             fn_800DBC84(5);
             break;
         case 2:
             limit = fn_8004AF20(lbl_80794880);
-            if (fn_8004BA00(lbl_80794880->slots_0x180[self->cursor_0x1A].id_0x00,
+            if (item_pair_index_find(lbl_80794880->slots_0x180[self->cursor_0x1A].id,
                             fn_8004AF78(lbl_80794880), limit) < 0) {
                 self->phase_0x00 -= 1;
             } else {
@@ -1038,7 +1026,7 @@ s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
 /* The pane's item-selection step machine (the second pane's variant). */
 s32 fn_801EE1E4(LbListPane* self)
 {
-    LbItemSlot tmp2;
+    IdValue tmp2;
     s16 value;
     s16 index;
     s16 limit;
@@ -1062,17 +1050,17 @@ s32 fn_801EE1E4(LbListPane* self)
             if (index > 0) {
                 side = self->side_0x005 == 0;
                 limit = fn_8004AF20(lbl_80794880);
-                move = fn_8004BA00(fn_8004AF60(lbl_80794880, side)[id].id_0x00,
+                move = item_pair_index_find(fn_8004AF60(lbl_80794880, side)[id].id,
                                    fn_8004AF78(lbl_80794880), limit);
                 self->entry_max_0x022 = move;
-                self->item_id_0x024 = fn_8004AF60(lbl_80794880, side)[id].id_0x00;
+                self->item_id_0x024 = fn_8004AF60(lbl_80794880, side)[id].id;
                 if (move < 0) {
                     self->phase_0x001 += 1;
                     limit = fn_8004AF20(lbl_80794880);
-                    move = fn_8004BA00(0, fn_8004AF78(lbl_80794880), limit);
+                    move = item_pair_index_find(0, fn_8004AF78(lbl_80794880), limit);
                     if (move >= 0) {
                         if (self->side_0x005 == 1 && *GetItemData(self->item_id_0x024) == 1) {
-                            s16 extra = fn_8004BA00(0, &fn_8004AF78(lbl_80794880)[0x18], 8);
+                            s16 extra = item_pair_index_find(0, &fn_8004AF78(lbl_80794880)[0x18], 8);
                             if (extra >= 0) {
                                 move = extra + 0x18;
                             }
@@ -1100,7 +1088,7 @@ s32 fn_801EE1E4(LbListPane* self)
             self->column_0x018 = menu_cursor_step(self->column_0x018, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             self->column_sub_0x01A = menu_cursor_step_fixed_tail(self->column_sub_0x01A, self->column_sub_max_0x01B,
-                                                 fn_802122AC(), 4, 8, &self->move_0x01C);
+                                                                 fn_802122AC(), 4, 8, &self->move_0x01C);
         }
         break;
     case 1:
@@ -1119,9 +1107,9 @@ s32 fn_801EE1E4(LbListPane* self)
                     item_take(self->item_id_0x024, self->move_max_0x01E,
                                 &fn_8004AF60(lbl_80794880, self->side_0x005)[id], 1, 1, 0);
                     fn_8004BBEC(lbl_80794880, self->item_id_0x024, -self->move_max_0x01E, side, 1);
-                    fn_8004BBEC(lbl_80794880, tmp2.id_0x00, tmp2.value_0x02, side, 1);
+                    fn_8004BBEC(lbl_80794880, tmp2.id, tmp2.value, side, 1);
                     limit = fn_8004AF20(lbl_80794880);
-                    self->entry_max_0x022 = fn_8004BA00(self->item_id_0x024,
+                    self->entry_max_0x022 = item_pair_index_find(self->item_id_0x024,
                                                         fn_8004AF78(lbl_80794880), limit);
                     self->row_sub_0x016 = self->entry_max_0x022 / 8;
                     fn_800DBC84(5);
@@ -1140,37 +1128,37 @@ s32 fn_801EE1E4(LbListPane* self)
             self->row_0x014 = menu_cursor_step(self->row_0x014, 8, fn_802122AC(), 1, 2);
         } else if (fn_802121F4(0xC) != 0) {
             self->row_sub_0x016 = menu_cursor_step_fixed_tail(self->row_sub_0x016, self->row_sub_max_0x017,
-                                              fn_802122AC(), 4, 8, &self->move_0x01C);
+                                                              fn_802122AC(), 4, 8, &self->move_0x01C);
         }
         break;
     case 2:
-        r = fn_802A91AC(&self->entry_0x020, self->move_max_0x01E, lobby_w.count_0x084,
-                        fn_802122AC(), &self->move_0x01C);
+        r = menu_cursor_page_move(&self->entry_0x020, self->move_max_0x01E, lobby_w.count_0x084,
+                                  fn_802122AC(), &self->move_0x01C);
         switch (r) {
         case 1:
             side = self->side_0x005 == 0;
-            if (fn_8004AF78(lbl_80794880)[self->entry_max_0x022].id_0x00 != 0
-                && self->item_id_0x024 != fn_8004AF78(lbl_80794880)[self->entry_max_0x022].id_0x00) {
+            if (fn_8004AF78(lbl_80794880)[self->entry_max_0x022].id != 0
+                && self->item_id_0x024 != fn_8004AF78(lbl_80794880)[self->entry_max_0x022].id) {
                 item_pair_copy(&tmp2, &fn_8004AF78(lbl_80794880)[self->entry_max_0x022]);
                 fn_8004BD30(&fn_8004AF60(lbl_80794880, self->side_0x005)[self->entry_max_0x022]);
                 item_take(self->item_id_0x024, self->entry_0x020,
                             &fn_8004AF60(lbl_80794880, self->side_0x005)[self->entry_max_0x022], 1, 1, 0);
                 fn_8004BBEC(lbl_80794880, self->item_id_0x024, -self->entry_0x020, side, 1);
-                fn_8004BBEC(lbl_80794880, tmp2.id_0x00, tmp2.value_0x02, side, 1);
+                fn_8004BBEC(lbl_80794880, tmp2.id, tmp2.value, side, 1);
             } else {
                 item_take(self->item_id_0x024, self->entry_0x020,
                             &fn_8004AF60(lbl_80794880, self->side_0x005)[self->entry_max_0x022], 1, 1, 0);
                 fn_8004BBEC(lbl_80794880, self->item_id_0x024, -self->entry_0x020, side, 1);
             }
             limit = fn_8004AF20(lbl_80794880);
-            self->entry_max_0x022 = fn_8004BA00(self->item_id_0x024, fn_8004AF78(lbl_80794880), limit);
+            self->entry_max_0x022 = item_pair_index_find(self->item_id_0x024, fn_8004AF78(lbl_80794880), limit);
             self->row_sub_0x016 = self->entry_max_0x022 / 8;
             self->phase_0x001 += 1;
             fn_800DBC84(5);
             break;
         case 2:
             limit = fn_8004AF20(lbl_80794880);
-            if (fn_8004BA00(self->item_id_0x024, fn_8004AF78(lbl_80794880), limit) < 0) {
+            if (item_pair_index_find(self->item_id_0x024, fn_8004AF78(lbl_80794880), limit) < 0) {
                 self->phase_0x001 -= 1;
             } else {
                 self->phase_0x001 = 0;
@@ -1211,8 +1199,8 @@ s32 fn_801EE940(u16 index, u16 item_id)
 /* The item-selection step machine driven by the digit entry's confirm (the swap variant). */
 s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list)
 {
-    LbItemSlot tmp;
-    LbItemSlot* slots;
+    IdValue tmp;
+    IdValue* slots;
     s32 result;
     s16 value;
 
@@ -1237,7 +1225,7 @@ s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list)
                 break;
             case 1:
                 slots = &lbl_80794880->slots_0x180[0];
-                if ((slots[value].id_0x00 == 0 && slots[self->cursor_0x1A].id_0x00 == 0)
+                if ((slots[value].id == 0 && slots[self->cursor_0x1A].id == 0)
                     || value == self->cursor_0x1A) {
                     sysSE_req(2);
                 } else {
@@ -1292,7 +1280,7 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         if (fn_8021213C(0x10) == 1U) {
             value = fn_801ED160(self);
             self->cursor_0x1A = value;
-            index = db->slots_0x180[value].value_0x02;
+            index = db->slots_0x180[value].value;
             self->pick_0x16 = index;
             if (index > 0) {
                 self->phase_0x00 += 1;
@@ -1309,8 +1297,8 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         }
         break;
     case 1:
-        r = fn_802A91AC(&self->pick_max_0x18, self->pick_0x16, lobby_w.count_0x084,
-                        fn_802122AC(), &self->flags_0x08);
+        r = menu_cursor_page_move(&self->pick_max_0x18, self->pick_0x16, lobby_w.count_0x084,
+                                  fn_802122AC(), &self->flags_0x08);
         switch (r) {
         case 1:
             self->phase_0x00 += 1;
@@ -1328,7 +1316,7 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         switch (r) {
         case 1:
             self->phase_0x00 = 0;
-            score_add_clamped(self->pick_max_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id_0x00),
+            score_add_clamped(self->pick_max_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id),
                         &db->data_0x18[0]);
             sysSE_req(9);
             fn_8004B870(&db->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);

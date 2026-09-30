@@ -46,9 +46,8 @@
 /* The band's unowned callees (no registered unit owns these addresses; rule 2's unsplit case). */
 extern "C" {
 
-u16* fn_802A9DE0(MenuSel* self, s16 index);
+u16* menu_slot_get(MenuSel* self, s16 index);
 void menu_cursor_column_step(u16* value);
-s8   fn_802A8F14(s32 a, s32 b);
 s32  fn_80274570(void* a);
 s32  fn_8033AAFC(u16 a);
 s32  fn_8033AC78(u16 a, u16 b, s32 c);
@@ -72,7 +71,7 @@ extern "C" void fn_8031AC04(MenuSel* self) {
 /* 0x8031AC0C - does item id `a` resolve to the slot `b`? */
 extern "C" s32 fn_8031AC0C(MenuSel* self, u16 a, u16 b) {
     if (a == 0xFFFF) return 0;
-    u16* rec = fn_802A9DE0(self, (s16)a);
+    u16* rec = menu_slot_get(self, (s16)a);
     if ((s16)rec[1] == 0) return 0;
     if (rec[0] != b) return 0;
     return fn_8033AAFC(b);
@@ -82,9 +81,9 @@ extern "C" s32 fn_8031AC0C(MenuSel* self, u16 a, u16 b) {
 extern "C" s32 fn_8031AC80(MenuSel* self, u16 a, u16 b) {
     if (a == 0xFFFF) return 0;
     if (a == b) return 0;
-    u16* rec = fn_802A9DE0(self, (s16)a);
+    u16* rec = menu_slot_get(self, (s16)a);
     if ((s16)rec[1] == 0) return 0;
-    u16* rec2 = fn_802A9DE0(self, (s16)b);
+    u16* rec2 = menu_slot_get(self, (s16)b);
     s32 r = fn_8033AC78(rec2[0], rec[0], 0);
     self->cursor_0x1EC.record_0x00 = (void*)r;
     return r != 0;
@@ -164,7 +163,7 @@ extern "C" void fn_8031B6D0(MenuSel* self) {
     self->value_0x017 = 8;
     self->count_0x1A3 = 8;
     self->col_0x1A0 = 0;
-    self->row_0x1A1 = fn_802A8F14(8, 8);
+    self->row_0x1A1 = menu_page_count(8, 8);
     self->sel_0x1A2 = 0;
     self->fade_0x23A = 0;
     self->state_0x001 = 0;

@@ -51,6 +51,7 @@
  */
 
 #include "types.h"
+#include "id_value.h"
 #include "gx.h"
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 
@@ -83,13 +84,6 @@ typedef struct FaceWork {
 } FaceWork; /* size: 0x4D0 */
 
 extern FaceWork lbl_806694E8;
-
-/* The per-id 4-byte pair the map's tables use: an id and a signed value/index (item_count_find, fn_8004BA00,
- * fn_8004BD30, fn_8004C004). */
-typedef struct IdValue {
-    /* +0x00 */ u16 id;
-    /* +0x02 */ s16 value;
-} IdValue; /* size: 0x4 */
 
 /* The unit's own `.data`/`.sdata` pool, declared (never defined) so the object emits only the references
  * (playbook 29).  The two face tables are runs of 8-byte `{size, name}` records. */
@@ -429,7 +423,7 @@ extern "C" s32 item_count_find(u16 id, const IdValue* table, s32 count)
 }
 
 /* The index of an id in a 4-byte `{id, value}` table, or -1. */
-extern "C" s32 fn_8004BA00(u16 id, const IdValue* table, s32 count)
+extern "C" s32 item_pair_index_find(u16 id, const IdValue* table, s32 count)
 {
     s32 index = 0;
 

@@ -999,6 +999,7 @@ menu/menu_message.cpp:
 	extab       start:0x800137D4 end:0x8001398C
 	extabindex  start:0x8003123C end:0x800314D0
 	.text       start:0x802A6624 end:0x802AA764
+	.data       start:0x805CE00C end:0x805CE040
 
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C

@@ -8,6 +8,7 @@
 #define MHTRI_FN_80047398_H
 
 #include "types.h"
+#include "id_value.h"
 
 /* The 2D sprite record `drawSpr2TF` consumes. size: 0x18 */
 typedef struct fltSpr2TF {
@@ -39,6 +40,8 @@ s32 fn_800497AC(void* pSelf);
 /* Added when `camera/fn_802B5C58.cpp` registered (rule 2).  0x80047398 returns the current
  * `nw4r::g3d::Camera` (through `ScnRoot`); every camera accessor starts from it. */
 void* fn_80047398(void);
+/* 0x8004BA00 - the index of `id` in a run of `count` `{id, value}` pairs, or -1. */
+s32 item_pair_index_find(u16 id, const IdValue* table, s32 count);
 /* 0x8004C4F0 - the record copy the light unit's copy constructor calls; added with the
  * `light/light.cpp` registration (rule 2: this range owns the address). */
 void fn_8004C4F0(u8* dst, const u8* src);
