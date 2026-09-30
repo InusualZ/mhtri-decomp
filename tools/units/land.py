@@ -1722,6 +1722,34 @@ def set_allow_orphan(addresses: list[str] | None) -> None:
     ALLOW_ORPHAN = [a.strip() for a in (addresses or []) if a and a.strip()]
 
 
+UNIT_RENAMES: dict[str, str] = {}
+
+
+def set_unit_renames(pairs: list[str] | None) -> None:
+    """Record `OLD=NEW` unit renames *this invocation* declares (a batch that `git mv`s a registered unit).
+
+    The base snapshots (undefrefs, orphans) are keyed by unit name, so a renamed unit would read as a NEW
+    unit and every pre-existing finding it carries as an addition. The pairs travel on the module, come only
+    from a command line (`--unit-rename Network/fn_803D3CE8=Network/NetworkSessionManager`), and the landing
+    log prints them; nothing in a file can declare one.
+    """
+    global UNIT_RENAMES                                                   # noqa: PLW0603 - one invocation
+    out: dict[str, str] = {}
+    for item in pairs or []:
+        if "=" in item:
+            old, new = item.split("=", 1)
+            if old.strip() and new.strip():
+                out[claims.norm_unit(old.strip().strip("/"))] = claims.norm_unit(new.strip().strip("/"))
+    UNIT_RENAMES = out
+
+
+def rename_snapshot_keys(snapshot: dict) -> dict:
+    """The base snapshot with every renamed unit's key moved to its new name (declared renames only)."""
+    if not UNIT_RENAMES or not snapshot:
+        return snapshot
+    return {UNIT_RENAMES.get(k, k): v for k, v in snapshot.items()}
+
+
 ALLOW_RULE12: list[str] = []
 
 
@@ -2613,7 +2641,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         # pre-existing debt would block a batch for what it did not create. The base's own unresolved set
         # was snapshotted at `record-base`; the pre-existing remainder is reported, never refused. Cheap:
         # the batch's own objects plus a cached link-symbol index (`undefrefs.link_symbol_index`).
-        result = uref.check_units(main, unit_units, base_snapshot=recorded.get("undefrefs") or {},
+        result = uref.check_units(main, unit_units,
+                                  base_snapshot=rename_snapshot_keys(recorded.get("undefrefs") or {}),
                                   base=want_base)
         check("every batch unit's relocations resolve against the link (no new undefined reference)",
               not result["problems"], "; ".join(result["problems"][:4]),
@@ -3042,6 +3071,15 @@ def selftest() -> int:
         _conf(("NonMatching", "Pl/pl_act.cpp"), ("Matching", "OS/a.c"), ("Matching", "New/b.cpp"))
         check("flipped_units: a new Matching unit counts", flipped_units(tmp), ["New/b"])
     check("flipcheck_problems: no units, no work", flipcheck_problems(".", []), [])
+    set_unit_renames(["Network/fn_803D3CE8=Network/NetworkSessionManager", "bad"])
+    check("unit renames: the declared pair is recorded, junk ignored",
+          UNIT_RENAMES, {"Network/fn_803D3CE8": "Network/NetworkSessionManager"})
+    check("unit renames: a snapshot key follows the new name",
+          rename_snapshot_keys({"Network/fn_803D3CE8": {"x": 1}, "OS/a": {"y": 2}}),
+          {"Network/NetworkSessionManager": {"x": 1}, "OS/a": {"y": 2}})
+    set_unit_renames(None)
+    check("unit renames: none declared leaves the snapshot alone",
+          rename_snapshot_keys({"OS/a": {"y": 2}}), {"OS/a": {"y": 2}})
 
     # a batch that DELETES an extension-less file: after the apply the tree no longer has it, so only the
     # BASE's tree can say it was a path (`tools/git/hooks/post-commit`, 2026-09-28). Real temporary repo.
@@ -4888,6 +4926,9 @@ def main() -> int:
                          "`run:.data:805FB0F8` for the Pat vtable the owner ruled stays claimed while "
                          "its slots are written; repeatable, recorded in the landing log, never a key "
                          "in a file")
+    ld.add_argument("--unit-rename", action="append", default=[], metavar="OLD=NEW",
+                    help="a registered unit this batch renames (git mv): its base-snapshot findings follow the "
+                         "new name instead of reading as a new unit's additions; recorded in the landing log")
     ld.add_argument("--allow-orphan", action="append", default=[], metavar="ADDR",
                     help="hex address of a data object (or a byte inside a shrunk claim) the data-closure "
                          "row accepts as deliberately unclaimed; repeatable, recorded in the landing log, "
@@ -4945,6 +4986,7 @@ def main() -> int:
             units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
             set_allow_rule10(args.allow_rule10)
             set_allow_rule12(args.allow_rule12)
+            set_unit_renames(args.unit_rename)
             set_allow_orphan(args.allow_orphan)
             return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
@@ -4956,6 +4998,7 @@ def main() -> int:
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         set_allow_rule10(args.allow_rule10)
         set_allow_rule12(args.allow_rule12)
+        set_unit_renames(args.unit_rename)
         set_allow_orphan(args.allow_orphan)
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     allow_rule10=args.allow_rule10,
