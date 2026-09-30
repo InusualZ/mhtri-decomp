@@ -199,7 +199,7 @@ extern f32 lbl_80798CF0; /* -2.38f */
 extern f32 lbl_80798CF4; /* 0.11f */
 
 extern u8 lbl_80570260[];
-extern u8 lbl_806A7AA0[0x18];
+extern VEC3 vec_pair_801B4458_0[2];
 
 /* the 0x805B1Bxx enemy-control program tables `em_se_tbl_play`/`em_se_tbl_play_alt` walk. */
 extern u8 lbl_805B1BB0[];
@@ -1674,12 +1674,17 @@ extern "C" void fn_801B6FB0(void) {
     nw4r::math::VEC3 tmp;
 
     setVec3(&tmp, lbl_80798C74, lbl_80798CE8, lbl_80798CEC);
-    fn_80051490(lbl_806A7AA0, &tmp);
+    fn_80051490(vec_pair_801B4458_0, &tmp);
     setVec3(&tmp, lbl_80798C74, lbl_80798CF0, lbl_80798CF4);
-    fn_80051490(lbl_806A7AA0 + 0x0C, &tmp);
+    fn_80051490(&vec_pair_801B4458_0[1], &tmp);
 }
 
 /* 0x801B701C (0x4).  The tail-call slot the neighbouring unit's table keeps. */
 extern "C" u32 fn_801B701C(_ENEMY_WORK* self) {
     return fn_80132184();
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AA0..0x806A7AB8`), in address order: the 1 two-vector record(s)
+ * its static constructor `fn_801B6FB0` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801B4458_0[2];  /* +0x806A7AA0 */

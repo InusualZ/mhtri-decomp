@@ -83,51 +83,8 @@ typedef struct LbMenuWork {
     /* +0x100 */ u16 value_0x100;
 } LbMenuWork; /* size: 0x104 */
 
-/* The `.bss` lobby work block (`lobby_w`, 0x17C bytes); this unit only reads the menu pointer. */
-typedef struct LbLobbyWork {
-    /* +0x000 */ u8 state_0x000;
-    /* +0x001 */ u8 field_0x001;
-    /* +0x002 */ union {
-        u8 field_0x002;   /* the menu-layer state `src/lobby/fn_801F9CD4.cpp` sets (0/2) and passes to
-                           * `fn_801FB2A8`/`fn_802AEEF8` */
-        u8 area_0x002;    /* the scene's area id, compared against `_PLW::area_0x16`
-                           * (`src/lobby/fn_802076D4.cpp`) - the same byte, two consumers */
-    };
-    /* +0x003 */ u8 unused_0x003[3];
-    /* +0x006 */ u8 field_0x006;
-    /* +0x007 */ u8 unused_0x007[0x05];
-    /* +0x00C */ u32 slots_0x00C[2];
-    /* +0x014 */ u8 field_0x014;
-    /* Merge of two views of the same 0x68 bytes: the option/menu layer names nothing in there, the
-     * NPC band (`lobby/fn_802029B4.cpp`) names its two state bytes.  Both keep their offsets. */
-    union {
-        /* +0x015 */ u8 unused_0x015[0x68];
-        struct {
-            /* +0x015 */ u8 unused_0x015b[0x61];
-            /* +0x076 */ u8 field_0x076;
-            /* +0x077 */ u8 field_0x077;
-            /* +0x078 */ u8 unused_0x078[0x5];
-        };
-    };
-    /* +0x07D */ u8 slots_0x07D[0x2F];
-    /* +0x0AC */ LbMenuWork* menu_0xAC;
-    /* +0x0B0 */ u8 field_0x0B0;
-    /* +0x0B1 */ u8 unused_0x0B1[0x7B];
-    /* +0x12C */ u8 field_0x12C;   /* 1 puts the lobby act layer on hold */
-    /* +0x12D */ u8 param_0x12D;
-    /* +0x12E */ u8 unused_0x12E[0x1];
-    /* +0x12F */ u8 param_0x12F;
-    /* +0x130 */ u8 unused_0x130[0x2C];
-    /* +0x15C */ u8 field_0x15C;
-    /* +0x15D */ u8 field_0x15D;
-    /* +0x15E */ u8 field_0x15E;
-    /* +0x15F */ u8 field_0x15F;
-    /* +0x160 */ u8 field_0x160;
-    /* +0x161 */ u8 field_0x161;
-    /* +0x162 */ u8 unused_0x162[0x14];
-    /* +0x176 */ u8 field_0x176;
-    /* +0x177 */ u8 unused_0x177[0x5];
-} LbLobbyWork; /* size: 0x17C */
+#include "lobby/lobby_w.h" /* `LbLobbyWork`/`lobby_w`, owned by lobby/fn_8021E1EC.cpp (rule 1/2) */
+#include "fn_80047398/lobby_world_block.h" /* `lobby_world_block`, owned by fn_80047398.cpp (rule 2) */
 
 /* The lobby's NPC move table block (`lb_npc_move_data`, .bss): +0x0C is the `LbNpcMotionEntry` array
  * `_LB_NPC::field_0x204` is pointed at.  Only the pointer is read here. size: 0x10 */
@@ -238,38 +195,11 @@ typedef struct LbBigBlock {
 extern "C" {
 #endif
 
-/* The option parameter block (`lb_param_w`, 0x806590B4, 0x9C bytes): three per-kind flags with the
- * matching value words, then four trailing shape words.  Only the fields this unit clears are named. */
-typedef struct LbParamWork {
-    /* +0x00 */ u16 field_0x00;
-    /* +0x02 */ u8 pad_0x02[2];
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[3];
-    /* +0x0B */ u8 flag_0x0b;      /* == 1 with +0x00 set is `quest_select_ready_ck` */
-    /* +0x0C */ u8 flag_0x0C[3];
-    /* +0x0F */ u8 pad_0x0F;
-    /* +0x10 */ u16 value_0x10[3];
-    /* +0x16 */ u16 value_0x16;
-    /* +0x18 */ u16 value_0x18;
-    /* +0x1A */ u16 value_0x1A;
-    /* +0x1C */ u16 value_0x1C;
-    /* +0x1E */ u8 pad_0x1E[0x7E];
-} LbParamWork; /* size: 0x9C */
+#include "mh3_pad/lb_param_w.h" /* `LbParamWork`/`lb_param_w`, owned by src/mh3_pad.cpp (rule 1/2) */
+#include "mh3_pad/Psw.h"        /* `PlayerPad`/`Psw[4]`, owned by src/mh3_pad.cpp (rule 1/2) */
 
-/* The per-player pad record block `Psw` (0x80659350, 0x350-byte stride - four players); only the
- * status word this unit tests is named. */
-typedef struct LbPswBlock {
-    /* +0x000 */ u8 pad_0x000[0x2C4];
-    /* +0x2C4 */ u16 status_0x2C4;
-    /* +0x2C6 */ u8 pad_0x2C6[0xE];
-    /* +0x2D4 */ u16 status2_0x2D4;
-    /* +0x2D6 */ u8 pad_0x2D6[0x7A];
-} LbPswBlock; /* size: 0x350 */
-
-extern LbPswBlock Psw[4];
 extern u8 jumptable_805B7CD8[36];
 extern u8 lb_item_get_data[];
-extern LbParamWork lb_param_w;
 extern u8 lbex_main_str[];
 extern u8 lbex_zaco_str[];
 extern u8 lbl_805B7A88[64];
@@ -406,7 +336,6 @@ extern u8 lbl_80791C38[8];
 extern u8 lbl_80791C40[2];
 extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
-extern u8 lobby_world_block[];
 /* The four 6-entry sprite/index tables `fn_803A4F7C`/`fn_803A5070` search, and the flat u16 run
  * their search continues into (both terminated by a 0 entry).  The addresses are in the unclaimed
  * `.data` run 0x805F2038..0x805F2A38 / `.sdata` run 0x80793530.., which no registered unit owns
@@ -427,7 +356,6 @@ extern const s16 lbl_805F0CDC[12];
  * `lobby` on the left, so the band header declares them (rule 2's unsplit case). */
 void fn_80394144(void* self);
 void fn_80394154(void* self);
-extern LbLobbyWork lobby_w;
 
 /* The lobby NPC band's own `.sdata2` pool (`src/lobby/fn_802029B4.cpp`'s state machines hand these to
  * `fn_801FE1CC` as its motion speed/base pair).  The run is unclaimed, so the band header is their

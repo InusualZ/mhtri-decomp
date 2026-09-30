@@ -11,38 +11,10 @@
 struct _PLW;
 struct _EQUIP;
 
-/* The pad/input status block at 0x80659350.  The lobby and `mh3_pad.cpp` each carry their own,
- * larger view of it, and `.bss` has no registered range in splits.txt, so the address band gives no
- * module: only the four control words `Pl_decide_mot_get` masks its pick table with are named here.
- * size: 0xD40 (the `Psw[]` array `mh3_pad.cpp` declares, 0x350 per player) */
-struct PswBlock {
-    /* +0x000 */ u8 pad_0x000[0xD6];
-    /* +0x0D6 */ u16 control_0x0D6;  /* the second control word's low pair (masked with 0x88) */
-    /* +0x0D8 */ u8 pad_0x0D8[0x6];
-    /* +0x0DE */ u16 control_0x0DE;
-    /* +0x0E0 */ u8 pad_0x0E0[0x1C];
-    /* +0x0FC */ u16 control_0x0FC;  /* the held-button word */
-    /* +0x0FE */ u8 pad_0x0FE[0x6];
-    /* +0x104 */ u16 control_0x104;  /* the pressed-button word */
-    /* +0x106 */ u8 pad_0x106[0xC3A];
-};
-extern struct PswBlock Psw;
-
-/* 0x806590B4 - the lobby/act parameter block.  `.bss` has no registered range in splits.txt, so the
- * address band gives no module and only the three id/value rows `fn_802753E4` reads are named here.
- * size: 0x9C */
-struct LbParamBlock {
-    /* +0x00 */ u8 pad_0x00[0xC];
-    /* +0x0C */ u8 id_a;   /* the three act ids the per-act bonus rows key on */
-    /* +0x0D */ u8 id_b;
-    /* +0x0E */ u8 id_c;
-    /* +0x0F */ u8 pad_0x0F[0x1];
-    /* +0x10 */ s16 bonus_a;
-    /* +0x12 */ s16 bonus_b;
-    /* +0x14 */ s16 bonus_c;
-    /* +0x16 */ u8 pad_0x16[0x86];
-};
-extern struct LbParamBlock lb_param_w;
+/* The pad record array `Psw` and the lobby parameter block `lb_param_w` this unit reads are owned by
+ * `src/mh3_pad.cpp`: their types and declarations live in `mh3_pad/Psw.h` and `mh3_pad/lb_param_w.h`. */
+#include "mh3_pad/Psw.h"
+#include "mh3_pad/lb_param_w.h"
 
 #ifdef __cplusplus
 extern "C" {

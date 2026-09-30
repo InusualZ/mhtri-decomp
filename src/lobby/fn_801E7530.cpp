@@ -989,25 +989,14 @@ void fn_801E92B0(void)
 
 void fn_801E9AA8(u8 arg0)
 {
-    LbPartSlot* slot;
+    u32 i;
 
-    slot = (LbPartSlot*)(lobby_world_block + 0x3F38);
-    if (slot[0].kind_0x00 != 2) {
-        lobby_w.slots_0x07D[0] = 0U;
-    } else if (lobby_w.slots_0x07D[0] == 0 && arg0 != 0) {
-        lobby_w.slots_0x07D[0] = 1U;
-    }
-    if (slot[1].kind_0x00 != 2) {
-        lobby_w.slots_0x07D[1] = 0U;
-    } else if (lobby_w.slots_0x07D[1] == 0 && arg0 != 0) {
-        lobby_w.slots_0x07D[1] = 1U;
-    }
-    if (slot[2].kind_0x00 != 2) {
-        lobby_w.slots_0x07D[2] = 0U;
-        return;
-    }
-    if (lobby_w.slots_0x07D[2] == 0 && arg0 != 0) {
-        lobby_w.slots_0x07D[2] = 1U;
+    for (i = 0; i < 3; i++) {
+        if (((LbPartSlot*)(lobby_world_block + 0x3F38))[i].kind_0x00 != 2) {
+            lobby_w.slots_0x07D[i] = 0U;
+        } else if (lobby_w.slots_0x07D[i] == 0 && arg0 != 0) {
+            lobby_w.slots_0x07D[i] = 1U;
+        }
     }
 }
 

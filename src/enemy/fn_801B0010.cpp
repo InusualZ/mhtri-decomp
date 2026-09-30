@@ -83,7 +83,7 @@
  *     float arguments are materialised in a different order.
  *   * `fn_801B0230` 95.64 and `fn_801B03E8` 93.65 (both improved by the transport): the remaining
  *     rows are the `Pl_Skill_ck`/`Pl_item_timer_get` argument setup and `fn_801B03E8`'s two
- *     `lbl_806BD360` byte reads.
+ *     `ainpc_w` byte reads.
  *
  * Follow-up queue (the 10 unwritten functions, biggest first; sizes in bytes):
  *   fn_801B2F30 (4880), fn_801B28C0 (600), fn_801B2B6C (436), fn_801B2D94 (412), fn_801B2684 (264),
@@ -110,6 +110,8 @@
 #include "enemy/fn_801DB8E0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_801251D0.h" /* EmGroundRec + fn_80125F54 (rule 1/2: their owner) */
+#include "ai/ainpc.h"   /* `_AINPC_W` (rule 1) */
+#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2) */
 #include "enemy/fn_8012EC74.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_80137604.h"
@@ -149,10 +151,6 @@ extern "C" void quest_item_work_merge(_PLW* plw, u16 id, s32 value);
 struct _AINPC_W;
 u32 ai_torch_ck(_AINPC_W* npc);
 
-/* The game-state block `lbl_806BD360` (0x4A8 bytes of `.bss`): this range reads its +0x000 liveness
- * byte and the +0x1A4 area byte, nothing else, so it is declared as the byte blob it is (no field
- * layout of its own is evidence here). */
-extern "C" u8 lbl_806BD360[];
 
 /* The `void (*)(_ENEMY_WORK*, u32)` the stance action reads out of `shell_set_func_ptr`'s +0x58 slot. */
 typedef void (*ShellSetFn)(_ENEMY_WORK* work, u32 id);
@@ -228,7 +226,7 @@ extern "C" f32 lbl_80798C58; /* 50.0f - its z */
 extern "C" f32 lbl_80798C5C; /* -100.0f - the second record's y */
 extern "C" f32 lbl_80798C60; /* -50.0f - its z */
 /* The two three-float records the unit's static constructor fills (0x18 bytes of `.bss`). */
-extern "C" u8 lbl_806A7A88[];
+extern "C" VEC3 vec_pair_801B0010_0[2];
 /* 0x803B9BA0 - the not-yet-registered band between `hud/fn_80324F7C.c` and
  * `Network/NetworkWiiMediator.c` (rule 2's named gap): r3 the work record, r4 the position, r5 the id. */
 extern "C" void fn_803B9BA0(_ENEMY_WORK* work, nw4r::math::VEC3* pos, u32 id);
@@ -313,7 +311,7 @@ extern "C" u32 fn_801B0168(_ENEMY_WORK* work) {
         }
         return 1;
     case 2:
-        if (work->field_0x382 != 0xFF && lbl_806BD360[0] != 0 && work->area_no == lbl_806BD360[0x1A4]) {
+        if (work->field_0x382 != 0xFF && ainpc_w.active != 0 && work->area_no == ainpc_w.field_0x1A4) {
             return 0;
         }
         return 1;
@@ -510,9 +508,9 @@ extern "C" u32 fn_801B06D4(_ENEMY_WORK* work) {
         }
     }
 
-    if (lbl_806BD360[0] != 0 && work->area_no == lbl_806BD360[0x1A4]) {
-        if (ai_torch_ck((_AINPC_W*)lbl_806BD360) == 1) {
-            if (fn_80050EAC(&work->pos, (nw4r::math::VEC3*)(lbl_806BD360 + 0x178)) <= lbl_80798B3C) {
+    if (ainpc_w.active != 0 && work->area_no == ainpc_w.field_0x1A4) {
+        if (ai_torch_ck(&ainpc_w) == 1) {
+            if (fn_80050EAC(&work->pos, &ainpc_w.vec_0x178) <= lbl_80798B3C) {
                 return 1;
             }
         }
@@ -1618,14 +1616,14 @@ extern "C" void fn_801B42C8(_ENEMY_WORK* work, u8* state, u8* flag) {
 }
 
 /* 0x801B42DC (0x6C).  The unit's static constructor (the `.ctors` word at 0x8056F344): it fills the
- * two three-float records of the `lbl_806A7A88` table. */
+ * two three-float records of the `vec_pair_801B0010_0` table. */
 extern "C" void fn_801B42DC(void) {
     VEC3 rec;
 
     setVec3(&rec, lbl_80798B48, lbl_80798B94, lbl_80798C58);
-    fn_80051490((Vec*)lbl_806A7A88, (Vec*)&rec);
+    fn_80051490((Vec*)vec_pair_801B0010_0, (Vec*)&rec);
     setVec3(&rec, lbl_80798B48, lbl_80798C5C, lbl_80798C60);
-    fn_80051490((Vec*)(lbl_806A7A88 + 0x0C), (Vec*)&rec);
+    fn_80051490((Vec*)&vec_pair_801B0010_0[1], (Vec*)&rec);
 }
 
 /* 0x801B4348 (0x50).  The em030 ground-position hook: the ground record `fn_80125F54` builds for the
@@ -1664,3 +1662,8 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
     }
     return 0;
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7A88..0x806A7AA0`), in address order: the 1 two-vector record(s)
+ * its static constructor `fn_801B42DC` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801B0010_0[2];  /* +0x806A7A88 */

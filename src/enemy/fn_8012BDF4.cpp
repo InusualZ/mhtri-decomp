@@ -52,6 +52,8 @@
 #include "Pl/pl_act.h"
 #include "Pl/pl_skill.h"
 #include "enemy/fn_8012BA00.h"
+#include "ai/ainpc.h"   /* `_AINPC_W` (rule 1) */
+#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2) */
 #include "enemy/fn_80138074.h"
 #include "unsplit/enemy.h"
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
@@ -216,18 +218,6 @@ struct EnemyData {
 };
 
 /* ------------------------------------------------------------------------------------------------ *
- * The global game-state block at 0x806BD360 (0x4A8 bytes in .bss); two bytes are read here.
- * ------------------------------------------------------------------------------------------------ */
-
-/* size: 0x4A8 */
-struct GameState {
-    /* +0x000 */ u8 field_0x000;
-    /* +0x001 */ u8 unused_0x001[0x171 - 0x001];
-    /* +0x171 */ u8 field_0x171;
-    /* +0x172 */ u8 unused_0x172[0x4A8 - 0x172];
-};
-
-/* ------------------------------------------------------------------------------------------------ *
  * Callees and pooled data.
  * ------------------------------------------------------------------------------------------------ */
 
@@ -293,7 +283,6 @@ EnemyData* get_enemy_data(_ENEMY_WORK* enemy);
 _PLW* get_move_work_adrs(u8 kind);
 u16 get_move_work_max(u8 kind);
 
-extern "C" GameState lbl_806BD360;
 extern "C" EnemyActionTable* lbl_805A0FF8[4];
 extern "C" EnemyActionTable* lbl_805A1034[3];
 extern "C" EnemyActionTable* lbl_805A106C[3];
@@ -353,12 +342,12 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
             fn_8012B944(enemy, (u8)i, value);
         }
     }
-    if (lbl_806BD360.field_0x000 != 0) {
-        if (lbl_806BD360.field_0x171 != 5) {
+    if (ainpc_w.active != 0) {
+        if (ainpc_w.field_0x171 != 5) {
             if (set == NULL || (table = set->table_0x004) == NULL) {
                 table = lbl_805A1034[0];
             }
-            value = fn_8012BA00(enemy, table, &lbl_806BD360, 2, 0);
+            value = fn_8012BA00(enemy, table, &ainpc_w, 2, 0);
         } else {
             value = -5;
         }

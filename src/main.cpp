@@ -7,6 +7,11 @@
  * brightness / screen-size accessors, and finally the `Screen_w` flag/rectangle accessors and the two
  * expansion-heap wrappers that sys_mem.cpp's `operator new`/`operator delete` call.
  *
+ * `.bss` 0x80658540-0x806585B8 is this unit's own: the main-heap `MEMAllocator`, the VI clock `OSAlarm`, the two arena
+ * bound triples and the warning counters, defined at the foot of the file (a definition above the bodies folds their
+ * addresses into one section base, which the target does not do).  `system_w`/`Screen_w` and the pad state that follow
+ * belong to `mh3_pad.cpp`.
+ *
  * Batch 4 extended the split from the 0x80040360 cut to the real seam 0x80040478 (`tudiscover`'s boundary,
  * commit 845a6d8): the `ck_WideMode`/`Screen_w` group belongs to this file, and 0x80040478 is where
  * sys_mem.cpp's `__nw__FUl` starts.
@@ -145,6 +150,8 @@
 
 #include "types.h"
 #include "gx.h"                  /* the SDK colour record `GXColor` (rule 1) */
+#include "OS/mem.h"               /* `MEMAllocator` (rule 1) */
+#include "mh3_pad/Screen_w.h"      /* `ScreenWork`/`Screen_w`, owned by mh3_pad.cpp (rule 1/2) */
 #include "unsplit/unknown.h"     /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "sound/fn_800D7F54.h"   /* owned by sound/fn_800D7F54.cpp (rule 2) */
@@ -200,30 +207,25 @@ struct _MH_VEC2 {
 extern GXRenderModeObj* Rmode;
 extern u32 restart;
 
-/* Screen geometry/calibration block (0x54 B in retail). */
-typedef struct {
-    u16 w0;
-    u16 w2;
-    f32 f4;
-    f32 f8;
-    f32 f12;
-    u32 w16;
-    f32 f20;
-    u8 b24;
-    u8 b25;
-    u8 unk26;
-    u8 pad27[17];
-    f32 f44;
-    f32 f48;
-    f32 f52;
-    f32 f56;
-    u16 h60;
-    u16 h62;
-    u8 pad64[8];
-    f32 fa72[3];
-} ScreenWork;
+/* The SDK alarm record (Dolphin `OSAlarm`, 0x30 B). */
+typedef struct OSAlarm {
+    /* +0x00 */ void* handler;
+    /* +0x04 */ u32 tag;
+    /* +0x08 */ u64 fire;
+    /* +0x10 */ OSAlarm* prev;
+    /* +0x14 */ OSAlarm* next;
+    /* +0x18 */ u64 period;
+    /* +0x20 */ u64 start;
+    /* +0x28 */ void* userData;
+    /* +0x2C */ u8 pad_0x2c[4];
+} OSAlarm; /* size: 0x30 */
 
-extern ScreenWork Screen_w;
+extern MEMAllocator main_heap_allocator;
+extern OSAlarm vi_clock_alarm;
+extern u32 mem1_arena_bounds[3];
+extern u32 mem2_arena_bounds[3];
+extern u32 warning_counts[8];
+
 
 /* The game/system state block `system_w` (0xA5C B) comes from `include/unsplit/unknown.h`: its module
  * is undecided (no `.bss` range is registered), so the type and the declaration live there (rule 1/2). */
@@ -253,9 +255,6 @@ extern void* lbl_8079483C;
 extern u32 lbl_80794868;
 extern void* lbl_80794A20;
 extern u8 lbl_80790E20;
-extern u32 lbl_80658580[3];
-extern u32 lbl_8065858C[3];
-extern u32 lbl_80658540[];
 extern char lbl_8057C82C[];
 extern char lbl_8057C850[];
 extern GXRenderModeObj lbl_8061A9C0;
@@ -312,7 +311,7 @@ extern "C" void PPCSync(void);
 extern "C" void OSSleepTicks(u32, u32);
 /* Owned by `ef/fn_800CDB2C.cpp` (rule 2).  The declaration stays here, in the block form that unit's
  * consumers use, because this unit reads the byte as `s8` - its one call site indexes
- * `Screen_w.fa72` with `(s8)my_player_no()` - and the owner's `u32` view would put an `extsb` back. */
+ * `Screen_w.player_aspect` with `(s8)my_player_no()` - and the owner's `u32` view would put an `extsb` back. */
 extern "C" {
 s8 my_player_no(void);
 }
@@ -382,32 +381,32 @@ int main(void)
     fn_8003FE24();
 
     ScreenWork* sw = &Screen_w;
-    sw->w0 = 640;
-    sw->w2 = 448;
+    sw->width = 640;
+    sw->height = 448;
     if (lbl_80794781 == 1) {
         f32 fb = lbl_80795AA0;
-        sw->f4 = fb;
-        sw->f8 = lbl_80795AA4;
-        sw->f12 = lbl_80795AA8;
-        sw->h60 = (s32)fb;
-        sw->h62 = Rmode->efbHeight;
-        sw->b25 = 1;
+        sw->width_f = fb;
+        sw->height_f = lbl_80795AA4;
+        sw->aspect = lbl_80795AA8;
+        sw->visible_width = (s32)fb;
+        sw->visible_height = Rmode->efbHeight;
+        sw->wide_mode = 1;
     } else {
         f32 fb = lbl_80795AAC;
-        sw->f4 = fb;
-        sw->f8 = lbl_80795AA4;
-        sw->f12 = lbl_80795AB0;
-        sw->b25 = 0;
-        sw->h60 = (s32)fb;
-        sw->h62 = Rmode->efbHeight;
+        sw->width_f = fb;
+        sw->height_f = lbl_80795AA4;
+        sw->aspect = lbl_80795AB0;
+        sw->wide_mode = 0;
+        sw->visible_width = (s32)fb;
+        sw->visible_height = Rmode->efbHeight;
     }
-    sw->w16 = lbl_8079479C;
-    sw->f20 = lbl_80795AB4 / (f32)lbl_8079479C;
-    sw->b24 = lbl_80794780;
-    sw->f44 = lbl_80795AB8;
-    sw->f48 = lbl_80795ABC;
-    sw->f52 = sw->f4 - sw->f44;
-    sw->f56 = sw->f8 - sw->f48;
+    sw->frame_divisor = lbl_8079479C;
+    sw->frame_scale = lbl_80795AB4 / (f32)lbl_8079479C;
+    sw->flag_0x18 = lbl_80794780;
+    sw->margin_x = lbl_80795AB8;
+    sw->margin_y = lbl_80795ABC;
+    sw->inner_width = sw->width_f - sw->margin_x;
+    sw->inner_height = sw->height_f - sw->margin_y;
 
     fn_804D56B0(_f_text);
     fn_804D57A0((void*)fn_8003F20C);
@@ -533,14 +532,12 @@ extern "C" void fn_8003F564(void)
 
 /* ---- 0x8003F58C-0x8003F730: the periodic alarm and the memory arenas ---- */
 
-extern char lbl_80658550[];
-
 /* The map has no name for 0x804E7110; the shared runtime dump calls it AIRegisterDMACallback (it swaps
 the single DMA-callback pointer at 0x80795654). The relocation has to carry the map's name. */
 extern "C" void* fn_804E7110(void* callback);
-extern "C" void OSCancelAlarm(void* alarm);
+extern "C" void OSCancelAlarm(OSAlarm* alarm);
 extern "C" u64 OSGetTime(void);
-extern "C" void OSSetPeriodicAlarm(void* alarm, u32 unk, u64 time, u32 arg5, u32 arg6, void* handler);
+extern "C" void OSSetPeriodicAlarm(OSAlarm* alarm, u32 unk, u64 time, u32 arg5, u32 arg6, void* handler);
 extern "C" void* MEMCreateExpHeapEx(void* startAddress, u32 size, u16 option);
 
 /* Arms or disarms the periodic alarm that keeps the VI-clock request counter running, and swaps the
@@ -548,13 +545,13 @@ extern "C" void* MEMCreateExpHeapEx(void* startAddress, u32 size, u16 option);
 extern "C" void fn_8003F58C(u8 arg)
 {
     fn_804E7110(0);
-    OSCancelAlarm(lbl_80658550);
+    OSCancelAlarm(&vi_clock_alarm);
     if (arg == 0) {
         fn_804E7110((void*)fn_8003F564);
-        OSCancelAlarm(lbl_80658550);
+        OSCancelAlarm(&vi_clock_alarm);
     } else {
         fn_804E7110(0);
-        OSSetPeriodicAlarm(lbl_80658550, 0xF0000, OSGetTime(), 0, 0xF7314, (void*)fn_8003F52C);
+        OSSetPeriodicAlarm(&vi_clock_alarm, 0xF0000, OSGetTime(), 0, 0xF7314, (void*)fn_8003F52C);
     }
 }
 
@@ -565,9 +562,9 @@ extern "C" void fn_8003F620(void)
     void* mem1Lo = OSGetMEM1ArenaLo();
     void* mem1Hi = OSGetMEM1ArenaHi();
 
-    lbl_80658580[0] = 0x80810000;
-    lbl_80658580[1] = (u32)mem1Lo;
-    lbl_80658580[2] = (u32)mem1Hi;
+    mem1_arena_bounds[0] = 0x80810000;
+    mem1_arena_bounds[1] = (u32)mem1Lo;
+    mem1_arena_bounds[2] = (u32)mem1Hi;
     lbl_80794760 = 0x80E2C600;
     lbl_80794770[0] = (void*)0x80EAC600;
     lbl_80794770[1] = (void*)((u32)lbl_80794770[0] + 0xA5000);
@@ -576,15 +573,15 @@ extern "C" void fn_8003F620(void)
 
     void* heap = MEMCreateExpHeapEx((void*)0x80C4CE00, 0x1DF800, 4);
     lbl_80794788 = heap;
-    MEMInitAllocatorForExpHeap(lbl_80658540, heap, 8);
+    MEMInitAllocatorForExpHeap(&main_heap_allocator, heap, 8);
     lbl_807947B0 = 0x43CE00;
     OSSetMEM1ArenaLo((void*)0x81700000);
     OSGetMEM1ArenaLo();
 
     void* mem2Lo = OSGetMEM2ArenaLo();
     void* mem2Hi = OSGetMEM2ArenaHi();
-    lbl_8065858C[1] = (u32)mem2Lo;
-    lbl_8065858C[2] = (u32)mem2Hi;
+    mem2_arena_bounds[1] = (u32)mem2Lo;
+    mem2_arena_bounds[2] = (u32)mem2Hi;
     lbl_8079483C = fn_8003F728((void*)0x90308000, 0x40000);
     lbl_80794A20 = MEMCreateExpHeapEx((void*)0x92B78000, 0x80000, 4);
 }
@@ -703,29 +700,29 @@ extern "C" void fn_8003F9E4(u32 arg)
     fn_804E7F60(Rmode);
 
     ScreenWork* sw = &Screen_w;
-    sw->w0 = 640;
-    sw->w2 = 448;
+    sw->width = 640;
+    sw->height = 448;
     if ((u8)arg == 1) {
         f32 fb = lbl_80795AA0;
-        sw->f4 = fb;
-        sw->f8 = lbl_80795AA4;
-        sw->f12 = lbl_80795AA8;
-        sw->h60 = (s32)fb;
-        sw->h62 = Rmode->efbHeight;
-        sw->b25 = 1;
+        sw->width_f = fb;
+        sw->height_f = lbl_80795AA4;
+        sw->aspect = lbl_80795AA8;
+        sw->visible_width = (s32)fb;
+        sw->visible_height = Rmode->efbHeight;
+        sw->wide_mode = 1;
     } else {
         f32 fb = lbl_80795AAC;
-        sw->f4 = fb;
-        sw->f8 = lbl_80795AA4;
-        sw->f12 = lbl_80795AB0;
-        sw->b25 = 0;
-        sw->h60 = (s32)fb;
-        sw->h62 = Rmode->efbHeight;
+        sw->width_f = fb;
+        sw->height_f = lbl_80795AA4;
+        sw->aspect = lbl_80795AB0;
+        sw->wide_mode = 0;
+        sw->visible_width = (s32)fb;
+        sw->visible_height = Rmode->efbHeight;
     }
-    sw->f44 = lbl_80795AB8;
-    sw->f48 = lbl_80795ABC;
-    sw->f52 = sw->f4 - sw->f44;
-    sw->f56 = sw->f8 - sw->f48;
+    sw->margin_x = lbl_80795AB8;
+    sw->margin_y = lbl_80795ABC;
+    sw->inner_width = sw->width_f - sw->margin_x;
+    sw->inner_height = sw->height_f - sw->margin_y;
     lbl_80794791 = arg;
 }
 
@@ -737,7 +734,6 @@ extern u8 set_widemode_flag;
 extern char set_widemode_param;
 extern f32 lbl_80790E24;
 extern char lbl_8057C860[];
-extern u32 lbl_80658598[];
 
 extern "C" void OSReport(const char* fmt, ...);
 extern "C" void GXSetColorUpdate(int enable);
@@ -796,7 +792,7 @@ u8 get_tv_mode(void)
 extern "C" void fn_8003FC64(u8 arg, u32 id, u32 value)
 {
     OSReport(lbl_8057C860, arg, id, value);
-    lbl_80658598[id]++;
+    warning_counts[id]++;
 }
 
 /* Enables GX colour output. */
@@ -961,31 +957,31 @@ extern "C" u16 fn_80040280(void)
 /* The screen's visible origin pair. */
 extern "C" u16* fn_8004028C(void)
 {
-    return &Screen_w.h60;
+    return &Screen_w.visible_width;
 }
 
-/* The screen height the current draw should use: a per-view offset when the calibration block has one,
- * the plain vertical size otherwise. */
+/* The aspect ratio the current draw should use: the per-player one while the screen is split, the
+ * plain screen aspect otherwise. */
 extern "C" f32 fn_8004029C(void)
 {
-    if (Screen_w.unk26 != 0) {
-        return Screen_w.fa72[(s8)my_player_no()];
+    if (Screen_w.split_mode != 0) {
+        return Screen_w.player_aspect[(s8)my_player_no()];
     }
-    return Screen_w.f12;
+    return Screen_w.aspect;
 }
 
 /* Writes the screen size the game is rendering at into `v`. */
 void get_ScreenSize(_MH_VEC2* v)
 {
-    v->x = Screen_w.f4;
-    v->y = Screen_w.f8;
+    v->x = Screen_w.width_f;
+    v->y = Screen_w.height_f;
 }
 
 /* Writes the screen size as floats, signed, for the display-list paths that need a float size. */
 extern "C" void fn_8004030C(_MH_VEC2* v)
 {
-    v->x = (f32)(s16)Screen_w.w0;
-    v->y = (f32)(s16)Screen_w.w2;
+    v->x = (f32)(s16)Screen_w.width;
+    v->y = (f32)(s16)Screen_w.height;
 }
 
 /* ---- 0x80040360-0x80040478: the screen-size accessors and the game's expansion-heap allocator ---- */
@@ -997,8 +993,8 @@ extern "C" void copyVec2(_MH_VEC2* dst, const _MH_VEC2* src);
 /* Copies the two screen-size rectangles out of the calibration block. */
 extern "C" void fn_80040360(_MH_VEC2* dst)
 {
-    copyVec2(&dst[0], (const _MH_VEC2*)&Screen_w.f44);
-    copyVec2(&dst[1], (const _MH_VEC2*)&Screen_w.f52);
+    copyVec2(&dst[0], (const _MH_VEC2*)&Screen_w.margin_x);
+    copyVec2(&dst[1], (const _MH_VEC2*)&Screen_w.inner_width);
 }
 
 /* Copies one screen-size rectangle. */
@@ -1011,19 +1007,19 @@ extern "C" void copyVec2(_MH_VEC2* dst, const _MH_VEC2* src)
 /* Reports whether the console is running in wide mode. */
 int ck_WideMode(void)
 {
-    return Screen_w.b25 != 0;
+    return Screen_w.wide_mode != 0;
 }
 
 /* Reports whether the calibration block's wide-mode flag is set. */
 extern "C" u32 fn_800403DC(void)
 {
-    return Screen_w.b24 != 0;
+    return Screen_w.flag_0x18 != 0;
 }
 
 /* Reports whether the calibration block's third flag is set. */
 extern "C" u32 fn_800403F8(void)
 {
-    return Screen_w.unk26 != 0;
+    return Screen_w.split_mode != 0;
 }
 
 /* Returns 0; the retail object defines the symbol as a constant load. */
@@ -1054,3 +1050,12 @@ extern "C" void fn_80040460(void* block)
         MEMFreeToExpHeap(lbl_80794788, block);
     }
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x80658540..0x806585B8`), in address order.  Defined at the foot of
+ * the file, after every use: with the definitions above the bodies MWCC folds these addresses into one section
+ * base plus displacements, where the target emits a `lis`/`addi` pair per symbol (fn_8003F620 88.5 %). */
+MEMAllocator main_heap_allocator;   /* +0x80658540: allocator over the main MEM1 exp heap (align 8) */
+OSAlarm vi_clock_alarm;             /* +0x80658550: periodic alarm of `fn_8003F58C` */
+u32 mem1_arena_bounds[3];           /* +0x80658580: {0x80810000, MEM1 arena lo, MEM1 arena hi} */
+u32 mem2_arena_bounds[3];           /* +0x8065858C: {unwritten, MEM2 arena lo, MEM2 arena hi} */
+u32 warning_counts[8];              /* +0x80658598: per-warning-id counters of `fn_8003FC64` */

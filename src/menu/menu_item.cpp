@@ -170,17 +170,7 @@
 
 #include "unsplit/lobby.h"
 #include "unsplit/ef.h"
-/* `include/Pl/fn_80273B14.h` and `include/unsplit/lobby.h` both declare two pad/parameter blocks with
- * different types (`Psw`: `struct PswBlock` vs `LbPswBlock[4]`; `lb_param_w`: `struct LbParamBlock`
- * vs `LbParamWork`), so this unit cannot see the two headers under one name.  The Pl header is
- * included under local renames - the dance `ef/ef_creationqueue.cpp` and `enemy/fn_801550FC.cpp`
- * already use for this class of clash - because only `fn_80274570` is needed from it.  Reconciling
- * the two views is a separate job (recorded in the outbox). */
-#define Psw mhtri_pl_fn_80273B14_Psw
-#define lb_param_w mhtri_pl_fn_80273B14_lb_param_w
-#include "Pl/fn_80273B14.h"
-#undef Psw
-#undef lb_param_w
+#include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
 #include "Pl/fn_8027D684.h"
 #include "g3d/g3d_anmchr.h"
 #include "sound/fn_800D7F54.h"

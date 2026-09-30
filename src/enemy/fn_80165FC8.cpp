@@ -19,7 +19,7 @@
  *     `em_mot_set_ck` and wait on `em_mot_end_ck`/`em_frame_check`), dispatched by `fn_80167404` /
  *     `fn_80167968` on `self->state_sub` (+0x1E6).
  *   * `fn_80166330` is the `.ctors` initializer that seeds the two global float vectors
- *     (`lbl_806A7868`, `lbl_806A7880`); the range owns `.ctors 0x8056F328..0x8056F32C`.
+ *     (`vec_pair_80165FC8_0`, `vec_pair_80165FC8_1`); the range owns `.ctors 0x8056F328..0x8056F32C`.
  *   * `fn_801661BC`, `fn_801661FC` and `fn_801662D4` are three methods of the `ResUserDataAc`
  *     user-data accessor (their addresses fall in this range, so they are emitted here): the
  *     `lbl_805A6D28` vtable slots +0x18, +0x2C and +0x08.  The table itself is another TU's data
@@ -157,10 +157,10 @@ void fn_80166330(void) {
 
     /* `setVec3` returns its first argument (the retail call site keeps it in r4 across the `bl`), so
      * the cast back to the callee's `VEC3*` costs no instruction. */
-    fn_80051490(&lbl_806A7868[0], (VEC3*)setVec3(&v0, lbl_80797330, lbl_80797338, lbl_80797330));
-    fn_80051490(&lbl_806A7868[1], (VEC3*)setVec3(&v1, lbl_80797330, lbl_807974EC, lbl_80797330));
-    fn_80051490(&lbl_806A7880[0], (VEC3*)setVec3(&v2, lbl_80797330, lbl_80797330, lbl_80797330));
-    fn_80051490(&lbl_806A7880[1], (VEC3*)setVec3(&v3, lbl_80797330, lbl_807974EC, lbl_80797330));
+    fn_80051490(&vec_pair_80165FC8_0[0], (VEC3*)setVec3(&v0, lbl_80797330, lbl_80797338, lbl_80797330));
+    fn_80051490(&vec_pair_80165FC8_0[1], (VEC3*)setVec3(&v1, lbl_80797330, lbl_807974EC, lbl_80797330));
+    fn_80051490(&vec_pair_80165FC8_1[0], (VEC3*)setVec3(&v2, lbl_80797330, lbl_80797330, lbl_80797330));
+    fn_80051490(&vec_pair_80165FC8_1[1], (VEC3*)setVec3(&v3, lbl_80797330, lbl_807974EC, lbl_80797330));
 }
 
 u32 fn_801663E4(_ENEMY_WORK* self) {
@@ -857,3 +857,9 @@ void fn_80167968(_ENEMY_WORK* self) {
         return fn_801678A0(self);
     }
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7868..0x806A7898`), in address order: the 2 two-vector record(s)
+ * its static constructor `fn_80166330` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_80165FC8_0[2];  /* +0x806A7868 */
+VEC3 vec_pair_80165FC8_1[2];  /* +0x806A7880 */

@@ -70,6 +70,7 @@
 #include "gx.h"
 #include "Runtime.PPCEABI.H/memset.h" /* memset is owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w (undecided module, rule 2's unsplit gap) */
+#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2): fn_800CEF60 clears it */
 
 /* --------------------------------------------------------------------------------------------- */
 /* Data owned by no registered unit (its range sits outside every splits.txt block); declared,
@@ -96,7 +97,6 @@ typedef struct SysSideTable {
 } SysSideTable; /* size: 0x4C */
 
 extern SysSideTable lbl_80694C68; /* .bss:0x80694C68 */
-extern u8 lbl_806BD360[0x4A8];    /* .bss:0x806BD360, cleared by fn_800CEF60 */
 extern u8 lbl_80794960;           /* .sdata, the debug-BBA flag */
 extern u8 lbl_806954AC[];         /* .bss, the message-table tail */
 
@@ -221,7 +221,7 @@ u16 fn_800CEF18(u16 value) {
 
 /* 0x800CEF60 - clear the 0x4A8-byte command record. */
 void fn_800CEF60(void) {
-    memset(lbl_806BD360, 0, 0x4A8);
+    memset(&ainpc_w, 0, 0x4A8);
 }
 
 /* 0x800CF208 - the current game mode. */

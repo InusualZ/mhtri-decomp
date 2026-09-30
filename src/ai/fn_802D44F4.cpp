@@ -68,6 +68,8 @@
 #include "ef/fn_800CDB2C.h"
 #include "pl.h"
 #include "ai/ainpc.h"
+#include "ai/ainpc_w.h" /* `ainpc_w`, defined at the foot of this file (rule 2) */
+#include "mh3_pad/lb_param_w.h" /* `lb_param_w`, owned by mh3_pad.cpp (rule 2) */
 #include "unsplit/ai.h"
 #include "ai/fn_802D44F4.h"    /* the owner's own header (rule 2) */
 
@@ -108,7 +110,6 @@ extern f32 lbl_80794B78[2];        /* .sbss:0x80794B78 - its second word is the 
 extern u16 lbl_805D43A0[0x7C];
 /* The matching 0x805D44EC table: 21 records of two u16 (size 0x54). */
 extern u16 lbl_805D44EC[0x2A];
-extern u8 lb_param_w[];            /* .bss:0x806BF838, the lobby/option parameter block */
 
 s32 quest_move_state_valid_ck(void);
 f32 fn_80050EAC(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
@@ -133,21 +134,21 @@ void ai_npc_hold_item_arm(void)
     if (quest_move_state_valid_ck() == 0) {
         return;
     }
-    if (lbl_806BD360.active == 0) {
+    if (ainpc_w.active == 0) {
         return;
     }
-    if (lbl_806BD360.field_0x171 == 5) {
+    if (ainpc_w.field_0x171 == 5) {
         return;
     }
-    if (lbl_806BD360.field_0x43D != 0) {
+    if (ainpc_w.field_0x43D != 0) {
         return;
     }
-    lbl_806BD360.field_0x43D = 1;
-    if (fn_80050EF4(&lbl_806BD360.vec_0x178,
-                    (nw4r::math::VEC3*)&lbl_806BD360.plw_0x16C->motion_pos_0x3C) >= lbl_8079A770) {
-        lbl_806BD360.field_0x43E = 0x258;
+    ainpc_w.field_0x43D = 1;
+    if (fn_80050EF4(&ainpc_w.vec_0x178,
+                    (nw4r::math::VEC3*)&ainpc_w.plw_0x16C->motion_pos_0x3C) >= lbl_8079A770) {
+        ainpc_w.field_0x43E = 0x258;
     } else {
-        lbl_806BD360.field_0x43E = 0x12C;
+        ainpc_w.field_0x43E = 0x12C;
     }
 }
 
@@ -370,9 +371,9 @@ void fn_802D7464(struct _AINPC_W* self)
     self->field_0x431 = 0;
     self->field_0x434 = 100;
     self->field_0x438 = 100;
-    self->skill_0x42E[0] = lb_param_w[0x26];
-    self->skill_0x42E[1] = lb_param_w[0x27];
-    self->skill_0x42E[2] = lb_param_w[0x28];
+    self->skill_0x42E[0] = lb_param_w.sub_0x26;
+    self->skill_0x42E[1] = lb_param_w.sub_0x27;
+    self->skill_0x42E[2] = lb_param_w.sub_0x28;
     if (ai_skill_ck(self, 2) == 1 || ai_skill_ck(self, 3) == 1 || ai_skill_ck(self, 4) == 1 ||
         ai_skill_ck(self, 5) == 1 || ai_skill_ck(self, 6) == 1 || ai_skill_ck(self, 8) == 1 ||
         ai_skill_ck(self, 9) == 1 || ai_skill_ck(self, 0xA) == 1) {
@@ -472,11 +473,11 @@ s32 fn_802D77DC(u8 slot)
  * forwards to the shared dispatcher. */
 void fn_802D7A50(void)
 {
-    if (lbl_806BD360.active == 0) {
+    if (ainpc_w.active == 0) {
         return;
     }
-    lbl_806BD360.field_0x440 = 1;
-    fn_802D4218(&lbl_806BD360);
+    ainpc_w.field_0x440 = 1;
+    fn_802D4218(&ainpc_w);
 }
 
 /* 0x802D7A74 - whether one of the four hold slots is holding the live-chain item (0x1D) while the
@@ -601,28 +602,28 @@ void fn_802D7CE4(u8 state)
     if (state != 0x1A) {
         return;
     }
-    if (lbl_806BD360.active == 0) {
+    if (ainpc_w.active == 0) {
         return;
     }
-    if (ai_area_ck(&lbl_806BD360) == 0) {
+    if (ai_area_ck(&ainpc_w) == 0) {
         return;
     }
-    fn_802D2A00(&lbl_806BD360, 7, 0, 0);
+    fn_802D2A00(&ainpc_w, 7, 0, 0);
 }
 
 /* 0x802D7D4C - the matching "lost the player" reaction for the +0x171 == 7 state. */
 void fn_802D7D4C(void)
 {
-    if (lbl_806BD360.active == 0) {
+    if (ainpc_w.active == 0) {
         return;
     }
-    if (ai_area_ck(&lbl_806BD360) == 0) {
+    if (ai_area_ck(&ainpc_w) == 0) {
         return;
     }
-    if (lbl_806BD360.field_0x171 != 7) {
+    if (ainpc_w.field_0x171 != 7) {
         return;
     }
-    fn_802D2A00(&lbl_806BD360, 7, 1, 0);
+    fn_802D2A00(&ainpc_w, 7, 1, 0);
 }
 
 /* 0x802D7DB4 - whether the +0x420 == 5 state's timer is running. */
@@ -736,26 +737,26 @@ s32 fn_802D7804(u8 index, f32 distance)
 {
     _PLW* plw;
 
-    if (lbl_806BD360.active == 0) {
+    if (ainpc_w.active == 0) {
         return 0;
     }
-    plw = lbl_806BD360.plw_0x16C;
+    plw = ainpc_w.plw_0x16C;
     if (plw == 0) {
         return 0;
     }
     if (distance < lbl_8079A670) {
         return 1;
     }
-    if (lbl_806BD360.field_0x1A4 != plw->area_0x16) {
+    if (ainpc_w.field_0x1A4 != plw->area_0x16) {
         return 0;
     }
-    if (lbl_806BD360.field_0x171 == 5) {
+    if (ainpc_w.field_0x171 == 5) {
         return 0;
     }
-    if (index == 4 && fn_802D9CE0(&lbl_806BD360) == 1) {
+    if (index == 4 && fn_802D9CE0(&ainpc_w) == 1) {
         return 0;
     }
-    return fn_80050EAC(&lbl_806BD360.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
+    return fn_80050EAC(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
            distance * distance;
 }
 
@@ -764,23 +765,23 @@ s32 fn_802D78FC(void)
 {
     _PLW* plw;
 
-    if (lbl_806BD360.active == 0) {
+    if (ainpc_w.active == 0) {
         return 0;
     }
-    if (lbl_806BD360.field_0x420 != 2) {
+    if (ainpc_w.field_0x420 != 2) {
         return 0;
     }
-    plw = lbl_806BD360.plw_0x16C;
+    plw = ainpc_w.plw_0x16C;
     if (plw == 0) {
         return 0;
     }
-    if (lbl_806BD360.field_0x1A4 != plw->area_0x16) {
+    if (ainpc_w.field_0x1A4 != plw->area_0x16) {
         return 0;
     }
-    if (lbl_806BD360.field_0x422 == 0) {
+    if (ainpc_w.field_0x422 == 0) {
         return 0;
     }
-    return fn_80050EAC(&lbl_806BD360.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
+    return fn_80050EAC(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
            lbl_8079A870;
 }
 
@@ -800,3 +801,27 @@ u32 ai_skill_ck(struct _AINPC_W* self, u8 skill)
     }
     return 0;
 }
+
+/* One 0x20-byte entry of `ainpc_entry_tbl`: `fn_802DA1B0` clears the sixteen of them with `fn_802DA200`. */
+struct AinpcEntry {
+    /* +0x00 */ u8 pad_0x00[0x20];
+}; /* size: 0x20 */
+
+/* The page state `fn_802DB2F0` and its helpers keep at `ainpc_page_state`: +0x00 and +0x26 are cleared per
+ * page, +0x01 is saved across the clear. */
+struct AinpcPageState {
+    /* +0x00 */ u8 active_0x00;
+    /* +0x01 */ u8 saved_0x01;
+    /* +0x02 */ u8 pad_0x02[0x24];
+    /* +0x26 */ u8 flag_0x26;
+    /* +0x27 */ u8 pad_0x27[0x29];
+}; /* size: 0x50 */
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806BD360..0x806BDA58`), in address order.  Defined at the foot of
+ * the file, after every use.  `ainpc_w` is constructed by the `.ctors` word `fn_802D9E14` (a tail call into the
+ * record's constructor `fn_802D9E20`, not reconstructed here).  The page state's users continue past this
+ * unit's registered text end (0x802DDC04); names of the last two are GUESSes. */
+_AINPC_W ainpc_w;                      /* +0x806BD360 */
+AinpcEntry ainpc_entry_tbl[16];        /* +0x806BD808 */
+AinpcPageState ainpc_page_state;       /* +0x806BDA08 */
+

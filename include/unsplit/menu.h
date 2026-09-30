@@ -75,7 +75,7 @@ void drawshape_exec(void);
 /* The `src/menu/get_pop_dat_ptr.cpp` band's own unowned data (its `.text` 0x803BE30C..0x803C4BA0 is
  * registered, so the symbols below resolve to no owning unit's data range and this is their rule-2
  * home).  Each is declared, never defined here. */
-extern u8 option_w[];           /* .bss 0x80659090, 0x24 B - the option table `get_option_cfg` reads */
+#include "mh3_pad/option_w.h" /* `option_w`, owned by src/mh3_pad.cpp (rule 2) */
 extern u8 option_value_max[];   /* .data 0x805F8528 - the per-index ceiling `ck_option_cfg` clamps to */
 extern u8 option_default_tbl[]; /* .data 0x805F8548 - the 31-byte default table */
 extern u8 option_value_tbl[];   /* .sdata 0x807936B8 - option id -> (value, flag) byte pairs */
@@ -263,18 +263,7 @@ typedef struct QuestListItem {
 extern QuestListItem** quest_list_items;   /* .sbss 0x80794C3C */
 extern u16* quest_list_values;             /* .sbss 0x80794C24 */
 extern s32 quest_list_count;               /* .sbss 0x80794C44 */
-/* The shared screen block `Screen_w` (.bss 0x8065903C, 0x54 B): +0x14 is the frame duration the
- * clear-time formatters divide by and the frame scale the band's `draw_*` calls use.  Moved here
- * from `src/menu/fn_802E4978.cpp`, which defined the same view locally - the second user is when a
- * type moves into a header (rule 1). size: 0x54 */
-typedef struct ScreenGeomView {
-    /* +0x00 */ u8 unused_0x00[0x0C];
-    /* +0x0C */ f32 aspect_0x0C;    /* the aspect ratio `arena_camera_init` hands `Camera::SetPerspective` */
-    /* +0x10 */ u8 unused_0x10[0x04];
-    /* +0x14 */ f32 field_0x14;
-    /* +0x18 */ u8 unused_0x18[0x54 - 0x18];
-} ScreenGeomView;
-extern "C" ScreenGeomView Screen_w;
+#include "mh3_pad/Screen_w.h" /* `ScreenWork`/`Screen_w`, owned by src/mh3_pad.cpp (rule 1/2) */
 /* The band's own data tables. */
 extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] */
 extern u8 quest_byte_table[];      /* .data 0x805F78B4 */

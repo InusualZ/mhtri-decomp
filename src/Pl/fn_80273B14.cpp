@@ -1035,14 +1035,14 @@ s16 fn_802753E4(struct _PLW* plw, u16 id)
     if (plw->field_0x446 != 0 && Pl_cat_skill_ck(plw, 0x27) == 0) {
         return 0;
     }
-    if (id == lb_param_w.id_a) {
-        value = lb_param_w.bonus_a;
+    if (id == lb_param_w.flag_0x0C[0]) {
+        value = lb_param_w.value_0x10[0];
     }
-    if (id == lb_param_w.id_b) {
-        value += lb_param_w.bonus_b;
+    if (id == lb_param_w.flag_0x0C[1]) {
+        value += lb_param_w.value_0x10[1];
     }
-    if (id == lb_param_w.id_c) {
-        value += lb_param_w.bonus_c;
+    if (id == lb_param_w.flag_0x0C[2]) {
+        value += lb_param_w.value_0x10[2];
     }
     return value;
 }
@@ -1087,27 +1087,27 @@ void Pl_decide_mot_get(u16* motion, u16* param)
         switch (get_ControlType(0)) {
         case 1:
             if (i < 4) {
-                if ((Psw.control_0x104 & row[i].control_a) != 0) {
+                if ((Psw[0].control_0x104 & row[i].control_a) != 0) {
                     index = (u16)i;
                 }
             } else if (i < 8) {
-                if ((Psw.control_0x104 & row[i].control_a) != 0 && (Psw.control_0x0FC & 4) != 0) {
+                if ((Psw[0].control_0x104 & row[i].control_a) != 0 && (Psw[0].control_0x0FC & 4) != 0) {
                     index = (u16)i;
                 }
-            } else if ((Psw.control_0x0FC & row[i].control_a) != 0) {
+            } else if ((Psw[0].control_0x0FC & row[i].control_a) != 0) {
                 index = (u16)i;
             }
             break;
         case 2:
             if (i < 4) {
-                if ((Psw.control_0x0DE & row[i].control_b) != 0) {
+                if ((Psw[0].control_0x0DE & row[i].control_b) != 0) {
                     index = (u16)i;
                 }
             } else if (i < 8) {
-                if ((Psw.control_0x0DE & row[i].control_b) != 0 && (Psw.control_0x0D6 & 0x88) != 0) {
+                if ((Psw[0].control_0x0DE & row[i].control_b) != 0 && (Psw[0].control_0x0D6 & 0x88) != 0) {
                     index = (u16)i;
                 }
-            } else if ((Psw.control_0x0D6 & row[i].control_b) != 0) {
+            } else if ((Psw[0].control_0x0D6 & row[i].control_b) != 0) {
                 index = (u16)i;
             }
             break;

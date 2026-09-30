@@ -17,7 +17,7 @@
  * second consumer includes it instead of copying the union (docs/plan.md 6.5 rule 1).  Follow-up for
  * the owner: drop its inline copy and `#include "ai/ainpc.h"` (filed with the orchestrator).
  *
- * size: 0x49C (approximate - evidenced to +0x498)
+ * size: 0x4A8 (the map's size of the `ainpc_w` object; evidenced to +0x498)
  */
 #ifndef MHTRI_AI_AINPC_H
 #define MHTRI_AI_AINPC_H
@@ -236,7 +236,7 @@ struct _AINPC_W {
     /* +0x492 */ u8 field_0x492;
     /* +0x493 */ u8 unused_0x493[0x498 - 0x493];
     /* +0x498 */ struct _se_w* sound_0x498;  /* the SE work `fn_800DCC24` is handed */
+    /* +0x49C */ u8 unused_0x49C[0x4A8 - 0x49C];
 };
-extern "C" struct _AINPC_W lbl_806BD360;
 
 #endif /* MHTRI_AI_AINPC_H */

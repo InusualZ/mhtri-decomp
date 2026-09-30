@@ -680,3 +680,8 @@ u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag) {
 }
 
 } /* extern "C" */
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7A70..0x806A7A88`), in address order: the 1 two-vector record(s)
+ * its static constructor `fn_8019E604` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801993E0_0[2];  /* +0x806A7A70 */

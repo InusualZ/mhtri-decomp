@@ -210,10 +210,10 @@ extern u8 lbl_805B63A8[];
 extern u8 lbl_805B63E8[];
 extern u8 lbl_805B6950[];
 extern u8 lbl_805B75B8[];
-extern u8 lbl_806A7B30[];
-extern u8 lbl_806A7B48[];
-extern u8 lbl_806A7B60[];
-extern u8 lbl_806A7B78[];
+extern VEC3 vec_pair_801D428C_0[2];
+extern VEC3 vec_pair_801D428C_1[2];
+extern VEC3 vec_pair_801D428C_2[2];
+extern VEC3 vec_pair_801D428C_3[2];
 
 /* ----------------------------------------------------------------------------------------------------
  * the C++-mangled callees (rule 9: declared with the signature the mangling encodes, called through it)
@@ -1481,14 +1481,14 @@ void fn_801D6FB8(void) {
     nw4r::math::VEC3 v12;
     nw4r::math::VEC3 v13;
 
-    fn_80051490(lbl_806A7B30, setVec3(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(lbl_806A7B30 + 0xC, setVec3(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(lbl_806A7B48, setVec3(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(lbl_806A7B48 + 0xC, setVec3(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(lbl_806A7B60, setVec3(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
-    fn_80051490(lbl_806A7B60 + 0xC, setVec3(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
-    fn_80051490(lbl_806A7B78, setVec3(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(lbl_806A7B78 + 0xC, setVec3(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
+    fn_80051490(vec_pair_801D428C_0, setVec3(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
+    fn_80051490(&vec_pair_801D428C_0[1], setVec3(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
+    fn_80051490(vec_pair_801D428C_1, setVec3(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
+    fn_80051490(&vec_pair_801D428C_1[1], setVec3(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
+    fn_80051490(vec_pair_801D428C_2, setVec3(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
+    fn_80051490(&vec_pair_801D428C_2[1], setVec3(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
+    fn_80051490(vec_pair_801D428C_3, setVec3(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
+    fn_80051490(&vec_pair_801D428C_3[1], setVec3(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
     fn_80051490(lbl_805B6950, setVec3(&v8, lbl_807994C0, lbl_80799220, lbl_807994C4));
     fn_80051490(lbl_805B6950 + 0xC, setVec3(&v9, lbl_807994C8, lbl_807994CC, lbl_807994D0));
     fn_80051490(lbl_805B6950 + 0x1C, setVec3(&v10, lbl_807994D4, lbl_80799220, lbl_807994D8));
@@ -1981,3 +1981,11 @@ void fn_801D8078(struct _ENEMY_WORK* self) {
 #ifdef __cplusplus
 }
 #endif
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7B30..0x806A7B90`), in address order: the 4 two-vector record(s)
+ * its static constructor `fn_801D6FB8` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801D428C_0[2];  /* +0x806A7B30 */
+VEC3 vec_pair_801D428C_1[2];  /* +0x806A7B48 */
+VEC3 vec_pair_801D428C_2[2];  /* +0x806A7B60 */
+VEC3 vec_pair_801D428C_3[2];  /* +0x806A7B78 */

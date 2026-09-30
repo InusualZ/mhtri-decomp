@@ -17,19 +17,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 
-/* The `.bss` lobby work block (`lobby_w`, 0x806AAB44, 0x17C bytes in the map).  This range reads the
- * four bytes below; the rest belongs to the units that own those offsets. */
-typedef struct LbMenuLobbyWork {
-    /* +0x000 */ u8 mode_0x000;
-    /* +0x001 */ u8 scene_0x001;
-    /* +0x002 */ u8 unused_0x002[0x25];
-    /* +0x027 */ u8 flag_0x027;
-    /* +0x028 */ u8 unused_0x028[0x2A];
-    /* +0x052 */ u8 page_0x052;
-    /* +0x053 */ u8 unused_0x053[0x5E];
-    /* +0x0B1 */ u8 sub_0x0B1;
-    /* +0x0B2 */ u8 unused_0x0B2[0xCA];
-} LbMenuLobbyWork; /* size: 0x17C (the map's own record) */
+#include "lobby/lobby_w.h" /* `LbLobbyWork`/`lobby_w`, owned by this unit (rule 1/2) */
+#include "fn_80047398/lobby_world_block.h" /* `lobby_world_block`, owned by fn_80047398.cpp (rule 2) */
 
 /* The block `lobby_world_block` (a 4-byte pointer in `.sbss`) points at.  This range reads the one byte the
  * item-list page mirrors. */
@@ -104,27 +93,7 @@ typedef struct LbMat3x3 {
     /* +0x20 */ f32 m_0x20;
 } LbMat3x3; /* size: 0x24 */
 
-/* The screen work block at `lbl_806AA8C8` (0x1C0 bytes in the map).  The range's table is the
- * 0x10-byte run at +0x0C (`index_0x14C` selects one of its rows), and the tail from +0x160 is the
- * 8 x 0xC vector run `fn_8021EFC8` clears. */
-typedef struct LbMenuRow {
-    /* +0x00 */ u32 table_0x00;    /* the row's table pointer `fn_8021EC20` hands out */
-    /* +0x04 */ u32 model_0x04;    /* the row's model pointer `fn_8021EBF0` hands out */
-    /* +0x08 */ u8 unused_0x08[8];
-} LbMenuRow; /* size: 0x10 */
-
-typedef struct LbMenuScratch {
-    /* +0x000 */ u32 unused_0x000;
-    /* +0x004 */ s16* fixed_a_0x004;  /* the -2 mode's string row */
-    /* +0x008 */ u8* fixed_b_0x008;   /* the -2 mode's model row */
-    /* +0x00C */ LbMenuRow rows_0x00C[20];
-    /* +0x14C */ s16 index_0x14C;   /* -1 = none, -2 = the two special pointers, >= 0 = a row */
-    /* +0x14E */ u8 unused_0x14E[0x02];
-    /* +0x150 */ u32 timer_0x150;
-    /* +0x154 */ u8 count_0x154;
-    /* +0x155 */ u8 unused_0x155[0x0B];
-    /* +0x160 */ VEC3 slots_0x160[8];
-} LbMenuScratch; /* size: 0x1C0 (the map's own record) */
+#include "lobby/lb_menu_scratch.h" /* `LbMenuScratch`/`lb_menu_scratch`, owned by this unit (rule 1/2) */
 
 /* The fallback record `fn_8021E1EC` reads when the entry has no position of its own. */
 typedef struct LbMenuFallback {
@@ -168,7 +137,7 @@ typedef struct LbMenuRow8 {
     /* +0x06 */ u16 rate_0x06;
 } LbMenuRow8; /* size: 0x8 */
 
-/* The 0x50-byte block at `lbl_806AAA88` (the item-list page's own state). */
+/* The 0x50-byte block at `lb_item_list_state` (the item-list page's own state). */
 typedef struct LbMenuItemState {
     /* +0x00 */ u32 active_0x00;
     /* +0x04 */ u32 stamp_0x04;      /* the tick the page last advanced on (`lbl_80794868`) */
@@ -185,14 +154,21 @@ typedef struct LbMenuItemState {
     /* +0x49 */ u8 unused_0x49[0x07];
 } LbMenuItemState; /* size: 0x50 (the map's own record) */
 
+/* The 0x18-byte page-state records at `lb_page_state_0`/`lb_page_state_1`: `.data` page descriptors point at
+ * them and nothing in this range reads a field. */
+typedef struct LbPageState {
+    /* +0x00 */ u8 pad_0x00[0x18];
+} LbPageState; /* size: 0x18 */
+
 /* ---------------------------------------------------------------------------------------------------
  * Globals
  */
 extern "C" {
-extern LbMenuLobbyWork lobby_w;      /* .bss 0x806AAB44 */
-extern LbMenuScratch lbl_806AA8C8;   /* .bss 0x806AA8C8 */
-extern LbMenuItemState lbl_806AAA88; /* .bss 0x806AAA88 */
-extern LbMenuBigBlock* lobby_world_block; /* .sbss 0x80794880, a 4-byte pointer (map: size:0x4 data:4byte) */
+extern LbMenuItemState lb_item_list_state; /* .bss 0x806AAA88 */
+extern LbPageState lb_page_state_0;  /* .bss 0x806AAAD8 */
+extern LbPageState lb_page_state_1;  /* .bss 0x806AAAF0 */
+extern VEC3 lb_menu_pos_tbl[4];      /* .bss 0x806AAB08 */
+extern VEC3 lb_menu_pos_extra;       /* .bss 0x806AAB38 */
 extern u8* lbl_80794B18;             /* .sbss 0x80794B18 */
 extern const f32 lbl_80799C60;       /* .sdata2 0x80799C60 - the y-window this range tests against */
 extern u8* lbl_807922B0[];           /* .sdata 0x807922B0 - the 8-byte row tables `fn_80223A18` indexes */

@@ -183,7 +183,7 @@ extern f32 lbl_80797E98;
 extern u32 lbl_805A950C[];
 extern u32 lbl_805A9518[];
 /* The four 0xC-byte vectors `fn_80182B94` seeds (`.data`, no module). */
-extern nw4r::math::VEC3 lbl_806A79D0[];
+extern nw4r::math::VEC3 vec_tbl_80181C88[4];
 
 } /* extern "C" */
 
@@ -664,13 +664,13 @@ void fn_80182B94(void) {
     VEC3 c;
     VEC3 d;
     setVec3(&a, lbl_80797B18, lbl_80797B18, lbl_80797E80);
-    copyVec3(&lbl_806A79D0[0], &a);
+    copyVec3(&vec_tbl_80181C88[0], &a);
     setVec3(&b, lbl_80797B18, lbl_80797B18, lbl_80797B18);
-    copyVec3(&lbl_806A79D0[1], &b);
+    copyVec3(&vec_tbl_80181C88[1], &b);
     setVec3(&c, lbl_80797C34, lbl_80797B18, lbl_80797B18);
-    copyVec3(&lbl_806A79D0[2], &c);
+    copyVec3(&vec_tbl_80181C88[2], &c);
     setVec3(&d, lbl_80797B18, lbl_80797B18, lbl_80797B18);
-    copyVec3(&lbl_806A79D0[3], &d);
+    copyVec3(&vec_tbl_80181C88[3], &d);
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -720,3 +720,8 @@ void fn_80182D44(_ENEMY_WORK* self, u32 arg) {
         fn_80130CDC(self, (s16)arg);
     }
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A79D0..0x806A7A00`): the four-vector table its static
+ * constructor `fn_80182B94` fills (the map's second row at +0x18 folded into it; `.data` tables point at both
+ * halves).  Name is a GUESS. */
+VEC3 vec_tbl_80181C88[4];  /* +0x806A79D0 */

@@ -122,9 +122,6 @@ extern const f32 lbl_8079A7AC;
 extern const f32 lbl_8079A7B0;
 
 /* ---- the tables the band reads ---- */
-extern u8 lbl_806BD360[];                  /* the shared `.bss` work block `fn_802D27E0` returns
-                                            * (an open array: the target addresses it
-                                            * absolutely, not through `r13`) */
 extern void* lbl_805D3FB8[8];              /* the two-level motion table `fn_802D282C` walks */
 extern u8 lbl_805D3AD8[];                  /* the motion-entry records `fn_802D2F7C` walks (stride 0x1A) */
 extern u32 lbl_80792508[];                 /* the motion ids the entries' +0x0F byte indexes */

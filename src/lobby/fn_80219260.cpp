@@ -54,6 +54,7 @@
 
 #include "pl.h"
 #include "unsplit/lobby.h"
+#include "lobby/lb_menu_scratch.h" /* `lb_menu_scratch`, owned by lobby/fn_8021E1EC.cpp (rule 2) */
 
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -106,13 +107,6 @@ struct LbMenuState {
 }; /* size: 0x138 */
 extern LbMenuState lbl_806AA790;
 
-/* The selection block at 0x806AA8C8 (0x1C0 B in the map). */
-struct LbSelectTable {
-    /* +0x000 */ u8 unused_0x000[0x156];
-    /* +0x156 */ u8 flags_0x156[8];  /* one byte per selected slot */
-    /* +0x15E */ u8 unused_0x15E[0x62];
-}; /* size: 0x1C0 */
-extern LbSelectTable lbl_806AA8C8;
 
 /* The `stage_w` block (0x806BAB44, 0x2FE0 B in the map); only its +0x54 gate byte is read here. */
 struct LbStageWork {
@@ -555,12 +549,12 @@ extern "C" s32 fn_8021D704(LbMenuSlot* slot) {
 
 /* Publishes one selected slot's byte in the selection table. */
 extern "C" void fn_8021D86C(s32 index, u8 value) {
-    lbl_806AA8C8.flags_0x156[(u8)index] = value;
+    lb_menu_scratch.flags_0x156[(u8)index] = value;
 }
 
 /* Clears the selection table. */
 extern "C" void fn_8021D9E0(void) {
-    memset(lbl_806AA8C8.flags_0x156, 0, 8);
+    memset(lb_menu_scratch.flags_0x156, 0, 8);
 }
 
 /* Copies a 0x10-byte menu row field by field (its float through `lfs`/`stfs`). */

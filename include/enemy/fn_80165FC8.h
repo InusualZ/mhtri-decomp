@@ -134,8 +134,8 @@ extern f32 lbl_8079750C;
 extern f32 lbl_80797510;
 extern f32 lbl_80797514;
 extern u8 lbl_805A5DB4[];
-extern nw4r::math::VEC3 lbl_806A7868[];
-extern nw4r::math::VEC3 lbl_806A7880[];
+extern nw4r::math::VEC3 vec_pair_80165FC8_0[2];
+extern nw4r::math::VEC3 vec_pair_80165FC8_1[2];
 
 #ifdef __cplusplus
 }

@@ -41,6 +41,7 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
 #include "enemy.h"
 #include "unsplit/enemy.h"
 #include "enemy/fn_8012BDF4.h"
@@ -996,3 +997,18 @@ extern "C" void fn_80169360(_ENEMY_WORK *self, u8 a) {
         break;
     }
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7898..0x806A79A0`), in address order: the 11 two-vector record(s)
+ * its static constructor `fn_8016CF18 and fn_8017054C` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801679B0_0[2];  /* +0x806A7898 */
+VEC3 vec_pair_801679B0_1[2];  /* +0x806A78B0 */
+VEC3 vec_pair_801679B0_2[2];  /* +0x806A78C8 */
+VEC3 vec_pair_801679B0_3[2];  /* +0x806A78E0 */
+VEC3 vec_pair_801679B0_4[2];  /* +0x806A78F8 */
+VEC3 vec_pair_801679B0_5[2];  /* +0x806A7910 */
+VEC3 vec_pair_801679B0_6[2];  /* +0x806A7928 */
+VEC3 vec_pair_801679B0_7[2];  /* +0x806A7940 */
+VEC3 vec_pair_801679B0_8[2];  /* +0x806A7958 */
+VEC3 vec_pair_801679B0_9[2];  /* +0x806A7970 */
+VEC3 vec_pair_801679B0_10[2];  /* +0x806A7988 */

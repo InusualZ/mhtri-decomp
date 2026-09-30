@@ -68,6 +68,7 @@
 #include "pl.h"
 #include "ai/ai_npc.h"
 #include "ai/fn_802D0F34.h"
+#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2) */
 
 /* One entry of the motion table `lbl_805D3AD8` (`fn_802D2F7C` walks it with a 0x1A stride): the two
  * s16 distances and the u8 motion row `lbl_80792508` is indexed with. size: 0x1A */
@@ -802,7 +803,7 @@ extern "C" {
 /* 0x802D27E0 - the address of the band's shared `.bss` work block. */
 u8* fn_802D27E0(void)
 {
-    return lbl_806BD360;
+    return (u8*)&ainpc_w;
 }
 
 }  /* the three mangled `ai_*` symbols are C++: nodefaults keeps their real spelling */
