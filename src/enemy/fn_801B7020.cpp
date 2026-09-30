@@ -740,3 +740,8 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
     }
     fn_801B7048(self);
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AB8..0x806A7AD0`), in address order: the 1 two-vector record(s)
+ * its static constructor `fn_801B985C` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801B7020_0[2];  /* +0x806A7AB8 */

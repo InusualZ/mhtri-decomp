@@ -264,9 +264,9 @@ extern u8 lbl_805A3DD0[];
 extern u8 lbl_805A3E90[];
 extern u8 lbl_805A3FC0[];
 extern u8 lbl_805A5D18[];
-extern u8 lbl_806A77D8[];
-extern u8 lbl_806A77F0[];
-extern u8 lbl_806A7808[];
+extern VEC3 vec_pair_801502C8_0[2];
+extern VEC3 vec_pair_801502C8_1[2];
+extern VEC3 vec_pair_801502C8_2[2];
 
 #ifdef __cplusplus
 extern "C" {
@@ -1091,12 +1091,12 @@ void fn_80154D44(void) {
     nw4r::math::VEC3 e;
     nw4r::math::VEC3 f;
 
-    fn_80051490(lbl_806A77D8, (s32)setVec3(&a, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
-    fn_80051490(lbl_806A77D8 + 0xC, (s32)setVec3(&b, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
-    fn_80051490(lbl_806A77F0, (s32)setVec3(&c, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
-    fn_80051490(lbl_806A77F0 + 0xC, (s32)setVec3(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
-    fn_80051490(lbl_806A7808, (s32)setVec3(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
-    fn_80051490(lbl_806A7808 + 0xC, (s32)setVec3(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
+    fn_80051490(vec_pair_801502C8_0, (s32)setVec3(&a, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
+    fn_80051490(&vec_pair_801502C8_0[1], (s32)setVec3(&b, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
+    fn_80051490(vec_pair_801502C8_1, (s32)setVec3(&c, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
+    fn_80051490(&vec_pair_801502C8_1[1], (s32)setVec3(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
+    fn_80051490(vec_pair_801502C8_2, (s32)setVec3(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
+    fn_80051490(&vec_pair_801502C8_2[1], (s32)setVec3(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
 }
 
 /* 0x80154E40 (0x50) - reset the effect slot set. */
@@ -1201,3 +1201,10 @@ void fn_80154FAC(struct _ENEMY_WORK* self, u8* arg1, u8* arg2) {
 #ifdef __cplusplus
 }
 #endif
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A77D8..0x806A7820`), in address order: the 3 two-vector record(s)
+ * its static constructor `fn_80154D44` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801502C8_0[2];  /* +0x806A77D8 */
+VEC3 vec_pair_801502C8_1[2];  /* +0x806A77F0 */
+VEC3 vec_pair_801502C8_2[2];  /* +0x806A7808 */

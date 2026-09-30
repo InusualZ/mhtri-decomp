@@ -1620,13 +1620,13 @@ u8 quest_target_rank_get(CockpitWork* work, _PLW* plw) {
             work->quest_timer_0x188--;
         }
         if (work->blink_clock_0x184 <= 0) {
-            work->blink_clock_0x184 = (s32)(5.0f * (60.0f * Screen_w.field_0x14));
+            work->blink_clock_0x184 = (s32)(5.0f * (60.0f * Screen_w.frame_scale));
         } else {
             work->blink_clock_0x184--;
             if (work->blink_clock_0x184 <= 0) {
-                work->blink_clock_0x184 = (s32)(5.0f * (60.0f * Screen_w.field_0x14));
+                work->blink_clock_0x184 = (s32)(5.0f * (60.0f * Screen_w.frame_scale));
                 if (rand() % 3 != 0) {
-                    work->quest_timer_0x188 = (s32)(30.0f * Screen_w.field_0x14);
+                    work->quest_timer_0x188 = (s32)(30.0f * Screen_w.frame_scale);
                 }
             }
         }
@@ -1636,7 +1636,7 @@ u8 quest_target_rank_get(CockpitWork* work, _PLW* plw) {
     } else if (Pl_cat_skill_ck(plw, 0x31) == 1) {
         s32 limit = quest_time_limit_get();
 
-        if ((f32)(limit - quest_time_elapsed_get()) < 30.0f * Screen_w.field_0x14) {
+        if ((f32)(limit - quest_time_elapsed_get()) < 30.0f * Screen_w.frame_scale) {
             rank |= 1;
         }
     }

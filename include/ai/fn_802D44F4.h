@@ -50,7 +50,7 @@ void fn_802DA3CC(void);                  /* 0x802DA3CC, registered by address */
 
 /* 0x802D94C4 - the area-mode setter `enemy/em020_handlers.cpp`'s `em020_area_model_set` calls for
  * the em020 area models: once the screen-state query `quest_move_state_valid_ck` is true it arms
- * `lbl_806BD360`'s +0x484 mode byte and its 90-frame +0x486 timer (1 for 0, 2 otherwise) and clears
+ * `ainpc_w`'s +0x484 mode byte and its 90-frame +0x486 timer (1 for 0, 2 otherwise) and clears
  * +0x485.  Added with that registration (rule 2: this range owns the address; the signature is the
  * callee's own body, which narrows r3 with `clrlwi r3,24` before the `cmpwi r3,0`). */
 void fn_802D94C4(u8 mode);

@@ -840,7 +840,7 @@ extern "C" void arena_task(TaskSlot* task) {
                 task->wait_0x0C--;
                 return;
             }
-            if ((Psw[0].status_0x2C4 & 0x10) != 0) {
+            if ((Psw[0].pressed_0x2C4 & 0x10) != 0) {
                 sysSE_req(0);
                 task->wait_0x0C = 20;
                 task->step_0x08++;
@@ -941,7 +941,7 @@ extern "C" void arena_camera_init(void) {
     posture.mUnk28 = arena_zero_f;
     camera_position_set(&camera, &arena_camera_vec[0]);
     camera.SetPosture(posture);
-    camera.SetPerspective(arena_50f, Screen_w.aspect_0x0C, arena_camera_near_z, arena_camera_far_z);
+    camera.SetPerspective(arena_50f, Screen_w.aspect, arena_camera_near_z, arena_camera_far_z);
 }
 
 /* Installs the arena scene's ambient colour and one direct light per entry of its four-colour table (the

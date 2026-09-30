@@ -239,3 +239,9 @@ void fn_80176374(_ENEMY_WORK* self, u32 arg) {
 #ifdef __cplusplus
 }
 #endif
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A79A0..0x806A79D0`), in address order: the 2 two-vector record(s)
+ * its static constructor `fn_80176B7C` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_80171194_0[2];  /* +0x806A79A0 */
+VEC3 vec_pair_80171194_1[2];  /* +0x806A79B8 */

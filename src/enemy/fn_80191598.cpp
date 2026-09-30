@@ -98,7 +98,7 @@
  *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
  *   * the unit registers a `.ctors` word (0x8056F33C..0x8056F340, added by the split itself): the
  *     original translation unit has a static constructor, most plausibly the one that fills the five
- *     static vectors `fn_80192204` builds (`lbl_806A7A00`..`lbl_806A7A60`).
+ *     static vectors `fn_80192204` builds (`vec_pair_80191598_0`..`vec_default_80191598`).
  */
 #include "types.h"
 
@@ -270,11 +270,11 @@ extern const f32 lbl_80798254;
 
 /* The five static vectors `fn_80192204` builds (the last one is the default `fn_80192108` copies
  * from). */
-extern EmVecPair lbl_806A7A00;
-extern EmVecPair lbl_806A7A18;
-extern EmVecPair lbl_806A7A30;
-extern EmVecPair lbl_806A7A48;
-extern VEC3 lbl_806A7A60;
+extern EmVecPair vec_pair_80191598_0;
+extern EmVecPair vec_pair_80191598_1;
+extern EmVecPair vec_pair_80191598_2;
+extern EmVecPair vec_pair_80191598_3;
+extern VEC3 vec_default_80191598;
 
 /* The one-shot latch `fn_80192108` sets. */
 extern s8 lbl_80794AA0;
@@ -796,11 +796,11 @@ void fn_80192080(EmActWork* self) {
 /* Fills in one effect request (id 0x17) from the default vector. */
 void fn_80192108(EmEffRequest* out, u8 a, s16 b, s16 c) {
     if (lbl_80794AA0 == 0) {
-        setVec3(&lbl_806A7A60, lbl_80797E88, lbl_80797E88, lbl_80797EB4);
+        setVec3(&vec_default_80191598, lbl_80797E88, lbl_80797E88, lbl_80797EB4);
         lbl_80794AA0 = 1;
     }
     out->id_0x00 = 0x17;
-    copyVec3(&out->pos_0x04, &lbl_806A7A60);
+    copyVec3(&out->pos_0x04, &vec_default_80191598);
     out->field_0x10 = a;
     out->field_0x12 = b;
     out->field_0x14 = c;
@@ -828,21 +828,21 @@ void fn_80192204(void) {
     VEC3 v7;
     VEC3 v8;
 
-    fn_80051490(&lbl_806A7A00.vec_0x00,
+    fn_80051490(&vec_pair_80191598_0.vec_0x00,
                 setVec3(&v1, lbl_80797E88, lbl_807981C0, lbl_80797E88));
-    fn_80051490(&lbl_806A7A00.vec_0x0C,
+    fn_80051490(&vec_pair_80191598_0.vec_0x0C,
                 setVec3(&v2, lbl_80797E88, lbl_80797E88, lbl_80797E88));
-    fn_80051490(&lbl_806A7A18.vec_0x00,
+    fn_80051490(&vec_pair_80191598_1.vec_0x00,
                 setVec3(&v3, lbl_80797E88, lbl_80798230, lbl_80797E88));
-    fn_80051490(&lbl_806A7A18.vec_0x0C,
+    fn_80051490(&vec_pair_80191598_1.vec_0x0C,
                 setVec3(&v4, lbl_80797E88, lbl_80797E88, lbl_80797E88));
-    fn_80051490(&lbl_806A7A30.vec_0x00,
+    fn_80051490(&vec_pair_80191598_2.vec_0x00,
                 setVec3(&v5, lbl_80797E88, lbl_80797F80, lbl_80797E88));
-    fn_80051490(&lbl_806A7A30.vec_0x0C,
+    fn_80051490(&vec_pair_80191598_2.vec_0x0C,
                 setVec3(&v6, lbl_80797E88, lbl_80798234, lbl_80797E88));
-    fn_80051490(&lbl_806A7A48.vec_0x00,
+    fn_80051490(&vec_pair_80191598_3.vec_0x00,
                 setVec3(&v7, lbl_80797E88, lbl_80797E88, lbl_80797EB4));
-    fn_80051490(&lbl_806A7A48.vec_0x0C,
+    fn_80051490(&vec_pair_80191598_3.vec_0x0C,
                 setVec3(&v8, lbl_80797E88, lbl_80797F24, lbl_80797E88));
 }
 
@@ -976,3 +976,12 @@ void fn_80192630(EmActWork* self) {
 #ifdef __cplusplus
 }
 #endif
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7A00..0x806A7A70`), in address order: the four vector pairs
+ * and the default vector its static constructor `fn_80192204` builds (`fn_80192108` copies the default).  Names
+ * are GUESSes. */
+EmVecPair vec_pair_80191598_0;  /* +0x806A7A00 */
+EmVecPair vec_pair_80191598_1;  /* +0x806A7A18 */
+EmVecPair vec_pair_80191598_2;  /* +0x806A7A30 */
+EmVecPair vec_pair_80191598_3;  /* +0x806A7A48 */
+VEC3 vec_default_80191598;      /* +0x806A7A60 */

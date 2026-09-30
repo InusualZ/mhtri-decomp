@@ -25,6 +25,15 @@
  * extabindex 0x8001E5A0-0x8001E948, and the .ctors word 0x8056F2C4-0x8056F2C8 (dtk assigned it to
  * this unit on the split; the first C++ static constructor of the file).
  *
+ * `.bss` 0x806585B8-0x806694E8 is this unit's own (claimed, defined at the foot of the file, every symbol offset and
+ * size equal to the target): `system_w`, `Screen_w`, `option_w`, `lb_param_w`, the `Psw` pad records and their twin, the
+ * task table, the WPAD sampling buffers and the pointer/mutex state.  Evidence: the static constructor
+ * `fn_80046B94` (`.ctors` word 0x8056F2C4) constructs `Psw` and `Psw_prev` as 4 x 0x350 B arrays, and the window is bounded by
+ * `main.cpp`'s `.bss` below and `fn_80047398.cpp`'s above.  The two pad arrays' constructor is not reconstructed (plain
+ * storage here); the names marked GUESS at their definitions (`Psw_prev`, `pad_chan_state`, `pad_btn_table_*`, `kpad_work`,
+ * `pointer_*`, `game_mutex`) are derived from the functions that touch them.  `lbl_807419C8` (the RcRecord table) is not
+ * in this window: it sits in the DVD library's `.bss`.
+ *
  * This session reconstructed 67 of the 145 functions to the 80 % bar: the RSO sub-overlay loader state
  * machine (fn_800408A8..fn_80040FDC), the task-slot table (fn_80041640..fn_80041944), the vector
  * helpers (copyVec3..fn_80041E9C), the RcRecord accessors (fn_80042B34..fn_80042F60), the pad
@@ -54,6 +63,11 @@
 #include "gx.h"
 #include "nw4r/math.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w (rule 1/2) */
+#include "mh3_pad/Psw.h"        /* PlayerPad / Psw (rule 1/2) */
+#include "mh3_pad/Screen_w.h"   /* ScreenWork / Screen_w (rule 1/2) */
+#include "mh3_pad/lb_param_w.h" /* LbParamWork / lb_param_w (rule 1/2) */
+#include "mh3_pad/option_w.h"   /* option_w (rule 2) */
+#include "OS/mem.h"            /* MEMAllocator (rule 1) */
 #include "RSO/runtime.h"     /* RSOModule + RSOStaticLocateObject (rule 2) */
 #include "fn_80040598.h"     /* the game-root RSO loaders (rule 2) */
 #include "ef/fn_800CDB2C.h"  /* fn_800CF208 / fn_800CEE2C (rule 2) */
@@ -66,30 +80,17 @@
  * Local types
  * ------------------------------------------------------------------ */
 
-/* `TaskSlot` (the 0x20-byte task slot `lbl_80659150` indexes by `slot << 5`) lives in `mh3_pad/task.h`. */
+/* `TaskSlot` (the 0x20-byte task slot `task_slot_table` indexes by `slot << 5`) lives in `mh3_pad/task.h`. */
 
-/* The per-player pad record at `Psw` (0x350 B stride; only the fields this unit reads are named -
- * the rest is padding until another unit needs it). */
-typedef struct PlayerPad {
-    /* +0x000 */ u8 pad_0x000[0x30];
-    /* +0x030 */ u32 field_0x30;
-    /* +0x034 */ u32 mode;
-    /* +0x038 */ u8 pad_0x038[0x96];
-    /* +0x0CE */ u16 field_0xce;
-    /* +0x0D0 */ u8 pad_0x0d0[0x2];
-    /* +0x0D2 */ u16 field_0xd2;
-    /* +0x0D4 */ u8 pad_0x0d4[0x6];
-    /* +0x0DA */ u16 field_0xda;
-    /* +0x0DC */ u8 pad_0x0dc[0x1C];
-    /* +0x0F8 */ u16 field_0xf8;
-    /* +0x0FA */ u8 pad_0x0fa[0x6];
-    /* +0x100 */ u16 field_0x100;
-    /* +0x102 */ u8 pad_0x102[0x1C];
-    /* +0x11E */ u16 field_0x11e;
-    /* +0x120 */ u8 pad_0x120[0x215];
-    /* +0x335 */ u8 field_0x335;
-    /* +0x336 */ u8 pad_0x336[0x1A];
-} PlayerPad; /* size: 0x350 */
+/* `PlayerPad` (the 0x350-byte per-player pad record at `Psw`) lives in `mh3_pad/Psw.h`. */
+
+/* The 0x18-byte per-channel state record of `pad_chan_state` (`fn_80041AA4` clears one per channel next to
+ * the `Psw` records); only the motor byte at +0x14 is read so far. */
+typedef struct PadChanState {
+    /* +0x00 */ u8 pad_0x00[0x14];
+    /* +0x14 */ u8 motor_level_0x14;  /* copied into `system_w.field_0x7dc` (the per-channel motor-on state) */
+    /* +0x15 */ u8 pad_0x15[3];
+} PadChanState; /* size: 0x18 */
 
 /* The 0x1E-byte record table at `lbl_807419C8` (fn_80042B34 and the fn_80042EE8..fn_80042F60
  * accessors read single bytes out of it). */
@@ -137,12 +138,10 @@ extern char lbl_8057CA50[];
 extern char lbl_805803EC[];
 
 /* --- .bss --- */
-extern u32 lbl_806585B8[];
-extern u32 lbl_806585CC[];
-extern TaskSlot lbl_80659150[];
-extern PlayerPad Psw[];
-extern u8 Screen_w[];
-extern u8 lbl_80669468[]; /* MEM2 allocator record */
+extern u32 rso_slot_load_base[5];
+extern u32 rso_slot_unused_words[5];
+extern TaskSlot task_slot_table[16];
+extern MEMAllocator wpad_mem2_allocator; /* MEM2 allocator record */
 
 /* --- .sbss table --- */
 extern RcRecord lbl_807419C8[];
@@ -176,7 +175,7 @@ extern void fn_8028E528(void);
 extern void fn_8028BF1C(void);
 extern void fn_803A13B4(void);
 extern void fn_8021F3A8(void);
-extern u8 lbl_8065ADD0[];
+extern PadChanState pad_chan_state[4];
 }
 
 /* ------------------------------------------------------------------ *
@@ -218,16 +217,16 @@ extern "C" void fn_80040954(void)
     loadedE0 = 0;
     loadedE4 = 0;
     lbl_807947C0 = lbl_807947BC;
-    lbl_806585B8[0] = 0;
-    lbl_806585CC[0] = 0;
-    lbl_806585B8[1] = 0;
-    lbl_806585CC[1] = 0;
-    lbl_806585B8[2] = 0;
-    lbl_806585CC[2] = 0;
-    lbl_806585B8[3] = 0;
-    lbl_806585CC[3] = 0;
-    lbl_806585B8[4] = 0;
-    lbl_806585CC[4] = 0;
+    rso_slot_load_base[0] = 0;
+    rso_slot_unused_words[0] = 0;
+    rso_slot_load_base[1] = 0;
+    rso_slot_unused_words[1] = 0;
+    rso_slot_load_base[2] = 0;
+    rso_slot_unused_words[2] = 0;
+    rso_slot_load_base[3] = 0;
+    rso_slot_unused_words[3] = 0;
+    rso_slot_load_base[4] = 0;
+    rso_slot_unused_words[4] = 0;
     if (lbl_807947D8 != NULL) {
         lbl_807947D8->epilog(lbl_807947D8);
         loadedD8 = 1;
@@ -273,7 +272,7 @@ extern "C" void fn_80040AC4(void)
 
     if ((s8)lbl_807947C8[0] != 2 && (s8)lbl_807947C8[0] != 4) {
         fn_80040954();
-        pools = lbl_806585B8;
+        pools = rso_slot_load_base;
         names = lbl_8057C9D8;
         idx = lbl_80790E28;
         pools[idx[0]] = lbl_807947C0;
@@ -293,14 +292,14 @@ extern "C" void fn_80040B98(void)
 {
     if ((s8)lbl_807947C8[0] != 1) {
         fn_80040954();
-        lbl_806585B8[lbl_80790E28[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)lbl_806585B8[lbl_80790E28[0]],
+        rso_slot_load_base[lbl_80790E28[0]] = lbl_807947C0;
+        lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)rso_slot_load_base[lbl_80790E28[0]],
                                                 lbl_80790E28[0]);
-        lbl_806585B8[lbl_80790E28[2]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(lbl_8057C9D8[2], (void*)lbl_806585B8[lbl_80790E28[2]],
+        rso_slot_load_base[lbl_80790E28[2]] = lbl_807947C0;
+        lbl_807947DC = (RSOModule*)fn_80040598(lbl_8057C9D8[2], (void*)rso_slot_load_base[lbl_80790E28[2]],
                                                 lbl_80790E28[2]);
-        lbl_806585B8[lbl_80790E28[3]] = lbl_807947C0;
-        lbl_807947E0 = (RSOModule*)fn_80040598(lbl_8057C9D8[3], (void*)lbl_806585B8[lbl_80790E28[3]],
+        rso_slot_load_base[lbl_80790E28[3]] = lbl_807947C0;
+        lbl_807947E0 = (RSOModule*)fn_80040598(lbl_8057C9D8[3], (void*)rso_slot_load_base[lbl_80790E28[3]],
                                                 lbl_80790E28[3]);
         fn_804DA7E4(lbl_807947D8);
         fn_804DA7E4(lbl_807947DC);
@@ -318,16 +317,16 @@ extern "C" void fn_80040CA8(void)
 {
     if ((s8)lbl_807947C8[0] != 3) {
         fn_80040954();
-        lbl_806585B8[lbl_80790E28[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)lbl_806585B8[lbl_80790E28[0]],
+        rso_slot_load_base[lbl_80790E28[0]] = lbl_807947C0;
+        lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)rso_slot_load_base[lbl_80790E28[0]],
                                                 lbl_80790E28[0]);
-        lbl_806585B8[lbl_80790E28[1]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(lbl_8057C9D8[1], (void*)lbl_806585B8[lbl_80790E28[1]],
+        rso_slot_load_base[lbl_80790E28[1]] = lbl_807947C0;
+        lbl_807947DC = (RSOModule*)fn_80040598(lbl_8057C9D8[1], (void*)rso_slot_load_base[lbl_80790E28[1]],
                                                 lbl_80790E28[1]);
-        lbl_806585B8[lbl_80790E28[3]] = lbl_807947C0;
-        lbl_807947E0 = (RSOModule*)fn_80040598(lbl_8057C9D8[4], (void*)lbl_806585B8[lbl_80790E28[3]],
+        rso_slot_load_base[lbl_80790E28[3]] = lbl_807947C0;
+        lbl_807947E0 = (RSOModule*)fn_80040598(lbl_8057C9D8[4], (void*)rso_slot_load_base[lbl_80790E28[3]],
                                                 lbl_80790E28[3]);
-        lbl_806585B8[3] = lbl_807947C0;
+        rso_slot_load_base[3] = lbl_807947C0;
         lbl_807947E4 = (RSOModule*)fn_80040598(lbl_8057C9D8[2], (void*)lbl_807947C0, 3);
         fn_804DA7E4(lbl_807947D8);
         fn_804DA7E4(lbl_807947DC);
@@ -355,8 +354,8 @@ extern "C" void fn_80040DE8(u8 which)
             lbl_807947E4 = NULL;
         }
         DCFlushRange((void*)lbl_807947C0, (u32)(0x80C4CE00 - lbl_807947C0));
-        lbl_806585B8[lbl_80790E28[4]] = lbl_807947C0;
-        lbl_807947E4 = (RSOModule*)fn_80040598(lbl_8057C9D8[sel], (void*)lbl_806585B8[lbl_80790E28[4]],
+        rso_slot_load_base[lbl_80790E28[4]] = lbl_807947C0;
+        lbl_807947E4 = (RSOModule*)fn_80040598(lbl_8057C9D8[sel], (void*)rso_slot_load_base[lbl_80790E28[4]],
                                                 lbl_80790E28[4]);
         fn_804DA7E4(lbl_807947E4);
         lbl_807947E4->prolog(lbl_807947E4);
@@ -369,14 +368,14 @@ extern "C" void fn_80040ED0(void)
 {
     if ((s8)lbl_807947C8[0] != 4) {
         fn_80040954();
-        lbl_806585B8[lbl_80790E28[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)lbl_806585B8[lbl_80790E28[0]],
+        rso_slot_load_base[lbl_80790E28[0]] = lbl_807947C0;
+        lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)rso_slot_load_base[lbl_80790E28[0]],
                                                 lbl_80790E28[0]);
-        lbl_806585B8[lbl_80790E28[1]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(lbl_8057C9D8[1], (void*)lbl_806585B8[lbl_80790E28[1]],
+        rso_slot_load_base[lbl_80790E28[1]] = lbl_807947C0;
+        lbl_807947DC = (RSOModule*)fn_80040598(lbl_8057C9D8[1], (void*)rso_slot_load_base[lbl_80790E28[1]],
                                                 lbl_80790E28[1]);
-        lbl_806585B8[lbl_80790E28[5]] = lbl_807947C0;
-        lbl_807947E0 = (RSOModule*)fn_80040598(lbl_8057C9D8[0x13], (void*)lbl_806585B8[lbl_80790E28[5]],
+        rso_slot_load_base[lbl_80790E28[5]] = lbl_807947C0;
+        lbl_807947E0 = (RSOModule*)fn_80040598(lbl_8057C9D8[0x13], (void*)rso_slot_load_base[lbl_80790E28[5]],
                                                 lbl_80790E28[5]);
         fn_804DA7E4(lbl_807947D8);
         fn_804DA7E4(lbl_807947DC);
@@ -431,7 +430,7 @@ extern "C" void fn_8004166C(f32 x, f32 y, f32 z)
 
 extern "C" void fn_80041680(void)
 {
-    memset(lbl_80659150, 0, 0x200);
+    memset(task_slot_table, 0, 0x200);
 }
 
 /* Start a task slot running `func` (state 0xC). */
@@ -439,7 +438,7 @@ extern "C" void fn_800417F0(void* func, s16 slot)
 {
     TaskSlot* task;
 
-    task = &lbl_80659150[slot];
+    task = &task_slot_table[slot];
     memset(task, 0, 0x20);
     task->state = 0xC;
     task->func = (void (*)(TaskSlot*))func;
@@ -452,22 +451,22 @@ extern "C" void fn_80041850(s16* timer)
 
 extern "C" void fn_8004185C(s16 slot)
 {
-    lbl_80659150[slot].state = 0x10;
+    task_slot_table[slot].state = 0x10;
 }
 
 extern "C" void fn_80041878(s16 slot)
 {
-    lbl_80659150[slot].state = 1;
+    task_slot_table[slot].state = 1;
 }
 
 extern "C" void fn_80041894(s16 slot)
 {
-    lbl_80659150[slot].state = 2;
+    task_slot_table[slot].state = 2;
 }
 
 extern "C" void fn_800418B0(s16 slot)
 {
-    lbl_80659150[slot].state = 0;
+    task_slot_table[slot].state = 0;
 }
 
 /* Start a task slot with a fresh body (state 8).  `Tsk_Change__FPvs`: (void*, short). */
@@ -475,7 +474,7 @@ void Tsk_Change(void* func, s16 slot)
 {
     TaskSlot* task;
 
-    task = &lbl_80659150[slot];
+    task = &task_slot_table[slot];
     memset(task, 0, 0x20);
     task->state = 8;
     task->func = (void (*)(TaskSlot*))func;
@@ -483,7 +482,7 @@ void Tsk_Change(void* func, s16 slot)
 
 extern "C" TaskSlot* fn_8004192C(s16 slot)
 {
-    return &lbl_80659150[slot];
+    return &task_slot_table[slot];
 }
 
 /* The arena-select task entry: load the four-overlay mode and hand slot 4 to `arena_task`. */
@@ -512,12 +511,12 @@ void ArenaSelExec(void)
 
 extern "C" void fn_80041A64(void* block)
 {
-    MEMAllocFromAllocator(lbl_80669468, (u32)block);
+    MEMAllocFromAllocator(&wpad_mem2_allocator, (u32)block);
 }
 
 extern "C" s32 fn_80041A74(void* block)
 {
-    MEMFreeToAllocator(lbl_80669468, block);
+    MEMFreeToAllocator(&wpad_mem2_allocator, block);
     return 1;
 }
 
@@ -778,13 +777,13 @@ extern "C" s32 fn_80046F0C(void)
 
 extern "C" s32 screen_split_mode_ck(void)
 {
-    return Screen_w[0x1A] != 0;
+    return Screen_w.split_mode != 0;
 }
 
 extern "C" s8 fn_800470B4(void)
 {
-    if (Screen_w[0x1A] != 0) {
-        return (s8)Screen_w[0x1B];
+    if (Screen_w.split_mode != 0) {
+        return (s8)Screen_w.split_view_no;
     }
     return -1;
 }
@@ -877,7 +876,7 @@ extern "C" void fn_80041EA4(u8 chan, s32 on)
             system_w.field_0x7dc[chan] = 0;
         }
     } else {
-        system_w.field_0x7dc[chan] = lbl_8065ADD0[chan * 0x18 + 0x14];
+        system_w.field_0x7dc[chan] = pad_chan_state[chan].motor_level_0x14;
     }
 }
 
@@ -921,3 +920,32 @@ extern "C" f32 clamp_acc(f32 value, f32 limit)
     }
     return value;
 }
+
+/* ------------------------------------------------------------------ *
+ * This unit's own `.bss` (`splits.txt` `.bss 0x806585B8..0x806694E8`), in address order.  Defined at the
+ * foot of the file, after every use: with the definitions above the bodies MWCC folds the addresses
+ * into one section base plus displacements, where the target emits a `lis`/`addi` pair per symbol.
+ * ------------------------------------------------------------------ */
+u32 rso_slot_load_base[5];             /* +0x806585B8: per-slot RSO load base, cleared by `fn_80040954` */
+u32 rso_slot_unused_words[5];          /* +0x806585CC: cleared with `rso_slot_load_base`, read nowhere else */
+SystemWork system_w;                   /* +0x806585E0: the game/system state block (`mh3_pad/system_w.h`) */
+ScreenWork Screen_w;                   /* +0x8065903C: the screen geometry block (`mh3_pad/Screen_w.h`) */
+u8 option_w[0x24];                     /* +0x80659090: the option table (`mh3_pad/option_w.h`) */
+LbParamWork lb_param_w;                /* +0x806590B4: the lobby parameter block (`mh3_pad/lb_param_w.h`) */
+TaskSlot task_slot_table[16];          /* +0x80659150: the task slot table `Tsk_Change` indexes */
+PlayerPad Psw[4];                      /* +0x80659350: the per-player pad records (`mh3_pad/Psw.h`) */
+PlayerPad Psw_prev[4];                 /* +0x8065A090: the second pad-record array `fn_80046B94` constructs (GUESS: previous frame) */
+PadChanState pad_chan_state[4];        /* +0x8065ADD0: per-channel state records, cleared with `Psw` by `fn_80041AA4` */
+u16 pad_btn_table_0[16];               /* +0x8065AE30: copy of the .data button table 0x80580E90 (GUESS name) */
+u16 pad_btn_table_1[16];               /* +0x8065AE50: copy of the .data button table 0x80580EB0 (GUESS name) */
+u16 pad_btn_table_2[16];               /* +0x8065AE70: copy of the .data button table 0x80580ED0 (GUESS name) */
+u8 kpad_work[0x1B8];                   /* +0x8065AE90: KPAD work area `fn_80045048`/`fn_80044D78` use (GUESS name) */
+u8 wpad_sampling_buf_fmt8[4][0x1518];  /* +0x8065B048: per-channel 100-sample buffer for data format 8 */
+u8 wpad_sampling_buf_fmt5[4][0x1388];  /* +0x806604A8: per-channel 100-sample buffer for data format 5 */
+u8 wpad_sampling_buf_fmt2[4][0x1068];  /* +0x806652C8: per-channel 100-sample buffer for data format 2 */
+MEMAllocator wpad_mem2_allocator;      /* +0x80669468: allocator over the MEM2 pad heap (align 0x20) */
+s16 pointer_hist_x[16];                /* +0x80669478: pointer x history ring, zeroed by `fn_80043BAC` (GUESS) */
+s16 pointer_hist_y[16];                /* +0x80669498: pointer y history ring (GUESS) */
+f32 pointer_center[3];                 /* +0x806694B8: half of `Screen_w.width_f`/`height_f` (GUESS name) */
+f32 pointer_offset[3];                 /* +0x806694C4: zeroed pointer offset (GUESS name) */
+u8 game_mutex[0x18];                   /* +0x806694D0: an OSMutex, initialised by `fn_80046C80` (GUESS name) */

@@ -9,7 +9,7 @@
  * The character face/skin render unit.  `.text` 0x80047398..0x8004C9A0 (0x5610 B, 117 functions),
  * `extab` 0x80006A90..0x80006CF0, `extabindex` 0x8001E948..0x8001ECD8 (75 framed functions each).
  * The range is one maximal unclaimed run (attribute.py): its seam is unproven, and the two halves of the
- * body work on different data (the loader/driver family around `lbl_806694E8`, and the sprite/transform
+ * body work on different data (the loader/driver family around `face_work`, and the sprite/transform
  * family from 0x80048E2C on) - see "Residual" below.
  *
  * Naming - which evidence class decided it.
@@ -30,7 +30,7 @@
  *
  * What the unit does (from the bodies): it loads the male/female face, skin and `facemake` TPL textures
  * through the 8-byte `{size, name}` tables at 0x80582D38/0x80582E58/0x80582EE0, binds them as GX texture
- * objects into a work block at `lbl_806694E8` (0x4D0 B, cleared by fn_800474A8, whose three `void*`
+ * objects into a work block at `face_work` (0x4D0 B, cleared by fn_800474A8, whose three `void*`
  * slots start at 0x04), keeps a per-player face/frame/animation state there (the byte arrays at 0x448,
  * 0x456, 0x4B0, 0x4BA, 0x4C4 and the ten-entry pointer runs at 0x460/0x488) and draws the 2D face with an
  * orthographic GX pipeline (fn_80047D6C builds C_MTXOrtho/GXSetProjection and pushes TPL quads).
@@ -55,7 +55,7 @@
 #include "gx.h"
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 
-/* --- the unit's own work block, `lbl_806694E8` (.bss 0x806694E8, 0x4D0 B) ------------------------ */
+/* --- the unit's own work block, `face_work` (.bss 0x806694E8, 0x4D0 B) ------------------------ */
 
 /* Byte arrays are indexed by the player (0/1); the two ten-entry pointer runs are the texture-base
  * addresses fn_800474A8 hands out (0x20000 apart) and they are contiguous (ptr488 = ptr460 + 10). */
@@ -83,7 +83,7 @@ typedef struct FaceWork {
     /* +0x4C6 */ u8 pad_4C6[10];
 } FaceWork; /* size: 0x4D0 */
 
-extern FaceWork lbl_806694E8;
+extern FaceWork face_work;
 
 /* The unit's own `.data`/`.sdata` pool, declared (never defined) so the object emits only the references
  * (playbook 29).  The two face tables are runs of 8-byte `{size, name}` records. */
@@ -127,9 +127,9 @@ extern "C" u32 fn_80047D38(u8 index);
 extern "C" void* fn_80047470(u8 index, u32 which)
 {
     if (which == 0) {
-        return lbl_806694E8.ptr460[index];
+        return face_work.ptr460[index];
     }
-    return lbl_806694E8.ptr488[index];
+    return face_work.ptr488[index];
 }
 
 /* Clears the work block and hands out the texture base addresses (0x80C0 / 0x32460 / 0x20000 apart). */
@@ -139,21 +139,21 @@ extern "C" void fn_800474A8(void)
     u32 i;
     u32 j;
 
-    memset(&lbl_806694E8, 0, 0x4D0);
-    if (lbl_806694E8.tex[0] == 0) {
-        lbl_806694E8.tex[0] = (void*)addr;
+    memset(&face_work, 0, 0x4D0);
+    if (face_work.tex[0] == 0) {
+        face_work.tex[0] = (void*)addr;
     }
     addr += 0x80C0;
-    if (lbl_806694E8.tex[1] == 0) {
-        lbl_806694E8.tex[1] = (void*)addr;
+    if (face_work.tex[1] == 0) {
+        face_work.tex[1] = (void*)addr;
     }
     addr += 0x80C0;
-    lbl_806694E8.tex[2] = (void*)addr;
+    face_work.tex[2] = (void*)addr;
     addr += 0x32460;
 
     for (i = 0; i < 2; i++) {
-        void** p1 = &lbl_806694E8.ptr460[i * 5];
-        void** p2 = &lbl_806694E8.ptr488[i * 5];
+        void** p1 = &face_work.ptr460[i * 5];
+        void** p2 = &face_work.ptr488[i * 5];
         for (j = 0; j < 5; j++) {
             if (p1[j] == 0) {
                 p1[j] = (void*)addr;
@@ -170,7 +170,7 @@ extern "C" void fn_800474A8(void)
 /* The load_file completion callback: marks the blob whose slot word the caller passed as loaded. */
 extern "C" void fn_80047618(u32 a, u32 b, u32 c, u32* slot)
 {
-    lbl_806694E8.state[*slot] = 2;
+    face_work.state[*slot] = 2;
 }
 
 /* Sets one player's face index and re-enables the draw. */
@@ -195,44 +195,44 @@ extern "C" void fn_80047884(u8 index, u8 value)
 /* Enables one player's face draw. */
 extern "C" void fn_80047AF0(u8 index)
 {
-    lbl_806694E8.enabled[index] = 1;
+    face_work.enabled[index] = 1;
 }
 
 /* Disables one player's face draw. */
 extern "C" void fn_80047B0C(u8 index)
 {
-    lbl_806694E8.enabled[index] = 0;
+    face_work.enabled[index] = 0;
 }
 
 /* The frame counter of one player's face animation. */
 extern "C" u32 fn_80047B28(u8 index)
 {
-    return lbl_806694E8.frame[index];
+    return face_work.frame[index];
 }
 
 /* The face index of one player. */
 extern "C" u32 fn_80047B40(u8 index)
 {
-    return lbl_806694E8.face[index];
+    return face_work.face[index];
 }
 
 /* Advances one player's face animation by a frame; at 100 it steps the face index (0 -> 1 -> 2). */
 extern "C" void fn_80047B58(u8 index)
 {
-    if (lbl_806694E8.frame[index] < 100) {
-        lbl_806694E8.frame[index]++;
-        if (lbl_806694E8.frame[index] == 100) {
-            if (lbl_806694E8.face[index] < 2) {
-                lbl_806694E8.face[index]++;
-                lbl_806694E8.frame[index] = 0;
+    if (face_work.frame[index] < 100) {
+        face_work.frame[index]++;
+        if (face_work.frame[index] == 100) {
+            if (face_work.face[index] < 2) {
+                face_work.face[index]++;
+                face_work.frame[index] = 0;
             }
         }
-        lbl_806694E8.dirty[index] = 1;
+        face_work.dirty[index] = 1;
     } else {
-        if (lbl_806694E8.face[index] < 2) {
-            lbl_806694E8.face[index]++;
-            lbl_806694E8.frame[index] = 0;
-            lbl_806694E8.dirty[index] = 1;
+        if (face_work.face[index] < 2) {
+            face_work.face[index]++;
+            face_work.frame[index] = 0;
+            face_work.dirty[index] = 1;
         }
     }
 }
@@ -240,20 +240,20 @@ extern "C" void fn_80047B58(u8 index)
 /* Steps one player's face animation back by a frame; at 0 it drops the face index. */
 extern "C" void fn_80047BE0(u8 index)
 {
-    if (lbl_806694E8.frame[index] != 0) {
-        lbl_806694E8.frame[index]--;
-        if (lbl_806694E8.frame[index] == 0) {
-            if (lbl_806694E8.face[index] != 0) {
-                lbl_806694E8.face[index]--;
-                lbl_806694E8.frame[index] = 100;
+    if (face_work.frame[index] != 0) {
+        face_work.frame[index]--;
+        if (face_work.frame[index] == 0) {
+            if (face_work.face[index] != 0) {
+                face_work.face[index]--;
+                face_work.frame[index] = 100;
             }
         }
-        lbl_806694E8.dirty[index] = 1;
+        face_work.dirty[index] = 1;
     } else {
-        if (lbl_806694E8.face[index] != 0) {
-            lbl_806694E8.face[index]--;
-            lbl_806694E8.frame[index] = 100;
-            lbl_806694E8.dirty[index] = 1;
+        if (face_work.face[index] != 0) {
+            face_work.face[index]--;
+            face_work.frame[index] = 100;
+            face_work.dirty[index] = 1;
         }
     }
 }
@@ -261,16 +261,16 @@ extern "C" void fn_80047BE0(u8 index)
 /* Sets one player's first colour byte and flags the draw. */
 extern "C" void fn_80047C68(u8 index, u8 value)
 {
-    lbl_806694E8.colorA[index] = value;
-    lbl_806694E8.dirty[index] = 1;
+    face_work.colorA[index] = value;
+    face_work.dirty[index] = 1;
 }
 
 /* Sets one player's two colour bytes and flags the draw. */
 extern "C" void fn_80047C88(u8 index, u8 a, u8 b)
 {
-    lbl_806694E8.colorB[index] = a;
-    lbl_806694E8.mouth[index] = b;
-    lbl_806694E8.dirty[index] = 1;
+    face_work.colorB[index] = a;
+    face_work.mouth[index] = b;
+    face_work.dirty[index] = 1;
 }
 
 /* Loads one player's face set and seeds its animation state (runs the real loads, mode 1). */
@@ -279,20 +279,20 @@ extern "C" void fn_80047CAC(u8 index, u8 a, u8 b, u8 c, u8 d)
     if (d != 0xFF) {
         fn_80047634(a, b, 1);
         fn_80047780(a, 0, 1);
-        lbl_806694E8.face[index] = c;
-        lbl_806694E8.frame[index] = d;
-        lbl_806694E8.enabled[index] = 1;
-        lbl_806694E8.dirty[index] = 1;
+        face_work.face[index] = c;
+        face_work.frame[index] = d;
+        face_work.enabled[index] = 1;
+        face_work.dirty[index] = 1;
     }
 }
 
 /* Ready when the draw is still disabled, otherwise whether the state is clean. */
 extern "C" u32 fn_80047D38(u8 index)
 {
-    if (lbl_806694E8.enabled[index] == 0) {
+    if (face_work.enabled[index] == 0) {
         return 1;
     }
-    return lbl_806694E8.dirty[index] == 0;
+    return face_work.dirty[index] == 0;
 }
 
 /* --- the GX pipe writers --------------------------------------------------------------------------- */
@@ -474,3 +474,21 @@ extern "C" void color_rgba_copy(u8* dst, const u8* src)
     dst[2] = src[2];
     dst[3] = src[3];
 }
+
+/* The hook `bg_tex_disp_func` holds: `fn_80046F28` (mh3_pad.cpp) stores the function, `fn_800492A4` calls it.  The map
+ * gives the object 8 bytes; only the first word is referenced (GUESS: the second is the hook's argument). */
+struct BgTexDispHook {
+    /* +0x00 */ void (*func)(void);
+    /* +0x04 */ u32 unused_0x04;
+}; /* size: 0x8 */
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806694E8..0x80669F68`) and `.sbss` (`0x80794870..0x80794884`), in
+ * address order.  Defined at the foot of the file, after every use.  `lobby_world_block` is the cache
+ * `get_userdata()` (0x8004D120) and the user-data init `fn_800497B4`/`fn_800498EC` store the 0x6000-byte
+ * user-data block in; the block belongs to the user-data subsystem this band and `fn_8004C9A0`/`fn_8004CAD8` share. */
+FaceWork face_work;                    /* +0x806694E8 */
+u8 sub_trans_buf[0x580];               /* +0x806699B8: the sub-transform buffer `subTransSetPrio` fills (GUESS name) */
+u8 sub_trans_state[0x30];              /* +0x80669F38: the sub-transform stack state (GUESS name) */
+u8* face_buf_tbl[2];                   /* +0x80794870: the two 0x4880-byte buffers `fn_800487D0` carves out of the work heap (GUESS name) */
+BgTexDispHook bg_tex_disp_func;        /* +0x80794878 */
+u8* lobby_world_block;                 /* +0x80794880: the cached user-data pointer */

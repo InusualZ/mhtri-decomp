@@ -53,6 +53,7 @@
  */
 
 #include "types.h"
+#include "nw4r/math.h"
 #include "enemy.h"
 
 /* ---------------------------------------------------------------------------------------------------
@@ -2012,3 +2013,10 @@ extern "C" s32 fn_8015D1F0(_ENEMY_WORK* self) {
 extern "C" void fn_8015D200(_ENEMY_WORK* self) {
     fn_8013A654(self, 3);
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7820..0x806A7868`), in address order: the three two-vector
+ * records its static constructor `fn_8015D764` builds (`.data` tables point at them).  Names are GUESSes:
+ * each record is a (0, y0, 0) / (0, y1, 0) pair of model-space points. */
+VEC3 vec_pair_801550FC_0[2];  /* +0x806A7820 */
+VEC3 vec_pair_801550FC_1[2];  /* +0x806A7838 */
+VEC3 vec_pair_801550FC_2[2];  /* +0x806A7850 */

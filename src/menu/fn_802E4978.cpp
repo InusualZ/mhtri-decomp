@@ -667,7 +667,7 @@ void fn_802E71C4(void) {
         bars = 0;
     } else {
         f32 f;
-        limit = (s32)(lbl_8079A91C * Screen_w.field_0x14);
+        limit = (s32)(lbl_8079A91C * Screen_w.frame_scale);
         if (fn_803AA41C(1, lbl_8079A91C) == 0) {
             total = quest_time_elapsed_get();
         } else {

@@ -382,3 +382,10 @@ extern "C" void fn_801C2A58(_ENEMY_WORK* self)
     self->field_0x1C0 = (s32)(u16)(self->field_0x1C0 + 0x8000);
     self->field_0x1C4 = 0;
 }
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AD0..0x806A7B18`), in address order: the 3 two-vector record(s)
+ * its static constructor `fn_801C28FC` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801BD6C0_0[2];  /* +0x806A7AD0 */
+VEC3 vec_pair_801BD6C0_1[2];  /* +0x806A7AE8 */
+VEC3 vec_pair_801BD6C0_2[2];  /* +0x806A7B00 */

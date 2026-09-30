@@ -17,6 +17,9 @@ main.cpp:
 	extab       start:0x800066E0 end:0x80006770
 	extabindex  start:0x8001E480 end:0x8001E558
 	.text       start:0x8003F200 end:0x80040478
+	.data       start:0x8057C82C end:0x8057C87C
+	.bss        start:0x80658540 end:0x806585B8
+	.sbss       start:0x80794770 end:0x807947B4
 	.sdata2     start:0x80795AA0 end:0x80795AD8
 
 sys_mem.cpp:
@@ -34,11 +37,17 @@ mh3_pad.cpp:
 	extabindex  start:0x8001E5A0 end:0x8001E948
 	.text       start:0x800408A8 end:0x80047398
 	.ctors      start:0x8056F2C4 end:0x8056F2C8
+	.data       start:0x805803EC end:0x80581158
+	.bss        start:0x806585B8 end:0x806694E8
+	.sbss       start:0x807947D0 end:0x80794814
 
 fn_80047398.cpp:
 	extab       start:0x80006A90 end:0x80006CF0
 	extabindex  start:0x8001E948 end:0x8001ECD8
 	.text       start:0x80047398 end:0x8004C9A0
+	.data       start:0x80582C60 end:0x80582EF8
+	.bss        start:0x806694E8 end:0x80669F68
+	.sbss       start:0x80794870 end:0x80794884
 
 fn_8004C9A0.cpp:
 	extab       start:0x80006CF0 end:0x80006CF8
@@ -629,6 +638,8 @@ enemy/fn_801502C8.cpp:
 	extabindex  start:0x80028968 end:0x80028A88
 	.text       start:0x801502C8 end:0x801550FC
 	.ctors      start:0x8056F320 end:0x8056F324
+	.data       start:0x805A2BD8 end:0x805A4478
+	.bss        start:0x806A77D8 end:0x806A7820
 
 enemy/fn_801550FC.cpp:
 	extab       start:0x8000DD14 end:0x8000DFA4
@@ -684,6 +695,9 @@ enemy/fn_80171194.cpp:
 	extabindex  start:0x80029790 end:0x80029928
 	.text       start:0x80171194 end:0x80176C58
 	.ctors      start:0x8056F334 end:0x8056F338
+	.rodata     start:0x8056FD10 end:0x8056FDD0
+	.data       start:0x805A8418 end:0x805A94A0
+	.bss        start:0x806A79A0 end:0x806A79D0
 
 enemy/fn_80176C58.cpp:
 	extab       start:0x8000E6D4 end:0x8000E724
@@ -711,13 +725,13 @@ enemy/fn_80178378.cpp:
 	.text       start:0x80178378 end:0x80181C88
 	.rodata     start:0x8056FE50 end:0x8056FF50
 	.data       start:0x805A9574 end:0x805AA8DC
-	.bss        start:0x806A79E8 end:0x806A7A00
 
 enemy/fn_80181C88.cpp:
 	extab       start:0x8000E96C end:0x8000E9EC
 	extabindex  start:0x80029D0C end:0x80029DCC
 	.text       start:0x80181C88 end:0x80182D5C
 	.ctors      start:0x8056F338 end:0x8056F33C
+	.bss        start:0x806A79D0 end:0x806A7A00
 
 enemy/fn_80182D5C.cpp:
 	extab       start:0x8000E9EC end:0x8000ECC4
@@ -737,6 +751,9 @@ enemy/fn_80191598.cpp:
 	extabindex  start:0x8002A300 end:0x8002A3D8
 	.text       start:0x80191598 end:0x801926EC
 	.ctors      start:0x8056F33C end:0x8056F340
+	.data       start:0x805AD310 end:0x805AD33C
+	.bss        start:0x806A7A00 end:0x806A7A6C
+	.sbss       start:0x80794AA0 end:0x80794AA8
 
 enemy/fn_801926EC.cpp:
 	extab       start:0x8000EDF4 end:0x8000F084
@@ -750,6 +767,8 @@ enemy/fn_801993E0.cpp:
 	extabindex  start:0x8002A7B0 end:0x8002A8DC
 	.text       start:0x801993E0 end:0x8019ED34
 	.ctors      start:0x8056F340 end:0x8056F344
+	.data       start:0x805AE118 end:0x805AE71C
+	.bss        start:0x806A7A70 end:0x806A7A88
 
 enemy/fn_8019ED34.cpp:
 	extab       start:0x8000F14C end:0x8000F304
@@ -814,9 +833,6 @@ enemy/fn_801CA004.cpp:
 	.data       start:0x805B3CA8 end:0x805B3D04
 	.bss        start:0x806A7B18 end:0x806A7B30
 
-Pl/bss_pool.cpp:
-	.bss        start:0x806AB848 end:0x806AC8A8
-
 enemy/fn_801CCBC4.cpp:
 	extab       start:0x8000FF4C end:0x800100D4
 	extabindex  start:0x8002BDDC end:0x8002C028
@@ -829,6 +845,8 @@ enemy/fn_801D428C.cpp:
 	extabindex  start:0x8002C028 end:0x8002C1C0
 	.text       start:0x801D428C end:0x801D80EC
 	.ctors      start:0x8056F358 end:0x8056F35C
+	.data       start:0x805B61F8 end:0x805B69A8
+	.bss        start:0x806A7B30 end:0x806A7B90
 
 enemy/fn_801D80EC.cpp:
 	extab       start:0x800101E4 end:0x8001031C
@@ -907,6 +925,11 @@ lobby/fn_8021E1EC.cpp:
 	extabindex  start:0x8002E41C end:0x8002E7B8
 	.text       start:0x8021E1EC end:0x80224AC4
 	.ctors      start:0x8056F360 end:0x8056F368
+	.data       start:0x805BA7E8 end:0x805BAA20
+	.bss        start:0x806AA8C8 end:0x806AACC0
+
+Pl/bss_pool.cpp:
+	.bss        start:0x806AB848 end:0x806AC8A8
 
 Pl/fn_80224AC4.cpp:
 	extab       start:0x80011B34 end:0x80011C7C
@@ -1103,7 +1126,9 @@ ai/fn_802D44F4.cpp:
 	extabindex  start:0x80032C88 end:0x800330FC
 	.text       start:0x802D44F4 end:0x802DDC04
 	.ctors      start:0x8056F388 end:0x8056F38C
-	.data       start:0x805D5428 end:0x805D5460
+	.data       start:0x805D5000 end:0x805D55B8
+	.bss        start:0x806BD360 end:0x806BDA58
+	.sbss       start:0x80794B78 end:0x80794B80
 
 hud/layout.cpp:
 	extab       start:0x80014DAC end:0x80014FFC

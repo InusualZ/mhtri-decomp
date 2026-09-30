@@ -42,7 +42,7 @@
  *    r3.  Both are the same instruction multiset in the same size; the expression forms tried are
  *    recorded in the outbox.
  *  - `quest_clear_time_text_get` (98.25 %) / `quest_elapsed_time_text_get` (98.33 %) keep the
- *    `sprintf(..., minutes, seconds, Screen_w.field_0x14)` form their call sites' float argument
+ *    `sprintf(..., minutes, seconds, Screen_w.frame_scale)` form their call sites' float argument
  *    makes; `quest_arena_time_text_get`'s own call site passes two integers only (retail `crclr`
  *    cr1eq, no r7), which is why its text omits the third argument.
  *  - `quest_item_slots_prune` (108 B, the row this pass added) is byte-identical; its shape needed
@@ -174,15 +174,7 @@
 #include "unsplit/ef.h"                   /* get_move_work_adrs */
 #include "ef/fn_800CDB2C.h"               /* my_player_no */
 #include "g3d/g3d_anmchr.h"               /* msg_str_gen / flfntStrLen / flKnjMsgNumPtr (rule 2) */
-/* `include/Pl/fn_80273B14.h` and `include/unsplit/lobby.h` both declare the two pad/parameter
- * blocks with different types (`Psw`: `struct PswBlock` vs `LbPswBlock[4]`; `lb_param_w`:
- * `struct LbParamBlock` vs `LbParamWork`) - the same clash `src/menu/menu_item.cpp` documents -
- * so the Pl header is included under the same local renames, only `fn_802752C8` being needed. */
-#define Psw mhtri_pl_fn_80273B14_Psw
-#define lb_param_w mhtri_pl_fn_80273B14_lb_param_w
 #include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
-#undef Psw
-#undef lb_param_w
 
 extern "C" {
 
@@ -405,12 +397,12 @@ char* quest_field2E8_text_get(void) {
 char* quest_clear_time_text_get(void) {
     char** tbl = (char**)get_str_tbl(6);
     s32 time = quest_work.field_0x024;
-    f32 frames = frames_per_second_60f * Screen_w.field_0x14;
+    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
     s32 minutes = time / (s32)frames;
-    s32 seconds = (time - minutes * (s32)frames) / (s32)Screen_w.field_0x14;
+    s32 seconds = (time - minutes * (s32)frames) / (s32)Screen_w.frame_scale;
 
     quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[2], minutes, seconds, Screen_w.field_0x14);
+    sprintf(quest_text_buffer, tbl[2], minutes, seconds, Screen_w.frame_scale);
     return quest_text_buffer;
 }
 
@@ -418,12 +410,12 @@ char* quest_clear_time_text_get(void) {
 char* quest_elapsed_time_text_get(void) {
     char** tbl = (char**)get_str_tbl(6);
     s32 time = quest_work.field_0x01C - quest_work.field_0x020;
-    f32 frames = frames_per_second_60f * Screen_w.field_0x14;
+    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
     s32 minutes = time / (s32)frames;
-    s32 seconds = (time - minutes * (s32)frames) / (s32)Screen_w.field_0x14;
+    s32 seconds = (time - minutes * (s32)frames) / (s32)Screen_w.frame_scale;
 
     quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[2], minutes, seconds, Screen_w.field_0x14);
+    sprintf(quest_text_buffer, tbl[2], minutes, seconds, Screen_w.frame_scale);
     return quest_text_buffer;
 }
 
@@ -502,9 +494,9 @@ char* quest_arena_time_text_get(QuestRecord* rec, s32 which) {
     } else if (quest_flag_10_ck(rec) == 1) {
         time = arena_time_table[rec->field_0x02C - 60000][(u8)which] * 30;
     }
-    frames = frames_per_second_60f * Screen_w.field_0x14;
+    frames = frames_per_second_60f * Screen_w.frame_scale;
     minutes = time / (s32)frames;
-    seconds = (time - minutes * (s32)frames) / (s32)Screen_w.field_0x14;
+    seconds = (time - minutes * (s32)frames) / (s32)Screen_w.frame_scale;
     quest_text_buffer[0] = 0;
     sprintf(quest_text_buffer, tbl[2], minutes, seconds);
     return quest_text_buffer;
