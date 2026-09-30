@@ -4,8 +4,10 @@ title: A switch tail's constant returns are if-converted, so write the arms nega
 status: works
 problem: A `switch` whose default is `return 1` and whose allowed cases `break` leaves the target as `return 0` looks like a missing arm: the diff shows the target loading a constant and branching while ours returns early per case, and the function sits at ~94 % with the same opcodes in a different order.
 tags: [source-shape]
-applies: []
+applies: [Wii/1.3]
 demo: 034-switch-tail-negated-arms.cpp
+reviewed: 2026-09-29
+related: [37, 61, 71]
 ---
 
 # 34. A switch tail's constant returns are if-converted, so write the arms negated
@@ -14,62 +16,69 @@ demo: 034-switch-tail-negated-arms.cpp
 `return 0` looks like a missing arm: the diff shows the target loading a constant and branching while ours
 returns early per case, and the function sits at ~94 % with the same opcodes in a different order.
 
-**Why try it.** MWCC if-converts two constant return arms (`return 0` / `return 1`) into a branchless boolean,
-so a body written `if (c) return 0; break;` compiles to an early `return 0` the target never has. Negating the
-test (`if (!c) return 1; break;`) gives the compiler the *same* two arms but in the order it folds into the
-branchless form, and the tail matches. The same class of shape - a case body that falls through to a shared
-constant - has to be written the way the *tail* reads, not the way the condition reads.
+**How it looks.** Same opcodes, different block order: retail has one shared `li r3,0 ; blr` tail with the case
+tests branching to it, while ours has an extra constant-return block (`li r3,0 ; b`) sitting where the `default`
+arm compiles, or returns early per case where retail falls through. Function size differs by one or two blocks
+(8 bytes per extra `li`+`b`/`blr`).
 
-**Result.** `Pl/pl_act`'s `fn_8027C208` 93.926 -> **99.967 %**, `.text` exact. The sibling shapes in the same
-round: cases written in **body-address order** (not condition order) took `fn_8027A340` 94.234 -> 98.084 %, and
-`s32` locals for equality tests (so the compiler emits `cmpwi`, not `cmplwi`) took `Pl_bari_ck`
-84.415 -> 86.679 %. Unit 97.42033 -> **97.86864 %**, matched bytes unchanged, no flag change.
+**Why it happens.** MWCC merges identical constant-return blocks, and if-converts a return arm into a
+branchless boolean (`cntlzw`+`srwi`, i.e. "is zero") **only** when the arms reduce to a boolean of the tested
+value. What it does with the same source therefore depends on what is in the arms, and the switch's `default`
+spelling decides whether the tail exists once or twice.
+
+**How to work it.** Match the switch's *tail*, not the conditions: count the constant-return blocks in the target's
+switch region and write the source so ours has the same number.
+
+* **The arms call something (a real function body, not a bare boolean):** `default: return 0;` next to a trailing
+  `return 0;` emits **two** return-0 blocks (the default's own plus the fall-through tail). `default: break;` plus
+  one trailing `return 0;` makes every non-returning case reach the **same** tail block - what retail has when its
+  `li r3,0` occurs once. Measured in the demo: `call_default_ret0` 0x6C B vs `call_default_break` 0x64 B (8 bytes = one extra block).
+* **The arms reduce to a boolean of the tested value** (`if (!allowed) return 1; break;` + `return 0`): the
+  direction *reverses*. `default: return 0` merges with the tail and the whole case test folds to a branchless
+  `cntlzw`/`srwi` (0x2C B), while `default: break` keeps the explicit `li 1` / `li 0` blocks (0x30 B). So if
+  retail shows the `cntlzw`/`srwi` form, the `default` must return the same constant as the tail.
+* **Default and tail constants differ** (`default: return 1` with a `return 0` tail): those are the two arms
+  MWCC if-converts as a pair, and `default: return 1;` is right.
+* Write the `case` labels in **body-address order** (the order the bodies appear in the target), not the
+  condition's order, and use `s32` locals for equality tests so the compare is `cmpwi`, not `cmplwi` (idea 72).
+
+**When NOT to apply.** Do not negate a condition (`if (!c) return 1;` versus `if (c) return 0;`) expecting a
+change: the demo's `arms_negated`/`arms_plain` (one spelling negated, semantically the same function) compile to
+identical code. That "negated arms" step of the original idea was **not reproduced** on Wii/1.3, nor with the Pl
+unit's flags (`-O3 -inline noauto -opt nopeephole`). The unit the idea came from,
+`Pl/pl_act`'s `fn_8027C208`, no longer contains a negated arm (its cases read `if (...) return 1; break;`), so the
+original evidence for negation is not checkable in the tree; treat it as unproven and try it only after the
+default-spelling lever above.
 
 **Example.**
 
 ```c
-/* target: the tail is `return 0`, the default `return 1`, every case falls through */
+/* retail tail: every non-returning case reaches ONE `li r3,0 ; blr`, and the cases call helpers */
 switch (id) {
-case 0: case 4: case 2:            /* body-address order, not condition order */
-    if (!allowed) return 1;        /* negated: gives MWCC its two constant arms */
+case 0: case 4:                    /* body-address order, not condition order */
+    if (chk(x)) return 1;
+    break;
+case 2:
+    if (x > 3) return 1;
     break;
 default:
-    return 1;
+    break;                         /* not `return 0;` - that emits a second return-0 block */
 }
 return 0;
 ```
 
-**Refinement (2026-09-27): when the default returns the *same* constant as the tail, write `default: break;` - `default: return 0;` emits a second return-0 block.** The rule above is about MWCC if-converting
-*two different* constant arms (`return 0` / `return 1`). When the constants are the *same* (the common
-`return 1` for the allowed cases, `return 0` for everything else), the spelling decides how many copies of
-the tail it emits:
+**Result.** `Pl/pl_act`'s `fn_8027C208` 93.926 -> **99.967 %**, `.text` exact (measured then; the source has since
+been rewritten). The sibling shapes in the same round: cases in **body-address order** took `fn_8027A340` 94.234 ->
+98.084 %, and `s32` locals for equality tests took `Pl_bari_ck` 84.415 -> 86.679 %. Unit 97.42033 -> **97.86864 %**,
+matched bytes unchanged, no flag change.
 
-```c
-default:
-    return 0;        /* a constant-return arm of its own -> its own block */
-...
-return 0;            /* the fall-through tail every `break` reaches -> a second block */
-```
+**Evidence (refinement of 2026-09-27).** Measured on all five switches of `Network/network_state.cpp`, each
+written `default: break;` + one trailing `return 0;`: `handleNetworkState1` 0.23 -> **82.50230 %**,
+`handleNetworkState2` 0.34 -> **91.28178 %**, `handleNetworkState2Fmp` 0.34 -> **81.01007 %** (the functions score
+with the batch's other levers - the per-unit `-O3`, `#pragma exceptions on` and idea 61's `dont_inline` pair).
 
-gives **two** return-0 blocks, while `default: break;` plus the one trailing `return 0;` makes every
-non-returning case fall into the **same** tail block - which is what retail has.
-
-**When the two forms differ, and how to tell from the target.** Count the constant-return blocks in the
-switch's region of the target: retail with a shared tail has exactly **one** `li r3, 0` reaching `blr`,
-with the case conditions branching to it, and no second `li r3, 0` at the default site. If our diff shows
-an extra constant block sitting where the default arm compiles, our `default: return 0;` created it - change
-that one word to `break`. (If the default's constant *differs* from the tail's, the two arms are the
-if-conversion pair this row's negation rule already covers, and `default: return 1;` is right.)
-
-**Measured** on all five switches of `Network/network_state.cpp`, each written `default: break;` + one
-trailing `return 0;`: `handleNetworkState1` 0.23 -> **82.50230 %**, `handleNetworkState2` 0.34 ->
-**91.28178 %**, `handleNetworkState2Fmp` 0.34 -> **81.01007 %** (the function scores with the batch's other
-levers - the per-unit `-O3`, `#pragma exceptions on` and section 61's `dont_inline` pair).
-
-**Demonstration.** `034-switch-tail-negated-arms.cpp` (Wii/1.3, base cflags, `ideas.py demo-check 34`). Measured in
-isolation: `default: return 0` plus a trailing `return 0` folds the case test into a branchless `cntlzw`/`srwi` and
-leaves ONE `li r3,0` block (0x2C B), while `default: break` keeps explicit `li 1` / `li 0` blocks (0x30 B) - so the
-spelling does change the tail, but the direction the refinement above states (`default: return 0` emitting a
-*second* return-0 block) was **not reproduced** here. The negated-arms rule was not reproduced either: `if (!allowed)
-return 1; ... return 0` and `if (allowed) return 0; ... return 1` compile to identical code (both 0x2C B), so that
-rule's effect depends on the surrounding function, not on the switch shape alone.
+**Demonstration.** `034-switch-tail-negated-arms.cpp` (Wii/1.3, base cflags, `ideas.py demo-check 34`): the four
+functions above are exactly the measurements quoted (0x2C / 0x30 for the boolean shape, 0x6C / 0x64 for the calling
+shape, and equal 0x2C for negated vs plain arms). Verified 2026-09-29 also under `-O3 -inline noauto -opt nopeephole`
+(same sizes). The earlier demo covered only the boolean shape, and its result was read as contradicting the
+refinement; the two shapes are consistent - the direction depends on whether the arms fold to a boolean.
