@@ -425,7 +425,10 @@ cflags_menu = [
 #   * the retail object never fuses srwi+clrlwi into extrwi
 #     => -opt nopeephole
 #   * the retail object emits one lis+addi pair per S-box table (no shared base register)
-#     => -pool off
+#     => -pool off  (`-pool` controls whether a function shares one section-relative base register
+#        across the distinct data objects it references; measured 2026-09-29: without the flag `.text`
+#        is 0x5F34 against 0x5F64, the tables are addressed off a shared base, and the unit falls
+#        99.96 -> 99.24 with camellia_encrypt/decrypt/setup 128/256 each dropping from 100 %)
 #   * -O4,p / -inline auto do not reproduce the retail code shape at all
 #     => -O3 -inline noauto
 # With these, 9 of the 10 functions in the unit are byte-identical to the retail object and only
@@ -459,8 +462,9 @@ cflags_camellia = [
 #     stmw/lmw do not occur anywhere in the range
 #     => -use_lmw_stmw off
 #   * RSOStaticLocateObject emits 12 `lis` for 11 distinct ADDR16_HA symbols, one dedicated base
-#     register each (r19, r21-r30) and never a shared base
-#     => -pool off
+#     register each (r19, r21-r30) and never a shared base.  `-pool off` was carried here for that
+#     shape; measured redundant 2026-09-29: the object is byte-identical (every section, symbol table
+#     and relocation; only `.comment`'s flag byte differs) with and without it, so the flag is gone.
 # -inline noauto is not observable in the binary yet; it is carried over from the Camellia evidence
 # and still needs a source-level experiment here.
 # NOTE (corrects an earlier revision of this comment): the whole-DOL "extrwi == 0 => nopeephole"
@@ -476,7 +480,6 @@ cflags_rso = [
     "-func_align 4",
     "-inline noauto",
     "-use_lmw_stmw off",
-    "-pool off",
 ]
 
 config.linker_version = "Wii/1.0"
@@ -2399,11 +2402,16 @@ config.libs = [
             # Per-unit flag deviation (brief section 8.2), instruction-level evidence, unchanged by the
             # split: `-O3` like the two sibling session units - measured on the combined unit, the lib's
             # `-O4,p` put 14 rows at 100 % (unit score 4.05), `-O3` put 37 of 38 there (unit score 7.37);
-            # and `-pool off` (playbook 43) - the target materialises each log string with its own
+            # and `-pool off` on `network_socket_streams` alone (playbook 43) - the target materialises each log string with its own
             # `lis`/`addi` pair (`NetworkMultipleUdp_receive`: `lis r4,lbl_805F988C@ha` / `addi
             # r4,r4,lbl_805F988C@l`, then `lis r4,lbl_805F98C4@ha`), where the default pooling addresses
             # every string of a function through one `@stringBase0` register; toggling it moved one row
-            # (`NetworkMultipleUdp_receive` 89.53 % -> 94.06 %) and lowered none.
+            # (`NetworkMultipleUdp_receive` 89.53 % -> 94.06 %) and lowered none.  Measured 2026-09-29: `-pool`
+            # (not `-str`) is the lever - with it on, a function referencing two `@NNN` strings addresses the
+            # second off the first's base (`addi r28,r5,<first>` then `addi r4,r28,<delta>`); it is a no-op
+            # on the other seven units of this group TODAY (each object is byte-identical without it), but they are
+            # TUs of the same retail family and the session units still have ~60 unwritten rows, several with two
+            # log strings in one function, so the flag stays on all eight rather than being re-discovered per row.
             Object(NonMatching, "Network/NetworkPeerBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             Object(NonMatching, "Network/NetworkPeerBuffer.cpp",
