@@ -112,6 +112,7 @@
 #include "nw4r/math.h"
 #include "stage/fn_802B2AA0.h"
 #include "unsplit/enemy.h"
+#include "stage/stg_w.h"
 
 /* `stage/fn_802B2AA0.h` used to open a file-wide `#pragma peephole off` that this unit picked up by
  * including it.  Measured: with the leak gone this unit drops (unit fuzzy 5.672 -> 5.650;
@@ -168,7 +169,7 @@ void em020_angle_step_to_zero(_ENEMY_WORK* self)
  * byte is a per-frame latch of "the map is 7 and the area is 3". */
 void em020_timers_tick(_ENEMY_WORK* self)
 {
-    if (fn_802B0668(self->field_0x1E0) == 7 && self->area_no == 3)
+    if (stage_map_kind_get(self->field_0x1E0) == 7 && self->area_no == 3)
         self->em020_0x328.latch_0x338 = 1;
     else
         self->em020_0x328.latch_0x338 = 0;
@@ -176,7 +177,7 @@ void em020_timers_tick(_ENEMY_WORK* self)
     if (self->em020_0x328.timer_0x334 > 0)
         self->em020_0x328.timer_0x334 -= 1;
 
-    if (fn_802B0668(self->field_0x1E0) == 7 && self->area_no == 2 && self->stack_0x961[0] == 6) {
+    if (stage_map_kind_get(self->field_0x1E0) == 7 && self->area_no == 2 && self->stack_0x961[0] == 6) {
         if (self->em020_0x328.timer_0x33E > 0)
             self->em020_0x328.timer_0x33E -= 1;
     }

@@ -113,7 +113,6 @@ void fn_8005D0CC(void* obj, const void* sub);
 void fn_80051490(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void fn_80051574(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void* fn_80097EB0(void* sub, s32 a);
-u8 fn_802B0668(u8 kind);
 u32 fn_802B0998(u32 kind);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4): declared in their owner's header,
  * `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them (rule 2). */

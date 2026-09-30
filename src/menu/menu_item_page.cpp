@@ -24,7 +24,7 @@
  * `build/RMHE08/src/menu/menu_item.o` is byte-identical before and after it).
  *
  * Naming note: the `fn_XXXXXXXX` names this file carries are all *references* to other units'
- * symbols (`fn_802E0AD4`, `fn_8004EA24`, `fn_8033ADD0`, `get_menu_lsp_tbl`'s band, ...) which the map
+ * symbols (`sprite_frame_apply`, `fn_8004EA24`, `fn_8033ADD0`, `get_menu_lsp_tbl`'s band, ...) which the map
  * still spells as stems and which are not this batch's to rename; every one of this file's own 22
  * symbols is named above.  The shape is the one `hud/fn_80334568.cpp` and `menu/fn_8031EA8C.cpp`
  * record for the same case (the gate's `rule7_defer_growth` refuses only a *defined* generated name
@@ -61,14 +61,14 @@
  *   * `item_page_draw_rows` 87.58 / `item_page_draw_blank_rows` 93.70: the row draws' argument
  *     narrowing (`(u16)` on the id and the `s16` step) - same size, instruction-order and masking
  *     differences.  `item_page_draw_rows`'s target also narrows its `first` parameter with `extsb`
- *     where our `u8` gives `clrlwi`, and sets `row_id` up *after* the first `fn_802E0AD4` call where
+ *     where our `u8` gives `clrlwi`, and sets `row_id` up *after* the first `sprite_frame_apply` call where
  *     we set it up before: a signed `first` and a reordered declaration are the next two things to
  *     try there (not tried - the row's remaining diff is dominated by the block order).
  *   * `item_page_item_price` 97.5 (260/256 B): the return and callee widths are load-bearing - the
  *     target masks NOTHING on the three `fn_8004B*` results or on `fn_8026FE44`'s compare, so this
  *     unit's view declares `item_page_item_price` and `fn_8004B0A4`/`item_count_find`/`fn_8004B70C` as
  *     `u32` and `fn_8026FE44` as `u32`, and the price chain is two statements
- *     (`base = fn_802731B4(worker, id); base += fn_8004B70C(...);`) so the worker call comes first
+ *     (`base = Pl_item_timer_get(worker, id); base += fn_8004B70C(...);`) so the worker call comes first
  *     like retail's.  That took the row 81.09 -> 97.5; the residual is one instruction, the mask the
  *     third argument's narrowing emits after `fn_8004AE70` instead of before the other two argument
  *     setups (retail masks into r5 immediately, we copy to r0 and mask at the call).  Three shapes
@@ -83,7 +83,7 @@
 #include "menu/menu_item.h"
 #include "menu/menu_item_page.h"
 
-/* This unit's own view of the 0x24-byte sprite-data record `fn_802E0AD4` fills in and the `draw_*`
+/* This unit's own view of the 0x24-byte sprite-data record `sprite_frame_apply` fills in and the `draw_*`
  * family takes by reference (`_SPR_DATA_` in the map's manglings): `include/hud/layout.h` owns the full
  * definition and `include/unsplit/lobby.h` keeps the tag incomplete, and including the owner's header
  * here collides with the lobby band's `_mh_ivec2_`/`get_lsp_data` views.  The record starts with the
@@ -216,8 +216,8 @@ extern "C" void item_page_draw(MenuSlot* slot)
     if (draw == 0) {
         return;
     }
-    fn_802E0AD4((_SPR_DATA_*)&back, 0x3FA, slot->field_0x23A, &posBack);
-    fn_802E0AD4((_SPR_DATA_*)&panel, 0x406, slot->field_0x23A, &posPanel);
+    sprite_frame_apply((_SPR_DATA_*)&back, 0x3FA, slot->field_0x23A, &posBack);
+    sprite_frame_apply((_SPR_DATA_*)&panel, 0x406, slot->field_0x23A, &posPanel);
     draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x46), slot->field_0x23A, &posBack);
     if (slot->field_0x001 == 1) {
         switch ((s8)slot->page_index) {
@@ -242,9 +242,9 @@ extern "C" void item_page_draw(MenuSlot* slot)
     draw_sprite_anim_idx(0x3FD, slot->field_0x23A, &posBack);
     item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x48), slot->field_0x23A, page_ofs == 0, &posPanel);
     if (slot->field_0x23A > 0x1E) {
-        fn_802E0AD4((_SPR_DATA_*)&page, 0x41F, slot->field_0x23A, &posPage);
+        sprite_frame_apply((_SPR_DATA_*)&page, 0x41F, slot->field_0x23A, &posPage);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x4C), slot->field_0x23A, &posPage);
-        fn_802E0AD4((_SPR_DATA_*)&nums, 0x438, slot->field_0x23A, &posNums);
+        sprite_frame_apply((_SPR_DATA_*)&nums, 0x438, slot->field_0x23A, &posNums);
         item_page_draw_page_widget((s8)slot->page_index, &posNums);
         if (arrow != 0) {
             PutPageArrow((u16*)get_menu_lsp_tbl(0x4F), (s16)slot->scroll.col, (s16)slot->scroll.col_count,
@@ -284,7 +284,7 @@ extern "C" void item_page_draw_page_arrow(u16* table, u32 id, s32 flag, _mh_ivec
     }
     part = id - 30;
     draw_sprite_anim_idx(table[0], part, pos);
-    fn_802E0AD4((_SPR_DATA_*)&spr, table[1], part, NULL);
+    sprite_frame_apply((_SPR_DATA_*)&spr, table[1], part, NULL);
     fn_802D9EA8();
     spr.colour_0x1C = (spr.colour_0x1C & 0xFF) | (color_lerp(spr.colour_0x1C, 0xFFD246FF) & 0xFFFFFF00);
     draw_sprite(*(_SPR_DATA_*)&spr, pos);
@@ -298,7 +298,7 @@ extern "C" void item_page_draw_page_widget(s8 page, _mh_ivec2_* pos)
     u16* row = (u16*)get_menu_lsp_tbl(0x4D);
 
     while (*row != 0xFFFF) {
-        fn_801E6850((s16*)&spr, get_lsp_data(*row, NULL));
+        spr_data_copy((s16*)&spr, get_lsp_data(*row, NULL));
         spr.colour_0x1C = item_page_colour_table[page];
         draw_sprite(*(_SPR_DATA_*)&spr, pos);
         row++;
@@ -317,16 +317,16 @@ extern "C" void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id,
     u16* row_id = &((u16*)get_menu_lsp_tbl(0x52))[first];
     s32 i;
 
-    fn_802E0AD4((_SPR_DATA_*)&row, 0x438, id, &ofs);
+    sprite_frame_apply((_SPR_DATA_*)&row, 0x438, id, &ofs);
     for (i = 0; i < count; i++) {
-        fn_802E0AD4((_SPR_DATA_*)&row, *row_id, id, NULL);
+        sprite_frame_apply((_SPR_DATA_*)&row, *row_id, id, NULL);
         row.pos.x += ofs.x;
         row.pos.y += ofs.y;
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x50), id, &row.pos);
         if (i == sel && chk_pointer() == 0) {
             draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x53), id2, &row.pos);
         }
-        fn_802E0AD4((_SPR_DATA_*)&text, 0x435, id, NULL);
+        sprite_frame_apply((_SPR_DATA_*)&text, 0x435, id, NULL);
         if (blend == i) {
             text.colour_0x1C = 0xB45511FF;
         }
@@ -350,10 +350,10 @@ extern "C" void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, 
     u16* row_id = (u16*)get_menu_lsp_tbl(0x52);
     s32 i;
 
-    fn_802E0AD4((_SPR_DATA_*)&row, 0x438, id, &ofs);
+    sprite_frame_apply((_SPR_DATA_*)&row, 0x438, id, &ofs);
     for (i = 0; i < count; i++) {
         if (i == 0 || entries->field_0x02 != 0) {
-            fn_802E0AD4((_SPR_DATA_*)&row, *row_id, id, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&row, *row_id, id, NULL);
             row.pos.x += ofs.x;
             row.pos.y += ofs.y;
             draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x50), id, &row.pos);
@@ -362,13 +362,13 @@ extern "C" void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, 
             }
             if (i == 0 && entries->field_0x02 == 0) {
                 u8** text_tbl = get_str_tbl(0x44);
-                fn_802E0AD4((_SPR_DATA_*)&text, 0x435, id, NULL);
+                sprite_frame_apply((_SPR_DATA_*)&text, 0x435, id, NULL);
                 if (entries->selected != 0) {
                     text.colour_0x1C = 0xBE5F1BFF;
                 }
                 draw_font(*(_SPR_DATA_*)&text, (s8*)*text_tbl, 0, &row.pos);
             } else {
-                fn_802E0AD4((_SPR_DATA_*)&text, 0x435, id, NULL);
+                sprite_frame_apply((_SPR_DATA_*)&text, 0x435, id, NULL);
                 if (entries->selected != 0) {
                     text.colour_0x1C = 0xBE5F1BFF;
                 }
@@ -390,7 +390,7 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
     if (fn_800CF208() == 2) {
         return fn_8004B0A4(id, (void*)lobby_world_block);
     }
-    base = fn_802731B4(worker, id);
+    base = Pl_item_timer_get(worker, id);
     base += fn_8004B70C(id, (void*)&lobby_world_block->field_0x0180, fn_8004AE70((void*)lobby_world_block));
     if (fn_8026FE44(worker) == 1) {
         return base + item_count_find(id, fn_8004AF60((void*)lobby_world_block, 0), fn_8004AF0C(0));
@@ -410,7 +410,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
 
     if (slot->field_0x002 != 0 || slot->field_0x23B != 0) {
         id = slot->field_0x23B;
-        fn_802E0AD4((_SPR_DATA_*)&spr, 0x4D9, id, &pos);
+        sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D9, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x57), id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x58), id, &pos);
         data = &fn_8004EA24()[slot->scroll.row];
@@ -423,7 +423,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             fn_802E23D0(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->item_id));
             fn_802E23D0(0x4F8, id, text, 2, &pos);
-            fn_802E0AD4((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->item_id));
@@ -435,7 +435,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             fn_802E23D0(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->equip_id));
             fn_802E23D0(0x4F8, id, text, 2, &pos);
-            fn_802E0AD4((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->equip_id));
@@ -447,7 +447,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             fn_802E23D0(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->equip_id));
             fn_802E23D0(0x4F8, id, text, 2, &pos);
-            fn_802E0AD4((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->equip_id));
@@ -468,7 +468,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             fn_802E23D0(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->field_0x0A));
             fn_802E23D0(0x4F8, id, text, 2, &pos);
-            fn_802E0AD4((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->field_0x0A));
@@ -497,7 +497,7 @@ extern "C" void item_page_draw_column0(MenuSlot* slot)
     item_page_draw_rows(slot->entries_b, slot->scroll.row, slot->scroll.row_limit, slot->field_0x23A, slot->field_0x23C,
                 0, blend);
     if (slot->field_0x002 == 2) {
-        fn_802E0AD4((_SPR_DATA_*)&spr, 0x4D9, slot->field_0x23B, &pos);
+        sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D9, slot->field_0x23B, &pos);
         ofs = (_mh_ivec2_*)get_lsp_data(0x4DA, NULL);
         pos.x += ofs->x;
         pos.y += ofs->y;
@@ -518,7 +518,7 @@ extern "C" void item_page_draw_wrapped_text(u16 id, u16 part, s8* text, const _m
     s8 buffer[0x200];
     s8* line = buffer;
 
-    fn_802E0AD4((_SPR_DATA_*)&spr, id, part, NULL);
+    sprite_frame_apply((_SPR_DATA_*)&spr, id, part, NULL);
     strcpy(buffer, text);
     for (;;) {
         s8* brk = (s8*)flfntStrChr((char*)line, 10);
@@ -556,7 +556,7 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
         id = slot->field_0x23B;
         entry = &slot->entries_b[slot->scroll.row];
         data = &((MenuRowRec*)fn_8029F808())[entry->field_0x06];
-        fn_802E0AD4((_SPR_DATA_*)&spr, 0x46C, id, &pos);
+        sprite_frame_apply((_SPR_DATA_*)&spr, 0x46C, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x54), id, &pos);
         if (entry->selected != 0) {
             draw_sprite_anim_ary((const u16*)((u32*)get_menu_lsp_tbl(0x55))[data->mode], id, &pos);
@@ -589,7 +589,7 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
                     sprintf(text, "%6.1f", value_a);
                     fn_802E23D0(0x4AE, id, text, 2, &pos);
                     if ((u8)(res_a + 0xFF) <= 1) {
-                        fn_802E0AD4((_SPR_DATA_*)&bar, 0x4A6, id, NULL);
+                        sprite_frame_apply((_SPR_DATA_*)&bar, 0x4A6, id, NULL);
                         if (res_a == 2) {
                             bar.pos.x += 0x14;
                             bar.pos.y += 0x14;
@@ -614,7 +614,7 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
                 sprintf(text, "%d", limit_a);
                 fn_802E23D0(0x4AA, id, text, 0, &pos);
                 if (data->field_0x03 != 0) {
-                    fn_802E0AD4((_SPR_DATA_*)&bar, 0x49F, id, NULL);
+                    sprite_frame_apply((_SPR_DATA_*)&bar, 0x49F, id, NULL);
                     for (i = 0; i < data->field_0x03; i++) {
                         draw_sprite(*(_SPR_DATA_*)&bar, &pos);
                         bar.pos.x += bar.ofs_x;
@@ -659,12 +659,12 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
     if (slot->field_0x002 != 0 || slot->field_0x23B != 0) {
         id = slot->field_0x23B;
         entry = &slot->entries_b[slot->scroll.row];
-        fn_802E0AD4((_SPR_DATA_*)&spr, 0x4B0, id, &pos);
+        sprite_frame_apply((_SPR_DATA_*)&spr, 0x4B0, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x56), id, &pos);
         if (entry->field_0x02 != 0) {
             item = (ItemRec*)fn_8033ADD0(entry->field_0x06, &item_a, &item_b, 0);
             if (item != NULL) {
-                fn_802E0AD4((_SPR_DATA_*)&spr, 0x4C4, id, NULL);
+                sprite_frame_apply((_SPR_DATA_*)&spr, 0x4C4, id, NULL);
                 draw_itemicon_item_id(*(_SPR_DATA_*)&spr, item->id, &pos);
                 fn_802E23D0(0x4C8, id, (s8*)ItemName(item->id), 4, &pos);
                 fn_802E23D0(0x4C9, id, (s8*)ItemName(item_a), 0, &pos);
@@ -673,7 +673,7 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
                 fn_802E23D0(0x4D4, id, text, 1, &pos);
                 fn_8033B67C(text, item);
                 fn_802E23D0(0x4D5, id, text, 1, &pos);
-                fn_802E0AD4((_SPR_DATA_*)&spr, 0x4D7, id, NULL);
+                sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D7, id, NULL);
                 font_set_size(spr.width, spr.height);
                 flfntSetColor(spr.colour_0x1C);
                 font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s",
@@ -709,11 +709,11 @@ extern "C" void item_page_draw_column3(MenuSlot* slot)
     u8 base;
     u8 kind;
 
-    fn_802E0AD4((_SPR_DATA_*)&spr, 0x438, slot->field_0x23A, &posGlyph);
+    sprite_frame_apply((_SPR_DATA_*)&spr, 0x438, slot->field_0x23A, &posGlyph);
     if (slot->field_0x002 != 0xA) {
         has_glyph = (slot->field_0x2F5 != 0);
         if (has_glyph == 1) {
-            fn_802E0AD4((_SPR_DATA_*)&glyph, *(u16*)get_menu_lsp_tbl(0x52), slot->field_0x23A, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&glyph, *(u16*)get_menu_lsp_tbl(0x52), slot->field_0x23A, NULL);
             glyph.pos.x += posGlyph.x;
             glyph.pos.y += posGlyph.y;
             draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x51), slot->field_0x23A, &glyph.pos);
@@ -761,7 +761,7 @@ extern "C" void item_page_draw_closed_column(u8 kind, u8 index, s8 light, s8 dar
     u8 blend;
 
     selected = item_page_option_row_index(kind, index, light);
-    fn_802E0AD4((_SPR_DATA_*)&spr, 0x438, id, &pos);
+    sprite_frame_apply((_SPR_DATA_*)&spr, 0x438, id, &pos);
     if (selected >= 0 && get_option_cfg(7) == 0) {
         blend = flags & 0xFE;
     } else {
@@ -919,7 +919,7 @@ extern "C" void item_page_draw_option_frame(s8 a, s8 b, u16 c, u16 d, u8 flags, 
     u32 glyph;
     u8 arrow = 3;
 
-    fn_802E0AD4((_SPR_DATA_*)&spr, 0x4FE, d, pos);
+    sprite_frame_apply((_SPR_DATA_*)&spr, 0x4FE, d, pos);
     draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x5A), d, pos);
     if ((flags & 8) == 0) {
         if ((flags & 4) != 0) {
@@ -947,12 +947,12 @@ extern "C" u32 item_page_option_available(s8 index)
         return 0;
     }
     fn_802DA2D4(1);
-    if (fn_802DA454(1, (u8)index, 0, 0, 1, 1, 0) != 0) {
+    if (hud_notice_spawn(1, (u8)index, 0, 0, 1, 1, 0) != 0) {
         result = 1;
     }
     if (index == 0xB && result == 1) {
         result = 0;
-        if (fn_802DA454(1, 0x15, 0, 0, 1, 1, 0) != 0) {
+        if (hud_notice_spawn(1, 0x15, 0, 0, 1, 1, 0) != 0) {
             result = 1;
         }
     }

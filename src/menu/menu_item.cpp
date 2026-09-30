@@ -876,7 +876,7 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
         move_work = (MENU_MOVE_WORK*)get_move_work_adrs(2);
         for (i = 0; i < self->item_count; i++) {
             draw_sprite_ary((u16*)get_menu_lsp_tbl(49), &pos);
-            fn_801E6850((s16*)&spr, get_lsp_data(772, 0));
+            spr_data_copy((s16*)&spr, get_lsp_data(772, 0));
             spr.color_0x1C = 0xC3C3C3FF;
             length = 0;
             if (i == self->item_cursor) {
@@ -1275,7 +1275,7 @@ extern "C" u32 fn_802A008C(MenuSlot* slot)
         if (quest_select_ready_ck() != 0 && (u8)fn_802FBA60() == 0) {
             return 0;
         }
-        if (fn_8027BC48(0) == 1) {
+        if (Pl_motion_input_ck(0) == 1) {
             return 0;
         }
         if (fn_8027E120(worker) == 0) {
@@ -1328,7 +1328,7 @@ extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
         default:
             return 0;
         case 1:
-            if (fn_80047058() != 0) {
+            if (screen_split_mode_ck() != 0) {
                 idx = self->slot_index;
                 slot = &lbl_806AC8C8.slot[idx];
             }

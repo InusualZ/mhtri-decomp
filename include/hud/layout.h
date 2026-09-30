@@ -55,7 +55,7 @@ typedef struct _SPR_ANIM_ {
 
 /* The sprite-data record every `draw_*` entry takes by reference - `get_lsp_data` hands one back
  * and `draw_sprite` blits it.  Every offset below is one the disassembly reads, and the 0x24-byte
- * size is the copy `fn_801E6850` makes field by field (its `lwz`/`sth`/`stb` sequence covers
+ * size is the copy `spr_data_copy` makes field by field (its `lwz`/`sth`/`stb` sequence covers
  * 0x00..0x23).  size: 0x24 */
 typedef struct _SPR_DATA_ {
     /* +0x00 */ _mh_ivec2_ pos;      /* the record's own anchor, added to the caller's position */
@@ -129,7 +129,7 @@ void fn_80055D20(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D20 */
 void fn_80055D8C(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D8C */
 void fn_80055CC4(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055CC4 */
 void fn_80055DC8(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
-void fn_801E6850(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */
+void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */
 
 const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
 u32 get_rare_color(u8 index);                                  /* 0x802DB254 */
@@ -138,9 +138,9 @@ u32 get_rare_color(u8 index);                                  /* 0x802DB254 */
 void fn_802E08E8(u16 id, u32 color, const _mh_ivec2_* pos);
 u32 fn_802E099C(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
 u32 fn_802E0A24(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out);
-u32 fn_802E0AD4(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out);
+u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out);
 u16 fn_802E0B54(u16 id);
-u16 fn_802E0C80(const u16* ids);
+u16 sprite_ary_last_frame(const u16* ids);
 u32 fn_802E0CE4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ivec2_* pos);
 u32 fn_802E0DA8(_SPR_DATA_* rec, u16 part, const _mh_ivec2_* pos);
 void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx);
@@ -232,6 +232,7 @@ u32 Gunner_opt_ok_ck(_EQUIP* equip);
 u8 Get_pl_type(_EQUIP* equipA, _EQUIP* equipB);
 void drawshape_init(u8 kind, u16 arg);
 void drawshape_set_vertex_rect(s16 x, s16 y, s16 w, s16 h);
+void drawshape_set_vertex_rect(f32 x, f32 y, f32 w, f32 h); /* 0x800538EC, the float overload */
 void drawshape_set_flat_color(u32 color);
 void drawshape_set_texture_rect(u16 id, const _mh_tex_uv_* uv0, const _mh_tex_uv_* uv1);
 void drawshape_exec(void);

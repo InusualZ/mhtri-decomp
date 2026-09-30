@@ -306,7 +306,7 @@ extern "C" int fn_802BECB8(char* buffer, u8 mapno)
  * first one otherwise. */
 extern "C" LightWork* fn_802BECD0(void)
 {
-    if (fn_80047058() != 0 && (s8)my_player_no() != 0) {
+    if (screen_split_mode_ck() != 0 && (s8)my_player_no() != 0) {
         return &lbl_806BB7E0[1];
     }
     return &lbl_806BB7E0[0];

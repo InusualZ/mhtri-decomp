@@ -228,7 +228,7 @@ extern "C" u8  fn_8027EE24(void* equip);
 u8  Get_pl_type(_EQUIP* a, _EQUIP* b);
 void cnvt_eur_fname(char* dst, char* src);
 extern "C" u8 fn_8028F288(void);
-extern "C" u8  fn_802B0668(u8 a);
+extern "C" u8  stage_map_kind_get(u8 a);
 extern "C" u8  fn_803B3420(u8 a, u8 b);
 extern "C" u32 fn_8044FB98(void);
 u8  get_now_mapno(void);
@@ -1287,7 +1287,7 @@ s32 demo_bgm_load(u8 index)
         return -1;
     }
     mapno = get_now_mapno();
-    alt = fn_802B0668(mapno) != mapno;
+    alt = stage_map_kind_get(mapno) != mapno;
     cfg = &lbl_8059AF80[index];
     set_stream_main_vol_flag(0, 1);
     set_stream_main_vol_flag(1, 0);

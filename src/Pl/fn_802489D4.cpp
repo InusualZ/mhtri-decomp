@@ -160,7 +160,7 @@ void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
         }
         if (arg2 == 1) {
             fn_802D884C(&item, &value);
-            if (fn_8027BC48(1) == 0 && value > 0) {
+            if (Pl_motion_input_ck(1) == 0 && value > 0) {
                 fn_80272E30(self, item, value);
             }
         }
@@ -681,7 +681,7 @@ void fn_8024B868(_PLW* self, s32 arg1) {
         self->field_0x28 = 0;
         if (Pl_master_ck(self) == 1) {
             fn_8024D144(self);
-            if (fn_8027BC48(1) == 0) {
+            if (Pl_motion_input_ck(1) == 0) {
                 fn_80272E30(self, self->field_0x306, -1);
                 return;
             }
@@ -720,7 +720,7 @@ void fn_8024C75C(_PLW* self) {
         Pl_chr_set_attr_default(self, 0x136, 0, 0x3C);
         if (Pl_master_ck(self) == 1) {
             fn_8024D094(self);
-            if (fn_8027BC48(1) == 0) {
+            if (Pl_motion_input_ck(1) == 0) {
                 fn_80272E30(self, self->field_0x306, -1);
             }
         }
@@ -779,7 +779,7 @@ void fn_8024C96C(_PLW* self) {
         Pl_chr_set_attr_default(self, 0x16B, 0, 0xD0);
         if (Pl_master_ck(self) == 1) {
             fn_8024D094(self);
-            if (fn_8027BC48(1) == 0) {
+            if (Pl_motion_input_ck(1) == 0) {
                 fn_80272E30(self, self->field_0x306, -1);
             }
         }

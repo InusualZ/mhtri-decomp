@@ -500,7 +500,7 @@ extern LbNpcMoveSpot lbl_805B8F70[3];
 void* fn_801E6F10(u16 id);
 void* fn_801E6F48(u16 id);
 s8* str_tbl_33_get(u8 id);
-s32 fn_801E6850(s16 *, void *);
+s32 spr_data_copy(s16 *, void *);
 s32 fn_801E6DCC(void);
 u16 fn_801E6EA8(u16, s32);
 s32 fn_801E6F80(void *);

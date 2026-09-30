@@ -124,7 +124,7 @@ u32 fn_80334A4C(void) {
     if (fn_8028BD54() == 1) {
         return 1;
     }
-    return fn_8027BC48(0);
+    return Pl_motion_input_ck(0);
 }
 
 /* Constructs the 0x4C-byte player-state message's position sub-object and returns the message. */

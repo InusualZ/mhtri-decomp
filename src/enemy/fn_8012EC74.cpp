@@ -25,7 +25,7 @@
  * unit's begins.
  *
  * What it is.  The enemy per-motion support set of `_ENEMY_WORK`: the motion-frame window helpers
- * (fn_8012EC74's 0.3/0.2/0.18/0.15 scaling, fn_8012ECF0/fn_8012F1D8's elapsed-frame ratio tests,
+ * (fn_8012EC74's 0.3/0.2/0.18/0.15 scaling, fn_8012ECF0/em_motion_window_ck's elapsed-frame ratio tests,
  * fn_8012ED68/fn_8012EE80's team-wide window scans), the in-area gates (fn_8012EFDC's status/team
  * test, fn_8012F110's program-mode test, fn_8012F39C's height-vs-scale test), the sleep gate
  * (`em_sleep_ck`) and, further up, the motion/effect helpers the map already names (`em_get_mot_no`,
@@ -65,7 +65,7 @@
  * will carry).  First block (0x8012EC74..0x8012F39C):
  *   * 100.00 % - fn_8012EC74 (124 B), fn_8012ECF0 (120 B), fn_8012EF98 (68 B), fn_8012EFDC (308 B),
  *     fn_8012F110 (200 B), fn_8012F2A4 (96 B);
- *   * fn_8012F1D8 97.65 % (204/204 B) - the final `field_0x7A0/0x7A4 <= rate+pad` is materialised by
+ *   * em_motion_window_ck 97.65 % (204/204 B) - the final `field_0x7A0/0x7A4 <= rate+pad` is materialised by
  *     this build's allocator branchlessly (`mfcr` + `extrwi`) where retail keeps the branch
  *     (`bne ret0` + `li r3,1`); an `if (...) return 1; return 0;` shape is worse (212 B, 95.98 %), so
  *     the value-return form is applied.  Register-colouring residual, docs/matching.md row 22;
@@ -134,7 +134,7 @@ u32 em_magma_check(_ENEMY_WORK* self);
 
 /* Other-unit / unsplit C-linkage callees. */
 extern "C" s32 fn_8011E640(_ENEMY_WORK* self, u32 mask);
-extern "C" u8 fn_802B0668(u32 map_no);
+extern "C" u8 stage_map_kind_get(u32 map_no);
 extern "C" u32 fn_803B5CA4(u32 id);
 extern "C" u32 quest_entry_active_ck(void);
 
@@ -227,10 +227,10 @@ extern "C" s32 fn_8012EFDC(_ENEMY_WORK* self)
         if (self->field_0x7B0 > lbl_80796C58) return 0;
         break;
     case 0x19:
-        if (fn_802B0668(self->field_0x1E0) == 6 && self->area_no == 2) return 1;
+        if (stage_map_kind_get(self->field_0x1E0) == 6 && self->area_no == 2) return 1;
         return 0;
     case 0x14:
-        if (fn_802B0668(self->field_0x1E0) == 7 && self->area_no == 3) return 1;
+        if (stage_map_kind_get(self->field_0x1E0) == 7 && self->area_no == 3) return 1;
         return 0;
     }
     return 1;
@@ -261,7 +261,7 @@ extern "C" s32 fn_8012F110(_ENEMY_WORK* self, u16 mode)
 }
 
 /* The window test with the sub-window padding `fn_80135AC4` selects (0.1 s or 0.05 s). */
-extern "C" u32 fn_8012F1D8(_ENEMY_WORK* self)
+extern "C" u32 em_motion_window_ck(_ENEMY_WORK* self)
 {
     if (self->field_0x938 > 0) {
         f32 rate = fn_8012EC74(self);
@@ -282,7 +282,7 @@ extern "C" u32 fn_8012F1D8(_ENEMY_WORK* self)
 extern "C" s32 fn_8012F2A4(_ENEMY_WORK* self)
 {
     if (fn_8012D8D0(self) == 1 || fn_8012DB3C(self) == 1) {
-        if (fn_8012F1D8(self) == 1) return 1;
+        if (em_motion_window_ck(self) == 1) return 1;
     }
     return 0;
 }

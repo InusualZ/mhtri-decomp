@@ -133,7 +133,7 @@ void fn_800810DC(void* obj, s32 flag);
 SeSlot* fn_800D8E58(_se_w* work, s32 id);
 /* 0x80047058 is `mh3_pad.cpp`'s: the retail body takes NO argument (it loads `Screen_w` itself), so
  * the `void* obj` this header carried was the call site's guess and collided with the owner. */
-s32 fn_80047058(void);
+s32 screen_split_mode_ck(void);
 
 /* this unit's read-only pool constants (referenced, not defined here - playbook 29) */
 extern const f32 lbl_807963E0;

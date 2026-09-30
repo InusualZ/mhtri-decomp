@@ -121,6 +121,7 @@
 #pragma peephole off
 
 #include "stage/fn_802B2AA0.h"
+#include "stage/stg_w.h"
 
 /* The shell-set job table pointer (`.sbss` 0x80794B60); an RSO stores it, nothing in the DOL does. */
 ShellSetFuncs* shell_set_func_ptr;
@@ -144,7 +145,7 @@ extern "C" void fn_802B2AA0(StageBlendRec* rec, void* obj, u8 store)
     f32 t;
 
     VEC3_ctor(&poly);
-    base = fn_802BDF5C();
+    base = camera_angle_y_get();
     fn_80050CA0(&world, &get_camera_pos(), obj);
     copyVec3(&poly, &world);
     calcVecAngXY(&poly, &ang_x, &ang_y);
@@ -1062,8 +1063,8 @@ extern "C" void fn_802B45F4(u8 index)
         st->field_0x2F92 |= bit;
         fn_802FBA94();
     }
-    now = fn_803A8858();
-    st->field_0x2F94[index] = now - fn_803A87E0();
+    now = quest_time_limit_get();
+    st->field_0x2F94[index] = now - quest_time_elapsed_get();
 }
 
 /* Tests area bit `index` of the stage block's 16-bit mask and reports whether it is clear. */
@@ -1094,9 +1095,9 @@ extern "C" void fn_802B4704(StageRuntime* st)
     s32 span;
     u8 index;
 
-    now = fn_803A8858();
-    span = now - fn_803A87E0();
-    if (fn_8027BC48(NULL) == 1U) {
+    now = quest_time_limit_get();
+    span = now - quest_time_elapsed_get();
+    if (Pl_motion_input_ck(NULL) == 1U) {
         return;
     }
     for (index = 0; index < 0x10U; index++) {
@@ -1115,7 +1116,7 @@ extern "C" s32 fn_802B47B0(void)
     StageRuntime* st = (StageRuntime*)stage_w;
     u8 index;
 
-    if (fn_802B0668(st->mapno) != 4) {
+    if (stage_map_kind_get(st->mapno) != 4) {
         return 0;
     }
     index = 1;
@@ -1242,8 +1243,8 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
     if (mapno != 5 && mapno != 0x10 && mapno != 0xA) {
         return;
     }
-    now = fn_803A8858();
-    base = fn_803A87E0();
+    now = quest_time_limit_get();
+    base = quest_time_elapsed_get();
     secs = (u16)((now - base) / 300);
     secs += fn_803A8F60(0);
     if (--st->field_0x2FDC > 0) {
@@ -1635,7 +1636,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
     fn_802BDDB0(&pos);
     fn_80050CA0(&world, &get_camera_pos(), &pos);
     copyVec3(&poly, &world);
-    if (fn_80047058() != 0) {
+    if (screen_split_mode_ck() != 0) {
         setVector3(&poly, lbl_8079A4D8, lbl_8079A4DC, lbl_8079A4E0);
     }
     fn_802C20A4(&poly);
@@ -1646,7 +1647,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
 extern "C" void fn_802B58D4(void)
 {
     fn_802B5738((StageAreaObj*)lbl_806BB7E0);
-    if (fn_80047058() != 0) {
+    if (screen_split_mode_ck() != 0) {
         my_player_no_set(1);
         fn_802B5738((StageAreaObj*)(lbl_806BB7E0 + 0x4F8));
         my_player_no_set(0);

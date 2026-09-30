@@ -117,7 +117,7 @@
  * `fn_80126324` + `fn_80128030` (owner `enemy/fn_801251D0.cpp`), `fn_8012E664` + `fn_8012E694`
  * (owner `enemy/fn_8012BDF4.cpp`), plus `fn_801337FC`, `f32 fn_8013026C(_ENEMY_WORK*)` and
  * `void fn_8012FE3C(_ENEMY_WORK*, f32)` in the band header.  The two callees with no
- * registered owner and no resolvable module band (`fn_802B0668`, `fn_80191598` - the lint's counted
+ * registered owner and no resolvable module band (`stage_map_kind_get`, `fn_80191598` - the lint's counted
  * "address band interleaves modules" gap) are declared locally, as are the pool literals.
  */
 
@@ -145,7 +145,7 @@ extern "C" {
  * case the argument is returned unchanged).  The three landed consumers declare three different
  * return types for it; the call here masks the result to a byte itself, so the wider view is the
  * one this range's target was built with (it carries the `clrlwi r0,r3,24`). */
-u32 fn_802B0668(u32 kind);
+u32 stage_map_kind_get(u32 kind);
 
 /* 0x80191598 - two `u8*` outputs of a `self` (the target passes `&self->action` / `&self->state_sub`
  * and reads the two bytes back). */
@@ -226,7 +226,7 @@ extern "C" void fn_80182D5C(_ENEMY_WORK* self) {
         fn_8012FCC4(self, 0x1E, t);
     }
 
-    switch ((u8)fn_802B0668(self->field_0x1E0)) {
+    switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         switch (self->area_no) {
         case 5:
@@ -285,7 +285,7 @@ extern "C" void fn_80182D5C(_ENEMY_WORK* self) {
  * ------------------------------------------------------------------------------------------------ */
 
 extern "C" u32 fn_80182F60(_ENEMY_WORK* self) {
-    switch ((u8)fn_802B0668(self->field_0x1E0)) {
+    switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         if ((u32)(self->area_no - 5) <= 1U || (s32)self->area_no == 8) {
             return 1;

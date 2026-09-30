@@ -1074,11 +1074,13 @@ menu/fn_802E4978.cpp:
 	extab       start:0x80014FFC end:0x800150C4
 	extabindex  start:0x80033660 end:0x8003378C
 	.text       start:0x802E4978 end:0x802E7408
+	.data       start:0x805D5B48 end:0x805D5C74
 
 hud/cockpit_quest.cpp:
 	extab       start:0x800150C4 end:0x8001529C
 	extabindex  start:0x8003378C end:0x80033A50
 	.text       start:0x802E7408 end:0x802EBED8
+	.data       start:0x805D5C74 end:0x805D6310
 
 hud/fn_802EBED8.cpp:
 	extab       start:0x8001529C end:0x80015424
@@ -1173,6 +1175,10 @@ lobby/lb_companion_ui.cpp:
 	extabindex  start:0x80035CC4 end:0x8003615C
 	.text       start:0x80338808 end:0x8033F270
 	.data       start:0x805E27D4 end:0x805E27F8
+
+hud/cockpit_icon_data.cpp:
+	.data       start:0x805E6A58 end:0x805E70F8
+	.sdata      start:0x80792D80 end:0x80792F8C
 
 ef/eft050.cpp:
 	extab       start:0x80016CA4 end:0x80016DB4

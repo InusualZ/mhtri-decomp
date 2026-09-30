@@ -286,7 +286,7 @@ extern void fn_8029F5B4(void* arg0, s32 arg1);
 extern void fn_802AD738(void* arg0, void* arg1);
 extern void fn_802B01AC(Vec3* out, const Vec3* v, u8 area);
 extern f32 fn_802B0430(u8 area);
-extern u8 fn_802B0668(u8 arg0);
+extern u8 stage_map_kind_get(u8 arg0);
 extern void em_roster_record_release(s32 arg0);
 extern s32 em_roster_record_slot_id_get(s32 arg0);
 extern s32 em_roster_record_alive_ck(void);
@@ -713,14 +713,14 @@ void fn_8013823C(EnemyWork* self) {
                 }
             }
         } else if (self->field_0x1FA == 1 && self->field_0x1FB == 1) {
-            if (fn_802B0668(self->field_0x1E0) == 5 && self->field_0x1E1 == 3) {
+            if (stage_map_kind_get(self->field_0x1E0) == 5 && self->field_0x1E1 == 3) {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D48, lbl_80796D40, lbl_80796D4C);
             } else {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D40, lbl_80796D40, lbl_80796D40);
             }
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v68, &v8C, self->field_0x1E1);
             copyVec3(&vC8, &v68);
-            if (fn_802B0668(self->field_0x1E0) == 5 && self->field_0x9F7 == 3) {
+            if (stage_map_kind_get(self->field_0x1E0) == 5 && self->field_0x9F7 == 3) {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D48, lbl_80796D40, lbl_80796D4C);
             } else {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D40, lbl_80796D40, lbl_80796D40);

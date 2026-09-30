@@ -92,7 +92,7 @@ void fn_801251D0(void* tbl, u32 a, u32 b);
 void fn_801251D8(void* tbl, u32 a, u32 b);
 void* fn_80125F54(void* out);
 u32 fn_801421E4(u32 id, void* out);
-u8 fn_802B0668(u8 map);
+u8 stage_map_kind_get(u8 map);
 u32 fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 u32 fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_8012D0B4(struct _ENEMY_WORK* self, void* area);
@@ -1558,7 +1558,7 @@ extern "C" s32 fn_801B6C38(_ENEMY_WORK* self, u8 flag) {
     return 0;
 }
 
-/* 0x801B6C84 (0x270).  The enemy-control seat picker: map the map id (`fn_802B0668`) and area to a
+/* 0x801B6C84 (0x270).  The enemy-control seat picker: map the map id (`stage_map_kind_get`) and area to a
  * motion pair through `fn_80126324`; when no map/area matches, report the unmatched state and copy
  * the control record's position/rotation onto the work. */
 extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
@@ -1566,7 +1566,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     u32 unmatched = 0;
 
     fn_80125F54(&rec);
-    switch (fn_802B0668(self->field_0x1E0)) {
+    switch (stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         switch (self->area_no) {
         case 1:

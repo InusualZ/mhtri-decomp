@@ -1289,7 +1289,7 @@ void fn_802D35B4(struct _AINPC_W* self, s32 delta)
 /* 0x802D35EC - drains the gauge (zeroed while the player is down) and reports whether it ran out. */
 u32 fn_802D35EC(struct _AINPC_W* self, s32 delta)
 {
-    if (fn_8027BC48(0) == 1) {
+    if (Pl_motion_input_ck(0) == 1) {
         delta = 0;
     }
     fn_802D35B4(self, delta);

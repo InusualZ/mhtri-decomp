@@ -9,7 +9,7 @@
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * Requests SE work 46 at the caller's position, with the SE code picked from the current map region
- * (`fn_802B0668` of `get_now_mapno`) and area number (`get_now_areano`).  The range was claimed in bulk
+ * (`stage_map_kind_get` of `get_now_mapno`) and area number (`get_now_areano`).  The range was claimed in bulk
  * from the DOL's own layout (docs/plan.md 12 item 5); the seam rests on a pinned .data pool run - the
  * unit's own 11-entry switch table, `jumptable_80597B50`.
  *
@@ -49,7 +49,7 @@ typedef nw4r::math::VEC3 VEC3; /* size: 0xC */
 u8 get_now_mapno(void);
 u8 get_now_areano(void);
 extern "C" {
-u32 fn_802B0668(u8 mapno);
+u32 stage_map_kind_get(u8 mapno);
 u32 fn_800DA72C(u32 se_work, u32 se_code, VEC3* pos);
 }
 
@@ -66,7 +66,7 @@ extern const f32 lbl_80796418;
  * select. */
 extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
 {
-    u32 m = fn_802B0668((u8)get_now_mapno());
+    u32 m = stage_map_kind_get((u8)get_now_mapno());
     u8 areano = get_now_areano();
     u32 se_code;
 

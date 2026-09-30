@@ -1457,7 +1457,7 @@ s32 fn_80276270(struct _PLW* plw, s32 value)
 /* Adds `delta` to the act's hold gauge, clamped to 0..`+0x372`. */
 void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta)
 {
-    if (Pl_master_ck(plw) != 0 && (fn_8027BC48(0) != 1U || delta >= 0) && plw->field_0x00A != 8) {
+    if (Pl_master_ck(plw) != 0 && (Pl_motion_input_ck(0) != 1U || delta >= 0) && plw->field_0x00A != 8) {
         s16 value;
 
         plw->field_0x370 += delta;

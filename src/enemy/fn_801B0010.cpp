@@ -47,7 +47,7 @@
  * TRANSPORT (landed on `main` 2026-09-26 from `worker/801b0010-fn-801b0010-ab10`).  The registration
  * and the bodies came across as a delta; the header set was reconciled with the units that landed
  * while the branch waited, and the two functions whose rows moved moved UP (`fn_801B0230` 95.09 ->
- * 95.64 and `fn_801B03E8` 91.35 -> 93.65: the branch had declared `Pl/pl_skill.h`'s `fn_802731B4`/
+ * 95.64 and `fn_801B03E8` 91.35 -> 93.65: the branch had declared `Pl/pl_skill.h`'s `Pl_item_timer_get`/
  * `fn_80272E30` at C++ scope, while their owner defines them `extern "C"`, so their call sites were
  * emitting a mangled reloc the target does not have).  Everything else that changed here:
  *   * `pl_model_state_set` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
@@ -82,7 +82,7 @@
  *   * ARGUMENT SET ORDER - `fn_801B2514` 91.74: its `fn_80133DB0`-family rows and the `setVec3`
  *     float arguments are materialised in a different order.
  *   * `fn_801B0230` 95.64 and `fn_801B03E8` 93.65 (both improved by the transport): the remaining
- *     rows are the `Pl_Skill_ck`/`fn_802731B4` argument setup and `fn_801B03E8`'s two
+ *     rows are the `Pl_Skill_ck`/`Pl_item_timer_get` argument setup and `fn_801B03E8`'s two
  *     `lbl_806BD360` byte reads.
  *
  * Follow-up queue (the 10 unwritten functions, biggest first; sizes in bytes):
@@ -334,15 +334,15 @@ extern "C" u32 fn_801B0230(_ENEMY_WORK* work, _PLW* plw) {
     if (Pl_master_ck(plw) != 1) {
         return 0;
     }
-    if (fn_8027BC48(0) == 1) {
+    if (Pl_motion_input_ck(0) == 1) {
         return 0;
     }
     if (Pl_Skill_ck(plw, 0x5A) == 1) {
         return 0;
     }
-    if (fn_802731B4(plw, 0x238) > 0) {
+    if (Pl_item_timer_get(plw, 0x238) > 0) {
         work->field_0x328 = 0x238;
-    } else if (fn_802731B4(plw, 0xD9) > 0) {
+    } else if (Pl_item_timer_get(plw, 0xD9) > 0) {
         work->field_0x328 = 0xD9;
     } else {
         u8 usable[0x18];

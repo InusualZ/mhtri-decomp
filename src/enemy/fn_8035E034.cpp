@@ -64,6 +64,7 @@
 #include "enemy/fn_80138074.h"
 #include "ef/fn_800CDB2C.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "stage/stg_w.h"
 
 /* ---------------------------------------------------------------------------------------------- *
  * Callees outside this unit.
@@ -176,7 +177,7 @@ extern "C" u8 fn_8035E034(_ENEMY_WORK* self, u8 mode)
  * ---------------------------------------------------------------------------------------------- */
 extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
 {
-    switch ((u8)fn_802B0668(self->field_0x1E0)) {
+    switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         switch (self->act_id) {
         case 1:
@@ -325,7 +326,7 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
                 }
             }
         } else {
-            switch ((u8)fn_802B0668(get_now_mapno())) {
+            switch ((u8)stage_map_kind_get(get_now_mapno())) {
             case 1:
                 if ((u8)(self->act_id - 1) > 3) {
                     return 0xFF;
@@ -368,7 +369,7 @@ extern "C" u8 fn_8035E81C(u8 a)
     u8 n;
     int i;
 
-    switch ((u8)fn_802B0668(get_now_mapno())) {
+    switch ((u8)stage_map_kind_get(get_now_mapno())) {
     case 1:
         if ((u8)(get_now_areano() - 1) > 3) {
             return 0;
@@ -412,7 +413,7 @@ extern "C" u8 fn_8035E984(u8 a, u8 b)
 {
     s32 type;
 
-    switch ((u8)fn_802B0668(get_now_mapno())) {
+    switch ((u8)stage_map_kind_get(get_now_mapno())) {
     case 1:
         if ((u8)(get_now_areano() - 1) > 3) {
             return 0;
@@ -506,7 +507,7 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
  * ---------------------------------------------------------------------------------------------- */
 extern "C" void fn_8035ECD8(_ENEMY_WORK* self)
 {
-    switch ((u8)fn_802B0668(self->field_0x1E0)) {
+    switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         if ((u8)(self->act_id - 1) <= 3) {
             fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
@@ -549,17 +550,17 @@ extern "C" void fn_8035EE40(_ENEMY_WORK* self, u8 a, VEC3* out)
 {
     switch (a) {
     case 0:
-        if ((u8)fn_802B0668(self->field_0x1E0) == 3 && self->act_id == 6) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 3 && self->act_id == 6) {
             fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 7), out);
         }
         break;
     case 1:
-        if ((u8)fn_802B0668(self->field_0x1E0) == 3 && self->act_id == 6) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 3 && self->act_id == 6) {
             fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 8), out);
         }
         break;
     case 2:
-        if ((u8)fn_802B0668(self->field_0x1E0) == 3 && self->act_id == 6) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 3 && self->act_id == 6) {
             fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 5), out);
         }
         break;

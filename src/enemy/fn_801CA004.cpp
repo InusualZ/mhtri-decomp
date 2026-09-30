@@ -60,6 +60,7 @@
 #include "enemy/fn_80147CE0.h"
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
+#include "stage/stg_w.h"
 
 /* retail keeps the unfused clrlwi/rlwinm + cmpwi pairs this band's -O3 peephole folds, so the whole
  * unit is built with the peephole off (the same finding as `enemy/fn_801B7020.cpp`,
@@ -138,7 +139,7 @@ void fn_801CAA8C(_ENEMY_WORK* self) {
  * then the record whose key is `a`; the value goes out through `out` and the record's second byte
  * is the answer. */
 u32 fn_801CA170(_ENEMY_WORK* self, u8 a, u32* out) {
-    if (fn_802B0668(self->field_0x1E0) != 4)
+    if (stage_map_kind_get(self->field_0x1E0) != 4)
         return 0;
     const EmLookupEntry* table = (const EmLookupEntry*)lbl_805B3CD8;
     for (u8 i = 0; table[i].key != 0xFF; i++) {
@@ -166,7 +167,7 @@ void fn_801CA4CC(_ENEMY_WORK* self, u8* out_mode, u8* out_flag) {
     fn_801305C4(self);
     *out_mode = 0x0C;
     *out_flag = 0;
-    switch (fn_802B0668(self->field_0x1E0)) {
+    switch (stage_map_kind_get(self->field_0x1E0)) {
     case 4:
         if ((s32)(u8)self->area_no == 4)
             fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
@@ -255,7 +256,7 @@ void fn_801CA004(_ENEMY_WORK* self) {
     color.a = (u8)(s32)self->timer_0x328.field_0x328;
     ((MHchar*)self->char_0x024)->setTevKColor(1, GX_KCOLOR1, color);
     u32 armed = 0;
-    if (fn_802B0668(self->field_0x1E0) == 4 && (self->area_no == 4 || self->area_no == 6))
+    if (stage_map_kind_get(self->field_0x1E0) == 4 && (self->area_no == 4 || self->area_no == 6))
         armed = 1;
     ((MHchar*)self->char_0x024)->getTevKColor(2, GX_KCOLOR3, &color);
     if (armed == 1)

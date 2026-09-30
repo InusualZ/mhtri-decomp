@@ -315,7 +315,7 @@ extern u8 lbl_807924A8[];
  * the callees (C linkage: the map spells every one of these plainly)
  * ------------------------------------------------------------------------------------------------ */
 
-extern "C" s32 fn_80047058(void);
+extern "C" s32 screen_split_mode_ck(void);
 /* 0x8004723C is `mh3_pad.cpp`'s; spelled as its owner's header does (this call site passes `s32*`,
  * `camera/fn_802B5C58.cpp` a `void**`, hence the erased types). */
 extern "C" void* word_copy_return_dst(void* out, const void* src);
@@ -335,14 +335,12 @@ extern "C" void fn_801FF984(void* out);
 extern "C" u32 fn_8021F218(void);
 extern "C" f32 fn_8021F228(u32 index);
 extern "C" s32 fn_8021F238(void);
-extern "C" u32 fn_8027BC48(void* work);
+extern "C" u32 Pl_motion_input_ck(void* work);
 extern "C" s32 fn_80291BBC(void* a, u8 area, s32 handle, void* out, s32 limit);
 extern "C" void fn_802AE1DC(StageColourRec* rec);
 extern "C" void fn_802AE250(void* out, const void* in);
 extern "C" s32 fn_802AFF38(void);
 extern "C" u8* fn_802B04A0(u8 kind);
-extern "C" u8 fn_802B0668(u8 kind);
-extern "C" u32 fn_802B0688(nw4r::math::VEC3* pos);
 extern "C" void fn_802B0B7C(StageRuntime* st, u8 index);
 extern "C" void fn_802B2E2C(void);
 extern "C" void fn_802B2F3C(StageColourRec* dst, const StageColourRec* src);
@@ -357,7 +355,7 @@ extern "C" u8 quest_id_head_ck(void);
 extern "C" u8 quest_id_tail_ck(void);
 extern "C" s32 fn_802B2978(u32 from, u32 to, f32 t);
 extern "C" s32 fn_802B46DC(u8 index);
-extern "C" s32 fn_802BDF5C(void);
+extern "C" s32 camera_angle_y_get(void);
 extern "C" void fn_802B4680(void* plw, u8 index);
 extern "C" f32 fn_802B4D24(s16 index, f32 span);
 extern "C" u32 fn_802B53CC(u32 base);
@@ -393,8 +391,8 @@ extern "C" void fn_802BEAAC(StageAreaObj* area, u8 kind);
 extern "C" void fn_802C20A4(nw4r::math::VEC3* vec);
 extern "C" void fn_802FBA94(void);
 extern "C" void lb_sub12_send(u8 index);
-extern "C" s32 fn_803A87E0(void);
-extern "C" s32 fn_803A8858(void);
+extern "C" s32 quest_time_elapsed_get(void);
+extern "C" s32 quest_time_limit_get(void);
 extern "C" u8 fn_803A8F60(s32 value);
 extern "C" u8 get_cfg(u8 kind, u8 mode);
 

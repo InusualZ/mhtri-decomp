@@ -14,7 +14,7 @@
  *     either.  The file therefore keeps its map stem (`hud/fn_802EBED8.cpp`).
  *   - module `hud`: the band is the cockpit HUD's continuation above `hud/cockpit_quest.cpp` - it
  *     reads the same `_PLW` act fields (`field_0x3D8`/`field_0x3DC`, `field_0x309`, `slot_id[26]`)
- *     and the quest-window record (`lbl_806BDCC8`, `get_lsp_data`, `draw_sprite_*`), and its
+ *     and the quest-window record (`cockpit_work`, `get_lsp_data`, `draw_sprite_*`), and its
  *     neighbours `layout.cpp` (0x802E0740..0x802E4978) and `cockpit_quest.cpp`
  *     (0x802E7408..0x802EBED8) are both registered in the `hud` lib.
  *   - the seam is unproven.  `tudiscover.py at 0x802EBED8` must-links `quest_marker_draw`/`fn_802EC200`
@@ -67,7 +67,7 @@
  * Not written (41, in address order): the rest of the band.  The largest are `fn_802F09C4` (0x8E0),
  * `fn_802EDCE4` (0x5A4), `fn_802F02EC` (0x4F8), `fn_802ECE28` (0x3E4), `quest_marker_draw` (0x328),
  * `fn_802EC200` (0x2F0), `fn_802EE3AC` (0x2B0), `fn_802EE97C` (0x2A8), `fn_802ED20C` (0x274); all of
- * them drive the same `lbl_806BDCC8` / `_PLW` records this unit's written bodies view.  Their m2c
+ * them drive the same `cockpit_work` / `_PLW` records this unit's written bodies view.  Their m2c
  * shape oracle is kept for the next lane in `build/tmp/m2c/` (throwaway, gitignored).
  */
 
@@ -228,7 +228,7 @@ void fn_802EE330(_PLW* plw, u16 id, u8 anim, u8 mask, const _mh_ivec2_* pos)
 {
     if ((plw->field_0x309 & mask) != 0) {
         _SPR_DATA_ spr;
-        fn_802E0AD4(&spr, id, anim, 0);
+        sprite_frame_apply(&spr, id, anim, 0);
         spr.color = 0xFFE300FF;
         draw_sprite(spr, pos);
     } else {
@@ -273,9 +273,9 @@ s32 fn_802EF62C(_PLW* plw)
  * tick it down. */
 void fn_802EF6B0(void)
 {
-    QuestBlink* blink = &lbl_806BDFF0;
+    QuestBlink* blink = &cockpit_state;
 
-    if (fn_802EF62C(lbl_806BDCC8[0]) == 0) {
+    if (fn_802EF62C(cockpit_work[0]) == 0) {
         blink->timer = 0;
         return;
     }

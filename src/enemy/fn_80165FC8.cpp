@@ -9,7 +9,7 @@
  * (`enemy/fn_8015E854.cpp` ends exactly at 0x80165FC8, `enemy/fn_801679B0.cpp` starts exactly at
  * 0x801679B0) and continues the same family: it drives the shared `_ENEMY_WORK` record.
  *   * `fn_80165FC8` and `fn_80166DF8` are the per-area seat/entry selectors: they switch on
- *     `fn_802B0668(self->field_0x1E0)` (the map lookup) and on `self->area_no` (+0x1E1) and the
+ *     `stage_map_kind_get(self->field_0x1E0)` (the map lookup) and on `self->area_no` (+0x1E1) and the
  *     entry state `self->field_0x9F6`, then call the motion setter `fn_80126324` with the per-area
  *     motion ids.
  *   * `fn_801663E4` is the big nested dispatch that maps (map, area, entry-state) to the same
@@ -54,6 +54,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_80165FC8.h"
 #include "ef/eft_slot.h"    /* enemy_data_find / enemy_data_grp (rule 2: their owner's header) */
+#include "stage/stg_w.h"
 
 /* -------------------------------------------------------------------------------------------------
  * the range's functions, in address order
@@ -66,7 +67,7 @@ u32 fn_80165FC8(_ENEMY_WORK* self, u32 arg1) {
 
     get_move_work_adrs(3);
     get_move_work_max(3);
-    entry = fn_802B0668(self->field_0x1E0);
+    entry = stage_map_kind_get(self->field_0x1E0);
     if ((s32)entry != 2) {
         return 0;
     }
@@ -164,7 +165,7 @@ void fn_80166330(void) {
 
 u32 fn_801663E4(_ENEMY_WORK* self) {
     u32 stale = 0;
-    u8 map = fn_802B0668(self->field_0x1E0);
+    u8 map = stage_map_kind_get(self->field_0x1E0);
 
     switch (map) {
     case 1:
@@ -525,7 +526,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
         fn_80133BC0(self);
         break;
     case 3:
-        map = fn_802B0668(self->field_0x1E0);
+        map = stage_map_kind_get(self->field_0x1E0);
         running = 0;
         if (self->field_0x00C == 3) {
             _ENEMY_DATA* data =

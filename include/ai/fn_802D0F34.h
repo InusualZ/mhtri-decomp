@@ -53,7 +53,7 @@ u32 fn_802D7B24(struct _AINPC_W* self);
 /* ---- the band below (`camera`/`light`/`stage`..) ---- */
 void fn_802CB858(struct _AINPC_W* self);
 s32 fn_802CB900(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 limit);
-u32 fn_8027BC48(s32 a);
+u32 Pl_motion_input_ck(s32 a);
 s32 fn_80291B08(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* out,
                s32 mode);
 s32 fn_8029208C(nw4r::math::VEC3* probe, nw4r::math::VEC3* current, nw4r::math::VEC3* pos,

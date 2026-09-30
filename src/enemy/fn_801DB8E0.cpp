@@ -53,6 +53,7 @@
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "stage/stg_w.h"
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
@@ -177,7 +178,7 @@ void fn_8005D1AC(void* out, u32 a);
 void fn_8006FDCC(void* a);
 void fn_800810DC(void* self, u32 a);
 
-/* `fn_802B0668`, `get_now_mapno` and `get_now_areano` come from `include/unsplit/unknown.h`. */
+/* `stage_map_kind_get`, `get_now_mapno` and `get_now_areano` come from `include/unsplit/unknown.h`. */
 
 /* ----------------------------------------------------------------------------------------------------
  * the definitions (C linkage: they keep the map's own `fn_XXXXXXXX` names)
@@ -353,7 +354,7 @@ void fn_801DF2F8(struct _ENEMY_WORK* self) {
         }
     }
     scaled = 0;
-    strength = fn_802B0668(self->field_0x1E0);
+    strength = stage_map_kind_get(self->field_0x1E0);
     if (strength == 4 && (self->area_no == 4 || self->area_no == 6)) {
         scaled = 1;
     }
@@ -406,13 +407,13 @@ u32 fn_801DF540(struct _ENEMY_WORK* self, u8 a) {
 }
 
 /* 0x801DF568 (0x2A4) - arm the part's motion (`em_move_mode_set`) and pick the `fn_80126278` effect id
- * from the work record's map kind (`fn_802B0668`) and `area_no`. */
+ * from the work record's map kind (`stage_map_kind_get`) and `area_no`. */
 void fn_801DF568(struct _ENEMY_WORK* self, u8* outA, u8* outB) {
     u32 kind;
     em_move_mode_set(self, 4);
     *outA = 0xc;
     *outB = 0;
-    kind = fn_802B0668(self->field_0x1E0);
+    kind = stage_map_kind_get(self->field_0x1E0);
     switch ((u8)kind) {
     case 1:
         switch (self->area_no) {
@@ -523,7 +524,7 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
     u32 kind;
     u32 found;
     u8 id;
-    kind = fn_802B0668(self->field_0x1E0);
+    kind = stage_map_kind_get(self->field_0x1E0);
     if ((u8)kind - 1 > 4) {
         return 0;
     }

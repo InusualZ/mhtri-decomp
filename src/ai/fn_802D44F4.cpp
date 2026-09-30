@@ -626,7 +626,7 @@ void fn_802D7D4C(void)
 }
 
 /* 0x802D7DB4 - whether the +0x420 == 5 state's timer is running. */
-s32 fn_802D7DB4(struct _AINPC_W* self)
+s32 ai_npc_hold_ck(struct _AINPC_W* self)
 {
     if (self->active == 0) {
         return 0;
@@ -653,7 +653,7 @@ s32 fn_802D7DF8(struct _AINPC_W* self)
 }
 
 /* 0x802D7E20 - whether the AI NPC has arrived (its step counter is at 1). */
-s32 fn_802D7E20(struct _AINPC_W* self)
+s32 ai_npc_arrived_ck(struct _AINPC_W* self)
 {
     if (self->active == 0) {
         return 0;

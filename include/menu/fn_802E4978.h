@@ -2,7 +2,7 @@
  * `menu/fn_802E4978.cpp`'s records and outbound declarations.
  *
  * The unit is the in-game cockpit/HUD band: `fn_802E4978` builds one player's cockpit work in the
- * global `lbl_806BDCC8` array (2 entries, stride 0x194), `fn_802E4AD4`/`fn_802E4B8C` pick which
+ * global `cockpit_work` array (2 entries, stride 0x194), `fn_802E4AD4`/`fn_802E4B8C` pick which
  * player views it, and the rest drive the item bar, the quest text and the action-button prompt.
  *
  * The 0x194-byte work record and the two records it points at are this unit's own view; where a
@@ -91,7 +91,7 @@ typedef struct MenuWorkView {
     /* +0x3C5 */ u8 unused_0x3C5[0x3C8 - 0x3C5];
 } MenuWorkView;
 
-/* One player's cockpit work (`lbl_806BDCC8` holds two, stride 0x194). Only the bytes this unit
+/* One player's cockpit work (`cockpit_work` holds two, stride 0x194). Only the bytes this unit
  * touches are named. size: 0x194 */
 typedef struct CockpitWork {
     /* +0x000 */ CockpitMove* move;      /* the player move record this work is drawn for */
@@ -176,7 +176,7 @@ typedef struct CockpitWork {
     /* +0x190 */ u32 field_0x190;
 } CockpitWork;
 
-/* The one-player cockpit state at `lbl_806BDFF0` (the sub-screen selector). size: 0x88 */
+/* The one-player cockpit state at `cockpit_state` (the sub-screen selector). size: 0x88 */
 typedef struct CockpitState {
     /* +0x000 */ u8 field_0x000;   /* 1 for the item view, 2 for the equip view */
     /* +0x001 */ u8 unused_0x001;
@@ -206,9 +206,9 @@ u32 get_move_work_max(u8 kind);
  *   * `include/hud/fn_802EBED8.h` (0x802EC4F0-0x802EF730), `include/hud/cockpit_quest.h`
  *     (0x802E796C-0x802EA33C) and `include/hud/layout.h` (0x802E0B54/0x802E270C): all three clash with
  *     `include/unsplit/lobby.h`, which this unit needs for `drawshape_*`/`draw_sprite_*`, on
- *     `_mh_ivec2_`, `fn_801E6850`, `fn_802E0DA8`, `draw_sprite_anim_ary`, `get_move_work_adrs` and
+ *     `_mh_ivec2_`, `spr_data_copy`, `fn_802E0DA8`, `draw_sprite_anim_ary`, `get_move_work_adrs` and
  *     `get_move_work_max`; `hud/cockpit_quest.h` additionally redefines `CockpitWork` and declares
- *     `lbl_806BDCC8` with its own record type.
+ *     `cockpit_work` with its own record type.
  *   * `include/ai/fn_802D0F34.h` (0x802D27E0): redefines `_HIT_W` against `include/menu/menu_item.h`
  *     and declares `get_move_work_adrs` as `u8*` against this header's `void*`.
  *   * `include/mh3_pad.h` (0x80046F0C): clashes with `include/pl.h` on its own pre-existing
@@ -232,12 +232,12 @@ u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
  * `(f32)(dx * dx + dy * dy)`).  Both measurements are in the outbox. */
 f32 fn_80050BC0(s32, s32, f32);
 void fn_80053960(u32, s32, s32, u32);   /* 0x80053960 fn_8004CAD8.cpp */
-void fn_80054178(s16*);                  /* 0x80054178 fn_8004CAD8.cpp */
-void fn_802E796C(void*, s32);           /* 0x802E796C hud/cockpit_quest.cpp */
-void fn_802E7FA0(void);                 /* 0x802E7FA0 hud/cockpit_quest.cpp */
+void drawshape_set_offset_ivec2(s16*);                  /* 0x80054178 fn_8004CAD8.cpp */
+void quest_gauge_update(void*, s32);           /* 0x802E796C hud/cockpit_quest.cpp */
+void quest_gauge_draw(void);                 /* 0x802E7FA0 hud/cockpit_quest.cpp */
 void quest_targets_update_b(void*);                /* 0x802E8C8C hud/cockpit_quest.cpp */
 void quest_marker_arm(void);                 /* 0x802E8E64 hud/cockpit_quest.cpp */
-void fn_802EA33C(void*);                /* 0x802EA33C hud/cockpit_quest.cpp */
+void quest_marks_flush(void*);                /* 0x802EA33C hud/cockpit_quest.cpp */
 void fn_802EC4F0(void*);                /* 0x802EC4F0 hud/fn_802EBED8.cpp */
 s32 fn_802EC6C4(void*);                 /* 0x802EC6C4 hud/fn_802EBED8.cpp */
 void fn_802EC700(void);                 /* 0x802EC700 hud/fn_802EBED8.cpp */

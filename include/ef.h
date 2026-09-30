@@ -270,7 +270,7 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* f
  * the `mh3_pad/control.h` bracket note, filed 2026-09-27).  Both spellings now name the record's
  * real type, `nw4r::math::VEC3` (docs/plan.md 6.5 rule 11).
  * Folding these two into an `#include "mh3_pad.h"` is the remaining step; it is deferred because
- * `mh3_pad.h` also carries `fn_80047058`/`word_copy_return_dst`/`get_ControlType`, whose other declarations in
+ * `mh3_pad.h` also carries `screen_split_mode_ck`/`word_copy_return_dst`/`get_ControlType`, whose other declarations in
  * the tree are still being settled.  Keeping the two here (rather than in `mh3_pad/vec3.h`) also keeps
  * this header's consumers' declaration set byte-for-byte what it was, which the compiler's anonymous
  * pool numbering is sensitive to (measured: adding one declaration to `ef/ef_disc.cpp` moved

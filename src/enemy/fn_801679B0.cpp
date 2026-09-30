@@ -70,7 +70,7 @@ extern void fn_8016BFC4(_ENEMY_WORK *self);
 extern void fn_8016D414(_ENEMY_WORK *self);
 extern void fn_8016D490(_ENEMY_WORK *self);
 
-extern u8 fn_802B0668(u8 a);
+extern u8 stage_map_kind_get(u8 a);
 extern void fn_80129668(_ENEMY_WORK *self, s32 a, s32 b);
 extern void fn_801697BC(_ENEMY_WORK *self);
 extern void fn_801698F4(_ENEMY_WORK *self);
@@ -614,7 +614,7 @@ extern "C" void fn_8016FA00(_ENEMY_WORK *self) {
 }
 
 extern "C" s32 fn_801704DC(_ENEMY_WORK *self) {
-    if ((u32)(fn_802B0668(self->field_0x1E0) - 1) <= 1U && self->field_0x011 != 0) {
+    if ((u32)(stage_map_kind_get(self->field_0x1E0) - 1) <= 1U && self->field_0x011 != 0) {
         self->state_0x1FC = 1;
         self->state_0x1FE = 7;
         self->state_0x1FF = 0;

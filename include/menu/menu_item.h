@@ -300,7 +300,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *
  * The callees split three ways by whose header can supply a declaration (rule 2):
  *   * `Pl/fn_8027D684.cpp` (`fn_8027EB18`, `fn_8027E120`, `fn_8027D738`), `mh3_pad.cpp`
- *     (`fn_80047058` - including `mh3_pad.h` here is impossible: it and `ef.h`, which `pl.h` pulls
+ *     (`screen_split_mode_ck` - including `mh3_pad.h` here is impossible: it and `ef.h`, which `pl.h` pulls
  *     in for `_HIT_W`'s sibling records, collide in one TU) and `fn_80040598.cpp` (`fn_8004082C`)
  *     have no header that declares these, so the shapes here are this unit's call sites' - the
  *     practice `include/Pl/fn_8028F66C.h` documents for the same situation.
@@ -314,7 +314,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *
  * The callees split three ways by whose header can supply a declaration (rule 2):
  *   * `Pl/fn_8027D684.cpp` (`fn_8027EB18`, `fn_8027E120`, `fn_8027D738`), `mh3_pad.cpp`
- *     (`fn_80047058`) and `fn_80040598.cpp` (`fn_8004082C`) have no header that declares these, so
+ *     (`screen_split_mode_ck`) and `fn_80040598.cpp` (`fn_8004082C`) have no header that declares these, so
  *     the shapes here are this unit's call sites' - the practice `include/Pl/fn_8028F66C.h`
  *     documents for the same situation, with one hard constraint: including `mh3_pad.h` here is
  *     impossible because it and `ef.h` (which `pl.h` pulls in for the records above) collide in one
@@ -412,7 +412,7 @@ u32 fn_8027E120(_PLW* worker);
 /* 0x80047058 is `mh3_pad.cpp`'s (no argument, `Screen_w+0x1A != 0`).  It was `u32` here, which
  * MWCC reports as `(10505) illegal overloading` against the owner's `s32` as soon as both headers
  * are visible in one TU. */
-s32 fn_80047058(void);
+s32 screen_split_mode_ck(void);
 void fn_8004082C(void);
 u8 fn_800CF208(void);
 u32 move_work_state_ck(void);

@@ -153,7 +153,7 @@ s32 em_tut_cam_ck(void) {
 /* Resets the record's three rotation angles; re-arms the two "rotation handed over" angles when the
  * area is 7/8 and the sub-state matches. */
 void em_rot_reset(_ENEMY_WORK* self) {
-    if (fn_802B0668(self->field_0x1E0) == 2) {
+    if (stage_map_kind_get(self->field_0x1E0) == 2) {
         switch (self->area_no) {
         case 7:
             if (self->field_0x9F6 == 8) {

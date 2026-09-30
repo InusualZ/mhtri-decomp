@@ -49,7 +49,7 @@ void* word_copy_return_dst(void *out /* untyped: a raw word the callee copies by
                   const void *src /* untyped: a raw word the callee copies byte-wise */);
 /* 0x80047058 - `Screen_w`'s +0x1A byte as a 0/1 flag; added with the `light/light.cpp` registration
  * (rule 2: this range owns the address), whose `fn_802BECD0` gates the second light work on it. */
-s32 fn_80047058(void);
+s32 screen_split_mode_ck(void);
 
 #ifdef __cplusplus
 }

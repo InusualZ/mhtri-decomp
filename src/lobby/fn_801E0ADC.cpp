@@ -111,7 +111,7 @@ typedef struct LbItemRef {
     /* +0x0C */ u8 unused_0x0C[4];
 } LbItemRef; /* size: 0x10 (the sibling unit's view of the same record) */
 
-/* The 0x24-byte record `fn_801E6850` copies field by field. */
+/* The 0x24-byte record `spr_data_copy` copies field by field. */
 typedef struct LbItemRec {
     /* +0x00 */ u32 id_0x00;
     /* +0x04 */ u32 value_0x04;
@@ -295,7 +295,7 @@ void fn_801E4FE0(LbEftWork* self)
 }
 
 /* Copies one 0x24-byte item record onto another. */
-void fn_801E6850(LbItemRec* dst, const LbItemRec* src)
+void spr_data_copy(LbItemRec* dst, const LbItemRec* src)
 {
     *dst = *src;
 }

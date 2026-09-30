@@ -410,7 +410,7 @@ void fn_801F60D4(const _mh_ivec2_* pos, u32 id, s16 sel, u32 flag, u32 extra)
 
     fn_801F6034(pos, (s16)sel, (u8)flag);
     if ((u16)id != 0) {
-        fn_802E0AD4(&spr, 6943, (u8)extra, 0);
+        sprite_frame_apply(&spr, 6943, (u8)extra, 0);
         if ((u8)extra != 0) {
             spr.color_0x1C = 0x505050FF;
         }

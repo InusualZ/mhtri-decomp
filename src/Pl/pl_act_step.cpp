@@ -137,7 +137,7 @@
  *     (retail's inner 6-arm `switch` uses `cmpwi`, which a `u32` parameter turns into `cmplwi` and
  *     costs 2 points), but the range test itself is unsigned in retail (`cmplwi r30,2`).
  *   * a **new `fn_` name is still a rule-7 finding**, so every remaining body needs its callee named
- *     first (`fn_8027BC48` alone blocks 9 of the 74 open rows).
+ *     first (`Pl_motion_input_ck` alone blocks 9 of the 74 open rows).
  *
  * Load-bearing shapes worth copying into the next functions of this range:
  *   * the per-part argument is `s32`, never `u8` - a `u8` declaration makes MWCC mask it
@@ -268,7 +268,7 @@ extern "C" void pl_act_step_offhand_gesture(_PLW* self, s32 part)
             }
         }
         if (Pl_frame_check(self, 0, pl_frame_window_260, pl_float_zero) == 1) {
-            if (fn_8027BC48(1) == 0) {
+            if (Pl_motion_input_ck(1) == 0) {
                 fn_80272E30(self, self->field_0x306, -1);
                 switch (self->field_0x306) {
                 case 98:

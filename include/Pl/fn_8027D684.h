@@ -23,6 +23,9 @@ extern "C" {
  * function 1.28 points. */
 u32 fn_8027D738(struct _PLW* self);
 
+/* 0x8027DFD0 - the player's +0x460 timer as a boolean (> 0). */
+s32 Pl_timer_0x460_ck(struct _PLW* self);
+
 /* 0x8027D76C - the owner's own action-complete hook (`fn_8027D684.cpp:147`, `extern "C" void`), the
  * call the AI band makes once a motion resolves.  Added with `ai/fn_802C474C.cpp`, its first consumer
  * (docs/plan.md 6.5 rule 2). */

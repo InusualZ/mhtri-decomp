@@ -139,9 +139,9 @@ typedef struct StageGroup {
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" void* fn_802AE564(u8 id);
-extern "C" u32 fn_802B0668(u32 kind);
+extern "C" u32 stage_map_kind_get(u32 kind);
 extern "C" bool fn_802B0B04(u8 index, u8 bit);
-extern "C" u32 fn_802AFF00(u8 id);
+extern "C" u32 stage_map_area_count_get(u8 id);
 extern "C" void fn_802B0FF0(void* self, u8 index);
 extern "C" void fn_802B11A0(void* self, u8 index);
 extern "C" void fn_802AFA7C(u8 index);
@@ -256,7 +256,7 @@ extern "C" bool fn_802B0B04(u8 index, u8 bit)
 /* Remaps an id through lbl_805CED40; an unmapped id (0xFF) is returned unchanged.  The parameter is
  * wider than a byte: retail masks it (`clrlwi`) before the table index, so the original signature
  * was not the byte one `include/unsplit/unknown.h` guessed. */
-extern "C" u32 fn_802B0668(u32 kind)
+extern "C" u32 stage_map_kind_get(u32 kind)
 {
     u8 mapped = lbl_805CED40[(u8)kind];
     if (mapped == 0xFF)
@@ -318,7 +318,7 @@ extern "C" void fn_802B08DC(f32 f)
 /* Whether `self`'s map id remaps to a "loadable" category. */
 extern "C" u32 fn_802B0B38(void* self)
 {
-    s32 mapped = (u8)fn_802B0668(((StageWork*)self)->mapno);
+    s32 mapped = (u8)stage_map_kind_get(((StageWork*)self)->mapno);
     return mapped == 4 || mapped == 10;
 }
 
@@ -370,12 +370,12 @@ extern "C" u32 fn_802AFEAC(u8 id, u8 j)
 /* Selects one of the two record groups by whether the id was remapped. */
 extern "C" void* fn_802AE564(u8 id)
 {
-    u8 mapped = fn_802B0668((u8)id);
+    u8 mapped = stage_map_kind_get((u8)id);
     return mapped == (u8)id ? SW->field_0x2FD4 : SW->field_0x2FD8;
 }
 
 /* Returns the selected group's head byte, or 0 for the unmapped id. */
-extern "C" u32 fn_802AFF00(u8 id)
+extern "C" u32 stage_map_area_count_get(u8 id)
 {
     StageGroup* g;
     if ((u8)id == 0xFF)
@@ -444,7 +444,7 @@ extern "C" void fn_802AFA40()
 /* Calls fn_802B0FF0 for each index below the current map's count. */
 extern "C" void fn_802B1138(void* self)
 {
-    u8 n = (u8)fn_802AFF00(((StageWork*)self)->mapno);
+    u8 n = (u8)stage_map_area_count_get(((StageWork*)self)->mapno);
     u8 i;
     for (i = 0; (u8)i < n; i++)
         fn_802B0FF0(self, i);
@@ -453,7 +453,7 @@ extern "C" void fn_802B1138(void* self)
 /* Calls fn_802B11A0 for each index below the current map's count. */
 extern "C" void fn_802B13A8(void* self)
 {
-    u8 n = (u8)fn_802AFF00(((StageWork*)self)->mapno);
+    u8 n = (u8)stage_map_area_count_get(((StageWork*)self)->mapno);
     u8 i;
     for (i = 0; (u8)i < n; i++)
         fn_802B11A0(self, i);

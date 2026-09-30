@@ -17,6 +17,24 @@ extern "C" {
  * `u8` where the definition's own return is `u32`. */
 u8 pl_act_kind_get(u8 id);
 
+/* 0x802AFF00 - the number of areas of map `id` (the head byte of its record group; 0 for the unmapped id 0xFF);
+ * the map's icon lists are walked at most this far.  GUESS name: read off its one consumer, `hud/cockpit_quest.cpp`. */
+u32 stage_map_area_count_get(u8 id);
+
+/* 0x802B0668 - the stage kind of map `mapno` (table lookup; 0xFF maps to itself); the pit map is kind 9. */
+u8 stage_map_kind_get(u8 mapno);
+
+/* 0x802B0230 - the stage's screen projection record (two scales and two offsets, `QuestScreen` in
+ * `hud/cockpit_quest.h`). */
+struct QuestScreen;
+const struct QuestScreen* screen_projection_get(void);
+
+/* 0x802B06A0 - the area's entry point `idx` (0 or 1): writes its position and an extra word (the pit map copies
+ * the stage record's, the others a fixed table's). */
+#ifdef __cplusplus
+void stage_area_point_get(u8 area, u8 idx, nw4r::math::VEC3* pos, u32* extra);
+#endif
+
 /* 0x802B0688 - the stage resource query the light unit's `fn_802BEE3C` hands a block to; added with
  * the `light/light.cpp` registration (rule 2: this range owns the address).  The owner defines it
  * `extern "C" u32 fn_802B0688(void* self)` at `stage/stg_w.cpp:275`. */
@@ -41,6 +59,11 @@ void fn_802AEC00(void);
  * so the declaration sits at C++ scope (rule 9).  Every effect setter gates its spawn on it; added
  * with `ef/eft035.cpp` (rule 2: this range owns the address). */
 u8 get_now_areano(void);
+
+/* 0x802B0100 - the world-space position of the area-local point `pos` in area `area`, returned by value (the hidden
+ * result pointer is `r3`, which is why the map's `get_worldworld_pos__FPQ34nw4r4math4VEC3Uc` - the retail name, carried
+ * by the `.sel` export table - spells two parameters for a three-register body). */
+nw4r::math::VEC3 get_worldworld_pos(nw4r::math::VEC3* pos, u8 area);
 #endif
 
 #endif /* MHTRI_STAGE_STG_W_H */
