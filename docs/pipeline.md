@@ -456,6 +456,20 @@ refuses a batch, names the row that refused, and the landing either passes every
   data carries relocations to it) or a WARNING when base objects do not match their unit's claims (stale census).
   Units with refusable pairs are `data-claim` backlog items
   (`backlog.py`, weight = pair count) that `triage` closes when the rule stops refusing the unit.
+  **`claim-exposed` (2026-09-30):** a NEW pair (unit U, address A) is claim-exposed when every relocation of U's
+  target object that names A sits in a data section of U (`datagap.exposing_sections` - the test `explain_added`
+  names "EXPOSED BY THE CLAIM") AND the batch newly claimed or widened U's claim in that section (base snapshot's
+  `unit_claims` vs the tree's); a pair U's `.text`/`extab` relocates is never claim-exposed, nor one the base already
+  had, nor any pair when the base carries no per-unit claims. Such a pair exists only because the batch claimed the
+  bytes that reference it (claiming `.data` exposes the `.bss`/`.sdata` words its relocations name, without end),
+  so `batch_orphans` reports it as `deferred (claim-exposed)` with "exposed by the batch's own claim of <range>;
+  <unit>'s claimed <section> reference it", in `datagap.py --row` and in `land.py`'s data-closure output and info
+  line; the gate does not refuse it and an `--allow-orphan` for it is reported unmatched (it earns no allowance).
+  Every other new pair keeps refusing. Backlog: one `data-claim` item per (unit, pair-run), defect
+  `claim-exposed:<section>:<start>-<end>` (`datagap.tree_claim_exposed`, tree-only test: an orphan whose every
+  relocation is in the unit's own data), weight = run pairs, `dataclaim_counts` leaves them out so a pair is never
+  owed twice, `triage` closes the item when no such pair is left in its range (claimed, or the referencing claim
+  went away).
 * **A committed scratch file refuses the batch** (`.tmp_dg.json`): remove it on the branch, never `--no-outbox`.
 * **`--already-applied` and the commit-sweep guard.** A tracked file dirty at `record-base` rides the next unit
   commit unless the batch names it (`CLAUDE.md`/`docs/plan.md` did): land the orchestrator-side tools/docs batch
@@ -970,6 +984,7 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-09-28 | The `.init` TRK-image request was landed; the residual 164 B is closed as unclaimable (§8). Parked decisions still standing: `memcpy.c`/`memset.c` stay separate; `-func_align 4` waits for `Runtime.PPCEABI.H`'s next pass; one `Matching` flip per commit. |
 | 2026-09-29 | **No `--allow-rule12` (and no `--no-outbox` for a code row) unless the owner rules.** `land.py --allow-rule12 <token>` is a recorded allowance and using it is the owner's call, not a lane's. The owner ruled once, for `DWCi_natProbeStatus` (`.sbss` 0x80795818, landed with `DWCi/DWCi_NatNeg`); its claim is scheduled in `.pi/data-requests.json` until the unregistered `fn_8050C770` band, which writes the word, becomes a unit. For `network_transport` the owner chose the real fix (peer classes + a `.data` claim) over an exemption. |
 | 2026-09-29 | **"Touched" is a real change, not an edited file** (owner: "Only real changes"): the strict data-closure row demands a unit's sole-owned orphans only when the batch registers it, recuts it, or changes its compiled object (name-insensitive, relocations by address); a rename sweep does not touch. The add-only half defers NEW pairs by the same classes the strict half uses; `isolated-run` stays as landed. See the gate list. |
+| 2026-09-30 | **Claim-exposed pairs are deferred, not refused** (owner: "defer them as a claim-exposed class"): claiming data exposes new orphan pairs through its own relocations, and refusing them forced claim after claim without end. A NEW pair only the batch's own newly claimed data references is reported `deferred (claim-exposed)` (gate log and `datagap.py --row`), earns no `--allow-orphan`, and becomes a `data-claim` backlog item per (unit, pair-run); every other new pair keeps refusing. Definition and tools: section 4 data-closure row (`datagap.claim_exposed_pairs`, `backlog.collect_dataclaim_items`). |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---
