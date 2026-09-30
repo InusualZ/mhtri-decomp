@@ -64,7 +64,7 @@ extern char DWCi_addressFormatPort[4];
  * whose +0x38 pointer reaches the per-character u16 flags, bit 3 marking a decimal digit). */
 extern struct DWCiCType DWCi_digitClassTable;
 
-/* 0x80795818 - the result of the NAT-probe check `fn_8050C770` runs (1 = failed, 2 / 3 = the two
+/* 0x80795818 - the result of the NAT-probe check `DWCi_natProbePoll` runs (1 = failed, 2 / 3 = the two
  * usable answers); the negotiator refuses to start while it reads 1.  Name and meaning are GUESSes
  * from that writer (it sends a probe, waits for its echo and stores 1, 2 or 3). */
 extern s32 DWCi_natProbeStatus;

@@ -174,6 +174,7 @@ public:
 class GameSpyInterfaceThread {
 public:
     GameSpyInterfaceThread();
+    static GameSpyInterfaceThread* getInstance();
     /* +0x0000 */ u8 pad_000[0x44A0];
 };   /* size: 0x44A0 (the allocation `initializeNetworkMediator` makes) */
 
@@ -195,11 +196,6 @@ void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
 void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
 void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
-/* The thread accessor the opening's init reaches.  Its body sits in the `Network/NetworkSessionManager.cpp` band
- * and returns that band's own thread object, so it stays `void*` in the owner's declaration and this
- * file declares the typed call; the map row is the owner's spelling of the dump's placeholder
- * `getInstance`, qualified by the class. */
-GameSpyInterfaceThread* GameSpyInterfaceThread_getInstance(void);
 u32   getMediatorField24(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
@@ -615,7 +611,7 @@ void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value)
     if (getInstance_() == NULL) {
         new PatInterface();
     }
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
         new GameSpyInterfaceThread();
     }
     setTermVersion(getInstance_(), 0);

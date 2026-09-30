@@ -2459,8 +2459,15 @@ config.libs = [
             # `lwz r3,0x6634; lwz r4,0x6638; bl fn_8041C9D8; extsb` (72 B) while `-inline auto` folds
             # the 128-byte callee into it (156 B), and fn_8041DD58/fn_8041CA94 grow the same way.
             # With `-inline noauto` the sizes land on the target and the unit's .text gap shrinks.
+            # `-pool off` (playbook 43), instruction-level evidence from claiming the unit's `.data` string
+            # run (2026-09-30): once the log strings are this TU's own literals the default pooling
+            # addresses them off one `...data.0` base (`lis r5,...data.0@ha ; addi r30,r5,...@l`, then
+            # `addi r4,r30,0x218`), where the target gives every string its own `lis`/`addi` pair
+            # (`lis r4,lbl_806033C8@ha ; addi r4,r4,lbl_806033C8@l`).  Unit-level, measured 2026-09-30: 99.87 % / 64 rows at 100 with the flag, 98.21 % / 59 without it
+            # (natNegCompletedCallback 89.78, gt2ConnectAttemptCallback 88.74, runNasLogin 92.46, startMatch 84.70 lower, none higher);
+            # an object that owns log strings after a recut needs the same flag.
             Object(NonMatching, "Network/fn_8041A87C.cpp",
-                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
         ],
     },
     {

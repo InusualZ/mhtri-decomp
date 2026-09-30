@@ -24,7 +24,7 @@
  * report) and `DWCi_natNegTickSocket` (the per-record state machine).  Every name is derived from the
  * body and is a GUESS where the image gives no spelling (the dump answers `zz_` for the range).
  * `DWCi_NatNegStartSession` takes SIX arguments - the game socket is `r3` and the Network caller reaches it
- * through `fn_8050E290`'s result - which the old 5-argument declaration hid.  The shared
+ * through `gt2GetSocketSOCKET`'s result - which the old 5-argument declaration hid.  The shared
  * `.bss`/`.sbss`/`.sdata` objects were renamed from what the code stores there
  * (`DWCi_natNegNatType`/`MappingScheme` are the words the report carries, `DWCi_natNegGameName` the
  * `%s.%s` prefix and the report's game name).
@@ -90,7 +90,7 @@
  * need are filed in the outbox: `.bss` 0x80762A20 (0x200 B, the socket receive buffer, sole referencer
  * `DWCi_natNegTickSocket`) and `.data` 0x806308E8 (0x120 B, the negotiator's string pool, sole referencer
  * `DWCi_NatNegStartSession`, dead-stripped emitters); `DWCi_natProbeStatus` (0x80795818) is written by the
- * unregistered band's `fn_8050C770`.
+ * unregistered band's `DWCi_natProbePoll`.
  */
 
 #include "types.h"

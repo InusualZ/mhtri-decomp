@@ -143,11 +143,7 @@ typedef struct SessionTimeoutPayload {
 
 /* The DWC error record `NetworkInstanceVtable::postError_288` takes (0x10 B; `Network/fn_8041A87C.h`
  * owns the named definition, this unit builds an equivalent record and casts). */
-typedef struct NetworkPostedError {
-    /* +0x00 */ s32 code_00;
-    /* +0x04 */ s32 param1_04;
-    /* +0x08 */ s32 param2_08;
-} NetworkPostedError;   /* size: 0x0C */
+/* `NetworkPostedError` (0x0C B) is defined in `unsplit/Network.h`, beside the class that dispatches it. */
 
 extern "C" {
 
@@ -198,11 +194,8 @@ void setMediatorState68A(NetworkInstance* mediator, s32 state);
 void getMediatorState68A(NetworkInstance* mediator, u8* out);
 void updatePatInterface(NetworkStateMachine* self, u32 a, u32 b, u32 c);
 
-/* `getInstance` (0x800E89D8) is owned by `src/sound/fn_800E46E8.cpp`, whose declaration - and
- * `Network/fn_8041A87C.h`'s - spells it `void*`; the same spelling is kept so both headers can be
- * included in one TU. */
-/* untyped: opaque handle - the network library mediator singleton, only forwarded to the setters */
-void* getInstance(void);
+/* `getInstance` (0x800E89D8) is owned by `src/sound/fn_800E46E8.cpp`; its header declares it. */
+#include "sound/fn_800E46E8.h"
 
 /* MSL primitive with no registered owner (rule 2's unsplit gap, the same home as `strlen` above). */
 int strcmp(const char* a, const char* b);

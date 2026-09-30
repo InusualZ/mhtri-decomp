@@ -72,7 +72,7 @@
  * `DWCi_authDataStateTable` (the two switch tables), the run's eleven data labels -> the names of the
  * objects they start (`DWCi_authDataPath`, `DWCi_acUrlDev`, `DWCi_prUrlDev`, ...), and
  * `fn_80508A70` -> `DWCi_authDataTask`, the state machine the second table dispatches into (a GUESS
- * from its shape: a no-argument task the middle band's `fn_8050A8D0`/`fn_8050A9D0` step functions
+ * from its shape: a no-argument task the middle band's `DWC_NASLoginProcess`/`DWC_SVLProcess` step functions
  * call, driving the NAND auth-data I/O and the HTTP layer through a 27-way state test).
  * Rows renamed by the body pass (2026-09-28): `fn_80508630` -> `DWCi_GetConsoleFriendCode` (its body
  * below), the two `.sbss` words it stores (`lbl_807957D0` -> `DWCi_friendCodeReady`, `lbl_807957D8` ->

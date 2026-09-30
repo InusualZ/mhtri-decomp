@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (80)
+## Ideas that work (84)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -89,6 +89,10 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 79 | [A reconstruction is not deferred for a low match score](079-no-deferral-for-low-score.md) | works | process | A data run and a compiler-emitted vtable were both left out of a unit because their bytes would score badly (a table about 5 % right) - and both deferrals were wrong, because the score is not the arbiter of what gets... |
 | 80 | [A TU's `.data` is globals, strings, vtables in reverse, then inline-function strings - two vtable groups with strings between them are two TUs](080-data-order-vtables-strings.md) | works | data, vtable, sections | A unit whose classes all emitted vtables of the right size still scored 10.4 % on `.data`, because the retail run interleaves vtables with strings - an order no single TU produces - so it reads as a claim or class-model... |
 | 94 | [One literal pool per TU: a pool literal two units read means the units are one original TU](094-pool-per-tu.md) | works | data, sections, measurement | A unit's literal pool is a partial pool - two neighbouring units' `.sdata2` interleave or share entries, the first `.data` object is 4 B late, or a claim "cannot be reproduced" - because the original was ONE TU cut into... |
+| 95 | [Under peephole off, a narrow store wants a compound assignment and a byte is a mask, not a cast](095-narrow-store-spelling.md) | works | source-shape, pragma | Retail stores a narrow value with no `clrlwi` (or fuses a shift and a mask into one `rlwinm`) while ours adds a `clrlwi` - and turning the peephole on to lose it breaks the unfused compares the same function needs. |
+| 96 | [An index used before and after a call: name the element pointer so the address survives it](096-element-pointer-across-call.md) | works | source-shape, allocator | Retail computes `index * 4` (and `this + index * 4`) once and keeps both in callee-saved registers across a call, where ours rebuilds the scaled index after the call and keeps a different register set. |
+| 97 | [A record passed by value to a virtual slot: give the pointer slot an inline by-value overload](097-by-value-virtual-overload.md) | works | source-shape, vtable | Retail builds a 12-byte error record twice (the record, then its argument copy with the constants re-materialised) and passes the copy's address through `lwz r12,0(r3)` / `lwz r12,0x288(r12)`; the pointer-typed virtual... |
+| 98 | [A class's vtable pointer lands where its first virtual is declared](098-vptr-follows-first-virtual.md) | works | source-shape, vtable | After a hand-wired `void* vtable_00` becomes a real `virtual ~Class()`, every field access in the class moves four bytes and dozens of rows drop ten points with nothing but an offset changed. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

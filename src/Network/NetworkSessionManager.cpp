@@ -1131,9 +1131,9 @@ extern "C" NetworkSessionCircleInfo* NetworkSessionCircleInfo_dtor(NetworkSessio
     return self;
 }
 
-extern "C" GameSpyInterfaceThread* GameSpyInterfaceThread_getInstance(void)
+GameSpyInterfaceThread* GameSpyInterfaceThread::getInstance()
 {
-    return (GameSpyInterfaceThread*)sGameSpyInterfaceThread;
+    return sGameSpyInterfaceThread;
 }
 
 extern "C" NetworkSessionCircleList* NetworkSessionCircleList_construct(NetworkSessionCircleList* self)
@@ -1243,7 +1243,7 @@ NetworkSessionManagerPat::NetworkSessionManagerPat()
     if (getInstance_() == 0) {
         new PatInterface();
     }
-    if (GameSpyInterfaceThread_getInstance() == 0) {
+    if (GameSpyInterfaceThread::getInstance() == 0) {
         new GameSpyInterfaceThread();
     }
     this->field_6E75 = 0;
@@ -1301,7 +1301,7 @@ void NetworkSessionManagerPat::init(u32 a, u32 b)
         new PatInterface();
     }
     this->NetworkSessionManager::init(a, b);
-    if (GameSpyInterfaceThread_getInstance() == 0) {
+    if (GameSpyInterfaceThread::getInstance() == 0) {
         new GameSpyInterfaceThread();
     }
     this->field_6E75 = 0;
@@ -1331,21 +1331,21 @@ void NetworkSessionManagerPat::release()
         networkLog_destroyContext((NetworkSessionManagerLogger*)getNetworkLogger(), context);
         this->field_660 = 0;
     }
-    if (GameSpyInterfaceThread_getInstance() != 0) {
+    if (GameSpyInterfaceThread::getInstance() != 0) {
         if (this->field_6E75 != 0) {
             NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
             log->vtable->warn_10(log, "NetworkSessionManagerPat::final: finalNetwork have not done.\n");
             this->field_6E75 = 0;
-            thread = GameSpyInterfaceThread_getInstance();
+            thread = GameSpyInterfaceThread::getInstance();
             thread->canClose();
-            thread = GameSpyInterfaceThread_getInstance();
+            thread = GameSpyInterfaceThread::getInstance();
             thread->armCancel();
         }
-        thread = GameSpyInterfaceThread_getInstance();
+        thread = GameSpyInterfaceThread::getInstance();
         while (thread->requestClose()) {
-            thread = GameSpyInterfaceThread_getInstance();
+            thread = GameSpyInterfaceThread::getInstance();
         }
-        thread = GameSpyInterfaceThread_getInstance();
+        thread = GameSpyInterfaceThread::getInstance();
         if (thread != 0) {
             thread->destroy(1);
         }
