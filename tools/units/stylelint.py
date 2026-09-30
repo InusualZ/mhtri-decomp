@@ -881,6 +881,30 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
     return out
 
 
+def leaf_header_owner(src: Source, names: list[str], ownership: "Ownership") -> "str | None":
+    """The unit that owns `src` as a **leaf header**, or None.
+
+    A leaf header is `include/<module>/<symbol>.h`: named for a symbol it declares, and declaring only
+    symbols that one registered unit defines (map row inside the unit's ranges).  It exists because the
+    owner's full header can redefine shared types and so cannot be included beside the consumer's.  The
+    test is symbol-based and strict: one unresolved, unowned or duplicate name, or symbols of two units,
+    and the header is not a leaf (no per-file exemption); the path-stem rule in `_owns` is unchanged.
+    """
+    rel = src.rel.replace("\\", "/")
+    if not rel.startswith(HEADERS + "/") or rel.startswith(UNSPLIT + "/") or not names:
+        return None
+    stem = os.path.splitext(os.path.basename(rel))[0]
+    if stem not in names:
+        return None
+    units = set()
+    for name in names:
+        r = ownership.resolve(name)
+        if r is None or r["kind"] != "owned":
+            return None
+        units.add(r["unit"])
+    return units.pop() if len(units) == 1 else None
+
+
 def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
     """Declarations in an ordinary `include/` header for a symbol another registered unit owns.
 
@@ -894,11 +918,13 @@ def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
     map has not registered yet - reporting them would bury the real foreign declarations.
     """
     out = []
-    for name, line in header_declarations(src):
+    decls = header_declarations(src)
+    leaf = leaf_header_owner(src, [n for n, _l in decls], ownership)
+    for name, line in decls:
         r = ownership.resolve(name)
         if r is None or r["kind"] != "owned":
             continue
-        if _owns(src.rel, r["unit"]):
+        if _owns(src.rel, r["unit"]) or r["unit"] == leaf:
             continue
         ownership.foreign_units[r["unit"]] += 1
         out.append(_rule2_finding(src, line, name,
@@ -3112,6 +3138,26 @@ def selftest() -> int:
           [f["detail"] for f in lint_source(Source("x", mhdr, "void foo(void);\n"), idx)
            if f["rule"] == 2],
           ["`foo` is owned by `src/mod/a.c` - declare it in that unit's header and #include it"])
+    # a leaf header `include/<module>/<symbol>.h`: owned by the one unit that defines every symbol it declares
+    leaf = "include/mod/foo.h"
+    two = Ownership({"foo": [(".text", 0x1000, "function")], "foo2": [(".text", 0x1100, "function")]},
+                    {".text": [(0x1000, 0x2000, "mod/a.c")]})
+    mixed = Ownership({"foo": [(".text", 0x1000, "function")], "mid": [(".text", 0x2500, "function")]},
+                      {".text": [(0x1000, 0x2000, "mod/a.c")]})
+    check("leaf header: one symbol of unit U is owned, no finding",
+          lines_of("void foo(void);\n", 2, leaf, idx), [])
+    check("leaf header: several symbols of the same unit are owned",
+          lines_of("extern \"C\" {\nvoid foo(void);\nvoid foo2(void);\n}\n", 2, leaf, two), [])
+    check("leaf header: a second unit's symbol makes it foreign (both are findings)",
+          lines_of("void foo(void);\nvoid bar(void);\n", 2, leaf, idx), [1, 2])
+    check("leaf header: an unowned symbol beside it makes it foreign",
+          lines_of("void foo(void);\nvoid mid(void);\n", 2, leaf, mixed), [1])
+    check("leaf header: not named for a declared symbol is not a leaf",
+          lines_of("void foo(void);\n", 2, "include/mod/other.h", idx), [1])
+    check("leaf header: the convention applies under include/ only",
+          lines_of("void foo(void);\n", 2, "src/mod/foo.h", idx), [1])
+    check("leaf header: path-stem ownership is unchanged",
+          lines_of("void foo(void);\nvoid bar(void);\n", 2, "include/mod/a.h", idx), [2])
     check("rule2 header: the owner's own header is clean",
           lines_of("void foo(void);\n", 2, "include/mod/a.h", idx), [])
     check("rule2 header: an `extern` declaration is judged too",
