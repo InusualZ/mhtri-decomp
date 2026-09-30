@@ -147,6 +147,15 @@ void* fn_8009368C(void* p, u32 i);
                     * (load-bearing for the caller's stack layout - see eft002.cpp's file header) while
                     * emitting the plain symbol. */
 extern "C" void fn_8006F304(void* dst, const u32& src);
+
+/* 0x80500AB0 - `nw4r::db::Panic`, the assert failure handler (file, line, message; variadic).  The address
+ * sits in no registered unit, so the band is its home (rule 2); the map's spelling is the mangling
+ * `Panic__Q24nw4r2dbFPCciPCce` (rule 9). */
+namespace nw4r {
+namespace db {
+void Panic(const char* file, int line, const char* fmt, ...);
+}  // namespace db
+}  // namespace nw4r
 #endif
 
 #endif /* MHTRI_UNSPLIT_G3D_H */

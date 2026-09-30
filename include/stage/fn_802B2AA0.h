@@ -237,19 +237,7 @@ typedef struct ShellSetFuncs {
     /* +0x88 */ void (*method_0x88)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* self);
 } ShellSetFuncs;
 
-/* The nw4r g3d scene root the two camera calls go through.  Only the methods this band uses are
- * declared and the class carries no virtuals, so MWCC emits nothing for it (docs/plan.md 6.5 rule 9:
- * the map names are manglings of these two members, never spelled as callables). */
-namespace nw4r {
-namespace g3d {
-/* size: 0x4 (approximation: declared only for the two camera methods this band calls) */
-class ScnRoot {
-public:
-    int GetCamera(int index);
-    void SetCurrentCamera(int camera);
-};
-} /* namespace g3d */
-} /* namespace nw4r */
+#include "g3d/g3d_scnroot.h" /* `nw4r::g3d::ScnRoot`, the scene root the two camera calls go through */
 
 /* ------------------------------------------------------------------------------------------------
  * the block symbols (.bss / .sbss: no registered unit owns them, so the declarations live here)
@@ -340,14 +328,14 @@ extern u8 lbl_807924A8[];
 extern "C" s32 fn_80047058(void);
 /* 0x8004723C is `mh3_pad.cpp`'s; spelled as its owner's header does (this call site passes `s32*`,
  * `camera/fn_802B5C58.cpp` a `void**`, hence the erased types). */
-extern "C" void* fn_8004723C(void* out, const void* src);
+extern "C" void* word_copy_return_dst(void* out, const void* src);
 extern "C" void fn_800473F4(u8 value);
 extern "C" void fn_80057DE0(s32 a, s32 count, u32* colours, f32 param);
 extern "C" void fn_80057EF4(s32 a, s32 count, u32* colours, f32 param);
-extern "C" void fn_80067E70(s32* out);
+extern "C" void camera_posture_info_ctor(s32* out);
 extern "C" s32 fn_8007A1B8(const void* a, s32 b, void* c, void* d, s32 e, s32 f, void* g);
 extern "C" s32 fn_80082C80(s32 root, s32 mode);
-extern "C" void fn_800CF394(s8 value);  /* s8 is the owner's spelling (the argument
+extern "C" void my_player_no_set(s8 value);  /* s8 is the owner's spelling (the argument
  * narrows with `extsb` in retail); `include/ef/fn_800CDB2C.h` declares it the same way. */
 extern "C" void fn_800DD38C(void);
 extern "C" u32 fn_800E16DC(void* chr, s32 a, s32 b, f32 c, f32 d);

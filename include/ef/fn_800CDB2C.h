@@ -25,7 +25,7 @@ u32 my_player_no(void);
  * 87.14 % on fn_802BEDE8 with `u8` and 100.00 % with `s8`).  Added with that registration (rule 2:
  * the range owns the address).  The map's name carries no mangling, so the consumer-side declaration
  * is C linkage; the owner's own definition (`src/ef/fn_800CDB2C.cpp:247`) is still C++ linkage. */
-void fn_800CF394(s8 value);
+void my_player_no_set(s8 value);
 u8  fn_800CF208(void);
 u32 move_work_state_ck(void);
 /* 0x800CF2C4 - the play-mode/move-state dispatcher: it reads `fn_800CF208()`, switches on
@@ -53,7 +53,13 @@ u32 game_ready_ck(void);
  * `menu_list_mode_get`/`menu_list_fill` as a signed byte (the caller keeps an `extsb` on the widened
  * form and compares it with a signed `cmpwi`+`ble`).  Added with `menu/menu_message.cpp`
  * (rule 2: this range owns the address). */
-s8 fn_800CF3C4(void);
+s8 player_count_get(void);
+
+/* 0x800CF3D4 - stores the session's player count (`system_w`'s +0x28, which `player_count_get` reads back);
+ * 0x800CF0F0 - the return-to-title reset: stops the sound, clears the system work and every task and
+ * re-enters the title.  Added with `quest/arenatask.cpp` (rule 2: this range owns both addresses). */
+void player_count_set(u8 count);
+void game_reset_to_title(void);
 
 #ifdef __cplusplus
 }
@@ -68,6 +74,11 @@ s8 fn_800CF3C4(void);
  * `enemy/fn_801B7020.cpp`, which calls it as `ran_suu(0)`. */
 u16 ran_suu(s32 index);
 
+/* 0x800CEC64 - reads the file `path` into `dest` (`size` bytes) through the loader; non-zero when the
+ * read succeeded.  A C++ free function, the map's `load_file__FPcUll`.  Added with `quest/arenatask.cpp`
+ * (rule 2: this range owns the address). */
+s32 load_file(char* path, u32 dest, s32 size);
+
 /* 0x800CF218 - the play-mode byte `PlayMode_ck__Fv`; the consumers use `u8` (values < 7).  Added
  * with `Pl/fn_80229ECC.cpp`, which gates on `(u8)PlayMode_ck() == 3`. */
 u8 PlayMode_ck(void);
@@ -78,6 +89,21 @@ u8 PlayMode_ck(void);
  * `ef/eft035.cpp`, whose release paths hand it the pooled `_g3d_work*` handles. */
 struct _g3d_work;
 void push_g3d_wk(struct _g3d_work* work);
+#endif
+
+#ifdef __cplusplus
+/* The mode and loader entry points `quest/arenatask.cpp`'s task drives (rule 2: this range owns them; the
+ * map names are the manglings of exactly these signatures, rule 9): 0x800CEA34 - polls the load of
+ * `name` (`out` receives its progress; 1 while pending), 0x800CEF9C - the full game reset,
+ * 0x800CF238/0x800CF254 - the game/play mode setters, 0x800CFB2C - builds the move work of `kind`,
+ * 0x800CFB0C - sets the move-work record count of slot `index`, 0x800D0F14 - the loading display. */
+u32 file_loading_ck(char* name, s32* out);
+void all_reset(void);
+void GameMode_set(u8 mode);
+void PlayMode_set(u8 mode);
+s32 create_move_work(s32 kind);
+void set_move_work_max(u8 index, s32 value);
+void loading_disp_set(u8 kind, u8 arg);
 #endif
 
 #endif /* MHTRI_EF_FN_800CDB2C_H */

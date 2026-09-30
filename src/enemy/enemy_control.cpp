@@ -128,7 +128,7 @@ s32  fn_80093B0C(void);
 void fn_80093990(void* self);
 u32  fn_800E264C(void* self);
 void* ckResourceName(char* name);
-s32* fn_80054FE8(s32* dst, s32 value);
+s32* res_file_ctor(s32* dst, s32 value);
 u32  fn_8009380C(void* self, s32* value);
 void fn_800F0F38(u8 kind);
 void fn_800D58B0(s32 handle);
@@ -159,7 +159,7 @@ u8   fn_8042CC20(void);
  * ----------------------------------------------------------------------------------------------- */
 
 /* the resource record `ckResourceName` returns, as far as `fn_801411B8` reads it (the u32 at
- * +0x44 is the value `fn_80054FE8` is called with).
+ * +0x44 is the value `res_file_ctor` is called with).
  * size: 0x48 */
 struct EmResHeader {
     /* +0x00 */ u8 unused_0x00[0x44];
@@ -180,7 +180,7 @@ void fn_801411B8(u8* self) {
         if (res != 0) {
             s32 tmp;
             s32 value;
-            fn_80054FE8(&tmp, res->field_0x44);
+            res_file_ctor(&tmp, res->field_0x44);
             value = tmp;
             handle = fn_8009380C(self, &value);
         }
@@ -225,7 +225,7 @@ void fn_8014131C(void) {
 void fn_80141358(u8 index) {
     EmcSlot* slot = &emc_work.slot_0x000[index];
     s32 tmp;
-    fn_80054FE8(&tmp, 0);
+    res_file_ctor(&tmp, 0);
     slot->id = index;
     slot->state = 0;
     slot->kind = 0;

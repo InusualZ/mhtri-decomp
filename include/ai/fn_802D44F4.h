@@ -34,6 +34,10 @@ void fn_802DA3CC(void);                  /* 0x802DA3CC, registered by address */
  * callee's own body, which narrows r3 with `clrlwi r3,24` before the `cmpwi r3,0`). */
 void fn_802D94C4(u8 mode);
 
+/* 0x802D9EA4 - forwards to the reaction dispatcher (its consumers call it with no argument: the AI work
+ * pointer is the caller's `r3`).  Added with `quest/arenatask.cpp` (rule 2: this range owns it). */
+void ai_npc_reaction_forward(void);
+
 #ifdef __cplusplus
 }
 #endif

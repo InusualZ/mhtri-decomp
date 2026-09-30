@@ -43,13 +43,13 @@
  * `build/RMHE08/obj/`).  Everything written is byte-identical except `get_camera_pos`, whose residual
  * is on the function (and is shared by the whole accessor family: `get_current_view_mtx`,
  * `get_camera_direction`, `fn_802BDC90`, `fn_802BDDB0`, `fn_802BDE90`, `fn_802BDFC0`, `fn_802BDFFC`,
- * `fn_802BE088`, `fn_802BE1DC`, `fn_802BE1EC`, `fn_802BE0F4` - they all start from `fn_80047398()`,
- * copy the handle through `fn_8004723C` and read a field, and all need MWCC to alias their returned
+ * `fn_802BE088`, `camera_position_set`, `fn_802BE1EC`, `fn_802BE0F4` - they all start from `fn_80047398()`,
+ * copy the handle through `word_copy_return_dst` and read a field, and all need MWCC to alias their returned
  * local to the `sret` pointer, which the spellings tried so far do not achieve).
  *
  * Shared-file cost.  Three declarations this unit needs are not in their owner's headers yet, so they
  * were added there in this branch (each an addition to an existing `extern "C"` block):
- * `include/mh3_pad.h` (`fn_8004723C`, owner `src/mh3_pad.cpp`), `include/fn_80047398.h`
+ * `include/mh3_pad.h` (`word_copy_return_dst`, owner `src/mh3_pad.cpp`), `include/fn_80047398.h`
  * (`fn_80047398`, owner `src/fn_80047398.cpp`) and `include/g3d/g3d_camera.h` (`fn_800749C8`, owner
  * `src/g3d/g3d_camera.cpp`).
  */
@@ -890,7 +890,7 @@ void fn_802BC89C(u8 mode, u32 arg)
 
 /*
  * The current camera's world position.  The four camera entry points share one shape: build a camera
- * handle from `fn_80047398`, copy it through `fn_8004723C`, then read the wanted field out of it.
+ * handle from `fn_80047398`, copy it through `word_copy_return_dst`, then read the wanted field out of it.
  *
  * Residual: 59.4 %.  The three calls are right and in retail's order, but retail's second object is
  * the return slot itself (MWCC aliased the returned local to the `sret` pointer), while ours keeps
@@ -909,7 +909,7 @@ nw4r::math::VEC3 get_camera_pos(void)
 
     VEC3_ctor(&pos);
     cam = fn_80047398();
-    fn_8004723C(&tmp, &cam);
+    word_copy_return_dst(&tmp, &cam);
     fn_800749C8(&tmp, &pos);
     return pos;
 }

@@ -45,8 +45,8 @@ extern "C" {
 u32 fn_800941DC(void* p, u32 flag);
 u32 fn_8009429C(void* p, u32 flag);
 /* The two handle-array element constructors fn_8006F528 runs. */
-void fn_80052BC0(void* p, u32 flag);
-void fn_800534B0(void* p, u32 flag);
+void res_tex_ctor(void* p, u32 flag);
+void res_pltt_ctor(void* p, u32 flag);
 /* The global material-table accessor the accessor chain reads at +0x3C. */
 void* fn_8005A9BC(void* self);
 
@@ -264,10 +264,10 @@ u32* fn_8006F528(u32* self) {
     u32* p = self + 1;
     u32* mid = self + 9;
     for (; p < mid; p++) {
-        fn_80052BC0(p, 0);
+        res_tex_ctor(p, 0);
     }
     for (; mid < self + 17; mid++) {
-        fn_800534B0(mid, 0);
+        res_pltt_ctor(mid, 0);
     }
     return self;
 }

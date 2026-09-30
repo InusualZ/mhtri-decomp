@@ -154,7 +154,7 @@ extern "C" void fn_800CFC64(void);
 
 extern "C" u32 fn_800D02C0(void* data, struct _tex_info* info);
 extern "C" void fn_800417F0(void* fn, u32 count);
-extern "C" void fn_8004C4F0(void* record, u32 value);
+extern "C" void color_rgba_copy(void* record, u32 value);
 extern "C" void* MEMAllocFromAllocator(void* allocator, u32 size);
 extern "C" void MEMFreeToAllocator(void* allocator, void* ptr);
 extern "C" void MEMDestroyExpHeap(void* heap);
@@ -244,7 +244,7 @@ u8 my_player_no(void) {
     return system_w.field_0x27;
 }
 
-void fn_800CF394(u8 value) {
+void my_player_no_set(u8 value) {
     system_w.field_0x27 = value;
 }
 
@@ -256,11 +256,11 @@ void fn_800CF3B4(u8 value) {
     system_w.field_0x26 = value;
 }
 
-u8 fn_800CF3C4(void) {
+u8 player_count_get(void) {
     return system_w.field_0x28;
 }
 
-void fn_800CF3D4(u8 value) {
+void player_count_set(u8 value) {
     system_w.field_0x28 = value;
 }
 
@@ -403,7 +403,7 @@ void fn_800CF8EC(void) {
 
 /* 0x800CFBA0 - reset the stream record and stamp its top byte. */
 void fn_800CFBA0(u32 value) {
-    fn_8004C4F0(&system_w.field_0x7bc, value);
+    color_rgba_copy(&system_w.field_0x7bc, value);
     system_w.field_0x7bc.bytes[3] = 0xFF;
 }
 

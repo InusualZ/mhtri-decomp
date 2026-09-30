@@ -315,7 +315,7 @@ extern "C" void fn_800E30DC(MHchar* self)
 /* Reset the model through its +0x?? state. */
 extern "C" void fn_800E3AE8(void* self)
 {
-    return fn_80054FE8(self, 0);
+    res_file_ctor((u32*)self, 0);
 }
 
 /* Point the model's +0x00 word at the initial joint table. */

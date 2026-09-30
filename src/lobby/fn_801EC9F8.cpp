@@ -316,7 +316,7 @@ s32 fn_80219530(void* p);
 void fn_80219590(void* p, void* a);
 s32 fn_8021B7EC(s32 a);
 s32 fn_802738E8(s32 a);
-s32 fn_8027EFB4(u8 kind);
+s32 equip_kind_table_class(u8 kind);
 s32 fn_802BBAC4(s32 a);
 s32 fn_8031BFEC(void* p, s32 a, s32 b);
 s32 fn_8031C028(void* p, u16 a);

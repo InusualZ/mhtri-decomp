@@ -41,14 +41,14 @@
 #include "Pl/pl_skill.h"
 
 
-extern "C" s32 fn_8027EFB4(u8 kind);
+extern "C" s32 equip_kind_table_class(u8 kind);
 extern "C" u8 fn_8027E290(u8 kind);
 extern "C" u8 fn_8027E29C(s32 kind);
 
 /* The 1-based kind's 0x18-byte equipment row (the row stride is the `mulli r0,r0,24` in retail). */
 extern "C" void* fn_8027E2A8(u8 kind, u16 index) {
     u8** base = lbl_806AB810[0];
-    if ((u8)fn_8027EFB4(kind) != 0) {
+    if ((u8)equip_kind_table_class(kind) != 0) {
         return 0;
     }
     u32 slot = fn_8027E290(kind);
@@ -61,7 +61,7 @@ extern "C" void* fn_8027E2A8(u8 kind, u16 index) {
 /* The sibling 0x1C-byte row of the second table. */
 extern "C" void* fn_8027E354(u8 kind, u16 index) {
     u8** base = lbl_806AB810[1];
-    if ((u8)fn_8027EFB4(kind) != 0) {
+    if ((u8)equip_kind_table_class(kind) != 0) {
         return 0;
     }
     u32 slot = fn_8027E290(kind);
@@ -439,7 +439,7 @@ extern "C" void* fn_8027FF20(_EQUIP* equip) {
 
 /* The equipment kind's row-table class: 0 for kinds 1-6, 1 for 7-11 and 14-15, 2 for 12-13, 0xFF for
  * anything else. */
-extern "C" s32 fn_8027EFB4(u8 kind) {
+extern "C" s32 equip_kind_table_class(u8 kind) {
     switch (kind) {
     case 7:
     case 8:

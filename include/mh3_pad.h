@@ -30,6 +30,7 @@
 #include "types.h"
 #include "mh3_pad/control.h"   /* get_ControlType / fn_80044B14 (rule 2) */
 #include "mh3_pad/vec3.h"      /* the three 3-float-record helpers below (rule 2) */
+#include "mh3_pad/task.h"      /* `TaskSlot`, the task table entry (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,12 +40,12 @@ extern "C" {
  * `mh3_pad/vec3.h`, included above - `ef/ef_cube.cpp` needs them without `types.h`. */
 
 /* Added when `camera/fn_802B5C58.cpp` registered (rule 2): the camera accessors all start by copying a
- * 4-byte camera handle through this unit's helper (`fn_8004726C` does the word copy). */
+ * 4-byte camera handle through this unit's helper (`word_copy` does the word copy). */
 /* 0x8004723C - copies the word `*src` into `*out` and returns `out`.  A raw 4-byte word copy, so
  * the parameters carry no pointee type: the two call sites pass different ones for the same slot
  * (`camera/fn_802B5C58.cpp` a `void**`, `stage/fn_802B2AA0.cpp` a `s32*`); the owner's body is
- * `fn_8004726C` + `mr r3,r31`.  docs/plan.md 6.5 rule 11 exemption. */
-void* fn_8004723C(void *out /* untyped: a raw word the callee copies byte-wise */,
+ * `word_copy` + `mr r3,r31`.  docs/plan.md 6.5 rule 11 exemption. */
+void* word_copy_return_dst(void *out /* untyped: a raw word the callee copies byte-wise */,
                   const void *src /* untyped: a raw word the callee copies byte-wise */);
 /* 0x80047058 - `Screen_w`'s +0x1A byte as a 0/1 flag; added with the `light/light.cpp` registration
  * (rule 2: this range owns the address), whose `fn_802BECD0` gates the second light work on it. */
@@ -52,6 +53,17 @@ s32 fn_80047058(void);
 
 #ifdef __cplusplus
 }
+
+/* 0x8004136C - writes into `out` the localised form of the resource file name `name` (the region's
+ * language folder is applied to it); a C++ free function, the map's `cnvt_eur_fname__FPcPc` (rule 9).
+ * Added with `quest/arenatask.cpp`, whose `arena_resource_load` builds its `.brres` path with it. */
+void cnvt_eur_fname(char* out, char* name);
+
+/* 0x80041978/0x80041A1C - enter the current game mode / the Vs mode; 0x80046EB4 - arms (or clears) the
+ * soft-reset flag.  Added with `quest/arenatask.cpp` (rule 2: this unit owns the addresses). */
+void GameModeExec(void);
+void VsGameModeExec(void);
+void setSoftresetFlag(bool flag);
 #endif
 
 #endif /* MHTRI_MH3_PAD_H */

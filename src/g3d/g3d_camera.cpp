@@ -24,6 +24,7 @@
 #include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
+#include "g3d/g3d_camera_types.h"
 #include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
@@ -165,36 +166,7 @@ struct CameraData {
     /* +0x108 */ s32 mScissorOffsetY;
 }; /* size: 0x10C */
 
-/* `nw4r::g3d::Camera` itself: a `ResCommon<CameraData>` handle, so the payload is the first word. The
- * three mangled map symbols require the real class, which is why this one is a class and not a struct. */
-namespace nw4r {
-namespace g3d {
-
-class Camera {
-public:
-    struct PostureInfo {
-        /* +0x00 */ s32 mType;
-        /* +0x04 */ f32 mPosX;
-        /* +0x08 */ f32 mPosY;
-        /* +0x0C */ f32 mPosZ;
-        /* +0x10 */ f32 mTargetX;
-        /* +0x14 */ f32 mTargetY;
-        /* +0x18 */ f32 mTargetZ;
-        /* +0x1C */ f32 mUpX;
-        /* +0x20 */ f32 mUpY;
-        /* +0x24 */ f32 mUpZ;
-        /* +0x28 */ f32 mUnk28;
-    }; /* size: 0x2C */
-
-    void SetPosition(const math::VEC3& rPos);
-    void SetPosture(const PostureInfo& rInfo);
-    void SetPerspective(f32 fovy, f32 aspect, f32 near, f32 far);
-
-    /* +0x0 */ CameraData* mpData;
-}; /* size: 0x4 */
-
-}  // namespace g3d
-}  // namespace nw4r
+/* `nw4r::g3d::Camera` itself lives in `g3d/g3d_camera_types.h` (rule 1: its consumers include the same one). */
 
 extern "C" {
 

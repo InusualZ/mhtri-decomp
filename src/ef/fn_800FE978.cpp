@@ -101,7 +101,6 @@ extern "C" void fn_800F886C(void* self);
 extern "C" s32 fn_804A6120(void* info);
 void* work_mem_alloc(u32 size);
 void work_mem_free(void* ptr);
-void load_file(char* path, u32 dst, s32 size);
 u16 ran_suu(s32 index);
 u8 get_now_mapno();
 extern "C" u8 fn_802FB8EC(u8 index);

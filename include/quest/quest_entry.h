@@ -347,6 +347,12 @@ struct Q_UserData* get_userdata(void);
  * C scope spelling is what makes `flipcheck.py` answer `undefined: 'get_move_work_adrs'`). */
 /* untyped: opaque work-area handle passed through - the record's type depends on the slot index */
 void* get_move_work_adrs(u8 index);
+
+/* 0x803AD47C - clears the quest work block and returns it; `kind` selects the block's mode.  Added with
+ * `quest/arenatask.cpp`, which reads the record the block points at (`record_0x03C`).  The block type is
+ * `unsplit/menu.h`'s `QuestWork`. */
+struct QuestWork;
+QuestWork* quest_init(u8 kind);
 #endif
 
 #endif /* MHTRI_QUEST_QUEST_ENTRY_H */

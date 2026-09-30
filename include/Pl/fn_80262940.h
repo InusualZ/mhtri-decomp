@@ -29,4 +29,10 @@ void pl_model_state_set(struct _PLW* self, u32 action, s32 a, u16 b);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x802673A4 - sets the number of players in play; the map's `set_max_player__Fl`.  Added with
+ * `quest/arenatask.cpp` (rule 2: this range owns the address). */
+void set_max_player(s32 value);
+#endif
+
 #endif /* MHTRI_PL_FN_80262940_H */

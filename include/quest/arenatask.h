@@ -9,11 +9,13 @@
  * declarations here.
  *
  * The `extern`s below came from the band header `include/unsplit/arena.h` when this unit claimed its
- * own `.bss 0x806E4010..0x806E40C0`, `.sbss 0x80794D3C..0x80794D50`, `.sdata 0x80793B28..0x80793B88`,
- * `.sdata2 0x8079C960..0x8079C998` and `.data 0x80607210..0x806073F0` runs in
+ * own `.bss 0x806E3E10..0x806E40C0`, `.sbss 0x80794D3C..0x80794D50`, `.sdata 0x80793B28..0x80793B88`,
+ * `.sdata2 0x8079C960..0x8079C998` and `.data 0x80604D30..0x806073F0` runs in
  * `config/RMHE08/splits.txt` (rule 12: the unit that uses the bytes claims and matches them; rule 2:
- * the declaration lives with the owner, and this is the owner's header).  The band's record types stay
- * in the band header, which this header includes.
+ * the declaration lives with the owner, and this is the owner's header).  `splits.txt` claims the `.bss` run,
+ * but the object emits none of it: `arena_user_data_buf`, `arena_work` and `arena_draw_func` stay declared here
+ * (see the header of `src/quest/arenatask.cpp`).  The band's record types stay in the band header, which
+ * this header includes.
  *
  * C++-only: the two vector arrays are `nw4r::math::VEC3` (the band's TUs are C++).
  */
@@ -31,7 +33,18 @@ extern "C" {
 
 /* 0x804463C4 - the arena mode's task body: first run loads `04/arena.brres` and the arena state, then
  * it drives the match, and on the match's end it hands over to `GameModeExec`/`VsGameModeExec`. */
-void arena_task(void);
+struct TaskSlot;
+void arena_task(struct TaskSlot* task);
+
+/* 0x80446EE8 - resets the arena work for the next round and builds its local or network setup;
+ * 0x804473B8 - the per-frame match step: returns 1 when the round ends, -1 on a network drop, 2 to leave. */
+void arena_result_next(ArenaWork* work);
+s32 arena_game_task(ArenaWork* work);
+
+/* 0x80445B80 - fills the arena quest-info rows; `mode` picks the clear-time column (1 = two-player);
+ * 0x804459E4 - loads the arena's `.brres` texture pack and binds its textures. */
+void arena_quest_info_build(u8 mode);
+void arena_resource_load(void);
 
 /* 0x80445D58 - records the equip index a *remote* player picked (`player` is the player number the
  * caller sends, `equip` the index); the local player's own choice never comes through here. */
@@ -57,8 +70,18 @@ extern nw4r::math::VEC3 arena_light_vec[4];    /* four direct-light positions */
 extern ArenaQuestInfoList* que_info;
 extern u8* arena_lsp_data_adrs;
 
+/* The arena texture pack's resource record (`.sdata` 0x80793B28: the archive size and its name) and the
+ * table of texture names `arena_resource_load` looks up in it (`.data` 0x80607310, 32 slots, the last
+ * one NULL). size: 0x8 */
+typedef struct ArenaResourceInfo {
+    /* +0x00 */ u32 size_0x00;
+    /* +0x04 */ const char* name_0x04;
+} ArenaResourceInfo; /* size: 0x8 */
+extern ArenaResourceInfo arena_resource_info;
+extern const char* arena_texture_names[32];
+
 /* The 0x200-byte arena user-data record buffer the two `arena_eqdata_from_*` fillers build their
- * record in and `arena_userdata_apply` consumes (`.bss` 0x806E3E10, claimed with this unit).  Its two
+ * record in and `arena_userdata_apply` consumes (`.bss` 0x806E3E10, claimed in `splits.txt`, not emitted).  Its two
  * 0x100-byte records are selected by the player work's own `chunk_ofs << 8`; the GUESS in the name is
  * that stride, which is what `arena_eqdata_from_vsuser` and `Pl/fn_80288CEC.cpp`'s `fn_8028F1E8`
  * both index it with.  `Pl/fn_80288CEC.cpp` is the one foreign reader (rule 2: it includes this
@@ -70,6 +93,8 @@ extern u8 arena_user_data_buf[];
  * place `arena_camera_light_vec_init` writes it into. */
 extern const f32 arena_zero_f;            /* .sdata2 0x8079C960, 0.0f */
 extern const f32 arena_50f;               /* .sdata2 0x8079C964, 50.0f */
+extern const f32 arena_camera_near_z;    /* .sdata2 0x8079C968, 1.0f */
+extern const f32 arena_camera_far_z;     /* .sdata2 0x8079C96C, 10000.0f */
 extern const f32 arena_85f;               /* .sdata2 0x8079C974, 85.0f */
 extern const f32 arena_440f;              /* .sdata2 0x8079C978, 440.0f */
 extern const f32 arena_75f;               /* .sdata2 0x8079C97C, 75.0f */
@@ -92,7 +117,7 @@ extern const u32 arena_ambient_color;     /* .sdata2 0x8079C970 */
 /* The ten-float spawn-offset table `arena_player_init` indexes with a three-float stride (`.data`
  * 0x806073B8): its three 12-byte rows are slot kind 0/1/2's `(x, y, z)`.  Declared extern like the
  * pool above - the range is this unit's own, so a definition would rebuild the run. */
-extern const f32 arena_player_offset_table[10];
+extern f32 arena_player_offset_table[10];
 
 /* The arena stage configuration table the band's three task bodies index with `stage_0x0C * 0x3B0`
  * (`.data` 0x80604D30, ten 0x3B0-byte records).  It is the first symbol of this unit's `.data`
@@ -117,7 +142,7 @@ void arena_eqdata_from_vsuser(struct _PLW* plw);
 /* 0x80446990 - places every player's move work at its arena spawn offset, gives it the motion its
  * equip slot's kind selects, and marks the slot the player index agrees with (its body is in
  * `src/quest/arenatask.cpp`). */
-void arena_player_init(ArenaEqParams* params);
+void arena_player_init(ArenaWork* work);
 
 #ifdef __cplusplus
 }

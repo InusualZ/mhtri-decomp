@@ -45,6 +45,7 @@
  */
 
 #include "types.h"
+#include "g3d/g3d_resanmtexsrt.h" /* `nw4r::g3d::ResFile` (this unit's own header, rule 1) */
 #include "nw4r/g3d/res_common.h"   /* ResHandle (rule 1) */
 #include "g3d/g3d_anmchr.h"        /* fn_8006268C/fn_80062750/fn_80062914 (rule 2, owner header) */
 #include "g3d/fn_800680CC.h"       /* fn_80069664/fn_8006CDBC/fn_8006D9FC (rule 2, owner header) */
@@ -581,7 +582,7 @@ extern "C" u32 fn_8009348C(void* self, u32 arg) {
 /* The same chain, but the ctor differs per category and two of them key through the `ResDic`
  * string lookup (fn_80092250) rather than the raw table (fn_80062750). */
 
-#include "fn_8004CAD8.h"           /* fn_80052BC0/fn_800534B0 (rule 2, owner header) */
+#include "fn_8004CAD8.h"           /* res_tex_ctor/res_pltt_ctor (rule 2, owner header) */
 #include "g3d/fn_80075DCC.h"       /* fn_8007B878 (rule 2, owner header) */
 #include "g3d/g3d_resanmamblight.h"/* fn_80089F94 (rule 2, owner header) */
 
@@ -619,10 +620,10 @@ extern "C" u32 fn_80092790(void* self, u32 arg) {
     u32 entry = fn_80092330(&dict, &name);
     if (entry != 0) {
         u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
-        fn_800534B0(&obj, key);
+        res_pltt_ctor(&obj, key);
         return obj;
     }
-    fn_800534B0(&obj, 0);
+    res_pltt_ctor(&obj, 0);
     return obj;
 }
 
@@ -638,10 +639,10 @@ extern "C" u32 fn_80092A54(void* self, u32 arg) {
     u32 entry = fn_80092330(&dict, &name);
     if (entry != 0) {
         u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
-        fn_80052BC0(&obj, key);
+        res_tex_ctor(&obj, key);
         return obj;
     }
-    fn_80052BC0(&obj, 0);
+    res_tex_ctor(&obj, 0);
     return obj;
 }
 
@@ -692,14 +693,6 @@ extern "C" u32 fn_800935D4(void* self, u32 arg) {
 namespace nw4r {
 namespace g3d {
 
-class ResFile {
-public:
-    u32 GetResPltt(const char* pName) const;
-    u32 GetResTex(const char* pName) const;
-
-    /* +0x0 */ void* mpData;
-}; /* size: 0x4 (a one-word `ResCommon<ResFileData>` handle) */
-
 u32 ResFile::GetResPltt(const char* pName) const {
     void* tmp;
     void* name;
@@ -712,10 +705,10 @@ u32 ResFile::GetResPltt(const char* pName) const {
     u32 entry = fn_80092330(&dict, &name);
     if (entry != 0) {
         u32 key = fn_80092250(fn_80062914(&e, entry), pName);
-        fn_800534B0(&obj, key);
+        res_pltt_ctor(&obj, key);
         return obj;
     }
-    fn_800534B0(&obj, 0);
+    res_pltt_ctor(&obj, 0);
     return obj;
 }
 
@@ -731,10 +724,10 @@ u32 ResFile::GetResTex(const char* pName) const {
     u32 entry = fn_80092330(&dict, &name);
     if (entry != 0) {
         u32 key = fn_80092250(fn_80062914(&e, entry), pName);
-        fn_80052BC0(&obj, key);
+        res_tex_ctor(&obj, key);
         return obj;
     }
-    fn_80052BC0(&obj, 0);
+    res_tex_ctor(&obj, 0);
     return obj;
 }
 
@@ -860,10 +853,10 @@ extern "C" u32 fn_800926CC(void* self, u32* arg) {
     if (entry != 0) {
         local = *arg;
         u32 e2 = fn_80092330(fn_80062914(&sub, entry), &local);
-        fn_800534B0(&obj, e2);
+        res_pltt_ctor(&obj, e2);
         return obj;
     }
-    fn_800534B0(&obj, 0);
+    res_pltt_ctor(&obj, 0);
     return obj;
 }
 
@@ -881,10 +874,10 @@ extern "C" u32 fn_80092990(void* self, u32* arg) {
     if (entry != 0) {
         local = *arg;
         u32 e2 = fn_80092330(fn_80062914(&sub, entry), &local);
-        fn_80052BC0(&obj, e2);
+        res_tex_ctor(&obj, e2);
         return obj;
     }
-    fn_80052BC0(&obj, 0);
+    res_tex_ctor(&obj, 0);
     return obj;
 }
 

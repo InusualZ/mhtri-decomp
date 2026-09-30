@@ -152,7 +152,7 @@ void fn_800C6054(EfParticleLayers* self) {
 /* The GX calls and the shared fog helper the per-draw setup below uses. */
 extern void GXSetNumTexGens(u8 count);
 extern void GXSetAlphaCompare(u32 ref0, u32 func, u32 ref1, u32 op, u32 ref2);
-extern void fn_8004C4F0(void* dst, const void* src);
+extern void color_rgba_copy(void* dst, const void* src);
 
 void fn_800C6064(EfDrawStrategyImpl* self, u32 a, u16* params, void* state);
 void fn_800C60DC(EfDrawStrategyImpl* self, u16* params);
@@ -195,7 +195,7 @@ void fn_800C64AC(EfDrawStrategyImpl* self, s32* color, f32* near, f32* far, f32*
     *far = self->fog_far;
     *density = self->fog_density;
     *out_scale = self->fog_scale;
-    fn_8004C4F0(fog_out, &self->pad_0x84);
+    color_rgba_copy(fog_out, &self->pad_0x84);
 }
 
 /* --------------------------------------------------------------------------------------------- *

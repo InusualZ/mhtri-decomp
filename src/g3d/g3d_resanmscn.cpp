@@ -287,10 +287,10 @@ void *fn_80090728(void *self, const void *pData); /* ResAnmCamera */
 /* The texture/palette handle helpers (0x80052xxx band). */
 u32 fn_80052984(const void *handle);                       /* is the ResTex handle valid */
 u32 fn_80052EF0(const void *handle);                       /* is the ResPltt handle valid */
-void *fn_80052B84(void *dst, const void *src);             /* store a ResTex handle */
-void *fn_80053A90(void *dst, const void *src);             /* store a ResPltt handle */
-void *fn_80052BC0(void *self, u32 value);                  /* construct a ResTex handle */
-void *fn_800534B0(void *self, u32 value);                  /* construct a ResPltt handle */
+void *res_tex_assign(void *dst, const void *src);             /* store a ResTex handle */
+void *res_pltt_assign(void *dst, const void *src);             /* store a ResPltt handle */
+void *res_tex_ctor(void *self, u32 value);                  /* construct a ResTex handle */
+void *res_pltt_ctor(void *self, u32 value);                  /* construct a ResPltt handle */
 
 /* The name/handle store helpers: store the source word at +0x0 of `self` and return `self`. */
 void *fn_8006268C(void *self, u32 value); /* g3d/g3d_anmchr.cpp */
@@ -603,7 +603,7 @@ u32 fn_800913A0(void *self, void *file)
             handle = fn_80092990(file, name);
             fn_80069C14(&tex, &handle);
             if (fn_80052984(&tex) != 0) {
-                fn_80052B84(pTexArray, &tex);
+                res_tex_assign(pTexArray, &tex);
                 numBound++;
             }
         }
@@ -623,7 +623,7 @@ u32 fn_800913A0(void *self, void *file)
             handle = fn_800926CC(file, name);
             fn_80069BD8(&pltt, &handle);
             if (fn_80052EF0(&pltt) != 0) {
-                fn_80053A90(pPlttArray, &pltt);
+                res_pltt_assign(pPlttArray, &pltt);
                 numBound++;
             }
         }
@@ -708,14 +708,14 @@ void fn_80091628(void *self)
     for (i = 0; i < (s32)(u32)numTex; i++) {
         ResTex tex;
 
-        fn_80052B84(pTexArray, fn_80052BC0(&tex, 0));
+        res_tex_assign(pTexArray, res_tex_ctor(&tex, 0));
         pTexArray++;
     }
 
     for (j = 0; j < numPltt; j++) {
         ResPltt pltt;
 
-        fn_80053A90(pPlttArray, fn_800534B0(&pltt, 0));
+        res_pltt_assign(pPlttArray, res_pltt_ctor(&pltt, 0));
         pPlttArray++;
     }
 }

@@ -7,11 +7,20 @@
 #define MHTRI_DRAW_SHAPE_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* 0x80055E30 - selects the resource arena index the loaders draw from (and clears the switch byte);
+ * `arena_resource_load` picks index 1 for the arena texture pack.  `res_file_ctor` (0x80054FE8) builds a
+ * `ResFile` handle from a 32-byte-aligned file address (asserting the alignment) and `res_file_assign`
+ * (0x80054FAC) copies one handle over another and returns the destination.  Added with
+ * `quest/arenatask.cpp` (rule 2: this unit owns the addresses). */
+void set_arena_idx(u8 index);
+u32* res_file_ctor(u32* dst, u32 file_data);
+u32* res_file_assign(u32* dst, u32* src);
 /* 0x80056A54 - arm the draw-shape state block (`lbl_8066ACF8`). */
 void fn_80056A54(u32 a, u32 b, u32 c);
 /* 0x80056A84 - the effect step's shape request: the position, the handle and the area byte.  Added

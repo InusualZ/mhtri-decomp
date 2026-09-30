@@ -427,6 +427,13 @@ u32 sendReqLayerUp(NetworkInstance* self);
 u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg);
 u32 sendReqLayerUserList(NetworkInstance* self);
 
+/* 0x804343C4 - starts the network session's close-down sequence (0 when there is no session manager or one
+ * is already closing, 1 once started); 0x80434668 - its progress: -1 on error, 1 when done or when there is
+ * no manager, else 0.  No registered unit owns the addresses, so the band is their home (rule 2).  Added
+ * with `quest/arenatask.cpp`; the names are GUESSES from the bodies. */
+s32 net_session_close_start(void);
+s32 net_session_close_state_get(void);
+
 }
 
 /* `__dl__FPv`'s real spelling (the caller's `operator delete`); see the ef units' convention.

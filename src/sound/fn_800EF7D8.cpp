@@ -223,7 +223,6 @@ typedef struct SndFlag3 {
 /* The file loader (`sound/fn_800DCFEC.c`'s neighbour band).  Its 5th argument is the number of words
  * it copies out of the 6th, which is why each call site declares `u32 args[n]` of that size. */
 void load_file_req(char* path, u32 dma, s32 size, u32 cb, s32 words, u32* args);
-void load_file(char* path, u32 dma, s32 size); /* +0x08 long, so it mangles load_file__FPcUll */
 
 extern "C" u8  fn_8027EE24(void* equip);
 u8  Get_pl_type(_EQUIP* a, _EQUIP* b);
@@ -1293,7 +1292,7 @@ s32 demo_bgm_load(u8 index)
     set_stream_main_vol_flag(0, 1);
     set_stream_main_vol_flag(1, 0);
     set_stream_main_vol_flag(2, 0);
-    fn_800D8438();
+    sound_frame_entry();
     if (cfg->se != 0) {
         PlayStream(0, 1);
     }

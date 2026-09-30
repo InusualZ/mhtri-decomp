@@ -19,6 +19,7 @@
 #define MHTRI_UNSPLIT_MENU_H
 
 #include "types.h"
+#include "fn_80047398.h"   /* `subTransSetPrio`, owned by fn_80047398.cpp (rule 2; it used to be declared here with a wrong mangling) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +57,6 @@ u8 get_arena_cfg(u8, u8);
 u8 get_now_areano(void);
 void set_zmode(u8, u8, u8);
 void set_blendmode(u8, u8, u8);
-void subTransSetPrio(u8, u32, u32, u32*);
 u8** get_str_tbl(s32);
 
 void flfntSetColor(u32);
@@ -162,7 +162,8 @@ typedef struct QuestRecord {
     /* +0x000 */ char field_0x000[0x02C];  /* the leading text run: the record's own name, which
                                              * `quest_result_field_text_get`'s field kinds 0/22 copy */
     /* +0x02C */ u16 field_0x02C;     /* the clear time in frames (compare against 0x2710/0x2328) */
-    /* +0x02E */ char field_0x02E[0x05D];  /* the second text run, rendered by field kinds 1/16/17 */
+    /* +0x02E */ char field_0x02E[0x05C];  /* the second text run, rendered by field kinds 1/16/17 */
+    /* +0x08A */ u8 category_0x08A;   /* the quest category + 1 (`arena_quest_info_build` stores it minus one) */
     /* +0x08B */ u8 field_0x08B;      /* index into string table 5 */
     /* +0x08C */ char field_0x08C[0x029];  /* field kind 2's text run (when the flag test fails) */
     /* +0x0B5 */ char field_0x0B5[0x029];  /* field kind 3's text run */
@@ -176,7 +177,9 @@ typedef struct QuestRecord {
     /* +0x30C */ u8 field_0x30C[2];  /* the two per-slot monster ids (bytes 0/1)
                                       * `quest_monster_text_get` renders through string table 33 */
     /* +0x30E */ u8 unused_0x30E[0x002];
-    /* +0x310 */ u8 unused_0x310[0x038];
+    /* +0x310 */ u8 unused_0x310[0x004];
+    /* +0x314 */ u8 flag_0x314;       /* copied into the arena quest-info row's flag byte */
+    /* +0x315 */ u8 unused_0x315[0x033];
     /* +0x348 */ s32 field_0x348;
     /* +0x34C */ s32 field_0x34C;
     /* +0x350 */ s32 field_0x350;
@@ -185,7 +188,9 @@ typedef struct QuestRecord {
     /* +0x36C */ u16 field_0x36C;     /* `quest_slot_progress_get` returns its low byte */
     /* +0x36E */ u8 unused_0x36E[0x004];
     /* +0x372 */ u16 field_0x372;
-    /* +0x374 */ u8 unused_0x374[0x3A0];
+    /* +0x374 */ u8 unused_0x374[0x140];
+    /* +0x4B4 */ u32 acdata_ofs_0x4B4;  /* byte offset from the record to its 0xA0-byte-per-player acdata equip records (`dl_acdata_to_ar_eqdata`) */
+    /* +0x4B8 */ u8 unused_0x4B8[0x25C];
 } QuestRecord; /* size: 0x714 (lower bound) */
 /* One 0x60-byte entry of the quest work block's element array at `quest_work` +0x94: `flags` gates
  * the entry, `id` is the u16 the callers match on and `value` is the count/target they compare.
@@ -263,7 +268,9 @@ extern s32 quest_list_count;               /* .sbss 0x80794C44 */
  * from `src/menu/fn_802E4978.cpp`, which defined the same view locally - the second user is when a
  * type moves into a header (rule 1). size: 0x54 */
 typedef struct ScreenGeomView {
-    /* +0x00 */ u8 unused_0x00[0x14];
+    /* +0x00 */ u8 unused_0x00[0x0C];
+    /* +0x0C */ f32 aspect_0x0C;    /* the aspect ratio `arena_camera_init` hands `Camera::SetPerspective` */
+    /* +0x10 */ u8 unused_0x10[0x04];
     /* +0x14 */ f32 field_0x14;
     /* +0x18 */ u8 unused_0x18[0x54 - 0x18];
 } ScreenGeomView;

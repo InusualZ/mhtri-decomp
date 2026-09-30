@@ -57,6 +57,7 @@
 #include "RSO/runtime.h"     /* RSOModule + RSOStaticLocateObject (rule 2) */
 #include "fn_80040598.h"     /* the game-root RSO loaders (rule 2) */
 #include "ef/fn_800CDB2C.h"  /* fn_800CF208 / fn_800CEE2C (rule 2) */
+#include "mh3_pad/task.h"    /* `TaskSlot` (rule 1) */
 #include "quest/arenatask.h" /* arena_task: the arena-select task ArenaSelExec installs (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/g3d.h"     /* fn_8007A510 (rule 2) */
@@ -65,14 +66,7 @@
  * Local types
  * ------------------------------------------------------------------ */
 
-/* The 0x20-byte task slot table at `lbl_80659150` (Tsk_Change / fn_800417F0 / fn_8004192C index it
- * by `slot << 5`, fn_80041694 walks all 16). */
-typedef struct TaskSlot {
-    /* +0x00 */ s16 state;
-    /* +0x02 */ s16 timer;
-    /* +0x04 */ void (*func)(struct TaskSlot*);
-    /* +0x08 */ u8 pad_0x08[0x18];
-} TaskSlot; /* size: 0x20 */
+/* `TaskSlot` (the 0x20-byte task slot `lbl_80659150` indexes by `slot << 5`) lives in `mh3_pad/task.h`. */
 
 /* The per-player pad record at `Psw` (0x350 B stride; only the fields this unit reads are named -
  * the rest is padding until another unit needs it). */
@@ -896,14 +890,14 @@ extern "C" s32 fn_80047234(s32* src)
     return *src;
 }
 
-extern "C" void fn_8004726C(s32* dst, s32* src)
+extern "C" void word_copy(s32* dst, s32* src)
 {
     *dst = *src;
 }
 
-extern "C" void* fn_8004723C(void* dst, const void* src)
+extern "C" void* word_copy_return_dst(void* dst, const void* src)
 {
-    fn_8004726C((s32*)dst, (s32*)src);
+    word_copy((s32*)dst, (s32*)src);
     return dst;
 }
 

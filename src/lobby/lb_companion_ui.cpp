@@ -306,7 +306,7 @@ void lb_handled_set(u8 unused, u8 index) {
 }
 
 /* Whether every set bit of `lbl_80794B90[index]`'s low nibble belongs to a pad that is present.
- * Name: counts the set low-nibble bits whose pad is present and compares the count with `fn_8042C850()` */
+ * Name: counts the set low-nibble bits whose pad is present and compares the count with `net_occupied_slot_count()` */
 s32 lb_seen_pad_ck(u8 index) {
     s32 count;
     u8 bits;
@@ -322,7 +322,7 @@ s32 lb_seen_pad_ck(u8 index) {
         bits = (u8)((s32)bits >> 1);
         i += 1;
     } while ((s32)i < 4);
-    return count == fn_8042C850();
+    return count == net_occupied_slot_count();
 }
 
 /* Whether the per-entry byte `lbl_80794B98[index]` is set.

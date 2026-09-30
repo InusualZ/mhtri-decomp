@@ -83,7 +83,7 @@
  *
  * The 13 functions still unwritten are blocked by *naming*, not by evidence: every one of them but
  * `quest_arena_summary_step` calls another band's starter name (`fn_80272E30`,
- * `fn_8027BC48`, `fn_8042C850`/`CB9C`/`CC20`,
+ * `fn_8027BC48`, `net_occupied_slot_count`/`CB9C`/`CC20`,
  * `fn_802D8ABC`..`fn_802D8EA8`, `fn_8035B5FC`, `fn_8033A920`, `fn_802AFC94`/`AFE08`, ..., and the
  * `fn_800CF280` this list used to carry is the already-named `move_work_state_ck`), and a call to
  * one in this new file is a rule-7 finding; `quest_arena_summary_step` (344 B) is blocked

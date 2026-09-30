@@ -52,6 +52,15 @@ u32 fn_8027FFFC(struct _EQUIP* equip);
  * the `fn_8027D738` declaration above. */
 u32 fn_8027DC64(void);
 
+/* 0x8027E72C - the colour table's `index`-th 3-byte row as an opaque-alpha RGBA word; 0x8027E7BC - the
+ * colour-table index the `_EQUIP` record's kind-row stores at +0x05 (0 when the row is absent);
+ * 0x8027EFB4 - the equipment kind's row-table class (0 for kinds 1-6, 1 for 7-11 and 14-15, 2 for
+ * 12-13, 0xFF otherwise).  Added with `quest/arenatask.cpp`'s `arena_equip_color_set` (rule 2). */
+struct _EQUIP;
+s32 equip_color_rgba_get(u8 index);
+u8 equip_color_index_get(struct _EQUIP* equip);
+s32 equip_kind_table_class(u8 kind);
+
 #ifdef __cplusplus
 }
 #endif
@@ -64,6 +73,10 @@ u32 fn_8027DC64(void);
  * row).  Added with `menu/menu_infomation.cpp`, its consumer: the call site and the target both spell
  * it `GetEquipName__FUcUs`, so it must not be reached through an `extern "C"` declaration. */
 u32 GetEquipName(u8 kind, u16 id);
+
+/* 0x8027E7F0 - whether the piece's kind allows recolouring (1 when it does); the arena's colour pack
+ * gates on it.  Added with `quest/arenatask.cpp` (rule 2). */
+u32 EnableChangeColor(struct _EQUIP* equip);
 #endif
 
 #endif /* MHTRI_PL_FN_8027D684_H */

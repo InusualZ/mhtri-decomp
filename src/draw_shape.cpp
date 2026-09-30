@@ -24,10 +24,10 @@
  * Results (objdiff `report generate`, the official metric; target object = the split
  * `build/RMHE08/obj/draw_shape.o`, source compiled with the unit's real `cflags_main` command line):
  * 32 of the 45 functions have bodies, **28 of those are >= 80 %** (16 at 100 %).
- * 100 %: fn_80054C64, fn_80054FAC, fn_80054FDC, fn_8005504C, fn_80055E30, set_arena_idx_switch,
+ * 100 %: fn_80054C64, res_file_assign, fn_80054FDC, fn_8005504C, set_arena_idx, set_arena_idx_switch,
  *        fn_80055E48, fn_80055E50, fn_80055E58, fn_80055E64, fn_800565D0, fn_800565D4, fn_800565FC,
  *        fn_80056A20, fn_80056A3C, fn_80056F04.
- * 90-100 %: fn_80054FE8 95.80, fn_8005696C 95.21, fn_80056E1C 96.55, fn_80055D8C 93.00,
+ * 90-100 %: res_file_ctor 95.80, fn_8005696C 95.21, fn_80056E1C 96.55, fn_80055D8C 93.00,
  *        fn_80056A84 92.22, fn_80055EC4 89.95.
  * 80-90 %: fn_80055D20 87.22, fn_80055C5C 86.73, fn_80055DC8 86.73, fn_800569CC 84.52,
  *        fn_80054C74 82.45, fn_80055CC4 81.96.
@@ -68,14 +68,14 @@ typedef struct DrawShapeWork {
     /* +0xD4 */ u32 field_0xD4;        /* GXInitTexObj wrapS / tlut name */
     /* +0xD8 */ u32 field_0xD8;        /* GXInitTexObj wrapT / tlut name */
     /* +0xDC */ u8 pad_0xDC[0x04];
-    /* +0xE0 */ u32 field_0xE0;        /* fn_80052BC0 handle */
-    /* +0xE4 */ u32 field_0xE4;        /* fn_800534B0 handle */
+    /* +0xE0 */ u32 field_0xE0;        /* res_tex_ctor handle */
+    /* +0xE4 */ u32 field_0xE4;        /* res_pltt_ctor handle */
     /* +0xE8 */ u8 pad_0xE8[0x10];
     /* +0xF8 */ u32 texObj_0xF8[0x40]; /* the GXTexObj storage */
     /* +0x1F8 */ u32 tlutObj_0x1F8[0x18];
     /* +0x258 */ u32 texHandle_0x258[0x21];  /* resource handle table, indexed by shape id */
     /* +0x2DC */ u32 plttHandle_0x2DC[0x21];
-    /* +0x360 */ u32 field_0x360;            /* fn_80052BC0 handle */
+    /* +0x360 */ u32 field_0x360;            /* res_tex_ctor handle */
 } DrawShapeWork; /* size: 0x364 */
 
 extern DrawShapeWork lbl_8066A920;
@@ -112,7 +112,7 @@ typedef struct DrawShapeState {
 
 extern DrawShapeState lbl_8066ACF8;
 
-/* `lbl_807948A0`/`A1` (.sbss): the current arena index pair - `fn_80055E30` sets both, the
+/* `lbl_807948A0`/`A1` (.sbss): the current arena index pair - `set_arena_idx` sets both, the
  * `set_arena_idx_switch` setter and the two getters below drive the second byte. */
 extern u8 lbl_807948A0;
 extern u8 lbl_807948A1;
@@ -181,20 +181,20 @@ extern char lbl_80581944[];
 extern "C" {
 /* The `drawshape_*` 2D helpers this range calls (0x8004F..0x80053.., same band). */
 void  fn_800539B4(u16 idx);
-void  fn_800529A0(u32 a, u32 b);
-void  fn_80052844(void* tex, void* pltt, u16 idx, u32 arg);
-s32   fn_800528DC(void);
-void  fn_80052B84(void* a, void* b);
-void  fn_80052BC0(void* out, u32 arg);
+void  draw_shape_tex_slots_clear(u32 a, u32 b);
+void  draw_shape_tex_slot_set(void* tex, void* pltt, u16 idx, u32 arg);
+s32   res_tex_has_pltt(void);
+void  res_tex_assign(void* a, void* b);
+void  res_tex_ctor(void* out, u32 arg);
 u16   fn_80052D98(void);
 void* fn_80052E30(void);
 void* fn_80052E54(void);
 s32   fn_80052EF0(void);
-void  fn_800534B0(void* out, u32 arg);
-void  fn_80053A90(void* a, void* b);
+void  res_pltt_ctor(void* out, u32 arg);
+void  res_pltt_assign(void* a, void* b);
 void  fn_8009A490(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h);
 void  fn_8009A5C4(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h);
-void  fn_8004C4F0(void* dst, const void* src);
+void  color_rgba_copy(void* dst, const void* src);
 void  fn_80057810(u32 a, u32 b, u32 c);
 
 /* SDK. */
@@ -226,13 +226,13 @@ extern "C" void fn_8005504C(u32* dst, u32 value) {
 }
 
 /* Copy through the one-word handle and return it (the resource-handle initialiser). */
-extern "C" u32* fn_80054FAC(u32* dst, u32* src) {
+extern "C" u32* res_file_assign(u32* dst, u32* src) {
     fn_80054FDC(dst, src);
     return dst;
 }
 
 /* Store `value` through `dst` after asserting it is 32-byte aligned. */
-extern "C" u32* fn_80054FE8(u32* dst, u32 value) {
+extern "C" u32* res_file_ctor(u32* dst, u32 value) {
     fn_8005504C(dst, value);
     if ((value & 0x1F) != 0) {
         nw4r::db::Panic(lbl_80581944, 0x3C, lbl_8058191C);
@@ -248,7 +248,7 @@ extern "C" u8 fn_80055E50(void) {
     return lbl_807948A1;
 }
 
-extern "C" void fn_80055E30(u8 idx) {
+extern "C" void set_arena_idx(u8 idx) {
     lbl_807948A0 = idx;
     lbl_807948A1 = 0;
 }
@@ -315,9 +315,9 @@ extern "C" void fn_80055DC8(s16* a, s16* b, u32 raw) {
 extern "C" DrawShapeWork* fn_80055E64(DrawShapeWork* self) {
     MTX34_ctor(&self->matrix_0x74);
     MTX34_ctor(&self->matrix_0xA4);
-    fn_80052BC0(&self->field_0xE0, 0);
-    fn_800534B0(&self->field_0xE4, 0);
-    fn_80052BC0(&self->field_0x360, 0);
+    res_tex_ctor(&self->field_0xE0, 0);
+    res_pltt_ctor(&self->field_0xE4, 0);
+    res_tex_ctor(&self->field_0x360, 0);
     return self;
 }
 
@@ -340,14 +340,14 @@ extern "C" void fn_80054C74(u16 idx, u32* outTex, u32* outTlut) {
     u8 mipmap;
 
     fn_800539B4(idx);
-    fn_80052BC0(&texHandle, w->texHandle_0x258[idx]);
-    fn_800534B0(&plttHandle, w->plttHandle_0x2DC[idx]);
+    res_tex_ctor(&texHandle, w->texHandle_0x258[idx]);
+    res_pltt_ctor(&plttHandle, w->plttHandle_0x2DC[idx]);
     *outTex = (u32)w->texObj_0xF8;
     *outTlut = (u32)w->tlutObj_0x1F8;
     w->field_0xD8 = 0;
     w->field_0xD4 = 0;
 
-    if (fn_800528DC() == 1) {
+    if (res_tex_has_pltt() == 1) {
         if (fn_80052EF0() == 0) {
             *outTlut = 0;
         } else {
@@ -474,7 +474,7 @@ extern "C" void fn_8005696C(u8 a, u8 b, u8 c, f32 scaleX, f32 scaleY, const void
     s->field_0x3F = c;
     s->field_0x44 = scaleX;
     s->field_0x48 = scaleY;
-    fn_8004C4F0(&s->color_0x50, color);
+    color_rgba_copy(&s->color_0x50, color);
     s->field_0x54 = handle;
 }
 

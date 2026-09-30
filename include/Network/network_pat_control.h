@@ -113,6 +113,17 @@ typedef struct NetCtrlWk {
 /* The work-record singleton, defined by another (unclaimed) TU. */
 extern NetCtrlWk* net_ctrl_wk;
 
+/* 0x8042C844 - the selected server id; 0x8042C850 - how many of the four server slots are occupied
+ * (0 with no control record); 0x8042ED30 - the sub-state result byte at +0xBF2D (0 below state 0x32);
+ * 0x8042EDE0 - clears the result flag at +0xC259; 0x8042FFDC - copies the 0x2000-byte quest record into
+ * the control record at +0xC3EC.  Added with `quest/arenatask.cpp` (rule 2: this range owns the
+ * addresses). */
+u8 net_selected_server_get(void);
+s8 net_occupied_slot_count(void);
+u8 net_sub_result_get(void);
+void net_result_flag_clear(void);
+void net_quest_record_set(const void* record /* untyped: byte range - the 0x2000-byte record it copies */);
+
 /* The network facade the band drives. */
 /* 0x8042CC20 - no arguments; the sibling predicate of `fn_8042CB9C`, reached by
  * `ef/eft_slot.cpp`.  Added here because this unit owns the address (rule 2). */
@@ -135,5 +146,11 @@ BOOL fn_803DF1A8(NetworkSessionManagerPat* session_manager);
  * declared in that unit's header (`g3d/g3d_anmchr.h`) and included where it is called (rule 2) -
  * `g3d/g3d_anmchr.h` and this header declare no other symbol in common, so a TU may include both. */
 void sysSE_req(long id);
+
+#ifdef __cplusplus
+/* 0x8042EEA4 - the pending network sub-error message id (0 when there is none); the map's
+ * `get_network_sub_error_msg__Fv`.  Added with `quest/arenatask.cpp` (rule 2: this range owns it). */
+s32 get_network_sub_error_msg(void);
+#endif
 
 #endif /* MHTRI_NETWORK_NETWORK_PAT_CONTROL_H */

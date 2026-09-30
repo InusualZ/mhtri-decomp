@@ -26,25 +26,6 @@
 extern "C" {
 #endif
 
-/* The arena task's own state block (`.bss` 0x806E4010, 0x58 B, the dump's `arena_work`).  Only the
- * offsets `src/quest/arenatask.cpp`'s functions touch are named; the rest is filler so the size and
- * the offsets stay checkable against the disassembly (rule 3/4/5). size: 0x58 */
-typedef struct ArenaWork {
-    /* +0x00 */ u8 unused_0x00[0x04];
-    /* +0x04 */ u8 mode_0x04;             /* 1 vs 2 selects the Vs (2-player) variant, read by `arena_task` */
-    /* +0x05 */ u8 unused_0x05[0x07];
-    /* +0x0C */ s32 stage_0x0C;           /* 0..9, the arena stage index; `arena_task` writes `0x2328 + stage` to `lb_param_w+0x00` and indexes the 0x3B0-byte config record with it */
-    /* +0x10 */ const u8* eq_data_0x10;   /* the arena's 0xEC-byte acdata equip records `arena_eqdata_from_userdata` indexes with the player's chunk slot (`arena_work + 0x10` is loaded as a full word) */
-    /* +0x14 */ u8 eq_slot_0x14;          /* 0..3, the 0xEC-byte eq record inside the stage's config */
-    /* +0x15 */ u8 unused_0x15[0x17];
-    /* +0x2C */ u8 other_eq_0x2C;         /* the equip index a *remote* player chose */
-    /* +0x2D */ u8 unused_0x2D[0x0A];
-    /* +0x37 */ u8 other_eq_dirty_0x37;   /* set with `other_eq_0x2C` */
-    /* +0x38 */ u8 unused_0x38[0x16];
-    /* +0x4E */ u16 sub_mode_0x4E;        /* compared against 3 by `arena_task`, set from the flag `arena_sub_mode_set` takes */
-    /* +0x50 */ u8 unused_0x50[0x08];
-} ArenaWork; /* size: 0x58 */
-
 /* The arena quest-info row list `arena_quest_info_build` fills (`.sbss` 0x80794D3C, the dump's `que_info`):
  * ten 0x18-byte rows, one per arena quest id 0x2328 + i. size: 0x18 */
 typedef struct ArenaQuestInfo {
@@ -55,9 +36,8 @@ typedef struct ArenaQuestInfo {
     /* +0x04 */ const u8* record_0x04;    /* the quest row itself */
     /* +0x08 */ const u8* sub_0x08;       /* the quest row + 0x2E */
     /* +0x0C */ u8 unused_0x0C[0x04];
-    /* +0x10 */ s16 time_0x10;            /* the quest row's +0x13A */
-    /* +0x12 */ u8 unused_0x12[0x02];
-    /* +0x14 */ u16 clear_limit_0x14[2];  /* the `multi_arena_clr_time` pair for this quest (a 4-byte row there) */
+    /* +0x10 */ s32 time_0x10;            /* the quest row's +0x13A (the target stores it with `stw`) */
+    /* +0x14 */ u32 clear_limit_0x14[1];  /* the `multi_arena_clr_time` entry for this quest */
 } ArenaQuestInfo; /* size: 0x18 */
 typedef struct ArenaQuestInfoList {
     /* +0x00 */ ArenaQuestInfo row_0x00[10];
@@ -82,46 +62,63 @@ typedef struct _arena_eq_data {
     /* +0xCC */ u8 tail_0xCC[0x20];
 } _arena_eq_data; /* size: 0xEC */
 
-/* One 0x18-byte per-player arena equip slot: `arena_eqdata_reset` clears it and `arena_eqdata_apply`
- * fills `kind_0x08`/`state_0x03` in it.  Only the offsets those two functions touch are named. size: 0x18 */
+/* One stage record of `arena_stage_config` (`.data` 0x80604D30, ten of them): four per-player equip
+ * records; the rest of the 0x3B0 is exactly those four (4 * 0xEC). size: 0x3B0 */
+typedef struct ArenaStageRecord {
+    /* +0x000 */ _arena_eq_data eq_0x000[4];
+} ArenaStageRecord; /* size: 0x3B0 */
+
+/* One 0x18-byte per-player arena equip slot: `arena_eqdata_reset` clears it, `arena_eqdata_apply` fills
+ * `kind_0x08`/`state_0x03` in it and `arena_result_next` binds the player's Vs user block to it.
+ * size: 0x18 */
+struct _vs_user_data;
 typedef struct ArenaEqSlot {
     /* +0x00 */ u8 player_0x00;       /* the move-work player index `arena_eqdata_apply` scales by 0xB20 */
     /* +0x01 */ u8 mode_0x01;         /* 3 / 4 / 5 */
     /* +0x02 */ u8 clear_0x02;        /* zeroed by `arena_eqdata_apply` */
     /* +0x03 */ u8 state_0x03;        /* 0 / 5 / 4 / 3 */
-    /* +0x04 */ u8 unused_0x04;
-    /* +0x05 */ u8 unused_0x05;
-    /* +0x06 */ u8 pair_a_0x06;       /* 3 / 4 */
+    /* +0x04 */ u8 stage_col_0x04;    /* the stage's column on the `pair_a_0x06`-wide stage grid (stage % width) */
+    /* +0x05 */ u8 stage_row_0x05;    /* its row (stage / width) */
+    /* +0x06 */ u8 pair_a_0x06;       /* 3 / 4; also the stage grid's width in `arena_result_next`'s mode 1 */
     /* +0x07 */ u8 pair_b_0x07;       /* 2 */
     /* +0x08 */ u8 kind_0x08;         /* the `arena_eqdata_apply` kind */
     /* +0x09 */ u8 state_0x09;        /* 3 when the owner's +0x04 is 2, else 4 */
-    /* +0x0A */ u8 unused_0x0A;
+    /* +0x0A */ u8 cleared_0x0A;      /* only ever cleared by `arena_eqdata_reset` */
     /* +0x0B */ u8 flag_0x0B;
     /* +0x0C */ u8 pair_0x0C;
     /* +0x0D */ u8 mirror_0x0D;       /* a `get_arena_cfg` byte */
     /* +0x0E */ u16 value_0x0E;
     /* +0x10 */ u16 value_0x10;
     /* +0x12 */ u16 value_0x12;
-    /* +0x14 */ u8 unused_0x14[0x04];
+    /* +0x14 */ struct _vs_user_data* user_0x14;   /* the player's Vs user block (`get_vsUser_work`) */
 } ArenaEqSlot; /* size: 0x18 */
 
-/* The arena's parameter block `arena_eqdata_setup` switches on and `arena_eqdata_reset`/
- * `arena_eqdata_apply` fill: a header, two equip slots and three trailing u16s. size: 0x4C */
-typedef struct ArenaEqParams {
+/* The arena task's state block (`.bss` 0x806E4010, the dump's `arena_work`): the setup mode, the Vs mode
+ * and stage, the two equip slots the mode selects and the sub-mode the task compares against 3.  It is
+ * also the parameter block `arena_eqdata_setup`/`_reset`/`_apply` and `arena_player_init` fill (their old
+ * `ArenaEqParams` view was this same record's first 0x4C bytes).  Only the offsets the band's functions
+ * touch are named; the rest is filler so the size and the offsets stay checkable. size: 0x58 */
+typedef struct ArenaWork {
     /* +0x00 */ u8 mode_0x00;         /* the setup's own 0/1/2 mode */
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 vs_mode_0x04;      /* == 2 selects the acdata -> eqdata conversion */
-    /* +0x05 */ u8 unused_0x05[0x0B];
-    /* +0x10 */ const u8* eq_records_0x10;   /* 0xEC-byte records, indexed by a slot's +0x00 */
-    /* +0x14 */ ArenaEqSlot slot_0x14;
-    /* +0x2C */ ArenaEqSlot slot_0x2C;
+    /* +0x01 */ u8 timer_0x01;        /* GUESS name: 0xC8 in the Vs setups, cleared by every setup */
+    /* +0x02 */ u8 unused_0x02;       /* only ever cleared */
+    /* +0x03 */ u8 round_0x03;        /* GUESS name: counts `arena_player_init` passes; its `<< 8` is the high byte of the players' motion word */
+    /* +0x04 */ u8 mode_0x04;         /* 0 = one-player, 1 = two-player Vs, 2 = network Vs; 2 selects the acdata -> eqdata conversion */
+    /* +0x05 */ u8 player_count_0x05; /* the network Vs player count */
+    /* +0x06 */ u8 pad_0x06[0x02];
+    /* +0x08 */ u16 ready_mask_0x08;  /* the players' ready bits, ORed from their user blocks */
+    /* +0x0A */ u16 item_mask_0x0A;   /* one bit per non-empty item slot of the players' user blocks */
+    /* +0x0C */ s32 stage_0x0C;       /* 0..9, the arena stage index (-1 once the task leaves the stage select); `arena_task` writes `0x2328 + stage` to `lb_param_w+0x00` and indexes the 0x3B0-byte config record with it */
+    /* +0x10 */ const ArenaStageRecord* eq_data_0x10;   /* the stage's 0xEC-byte acdata equip records, indexed by a slot's `player_0x00` */
+    /* +0x14 */ ArenaEqSlot slot_0x14[2];
     /* +0x44 */ u16 value_0x44;
     /* +0x46 */ u16 value_0x46;
     /* +0x48 */ u16 value_0x48;
-    /* +0x4A */ u8 unused_0x4A[0x02];
-} ArenaEqParams; /* size: 0x4C */
+    /* +0x4A */ u8 pad_0x4A[0x04];
+    /* +0x4E */ s16 sub_mode_0x4E;    /* compared against 3 by `arena_task`, set from the flag `arena_sub_mode_set` takes */
+    /* +0x50 */ u8 solo_0x50;         /* 1 when the play is not online (`system_w`'s +0x8AE is 0) */
+    /* +0x51 */ u8 pad_0x51[0x07];
+} ArenaWork; /* size: 0x58 */
 
 #ifdef __cplusplus
 }

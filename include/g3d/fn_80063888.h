@@ -16,6 +16,7 @@
 #define MHTRI_G3D_FN_80063888_H
 
 #include "types.h"
+#include "g3d/g3d_camera_types.h" /* `nw4r::g3d::Camera::PostureInfo`, the object `camera_posture_info_ctor` initialises */
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,10 @@ void fn_80064C14(void *self, const f32 *v);
 u32 fn_800651BC(void *self);                /* 0x800651BC - reads the word at +0x0 of `self` */
 void *fn_80067E54(void *out, void *in);     /* 0x80067E54 - copies 0x10 B, returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
+#ifdef __cplusplus
+/* 0x80067E70 - the posture record's constructor: default-constructs its position, target and up vectors. */
+nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self);
+#endif
 
 /* Added when `g3d/g3d_resanmchr.cpp` registered (rule 2): the frame walkers clamp a frame through
  * this cluster's 3-float helper. */

@@ -492,7 +492,7 @@ void fn_802B58D4(void);
 void fn_802ADB98(void);
 void fn_800F8DA4(void);
 void fn_8035AB50(void);
-void fn_802D9EA4(void);
+void ai_npc_reaction_forward(void);
 void fn_802DB2EC(void);
 void fn_802A07A0(void);
 void fn_8021DC24(void);
@@ -504,8 +504,8 @@ void fn_801FD338(_LB_NPC* self, u8* data);
 u32 fn_802FB600(void);
 void fn_801E0298(u8 index);
 void fn_800E26C4(u8* self);
-void fn_80054FE8(void* out, s32 zero);
-void fn_80054FAC(void* a, void* b);
+void res_file_ctor(void* out, s32 zero);
+void res_file_assign(void* a, void* b);
 void fn_800E3358(s32 a, u8* b, void* c);
 void fn_800D5CAC(void* rec);
 void* memset(void* dst, s32 c, u32 n);
@@ -541,7 +541,7 @@ void fn_801FC6EC(void)
         light_move();
         fn_800F8DA4();
         fn_8035AB50();
-        fn_802D9EA4();
+        ai_npc_reaction_forward();
         fn_802DB2EC();
         system_w.field_0x8C0 = 0;
         if (lobby_w.field_0x12C != 1 && (lobby_w.field_0x000 == 0 || lobby_w.field_0x000 == 0x24)) {
@@ -625,12 +625,12 @@ void fn_801FCADC(u8* self, u32 index)
     LbResRec dst;
     LbResRec src;
 
-    fn_80054FE8(&dst, 0);
+    res_file_ctor(&dst, 0);
     {
         LbResource* res = (LbResource*)ckResourceName((s8*)lbl_80582A68[index].b_0x04);
         if (res != 0) {
-            fn_80054FE8(&src, (s32)res->payload_0x44);
-            fn_80054FAC(&dst, &src);
+            res_file_ctor(&src, (s32)res->payload_0x44);
+            res_file_assign(&dst, &src);
             fn_800E3358(4, self, &dst);
         }
     }
