@@ -14,7 +14,7 @@
  * before it is read only by `Pl/fn_80288CEC.cpp`, and `0x806AC8A8` - the seam - is the first address a
  * non-`Pl` unit touches (`menu/menu_item.cpp`).  So the run ends there and the lower half
  * (`0x806AC8A8..0x806AD698`, read by `menu/menu_item`, `menu/fn_8031EA8C`, `ai/fn_802D44F4`,
- * `enemy/em024_ai` and `lobby/fn_802076D4`) is a different owner's - see the unit header's residual.
+ * `menu/menu_row` and `lobby/fn_802076D4`) is a different owner's - see the unit header's residual.
  *
  * The construction is what fixes each array's shape: the band's static initializer `fn_80297C30`
  * (0x80297C30, inside `Pl/fn_80295EF4.cpp`) builds them all with `__construct_array`, and its element

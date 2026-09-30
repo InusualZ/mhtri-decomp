@@ -776,6 +776,14 @@ config.libs = [
             # `cflags_menu` as its file family (`menu_item.cpp` and `menu_infomation.cpp` carry the
             # same `menu_*` name pattern); the body keeps no fold-shaped pair.
             Object(Matching, "menu/menu_note.cpp"),
+            # Re-cut 2026-09-29 out of `enemy/em024_ai.cpp`: `.text` 0x8034C1D0..0x8034D2B0 (27
+            # functions / 4320 B), extab 0x80017094..0x800170F4, extabindex 0x80036744..0x800367D4
+            # and `.sdata2` 0x8079B368..0x8079B3A8.  Module `menu`: the range calls
+            # `get_note_item_slot`/`item_page_option_*`/`draw_sprite`, works the `MenuRowData` table
+            # and the `MenuSlot::place_entries` list and references no enemy symbol; the seam to the
+            # player band is the `extabindex` and `.sdata2` runs breaking at 0x8034D2B0.  File name
+            # a GUESS from the dominant type; evidence in the file header.  `cflags_menu` (this lib).
+            Object(NonMatching, "menu/menu_row.cpp"),
             # Registered once, at its final home, from proposal/803967F0_fn_803967F0.cpp: the
             # quest-result screen band (`.text` 0x803967F0..0x8039D278, 85 functions / 0x6A88 B).
             # Module `menu` (evidence class 3): the `.data` band its own tables sit in carries
@@ -1205,27 +1213,16 @@ config.libs = [
             # extab 0x80017574..0x800175DC (13 records), extabindex 0x80036E94..0x80036F30 (13 x 12 B),
             # `.text` 0x8035E034..0x8035F2B4.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/fn_8035E034.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from proposal/8034C1D0_fn_8034C1D0.cpp:
-            # the em024 monster-AI band `.text` 0x8034C1D0..0x80358624 (120 functions / 50260 B) plus
-            # its extab 0x80017094..0x8001736C (91 records) and extabindex 0x80036744..0x80036B88
-            # (91 x 12 B).  Module `enemy` from the link band (the unit below starts at the range's
-            # end, every callee out of the range is enemy-band: `em_frame_check`,
-            # `em_after_frame_check`, `em_act_ck`, `em_get_mot_no`, `fn_8012xxxx`, `fn_80136xxx`) and
-            # from the code (the biggest body in the range is a 0x1A84-byte switch over
-            # `em_get_mot_no()`'s motions).  No `__FILE__` string is reachable from the range and the
-            # runtime dump answers only `zz_` placeholders, so the file name and the 14 symbols the
-            # file defines are **guesses from the range's dominant content**: `em024_prog_tbl`
-            # (`.data:0x805EBBE0`, the monster-id program table `em0XX_prog_tbl`) lists seven of the
-            # band's functions (0x8034F334, 0x8034F524, 0x803562B4, 0x8034F410, 0x8034F414,
-            # `fn_80356664`, `fn_803580E8`) and sits inside the band's own `.data` run, next to its
-            # switch jump tables (`jumptable_805EBD78`/`jumptable_805EC1C0`/`jumptable_805ECE88`) - so
-            # this is the em024 monster's AI band.  The range's head (0x8034C1D0..0x8034D124) is menu
-            # item-page note code, so `menu/menu_note.cpp` may be a fragment of a TU that continues
-            # here - a seam re-draw candidate in the unit's outbox; the 14 named symbols are all in
-            # that head and are named for what they are (note page / menu row table / placement
-            # list), the file for the band it registers.  The `rule 7 deferred` escape the file still
-            # carries covers only the callee names it references in other units.  C++; every plain
-            # `fn_` definition is `extern "C"`.  See the unit header for the residuals.
+            # Registered once, at its final home (docs/plan.md 12) from proposal/8034C1D0 and re-cut
+            # 2026-09-29 to the em024 monster's own AI: `.text` 0x8034F138..0x80358624 (69 functions /
+            # 38124 B), extab 0x800171A4..0x8001736C (57 records), extabindex 0x800368DC..0x80036B88
+            # (57 x 12 B), `.data` 0x805EBBE0..0x805ED0C0 (`em024_prog_tbl`, the switch jump tables and
+            # per-motion tables), `.sdata` 0x80793330..0x80793338 and `.sdata2` 0x8079B3C8..0x8079B640.
+            # The original range 0x8034C1D0..0x80358624 was three TUs: `menu/menu_row.cpp` and
+            # `Pl/pl_act_class3.cpp` took the head and the player band.  One TU from here: the pool
+            # float `lbl_8079B3CC` is loaded by 28 functions across the range and by nothing outside.
+            # File name a GUESS from `em024_prog_tbl` and the enemy id 0x18 tested by the caller of
+            # `fn_8034F138`.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/em024_ai.cpp"),
             # Registered from proposal/8035F2B4_fn_8035F2B4.cpp, re-cut to the em035 program's own
             # half: `.text` 0x8035F2B4..0x8035FC18 (20 functions / 2404 B) plus its extab run
@@ -2051,6 +2048,14 @@ config.libs = [
             # because this source states the static initializer as an explicit function (invariant
             # 8.4).  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_80295EF4.cpp"),
+            # Re-cut 2026-09-29 out of `enemy/em024_ai.cpp`: the player act-state handlers of
+            # `_PLW::field_0x002` class 3 (`Pl/fn_80258FCC.cpp`'s `jumptable_805C5648` entry 3 is
+            # this band's dispatcher `fn_8034EE18`), `.text` 0x8034D2B0..0x8034F138 (24 functions /
+            # 7816 B), extab 0x800170F4..0x800171A4, extabindex 0x800367D4..0x800368DC, `.data`
+            # 0x805E9248..0x805EBBE0, `.sdata` 0x80793308..0x80793330 and `.sdata2` 0x8079B3A8..
+            # 0x8079B3C8.  The file name is a GUESS (the selector's meaning is unproven); evidence
+            # and the data caveat are in the file header.  It uses `cflags_pl` (this lib).
+            Object(NonMatching, "Pl/pl_act_class3.cpp"),
         ],
     },
     {

@@ -59,7 +59,7 @@ void fn_80346268(u32 a, u32 b);
 void fn_803386C4(void* slot, u32 mode, u32 value);
 
 /* 0x80349914 - the two-byte copy MWCC emits for a `u16` pair assignment (`*dst = *src`).  Added with
- * `enemy/em024_ai.cpp`, its consumer (rule 2: the address is in this unit's range). */
+ * `menu/menu_row.cpp`, its consumer (rule 2: the address is in this unit's range). */
 void fn_80349914(u16* dst, const u16* src);
 
 #ifdef __cplusplus

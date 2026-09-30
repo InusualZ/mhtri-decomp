@@ -1192,10 +1192,27 @@ menu/menu_note.cpp:
 	.text       start:0x8034C0C4 end:0x8034C1D0
 	.data       start:0x805E9220 end:0x805E9248
 
+menu/menu_row.cpp:
+	extab       start:0x80017094 end:0x800170F4
+	extabindex  start:0x80036744 end:0x800367D4
+	.text       start:0x8034C1D0 end:0x8034D2B0
+	.sdata2     start:0x8079B368 end:0x8079B3A8
+
+Pl/pl_act_class3.cpp:
+	extab       start:0x800170F4 end:0x800171A4
+	extabindex  start:0x800367D4 end:0x800368DC
+	.text       start:0x8034D2B0 end:0x8034F138
+	.data       start:0x805E9248 end:0x805EBBE0
+	.sdata      start:0x80793308 end:0x80793330
+	.sdata2     start:0x8079B3A8 end:0x8079B3C8
+
 enemy/em024_ai.cpp:
-	extab       start:0x80017094 end:0x8001736C
-	extabindex  start:0x80036744 end:0x80036B88
-	.text       start:0x8034C1D0 end:0x80358624
+	extab       start:0x800171A4 end:0x8001736C
+	extabindex  start:0x800368DC end:0x80036B88
+	.text       start:0x8034F138 end:0x80358624
+	.data       start:0x805EBBE0 end:0x805ED0C0
+	.sdata      start:0x80793330 end:0x80793338
+	.sdata2     start:0x8079B3C8 end:0x8079B640
 
 ef/eft052.cpp:
 	extab       start:0x8001736C end:0x80017574

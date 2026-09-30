@@ -30,7 +30,7 @@
  *
  * Residual: the lower half of the band, `.bss` 0x806AC8A8-0x806AD698 (~0xDD0 B, `HitRegistry` and the
  * menu item work tables), stays unowned - it is shared by `menu/menu_item`, `menu/fn_8031EA8C`,
- * `ai/fn_802D44F4`, `enemy/em024_ai` and `lobby/fn_802076D4`, so it needs a **joint** named owner whose
+ * `ai/fn_802D44F4`, `menu/menu_row` and `lobby/fn_802076D4`, so it needs a **joint** named owner whose
  * header those five modules declare into, and `lbl_806AC8A8` (Pl-typed - `Pl/fn_80295EF4.h` declares
  * `HitRegistry lbl_806AC8A8`) is that owner's first row, not this unit's.
  */

@@ -180,7 +180,7 @@ struct MenuScroll {
 };
 
 struct _mh_ivec2_;
-/* The 0x24-byte placement record `MenuSlot::place_entries` points at: `enemy/em024_ai.cpp` is its
+/* The 0x24-byte placement record `MenuSlot::place_entries` points at: `menu/menu_row.cpp` is its
  * only consumer, so its definition lives in that unit and this header only names the pointer's type. */
 struct MenuPlaceRec;
 
@@ -248,7 +248,7 @@ struct MenuSlot {
     /* +0x31E */ u8 field_0x31E;
     /* +0x31F */ u8 field_0x31F;
     /* +0x320 */ u8 unused_0x320[0x4];
-    /* +0x324 */ MenuPlaceRec* place_entries; /* the 0x24-byte placement list `enemy/em024_ai.cpp` walks */
+    /* +0x324 */ MenuPlaceRec* place_entries; /* the 0x24-byte placement list `menu/menu_row.cpp` walks */
     /* +0x328 */ s32 place_count;
     /* +0x32C */ u8 unused_0x32C[0x1];
     /* +0x32D */ u8 field_0x32D;      /* the flag `fn_802A0188` clears after `fn_8004082C` */
@@ -336,7 +336,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  * includes this header for it now (rule 2).  Its third parameter is the lobby band's 2D vector, whose
  * tag is declared here rather than including a band header for it. */
 struct _mh_ivec2_;
-/* The 0x24-byte placement record `MenuSlot::place_entries` points at: `enemy/em024_ai.cpp` is its
+/* The 0x24-byte placement record `MenuSlot::place_entries` points at: `menu/menu_row.cpp` is its
  * only consumer, so its definition lives in that unit and this header only names the pointer's type. */
 struct MenuPlaceRec;
 
