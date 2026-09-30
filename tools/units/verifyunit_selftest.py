@@ -471,8 +471,8 @@ def _pad_row_end_to_end() -> int:
 # --------------------------------------------------------------------------------------------------
 
 def _real_objects():
-    tgt = os.path.join(ROOT, "build", "RMHE08", "obj", "hud", "fn_80334568.o")
-    cand = os.path.join(ROOT, "build", "RMHE08", "src", "hud", "fn_80334568.o")
+    tgt = os.path.join(ROOT, "build", "RMHE08", "obj", "quest", "arenatask.o")
+    cand = os.path.join(ROOT, "build", "RMHE08", "src", "quest", "arenatask.o")
     objdiff = os.path.join(ROOT, "build", "tools", "objdiff-cli.exe")
     return tgt, cand, objdiff
 
@@ -486,13 +486,13 @@ def live_rows() -> int:
         print("skip  live cross-check (no compiled unit / report / objdiff)")
         return 0
     failures = 0
-    ok, detail, advisories = vu.verify_units(ROOT, ["hud/fn_80334568"], objdiff=objdiff)
+    ok, detail, advisories = vu.verify_units(ROOT, ["quest/arenatask"], objdiff=objdiff)
     failures = _ok("verify_units accepts a real registered unit", ok, True, failures)
     failures = _ok("... and reports the objects it re-measured", "re-measured" in detail, True, failures)
     for line in advisories:
         print("note  advisory: " + line)
-    ok, detail = vu.registration_check(ROOT, ["hud/fn_80334568"])
-    failures = _ok("the real tree registers hud/fn_80334568", ok, True, failures)
+    ok, detail = vu.registration_check(ROOT, ["quest/arenatask"])
+    failures = _ok("the real tree registers quest/arenatask", ok, True, failures)
     failures = _ok("... and the registration check refuses a unit the tree lacks",
                    vu.registration_check(ROOT, ["hud/fn_00000000"])[0], False, failures)
     return failures
@@ -509,17 +509,17 @@ def doctored_report_rows() -> int:
     failures = 0
     real = None
     for entry in json.load(open(report, encoding="utf-8")).get("units") or []:
-        if entry.get("name") == "main/hud/fn_80334568":
+        if entry.get("name") == "main/quest/arenatask":
             real = entry
             break
     if real is None:
-        print("skip  doctored-report fixture (hud/fn_80334568 not in the report)")
+        print("skip  doctored-report fixture (quest/arenatask not in the report)")
         return 0
     with tempfile.TemporaryDirectory() as tmp:
-        os.makedirs(os.path.join(tmp, "build", "RMHE08", "obj", "hud"))
-        os.makedirs(os.path.join(tmp, "build", "RMHE08", "src", "hud"))
-        shutil.copyfile(tgt, os.path.join(tmp, "build", "RMHE08", "obj", "hud", "fn_80334568.o"))
-        shutil.copyfile(cand, os.path.join(tmp, "build", "RMHE08", "src", "hud", "fn_80334568.o"))
+        os.makedirs(os.path.join(tmp, "build", "RMHE08", "obj", "quest"))
+        os.makedirs(os.path.join(tmp, "build", "RMHE08", "src", "quest"))
+        shutil.copyfile(tgt, os.path.join(tmp, "build", "RMHE08", "obj", "quest", "arenatask.o"))
+        shutil.copyfile(cand, os.path.join(tmp, "build", "RMHE08", "src", "quest", "arenatask.o"))
         doctored = json.loads(json.dumps(real))
         # flip the first 100% symbol's score so the committed report can no longer be reproduced
         victim = next((f for f in doctored["functions"]
@@ -531,7 +531,7 @@ def doctored_report_rows() -> int:
         victim["fuzzy_match_percent"] = 13.0
         json.dump({"units": [doctored]},
                   open(os.path.join(tmp, "build", "RMHE08", "report.json"), "w"))
-        ok, detail, _adv = vu.verify_units(tmp, ["hud/fn_80334568"], objdiff=objdiff)
+        ok, detail, _adv = vu.verify_units(tmp, ["quest/arenatask"], objdiff=objdiff)
         failures = _ok("a report that disagrees with a fresh measurement refuses", ok, False, failures)
         failures = _ok("... and names the symbol", victim["name"] in detail, True, failures)
     return failures
