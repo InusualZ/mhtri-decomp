@@ -1783,6 +1783,7 @@ def expire(main: str, minutes: int, apply: bool) -> list[dict]:
 
 
 def selftest() -> int:
+    unitutil.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
     fails = []
     checks = 0
 
@@ -1818,7 +1819,7 @@ def selftest() -> int:
           os.path.join("/tmp/mhtri-dtk", ".pi"))
 
     import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = os.path.join(tmp, "mhtri-dtk")
         os.makedirs(main)
         check("registry starts empty", load_registry(main), {})
@@ -1846,7 +1847,7 @@ def selftest() -> int:
 
     # ack/status/timeout against a throwaway registry
     import tempfile as _tf
-    with _tf.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi"), exist_ok=True)
         save_registry(tmp, {"Pl/x": {"branch": "worker/x", "claimed_at": "2026-01-01T00:00:00"}})
         check("an unacked claim has no ack file", load_ack(tmp, "Pl/x"), {})
@@ -1862,7 +1863,7 @@ def selftest() -> int:
     # the pane layer: a stale ack is not enough to reclaim a worker that is still moving. herdr is matched
     # to the claim by the worktree name, then the pane's own output is watched (the 2026-09-23 reclaims fired
     # on live workers because the ack is the only signal the old code had)
-    with _tf.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi", "ack"), exist_ok=True)
 
         def stale_ack(main, unit, minutes, pane="w1:pK"):
@@ -2103,7 +2104,7 @@ def selftest() -> int:
 
     # the handoff slug is the claim's branch minus worker/, so outbox/notes follow the branch - the name
     # brief.py writes and land.py's gate reads - while the ack stays keyed by the unit
-    with _tf.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi"), exist_ok=True)
         save_registry(tmp, {
             "Pl/pl_act": {"branch": branch_for("Pl/pl_act")},
@@ -2186,7 +2187,7 @@ def selftest() -> int:
     # claim() end to end in a throwaway repo: the worktree it cuts is seeded before the worker sees it
     # (#2/#5).  The seeding above is asserted at the function level; this is the integration assertion,
     # and it ends in `release` so the test cannot leave a stray claim behind.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         seed_main = new_repo(tmp)
         os.makedirs(os.path.join(seed_main, "build", "tools"))
         open(os.path.join(seed_main, "build", "tools", "dtk.exe"), "wb").write(b"dtk")
@@ -2223,7 +2224,7 @@ def selftest() -> int:
         check("MAIN's original survives the claim's teardown",
               open(os.path.join(seed_main, "orig", "RMHE08", "sys", "main.dol"), "rb").read(), b"dol")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         # ack is where a worker proves it is in the right place: the claim's worktree, on the claim's branch
@@ -2252,7 +2253,7 @@ def selftest() -> int:
     # from MAIN's HEAD, so it must refuse a caller that is not MAIN (a worker's own worktree) and a MAIN whose
     # HEAD is not `main`, before anything is created. The refusal leaves the registry, the branch and the
     # worktree untouched.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         _worker_branch, worker_wt = claimed(main, "Pl/pl_act")   # a real claim: worktree + branch + registry
         check("a claim from MAIN on main passes the guard", claim_place_error(main, main), None)
@@ -2276,7 +2277,7 @@ def selftest() -> int:
         check("... and cuts no branch", branch_exists(main, branch_for(fresh)), False)
         check("... and makes no worktree", os.path.exists(worktree_for(fresh, main)), False)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         tip = repo_git(main, "rev-parse", branch)
@@ -2294,7 +2295,7 @@ def selftest() -> int:
         check("release twice: every step is accounted for",
               all(s["status"] in ("done", "skipped") for s in second["steps"]), True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         shutil.rmtree(wt)                      # removed by hand: git's registration is still there
@@ -2303,7 +2304,7 @@ def selftest() -> int:
         check("... and the skip says so", "already gone" in step_of(out, "worktree remove")["why"], True)
         check("... and the branch still goes", branch_exists(main, branch), False)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit, worktree=False)
         repo_git(main, "branch", "-D", branch)   # the branch is already gone
@@ -2314,7 +2315,7 @@ def selftest() -> int:
         check("... and the skip says so", "already gone" in step_of(out, "branch -D")["why"], True)
         check("... a leftover directory git no longer tracks is removed", os.path.isdir(wt), False)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         out = release(unit, main, force=False, dry_run=False, probe=live_pane)
@@ -2325,7 +2326,7 @@ def selftest() -> int:
         check("... the branch is kept", branch_exists(main, branch), True)
         check("... and the teardown is not complete", out["complete"], False)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         closed = []
@@ -2337,7 +2338,7 @@ def selftest() -> int:
               labels.index("herdr pane close w1:pK") < labels.index("git worktree remove --force " + wt), True)
         check("and then the release completes", out["complete"], True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         out = release(unit, main, force=False, dry_run=False, probe=idle_pane,
@@ -2349,7 +2350,7 @@ def selftest() -> int:
         check("... the registry entry is kept", unit in load_registry(main), True)
         check("... and no later step is attempted", step_of(out, "worktree remove")["status"], "skipped")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         out = release(unit, main, force=False, dry_run=True, probe=no_pane)
@@ -2407,7 +2408,7 @@ def selftest() -> int:
         return branch, wt
 
     # (a) redundant: the unit is on main and the touched path matches, so the ref is pruned and says so
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "red/red")
         rescue_audit._write(wt, "src/red/red.cpp", "int f(void) { return 1; }\n")
@@ -2427,7 +2428,7 @@ def selftest() -> int:
         check("a redundant ref: it is gone", rescue_exists(main, "red/red"), None)
 
     # (c) landed-with-drift: the unit is on main but the paths differ - reported, kept, never pruned
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "drift/drift")
         rescue_audit._apply_unit(wt, "drift/drift", "int f(void) { return 1; }\n")
@@ -2446,7 +2447,7 @@ def selftest() -> int:
         check("a drifted ref: the release completes", out["complete"], True)
 
     # (b) unlanded: the unit never reached main - surfaced loudly, and the ref is the only copy, so kept
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "unl/unl")
         rescue_audit._apply_unit(wt, "unl/unl")
@@ -2465,7 +2466,7 @@ def selftest() -> int:
         check("an unlanded ref: the release still completes", out["complete"], True)
 
     # (e) unknown: nothing parseable to prove containment with - reported, kept, never guessed at
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "tools/scratch")
         rescue_audit._write(wt, "tools/scratch.txt", "a tool change, no unit\n")
@@ -2480,7 +2481,7 @@ def selftest() -> int:
         check("a ref nothing can be proven about: the release completes", out["complete"], True)
 
     # (d) a clean landing parks no ref at all: the audit step is a named skip, and the release is unchanged
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "clean/clean")
         rescue_audit._apply_unit(wt, "clean/clean")
@@ -2495,7 +2496,7 @@ def selftest() -> int:
         check("a clean landing: the release completes", out["complete"], True)
 
     # --force prune coherence: the cost line must not send a reader to a ref the audit just pruned
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "red/red")
         rescue_audit._write(wt, "src/red/red.cpp", "int f(void) { return 1; }\n")
@@ -2512,7 +2513,7 @@ def selftest() -> int:
               "pruned by the audit" in (forced["cost"] or ""), True)
         check("--force on redundant work: the release completes", forced["complete"], True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         # a subagent pane (label starts with the claim's slug) and a sibling's pane (it must not be touched)
@@ -2527,7 +2528,7 @@ def selftest() -> int:
         check("... and does not touch a sibling's pane", "w1:pB" in closed, False)
         check("... and the release completes", out["complete"], True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         out = release(unit, main, force=False, dry_run=False, probe=no_pane,
@@ -2539,7 +2540,7 @@ def selftest() -> int:
               any(s["status"] == "failed" and "w1:pA" in s["label"] for s in out["steps"]), True)
 
     # the sweep: only merged claims, and a live pane is reported rather than forced
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         done_branch, done_wt = claimed(main, "Pl/pl_act")
         repo_git(main, "cherry-pick", done_branch)
@@ -2568,7 +2569,7 @@ def selftest() -> int:
 
     # a branch selector: one unit can carry two claims and the registry records only one of them - usually the
     # older - so `release <unit>` can only ever tear down that one (2026-09-27, the drain's `ef/eft050`)
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         main = new_repo(tmp)
         old_branch, old_wt = claimed(main, unit)
         second_branch = "worker/8033f270-second-claim"

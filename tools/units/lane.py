@@ -203,7 +203,7 @@ def selftest() -> int:
 
     # a real repo, so the git plumbing is exercised rather than mocked
     import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         def run(*a):
             return subprocess.run(["git"] + list(a), cwd=tmp, capture_output=True, text=True, encoding="utf-8",
                                   errors="replace")

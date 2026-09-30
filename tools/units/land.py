@@ -537,6 +537,30 @@ def selftest_detail(p: subprocess.CompletedProcess) -> str:
     return "exit %d: %s" % (p.returncode, "; ".join(parts) or command_detail(p))
 
 
+def selftest_tails(p: subprocess.CompletedProcess) -> str:
+    """What the selftest row prints beside its one-line refusal: every failing tool's last output lines and every
+    flake (a selftest that failed, then passed alone) - `tools/selftest.py --json`'s `failures[].tail` and `flaky`.
+
+    The one-line detail only NAMES the tool (`failed: tools/units/claims`); the lines that say why are here, so a
+    refusal never needs the whole suite re-run by hand to learn what failed. "" when the output is not the JSON.
+    """
+    try:
+        data = json.loads(p.stdout or "")
+    except ValueError:
+        return ""
+    out = []
+    for f in data.get("failures") or []:
+        out.append("selftest FAILED: %s (%s, exit %s) - last lines:" % (f.get("name"), f.get("status"),
+                                                                       f.get("returncode")))
+        out.extend("    " + ln for ln in (f.get("tail") or f.get("head") or "").splitlines())
+    for f in data.get("flaky") or []:
+        out.append("WARNING selftest FLAKY: %s %s, then passed on the isolated re-run (logged in "
+                   ".pi/selftest-flakes.jsonl) - first failure's last lines:" % (f.get("name"),
+                                                                              f.get("first_status")))
+        out.extend("    " + ln for ln in (f.get("first_failure") or "").splitlines()[-12:])
+    return "\n".join(out)
+
+
 def land_decision(gate_ok: bool, stageable: list[str],
                   failed: list[str] | None = None,
                   kinds: set[str] | None = None) -> tuple[str, str]:
@@ -2119,6 +2143,22 @@ def summary(before: dict, after: dict) -> str:
     return ", ".join(parts) or "(ledger numbers unavailable)"
 
 
+def ledger_line(before: dict, after: dict) -> str:
+    """`LEDGER: covered A -> B, closed ..., matched ..., bytes ...` - the delta alone, short enough to survive a cut.
+
+    `partial` is left out (it is in the LANDED line's longer form); `(ledger numbers unavailable)` when the
+    base recorded none.
+    """
+    keep = {k: v for k, v in after.items() if k in ("covered", "closed", "matched", "bytes")}
+    return "LEDGER: " + summary({k: before.get(k) for k in keep}, keep)
+
+
+def answer_line(output: str) -> str:
+    """The `LANDED`/`REFUSED` answer line of a `land` run: the last non-empty line (LEDGER sits above it)."""
+    lines = [ln for ln in output.splitlines() if ln.strip()]
+    return lines[-1] if lines else ""
+
+
 def branch_commits(main: str, unit: str) -> int:
     """How many commits the unit's worker branch has that main does not already have.
 
@@ -2501,6 +2541,9 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
               info="--no-selftests (fast path) - the suite did not run")
     elif os.path.exists(selftests):
         p = run([sys.executable, selftests, "--json"], main)
+        tails = selftest_tails(p)
+        if tails:
+            print(tails, file=sys.stderr)
         check("all tool selftests pass (except the parked list)", p.returncode == 0,
               selftest_detail(p),
               remedy="fix the named tool's selftest, or park a *pre-existing* failure in "
@@ -3032,18 +3075,23 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
                 teardown.append(u)
             else:
                 incomplete.append("%s (%s)" % (u, out.get("refused") or "a teardown step failed"))
-    ledger = summary(read_base(main).get("ledger") or {}, ledger_numbers(main))
+    before_ledger, after_ledger = read_base(main).get("ledger") or {}, ledger_numbers(main)
+    ledger = summary(before_ledger, after_ledger)
     tail = ""
     if teardown:
         tail += " | teardown %s" % ",".join(teardown)
     if incomplete:
         tail += " | TEARDOWN INCOMPLETE: %s" % "; ".join(incomplete)
+    # the short ledger delta goes on its OWN line above the answer line: a long batch's LANDED line lists every
+    # unit and is cut by `cut -c1-N` before it reaches its numbers. The LANDED line stays as it was.
+    print(ledger_line(before_ledger, after_ledger))
     print("LANDED %s %s | %s%s" % (sha, ",".join(norm_units), ledger, tail))
     return 1 if incomplete else 0
 
 
 def selftest() -> int:
     import tempfile
+    unitutil.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -3061,7 +3109,7 @@ def selftest() -> int:
     check("outside the batch: the campaign state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
 
     # the flip-readiness row's input: which units configure.py turns Matching (2026-09-29). Real temporary repo.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         def _f(*a):
             subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=tmp, check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -3091,7 +3139,7 @@ def selftest() -> int:
 
     # a batch that DELETES an extension-less file: after the apply the tree no longer has it, so only the
     # BASE's tree can say it was a path (`tools/git/hooks/post-commit`, 2026-09-28). Real temporary repo.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         def _g(*a):
             subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=tmp, check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -3128,7 +3176,7 @@ def selftest() -> int:
     # block and no `build/RMHE08/src/<unit>.o` target, so the unit-shaped rows must skip it. The extension
     # signal alone missed the extension-less ones - a batch naming `.gitignore` or `LICENSE` was refused by
     # the registration row with a message about a source file registered in name only (2026-09-27).
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         open(os.path.join(tmp, ".gitignore"), "w").write("build/\n")
         open(os.path.join(tmp, "LICENSE"), "w").write("CC0\n")
         open(os.path.join(tmp, "Makefile"), "w").write("all:\n")
@@ -3258,7 +3306,7 @@ def selftest() -> int:
     check("no units still yields a conventional subject",
           land_subject([]), "repo/batch: land a batch")
 
-    with tempfile.TemporaryDirectory() as lint_root:
+    with unitutil.temp_dir() as lint_root:
         for rel in ("tools/units/land.py", "tools/units/stylelint.py", "tools/git/commitlint.py"):
             path = os.path.join(lint_root, *rel.split("/"))
             os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -3314,6 +3362,17 @@ def selftest() -> int:
           "changed the tree" in selftest_detail(_stp(1, _dirty)), True)
     check("unparseable output falls back to the head",
           "boom" in selftest_detail(_stp(1, "boom")), True)
+    # the refusal also carries the failing tool's last lines, and a green run still names its flakes
+    _tail = json.dumps({"failures": [{"name": "tools/units/claims", "status": "fail", "returncode": 1,
+                                      "tail": "Traceback\nPermissionError: [WinError 5]"}],
+                        "flaky": [{"name": "tools/agents/ideas", "first_status": "fail",
+                                   "first_failure": "FAIL ids raced"}], "tree_clean": True})
+    _blk = selftest_tails(_stp(1, _tail))
+    check("selftest_tails: the failing tool's last lines", "PermissionError: [WinError 5]" in _blk, True)
+    check("... named with its tool and exit", "FAILED: tools/units/claims (fail, exit 1)" in _blk, True)
+    check("... and the flake is a WARNING with its first failure",
+          "WARNING selftest FLAKY: tools/agents/ideas" in _blk and "FAIL ids raced" in _blk, True)
+    check("selftest_tails: nothing for output that is not the JSON", selftest_tails(_stp(1, "boom")), "")
 
     # the 2026-09-25 `d910.json` defect. An objdiff `diff` dump from the repo root is outside the guard's
     # allowed set, so `outside_batch` still classifies it - the tolerance is a deliberate carve-out *at the
@@ -3384,7 +3443,7 @@ def selftest() -> int:
         def __init__(self, code, out="", err=""):
             self.returncode, self.stdout, self.stderr = code, out, err
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         open(os.path.join(tmp, "build.ninja"), "w").close()
         calls = []
 
@@ -3412,7 +3471,7 @@ def selftest() -> int:
         check("compile gate: an unattributable ninja failure is not read as a pass", ok, False)
         check("... and the reason is in the detail", "unknown target" in detail, True)
 
-    with tempfile.TemporaryDirectory() as no_build:
+    with unitutil.temp_dir() as no_build:
         ok, detail = compile_check(no_build, ["Pl/pl_act"], runner=lambda args: FakeProc(1, "x"))
         check("compile gate: without build.ninja the configure.py gate owns it", ok, True)
 
@@ -3481,7 +3540,7 @@ def selftest() -> int:
                      "in_candidate": True, "identical": True}})[0]),
           True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".git"), exist_ok=True)
         stale = write_land_message(tmp, "land: old batch\n")
         check("a green gate writes the message", os.path.exists(stale), True)
@@ -3489,7 +3548,7 @@ def selftest() -> int:
         check("... and it is gone", os.path.exists(stale), False)
         check("clearing a missing message is a no-op", clear_land_message(tmp), None)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # regression_rows() reads a report_changes.json fixture
         fixture = os.path.join(tmp, "changes.json")
         json.dump({"units": [
@@ -3607,7 +3666,7 @@ def selftest() -> int:
     # (`85f3d4b5`, `d50fdd32`). The proof is a real repo, run through the real `land_stageable` and the real
     # commit helper: the batch's paths are committed, the foreign edit is not, and it is still staged
     # afterwards. A rename's deletion is part of the batch, so both of its paths go in the pathspec.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         for name in ("src/batch.c", "src/old.c", "tools/units/langcheck.py"):
@@ -3822,7 +3881,7 @@ def selftest() -> int:
         write_scratch(main)
         write_foreign(main)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # the pre-flight: a foreign path ALREADY in the tree (not during the build) is named - with a likely
         # cause when it looks like lane scratch - and refused BEFORE the expensive gate runs.
         repo_git(tmp, "init", "-q")
@@ -3853,12 +3912,12 @@ def selftest() -> int:
         check("... and the likely cause (a lane launched in MAIN)", "cwd set to MAIN" in err.getvalue(), True)
         check("... and nothing was committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "base")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # (a) scratch appears during the build: the batch lands, the scratch is never staged or committed, and
         # the caller's dump is left in the tree - the tolerance is named, not silent
         code, out, err, _base = land_fixture(tmp, fake_verify_with(write_scratch))
         check("scratch during the build: the landing is not refused", code, 0)
-        check("... the answer line says LANDED", out.startswith("LANDED"), True)
+        check("... the answer line says LANDED", answer_line(out).startswith("LANDED"), True)
         check("... the batch is committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "the batch")
         check("... the scratch is NOT committed",
               run(["git", "cat-file", "-e", "HEAD:d910.json"], tmp).returncode != 0, True)
@@ -3868,12 +3927,12 @@ def selftest() -> int:
         check("... the gate log names it", "d910.json" in err, True)
         check("... and says the tolerance is not a refusal", "never a refusal" in err, True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # (b) the index already holds the scratch (the landing flow's `git add -A` did it): `land` de-indexes
         # it, so the commit can never carry a path the batch did not receive
         code, out, err, _base = land_fixture(tmp, fake_verify_with(lambda main: None), stage_scratch=True)
         check("a staged scratch does not block the landing", code, 0)
-        check("... the answer line says LANDED", out.startswith("LANDED"), True)
+        check("... the answer line says LANDED", answer_line(out).startswith("LANDED"), True)
         check("... the batch is committed", repo_git(tmp, "show", "HEAD:src/batch.c"), "the batch")
         check("... the staged scratch is de-indexed and never committed",
               run(["git", "cat-file", "-e", "HEAD:d910.json"], tmp).returncode != 0, True)
@@ -3883,7 +3942,7 @@ def selftest() -> int:
               open(os.path.join(tmp, "d910.json"), encoding="utf-8").read(), "staged by another step\n")
         check("... and the de-indexing is named", "removed from the index" in err, True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # a `git reset` that fails must be REPORTED, never claimed as removed: the guarantee is "the batch can
         # never carry a path it did not receive", and a silent failure would leave that guarantee a fiction
         repo_git(tmp, "init", "-q")
@@ -3913,7 +3972,7 @@ def selftest() -> int:
               open(os.path.join(tmp, "d910.json"), encoding="utf-8").read(), "scratch\n")
         check("... and is no longer staged", repo_git(tmp, "diff", "--cached", "--name-only"), "")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # (c) a foreign path outside the batch that appears during the build is refused loudly - the tolerance is
         # tool scratch only, and it does not swallow the refusal when scratch appears beside it
         code, out, _err, base_sha = land_fixture(tmp, fake_verify_with(write_foreign_root))
@@ -3922,14 +3981,14 @@ def selftest() -> int:
         check("... the refused batch is not committed", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
         check("... and its message is cleared", os.path.exists(land_message_path(tmp)), False)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         code, out, _err, base_sha = land_fixture(tmp, fake_verify_with(write_foreign))
         check("a foreign ground-truth edit is refused", code, 1)
         check("... the refusal names it",
               "appeared during the build: config/RMHE08/build.sha1" in out, True)
         check("... the refused batch is not committed", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         code, out, err, base_sha = land_fixture(tmp, fake_verify_with(write_both))
         check("foreign + scratch together is still refused", code, 1)
         check("... and the foreign path is the one named",
@@ -3937,7 +3996,7 @@ def selftest() -> int:
         check("... the refused batch is not committed", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
         check("... and the tolerated scratch is still named", "d910.json" in err, True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # (d) a failing gate NAMES itself: the 2026-09-25 `proposal/800916FC` refusal printed only "the gate
         # failed - nothing staged or committed" while its lint row showed stylelint's trailing legend, so the
         # reader hunted for a defect that was not there. Both halves are asserted here - the check's name, what
@@ -4013,7 +4072,7 @@ def selftest() -> int:
     # at refs/rescue/<slug>. The gate cares that the work exists as commits, so it restores the branch from
     # the rescue ref itself (`restore_rescued_branch`) instead of refusing (2026-09-26). A real temp repo,
     # because the whole point is git reachability, then the real `verify` on top.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         os.makedirs(os.path.join(tmp, "src", "Pl"), exist_ok=True)
@@ -4098,7 +4157,7 @@ def selftest() -> int:
         record_base(tmp)          # the ordering mistake: the batch is already in the tree
         return repo_git(tmp, "rev-parse", "HEAD")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         base_sha = already_applied_repo(tmp)
         check("case (b): record-base snapshotted the applied path as dirty",
               "src/Pl/pl_act.c" in base_dirty_paths(tmp), True)
@@ -4110,7 +4169,7 @@ def selftest() -> int:
         check("case (b): without --already-applied land refuses", code, 1)
         check("... and says plainly the batch is already applied", "already applied" in buf.getvalue(), True)
         check("... and never commits", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         base_sha = already_applied_repo(tmp)
         buf = io.StringIO()
         with mock.patch.object(module, "verify", fake_verify_with(lambda main: None)), \
@@ -4118,7 +4177,7 @@ def selftest() -> int:
             code = land(tmp, ["Pl/pl_act"], None, no_build=True, check_outbox=False,
                         release_claims=False, subject="x", already_applied=True)
         check("case (b): --already-applied lands the batch (no manual commit)", code, 0)
-        check("... the answer line says LANDED", buf.getvalue().startswith("LANDED"), True)
+        check("... the answer line says LANDED", answer_line(buf.getvalue()).startswith("LANDED"), True)
         check("... the batch file is committed", repo_git(tmp, "show", "HEAD:src/Pl/pl_act.c"),
               "the batch, applied before record-base")
         check("... and the base commit is the commit before it", repo_git(tmp, "rev-parse", "HEAD~1"), base_sha)
@@ -4156,7 +4215,7 @@ def selftest() -> int:
     # the snapshot the guard reads: `record_base` must capture what was dirty when it ran, so a path the
     # batch edits afterwards is batch material and one that was dirty before it is foreign. CLAUDE.md is an
     # ordinary tracked file here: an edit to it is foreign when dirty at the base and stageable when named.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
@@ -4181,7 +4240,7 @@ def selftest() -> int:
               "CLAUDE.md" in land_stageable(["src/a.c"], changed_status(tmp), base_dirty_paths(tmp)), False)
         check("... and the clean-tree gate treats it as dirt", "CLAUDE.md" in (require_clean_tree(tmp) or ""), True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
@@ -4193,14 +4252,14 @@ def selftest() -> int:
         check("the .cpp spelling finds the same branch", branch_commits(tmp, unit + ".cpp"),
               branch_commits(tmp, unit))
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
         repo_git(tmp, "branch", branch)          # cut, but nothing committed on it
         check("a branch with no commits ahead of main fails", branch_commits(tmp, unit), 0)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
@@ -4212,7 +4271,7 @@ def selftest() -> int:
         check("a branch cut before the batch base still passes with commits ahead",
               branch_commits(tmp, unit) > 0, True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
@@ -4221,7 +4280,7 @@ def selftest() -> int:
     # a `--force` release deletes the branch and parks the work at refs/rescue/<slug>. The gate's need is that
     # the work exists as commits, so a rescue ref carrying commits is ACCEPTED as the branch's work (2026-09-26
     # case (a)); a rescue ref with no commits of its own, or none at all, is still reported.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
@@ -4247,7 +4306,7 @@ def selftest() -> int:
     entry = {"unit": "Pl/pl_act", "worker": "a", "finished_at": "2026-01-01T00:00:00", "unit_percent": 50.0,
              "symbols": [{"name": "fn_1", "percent": 50.0}], "residual": "none",
              "measured_with": "recompile.py", "config_requests": [], "flags_probed": [], "blockers": []}
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
         claims.save_registry(tmp, {"Pl/pl_act": {"branch": claims.branch_for("Pl/pl_act") + "-dd6e"}})
         json.dump(entry, open(os.path.join(tmp, ".pi", "outbox", claims.slug("Pl/pl_act") + "-dd6e.json"), "w"))
@@ -4261,7 +4320,7 @@ def selftest() -> int:
 
     # the case that failed: a registry keyed by the extensionless name, the gate asked for the .c spelling.
     # `land.py verify --units Camellia/camellia.c` must read the same outbox as `Camellia/camellia`.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
         claims.save_registry(tmp, {"Camellia/camellia": {"branch": "worker/camellia-67ed"}})
         json.dump(dict(entry, unit="Camellia/camellia"),
@@ -4278,7 +4337,7 @@ def selftest() -> int:
     # so the header was validated as a unit and demanded `residual`/`flags_probed` - a BOOKKEEPING refusal while
     # every real gate row passed (2026-09-28, landed with `--no-outbox`). The fixture gives the header a
     # non-unit outbox deliberately: if the row ever runs on it again, this check fails.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "include", "Network"))
         open(os.path.join(tmp, "include", "Network", "network_state.h"), "w").write("/* h */\n")
         os.makedirs(os.path.join(tmp, ".pi", "outbox"), exist_ok=True)
@@ -4299,7 +4358,7 @@ def selftest() -> int:
     # a multi-unit batch: one outbox names both units' symbols. Validating it against one unit at a time made
     # every symbol of the other unit "not owned", so the batch could only land with --no-outbox (which turns
     # the outbox check off entirely). The row now reads the batch's whole owned set.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         cfg = os.path.join(tmp, "config", "RMHE08")
         os.makedirs(cfg)
         with open(os.path.join(cfg, "splits.txt"), "w", encoding="utf-8") as fh:
@@ -4345,7 +4404,7 @@ def selftest() -> int:
     # so MAIN's HEAD left `main` and the next 14 landings went onto that branch while the `main` ref sat at
     # `e3ade082`. `applybranch.sh` and `land.py` both key off `main`, so a stale `main` does not fail - it
     # silently changes what their diff means. The gate must refuse before any check runs.
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
@@ -4372,7 +4431,7 @@ def selftest() -> int:
     # the entry points themselves are exercised through `main()` with the worktree root pointed at a temp repo.
     import io
     import unittest.mock
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         repo_commit(tmp, "claim-time main")
@@ -4456,7 +4515,7 @@ def selftest() -> int:
         "include/unsplit/cxx.h": "#ifndef B4\n#define B4\nu32 em_act_ck(struct _ENEMY_WORK*, u8);\n#endif\n",
     }
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         _write_tree(tmp, band_fixture)
@@ -4504,7 +4563,7 @@ def selftest() -> int:
         # the guard's own failure mode: with no base there is no diff to reason about, so it is silent
         check("band: no base is silent", band_ownership_warnings(tmp, None), [])
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # a CLEAN batch - source only, no registration edit - must say nothing
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
@@ -4553,7 +4612,7 @@ def selftest() -> int:
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
         return wt
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         base = _resolve_fixture(
             tmp,
             branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
@@ -4578,7 +4637,7 @@ def selftest() -> int:
         repo_git(tmp, "worktree", "remove", "--force", wt)
         repo_git(tmp, "branch", "-D", "scratch")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # An UNSAFE union: both sides changed the same existing line - unionguard must refuse, and the
         # tree must keep its markers for a hand resolution.
         base = _resolve_fixture(
@@ -4595,7 +4654,7 @@ def selftest() -> int:
         repo_git(tmp, "worktree", "remove", "--force", wt)
         repo_git(tmp, "branch", "-D", "scratch")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # The invariant unionguard CANNOT see: both sides append disjointly (empty base), but their brand
         # bands claim the *same* address range. The union is textually safe and would overlap - the
         # assertion is what refuses it, and nothing is written.
@@ -4616,7 +4675,7 @@ def selftest() -> int:
         repo_git(tmp, "worktree", "remove", "--force", wt)
         repo_git(tmp, "branch", "-D", "scratch")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # A conflict outside the scope (a header) is a content conflict, never a union.
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
@@ -4635,7 +4694,7 @@ def selftest() -> int:
         repo_git(tmp, "worktree", "remove", "--force", wt)
         repo_git(tmp, "branch", "-D", "scratch")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         _write_tree(tmp, {"src/a.cpp": "int a;\n"})
@@ -4643,7 +4702,7 @@ def selftest() -> int:
         check("MAIN is refused as a resolution tree", result.get("ok"), False)
         check("... naming MAIN", "inside MAIN" in result.get("reason", ""), True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # scratch_resolve: the merger lane's operation - a temp worktree, `git merge main`, resolve,
         # commit - with MAIN's HEAD provably untouched.
         base = _resolve_fixture(
@@ -4666,7 +4725,7 @@ def selftest() -> int:
         repo_git(tmp, "worktree", "remove", "--force", result["worktree"])
         repo_git(tmp, "branch", "-D", result["scratch_branch"])
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         _resolve_fixture(
             tmp,
             branch_anchor_conf='            Object(NonMatching, "anchor_branch.cpp"),\n',
@@ -4677,7 +4736,7 @@ def selftest() -> int:
               repo_git(tmp, "worktree", "list", "--porcelain").count("worktree "), 1)
 
     # --- the one-command landing (`land --branch`) -------------------------------------------------
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         _write_tree(tmp, {"src/a.cpp": "int a;\n", "CLAUDE.md": "base\n"})
@@ -4702,7 +4761,7 @@ def selftest() -> int:
         write_land_message(main, "land: %s\n\nledger: (fixture)\n" % ",".join(units))
         return 0
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         base = _resolve_fixture(
             tmp,
             branch_splits="menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
@@ -4717,7 +4776,7 @@ def selftest() -> int:
             code = land_branch(tmp, "worker/x", no_build=True, check_outbox=False,
                                release_claims=False, subject="selftest")
         check("land --branch: lands the branch in one command", code, 0)
-        check("... the answer line says LANDED", buf.getvalue().startswith("LANDED"), True)
+        check("... the answer line says LANDED", answer_line(buf.getvalue()).startswith("LANDED"), True)
         check("... main advanced past the base", repo_git(tmp, "rev-parse", "HEAD") != main_head, True)
         text = open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), encoding="utf-8").read()
         check("... both bands are in the committed file",
@@ -4726,7 +4785,7 @@ def selftest() -> int:
         check("... and a conflict-free landing leaves no land/* ref",
               repo_git(tmp, "for-each-ref", "refs/heads/land/"), "")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # A landing that goes through the conflict-resolution path: `scratch_resolve` parked the union on
         # a `land/resolve-*` helper (and its scratch worktree), the caller fast-forwarded the branch onto
         # it, and the landing deletes the now-redundant helper - visibly.
@@ -4753,7 +4812,7 @@ def selftest() -> int:
         check("resolve helper: the deletion is visible in the landing output",
               "resolve helper refs/heads/%s deleted" % helper in buf.getvalue(), True)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # The helper carries a hand fix the branch never took: deleting it would drop the only copy, so
         # the landing must refuse loudly and leave it alone.
         _resolve_fixture(
@@ -4779,7 +4838,7 @@ def selftest() -> int:
         repo_git(tmp, "worktree", "remove", "--force", resolved["worktree"])
         repo_git(tmp, "branch", "-D", helper)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         _resolve_fixture(
             tmp,
             branch_anchor_conf='            Object(NonMatching, "anchor_branch.cpp"),\n',
@@ -4794,7 +4853,7 @@ def selftest() -> int:
         check("... and the tree is left clean (the apply was undone)", require_clean_tree(tmp), None)
         check("... with main unchanged", repo_git(tmp, "rev-parse", "HEAD"), main_head)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         _write_tree(tmp, {"src/a.cpp": "int a;\n"})
@@ -4807,7 +4866,7 @@ def selftest() -> int:
         check("... the refusal names the clean command", "stash push --include-untracked" in buf.getvalue(), True)
         check("... and main did not move", repo_git(tmp, "rev-parse", "HEAD"), repo_git(tmp, "rev-parse", "main"))
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # A unit renamed at registration: the outbox keeps the pre-registration branch slug. The
         # branch-derived lookup finds it; the unit-derived one does not - and says --no-outbox is the
         # remedy.
@@ -4825,7 +4884,7 @@ def selftest() -> int:
         check("renamed unit: the claim key is read from the branch",
               claim_unit_for_branch(tmp, renamed), None)   # no registry entry: None, not a wrong key
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         # the CLI wiring for the one command, through `main()` with MAIN pointed at the fixture
         _resolve_fixture(
             tmp,
@@ -4842,7 +4901,18 @@ def selftest() -> int:
             with contextlib.redirect_stdout(buf):
                 code = main()
         check("land --branch runs through main()", code, 0)
-        check("... and prints the one answer line", buf.getvalue().startswith("LANDED"), True)
+        check("... and prints the one answer line", answer_line(buf.getvalue()).startswith("LANDED"), True)
+        check("... with the short LEDGER line directly above it",
+              [ln.split(" ")[0] for ln in buf.getvalue().splitlines() if ln.strip()][-2:], ["LEDGER:", "LANDED"])
+
+    # the short ledger line: the delta alone (no `partial`, no unit list), so a cut LANDED line loses nothing
+    _b = {"covered": 10, "closed": 4, "partial": 2, "matched": 30, "bytes": 1000}
+    _a = {"covered": 12, "closed": 5, "partial": 3, "matched": 35, "bytes": 1600, "total_code": 9}
+    check("ledger_line: covered/closed/matched/bytes deltas", ledger_line(_b, _a),
+          "LEDGER: covered 10 -> 12, closed 4 -> 5, matched 30 -> 35, bytes 1000 -> 1600")
+    check("ledger_line: no recorded base is said plainly", ledger_line({}, _a), "LEDGER: (ledger numbers unavailable)")
+    check("ledger_line: short enough to survive a cut", len(ledger_line(_b, _a)) < 100, True)
+    check("answer_line: the last non-empty line", answer_line("LEDGER: x\nLANDED abc u | y\n\n"), "LANDED abc u | y")
 
     # --- F34: the gate's own decode, and the lint that keeps it that way ---------------------------------
     # `land.run` used `text=True` with no codec, so git's UTF-8 stdout was decoded with the host's locale
@@ -4855,7 +4925,7 @@ def selftest() -> int:
     probe = run([sys.executable, "-c", "import sys; sys.stdout.buffer.write(bytes.fromhex('%s'))"
                  % dash.encode("utf-8").hex()], SELF_REPO)
     check("F34: `run` decodes a subprocess' UTF-8 stdout as UTF-8", probe.stdout, dash)
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")
         prose = "prose with an em dash %s in it\n" % dash

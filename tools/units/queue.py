@@ -792,10 +792,10 @@ def selftest() -> int:
     check("strictly_newer: diverged (stale pads)", strictly_newer(["a", "new"], ["a", "old"]), None)
     check("strictly_newer: main is newer", strictly_newer(["a", "b"], ["a"]), None)
     check("strictly_newer: empty branch", strictly_newer(["a"], []), None)
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         check("unlanded_branches outside a repo", unlanded_branches(tmp), [])
         check("unlanded_error outside a repo", unlanded_error(tmp), None)
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "src", "auto"))
         # two stubs at different .text addresses, and one that already has a body
         for name in ("stubA", "stubB", "done"):
@@ -946,7 +946,7 @@ def selftest() -> int:
 
     # option A: a proposal is ready while it is in the queue, and stale once the queue drops it (which is
     # what happens when its range is registered and `attribute.py queue` is re-run)
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
         open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
@@ -996,7 +996,7 @@ def selftest() -> int:
     # the campaign needs, because adjacency is what puts two workers on one TU (proposal/8007270C and
     # proposal/80073180 are both g3d_calcvtx.cpp), makes a neighbour register a symbol you declare
     # (the rule-2 boundary artefacts), and shares owner headers by construction.
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
         open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
@@ -1124,7 +1124,7 @@ def selftest() -> int:
     # OLD scope - and `queue.py next` copied it. `proposal/80119DEC` was handed `.text 0x80119DEC..0x8011A34C`
     # (two functions) while the queue said `..0x8011D448` (thirty-seven). The claim path must render the
     # current entry, and the stale pooled range must never appear in what the worker reads.
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
         open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
@@ -1161,7 +1161,7 @@ def selftest() -> int:
               "0x8011A34C" in open(pool_path, encoding="utf-8").read(), True)
 
     # an empty pool must refuse, not hand out a brief for a unit nobody prepared
-    with tempfile.TemporaryDirectory() as empty:
+    with claims.unitutil.temp_dir() as empty:
         os.makedirs(os.path.join(empty, "src"))
         open(os.path.join(empty, "configure.py"), "w").write("config.libs = [\n]\n")
         check("an empty pool has no ready brief", pool_state(empty)["ready"], [])
@@ -1188,7 +1188,7 @@ def selftest() -> int:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         repo = os.path.join(tmp, "mhtri-dtk")
         os.makedirs(repo)
         qgit(repo, "init", "-q")
@@ -1213,7 +1213,7 @@ def selftest() -> int:
     # registry entry was lost - a half-torn-down release, or two claims racing on `save_registry` - still owns
     # its unit. Selection read only the registry and re-offered such a proposal, then `queue.py next` refused
     # at the branch: the 2026-09-24 pool re-hand on the claim axis (the covered axis is `covered_by_registered`).
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         repo = os.path.join(tmp, "mhtri-dtk")
         os.makedirs(os.path.join(repo, "src"))
         os.makedirs(os.path.join(repo, "tools", "units", "briefs", "pool"))
@@ -1254,7 +1254,7 @@ def selftest() -> int:
     # a claim spends `ratio` (default 1), the register starts with 1. The first claim is handed out and
     # recorded; the next is refused until a backlog item is resolved. `--ignore-backlog` is the deliberate
     # override and spends nothing. `parked` earns nothing - parking removes a ghost, it does not buy a claim.
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
         open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
@@ -1342,7 +1342,7 @@ def selftest() -> int:
     # like a unit proposal - the same `claims.claim` worktree/branch lock (held on the item's file), the same
     # credit balance - so the paydown is scheduled work instead of something a lane does incidentally.  One
     # resolved item still earns exactly one credit.
-    with tempfile.TemporaryDirectory() as tmp:
+    with claims.unitutil.temp_dir() as tmp:
         for sub in ("src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
             os.makedirs(os.path.join(tmp, sub), exist_ok=True)
         open(os.path.join(tmp, "configure.py"), "w", encoding="utf-8").write("config.libs = [\n]\n")

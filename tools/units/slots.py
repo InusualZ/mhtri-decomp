@@ -2023,6 +2023,7 @@ def status(main: str, registry: str | None = None) -> list[dict]:
 # --- selftest ------------------------------------------------------------------------------------
 
 def selftest() -> int:
+    unitutil.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -2171,7 +2172,7 @@ def selftest() -> int:
     check("slot path is stable", slot_dir("/tmp/mhtri-dtk", 3), slot_dir("/tmp/mhtri-dtk", 3))
     check("a tree with no pool is not enabled", enabled("/tmp/nonexistent-mhtri-dtk"), False)
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo = fixture(tmp, count=2)
         out = init(repo, count=2)
         check("init creates the requested slots", out["created"], [1, 2])
