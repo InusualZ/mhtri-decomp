@@ -1747,45 +1747,53 @@ def set_allow_orphan(addresses: list[str] | None) -> None:
 
 
 UNIT_RENAMES: dict[str, str] = {}
+UNIT_RENAME_LISTS: dict[str, list[str]] = {}
 
 
 def set_unit_renames(pairs: list[str] | None) -> None:
-    """Record `OLD=NEW` unit renames *this invocation* declares (a batch that `git mv`s a registered unit).
+    """Record `OLD=NEW` unit renames *this invocation* declares (a batch that `git mv`s or folds registered units).
 
     The base snapshots (undefrefs, orphans) are keyed by unit name, so a renamed unit would read as a NEW
     unit and every pre-existing finding it carries as an addition. The pairs travel on the module, come only
     from a command line (`--unit-rename Network/fn_803D3CE8=Network/NetworkSessionManager`), and the landing
-    log prints them; nothing in a file can declare one.
+    log prints them; nothing in a file can declare one. Several OLDs may share one NEW (a fold), and ONE OLD
+    may be declared onto several NEWs (a unit split across absorbers): the snapshot merge (`rename_snapshot_keys`)
+    copies its entry to every NEW, while `UNIT_RENAMES` (handed to the data-closure row, which derives its own
+    fold map) keeps only the OLDs with exactly one target so an explicit pair never narrows a derived map.
+    `OLD=` with no NEW says the unit's base entries go with it.
     """
-    global UNIT_RENAMES                                                   # noqa: PLW0603 - one invocation
-    out: dict[str, str] = {}
+    global UNIT_RENAMES, UNIT_RENAME_LISTS                                # noqa: PLW0603 - one invocation
+    lists: dict[str, list[str]] = {}
     for item in pairs or []:
         if "=" in item:
             old, new = item.split("=", 1)
             if old.strip():
-                # several OLDs may share one NEW (a fold); `OLD=` with no NEW says the unit's base entries go with it
-                out[claims.norm_unit(old.strip().strip("/"))] = (claims.norm_unit(new.strip().strip("/"))
-                                                                 if new.strip() else "")
-    UNIT_RENAMES = out
+                key = claims.norm_unit(old.strip().strip("/"))
+                tgt = claims.norm_unit(new.strip().strip("/")) if new.strip() else ""
+                if tgt not in lists.setdefault(key, []):
+                    lists[key].append(tgt)
+    UNIT_RENAME_LISTS = lists
+    UNIT_RENAMES = {k: v[0] for k, v in lists.items() if len(v) == 1}
 
 
 def rename_snapshot_keys(snapshot: dict) -> dict:
-    """The base snapshot with every renamed unit's key moved to its new name (declared renames only).
+    """The base snapshot with every renamed unit's key moved to its new name(s) (declared renames only).
 
     Several OLDs declared onto one NEW (a fold) are **merged** under NEW - refs unioned, the first entry's other
-    fields kept - never overwritten by whichever came last; `OLD=` (no NEW) drops the entry with the unit.
+    fields kept - never overwritten by whichever came last; one OLD declared onto several NEWs is copied to each;
+    `OLD=` (no NEW) drops the entry with the unit.
     """
-    if not UNIT_RENAMES or not snapshot:
+    if not UNIT_RENAME_LISTS or not snapshot:
         return snapshot
     out: dict = {}
-    for k, v in sorted(snapshot.items(), key=lambda kv: UNIT_RENAMES.get(kv[0], kv[0]) != kv[0]):   # NEW's own first
-        nk = UNIT_RENAMES.get(k, k)
-        if not nk:
-            continue
-        if nk not in out:
-            out[nk] = v
-        elif isinstance(out[nk], dict) and isinstance(v, dict):
-            out[nk] = dict(out[nk], refs=sorted(set(out[nk].get("refs") or []) | set(v.get("refs") or [])))
+    for k, v in sorted(snapshot.items(), key=lambda kv: kv[0] in UNIT_RENAME_LISTS):      # NEW's own entries first
+        for nk in (UNIT_RENAME_LISTS.get(k) or [k]):
+            if not nk:
+                continue
+            if nk not in out:
+                out[nk] = v
+            elif isinstance(out[nk], dict) and isinstance(v, dict):
+                out[nk] = dict(out[nk], refs=sorted(set(out[nk].get("refs") or []) | set(v.get("refs") or [])))
     return out
 
 
@@ -3167,6 +3175,10 @@ def selftest() -> int:
           rename_snapshot_keys({"E/a": {"source": "1", "refs": ["x"]}, "E/b": {"source": "2", "refs": ["y"]},
                                 "E/c": {"source": "3", "refs": ["z"]}, "E/gone": {"refs": ["q"]}}),
           {"E/c": {"source": "3", "refs": ["x", "y", "z"]}})
+    set_unit_renames(["E/donor=E/x", "E/donor=E/y", "E/solo=E/z"])
+    check("unit renames: one OLD onto several NEWs is copied to each; only single-target OLDs reach the data row",
+          (UNIT_RENAMES, rename_snapshot_keys({"E/donor": {"refs": ["d"]}, "E/x": {"refs": ["a"]}})),
+          ({"E/solo": "E/z"}, {"E/x": {"refs": ["a", "d"]}, "E/y": {"refs": ["d"]}}))
     set_unit_renames(None)
     check("unit renames: none declared leaves the snapshot alone",
           rename_snapshot_keys({"OS/a": {"y": 2}}), {"OS/a": {"y": 2}})
