@@ -8,8 +8,8 @@
  * 0x803CCDF8..0x803CCF30, `.data` 0x805F94E0..0x805F9510, extab 0x800198C8..0x800198E0, extabindex
  * 0x8003A0BC..0x8003A0E0.
  *
- * NAMES.  `NetworkPeerBase`, the `networkPeerError_*` accessors and `networkSmallObject_dtor` are GUESSed names
- * (derived from behaviour); `networkSmallObject_dtor` sits at the range's left edge, a discovery cap, so its TU is
+ * NAMES.  `NetworkPeerBase`, the `networkPeerError_*` accessors and `NetworkSmallObjectSink` are GUESSed names
+ * (derived from behaviour); the sink's deleting destructor sits at the range's left edge, a discovery cap, so its TU is
  * unproven.  Every name here is the map's or a derived one; the derived ones are marked GUESS in
  * `Network/network_transport_types.h`.
  *
@@ -23,7 +23,7 @@
  */
 #include "types.h"
 #include "Network/network_transport.h"
-#include "Network/fn_803D3CE8.h"
+#include "Network/NetworkSessionManager.h"
 #include "unsplit/NetworkData.h"
 #include "unsplit/NetworkStream.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
@@ -40,18 +40,10 @@
 
 extern "C" {
 
-/* Deleting destructor of the small transport object: frees the owned block, then the object itself
-   when the caller asks for it. */
-/* untyped: opaque handle passed through - the callers hand the peer they already hold */
-void* networkSmallObject_dtor(void* self, s32 flags)
+/* Deleting destructor of the small transport object: runs the sink's destructor, then frees the object when the
+   caller asks for it. */
+NetworkSmallObjectSink::~NetworkSmallObjectSink()
 {
-    if (self != NULL) {
-        dtor_803C989C(self, 0);
-        if ((s16)flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
 #pragma dont_inline on

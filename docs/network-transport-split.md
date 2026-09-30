@@ -37,7 +37,7 @@ owned by `Network/network_shared_data.cpp` and are not part of the split.
 | `Network/network_socket_streams.cpp` | 803CE060-803CF14C | 805F9610-805F9958 | | 8003A1DC-8003A2F0 (23) | 800199B0-80019A68 | `NetworkSingleTcp`/`NetworkMultipleUdp` users, `NetworkByteStream` methods, `NetworkResolverBase` |
 | `Network/NetworkResolverWii.cpp` | 803CF14C-803CF654 | 805F9958-805F99A0 | | 8003A2F0-8003A338 (6) | 80019A68-80019AAC | `NetworkResolverWii`, thread entry, lookup |
 | `Network/NetworkSessionBase.cpp` | 803CF654-803CF6D8 | 805F99A0-805F9A40 | | 8003A338-8003A344 (1) | 80019AAC-80019AB4 | `NetworkSessionBase` destructor (vtable key), mutex wrappers, `setNotifyValue` |
-| `Network/NetworkSessionStable.cpp` | 803CF6D8-803D3CE8 | 805F9A40-805FA4EC (claim as before; the TU's data runs to 805FA788) | | 8003A344-8003A524 (40) | 80019AB4-80019E5C | the four `NetworkSessionBase` setters, nonce helpers, small-object dtors, the session state machine |
+| `Network/NetworkSessionStable.cpp` | 803CF6D8-803D4904 | 805F9A40-805FA788 | | 8003A344-8003A5A8 (51) | 80019AB4-80019F3C | the four `NetworkSessionBase` setters, nonce helpers, small-object dtors, the session state machine |
 
 ## Confidence per cut
 
@@ -54,7 +54,7 @@ owned by `Network/network_shared_data.cpp` and are not part of the split.
 
 Not split: `network_socket_streams` might hide one more cut at `NetworkResolverBase`'s constructor (0x803CF0A8), but
 the `.data` there is `S* V` with no seam, and nothing else separates the socket users from `NetworkResolverBase`.
-The state machine (0x803CF6D8..0x803D3CE8) has no interior seam: its strings, jump table and vtables are one run.
+The state machine (0x803CF6D8..0x803D4904; the twelve op-code writers and rate functions at 0x803D3CE8..0x803D4904 joined it once the `.data` order showed their strings before the tables) has no interior seam: its strings, jump table and vtables are one run.
 
 ## Result (2026-09-29)
 

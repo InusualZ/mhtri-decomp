@@ -46,7 +46,7 @@
  * 0x80794CE0 (stored four times here, read ten) and 0x80794CE4 `sGameSpyInterfaceThread`, the
  * singleton this unit publishes at `.text`+0x1E14 and its destructor zeroes at +0x1EE0 (both
  * `stw rX, 0(0)` + `R_PPC_EMB_SDA21`).  The band header `include/unsplit/Network.h` declared both,
- * which is rule 12.  The *other* unit that names the singleton, `Network/fn_803D3CE8.cpp`, only
+ * which is rule 12.  The *other* unit that names the singleton, `Network/NetworkSessionManager.cpp`, only
  * loads it (`GameSpyInterfaceThread_getInstance`), so the definer is this unit and the claim is
  * here.  One contiguous run, symbol- and 8-byte-aligned, so the split needs no interior auto band.
  *

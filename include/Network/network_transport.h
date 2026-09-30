@@ -6,7 +6,7 @@
  * `NetworkPeerBuffer`, `NetworkPeerUdp`, `NetworkPeerMcs`, `network_socket_streams`, `NetworkResolverWii`,
  * `NetworkSessionBase` and `NetworkSessionStable` (docs/network-transport-split.md).  The types are
  * `Network/network_transport_types.h`'s, and a symbol's declaration is in its owner's header; this file only
- * gathers them so `Network/fn_803D3CE8.h` and `unsplit/Network.h` keep one include.
+ * gathers them so `Network/NetworkSessionManager.h` and `unsplit/Network.h` keep one include.
  */
 
 #ifndef NETWORK_NETWORK_TRANSPORT_H

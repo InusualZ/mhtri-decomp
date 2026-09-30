@@ -17,7 +17,7 @@
  * `lis`+`addi` pair in 0x803B465C..0x803BE30C resolves to a numeric table, never a bare source-file
  * name (checked against the DOL's `.data`/`.rodata`/`.sdata` bytes).  2. `dumpmap.py lookup` answers
  * `zz_` for every symbol in the range - no real runtime-dump name.  3. The bracketing registered
- * units name different modules (`menu/multi_result.cpp` below, `Network/fn_803D3CE8.cpp` above), so
+ * units name different modules (`menu/multi_result.cpp` below, `Network/NetworkSessionManager.cpp` above), so
  * no neighbour scheme reaches the range.  4. **GUESS**, recorded here as the brief requires: module
  * `enemy` and file name `em_pop` are derived from what the range does (it builds, indexes and
  * recycles the per-map enemy population the `em_set`/`_pop.dat` files describe), plus the callers -

@@ -30,7 +30,7 @@
  * after the roster refresh; GUESS) and the field/member names of NetCtrlWk and the record types are
  * derived from use and offsets.  About 150 callee and record names are GUESSES from the caller's use
  * (never from a retail symbol): the blocks marked GUESS in `include/unsplit/Network.h`,
- * `Network/NetworkWiiMediator.h`, `Network/NetworkLayerPat.h`, `Network/fn_803D3CE8.h` and this
+ * `Network/NetworkWiiMediator.h`, `Network/NetworkLayerPat.h`, `Network/NetworkSessionManager.h` and this
  * unit's own header.  Left as they are: `isReadyCountOne` (the body is `ready_count_0x044 == 1`, what
  * the count is stays unknown) and `resetFailureState` (a `blr` stub).
  *
@@ -54,7 +54,7 @@
  */
 
 #include "Network/network_pat_control.h"
-#include "Network/fn_803D3CE8.h"   /* NetworkSessionManagerPat - the class the band dispatches through */
+#include "Network/NetworkSessionManager.h"   /* NetworkSessionManagerPat - the class the band dispatches through */
 #include "Runtime.PPCEABI.H/memset.h"            /* memset, owner Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/Runtime.PPCEABI.H.h"           /* strcpy - unowned MSL helper (rule 2's unsplit gap) */
 #include "g3d/g3d_anmchr.h"                      /* flfntStrLen, owner g3d/g3d_anmchr.cpp (rule 2) */
@@ -1075,7 +1075,7 @@ void updateNetworkPatControl(void)
             getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C((NetId*)&id);
             work->name_0x7368[0] = 0;
             formatNetId(work->name_0x7368, (NetId*)&id);
-            networkSmallObject_dtor(&id, -1);
+            NetworkSmallObjectSink::destroy(&id);
             flushRosterSync();
             refreshRosterCache();
             work->sub_state_0x017 = 0x10;

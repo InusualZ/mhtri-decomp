@@ -14,7 +14,7 @@
 #define MHTRI_NETWORK_NETWORKLAYERPAT_H
 
 #include "types.h"
-#include "Network/fn_803D3CE8.h"   /* NetworkRequest - the record the state machine advances */
+#include "Network/NetworkSessionManager.h"   /* NetworkRequest - the record the state machine advances */
 
 /* The 10-byte network user id the friend/peer code copies and compares (`importNetId` imports one,
  * `isSameNetId` compares two, `formatNetId` renders one as text).  size: 0xA */

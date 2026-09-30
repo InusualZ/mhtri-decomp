@@ -108,7 +108,7 @@
  * already spelled that way; `create__22GameSpyInterfaceThreadFv` -> `__ct__22GameSpyInterfaceThreadFv`
  * (0x8041C66C), whose owner `Network/fn_8041A87C.cpp` turned its `create()` into the class's
  * constructor in the same change; and `fn_803D6A98` -> `GameSpyInterfaceThread_getInstance`
- * (0x803D6A98, `Network/fn_803D3CE8.cpp`), with the referrers in `include/Network/fn_8041A87C.h` and
+ * (0x803D6A98, `Network/NetworkSessionManager.cpp`), with the referrers in `include/Network/fn_8041A87C.h` and
  * `src/Network/fn_8041A87C.cpp`.  Re-measured: every `.text` row and the whole-project progress are
  * unchanged, and `flipcheck.py` reports exactly the four complaints it did before, no new one.
  *
@@ -195,7 +195,7 @@ void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
 void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
 void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
-/* The thread accessor the opening's init reaches.  Its body sits in the `Network/fn_803D3CE8.cpp` band
+/* The thread accessor the opening's init reaches.  Its body sits in the `Network/NetworkSessionManager.cpp` band
  * and returns that band's own thread object, so it stays `void*` in the owner's declaration and this
  * file declares the typed call; the map row is the owner's spelling of the dump's placeholder
  * `getInstance`, qualified by the class. */

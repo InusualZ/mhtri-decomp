@@ -4,13 +4,13 @@
  *
  * WHY THIS UNIT EXISTS.  MWCC emits a class's vtable in the translation unit that defines the class's
  * **key function** - the first non-inline, non-pure virtual declared in the class - and
- * `NetworkSessionManagerPat::move` is that function (`include/Network/fn_803D3CE8.h` declares it first
+ * `NetworkSessionManagerPat::move` is that function (`include/Network/NetworkSessionManager.h` declares it first
  * for exactly this reason).  The target says which TU that was: `__vt__24NetworkSessionManagerPat` sits
  * at 0x805FB0F0, one byte past the end of this band's own `.data` run start (0x805FAAD0, where the two
  * Pat message strings and the three jump tables of this band's other functions live), i.e. this band,
- * not `Network/fn_803D3CE8.cpp` - whose object carries the *base* table alone.  So the table is claimed
+ * not `Network/NetworkSessionManager.cpp` - whose object carries the *base* table alone.  So the table is claimed
  * here with the key function, and the class's other ~100 overrides (whose bodies are still `fn_`
- * rows in the two bands) are the residual: see the file header of `Network/fn_803D3CE8.h` for the
+ * rows in the two bands) are the residual: see the file header of `Network/NetworkSessionManager.h` for the
  * slot census.
  *
  * SECTIONS.  `.text` 0x803D70B8..0x803D72F4 (exactly the key function's extent), `.data`
@@ -27,7 +27,7 @@
  * **all 112** slots the target relocates, each naming the symbol the target's object names.  It did not
  * before - the base leaves 62 of those slots pure, so 61 of them were emitted as `0x00000000` and the
  * 62nd as the base's `setFlag79` - and closing them is what `NetworkSessionManagerPat`'s declaration
- * block in `include/Network/fn_803D3CE8.h` is for: one override per filled slot.  What is still
+ * block in `include/Network/NetworkSessionManager.h` is for: one override per filled slot.  What is still
  * UNWRITTEN is the 62 overriding bodies.  They live in bands no unit has claimed (0x803D72F4..0x803DDB64,
  * 0x803DE56C/0x803DE5F4, 0x803DEF38..0x803DF178 - 20,068 B), so each declaration's name and parameter
  * list is a reconstruction from that body: `handleCircleJoin` calls `sendReqCircleJoin`,
@@ -55,7 +55,7 @@
  * the map's `lbl_8079C758`.  Naming it would mean claiming a symbol the original did not have, so it
  * stays a pool entry (playbook 58).
  */
-#include "Network/fn_803D3CE8.h"
+#include "Network/NetworkSessionManager.h"
 #include "unsplit/Network.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"

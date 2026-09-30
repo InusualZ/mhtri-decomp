@@ -25,7 +25,7 @@
 
 #include "types.h"
 
-/* The class `Network/fn_803D3CE8.cpp` reconstructs (table `__vt__24NetworkSessionManagerPat`,
+/* The class `Network/NetworkSessionManager.cpp` reconstructs (table `__vt__24NetworkSessionManagerPat`,
  * 0x805FB0F0); its declaration lives in that unit's header. */
 class NetworkSessionManagerPat;
 

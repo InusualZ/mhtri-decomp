@@ -21,9 +21,9 @@
 #include "unsplit/SO.h"
 
 /* The neighbouring units' classes, named but not defined here: this header is included BY
-   `Network/fn_803D3CE8.h`, so it cannot include it back.  A forward declaration of the class name is
+   `Network/NetworkSessionManager.h`, so it cannot include it back.  A forward declaration of the class name is
    all a pointer parameter needs. */
-struct NetworkSessionStable;
+class NetworkSessionStable;
 struct NetworkStreamWriter;
 struct NetworkPeerInfo;
 
@@ -37,12 +37,22 @@ struct NetworkPeerInfo;
 enum NetworkPeerErrorSource {
     NETWORK_ERROR_NONE = 0,
     NETWORK_ERROR_UDP_UNATTACHED = 0x80030002,   /* the udp peer has no udp object to send/receive on */
+    NETWORK_ERROR_SESSION_CONTROL = 0x80030003,  /* `NetworkSessionStable::execControlOne` refused a control message */
     NETWORK_ERROR_PUT_TOO_BIG = 0x80030004,      /* `NetworkSessionStable::put: data too big` */
     NETWORK_ERROR_MCS_SOCKET = 0x80030011,       /* the Mcs peer's socket open/close/idle failed */
     NETWORK_ERROR_MCS_STATE = 0x80030012,        /* the Mcs peer's state machine met an armed flag */
     NETWORK_ERROR_PEER_SEND = 0x80030021,        /* a peer's send overflowed or the socket refused it */
     NETWORK_ERROR_PEER_RECEIVE = 0x80030022,     /* a peer's receive failed or read a zero length */
-    NETWORK_ERROR_PUT_OVERFLOW = 0x80030032      /* `NetworkSessionStable::put: data overflow` */
+    NETWORK_ERROR_PUT_OVERFLOW = 0x80030032,     /* `NetworkSessionStable::put: data overflow` */
+    NETWORK_ERROR_SLEEP_TIMEOUT = 0x80030036,    /* a peer slept longer than it announced (`move`) */
+    NETWORK_ERROR_SESSION_DROPPED = 0x80030037,  /* a peer said it dropped (`execControlOne` case 5) */
+    NETWORK_ERROR_SESSION_TIMEOUT = 0x80030039,  /* too many peers timed out (`move`) */
+    NETWORK_ERROR_SESSION_KICKED = 0x8003003A,   /* `leave` / `kick` */
+    NETWORK_ERROR_CONNECT_TIMEOUT = 0x8003003B,  /* a peer could not be established within the subhost timeout (`move`) */
+    NETWORK_ERROR_HOST_TIMEOUT = 0x8003003F,     /* no host seen within the timeout (`move`) */
+    NETWORK_ERROR_CONNECT_FAILED = 0x80030041,   /* the slot could not be established (`move`) */
+    NETWORK_ERROR_PEER_CLOSED = 0x80030042,      /* a peer was closed: too few peers left, or it cannot be established (`move`) */
+    NETWORK_ERROR_PEER_LEFT = 0x80030044         /* the peer left (`setNetworkConnectionEvent`, `execControlOne`) */
 };
 
 /* The abstract peer the transport peers derive from (GUESS on the name: the class is the error-record
@@ -265,51 +275,64 @@ typedef struct NetworkPeerInfo {
     s32  labelSize_4C;                  /* +0x4C - bytes of it in use */
 } NetworkPeerInfo;   /* size: 0x50 */
 
-/* The session base class (table 0x805F99A0, 0xA0 B: the deleting destructor, thirty-three pure slots
-   and the four setters this unit defines - GUESS on the class name, evidenced only by `networkPeer_resetSlots`
-   driving its +0x1C slot once per slot index and by the setters' slot positions).  The destructor is the
-   key function that makes MWCC emit the table. */
+/* The event callback the session reports through (`init` stores it at +0x04, the user pointer at +0x08):
+   the event code (1 established, 2 data, 3 error, 4 control data, 5 record), the slot index, an argument,
+   a size, the payload and the user pointer. */
+/* untyped: caller-owned payload - the payload bytes and the user pointer are forwarded unchanged */
+typedef void (*NetworkSessionCallback)(s32 event, s32 index, u32 arg, s32 size, const void* data, void* user);
+
+/* The session base class (table 0x805F99A0, 0xA0 B: the deleting destructor and thirty-eight slots, every
+   one of which `NetworkSessionStable` overrides; the four setters at +0x50..+0x5C have a body here, defined in
+   the Stable unit - GUESS on the class name, evidenced by `NetworkSessionStable::resetAllSlots` driving the
+   +0x1C slot once per slot index).  The destructor is the key function that makes MWCC emit the table.  The slot
+   names are the derived class's (GUESS on each, read off its body and callers). */
 class NetworkSessionBase {
 public:
+    NetworkSessionBase();
     virtual ~NetworkSessionBase();
-    /* +0x0C */ virtual void slot_0C() = 0;
-    /* +0x10 */ virtual void slot_10() = 0;
-    /* +0x14 */ virtual void slot_14() = 0;
-    /* +0x18 */ virtual void slot_18() = 0;
-    /* +0x1C (GUESS) */ virtual void resetSlot(s8 index) = 0;
-    /* +0x20 */ virtual void slot_20() = 0;
-    /* +0x24 */ virtual void slot_24() = 0;
-    /* +0x28 */ virtual void slot_28() = 0;
-    /* +0x2C */ virtual void slot_2C() = 0;
-    /* +0x30 */ virtual void slot_30() = 0;
-    /* +0x34 */ virtual void slot_34() = 0;
-    /* +0x38 */ virtual void slot_38() = 0;
-    /* +0x3C */ virtual void slot_3C() = 0;
-    /* +0x40 */ virtual void slot_40() = 0;
-    /* +0x44 */ virtual void slot_44() = 0;
-    /* +0x48 */ virtual void slot_48() = 0;
-    /* +0x4C */ virtual void slot_4C() = 0;
+    /* +0x0C */ virtual void init(s8 isHost, NetworkSessionCallback callback, void* user, /* untyped: caller-owned payload - the callback's user pointer */
+                                  const u8* address, s32 param) = 0;
+    /* +0x10 */ virtual void resetAllSlots() = 0;
+    /* +0x14 */ virtual void move() = 0;
+    /* +0x18 */ virtual s32 set(s32 isSelf, const u8* address) = 0;
+    /* +0x1C */ virtual void resetSlot(s8 index) = 0;
+    /* +0x20 */ virtual void connect(s8 index, u32 a, u32 b) = 0;
+    /* +0x24 */ virtual void disconnectAll() = 0;
+    /* +0x28 */ virtual void leave() = 0;
+    /* +0x2C */ virtual void kick(s8 index) = 0;
+    /* +0x30 */ virtual void sendOp1(u32 value) = 0;
+    /* +0x34 */ virtual void sendOp2() = 0;
+    /* +0x38 */ virtual void put(const u8* data, s32 size, s32 a, s32 b, const s8* targets, u8 limit) = 0;
+    /* +0x3C */ virtual void post(const u8* data, s32 size, s8 channel, s8 index) = 0;
+    /* +0x40 */ virtual void sendOp4(const void* data, u32 length, s8 index) = 0; /* untyped: byte range (the payload bytes) */
+    /* +0x44 */ virtual void receiveAll() = 0;
+    /* +0x48 */ virtual void discardAll() = 0;
+    /* +0x4C */ virtual s32 isConnected(s8 index) = 0;
     /* +0x50 (GUESS: the name follows the words it writes) */ virtual void setLimits(u32 maxHosts, u32 maxSubhosts);
     /* +0x54 (GUESS) */ virtual void setHostTimeout(f32 seconds);
     /* +0x58 (GUESS) */ virtual void setSubhostTimeout(f32 seconds);
     /* +0x5C (GUESS) */ virtual void setRate(s32 count, s32 divisor);
-    /* +0x60 */ virtual void slot_60() = 0;
-    /* +0x64 */ virtual void slot_64() = 0;
-    /* +0x68 */ virtual void slot_68() = 0;
-    /* +0x6C */ virtual void slot_6C() = 0;
-    /* +0x70 */ virtual void slot_70() = 0;
-    /* +0x74 */ virtual void slot_74() = 0;
-    /* +0x78 */ virtual void slot_78() = 0;
-    /* +0x7C */ virtual void slot_7C() = 0;
-    /* +0x80 */ virtual void slot_80() = 0;
-    /* +0x84 */ virtual void slot_84() = 0;
-    /* +0x88 */ virtual void slot_88() = 0;
-    /* +0x8C */ virtual void slot_8C() = 0;
-    /* +0x90 */ virtual void slot_90() = 0;
-    /* +0x94 */ virtual void slot_94() = 0;
-    /* +0x98 */ virtual void slot_98() = 0;
-    /* +0x9C */ virtual void slot_9C() = 0;
-};   /* size: 0x04 - the state lives in unit-level globals */
+    /* +0x60 */ virtual void setConnectionInterval(f32 seconds) = 0;
+    /* +0x64 */ virtual void setConnectionTimeout(f32 seconds) = 0;
+    /* +0x68 */ virtual void setConnectionLimit(f32 seconds) = 0;
+    /* +0x6C */ virtual s32 getOwnIndex() = 0;
+    /* +0x70 */ virtual void setHostIndex(s8 index) = 0;
+    /* +0x74 */ virtual s8 getRelayIndex(s8 index) = 0;
+    /* +0x78 */ virtual void setUserFlagA(u8 value) = 0;
+    /* +0x7C */ virtual u8 getUserFlagA() = 0;
+    /* +0x80 */ virtual void setUserFlagB(u8 value) = 0;
+    /* +0x84 */ virtual u8 getUserFlagB() = 0;
+    /* +0x88 */ virtual void markJoined() = 0;
+    /* +0x8C */ virtual f32 getRoundTrip(s8 index) = 0;
+    /* +0x90 */ virtual s32 getBandwidth(s8 index) = 0;
+    /* +0x94 */ virtual void setCongestion(s8 index, f32 value) = 0;
+    /* +0x98 */ virtual f32 getCongestion(s8 index) = 0;
+    /* +0x9C */ virtual s32 getFreeSpace(s8 index) = 0;
+
+    /* +0x04 */ NetworkSessionCallback callback_04;   /* the event callback `init` stores; the constructor clears it */
+    /* +0x08 */ void* user_08;                        /* untyped: caller-owned payload - handed back to the callback */
+    /* +0x0C */ s8 isHost_0C;                         /* set by `init` for the host session */
+};   /* size: 0x10 (evidence: the constructor stores the table and clears the words at +0x04/+0x08 and the byte at +0x0C; the derived fields start at +0x0D) */
 
 /* ---------------- the peer that owns a byte stream -------------------------------------------- */
 
@@ -319,15 +342,25 @@ public:
    slots at +0x20/+0x24, and the helper stays valid through a pointer). */
 class NetworkStreamSink {
 public:
-    /* +0x08 */ virtual void slot_08();
-    /* +0x0C */ virtual void slot_0C();
-    /* +0x10 */ virtual void slot_10();
-    /* +0x14 */ virtual void slot_14();
-    /* +0x18 */ virtual void slot_18();
-    /* +0x1C */ virtual void slot_1C();
+    NetworkStreamSink();
+    /* +0x08 */ virtual ~NetworkStreamSink();
+    /* +0x0C (GUESS: the flush hook, empty in this class) */ virtual void onFlush(u8* data, u32 size);
+    /* +0x10 (GUESS: hands the stored bytes to `onFlush`) */ virtual void flush();
+    /* +0x14 (GUESS: binds the stream to an empty block) */ virtual void attach(u8* block, u32 capacity);
+    /* +0x18 (GUESS: zeroes the block) */ virtual void clear();
+    /* +0x1C (GUESS: binds the stream to a block that is full) */ virtual void bind(u8* block, u32 size);
     /* +0x20 (GUESS) */ virtual s32 fill(u8* out, u32 size);
     /* +0x24 (GUESS) */ virtual s32 put(const u8* data, u32 size);
-};   /* size: 0x04 - only ever reached through a pointer in this unit */
+    /* +0x28 (GUESS: offset-derived) */ virtual void slot_28();
+    /* +0x2C (GUESS: offset-derived) */ virtual void slot_2C();
+    /* +0x30 (GUESS: offset-derived) */ virtual void slot_30();
+    /* +0x34 (GUESS: offset-derived) */ virtual void slot_34();
+    /* +0x38 (GUESS: offset-derived) */ virtual void slot_38();
+
+    /* +0x04 */ u8* data_04;         /* the block the stream reads or writes */
+    /* +0x08 */ u32 capacity_08;     /* its size */
+    /* +0x0C */ u32 used_0C;         /* the bytes it holds */
+};   /* size: 0x10 (evidence: the constructor stores the table and three words) */
 
 /* What a caller hands several of the stream's helpers: somewhere to put the bytes and how much room there
    is (a `u16`, because the length prefix it is compared against is one). */
@@ -360,16 +393,6 @@ struct NetworkByteStream {
     void readLength(u16* out);
     void takeByte(u8* out);
 };   /* size: 0x10 */
-
-/* The object whose destructor destroys two sub-objects: the first is an embedded small object at
-   +0x30, the second an object of another class at +0x54.  Only those two offsets are evidenced. */
-typedef struct NetworkPeerOwner {
-    void* unused_00;                 /* +0x00 */
-    u8    pad_04[0x2C];              /* +0x04..+0x2F */
-    u8    small_30[0x10];            /* +0x30..+0x3F - the embedded small object's own storage */
-    u8    pad_40[0x14];              /* +0x40..+0x53 */
-    u8    sub_54[0x0C];              /* +0x54..+0x5F - the second owned sub-object */
-} NetworkPeerOwner;   /* size: 0x60 (approximation - only the two sub-object offsets are evidenced) */
 
 /* The lock a peer keeps at its own +0x04: the two mutex helpers wrap the OS mutex that starts four
    bytes into the object they are handed. */
@@ -427,15 +450,8 @@ public:
 
 extern "C" {
 
-/* The two unsplit helpers the destructors chain and the socket reader: symbols no registered unit owns, declared
-   in the header the band's consumers already include.  They used to be forced here by a return-type clash
-   between `include/unsplit/Network.h` and `Network/fn_803D3CE8.h` over the logger accessor `fn_803C9974` - now the
-   map's `getNetworkLogger`, whose declaration the Pat landing left in the band header alone, so the clash is
-   gone. */
-/* untyped: opaque handle passed through - the caller hands an object of another band's layout */
-void dtor_803C989C(void* self, s32 flags);
-/* untyped: opaque handle passed through - the caller hands an object of another band's layout */
-void dtor_803CA4E8(void* self, s32 flags);
+/* The unsplit socket reader: a symbol no registered unit owns, declared in the header the band's
+   consumers already include. */
 /* untyped: opaque handle passed through - the socket object belongs to another band */
 s32 getBytesAvailableToRead(void* handle);
 

@@ -8,7 +8,7 @@
  * `include/unsplit/Network.h` (a shared type, not an owned symbol).
  *
  * The `NetworkStateMachine`/`NetworkUserRow` views below and the unsplit callees this unit needs are
- * declared here rather than in the band header - the same convention `include/Network/fn_803D3CE8.h`
+ * declared here rather than in the band header - the same convention `include/Network/NetworkSessionManager.h`
  * follows for its own range, because `include/unsplit/Network.h` belongs to the sibling mediator lane.
  */
 #ifndef NETWORK_STATE_H

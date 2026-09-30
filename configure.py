@@ -1744,6 +1744,7 @@ config.libs = [
         "progress_category": "sdk",  # str | List[str]
         "objects": [
             Object(Matching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
+            Object(NonMatching, "Runtime.PPCEABI.H/ptmf.c"),
             # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
             Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(Matching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
@@ -2327,7 +2328,7 @@ config.libs = [
             # the retired `Network/NetworkWiiMediator.c` (`fn_80413F3C` at 0x80413F3C) so the whole
             # class band has one owner; the fold-in is part of this batch, not a later one.
             # Per-unit flag deviation (brief section 8.2), instruction-level evidence: the two
-            # session-manager units are `-O3` scheduling, like the sibling `Network/fn_803D3CE8.cpp`
+            # session-manager units are `-O3` scheduling, like the sibling `Network/NetworkSessionManager.cpp`
             # below.  With the lib's `-O4,p` every framed function hoists its constant-argument
             # setup into the prologue's `mflr`->`stw` latency slot (sendReqCommonKey: the target is
             # `stw r0,20; stw r31,12; stw r30,8; mr r30,r3; li r4,18; li r5,0; bl` while ours puts
@@ -2390,8 +2391,9 @@ config.libs = [
             Object(Matching, "Network/NetworkPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Registered once, at its final home (docs/plan.md 12): proposal
-            # `803D3CE8_fn_803D3CE8.cpp` (`.text` 0x803D3CE8..0x803D70B8, 101 functions / 13264 B) -
-            # the Network session band: `NetworkSessionStable`'s op-code packet writers, the
+            # `803D3CE8_NetworkSessionManager.cpp` (`.text` now 0x803D4904..0x803D70B8: the twelve `NetworkSessionStable`
+            # op-code writers that opened the range moved to `Network/NetworkSessionStable.cpp`, whose
+            # `.data` order proved the seam at 0x803D4904) - the Network session band: the
             # `NetworkSessionManager` request pool/state machine and the first `NetworkSessionManagerPat`
             # virtual slots.  Module `Network` from the class names and the registered neighbour
             # `Network/NetworkWiiMediator.cpp`; no `__FILE__` string and only `zz_` dump names cover the
@@ -2403,17 +2405,17 @@ config.libs = [
             # mr r30,r3; mr r31,r4` and its global-descriptor copy is the plain `lwz/stw` block, both of
             # which `-O4,p` destroys (it interleaves the saves and folds the copy into `lwzu`).  Measured:
             # the same source scores fn_803D53B0 59.79 % at `-O4,p` and 95.15 % at `-O3`, fn_803D4904
-            # 70.42 % -> 93.24 %, fn_803D3CE8 81.63 % -> 92.23 %.  `-func_align 4` is kept (the 4-byte
+            # 70.42 % -> 93.24 %, NetworkSessionManager 81.63 % -> 92.23 %.  `-func_align 4` is kept (the 4-byte
             # functions `fn_803D4B5C`/`fn_803D5D64` prove it).  This is the object's cflags, not the lib's:
             # the sibling `NetworkWiiMediator.cpp` is byte-identical at `-O4,p`.
-            Object(NonMatching, "Network/fn_803D3CE8.cpp",
+            Object(NonMatching, "Network/NetworkSessionManager.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # The Network transport band, `.text` 0x803CCDF8..0x803D3CE8, registered as eight units -
             # one per translation unit (docs/network-transport-split.md holds the evidence and the
             # confidence of each cut: the retail `.data` interleaves each class's vtable with its own
             # strings, which one TU cannot emit, and the `extabindex` entries tile in the same order).
             # Module `Network` from the class names and the registered neighbours
-            # (`Network/fn_803D3CE8.cpp` abuts the last one exactly in extab/extabindex); no `__FILE__`
+            # (`Network/NetworkSessionManager.cpp` abuts the last one exactly in extab/extabindex); no `__FILE__`
             # string names any of them, so every file name is derived from the classes it holds and is a
             # GUESS (recorded in each unit's header).  C++ (`__dl__FPv`, virtual dispatch); the lib's
             # `-Cpp_exceptions on` supplies the target's extab/extabindex.
@@ -2450,12 +2452,12 @@ config.libs = [
             # 0x8079C690-0x8079C758 (200 B) and `.sdata` 0x80793900-0x80793930 (48 B), whose source
             # defines nothing (playbook 23/53 route 2, playbook 54; the model is
             # `Pl/pl_frame_data.cpp`).  Both runs are read by more than one party -
-            # the Network transport units and `Network/fn_803D3CE8.cpp` share
+            # the Network transport units and `Network/NetworkSessionManager.cpp` share
             # 0x8079C6EC..0x8079C754, and unsplit (Network) code reads 0x8079C690 and 0x8079C750 -
             # so no consumer may claim them without taking rows only the other consumer reads.
             # One owner is what lets every consumer include `Network/network_shared_data.h`
             # instead of declaring the words into its own file, which is the rule-12 finding those
-            # 14 declarations were in `include/Network/fn_803D3CE8.h`.  Registered once, at its
+            # 14 declarations were in `include/Network/NetworkSessionManager.h`.  Registered once, at its
             # final home; the `-O3` override above does not apply (no code in this unit).
             Object(NonMatching, "Network/network_shared_data.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
