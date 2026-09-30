@@ -1779,7 +1779,9 @@ def set_unit_renames(pairs: list[str] | None, survivors: list[str] | None = None
                 if tgt not in lists.setdefault(key, []):
                     lists[key].append(tgt)
     UNIT_RENAME_LISTS = lists
-    UNIT_RENAMES = {k: v[0] for k, v in lists.items() if len(v) == 1}
+    # a SURVIVING donor (still registered after the batch) is not a rename for the data row: its base keys stay
+    # under its own name there (the row derives the fold map itself); only the undefrefs merge uses the pair
+    UNIT_RENAMES = {k: v[0] for k, v in lists.items() if len(v) == 1 and k not in UNIT_SURVIVORS}
 
 
 def rename_snapshot_keys(snapshot: dict) -> dict:
