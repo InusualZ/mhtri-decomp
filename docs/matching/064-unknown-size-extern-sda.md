@@ -5,7 +5,7 @@ status: works
 problem: A band declares `extern const char lbl_80793998[];` and the caller materialises the address with `lis r5, sym@ha` + `addi r5, r5, sym@l`, where the target has a single `li r5, sym@sda21`. The extra instruction shifts every later register and offset, so the function reads as a scheduling or source-order residual.
 tags: [data, source-shape]
 applies: []
-demo:
+demo: 064-unknown-size-extern-sda.cpp
 ---
 
 # 64. An unknown-size `extern` array is addressed absolutely - give it its size for the SDA form
@@ -32,3 +32,6 @@ not per-header.
 extern const char lbl_80793998[];      /* lis + addi  - absolute */
 extern const char lbl_80793998[4];     /* li sym@sda21 - retail   */
 ```
+
+**Demonstration.** `064-unknown-size-extern-sda.cpp` (`ideas.py demo-check 64`) reproduces it: `extern const char x[]` is
+`lis` + `addi` (absolute), `extern const char x[4]` is one `li` with an `SDA21` relocation.

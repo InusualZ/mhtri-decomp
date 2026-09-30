@@ -37,8 +37,14 @@ never by editing `cflags_base`/`cflags_runtime` for everybody.
   the skill's copy. Fill the body, set the `problem:` line and `status`, then check.
 * **Check.** `ideas.py check` is the whole gate: front-matter schema, ids unique and agreeing with the file
   names, the H1 agreeing with the title, `index.md` and the skill's copy fresh, every `demo:` existing, no orphan
-  demo file, every demo header well-formed. (`tools/selftest.py` runs it when `docs/matching/` changes.) Demos are
-  listed but not compiled yet - the checker that compiles them and tests `EXPECT:` is the next stage.
+  demo file, every demo header well-formed. (`tools/selftest.py` runs it when `docs/matching/` changes.) `check
+  --demos` also compiles every demo (see "Demos" below).
+* **Demos.** `ideas.py demo-check [N ...|--all|--changed REF]` compiles each demo with the real MWCC and tests
+  its `EXPECT:` lines; it prints PASS/FAIL per demo, and for a failure the EXPECT, why, and the part of the
+  object it is about. Exit 0 when all pass, 1 on a failure, 3 when a demo was skipped (no compiler under
+  `build/compilers/`); `--changed REF` selects demos whose `.cpp` or idea file changed since REF (the
+  landing gate's selftest runner does this whenever `docs/matching/` changes); `--dump` prints the objdump of a
+  demo instead of checking it - the way to see what to assert when writing one. All demos: about 2 s.
 * For a unit that does not match, walk the ideas in id order too: the ids are the order they were learned.
 
 ## How ideas are recorded
@@ -68,10 +74,37 @@ demo:                    # NNN-slug.cpp when a compilable demonstration exists
 /* Demo for idea NNN: <title>
  * FLAGS: -O4,p -inline auto        flags appended to the unit's base cflags, one line
  * MWCC: Wii/1.3                    compiler under build/compilers/; optional, default Wii/1.3
- * EXPECT: contains fmuls           repeatable, one assertion about the compiled object per line:
- * EXPECT: absent fmadds              contains|absent <mnemonic or symbol>, size <symbol> <bytes>
+ * EXPECT: contains fmuls           repeatable, one assertion about the compiled object per line
+ * EXPECT: absent fmadds              (two or more spaces end the assertion; the rest is a note)
  */
 ```
+
+  **How a demo is compiled.** With the base `cflags_base` read out of `configure.py` (never a copy), in which the
+  demo's `FLAGS:` replace every flag of the same family (`-O3` replaces `-O4,p`, `-str reuse,pool` replaces
+  `-str reuse`), through `sjiswrap` and the chosen `mwcceppc.exe`, into a scratch directory; the object is read
+  with `objdump -d -r -t -h -s`. A **symbol** in an assertion matches exactly or as the C++ mangling prefix
+  (`f` finds `f__Fi`). **The vocabulary** (`ideas_demo.py` is the one implementation):
+
+| EXPECT | holds when |
+| --- | --- |
+| `contains <x>` / `absent <x>` | `<x>` is (not) an instruction mnemonic, a symbol, or a relocation target |
+| `size <sym> <bytes>` | the symbol's size |
+| `section <name> <bytes>` | the section's size (`0` also holds for a missing section) |
+| `order <section> <A> < <B>` | symbol A is at a lower address than B inside the section (data order, ideas 80) |
+| `reloc <sym>` | a relocation names `<sym>` |
+| `seq <m1> <m2> ... [in <func>]` | the mnemonics occur in this order (a subsequence), in `<func>` if given |
+| `count <mnemonic> <n> [in <func>]` | the mnemonic occurs exactly `n` times |
+| `insn <mnemonic> <operands> [in <func>]` | an instruction with exactly these operands, e.g. `insn rlwinm r3,r0,0,24,24` |
+| `bytes <section> <hex>` / `nobytes ...` | the section's contents do (not) contain the byte string |
+
+  **How to write one.** Give the smallest file that shows the idea, with **both shapes** in it when the idea is
+  "write it this way, not that way" (two functions with different names); `extern "C"` keeps the names
+  unmangled. Write the header with placeholder EXPECTs, run `ideas.py demo-check N --dump` to see the
+  object, then assert the difference: a count or a size per function is sturdier than a whole sequence.
+  An assertion must be one that can fail - if the two spellings compile identically in isolation, say so with
+  two equal `size` lines rather than pretending a difference. **When the real compiler disagrees with the idea's
+  text, the demo records what the compiler did and the idea gets a "Demonstration" note** - a demo is never
+  bent to fit the prose.
 
 * **Tags** come from a fixed vocabulary: `flags`, `pragma`, `source-shape`, `allocator`, `data`, `vtable`,
   `linker`, `sections`, `symbols`, `relocations`, `measurement`, `process`, `tooling`. Use the few that are

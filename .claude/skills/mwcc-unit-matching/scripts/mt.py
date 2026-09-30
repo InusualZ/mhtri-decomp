@@ -17,7 +17,7 @@ Usage:
     python scripts/mt.py slots  [-u <unit>] <symbol> [--map] [--slot 0x64]
     python scripts/mt.py sections [-u <unit>]                           (elfsect: section table)
     python scripts/mt.py dwarf  <obj> <function>                        (dwarfmap: var -> slot)
-    python scripts/mt.py ideas  find <words>|show N|where N|new ...|check (the playbook's ideas)
+    python scripts/mt.py ideas  find <words>|show N|where N|new ...|check [--demos]|demo-check (the playbook's ideas)
 
 Anything after the subcommand is passed through unchanged, so `--help` works per tool.
 """

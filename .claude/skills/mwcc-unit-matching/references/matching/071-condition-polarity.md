@@ -5,7 +5,7 @@ status: works
 problem: A function whose logic and instruction set are right still misses by a register shuffle and an exit: the two arms do not merge, an early return arrives as a `beq`+`b` pair where retail has one `bne`, or a `memcmp` test arrives as `cmpwi`/`bne` where retail materialises a boolean with `cntlzw`/`srwi.`. It reads as an allocator problem because every later register and offset shifts with the branch.
 tags: [source-shape]
 applies: [DWCi]
-demo:
+demo: 071-condition-polarity.cpp
 ---
 
 # 71. The condition's POLARITY decides the exit - a ternary merges arms where `if/else` does not
@@ -43,3 +43,8 @@ return ok;                      /* `if (ok != 0) return ok;` would give beq + b 
 s32 same = (memcmp(a, b, n) == 0);   /* cntlzw / srwi. */
 if (same) { ... }                    /* `if (memcmp(...) == 0)` gives cmpwi/bne */
 ```
+
+**Demonstration.** `071-condition-polarity.cpp` (`ideas.py demo-check 71`). Reproduced: an assigned boolean gives
+`cntlzw` + `srwi.` where `if (memcmp(...) == 0)` (and `if (!memcmp(...))`) give `cmpwi` + `bne`. **Not reproduced in
+isolation:** the ternary and the `if/else` spelling of the merged arm compile identically (both 0x18 B), so the ternary
+claim depends on the surrounding function.

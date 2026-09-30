@@ -5,7 +5,7 @@ status: works
 problem: The unit's retail string pool sits in `.data`, but our `cflags` carry `-str reuse,pool,readonly`, so our strings land in `.rodata` and the section does not pair. It reads as a missing data range.
 tags: [flags, data]
 applies: []
-demo:
+demo: 044-str-readonly-pool-in-data.cpp
 ---
 
 # 44. A string pool in `.data` means the build was not `-str readonly`
@@ -23,3 +23,6 @@ demo:
 ```
 -str reuse,pool
 ```
+
+**Demonstration.** `044-str-readonly-pool-in-data.cpp` (`ideas.py demo-check 44`) reproduces it: `-str reuse,pool` puts
+the strings in `.data` behind `@stringBase0`; adding `readonly` moves the same 0x18 B to `.rodata`.

@@ -106,7 +106,8 @@ SOURCE_ENTRIES = {
 }
 SOURCE_CHECKS = {
     "docs/matching.md": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
-    "docs/matching/": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",)), ("tools/agents/ideas.py", ("check",))),
+    "docs/matching/": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",)), ("tools/agents/ideas.py", ("check",)),
+                       ("tools/agents/ideas.py", ("demo-check", "--changed", "{ref}"))),
     SKILL_MATCHING: ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",)), ("tools/agents/ideas.py", ("check",))),
     ".claude/skills/mwcc-unit-matching/SKILL.md": ((SR_REL, ("--check",)),),
 }
@@ -374,15 +375,17 @@ def mapped_entries(changed: list[str]) -> list[str]:
     return out
 
 
-def mapped_checks(changed: list[str]) -> list[tuple[str, list[str]]]:
+def mapped_checks(changed: list[str], ref: str = "HEAD") -> list[tuple[str, list[str]]]:
     """`(entry name, argv tail)` for every non-`tools/` source that owns a `--check` (F37).
 
     The name is what the table prints and the park list matches (`<tool> --check`); the argv tail is
-    relative to the root the run uses as cwd.
+    relative to the root the run uses as cwd. A `{ref}` in the argv is the diff base the run compares against
+    (`ideas.py demo-check --changed {ref}` re-compiles exactly the demos that diff touches).
     """
     out, seen = [], set()
     for src in changed:
         for rel, extra in _source_lookup(SOURCE_CHECKS, src):
+            extra = tuple(x.replace("{ref}", ref) for x in extra)
             name = "%s %s" % (rel, " ".join(extra))
             if name in seen:
                 continue
@@ -439,7 +442,7 @@ def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[l
         if entry is not None and entry.name not in names:
             picked.append(entry)
             names.add(entry.name)
-    for name, tail in mapped_checks(changed):
+    for name, tail in mapped_checks(changed, rng):
         if name in names:
             continue
         picked.append(Entry(name, None, None).as_check([sys.executable, *tail]))
@@ -543,8 +546,12 @@ def selftest() -> int:
     check("an edit under docs/matching/ selects the index selftest, the index check and the skill copy check",
           ([n for n, _t in mapped_checks(["docs/matching/043-pool-off-string-addressing.md"])],
            mapped_entries(["docs/matching/index.md"])),
-          ([SR_REL + " --check", "tools/agents/sync_playbook_index.py --check", "tools/agents/ideas.py check"],
+          ([SR_REL + " --check", "tools/agents/sync_playbook_index.py --check", "tools/agents/ideas.py check",
+            "tools/agents/ideas.py demo-check --changed HEAD"],
            ["tools/agents/sync_playbook_index", "tools/agents/ideas"]))
+    check("the demo check is handed the diff base it runs against",
+          [t for n, t in mapped_checks(["docs/matching/034-switch-tail-negated-arms.cpp"], "main")
+           if "demo-check" in n], [["tools/agents/ideas.py", "demo-check", "--changed", "main"]])
     check("an edit under the skill's references/matching/ selects all three checks",
           [n for n, _t in mapped_checks([SKILL_MATCHING + "index.md"])],
           [SR_REL + " --check", "tools/agents/sync_playbook_index.py --check", "tools/agents/ideas.py check"])
@@ -571,6 +578,7 @@ def selftest() -> int:
                              ("docs/matching/README.md", [(SR_REL + " --check", "check", "--check"),
                                                ("tools/agents/ideas", "tool", "--selftest"),
                                                ("tools/agents/ideas.py check", "check", "check"),
+                                               ("tools/agents/ideas.py demo-check --changed HEAD", "check", "HEAD"),
                                                ("tools/agents/sync_playbook_index", "tool", "--selftest"),
                                                ("tools/agents/sync_playbook_index.py --check", "check", "--check")]),
                              ("docs/matching.md", [(SR_REL + " --check", "check", "--check"),

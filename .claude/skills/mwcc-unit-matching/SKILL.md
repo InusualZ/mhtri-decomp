@@ -72,7 +72,8 @@ python scripts/mt.py slots  -u <unit> <symbol> [--map] [--slot 0x64]
 python scripts/mt.py sections -u <unit>
 python scripts/mt.py dwarf  <obj> <function>
 python scripts/mt.py ideas find <words> [--tag T] [--status S] [--applies V]   # playbook search
-python scripts/mt.py ideas show|where N | new --title T --tags a,b [--kind codegen] | check
+python scripts/mt.py ideas show|where N | new --title T --tags a,b [--kind codegen] | check [--demos]
+python scripts/mt.py ideas demo-check [N ...|--all|--changed REF] [--dump]      # compile demos, test EXPECT lines
 ```
 
 ## External oracles: the shared memory dump (names, signatures, structs, data)
@@ -158,6 +159,7 @@ python scripts/sync_reference.py                     # refresh references/matchi
 python tools/agents/sync_playbook_index.py --check   # exit 1 when stale (safe for hooks/CI)
 python scripts/sync_reference.py --check
 python tools/agents/ideas.py check                   # the whole gate: schema, ids, H1, demos, index and copy fresh
+python tools/agents/ideas.py demo-check --all        # compile every demo with the real MWCC and test its EXPECTs
 ```
 
 A merge conflict in a generated file (`docs/matching/index.md`, `references/matching/**`) is never resolved by

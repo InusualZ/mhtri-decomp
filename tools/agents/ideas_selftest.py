@@ -190,7 +190,7 @@ check("check: a demo without EXPECT is refused",
       any("no `EXPECT:`" in x for x in defects_of({"001-a.md": idea_text(1, demo="001-a.cpp"),
                                                     "001-a.cpp": "/* FLAGS: -O4 */\n"})), True)
 check("check: a bad EXPECT is refused",
-      any("not `contains" in x for x in defects_of({"001-a.md": idea_text(1, demo="001-a.cpp"),
+      any("not one of" in x for x in defects_of({"001-a.md": idea_text(1, demo="001-a.cpp"),
                                                      "001-a.cpp": "/*\n * FLAGS: -O4\n * EXPECT: fast\n */\n"})), True)
 check("check: schema errors surface", any("unknown tag" in x for x in defects_of({"001-a.md": idea_text(1, tags="[nope]")})), True)
 check("check: duplicate ids surface", any("appears 2 times" in x for x in
@@ -208,6 +208,143 @@ check("scaffold: the shipped skeleton's own header parses",
 check("find: score is word-substring (reloc finds relocations)",
       ideas.score({"title": "x", "tags": ["relocations"], "slug": "x", "applies": [], "problem": "y"}, ["reloc"]) > 0, True)
 check("tags: derive_tags suggests from a title", "pragma" in spi.derive_tags("A pragma leaks", ""), True)
+
+# ---- demo-check: the EXPECT grammar, the object model, the runner ---------------------------------------------------
+import ideas_demo  # noqa: E402
+
+DUMP = "\n".join([
+    "", "x.o:     file format elf32-powerpc", "", "Sections:", "Idx Name          Size      VMA       LMA       File off  Algn",
+    "  0 .text         00000028  00000000  00000000  00000040  2**4", "                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE",
+    "  1 .data         00000020  00000000  00000000  00000068  2**3", "SYMBOL TABLE:",
+    "00000000 l    df *ABS*\t00000000 x.cpp",
+    "00000000 l     O .data\t00000010 g_first", "00000010 l     O .data\t00000010 @9",
+    "00000018 g     O .data\t00000004 g_late", "00000000         *UND*\t00000000 callee",
+    "00000000 g     F .text\t0000001c f__Fi", "00000020 g     F .text\t00000008 h",
+    "Contents of section .data:", " 0000 41420a00 00000000 00000000 00000000  AB..............",
+    " 0010 0d0a0000 00000000 00000000 00000000  ................", "",
+    "Disassembly of section .text:", "", "00000000 <f__Fi>:",
+    "   0:\t94 21 ff f0 \tstwu    r1,-16(r1)", "   4:\t48 00 00 01 \tbl      4 <f__Fi+0x4>",
+    "\t\t\t4: R_PPC_REL24\tcallee", "   8:\t54 60 06 30 \trlwinm  r0,r3,0,24,24", "   c:\t54 60 06 30 \trlwinm  r0,r3,0,24,24",
+    "  10:\t4e 80 00 20 \tblr", "", "00000020 <h>:", "  20:\t4e 80 00 20 \tblr", ""])
+O = ideas_demo.Obj(DUMP)
+
+
+def ev(line):
+    return ideas_demo.evaluate(O, line)[0]
+
+
+check("obj: sections, symbols and functions are read", (O.sections, sorted(O.funcs), len(O.symbols)),
+      ({".text": 0x28, ".data": 0x20}, ["f__Fi", "h"], 6))
+check("obj: section contents are read as hex", O.contents[".data"][:8], "41420a00")
+check("expect: contains a mnemonic, a symbol and a relocation target", (ev("contains rlwinm"), ev("contains g_first"), ev("contains callee")),
+      (True, True, True))
+check("expect: a mangled symbol is found by its C++ prefix", (ev("size f 0x1c"), ev("size f__Fi 28")), (True, True))
+check("expect: absent is the negation", (ev("absent fmadds"), ev("absent rlwinm")), (True, False))
+check("expect: size, and a wrong size fails", (ev("size f 0x1c"), ev("size f 0x20"), ev("size nosuch 4")), (True, False, False))
+check("expect: section size, missing section is 0", (ev("section .text 0x28"), ev("section .rodata 0"), ev("section .rodata 4")),
+      (True, True, False))
+check("expect: order is by address inside the section", (ev("order .data g_first < g_late"), ev("order .data g_late < g_first"),
+                                                          ev("order .data @9 < g_late"), ev("order .text g_first < g_late")),
+      (True, False, True, False))
+check("expect: reloc", (ev("reloc callee"), ev("reloc other")), (True, False))
+check("expect: seq is an ordered subsequence, optionally inside a function",
+      (ev("seq stwu bl blr"), ev("seq blr stwu"), ev("seq stwu blr in f"), ev("seq stwu blr in h"), ev("seq blr in nosuch")),
+      (True, False, True, False, False))
+check("expect: count, optionally inside a function", (ev("count rlwinm 2"), ev("count blr 1 in h"), ev("count blr 2"), ev("count rlwinm 1")),
+      (True, True, True, False))
+check("expect: insn matches mnemonic and operands", (ev("insn rlwinm r0,r3,0,24,24"), ev("insn rlwinm r0,r3,0,24,24 in f"),
+                                                     ev("insn rlwinm r3,r0,0,24,24"), ev("insn rlwinm r0,r3,0,24,24 in h")),
+      (True, True, False, False))
+check("expect: bytes and nobytes read the section contents", (ev("bytes .data 41 42 0a"), ev("bytes .data 0d0a"), ev("nobytes .data 0d0a"),
+                                                              ev("nobytes .data ffff"), ev("bytes .rodata 00")),
+      (True, True, False, True, False))
+check("expect: every vocabulary form is accepted by the grammar",
+      all(ideas_demo.expect_ok(x) for x in ("contains a", "absent b", "size f 0x10", "section .data 8", "order .data a < b", "reloc s",
+                                            "seq a b c", "seq a b in f", "count x 2", "count x 2 in f", "insn li r3,0", "insn li r3,0 in f",
+                                            "bytes .data 0a0d", "nobytes .data 0d0a")), True)
+check("expect: malformed lines are refused", [x for x in ("fast", "size f", "order .data a b", "count x", "bytes .data zz")
+                                              if ideas_demo.expect_ok(x)], [])
+check("expect: an unknown verb is a failed EXPECT, not a crash", ideas_demo.evaluate(O, "wobble x")[0], False)
+rep_failing = ideas_demo.excerpt(O, "size f 0x20")
+check("report: a failed size shows the symbol row", "f__Fi" in rep_failing, True)
+
+good = "/*\n * FLAGS: -O4,p\n * EXPECT: contains rlwinm\n * EXPECT: size f 0x1c\n */\nint x;\n"
+bad = "/*\n * FLAGS: -O4,p\n * EXPECT: contains rlwinm\n * EXPECT: size f 0x99\n */\nint x;\n"
+droot = fixture({"001-a.md": idea_text(1, demo="001-a.cpp"), "001-a.cpp": good, "002-b.md": idea_text(2, demo="002-b.cpp"), "002-b.cpp": bad})
+sync(droot)
+stub = lambda root_, info_, path_: (O, "")  # noqa: E731
+stub_skip = lambda root_, info_, path_: (None, "SKIP compiler missing: build/compilers/x")  # noqa: E731
+stub_fail = lambda root_, info_, path_: (None, "compile failed (rc 1):\nerror")  # noqa: E731
+
+
+def dc(compile_fn, **kw):
+    out, err = io.StringIO(), io.StringIO()
+    args = dict(ids=[], all=False, changed=None, dump=False)
+    args.update(kw)
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        rc = ideas.cmd_demo_check(droot, argparse.Namespace(**args), out, compile_fn)
+    return rc, out.getvalue(), err.getvalue()
+
+
+rc, out, _ = dc(stub, all=True)
+check("demo-check: a failing EXPECT fails the run and names it", (rc, "FAIL  002" in out, "PASS  001" in out, "size f 0x99" in out,
+                                                                   "`f` is 28 (0x1C) bytes, want 153" in out), (1, True, True, True, True))
+rc, out, _ = dc(stub, ids=[1])
+check("demo-check: naming an idea checks only it", (rc, "PASS  001" in out, "002" in out), (0, True, False))
+rc, out, err = dc(stub, ids=[7])
+check("demo-check: an idea with no demo is refused", (rc, "no demo for idea" in err), (1, True))
+rc, out, err = dc(stub)
+check("demo-check: no selection is a usage error", rc, 2)
+rc, out, _ = dc(stub_skip, ids=[1])
+check("demo-check: a missing compiler is a SKIP with a distinct exit code, never a silent pass", (rc, "SKIP  001" in out), (3, True))
+rc, out, _ = dc(stub_fail, ids=[1])
+check("demo-check: a compile error is a FAIL that shows the log", (rc, "FAIL  001" in out, "compile failed" in out), (1, True, True))
+orig_changed = ideas.changed_paths
+ideas.changed_paths = lambda root_, ref: {"docs/matching/001-a.cpp"}
+rc, out, _ = dc(stub, changed="main")
+check("demo-check: --changed selects the demo whose file changed", (rc, "PASS  001" in out, "002" in out), (0, True, False))
+ideas.changed_paths = lambda root_, ref: {"docs/matching/002-b.md"}
+rc, out, _ = dc(stub, changed="main")
+check("demo-check: --changed also selects a demo by its idea file", (rc, "FAIL  002" in out), (1, True))
+ideas.changed_paths = lambda root_, ref: {"tools/whatever.py"}
+rc, out, _ = dc(stub, changed="main")
+check("demo-check: --changed with no demo touched passes without compiling", (rc, "no demo changed" in out), (0, True))
+ideas.changed_paths = orig_changed
+rc, out, _ = dc(stub, ids=[1], dump=True)
+check("demo-check: --dump prints the object instead of checking", (rc, "==== 001" in out, "PASS" in out), (0, True, False))
+noexp = fixture({"001-a.md": idea_text(1, demo="001-a.cpp"), "001-a.cpp": "/*\n * FLAGS: -O4\n */\nint x;\n"})
+out, err = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+    rc = ideas.run_demos(noexp, [({"id": 1, "demo": "001-a.cpp"}, os.path.join(noexp, "docs", "matching", "001-a.cpp"))], out, stub)
+check("demo-check: a malformed header is a FAIL naming the defect", (rc[1], "no `EXPECT:`" in out.getvalue()), (1, True))
+
+# ---- the base flags come from configure.py, and FLAGS replace a family -----------------------------------------------------
+real_root = spi.find_root()
+base = ideas_demo.base_flags(real_root)
+check("flags: cflags_base is read from configure.py (no hand copy)", ("-O4,p" in base, "-inline" in base, "cats off" in base, "-DNDEBUG=1" in base),
+      (True, True, True, True))
+check("flags: -pragma \"cats off\" stays two tokens", base[base.index("-pragma") + 1], "cats off")
+argv, comp = ideas_demo.demo_command(real_root, {"FLAGS": "-O3 -str reuse,pool", "MWCC": "Wii/1.0"}, "x.cpp", "out")
+check("flags: a demo's -O3 replaces the base -O4,p and -str replaces -str", ("-O3" in argv, "-O4,p" in argv, "reuse,pool" in argv, argv.count("-str")),
+      (True, False, True, 1))
+check("flags: MWCC selects the compiler", comp.replace("\\", "/").endswith("build/compilers/Wii/1.0/mwcceppc.exe"), True)
+
+# ---- ONE real compile of a tiny demo (skipped without build/compilers) ---------------------------------------------------
+if os.path.isfile(ideas_demo.demo_command(real_root, {"FLAGS": ""}, "x", "o")[1]) and os.path.isfile(ideas_demo.objdump_exe(real_root)):
+    tiny = tempfile.mkdtemp(prefix="ideas-demo-real-")
+    path = os.path.join(tiny, "tiny.cpp")
+    with open(path, "w", newline="") as f:
+        f.write('/*\n * FLAGS: -O4,p\n * EXPECT: contains rlwinm\n * EXPECT: size masked 12\n * EXPECT: absent fmadds\n'
+                ' * EXPECT: insn rlwinm r3,r0,0,24,24 in masked\n */\nstruct S { char pad[8]; unsigned char f; };\n'
+                'extern "C" int masked(S *s) { return s->f & 0x80; }\n')
+    info_, dd_ = ideas.demo_header(spi.read(path))
+    status, rep = ideas_demo.check_demo(real_root, info_, path)
+    check("real compile: a tiny demo compiles with the real MWCC and every EXPECT holds", (dd_, status, rep), ([], "PASS", []))
+    info_["EXPECT"].append("size masked 99")
+    status, rep = ideas_demo.check_demo(real_root, info_, path)
+    check("real compile: the same object fails a wrong EXPECT", (status, "size masked 99" in "".join(rep)), ("FAIL", True))
+else:
+    print("note: build/compilers or build/binutils is absent - the real-compile checks are SKIPPED")
 
 # ---- the real tree ------------------------------------------------------------------------------------------------
 real = spi.find_root()

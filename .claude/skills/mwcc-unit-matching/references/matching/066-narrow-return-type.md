@@ -5,7 +5,7 @@ status: works
 problem: The caller is one instruction off at the `bl`: the target stores the result with a raw `sth`, ours masks it first - a `clrlwi`/`extsh` retail does not have - and every later instruction shifts with it. It reads as caller-side scheduling, where a mask cannot come from.
 tags: [source-shape]
 applies: []
-demo:
+demo: 066-narrow-return-type.cpp
 ---
 
 # 66. A narrow RETURN TYPE is visible at the caller
@@ -30,3 +30,7 @@ declared `s32` while its call sites cast to `u8` - retail's early returns are `l
 u16 flag_48(void);                  /* the caller stores it raw:  sth r3, ... */
 s32 flag_48(void);                  /* ... and this spelling masks at the store */
 ```
+
+**Demonstration.** `066-narrow-return-type.cpp` (`ideas.py demo-check 66`) reproduces the return position: forwarding an
+`s32`-returning callee as `u16` costs a `clrlwi`, a `u16`-returning callee is a plain tail call. The *store* form (`sth`
+of a wide result) was not reproduced: storing `s32` or `u16` results into a `u16` field is a raw `sth` either way.
