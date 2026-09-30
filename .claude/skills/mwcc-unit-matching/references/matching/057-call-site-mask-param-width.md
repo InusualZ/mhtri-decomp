@@ -1,74 +1,83 @@
 ---
 id: 57
-title: A call-site mask means the callee's parameter is declared wider than the value
+title: A call-site mask comes from the callee's declared parameter type and the value's own type
 status: works
-problem: A wrapper (or any caller) sits at 50-90 % and the first divergence is one instruction at the `bl`: retail masks or sign-extends the argument (`clrlwi r4,r4,16`, `extsh r5,r5`, a `slwi`/`srawi` pair) and ours passes it straight through. It reads as a scheduling or inlining residual, nothing in the caller's own source hints at a mask, and the search goes to flags and to the caller's statement order - where the mask cannot exist.
+problem: A caller sits at 50-90 % and the first divergence is one instruction at the `bl`: retail masks or sign-extends the argument (`clrlwi r4,r4,16`, `extsh r5,r5`, `slwi`/`srawi`) and ours passes it through, or the reverse - nothing in the caller's source hints at it.
 tags: [source-shape]
 applies: []
 demo: 057-call-site-mask-param-width.cpp
+reviewed: 2026-09-29
+related: [56, 66, 72, 38]
 ---
 
-# 57. A call-site mask means the callee's parameter is declared wider than the value
+# 57. A call-site mask comes from the callee's declared parameter type and the value's own type
 
 **Problem.** A wrapper (or any caller) sits at 50-90 % and the first divergence is one instruction at the `bl`:
 retail masks or sign-extends the argument (`clrlwi r4,r4,16`, `extsh r5,r5`, a `slwi`/`srawi` pair) and ours
-passes it straight through. It reads as a scheduling or inlining residual, nothing in the caller's own source
-hints at a mask, and the search goes to flags and to the caller's statement order - where the mask cannot exist.
+passes it straight through (or the mirror: ours masks and retail does not). It reads as a scheduling or inlining
+residual, nothing in the caller's own source hints at a mask, and the search goes to flags and to the caller's
+statement order - where the mask cannot exist.
 
-**Why try it.** The mask is the *caller's* cost of the *callee's* prototype: MWCC converts an argument to the
-callee's declared parameter width, so a parameter declared `s32`/`u32` forces a mask on a value whose own type
-is narrower (`s16`, `u8`, a bitfield), while a parameter declared with the narrow type does not. The mask is
-therefore evidence about a declaration that is not in the function you are looking at.
+**How it looks.**
 
-**Result.** When retail's call site carries a mask ours does not, widen the **callee's parameter** to
-`s32`/`u32` and narrow explicitly at the use inside the callee (which keeps the callee's own codegen) - or, for
-a local, widen the local's declared type and mask at the use. Measured across one `ai` band without any flag
-change: `fn_802D2ABC` 56.7 -> 90, `fn_802D287C` 85.9 -> 93.8, `fn_802D2264` 77.9 -> 81.7, and ten thin wrappers
-went to **100 %**. The mirror case is the same lever: `fn_802D3984` (76.14 %) has our mask *too* wide, i.e. a
-parameter declared wider than retail's, so the presence *or absence* of the mask is a statement about the
-callee's declared width rather than about the caller.
+```
+target:   clrlwi r4,r4,16        ; mask a 32-bit value down to 16 bits
+          bl     take_narrow
+ours:     bl     take_narrow      ; the mask is missing (or, in the mirror case, ours has one retail lacks)
+```
 
-**Example (the layout calculator that found the band's other class).** These records are written as explicit pad
-arrays (`u8 pad_0xNNN[0xMMM - 0xNNN];`), which makes the layout mechanically checkable: a 30-line checker
-asserts that the offsets tile (every filler's declared end equals the next member's offset, no duplicate
-offsets). It caught `field_0x216` declared `s32` where the code does a `lbz` - the field is **1** byte, so every
-later field sat 2 or 8 bytes out and ~20 functions each lost ~20 points. Take a field's size from the **access
-width in the code** (`lbz` = 1, `lhz` = 2, `lwz` = 4, `stb`/`sth` likewise), never from the type you guessed,
-and assert the tiling before you measure.
+(`clrlwi rA,rS,16` clears the high 16 bits - a `u16` conversion; `extsh` sign-extends a halfword - an `s16`.)
 
-**Refinement, same session (a second and third view of the same record).** Two traps the first merge walked into,
-both of them invisible to the tiling assert:
+**Why it happens.** The mask is the *caller's* cost of a type conversion at the call, and MWCC decides it from two
+declarations, neither of which is in the caller's body: the **callee's declared parameter type** (the prototype)
+and the **value's own declared type**. Measured 2026-09-29 (`ideas.py demo-check 57`, `-O4,p -inline auto`):
 
-* **A header file can define more than one struct.** Keying members by offset alone matched `_AINPC_W`'s offsets
-  against a smaller struct that sits above it in the same file (`0x0`, `0xC`), so the "next member offset" that
-  sizes a field came from the wrong struct - `active` was sized 12 B instead of 1 B, and every splice was then
-  refused for lack of room. Parse **per struct**: name each group, keep its own member list, and compute every
-  size and every covering filler *within* the group. (A byte-wide filler is also written `u8 unused_0xNNN;` with
-  no `[0xE - 0xN]` bracket, so a tiling check that reads only the bracket form should not flag it - the field
-  ends at the next member either way.)
-* **Compare the declaration, not just `(offset, name)`.** Fourteen differences: six were fillers the splices
-  themselves superseded (a filler shrinks as its sub-fields arrive - the expected shape), and one was a genuine
-  conflict the `(offset, name)` rule skipped silently - main had `u8 field_0x3F8;`, the newcomer
-  `u8 field_0x3F8[4];`, and the newcomer's code indexes it. The merged header therefore compiled every *landed*
-  consumer and not the newcomer's own source (`illegal operands 'unsigned char' [ 'unsigned char'`). **The test
-  of a record merge is that both sides' sources compile** - whole-tree `ninja -k 0` at 0 FAILED, not just the
-  consumer's object - **plus the rows** (`ninja changes` must print no line for a unit that already owned the
-  record). Only the same-name-different-size class needs a decision, and the side whose *code* depends on the
-  declaration has the better claim: here the array won, the scalar's neighbouring `unused_0x3F9` filler (which
-  the array now covers) was dropped, and the whole-tree build plus an empty `ninja changes` proved both
-  consumers and the newcomer.
+| value passed | parameter | mask at the call |
+| --- | --- | --- |
+| `u32` | `u16` | `clrlwi r3,r3,16` |
+| `u32` | `u32` | none |
+| `int` sum | `s16` | `extsh` |
+| `int` sum | `int` | none |
+| `s16`-typed value | `int` | **`extsh` (re-extended anyway)** |
+| `s16`-typed value | `s16` | `extsh` |
 
-**The tool.** `tools/units/recordmerge.py` implements the three rules above:
+So a parameter declared **narrower** than the value adds a mask (widen the prototype to remove it), while a
+**narrow-typed value** is re-extended whatever the parameter is (only the value's declared type can remove it).
 
-    python tools/units/recordmerge.py --base include/ai/ainpc.h         --other worker/<slug>:include/ai/ainpc.h --out include/ai/ainpc.h
+**How to work it.** Find out which side owns the mask before editing.
 
-It refuses to write while anything is unresolved - a named member in the way, no room in the covering
-filler, a same-offset rename, a member whose size is the struct total - and prints the per-group delta so
-the decision is visible. Top-level lines only the other view has are carried verbatim after the last group
-when they are declarations (reported), and reported but not carried when they are not. Run against the
-merge that produced this section (`089491a7b`'s header and the `802d44f4` view) it reproduces the 36
-splices, the 33 filler splits and the `0x3F8` decision exactly, and keeps one trailing comment the hand
-pass typed away. It is still only the edit: **the proof remains the whole-tree build plus `ninja changes`.**
+* Retail masks and ours does not: the retail callee's parameter is *narrower* than the value you pass (or retail's
+  value is narrow-typed): **narrow our prototype** (`u16`/`s16`/`u8`) or give the local/field the narrow type.
+* Ours masks and retail does not: our prototype is narrower than retail's, or our local is narrower-typed than
+  retail's: **widen the parameter** (`s32`/`u32`; narrow explicitly at the use inside the callee if its own code needs
+  it) or widen the local's declared type and mask at the use.
+* Check the callee's *own* row after touching its prototype: the type is shared by every caller (ideas 60/72: the
+  declared shape is a codegen input), so measure the whole tree, not one wrapper.
 
-**Demonstration.** `057-call-site-mask-param-width.cpp` (`ideas.py demo-check 57`): passing a `u32` to a callee declared
-`u16` costs a `clrlwi` at the call site; the same call to a `u32` parameter costs none.
+**Result.** Measured across one `ai` band without any flag change: `fn_802D2ABC` 56.7 -> 90, `fn_802D287C`
+85.9 -> 93.8, `fn_802D2264` 77.9 -> 81.7, and ten thin wrappers went to **100 %**. The mirror case is the same
+lever: `fn_802D3984` (76.14 %) had our mask *too* wide, i.e. a parameter declared wider than retail's. The presence
+*or absence* of the mask is a statement about declared types rather than about the caller's own statements.
+
+**When NOT to apply.** A mask on a *return value* is idea 66 (the callee's return type). A store through a narrow
+field is idea 38. Do not assume the direction: read which side has the `clrlwi`/`extsh`, and if it is an `s16`-typed
+value, widening the callee's parameter will not remove it (last table row) - the value's type has to change.
+
+**Demonstration.** `057-call-site-mask-param-width.cpp` (`ideas.py demo-check 57`, re-verified 2026-09-29):
+
+```
+pass_to_narrow(u32 v)   { take_narrow(v); }   // callee takes u16: clrlwi r3,r3,16 ; b take_narrow  (8 bytes)
+pass_to_wide(u32 v)     { take_wide(v);   }   // callee takes u32: b take_wide                       (4 bytes)
+s16_value_to_s32(s16 v) { take_s32(v);    }   // extsh r3,r3 although the parameter is int
+```
+
+**Finding (recorded by the 2026-09-29 review).** The idea's first wording said a callee parameter declared
+`s32`/`u32` "forces a mask on a narrower value" and prescribed widening the parameter. The compiler shows the two
+cases separately (table): widening the prototype removes a mask only when the value is at least as wide as the
+parameter was declared; an `s16`-typed value keeps its `extsh` for an `int` parameter. The title and the direction
+rules above were corrected accordingly.
+
+**Evidence.** The `ai`-band numbers are dated evidence from the session that found the rule. The layout calculator
+and the record-merge traps that came out of the same band (a `field_0x216` declared `s32` that was a `lbz`; a
+header defining more than one struct) are idea 56's evidence: they concern merging shared work records, not
+call-site masks.
