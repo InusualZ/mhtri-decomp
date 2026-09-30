@@ -22,9 +22,11 @@ cause is a flag or the source, isolate one change at a time, and only claim a wi
    tag vocabulary and how ideas are recorded.
 2. **`references/matching/index.md`** - the generated table of every idea (id, title, status, tags, the problem
    it solves). Find the idea for a symptom here, then open `references/matching/NNN-slug.md` (the id is
-   permanent; `python tools/agents/sync_playbook_index.py --where N` prints the path in the repository).
-3. `references/matching/toolbox.md` (the tools), `ruled-out.md` and `todo.md` (do not re-run / not tried yet),
-   `examples/` (the whole loop run twice).
+   permanent). From the repository: `python scripts/mt.py ideas find <symptom words>` ranks ideas by what you see,
+   `ideas show N` prints one (with its demo), `ideas where N` prints the path.
+3. `references/matching/toolbox.md` (the tools) and `examples/` (the whole loop run twice). Ideas that were
+   tried and dropped (`status: ruled-out`) or not tried yet (`todo`) are ordinary idea files listed in their own
+   sections of `index.md` - `mt.py ideas find --status ruled-out` lists them.
 4. **The unit's own file header comment** - the residual diff of a unit (what still differs and why) is
    documented there, in one place. Per-function comments are short descriptions of what the function does and
    carry **no** symbol name and **no** match percentage; the naming and commenting rules are in `CLAUDE.md` ->
@@ -69,6 +71,8 @@ python scripts/mt.py diff   -u <unit> <symbol> [n] [--all]
 python scripts/mt.py slots  -u <unit> <symbol> [--map] [--slot 0x64]
 python scripts/mt.py sections -u <unit>
 python scripts/mt.py dwarf  <obj> <function>
+python scripts/mt.py ideas find <words> [--tag T] [--status S] [--applies V]   # playbook search
+python scripts/mt.py ideas show|where N | new --title T --tags a,b [--kind codegen] | check
 ```
 
 ## External oracles: the shared memory dump (names, signatures, structs, data)
@@ -128,20 +132,20 @@ Details, recipes and worked examples: `docs/memory-dump.md`.
 * One idea at a time, and record the *first-divergence index* - it is the thing that tells the next person
   where the change landed.
 * Never edit `configure.py` for everyone: proven flags go into a per-library `cflags_*` override.
-* If the idea fails, record it (`ruled-out.md`, or an idea file with `status: ruled-out`) so it is not re-run.
+* If the idea fails, record it as an idea file with `status: ruled-out` so it is not re-run.
 
 ## Adding a new idea
 
-1. Add a `todo` row to `docs/matching/todo.md`: the idea and the problem it solves.
+1. Search first: `python scripts/mt.py ideas find <words>` - a repeat is a vote for the existing idea, not a new file.
 2. Try it with the tools above, on one unit (`mt.py variants <name>` runs the probe).
 3. **Land it if it wins.** `python scripts/mt.py variants --apply <name>` writes the rewrite into the
    unit's real source (line endings preserved; it refuses when the rewrite does not apply or changes
    nothing). Force a rebuild, re-measure on the real object, and only quote those numbers.
-4. Record it: `docs/matching/NNN-slug.md` with the next free id and the front matter from the README (tags from
-   the fixed vocabulary; an empty or short tag list is fine). Then run
-   `python tools/agents/sync_playbook_index.py` and `python scripts/sync_reference.py`.
-5. If it failed, leave it as `no` in `todo.md` / `ruled-out.md` with a one-line note. A failed idea never
-   touches the source.
+4. Record it: `python scripts/mt.py ideas new --title "<title>" --tags a,b [--kind codegen]` allocates the next
+   free id atomically, scaffolds `docs/matching/NNN-slug.md` (and, for `--kind codegen`, a demo `NNN-slug.cpp`
+   with `FLAGS:`/`EXPECT:` header lines), and regenerates the index and this skill's copy. Fill in the body,
+   set `status: works` (or `ruled-out` with the evidence that killed it), then run `mt.py ideas check`.
+5. A failed idea keeps its file with `status: ruled-out` and never touches the source.
 
 ## Keeping in sync
 
@@ -153,4 +157,8 @@ python tools/agents/sync_playbook_index.py           # regenerate docs/matching/
 python scripts/sync_reference.py                     # refresh references/matching/
 python tools/agents/sync_playbook_index.py --check   # exit 1 when stale (safe for hooks/CI)
 python scripts/sync_reference.py --check
+python tools/agents/ideas.py check                   # the whole gate: schema, ids, H1, demos, index and copy fresh
 ```
+
+A merge conflict in a generated file (`docs/matching/index.md`, `references/matching/**`) is never resolved by
+hand or by union: take either side, then regenerate with the two sync commands above.

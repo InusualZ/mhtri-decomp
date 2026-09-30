@@ -107,6 +107,22 @@ check("index: starts with the generated banner", block.split("\n")[0], spi.BEGIN
 check("index: 220-char cap with ellipsis",
       spi.cell("word " * 80).endswith("...") and len(spi.cell("word " * 80)) <= spi.CELL_CAP + 3, True)
 
+# ---- grouping by status and the tag suggestion ------------------------------------------------------------
+gfiles = dict(GOOD)
+gfiles["004-tried.md"] = idea_text(4, "Tried and dropped", status="ruled-out")
+gfiles["005-later.md"] = idea_text(5, "Not yet tried", status="todo")
+gblock = spi.build_index(spi.load_ideas(fixture(gfiles))[0])
+heads = [ln for ln in gblock.split(spi.NL) if ln.startswith("## ")]
+check("index: one section per non-empty status, in fixed order",
+      [h.split(" (")[0] for h in heads], ["## Ideas that work", "## Ruled out - tried and it did not work, do not re-run",
+                                           "## Not tried yet"])
+check("index: the section counts", [h.rsplit("(", 1)[1] for h in heads], ["3)", "1)", "1)"])
+check("index: an idea sits under its own status heading",
+      gblock.index("004-tried.md") > gblock.index("## Ruled out") and gblock.index("004-tried.md") < gblock.index("## Not tried"), True)
+check("index: no empty section for an unused status", "## Superseded" in gblock, False)
+check("tags: derive_tags is ranked and capped", len(spi.derive_tags("pragma flag linker section symbol reloc measure", "")) <= spi.MAX_TAGS, True)
+check("tags: derive_tags stays inside the vocabulary", set(spi.derive_tags("a pragma and a vtable", "")) <= set(spi.TAGS), True)
+
 # ---- refusals ----------------------------------------------------------------------------------------------
 dup = dict(GOOD)
 dup["003-again.md"] = idea_text(3, "Clash")

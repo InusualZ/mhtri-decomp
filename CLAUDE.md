@@ -192,15 +192,16 @@ It is **not** loaded into every lane: load the project skill **`mwcc-unit-matchi
 (`.claude/skills/mwcc-unit-matching/`, tracked) when a unit's functions mismatch.
 
 * **The index** of every idea (id, title, status, tags, the problem it solves) is the generated
-  `docs/matching/index.md`; `python tools/agents/sync_playbook_index.py --where N` prints idea N's path. The loop,
-  the tag vocabulary and how ideas are recorded are in `docs/matching/README.md`; the ideas tried and ruled out
-  are `ruled-out.md` and `todo.md` beside it.
+  `docs/matching/index.md`; `python tools/agents/ideas.py find <symptom words>` searches it, `ideas.py show N` / `where N` open idea N,
+  `ideas.py new` adds one (atomic id) and `ideas.py check` is the gate. The loop, the tag vocabulary, the demo
+  format and how ideas are recorded are in `docs/matching/README.md`; ideas tried and ruled out (or not yet
+  tried) are ordinary idea files with `status: ruled-out` / `todo`.
 * **Never edit the generated files.** `python tools/agents/sync_playbook_index.py` writes `index.md` (from the
   front matter of the idea files) and `python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py` writes
   the skill's portable byte copy `references/matching/`; both take `--check` and both run from
   `tools/selftest.py` whenever anything under `docs/matching/` changes.
 * `python .claude/skills/mwcc-unit-matching/scripts/mt.py` forwards to the `tools/` helpers (`units`, `info`,
-  `frames`, `matrix`, `sweep`, `variants`, `shapes`, `diff`, `slots`, `sections`, `dwarf`).
+  `frames`, `matrix`, `sweep`, `variants`, `shapes`, `diff`, `slots`, `sections`, `dwarf`, `ideas`).
 * **How to work an idea:** one at a time, with evidence (numbers, sizes, first-divergence indices); an idea that
   works earns its own `docs/matching/NNN-slug.md` in the same session (front matter, then Problem / Why it
   happens / How to work it / Result / Example) with the next free id (ids are never renumbered); an idea that fails is recorded as ruled out so nobody re-runs it;

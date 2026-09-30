@@ -100,14 +100,14 @@ SKILL_MATCHING = ".claude/skills/mwcc-unit-matching/references/matching/"
 SOURCE_ENTRIES = {
     "docs/plan.md": ("tools/agents/sync_profiles",),
     "docs/matching.md": ("tools/agents/sync_playbook_index",),
-    "docs/matching/": ("tools/agents/sync_playbook_index",),
-    SKILL_MATCHING: ("tools/agents/sync_playbook_index",),
+    "docs/matching/": ("tools/agents/sync_playbook_index", "tools/agents/ideas"),
+    SKILL_MATCHING: ("tools/agents/sync_playbook_index", "tools/agents/ideas"),
     ".claude/skills/mwcc-unit-matching/SKILL.md": ("tools/agents/sync_playbook_index",),
 }
 SOURCE_CHECKS = {
     "docs/matching.md": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
-    "docs/matching/": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
-    SKILL_MATCHING: ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
+    "docs/matching/": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",)), ("tools/agents/ideas.py", ("check",))),
+    SKILL_MATCHING: ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",)), ("tools/agents/ideas.py", ("check",))),
     ".claude/skills/mwcc-unit-matching/SKILL.md": ((SR_REL, ("--check",)),),
 }
 
@@ -541,12 +541,13 @@ def selftest() -> int:
            mapped_entries([".claude/skills/mwcc-unit-matching/SKILL.md"])),
           ([SR_REL + " --check"], ["tools/agents/sync_playbook_index"]))
     check("an edit under docs/matching/ selects the index selftest, the index check and the skill copy check",
-          ([n for n, _t in mapped_checks(["docs/matching/043-retails-per-string-lis-addi-addressing.md"])],
+          ([n for n, _t in mapped_checks(["docs/matching/043-pool-off-string-addressing.md"])],
            mapped_entries(["docs/matching/index.md"])),
-          ([SR_REL + " --check", "tools/agents/sync_playbook_index.py --check"], ["tools/agents/sync_playbook_index"]))
-    check("an edit under the skill's references/matching/ selects both checks",
+          ([SR_REL + " --check", "tools/agents/sync_playbook_index.py --check", "tools/agents/ideas.py check"],
+           ["tools/agents/sync_playbook_index", "tools/agents/ideas"]))
+    check("an edit under the skill's references/matching/ selects all three checks",
           [n for n, _t in mapped_checks([SKILL_MATCHING + "index.md"])],
-          [SR_REL + " --check", "tools/agents/sync_playbook_index.py --check"])
+          [SR_REL + " --check", "tools/agents/sync_playbook_index.py --check", "tools/agents/ideas.py check"])
     check("a file next to docs/matching/ (not under it) selects nothing", mapped_checks(["docs/matching-other.md"]), [])
     check("... and the argv runs that tool with --check",
           md_checks[0][1] if md_checks else None, [SR_REL, "--check"])
@@ -568,6 +569,8 @@ def selftest() -> int:
     try:
         for source, want in (("docs/plan.md", [("tools/agents/sync_profiles", "tool", "--selftest")]),
                              ("docs/matching/README.md", [(SR_REL + " --check", "check", "--check"),
+                                               ("tools/agents/ideas", "tool", "--selftest"),
+                                               ("tools/agents/ideas.py check", "check", "check"),
                                                ("tools/agents/sync_playbook_index", "tool", "--selftest"),
                                                ("tools/agents/sync_playbook_index.py --check", "check", "--check")]),
                              ("docs/matching.md", [(SR_REL + " --check", "check", "--check"),

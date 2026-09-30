@@ -46,7 +46,7 @@ import sys
 from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "agents"))
-import split_playbook  # noqa: E402  (derive_tags: the idea-tag keyword heuristic)
+import sync_playbook_index  # noqa: E402  (derive_tags: the idea-tag keyword heuristic)
 
 MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUTBOX = os.path.join(MAIN, ".pi", "outbox")
@@ -561,7 +561,7 @@ def idea_stub_name(g: Group, number: int) -> str:
 
 def render_section(g: Group, number: int) -> str:
     """An idea file stub: the front matter prefilled (tags left for the author unless the heuristic is sure)."""
-    tags = split_playbook.derive_tags(g.title, g.problem)
+    tags = sync_playbook_index.derive_tags(g.title, g.problem)
     parts = ["---", "id: %d" % number, "title: %s" % g.title, "status: works",
              "problem: %s" % " ".join(g.problem.split()), "tags: [%s]" % ", ".join(tags), "applies: []", "demo:",
              "---", "",
