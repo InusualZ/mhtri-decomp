@@ -78,11 +78,11 @@ void NetworkSessionManagerPat::move()
     PatCircleInfo circleInfo;     /* 892 B: the pending records + their count + the mode byte */
     char name[0x104];             /* 260 B: the session name `buildCircleInfoName` packs */
 
-    if (this->receiver_658 != NULL) {
-        receivePatInterfaces(this->receiver_658);
+    if (this->tcp_658 != NULL) {
+        this->tcp_658->move();
     }
-    if (this->requestQueue_65C != NULL) {
-        flushPatRequests(this->requestQueue_65C);
+    if (this->udp_65C != NULL) {
+        this->udp_65C->move();
     }
     if (GameSpyInterfaceThread_getInstance() != NULL) {
         if (this->field_6E75 != 0) {

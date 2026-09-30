@@ -119,10 +119,10 @@ s32 NetworkPeerMcs::send(const u8* data, s32 size, const u8* data2, s32 size2, s
     prefix = getNetworkLogger()->encode_4C((u16)size);
     memcpy(networkMcsPacketBuffer, &prefix, 2);
     memcpy(networkMcsPacketBuffer + 2, data, size);
-    if ((this->armed_10 == 0 || networkPeer_clearReceiveSocket(this->connection_2428) != 0)
+    if ((this->armed_10 == 0 || this->connection_2428->clearReceive() != 0)
         && this->connection_2428->send(networkMcsPacketBuffer, size + 2) < 0) {
         error = this->connection_2428->getError();
-        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, networkPeer_getAvailableToRead(this->connection_2428), error);
+        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, this->connection_2428->getAvailableToRead(), error);
         return -1;
     }
     memcpy(this->work_19 + this->workUsed_241C, networkMcsPacketBuffer, size + 2);
@@ -143,9 +143,9 @@ s32 NetworkPeerMcs::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind)
     if (this->connection_2428 == NULL) {
         return 0;
     }
-    if (this->armed_10 == 0 && networkPeer_getAvailableToRead(this->connection_2428) != 0) {
+    if (this->armed_10 == 0 && this->connection_2428->getAvailableToRead() != 0) {
         error = this->connection_2428->getError();
-        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, networkPeer_getAvailableToRead(this->connection_2428), error);
+        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, this->connection_2428->getAvailableToRead(), error);
         return -1;
     }
     capacity = *size;
@@ -216,12 +216,12 @@ s32 NetworkPeerMcs::move()
             networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, 0, 0x80000000);
             return -1;
         }
-        if (networkPeer_getAvailableToRead(this->connection_2428) != 0) {
+        if (this->connection_2428->getAvailableToRead() != 0) {
             error = this->connection_2428->getError();
-            networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, networkPeer_getAvailableToRead(this->connection_2428), error);
+            networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, this->connection_2428->getAvailableToRead(), error);
             return -1;
         }
-        if (networkPeer_clearReceiveSocket(this->connection_2428) == 0) {
+        if (this->connection_2428->clearReceive() == 0) {
             return 0;
         }
         if (getNetworkLogger()->getTime_60() < networkMcsRetryInterval + networkMcsRetryTime) {
@@ -245,10 +245,10 @@ s32 NetworkPeerMcs::move()
     }
     switch (this->state_14) {
     case 0:
-        networkPeer_clearReceiveBuffer(this->connection_2428);
-        if (networkPeer_openSocket(this->connection_2428, &this->peerAddress_2420) < 0) {
+        this->connection_2428->clearReceiveBuffer();
+        if (this->connection_2428->open(&this->peerAddress_2420) < 0) {
             error = this->connection_2428->getError();
-            networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, networkPeer_getAvailableToRead(this->connection_2428), error);
+            networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, this->connection_2428->getAvailableToRead(), error);
             this->state_14 = 0;
             return -1;
         }
@@ -257,10 +257,10 @@ s32 NetworkPeerMcs::move()
         this->state_14++;
         break;
     case 1:
-        result = networkPeer_closeSocket(this->connection_2428);
+        result = this->connection_2428->close();
         if (result < 0) {
             error = this->connection_2428->getError();
-            networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, networkPeer_getAvailableToRead(this->connection_2428), error);
+            networkPeerError_set(this, (const void*)NETWORK_ERROR_MCS_SOCKET, this->connection_2428->getAvailableToRead(), error);
             this->state_14 = 0;
             return -1;
         }
@@ -303,8 +303,8 @@ void NetworkPeerMcs::reset()
     if (this->connection_2428 != NULL) {
         this->connection_2428->remove(this);
         if (this->armed_10 != 0) {
-            networkPeer_release(this->connection_2428);
-            networkPeer_clearReceiveBuffer(this->connection_2428);
+            this->connection_2428->release();
+            this->connection_2428->clearReceiveBuffer();
         }
     }
     memset(this->work_19, 0, 0x2400);

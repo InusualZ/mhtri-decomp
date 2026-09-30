@@ -355,14 +355,6 @@ public:
 
 /* ---------------- the Pat band's channel records -------------------------------------------- */
 
-/* The two channel objects the Pat manager holds at +0x658 / +0x65C and pumps once per frame.  Only
- * their *pointers* are ever held here - their layouts belong to the band that builds them, which is
- * still unclaimed - so both are incomplete classes and the manager only forwards them.  Their names
- * are **GUESSED** from the two pumps (`receivePatInterfaces`, `flushPatRequests`), which is all the
- * binary gives: the manager's own fields were anonymous (`field_658`/`field_65C`) before this pass. */
-class PatReceiver;      /* +0x658 - `receivePatInterfaces` reads its transport at +0x04 */
-class PatRequestQueue;  /* +0x65C - `flushPatRequests` walks its request list */
-
 /* The name/entry list `buildCircleInfoName` packs: a count at +0x04 and the entries after it.  The
  * sizes are bounded by the manager's own layout (the list runs from +0x7A0 up to the circle-record
  * count at +0x950), not read from the list itself.  size: 0x1B0 (approximate). */
@@ -384,15 +376,13 @@ typedef struct PatCircleInfo {
     /* +0x379 */ u8 pad_379[0x3];
 } PatCircleInfo;   /* size: 0x37C */
 
-/* The Pat band's helpers.  `receivePatInterfaces` (0x803CE064) and `flushPatRequests` (0x803CE5F0)
- * sit inside `Network/network_socket_streams.cpp`'s claimed range, so rule 2 gives their declarations to
- * that unit's header (`Network/network_socket_streams.h`, reached through `Network/network_transport.h`,
- * included at the top of this file).  The rest have
+/* The Pat band's helpers: the members the manager pumps (`NetworkSingleTcp::move`, `NetworkMultipleUdp::move`)
+ * are declared with their classes in `Network/network_transport_types.h`.  The rest have
  * no registered owner, and this header - not `include/unsplit/Network.h` - is where this band's
  * unowned helpers already live (`networkPatAttachBuffer`, `networkPatResetCircleInfo`, `PatInterface_*`),
- * so they are declared beside the records they take.  The first three of the five were the map's
- * `fn_803CE064` / `fn_803CE5F0` / `fn_803DE524` until the Pat pass renamed them from what their bodies
- * do (**GUESSES**, each recorded where it is declared); the last two are the map's own names. */
+ * so they are declared beside the records they take.  The first of the three was the map's
+ * `fn_803DE524` until the Pat pass renamed it from what its body
+ * does (**GUESS**, recorded where it is declared); the other two are the map's own names. */
 /* the manager itself is declared below - the band's helpers take it, so name it first, and
  * `NetworkInstance` is the session singleton's class (`include/unsplit/Network.h` defines it; a
  * forward declaration is enough here because only a pointer crosses the call) */
@@ -517,8 +507,8 @@ public:
     u32 circleInfoRequestId_41C;               /* +0x41C - the id `sendReqCircleInfoSet` sends under */
     u8 pad_420[0x118];                         /* +0x420..+0x537 */
     NetworkSessionPlayerRecord players_538[4]; /* +0x538..+0x657 */
-    PatReceiver* receiver_658;                 /* +0x658 - pumped by `receivePatInterfaces` */
-    PatRequestQueue* requestQueue_65C;         /* +0x65C - pumped by `flushPatRequests` */
+    NetworkSingleTcp* tcp_658;                 /* +0x658 - the Tcp connection, pumped by `NetworkSingleTcp::move` */
+    NetworkMultipleUdp* udp_65C;               /* +0x65C - the Udp socket, pumped by `NetworkMultipleUdp::move` */
     s32 field_660;                             /* +0x660 */
     u8 pad_664[0x13C];                         /* +0x664..+0x79F */
     NetworkNameList nameList_7A0;              /* +0x7A0..+0x94F - `buildCircleInfoName` reads it */

@@ -8,12 +8,22 @@
  * 0x803CE060..0x803CF14C, `.data` 0x805F9610..0x805F9958, extab 0x800199B0..0x80019A68, extabindex
  * 0x8003A1DC..0x8003A2F0.
  *
+ * CLASSES.  Every function is a member (rule 13).  `NetworkSingleTcp::move` and `NetworkMultipleUdp::move` are the
+ * pumps the log strings name (`NetworkSingleTcp::move`, `NetworkMultipleUdp::move`); the Pat manager holds the two
+ * objects at +0x658/+0x65C.  Tcp and Udp each own a copy of `release`/`disconnect`/`getAvailableToRead`/`getError`
+ * (identical bodies, address order Tcp 0x803CE060.. then Udp 0x803CE5EC..), so `NetworkSocketUser` stays a data base.
+ * `close`/`clearReceive`/`open`/`clearReceiveBuffer` exist once, in the Tcp run, and only `NetworkPeerMcs` calls them.
+ * GUESS: the class name `NetworkByteStream` and its method names `getData`/`getSize` (the map had
+ * `networkPeer_getSocket`/`networkPeer_getPeerId`, which return `data_04`/`cursor_0C`), `readLength`, and the Tcp
+ * member names `open`/`close`/`clearReceive`/`release`/`disconnect`.  `NetworkStreamSink` is kept as the offset-derived
+ * interface of the two record helpers: no `NetworkPeer*` class has `fill`/`put` at +0x20/+0x24 (evidence: none).
+ *
  * NAMES.  The file name is a GUESS (the range mixes the socket users, the byte stream and the resolver base, and
  * no `__FILE__` string names it); a further cut at `NetworkResolverBase`'s constructor (0x803CF0A8) is possible
  * but has no `.data` evidence.  Every name here is the map's or a derived one; the derived ones are marked GUESS
  * in `Network/network_transport_types.h`.
  *
- * EDGE UNPROVEN: the left edge is the 4-byte `networkPeer_disconnect` stub; its single caller is in the unsplit
+ * EDGE UNPROVEN: the left edge is the 4-byte `NetworkSingleTcp::disconnect` stub; its single caller is in the unsplit
  * Network band, so nothing contradicts placing it here, and no evidence pins it to the previous unit either.
  *
  * TABLE.  `NetworkResolverBase`'s table (0x805F9938, 0x20 B) is emitted from its destructor, the key function
@@ -22,9 +32,9 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  `networkPeerStream_takeRecord` 81.39 % (retail branches forward to the shared zero-store where ours
+ * RESIDUALS.  `NetworkByteStream::takeRecord` 81.39 % (retail branches forward to the shared zero-store where ours
  * falls through, plus one `lhz` reload of the address-taken length local; both spellings were tried);
- * `NetworkMultipleUdp_receive` 94.06 % (the peer-index/length register pair is swapped: r31 in retail, r29 ours);
+ * `NetworkMultipleUdp::receive` 94.06 % (the peer-index/length register pair is swapped: r31 in retail, r29 ours);
  * the object's `.text` is 4 B short of the claim.
  */
 #include "types.h"
@@ -49,53 +59,52 @@ extern "C" {
 #pragma dont_inline on
 
 /* Releases the peer's socket through the peer's own helper. */
-void networkPeer_disconnect(NetworkSingleTcp* self)
+void NetworkSingleTcp::disconnect()
 {
-    networkPeer_release(self);
+    this->release();
 }
 
 #pragma dont_inline off
 
 /* Reads what the socket holds into the receive area, cuts it into length-prefixed packets and hands
    the complete ones to every registered peer; an invalid length releases the socket. */
-void receivePatInterfaces(PatReceiver* receiver)
+void NetworkSingleTcp::move()
 {
-    NetworkSingleTcp* self = (NetworkSingleTcp*)receiver;
     s32 received;
     s32 offset;
     s32 index;
     u16 length;
 
-    if (self->handle_04 != NULL && self->handle_04->clearReceive() != 0) {
+    if (this->handle_04 != NULL && this->handle_04->clearReceive() != 0) {
         do {
-            received = self->handle_04->receive(self->recv_20 + self->recvUsed_2420, 0x2400 - self->recvUsed_2420, NULL);
+            received = this->handle_04->receive(this->recv_20 + this->recvUsed_2420, 0x2400 - this->recvUsed_2420, NULL);
             if (received < 1) {
                 break;
             }
-            self->recvUsed_2420 += received;
+            this->recvUsed_2420 += received;
             offset = 0;
-            while (offset + 2 <= (s32)self->recvUsed_2420) {
-                memcpy(&length, self->recv_20 + offset, 2);
+            while (offset + 2 <= (s32)this->recvUsed_2420) {
+                memcpy(&length, this->recv_20 + offset, 2);
                 length = getNetworkLogger()->flag_48(length);
                 if (length == 0 || length > 0x400) {
                     getNetworkLogger()->warn_10("NetworkSingleTcp::move: invalid packet. %d\n", length);
-                    networkPeer_release(self);
+                    this->release();
                     return;
                 }
-                if ((s32)self->recvUsed_2420 < offset + length + 2) {
+                if ((s32)this->recvUsed_2420 < offset + length + 2) {
                     break;
                 }
                 offset += length + 2;
             }
             for (index = 0; index < 4; index++) {
-                if (self->peers_10[index] != NULL && self->peers_10[index]->put(self->recv_20, offset, 0, 0, 0) < 0) {
+                if (this->peers_10[index] != NULL && this->peers_10[index]->put(this->recv_20, offset, 0, 0, 0) < 0) {
                     getNetworkLogger()->log_14("NetworkSingleTcp::move: [%d] put failed. 0x%x(0x%x)/0x%x\n",
-                                               index, self->recvUsed_2420, received, offset);
+                                               index, this->recvUsed_2420, received, offset);
                 }
             }
-            self->recvUsed_2420 -= offset;
-            if ((s32)self->recvUsed_2420 > 0) {
-                memmove(self->recv_20, self->recv_20 + offset, self->recvUsed_2420);
+            this->recvUsed_2420 -= offset;
+            if ((s32)this->recvUsed_2420 > 0) {
+                memmove(this->recv_20, this->recv_20 + offset, this->recvUsed_2420);
             }
         } while (received > 0);
     }
@@ -106,57 +115,57 @@ void receivePatInterfaces(PatReceiver* receiver)
 /* Opens the connection's socket and registers the address it was opened on: the socket comes from the
    band's pool, `open`/`setPeer` are the socket's own two slots, and the six address bytes are kept on
    the connection.  Returns 0, or the negative step that failed. */
-s32 networkPeer_openSocket(NetworkSingleTcp* self, const NetworkPeerAddress* address)
+s32 NetworkSingleTcp::open(const NetworkPeerAddress* address)
 {
-    if (self->handle_04 != NULL) {
+    if (this->handle_04 != NULL) {
         return -1;
     }
-    self->handle_04 = networkSocketPool_acquire(getNetworkLogger());
-    if (self->handle_04 == NULL) {
+    this->handle_04 = networkSocketPool_acquire(getNetworkLogger());
+    if (this->handle_04 == NULL) {
         return -2;
     }
-    if (self->handle_04->open(1) < 0) {
-        networkPeer_release(self);
+    if (this->handle_04->open(1) < 0) {
+        this->release();
         return -3;
     }
-    if (self->handle_04->setPeer(address) < 0) {
-        networkPeer_release(self);
+    if (this->handle_04->setPeer(address) < 0) {
+        this->release();
         return -4;
     }
-    memcpy(&self->address_08, address, 6);
+    memcpy(&this->address_08, address, 6);
     return 0;
 }
 
 #pragma dont_inline off
 
 /* Closes the peer's socket through the socket's own vtable; -1 when there is no socket. */
-s32 networkPeer_closeSocket(NetworkSocketUser* self)
+s32 NetworkSingleTcp::close()
 {
-    if (self->handle_04 == NULL) {
+    if (this->handle_04 == NULL) {
         return -1;
     }
-    return self->handle_04->closeSocket();
+    return this->handle_04->closeSocket();
 }
 
 /* Clears the peer's socket receive buffer through the socket's own vtable; 0 when there is none. */
-s32 networkPeer_clearReceiveSocket(NetworkSocketUser* self)
+s32 NetworkSingleTcp::clearReceive()
 {
-    if (self->handle_04 == NULL) {
+    if (this->handle_04 == NULL) {
         return 0;
     }
-    return self->handle_04->clearReceive();
+    return this->handle_04->clearReceive();
 }
 
 #pragma dont_inline on
 
 /* Releases the peer's socket: shuts the socket down, hands it back to the pool the peer band
    registers with, and clears the peer's own slot. */
-void networkPeer_release(NetworkSingleTcp* self)
+void NetworkSingleTcp::release()
 {
-    if (self->handle_04 != NULL) {
-        self->handle_04->shutdownSocket();
-        networkSocketPool_release(getNetworkLogger(), self->handle_04);
-        self->handle_04 = NULL;
+    if (this->handle_04 != NULL) {
+        this->handle_04->shutdownSocket();
+        networkSocketPool_release(getNetworkLogger(), this->handle_04);
+        this->handle_04 = NULL;
     }
 }
 
@@ -194,10 +203,10 @@ void NetworkSingleTcp::remove(NetworkPeerMcs* peer)
 }
 
 /* Empties the peer's own 0x2400-byte receive area. */
-void networkPeer_clearReceiveBuffer(NetworkSingleTcp* self)
+void NetworkSingleTcp::clearReceiveBuffer()
 {
-    memset(self->recv_20, 0, 0x2400);
-    self->recvUsed_2420 = 0;
+    memset(this->recv_20, 0, 0x2400);
+    this->recvUsed_2420 = 0;
 }
 
 /* Sends bytes on the connection's socket; -1 (logged) when it has none. */
@@ -210,12 +219,11 @@ s32 NetworkSingleTcp::send(const u8* data, s32 size)
     return this->handle_04->send(data, size, NULL);
 }
 
-/* Same question for the peer class that keeps its socket in the same slot (GUESS: identical body,
-   the two classes' slot tables differ). */
-s32 networkPeer_getAvailableToRead(NetworkSocketUser* self)
+/* Asks the connection's socket how many bytes are readable; 0 when it holds no socket. */
+s32 NetworkSingleTcp::getAvailableToRead()
 {
-    if (self->handle_04 != NULL) {
-        return getBytesAvailableToRead(self->handle_04);
+    if (this->handle_04 != NULL) {
+        return getBytesAvailableToRead(this->handle_04);
     }
     return 0;
 }
@@ -231,38 +239,37 @@ s32 NetworkSingleTcp::getError()
 
 #pragma dont_inline on
 
-/* The same teardown for the second peer class in the band (GUESS: identical tail). */
-void networkPeer_disconnectSocket(NetworkSingleTcp* self)
+/* Disconnects the Udp socket by releasing it. */
+void NetworkMultipleUdp::disconnect()
 {
-    networkPeer_releaseSocket(self);
+    this->release();
 }
 
 #pragma dont_inline off
 
 /* Reads datagrams off the shared socket and queues each one behind the peer whose address sent it
    (logged when the peer's 0x1770-byte queue would overflow). */
-void flushPatRequests(PatRequestQueue* queue)
+void NetworkMultipleUdp::move()
 {
-    NetworkMultipleUdp* self = (NetworkMultipleUdp*)queue;
     NetworkPeerAddress sender;
     s32 received;
     u16 length;
     s32 index;
 
-    if (self->handle_04 != NULL) {
+    if (this->handle_04 != NULL) {
         while (1) {
-            received = self->handle_04->receive(self->datagram_26, 0x5DC, &sender);
+            received = this->handle_04->receive(this->datagram_26, 0x5DC, &sender);
             if (received < 1) {
                 break;
             }
             length = received;
             for (index = 0; index < 4; index++) {
-                if (memcmp(&self->addresses_0E[index], &sender, 6) == 0) {
-                    if ((s32)(length + self->used_63C4[index]) > 0x1770) {
+                if (memcmp(&this->addresses_0E[index], &sender, 6) == 0) {
+                    if ((s32)(length + this->used_63C4[index]) > 0x1770) {
                         getNetworkLogger()->log_14("NetworkMultipleUdp::move: buf_recv_peer over. please check NetworkMultipleUdp::MAX_SIZE_BUF_PEER\n");
                     } else {
-                        memcpy(self->received_602[index] + self->used_63C4[index], self->datagram_26, length);
-                        self->used_63C4[index] += length;
+                        memcpy(this->received_602[index] + this->used_63C4[index], this->datagram_26, length);
+                        this->used_63C4[index] += length;
                     }
                     break;
                 }
@@ -273,14 +280,13 @@ void flushPatRequests(PatRequestQueue* queue)
 
 #pragma dont_inline on
 
-/* The same teardown for the second peer class in the band (GUESS: identical body, the two classes'
-   tables differ). */
-void networkPeer_releaseSocket(NetworkSingleTcp* self)
+/* Releases the Udp socket: shuts it down, hands it back to the pool and clears the slot. */
+void NetworkMultipleUdp::release()
 {
-    if (self->handle_04 != NULL) {
-        self->handle_04->shutdownSocket();
-        networkSocketPool_release(getNetworkLogger(), self->handle_04);
-        self->handle_04 = NULL;
+    if (this->handle_04 != NULL) {
+        this->handle_04->shutdownSocket();
+        networkSocketPool_release(getNetworkLogger(), this->handle_04);
+        this->handle_04 = NULL;
     }
 }
 
@@ -390,11 +396,11 @@ s32 NetworkMultipleUdp::receive(s32 peerIndex, u8* out, s32 capacity)
     return total;
 }
 
-/* Asks the peer's socket how many bytes are readable; 0 when it holds no socket. */
-s32 getAvailableToRead(NetworkSocketUser* self)
+/* Asks the Udp socket how many bytes are readable; 0 when it holds no socket. */
+s32 NetworkMultipleUdp::getAvailableToRead()
 {
-    if (self->handle_04 != NULL) {
-        return getBytesAvailableToRead(self->handle_04);
+    if (this->handle_04 != NULL) {
+        return getBytesAvailableToRead(this->handle_04);
     }
     return 0;
 }
@@ -409,105 +415,106 @@ s32 NetworkMultipleUdp::getError()
 }
 
 /* Returns the stream's byte block. */
-u8* networkPeer_getSocket(NetworkByteStream* self)
+u8* NetworkByteStream::getData()
 {
-    return self->data_04;
+    return this->data_04;
 }
 
 /* Returns how many bytes the stream holds. */
-u32 networkPeer_getPeerId(NetworkByteStream* self)
+u32 NetworkByteStream::getSize()
 {
-    return self->cursor_0C;
+    return this->cursor_0C;
 }
 
 #pragma dont_inline on
 
 /* Fills the stream's leading 0xE-byte record from a sink and advances the cursor over it. */
-void networkPeerStream_pullRecord(NetworkByteStream* self, NetworkStreamSink* sink)
+void NetworkByteStream::pullRecord(NetworkStreamSink* sink)
 {
-    if (self->cursor_0C + 0xE <= self->size_08) {
-        if (sink->fill(&self->data_04[self->cursor_0C], 0xE) > 0) {
-            self->cursor_0C += 0xE;
+    if (this->cursor_0C + 0xE <= this->size_08) {
+        if (sink->fill(&this->data_04[this->cursor_0C], 0xE) > 0) {
+            this->cursor_0C += 0xE;
         }
     }
 }
 
 /* Writes the record's u16 length prefix and then its bytes, when both fit. */
-void networkPeerStream_putRecord(NetworkByteStream* self, const NetworkPeerRecord* record)
+void NetworkByteStream::putRecord(const NetworkPeerRecord* record)
 {
-    if (self->cursor_0C + record->size_04 + 2 <= self->size_08) {
-        networkPeerStream_putU16(self, record->size_04);
+    if (this->cursor_0C + record->size_04 + 2 <= this->size_08) {
+        this->putU16(record->size_04);
         if (record->data_00 != NULL && record->size_04 != 0) {
-            memcpy(&self->data_04[self->cursor_0C], record->data_00, record->size_04);
+            memcpy(&this->data_04[this->cursor_0C], record->data_00, record->size_04);
         }
-        self->cursor_0C += record->size_04;
+        this->cursor_0C += record->size_04;
     }
 }
 
 /* Writes one 4-byte value, encoded through the log manager's own value slot. */
-void networkPeerStream_putU32(NetworkByteStream* self, u32 value)
+void NetworkByteStream::putU32(u32 value)
 {
     u32 encoded;
 
-    if (self->cursor_0C + 4 > self->size_08) {
+    if (this->cursor_0C + 4 > this->size_08) {
         return;
     }
     encoded = getNetworkLogger()->encode_54(value);
-    memcpy(&self->data_04[self->cursor_0C], &encoded, 4);
-    self->cursor_0C += 4;
+    memcpy(&this->data_04[this->cursor_0C], &encoded, 4);
+    this->cursor_0C += 4;
 }
 
 /* Writes one 2-byte value, encoded through the log manager's own value slot. */
-void networkPeerStream_putU16(NetworkByteStream* self, u16 value){
+void NetworkByteStream::putU16(u16 value)
+{
     u16 encoded;
 
-    if (self->cursor_0C + 2 > self->size_08) {
+    if (this->cursor_0C + 2 > this->size_08) {
         return;
     }
     encoded = getNetworkLogger()->encode_4C(value);
-    memcpy(&self->data_04[self->cursor_0C], &encoded, 2);
-    self->cursor_0C += 2;
+    memcpy(&this->data_04[this->cursor_0C], &encoded, 2);
+    this->cursor_0C += 2;
 }
 
 #pragma dont_inline off
 
 /* Appends one byte when the stream's cursor has room for it. */
-void networkPeerStream_putByte(NetworkByteStream* self, u8 value)
+void NetworkByteStream::putByte(u8 value)
 {
-    if (self->cursor_0C + 1 <= self->size_08) {
-        self->data_04[self->cursor_0C] = value;
-        self->cursor_0C++;
+    if (this->cursor_0C + 1 <= this->size_08) {
+        this->data_04[this->cursor_0C] = value;
+        this->cursor_0C++;
     }
 }
 
 /* Hands the stream's leading 0xE-byte record to a sink and drops it from the front. */
-void networkPeerStream_forwardRecord(NetworkByteStream* self, NetworkStreamSink* sink)
+void NetworkByteStream::forwardRecord(NetworkStreamSink* sink)
 {
     u32 remaining;
 
-    if (self->cursor_0C < 0xE) {
+    if (this->cursor_0C < 0xE) {
         return;
     }
-    if (sink->put(self->data_04, 0xE) > 0) {
-        remaining = self->cursor_0C - 0xE;
-        self->cursor_0C = remaining;
+    if (sink->put(this->data_04, 0xE) > 0) {
+        remaining = this->cursor_0C - 0xE;
+        this->cursor_0C = remaining;
         if (remaining != 0) {
-            memmove(self->data_04, self->data_04 + 0xE, remaining);
+            memmove(this->data_04, this->data_04 + 0xE, remaining);
         }
     }
 }
 
 /* Copies the stream's leading length-prefixed record into the caller's record when both the stream
    and the caller have room, then drops it from the front. */
-void networkPeerStream_takeRecord(NetworkByteStream* self, NetworkPeerRecord* record)
+void NetworkByteStream::takeRecord(NetworkPeerRecord* record)
 {
     u16 length;
 
-    if (self->cursor_0C < 2) {
+    if (this->cursor_0C < 2) {
         return;
     }
-    networkPeerStream_readLength(self, &length);
-    if (length > self->cursor_0C || length > record->size_04) {
+    this->readLength(&length);
+    if (length > this->cursor_0C || length > record->size_04) {
         record->size_04 = 0;
         return;
     }
@@ -516,11 +523,11 @@ void networkPeerStream_takeRecord(NetworkByteStream* self, NetworkPeerRecord* re
         return;
     }
     if (record->data_00 != NULL) {
-        memcpy(record->data_00, self->data_04, length);
+        memcpy(record->data_00, this->data_04, length);
     }
-    self->cursor_0C -= length;
-    if (self->cursor_0C != 0) {
-        memmove(self->data_04, self->data_04 + length, self->cursor_0C);
+    this->cursor_0C -= length;
+    if (this->cursor_0C != 0) {
+        memmove(this->data_04, this->data_04 + length, this->cursor_0C);
     }
 }
 
@@ -528,59 +535,59 @@ void networkPeerStream_takeRecord(NetworkByteStream* self, NetworkPeerRecord* re
 
 /* Takes the stream's leading 4-byte value, decoded through the log manager's own value slot, and
    drops it from the front. */
-void networkPeerStream_takeU32(NetworkByteStream* self, u32* out)
+void NetworkByteStream::takeU32(u32* out)
 {
     u32 value;
     u32 remaining;
 
-    if (self->cursor_0C < 4) {
+    if (this->cursor_0C < 4) {
         return;
     }
-    memcpy(&value, self->data_04, 4);
+    memcpy(&value, this->data_04, 4);
     *out = getNetworkLogger()->decode_50(value);
-    remaining = self->cursor_0C - 4;
-    self->cursor_0C = remaining;
+    remaining = this->cursor_0C - 4;
+    this->cursor_0C = remaining;
     if (remaining != 0) {
-        memmove(self->data_04, self->data_04 + 4, remaining);
+        memmove(this->data_04, this->data_04 + 4, remaining);
     }
 }
 
 /* Records the stream's leading length prefix into the caller's u16, decoded through the log
    manager's own value slot, then drops the two bytes from the front. */
-void networkPeerStream_readLength(NetworkByteStream* self, u16* out)
+void NetworkByteStream::readLength(u16* out)
 {
     u16 encoded;
     u32 remaining;
 
-    if (self->cursor_0C < 2) {
+    if (this->cursor_0C < 2) {
         return;
     }
-    memcpy(&encoded, self->data_04, 2);
+    memcpy(&encoded, this->data_04, 2);
     *out = getNetworkLogger()->flag_48(encoded);
-    remaining = self->cursor_0C - 2;
-    self->cursor_0C = remaining;
+    remaining = this->cursor_0C - 2;
+    this->cursor_0C = remaining;
     if (remaining != 0) {
-        memmove(self->data_04, self->data_04 + 2, remaining);
+        memmove(this->data_04, this->data_04 + 2, remaining);
     }
 }
 
 #pragma dont_inline off
 
 /* Takes the stream's leading byte into the caller's byte and drops it from the front. */
-void networkPeerStream_takeByte(NetworkByteStream* self, u8* out)
+void NetworkByteStream::takeByte(u8* out)
 {
     u32 remaining;
     u8* base;
 
-    if (self->cursor_0C < 1) {
+    if (this->cursor_0C < 1) {
         return;
     }
-    base = self->data_04;
+    base = this->data_04;
     *out = base[0];
-    remaining = self->cursor_0C - 1;
-    self->cursor_0C = remaining;
+    remaining = this->cursor_0C - 1;
+    this->cursor_0C = remaining;
     if (remaining != 0) {
-        memmove(self->data_04, self->data_04 + 1, remaining);
+        memmove(this->data_04, this->data_04 + 1, remaining);
     }
 }
 
