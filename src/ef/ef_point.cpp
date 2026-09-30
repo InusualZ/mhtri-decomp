@@ -126,7 +126,7 @@ extern f32 fn_800A8A08(struct EfRate *rate);
 extern u16 fn_800A9FB0(void *self, u16 id, struct EfEmitter *em, f32 f);
 extern void fn_800A99B4(void *self, nw4r::math::VEC3 *out, struct EfEmitter *em, nw4r::math::VEC3 *a,
                         nw4r::math::VEC3 *b, nw4r::math::VEC3 *c, nw4r::math::VEC3 *d);
-extern f32 fn_80050BC0(f32 x);
+extern f32 sqrt_f32(f32 x);
 extern void fn_8009C760(f32 *a, f32 *b, f32 angle);
 extern void fn_8009C484(nw4r::math::VEC3 *a, nw4r::math::VEC3 *b);
 }
@@ -185,7 +185,7 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
             else
                 s = (lbl_8079630C - lbl_80796310 * t) * t;
             v_38.x = s;
-            r = fn_80050BC0(lbl_80796308 - v_38.x * v_38.x);
+            r = sqrt_f32(lbl_80796308 - v_38.x * v_38.x);
             fn_8009C760(&v_38.z, &v_38.y,
                         lbl_80796304 * (lbl_80796314 * fn_800A8A08(&em->rate)));
             v_38.y = v_38.y * r;

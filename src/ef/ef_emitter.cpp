@@ -161,17 +161,17 @@ void fn_8009BCB4(void* mtx, void* vec);
 void fn_8009CC20(void* out, void* mtx, void* in);
 void fn_8009CCAC(void* out, void* mtx, void* in);
 f32 fn_8009CD64(void* vec, s32 index);
-f32 fn_80050BC0(f32 x);
+f32 sqrt_f32(f32 x);
 void subVec3(void* dst, void* a, void* b);
 void* fn_800508AC(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
-void fn_800504D4(void* mtx);
+void mtx34_identity(void* mtx);
 void fn_80051424(void* dst, void* src, f32 scale);
 void fn_80051490(void* dst, void* src);
 void fn_800514FC(void* dst, void* mtx, void* vec);
 void fn_8007100C(void* dst, void* src);
 void fn_800710BC(void* dst, void* a, void* b);
-void fn_800883C4(void* mtx, void* in);
+void mtx34_inverse(void* mtx, void* in);
 void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);
 void fn_8009CBA0(void* dst, void* mtx, void* vec);
 void fn_80501390(void* dst, void* mtx, void* vec);
@@ -821,11 +821,11 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         fn_800A95D8(e);
         MTX34_ctor(&m1);
         MTX34_ctor(&m2);
-        fn_800504D4(&m1);
+        mtx34_identity(&m1);
         fn_8009CA30(&m1, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m1, &m1, &e->vec_0x9C);
         fn_800A94A4(e, &m2);
-        fn_800883C4(&m2, &m2);
+        mtx34_inverse(&m2, &m2);
         fn_800710BC(&m1, &m1, &m2);
         if (pm != NULL) {
             fn_800AE360((void*)pm->manager, &m2);
@@ -840,7 +840,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         }
         fn_8009CA30(&m2, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m2, &m2, &e->vec_0x9C);
-        fn_800883C4(&m2, &m2);
+        mtx34_inverse(&m2, &m2);
         fn_800710BC(&m1, &m1, &m2);
         e->position.x = v.x + m1.m[0][3];
         e->position.y = v.y + m1.m[1][3];
@@ -922,11 +922,11 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             fn_800A95D8(&e);
             MTX34_ctor(&m1);
             MTX34_ctor(&m2);
-            fn_800504D4(&m1);
+            mtx34_identity(&m1);
             fn_8009CA30(&m1, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m1, &m1, &e.vec_0x9C);
             fn_800A94A4(&e, &m2);
-            fn_800883C4(&m2, &m2);
+            mtx34_inverse(&m2, &m2);
             fn_800710BC(&m1, &m1, &m2);
             if (pm != NULL) {
                 fn_800AE360((void*)pm->manager, &m2);
@@ -941,7 +941,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             }
             fn_8009CA30(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m2, &m2, &e.vec_0x9C);
-            fn_800883C4(&m2, &m2);
+            mtx34_inverse(&m2, &m2);
             fn_800710BC(&m1, &m1, &m2);
             e.position.x = pos.x + m1.m[0][3];
             e.position.y = pos.y + m1.m[1][3];
@@ -1016,7 +1016,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
                 MTX34_ctor(&m3);
                 MTX34_ctor(&m4);
                 fn_800AE360((void*)created, &m4);
-                fn_800883C4(&m4, &m4);
+                mtx34_inverse(&m4, &m4);
                 fn_800A94A4(&e, &m3);
                 fn_800710BC(&m3, &m4, &m3);
                 fn_800A834C(&e, (EfParticleRec*)created, &m3);
@@ -1078,7 +1078,7 @@ extern "C" void* fn_800A8040(EfEmitterObj* self, void* target, u32 a, u32 b, s8 
 
 extern "C" f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4) {
     f32 range = p1 - p2;
-    f32 d = fn_80050BC0(fn_800A8300(b, a));
+    f32 d = sqrt_f32(fn_800A8300(b, a));
     f32 x = d - p2;
     f32 lo = range * p4;
     f32 hi = range * p3;
@@ -1403,7 +1403,7 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
         MTX34_ctor(&m1);
         MTX34_ctor(&m2);
         fn_800AE360((void*)pm->manager, &m2);
-        fn_800883C4(&m2, &m2);
+        mtx34_inverse(&m2, &m2);
         fn_800A94A4(self, &m1);
         fn_800710BC(&m1, &m2, &m1);
         if (self->field_0x0DE != 0) {
@@ -1457,7 +1457,7 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
             fn_8009CA30(&m4, lbl_80796028, lbl_80796004, lbl_80796004);
             fn_800710BC(&m3, &m3, &m4);
         }
-        fn_800883C4(&m2, &m2);
+        mtx34_inverse(&m2, &m2);
         fn_800710BC(&m2, &m2, &m3);
         fn_8009CCAC(&m2, &m2, &self->rotation);
         fn_8009CC20(&m2, &self->vec_0x9C, &m2);
@@ -1483,10 +1483,10 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
         return dst;
     }
     if (a == 0 && b == 0 && c == 0) {
-        fn_800504D4(dst);
+        mtx34_identity(dst);
         return dst;
     }
-    fn_800504D4(dst);
+    mtx34_identity(dst);
     {
         EfVec offset;
         EfVec pt;

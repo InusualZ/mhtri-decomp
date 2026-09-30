@@ -624,7 +624,7 @@ void fn_802E5D68(s16 arg0, u8 arg1) {
     dx = pos.x;
     dy = pos.y;
     sq = dx * dx;
-    v = (s8)(lbl_8079A90C * fn_80050BC0(sq, dx, (f32)(sq + dy * dy)));
+    v = (s8)(lbl_8079A90C * sqrt_f32(sq, dx, (f32)(sq + dy * dy)));
     self->field_0x178 = v;
     if ((u8)v == 0) {
         self->field_0x178 = 1;

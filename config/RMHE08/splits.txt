@@ -368,16 +368,34 @@ ef/ef_point.cpp:
 	extabindex  start:0x80023C64 end:0x80023C70
 	.text       start:0x800CD584 end:0x800CDB2C
 
+ef/ef_sphere.cpp:
+	extab       start:0x8000A5DC end:0x8000A5E4
+	extabindex  start:0x80023C70 end:0x80023C7C
+	.text       start:0x800CDB2C end:0x800CE5A8
+	.data       start:0x80595058 end:0x80595108
+
 ef/fn_800CDB2C.cpp:
-	extab       start:0x8000A5DC end:0x8000AA9C
-	extabindex  start:0x80023C70 end:0x80024030
-	.text       start:0x800CDB2C end:0x800D45AC
+	extab       start:0x8000A5E4 end:0x8000A77C
+	extabindex  start:0x80023C7C end:0x80023EE0
+	.text       start:0x800CE5A8 end:0x800D2FEC
 	.ctors      start:0x8056F2EC end:0x8056F2F0
+	.data       start:0x80595118 end:0x80595378
+	.bss        start:0x80694C68 end:0x80695610
+	.sbss       start:0x80794958 end:0x80794970
 
 nw_resource.cpp:
-	extab       start:0x8000AA9C end:0x8000AC54
-	extabindex  start:0x80024030 end:0x800242C4
-	.text       start:0x800D45AC end:0x800D77B0
+	extab       start:0x8000A77C end:0x8000AC0C
+	extabindex  start:0x80023EE0 end:0x80024258
+	.text       start:0x800D2FEC end:0x800D6C00
+	.data       start:0x80595378 end:0x80595790
+	.sbss       start:0x80794970 end:0x80794978
+
+g3d/g3d_xsi.cpp:
+	extab       start:0x8000AC0C end:0x8000AC54
+	extabindex  start:0x80024258 end:0x800242C4
+	.text       start:0x800D6C00 end:0x800D77B0
+	.rodata     start:0x8056F830 end:0x8056F868
+	.data       start:0x80595790 end:0x80595840
 
 g3d/fn_800D77B0.cpp:
 	extab       start:0x8000AC54 end:0x8000AC5C
@@ -1062,10 +1080,28 @@ menu/menu_item.cpp:
 	.text       start:0x8029F3C8 end:0x802A6624
 
 menu/menu_message.cpp:
-	extab       start:0x800137D4 end:0x8001398C
-	extabindex  start:0x8003123C end:0x800314D0
-	.text       start:0x802A6624 end:0x802AA764
-	.data       start:0x805CE00C end:0x805CE040
+	extab       start:0x800137D4 end:0x80013984
+	extabindex  start:0x8003123C end:0x800314C4
+	.text       start:0x802A6624 end:0x802AA6A8
+	.data       start:0x805CE00C end:0x805CE198
+
+stage/shell.cpp:
+	extab       start:0x80013984 end:0x80013AC4
+	extabindex  start:0x800314C4 end:0x800316A4
+	.text       start:0x802AA6A8 end:0x802ABD28
+	.ctors      start:0x8056F374 end:0x8056F378
+	.bss        start:0x806AD698 end:0x806B8798
+	.sdata2     start:0x8079A400 end:0x8079A410
+
+Pl/pl_yure.cpp:
+	extab       start:0x80013AC4 end:0x80013B0C
+	extabindex  start:0x800316A4 end:0x80031710
+	.text       start:0x802ABD28 end:0x802AD9C0
+	.ctors      start:0x8056F378 end:0x8056F37C
+	.data       start:0x805CE638 end:0x805CED40
+	.bss        start:0x806B8798 end:0x806B87C0
+	.sdata      start:0x807922C0 end:0x807922E0
+	.sdata2     start:0x8079A410 end:0x8079A448
 
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013D2C

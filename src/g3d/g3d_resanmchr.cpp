@@ -43,7 +43,7 @@
 #include "unsplit/g3d.h"         /* fn_8007100C, fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* fn_800610AC, fn_800618BC, fn_800628C8 (rule 2) */
 #include "g3d/fn_80063888.h"     /* fn_8006497C (rule 2) */
-#include "fn_8004CAD8.h"         /* anim_tick_angle, fn_800504D4, fn_80050BC0 (rule 2) */
+#include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
 #include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
 
 /* fp_contract stays ON (cflags_g3d): the target's `fn_8008AED0` uses fused fmadds/fmsubs, so this unit
@@ -202,7 +202,7 @@ f32 fn_8008BF08(u32* iter, const f32* self);
 f32 fn_8008DF64(f32 a, f32 b);
 f32 fn_8008F6C4(u32 self, s32 index);
 f32 anim_tick_angle(u16 count);
-f32 fn_80050BC0(f32 value);
+f32 sqrt_f32(f32 value);
 s16 fn_8008B700(f32 value);
 u8 fn_8008BE88(f32 value);
 u8 fn_8008BE7C(u32* p);
@@ -646,7 +646,7 @@ void fn_8008D1AC(ResAnmChrObj* self)
     self->scale[0] = lbl_80795EE8;
     self->scale[1] = lbl_80795EE8;
     self->scale[2] = lbl_80795EE8;
-    fn_800504D4(self->mat);
+    mtx34_identity(self->mat);
 }
 
 /* Re-evaluates the record from the source key.  The frame is passed through untouched (the target sets no
@@ -655,7 +655,7 @@ void fn_8008D2CC(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
 {
     (void)unused;
     fn_8008A664(self->scale, (u32*)key, (f32*)&key[2], frame);
-    fn_800504D4(self->mat);
+    mtx34_identity(self->mat);
 }
 
 /* The float normaliser. */
@@ -671,7 +671,7 @@ f32 fn_8008F6C4(u32 self, s32 index)
 {
     const f32* p = (const f32*)self + index;
 
-    return fn_80050BC0(p[4] * p[4] + p[0] * p[0] + p[8] * p[8]);
+    return sqrt_f32(p[4] * p[4] + p[0] * p[0] + p[8] * p[8]);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1206,7 +1206,7 @@ void fn_8008D1C4(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
     self->scale[0] = lbl_80795EE8;
     self->scale[1] = lbl_80795EE8;
     self->scale[2] = lbl_80795EE8;
-    fn_800504D4(self->mat);
+    mtx34_identity(self->mat);
     fn_8008CF2C(&rec, key, key + 2, frame);
     self->mat[3] = rec.x;
     self->mat[7] = rec.y;
@@ -1262,7 +1262,7 @@ void fn_8008D47C(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
     (void)unused;
     VEC3_ctor(&rec);
     row = (void*)fn_8008A664(self->scale, (u32*)key, (f32*)&key[2], frame);
-    fn_800504D4(self->mat);
+    mtx34_identity(self->mat);
     fn_8008CF2C(&rec, key, row, frame);
     self->mat[3] = rec.x;
     self->mat[7] = rec.y;
@@ -1406,9 +1406,9 @@ void fn_8008E408(ResAnmChrObj* self, f32* out)
     flags = self->flags;
     if (flags & 0x20) {
         if (flags & 0x40) {
-            fn_800504D4(out);
+            mtx34_identity(out);
         } else {
-            fn_800504D4(out);
+            mtx34_identity(out);
             out[3] = self->mat[3];
             out[7] = self->mat[7];
             out[11] = self->mat[11];
@@ -1598,7 +1598,7 @@ s32 fn_8008DC4C(ResAnmChrObj* self, f32* out)
         copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->pos);
         return 1;
     }
-    r = fn_80050BC0(lbl_80795EE8 - self->mat[8] * self->mat[8]);
+    r = sqrt_f32(lbl_80795EE8 - self->mat[8] * self->mat[8]);
     if (r == lbl_80795ED0) {
         out[0] = fn_8008DF64(self->mat[2] + self->mat[5], self->mat[6] + self->mat[1]);
         out[1] = fn_8006497C(self->mat[8], lbl_80795EF8, lbl_80795EFC);

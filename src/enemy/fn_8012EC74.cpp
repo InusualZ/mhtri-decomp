@@ -52,7 +52,7 @@
  * spelling was added to its owner's header in the same landing as this file because the header only
  * carried the mangled `em_area_ck__FP11_ENEMY_WORK` spelling before.  `fn_8012D8D0`, `fn_8012DB3C` and
  * `fn_8012E21C` are declared in their owner's header for the same reason.  The in-range helpers this
- * block calls (`fn_80135AC4`, `fn_80130134`, `fn_8013032C`, `fn_801322CC`, `fn_80132270`) are
+ * block calls (`em_get_rank`, `fn_80130134`, `fn_8013032C`, `fn_801322CC`, `fn_80132270`) are
  * forward-declared here and are part of the follow-up queue.
  *
  * Flags.  The unit's command line is the `enemy` lib's (`configure.py`), and it carries the same
@@ -123,7 +123,7 @@ u16 get_move_work_max(u8 kind);
 /* In-range helpers this first block calls (defined later in the follow-up queue), plus the forward
  * declaration of the first definition below. */
 extern "C" f32 fn_8012EC74(_ENEMY_WORK* self);
-extern "C" u32 fn_80135AC4(_ENEMY_WORK* self);
+extern "C" u32 em_get_rank(_ENEMY_WORK* self);
 extern "C" u32 fn_80130134(_ENEMY_WORK* self, u32 flag);
 extern "C" f32 fn_8013032C(_ENEMY_WORK* self);
 extern "C" u32 fn_801322CC(_ENEMY_WORK* self, u32 flag);
@@ -148,12 +148,12 @@ extern "C" s32 fn_8012ECF0(_ENEMY_WORK* self)
 }
 
 /* The mode-selected base window: 0.3/0.2/0.18/0.15 s by the motion's sub-window count
- * `fn_80135AC4` returns.  The target re-reads the count in each arm, so the call is written per arm. */
+ * `em_get_rank` returns.  The target re-reads the count in each arm, so the call is written per arm. */
 extern "C" f32 fn_8012EC74(_ENEMY_WORK* self)
 {
-    if ((u8)fn_80135AC4(self) <= 1) return lbl_80796CB8;
-    if ((u8)fn_80135AC4(self) <= 2) return lbl_80796CBC;
-    if ((u8)fn_80135AC4(self) <= 3) return lbl_80796CC0;
+    if ((u8)em_get_rank(self) <= 1) return lbl_80796CB8;
+    if ((u8)em_get_rank(self) <= 2) return lbl_80796CBC;
+    if ((u8)em_get_rank(self) <= 3) return lbl_80796CC0;
     return lbl_80796CC4;
 }
 
@@ -260,14 +260,14 @@ extern "C" s32 fn_8012F110(_ENEMY_WORK* self, u16 mode)
     return 1;
 }
 
-/* The window test with the sub-window padding `fn_80135AC4` selects (0.1 s or 0.05 s). */
+/* The window test with the sub-window padding `em_get_rank` selects (0.1 s or 0.05 s). */
 extern "C" u32 em_motion_window_ck(_ENEMY_WORK* self)
 {
     if (self->field_0x938 > 0) {
         f32 rate = fn_8012EC74(self);
         f32 limit;
 
-        if ((u8)fn_80135AC4(self) <= 1) {
+        if ((u8)em_get_rank(self) <= 1) {
             limit = rate + lbl_80796CC8;
         } else {
             limit = rate + lbl_80796CCC;

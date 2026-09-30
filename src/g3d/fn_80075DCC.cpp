@@ -53,6 +53,7 @@ typedef struct {
 #include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "g3d/fn_800D74E8.h"
 
 #define M2C_ERROR(x) /* unknown instruction */
 
@@ -172,7 +173,7 @@ u32 TheBeatMatchOutput(void);
 u32 VIGetTvFormat(void);
 u32 dtor_800813B8(u32);
 u32 color_rgba_copy(s32, void*);
-u32 fn_800504D4(s32);
+u32 mtx34_identity(s32);
 u32 fn_80050850(void*, void*, f32, f32);
 u32 fn_800514FC(void*, s32, void*);
 u32 fn_8005A8E0(void*, void*);
@@ -285,7 +286,6 @@ s32 fn_80099BB0(void*);
 u32 fn_8009A748(void*, void*, u32);
 u32 fn_8009A910(void*, u32);
 u32 fn_8009AB48(u32);
-s32 fn_800D74E8(s32, s32, s32, s32);
 s32 fn_800D79B4(s32, s32, s32, s32);
 u32 fn_80463EBC(void);
 u32 fn_804B7800(s32);
@@ -302,7 +302,7 @@ u32 fn_804B9C60(void*, u16, s32);
 u32 fn_804C6900(f32, f32, f32, f32, f32, f32);
 u32 fn_804C69A0(f32, f32, f32, f32);
 u32 math_sincos_idx(f32);
-u32 fn_805015C8(void*, s32, void*);
+u32 mtx34_rotate_vec3(void*, s32, void*);
 u32 fn_80502678(void);
 u32 fn_805026D8(void);
 /* internal */ void fn_80075DCC(f32 farg0);
@@ -605,7 +605,7 @@ void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0) 
         nw4r::db::Panic((const char*)&lbl_8058E570, 0x3C, (const char*)&lbl_8058E5D8);
     }
     if ((var_r26 != 0) && (arg1 != 0)) {
-        fn_800504D4((s32)(arg0));
+        mtx34_identity((s32)(arg0));
     }
 }
 
@@ -647,7 +647,7 @@ void fn_80076050(s32 arg0, s32 arg1, s32 arg2, s32 arg3) {
         nw4r::db::Panic((const char*)&lbl_8058E570, 0x4C, (const char*)&lbl_8058E57C, arg0);
     }
     if (((s32) (fn_800D79B4((s32)(arg0), (s32)(arg1), (s32)(arg2), (s32)(arg3)) == 0) != 0) && (arg1 != 0)) {
-        fn_800504D4((s32)(arg0));
+        mtx34_identity((s32)(arg0));
     }
 }
 

@@ -86,6 +86,7 @@
 #include "ef/ef_particlemanager.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/pRoot.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the unit's own prototypes (plain C linkage: the map's stems must stay unmangled)
@@ -266,7 +267,6 @@ struct _EFT019_EMY_DATA {
 
 /* --- pooled data (declared, never defined: the pool belongs to the data pass) -------------------- */
 
-extern s32 pRoot;          /* the model manager `fn_80075258` projects through (.sdata 0x807918E8) */
 extern u8 lbl_8059F670[];  /* per-id effect count, indexed by `type_0x02` (.data 0x8059F670, 0x8C) */
 extern u16 lbl_8059F6FC[]; /* the effect id table `res_eft_create` is fed (.data 0x8059F6FC, 0x114) */
 extern u16 lbl_8059F810[]; /* its second field (.data 0x8059F810, 0x114) */

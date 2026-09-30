@@ -83,6 +83,11 @@ void fn_8033A920(u32 arg);
  * signature its own call sites set (`f32 fn_80463EE0(s16, f32)`), which is the one declared
  * here; the action band tail-calls it with its own parameters. */
 f32 fn_80463EE0(s16 a, f32 b);
+/* 0x80463E08 - the arctangent of `y / x` in radians (the libm `atan2` entry); `Pl/pl_yure.cpp` turns it into
+ * a 16-bit angle word.  0x805015C8 - `out = mtx * v` (the paired-single matrix/vector multiply); the two
+ * vectors may alias.  Added with that unit. */
+f32 atan2f(f32 y, f32 x);
+void mtx34_rotate_vec3(nw4r::math::VEC3* out, const nw4r::math::MTX34* mtx, const nw4r::math::VEC3* v);
 /* The `.sdata2` / `.data` pool entries the 0x805482CC-0x8054E894 game-UI band loads.  The band's
  * target object carries no data section at all, so every constant it uses is another translation
  * unit's pool entry and is declared here `extern` and used as a load operand - never defined

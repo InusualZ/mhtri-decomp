@@ -52,6 +52,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/pRoot.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the two per-family `_EFT::work_0x38` blocks
@@ -131,7 +132,7 @@ struct _EFT_ENEMY_VIEW {
     /* +0x950 */ s16 field_0x950; /* the status family's second countdown */
 }; /* size: 0x952 */
 
-/* The object `fn_800E3B8C` hands back, whose owner slot this unit writes. size: 0x30 - lower bound */
+/* The object `sound_job_request` hands back, whose owner slot this unit writes. size: 0x30 - lower bound */
 struct _EFT_LIGHT_OBJ {
     /* +0x00 */ u8 pad_0x00[0x2C];
     /* +0x2C */ _EFT* owner_0x2C;
@@ -167,20 +168,20 @@ void scaleMat34W(nw4r::math::MTX34* mtx, nw4r::math::VEC3* v);
 
 /* The unmangled `fn_XXXXXXXX` callees: inside a linkage block they need no per-declaration spelling. */
 extern "C" {
-void fn_800504D4(nw4r::math::MTX34* mtx);
+void mtx34_identity(nw4r::math::MTX34* mtx);
 void fn_800513F0(nw4r::math::VEC3* v, f32 s);
 void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void fn_8007100C(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void fn_800710BC(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34* m);
 void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
-void fn_8007F0CC(s32 root, u32 id);
-void fn_800883C4(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
+void g3d_root_model_bind(s32 root, u32 id);
+void mtx34_inverse(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
 s32 fn_80097EB0(void* handle, s32 index);
 s32 fn_8006FDCC(void* handle);
 void fn_800DAA4C(nw4r::math::VEC3* pos);
 s32 fn_800E0A8C(MHchar* model);
 void fn_800E0BE8(MHchar* model, s32 value);
-void* fn_800E3B8C(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
+void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
 void* fn_800F8788(u32 pool);
 void fn_800F886C(void* self);
 void* fn_800F8914();
@@ -242,7 +243,6 @@ extern f32 lbl_80796828;
 extern f32 lbl_8079682C;
 extern f32 lbl_80796830;
 extern f32 lbl_80796834;
-extern s32 pRoot;
 
 /* ---------------------------------------------------------------------------------------------------
  * the light family
@@ -565,7 +565,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
     }
 }
 
-/* The light-object callback `fn_800E3B8C` installs: places the effect's models on the enemy joint. */
+/* The light-object callback `sound_job_request` installs: places the effect's models on the enemy joint. */
 extern "C" void fn_8010CE80(void* arg)
 {
     _EFT* self = ((_EFT_LIGHT_OBJ*)arg)->owner_0x2C;
@@ -628,7 +628,7 @@ extern "C" void fn_8010CFCC(_EFT* self, nw4r::math::MTX34* out, nw4r::math::MTX3
     rotVecZ(&v20, (u16)(s32)angle);
     v20.y = v20.y + lbl_80796834;
     mulVecMat(&v20, mtx);
-    fn_800504D4(out);
+    mtx34_identity(out);
     out->m[0][3] = v20.x + mtx->m[0][3] + v14.x;
     out->m[1][3] = v20.y + mtx->m[1][3] + v14.y;
     out->m[2][3] = v20.z + mtx->m[2][3] + v14.z;
@@ -644,7 +644,7 @@ extern "C" void fn_8010D12C(nw4r::math::MTX34* a, nw4r::math::MTX34* b)
     m.m[0][3] = lbl_80796810;
     m.m[1][3] = lbl_80796810;
     m.m[2][3] = lbl_80796810;
-    fn_800883C4(&m, &m);
+    mtx34_inverse(&m, &m);
     fn_800710BC(a, b, &m);
 }
 
@@ -668,7 +668,7 @@ extern "C" void fn_8010CD68(_EFT* self, MHchar** models, s32 count)
             }
             if (((_EFT_MODEL_VIEW*)model)->field_0x118 ==
                 *(u32*)((u8*)((_EFT_MODEL_VIEW*)model)->slot_0x10C + 4)) {
-                fn_8007F0CC(pRoot, 0);
+                g3d_root_model_bind(pRoot, 0);
             }
         }
     } else {
@@ -682,10 +682,10 @@ extern "C" void fn_8010CD68(_EFT* self, MHchar** models, s32 count)
                 *(u32*)((u8*)((_EFT_MODEL_VIEW*)model)->slot_0x10C + 4)) {
                 continue;
             }
-            p = fn_800E3B8C(1, model->ready, 0, 0x40, 0, fn_8010CE80);
+            p = sound_job_request(1, model->ready, 0, 0x40, 0, fn_8010CE80);
             if (p != NULL) {
                 ((_EFT_LIGHT_OBJ*)p)->owner_0x2C = self;
-                fn_8007F0CC(pRoot, ((_EFT_MODEL_VIEW*)model)->field_0x118);
+                g3d_root_model_bind(pRoot, ((_EFT_MODEL_VIEW*)model)->field_0x118);
             }
         }
     }

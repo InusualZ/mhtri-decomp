@@ -49,6 +49,10 @@ u8* fn_800F8914(void);
  * owner's own `src/ef/eft_res.cpp:801`, `res_eft_UV_model_create` is still un-reconstructed). */
 struct MHchar;
 struct _g3d_work;
+/* 0x800F91B4 - creates the pooled effect `id` of resource group `group`; `stage/shell.cpp`'s
+ * `res_eft_create_shell` forwards to it with flags 0. */
+namespace nw4r { namespace ef { struct Effect; } }
+nw4r::ef::Effect* res_eft_create(u16 group, u16 id, u32 flags);
 void* res_eft_model_create(MHchar* model, u16 id, u32 arg);
 void* res_eft_UV_model_create(MHchar* model, u16 id, u32 arg, long mode, struct _g3d_work** list,
                               long count, u8 flag);

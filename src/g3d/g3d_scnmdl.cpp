@@ -177,7 +177,7 @@ u32 fn_8007EF84(void* pSelf, u32* pKey);
 u32 fn_8007EFF0(void* pSelf, u32* pKey);
 u32 fn_8007F05C(ScnMdl* pSelf);
 u32 fn_8007F0BC(ScnMdl* pSelf);
-u32 fn_8007F0CC(ScnMdl* pSelf, u32 id);
+u32 g3d_root_model_bind(ScnMdl* pSelf, u32 id);
 
 /* ------------------------------------------------------------------------------------------------ */
 /* bodies                                                                                            */
@@ -600,7 +600,7 @@ u32 fn_8007F0BC(ScnMdl* pSelf) {
 
 /* 0x8007F0CC - dispatch the material id through slot +0x34 (the `CopiedMatAccess` constructor's
  * handle hand-over). */
-u32 fn_8007F0CC(ScnMdl* pSelf, u32 id) {
+u32 g3d_root_model_bind(ScnMdl* pSelf, u32 id) {
     return pSelf->mpfn_0x34(pSelf->mResMdl, id);
 }
 

@@ -35,7 +35,7 @@
  * ~4 % of the range's bytes, with 16 functions byte-identical and the rest of this pass's set between
  * 92 and 99 %.  Per-symbol numbers are in `build/RMHE08/report.json` and the outbox; what is
  * deliberately NOT written, and why:
- *   * `fn_8029F204` (452 B, the hit-record initializer) reads the owner's area byte for all four
+ *   * `hit_data_apply` (452 B, the hit-record initializer) reads the owner's area byte for all four
  *     owner kinds; kinds 1 and 2 land on offsets `pl.h` does not name (+0x1E1 inside an `_EQUIP`
  *     sub-record, +0x08 inside a run another lane owns), and this pass did not invent names for them.
  *   * The owner work records (`_HIT_W`'s owner, written at +0x470/+0x574/+0x8B4 by the
@@ -129,7 +129,7 @@ extern "C" u32 fn_8029F084(u16* ids, u16 id)
 }
 
 /* Empties a 20-entry id table and clears the count byte that indexes it. */
-extern "C" void fn_8029F170(u16* ids, u8* count)
+extern "C" void hit_id_list_clear(u16* ids, u8* count)
 {
     s32 i;
 
@@ -163,7 +163,7 @@ extern "C" void fn_80299ED8(void)
 }
 
 /* Pushes an active hit onto the registry's first list. */
-extern "C" void fn_8029EFDC(_HIT_W* hit)
+extern "C" void hit_attack_list_push(_HIT_W* hit)
 {
     HitRegistry* reg = &lbl_806AC8A8;
     _HIT_W* prev;
@@ -178,7 +178,7 @@ extern "C" void fn_8029EFDC(_HIT_W* hit)
 }
 
 /* The same push onto the registry's second list. */
-extern "C" void fn_8029F00C(_HIT_W* hit)
+extern "C" void hit_body_list_push(_HIT_W* hit)
 {
     HitRegistry* reg = &lbl_806AC8A8;
     _HIT_W* prev;
@@ -193,14 +193,14 @@ extern "C" void fn_8029F00C(_HIT_W* hit)
 }
 
 /* Records one hit's owner and its kind. */
-extern "C" void fn_8029F03C(_HIT_W* self, u8 kind, void* owner)
+extern "C" void hit_source_set(_HIT_W* self, u8 kind, void* owner)
 {
     self->owner_0x10 = owner;
     self->owner_kind_0x06 = kind;
 }
 
 /* Records the second owner slot of a hit. */
-extern "C" void fn_8029F048(_HIT_W* self, u8 kind, void* owner)
+extern "C" void hit_owner_set(_HIT_W* self, u8 kind, void* owner)
 {
     self->owner_0x14 = owner;
     self->kind_0x07 = kind;
@@ -344,7 +344,7 @@ extern "C" u32 fn_8029D6FC(u8 a, u8 b)
     return 0;
 }
 
-/* The four-way kind `fn_8029F204`'s two floats select: 0 when neither value is usable, 1/2 by which
+/* The four-way kind `hit_data_apply`'s two floats select: 0 when neither value is usable, 1/2 by which
  * slot carries the positive value and 3 when the second slot is the unusable default. */
 extern "C" u32 fn_8029A140(_HIT_W* self)
 {

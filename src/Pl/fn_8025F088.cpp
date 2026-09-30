@@ -792,6 +792,6 @@ void fn_8025F088(_PLW* self) {
     if (fn_8026FD94(self) == 0) {
         fn_8027D4F0(self);
     }
-    fn_8029EFDC(&self->field_0x484);
-    fn_8029EFDC(&self->field_0x4E0);
+    hit_attack_list_push(&self->field_0x484);
+    hit_attack_list_push(&self->field_0x4E0);
 }

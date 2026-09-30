@@ -548,9 +548,9 @@ void fn_802D1D90(struct _AINPC_W* self)
     fn_802D1FFC(self);
     fn_800E0914(&self->model);
     for (i = 0; i < 2; i++) {
-        fn_8029EFDC(&self->hit[i]);
+        hit_attack_list_push(&self->hit[i]);
     }
-    fn_8007F0CC(pRoot, self->model.field_0x118);
+    g3d_root_model_bind(pRoot, self->model.field_0x118);
 }
 
 /* 0x802D1FFC - copies the model-transform words into the engine model and the position into its
@@ -1101,7 +1101,7 @@ void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row)
     f32 limit;
 
     hit->field_0x08 = lbl_80792508[entry->motion_id_0x0F];
-    fn_8029F538(hit);
+    hit_flags_clear(hit);
     hit_flag_set(hit, 0x320);
     hit->motion_no_0x18 = ai_get_motion_no(self);
     hit->field_0x1A = 0;
@@ -1124,7 +1124,7 @@ void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row)
             }
         }
     }
-    fn_8029F204(hit, entry, lbl_8079A670);
+    hit_data_apply(hit, entry, lbl_8079A670);
     fn_802D2BB0(self, hit);
 }
 

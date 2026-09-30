@@ -169,8 +169,9 @@ struct LbEquipWork {
     /* +0x40FA */ u16 maskB_0x40FA; /* bits 12-19 */
     /* +0x40FC */ u8 unused_0x40FC[8];
     /* +0x4104 */ u32 bits_0x4104[4]; /* bits 0-117 of the owned-item mask */
-}; /* size: 0x4114+ (approximate: traced from the fields this range reads; the object lives in the
-      `.bss` run the map calls `lbl_806ADA58`) */
+}; /* size: 0x4114+ (approximate: traced from the fields this range reads; the object is reached through
+      a pointer argument; nothing but `stage/shell.cpp` references `.bss` 0x806ADA58 (`shell_work_tbl`, 64 x 0x10C),
+      so it does not live there) */
 
 } /* extern "C" */
 

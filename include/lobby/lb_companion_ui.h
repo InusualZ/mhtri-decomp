@@ -16,6 +16,7 @@
 
 #include "types.h"
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
+#include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
 
 /* `include/lobby/lb_quest_screen.h` (where `quest_element_pick_ck` belongs) cannot be included from
  * here: it declares `fmt_803AA41C(s32, f32)` (the owner's two-argument form) where this header's own
@@ -135,18 +136,6 @@ typedef struct LbCompanionWork {
     /* +0x06A68 */ u8 index_0x6A68;
     /* +0x06A69 */ u8 unused_0x06A69[0x3];
 } LbCompanionWork; /* size: 0x6A6C */
-
-/* The row record `fn_802AB538` returns (the lobby's per-kind row): the index at +0x05, the state
- * byte the act sets to 4 and the value word at +0x08.  Only what this band reads is named, so the
- * size is the extent read here.  size: >= 0xA */
-typedef struct LbRowWork {
-    /* +0x00 */ u8 unused_0x00[0x5];
-    /* +0x05 */ u8 index_0x05;
-    /* +0x06 */ u8 unused_0x06;
-    /* +0x07 */ u8 state_0x07;
-    /* +0x08 */ u16 value_0x08;
-    /* +0x0A */ u8 unused_0x0A[0x2];
-} LbRowWork; /* size: 0xC (>= 0xA read) */
 
 /* The record `get_move_work_adrs(0)` returns, as this band reads it: the companion work pointer at
  * +0xDC, the act state bytes at +0xFA (set by the act handlers) and the flag at +0x22E3.  The kind-0
@@ -504,7 +493,6 @@ void fn_803B6998(u16 a, u16 b);
 s32 fn_803AA41C(s32 a);
 u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 void fn_803A9F28(LbCompanionWork* work, LbCompanionSlot* slot, u16 index, u32 a);
-void fn_802AB760(LbRowWork* row, u8 value, u16 word);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
@@ -546,7 +534,6 @@ int memcmp(const void* a, const void* b, u32 n);
 #ifdef __cplusplus
 /* The C++-linkage AI/move-work accessor whose map name is `get_move_work_adrs__FUc` (rule 9). */
 LbMoveWork* get_move_work_adrs(u8 kind);
-LbRowWork* fn_802AB538(u8 a, u8 b);
 #endif
 
 #ifdef __cplusplus

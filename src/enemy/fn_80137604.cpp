@@ -82,6 +82,7 @@
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "ef/pRoot.h"
 
 #pragma peephole off
 
@@ -98,8 +99,7 @@ extern f32 lbl_80796D3C;
 /* The four 0x0C-byte colour records `setVec3` rebuilds; the table's bytes belong to the data pass. */
 extern nw4r::math::VEC3 lbl_806A4560[];
 
-/* The scene root `fn_8007F0CC` looks a model up in. */
-extern s32 pRoot;
+/* The scene root `g3d_root_model_bind` looks a model up in. */
 
 /* ------------------------------------------------------------------------------------------------ *
  * the callees
@@ -173,7 +173,7 @@ void fn_8013A978(_ENEMY_WORK* self);
 /* `mh3_pad.cpp`: rebuilds one 0x0C-byte record from three floats. */
 
 /* `g3d/g3d_scnmdl.cpp`: finds a scene model by id. */
-void fn_8007F0CC(s32 root, u32 id);
+void g3d_root_model_bind(s32 root, u32 id);
 
 /* `ef/fn_800CDB2C.cpp` */
 u32 my_player_no(void);
@@ -445,7 +445,7 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
             fn_800E0914((struct MHchar*)&self->char_0x024);
         }
         if (self->model_flag_0x058 != 0) {
-            fn_8007F0CC(pRoot, self->field_0x13C);
+            g3d_root_model_bind(pRoot, self->field_0x13C);
         }
         }
         break;

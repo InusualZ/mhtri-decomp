@@ -1038,7 +1038,7 @@ extern "C" u32 fn_8029F51C(_HIT_W* hit, u32 mask)
 }
 
 /* 0x8029F538: clears the hit entry's flag word. */
-extern "C" void fn_8029F538(_HIT_W* hit)
+extern "C" void hit_flags_clear(_HIT_W* hit)
 {
     hit->flags = 0;
 }
@@ -1077,7 +1077,7 @@ u8 hit_result_check(_HIT_W* hit)
 }
 
 /* 0x8029F5B4: stores the attack's damage value as the entry's +0x03C float. */
-extern "C" void fn_8029F5B4(_HIT_W* hit, s16 value)
+extern "C" void hit_knock_set(_HIT_W* hit, s16 value)
 {
     hit->field_0x03C = (f32)value;
 }

@@ -46,7 +46,7 @@ struct AINPCFormation {
 };
 
 /* One attack entry of the two the AI NPC carries at +0x240 (stride 0x5C).  `hit_flag_set` /
- * `fn_8029F538` are the shared registry helpers and take this pointer, which is what fixes the
+ * `hit_flags_clear` are the shared registry helpers and take this pointer, which is what fixes the
  * type (`hit_flag_set__FP6_HIT_WUl`). size: 0x5C */
 struct _HIT_W {
     /* +0x00 */ u8 unused_0x00[0x05];
@@ -62,7 +62,7 @@ struct _HIT_W {
     /* +0x1C */ u16 field_0x1C;
     /* +0x1E */ u16 field_0x1E;
     /* +0x20 */ u32 flags;             /* the registry flag word `hit_flag_set` ORs into and
-                                        * `fn_8029F538` clears */
+                                        * `hit_flags_clear` clears */
     /* +0x24 */ u8 unused_0x24[0x31 - 0x24];
     /* +0x31 */ u8 field_0x31;         /* the attack selector: 0x0A for a fresh entry, 1 on a
                                         * blocked one */

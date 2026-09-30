@@ -50,6 +50,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/fn_8012BDF4.h"
+#include "Pl/yure_joint_apply.h"
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_resanmcamera.h"
 #include "sys_mem.h"
@@ -168,8 +169,8 @@ void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4
 void fn_80139854(void);
 void fn_80139858(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3);
 void fn_80139954(ResUserDataAc* self, MtxHolder* arg1, s32 arg2, s32 arg3, s32 arg4, UserDataItem* arg5);
-void fn_80139A64(MtxHolder* dst, void* src);
-void fn_80139A7C(MtxHolder* holder, void* mtx);
+void joint_mtx_store(MtxHolder* dst, void* src);
+void joint_mtx_load(MtxHolder* holder, void* mtx);
 void fn_80139A98(MtxHolder* holder, void* src);
 void fn_80139AA0(void);
 void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2);
@@ -226,7 +227,7 @@ u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2);
 extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, s32 line, const char* msg, ...);
 extern s32 strcmp(const char* a, const char* b);
 
-extern void fn_800504D4(void* mtx);
+extern void mtx34_identity(void* mtx);
 extern void subVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern f32 fn_80050EF4(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
@@ -281,9 +282,8 @@ extern void fn_8012B64C(EnemyWork* work);
 extern void em_busy_set(EnemyWork* work);
 extern u32 fn_80133BCC(EnemyWork* work);
 extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
-extern void fn_8029EFDC(void* arg0);
-extern void fn_8029F5B4(void* arg0, s32 arg1);
-extern void fn_802AD738(void* arg0, void* arg1);
+extern void hit_attack_list_push(void* arg0);
+extern void hit_knock_set(void* arg0, s32 arg1);
 extern void fn_802B01AC(Vec3* out, const Vec3* v, u8 area);
 extern f32 fn_802B0430(u8 area);
 extern u8 stage_map_kind_get(u8 arg0);
@@ -423,7 +423,7 @@ struct UserDataCursor { /* size: 0x08 */
     /* +0x06 */ u16 field_0x06;
 };
 
-/* A struct holding one matrix pointer (the `fn_80139A64`/`fn_80139A7C` argument). */
+/* A struct holding one matrix pointer (the `joint_mtx_store`/`joint_mtx_load` argument). */
 struct MtxHolder { /* size: 0x04 */
     /* +0x00 */ void* mtx;
 };
@@ -1030,9 +1030,9 @@ void fn_80138EC8(EnemyWork* self, u32 arg1) {
     u8 index = (u8)arg1;
 
     if (self->field_0xA08[index].field_0x05 != 0 && (self->field_0xAEC[index] & 1) != 0) {
-        fn_8029F5B4(&self->field_0xA08[index], 100);
+        hit_knock_set(&self->field_0xA08[index], 100);
     }
-    fn_8029EFDC(&self->field_0xA08[index]);
+    hit_attack_list_push(&self->field_0xA08[index]);
 }
 
 /* Marks every move the work cannot currently reach with the -1 sentinel. */
@@ -1351,29 +1351,29 @@ void fn_80139954(ResUserDataAc* self, MtxHolder* arg1, s32 arg2, s32 arg3, s32 a
     }
     case 1:
         if (arg5->field_0x08 < 6) {
-            fn_80139A7C(arg1, &mtx);
+            joint_mtx_load(arg1, &mtx);
             rotMatrixY__FUlPQ34nw4r4math5MTX34(self->work->field_0x742[arg5->field_0x08], &mtx);
-            fn_80139A64(arg1, &mtx);
+            joint_mtx_store(arg1, &mtx);
             return;
         }
         break;
     case 2:
-        fn_802AD738(&self->work->field_0x590[arg5->field_0x08], arg1);
+        yure_joint_apply((struct YureRec*)&self->work->field_0x590[arg5->field_0x08], (struct MtxHolder*)arg1);
         break;
     }
 }
 
 /* Copies a matrix into the holder, or resets it when no source is given. */
-void fn_80139A64(MtxHolder* dst, void* src) {
+void joint_mtx_store(MtxHolder* dst, void* src) {
     if (src != NULL) {
         fn_8007100C(dst->mtx, src);
         return;
     }
-    fn_800504D4(dst->mtx);
+    mtx34_identity(dst->mtx);
 }
 
 /* Copies the holder's matrix into the destination. */
-void fn_80139A7C(MtxHolder* holder, void* mtx) {
+void joint_mtx_load(MtxHolder* holder, void* mtx) {
     if (mtx == NULL) {
         return;
     }
@@ -1405,7 +1405,7 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
     idx = fn_8005D124(arg1);
     fn_8005D0CC(&key, &idx);
     fn_800532DC(&m2, &arg2[fn_8006FDCC(&key)]);
-    fn_800883C4(&m3, &m2);
+    mtx34_inverse(&m3, &m2);
     fn_800710BC(out, &m3, &m1);
 }
 

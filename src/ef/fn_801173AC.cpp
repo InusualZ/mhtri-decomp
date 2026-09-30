@@ -431,7 +431,7 @@ extern "C" void fn_801173AC(_EFT* self)
     work->rot_y = (u16)(work->rot_y + (u16)work->spin_y);
     work->rot_z = (u16)(work->rot_z + (u16)work->spin_z);
 
-    fn_800504D4(&mtx);
+    mtx34_identity(&mtx);
     rotMatrixX(work->rot_x, &mtx);
     rotLocalMatY(work->rot_y, &mtx);
     rotLocalMatZ(work->rot_z, &mtx);
@@ -646,7 +646,7 @@ extern "C" void fn_80117A1C(_EFT* self)
         fn_800E0A14(&actor->physics_0x13C->chr_0x04, 0xb, &mtxA);
         setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
         mulVecMat(&vec, &mtxA);
-        fn_800504D4(&mtxB);
+        mtx34_identity(&mtxB);
         rotLocalMatY(self->field_0x10, &mtxB);
         mtxB.m[0][3] = mtxA.m[0][3] + vec.x;
         self->pos_0x18.x = mtxA.m[0][3] + vec.x;
@@ -895,7 +895,7 @@ extern "C" void fn_80118214(_EFT* self)
         get_joint_wpos_em((struct _ENEMY_WORK*)em, work->joint, &vA);
         copyVec3(&self->pos_0x18, &vA);
         copyVec3(&vB, &work->offset);
-        fn_800504D4(&mtx);
+        mtx34_identity(&mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);
         rotLocalMatX(self->rot_0x24.x, &mtx);
         rotLocalMatZ(self->rot_0x24.z, &mtx);
@@ -1069,7 +1069,7 @@ extern "C" void fn_8011870C(_EFT* self)
     self->area_0x44 = em->area_0x16;
     em->model_0x13C->chr_0x04.get_joint_wpos(3, &vA);
     copyVec3(&self->pos_0x18, &vA);
-    fn_800504D4(&mtx);
+    mtx34_identity(&mtx);
     rotLocalMatY(self->rot_0x24.y, &mtx);
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatY(work->rot_c, &mtx);
@@ -1126,7 +1126,7 @@ extern "C" void fn_80118B2C(_EFT* self)
     self->area_0x44 = em->area_no_0x1E1;
     self->rot_0x24.z += (u16)(s32)(lbl_80796AF8 + lbl_80796AFC * lbl_805A04E0[self->type_0x02] / lbl_80796B00);
 
-    fn_800504D4(&mtx);
+    mtx34_identity(&mtx);
     rotLocalMatY(self->rot_0x24.y, &mtx);
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatZ(self->rot_0x24.z, &mtx);
@@ -1380,7 +1380,7 @@ extern "C" void fn_80119450(_EFT* self)
         self->field_0x10 = 4;
     }
 
-    fn_800504D4(&mtx);
+    mtx34_identity(&mtx);
     rotMatrixY(self->rot_0x24.y, &mtx);
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatZ(self->rot_0x24.z, &mtx);

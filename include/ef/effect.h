@@ -42,4 +42,11 @@ s32 fn_800F9D80(_EFT* self);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x800F9920 - steps the pooled effect one frame and reports whether it is still alive; the map spells
+ * it `effect_move__FPQ34nw4r2ef6Effect`, so it is a C++ free function (rule 9);
+ * `stage/shell.cpp`'s `shell_draw_set_eff` drives it. */
+u32 effect_move(nw4r::ef::Effect* effect);
+#endif
+
 #endif /* MHTRI_EF_EFFECT_H */

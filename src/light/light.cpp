@@ -186,7 +186,7 @@ typedef struct LightWrap {
     /* +0x04 */ LightVecAt4 inner;
 } LightWrap; /* size: 0x14 */
 
-/* fn_802C2698's record: the block at +0x08 is handed to fn_801FF984 by address. */
+/* fn_802C2698's record: the block at +0x08 is handed to mhchar_construct by address. */
 typedef struct LightWrap2 {
     /* +0x00 */ u8 unused_0x00[0x08];
     /* +0x08 */ u32 block;
@@ -591,7 +591,7 @@ extern "C" LightWrap* fn_802C2664(LightWrap* self)
 /* Constructs the block the record carries at +0x08. */
 extern "C" LightWrap2* fn_802C2698(LightWrap2* self)
 {
-    fn_801FF984(&self->block);
+    mhchar_construct(&self->block);
     return self;
 }
 

@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 void addVec3To(void* dst, const void* src);
+void addVec3To(void* dst, const void* src);
 
 /* The matrix-id flag helpers `fn_800737CC` defines (they set/clear the mode bits of a matrix id).
  * Consumers: `src/g3d/fn_800D77B0.cpp` (the per-node transform), from docs/plan.md 6.5 rule 2. */

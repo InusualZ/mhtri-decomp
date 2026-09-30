@@ -15,6 +15,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/pRoot.h"
 
 /* The `g3d_calcworld`/`g3d_camera` resource types the returned pointers name; only ever used through a
  * pointer here, so the incomplete type is enough. */
@@ -50,7 +51,7 @@ f32 fn_80463E74(void);
 void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
 void fn_80080B10(void* arg0, u32 arg1);
 void fn_800810DC(void* arg0, s32 arg1);
-void fn_800883C4(Mtx34* out, const Mtx34* src);
+void mtx34_inverse(Mtx34* out, const Mtx34* src);
 void fn_800834F0(void* p); /* constructs one 8-byte sub-object (ef_particle's parameter record) */
 
 /* 0x8006946C..0x80069768 - the `g3d_resvtx_ac.h` accessor group moved to its owner's header,
@@ -97,8 +98,7 @@ void fn_800868A0(u32 value);
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 s32 fn_80082BCC(s32 model);
-void fn_8007F0CC(s32 root, u32 id);
-extern s32 pRoot; /* .sbss 0x80794974 - the g3d model root the effect units project through */
+void g3d_root_model_bind(s32 root, u32 id);
 
 /* 0x8007A510 - the softreset/return-to-title request (caller: src/mh3_pad.cpp). */
 void fn_8007A510(void);

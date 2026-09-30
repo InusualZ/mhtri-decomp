@@ -285,7 +285,7 @@ void fn_800A95D8(void* node);
 u32 fn_800A98D4(void* pm, void (*cb)(void*, u32), u32 arg, bool flag, u32 zero);
 void fn_800AE500(void* pm, u32 flag);
 void fn_800AE5B0(void* pm);
-void fn_800504D4(void* mtx);
+void mtx34_identity(void* mtx);
 void fn_8007100C(MTX34* dst, const MTX34* src);
 u16 fn_8009B374(void* list, void** buf, u16 size);
 void fn_80501A64(void* list, void* node);
@@ -381,7 +381,7 @@ extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
     fn_800A444C(self);
     fn_800A4428(&self->mEmitters);
     self->mField_0xA0 = mgr->field_0x04;
-    fn_800504D4(&self->mRootMtx);
+    mtx34_identity(&self->mRootMtx);
     self->mManagerES = mgr;
     self->mField_0x48 = 0;
     self->mField_0x4C = 0;

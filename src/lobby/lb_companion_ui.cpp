@@ -457,20 +457,20 @@ void lb_sub0d_send(u8 index, LbActReq* req, s8 flag) {
 }
 
 /* Act 13: hands the request's row and word to the row updater, or marks the row started.
- * Name: act 13: `fn_802AB538` row lookup, then either the state-4 start (with `lb_sub0d_send`) or
- *   `fn_802AB760` */
+ * Name: act 13: `serial_find` row lookup, then either the state-4 start (with `lb_sub0d_send`) or
+ *   `serial_state_set_word` */
 void lb_act_row_update(u8 unused, LbActReq* req) {
-    LbRowWork* row;
+    ShellSerialEntry* row;
 
-    row = fn_802AB538(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
+    row = serial_find(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
     if (row != NULL) {
         if (isReadyCountOne() == 1 && req->sel_0x04.bytes_0x00.c_0x02 == 3 && row->state_0x07 <= 3) {
-            row->value_0x08 = req->mask_0x08.half_0x00;
+            row->word_0x08 = req->mask_0x08.half_0x00;
             row->state_0x07 = 4;
-            lb_sub0d_send(row->index_0x05, req, 4);
+            lb_sub0d_send(row->player_0x05, req, 4);
             return;
         }
-        fn_802AB760(row, req->sel_0x04.bytes_0x00.c_0x02, req->mask_0x08.half_0x00);
+        serial_state_set_word(row, req->sel_0x04.bytes_0x00.c_0x02, req->mask_0x08.half_0x00);
     }
 }
 

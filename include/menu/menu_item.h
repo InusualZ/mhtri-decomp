@@ -39,7 +39,7 @@ struct _HIT_W {
     /* +0x024 */ u8 unused_0x024[0x031 - 0x024];
     /* +0x031 */ u8 field_0x031;       /* the mask byte `fn_8029F57C` tests */
     /* +0x032 */ u8 unused_0x032[0x03C - 0x032];
-    /* +0x03C */ f32 field_0x03C;      /* the s16 `fn_8029F5B4` widens and stores */
+    /* +0x03C */ f32 field_0x03C;      /* the s16 `hit_knock_set` widens and stores */
     /* +0x040 */ u8 unused_0x040[0x05B - 0x040];
     /* +0x05B */ u8 field_0x05B;       /* the mask byte `fn_8029F51C` tests */
 };
@@ -128,7 +128,7 @@ struct ItemDataHead {
 };
 
 /* The menu table set at `.bss:0x806ACF28` (0x770 B, the whole `.bss` run between the item head and
- * `lbl_806AD698`).  The three accessors below index `lsp_tbl`, `tab_0x66C` and `array_0x758`; the
+ * `shell_pool`).  The three accessors below index `lsp_tbl`, `tab_0x66C` and `array_0x758`; the
  * 0xE8 bytes between `tab_0x66C` and `field_0x754` are not touched by this unit. */
 struct MenuTables {
     /* +0x000 */ u32* lsp_tbl[0x66C / 4];
@@ -358,11 +358,11 @@ extern "C" {
 
 void fn_8029F4C4(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d);
 u32 fn_8029F51C(_HIT_W* hit, u32 mask);
-void fn_8029F538(_HIT_W* hit);
+void hit_flags_clear(_HIT_W* hit);
 void fn_8029F554(_HIT_W* hit, u32 flags);
 u32 fn_8029F564(_HIT_W* hit, u32 flags);
 u32 fn_8029F57C(_HIT_W* hit, u32 mask);
-void fn_8029F5B4(_HIT_W* hit, s16 value);
+void hit_knock_set(_HIT_W* hit, s16 value);
 u32 fn_8029F5E4(_HIT_W* hit);
 u32 fn_8029F5F8(_HIT_W* hit);
 u32 fn_8029F60C(void);

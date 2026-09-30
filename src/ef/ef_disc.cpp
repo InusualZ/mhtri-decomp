@@ -32,7 +32,7 @@
  */
 
 #include "ef.h"
-#include "fn_8004CAD8.h"      /* fn_80050BC0 - that unit owns the address and publishes it (rule 2) */
+#include "fn_8004CAD8.h"      /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
 #pragma peephole off
 #pragma fp_contract off
 
@@ -88,7 +88,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
              * Retail's `f2` at 0x800CCA7C is the hoisted `1.0f - t`, which the else branch below reuses
              * (0x800CCA98) - so the shared subexpression stays in the expression and MWCC still
              * materialises it before the call. */
-            scale = fn_80050BC0(t + (1.0f - t) * (rate * rate));
+            scale = sqrt_f32(t + (1.0f - t) * (rate * rate));
         } else {
             scale = t + rate * (1.0f - t);
         }

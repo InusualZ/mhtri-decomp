@@ -2,7 +2,7 @@
  * The two `src/fn_8004CAD8.cpp` symbols that other bands reach without needing that unit's whole
  * header: 0x8005050C (`MTX34_ctor`) and 0x8004CAD8 (`set_slot_none`).  `include/fn_8004CAD8.h`
  * includes this file; it is split out because its own declaration set (`res_tex_ctor`,
- * `fn_80050850`, `fn_800504D4`, ...) still disagrees with several consumers' local copies, so
+ * `fn_80050850`, `mtx34_identity`, ...) still disagrees with several consumers' local copies, so
  * pulling the whole header into the `ef`/`g3d`/`Pl` bands fails to compile (measured: 30 TUs,
  * MWCC `(10505)`/`(10197)` on the *other* symbols).
  *

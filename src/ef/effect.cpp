@@ -271,8 +271,8 @@ s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
 s32 fn_800F6B6C(u32 a, u32 b, u8 idx, u32 c, u8 d);
 void* fn_800FBD68(s32 a);
 void* fn_802B0420(void);
-u32 fn_802AFFF4(void);
-u32 fn_802AFF38(void);
+u32 stage_water_area_ck(void);
+u32 stage_water_enabled_ck(void);
 void fn_8028F558(void* a, void* b);
 u32 fn_802907BC(void* a, void* b);
 f32 fn_80050EDC(void* v);
@@ -552,11 +552,11 @@ extern "C" s32 fn_800F9D80(EftFrameState* self) {
     if (self->value_0x1C < lbl_807965F4) {
         u8 flags = self->flags_0x04;
         if ((flags & 0x4) != 0) {
-            if (fn_802AFFF4() == 1) {
+            if (stage_water_area_ck() == 1) {
                 result = 1;
             }
         } else if ((flags & 0x2) != 0) {
-            if (fn_802AFF38() == 1) {
+            if (stage_water_enabled_ck() == 1) {
                 result = 1;
             }
         }

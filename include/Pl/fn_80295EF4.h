@@ -9,12 +9,15 @@
 #include "types.h"
 #include "nw4r/math.h"
 
+struct _HIT_SIZE_DATA;
+struct _HIT_DATA;
+
 /* One entry of the global hit registry's linked lists (the map's `_HIT_W`, spelled by
  * `hit_flag_set__FP6_HIT_WUl` / `hit_result_check__FP6_HIT_W`): the record a live attack is
- * registered as.  `+0x00` is the list link (`fn_8029EFDC`/`fn_8029F00C` push the record onto one of
+ * registered as.  `+0x00` is the list link (`hit_attack_list_push`/`hit_body_list_push` push the record onto one of
  * the registry's two heads and write the previous head here), `+0x05` is tested for zero before the
  * push, `+0x06`/`+0x07` select the owner's type twice over and `+0x10`/`+0x14` are the two owner
- * pointers - `fn_8029F204` stores the hit id at `+0x0C` and reads the owner's area byte through
+ * pointers - `hit_data_apply` stores the hit id at `+0x0C` and reads the owner's area byte through
  * `+0x10`.
  * size: 0x60 (lower bound - the highest offset this unit touches is +0x5B) */
 struct _HIT_W {
@@ -23,13 +26,21 @@ struct _HIT_W {
     /* +0x05 */ u8 active_0x05;
     /* +0x06 */ u8 owner_kind_0x06;   /* 0 = player, 1 = enemy, 2 = ?, 3 = AI NPC (`fn_80299EF8`) */
     /* +0x07 */ u8 kind_0x07;
-    /* +0x08 */ u8 unused_0x08[0x0C - 0x08];
+    /* +0x08 */ _HIT_SIZE_DATA* size_data_0x08;   /* the hit-box size record `shell_attack_set` picks */
     /* +0x0C */ u16 hit_id_0x0C;
     /* +0x0E */ u8 unused_0x0E[0x10 - 0x0E];
     /* +0x10 */ void* owner_0x10;
     /* +0x14 */ void* owner_0x14;
-    /* +0x18 */ u8 unused_0x18[0x50 - 0x18];
-    /* +0x50 */ f32 value_0x50;      /* `fn_8029F204` stores `-100.0f` or a lowered byte here */
+    /* +0x18 */ u8 unused_0x18[0x31 - 0x18];
+    /* +0x31 */ u8 attack_flags_0x31;    /* the attack-flag byte `shell_attack_set` stores (bit 4 is dropped for
+                                          * a weak enemy master) */
+    /* +0x32 */ u8 attack_kind_0x32;
+    /* +0x33 */ u8 unused_0x33[0x38 - 0x33];
+    /* +0x38 */ f32 power_0x38;          /* the attack record's first s16, as a float */
+    /* +0x3C */ f32 knock_0x3C;          /* its second s16, as a float */
+    /* +0x40 */ s16 life_0x40;           /* the hit's remaining frames (scaled by an enemy master's rate) */
+    /* +0x42 */ u8 unused_0x42[0x50 - 0x42];
+    /* +0x50 */ f32 value_0x50;      /* `hit_data_apply` stores `-100.0f` or a lowered byte here */
     /* +0x54 */ f32 value_0x54;      /* the same for the second owner slot */
     /* +0x58 */ u8 unused_0x58[0x60 - 0x58];
 };
@@ -76,6 +87,15 @@ extern "C" {
 /* The 0x25-byte tile-id table `fn_8029B8F4` indexes (`.data`; unowned, so declared here). */
 extern u8 lbl_805CDC88[];
 extern HitRegistry lbl_806AC8A8;
+
+/* The registry helpers the shell pool (`stage/shell.cpp`) drives.  The owner argument is whatever record the hit belongs to (a shell,
+ * a player or an enemy, by kind). */
+void hit_attack_list_push(_HIT_W* hit);
+void hit_body_list_push(_HIT_W* hit);
+void hit_source_set(_HIT_W* self, u8 kind, void* owner /* untyped: caller-owned payload - the shell, player or enemy record the kind names */);
+void hit_owner_set(_HIT_W* self, u8 kind, void* owner /* untyped: caller-owned payload - the shell, player or enemy record the kind names */);
+void hit_id_list_clear(u16* ids, u8* count);
+void hit_data_apply(_HIT_W* hit, _HIT_DATA* data);
 
 #ifdef __cplusplus
 }

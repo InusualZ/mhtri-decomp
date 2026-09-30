@@ -91,7 +91,7 @@
  *     owner's header - `include/enemy/fn_80138074.h` declares `fn_8013A654` with `_ENEMY_WORK*` where
  *     the callee's own body reads +0x04/+0x08 (settled from the callee, rule 6 of the playbook).
  *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
- *     `fn_8013918C`, `fn_80139A64`, `fn_80139A7C`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
+ *     `fn_8013918C`, `joint_mtx_store`, `joint_mtx_load`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
  *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `mtx34_trans_add`, `mtx34_trans_get`, `MTX34_ctor`,
  *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `stage_map_kind_get`,
  *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
@@ -219,7 +219,7 @@ struct EmUserItem {
     /* +0x05 */ u8 unused_0x05[0x13];
 };
 
-/* A holder of one matrix pointer (`fn_80139A64`/`fn_80139A7C`'s argument; the owner spells it
+/* A holder of one matrix pointer (`joint_mtx_store`/`joint_mtx_load`'s argument; the owner spells it
  * `MtxHolder`).
  * size: 0x04 */
 struct EmMtxHolder {
@@ -323,8 +323,8 @@ void em_mot_set(EmActWork* self, s32 a, s32 b, s32 c);
 void fn_803B9BA0(EmActWork* self, VEC3* pos, s32 value);
 void fn_8013918C(void* p, s16 flag);
 void em_hit_window_set(EmActWork* self, u8 a, u32 b, u32 c);
-void fn_80139A64(EmMtxHolder* holder, void* src);
-void fn_80139A7C(EmMtxHolder* holder, void* mtx);
+void joint_mtx_store(EmMtxHolder* holder, void* src);
+void joint_mtx_load(EmMtxHolder* holder, void* mtx);
 void fn_8013A654(EmUserData* self, u32 flags);
 void fn_8008E8D0(void* holder, void* vec);
 void fn_8008EE68(void* holder, void* mtx);
@@ -703,9 +703,9 @@ void fn_80191E30(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
             return;
         }
         if (work->clusters_0x590[index].live_0x03 >= 1) {
-            fn_80139A7C(holder, &mtx);
+            joint_mtx_load(holder, &mtx);
             fn_800FBB90(&mtx, &work->clusters_0x590[index].pos_0x24);
-            fn_80139A64(holder, &mtx);
+            joint_mtx_store(holder, &mtx);
         }
         break;
     }

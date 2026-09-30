@@ -809,7 +809,7 @@ extern "C" void fn_803088FC(_EFT* self)
         work->v_0x0C.offset.y -= work->field_0x18;
         addVec3To(&self->pos_0x18, &work->v_0x0C.offset);
         self->rot_0x24.x -= 2185;
-        fn_800504D4(&mtx);
+        mtx34_identity(&mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);
         rotLocalMatX(self->rot_0x24.x, &mtx);
         fn_800FBB90(&mtx, &self->pos_0x18);

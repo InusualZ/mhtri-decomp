@@ -55,7 +55,7 @@ extern "C" void GXSetProjection(const f32* pMtx, s32 type);
 extern "C" void GXSetScissor(u32 left, u32 top, u32 width, u32 height);
 extern "C" void GXSetScissorBoxOffset(s32 x, s32 y);
 extern "C" void GXSetViewport(f32 x, f32 y, f32 width, f32 height, f32 near, f32 far);
-extern "C" void fn_800504D4(void* pOut);
+extern "C" void mtx34_identity(void* pOut);
 extern "C" void* fn_80050508(void* pMtx);
 extern "C" void fn_80050850(void* pOut, const void* pIn);
 extern "C" s32 fn_800508A8(const void* pIn);
@@ -512,7 +512,7 @@ void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut) {
         return;
     }
     CameraData* pData = fn_80074A54(pSelf);
-    fn_800504D4(pOut);
+    mtx34_identity(pOut);
     f32* pMtx = (f32*)pOut;
     pMtx[0] = pData->mUnkCC;
     pMtx[3] = pData->mUnkD4;

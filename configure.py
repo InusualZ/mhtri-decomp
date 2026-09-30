@@ -574,6 +574,14 @@ config.libs = [
             # file name is class 3 (brief section 2).  `.text` only: the range references `.bss`
             # (`stage_w`, `lbl_806BB7A0`) and shares the pool of the earlier units, so no data range
             # is claimed.
+            # The gunner-shell pool `_SHELL_W` below the menu band (`.text` 0x802AA6A8..0x802ABD28,
+            # 58 functions; cut out of `menu/menu_message.cpp`'s tail; extab 0x80013984..0x80013AC4,
+            # extabindex 0x800314C4..0x800316A4, `.ctors` 0x8056F374, `.bss` 0x806AD698..0x806B8798,
+            # `.sdata2` 0x8079A400..0x8079A410).  The seam to `Pl/pl_yure.cpp` is the static initialiser
+            # `.ctors` word (one `__sinit` per TU) and the disjoint `.data`/`.bss`/`.sdata2` referrers -
+            # see the unit headers.  Flags: `cflags_main` plus the source's `#pragma peephole off`, the
+            # stage band's same deviation (see `stage/stg_w.cpp`).
+            Object(NonMatching, "stage/shell.cpp"),
             Object(NonMatching, "stage/stg_w.cpp"),
             Object(NonMatching, "stage/fn_802B2978.c"),
             # Registered from proposal/802B2AA0_fn_802B2AA0.cpp (a 0x802B2AA0 run discovery
@@ -1584,6 +1592,8 @@ config.libs = [
             Object(NonMatching, "ef/ef_emform.cpp"),
             Object(NonMatching, "ef/ef_line.cpp"),
             Object(NonMatching, "ef/ef_point.cpp"),
+            # Carved out of the 0x800CDB2C proposal range on 2026-09-30: the `ef_sphere.cpp` TU (one function; see the unit header).
+            Object(NonMatching, "ef/ef_sphere.cpp"),
             # Registered from proposal/800CDB2C_fn_800CDB2C.cpp (a 0x800CDB2C run discovery
             # proposed at a --max-bytes cap; the seam is a guess and the range is several
             # original TUs - see the unit's file header).
@@ -2070,6 +2080,11 @@ config.libs = [
             # 0x8079B3C8.  The file name is a GUESS (the selector's meaning is unproven); evidence
             # and the data caveat are in the file header.  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/pl_act_class3.cpp"),
+            # The equipment sway band below the shell pool: `.text` 0x802ABD28..0x802AD9C0, extab
+            # 0x80013AC4..0x80013B0C, extabindex 0x800316A4..0x80031710, `.ctors` 0x8056F378 (its own
+            # static initialiser), `.data` 0x805CE638..0x805CED40, `.sdata` 0x807922C0..0x807922E0,
+            # `.bss` 0x806B8798..0x806B87C0, `.sdata2` 0x8079A410..0x8079A448 - see `Pl/pl_yure.cpp`.
+            Object(NonMatching, "Pl/pl_yure.cpp"),
         ],
     },
     {
@@ -2241,6 +2256,8 @@ config.libs = [
             # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
             # builder) and names it; the range's own data has no `__FILE__` string, so the name stays
             # the map's `fn_` stem (docs/plan.md 12, the register-once rule).
+            # The `g3d_xsi.cpp` TU (0x800D6C00-0x800D77B0), carved out of `nw_resource.cpp`'s tail on 2026-09-30 (its own `__FILE__` string).
+            Object(NonMatching, "g3d/g3d_xsi.cpp"),         # 0x800D6C00-0x800D77B0
             Object(NonMatching, "g3d/fn_800D77B0.cpp"),     # 0x800D77B0-0x800D79B4
             # The `g3d_basic.cpp` SRT/matrix cluster, named by its own `__FILE__` string
             # (`lbl_80595840` = "g3d_basic.cpp", reached by fn_800D79B4's `nw4r::db::Panic` asserts).

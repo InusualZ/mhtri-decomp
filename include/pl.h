@@ -105,7 +105,9 @@ typedef struct MHchar {
     /* +0x0C0 */ u8 pad_0xC0[0x31];
     /* +0x0F1 */ u8 field_0xF1;     /* the model visibility flag `fn_8026A2D0`/`fn_8026A2DC` set */
     /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `pl_model_set_state`/`fn_8026A2F8` */
-    /* +0x0F3 */ u8 pad_0xF3[0x21];
+    /* +0x0F3 */ u8 pad_0xF3[0x19];
+    /* +0x10C */ struct _g3d_work* g3d_0x10C;   /* the pooled g3d work `push_shell_chara_heap` releases */
+    /* +0x110 */ u8 pad_0x110[0x4];
     /* +0x114 */ s32 field_0x114;
     /* +0x118 */ s32 field_0x118;
     /* +0x11C */ u8 pad_0x11C[0x20];
@@ -1018,7 +1020,7 @@ struct _PLW {
         };
         struct {   /* this branch's names, padded to the same byte total */
         /* +0x480 */ u8 pad_merge_0x480[0x4];
-                                /* +0x484 */ u8 field_0x484;   /* the per-frame work block `fn_8029EFDC` resets */
+                                /* +0x484 */ u8 field_0x484;   /* the per-frame work block `hit_attack_list_push` resets */
         /* +0x485 */ u8 pad_merge_0x485[0x5B];
         };
     };
@@ -1029,7 +1031,7 @@ struct _PLW {
             /* +0x4E0 */ u8 unk4E0[0x4E5 - 0x4E0];
         };
         struct {   /* this branch's names, padded to the same byte total */
-                                /* +0x4E0 */ u8 field_0x4E0;   /* the second per-frame work block `fn_8029EFDC` resets */
+                                /* +0x4E0 */ u8 field_0x4E0;   /* the second per-frame work block `hit_attack_list_push` resets */
         /* +0x4E1 */ u8 pad_merge_0x4E1[0x4];
         };
     };

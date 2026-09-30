@@ -54,6 +54,7 @@
 #include "ef/eft004.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/pRoot.h"
 
 /* ---- math types ---- */
 /* `Vec3` (and the `VEC3`/`MTX34`/`Mtx34` spellings) come from `nw4r/math.h` - one definition, in the
@@ -115,7 +116,7 @@ typedef union EftColor {
     } c; /* size: 0x04 */
 } EftColor; /* size: 0x04 */
 
-/* The light object fn_800E3B8C hands back; its owner pointer is the only field this unit writes.
+/* The light object sound_job_request hands back; its owner pointer is the only field this unit writes.
  * size: 0x30 - lower bound. */
 typedef struct EftLightObj {
     /* +0x00 */ u8 unused_0x00[0x2C];
@@ -265,7 +266,6 @@ extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
 extern s16 fn_802BF814(void);
 extern void fn_80111870(void);
 extern s32 fn_8026A328(s32 a, f32 b, f32 c);
-extern s32 pRoot;
 extern u16 Get_motion_no__FP4_PLW(Plw* plw);
 extern s32 Pl_frame_check__FP4_PLWUlff(Plw* plw, u32 a, f32 b, f32 c);
 extern Rgb3 lbl_8059F5B0[];
@@ -851,15 +851,15 @@ void fn_80111BC0(Eft* self, EftModel* model, u16 arg2)
     work = self->work_0x38;
     if ((arg2 - 0x15D) <= 1 || (arg2 == 0x150 && fn_8026A328(1, lbl_80796884, lbl_80796884) != 0)) {
         if (self->areano_0x44 != get_now_areano__Fv() || self->flag_0x01 == 0) {
-            fn_8007F0CC(pRoot, model->field_0x118);
+            g3d_root_model_bind(pRoot, model->field_0x118);
             return;
         }
         if (model != NULL && model->field_0x118 == model->field_0x10C->field_0x4) {
-            p = fn_800E3B8C(1, model->field_0x35, 0, 0x40, 0, fn_80111870);
+            p = sound_job_request(1, model->field_0x35, 0, 0x40, 0, fn_80111870);
             if (p != NULL) {
                 ((EftLightObj*)p)->owner_0x2C = self;
             }
-            fn_8007F0CC(pRoot, model->field_0x118);
+            g3d_root_model_bind(pRoot, model->field_0x118);
         }
     } else {
         fn_800F93D8(self, &work->slots_0x10.items.items_0x10[0], 2, 1, 0);

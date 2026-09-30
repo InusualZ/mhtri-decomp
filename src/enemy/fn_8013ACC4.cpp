@@ -76,6 +76,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/fn_8013ACC4.h"
+#include "stage/niku_find.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* One scoped pragma, measured on this unit's own command line: with the -O3 peephole MWCC fuses the
@@ -339,9 +340,6 @@ void fn_80140AF8(EmWork* self, u32 a, u8 b);
 u8 fn_80140768(u8* in);
 s16 fn_80140778(u8* in, u8 code, u8 mode);
 
-/* the shared layers */
-u32 fn_802AB994(u8 a, u8 b);
-u32 fn_802ABBA8(u32 id, EmWork* self);
 
 } /* extern "C" */
 
@@ -929,7 +927,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             case 10:
                 switch (self->field_0x95D) {
                 case 0:
-                    if (fn_802ABBA8(fn_802AB994(self->field_0x381, self->field_0x382), self) == 1) {
+                    if (niku_enemy_serial_matches(niku_find(self->field_0x381, self->field_0x382), (struct _ENEMY_WORK*)self) == 1) {
                         fn_8013AB74(self, self->field_0x95C, 1);
                     } else {
                         EmRunRec* run = (EmRunRec*)fn_80130DF8(self);

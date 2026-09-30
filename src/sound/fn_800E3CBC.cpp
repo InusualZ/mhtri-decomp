@@ -49,6 +49,7 @@
 #include "sound/fn_800E46E8.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/nw_res_manager.h"
 
 #pragma peephole off
 
@@ -116,7 +117,7 @@ struct Obj {
     /* 0x1C */ ObjSub* sub;
 };
 
-/* The manager `lbl_80794970` points at; only +0x29084 is read (the trailing struct size is therefore
+/* The manager `nw_res_manager` points at; only +0x29084 is read (the trailing struct size is therefore
  * approximate - the real record is longer).  size: 0x29088 (approximate) */
 typedef struct PrimMgr {
     /* 0x00000 */ u8 pad_0x00000[0x29084];
@@ -133,7 +134,6 @@ extern u32 lbl_807949A8[2];     /* .sbss record-list counts */
 extern u16 lbl_80791460[2];     /* .sdata record-list capacities */
 extern void* lbl_80597D20[6];   /* .data free-list bases */
 extern u16 lbl_80597D38[6];     /* .data free-list counts */
-extern void* lbl_80794970;      /* .sbss manager pointer */
 extern f32 lbl_80796458;
 extern f32 lbl_8079645C;
 extern f32 lbl_80796460;
@@ -143,7 +143,7 @@ extern f64 lbl_80796470;
 void fn_800E3C90(void* p);
 void fn_80075394(void* a, WorkBuf* out);
 void* fn_80047234(void* a);
-s32 fn_802AFF38(void);
+s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
 s32 fn_802AFF58(void);
 s32 fn_800D0724(void);
@@ -230,7 +230,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
     GXInvalidateVtxCache();
     fn_80075394(a, &b40);
     DrawCtx* ctx = (DrawCtx*)fn_80047234(a);
-    s32 sel = fn_802AFF38();
+    s32 sel = stage_water_enabled_ck();
     if (sel == 1) {
         f31 = lbl_80796458;
         fn_80074AA8(a, 0, &scalef, 0);
@@ -455,7 +455,7 @@ extern "C" void fn_800E444C(u8 idx, u8 mode)
         }
         if (rec->kind == 2) {
             Obj* h = (Obj*)rec->handle;
-            void* m = ((PrimMgr*)lbl_80794970)->field_0x29084;
+            void* m = ((PrimMgr*)nw_res_manager)->field_0x29084;
             h->sub->slot7(h, m);
             fn_80088590(0x7FF);
             continue;

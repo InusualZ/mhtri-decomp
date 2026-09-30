@@ -236,7 +236,7 @@ extern "C" u8 fn_802B0AEC(u8 index)
 }
 
 /* Tests bit 0 of the stage flag byte. */
-extern "C" bool fn_802AFF38()
+extern "C" bool stage_water_enabled_ck()
 {
     return SW->flags & 1;
 }

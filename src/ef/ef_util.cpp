@@ -70,7 +70,7 @@
  * with the pass on.
  *
  * Shared-file note: this unit's declarations for the symbols `src/fn_8004CAD8.cpp` owns
- * (fn_80050EDC/fn_80050F24/fn_80050BC0/fn_80051424/fn_80051820/fn_80052214/PSVECSubtract) were added to
+ * (fn_80050EDC/fn_80050F24/sqrt_f32/fn_80051424/fn_80051820/fn_80052214/PSVECSubtract) were added to
  * that owner's header `include/fn_8004CAD8.h` (rule 2), because the owner registered before this unit
  * and its header carried only the five declarations its own consumers needed.
  */
@@ -107,7 +107,7 @@ void* fn_80501C60(void* list, void* node);
  * address band does not name a module, so the declaration stays with the consumer (rule 2's named gap). */
 f32 fn_8009CD64(const f32* mtx, s32 index);
 f32 fn_80463DE4(f32 x);
-f32 fn_80463E08(f32 y, f32 x);
+f32 atan2f(f32 y, f32 x);
 f32 fn_8005A63C(f32 x);
 
 /* This unit's own bodies, in address order: a forward declaration for the ones a later body calls
@@ -244,7 +244,7 @@ extern "C" void fn_8009B448(f32* mtx, const f32* vec) {
         a = lbl_80795F7C;
         b = lbl_80795F7C;
     } else {
-        s = fn_80050BC0(lbl_80795F80 - z * z);
+        s = sqrt_f32(lbl_80795F80 - z * z);
         a = vec[1] / s;
         b = vec[0] / -s;
     }
@@ -346,10 +346,10 @@ extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
             t = lbl_80795F88;
         rot[1] = fn_80463DE4(t);
         if (fn_8005A63C(rot[1]) >= lbl_80795F90) {
-            rot[0] = fn_80463E08(mtx[9] / sy, mtx[10] / sz);
-            rot[2] = fn_80463E08(mtx[4], mtx[0]);
+            rot[0] = atan2f(mtx[9] / sy, mtx[10] / sz);
+            rot[2] = atan2f(mtx[4], mtx[0]);
         } else {
-            rot[0] = fn_80463E08(mtx[1], mtx[5]);
+            rot[0] = atan2f(mtx[1], mtx[5]);
             rot[2] = lbl_80795F7C;
         }
         return;
@@ -491,7 +491,7 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
 
             len = fn_80050EDC(v14);
             if (len > lbl_80795F8C) {
-                scale[2] = fn_80050BC0(len);
+                scale[2] = sqrt_f32(len);
                 fn_80051820(v8, v20, v14);
                 if (fn_80052214(v2c, v8) < lbl_80795F7C) {
                     scale[0] = scale[0] * -1.0;
@@ -509,7 +509,7 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
             PSVECSubtract(v14, v14, v8);
             len = fn_80050EDC(v14);
             if (len > lbl_80795F8C)
-                scale[2] = fn_80050BC0(len);
+                scale[2] = sqrt_f32(len);
             else
                 scale[2] = lbl_80795F7C;
         }

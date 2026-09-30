@@ -7,7 +7,7 @@
  * 0x803CF654..0x803CF6D8, `.data` 0x805F99A0..0x805F9A40, extab 0x80019AAC..0x80019AB4, extabindex
  * 0x8003A338..0x8003A344.
  *
- * NAMES.  `NetworkSessionBase` is a GUESS (evidenced by `networkPeer_resetSlots` driving its +0x1C slot and the
+ * NAMES.  `NetworkSessionBase` is a GUESS (evidenced by `resetAllSlots__20NetworkSessionStableFv` driving its +0x1C slot and the
  * setters' slot positions).  Every name here is the map's or a derived one; the derived ones are marked GUESS in
  * `Network/network_transport_types.h`.
  *

@@ -153,7 +153,7 @@ f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
  * included above).  A linkage block keeps them out of the per-declaration checker; the owned ones
  * come from their owner's header. */
 extern "C" {
-void fn_800504D4(nw4r::math::MTX34* m);
+void mtx34_identity(nw4r::math::MTX34* m);
 void fn_80050850(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void subVec3(nw4r::math::VEC3* out, nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);

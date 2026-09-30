@@ -52,6 +52,11 @@ void fn_802B0A98(u8 idx, u8 value);
  * signature is the call site's view: no arguments, no result. */
 void fn_802AEC00(void);
 
+/* 0x802AFF38 / 0x802AFFF4 - the water tests for a shell's two area bits; each answers 1 while the point is under
+ * water (no arguments, the answer in r3).  `stage_water_enabled_ck` is `s32` because `stage/fn_802B2AA0.h` declares it so. */
+s32 stage_water_enabled_ck(void);
+u32 stage_water_area_ck(void);
+
 #ifdef __cplusplus
 }
 
