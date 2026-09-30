@@ -426,6 +426,15 @@ refuses a batch, names the row that refused, and the landing either passes every
   `OLD=` says its base pairs are simply gone (`land.py` and `datagap.py --row`). The freshness warning and
   `explain_added` are scoped to the batch's units. Same rule for `stylelint --diff/--ref`: a deleted file's base
   findings are read from the base blob, so a fold's removals are credited as moves.
+* **Split credit in `stylelint --diff/--ref`** (owner's delegate, 2026-09-30): a source file that lost an identity
+  (deleted, or it stopped carrying it) whose bytes went to N files earns up to N credits for it - one per
+  **absorber** that newly carries it. Absorbers come from the same derived fold map as the data row
+  (`datagap.derive_absorption`: F's base byte range now claimed by G), never from names. A rule-1 duplicate is never
+  credited by absorption, a copy that leaves the original intact or a token F never carried earns nothing, and
+  F's own removal is consumed once so no non-absorber can also draw on it (the absorber pass runs first). Printed as
+  `moved (split across N absorbers) rule R: <token>: F -> G1, G2` and as `split: true` entries in `--json` `moved`.
+  The 11 "claim shrunk" refusals `datagap --row` showed on the enemy recut were an artefact of a base (`main`) newer
+  than the branch (quest_entry's claims landed after it): against the branch's merge base the row is PASS.
 * **The strict half of the same row** (owner, 2026-09-29: "Yes, refuse (strict)" - no data is left behind when a
   unit is touched): the check "no batch unit the batch really changes still has data only it references left
   unclaimed" refuses, for every **touched** batch unit, each **sole-owned** orphan pair - exactly one registered object references the address and
