@@ -143,6 +143,25 @@ for label, files, want in (
         ("demo of another id", {"001-a.md": idea_text(1, demo="002-x.cpp"), "002-x.cpp": ""}, "must be a `001-*` file"),
         ("empty dir", {}, "no NNN-slug.md idea file")):
     check("refuse: %s" % label, any(want in d for d in defects_of(files)), True)
+# optional stage-4 keys: reviewed / related / superseded_by
+check("accept: reviewed, related and superseded_by",
+      defects_of({"001-a.md": idea_text(1, extra="reviewed: 2026-09-29" + chr(10) + "related: [2]" + chr(10)
+                                        + "superseded_by: 2"),
+                  "002-b.md": idea_text(2)}), [])
+for label, extra, want in (
+        ("a malformed reviewed date", "reviewed: yesterday", "reviewed `yesterday`"),
+        ("related that is not a list of ids", "related: 2", "related must be a bracket list of idea ids"),
+        ("related naming a missing idea", "related: [9]", "related id 9"),
+        ("related naming itself", "related: [1]", "related id 1"),
+        ("superseded_by naming a missing idea", "superseded_by: 9", "superseded_by 9"),
+        ("superseded_by that is not an id", "superseded_by: two", "superseded_by `two`")):
+    check("refuse: %s" % label, any(want in d for d in defects_of({"001-a.md": idea_text(1, extra=extra),
+                                                                     "002-b.md": idea_text(2)})), True)
+check("refuse: status superseded without superseded_by",
+      any("needs `superseded_by: N`" in d for d in defects_of({"001-a.md": idea_text(1, status="superseded")})), True)
+check("json: the optional keys are exposed",
+      [ (i["reviewed"], i["related"], i["superseded_by"]) for i in
+        [x for x in spi.load_ideas(tempfile.mkdtemp(prefix="spi-x-"))[0]] ], [])
 check("accept: a demo that exists", defects_of({"001-a.md": idea_text(1, demo="001-a.cpp"), "001-a.cpp": "int x;\n"}), [])
 check("refuse: a missing docs/matching dir",
       spi.load_ideas(tempfile.mkdtemp(prefix="spi-empty-"))[1], ["docs/matching does not exist"])
