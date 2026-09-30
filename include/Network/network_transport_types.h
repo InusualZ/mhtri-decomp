@@ -26,10 +26,6 @@
 struct NetworkSessionStable;
 struct NetworkStreamWriter;
 struct NetworkPeerInfo;
-/* the Pat band's opaque record types, which only ever cross as pointers (`receivePatInterfaces` /
-   `flushPatRequests` below are the pumps `NetworkSessionManagerPat` drives) */
-class PatReceiver;
-class PatRequestQueue;
 
 /* ---------------- the peer's error record --------------------------------------------------- */
 
@@ -141,7 +137,7 @@ public:
 };   /* size: 0x04 - only ever reached through a pointer in this unit */
 
 /* What the Tcp and Udp users share: a vptr word and the socket they were opened on at +0x04.  Size
-   evidence: `networkPeer_openSocket` copies the connection's address to +0x08 (`memcpy(&address_08, ..)`),
+   evidence: `NetworkSingleTcp::open` copies the connection's address to +0x08 (`memcpy(&address_08, ..)`),
    so the base ends there; nothing reads the +0x00 word, which is why it stays `unused_`. */
 struct NetworkSocketUser {
     void* unused_00;                 /* +0x00 */
@@ -162,15 +158,23 @@ struct NetworkSingleTcp : public NetworkSocketUser {
     u8  recv_20[0x2400];             /* +0x20..+0x241F */
     u32 recvUsed_2420;               /* +0x2420 - bytes received */
 
+    void disconnect();
+    void move();
+    s32 open(const NetworkPeerAddress* address);
+    s32 close();
+    s32 clearReceive();
+    void release();
     s32 add(NetworkPeerMcs* peer);
     void remove(NetworkPeerMcs* peer);
+    void clearReceiveBuffer();
     s32 send(const u8* data, s32 size);
+    s32 getAvailableToRead();
     s32 getError();
 };   /* size: 0x2424 */
 
 /* `NetworkMultipleUdp`: one socket shared by up to four peers, each with its own address at +0x0E and
    its own 0x1770-byte reassembly buffer behind the one datagram buffer at +0x26.  The datagram is 0x5DC
-   bytes because that is the capacity `flushPatRequests` reads with and `receivePackets` frames into; the
+   bytes because that is the capacity `NetworkMultipleUdp::move` reads with and `receivePackets` frames into; the
    map's 0x5E0 for the `.bss` scratch packet is dtk's gap to the next symbol (a 32-byte boundary), i.e. the
    same 0x5DC plus alignment - the source declares that scratch as [0x5E0] because [0x5DC] measures the
    `.bss` row at 70 %.  Size: (approximation - the last word the range touches, `used_63C4[3]`, ends at
@@ -183,10 +187,14 @@ struct NetworkMultipleUdp : public NetworkSocketUser {
     u8  pad_63C2[0x02];              /* +0x63C2..+0x63C3 */
     s32 used_63C4[4];                /* +0x63C4..+0x63D3 - bytes queued per peer */
 
+    void disconnect();
+    void move();
+    void release();
     void remove(const NetworkPeerAddress* address);
     void reset(s32 peerIndex);
     s32 send(s32 peerIndex, const u8* data, s32 size);
     s32 receive(s32 peerIndex, u8* out, s32 capacity);
+    s32 getAvailableToRead();
     s32 getError();
 };   /* size: 0x63D4 (approximation - see above) */
 
@@ -305,19 +313,10 @@ public:
 
 /* ---------------- the peer that owns a byte stream -------------------------------------------- */
 
-/* The stream cursor the append helpers drive: the block at +0x04, its size at +0x08 and the write
-   cursor at +0x0C. */
-typedef struct NetworkByteStream {
-    void* unused_00;       /* +0x00 */
-    u8* data_04;           /* +0x04 - the bytes the cursor writes into */
-    u32 size_08;           /* +0x08 - capacity */
-    u32 cursor_0C;         /* +0x0C - bytes written so far */
-} NetworkByteStream;   /* size: 0x10 */
-
 /* The sink the stream helpers hand a record to: only its +0x20 and +0x24 slots are called here, the first
    fills the buffer it is given and the second takes a record, each reporting how many bytes it moved
-   (GUESS: offset-derived - the range never names the class, and the helper stays valid through a
-   pointer). */
+   (GUESS: offset-derived - the range never names the class, no `NetworkPeer*` class carries these two
+   slots at +0x20/+0x24, and the helper stays valid through a pointer). */
 class NetworkStreamSink {
 public:
     /* +0x08 */ virtual void slot_08();
@@ -330,15 +329,37 @@ public:
     /* +0x24 (GUESS) */ virtual s32 put(const u8* data, u32 size);
 };   /* size: 0x04 - only ever reached through a pointer in this unit */
 
-/* ---------------- the record the byte stream copies out --------------------------------------- */
-
-/* What a caller hands several of these helpers: somewhere to put the bytes and how much room there
+/* What a caller hands several of the stream's helpers: somewhere to put the bytes and how much room there
    is (a `u16`, because the length prefix it is compared against is one). */
 typedef struct NetworkPeerRecord {
     /* untyped: caller-owned payload - the caller's own buffer */
     void* data_00;   /* +0x00 - the caller's buffer */
     u16   size_04;   /* +0x04 - its capacity, and the length actually copied */
 } NetworkPeerRecord;   /* size: 0x08 (approximation: the two fields the range reads) */
+
+/* The stream cursor the append and take helpers drive (GUESS on the class name: the map's helpers are
+   `networkPeerStream_*` and the record is a byte stream; its callers reach it as an embedded object): the
+   block at +0x04, its capacity at +0x08 and the cursor at +0x0C, which counts the bytes the block holds.
+   +0x00 is never read here, so it is not evidenced as a vptr and the methods are not virtual. */
+struct NetworkByteStream {
+    void* unused_00;       /* +0x00 */
+    u8* data_04;           /* +0x04 - the bytes the cursor writes into */
+    u32 size_08;           /* +0x08 - capacity */
+    u32 cursor_0C;         /* +0x0C - bytes held so far */
+
+    u8* getData();
+    u32 getSize();
+    void pullRecord(NetworkStreamSink* sink);
+    void putRecord(const NetworkPeerRecord* record);
+    void putU32(u32 value);
+    void putU16(u16 value);
+    void putByte(u8 value);
+    void forwardRecord(NetworkStreamSink* sink);
+    void takeRecord(NetworkPeerRecord* record);
+    void takeU32(u32* out);
+    void readLength(u16* out);
+    void takeByte(u8* out);
+};   /* size: 0x10 */
 
 /* The object whose destructor destroys two sub-objects: the first is an embedded small object at
    +0x30, the second an object of another class at +0x54.  Only those two offsets are evidenced. */

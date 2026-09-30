@@ -1589,8 +1589,8 @@ void NetworkSessionManagerPat::clear()
     this->field_3C8 = 0;
     this->field_3CC.vtable->slot_18(&this->field_3CC);
     memset(&this->field_3EC[0], 0, 48);
-    this->receiver_658 = 0;
-    this->requestQueue_65C = 0;
+    this->tcp_658 = 0;
+    this->udp_65C = 0;
     this->field_660 = 0;
     networkPatAttachBuffer((NetworkBuffer*)this);
     this->circleList_AF0.pad_00[0] = 0;
