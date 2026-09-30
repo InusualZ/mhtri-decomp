@@ -680,7 +680,7 @@ struct _ENEMY_WORK {
     /* +0x7A0 */ u32 field_0x7A0;       /* the numerator of the ratio `fn_8014001C` reports */
     /* +0x7A4 */ u32 field_0x7A4;       /* its denominator */
     /* +0x7A8 */ u8 unused_0x7A8[0x7AC - 0x7A8];
-    /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `fn_8012EE80` measures against `field_0x7A0` */
+    /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `em_team_damage_over_ck` measures against `field_0x7A0` */
     /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `fn_8012EFDC` tests against 0.0 */
     /* +0x7B4 */ f32 shell_rate_0x7B4;  /* the factor `shell_attack_set` scales a shell's hit life by */
     /* +0x7B8 */ u8 unused_0x7B8[0x7BC - 0x7B8];

@@ -89,23 +89,17 @@ extern EmPopWorkSlot em_pop_w;
 
 /* The roster accessor (0x803BDECC) - the one this unit's table searches go through. */
 EmPopRec* em_roster_record_get(u32 index);
-/* 0x803B50A8 - the work state word's bit 21, with the `self == NULL -> singleton` fallback every
- * accessor in this band carries.  Moved here from `include/unsplit/unknown.h` when this unit
- * registered the address (rule 2: the owner's header carries it). */
-u32 em_work_state_bit21_ck(struct _ENEMY_WORK* self);
 /* 0x803B9588 - the per-slot effect/joint binding the range's entry points walk: r3 the work
  * record, r4 the slot index, r5 the slot pointer, r6/r7 two scalars. */
 void em_roster_slot_effect_set(struct _ENEMY_WORK* self, u16 index, s32* slot, s32 a, s32 b);
 s32 em_roster_record_slot_id_get(u32 index);
 u32 em_roster_record_alive_ck(u32 index);
 void em_roster_record_pos_set(s32 index, nw4r::math::VEC3* pos, u8 area);
-/* 0x803B521C - the work state word's bit 7, same `self == NULL -> singleton` fallback as above.
- * 0x803B6078 - fills two u16s from the work's per-slot pair when the slot is armed.
+/* 0x803B6078 - fills two u16s from the work's per-slot pair when the slot is armed.
  * 0x803B8E1C - the em_set work's own state word.
- * All three moved out of `include/unsplit/menu.h` when this unit registered their addresses
+ * Both moved out of `include/unsplit/menu.h` when this unit registered their addresses
  * (rule 2: the owner's header carries them). */
-u32 em_work_state_bit7_ck(s32 self);
-void em_work_slot_pair_get(u16 index, u16* out);
+u16 em_work_slot_pair_get(u16 index, s16* out);
 s32 em_set_work_state_get(void);
 void em_roster_record_release(u32 index);
 EmPopRec* em_roster_record_clear(EmPopRec* rec);
@@ -131,15 +125,37 @@ struct QuestRecord;   /* defined in `unsplit/menu.h` (the arena-result band's re
  * selects the work's own through `quest_record_get`).  The bit names are this header's reading of
  * the call sites, all in the quest board and the result screens; the 0x800000 predicate came in
  * with `quest/quest_entry.cpp`, whose entry test it is. */
+u32 quest_flag_8_ck(QuestRecord* rec);
 u32 quest_flag_10_ck(QuestRecord* rec);
+u32 quest_flag_80_ck(QuestRecord* rec);
 u32 quest_flag_100_ck(QuestRecord* rec);
-u32 quest_flag_100000_ck(QuestRecord* rec);
+u32 quest_flag_800_ck(QuestRecord* rec);
+u32 quest_flag_40000_ck(QuestRecord* rec);
 u32 quest_flag_80000_ck(QuestRecord* rec);
+u32 quest_flag_100000_ck(QuestRecord* rec);
+u32 quest_flag_200000_ck(QuestRecord* rec);
 u32 quest_flag_800000_ck(QuestRecord* rec);
+u32 quest_flag_1000000_ck(QuestRecord* rec);
 u32 quest_flag_2000000_ck(QuestRecord* rec);
+u32 quest_flag_2000000_only_ck(QuestRecord* rec);
+u32 quest_flag_2000000_or_80000000_ck(QuestRecord* rec);
 u32 quest_flag_4000000_ck(QuestRecord* rec);
-u32 quest_flag_80000000_ck(QuestRecord* rec);
 u32 quest_flag_10000000_ck(QuestRecord* rec);
+u32 quest_flag_40000000_ck(QuestRecord* rec);
+u32 quest_flag_80000000_ck(QuestRecord* rec);
+/* 0x803B465C - the text a result-screen field kind (0..31) shows for the current row.  GUESS name: the
+ * `_cur_` twin of `quest_result_field_text_get`, which takes the row. */
+char* quest_result_field_text_cur_get(u8 kind);
+/* The result row's per-slot and odd-field accessors (`rec` 0 means the current row): the slot's byte and
+ * halfword values, and the +0x37A / +0x32C / +0x32E fields.  GUESS names. */
+u8 quest_slot_byte_get(QuestRecord* rec, u8 slot);
+u16 quest_slot_word_get(QuestRecord* rec, u8 slot);
+u16 quest_field37A_get(QuestRecord* rec);
+u32 quest_field32C_ck(QuestRecord* rec);
+u8 quest_field32E_get(QuestRecord* rec);
+u32 quest_field32C_or_4000000_ck(void);
+u32 quest_row394_get(u8 index);
+u8 quest_objective_result_get(QuestRecord* rec);
 /* The arena element `id`'s stored value; `out` gets it, and the return is 0 when no element
  * matches (0x803B5F28). */
 s32 quest_element_value_get(u16 id, s16* out);
@@ -162,15 +178,64 @@ s32 quest_arena_need_get(s32 index);
  * +0x94/+0xF4/+0x154 needs bit 4 set together with bit 2 and bit 10 (with or without bit 4 again) -
  * 0x404 or 0x414.  Forces the pair rolls in `quest_pair_roll_all` (0x803B5E2C). */
 u32 quest_element_state_ck(void);
+/* The state (0x4014, 0x414 or 0x404) of the element whose low id byte is `key` (0x803B5CA4), and whether any
+ * element carries state 0x404 (0x803B5D90).  GUESS names. */
+u32 quest_element_state_find(u8 key);
+u32 quest_element_404_ck(void);
+/* 0x803B5B1C - scans the item work's three elements for the em020 hunt goal and arms the one whose team window
+ * has closed (1 when one was armed).  GUESS name. */
+u32 quest_element_window_check(struct QuestWork* work);
+/* 0x803B62D8 / 0x803B63C0 / 0x803B64F4 - the arena element passes: a value clear test, a key clear, and the
+ * per-frame countdown step (`first` gets the first finished index, -1 when none).  GUESS names. */
+u32 quest_arena_value_clear_ck(u16 id, u16 value);
+u32 quest_arena_key_clear(u8 key);
+u32 quest_element_progress_step(u16 kind, u8 mode, s8* first);
+/* 0x803B6AC4 / 0x803B6F2C / 0x803B6F90 - the +0x6AA4 run, and the key-row tests.  GUESS names. */
+u8* quest_field6AA4_get(void);
+u32 quest_key_row_ck(u8 key);
+u32 quest_key20_flag_ck(u8 invert);
 
 /* 0x803B7434 - whether the downloaded file in `buffer` carries `version` (its u16 at +0x2C); the
  * network band's staging download checks with it. */
 u32 matchesFileVersion(const u8* buffer, u16 version);
+/* 0x803B729C - steps the staging download of the staged file whose header carries `version` (-1 when none
+ * does).  GUESS name from the loop over `net_ctrl_wk`'s ten file buffers. */
+s32 stepStagingDownloadForVersion(u16 version);
+/* The staged file's header as `matchesFileVersion` reads it; only the version halfword is evidenced.
+ * size: 0x2E (lower bound) */
+typedef struct StagingFileHeader {
+    /* +0x00 */ u8 unused_0x00[0x2C];
+    /* +0x2C */ u16 version_0x2C;
+} StagingFileHeader;
+
+/* 0x803B88A8 / 0x803B88EC / 0x803BA69C - the local slot's move-work sub-state: read whether it is 4, set it to 4,
+ * and test the sub index.  GUESS names. */
+s32 quest_move_sub_state_4_get(void);
+void quest_move_sub_state_4_set(u8 flag);
+u32 quest_move_area_sub_ck(u8 sub);
+
+/* One entry of a 0xFFFF-terminated weight table: its `weight` and the `value` a pick returns. size: 0x4 */
+typedef struct EmWeightEntry {
+    /* +0x0 */ u16 weight;
+    /* +0x2 */ u16 value;
+} EmWeightEntry;
+/* 0x803BAE80 - the weighted random pick over such a table.  GUESS name. */
+u16 em_weight_table_pick(const EmWeightEntry* table);
+/* 0x803B8E40 - settles the carried-item pouch (`Q_ItemPair` x35): returns the credit, `flag` set when a
+ * category-2 item was cleared.  GUESS name. */
+struct Q_ItemPair;
+s32 quest_pouch_items_settle(struct Q_ItemPair* pouch, u8* flag);
+
+/* 0x803BDF0C / 0x803BDFF4 / 0x803BE08C - the kind searches over the roster: collect the matching indices, and
+ * read one record's aim position or +0x005 byte under the same acceptance test.  GUESS names. */
+u8 em_roster_kind_collect(u8 kind, u8* out, u8 max);
+nw4r::math::VEC3* em_roster_kind_aim_pos_get(u8 index, u8 kind);
+s32 em_roster_kind_field5_get(u8 index, u8 kind);
 
 struct Q_ItemWork;
 /* 0x803B5658 - fills the quest result work's stat block (+0x3E0) from the item work at the end of a hunt of
  * a finished quest: cleared when the item work carries a stat, else the em020 hit info.  GUESS name. */
-void quest_result_stat_fill(struct Q_ItemWork* item);
+void quest_result_stat_fill(struct QuestWork* item);
 /* 0x803B5408 - the objective code of a result row (the current one when `rec` is NULL), from its +0x310
  * flag word: 1, 9, 2, 3 or 4, and 0 while the slot is in its entry state or no row exists.  GUESS name. */
 u8 quest_objective_get(QuestRecord* rec);

@@ -28,6 +28,27 @@ QuestRecord* quest_record_find(u16 quest_id);
  * (`quest_str_tbl_35_get` is declared in the leaf header below). */
 char* quest_str_tbl_4_get(u32 index);
 
+/* 0x803B2D50 - how many of item `id` the player `who` holds (the quest band's element accessors
+ * subtract it from an element's target). */
+s16 quest_item_count_sum(u16 id, s32 who);
+
+/* 0x803B3454.. - the result screen's text getters: the `_of` forms take the row, the plain forms read the
+ * current one; each returns `quest_text_buffer` or a string-table entry. */
+char* quest_name_text_get(void);
+char* quest_field198_text_get(void);
+char* quest_field13A_text_get(void);
+char* quest_time_text_get(u8 which);
+char* quest_field348_text_get(void);
+char* quest_field2E8_text_get(void);
+char* quest_clear_time_text_get(void);
+char* quest_elapsed_time_text_get(void);
+char* quest_score_text_get(void);
+char* quest_arena_items_text_get(u8 index);
+char* quest_arena_time_text_get(QuestRecord* rec, s32 which);
+char* quest_grade_text_get(u8 grade);
+char* quest_grade_text_cur_get(void);
+char* quest_monster_text_get(QuestRecord* rec, u8 which);
+
 #ifdef __cplusplus
 }
 #endif

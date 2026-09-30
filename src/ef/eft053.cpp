@@ -74,7 +74,7 @@
  *     are necessary (with one shared arm MWCC if-converts them and the function is 16 instructions
  *     short).  Needs `#pragma peephole off` around it: retail keeps `extsb` + `cmpwi`, `-O3` fuses
  *     them into `extsb.`.
- *   * `eft053_model_list_get` 99.04 - the `li r3,0` argument setups at the `em_work_state_bit21_ck` calls are
+ *   * `eft053_model_list_get` 99.04 - the `li r3,0` argument setups at the `quest_flag_200000_ck` calls are
  *     there since `include/enemy/em_pop.h` declares the helper with its real work-record parameter
  *     (2026-09-30 recut); four bytes of residual remain.
  *   * `eft053_get_shell_data` 93.50 (1260 B) - 40 bytes; every one of its seven map-number cases
@@ -341,7 +341,7 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
     case 17:
         switch (get_now_areano()) {
         case 1:
-            if (em_work_state_bit21_ck(0) != 0) {
+            if (quest_flag_200000_ck(0) != 0) {
                 *out_count = 6;
             } else {
                 *out_count = 8;
@@ -349,7 +349,7 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
             *out_kind = 0;
             return 1;
         case 2:
-            if (em_work_state_bit21_ck(0) != 0) {
+            if (quest_flag_200000_ck(0) != 0) {
                 *out_count = 6;
             } else {
                 *out_count = 8;

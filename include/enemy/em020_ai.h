@@ -30,6 +30,17 @@ u32 fn_803768F8(void);
 s32 fn_80377664(void* unused);
 /* 0x803754F4 - the "aim target found" predicate (`+0x836` bit 15). */
 u32 em020_aim_target_ck(struct _ENEMY_WORK* self);
+/* The out record `em020_hit_info_get` fills for its caller: the hit flag, the per-part damage-level
+ * bits, the facing angle and the damage numerator (the first 8 bytes of a `Q_QuestStat`).
+ * size: 0x08 */
+struct Em020HitInfo {
+    /* +0x0 */ u8 hit_0x00;
+    /* +0x1 */ u8 levels_0x01;
+    /* +0x2 */ s16 angle_0x02;
+    /* +0x4 */ u32 damage_0x04;
+};
+/* 0x80375540 - the em020 area hit's damage-level gate. */
+void em020_hit_info_get(struct _ENEMY_WORK* self, struct Em020HitInfo* out);
 
 #ifdef __cplusplus
 }

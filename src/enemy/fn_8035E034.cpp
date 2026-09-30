@@ -63,6 +63,7 @@
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
+#include "enemy/em_pop.h" /* the roster records and kind searches (the owner's header, rule 1/2) */
 #include "ef/fn_800CDB2C.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "stage/stg_w.h"
@@ -83,14 +84,6 @@ void fn_800513F0(VEC3* v, f32 s);
 void fn_8012B380(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void fn_8012CEB4(_ENEMY_WORK* self, s16 a, u32 b);
 
-/* The monster-roster helpers at 0x803BDF0C.. (the run 0x803B465C..0x803BE30C, unclaimed).  They
- * index a global 0x224-byte-stride record array; `fn_803BDFF4` returns the record's +0x1D0 aim
- * position, `em_roster_record_get` the record itself. */
-struct EmRosterRec {
-    /* +0x000 */ u8 pad_0x000[0x1F0];
-    /* +0x1F0 */ f32 field_0x1F0;   /* the approach radius `fn_8035EB80` compares against */
-}; /* size: 0x1F4 */
-
 /* The object the aim writer's first argument points at, and the source block its +0x4 member names
  * (`fn_8035EF58`).  Only the two fields the body touches are named. */
 struct EmAimOwner {
@@ -103,10 +96,6 @@ struct EmAimSource {
     /* +0x00B */ u8 pad_0x00B[0x348 - 0xB];
     /* +0x348 */ nw4r::math::VEC3 field_0x348;
 }; /* size: 0x354 */
-u8 fn_803BDF0C(u8 area, u8* out, u32 max);
-s32 fn_803BE08C(u8 id, u8 area);
-VEC3* fn_803BDFF4(u8 id, u8 area);
-EmRosterRec* em_roster_record_get(u8 id);
 
 u32 fn_802B0998(u8 index);
 
@@ -167,7 +156,7 @@ extern "C" u8 fn_8035E034(_ENEMY_WORK* self, u8 mode)
         copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B70C;
     case 6:
-        return fn_803BDFF4(self->field_0x33B, self->act_id) != 0;
+        return em_roster_kind_aim_pos_get(self->field_0x33B, self->act_id) != 0;
     default:
         return 0;
     }
@@ -289,16 +278,16 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
 
     VEC3_ctor(&v1);
     VEC3_ctor(&v2);
-    n = (u8)fn_803BDF0C(self->act_id, buf, 0x10);
+    n = (u8)em_roster_kind_collect(self->act_id, buf, 0x10);
     if (n > 0x10) {
         return 0xFF;
     }
     for (i = 0; i < n; i++) {
         u8 id = buf[i];
-        s32 type = (s8)fn_803BE08C(id, self->act_id);
+        s32 type = (s8)em_roster_kind_field5_get(id, self->act_id);
         if (a == 0) {
             if (type == 5 || type == 1 || type == 0xF) {
-                VEC3* p = fn_803BDFF4(id, self->act_id);
+                VEC3* p = em_roster_kind_aim_pos_get(id, self->act_id);
                 if (p != 0) {
                     u16 ang = em_hit_mask_get(self);
                     int ok = 1;
@@ -306,7 +295,7 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
                         VEC3 v3;
                         subVec3(&v3, &v1, p);
                         copyVec3(&v2, &v3);
-                        if (fn_80050F24((const f32*)&v2) > em_roster_record_get(id)->field_0x1F0) {
+                        if (fn_80050F24((const f32*)&v2) > em_roster_record_get(id)->radius_0x1F0) {
                             ok = 0;
                         }
                     }
@@ -352,7 +341,7 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
                 return 0xFF;
             }
             if (type == 4 || type == 0 || type == 0xE) {
-                if (fn_803BDFF4(id, self->act_id) != 0) {
+                if (em_roster_kind_aim_pos_get(id, self->act_id) != 0) {
                     return id;
                 }
             }
@@ -394,12 +383,12 @@ extern "C" u8 fn_8035E81C(u8 a)
     default:
         return 0;
     }
-    n = (u8)fn_803BDF0C(a, buf, 0x10);
+    n = (u8)em_roster_kind_collect(a, buf, 0x10);
     if (n > 0x10) {
         return 0;
     }
     for (i = 0; i < n; i++) {
-        s32 type = (s8)fn_803BE08C(buf[i], a);
+        s32 type = (s8)em_roster_kind_field5_get(buf[i], a);
         if (type == 5 || type == 1 || type == 0xF) {
             return 1;
         }
@@ -438,7 +427,7 @@ extern "C" u8 fn_8035E984(u8 a, u8 b)
     default:
         return 0;
     }
-    type = (s8)fn_803BE08C(a, b);
+    type = (s8)em_roster_kind_field5_get(a, b);
     if (type == 4 || type == 0 || type == 0xE) {
         return 1;
     }
@@ -454,7 +443,7 @@ extern "C" void fn_8035EAA0(_ENEMY_WORK* self, u8 a)
 
     if (id != 0xFF) {
         self->field_0x33B = id;
-        copyVec3(&self->target, fn_803BDFF4(id, self->act_id));
+        copyVec3(&self->target, em_roster_kind_aim_pos_get(id, self->act_id));
         fn_8012B380(self, 6, 0xFF, 0);
         fn_8013072C(self, 5, 1);
     } else {
@@ -480,13 +469,13 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
     VEC3_ctor(&v1);
     VEC3_ctor(&v2);
     if (fn_8035E984(self->field_0x33B, self->act_id) == 1) {
-        VEC3* p = fn_803BDFF4(self->field_0x33B, self->act_id);
+        VEC3* p = em_roster_kind_aim_pos_get(self->field_0x33B, self->act_id);
         u16 ang = em_hit_mask_get(self);
         int keep = 1;
         if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
             subVec3(&v3, &v1, p);
             copyVec3(&v2, &v3);
-            if (fn_80050F24((const f32*)&v2) > em_roster_record_get(self->field_0x33B)->field_0x1F0) {
+            if (fn_80050F24((const f32*)&v2) > em_roster_record_get(self->field_0x33B)->radius_0x1F0) {
                 keep = 0;
             }
         }

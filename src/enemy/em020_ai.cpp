@@ -92,16 +92,6 @@ extern "C" {
 
 /* --- this unit's own entry points (renamed in the map in the same batch) --- */
 
-/* The out record `em020_hit_info_get` fills for its caller: the hit flag, the per-part damage-level
- * bits, the facing angle and the damage numerator.
- * size: 0x08 */
-struct Em020HitInfo {
-    /* +0x0 */ u8 hit_0x00;
-    /* +0x1 */ u8 levels_0x01;
-    /* +0x2 */ s16 angle_0x02;
-    /* +0x4 */ u32 damage_0x04;
-};
-
 /* The em020 area hit's damage-level gate: every part's damage level is folded into `out->levels_0x01`
  * and the enemy's current facing angle and damage numerator are copied out.
  * 0x80375540 */

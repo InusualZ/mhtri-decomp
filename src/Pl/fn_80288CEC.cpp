@@ -89,6 +89,7 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_80288CEC.h" /* `PlBox`, shared with `Pl/fn_8028F66C.cpp` (rule 1) */
 #include "ef/fn_800CDB2C.h"
+#include "enemy/em_pop.h" /* quest_flag_8_ck, quest_flag_80_ck (the owner's header, rule 2) */
 #include "fn_80047398.h" /* `arena_userdata_apply` (rule 2) */
 #include "quest/arenatask.h" /* `arena_user_data_buf` (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -140,8 +141,6 @@ u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
 void fn_802BE568(void* self, u32 sub);
 u32 fn_803A7E1C(void);
-u32 fn_803B4B74(void);
-u32 em_work_state_bit7_ck(void);
 void fn_803BA814(u8 idx);
 void PSVECSubtract(void* dst, void* a, void* b);
 }
@@ -458,7 +457,7 @@ void fn_8028F2F8(u32 arg) {
     if (root == 0) {
         return;
     }
-    if (fn_803B4B74() == 0) {
+    if (quest_flag_8_ck(0) == 0) {
         return;
     }
     if (arg == 0) {
@@ -480,7 +479,7 @@ u32 fn_8028F368(void) {
     if (mode == 0) {
         return 0;
     }
-    if (em_work_state_bit7_ck() == 0) {
+    if (quest_flag_80_ck(0) == 0) {
         return 0;
     }
     mode[0x6A3E] = 4;

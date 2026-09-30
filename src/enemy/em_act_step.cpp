@@ -210,6 +210,7 @@
 #include "fn_8004CAD8.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/em_act_step.h"
+#include "enemy/em_pop.h" /* quest_move_sub_state_4_get (the owner's header, rule 2) */
 #include "unsplit/enemy.h"
 #include "pl.h"
 #include "Pl/fn_802693C4.h"
@@ -239,7 +240,6 @@ void fn_8012E694(struct _ENEMY_WORK* self);
 void fn_80136DF4(struct _ENEMY_WORK* self);
 void fn_800FC0D4(_CP_VECTOR* dst, const _CP_VECTOR* src);
 u32 quest_sub_state_end_ck(u32 a);
-u32 fn_803B88A8(void);
 void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
 void fn_8012E664(struct _ENEMY_WORK* self);
@@ -391,7 +391,7 @@ extern "C" u32 em_act_face_away(_EM_CHARA_WORK* self, _PLW* pl)
     if (quest_sub_state_end_ck(1) != 0) {
         return 0;
     }
-    if (fn_803B88A8() != 0) {
+    if (quest_move_sub_state_4_get() != 0) {
         return 0;
     }
 

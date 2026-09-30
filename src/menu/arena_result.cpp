@@ -8,7 +8,7 @@
  *   - the left boundary is the proposal cap and the right one is confirmed: the three private jump
  *     tables `jumptable_805F7B78`/`BB0`/`BE8` (`.data` 0x805F7B78..0x805F7C68) are each cited by
  *     exactly one function of this range, in code order, and `jumptable_805F7C68` belongs to
- *     `fn_803B465C` - the next band (`tudiscover at 0x803B0F98` calls the `.data` run jump at both
+ *     `quest_result_field_text_cur_get` - the next band (`tudiscover at 0x803B0F98` calls the `.data` run jump at both
  *     edges "strong" evidence).
  *   - no `__FILE__` string covers the range: the DOL's only single-copy menu source name is
  *     `menu_note.cpp` (0x805E91F8), cited from `menu/menu_note.cpp`'s own range, and every other
@@ -770,7 +770,7 @@ s32 quest_players_state_get(void) {
 /* Clears element `index` of the work block's element array. */
 void quest_element_reset(u8 index) {
     if (quest_work_ptr != NULL) {
-        quest_element_set(quest_work_ptr, index, NULL);
+        quest_element_set(quest_work_ptr, index, 0);
     }
 }
 
@@ -788,7 +788,7 @@ void quest_element_value_set(s32 index, u16 id) {
         if ((el->flags & 0x8) != 0 && (el->flags & 0x2) != 0) {
             if (el->id == id) {
                 if (quest_item_count_sum(id, 0) >= el->value) {
-                    quest_element_set(work, (u16)i, NULL);
+                    quest_element_set(work, (u16)i, 0);
                 }
             }
         }

@@ -19,6 +19,10 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
+/* 0x8012ED68 / 0x8012EE80 - the team-wide damage window scans: whether a live record of `team` has taken at
+ * most (100 - `kind`) % / at least `kind` % of its health.  GUESS names from the two ratios they compare. */
+u32 em_team_damage_under_ck(u8 team, u8 kind);
+u32 em_team_damage_over_ck(u8 team, u8 kind);
 /* 0x80133BB4 - r3 the work record; the hit-part refresh the action band calls. */
 void fn_80133BB4(struct _ENEMY_WORK* enemy);
 /* r3 (`self`) and f1; its callers `fadds` the return into a value they build. */
