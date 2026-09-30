@@ -316,12 +316,12 @@ Decide the module and file name from evidence, in this order, and write the clas
    name (`src/enemy/fn_8033041C.cpp`). Do not invent a module either - if the module is genuinely unknown, ask
    the orchestrator.
 
-`python tools/units/dumpmap.py lookup <addr>` answers class 2. A discovery `seam_note` about "one source file" is
+`python tools/symbols/dumpmap.py lookup <addr>` answers class 2. A discovery `seam_note` about "one source file" is
 often an `owner_merge` artefact - verify it.
 
 **Naming is part of the unit's work, not a later pass - for every symbol the unit owns.**
 
-* **Functions**: use the real name whenever the evidence has one - the shared runtime dump first (`dumpmap.py
+* **Functions**: use the real name whenever the evidence has one - the shared runtime dump first (`tools/symbols/dumpmap.py
   lookup <addr>`), then the map. A rename is **two** edits (the map and the source) or objdiff pairs nothing
   (playbook 31/48): `python tools/symbols/symedit.py rename fn_XXXXXXXX <name>`, never a hand edit. **Otherwise
   derive the name from context** - what it does, what it returns, who calls it, what it writes - and when the

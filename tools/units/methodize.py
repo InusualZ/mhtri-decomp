@@ -14,7 +14,22 @@ member signature to write, the mangled name the compiler will then emit, and the
     python tools/units/methodize.py --all                        # every type that has a finding
     python tools/units/methodize.py NetworkSingleTcp --batch out.txt   # a `symedit.py rename-batch` input
     python tools/units/methodize.py NetworkSingleTcp --exact     # confirm each mangling with the real compiler
+    python tools/units/methodize.py --class NetworkTcp --fn networkPeer_send=send --fn networkPeer_recv=recv \
+        --unit Network/network_socket_streams.cpp --batch out.txt      # explicit mapping (below)
+    python tools/units/methodize.py --map networkPeer_send=NetworkTcp::send --map-file map.json
     python tools/units/methodize.py --selftest
+
+Explicit mapping: when the free functions do not share the class's prefix (`networkPeerStream_*` -> `NetworkByteStream`,
+`networkPeer_*` -> Tcp or Udp by address order), name each `old=Class::member` (`--map`, repeatable; `--map-file` is a
+JSON object of the same pairs; `--class C --fn old=member` is the short form). Each function is found by its exact name
+(no prefix or `Type* self` naming needed): a first parameter of type `Class*`/`const Class*`/`Class&` is the `this`
+(kind member), anything else makes it a static member. The plan adds, per function, the exact edits it can determine
+(`edits`: the definition header rewritten to `Class::member(...)`, a declaration to move into the class, every call
+site rewritten to `obj->member(...)` / `Class::member(...)`) and writes the rename-batch. The mangling is estimated by
+`mangle.py`; with `--unit <src path>` (or `--obj <file.o>`) it is VERIFIED against the function symbols of that built
+object: a name the object defines is `verified`, and a Class::member the object defines under a *different* mangling
+refuses the plan (exit 2, no batch written). An object built before the migration only carries the old names and
+leaves the estimate unconfirmed (say so, rebuild, rerun). Two mappings that mangle to one name are refused.
 
 It **never edits source or the map**. A lane does the source half (declare in the class, define `Type::name`,
 sweep the call sites) and measures it (playbook 60: `this` arrives in r3 like the old `self`, so a non-virtual
@@ -48,6 +63,7 @@ import stylelint as sl  # noqa: E402
 
 SYMBOLS = os.path.join("config", "RMHE08", "symbols.txt")
 CTOR_LIKE_RE = re.compile(r"^(?:construct|ctor|dtor|destruct|destroy|delete)(?:$|[A-Z_0-9])", re.I)
+CONFIRMED = ("exact", "verified")
 MAP_ROW_RE = re.compile(r"^(\S+)\s*=\s*([.\w]+):(0x[0-9A-Fa-f]+);?\s*(.*)$")
 
 
@@ -168,6 +184,187 @@ def plan(root: str, type_name: str | None, exact: bool = False) -> list[dict]:
     return out
 
 
+# --------------------------------------------------------------------------------------------------
+# explicit mapping: `old=Class::member`, no prefix convention needed
+# --------------------------------------------------------------------------------------------------
+def parse_mapping(pairs: list[str], class_name: str | None = None, fns: list[str] | None = None) -> dict:
+    """`{old: (Class, member)}` from `old=Class::member` pairs plus `--class C --fn old=member`."""
+    out: dict = {}
+    for text in pairs:
+        old, sep, tgt = text.partition("=")
+        cls, sep2, member = tgt.partition("::")
+        if not (sep and sep2 and old.strip() and cls.strip() and member.strip()):
+            raise ValueError("bad --map %r (want old=Class::member)" % text)
+        out[old.strip()] = (cls.strip(), member.strip())
+    for text in fns or []:
+        old, sep, member = text.partition("=")
+        if not (sep and class_name and old.strip() and member.strip()):
+            raise ValueError("bad --fn %r (want old=member, with --class)" % text)
+        out[old.strip()] = (class_name, member.strip())
+    return out
+
+
+def _call_sites(src: "sl.Source", name: str, skip: set) -> list[tuple[int, int, list[str]]]:
+    """`(start, end, args)` of every call `name(args)` in code (offsets into the file), minus `skip` lines."""
+    out = []
+    for m in re.finditer(r"\b%s\b\s*\(" % re.escape(name), src.code):
+        if (src.rel, src.line_of(m.start())) in skip:
+            continue
+        open_pos = m.end() - 1
+        depth, close = 0, None
+        for i in range(open_pos, len(src.code)):
+            c = src.code[i]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    close = i
+                    break
+        if close is None:
+            continue
+        chunks = sl._split_parameters(src.code, open_pos + 1, close) if close > open_pos + 1 else []
+        args = [src.text[o:o + len(c)].strip() for c, o in chunks]
+        out.append((m.start(), close + 1, args))
+    return out
+
+
+def _receiver(arg: str) -> str:
+    """`obj->` / `obj.` text for a `this` argument expression."""
+    if arg == "this":
+        return "this->"
+    if arg.startswith("&") and re.fullmatch(r"[A-Za-z_][\w.\[\]>-]*", arg[1:]):
+        return arg[1:] + "."
+    if re.fullmatch(r"[A-Za-z_][\w.\[\]>-]*(?:\([^()]*\))?", arg):
+        return arg + "->"
+    return "(%s)->" % arg
+
+
+def plan_mapping(root: str, mapping: dict, obj_names: list[str] | None = None,
+                 exact: bool = False) -> tuple[list[dict], list[str]]:
+    """`(entries, errors)` for an explicit `{old: (Class, member)}` mapping; entries are `plan()`-shaped plus `edits`.
+
+    `obj_names` is the function symbol list of the unit's built object (verification), or None to skip it.
+    """
+    sl.set_rule13_context(root)
+    sources = list(sl.all_sources(root))
+    sources += [sl.Source(path, sl.rel_of(root, path), sl.read_text(path)) for path in sl.header_files(root)]
+    sl.set_rule13_context(None)
+    errors: list[str] = []
+    rows = map_rows(root, set(mapping))
+    entries: list[dict] = []
+    for old in mapping:
+        cls, member = mapping[old]
+        decls, defs, first, edits, skip = [], [], None, [], set()
+        found = []
+        for src in sources:
+            code = sl._mask_preproc(src.code)
+            for d in sl.function_declarations(src):
+                if d["name"] != old:
+                    continue
+                chunks = sl._split_parameters(code, d["params_pos"], d["params_pos"] + len(d["params"]))
+                found.append((src, d, [c.strip() for c, _o in chunks]))
+        if not found:
+            errors.append("%s: no declaration or definition found in src/ or include/" % old)
+            continue
+        for src, d, chunks in found:
+            first_p = chunks[0] if chunks else ""
+            selfy = sl._rule13_self_type(first_p)
+            is_member = selfy is not None and selfy[0] == cls
+            rest = chunks[1:] if is_member else ([] if first_p in ("", "void") else chunks)
+            const_self = bool(is_member and selfy[1])
+            ret = d["ret"].strip()
+            sig = {"ret": ret or "void", "owner": cls, "method": member, "params": rest, "const_self": const_self,
+                   "static": not is_member}
+            if first is None:
+                first = sig
+            elif (first["params"], first["ret"], first["static"], first["const_self"]) != (
+                    rest, sig["ret"], sig["static"], const_self):
+                errors.append("%s: declaration and definition disagree (%s:%d)" % (old, src.rel, d["line"]))
+            line = d["line"]
+            skip.add((src.rel, line))
+            tail = " const" if const_self else ""
+            has_body = bool(d.get("body"))
+            (defs if has_body else decls).append({"file": src.rel, "line": line})
+            if has_body:
+                edits.append({"kind": "define", "file": src.rel, "line": line,
+                              "new": "%s %s::%s(%s)%s" % (ret, cls, member, ", ".join(rest), tail)})
+            else:
+                edits.append({"kind": "declare", "file": src.rel, "line": line,
+                              "new": "%s%s %s(%s)%s;  // move into %s, delete this free declaration"
+                                     % ("static " if not is_member else "", ret, member, ", ".join(rest), tail, cls)})
+        mangled, how = None, "estimated"
+        if CTOR_LIKE_RE.match(member):
+            note = "constructor/destructor-shaped member name: decide its `__ct__`/`__dt__` spelling by hand"
+        else:
+            note = None
+            mangled = mg.estimate_member_mangling(cls, member, first["params"], const_self=first["const_self"])
+            if exact:
+                ex = exact_mangling(first)
+                if ex:
+                    mangled, how = ex, "exact"
+            if mangled is None:
+                note = "no mangling estimate (a shape the estimator will not guess) - rerun with --exact"
+        refs = references(sources, old, skip)
+        for src in sources:
+            for start, end, args in _call_sites(src, old, skip):
+                if first["static"]:
+                    new = "%s::%s(%s)" % (cls, member, ", ".join(args))
+                elif args:
+                    new = "%s%s(%s)" % (_receiver(args[0]), member, ", ".join(args[1:]))
+                else:
+                    continue
+                edits.append({"kind": "call", "file": src.rel, "line": src.line_of(start), "new": new,
+                              "old": src.text[start:end]})
+        entries.append({"name": old, "type": cls, "method": member,
+                        "kind": "static" if first["static"] else "member",
+                        "call_form": ("%s::%s(...)" % (cls, member)) if first["static"] else "obj->%s(...)" % member,
+                        "signature": member_signature(first), "declarations": decls, "definitions": defs,
+                        "references": refs, "mangled": mangled, "mangled_how": how, "map_row": rows.get(old),
+                        "note": note, "edits": edits})
+    seen: dict = {}
+    for e in entries:
+        if e["mangled"]:
+            if e["mangled"] in seen:
+                errors.append("%s and %s both mangle to %s" % (seen[e["mangled"]], e["name"], e["mangled"]))
+            seen.setdefault(e["mangled"], e["name"])
+    if obj_names is not None:
+        errors.extend(verify_names(entries, obj_names))
+    return entries, errors
+
+
+def verify_names(entries: list[dict], names: list[str]) -> list[str]:
+    """Confirm each estimate against the built object's function symbols; a differing mangling is an error."""
+    errors: list[str] = []
+    have = set(names)
+    for e in entries:
+        if not e["mangled"]:
+            continue
+        if e["mangled"] in have:
+            e["mangled_how"] = "verified"
+            continue
+        tag = "__%d%s" % (len(e["type"]), e["type"])
+        cands = sorted(n for n in have if n.startswith(e["method"] + "__") and tag in n)
+        if cands:
+            errors.append("%s: the object defines %s but the estimate is %s (mangling mismatch, refusing)"
+                          % (e["name"], ", ".join(cands), e["mangled"]))
+        elif e["name"] in have:
+            e["note"] = ((e["note"] + "; ") if e["note"] else "") + \
+                "the object still carries the old name (built before the migration): estimate not verified"
+        else:
+            e["note"] = ((e["note"] + "; ") if e["note"] else "") + \
+                "the object defines neither the old name nor a %s::%s: estimate not verified" % (e["type"], e["method"])
+    return errors
+
+
+def object_for_unit(root: str, unit: str) -> str:
+    """`build/RMHE08/src/<unit minus extension>.o` for a source path like `Network/x.cpp` (or `src/Network/x.cpp`)."""
+    unit = unit.replace("\\", "/")
+    if unit.startswith("src/"):
+        unit = unit[4:]
+    return os.path.join(root, "build", "RMHE08", "src", os.path.splitext(unit)[0] + ".o")
+
+
 def render(entries: list[dict]) -> str:
     lines: list[str] = []
     for e in entries:
@@ -187,12 +384,16 @@ def render(entries: list[dict]) -> str:
                      % ("%s = %s:%s %s" % (e["name"], row["section"], row["address"], row["attrs"]) if row
                         else "none - the name is not in the map (no rename to apply)"))
         if e["mangled"]:
-            lines.append("  mangled:     %s%s" % ("~" if e["mangled_how"] != "exact" else "", e["mangled"]))
-            if e["mangled_how"] != "exact":
+            lines.append("  mangled:     %s%s" % ("" if e["mangled_how"] in CONFIRMED else "~", e["mangled"]))
+            if e["mangled_how"] in CONFIRMED:
+                lines.append("               (%s)" % e["mangled_how"])
+            else:
                 lines.append("               (%s; confirm with --exact before renaming the map row)"
                              % e["mangled_how"])
         if e["note"]:
             lines.append("  note:        %s" % e["note"])
+        for ed in e.get("edits", []):
+            lines.append("  edit %-8s %s:%d  %s" % (ed["kind"], ed["file"], ed["line"], ed["new"]))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n" if lines else "no rule-13 findings for that selection.\n"
 
@@ -205,7 +406,7 @@ def batch_text(entries: list[dict]) -> str:
     for e in entries:
         if not e["map_row"] or not e["mangled"]:
             out.append("# %s: %s" % (e["name"], "not in the map" if not e["map_row"] else e["note"]))
-        elif e["mangled_how"] == "exact":
+        elif e["mangled_how"] in CONFIRMED:
             out.append("%s %s" % (e["name"], e["mangled"]))
         else:
             out.append("#~ %s %s" % (e["name"], e["mangled"]))
@@ -291,6 +492,71 @@ def selftest() -> int:
               [("Tcp_send", "send__3TcpFPCUcl")])
         check("the tree was not touched (no file written by the planner)",
               sorted(os.listdir(os.path.join(tmp, "src", "mod"))), ["other.cpp", "tcp.cpp"])
+
+    # explicit mapping: two prefixes, a Tcp/Udp-style duplicated body pair
+    with tempfile.TemporaryDirectory() as tmp:
+        def put(rel, text):
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+        put("include/net/peer.h",
+            "struct Tcp {\n    int a;\n};\nstruct Udp {\n    int a;\n};\nstruct Stream {\n    int a;\n};\n"
+            "s32 netPeer_send(Tcp* self, const u8* data, s32 size);\n"
+            "s32 netPeerB_send(Udp* self, const u8* data, s32 size);\n"
+            "s32 netPeerC_send(Tcp* self, const u8* data, s32 size);\n"
+            "s32 netStream_size(const Stream* s);\nStream* netStream_make(void);\n")
+        put("src/net/peer.cpp",
+            '#include "net/peer.h"\n'
+            "s32 netPeer_send(Tcp* self, const u8* data, s32 size) {\n    return size;\n}\n"
+            "s32 netPeerB_send(Udp* self, const u8* data, s32 size) {\n    return size;\n}\n"
+            "s32 netStream_size(const Stream* s) {\n    return 1;\n}\n"
+            "void user(Tcp* t, Udp* u, Stream* s) {\n    netPeer_send(t, 0, 1);\n    netPeerB_send(&g_udp, 0, 2);\n"
+            "    netStream_size(s);\n    netStream_make();\n}\n")
+        put("config/RMHE08/symbols.txt",
+            "".join("%s = .text:0x8000%04X; // type:function size:0x10\n" % (n, i * 16)
+                    for i, n in enumerate(["netPeer_send", "netPeerB_send", "netStream_size", "netStream_make"])))
+        mp = parse_mapping(["netPeer_send=Tcp::send", "netPeerB_send=Udp::send", "netStream_size=Stream::size"],
+                           "Stream", ["netStream_make=make"])
+        check("mapping parse", mp["netStream_make"], ("Stream", "make"))
+        ents, errs = plan_mapping(tmp, mp)
+        by = {e["name"]: e for e in ents}
+        check("no errors on a clean mapping", errs, [])
+        check("Tcp/Udp duplicated pair mangles apart",
+              (by["netPeer_send"]["mangled"], by["netPeerB_send"]["mangled"]),
+              ("send__3TcpFPCUcl", "send__3UdpFPCUcl"))
+        check("const self -> C, static form has none",
+              (by["netStream_size"]["mangled"], by["netStream_make"]["kind"], by["netStream_make"]["mangled"]),
+              ("size__6StreamCFv", "static", "make__6StreamFv"))
+        calls = sorted(x["new"] for e in ents for x in e["edits"] if x["kind"] == "call")
+        check("call sites are rewritten (member, address-of receiver, static)", calls,
+              sorted(["Stream::make()", "s->size()", "t->send(0, 1)", "g_udp.send(0, 2)"]))
+        check("a definition edit drops the self",
+              [x["new"] for x in by["netPeer_send"]["edits"] if x["kind"] == "define"],
+              ["s32 Tcp::send(const u8* data, s32 size)"])
+        check("the map row is found by exact name", by["netPeer_send"]["map_row"] is not None, True)
+        good = ["send__3TcpFPCUcl", "send__3UdpFPCUcl", "size__6StreamCFv", "make__6StreamFv"]
+        ents2, errs2 = plan_mapping(tmp, mp, obj_names=good)
+        check("names present in the object are verified", (errs2, {e["mangled_how"] for e in ents2}),
+              ([], {"verified"}))
+        b = batch_text(ents2)
+        check("a verified name is an active batch row",
+              sorted(l for l in b.splitlines() if l and not l.startswith("#")),
+              sorted(["netPeer_send send__3TcpFPCUcl", "netPeerB_send send__3UdpFPCUcl",
+                      "netStream_size size__6StreamCFv", "netStream_make make__6StreamFv"]))
+        _e3, errs3 = plan_mapping(tmp, mp, obj_names=["send__3TcpFPCUc"] + good[1:])
+        check("a different mangling in the object is refused", len(errs3), 1)
+        check("... and names the mismatch", "mismatch" in errs3[0] and "send__3TcpFPCUc" in errs3[0], True)
+        ents4, errs4 = plan_mapping(tmp, mp, obj_names=["netPeer_send", "netPeerB_send", "netStream_size",
+                                                        "netStream_make"])
+        check("a pre-migration object is not a mismatch, just unverified",
+              (errs4, {e["mangled_how"] for e in ents4}), ([], {"estimated"}))
+        _e5, errs5 = plan_mapping(tmp, {"netPeer_send": ("Tcp", "send"), "netPeerC_send": ("Tcp", "send")})
+        check("two mappings mangling to one name are refused", any("both mangle" in x for x in errs5), True)
+        _e6, errs6 = plan_mapping(tmp, {"nope": ("Tcp", "x")})
+        check("an unknown function is an error", len(errs6), 1)
+        check("the explicit plan does not write the tree",
+              sorted(os.listdir(os.path.join(tmp, "src", "net"))), ["peer.cpp"])
     sl.set_rule13_context(None)
 
     if fails:
@@ -309,14 +575,49 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--root", default=None, help="the tree to read (default: this git tree)")
     ap.add_argument("--batch", metavar="FILE", help="write a `symedit.py rename-batch` input here")
     ap.add_argument("--exact", action="store_true", help="confirm each mangling with the compiler (needs build/)")
+    ap.add_argument("--map", action="append", default=[], metavar="OLD=CLASS::MEMBER",
+                    help="explicit mapping (repeatable); no prefix convention needed")
+    ap.add_argument("--map-file", metavar="JSON", help="a JSON object {old: \"Class::member\"}")
+    ap.add_argument("--class", dest="cls", help="with --fn: the class every --fn maps into")
+    ap.add_argument("--fn", action="append", default=[], metavar="OLD=MEMBER")
+    ap.add_argument("--unit", help="the unit's source (Network/x.cpp): verify manglings against its built object")
+    ap.add_argument("--obj", help="verify against this object file's function symbols")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    root = args.root or repo_root()
+    if args.map or args.map_file or args.fn:
+        pairs = list(args.map)
+        if args.map_file:
+            with open(args.map_file, encoding="utf-8") as fh:
+                pairs += ["%s=%s" % kv for kv in json.load(fh).items()]
+        try:
+            mapping = parse_mapping(pairs, args.cls, args.fn)
+        except ValueError as ex:
+            ap.error(str(ex))
+        obj = args.obj or (object_for_unit(root, args.unit) if args.unit else None)
+        names = None
+        if obj:
+            if not os.path.isfile(obj):
+                print("the object %s is not built; manglings stay estimates (build it to verify)" % obj)
+            else:
+                import unitutil
+                names = unitutil.function_names(obj)
+        entries, errors = plan_mapping(root, mapping, names, exact=args.exact)
+        sys.stdout.write((json.dumps(entries, indent=1) + "\n") if args.json else render(entries))
+        if errors:
+            for e in errors:
+                print("REFUSED: " + e)
+            return 2
+        if args.batch:
+            with open(args.batch, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(batch_text(entries))
+            print("batch file: %s" % args.batch)
+        return 0
     if not args.type and not args.all:
         ap.error("name a type, or pass --all")
-    root = args.root or repo_root()
     entries = plan(root, None if args.all else args.type, exact=args.exact)
     if args.batch:
         with open(args.batch, "w", encoding="utf-8", newline="\n") as fh:
