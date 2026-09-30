@@ -1,4 +1,4 @@
-/* enemy/fn_80387844.cpp - the enemy monster-AI action band, `.text` 0x80387844..0x8038E8E8.
+/* enemy/fn_80387844.cpp - the enemy monster-AI action band (the `em009` TU), `.text` 0x803868DC..0x8038EC44.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address here resolves to a `zz_XXXXXXXX_` dump
  * name and a bare `.text` entry in config/RMHE08/symbols.txt, so no real function name survives).
@@ -25,8 +25,19 @@
  * LANGUAGE AND SECTIONS.  C++: the range reaches genuinely mangled callees (`setVector3`,
  * `mulVecMatAddTrans`, `rotVecY`, `calcVecAng2`, `eft009_set_pos`) through their real signatures
  * (rule 9).  Every plain `fn_` definition is `extern "C"` so it keeps the map's name (playbook 42).
- * Sections: `.text` 0x80387844..0x8038E8E8, plus the extab/extabindex runs its framed functions
- * carry.  The `.data` switch tables are not yet claimed (residual - see the outbox).
+ * Sections: `.text` 0x803868DC..0x8038EC44, extab 0x8001803C..0x800181C4, extabindex
+ * 0x80037EC0..0x8003810C, `.rodata` 0x80570B20..0x80570BA0, `.data` 0x805EFA00..0x805F0CB8.
+ *
+ * SEAM (recut 2026-09-30).  The unit took the tail of `enemy/fn_80382310.cpp` (0x803868DC..0x80387844,
+ * eight functions) and the `em009` action slots that headed `lobby/lb_quest_ui.cpp`
+ * (0x8038E8E8..0x8038EC44).  Right edge: `fn_8038EBE8` is the deleting destructor that closes the TU (same
+ * shape as `fn_8019E5A8`/`fn_801AA0F8`).  Left edge: the 0.0 pool entry is repeated at `lbl_8079BFF8`, first
+ * read by `fn_803868F0`, and `fn_80385A54` tail-calls `fn_803865B4` (0x328, the last reader of the note
+ * pane's pool run 0x8079BFA0..0x8079BFF0), so 0x803868DC (the window 0x803868DC..0x803868F0 the dedupe
+ * gives) starts this TU.  The data tile: `lbl_805EFAB8` (read by `fn_8038E9F0`), `jumptable_805EFAC4`
+ * (`fn_80386A04`) and `lbl_805F0C88` (`fn_803869C8`) sit among this unit's tables.  The range
+ * 0x80385EE0..0x803868DC that stays in `enemy/fn_80382310.cpp` is a third note-pane TU: its pool
+ * repeats the 41c00000 entry of the TU below (`lbl_8079BF88` -> `lbl_8079BFAC`).
  *
  * STATUS / RESIDUALS.  See the outbox `config_requests` and the batch note; the band was written
  * from the target object's own disassembly and the m2c shape oracle.
@@ -49,6 +60,8 @@
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
+#include "enemy/fn_80147CE0.h" /* em_res_user_data_ctor (rule 2: the owner's header) */
+#include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 
 /* The band's pooled `.sdata2` constants (declared, never defined: the pool belongs to the data pass,
  * playbook 29). */
@@ -117,7 +130,127 @@ extern "C" void fn_8038C124(_ENEMY_WORK* self);
 extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 e);
 extern "C" void fn_8038D0A4(_ENEMY_WORK* self);
 
+extern u8 lbl_805F0C88[]; /* .data 0x805F0C88 - the record table `fn_803869C8` installs */
+
 static _ENEMY_WORK* w(void* p) { return (_ENEMY_WORK*)p; }
+
+/* =================================================================================================
+ * 0x803868DC..0x80387844 - the tail of the former `enemy/fn_80382310.cpp`
+ * ================================================================================================= */
+
+/* 0x803868DC */
+extern "C" void fn_803868DC(_ENEMY_WORK* self) {
+    self->handles_0x328[0] = 0;
+    self->init_0x328.field_0x338 = 0;
+    self->init_0x328.field_0x33A = 0;
+}
+
+/* 0x803869C8 */
+extern "C" void* fn_803869C8(void* self) {
+    em_res_user_data_ctor(self);
+    *(void**)self = (void*)lbl_805F0C88;
+    return self;
+}
+
+/* 0x8038729C */
+extern "C" void fn_8038729C(_ENEMY_WORK* self) {
+    if (self->init_0x328.field_0x338 < 1800) {
+        self->init_0x328.field_0x338++;
+    }
+    if (self->init_0x328.field_0x33A > 0) {
+        self->init_0x328.field_0x33A--;
+    }
+}
+
+/* 0x803872C8 - the motion state machine, set A. */
+extern "C" void fn_803872C8(_ENEMY_WORK* self) {
+    u8 v = self->state;
+    if (v == 0) {
+        self->state = v + 1;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 1, 6, 0);
+    } else if (v == 1) {
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+    }
+}
+
+/* 0x80387344 - the motion state machine, set B. */
+extern "C" void fn_80387344(_ENEMY_WORK* self) {
+    u8 v = self->state;
+    if (v == 0) {
+        self->state = v + 1;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 2, 6, 0);
+    } else if (v == 1) {
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+    }
+}
+
+/* 0x803873C0 - the motion state machine, set C. */
+extern "C" void fn_803873C0(_ENEMY_WORK* self) {
+    u8 v = self->state;
+    if (v == 0) {
+        self->state = v + 1;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 14, 6, 0);
+    } else if (v == 1) {
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+    }
+}
+
+/* 0x8038743C - the motion state machine, set D. */
+extern "C" void fn_8038743C(_ENEMY_WORK* self) {
+    u8 v = self->state;
+    if (v == 0) {
+        self->state = v + 1;
+        em_move_mode_set(self, 4);
+        em_mot_set_ck(self, 1, 0, 0);
+        fn_801303EC(self, fn_8013032C(self));
+    } else if (v == 1) {
+        if (em_mot_end_ck(self) == 1) {
+            fn_801280F4(self);
+        }
+    }
+}
+
+/* 0x803874C8 */
+extern "C" void fn_803874C8(_ENEMY_WORK* self) {
+    u8 v = self->state_sub;
+    if (v == 0) {
+        fn_803872C8(self);
+        return;
+    }
+    if (v == 1) {
+        fn_80387344(self);
+        return;
+    }
+    if (v == 2) {
+        fn_803873C0(self);
+        return;
+    }
+    if (v == 3) {
+        fn_803872C8(self);
+        return;
+    }
+    if (v == 4) {
+        fn_803872C8(self);
+        return;
+    }
+    if (v == 6) {
+        fn_803872C8(self);
+        return;
+    }
+    if (v == 7) {
+        fn_8038743C(self);
+        return;
+    }
+}
 
 /* =================================================================================================
  * 0x80387844
@@ -1855,3 +1988,31 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
         return;
     }
 }
+
+/* =================================================================================================
+ * 0x8038E8E8..0x8038EC44 - the em009 action slots of the former `lobby/lb_quest_ui.cpp` head
+ * ================================================================================================= */
+extern "C" {
+
+/* An unused `em009` slot handler. */
+void em009_act_noop(void) {
+}
+
+/* Clears the handler's 0x33A parameter word. */
+void em009_act_clear_param(_ENEMY_WORK* work) {
+    work->init_0x328.field_0x33A = 0;
+}
+
+/* Fills a slot-kind pair after arming the work's effect slot 4. */
+void em009_act_slot_init(_ENEMY_WORK* work, u8* kind, u8* value) {
+    em_move_mode_set(work, 4);
+    *kind = 12;
+    *value = 0;
+}
+
+/* Whether the work's part 6 is damaged. */
+int em009_act_part_broken_ck(_ENEMY_WORK* work) {
+    return em_parts_damage_level_get(work, 6) >= 1;
+}
+
+} /* extern "C" */

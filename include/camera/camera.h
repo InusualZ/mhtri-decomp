@@ -63,7 +63,7 @@ void fn_802BBAC4(u8 value);
 /* 0x802B8DF8 - r3 the player work; `Pl/fn_802489D4.cpp`'s leaves call it. */
 void fn_802B8DF8(struct _PLW* self);
 
-/* 0x802BE638 - r3 the enemy work, r4 a kind, r5 an output `Vec3`; `enemy/fn_801A4504.cpp` calls it. */
+/* 0x802BE638 - r3 the enemy work, r4 a kind, r5 an output `Vec3`; `enemy/fn_8019ED34.cpp` calls it. */
 void fn_802BE638(struct _ENEMY_WORK* self, s32 a, Vec3* v);
 }
 

@@ -15,6 +15,20 @@
 struct _ENEMY_WORK;
 
 #ifdef __cplusplus
+extern "C" {
+#endif
+/* The action-table head 0x803874C8..0x80387844 (inside this unit's range): the first four `state_sub` handlers
+ * `fn_80388144` dispatches to.  Each drives the shared `_ENEMY_WORK`; `fn_803874C8` takes the work record, the
+ * other three take none (they forward r3). */
+void fn_803874C8(struct _ENEMY_WORK* self);
+void fn_80387528(void);
+void fn_803875A4(void);
+void fn_80387620(void);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
 void* get_move_work_adrs(u8 kind);
 u32 get_move_work_max(u8 kind);
 #endif

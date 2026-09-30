@@ -44,7 +44,7 @@ void em_res_user_data_set(struct _ENEMY_WORK* self, void* arg1);
 /* 0x8013A654 - r3 (`self`, the owner spells it `ResUserDataAc*`) and r4, stored at +0x8 of the
  * record at +0x4; moved here from `enemy/fn_801550FC.cpp` on landing (rule 2). */
 void fn_8013A654(struct _ENEMY_WORK* self, u32 a);
-/* 0x8013918C - r3 (`self`) and r4, the flag `enemy/fn_801993E0.cpp`'s `fn_8019E5A8` passes as 0
+/* 0x8013918C - r3 (`self`) and r4, the flag `enemy/fn_801926EC.cpp`'s `fn_8019E5A8` passes as 0
  * before it decides whether to `operator delete` the record; added with that unit's registration
  * (rule 2: this range owns the address). */
 void fn_8013918C(struct _ENEMY_WORK* self, u32 a);

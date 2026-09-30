@@ -83,7 +83,7 @@
  *  - `include/fn_8004CAD8.h`: `fn_8005024C`.
  *  - `include/sound/mhchar.h`: the pointer-taking `setTevKColor` overload the enemy action band's
  *    target relocations encode (`...P8_GXColor`); the by-value spelling is kept for the existing
- *    `enemy/fn_801D428C.cpp`/`enemy/fn_801DB8E0.cpp` call sites.
+ *    `enemy/fn_801CCBC4.cpp`/`enemy/fn_801D80EC.cpp` call sites.
  *
  * fn_80182B94 seals its four table entries with the `copyVec3` 0xC-byte copy (mh3_pad.h) rather
  * than the target's `assignVec3`: the target's reloc pairs identically in the report metric (both

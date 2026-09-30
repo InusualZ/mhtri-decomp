@@ -171,7 +171,7 @@ f32 fn_801356A8(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
  * before ANDing it against the record's `flags_0x836`; the body's `neg`/`or`/`srwi 31` returns 1
  * when any masked bit is set, so the result is a u32 0/1 and every call site compares it with
  * `cmplwi`.  The old-style `s32 em_flags836_ck()` declaration could not carry the two arguments the
- * landed callers pass (`enemy/fn_8014A1BC.c` and `enemy/fn_801DB8E0.cpp` both call it
+ * landed callers pass (`enemy/fn_8014A1BC.c` and `enemy/fn_801D80EC.cpp` both call it
  * `(self, mask)`). */
 u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
 u32 fn_80135BC4(struct _ENEMY_WORK* work, s32 arg1);
@@ -262,9 +262,9 @@ void fn_80132264(struct _ENEMY_WORK* self);
  * spawn record; the spellings here were the call sites' `void*`/`u32` view (rule 2). */
 /* `em_spawn_request` (0x80141B88) moved to its owner's header, `include/enemy/enemy_control.h`. */
 /* The unclaimed `.text` run 0x801926EC..0x801993E0 (a proposal of its own, registered by nobody
- * yet): its per-action entry points are what the dispatchers in `enemy/fn_801993E0.cpp` switch
+ * yet): its per-action entry points are what the dispatchers in `enemy/fn_801926EC.cpp` switch
  * over.  Added with that unit's registration (docs/plan.md 6.5 rule 2): the address band brackets as
- * `enemy` on both sides (`enemy/fn_80191598.cpp` below, `enemy/fn_801993E0.cpp` above), so the
+ * `enemy` on both sides (`enemy/fn_80191598.cpp` below, `enemy/fn_801926EC.cpp` above), so the
  * declarations belong in this band header until the run's own unit claims them.  Every one of them
  * takes the `_ENEMY_WORK` record and returns nothing - they are called as `fn(self); break;` from a
  * `void` dispatcher and the target tail-calls the last ones. */
@@ -289,8 +289,8 @@ void fn_80198F14(struct _ENEMY_WORK* self);
 u32 fn_801B701C(struct _ENEMY_WORK* self);
 /* The enemy effect-slot cluster below `fn_801A4504`'s range (0x801A3xxx-0x801A9xxx): unowned (the
  * bracketing registered units are `lobby` above), so the declarations live in this band header.
- * `enemy/fn_801A4504.cpp` calls all of them; the signatures are its call sites' registers.  The
- * 0x8019E9xx members are NOT here - they are inside `enemy/fn_801993E0.cpp`'s range, so its owner
+ * `enemy/fn_8019ED34.cpp` calls all of them; the signatures are its call sites' registers.  The
+ * 0x8019E9xx members are NOT here - they are inside `enemy/fn_801926EC.cpp`'s range, so its owner
  * header carries them. */
 void fn_801A3E90(struct _ENEMY_WORK* self);
 void fn_801A3FD8(struct _ENEMY_WORK* self);
@@ -299,22 +299,9 @@ void fn_801A4218(struct _ENEMY_WORK* self);
 void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
 /* r3 the work record, r4/r5/r6/r7 four scalars and f1 (the target's call sites set all five). */
 void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
-/* Added with `enemy/fn_801A9540.cpp`'s registration (rule 2): the enemy-band callees that
- * range's state machines call and no registered unit owns.  Their bracketing registered units
- * both name `enemy`, so this band header is their home. */
-void fn_801A9748(struct _ENEMY_WORK* self);
-void fn_801A98F8(struct _ENEMY_WORK* self);
-/* The enemy action-table head above `enemy/fn_80387844.cpp`'s range (0x803874C8..0x80387844): the
- * first four `state_sub` handlers `fn_80388144` dispatches to.  Unowned (the bracketing registered
- * units are `enemy` on both sides), so the band header is their rule-2 home.  Each drives the shared
- * `_ENEMY_WORK`; `fn_803874C8` takes the work record, the other three take none (they forward r3). */
 /* 0x80346268 - the two-argument request `enemy/em_action.cpp`'s entry action's case 11 makes when
  * the enemy data entry is latched.  `ef/eft_slot.cpp` registered the band that owns the address, so
  * the declaration moved to that unit's header, `include/ef/eft_slot.h` (rule 2). */
-void fn_803874C8(struct _ENEMY_WORK* self);
-void fn_80387528(void);
-void fn_803875A4(void);
-void fn_80387620(void);
 
 /* The `0x803253BC` band's pooled constants - the `.sdata2` run 0x8079AF4C..0x8079B100 and the
  * `.data` word its action record's first field is set to.  Declared, never defined (playbook 29):

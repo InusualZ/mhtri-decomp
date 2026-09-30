@@ -1,91 +1,42 @@
-/* enemy/fn_801BD6C0.cpp - the enemy "em" motion/act-instruction band's continuation,
- * `.text` 0x801BD6C0..0x801CA004 (128 functions, 0xC944 B), extab 0x8000FACC..0x8000FDFC (102
- * records), extabindex 0x8002B71C..0x8002BBE4 (102 x 12 B).  Registered from
- * `proposal/801BD6C0_fn_801BD6C0.cpp`.
+/* enemy/fn_801BD6C0.cpp - the em006 enemy's action band, `.text` 0x801BB758..0x801C29F8.
  *
- * Module `enemy`.  Both bracketing registered units are `enemy/*`: below is `enemy/fn_801B7020.cpp`
- * (`.text` ends exactly at 0x801BD6C0, its extab at 0x8000FACC and its extabindex at 0x8002B71C,
- * which is where this unit's runs begin) and above, after the still-unclaimed 0x801CA004..0x801D428C
- * run, `enemy/fn_801D428C.cpp` (its extab starts at 0x800100D4, the next record after this unit's
- * 0x8000FDFC).  Every callee out of the range is the enemy work API (`get_joint_wpos_em`,
- * `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check__FP11_ENEMY_WORKUsff`, `em_move_mode_set`,
- * `em_mot_end_ck`, `get_now_areano__Fv`).
+ * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
+ * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
+ * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
+ * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
+ * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
+ * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
+ * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
  *
- * Seam.  `tudiscover at 0x801BD6C0` reports a weak left edge (the closure edge): the bounding cut is
- * the size cap the proposal records, not a translation-unit boundary - the region's edges are
- * `enemy/fn_801B7020.cpp`'s end and the as-yet-unregistered 0x801CA004..0x801D428C run, and this
- * unit's extab/extabindex runs end exactly where that run's would begin.  Registered separately from
- * `enemy/fn_801B7020.cpp` per the proposal's pinned seam; the header of that unit records the same
- * provisional boundary.  See the outbox.
+ * This unit's sections: extab 0x8000F9A4..0x8000FB84, extabindex 0x8002B560..0x8002B830, `.ctors`
+ * 0x8056F350..0x8056F354 (`fn_801C28FC`, the six-vector `__sinit`: the last function before em004's first,
+ * `fn_801C29F8`), `.rodata` 0x805702A0..0x80570320, `.data` 0x805B28D0..0x805B3B7C (from `em006_prog_tbl`) and `.bss`
+ * 0x806A7AD0..0x806A7B18.  Left edge 0x801BB758: the 0.0 pool entry repeats at `lbl_80798E40`, first read by
+ * `fn_801BB758` (a one-function window).
  *
- * Name.  The symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `tools/symbols/dumpmap.py lookup 0x801BD6C0`: the runtime dump answers `zz_01bd6c0_` and the rest
- * `zz_`/nothing; no `__FILE__`-spelling string is referenced anywhere in the range - every data
- * reference is a pool float, an integer table or a `.bss` block), so the file keeps the map's stem
- * (brief section 2, class 4).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `tools/symbols/dumpmap.py lookup` and a scan of the range's data references in the auto split)
- *
- * Language: C++ (re-derived from the range's own evidence: its callees carry argument-list manglings -
- * `em_frame_check__FP11_ENEMY_WORKUsff`, `get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3`,
- * `setVector3__FPQ34nw4r4math4VEC3fff` - and the flat `fn_*` symbols are `extern "C"` so objdiff
- * pairs them by name).
- *
- * Status (this branch).  Twelve rows are written and measured one at a time with
- * `python tools/units/recompile.py enemy/fn_801BD6C0.cpp --measure <symbol>` - eleven are exactly
- * 100 % and `fn_801BD838` is 97.67 % (its 344 B object is the target's size to the byte).  The other
- * 116 rows of the range are a residual of the round (unwritten), not a claim.
- *
- * Residual - `fn_801BD838` 97.67 %.  Same 86 instructions and same 344 B; the only difference is the
- * order of the `li r4, 0` and `lfs f1, lbl_80798EA8@sda21` pair before the `em_approach_start(self, 0,
- * lbl_80798EA8)` call (retail loads f1 first, this build materialises the integer first).  Tried: a
- * `f32 scale = lbl_80798EA8;` local before the call (unchanged, 97.67 %).  The one other scheduling
- * difference the range first showed (`fn_801BD6C0`'s `li r4, 0x2D`) was closed by spelling the limit
- * as the ternary `arg1 == 1 ? 0x50 : 0x2D` instead of an `if` over an initialised local.
- *
- * `#pragma peephole off` is this unit's one scoped pragma (the same lever `enemy/fn_8015D860.cpp`
- * and `enemy/fn_801B7020.cpp` document, docs/plan.md 8.2): every row here measures at 100 % with the
- * `-O3` peephole pass off.  No lib flag is involved - the `enemy` lib's `cflags_main` measures every
- * body below.
- */
-
-/* The two fields the shared `_ENEMY_WORK` view did not carry yet are declared there (rule 1): the
- * `_se_w*` handle at +0xB14 (`se_req_pos_ps`/`shell_se_req`).  The pool floats are declared locally,
- * as `src/draw_shape.cpp`/`src/ef/effect.cpp` do.
+ * The written functions are the former `enemy/fn_801BD6C0.cpp`'s; `fn_801C2A58` (0x801C2A58, em004's) moved to
+ * `enemy/fn_801CA004.cpp`.  Their bodies, residuals and measurements are unchanged (per-function rows in the report).
  */
 
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
-
 #include "nw4r/math.h"
-
 #include "enemy/ENEMY_WORK.h"
-
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
-
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"
-
 #include "sound/fn_800D7F54.h"
-
-/* The SE request layer's owner header (rule 2): `se_req_pos_ps` is declared there, once, in
- * `sound/se.h`.  A local copy in `sound/fn_800D7F54.h` clashed with `ef/fn_80105314.cpp`'s own
- * `void se_req_pos_ps(...)` spelling (`(10505) illegal overloading`). */
 #include "sound/se.h"
-
-/* `VEC3_ctor` (the 3-float record writer) - via the ef band, because `sound/se.h` and the
- * owner's `mh3_pad.h` both declare `copyVec3`/`setVec3` with signatures that clash
- * (`(10197) illegal function overloading`), the same conflict `ai/fn_802CC794.cpp` records.  The
- * ef band carries the identical `Vec3*` spelling (`Vec3` is `nw4r::math::VEC3`). */
 #include "unsplit/ef.h"
-
 #include "ef/eft009.h"
-
 #include "draw_shape.h"
 #include "fn_8004CAD8.h"
+
+/* ===================================================================================================
+ * former fn_801BD6C0.cpp
+ * =================================================================================================== */
 
 #pragma peephole off
 
@@ -374,13 +325,6 @@ extern "C" s32 fn_801C250C(_ENEMY_WORK* self, u8 arg1)
         return 1;
     }
     return 0;
-}
-
-/* 0x801C2A58 - flips the halfword rotation and clears the third angle. */
-extern "C" void fn_801C2A58(_ENEMY_WORK* self)
-{
-    self->field_0x1C0 = (s32)(u16)(self->field_0x1C0 + 0x8000);
-    self->field_0x1C4 = 0;
 }
 
 /* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AD0..0x806A7B18`), in address order: the 3 two-vector record(s)

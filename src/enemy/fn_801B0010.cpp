@@ -52,7 +52,7 @@
  * emitting a mangled reloc the target does not have).  Everything else that changed here:
  *   * `pl_model_state_set` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
  *     its owner existed) to the owner's header `include/Pl/fn_80262940.h`; `fn_801E01BC` likewise to
- *     `include/enemy/fn_801DB8E0.h`, and this unit's own three band symbols to
+ *     `include/enemy/fn_801D80EC.h`, and this unit's own three band symbols to
  *     `include/enemy/fn_801B0010.h` (`fn_801B0010` was parked in `unsplit/enemy.h` with the note
  *     "owned by the still-unregistered proposal/801B0010 range"; `fn_801B4348`/`fn_801B4398` were
  *     declared in `enemy/fn_801B4458.cpp`).
@@ -106,8 +106,8 @@
 
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_801B0010.h"
-#include "enemy/fn_801D428C.h"
-#include "enemy/fn_801DB8E0.h"
+#include "enemy/fn_801CCBC4.h"
+#include "enemy/fn_801D80EC.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_801251D0.h" /* EmGroundRec + fn_80125F54 (rule 1/2: their owner) */
 #include "ai/ainpc.h"   /* `_AINPC_W` (rule 1) */

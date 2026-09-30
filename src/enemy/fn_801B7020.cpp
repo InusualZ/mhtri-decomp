@@ -1,8 +1,17 @@
-/* enemy/fn_801B7020.cpp - the enemy band's motion/act-instruction group.
+/* enemy/fn_801B7020.cpp - the em036 enemy's motion/act-instruction group.
  *
- * `.text` 0x801B7020..0x801BD6C0 (123 functions, 0x66A0 B), extab 0x8000F7EC..0x8000FACC (92
- * records), extabindex 0x8002B2CC..0x8002B71C (92 x 12 B), one `.ctors` word at
- * 0x8056F34C..0x8056F350.  Registered from `proposal/801B7020_fn_801B7020.cpp`.
+ * `.text` 0x801B7020..0x801B98C8 (em036), extab 0x8000F7EC..0x8000F904, extabindex 0x8002B2CC..0x8002B470, one
+ * `.ctors` word at 0x8056F34C..0x8056F350 (`fn_801B985C`, the `__sinit`), `.data` 0x805B2188..0x805B2804 (after
+ * `em036_prog_tbl`, 0x805B2118) and `.bss` 0x806A7AB8..0x806A7AD0.  Registered from
+ * `proposal/801B7020_fn_801B7020.cpp`; the range was 0x801B7020..0x801BD6C0 until the 2026-09-30 recut.
+ *
+ * The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
+ * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
+ * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
+ * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
+ * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
+ * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
+ * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
  *
  * Module `enemy`.  Both bracketing registered units are `enemy/*` (`enemy/fn_80191598.cpp` below at
  * 0x80191598..0x801926EC, `lobby/lobby_scene.c` only after the whole 0x801926EC..0x801EC9E0 band), and
@@ -12,10 +21,10 @@
  * class/namespace declaration reproduces (`setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`,
  * `rotVecY__FPQ34nw4r4math4VEC3Ul`, `shell_se_req__FP5_se_wPQ34nw4r4math4VEC3UcUl`).
  *
- * Seam.  The proposal's own edges: below is the still-unclaimed 0x801926EC..0x801B7020 hole (whose
- * last function, the 4-byte `fn_801B701C`, is not this unit's) and above is `proposal/801BD6C0`.  The
- * unit's extabindex run holds exactly the 92 records of this range's framed functions, bracketed by
- * the records of 0x801B6FB0 (below) and 0x801BD6C0 (above), so the extab/extabindex edges are exact.
+ * Seam.  Right edge 0x801B98C8: `fn_801B985C` is this TU's `__sinit` (the `.ctors` word) and `fn_801B98C8` is an
+ * ordinary function that opens em040 (the 0.0 pool entry repeats at `lbl_80798DA4` in the window 0x801B98C8..
+ * 0x801B9968).  Left edge 0x801B7020: the 4-byte `fn_801B701C` is in the window 0x801B701C..0x801B70A4 the 0.0
+ * dedupe gives and stays with the unit below (not proven either way).
  *
  * Name.  The map has only `fn_XXXXXXXX` for this range - the runtime dump answers `zz_01b7020_` for
  * 0x801B7020 and nothing at all for the later rows (`tools/symbols/dumpmap.py lookup`) - and no
@@ -23,8 +32,7 @@
  *
  * Status (this branch).  The first 24 rows (0x801B7020..0x801B7F74, 0x1A0C B) are written; 21 of them
  * are byte-identical under the official `report generate` metric and 3 carry a residual (below).  The
- * remaining 99 rows are a residual of the round, not a claim: they are unwritten, so the unit's own
- * score is 14.89 % fuzzy over 26272 B (3192 B matched).  Every written row was measured one at a time
+ * rest of the range is unwritten (the unit's score is in the report).  Every written row was measured one at a time
  * with `python tools/units/recompile.py enemy/fn_801B7020 --measure <symbol>` and re-measured in the
  * tree-wide report.
  *

@@ -74,10 +74,9 @@
  *     are necessary (with one shared arm MWCC if-converts them and the function is 16 instructions
  *     short).  Needs `#pragma peephole off` around it: retail keeps `extsb` + `cmpwi`, `-O3` fuses
  *     them into `extsb.`.
- *   * `eft053_model_list_get` 97.16 - two `li r3,0` argument setups are missing at the `em_work_state_bit21_ck`
- *     calls: the target's declaration of that helper takes a parameter, while
- *     `include/unsplit/unknown.h` declares it `(void)` for `ef/fn_801A4504.cpp`.  A shared-file
- *     change (that header) closes the 12 bytes; requested in this unit's outbox, not smuggled in.
+ *   * `eft053_model_list_get` 99.04 - the `li r3,0` argument setups at the `em_work_state_bit21_ck` calls are
+ *     there since `include/enemy/em_pop.h` declares the helper with its real work-record parameter
+ *     (2026-09-30 recut); four bytes of residual remain.
  *   * `eft053_get_shell_data` 93.50 (1260 B) - 40 bytes; every one of its seven map-number cases
  *     shares one tail, which the original reached with a jump - the C here computes the case
  *     selectors and runs the tail after the switch, so MWCC's block layout differs at the joins.
@@ -342,7 +341,7 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
     case 17:
         switch (get_now_areano()) {
         case 1:
-            if (em_work_state_bit21_ck() != 0) {
+            if (em_work_state_bit21_ck(0) != 0) {
                 *out_count = 6;
             } else {
                 *out_count = 8;
@@ -350,7 +349,7 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
             *out_kind = 0;
             return 1;
         case 2:
-            if (em_work_state_bit21_ck() != 0) {
+            if (em_work_state_bit21_ck(0) != 0) {
                 *out_count = 6;
             } else {
                 *out_count = 8;

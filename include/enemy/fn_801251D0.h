@@ -28,7 +28,7 @@ s32 fn_80126104(struct _ENEMY_WORK* work);
 /* 0x80126278 - THREE arguments, settled from the callee's own call sites: the target passes
  * r3 = the `_ENEMY_WORK` (its first act is `mr r4,r3`-style forwarding of the record), r4 = the
  * 16-bit id and r5 = the `VEC3*` fill target.  The two-argument form this header used to carry
- * was the wrong view for `enemy/fn_801993E0.cpp`'s `fn_8019D9BC`, whose call sites set all
+ * was the wrong view for `enemy/fn_801926EC.cpp`'s `fn_8019D9BC`, whose call sites set all
  * three. */
 void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);

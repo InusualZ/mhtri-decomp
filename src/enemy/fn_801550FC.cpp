@@ -1,4 +1,4 @@
-/* enemy/fn_801550FC.cpp - the em003 enemy's action/state unit, 0x801550FC..0x8015D860 (104 functions).
+/* enemy/fn_801550FC.cpp - the em003 enemy's action/state unit, 0x80154E40..0x8015D860 (108 functions).
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `dumpmap.py
  * lookup`: every function of the range reports `zz_<addr>_` in the shared runtime dump and no
  * `__FILE__`/class string names it, and `config/RMHE08/symbols.txt` carries only the bare
@@ -13,13 +13,13 @@
  * per-action state steps: frame/timer gates on the work record, distance and angle tests against the
  * player, `em_act_ck`/`em_frame_check` gates, motion requests and effect/part requests.
  *
- * The range's own seam is unproven and the header says so (docs/plan.md 8.3).  `tudiscover` on
- * 0x801550FC suggests 0x801502C8 as the nearest strong pool boundary below (share 0.045, the queue's
- * own `proposal/801502C8` entry names the same cut), and the em003 data chunk
- * (`em003_prog_tbl` 0x805A44A8 .. `em008_prog_tbl` 0x805A5D48) is referenced from 0x80154F70 upwards -
- * so the real translation unit plausibly starts a few functions below this range's first function.
- * The upper end is bounded by the em008 chunk taking over (the next queue entry starts 0x8015E854);
- * the registration follows the proposal's own range and the boundary is recorded as provisional.
+ * The range's left edge is settled from evidence (2026-09-30 recut): `fn_80154D44` is the static-initializer
+ * of the unit below (its `.ctors` word points at it), the 0.0 pool entry is duplicated at
+ * `lbl_807970C0` from `fn_80154E90` on (one TU pools a value once), and the em003 data chunk
+ * (`lbl_805A4518` .. the `jumptable_805A4848` of `fn_80154FAC` and the `lbl_805A5D18` vtable `fn_80154F70`
+ * installs) is read from 0x80154E90 upwards - so the unit starts at 0x80154E40, the four functions
+ * 0x80154E40..0x801550FC came from `enemy/fn_801502C8.cpp`.  The upper end is bounded by the em008 chunk
+ * taking over (the next queue entry starts 0x8015E854).
  *
  * Language: C++ (the range defines three C++-mangled symbols; `langcheck.py` agrees).  The flat
  * `fn_*` symbols are `extern "C"` so objdiff pairs them by name, and the mangled callees are declared
@@ -48,6 +48,10 @@
  *     difference is instruction order inside the same 240-byte body.
  *   * the biggest bodies (`fn_801550FC` and up) need the per-action record fields this unit reaches
  *     through the helpers (motion ids, effect/part requests) and are the next pass's work.
+ *   * `fn_80154E90` (90.98 %, recut 2026-09-30): retail keeps `clrlwi r0,r31,24`+`cmpwi` for the `arg1 != 0` test
+ *     (this unit's peephole folds it) and loads the two `fn_8012FCC4` float arguments one call later; the
+ *     instruction multiset is otherwise the same.  `fn_80154F70` (99.33 %) picks `r3` where retail picks `r0`
+ *     for the table address.
  *   * nothing here is a paired-single (`psq_l`/`psq_st`) residual: the range has no such instruction
  *     (checked with the disassembly), so the stopping rule of `docs/matching.md` does not apply.
  */
@@ -76,6 +80,9 @@ extern void rotVecY(VEC3*, u32);
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80138074.h"
+#include "enemy/fn_80147CE0.h"
+#include "ef/fn_80105314.h"
+#include "sys_mem.h"
 #include "fn_8004CAD8.h"
 /* The `VEC3_ctor`/`setVec3` macros that used to guard this include are gone: `ef.h` now spells both
  * exactly as their owner `mh3_pad.h` does, so the two headers no longer clash. */
@@ -86,6 +93,11 @@ extern "C" {
 extern void fn_803B9BA0(_ENEMY_WORK*, u32, u32);
 extern void fn_8043B410(_ENEMY_WORK*);
 extern void fn_8043B424(_ENEMY_WORK*, u32, u32);
+extern "C" void fn_80154E40(_ENEMY_WORK* self);
+extern "C" void fn_80154E90(_ENEMY_WORK* self, u8 arg1);
+/* untyped: opaque handle - the 0x0C-byte effect helper (the constructor returns its `this`) */
+extern "C" void** fn_80154F70(void** self);
+extern "C" void fn_80154FAC(_ENEMY_WORK* self, u8* arg1, u8* arg2);
 extern "C" void fn_801550FC(_ENEMY_WORK* self, u8 arg1, u8 arg2);
 extern "C" void fn_80155664(_ENEMY_WORK* self);
 extern "C" void fn_8015569C(_ENEMY_WORK* self);
@@ -194,6 +206,7 @@ extern u8 lbl_8056FA78[];
 extern u8 lbl_8056FAB8[];
 extern u8 lbl_8056FB24[];
 extern u8 lbl_805A4568[];
+extern u8 lbl_805A5D18[];
 extern u8 lbl_805A4590[];
 extern u8 lbl_805A45F0[];
 extern u8 lbl_805A55D8[];
@@ -203,6 +216,7 @@ extern u8 lbl_805A56D0[];
 extern u8 lbl_805A5700[];
 extern f32 lbl_807970C0;
 extern f32 lbl_807970C4;
+extern f32 lbl_807970C8;
 extern f32 lbl_807970CC;
 extern f32 lbl_807970D8;
 extern f32 lbl_807970FC;
@@ -248,6 +262,114 @@ extern f32 lbl_807971F8;
 extern f32 lbl_80797260;
 extern f32 lbl_80797264;
 extern f32 lbl_80797268;
+
+/* Resets the effect slot set: the first six slot bytes to 0xFF, the rest of the set and both timers to 0. */
+extern "C" void fn_80154E40(_ENEMY_WORK* self) {
+    self->init_0x320.bytes_0x328[0] = 0xFF;
+    self->init_0x320.bytes_0x328[1] = 0xFF;
+    self->init_0x320.bytes_0x32A[0] = 0xFF;
+    self->init_0x320.bytes_0x32A[1] = 0xFF;
+    self->bytes_0x32C.field_0x32C = 0xFF;
+    self->bytes_0x32C.field_0x32D = 0xFF;
+    self->field_0x32E = 0;
+    self->field_0x32F = 0;
+    self->field_0x330 = 0;
+    self->field_0x331 = 0;
+    self->bytes_0x332.field_0x332 = 0;
+    self->timer_0x338 = 0;
+    self->bytes_0x332.field_0x333 = 0;
+    self->field_0x334 = 0;
+    self->field_0x335 = 0;
+    self->field_0x336 = 0;
+    self->counter_0x33C = 0;
+}
+
+/* Attaches the 0x0C-byte effect helper and arms the 0x1C72 effect at the work position. */
+extern "C" void fn_80154E90(_ENEMY_WORK* self, u8 arg1) {
+    VEC3 pos;
+    s32 helper;
+
+    VEC3_ctor(&pos);
+    if (arg1 != 0) {
+        fn_8012FCC4(self, 0, lbl_807970C0);
+        fn_8012FCC4(self, 0xA, lbl_807970C4);
+    }
+    if (em_res_user_data_ck(self) == 0) {
+        helper = (s32)operator new(0xC);
+        if (helper != 0) {
+            fn_80154F70((void**)helper);
+        }
+        em_res_user_data_set(self, (void*)helper);
+    }
+    if (self->state_0x009 == 0) {
+        setVector3(&pos, lbl_807970C0, lbl_807970C8, lbl_807970CC);
+        fn_801057A4(self, 0x1A, &pos, lbl_807970C4, 0x1C72);
+    }
+    self->flags_0x836 = (u16)(self->flags_0x836 | 0x8000);
+}
+
+/* Constructs the 0x0C-byte effect helper and installs its `lbl_805A5D18` table. */
+/* untyped: opaque handle - the 0x0C-byte effect helper (the constructor returns its `this`) */
+extern "C" void** fn_80154F70(void** self) {
+    em_res_user_data_ctor(self);
+    *self = (void*)lbl_805A5D18;
+    return self;
+}
+
+/* Remaps the effect id when the action is past its first step. */
+extern "C" void fn_80154FAC(_ENEMY_WORK* self, u8* arg1, u8* arg2) {
+    switch (*arg1) {
+    case 1:
+        if (fn_8012ECF0() == 1 || self->field_0x7c8 >= 0x29) {
+            switch (*arg2) {
+            case 8:
+                *arg2 = 0x19;
+                return;
+            case 13:
+                *arg2 = 0x1A;
+                return;
+            case 14:
+                *arg2 = 0x1B;
+                return;
+            case 15:
+                *arg2 = 0x1C;
+                return;
+            case 16:
+                *arg2 = 0x1D;
+                return;
+            case 17:
+                *arg2 = 0x1E;
+                return;
+            case 33:
+                *arg2 = 0x23;
+                return;
+            case 34:
+                *arg2 = 0x24;
+                return;
+            }
+        }
+        return;
+    case 2:
+        switch (*arg2) {
+        case 0:
+            if (fn_8012ECF0() == 1) {
+                *arg2 = 3;
+            }
+            return;
+        case 8:
+            if (fn_8012ECF0() == 1) {
+                *arg2 = 9;
+            }
+            return;
+        case 10:
+            if (fn_8012ECF0() == 1) {
+                *arg2 = 0xB;
+            }
+            return;
+        }
+        return;
+    }
+}
 
 extern "C" void fn_80155664(_ENEMY_WORK* self) {
     s16 temp_r4;

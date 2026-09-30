@@ -138,8 +138,14 @@ struct _ENEMY_WORK {
         VEC3 v_0x320;
         struct {
             /* +0x320 */ u8 unused_0x320[0x8];
-            /* +0x328 */ u16 field_0x328;   /* `enemy/fn_8035E034.cpp`'s em035 init (0x708) */
-            /* +0x32A */ u16 field_0x32A;   /* ... and 0xB4 */
+            /* +0x328 */ union {
+                u16 field_0x328;   /* `enemy/fn_8035E034.cpp`'s em035 init (0x708) */
+                u8 bytes_0x328[0x2];   /* the effect-slot bytes `fn_80154E40` resets */
+            };
+            /* +0x32A */ union {
+                u16 field_0x32A;   /* ... and 0xB4 */
+                u8 bytes_0x32A[0x2];
+            };
         } init_0x320;
     };
     /* +0x32C */ union {
@@ -149,7 +155,7 @@ struct _ENEMY_WORK {
             /* +0x32D */ u8 field_0x32D;
         } bytes_0x32C;
     };
-    /* +0x32E */ u8 pad_0x32E[0x1];
+    /* +0x32E */ u8 field_0x32E;
     /* +0x32F */ u8 field_0x32F;
     /* +0x330 */ u8 field_0x330;
     /* +0x331 */ u8 field_0x331;
@@ -158,7 +164,7 @@ struct _ENEMY_WORK {
         s16 timer_0x332;
         /* `fn_8015D194` of `enemy/fn_801550FC.cpp` clears the byte at +0x333 on its own */
         struct {
-            /* +0x332 */ u8 unused_0x332;
+            /* +0x332 */ u8 field_0x332;
             /* +0x333 */ u8 field_0x333;
         } bytes_0x332;
     };
@@ -244,7 +250,8 @@ struct _ENEMY_WORK {
     /* +0x80E */ u16 mask_0x80E;     /* the bit mask fn_8011F230 ORs into */
     /* +0x810 */ u8 pad_0x810[0x14];
     /* +0x824 */ u32 bits_0x824;     /* the per-enemy status bits fn_8011E5EC..E640 own */
-    /* +0x828 */ u8 pad_0x828[0x10];
+    /* +0x828 */ u8 pad_0x828[0xE];
+    /* +0x836 */ u16 flags_0x836;    /* bit 0x8000 is set once the effect helper is attached (`fn_80154E90`) */
     /* +0x838 */ _ENEMY_PART parts_0x838[8]; /* the per-part damage table (stride 6, 8 parts) */
     /* +0x868 */ u32 values_0x868[14];
     /* +0x8A0 */ u8 pad_0x8A0[0x2];

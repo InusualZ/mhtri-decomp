@@ -1,11 +1,23 @@
 /* enemy/fn_801926EC.cpp - the enemy "em" action band's per-motion step group.
  *
- * `.text` 0x801926EC..0x801993E0 (93 functions, 0x6CF4 B); extab 0x8000EDF4..0x8000F084;
- * extabindex 0x8002A3D8..0x8002A7B0.  Registered from `proposal/801926EC_fn_801926EC.cpp`.
+ * `.text` 0x801926EC..0x8019E670 (0xBF84 B); extab 0x8000EDF4..0x8000F124; extabindex
+ * 0x8002A3D8..0x8002A8A0; `.ctors` 0x8056F340..0x8056F344; `.data` 0x805AD3DC..0x805AE750; `.bss`
+ * 0x806A7A70..0x806A7A88.  Registered from `proposal/801926EC_fn_801926EC.cpp`; the unit absorbed the
+ * former `enemy/fn_801993E0.cpp` (0x801993E0..0x8019E670) in the 2026-09-30 recut.
  *
- * Module `enemy`: the bracketing registered units are `enemy/fn_80191598.cpp` (ends 0x801926EC)
- * and `enemy/fn_801993E0.cpp` (starts 0x801993E0), and every callee out of the range is an
- * enemy-band function.  Language C++ (the range reaches the mangled `em_frame_check`).
+ * Seam.  The right edge 0x8019E670 is where the TU's own static-initializer ends: the `.ctors` word
+ * points at `fn_8019E604`, which seeds the two vectors at `lbl_806A7A70`, and MWCC emits a TU's
+ * `__sinit` last.  The next function, `fn_8019E670`, is the first reader of the second 0.0 pool entry
+ * (`lbl_80798538`; the first, `lbl_80798238`, is read here), and one TU pools a value once.  The data
+ * proves the 0x801993E0 edge false: the jump tables and tables at 0x805AE118..0x805AE6FC are read only by
+ * 0x801994F4..0x8019D8B8 and the table at 0x805AE720 by `fn_8019287C`, so one `.data` run spans both
+ * old units.  The left edge 0x801926EC is NOT proven: the same two pieces of evidence put this TU's
+ * start at 0x80192348 (the function after `fn_80192204`, the preceding TU's `__sinit`), i.e. the
+ * tail of `enemy/fn_80191598.cpp` (0x80192348..0x801926EC, written over its own `EmActWork` model)
+ * belongs here.
+ *
+ * Module `enemy`: every callee out of the range is an enemy-band function.  Language C++ (the range
+ * reaches the mangled `em_frame_check`).
  *
  * Name.  No `__FILE__` string survives in the range and the runtime dump answers only `zz_`
  * placeholders (`dumpmap.py lookup 0x801926EC` -> `zz_01926ec_`), so the map's own stem keeps the
@@ -15,14 +27,14 @@
  * lookup on the range's inventory: every name is a bare `.text` entry in
  * config/RMHE08/symbols.txt and the runtime dump answers only `zz_XXXXXXXX_` placeholders)
  *
- * Structure.  `fn_801993E0.cpp`'s `fn_80199B24` dispatches `self->action` (0x1E5) into this range's
+ * Structure.  `fn_80199B24` dispatches `self->action` (0x1E5) into this range's
  * six dispatchers `fn_80192F24`/`fn_80193394`/`fn_801938D8`/`fn_801953BC`/`fn_80196618`/`fn_801987E4`,
  * each of which switches on `self->state_sub` (0x1E6) and tail-calls one per-motion step.  Every
  * state machine reads `self->state` (0x005) and, at state 0, runs `em_move_mode_set` + a motion setter
  * (`em_mot_set_ck`/`fn_8012F5C4`/`em_mot_set`); at state 1 it waits on `em_mot_end_ck(self) == 1` and
  * runs a completion hook.
  *
- * Status (official `report.json`, this worktree, split target `build/RMHE08/obj/enemy/fn_801926EC.o`).
+ * Status of the original 0x801926EC..0x801993E0 range (official `report.json`; the absorbed range is below).
  * 56 of the 93 functions are written and every written one is above the 80 % bar: 44 are byte-identical
  * and 12 are codegen near-misses (fn_801933DC 89.71, fn_801934EC 95.56, fn_80193964 97.98,
  * fn_8019485C 98.09, fn_80194CC8 96.10, fn_80195BCC 98.06, fn_8019610C 97.77, fn_801961C8 97.61,
@@ -40,6 +52,14 @@
  * `switch (self->state)` state machine of the same family as the ones above; they were not reached in
  * this round.
  *
+ * Absorbed range 0x801993E0..0x8019E670: 14 functions written, nine unwritten - `fn_801994F4` (1336 B),
+ * `fn_80199BE0` (980 B), `fn_80199FB4` (544 B), `fn_8019A1D4` (12336 B), `fn_8019D204` (1716 B),
+ * `fn_8019DBDC` (692 B), `fn_8019DE98` (556 B), `fn_8019E0C4` (724 B), `fn_8019E604` (108 B, the `__sinit`).
+ * Residuals: `stage_map_kind_get`'s `clrlwi r0,r3,24` after the call
+ * is folded away (`fn_8019D8B8` 90.52, `fn_8019D9BC` 82.62, `fn_8019DAC0` 96.00: the owner's `u32`
+ * declaration would need a `u8` view, which re-measures every landed consumer); `fn_8019E398` 89.85 and
+ * `fn_8019E49C` 92.11 are register allocation on the `||` blocks and the f30 save of the radius test.
+ *
  * Residual shapes on the 12 near-misses (all are register/evaluation ordering, not comprehension):
  *   * fn_801933DC - the target keeps a `clrlwi r4,r4,16` before `em_mot_set` that MWCC folds away for
  *     the constant ternary; the motion value needs a u16 spelling the header's `s32` prototype cannot ask
@@ -50,18 +70,22 @@
  *   * fn_80194CC8 - the +0x020 timer loop's `lfs`/`fcmpo` ordering.
  */
 #include "types.h"
+#include "nw4r/math.h"
 
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/enemy_control.h"
 #include "enemy/fn_801251D0.h" /* fn_801280F4, fn_80128030 */
 #include "enemy/fn_8012BDF4.h" /* em_busy_set */
 #include "enemy/fn_8012EC74.h" /* em_camera_req */
-#include "enemy/fn_80138074.h"  /* em_res_user_data_set, em_res_user_data_ck */
+#include "enemy/fn_80138074.h"  /* em_res_user_data_set, em_res_user_data_ck, fn_8013A654, fn_8013918C */
+#include "enemy/fn_80191598.h" /* fn_80192370, fn_80192618 */
+#include "fn_8004CAD8.h"       /* calcDistanceSqXZ */
 #include "unsplit/enemy.h"     /* the plain enemy-band callees (rule 2 band header) */
 
 /* The `.sdata2` and `.data` pool labels this range loads.  They are unsplit (no registered unit
  * claims a range covering them) and `stylelint`'s rule-2 `module()` answers `None`, so they stay
  * declared here as the counted "address band interleaves modules" gap - the same shape the landed
- * `enemy/fn_801993E0.cpp` uses for its own pool runs.  Never defined: the target addresses them. */
+ * `enemy/fn_8019ED34.cpp` uses for its own pool runs.  Never defined: the target addresses them. */
 extern f32 lbl_80798238;
 extern f32 lbl_80798264;
 extern f32 lbl_80798268;
@@ -85,6 +109,11 @@ extern f32 lbl_80798398;
 extern f32 lbl_8079839C;
 extern f32 lbl_807983A0;
 extern f32 lbl_807982E0;
+extern f32 lbl_807983B0;
+extern f32 lbl_807983F0;
+extern f32 lbl_807983F4;
+extern f32 lbl_807983F8;
+extern f32 lbl_80798510;
 /* The `em_turn_seq_start`/`em_turn_seq_step` descriptor blocks this band arms (`.data` tables). */
 extern u8 lbl_80570050[];
 extern u8 lbl_80570090[];
@@ -93,8 +122,17 @@ extern u8 lbl_80570110[];
 
 extern "C" {
 
+/* 0x802B0668 - the map-id lookup: a byte table, `0xFF` meaning "no entry" (the argument comes back). */
+u32 stage_map_kind_get(u32 kind);
+
 /* This range's own functions, declared so the dispatchers can tail-call them (they are defined
  * below, in address order). */
+void fn_801993E0(struct _ENEMY_WORK* self);
+void fn_80199468(struct _ENEMY_WORK* self);
+void fn_801994F4(struct _ENEMY_WORK* self);
+void fn_80199A2C(struct _ENEMY_WORK* self);
+void fn_80199ADC(struct _ENEMY_WORK* self);
+void fn_8019E398(struct _ENEMY_WORK* self);
 void fn_801926EC(struct _ENEMY_WORK* self, u8 act);
 void fn_8019287C(void* self);
 void fn_801928B8(void);
@@ -1578,4 +1616,313 @@ void fn_80198FE8(struct _ENEMY_WORK* self) {
     }
 }
 
+/* 0x801993E0 - the state-advance entry of the enemy's "em" action: state 0 arms the motion, state 1
+ * waits for `em_mot_end_ck` to report the current action finished and then runs the band's
+ * `em_state_set(self, 13, 5)` completion. */
+void fn_801993E0(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 2);
+        em_mot_set_blend(self, 49, 20, 0, 1);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            em_state_set(self, 13, 5);
+        }
+        break;
+    }
+}
+
+/* 0x80199468 - the same shape with this action's own arming pair (mode 46, duration 6, the 1000 ms
+ * `fn_80130CDC` timer) and `fn_80128030` as the completion. */
+void fn_80199468(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 2);
+        em_mot_set_blend(self, 46, 6, 0, 1);
+        fn_80130CDC(self, 1000);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            fn_80128030(self);
+        }
+        break;
+    }
+}
+
+/* 0x80199A2C - the motion step of the action `fn_80199ADC` dispatches case 7 to: state 0 arms mode
+ * 31 with the band's `em_demo_pos_set`/`em_demo_rot_set` pair and zeroes the stored height, state 1 waits for
+ * `em_mot_end_ck` and then runs `fn_80128030`. */
+void fn_80199A2C(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 2);
+        em_mot_set(self, 31, 0, 0);
+        em_demo_pos_set(self, lbl_807983F0, lbl_807983F4, lbl_807983F8);
+        em_demo_rot_set(self, lbl_80798238, lbl_807983B0, lbl_80798238);
+        fn_801303EC(self, lbl_80798238);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            fn_80128030(self);
+        }
+        break;
+    }
+}
+
+/* 0x80199ADC - the action-id dispatcher: `self->state_sub` (0x1E6) selects this range's own
+ * per-action update, whose first two entries the registered `enemy/fn_80191598.cpp` owns. */
+void fn_80199ADC(struct _ENEMY_WORK* self) {
+    switch (self->state_sub) {
+    case 0:
+        fn_80198F28(self);
+        break;
+    case 1:
+        fn_80198FE8(self);
+        break;
+    case 2:
+        fn_801990E0(self);
+        break;
+    case 3:
+        fn_801991E4(self);
+        break;
+    case 4:
+        fn_801993E0(self);
+        break;
+    case 5:
+        fn_80199468(self);
+        break;
+    case 6:
+        fn_801994F4(self);
+        break;
+    case 7:
+        fn_80199A2C(self);
+        break;
+    }
+}
+
+/* 0x80199B24 - the per-action `action` (0x1E5) dispatcher of the run above, plus the common tail
+ * every action shares: the +0x1E2 gate that runs the pair `em_busy_set`/`em_busy_timer_reset`, then this
+ * unit's own `fn_8019E398`. */
+void fn_80199B24(struct _ENEMY_WORK* self) {
+    switch (self->action) {
+    case 0:
+        fn_80192F24(self);
+        break;
+    case 1:
+        fn_80193394(self);
+        break;
+    case 2:
+        fn_801938D8(self);
+        break;
+    case 5:
+        fn_801953BC(self);
+        break;
+    case 6:
+        fn_80196618(self);
+        break;
+    case 7:
+        fn_801987E4(self);
+        break;
+    case 10:
+        fn_80198910(self);
+        break;
+    case 11:
+        fn_80198E00(self);
+        break;
+    case 12:
+        fn_80198F14(self);
+        break;
+    case 13:
+        fn_80199ADC(self);
+        break;
+    }
+    if (self->field_0x1E2 == 1) {
+        em_busy_set(self);
+        em_busy_timer_reset(self);
+    }
+    fn_8019E398(self);
+}
+
+/* 0x8019D8B8 - the per-mode "this action may run" predicate the band's dispatchers gate on. */
+u32 fn_8019D8B8(struct _ENEMY_WORK* self, u8 mode) {
+    switch (mode) {
+    case 0:
+        if (em_water_check(self) == 1) {
+            return 1;
+        }
+        break;
+    case 1:
+        if ((self->field_0x35C & 1) == 0) {
+            return 1;
+        }
+        break;
+    case 2:
+        if ((self->field_0x35C & 2) == 0) {
+            return 1;
+        }
+        break;
+    case 3:
+        if ((self->field_0x228 & 3) != 0) {
+            return 1;
+        }
+        break;
+    case 4:
+        if (self->vec_0x36C.z - self->pos.y >= lbl_80798288) {
+            return 1;
+        }
+        break;
+    case 5:
+        if (fn_80192370(self, 16) == 0) {
+            return 1;
+        }
+        break;
+    case 6:
+        if (self->field_0x360 <= 0) {
+            return 1;
+        }
+        break;
+    case 7:
+        if (self->field_0x362 <= 0) {
+            return 1;
+        }
+        break;
+    }
+    return 0;
+}
+
+/* 0x8019D9BC - the "load the action's joint position" init: arm mode 4, publish the two record
+ * bytes and ask `fn_80126278` for the area's joint, then run the band's common tail. */
+void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
+    em_move_mode_set(self, 4);
+    *out_a = 12;
+    *out_b = 0;
+    switch (stage_map_kind_get(self->field_0x1E0)) {
+    case 3:
+        switch (self->area_no) {
+        case 3:
+            fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | 6), &self->pos);
+            break;
+        case 8:
+            fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | 9), &self->pos);
+            break;
+        }
+        break;
+    case 9:
+    case 11:
+        if (self->area_no == 1) {
+            fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+        }
+        break;
+    }
+    fn_80192618(self);
+}
+
+/* 0x8019DAC0 - the area dispatch of the "already in mode" state: the map lookup picks the area
+ * group, this area decides whether the state is armed. */
+void fn_8019DAC0(struct _ENEMY_WORK* self) {
+    u32 state = 0;
+    if (stage_map_kind_get(self->field_0x1E0) == 3) {
+        switch (self->area_no) {
+        case 1:
+            state = 1;
+            break;
+        case 2:
+            state = 2;
+            break;
+        case 3:
+            if (self->field_0x9F6 == 2) {
+                state = 1;
+            }
+            break;
+        }
+    }
+    if (state == 1) {
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 1, 0, 0);
+    } else if (state == 2) {
+        em_move_mode_set(self, 2);
+        em_mot_set(self, 40, 0, 0);
+    }
+}
+
+/* 0x8019DB9C - the "action 2 still running" gate: true only in mode 4 of the enemy-control state
+ * machine while `em_alt_mode_ck` reports not-yet-armed. */
+u32 fn_8019DB9C(struct _ENEMY_WORK* self) {
+    if (self->field_0x1E2 == 4 && em_alt_mode_ck(self) == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+/* 0x8019DE90 - the one-line tail call the band's teardown uses: `fn_8013A654(self, 1)`. */
+void fn_8019DE90(struct _ENEMY_WORK* self) {
+    fn_8013A654(self, 1);
+}
+
+/* 0x8019E398 - the two +0x35C completion flags: each is set while its action pair matches and
+ * cleared once the enemy has moved on to another action. */
+void fn_8019E398(struct _ENEMY_WORK* self) {
+    if (em_act_ck(self, 6, 0) == 1 || em_act_ck(self, 6, 1) == 1) {
+        if ((self->field_0x35C & 1) == 0) {
+            self->field_0x35C |= 1;
+        }
+    } else if (self->action != 0 && (self->field_0x35C & 1) != 0) {
+        self->field_0x35C &= ~1;
+    }
+    if (em_act_ck(self, 5, 17) == 1 || em_act_ck(self, 5, 18) == 1) {
+        if ((self->field_0x35C & 2) == 0) {
+            self->field_0x35C |= 2;
+        }
+    } else if (self->action != 0 && (self->field_0x35C & 2) != 0) {
+        self->field_0x35C &= ~2;
+    }
+}
+
+/* 0x8019E49C - "is the record we are hunting within reach": true when the paired record exists and
+ * the xz distance is inside the scaled radius (or when the caller asked for the trivial answer). */
+u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag) {
+    struct _ENEMY_WORK* other = fn_80131034(self, 23, 0);
+    if (other != 0 && fn_8012E5A8(other) == 1) {
+        if ((u8)flag == 0) {
+            return 1;
+        }
+        f32 dist = calcDistanceSqXZ(&self->pos, &other->pos);
+        f32 range = get_em_chg_scale(self) * lbl_80798510;
+        if (dist < range * (get_em_chg_scale(self) * lbl_80798510)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* 0x8019E580 - "action 13 in its first five sub-states". */
+u32 fn_8019E580(struct _ENEMY_WORK* self) {
+    if (self->action == 13 && self->state_sub <= 5) {
+        return 1;
+    }
+    return 0;
+}
+
+/* 0x8019E5A8 - the deleting destructor of that record: reset through the owner's `fn_8013918C`,
+ * then `operator delete` when the caller passed a positive flag.  Returns its argument, exactly as
+ * the target's `mr r3,r30` epilogue does. */
+void* fn_8019E5A8(void* p, s16 flags) {
+    if (p != 0) {
+        fn_8013918C((struct _ENEMY_WORK*)p, 0);
+        if (flags > 0) {
+            operator delete(p);
+        }
+    }
+    return p;
+}
+
 } /* extern "C" */
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7A70..0x806A7A88`): the two-vector record its static
+ * constructor `fn_8019E604` builds (`.data` tables point at it).  The name is a GUESS: a pair of model-space
+ * points. */
+VEC3 vec_pair_801926EC_0[2];  /* +0x806A7A70 */

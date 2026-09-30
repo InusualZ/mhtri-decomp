@@ -1,4 +1,4 @@
-/* lobby/lb_quest_ui.cpp - the lobby's list/detail UI band, `.text` 0x8038E8E8..0x80394038.
+/* lobby/lb_quest_ui.cpp - the lobby's list/detail UI band, `.text` 0x8038EC44..0x80394038.
  *
  * WHAT IT IS.  A lobby screen: it draws scrolling list rows with sprite icons and glyph text
  * (`get_lsp_data` / `draw_sprite_ary` / `draw_sprite_idx` / `draw_font` / `draw_font_idx`), colours
@@ -6,8 +6,8 @@
  * with `sprintf` and the lobby's localized strings with `LbStr`, and plays UI sounds with
  * `sysSE_req`.  The rows live in the record the screen's entry point is handed (a `+0xC4` array of
  * `{u16 id, u8 payload}` rows) and the screen's state is driven by `game_ready_ck` plus the
- * `fn_8021D5BC` lobby state query.  Its first ten functions (`0x8038E8E8..0x8038EF28`) are another
- * subsystem's - see SEAM below.
+ * `fn_8021D5BC` lobby state query.  The `em009` action slots that used to head the range
+ * (`0x8038E8E8..0x8038EC44`) moved to `enemy/fn_80387844.cpp` - see SEAM below.
  *
  * MODULE AND NAME (brief section 2, evidence order), evidence class 3.  1. No `__FILE__` string
  * covers the range: every `s_*`/`lbl_*` reference of its 65 split objects is a `.data` table, a
@@ -32,22 +32,18 @@
  * `lb_menu_page`) for what the range plainly is: the frame step, list rows, detail pane and sprites
  * of one lobby screen.
  *
- * SEAM (unproven, two candidates).  The proposal is one maximal unclaimed run and discovery's own
- * note flags a candidate seam inside it: `tudiscover.py` reports a strong `.sdata2` cut at
- * 0x8038EF28 (the range below it owns no `.sdata2` at all; the range above it owns the whole run
- * 0x8079C298..0x8079C2B4).  A second candidate sits at 0x8038EBE8/0x8038EC44, and it is the better
- * supported one: the six functions `0x8038E8E8..0x8038E9F0` are entry slots of `em009_prog_tbl`
- * (`.data` 0x805EF990, the enemy program-table block) and their only `.data` reference is
- * `lbl_805EFAB8` (`.data` 0x805EFAB8 = `{ -1.0f, 0, 20 }`, the enemy band's data), while every other
- * section of the range (`.data` 0x805F0CB8 onward, `.sdata` 0x807933D8, `.sbss` 0x80794880,
- * `.sdata2` 0x8079C298) is the UI band's - so those six are most likely an `em009` action TU.  They
- * are named `em009_act_*` here (evidence: `em009_prog_tbl` lists each of their addresses) and the
- * re-draw is reported for the seam round.
+ * SEAM (2026-09-30 recut).  The range used to start at 0x8038E8E8; its first functions
+ * (`0x8038E8E8..0x8038EBE8`) are entry slots of `em009_prog_tbl` (`.data` 0x805EF990, the enemy
+ * program-table block) whose only `.data` reference is `lbl_805EFAB8`, which sits between the `em009`
+ * band's own tables, so they belong to that TU.  `fn_8038EBE8` (0x5C) is the same deleting destructor
+ * as `fn_8019E5A8`/`fn_801AA0F8`, each the last function of its TU, so the em009 TU ends at 0x8038EC44
+ * (`enemy/fn_80387844.cpp`).  The `.sdata2` pool corroborates the window (the repeated 1.0 at
+ * `lbl_8079C2A4` starts a new pool somewhere in 0x8038E8E8..0x8038EFEC).  GUESS: this unit's true first
+ * function could be anywhere up to 0x8038EF28 (`fn_8038EF28` is the first reader of the new pool); the
+ * dtor closes the em009 TU, so 0x8038EC44 is taken.
  *
- * SECTIONS.  `.text` 0x8038E8E8..0x80394038 (70 functions / 0x5750 B), extab 0x8001819C..0x8001833C
- * (52 x 8 B) and extabindex 0x800380D0..0x80038340 (52 x 12 B) - each run is exactly the gap the
- * bracketing registered units leave (`enemy/fn_80387844.cpp` ends at 0x8001819C / 0x800380D0, and
- * both runs are contiguous from there).  No `.data`/`.sdata`/`.sdata2` claim: the range *references*
+ * SECTIONS.  `.text` 0x8038EC44..0x80394038, extab 0x800181C4..0x8001833C and extabindex 0x8003810C..0x80038340 -
+ * each run is exactly the gap the bracketing registered units leave.  No `.data`/`.sdata`/`.sdata2` claim: the range *references*
  * 45 `.data` labels, 20 `.sdata` ones and the `.sdata2` run but owns none of the bytes it does not
  * emit, and the two compiler-emitted switch tables it would need (`jumptable_805F0F5C`,
  * `jumptable_805F1020`) sit inside an unclaimed `.data` band - claiming it would take other units'
@@ -219,32 +215,6 @@ s32 lb_screen_list_state_ck(void) {
 s32 lb_screen_info_state_ck(void) {
     return fn_80217934();
 }
-
-/* --------------------------------------------------------------------------------------------- *
- * The `em009` entry slots (see SEAM): `em009_prog_tbl` lists each of these addresses.
- * --------------------------------------------------------------------------------------------- */
-
-/* An unused `em009` slot handler. */
-void em009_act_noop(void) {
-}
-
-/* Clears the handler's 0x33A parameter word. */
-void em009_act_clear_param(_ENEMY_WORK* work) {
-    work->init_0x328.field_0x33A = 0;
-}
-
-/* Fills a slot-kind pair after arming the work's effect slot 4. */
-void em009_act_slot_init(_ENEMY_WORK* work, u8* kind, u8* value) {
-    em_move_mode_set(work, 4);
-    *kind = 12;
-    *value = 0;
-}
-
-/* Whether the work's part 6 is damaged. */
-int em009_act_part_broken_ck(_ENEMY_WORK* work) {
-    return em_parts_damage_level_get(work, 6) >= 1;
-}
-
 
 /* --------------------------------------------------------------------------------------------- *
  * The screen's per-frame state, its row keys and its page bit sets.

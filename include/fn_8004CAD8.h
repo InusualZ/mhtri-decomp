@@ -158,9 +158,6 @@ f32 calcVecDistXZ(const void* a, const void* b);
 /* 0x80050EAC - the SQUARED distance between two positions (the callers compare it against a squared
  * radius constant, e.g. `enemy/fn_801B0010.cpp` against `lbl_80798B3C` = 2250000.0f = 1500^2). */
 f32 fn_80050EAC(const void* a, const void* b);
-/* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
- * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
-f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 /* 0x80051378 - the three-pointer vector helper this range owns (unmangled `addVec3`, so C
  * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3_ctor`, then tail-forwards all
  * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
@@ -251,9 +248,14 @@ void fn_8004EA58(const void* entry);
 #endif
 
 #ifdef __cplusplus
+/* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
+ * C++ linkage at global scope (outside the `extern "C"` block above): the map name is the mangling
+ * (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
+f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
+
 /* 0x800514AC - the `out = mtx * v + trans` helper (map name
  * `mulVecMatAddTrans__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34`, so C++ linkage at global scope).
- * Added with `enemy/fn_801A4504.cpp`, its consumer (rule 2/9). */
+ * Added with `enemy/fn_8019ED34.cpp`, its consumer (rule 2/9). */
 void mulVecMatAddTrans(VEC3* v, MTX34* m);
 
 /* 0x800500CC / 0x80050364 - build the rotation about X / Z by the angle word `angle` into `m` (map
