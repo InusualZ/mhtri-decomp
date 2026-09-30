@@ -929,9 +929,6 @@ lobby/fn_8021E1EC.cpp:
 	.data       start:0x805BA7E8 end:0x805BAA20
 	.bss        start:0x806AA8C8 end:0x806AACC0
 
-Pl/bss_pool.cpp:
-	.bss        start:0x806AB848 end:0x806AC8A8
-
 Pl/fn_80224AC4.cpp:
 	extab       start:0x80011B34 end:0x80011C7C
 	extabindex  start:0x8002E7B8 end:0x8002E9A4
@@ -1045,6 +1042,12 @@ Pl/fn_80288CEC.cpp:
 	extabindex  start:0x80030678 end:0x800309D8
 	.text       start:0x80288CEC end:0x8028F66C
 	.ctors      start:0x8056F36C end:0x8056F370
+	.data       start:0x805CBFC0 end:0x805CDC44
+	.bss        start:0x806AB830 end:0x806AB848
+	.sbss       start:0x80794B3C end:0x80794B58
+
+Pl/bss_pool.cpp:
+	.bss        start:0x806AB848 end:0x806AC8A8
 
 Pl/fn_8028F66C.cpp:
 	extab       start:0x8001323C end:0x800133CC
@@ -1441,6 +1444,7 @@ menu/arena_result.cpp:
 	extab       start:0x80018C54 end:0x80018DC4
 	extabindex  start:0x800390E4 end:0x8003930C
 	.text       start:0x803B0F98 end:0x803B465C
+	.data       start:0x805F7B78 end:0x805F7C68
 	.sdata      start:0x8079367C end:0x80793684
 
 Network/network_shared_data.cpp:
@@ -1452,8 +1456,9 @@ enemy/em_pop.cpp:
 	extabindex  start:0x8003930C end:0x8003987C
 	.text       start:0x803B465C end:0x803BE30C
 	.ctors      start:0x8056F3B4 end:0x8056F3B8
-	.bss        start:0x806D2A78 end:0x806D2AF8
-	.sbss       start:0x80794C58 end:0x80794C60
+	.data       start:0x805F7C68 end:0x805F84E0
+	.bss        start:0x806CC420 end:0x806D2AF8
+	.sbss       start:0x80794C48 end:0x80794C60
 
 menu/get_pop_dat_ptr.cpp:
 	extab       start:0x80019164 end:0x800193D4

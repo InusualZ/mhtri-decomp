@@ -544,7 +544,7 @@ extern "C" void arena_quest_info_build(u8 mode) {
         if (rec != NULL) {
             que_info->row_0x00[index].kind_0x00 = rec->category_0x08A - 1;
             que_info->row_0x00[index].rank_0x01 = rec->field_0x08B;
-            que_info->row_0x00[index].flag_0x02 = rec->flag_0x314;
+            que_info->row_0x00[index].flag_0x02 = rec->slot_bytes_0x314[0].value;
             que_info->row_0x00[index].record_0x04 = (const u8*)rec;
             que_info->row_0x00[index].sub_0x08 = (const u8*)rec->field_0x02E;
             que_info->row_0x00[index].time_0x10 = rec->field_0x13A;

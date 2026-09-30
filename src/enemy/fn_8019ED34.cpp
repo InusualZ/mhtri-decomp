@@ -21,8 +21,8 @@
  *
  * Header-signature decisions the merge forced (every function re-measured, none lower): `stage_map_kind_get`
  * is the owner's `u8` form (`stage/stg_w.h`; the retail `clrlwi r0,r3,24` after the call now appears),
- * `em_work_state_bit21_ck` takes the work record (`enemy/em_pop.h`: 0 at the `fn_8019E70C`/`fn_8019E840`
- * sites, `self` at `fn_801A9384`'s), and `em_roster_record_release` is `em_pop.h`'s `u32`.
+ * `quest_flag_200000_ck` (was `em_work_state_bit21_ck`) takes a `QuestRecord*` (`enemy/em_pop.h`) and every
+ * retail call site, `fn_801A9384`'s included, passes `li r3,0`, and `em_roster_record_release` is `em_pop.h`'s `u32`.
  *
  * Registration (proposal/8019ED34_fn_8019ED34.cpp).  The range is registered once, here, at its
  * final home.  Which class decided the name and module:
@@ -282,7 +282,7 @@ u32 fn_8019E70C(struct _ENEMY_WORK* self) {
     if (self->team != 25) {
         return 255;
     }
-    if (stage_map_kind_get(self->field_0x1E0) == 6 && self->area_no == 1 && em_work_state_bit21_ck(0) != 1) {
+    if (stage_map_kind_get(self->field_0x1E0) == 6 && self->area_no == 1 && quest_flag_200000_ck(0) != 1) {
         if (fn_8019E670(self, 3, 0, 3)) {
             return 0;
         }
@@ -308,7 +308,7 @@ u32 fn_8019E840(struct _ENEMY_WORK* self) {
         if (self->team == 25) {
             if (stage_map_kind_get(self->field_0x1E0) == 6) {
                 if (self->area_no == 1) {
-                    if (em_work_state_bit21_ck(0) != 1) {
+                    if (quest_flag_200000_ck(0) != 1) {
                         if (fn_8019E670(self, 3, 30, 59) == 1) {
                             return 1;
                         }
@@ -2736,7 +2736,7 @@ int fn_801A9384(_ENEMY_WORK* self, u32 kind) {
         }
         return self->pos.x > lbl_807986B8;
     case 4:
-        return em_work_state_bit21_ck(self) == 1;
+        return quest_flag_200000_ck(0) == 1;
     case 5:
         return self->field_0x358 != 0;
     default:

@@ -26,7 +26,7 @@
  *
  * What it is.  The enemy per-motion support set of `_ENEMY_WORK`: the motion-frame window helpers
  * (fn_8012EC74's 0.3/0.2/0.18/0.15 scaling, fn_8012ECF0/em_motion_window_ck's elapsed-frame ratio tests,
- * fn_8012ED68/fn_8012EE80's team-wide window scans), the in-area gates (fn_8012EFDC's status/team
+ * em_team_damage_under_ck/em_team_damage_over_ck's team-wide window scans), the in-area gates (fn_8012EFDC's status/team
  * test, fn_8012F110's program-mode test, fn_8012F39C's height-vs-scale test), the sleep gate
  * (`em_sleep_ck`) and, further up, the motion/effect helpers the map already names (`em_get_mot_no`,
  * `em_frame_check`, `get_joint_wmat_em`, the `shuffle*` table builders).
@@ -69,7 +69,7 @@
  *     this build's allocator branchlessly (`mfcr` + `extrwi`) where retail keeps the branch
  *     (`bne ret0` + `li r3,1`); an `if (...) return 1; return 0;` shape is worse (212 B, 95.98 %), so
  *     the value-return form is applied.  Register-colouring residual, docs/matching.md row 22;
- *   * fn_8012ED68 96.13 % (272/280 B) and fn_8012EE80 96.99 % (272/280 B) - every instruction matches
+ *   * em_team_damage_under_ck 96.13 % (272/280 B) and em_team_damage_over_ck 96.99 % (272/280 B) - every instruction matches
  *     except the two-instruction dead loop counter (`li r4,0` + `addi r4,r4,1`); this build drops an
  *     unused `i`, retail keeps it.  The same residual `enemy/fn_8012E968.cpp` records for its walk
  *     (“a fresh local does not reproduce it”).  Recorded, not chased;
@@ -96,6 +96,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
+#include "enemy/em_pop.h" /* quest_element_state_find (the owner's header, rule 2) */
 
 #pragma peephole off
 
@@ -135,7 +136,6 @@ u32 em_magma_check(_ENEMY_WORK* self);
 /* Other-unit / unsplit C-linkage callees. */
 extern "C" s32 fn_8011E640(_ENEMY_WORK* self, u32 mask);
 extern "C" u8 stage_map_kind_get(u32 map_no);
-extern "C" u32 fn_803B5CA4(u32 id);
 extern "C" u32 quest_entry_active_ck(void);
 
 /* Whether the enemy's area/group state admits the record (see the file header). */
@@ -159,7 +159,7 @@ extern "C" f32 fn_8012EC74(_ENEMY_WORK* self)
 
 /* The first team-wide window scan: "(100 - kind) % of the motion has run on a live record of `team`".
  * `team`/`kind` are the two bytes the callers at 0x803B5990 mask out of their table row. */
-extern "C" s32 fn_8012ED68(u8 team, u8 kind)
+extern "C" u32 em_team_damage_under_ck(u8 team, u8 kind)
 {
     _ENEMY_WORK* work;
     u16 max;
@@ -182,7 +182,7 @@ extern "C" s32 fn_8012ED68(u8 team, u8 kind)
 
 /* The second team-wide window scan: "the taken part `(field_0x7AC - field_0x7A0) / field_0x7A4` is at
  * least `kind` %". */
-extern "C" s32 fn_8012EE80(u8 team, u8 kind)
+extern "C" u32 em_team_damage_over_ck(u8 team, u8 kind)
 {
     _ENEMY_WORK* work;
     u16 max;
@@ -206,7 +206,7 @@ extern "C" s32 fn_8012EE80(u8 team, u8 kind)
 /* "The record's team id is a live map id and the map's frame gate is the first frame". */
 extern "C" s32 fn_8012EF98(_ENEMY_WORK* self)
 {
-    if (fn_803B5CA4(self->team) != 0) {
+    if (quest_element_state_find(self->team) != 0) {
         if (quest_entry_active_ck() == 1) return 1;
     }
     return 0;
@@ -220,7 +220,7 @@ extern "C" s32 fn_8012EFDC(_ENEMY_WORK* self)
         if (em_area_ck(self) == 0) return 0;
         if (fn_80130134(self, 1) == 1) return 0;
         if (em_magma_check(self) == 1) return 0;
-        if (fn_803B5CA4(self->team) == 0x404) return 0;
+        if (quest_element_state_find(self->team) == 0x404) return 0;
     }
     switch (self->team) {
     case 0xf:

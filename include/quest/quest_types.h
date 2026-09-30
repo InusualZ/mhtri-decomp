@@ -251,7 +251,9 @@ struct Q_MoveWork {
     /* +0x0113 */ u8 state_0x113;           /* 1 while the slot is in its entry state */
     /* +0x0114 */ u8 pad_0x0114[0x22D4 - 0x114];
     /* +0x22D4 */ u8 state_0x22D4;          /* the state byte `quest_move_state_valid_ck`/`_get` read */
-    /* +0x22D5 */ u8 pad_0x22D5[0x7];
+    /* +0x22D5 */ u8 pad_0x22D5[0x4];
+    /* +0x22D9 */ u8 sub_flag_0x22D9;      /* set to 1 by `quest_move_sub_state_4_set` when its flag argument is 1 */
+    /* +0x22DA */ u8 pad_0x22DA[0x2];
     /* +0x22DC */ u8 flag_0x22DC;
     /* +0x22DD */ u8 pad_0x22DD[0x22E8 - 0x22DD];  /* cleared, never read: the lobby's own view names
                                                    * +0x22E3, this one reads up to +0x22DC */

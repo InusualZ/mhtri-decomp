@@ -155,6 +155,26 @@ typedef struct QuestArenaItem {
     /* +0x002 */ u16 count;
     /* +0x004 */ u16 remaining;
 } QuestArenaItem;
+/* One 0x8-byte entry of the result record's first per-slot run (+0x314): the slot's `value` byte and the
+ * `armed` byte that says it is set.  size: 0x8 */
+typedef struct QuestRecordSlotByte {
+    /* +0x0 */ u8 value;
+    /* +0x1 */ u8 unused_0x1[0x2];
+    /* +0x3 */ u8 armed;
+    /* +0x4 */ u8 unused_0x4[0x4];
+} QuestRecordSlotByte;
+/* One 0x8-byte entry of the result record's second per-slot run (+0x330): the slot's state `flags` and
+ * its `value` halfword.  size: 0x8 */
+typedef struct QuestRecordSlotWord {
+    /* +0x0 */ u32 flags;
+    /* +0x4 */ u16 value;
+    /* +0x6 */ u8 unused_0x6[0x2];
+} QuestRecordSlotWord;
+/* One 0x60-byte entry of the result record's third run (+0x394); only its leading word is read. size: 0x60 */
+typedef struct QuestRecordRow {
+    /* +0x00 */ u32 field_0x00;
+    /* +0x04 */ u8 unused_0x04[0x5C];
+} QuestRecordRow;
 /* The record `quest_work.pad_0x03C` points at: one player's quest/arena result row.  Only the
  * offsets this band reads are named, and the whole tail below +0x372 is not evidenced.
  * size: 0x714 (lower bound) */
@@ -177,9 +197,13 @@ typedef struct QuestRecord {
     /* +0x30C */ u8 field_0x30C[2];  /* the two per-slot monster ids (bytes 0/1)
                                       * `quest_monster_text_get` renders through string table 33 */
     /* +0x30E */ u8 unused_0x30E[0x002];
-    /* +0x310 */ u8 unused_0x310[0x004];
-    /* +0x314 */ u8 flag_0x314;       /* copied into the arena quest-info row's flag byte */
-    /* +0x315 */ u8 unused_0x315[0x033];
+    /* +0x310 */ u32 flags_0x310;    /* the row's flag word the `quest_flag_*_ck` predicates test */
+    /* +0x314 */ QuestRecordSlotByte slot_bytes_0x314[3];   /* slot 0's byte is the arena quest-info row's flag byte */
+    /* +0x32C */ u8 field_0x32C;
+    /* +0x32D */ u8 unused_0x32D;
+    /* +0x32E */ u8 field_0x32E;
+    /* +0x32F */ u8 unused_0x32F;
+    /* +0x330 */ QuestRecordSlotWord slot_words_0x330[3];
     /* +0x348 */ s32 field_0x348;
     /* +0x34C */ s32 field_0x34C;
     /* +0x350 */ s32 field_0x350;
@@ -188,7 +212,10 @@ typedef struct QuestRecord {
     /* +0x36C */ u16 field_0x36C;     /* `quest_slot_progress_get` returns its low byte */
     /* +0x36E */ u8 unused_0x36E[0x004];
     /* +0x372 */ u16 field_0x372;
-    /* +0x374 */ u8 unused_0x374[0x140];
+    /* +0x374 */ u8 unused_0x374[0x006];
+    /* +0x37A */ u16 field_0x37A;
+    /* +0x37C */ u8 unused_0x37C[0x018];
+    /* +0x394 */ QuestRecordRow rows_0x394[3];
     /* +0x4B4 */ u32 acdata_ofs_0x4B4;  /* byte offset from the record to its 0xA0-byte-per-player acdata equip records (`dl_acdata_to_ar_eqdata`) */
     /* +0x4B8 */ u8 unused_0x4B8[0x25C];
 } QuestRecord; /* size: 0x714 (lower bound) */
@@ -201,17 +228,27 @@ typedef struct QuestElement {
     union {
         struct {
             /* +0x04 */ u16 id;
-            /* +0x06 */ s16 value;
+            union {
+                /* +0x06 */ s16 value;
+                /* +0x06 */ u16 target_count;   /* the same halfword as the arena passes read it */
+            };
         };
         /* +0x04 */ u8 key_bytes[3];
     };
     /* +0x08 */ u8 unused_0x08[0x58];
 } QuestElement;
+/* One 0x8-byte entry of the work block's key run at +0x319: only its leading key byte is read. size: 0x8 */
+typedef struct QuestKeyRow {
+    /* +0x0 */ u8 key;
+    /* +0x1 */ u8 unused_0x1[0x7];
+} QuestKeyRow;
 /* The quest/arena work block (`quest_work`, .bss 0x806C5858, 0x6AB8 B - the size `quest_init`
  * memsets).  `quest_work_ptr` (.sbss 0x80794C40) is the same object's address.  Only the offsets
  * the band reads are named, in ascending order. size: 0x6AB8 */
 typedef struct QuestWork {
-    /* +0x0000 */ u8 unused_0x0000[0x01C];
+    /* +0x0000 */ u8 unused_0x0000[0x010];
+    /* +0x0010 */ u16 stat_word_0x10;           /* `quest_result_stat_fill` stores it into the result stat's last word */
+    /* +0x0012 */ u8 unused_0x0012[0x00A];
     /* +0x001C */ s32 field_0x01C;              /* a clear-time-like pair with +0x020 */
     /* +0x0020 */ s32 field_0x020;
     /* +0x0024 */ s32 field_0x024;
@@ -222,13 +259,16 @@ typedef struct QuestWork {
     /* +0x0091 */ s8 field_0x091;
     /* +0x0092 */ u8 unused_0x0092[0x002];
     /* +0x0094 */ QuestElement elements_0x0094[3];
-    /* +0x01B4 */ u8 unused_0x01B4[0x120];      /* entries 3.. of the same 0x60-stride array: the
-                                                 * callers that reach them use their absolute offsets
-                                                 * below (entry 6's +0x04..+0x06 is +0x2D4) */
+    /* +0x01B4 */ QuestElement arena_elements_0x01B4[3];   /* the same 0x60-stride array's entries 3..5
+                                                          * (entry 6's +0x04..+0x06 is +0x2D4 below) */
     /* +0x02D4 */ u8 player_state_0x2D4[3];     /* entry 6's three key bytes */
     /* +0x02D7 */ u8 unused_0x02D7[0x011];
     /* +0x02E8 */ s32 field_0x2E8;              /* clamped to 0 before it is formatted */
-    /* +0x02EC */ u8 unused_0x02EC[0x2EC];
+    /* +0x02EC */ u8 unused_0x02EC[0x02D];
+    /* +0x0319 */ QuestKeyRow key_rows_0x0319[3];
+    /* +0x0331 */ u8 unused_0x0331[0x187];
+    /* +0x04B8 */ u16 stat_gate_0x4B8;          /* non-zero clears the result stat instead of filling it */
+    /* +0x04BA */ u8 unused_0x04BA[0x11E];
     /* +0x05D8 */ u16 field_0x5D8;              /* the run's point score */
     /* +0x05DA */ u8 unused_0x05DA[0x60BE];
     /* +0x6698 */ u16* slot_values_0x6698[8];   /* the eight u16 stacks `quest_slot_items_get` copies */
@@ -237,7 +277,9 @@ typedef struct QuestWork {
     /* +0x6758 */ s32 field_0x6758;             /* quest_init stores 0x19 here */
     /* +0x675C */ u8 unused_0x675C[0x004];
     /* +0x6760 */ u8 field_0x6760[8];
-    /* +0x6768 */ u8 unused_0x6768[0x20D];
+    /* +0x6768 */ u8 unused_0x6768[0x09B];
+    /* +0x6803 */ u8 item_bytes_0x6803[0x149];  /* byte table `quest_arena_need_get` reads at [id * 8 + value] */
+    /* +0x694C */ u8 key_bits_0x694C[0x029];    /* per-id bit masks `quest_arena_key_clear` tests against `1 << value` */
     /* +0x6975 */ u8 field_0x6975;             /* the screen's active flag */
     /* +0x6976 */ u8 unused_0x6976[0x002];
     /* +0x6978 */ u8 field_0x6978;             /* the screen phase the dispatchers switch on */
@@ -246,10 +288,13 @@ typedef struct QuestWork {
     /* +0x6980 */ u8 unused_0x6980[0x0AA];
     /* +0x6A2A */ s8 count_0x6A2A;             /* entries in the arena item table below */
     /* +0x6A2B */ u8 unused_0x6A2B;
-    /* +0x6A2C */ QuestArenaItem arena_items_0x6A2C[3];
-    /* +0x6A3E */ u8 unused_0x6A3E[0x02C];
+    /* +0x6A2C */ QuestArenaItem arena_items_0x6A2C[2];
+    /* +0x6A38 */ u8 unused_0x6A38[0x002];
+    /* +0x6A3A */ u8 entry_send_0x6A3A[7];      /* the quest entry-send header block */
+    /* +0x6A41 */ u8 unused_0x6A41[0x029];
     /* +0x6A6A */ QuestItemSlot player_items_0x6A6A[4][3];
-    /* +0x6A9A */ u8 unused_0x6A9A[0x01E];
+    /* +0x6A9A */ u8 unused_0x6A9A[0x00A];
+    /* +0x6AA4 */ u8 field_0x6AA4[0x014];      /* the run `quest_field6AA4_get` hands out */
 } QuestWork;
 extern QuestWork quest_work;              /* .bss 0x806C5858 */
 extern QuestWork* quest_work_ptr;         /* .sbss 0x80794C40, set by `quest_init` */

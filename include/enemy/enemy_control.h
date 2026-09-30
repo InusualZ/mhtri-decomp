@@ -125,6 +125,12 @@ u8 fn_80143BF8(void);
 
 #ifdef __cplusplus
 }
+
+/* 0x801445E0 - the enemy record lookup by id: stores the record in `*out` (and its mini work in `*mini` when
+ * non-null); a C++ free function, so the map row is the mangling (rule 9). */
+struct _ENEMY_MINI_WORK;
+u32 em_get_unique_work(u16 id, struct _ENEMY_WORK** out, struct _ENEMY_MINI_WORK** mini);
 #endif
+
 
 #endif

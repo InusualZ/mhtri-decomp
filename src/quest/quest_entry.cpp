@@ -1082,7 +1082,7 @@ void quest_result_enter(Q_ItemWork* item, Q_MoveWork* work, u8 kind) {
     item->field_0x2D = 0;
     quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
     ai_slots_clear();
-    quest_result_stat_fill(item);
+    quest_result_stat_fill((QuestWork*)item);
     if (kind == 1) {
         hud_msg_push(0, quest_str_tbl_35_get(8));
     }

@@ -66,9 +66,8 @@ void quest_time_limit_set(s32 frames);
  * test) and by the quest selector band. */
 u32 quest_id_get(void);
 
-/* 0x803A9DEC - writes one 0x60-byte quest-work element's value.  The caller owns the payload,
- * so the record stays a forward declaration here and the value is untyped. */
-void quest_element_set(struct QuestWork* work, u8 index, void* value); /* untyped: caller-owned payload */
+/* 0x803A9DEC - writes one 0x60-byte quest-work element's flag word (`value` is the flag mask). */
+void quest_element_set(struct QuestWork* work, u16 index, u32 value);
 
 /* 0x803AA060 - whether the caller-owned work record may take a roll for element `index`: the
  * element's flags need bit 3 set and bit 6 clear, and the record's own word at +0x2D8 + index*4 needs
