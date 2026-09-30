@@ -32,7 +32,16 @@ Every call appends the raw input and the decision to `<main>/.pi/lanes/hook.log`
 `cwd`, `hook_event_name`, `name` (`agent-<agentId>`), `prompt_id`, `scratchpad_dir`, `session_id`,
 `transcript_path` (create) and `worktree_path` (remove).
 
-  python tools/units/worktreehook.py arm N [--ttl SECONDS] | arm --slot N [--slot M ...] | disarm | status
+**The payload cannot identify the lane** (measured in hook.log, 2026-09-29): `name` is `agent-<agentId>`, an id
+the harness generates at launch, so the orchestrator cannot know it when it arms; `prompt_id` is shared by every
+Agent call issued in one assistant message (three parallel launches logged one id); there is no description,
+prompt text, branch or requested-name field.  Nothing the launcher controls reaches the hook, so tokens cannot be
+keyed by lane and parallel launches take tokens in claim order (a lane briefed for slot 4 got slot 3).
+**Rule: a slot-bound token is armed and launched ONE AT A TIME** - `arm` refuses a second bound token, and any
+mix of bound and unbound tokens; unbound tokens (any free slot) may be armed N at a time.  After each launch
+returns (its create hook has consumed the token) arm the next.
+
+  python tools/units/worktreehook.py arm N [--ttl SECONDS] | arm --slot N | disarm | status
   python tools/units/worktreehook.py create|remove        # stdin: the hook JSON
   python tools/units/worktreehook.py --selftest
 """
@@ -89,12 +98,43 @@ def _tokens(main: str) -> list[str]:
         return []
 
 
+def _live_slot_bound(main: str) -> int:
+    n = 0
+    for name in _tokens(main):
+        path = os.path.join(armed_dir(main), name)
+        if not _expired(path) and _token_slot(path) is not None:
+            n += 1
+    return n
+
+
 def arm(main: str, count: int = 0, ttl: int = TOKEN_TTL, slot_numbers: list[int] | None = None) -> list[str]:
     """Write tokens that each authorise one slot hand-out for the next `ttl` seconds.
 
     `count` tokens name no slot (any current free one); each number in `slot_numbers` is a token bound to
-    that slot.
+    that slot.  A slot-bound token must be the ONLY live token (SystemExit otherwise): the hook payload
+    carries nothing the launcher controls (module docstring), so a token cannot be matched to its lane and
+    parallel launches take tokens in claim order.  Bound launches are therefore sequential - arm one slot,
+    launch that one lane, arm the next.
     """
+    bound = list(slot_numbers or [])
+    if bound:
+        live = armed_count(main)
+        if len(bound) > 1:
+            raise SystemExit("worktreehook: refusing to arm %d slot-bound tokens at once (slots %s): the hook "
+                             "payload cannot tell the launches apart, so the lanes would receive slots in "
+                             "token-claim order, not launch order. Arm ONE slot, launch that lane, then arm "
+                             "the next." % (len(bound), ", ".join(map(str, bound))))
+        if count or live:
+            raise SystemExit("worktreehook: a slot-bound token must be the only live token (%d unbound "
+                             "requested, %d already live): another launch could consume it. Launch or "
+                             "`disarm` first." % (count, live))
+    elif count and _live_slot_bound(main):
+        raise SystemExit("worktreehook: a slot-bound token is live; an unbound launch could consume it and "
+                         "take the wrong slot. Launch that lane or `disarm` first.")
+    return _write_tokens(main, count, ttl, bound)
+
+
+def _write_tokens(main: str, count: int, ttl: int, slot_numbers: list[int]) -> list[str]:
     os.makedirs(armed_dir(main), exist_ok=True)
     stamp = int(time.time() * 1000)
     names = []
@@ -181,8 +221,8 @@ def take_token(main: str) -> dict | None:
 
 def give_back(main: str, token: dict, ttl: int = TOKEN_TTL) -> None:
     """Return a token a failed hand-out did not use, so a slot shortage does not silently disarm the batch."""
-    arm(main, 0 if token.get("slot") is not None else 1, ttl,
-        [token["slot"]] if token.get("slot") is not None else None)
+    bound = token.get("slot") is not None
+    _write_tokens(main, 0 if bound else 1, ttl, [token["slot"]] if bound else [])
 
 
 # --- create ----------------------------------------------------------------------------------------
@@ -382,9 +422,45 @@ def selftest() -> int:
             t.join()
         check("12 racing hooks share 5 tokens: exactly 5 win", len(wins), 5)
         check("... and no token is taken twice", len(set(wins)), 5)
-        arm(main, 0, slot_numbers=[4, 6])
-        taken = sorted(take_token(main)["slot"] for _ in range(2))
-        check("slot-bound tokens carry their slot", taken, [4, 6])
+        arm(main, 0, slot_numbers=[4])
+        check("a slot-bound token carries its slot", take_token(main)["slot"], 4)
+        # parallel bound launches are refused (the payload cannot tell them apart)
+        res = quiet(arm, main, 0, TOKEN_TTL, [2, 3, 4])
+        check("arming several slot-bound tokens at once is refused", isinstance(res, SystemExit), True)
+        check("... naming the reason", "token-claim order" in str(res), True)
+        check("... and arms nothing", armed_count(main), 0)
+        arm(main, 0, slot_numbers=[2])
+        res = quiet(arm, main, 0, TOKEN_TTL, [3])
+        check("a second bound token while one is live is refused", isinstance(res, SystemExit), True)
+        res = quiet(arm, main, 1)
+        check("an unbound token beside a live bound one is refused", isinstance(res, SystemExit), True)
+        check("... the bound token is untouched", (armed_count(main), _live_slot_bound(main)), (1, 1))
+        disarm(main)
+        arm(main, 1)
+        res = quiet(arm, main, 0, TOKEN_TTL, [3])
+        check("a bound token beside a live unbound one is refused", isinstance(res, SystemExit), True)
+        disarm(main)
+        arm(main, 2)
+        arm(main, 2)
+        check("unbound tokens may be armed in batches", armed_count(main), 4)
+        disarm(main)
+        arm(main, 0, ttl=-1, slot_numbers=[2])
+        arm(main, 0, slot_numbers=[3])
+        check("an expired bound token does not block the next arm", armed_count(main), 1)
+        disarm(main)
+        # bound tokens armed sequentially, launches racing on the take: each arm is consumed by exactly one
+        # hook, and the taker gets the slot its own arm named
+        got_slots, lock2 = [], threading.Lock()
+        for slot in (2, 3, 4):
+            arm(main, 0, slot_numbers=[slot])
+            threads = [threading.Thread(target=lambda: (lambda t: t and (lock2.acquire(), got_slots.append(t["slot"]),
+                                                                          lock2.release()))(take_token(main)))
+                       for _ in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        check("sequential bound arms under racing hooks hand out each slot exactly once", got_slots, [2, 3, 4])
 
         # --- plain worktrees (unarmed) -----------------------------------------------------------
         path = quiet(create, main, {"name": "agent-abc123"})
@@ -509,7 +585,7 @@ def main(argv=None) -> int:
     a = sub.add_parser("arm", help="authorise N slot hand-outs (or hand-outs of named claimed slots) for --ttl seconds")
     a.add_argument("count", type=int, nargs="?", default=0, help="any-current-free-slot tokens")
     a.add_argument("--slot", type=int, action="append", default=[],
-                   help="a token bound to this already-claimed slot (repeatable)")
+                   help="a token bound to this already-claimed slot (one at a time: see the module docstring)")
     a.add_argument("--ttl", type=int, default=TOKEN_TTL)
     sub.add_parser("disarm", help="remove every arm token")
     sub.add_parser("status", help="how many hand-outs are armed")
