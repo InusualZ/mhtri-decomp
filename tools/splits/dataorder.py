@@ -510,9 +510,11 @@ def selftest() -> int:
     if os.path.exists(DOL) and os.path.exists(SYMBOLS):
         out = scan_dol()
         check("real DOL: vtables were found", out["kinds"].get(VTABLE, 0) > 150, True)
-        inside = {s["addr"] for s in out["inside_registered_unit"]}
+        # inside the unit while it was one TU, at a registered unit's start since it was split (Network/NetworkPeerMcs
+        # and its neighbours, docs/network-transport-split.md): either way the scan must find all four
+        inside = {s["addr"] for s in out["inside_registered_unit"] + out["at_registered_unit_start"]}
         found_nt = [a for a in (0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40) if a in inside]
-        check("real DOL: the four network_transport V->S seams are inside the unit",
+        check("real DOL: the four network_transport V->S seams are inside a unit or at a unit start",
               found_nt, [0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40])
         check("real DOL: unclaimed .data holds candidate seams", out["in_unclaimed_data"] > 30, True)
         rows_vs = [s for s in out["inside_registered_unit"] + out["unclaimed"] + out["at_registered_unit_start"]
