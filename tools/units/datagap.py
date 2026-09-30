@@ -24,6 +24,7 @@ Usage:
     python tools/units/datagap.py --mode both        # both directions
     python tools/units/datagap.py --unit Pl/fn_8026FFBC
     python tools/units/datagap.py --json out.json    # machine-readable
+    python tools/units/datagap.py --pool-seams       # literal pools as TU evidence: which units are ONE original TU
     python tools/units/datagap.py --selftest
 
 `--flip-blockers` is the list to work: units whose **code already matches** (`fuzzy_match_percent` at or above
@@ -52,6 +53,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # `tools/`: `from units import`
 import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
+import poolseams  # noqa: E402  (literal pools as TU evidence: a deferral a pool-sharing group explains)
 
 META_SECTIONS = {".comment", ".note.split", ".shstrtab", ".strtab", ".symtab", ".dynsym", ".dynstr"}
 
@@ -607,6 +609,28 @@ def judge_blocks(unit: str, section: str, runs: list[dict], ctx: dict) -> list[d
                                "or unowned data (a merged cross-TU pool)" % (section, start, end))
                 continue
         b["reason"] = "a new %s range for the unit" % section
+    return _explain_by_pool(unit, blocks, ctx)
+
+
+#: the deferral classes a pool-sharing group can explain (docs/pool-seams.md): the claim is a partial pool of a TU
+#: that the registry has cut into several units
+POOL_FOLD_CLASSES = ("pool-synth", "isolated-run", "span-blocked", "ambiguous-owner")
+
+
+def _explain_by_pool(unit: str, blocks: list[dict], ctx: dict) -> list[dict]:
+    """Append the pool-sharing group to a deferred block's reason: a seam blocks the claim, not the tool.
+
+    `ctx["pool"]` is `poolseams.build_groups`' census (absent = no change). The verdict and class never change,
+    so this is add-only: a deferral stays a deferral and is only *named* better.
+    """
+    census = ctx.get("pool")
+    group = poolseams.group_of(census, unit) if census else None
+    if not group:
+        return blocks
+    for b in blocks:
+        if b["verdict"] == "deferred" and b["cls"] in POOL_FOLD_CLASSES and b["section"] in POOL_SECTIONS:
+            b["reason"] += "; %s - the claim is blocked by a seam, not by the tool" % poolseams.fold_line(group, unit)
+            b["fold"] = list(group["units"])
     return blocks
 
 
@@ -625,7 +649,9 @@ def strict_report(root: str, records: list[dict], ranges: dict, units: list[str]
     pairs, stats = sole_owned_pairs(records, query, units)
     ctx = {"ranges": ranges, "rows": section_rows(symbols), "query": query,
            "group_units": {k: set(g["units"]) for k, g in orphan_groups(records).items()},
-           "text_start": text_starts(ranges), "our_sizes": {}}
+           "text_start": text_starts(ranges), "our_sizes": {},
+           # the pool-sharing census over the SAME records/claims (no second reader pass)
+           "pool": poolseams.build_groups(records, ranges, poolseams.literal_table(symbols))}
     for unit in sorted({p["unit"] for p in pairs}):
         path = os.path.join(root, "build", GAME_DIR, "src", unit + ".o")
         try:
@@ -1379,6 +1405,17 @@ def selftest_strict(eq) -> None:
         eq(judge_blocks("A/a", ".sdata2", [run], ctx0)[0]["cls"], "isolated-run", "no own pool: the next test decides")
         eq(judge_blocks("A/a", ".sdata2", [run], dict(ctx0, our_sizes={"A/a": None}))[0]["cls"], "isolated-run",
            "a unit with no built object is never deferred as pool-synth")
+        # a pool-sharing group names the seam behind a deferral (add-only: verdict and class are unchanged)
+        pool = poolseams.build_groups(
+            census_records({"A/a": {"s1": 1}, "B/b": {"s1": 1, "f1": 1}}, symbols, ranges)[0], ranges,
+            poolseams.literal_table(symbols))
+        named = judge_blocks("A/a", ".sdata2", [run], dict(ctx0, pool=pool))[0]
+        eq((named["verdict"], named["cls"]), ("deferred", "isolated-run"), "a pool group leaves the verdict alone")
+        eq("candidate fold: A/a with B/b" in named["reason"] and "blocked by a seam, not by the tool" in named["reason"],
+           True, "... and names the fold in the reason")
+        eq(named["fold"], ["A/a", "B/b"], "... and lists the units")
+        eq("candidate fold" in judge_blocks("A/a", ".sdata2", [run], ctx0)[0]["reason"], False,
+           "no pool census: no fold note")
         # a non-pool section never defers on our object's emission
         drun = dict(run, section=".data", start=0x805E0010, end=0x805E0014,
                     pairs=[dict(run["pairs"][0], section=".data", address=0x805E0010)])
@@ -1661,6 +1698,10 @@ def main(argv=None) -> int:
                     help="the data census: per registered unit, the data its TARGET object references, "
                          "classified own / other-unit / orphan (no claim covers it); --unit narrows it")
     ap.add_argument("--top", type=int, default=40, help="orphans listed by --census (ranked by readers)")
+    ap.add_argument("--pool-seams", action="store_true",
+                    help="the literal-pool census (tools/units/poolseams.py): groups of registered units that read "
+                         "one pooled literal = one original TU (a fold candidate); --unit names one unit's group, "
+                         "--json writes it, --top caps the groups shown")
     ap.add_argument("--row", metavar="UNITS",
                     help="what the land gate's data-closure row says for these comma-separated units in --root, "
                          "judged against --base-root's census (pairs) and --base-ref's claims (default: "
@@ -1737,6 +1778,19 @@ def main(argv=None) -> int:
                                                                                   len(verdict["sole_owned"]))
                            if failed else "PASS"))
         return 1 if failed else 0
+    if args.pool_seams:
+        census = poolseams.load_census(args.root, True)
+        if args.json:
+            with open(args.json, "w", encoding="utf-8") as fh:
+                json.dump(census, fh, indent=1, default=list)
+            print(f"wrote {args.json}")
+        if args.unit:
+            for unit in args.unit:
+                group = poolseams.group_of(census, unit)
+                print("\n".join(poolseams.render_group(group)) if group else f"{unit}: no pool-sharing group")
+            return 0
+        print(poolseams.render_census(census, min(args.top, 25)))
+        return 0
     if args.census:
         ranges = load_claims(args.root)
         (records, stats), registered, read = census(args.root, args.unit or None, ranges=ranges)

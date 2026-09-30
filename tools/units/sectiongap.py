@@ -68,6 +68,8 @@ sys.path.insert(0, os.path.join(TOOLS, "elf"))
 sys.path.insert(0, TOOLS)
 import elfsect  # noqa: E402  (the project's object section reader)
 import unitutil  # noqa: E402  (unit spec -> build/RMHE08/{src,obj} paths)
+sys.path.insert(0, HERE)
+import poolseams  # noqa: E402  (literal pools as TU evidence: which differing pools are a partial pool)
 
 # Sections that are bookkeeping, not the unit's code or data. `datagap.py` ignores them for the same
 # reason: they move with symbol-table and compiler-version churn, never with the source.
@@ -238,6 +240,25 @@ def _size(n: int) -> str:
     return "0x%X (%d B)" % (n, n)
 
 
+POOL_SECTIONS = (".sdata2", ".sdata")
+
+
+def add_pool_notes(rows: list, note: str | None) -> list:
+    """Append the pool-sharing explanation to a differing `.sdata2`/`.sdata` row (`note` is `poolseams`' fold line).
+
+    A literal pool that differs in a unit that shares pooled literals with other registered units is a partial pool
+    of ONE original TU (docs/pool-seams.md): the difference is the seam, not the source.  Other sections and a unit
+    with no group are untouched.
+    """
+    if not note:
+        return rows
+    for row in rows:
+        if row["section"] in POOL_SECTIONS:
+            row["why"] += ("; pool-shared: our object's %s is a partial pool of a TU that spans several registered "
+                           "units (%s)" % (row["section"], note))
+    return rows
+
+
 def selftest() -> int:
     """Delegates to `sectiongap_selftest.py` (fixtures only, no build and no repository state)."""
     import sectiongap_selftest
@@ -273,6 +294,8 @@ def main(argv=None) -> int:
             continue
         rows = compare_objects(read_object(unit.obj, args.all_sections),
                                read_object(unit.target, args.all_sections))
+        if any(r["section"] in POOL_SECTIONS for r in rows):
+            rows = add_pool_notes(rows, poolseams.note_for_unit(MAIN, unit.name))
         if not rows:
             clean += 1
             print("%s: clean - every compared section has the same size, the same bytes and the same "

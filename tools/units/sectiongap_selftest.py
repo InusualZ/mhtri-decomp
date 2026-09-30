@@ -171,6 +171,16 @@ def selftest() -> int:
         _contains("the reason names the relocated symbol", "`__dl__FPv`", rows[0]["why"])
         _contains("the reason calls it a relocation difference", "relocations for", rows[0]["why"])
 
+        # --- pool sharing: a differing literal pool of a unit in a pool group says it is a partial pool ---
+        pool_rows = [{"section": ".sdata2", "ours": 8, "target": 16, "why": "target-extra 0x8 (8 B)"},
+                     {"section": "extab", "ours": 8, "target": 8, "why": "bytes differ"}]
+        fold = "candidate fold: A/a with B/b (3 shared pool literal(s), text adjacent, confidence high)"
+        noted = sg.add_pool_notes([dict(r) for r in pool_rows], fold)
+        _contains("a differing .sdata2 row names the partial pool and the fold", "partial pool of a TU", noted[0]["why"])
+        _contains("... with the fold line", fold, noted[0]["why"])
+        _check("another section's row is untouched", noted[1]["why"], "bytes differ")
+        _check("no fold line, no note", sg.add_pool_notes([dict(r) for r in pool_rows], None), pool_rows)
+
         # --- F39: the short record, both sizes in one row ----------------------------------------------
         short = {"sections": {"extab": {"size": 0x2E4, "data": b"\0" * 0x2E4}},
                  "order": ["extab"], "relocs": {"extab": []}}

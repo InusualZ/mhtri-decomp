@@ -68,6 +68,7 @@ sys.path.insert(0, os.path.join(MAIN, "tools"))
 from units import claims as claims_mod  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
+import poolseams  # noqa: E402  (literal pools as TU evidence: a pool difference a fold explains)
 
 # section names may or may not start with a dot: extab/extabindex do not.
 SEC_RE = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
@@ -319,6 +320,31 @@ def data_seam_problems(unit: str, name: str, ours_path: str, obj_path: str, seam
         return []
     note = dataseams.seam_note(unit, ours_path, obj_path, name, seams, rng)
     return [note] if note else []
+
+
+def pool_group_problems(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str,
+                        note: str | None = None) -> list[str]:
+    """The pool-sharing explanation for a differing `.sdata2`/`.sdata`: our object holds a partial pool of a TU.
+
+    MWCC emits one literal pool per TU and the linker does not merge pools (docs/pool-seams.md), so when the
+    unit's pooled literals are also read by other registered units the target's pool is shared with them and ours
+    can only be a part of it - the flip is blocked by the seam, not by the source.  `note` is `poolseams`' fold line
+    (None = look it up; nothing when the unit is in no group).  One line per differing pool section.
+    """
+    out = []
+    for name in (".sdata2", ".sdata"):
+        if name not in claim:
+            continue
+        got = ours.get(name)
+        mine, tgt = raw_section(src_path, name), raw_section(obj_path, name)
+        if got is not None and got[0] == claim[name][0] and mine is not None and tgt is not None and mine == tgt:
+            continue
+        if note is None:
+            note = poolseams.note_for_unit(MAIN, unit) or ""
+        if note:
+            out.append("%s: our object's pool is a partial pool of a TU that spans several registered units - %s; "
+                       "fold the units (one TU, one pool) before expecting this section to match" % (name, note))
+    return out
 
 
 # Row 36 (docs/matching.md): `dol split` writes the target objects with `export_all: true`, which stamps
@@ -726,6 +752,8 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
         if mine != tgt:
             problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
             problems += data_seam_problems(unit, name, src_path, obj_path)
+
+    problems += pool_group_problems(unit, claim, ours, src_path, obj_path)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.

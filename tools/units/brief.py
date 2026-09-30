@@ -1213,6 +1213,10 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     if seam_note:
         lines.append(seam_note)
         lines.append("")
+    pool_note = _pool_seam_note(p)
+    if pool_note:
+        lines.append(pool_note)
+        lines.append("")
     lines.append("Read this file, do the task, write your report where §4 says. Nothing outside this file is a rule.")
     lines.append("")
     _your_tree_lines(lines, b)
@@ -1546,6 +1550,27 @@ def _data_seam_note(p: dict) -> str | None:
         tail += (" Candidate `.text` cuts (not applied, verify each against the callers): %s."
                  % "; ".join(cuts[:4]))
     return head + tail
+
+
+def _pool_seam_note(p: dict) -> str | None:
+    """The literal-pool evidence for a proposal (`attribute.pool_seams_of`), or None.
+
+    MWCC emits one literal pool per translation unit and `mwld` does not merge pools, so a pooled literal this
+    range reads that a REGISTERED unit already reads or claims means the two are one original TU: this range is
+    the rest of that unit's TU (a fold), not an independent unit, and the neighbour's `.sdata2`/`.sdata` is a
+    partial pool until they are one (docs/pool-seams.md, playbook idea 94).
+    """
+    ps = p.get("pool_seams") or {}
+    rows = ps.get("units") or []
+    if not rows:
+        return None
+    shown = "; ".join("`%s` (%d literal(s), e.g. `0x%08X`)" % (r["unit"], r["count"], (r.get("addresses") or [0])[0])
+                      for r in rows[:4])
+    return ("**Pool evidence (TU probe): this range reads %d pooled literal(s) that registered unit(s) already read or "
+            "claim - %s.** MWCC emits one literal pool per TU, so this range is one TU with %s: register it as a fold "
+            "(or extend that unit) instead of a new independent unit, and expect its pool to be partial until then. "
+            "Check `python tools/units/poolseams.py --unit %s` before you register."
+            % (ps.get("shared", 0), shown, "that unit" if len(rows) == 1 else "those units", rows[0]["unit"]))
 
 
 def brief_unit(path: str) -> str | None:
@@ -1985,6 +2010,19 @@ def selftest() -> int:
         check("... but it is still named", "at this range's edge" in _edge, True)
         check("no data seams, no note", (_data_seam_note({}), _data_seam_note({"data_seams": {"seams": []}})),
               (None, None))
+        _pool = {"pool_seams": {"shared": 3, "units": [{"unit": "menu/fn_802E4978", "count": 2,
+                                                        "addresses": [0x8079A8E8]},
+                                                       {"unit": "hud/cockpit_quest", "count": 1,
+                                                        "addresses": [0x8079A910]}]}}
+        _pn = _pool_seam_note(_pool) or ""
+        check("the pool note names the units, the literal count and says fold",
+              ("3 pooled literal(s)" in _pn, "`menu/fn_802E4978` (2 literal(s), e.g. `0x8079A8E8`)" in _pn,
+               "register it as a fold" in _pn, "poolseams.py --unit menu/fn_802E4978" in _pn),
+              (True, True, True, True))
+        check("no pool seams, no note", (_pool_seam_note({}), _pool_seam_note({"pool_seams": {"units": []}})), (None, None))
+        _pb = render_proposal(tmp, build_proposal(tmp, dict(clean, **_pool), None, assume_claim=True), None)
+        check("the pool note is at the top of the brief", "Pool evidence (TU probe)" in _pb
+              and _pb.index("Pool evidence") < _pb.index("## 1 · This is a proposal"), True)
         check("a proposal without data seams renders without the note",
               "Data-order evidence" in render_proposal(tmp, build_proposal(tmp, clean, None,
                                                                           assume_claim=True), None), False)
