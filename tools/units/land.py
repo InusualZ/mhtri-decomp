@@ -2730,6 +2730,9 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         if orphans["added_deferred"]:
             print("data closure: %d NEW pair(s) deferred by class, not refused: %s"
                   % (len(orphans["added_deferred"]), orphans["added_deferred"][0]))
+        if orphans["claim_exposed"]:
+            print("data closure: %d NEW pair(s) deferred (claim-exposed), not refused, no allowance earned, "
+                  "backlog `data-claim`: %s" % (len(orphans["claim_exposed"]), orphans["claim_exposed"][0]))
         for cls, lines in sorted(orphans["strict"]["deferred"].items()):
             print("data closure: deferred %s, %d pair(s), not refused: %s" % (cls, len(lines), lines[0]))
         if not orphans["have_base"]:
@@ -2741,7 +2744,12 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
               not orphans["added"], "%d added: %s" % (len(orphans["added"]), "; ".join(orphans["added"][:4])),
               info=("pre-existing, reported: %d orphan reference(s) in the batch's units, e.g. %s"
                     % (len(orphans["pre_existing"]), "; ".join(orphans["pre_existing"][:2])))
-                   if orphans["pre_existing"] else "no orphan data reference in the batch's units",
+                   + ("; deferred (claim-exposed): %d" % len(orphans["claim_exposed"])
+                      if orphans["claim_exposed"] else "")
+                   if orphans["pre_existing"] else
+                   ("no orphan data reference in the batch's units"
+                    + ("; deferred (claim-exposed): %d" % len(orphans["claim_exposed"])
+                       if orphans["claim_exposed"] else "")),
               remedy="claim the data: add a `splits.txt` range for it to the unit that owns it (or a named "
                      "data-only unit for a pool several units share - `python tools/units/dataclaim.py "
                      "--unit <unit>` prints the exact text), or restore the claim a recut dropped. Run "

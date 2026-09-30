@@ -70,6 +70,10 @@ Five sources, one register:
   The pair count is the item's rank weight; the item is an ordinary open item the credit ratio rations against,
   keyed by the unit, carried forward from the published register, and `triage` re-runs the one rule and closes
   it once the unit has none left - the same lifecycle as an `undefrefs` item.
+  A second `data-claim` defect (owner, 2026-09-30) is `claim-exposed:<section>:<start>-<end>`: one item per
+  (unit, pair-run) of pairs only the unit's own claimed data references - the pairs the land gate defers
+  (`datagap.claim_exposed_pairs`) because claiming data exposes the pairs its relocations name. Weight = the run's
+  pairs (the `sole-owned` count leaves them out); `triage` closes it when no such pair remains in the range.
 
 This is also the owner's "do not revoke committed progress - put the mounted naming debt in a backlog and
 work on it slowly" half: the stylelint items are ordinary open items, so the credit ratio rations new
@@ -169,6 +173,13 @@ UNDEFREF_KIND = "undefrefs"
 # item once the unit has none left. The unit's pairs a deferred class keeps out (`datagap.STRICT_CLASSES`) are
 # not backlog: they are reported by the row, never owed.
 DATACLAIM_KIND = "data-claim"
+# A second defect of the same kind (owner, 2026-09-30, the `claim-exposed` deferral class): a pair only the unit's
+# OWN claimed data references - claiming data exposes the pairs its relocations name, so the land gate defers
+# them (`datagap.claim_exposed_pairs`) rather than chain claim after claim. One item per (unit, pair-run), its
+# defect carrying the run's extent so `triage` can re-check exactly that range; the credit ratio rations it like
+# any other item.
+EXPOSED_PREFIX = "claim-exposed:"
+_EXPOSED_RE = re.compile(r"^claim-exposed:(\.?[A-Za-z0-9]+):([0-9A-Fa-f]{8})-([0-9A-Fa-f]{8})$")
 
 # -----------------------------------------------------------------------------------------------------------
 # Text helpers
@@ -737,11 +748,11 @@ def collect_undefref_items(main: str, register: str | None = None) -> list[Item]
 _DATACLAIM_CACHE: dict = {}
 
 
-def dataclaim_counts(main: str) -> dict | None:
-    """`{unit: refusable pair count}` from `datagap.strict_report` - the one rule, never a second.
+def _dataclaim_state(main: str):
+    """`(counts, exposed_runs)` from ONE strict report + census over the tree, or `None` when it cannot run.
 
-    `None` when the rule cannot run here (no split objects, or a read failure): the source then contributes
-    nothing and `triage` leaves the items `open (no check)`, rather than reading an empty tree as "all claimed".
+    `counts` is `{unit: refusable sole-owned pair count}`; `exposed_runs` is `datagap.tree_claim_exposed` - the
+    claim-exposed pairs (owner, 2026-09-30), which the `sole-owned` count leaves out so no pair is owed twice.
     Cached per process on the map/splits mtimes, because `build` runs several times per command.
     """
     base = os.path.join(main, "config", "RMHE08")
@@ -759,40 +770,77 @@ def dataclaim_counts(main: str) -> dict | None:
         if not have:
             return None
         report = dg.strict_report(main, records, ranges)
+        runs = dg.tree_claim_exposed(main, records)
     except Exception:                              # additive source: never take the register down
         return None
+    exposed = {(p["unit"], p["address"]) for run in runs for p in run["pairs"]}
     counts: dict = {}
     for block in report["blocks"]:
         if block["verdict"] == "refuse":
-            counts[block["unit"]] = counts.get(block["unit"], 0) + len(block["pairs"])
-    _DATACLAIM_CACHE[main] = (stamp, counts)
-    return counts
+            n = sum(1 for p in block["pairs"] if (p["unit"], p["address"]) not in exposed)
+            if n:
+                counts[block["unit"]] = counts.get(block["unit"], 0) + n
+    _DATACLAIM_CACHE[main] = (stamp, (counts, runs))
+    return counts, runs
+
+
+def dataclaim_counts(main: str) -> dict | None:
+    """`{unit: refusable pair count}` from `datagap.strict_report` - the one rule, never a second.
+
+    Claim-exposed pairs are not counted here (they are `dataclaim_exposed`'s). `None` when the rule cannot run
+    here (no split objects, or a read failure): the source then contributes nothing and `triage` leaves the
+    items `open (no check)`, rather than reading an empty tree as "all claimed".
+    """
+    state = _dataclaim_state(main)
+    return None if state is None else state[0]
+
+
+def dataclaim_exposed(main: str) -> list | None:
+    """The tree's claim-exposed runs (`datagap.tree_claim_exposed`), or `None` when the rule cannot run here."""
+    state = _dataclaim_state(main)
+    return None if state is None else state[1]
+
+
+def exposed_defect(section: str, start: int, end: int) -> str:
+    """The claim-exposed item's defect: `claim-exposed:<section>:<start>-<end>` (hex, the run's extent)."""
+    return "%s%s:%08X-%08X" % (EXPOSED_PREFIX, section, start, end)
+
+
+def parse_exposed_defect(defect: str):
+    """`(section, start, end)` of a claim-exposed defect, or `None` for any other item."""
+    m = _EXPOSED_RE.match(defect or "")
+    return (m.group(1), int(m.group(2), 16), int(m.group(3), 16)) if m else None
 
 
 def _prior_dataclaim_items(register: dict) -> dict:
     """The `unit` data-claim items the published register already carries, keyed for carry-forward (see
-    `_prior_undefref_items`: the item must survive the regeneration that follows its fix, so `triage` can close it)."""
+    `_prior_undefref_items`: the item must survive the regeneration that follows its fix, so `triage` can close it).
+    Keyed `(target, defect)`: a unit has one `sole-owned` item and one `claim-exposed` item per pair-run."""
     out: dict = {}
     for it in (register or {}).get("items", []):
         if isinstance(it, dict) and it.get("kind") == DATACLAIM_KIND:
-            out[it.get("target", "")] = it
+            out[(it.get("target", ""), it.get("defect", "sole-owned") or "sole-owned")] = it
     return out
 
 
 def collect_dataclaim_items(main: str, register: str | None = None) -> list[Item]:
-    """The fifth source: `datagap.py`'s strict data-claim rule, one item per unit with refusable pairs.
+    """The fifth source: `datagap.py`'s strict data-claim rule.
 
-    The pair count is the item's `weight`, so the unit with the most unclaimed data of its own leads. A unit
-    whose debt is gone is carried forward from the published register (weight 0) so `triage` can re-run the
-    rule and earn the credit. A tree the rule cannot run on contributes nothing new but still carries the
-    published items forward.
+    One `sole-owned` item per unit with refusable pairs, weight = the pair count, so the unit with the most
+    unclaimed data of its own leads; plus one `claim-exposed` item per (unit, pair-run) of claim-exposed pairs
+    (owner, 2026-09-30: the gate defers them, the backlog owes them), weight = the run's pair count. An item
+    whose debt is gone is carried forward from the published register (weight 0) so `triage` can re-run the rule
+    and earn the credit. A tree the rule cannot run on contributes nothing new but still carries the published
+    items forward.
     """
     counts = dataclaim_counts(main)
+    runs = dataclaim_exposed(main) or []
     prior = _prior_dataclaim_items(load_register(main, register))
     items: list[Item] = []
-    for unit in sorted(set(counts or {}) | set(prior)):
-        live = (counts or {}).get(unit, 0)
-        last = int((prior.get(unit) or {}).get("weight") or 0)
+    live_sole = counts or {}
+    for unit in sorted({u for u, d in prior if d == "sole-owned"} | set(live_sole)):
+        live = live_sole.get(unit, 0)
+        last = int((prior.get((unit, "sole-owned")) or {}).get("weight") or 0)
         ask = ("`%s` still has %d data pair(s) only its own object references and no `splits.txt` claim covers - "
                "claim them (`python tools/units/dataclaim.py --unit %s` prints the exact lines) and reconstruct "
                "the bytes, until the strict data-claim rule stops refusing the unit"
@@ -800,6 +848,21 @@ def collect_dataclaim_items(main: str, register: str | None = None) -> list[Item
         items.append(Item(kind=DATACLAIM_KIND, target=unit, defect="sole-owned", status="open",
                           default_status="open", ask=ask, weight=live,
                           filings=[Filing(source="datagap", lane="datagap", when="", detail=ask)]))
+    live_exposed = {(r["unit"], exposed_defect(r["section"], r["start"], r["end"])): r for r in runs}
+    for unit, defect in sorted({k for k in prior if k[1].startswith(EXPOSED_PREFIX)} | set(live_exposed)):
+        run = live_exposed.get((unit, defect))
+        parsed = parse_exposed_defect(defect)
+        if parsed is None:
+            continue
+        section, start, end = parsed
+        last = int((prior.get((unit, defect)) or {}).get("weight") or 0)
+        n = len(run["pairs"]) if run else 0
+        ask = ("`%s` has %d %s data pair(s) at 0x%08X-0x%08X that only its own claimed data references "
+               "(claim-exposed: claiming that data exposed them, so the gate that landed it deferred them) - claim "
+               "them (`python tools/units/dataclaim.py --unit %s` prints the exact lines), until the unit's "
+               "object no longer leaves them unclaimed" % (unit, n or last, section, start, end, unit))
+        items.append(Item(kind=DATACLAIM_KIND, target=unit, defect=defect, status="open", default_status="open",
+                          ask=ask, weight=n, filings=[Filing(source="datagap", lane="datagap", when="", detail=ask)]))
     return items
 
 
@@ -1671,12 +1734,27 @@ def _check_dataclaim(main: str, item: Item, ctx: dict):
 
     `resolved` only when the rule ran, the unit still has a built target object to judge and the rule refuses
     none of its data; `open` otherwise, naming the live pair count. No object, no evidence, so it stays open.
+    A `claim-exposed` item is judged on its own run: resolved when no claim-exposed pair of the unit is left in
+    the item's range (the pairs were claimed, or the claim that carried the reference went away).
     """
     counts = _dataclaim_census(main, ctx)
     if counts is None:
         return ("open", "no check: the strict data-claim rule is not runnable here (no split objects)")
     if not os.path.exists(os.path.join(main, "build", "RMHE08", "obj", item.target + ".o")):
         return ("open", "no check: no target object for %s to re-run the rule" % item.target)
+    span = parse_exposed_defect(item.defect)
+    if span is not None:
+        section, start, end = span
+        if "dataclaim_exposed" not in ctx:
+            ctx["dataclaim_exposed"] = dataclaim_exposed(main)
+        live = [p for r in (ctx["dataclaim_exposed"] or []) if r["unit"] == item.target and r["section"] == section
+                for p in r["pairs"] if start <= p["address"] < end]
+        if live:
+            return ("open", "%s still has %d claim-exposed data pair(s) in %s 0x%08X-0x%08X"
+                    % (item.target, len(live), section, start, end))
+        return ("resolved", "no claim-exposed pair of %s remains in %s 0x%08X-0x%08X (re-ran "
+                            "datagap.tree_claim_exposed over the tree: claimed, or the referencing claim is gone)"
+                % (item.target, section, start, end))
     live = counts.get(item.target, 0)
     if live:
         return ("open", "%s still has %d refusable sole-owned data pair(s)" % (item.target, live))

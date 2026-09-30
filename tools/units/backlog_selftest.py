@@ -860,6 +860,50 @@ def selftest() -> int:
           bl.lane_task(ddir, bl.Item(kind="data-claim", target="A/a", defect="sole-owned", status="open",
                                      default_status="open", ask="x"))["agent"], "decompiler")
 
+    # --- the claim-exposed defect (owner, 2026-09-30): one item per (unit, pair-run) of pairs only the unit's
+    # own claimed data references; the sole-owned count leaves them out, triage closes them by range ----------
+    xdir = data_tree("backlog-exposed-", with_object=False)
+    with open(os.path.join(xdir, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(splits_a + "\t.data start:0x805EB000 end:0x805EB010\n")
+    with open(os.path.join(xdir, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("x_bss0 = .bss:0x806A0000; // type:object size:0x4\nx_bss1 = .bss:0x806A0004; // type:object size:0x4\n"
+                 "gap_row = .bss:0x806A0050; // type:object size:0x4\n"
+                 "x_far = .bss:0x806A0100; // type:object size:0x4\ncode_read = .bss:0x806A0200; "
+                 "// type:object size:0x4\n")
+    dgap.build_fixture_object(os.path.join(xdir, "build", "RMHE08", "obj", "A", "a.o"), ["code_read"],
+                              data_refs=["x_bss0", "x_bss1", "x_far"])
+    xitems = bl.collect_dataclaim_items(xdir)
+    check("claim-exposed: one item per (unit, pair-run), the code-read word is the sole-owned item's",
+          sorted((i.target, i.defect, i.weight) for i in xitems),
+          [("A/a", "claim-exposed:.bss:806A0000-806A0008", 2), ("A/a", "claim-exposed:.bss:806A0100-806A0104", 1),
+           ("A/a", "sole-owned", 1)])
+    check("claim-exposed: the sole-owned count leaves the exposed pairs out", bl.dataclaim_counts(xdir), {"A/a": 1})
+    check_true("claim-exposed: the ask names the range and the deferral",
+               any("0x806A0000-0x806A0008" in i.ask and "claim-exposed" in i.ask for i in xitems))
+    check("claim-exposed: the defect round-trips", bl.parse_exposed_defect(bl.exposed_defect(".bss", 0x806A0000, 0x806A0008)),
+          (".bss", 0x806A0000, 0x806A0008))
+    check("claim-exposed: a sole-owned defect is not one", bl.parse_exposed_defect("sole-owned"), None)
+    xrun = next(i for i in xitems if i.defect.endswith("806A0000-806A0008"))
+    xdec, xev = bl._check_dataclaim(xdir, xrun, {})
+    check("claim-exposed: triage keeps the run open while its pairs are unclaimed", xdec, "open")
+    check_true("claim-exposed: ... and names the live count", "2 claim-exposed" in (xev or ""))
+    check("claim-exposed: the open items are rationed like any other (summed debt)",
+          bl.weight_sums(bl.build_items(os.path.join(xdir, ".pi", "outbox"), os.path.join(xdir, ".pi", "notes"),
+                                        os.path.join(xdir, "none.md"), {}, dataclaim_items=xitems)).get("data-claim"), 4)
+    # the unit claims the .bss run: the pairs are claimed, the item resolves; the far run stays open
+    with open(os.path.join(xdir, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(splits_a + "\t.data start:0x805EB000 end:0x805EB010\n\t.bss start:0x806A0000 end:0x806A0008\n")
+    os.utime(os.path.join(xdir, "config", "RMHE08", "splits.txt"), (1, 2000000001))
+    xdec, xev = bl._check_dataclaim(xdir, xrun, {})
+    check("claim-exposed: triage resolves the run once its pairs are claimed", xdec, "resolved")
+    xfar = next(i for i in xitems if i.defect.endswith("806A0100-806A0104"))
+    check("claim-exposed: ... and leaves the other run open", bl._check_dataclaim(xdir, xfar, {})[0], "open")
+    # the referencing claim goes away: the object no longer relocates them, the item resolves
+    dgap.build_fixture_object(os.path.join(xdir, "build", "RMHE08", "obj", "A", "a.o"), ["code_read"])
+    os.utime(os.path.join(xdir, "config", "RMHE08", "splits.txt"), (1, 2000000002))
+    check("claim-exposed: triage resolves a run whose referencing claim is gone", bl._check_dataclaim(xdir, xfar, {})[0],
+          "resolved")
+
     # --- --check semantics -------------------------------------------------------------------------
     import contextlib
     import io

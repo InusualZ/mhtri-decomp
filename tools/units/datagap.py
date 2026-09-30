@@ -298,6 +298,38 @@ def object_data_refs(path: str) -> dict[str, int]:
     return out
 
 
+CODE_SOURCES = (".text", "extab")
+
+
+def object_reloc_sources(path: str) -> dict[str, set[str]]:
+    """`{name: {section of each relocation that names it}}` for an object's non-bookkeeping relocations.
+
+    `{}` when the object cannot be read. The section is the relocation's `target` (`.text`, `.data`, ...).
+    """
+    from units import undefrefs as uref  # noqa: PLC0415 - the one relocation reader
+
+    loaded = uref.load_object(path) if os.path.exists(path) else None
+    out: dict[str, set[str]] = {}
+    for rel in (loaded or {}).get("relocs", ()):
+        if rel["symbol"]:
+            out.setdefault(rel["symbol"], set()).add(rel["target"] or "")
+    return out
+
+
+def exposing_sections(sources) -> list[str]:
+    """The claimed sections that are the ONLY thing referencing a symbol; `[]` when anything else does.
+
+    THE claim-exposed test (owner, 2026-09-30): a name is exposed by a claim when every relocation that
+    names it sits in a data section of the unit's own object - a `.text`/`extab` relocation (the unit's code
+    reads it) or an unnamed section means the unit needs the word whatever it claims. Pure; `explain_added`
+    (the `--base-root` cause) and `claim_exposed_pairs` (the gate's deferral) both read it.
+    """
+    srcs = {t for t in sources if t}
+    if not srcs or any(t.startswith(CODE_SOURCES) for t in sources):
+        return []
+    return sorted(srcs)
+
+
 def census_records(unit_refs: dict, symbols: dict, ranges: dict) -> tuple[list[dict], dict]:
     """`(records, stats)` - one record per (unit, referenced data symbol). Pure.
 
@@ -1113,8 +1145,6 @@ def explain_added(root: str, base_root: str, units: list[str], base_keys, base_r
     reference the symbol (the objects differ - `stale` when the base object predates the base's map files);
     the base's claims cover the address (a claims effect); else the snapshot and the base tree disagree.
     """
-    from units import undefrefs as uref  # noqa: PLC0415 - the one relocation reader
-
     names = [os.path.splitext(u)[0] for u in units]
     (records, _stats), _n, _have = census(root, names)
     base_keys = set(base_keys)
@@ -1129,18 +1159,14 @@ def explain_added(root: str, base_root: str, units: list[str], base_keys, base_r
         if unit not in cache:
             bo = os.path.join(base_root, "build", GAME_DIR, "obj", unit + ".o")
             ro = os.path.join(root, "build", GAME_DIR, "obj", unit + ".o")
-            sources: dict[str, set] = {}
-            loaded = uref.load_object(ro) if os.path.exists(ro) else None
-            for rel in (loaded or {}).get("relocs", ()):
-                if rel["symbol"]:
-                    sources.setdefault(rel["symbol"], set()).add(rel["target"] or "")
+            sources = object_reloc_sources(ro)
             cache[unit] = (object_data_refs(bo) if os.path.exists(bo) else None, _sha(bo), _sha(ro), sources)
         refs, bsha, rsha, sources = cache[unit]
         if refs is None:
             why = "the base tree has no target object for this unit (a unit the batch registers)"
         elif r["name"] not in refs:
-            via = sorted(t for t in sources.get(r["name"], ()) if t and not t.startswith((".text", "extab")))
-            if via and not any(t.startswith((".text", "extab")) for t in sources.get(r["name"], ())):
+            via = exposing_sections(sources.get(r["name"], ()))
+            if via:
                 why = ("EXPOSED BY THE CLAIM: the base object does not reference it; in the tree only the unit's "
                        "claimed %s reference it (claimed data carries its own relocations - the next plan only exists "
                        "because the claim was made: run `dataclaim.py --unit %s --fixpoint`)" % (", ".join(via), unit))
@@ -1379,6 +1405,62 @@ def snapshot_orphans(root: str, units: list[str] | None = None) -> dict:
             "unit_claims": table, "objects": objects}
 
 
+def claim_exposed_pairs(root: str, new: dict[str, dict], base_unit_claims: dict, now_unit_claims: dict) -> dict[str, dict]:
+    """`{orphan_key: {reason, ranges, via, pair}}` for the NEW pairs the batch's own claim exposed. Pure but for IO.
+
+    CLAIM-EXPOSED (owner, 2026-09-30): a pair (unit U, address A) that the base did not have, where every
+    relocation of U's target object that names A sits in a data section of U (`exposing_sections` - the
+    classifier `explain_added` names "EXPOSED BY THE CLAIM") AND the batch newly claimed or widened U's claim in
+    that section (`base_unit_claims` vs `now_unit_claims`, `unit_claim_table`s). The pair exists only because the
+    batch claimed the bytes that reference it; a `.text` reference never qualifies. `new` is `{key: record}`.
+    """
+    sources: dict[str, dict] = {}
+    out: dict[str, dict] = {}
+    for key, rec in new.items():
+        unit = rec["unit"]
+        if unit not in sources:
+            sources[unit] = object_reloc_sources(os.path.join(root, "build", GAME_DIR, "obj", unit + ".o"))
+        via = exposing_sections(sources[unit].get(rec["name"], ()))
+        if not via:
+            continue
+        ranges, wanted = [], True
+        for sec in via:
+            before = {tuple(r) for r in (base_unit_claims.get(unit) or {}).get(sec, [])}
+            now = [tuple(r) for r in (now_unit_claims.get(unit) or {}).get(sec, [])]
+            fresh = [r for r in now if r not in before]
+            if not fresh:
+                wanted = False
+                break
+            ranges += ["%s 0x%08X-0x%08X" % (sec, lo, hi) for lo, hi in fresh]
+        if not wanted:
+            continue
+        out[key] = {"reason": "exposed by the batch's own claim of %s; %s's claimed %s reference it"
+                              % (", ".join(ranges), unit, ", ".join(via)),
+                    "ranges": ranges, "via": via, "pair": rec}
+    return out
+
+
+def tree_claim_exposed(root: str, records: list[dict], symbols: dict | None = None) -> list[dict]:
+    """The backlog view of claim-exposed data: `[{unit, section, start, end, pairs}]`, one run per adjacent stretch.
+
+    A tree has no batch, so the test is the tree half of `claim_exposed_pairs`: an ORPHAN pair of a unit whose
+    every relocation in its target object sits in one of its own data sections (`exposing_sections`) - the claim
+    carries the reference, nothing else. The pair may also be sole-owned (the strict report refuses it); the
+    backlog then owes it as THIS item and not as the `sole-owned` one (`backlog.dataclaim_counts` leaves it out).
+    """
+    symbols = symbols if symbols is not None else load_data_symbols(root)
+    sources: dict[str, dict] = {}
+    pairs = []
+    for _key, rec in sorted(orphan_keys(records).items()):
+        unit = rec["unit"]
+        if unit not in sources:
+            sources[unit] = object_reloc_sources(os.path.join(root, "build", GAME_DIR, "obj", unit + ".o"))
+        if exposing_sections(sources[unit].get(rec["name"], ())):
+            pairs.append({"unit": unit, "name": rec["name"], "section": rec["section"],
+                          "address": rec["address"], "size": rec["size"], "sites": rec["sites"]})
+    return _runs(pairs, section_rows(symbols))
+
+
 def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allowed=(), strict=True,
                   query="lazy", touched=None) -> dict:
     """The gate row's whole decision for the batch units against the recorded base (see `orphan_verdict`).
@@ -1403,10 +1485,22 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
         classes = classify_pairs(report)
         added_deferred = {k: classes[k] for k in after if k not in base_keys and k in classes
                           and classes[k]["verdict"] == "deferred"}
-    refusable = {k: v for k, v in after.items() if k not in added_deferred}
+    # CLAIM-EXPOSED (owner, 2026-09-30): a new pair only the batch's own newly claimed data references is
+    # deferred too - claiming data exposes the pairs its relocations name, without end - reported, never refused,
+    # and it earns no allowance. Needs the base's per-unit claims: without them nothing is exposed.
+    exposed: dict[str, dict] = {}
+    if snap.get("unit_claims") is not None:
+        new_pairs = {k: v for k, v in after.items() if k not in base_keys and k not in added_deferred}
+        exposed = claim_exposed_pairs(root, new_pairs, snap["unit_claims"], unit_claim_table(ranges))
+    refusable = {k: v for k, v in after.items() if k not in added_deferred and k not in exposed}
     verdict = orphan_verdict(snap.get("keys") or [], refusable, shrinks, allowed)
     verdict["added_deferred"] = [pair_line(c["pair"], "deferred %s, a new pair, not refused: %s" % (c["cls"], c["reason"]))
                                  for c in added_deferred.values()]
+    verdict["claim_exposed"] = [pair_line(c["pair"], "deferred claim-exposed, a new pair, not refused: %s" % c["reason"])
+                                for c in exposed.values()]
+    verdict["claim_exposed_pairs"] = [{"unit": c["pair"]["unit"], "name": c["pair"]["name"],
+                                       "section": c["pair"]["section"], "address": c["pair"]["address"],
+                                       "reason": c["reason"]} for c in exposed.values()]
     verdict["have_base"] = "keys" in snap and "claims" in snap
     if report is not None:
         symbols = load_data_symbols(root)
@@ -1439,7 +1533,7 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
             except ValueError:
                 continue
         used = set(sv["used"]) | {r["address"] for k, r in after.items()
-                                   if k not in base_keys and r["address"] in sanction}
+                                   if k not in base_keys and k not in exposed and r["address"] in sanction}
         used |= {a for a in sanction for _s, lo, hi in shrinks if lo <= a < hi}
         verdict["unmatched_allowances"] = sorted("0x%08X" % a for a in sanction - used)
         verdict["sole_owned_debt"] = sv["refused"] + sv["accepted"] + [ln for v in sv["deferred"].values() for ln in v]
@@ -1553,35 +1647,40 @@ def render_census(rep: dict, top: int, units_total: tuple[int, int]) -> str:
     return "\n".join(lines)
 
 
-def build_fixture_object(path: str, refs: list[str], defined: list[str] = (), fill: int = 0) -> None:
+def build_fixture_object(path: str, refs: list[str], defined: list[str] = (), fill: int = 0,
+                         data_refs: list[str] = ()) -> None:
     """Write a minimal ELF32-BE object: `.text` with one `R_PPC_ADDR16_HA` relocation per name in `refs`
-    (undefined symbols) and an empty `.data` defining each name in `defined`; `fill` is the `.text` byte value (a body edit).
+    (undefined symbols), a `.data` with one relocation per name in `data_refs` (claimed data carrying its own
+    references) and each name in `defined` defined there; `fill` is the `.text` byte value (a body edit).
     Enough for `parse_elf`."""
     import struct
 
-    names = list(refs) + list(defined)
+    names = list(refs) + [n for n in data_refs if n not in refs] + list(defined)
+    undefined = names[:len(names) - len(list(defined))]
     strtab = b"\0"
     offs = {}
     for n in names:
         offs[n] = len(strtab)
         strtab += n.encode() + b"\0"
     syms = b"\0" * 16
-    for n in refs:
+    for n in undefined:
         syms += struct.pack(">IIIBBH", offs[n], 0, 0, 0x10, 0, 0)            # global, undefined
     for n in defined:
         syms += struct.pack(">IIIBBH", offs[n], 0, 4, 0x11, 0, 2)            # global object in section 2
     index = {n: i + 1 for i, n in enumerate(names)}
     rela = b"".join(struct.pack(">IIi", 4 * i, (index[n] << 8) | 6, 0) for i, n in enumerate(refs))
-    shstr = b"\0.text\0.data\0.rela.text\0.symtab\0.strtab\0.shstrtab\0"
+    rela_data = b"".join(struct.pack(">IIi", 4 * i, (index[n] << 8) | 6, 0) for i, n in enumerate(data_refs))
+    shstr = b"\0.text\0.data\0.rela.text\0.rela.data\0.symtab\0.strtab\0.shstrtab\0"
 
     def name_off(s):
         return shstr.index(b"\0" + s.encode() + b"\0") + 1
 
-    bodies = [b"", bytes([fill]) * max(4, 4 * len(refs)), b"\0" * 4, rela, syms, strtab, shstr]
+    bodies = [b"", bytes([fill]) * max(4, 4 * len(refs)), b"\0" * max(4, 4 * len(data_refs)), rela, rela_data,
+              syms, strtab, shstr]
     heads = [(0, 0, 0, 0), (name_off(".text"), 1, 0, 0), (name_off(".data"), 1, 0, 0),
-             (name_off(".rela.text"), 4, 4, 1), (name_off(".symtab"), 2, 5, 1),
-             (name_off(".strtab"), 3, 0, 0), (name_off(".shstrtab"), 3, 0, 0)]
-    entsize = {3: 12, 4: 16}
+             (name_off(".rela.text"), 4, 5, 1), (name_off(".rela.data"), 4, 5, 2),
+             (name_off(".symtab"), 2, 6, 1), (name_off(".strtab"), 3, 0, 0), (name_off(".shstrtab"), 3, 0, 0)]
+    entsize = {3: 12, 4: 12, 5: 16}
     blob = b"\0" * 0x34
     offsets = []
     for body in bodies:
@@ -1592,7 +1691,7 @@ def build_fixture_object(path: str, refs: list[str], defined: list[str] = (), fi
         blob += struct.pack(">IIIIIIIIII", nm, typ, 0, 0, offsets[i], len(bodies[i]), link, info, 4,
                             entsize.get(i, 0))
     ident = b"\x7fELF\x01\x02\x01" + b"\0" * 9
-    hdr = ident + struct.pack(">HHIIIIIHHHHHH", 1, 20, 1, 0, 0, shoff, 0, 0x34, 0, 0, 40, len(heads), 6)
+    hdr = ident + struct.pack(">HHIIIIIHHHHHH", 1, 20, 1, 0, 0, shoff, 0, 0x34, 0, 0, 40, len(heads), 7)
     with open(path, "wb") as fh:
         fh.write(hdr + blob[0x34:])
 
@@ -1923,6 +2022,102 @@ def selftest_touch(eq) -> None:
         eq(row(snap, strict=False)["added_deferred"], [], "strict=False has no classification: the old add-only row")
 
 
+def selftest_exposed(eq) -> None:
+    """The claim-exposed deferral (owner, 2026-09-30): the data a batch claims carries its own relocations."""
+    import tempfile
+
+    eq(exposing_sections({".data"}), [".data"], "a word only claimed .data references is exposed by the claim")
+    eq(exposing_sections({".data", ".text"}), [], "... a .text relocation (the unit's code) is never exposed")
+    eq(exposing_sections({".data", "extab"}), [], "... nor is an extab one")
+    eq(exposing_sections({""}), [], "... nor a relocation of no known section")
+    eq(exposing_sections(()), [], "... nor a name nothing references")
+
+    text_only = ("Sections:\n\t.text type:code align:32\n\nA/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n")
+    with_data = text_only + "\t.data start:0x805E0000 end:0x805E0010\n"
+    symbols = ("a1 = .data:0x805E0000; // type:object size:0x4\n"
+               "w_bss = .bss:0x806A0000; // type:object size:0x4\n"
+               "w_bss2 = .bss:0x806A0004; // type:object size:0x4\n")
+    with tempfile.TemporaryDirectory() as tmp:
+        def put(rel, text):
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def objs(refs=(), data=(), fill=0):
+            for kind in ("src", "obj"):
+                path = os.path.join(tmp, "build", "RMHE08", kind, "A", "a.o")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                build_fixture_object(path, list(refs), fill=fill, data_refs=list(data))
+
+        def row(snap, **kw):
+            return batch_orphans(tmp, ["A/a"], snap, query=None, **kw)
+
+        put("config/RMHE08/symbols.txt", symbols)
+        put("config/RMHE08/splits.txt", text_only)
+        objs()
+        snap = snapshot_orphans(tmp, ["A/a"])
+
+        # the batch claims .data; its relocations name an unclaimed .bss word
+        put("config/RMHE08/splits.txt", with_data)
+        objs(data=["w_bss"], fill=1)
+        v = row(snap)
+        eq((v["added"], v["sole_owned"]), ([], []), "claimed .data referencing an unclaimed .bss word: not refused")
+        eq(len(v["claim_exposed"]), 1, "... it is deferred claim-exposed")
+        eq("claim-exposed" in v["claim_exposed"][0] and "exposed by the batch's own claim of .data 0x805E0000-0x805E0010"
+           in v["claim_exposed"][0], True, "... with the claimed range in the reason")
+        eq([(p["unit"], p["name"]) for p in v["claim_exposed_pairs"]], [("A/a", "w_bss")], "... and as a structured pair")
+        eq(v["accepted"], [], "... and it earns no allowance")
+        v = row(snap, allowed=["0x806A0000"])
+        eq(v["unmatched_allowances"], ["0x806A0000"], "... an --allow-orphan for it is unmatched (nothing to excuse)")
+
+        # the same word read by the unit's own code: refused
+        objs(refs=["w_bss"], data=[], fill=1)
+        v = row(snap)
+        eq((len(v["added"]), v["claim_exposed"]), (1, []), "the same word referenced by .text is still refused")
+        objs(refs=["w_bss"], data=["w_bss"], fill=1)
+        v = row(snap)
+        eq((len(v["added"]), v["claim_exposed"]), (1, []), "... and so is one both .text and the claimed .data reference")
+
+        # one exposed word and one code-read word: only the second refuses
+        objs(refs=["w_bss2"], data=["w_bss"], fill=1)
+        v = row(snap)
+        eq((len(v["added"]), len(v["claim_exposed"])), (1, 1), "a mixed batch defers the exposed word, refuses the other")
+        eq("w_bss2" in v["added"][0], True, "... and the refused one is the code-read word")
+
+        # the claim did not change: the reference was already there, so a new pair is not exposed by the batch
+        put("config/RMHE08/splits.txt", with_data)
+        objs(fill=0)
+        snap_d = snapshot_orphans(tmp, ["A/a"])
+        objs(data=["w_bss"], fill=1)
+        v = row(snap_d)
+        eq((len(v["added"]), v["claim_exposed"]), (1, []), "an unchanged claim exposes nothing: a new pair refuses")
+
+        # a pair that existed at the base keeps its behaviour (pre-existing, reported)
+        objs(data=["w_bss"], fill=1)
+        snap_p = snapshot_orphans(tmp, ["A/a"])
+        put("config/RMHE08/splits.txt", text_only)
+        snap_p["unit_claims"] = unit_claim_table(parse_splits_text(text_only))
+        put("config/RMHE08/splits.txt", with_data)
+        v = row(snap_p)
+        eq((v["added"], v["claim_exposed"], len(v["pre_existing"])), ([], [], 1),
+           "a pair that existed at the base is pre-existing, not claim-exposed")
+
+        # a base with no per-unit claims cannot say what the batch claimed: nothing is deferred
+        nobase = dict(snap)
+        nobase.pop("unit_claims")
+        objs(data=["w_bss"], fill=1)
+        eq((len(row(nobase)["added"]), row(nobase)["claim_exposed"]), (1, []), "no base claims: refused, never guessed")
+
+        # the tree view the backlog reads
+        objs(refs=["w_bss"], data=["w_bss2"], fill=1)
+        ranges = load_claims(tmp)
+        (records, _stats), _n, _have = census(tmp, None, ranges=ranges)
+        runs = tree_claim_exposed(tmp, records)
+        eq([(r["unit"], r["section"], r["start"], len(r["pairs"])) for r in runs], [("A/a", ".bss", 0x806A0004, 1)],
+           "the tree view lists the orphan only claimed data references, not the code-read one")
+
+
 def selftest_span(eq) -> None:
     """A claim span never covers another unit's read; the anchor survives; the fixpoint; the census freshness."""
     import tempfile
@@ -2189,6 +2384,7 @@ def selftest() -> int:
     selftest_census(eq)
     selftest_strict(eq)
     selftest_touch(eq)
+    selftest_exposed(eq)
     selftest_span(eq)
 
     print(f"datagap selftest: {checks} checks OK")
@@ -2268,6 +2464,10 @@ def main(argv=None) -> int:
             print("deferred (new pair) " + line)
         if len(verdict["added_deferred"]) > 6:
             print("deferred (new pair) ... %d more" % (len(verdict["added_deferred"]) - 6))
+        for line in verdict["claim_exposed"][:6]:
+            print("deferred (claim-exposed) " + line)
+        if len(verdict["claim_exposed"]) > 6:
+            print("deferred (claim-exposed) ... %d more" % (len(verdict["claim_exposed"]) - 6))
         for line in verdict["added"]:
             print("REFUSED  " + line)
         if verdict["added"] and os.path.abspath(base_root) != os.path.abspath(args.root):
@@ -2292,7 +2492,8 @@ def main(argv=None) -> int:
             print("  %-34s refusable pairs %3d, deferred pairs %3d" % (unit, row["refuse"], row["deferred"]))
         for unit, count in sorted(verdict["untouched_pairs"].items()):
             print("  %-34s not touched: %3d sole-owned pair(s) reported, not demanded" % (unit, count))
-        print("pre-existing (reported, not refused): %d" % len(verdict["pre_existing"]))
+        print("pre-existing (reported, not refused): %d; claim-exposed (deferred, not refused): %d"
+              % (len(verdict["pre_existing"]), len(verdict["claim_exposed"])))
         failed = bool(verdict["added"] or verdict["sole_owned"])
         print("row: %s" % ("FAIL, %d added + %d sole-owned pair(s) unclaimed" % (len(verdict["added"]),
                                                                                   len(verdict["sole_owned"]))
